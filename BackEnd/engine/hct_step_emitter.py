@@ -443,6 +443,13 @@ def build_hct_animation_steps(
         steps, turn_result, away_offense=away_offense,
     )
 
+    try:
+        from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+        enforce_step_start_continuity(steps, context="hct")
+    except Exception:
+        import logging
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps
 
 

@@ -2186,6 +2186,15 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       unguarded rather than broken, so a future edit could reintroduce this with nothing
       objecting. One shape, one fix, one set of measurements — they are not touched here.
 
+      **AMENDED 2026-09-14 — FCP/FLSS join was live; the nine are now wired.** The published
+      "100% continuous" row was wrong: `combine_eoq_origin_prefix` concatenated an FCP prefix
+      onto an independently seeded FLSS list (clocks only). That is the 21 Played / 24 wrap
+      gap (up to 50.2 ft). Closed by seeding `flss[0].start.coords` from `prefix[-1].end.coords`
+      (prior end wins; T not recomputed). Then, and only then, `enforce_step_start_continuity`
+      was added at the outermost return of the nine. After the merge the guard is a no-op
+      (0 corrections). Reverting the merge returns the wrap FCP/MISS gaps; a wrong merge
+      coord is what the guard fires on. Do not recut the Phase 6 stick.
+
       **GUARD TEST**, the durable part: ``tests/test_step_start_continuity.py``, 7 cases. Asserts
       exact equality rather than a tolerance, and fails on ABSORBED discontinuities too, not just
       teleports — a player gliding along a path nobody authored is also a defect. Carries the

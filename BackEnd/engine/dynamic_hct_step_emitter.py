@@ -1679,4 +1679,11 @@ def build_dynamic_hct_animation_steps(
             turn_result=turn_result,
         )
 
+    try:
+        from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+        enforce_step_start_continuity(steps, context="dynamic_hct")
+    except Exception:
+        import logging
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps

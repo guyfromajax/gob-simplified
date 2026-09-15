@@ -616,4 +616,11 @@ def build_fb_drive_resolution_steps(
         "stealer_id=%s n_steps=%d",
         kind_prefix, result_type, outcome, uses_meet_step, stealer_id, len(steps),
     )
+    if steps:
+        try:
+            from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+            enforce_step_start_continuity(steps, context="fb_drive")
+        except Exception:
+            logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps or None

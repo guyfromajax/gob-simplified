@@ -137,3 +137,46 @@ class TestGuardHelper:
         assert enforce_step_start_continuity(steps) == 1
         assert steps[1]["start"]["coords"]["a"] == _coord(2, 2)
         assert steps[1]["start"]["coords"]["b"] == _coord(5, 5)
+
+
+NINE_EMITTERS = (
+    ("dreb_step_emitter.py", "dreb"),
+    ("dynamic_fcp_step_emitter.py", "dynamic_fcp"),
+    ("dynamic_hct_step_emitter.py", "dynamic_hct"),
+    ("fb_drive_step_emitter.py", "fb_drive"),
+    ("fb_outlet_pass_step_emitter.py", "fb_outlet_pass"),
+    ("ft_step_emitter.py", "ft"),
+    ("hct_step_emitter.py", "hct"),
+    ("oreb_step_emitter.py", "oreb"),
+    ("triangle_step_emitter.py", "triangle"),
+)
+
+
+class TestNineEmittersWired:
+    """Each of the nine remaining emitters must call the guard, and a poisoned
+    two-step gap under that emitter's context must be repaired and logged.
+    """
+
+    def test_source_contains_enforce_and_context(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1] / "BackEnd" / "engine"
+        for fname, ctx in NINE_EMITTERS:
+            src = (root / fname).read_text()
+            assert "enforce_step_start_continuity" in src, fname
+            assert f'context="{ctx}"' in src, (fname, ctx)
+
+    @pytest.mark.parametrize("fname,ctx", NINE_EMITTERS)
+    def test_poisoned_gap_repairs_and_logs(self, fname, ctx, caplog):
+        steps = [
+            _step({"s": _coord(90.18, 24.18)}, {"s": _coord(93.36, 27.36)}),
+            _step({"s": _coord(90.18, 24.18)}, {"s": _coord(90.18, 24.18)}),
+        ]
+        with caplog.at_level("WARNING"):
+            assert enforce_step_start_continuity(steps, context=ctx) == 1
+        assert_within_turn_continuity(steps, f"after {ctx} guard")
+        joined = " ".join(r.getMessage() for r in caplog.records)
+        assert "[UESS 8.1]" in joined
+        assert ctx in joined
+        assert "start=(90.18,24.18)" in joined
+        assert "prior end=(93.36,27.36)" in joined
