@@ -1,6 +1,9 @@
 """Tests for EOQ perfection helpers (run-out clock, FLSS zones, inside paint)."""
 
 import random
+from types import SimpleNamespace
+
+import pytest
 
 from BackEnd.constants import is_inside_paint_grid
 from BackEnd.constants.shot_variants import (
@@ -13,6 +16,8 @@ from BackEnd.constants.shot_variants import (
     select_flss_heave_miss_variant,
 )
 from BackEnd.engine.eoq_perfection import (
+    _flss_defender_coords,
+    _place_flss_penalty_defender,
     build_flss_skeleton_steps,
     classify_flss_zone,
     compute_flss_drive_plan,
@@ -240,3 +245,29 @@ def test_stamp_flss_airball_animation_coords():
     stamp_flss_airball_animation_coords(game, result)
     assert result.get("flss_airball_land_x") is not None
     assert result.get("flss_airball_oob_y") == result.get("flss_airball_land_y")
+
+
+class _Def:
+    def __init__(self, pid, x, y):
+        self.player_id = pid
+        self.coords = {"x": x, "y": y}
+
+
+def test_place_flss_penalty_defender_writes_authored_offset_not_center():
+    """The n=1 firing's write is shooter x+3, not a fabricated {50,25}."""
+    shooter = {"x": 60.0, "y": 22.0}
+    near = _Def("near", 55.0, 21.0)
+    far = _Def("far", 20.0, 10.0)
+    lineup = {"PG": near, "C": far}
+    got = _place_flss_penalty_defender(shooter, lineup, is_home_offense=True)
+    assert got is near
+    assert near.coords == _flss_defender_coords(shooter, is_home_offense=True)
+    assert near.coords == {"x": 63.0, "y": 22.0}
+    assert far.coords == {"x": 20.0, "y": 10.0}
+
+
+def test_place_flss_penalty_defender_raises_when_nobody_has_coords():
+    lineup = {"PG": _Def("a", None, None), "SG": SimpleNamespace(player_id="b", coords=None)}
+    lineup["PG"].coords = {}
+    with pytest.raises(RuntimeError, match="no defender has a usable coordinate"):
+        _place_flss_penalty_defender({"x": 60.0, "y": 22.0}, lineup, is_home_offense=True)

@@ -1239,6 +1239,17 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       `defender.coords` — so an arbitrarily chosen defender would be teleported to the FLSS
       defender position. The fix covers it, since it is inside the function.
 
+      **AMENDED 2026-09-15 — Phase 4 item 1, latent-shape, not a live defect.**
+      The one historical firing (Played seed 1, pre-O_FOUL) was a real nearest-defender
+      pick (item 24 / live ``player.coords``), not a fabricated player. The write is
+      authored ``_flss_defender_coords`` (shooter x ± 3, same y), not ``{50,25}``.
+      ``resolve_shot`` reads those coords via ``_player_xy`` (radius 11); offset 3 is
+      inside the radius, so the write can decide contest. Success path is correct FLSS
+      penalty design. At this HEAD the path is n=0 across 8+8 (O_FOUL moved it).
+      Failure mode is now explicit: ``_place_flss_penalty_defender`` raises if the
+      selector returns None or the pick is not in the lineup. Success behaviour
+      unchanged.
+
 25. LOGGED, NOT FIXED — found by the item 24 Part 1 search, which is why the search came first
     - `defender_coords_by_pos_from_lineup` (`phase_resolution.py:596`) already existed and
       builds exactly the position→coords map item 24 needed. It routes through

@@ -626,6 +626,39 @@ def _flss_defender_coords(shooter_coords: Dict[str, float], *, is_home_offense: 
     return {"x": round(max(1, sx - 3), 2), "y": sy}
 
 
+def _place_flss_penalty_defender(
+    shooter_coords: Dict[str, float],
+    def_lineup: Dict[str, Any],
+    *,
+    is_home_offense: bool,
+):
+    """Pick the nearest defender and stand him on the authored FLSS contest spot.
+
+    The selector reads live ``player.coords`` (item 24). The write is
+    ``_flss_defender_coords`` — shooter x ± 3, same y — not a read of where
+    he was, and not ``{50, 25}``. ``resolve_shot`` then measures contest from
+    those coords (``_player_xy``, radius 11). A missing pick must not invent
+    a defender.
+    """
+    if not def_lineup:
+        return None
+    defender = select_defender_closest_to_victim(shooter_coords, def_lineup, None)
+    if defender is None:
+        raise RuntimeError(
+            "FLSS penalty: no defender has a usable coordinate; "
+            "refusing to invent a contest position"
+        )
+    d_pos = get_player_position(def_lineup, defender)
+    if not d_pos:
+        raise RuntimeError(
+            "FLSS penalty: closest defender is not in the defensive lineup"
+        )
+    defender.coords = dict(
+        _flss_defender_coords(shooter_coords, is_home_offense=is_home_offense)
+    )
+    return defender
+
+
 def _resolve_flss_heave(
     shooter, shooter_x: float, *, is_home_offense: bool
 ) -> Tuple[bool, int, float, int]:
@@ -770,12 +803,9 @@ def resolve_flss_shot_logic(
 
     defender = None
     if zone == "penalty" and def_lineup:
-        defender = select_defender_closest_to_victim(shooter_coords, def_lineup, None)
-        if defender:
-            d_pos = get_player_position(def_lineup, defender)
-            if d_pos:
-                d_coords = _flss_defender_coords(shooter_coords, is_home_offense=is_home_off)
-                defender.coords = dict(d_coords)
+        defender = _place_flss_penalty_defender(
+            shooter_coords, def_lineup, is_home_offense=is_home_off
+        )
 
     if zone == "heave":
         from BackEnd.constants.shot_variants import (
