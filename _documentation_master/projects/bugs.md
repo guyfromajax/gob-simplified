@@ -1411,6 +1411,10 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       TO totals across 7 of 8 seeds. `_motion_bh_at_step` omits `drive` for a different
       reason — the walk skips those steps so `drive_contact` owns them — and must stay
       omitted. Three lists, three jobs. Do not unify them.
+      **AMENDED 2026-09-15.** Shot-clock IQ is closed post-draw (item 59): keep `x`,
+      recompute the threshold from the pin step's drive action. Zone `random.choice`
+      is LEFT BY DECISION (item 60) — 0 fires, overwrite before flourish. Teaching
+      the resolver remains the expensive path. Do not.
     - FIX 2026-09-14. Credit the driver from the drive-contact payload
       (`_hco_drive_contact_driver_id`) immediately before `resolve_turnover_logic`,
       after the pre-credit RNG. Guard: `assert_dead_ball_victim_had_ball` — the charged
@@ -3098,9 +3102,59 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     drive-contact stash is present. Stash tuple at the pin now includes
     `O_FOUL`. Does not rewrite `ball_handler` before the draw (that
     desynced 7 of 8 seeds). Does not touch the 40% off-ball slot, the
-    resolver, IQ, or zone. Q1 at ``bbabe427d``: 3 Played / 2 wrap per 8
+    resolver, or zone. IQ closed separately, post-draw (item 59). Q1 at
+    ``bbabe427d``: 3 Played / 2 wrap per 8
     games; fabricated F incremented 3/3 and 2/2; wrap seed 5 Von Sanborn
     fouled out on a later foul that needed the fabricated +1.
+
+## 59. Shot-clock IQ — fabricated PG closed post-draw (Phase 4 A)
+
+**CLOSED.** `get_ball_handler_from_skeleton` still omits `drive`. After
+`x = random.randint(1, 100)` the threshold is recomputed from the pin
+step's drive action (`_drv_id` at `:8330`, not the resolver). Same `x`.
+No extra draw. Absence of a drive pin is a no-op (rule 26). Every
+recomputation is logged (26b): fabricated PG, driver, both thresholds,
+`x`, whether the branch flipped.
+
+Rationale for closing despite "inert in evidence": fabricated-pin count
+moved 5 → 2 between footings this week; would-flip is 0 on a sample of 2.
+A close that costs nothing and only diverges when it corrects a real
+error belongs in the baseline.
+
+**Would-flip.** Seeds 1–8 (`0xB40000`): 0. Played 47 IQ evals / 2
+fabricated pins (seeds 3 and 8); wrap 33 / 0. Both pins recomputed
+from the driver (84→83 x=13; 102→97 x=94). Neither flipped. The
+other 45 / 33 are untouched (byte-identical scores and draws vs HEAD).
+
+**equiv-v3 n=40 vs HEAD is not identical — a real flip landed.**
+Played seed 8037 (`0xE0025`): Xenon Fletcher (fabricated PG) thr=91
+→ Ronnie Rozier (driver) thr=84, x=89, flipped=True. HEAD took
+shot-at-1 (`x ≤ 91`); the driver takes the violation (`x > 84`).
+That seed 85.0 → 76.5 ppt, 437 → 448 turns, 32 → 44 possessions.
+The other 39 played seeds and all 40 wrap seeds are byte-identical
+(wrap 83.39 ±3.02 held). Played mean 75.19 → 74.97 ±2.91. The flip
+is the point: the driver has the ball, so his IQ governs whether
+he forces one up.
+
+`BackEnd/engine/phase_resolution.py` (`_driver_on_skeleton_step`,
+`_shot_clock_iq_threshold`, `recompute_shot_clock_threshold_from_pin_driver`).
+`tests/test_shot_clock_iq_driver.py`.
+
+## 60. Zone `random.choice` — LEFT BY DECISION
+
+**LEFT BY DECISION.** Not latent.
+
+The fabricated-BH `random.choice` at the zone flourish (`:8591` /
+`:8897`) fires **0 times** on both footings. The pick is overwritten by
+`_hco_moment_defender_id` (`:8873–8878`) before the flourish. The fouler
+is independent and already post-draw corrected (`98a4132c3`).
+
+Poison: `zone_last` 8/8 Played (and wrap). `zone_driver` 2/8 Played
+(BH rewrite at `:8479` before `select_foul_player` reweights the 60%
+slot). The only available correction is a pre-draw identity swap that
+reweights that slot and desyncs the stream — expensive, cosmetic gain.
+
+Leave the resolver untaught. Do not swap identity before the draw.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

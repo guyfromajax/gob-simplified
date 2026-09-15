@@ -512,6 +512,72 @@ def assert_o_foul_charger_had_ball(skeleton, step_index, player, off_lineup):
         )
 
 
+def _driver_on_skeleton_step(skeleton, off_lineup, step_index):
+    """The player whose action on ``step_index`` is ``drive``, or None.
+
+    Same read as the drive-contact pin (``_drv_id``). Does not go through
+    ``get_ball_handler_from_skeleton``. Absence of a drive is a no-op
+    (rule 26) — do not guess a handler.
+    """
+    steps = (skeleton or {}).get("steps") or []
+    if not (isinstance(step_index, int) and 0 <= step_index < len(steps)):
+        return None
+    pos_actions = steps[step_index].get("pos_actions") or {}
+    drv_pos = next(
+        (
+            pos
+            for pos, info in pos_actions.items()
+            if ((info or {}).get("action") or "").lower().strip() == "drive"
+        ),
+        None,
+    )
+    if not drv_pos:
+        return None
+    return (off_lineup or {}).get(drv_pos)
+
+
+def _shot_clock_iq_threshold(player, chemistry, discipline):
+    iq = int((getattr(player, "attributes", None) or {}).get("IQ", 0) or 0)
+    intelligence = min(25, iq // 4)
+    return 60 + int(chemistry) + int(discipline) + intelligence
+
+
+def recompute_shot_clock_threshold_from_pin_driver(
+    fabricated_threshold,
+    x,
+    skeleton,
+    off_lineup,
+    step_index,
+    fabricated_bh,
+    chemistry,
+    discipline,
+):
+    """Post-draw IQ close. Keep ``x``; swap the threshold if the pin is a drive.
+
+    ``get_ball_handler_from_skeleton`` omits ``drive`` and falls back to the
+    PG. Teaching that resolver ``drive`` desyncs zone RNG. This reads the
+    pin step's drive action instead. No drive pin → return the fabricated
+    threshold unchanged (rule 26).
+    """
+    driver = _driver_on_skeleton_step(skeleton, off_lineup, step_index)
+    if driver is None:
+        return fabricated_threshold
+    driver_threshold = _shot_clock_iq_threshold(driver, chemistry, discipline)
+    flipped = (x > fabricated_threshold) != (x > driver_threshold)
+    logging.warning(
+        "[SHOT-CLOCK IQ] fabricated %s (%s) thr=%s -> driver %s (%s) thr=%s x=%s flipped=%s",
+        getattr(fabricated_bh, "player_id", None),
+        get_name_safe(fabricated_bh) if fabricated_bh is not None else None,
+        fabricated_threshold,
+        getattr(driver, "player_id", None),
+        get_name_safe(driver),
+        driver_threshold,
+        x,
+        flipped,
+    )
+    return driver_threshold
+
+
 def _apply_drive_contact_dead_ball_credit(roles, game_state, skeleton, off_lineup):
     """Charge the driver for a drive-contact dead-ball TO.
 
@@ -8393,10 +8459,22 @@ def resolve_half_court_offense_logic(game):
                     from BackEnd.utils.shot_clock_policy import can_commit_shot_clock_violation
 
                     ball_handler_at_step = get_ball_handler_from_skeleton(final_skeleton, off_lineup, step_index=i)
-                    iq = int(getattr(ball_handler_at_step, "attributes", {}).get("IQ", 0) or 0)
-                    intelligence = min(25, iq // 4)  # int(IQ/4), cap 0-25 (Shot_Clock_System.md)
-                    violation_threshold = 60 + chemistry + discipline + intelligence
+                    violation_threshold = _shot_clock_iq_threshold(
+                        ball_handler_at_step, chemistry, discipline
+                    )
                     x = random.randint(1, 100)
+                    # Post-draw: if this pin is a drive, the resolver invented
+                    # the PG. Keep x; recompute the threshold from the driver.
+                    violation_threshold = recompute_shot_clock_threshold_from_pin_driver(
+                        violation_threshold,
+                        x,
+                        final_skeleton,
+                        off_lineup,
+                        i,
+                        ball_handler_at_step,
+                        chemistry,
+                        discipline,
+                    )
                     if (
                         can_commit_shot_clock_violation(game_state)
                         and x > violation_threshold
