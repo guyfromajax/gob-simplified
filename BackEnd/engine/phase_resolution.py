@@ -4,6 +4,7 @@ import copy
 import time
 import json
 from typing import TYPE_CHECKING, Dict
+from BackEnd.constants import require_hco_spot
 from BackEnd.constants.momentum import (
     MO_STEAL_DELTA,
     MO_FT_ALL_MISS_DELTA,
@@ -710,8 +711,8 @@ def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_p
     ball_handler_location = ball_handler_action.get("location") or ball_handler_action.get("spot") or "key"
     
     # Convert location string to coordinates
-    from BackEnd.constants import HCO_STRING_SPOTS
-    ball_handler_coords = HCO_STRING_SPOTS.get(ball_handler_location, {"x": 50, "y": 25})
+    from BackEnd.constants import HCO_STRING_SPOTS, require_hco_spot
+    ball_handler_coords = require_hco_spot(ball_handler_location)
     
     # Calculate defender's position based on ball handler's position
     from BackEnd.utils.shared_defense import get_defender_coords
@@ -803,11 +804,9 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, rol
 def _usable_grid_coord(coords):
     """``(x, y)`` floats from a grid-coord dict, or None if there is no real coordinate there.
 
-    Deliberately unlike ``grid_coords_from_player`` below, which always returns a coordinate and
-    substitutes ``{50, 25}`` when it has none. That contract is right for placing a sprite and
-    wrong for MEASURING between players: a stand-in shared by several candidates makes every
-    distance between them equal, so a comparison silently becomes a coin toss. Callers that
-    compare distances need to be able to tell "no coordinate" apart from "centre court".
+    Deliberately unlike ``grid_coords_from_player`` below, which returns a live or caller-supplied
+    coordinate and raises when it has none. Callers that compare distances need to be able to
+    tell "no coordinate" apart from "centre court".
     """
     if not isinstance(coords, dict):
         return None
@@ -821,7 +820,7 @@ def _usable_grid_coord(coords):
 
 
 def grid_coords_from_player(player, fallback=None):
-    """Return ``{x, y}`` grid coords from a player's current ``coords`` attribute."""
+    """Return ``{x, y}`` from ``player.coords``, or ``fallback``. Raises if neither is usable."""
     coords = getattr(player, "coords", None) or {}
     if isinstance(coords, dict) and coords.get("x") is not None and coords.get("y") is not None:
         try:
@@ -833,7 +832,7 @@ def grid_coords_from_player(player, fallback=None):
             return {"x": float(fallback["x"]), "y": float(fallback["y"])}
         except (TypeError, ValueError):
             pass
-    return {"x": 50.0, "y": 25.0}
+    raise ValueError("player has no usable grid coords; refusing to invent centre court")
 
 
 def defender_coords_by_pos_from_lineup(def_lineup):
@@ -3134,7 +3133,7 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                                         player_spot = action_info.get("location") or action_info.get("spot") or "key"
                             
                             # Convert spot to coordinates
-                            spot_coords = HCO_STRING_SPOTS.get(player_spot, {"x": 50, "y": 25})
+                            spot_coords = require_hco_spot(player_spot)
                             if is_away_offense:
                                 spot_coords = get_away_player_coords(spot_coords)
                             
@@ -3316,7 +3315,7 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
                                         player_spot = action_info.get("location") or action_info.get("spot") or "key"
                             
                             # Convert spot to coordinates
-                            spot_coords = HCO_STRING_SPOTS.get(player_spot, {"x": 50, "y": 25})
+                            spot_coords = require_hco_spot(player_spot)
                             if is_away_offense:
                                 spot_coords = get_away_player_coords(spot_coords)
                             
@@ -4290,13 +4289,13 @@ def _find_closest_receiver(ball_handler_location, receivers, off_lineup):
         return receivers[0]
     
     # Get ball handler coordinates
-    bh_coords = HCO_STRING_SPOTS.get(ball_handler_location, {"x": 50, "y": 25})
+    bh_coords = require_hco_spot(ball_handler_location)
     
     # Calculate distances
     receiver_distances = []
     for receiver in receivers:
         receiver_location = receiver["location"]
-        receiver_coords = HCO_STRING_SPOTS.get(receiver_location, {"x": 50, "y": 25})
+        receiver_coords = require_hco_spot(receiver_location)
         
         # Euclidean distance
         distance = ((bh_coords["x"] - receiver_coords["x"]) ** 2 + 
@@ -4559,7 +4558,7 @@ def _apply_attack_penalty(shot_location, is_away_offense):
         return 0.0
     
     # Get shot location coordinates
-    shot_coords = HCO_STRING_SPOTS.get(shot_location, {"x": 50, "y": 25})
+    shot_coords = require_hco_spot(shot_location)
     
     # Get basket spot coordinates
     if is_away_offense:
@@ -4732,12 +4731,16 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
         # Legacy named-spot fallback: HCO_STRING_SPOTS is home-oriented → mirror for away.
         location = (pa.get("location") or pa.get("spot") or "key").strip()
         # Case-insensitive lookup (skeleton may use "upper midwing" vs constant "upper midWing")
-        coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
-        if coords == {"x": 50, "y": 25} and location.lower() != "key":
+        try:
+            coords = require_hco_spot(location)
+        except KeyError:
+            coords = None
             for k, v in HCO_STRING_SPOTS.items():
                 if k.lower() == location.lower():
-                    coords = v
+                    coords = {"x": float(v["x"]), "y": float(v["y"])}
                     break
+            if coords is None:
+                raise KeyError("HCO_STRING_SPOTS has no usable coords for %r" % (location,))
         if game.offense_team.team_id == game.away_team.team_id:
             coords = get_away_player_coords(coords)
     shooter.coords = coords
@@ -8506,7 +8509,7 @@ def resolve_half_court_offense_logic(game):
                                 break
                 
                 # Get ball handler's coordinates
-                ball_handler_coords = HCO_STRING_SPOTS.get(ball_handler_spot, {"x": 50, "y": 25})
+                ball_handler_coords = require_hco_spot(ball_handler_spot)
                 
                 # Determine court orientation
                 is_away_offense = off_team.team_id == game.away_team.team_id
@@ -8540,7 +8543,7 @@ def resolve_half_court_offense_logic(game):
                                     break
                     
                     # Convert spot to coordinates
-                    spot_coords = HCO_STRING_SPOTS.get(player_spot, {"x": 50, "y": 25})
+                    spot_coords = require_hco_spot(player_spot)
                     if is_away_offense:
                         spot_coords = get_away_player_coords(spot_coords)
                     

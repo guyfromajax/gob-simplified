@@ -57,6 +57,7 @@ from BackEnd.constants import (
     FB_PASS_MIN_GAME_SECONDS,
     HCO_STRING_SPOTS,
     HOME_RIM_COORDS,
+    require_hco_spot,
 )
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.engine.fb_uess_debug import mark_fb_emitter_fallback
@@ -866,7 +867,7 @@ LANE_PASS_LEAD_RAW_THRESHOLD = 125
 
 
 def _fb_spot_coords(spot: str, is_away_offense: bool) -> GridCoord:
-    coords = dict(HCO_STRING_SPOTS.get(spot, {"x": 50, "y": 25}))
+    coords = dict(require_hco_spot(spot))
     if is_away_offense:
         coords = get_away_player_coords(coords)
     return {"x": float(coords["x"]), "y": float(coords["y"])}

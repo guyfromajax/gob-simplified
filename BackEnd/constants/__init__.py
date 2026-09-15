@@ -462,6 +462,18 @@ HCO_STRING_SPOTS = {
     "hct_inbound_sg": {"x": 15, "y": 35},
 }
 
+
+def require_hco_spot(name):
+    """Return a copy of ``HCO_STRING_SPOTS[name]``. Raises on a miss.
+
+    Centre court is a real spot (``"center court"``). A missed name must not
+    silently become that coordinate — rule 26.
+    """
+    coords = HCO_STRING_SPOTS.get(name)
+    if not isinstance(coords, dict) or coords.get("x") is None or coords.get("y") is None:
+        raise KeyError("HCO_STRING_SPOTS has no usable coords for %r" % (name,))
+    return {"x": float(coords["x"]), "y": float(coords["y"])}
+
 # ---- Pool classification for every HCO_STRING_SPOTS key -------------------
 # This table serves two masters: it is the half-court offensive VOCABULARY and
 # also the global named-spot REGISTRY that inbound setup draws from. Motion

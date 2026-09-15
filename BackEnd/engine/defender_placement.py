@@ -23,8 +23,17 @@ from BackEnd.constants import (
     HCO_STRING_SPOTS,
     OFFSET_SPOTS,
     ACTIONS,
+    require_hco_spot,
 )
 from BackEnd.utils.shared import get_away_player_coords
+
+
+def _require_step_coords(step):
+    coords = (step or {}).get("coords")
+    if not isinstance(coords, dict) or coords.get("x") is None or coords.get("y") is None:
+        raise KeyError("movement step has no usable coords; refusing to invent centre court")
+    return coords
+
 
 # Dynamic HCO Defense — S1 Part B (Dynamic_MM_Brief §7). A beaten defender LAGS instead of tracking:
 # he ends a fraction of the way from his prior spot toward his tracked (man-following) spot, opening
@@ -194,7 +203,9 @@ def build_all_animations(game, skeleton, off_lineup, def_lineup, add_defenders=T
             # Opp field handling (debug logs removed)
             
             if "coords" in pos_action:
-                coords = pos_action.get("coords", {"x": 50, "y": 25})
+                coords = pos_action.get("coords")
+                if not isinstance(coords, dict) or coords.get("x") is None or coords.get("y") is None:
+                    raise KeyError("pos_action coords are missing or unusable")
                 # Coords already exist - these should have been set by apply_opposite_side_logic()
                 coords_already_flipped = True
             elif "location" in pos_action or "spot" in pos_action:
@@ -208,10 +219,10 @@ def build_all_animations(game, skeleton, off_lineup, def_lineup, add_defenders=T
                 # Check both ACTIONS["SCREEN"] (which is "screen") and literal "screen" for safety
                 if action == ACTIONS["SCREEN"] or action == "screen":
                     # Try to use offset coords for screeners, fallback to standard if not available
-                    coords = OFFSET_SPOTS.get(location) or HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                    coords = OFFSET_SPOTS.get(location) or require_hco_spot(location)
                 else:
                     # Use standard coordinates for non-screen actions
-                    coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                    coords = require_hco_spot(location)
                 
                 coords_from_location = True
                 coords_already_flipped = False
@@ -527,7 +538,7 @@ def position_hct_zone_defenders(game, offensive_animations, def_lineup, skeleton
     offensive_positions_by_step = {}
     for pos, off_anim in offensive_animations.items():
         offensive_positions_by_step[pos] = [
-            step.get("coords", {"x": 50, "y": 25}) for step in off_anim.get("movement", [])
+            _require_step_coords(step) for step in off_anim.get("movement", [])
         ]
 
     max_steps = max(
@@ -726,7 +737,7 @@ def position_zone_defenders(game, offensive_animations, def_lineup, skeleton_ste
     for pos, off_anim in offensive_animations.items():
         offensive_positions_by_step[pos] = []
         for step in off_anim.get("movement", []):
-            coords = step.get("coords", {"x": 50, "y": 25})
+            coords = _require_step_coords(step)
             # ✅ DON'T unflip offensive coords - pass them as-is to zone functions
             # assign_bh_defender_coords and assign_non_bh_defender_coords expect
             # coords in their original flipped state (away orientation if away offense)
@@ -1009,7 +1020,7 @@ def position_standard_defenders(game, offensive_animations, def_lineup, skeleton
     for pos, off_anim in offensive_animations.items():
         offensive_positions_by_step[pos] = []
         for step in off_anim.get("movement", []):
-            coords = step.get("coords", {"x": 50, "y": 25})
+            coords = _require_step_coords(step)
             offensive_positions_by_step[pos].append(coords)
     
     # Find ball handler position (player with ball at step 0)

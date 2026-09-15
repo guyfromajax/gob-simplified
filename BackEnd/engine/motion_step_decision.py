@@ -14,7 +14,7 @@ so there is no double random.
 import logging
 from BackEnd.utils.sim_random import sim_rng as _random
 from BackEnd.utils.team_attr_scale import core8_gameplay
-from BackEnd.constants import HCO_STRING_SPOTS
+from BackEnd.constants import require_hco_spot, HCO_STRING_SPOTS
 from BackEnd.utils.shared import (
     player_read_raw, defender_pressure_raw, inside_defender_raw, ball_handling_raw,
 )
@@ -72,8 +72,8 @@ BH_SURVEY_PROBABILITY = 0.5   # perimeter BH: survey-rock vs still (heartbeat on
 # small helpers
 # --------------------------------------------------------------------------- #
 def _coords(location):
-    c = HCO_STRING_SPOTS.get(location) or {"x": 50.0, "y": 25.0}
-    return float(c.get("x", 50.0)), float(c.get("y", 25.0))
+    c = require_hco_spot(location)
+    return float(c["x"]), float(c["y"])
 
 
 def _dist(loc_a, loc_b):

@@ -1253,10 +1253,11 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 25. LOGGED, NOT FIXED — found by the item 24 Part 1 search, which is why the search came first
     - `defender_coords_by_pos_from_lineup` (`phase_resolution.py:596`) already existed and
       builds exactly the position→coords map item 24 needed. It routes through
-      `grid_coords_from_player` (`:580`), whose fallback is `{"x": 50.0, "y": 25.0}` — so it
-      carries the same fabrication one layer down. It could not be reused for the item 24 fix
+      `grid_coords_from_player` (`:580`), whose fallback was `{"x": 50.0, "y": 25.0}` — so it
+      carried the same fabrication one layer down. It could not be reused for the item 24 fix
       without reintroducing the defect, which is why `_usable_grid_coord` was added beside it
-      rather than the existing helper being called.
+      rather than the existing helper being called. Swept 2026-09-15: the helper now raises
+      instead of inventing centre court (Phase 4 item 2).
     - Not currently harmful: measured 0 collapses at `turn_manager.py:619`, its consumer, across
       8 played games, because all ten players always had coords. It is a hazard, not a bug.
     - THE REST OF THE SEARCH CAME BACK CLEAN, and that is the useful half. The three other live
@@ -1304,6 +1305,17 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       establish that. A sweep is a balance change wearing a tidy-up costume and it belongs AFTER
       Jamie's balance pass. This entry is the policy only; `_usable_grid_coord`
       (`phase_resolution.py`) is the shape the eventual fix should take.
+
+      **AMENDED 2026-09-15 — Phase 4 item 2, the 26 `.get()` sites +
+      `grid_coords_from_player`.** Poison measured zero on both footings, so
+      the sweep is a no-op if that zero was right. ``require_hco_spot`` raises
+      on a miss (centre court remains a real named spot). ``grid_coords_from_player``
+      raises when neither live coords nor the caller fallback is usable.
+      Movement-step ``coords`` misses raise rather than invent. No substitute
+      default (rule 26). ``{64,25}`` key fallbacks were left alone. equiv-v3
+      n=40 vs ``c70f92ac1``: 80/80 byte-identical. Seam-static holds at the
+      re-recorded 2,754 / 2,323. If this had not been identical, the zero was
+      wrong and the sweep would have been a live defect.
 
     - EXTENSION, owner field, recorded 2026-09-14. The same shape, a new field.
       **An owner fallback never invents a holder — it abstains or it fails.**

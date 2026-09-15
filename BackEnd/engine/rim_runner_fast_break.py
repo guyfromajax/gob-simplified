@@ -14,6 +14,7 @@ from BackEnd.constants import (
     AWAY_RIM_COORDS,
     HCO_STRING_SPOTS,
     HOME_RIM_COORDS,
+    require_hco_spot,
 )
 from BackEnd.constants.fast_break_play_types import RIM_RUNNER, TRIANGLE
 from BackEnd.models.animator import Animator
@@ -60,7 +61,7 @@ TRIANGLE_LANE_TARGETS = (
 
 
 def _spot_coords(spot: str, is_away_offense: bool) -> Dict[str, float]:
-    coords = dict(HCO_STRING_SPOTS.get(spot, {"x": 50, "y": 25}))
+    coords = dict(require_hco_spot(spot))
     if is_away_offense:
         coords = get_away_player_coords(coords)
     return {"x": float(coords["x"]), "y": float(coords["y"])}

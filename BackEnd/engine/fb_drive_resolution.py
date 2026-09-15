@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from BackEnd.constants import HCO_STRING_SPOTS
+from BackEnd.constants import HCO_STRING_SPOTS, require_hco_spot
 from BackEnd.constants.fast_break_constants import (
     FB_DRIVE_CUTOFF_PATH_CORRIDOR,
     FB_DRIVE_CUTOFF_TIME_SLACK,
@@ -64,7 +64,7 @@ def _clamp_drive_coord(coord: GridCoordDict) -> GridCoordDict:
 
 
 def _fb_spot_coords(spot: str, *, is_away_offense: bool) -> GridCoordDict:
-    coords = dict(HCO_STRING_SPOTS.get(spot, {"x": 50, "y": 25}))
+    coords = dict(require_hco_spot(spot))
     if is_away_offense:
         coords = get_away_player_coords(coords)
     return {"x": float(coords["x"]), "y": float(coords["y"])}

@@ -25,7 +25,7 @@ from __future__ import annotations
 from BackEnd.utils.sim_random import sim_rng as _random_module
 from typing import Any, Dict, List, Optional, Tuple
 
-from BackEnd.constants import HCO_STRING_SPOTS
+from BackEnd.constants import HCO_STRING_SPOTS, require_hco_spot
 from BackEnd.constants.fast_break_constants import (
     FB_AS_ARC_SPOTS_LOWER,
     FB_AS_ARC_SPOTS_UPPER,
@@ -61,7 +61,7 @@ def _mirror_x(home_x: float) -> float:
 
 
 def _spot_coords(name: str, is_away_offense: bool) -> Coord:
-    raw = HCO_STRING_SPOTS.get(name, {"x": 50, "y": 25})
+    raw = require_hco_spot(name)
     x, y = float(raw["x"]), float(raw["y"])
     if is_away_offense:
         x = _mirror_x(x)

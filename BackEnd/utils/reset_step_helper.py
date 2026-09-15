@@ -34,6 +34,7 @@ from BackEnd.constants import (
     FB_PASS_MIN_GAME_SECONDS,
     HCO_STRING_SPOTS,
     RESET_INBOUND_PASS_GRID_PER_GAME_SECOND,
+    require_hco_spot,
 )
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
@@ -69,7 +70,7 @@ _RESET_LANE_SPOTS = (
 
 
 def _lane_spot_coords(spot_label: str, is_away_offense: bool) -> GridCoord:
-    spot = HCO_STRING_SPOTS.get(spot_label, {"x": 50, "y": 25})
+    spot = require_hco_spot(spot_label)
     x = float(spot["x"])
     y = float(spot["y"])
     if is_away_offense:

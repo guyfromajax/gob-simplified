@@ -2,7 +2,7 @@ import math
 from BackEnd.utils.sim_random import sim_rng as random
 import logging
 from BackEnd.utils.shared import get_away_player_coords
-from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS
+from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS, require_hco_spot
 
 # PHASE 6: Old functions removed - use get_defender_coords() instead
 # assign_bh_defender_coords() and assign_non_bh_defender_coords() have been removed
@@ -374,7 +374,7 @@ def _get_zone_coords(zone_definition, is_away_offense=False):
     """
     coords = []
     for spot in zone_definition:
-        spot_coords = HCO_STRING_SPOTS.get(spot, {"x": 50, "y": 25})
+        spot_coords = require_hco_spot(spot)
         x, y = spot_coords["x"], spot_coords["y"]
         
         # Flip coordinates if away team is on offense
