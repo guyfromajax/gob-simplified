@@ -2220,7 +2220,9 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       (prior end wins; T not recomputed). Then, and only then, `enforce_step_start_continuity`
       was added at the outermost return of the nine. After the merge the guard is a no-op
       (0 corrections). Reverting the merge returns the wrap FCP/MISS gaps; a wrong merge
-      coord is what the guard fires on. Do not recut the Phase 6 stick.
+      coord is what the guard fires on. Phase 6 stick is now
+      ``b2982fce1`` (74.97 ±2.91 / 83.39 ±3.02); do not recut it
+      from a seam-only change.
 
       **GUARD TEST**, the durable part: ``tests/test_step_start_continuity.py``, 7 cases. Asserts
       exact equality rather than a tolerance, and fails on ABSORBED discontinuities too, not just
@@ -3155,6 +3157,36 @@ slot). The only available correction is a pre-draw identity swap that
 reweights that slot and desyncs the stream — expensive, cosmetic gain.
 
 Leave the resolver untaught. Do not swap identity before the draw.
+
+## PHASE 6 REFERENCE — cut 2026-09-15 at ``b2982fce1``
+
+Supersedes ``bbabe427d`` 75.76 / 83.69 as the measuring stick. Tune
+against this cut. The older item-42 recut at ``094f36ca2`` (75.16 /
+87.65) is a different footing (pre-O_FOUL, pre-IQ-close) and is not
+this stick.
+
+> **REFERENCE, points per team, 2026-09-15, cut at ``b2982fce1``,
+> equiv-v3, n=40, seeds 8000–8039, ``scratch_equiv3_fbdedupe.py``,
+> Lancaster vs Bentley-Truman, all sliders 2 except ``hc_trap`` /
+> ``fc_press`` 5, plays catalogue SEEDED, ``PYTHONHASHSEED=0``,
+> game_id ``0xE0000+(seed-8000)``, published CI = 1.96 × SEM
+> (sample SD / √n):**
+>
+> - **[PLAYED] 74.97 ±2.91**, possessions 46.62 ±2.32, draws 62476.6 ±541.6
+> - **[SIM] 83.39 ±3.02**, possessions 47.17 ±2.10, draws 60581.6 ±687.9
+> - arm gap (sim − played) 8.42
+>
+> **Gates.** Independence: seed 8000 × 3 processes, both arms
+> byte-identical (played 76.5 / 427 / 62598; sim 93.0 / 498 / 61187),
+> and those rows match the n=40 cells. FT-honour: played 99.8%
+> (2592/2596), sim 99.5% (2796/2810), gap 0.3pp. 0 errors.
+>
+> **Seam-static invariant at this SHA:** 2,754 Played / 2,323 wrap,
+> seam-moved 0/0. Re-baselines when game paths shift (item 44 / H).
+
+One played seed moved vs the pre-close HEAD (8037 / ``0xE0025``):
+shot-at-1 → shot-clock violation. That is item 59. Wrap was
+byte-identical.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
