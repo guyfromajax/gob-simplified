@@ -8,7 +8,7 @@
    - **POST /api/auth/logout** – Logout (client discards token)
    - **GET /api/auth/me** – Current user info incl. `account_settings`, `tutorial_state`, `record`, `archetypes`, `lead_archetype`, `archetype_reveal_seen`, `archetype_evolution_pending`, alpha-feedback gating (`alpha_feedback_submitted`, `alpha_feedback_games`, `alpha_feedback_prompt_level`), tutorial-alert state (`tutorial_alerts_franchise_id`, `tutorial_alerts_dismissed`, `tutorial_alerts_games`, `tutorial_alerts_training_returns`), plus account-page fields `subscription`, `geek_points`, `geek_points_by_team`, `championships_total` (requires auth)
    - **GET /api/auth/config** – Auth config (IS_ALPHA, OTP required)
-   - **POST /api/auth/request-access-code** – Join the alpha access list (body: `email`, optional `source`). Default (`ALPHA_AUTO_SEND_CODES=false`): upsert `alpha_access_requests` as `pending`; no code is emailed. Legacy auto-send path remains behind the flag. See [`00_Operations/Alpha_Access_Runbook.md`](../00_Operations/Alpha_Access_Runbook.md).
+   - **POST /api/auth/request-access-code** – Join the alpha access list (body: `email`, optional `source`). Default (`ALPHA_AUTO_SEND_CODES=false`): upsert `alpha_access_requests` as `pending` and send the waitlist confirmation; no code is emailed. Legacy auto-send path remains behind the flag. See [`00_Operations/Alpha_Access_Runbook.md`](../00_Operations/Alpha_Access_Runbook.md).
    - **POST /api/auth/check-access-code** – Read-only code check (body: `code`) → `{ valid, reason }` (`null` | `invalid` | `exhausted` | `inactive`)
    - **POST /api/auth/set-username** – Set username (requires auth)
    - **PATCH /api/auth/account-settings** – Update account settings, e.g. `display_color` (requires auth)
@@ -95,7 +95,7 @@ Geek Points use the same marker: bulk-sim games receive the base Geek Points awa
 | POST | /api/auth/login | No | Email + password → JWT + user |
 | POST | /api/auth/logout | No | Logout (client discards token) |
 | GET | /api/auth/me | Yes | Current user profile (settings, tutorial_state, record, archetypes, lead_archetype, archetype_reveal_seen, subscription, geek_points, geek_points_by_team, championships_total) |
-| POST | /api/auth/request-access-code | No | Join the alpha list (body: email, optional source). Default queues; no code emailed |
+| POST | /api/auth/request-access-code | No | Join the alpha list (body: email, optional source). Default queues + waitlist email; no code emailed |
 | POST | /api/auth/check-access-code | No | Read-only `{ valid, reason }` for a code |
 | POST | /api/auth/set-username | Yes | Set or update username |
 | PATCH | /api/auth/account-settings | Yes | Update account settings (e.g. `display_color`) |
@@ -115,7 +115,7 @@ Geek Points use the same marker: bulk-sim games receive the base Geek Points awa
 
 ### Request access (alpha signup)
 
-- **Flow:** On the signup page (when `IS_ALPHA=true`), step 1 is the access code. "No code? Request access" opens a modal with its own email field. Submit calls **POST /api/auth/request-access-code** with `{ "email", "source"? }`. `source` is the exhausted code when that path was used, else `utm_source` or `ref` from the URL. With `ALPHA_AUTO_SEND_CODES=false` (default), the backend upserts **alpha_access_requests** (`pending`) and appends **access_code_requests** (`queued`). No code is emailed. Success copy: "You're on the list, Coach." plus the email the code would go to if a spot opens. Grant with `scripts/grant_alpha_access.py`. `ALPHA_AUTO_SEND_CODES=true` keeps the legacy pool-email / waitlist-email path.
+- **Flow:** On the signup page (when `IS_ALPHA=true`), step 1 is the access code. "No code? Request access" opens a modal with its own email field. Submit calls **POST /api/auth/request-access-code** with `{ "email", "source"? }`. `source` is the exhausted code when that path was used, else `utm_source` or `ref` from the URL. With `ALPHA_AUTO_SEND_CODES=false` (default), the backend upserts **alpha_access_requests** (`pending`), sends the waitlist confirmation once per email, and appends **access_code_requests**. No code is emailed. Success copy: "You're on the list, Coach." plus the email the code would go to if a spot opens. Grant with `scripts/grant_alpha_access.py`. `ALPHA_AUTO_SEND_CODES=true` keeps the legacy pool-email / waitlist-email path.
 - **Continue:** **POST /api/auth/check-access-code** before revealing email/password. `?code=` prefills and auto-continues.
 - **Rate limit:** Same as other auth endpoints (10/minute per IP). Email-address limiter also applies (`ALPHA_ACCESS_CODE_RATE_LIMIT_PER_HOUR`, default 3).
 - **Files:** `BackEnd/api/auth_routes.py`, `BackEnd/db.py`, `FrontEnd/static/signup.html`, `FrontEnd/static/auth.css`. Operator steps: [`00_Operations/Alpha_Access_Runbook.md`](../00_Operations/Alpha_Access_Runbook.md).

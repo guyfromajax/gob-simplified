@@ -14,7 +14,7 @@ Transactional HTML email via [Resend](https://resend.com) for alpha access and i
 | `FEEDBACK_TO_EMAIL` | Feedback recipient | `jamie@geekedoutgames.com` |
 | `SIGNUP_LINK_BASE_URL` | Link in alpha welcome body | `https://www.geekedoutbasketball.com/signup.html` |
 | `ALPHA_BADGE_URL` | Optional inline image override | derived from signup origin + `/images/gob-alpha-badge.png` |
-| `ALPHA_AUTO_SEND_CODES` | If `true`, `POST /api/auth/request-access-code` emails a pool code or the waitlist template | `false` (request joins the grant queue; no email) |
+| `ALPHA_AUTO_SEND_CODES` | If `true`, `POST /api/auth/request-access-code` emails a pool code or the waitlist template | `false` (request joins the grant queue and sends the waitlist confirmation; no code email) |
 
 Set `RESEND_API_KEY` in Railway/Netlify env for staging and production.
 
@@ -26,10 +26,10 @@ Set `RESEND_API_KEY` in Railway/Netlify env for staging and production.
 |---|---|---|
 | Generic HTML send | [`BackEnd/utils/resend_sender.py`](../../BackEnd/utils/resend_sender.py) | `send_resend_html_email()` → `POST https://api.resend.com/emails` (10s timeout) |
 | Alpha welcome OTP | [`BackEnd/utils/alpha_access_email.py`](../../BackEnd/utils/alpha_access_email.py) | `build_alpha_welcome_html`, `send_alpha_welcome_email` |
-| Alpha waitlist ("code coming soon") | [`BackEnd/utils/alpha_access_email.py`](../../BackEnd/utils/alpha_access_email.py) | `send_alpha_waitlist_email` — only when `ALPHA_AUTO_SEND_CODES=true` |
+| Alpha waitlist ("code coming soon") | [`BackEnd/utils/alpha_access_email.py`](../../BackEnd/utils/alpha_access_email.py) | `send_alpha_waitlist_email` — default queue path (once per email) and when `ALPHA_AUTO_SEND_CODES=true` with no free pool code |
 | Feedback form | [`BackEnd/utils/resend_sender.py`](../../BackEnd/utils/resend_sender.py) | `send_feedback_email()` — escaped HTML body + context fields (`BackEnd/api/feedback_routes.py`) |
 | Alpha survey (12-question) | [`BackEnd/utils/resend_sender.py`](../../BackEnd/utils/resend_sender.py) | `send_alpha_feedback_email()` — 8 rating rows + free-text answers to `FEEDBACK_TO_EMAIL` (`BackEnd/api/alpha_feedback_routes.py`) |
-| Auth / alpha routes | [`BackEnd/api/auth_routes.py`](../../BackEnd/api/auth_routes.py) | Default: queue only. Welcome/waitlist sends run when `ALPHA_AUTO_SEND_CODES=true`, or when a granted user requests again (resend). Manual grants: [`scripts/grant_alpha_access.py`](../../scripts/grant_alpha_access.py) |
+| Auth / alpha routes | [`BackEnd/api/auth_routes.py`](../../BackEnd/api/auth_routes.py) | Default: queue + waitlist confirmation (no code). Welcome/code sends run on grant, on granted-user resend, or when `ALPHA_AUTO_SEND_CODES=true`. Manual grants: [`scripts/grant_alpha_access.py`](../../scripts/grant_alpha_access.py) |
 
 Operator steps (list pending, grant, creator codes): [`Alpha_Access_Runbook.md`](Alpha_Access_Runbook.md).
 

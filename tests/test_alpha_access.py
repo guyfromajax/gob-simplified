@@ -204,7 +204,7 @@ def test_request_upsert_and_dedupe():
 
     logs = list(access_code_requests_collection.find({"email": email}))
     assert len(logs) == 2
-    assert {row["status"] for row in logs} == {"queued"}
+    assert {row["status"] for row in logs} == {"waitlisted", "queued"}
 
 
 def test_granted_resend_path(monkeypatch):

@@ -448,6 +448,28 @@ def _queue_access_code_request(*, email: str, now: datetime, source: Optional[st
                     )
                 return _queued_access_response()
 
+    if doc.get("status") == "pending":
+        already_notified = access_code_requests_collection.find_one(
+            {"email": email, "status": "waitlisted"}
+        )
+        if already_notified:
+            _record_access_code_request(email=email, now=now, status="queued")
+            return _queued_access_response()
+
+        sent = send_alpha_waitlist_email(email)
+        status = "waitlisted" if sent else "failed"
+        _record_access_code_request(
+            email=email,
+            now=now,
+            status=status,
+            sent_at=now if sent else None,
+        )
+        if not sent:
+            logger.warning(
+                "Failed to send waitlist email to %s", _redact_email(email)
+            )
+        return _queued_access_response()
+
     _record_access_code_request(email=email, now=now, status="queued")
     return _queued_access_response()
 
@@ -468,8 +490,9 @@ async def request_access_code(request: Request, body: RequestAccessCodeRequest):
     """
     Request alpha access.
 
-    Default (ALPHA_AUTO_SEND_CODES=false): upsert the grant queue, do not email a
-    new code. If the email is already registered, trigger password reset.
+    Default (ALPHA_AUTO_SEND_CODES=false): upsert the grant queue and send the
+    waitlist confirmation email. Does not email a new code. If the email is
+    already registered, trigger password reset.
     Legacy auto-send emails a pool code or the waitlist template.
     """
     email = body.email.lower().strip()

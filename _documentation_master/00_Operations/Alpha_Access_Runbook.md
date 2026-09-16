@@ -1,6 +1,6 @@
 # Alpha Access Runbook
 
-Manual grants for the alpha list. Default product behavior is **request = join the list**; a code is emailed only when you grant one (or when `ALPHA_AUTO_SEND_CODES=true`, which is the legacy auto-send path and should stay off).
+Manual grants for the alpha list. Default product behavior is **request = join the list** and send the waitlist confirmation; a code is emailed only when you grant one (or when `ALPHA_AUTO_SEND_CODES=true`, which is the legacy auto-send path and should stay off).
 
 Authorization and connection rules are the same as [`Environment_Operations.md`](Environment_Operations.md). Dry-run unless you pass `--apply`. Production writes need process-only `GOB_DB_ACCESS=write`. Never put that variable in a dotenv file.
 
@@ -20,7 +20,7 @@ Use `PYTHONPATH=. ./.venv/bin/python` from the repo root.
 
 | Variable | Default | Effect |
 |---|---|---|
-| `ALPHA_AUTO_SEND_CODES` | `false` | `false`: `POST /api/auth/request-access-code` upserts `alpha_access_requests` as `pending` and does not email a new code. `true`: emails a pool code when one is free, or the waitlist template when not. |
+| `ALPHA_AUTO_SEND_CODES` | `false` | `false`: `POST /api/auth/request-access-code` upserts `alpha_access_requests` as `pending` and sends the waitlist confirmation (no code). `true`: emails a pool code when one is free, or the waitlist template when not. |
 
 Keep this `false` on staging and production unless you are deliberately using the old auto-send path.
 

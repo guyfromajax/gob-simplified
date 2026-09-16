@@ -57,7 +57,7 @@ def test_badge_url_uses_netlify_images_path(monkeypatch):
     assert get_alpha_badge_url() == "https://gob-test.netlify.app/images/gob-alpha-badge.png"
 
 
-def test_auto_send_flag_defaults_false_and_does_not_email(monkeypatch):
+def test_auto_send_flag_defaults_false_sends_waitlist_not_code(monkeypatch):
     monkeypatch.delenv("ALPHA_AUTO_SEND_CODES", raising=False)
     sent = []
     monkeypatch.setattr(auth_routes, "send_alpha_welcome_email", lambda *a, **k: sent.append("welcome") or True)
@@ -70,10 +70,18 @@ def test_auto_send_flag_defaults_false_and_does_not_email(monkeypatch):
     )
     assert response.status_code == 200
     assert response.json()["status"] == "queued"
-    assert sent == []
+    assert sent == ["waitlist"]
     queued = alpha_access_requests_collection.find_one({"email": email})
     assert queued["status"] == "pending"
     assert queued["request_count"] == 1
+
+    second = client.post(
+        "/api/auth/request-access-code",
+        json={"email": email},
+        headers={"X-Forwarded-For": "192.0.2.40"},
+    )
+    assert second.status_code == 200
+    assert sent == ["waitlist"]
 
 
 def test_auto_send_flag_true_keeps_legacy_email_path(monkeypatch):
