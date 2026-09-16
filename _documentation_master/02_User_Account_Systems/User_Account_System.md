@@ -8,7 +8,8 @@
    - **POST /api/auth/logout** – Logout (client discards token)
    - **GET /api/auth/me** – Current user info incl. `account_settings`, `tutorial_state`, `record`, `archetypes`, `lead_archetype`, `archetype_reveal_seen`, `archetype_evolution_pending`, alpha-feedback gating (`alpha_feedback_submitted`, `alpha_feedback_games`, `alpha_feedback_prompt_level`), tutorial-alert state (`tutorial_alerts_franchise_id`, `tutorial_alerts_dismissed`, `tutorial_alerts_games`, `tutorial_alerts_training_returns`), plus account-page fields `subscription`, `geek_points`, `geek_points_by_team`, `championships_total` (requires auth)
    - **GET /api/auth/config** – Auth config (IS_ALPHA, OTP required)
-   - **POST /api/auth/request-access-code** – Request alpha access code (body: `email`); stores request for admin to process manually
+   - **POST /api/auth/request-access-code** – Join the alpha access list (body: `email`, optional `source`). Default (`ALPHA_AUTO_SEND_CODES=false`): upsert `alpha_access_requests` as `pending`; no code is emailed. Legacy auto-send path remains behind the flag. See [`00_Operations/Alpha_Access_Runbook.md`](../00_Operations/Alpha_Access_Runbook.md).
+   - **POST /api/auth/check-access-code** – Read-only code check (body: `code`) → `{ valid, reason }` (`null` | `invalid` | `exhausted` | `inactive`)
    - **POST /api/auth/set-username** – Set username (requires auth)
    - **PATCH /api/auth/account-settings** – Update account settings, e.g. `display_color` (requires auth)
    - **PATCH /api/auth/archetype-reveal-seen** – Mark the one-time first-archetype reveal modal seen (requires auth)
@@ -42,15 +43,16 @@
    - **role**: `"user"` (default) or `"admin"`. New signups get `role: "user"`. To set admin: run `python scripts/set_admin_user.py <email>` (or `set_admin_user_production.py` for production DB). Admin status is read from the DB when needed: `/api/auth/me` and builder API checks use the DB role so promoting a user to admin works without re-login.
    - **subscription**, **geek_points**: New signups get `subscription: "alpha"` (string) and `geek_points: 0` (integer). `geek_points_by_team` is not set until the user earns franchise points by team. Existing users were backfilled via `scripts/add_user_subscription_geek_points.py`.
    - **password_reset_tokens collection**: `token`, `user_id`, `expires_at`, `created_at` (tokens expire in 1 hour, deleted after use)
-   - **access_code_requests collection**: `email`, `created_at`, `status` ("pending"). Used when user clicks "Request Access Code" on signup; admin checks collection and sends codes manually (no transactional email until configured).
+   - **access_code_requests collection**: append-only request log (`email`, `created_at`, `status`, optional `source` / `otp_code` / `sent_at`).
+   - **alpha_access_requests collection**: one doc per email for the manual grant queue (`status`: `pending` | `granted` | `registered`, `source`, `request_count`, `otp_code` when granted). Unique index on `email`.
    - **JWT**: Stored client-side; sent in `Authorization: Bearer <token>` for protected endpoints
-   - **Alpha OTP**: When `IS_ALPHA=true`, signup requires valid unused OTP from `alpha_otps` collection
+   - **Alpha OTP**: When `IS_ALPHA=true`, signup requires a redeemable code from `alpha_otps` (`active != false`, `used != true`, `use_count < max_uses`; missing `max_uses` = 1). Codes are strip+uppercase. Signup reserves a spot before creating the user.
 
 3. **Password rules**: 8–128 characters, at least one letter and one number. Hashed with bcrypt.
 
 **User Account System Flow (4 Steps)**
 
-1. **Signup** – Validate email, password, OTP (if alpha); create user doc; return JWT and user payload
+1. **Signup** – Validate email, password, and a redeemable access code (if alpha); create user doc; return JWT and user payload
 2. **Login** – Find user by email; verify password; issue JWT; update `last_login_at`; return JWT and user payload
 3. **Protected routes** – `get_current_user` dependency validates JWT and loads user; 401 if invalid/missing
 4. **Username** – Optional; set via `/api/auth/set-username`; uniqueness is case-insensitive (`username_lower`)
@@ -59,7 +61,7 @@
 
 ### Overview
 
-The User Account System handles signup, login, JWT-based authentication, and optional usernames. When the app is in alpha mode (`IS_ALPHA=true`), signup requires a one-time access code (OTP). Auth endpoints are rate-limited per IP to prevent brute force.
+The User Account System handles signup, login, JWT-based authentication, and optional usernames. When the app is in alpha mode (`IS_ALPHA=true`), signup is code-first and requires a redeemable access code from `alpha_otps`. Requesting access joins a list; Jamie or a creator grants a code. Auth endpoints are rate-limited per IP to prevent brute force.
 
 **Location:** `BackEnd/api/auth_routes.py`, `BackEnd/utils/auth.py`, `BackEnd/utils/otp_validator.py`  
 **Status:** ✅ Implemented with rate limiting and alpha OTP  
@@ -93,7 +95,8 @@ Geek Points use the same marker: bulk-sim games receive the base Geek Points awa
 | POST | /api/auth/login | No | Email + password → JWT + user |
 | POST | /api/auth/logout | No | Logout (client discards token) |
 | GET | /api/auth/me | Yes | Current user profile (settings, tutorial_state, record, archetypes, lead_archetype, archetype_reveal_seen, subscription, geek_points, geek_points_by_team, championships_total) |
-| POST | /api/auth/request-access-code | No | Request alpha access code (body: email); stores in DB for admin |
+| POST | /api/auth/request-access-code | No | Join the alpha list (body: email, optional source). Default queues; no code emailed |
+| POST | /api/auth/check-access-code | No | Read-only `{ valid, reason }` for a code |
 | POST | /api/auth/set-username | Yes | Set or update username |
 | PATCH | /api/auth/account-settings | Yes | Update account settings (e.g. `display_color`) |
 | PATCH | /api/auth/archetype-reveal-seen | Yes | Mark the one-time first-archetype reveal modal seen |
@@ -110,11 +113,12 @@ Geek Points use the same marker: bulk-sim games receive the base Geek Points awa
 | POST | /api/auth/reset-password | No | Set new password with token; invalidates token |
 | GET | /api/leaderboard/by-team | Yes | Top coaches per A1 team; rows include `lead_archetype` (separate router) |
 
-### Request Access Code (alpha signup)
+### Request access (alpha signup)
 
-- **Flow:** On the signup page (when `IS_ALPHA=true`), a "Request Access Code" link appears below the Alpha Access Code field. User must enter a valid email above (password can be blank). On click, the frontend validates the email; if valid, it calls **POST /api/auth/request-access-code** with `{ "email": "..." }`. The backend stores a document in **access_code_requests** with `email`, `created_at`, and `status: "pending"`. No email is sent. The user sees a popup: "Thanks Coach, we'll send your access code shortly." Admin checks the `access_code_requests` collection (e.g. daily) and sends codes manually. When transactional email is added later, the same collection can drive automated "send code to user" flows.
-- **Rate limit:** Same as other auth endpoints (10/minute per IP).
-- **Files:** `BackEnd/api/auth_routes.py`, `BackEnd/db.py` (`access_code_requests_collection`), `FrontEnd/static/signup.html`, `FrontEnd/static/auth.css`.
+- **Flow:** On the signup page (when `IS_ALPHA=true`), step 1 is the access code. "No code? Request access" opens a modal with its own email field. Submit calls **POST /api/auth/request-access-code** with `{ "email", "source"? }`. `source` is the exhausted code when that path was used, else `utm_source` or `ref` from the URL. With `ALPHA_AUTO_SEND_CODES=false` (default), the backend upserts **alpha_access_requests** (`pending`) and appends **access_code_requests** (`queued`). No code is emailed. Success copy: "You're on the list, Coach." plus the email the code would go to if a spot opens. Grant with `scripts/grant_alpha_access.py`. `ALPHA_AUTO_SEND_CODES=true` keeps the legacy pool-email / waitlist-email path.
+- **Continue:** **POST /api/auth/check-access-code** before revealing email/password. `?code=` prefills and auto-continues.
+- **Rate limit:** Same as other auth endpoints (10/minute per IP). Email-address limiter also applies (`ALPHA_ACCESS_CODE_RATE_LIMIT_PER_HOUR`, default 3).
+- **Files:** `BackEnd/api/auth_routes.py`, `BackEnd/db.py`, `FrontEnd/static/signup.html`, `FrontEnd/static/auth.css`. Operator steps: [`00_Operations/Alpha_Access_Runbook.md`](../00_Operations/Alpha_Access_Runbook.md).
 
 ### Password Reset (Step 11)
 

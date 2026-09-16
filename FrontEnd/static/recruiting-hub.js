@@ -2037,10 +2037,22 @@
   // The week-36 screen is a league LIST now, not a playback — the reveal moved to
   // Signing Day itself, so its Next / Auto-play / Skip all controls and the
   // per-row reveal helpers went with it.
+  /** Season-stamped so the FCC green button can move on from View Recruiting Results. */
+  var signingsSeenSent = false;
+  function markSigningsSeen() {
+    if (signingsSeenSent || !context.franchiseId) return;
+    signingsSeenSent = true;
+    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/week-36-results-seen'), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ franchise_id: context.franchiseId })
+    }).catch(function (err) { console.error('[SIGNINGS] seen stamp failed', err); });
+  }
+
   function renderSignings() {
     var host = document.getElementById('hub-signings'); if (!host) return;
     host.innerHTML = finalSigningsHtml();
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['div']);
+    markSigningsSeen();
   }
   // ---- Weekly-visit results panel (wks 20-26) ----
   function showWeeklyPanel() { return state.phase === 'invite' && state.currentResultsWeek === state.week && !state.weeklyDismissed; }

@@ -106,6 +106,7 @@ Possible regular-season and fallback labels:
 - `Play Next Game`
 - `Cut Players`
 - `Recruiting`
+- `View Recruiting Results`
 - `Go To Next Season`
 - `Sim Next Round`
 
@@ -130,8 +131,22 @@ Postseason weeks 27-34 replace the generic play/sim labels with the tournament-r
   - EOS case where user is eliminated or has a bye and can advance bracket state
   - calls `/franchise/sim-rest-of-tournament`
   - while the request runs, FCC shows `PageLoadOverlay` pulse (text + green pulse bar, no banner) with round copy: `Simming Conference Semifinals` / `Simming Conference Finals` / `Simming Region Semifinals` / `Simming Region Finals` / `Simming National First Round` / `Simming National Semifinals` / `Simming National Finals` (weeks 28–34)
+- `view-recruiting-results`
+  - week 36, before the league signing list has been viewed this season
+  - routes to the Recruiting Hub (`recruiting.html`), whose week-36 `results` phase renders every
+    signing in the league by conference — user's conference first, then its sister, then the rest
+    (server order, `_recruiting_conference_context`)
+  - the hub stamps `week_36_results_seen_season` on render (`PATCH /franchise/week-36-results-seen`);
+    the wire payload exposes it as `week_36_results_seen`, which flips this button to `new-season`
+  - season-stamped, so the next season gets its own viewing without anything clearing a flag
+  - deliberately ahead of the rollover: `finish-season` cannot be reopened, and the results are the
+    payoff for Signing Day
+  - while this state is live the secondary recruiting button (`View Signings`) is hidden — it points
+    at the same page, so it would only restate where green already goes. It returns as soon as green
+    flips to `new-season`, and it is never hidden from week 37 on, where green is the rollover and the
+    secondary button is the only way back to the signing list
 - `new-season`
-  - week 36 or tournament-complete rollover state
+  - week 36 **after** the results have been viewed, or tournament-complete rollover state
   - shows confirmation modal
   - calls `/franchise/finish-season`
 

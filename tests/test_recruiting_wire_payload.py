@@ -51,6 +51,26 @@ def _payload(monkeypatch, ftd_doc, franchise_doc=None, team_id=TEAM_ID):
 # The three cases named in review
 # ---------------------------------------------------------------------------
 
+def test_week_36_results_seen_false_until_stamped(monkeypatch):
+    """The FCC week-36 green button reads this: unstamped means View Recruiting Results."""
+    doc = _franchise_doc(week=36, current_season=3)
+    payload = _payload(monkeypatch, {"Recruits": dict(EMPTY_INIT_RECRUITS)}, doc)
+    assert payload["week_36_results_seen"] is False
+
+
+def test_week_36_results_seen_true_when_stamped_this_season(monkeypatch):
+    doc = _franchise_doc(week=36, current_season=3, week_36_results_seen_season=3)
+    payload = _payload(monkeypatch, {"Recruits": dict(EMPTY_INIT_RECRUITS)}, doc)
+    assert payload["week_36_results_seen"] is True
+
+
+def test_week_36_results_seen_resets_next_season(monkeypatch):
+    """Season-stamped, not boolean — last season's viewing must not gate this one."""
+    doc = _franchise_doc(week=36, current_season=4, week_36_results_seen_season=3)
+    payload = _payload(monkeypatch, {"Recruits": dict(EMPTY_INIT_RECRUITS)}, doc)
+    assert payload["week_36_results_seen"] is False
+
+
 def test_all_none_init_dict_is_not_a_saved_board(monkeypatch):
     """The bug: 20 keys of None is truthy, but it is not a board."""
     payload = _payload(monkeypatch, {"Recruits": dict(EMPTY_INIT_RECRUITS)})

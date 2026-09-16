@@ -196,6 +196,8 @@ if not USING_MONGOMOCK:
     alpha_otps_collection = db["alpha_otps"]
     # Alpha access code requests (signup page "Request Access Code" – admin checks and sends codes manually)
     access_code_requests_collection = db["access_code_requests"]
+    # One-doc-per-email queue for manual alpha grants
+    alpha_access_requests_collection = db["alpha_access_requests"]
     # Users collection for authentication (Step 1)
     users_collection = db["users"]
     # Password reset tokens (Step 11 - minimal email)
@@ -239,6 +241,8 @@ else:
     alpha_otps_collection = db["alpha_otps"]
     # Alpha access code requests (signup page "Request Access Code")
     access_code_requests_collection = db["access_code_requests"]
+    # One-doc-per-email queue for manual alpha grants
+    alpha_access_requests_collection = db["alpha_access_requests"]
     # Users collection for authentication (Step 1)
     users_collection = db["users"]
     # Password reset tokens (Step 11 - minimal email)
@@ -345,6 +349,20 @@ def ensure_franchises_user_id_index():
         )
     except Exception as e:
         print(f"⚠️ [DB] ensure_franchises_user_id_index: {e}", file=sys.stderr, flush=True)
+
+
+def ensure_alpha_access_requests_email_index():
+    """Unique index on alpha_access_requests.email (one queue doc per email)."""
+    if not client:
+        return
+    try:
+        alpha_access_requests_collection.create_index(
+            [("email", 1)],
+            unique=True,
+            name="email_unique",
+        )
+    except Exception as e:
+        print(f"⚠️ [DB] ensure_alpha_access_requests_email_index: {e}", file=sys.stderr, flush=True)
 
 
 def ensure_users_username_index():

@@ -22,7 +22,6 @@
 1. PvP sim -- playtest post-launch / immediate parallel task
 2. College and Pro setup
 3. Team Mod System
-4. Stronger week 36 CTA to review all Recrutiing results -- and carry forward results chart, not just report/rankings. Order chart within each conference by top to bottom team recruiting performance
 6. Replace Kobe look alike image and add more walk on images
 7. Auto train button on FCC
 8. Position & Archetype assignmnents for players
