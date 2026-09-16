@@ -6952,6 +6952,44 @@ def _zone_bh_defender(defense_playcall, bh_location, is_away_offense, def_lineup
     return def_lineup.get(dpos) if dpos else def_lineup.get(bh_pos)
 
 
+def _zone_ball_handler_guards(defense_playcall, offensive_players, ball_handler_coords, ball_spot,
+                              ball_handler_id, aggression, is_away_offense):
+    """Zone defenders assigned to the ball handler, in assignment order.
+
+    Boundaries come from the called zone's shell variant, the resolver every other zone site
+    uses. This used to compare ``defense_playcall`` against the legacy "3-2 Zone" / "1-3-1 Zone"
+    display strings, which the catalogue ids ("3-2-zone") never match, so every zone credited
+    its defender with 2-3 geometry.
+
+    When the shell is not 2-3 and the assignment differs from the 2-3 one, that re-attribution is
+    logged. The 2-3 comparison runs with the sim RNG state saved and restored.
+    """
+    from BackEnd.engine.attack_drive_clearance import _zone_boundaries_for_spot
+    from BackEnd.utils.shared_defense import _get_23_zone_boundaries, assign_all_zone_defenders
+
+    def _guards(zone_boundaries):
+        _, defender_to_offensive_player = assign_all_zone_defenders(
+            zone_boundaries, offensive_players, ball_handler_coords, ball_spot, aggression,
+            is_away_offense,
+        )
+        return [dp for dp, guarded in defender_to_offensive_player.items() if guarded == ball_handler_id]
+
+    guards = _guards(_zone_boundaries_for_spot(defense_playcall, ball_spot, is_away_offense))
+
+    if (defense_zone_shell_variant(defense_playcall) or "23") != "23":
+        state = random.getstate()
+        try:
+            legacy = _guards(_get_23_zone_boundaries(ball_spot, is_away_offense))
+        finally:
+            random.setstate(state)
+        if sorted(legacy) != sorted(guards):
+            logging.warning(
+                "[ZONE CREDIT] %s credits the ball-handler defender from %s instead of the 2-3 "
+                "shell's %s (spot=%s)", defense_playcall, guards, legacy, ball_spot,
+            )
+    return guards
+
+
 def _resolve_hco_moment_walk(skeleton, game, off_lineup, def_lineup, reach_in_tags=None):
     """RETIRED FROM THE SPINE (moment fusion, 2026-07-12): the on-ball moment now rolls INSIDE
     ``_resolve_hco_offense_shot_dynamic``'s per-step walk (moment-first, reached steps only) instead of
@@ -8561,13 +8599,9 @@ def resolve_half_court_offense_logic(game):
             is_zone = is_zone_defense(def_call)
             if is_zone:
                 # Zone defense: use actual zone assignment logic to find which defender(s) are guarding the ball handler
-                from BackEnd.utils.shared_defense import (
-                    _get_23_zone_boundaries, _get_32_zone_boundaries, _get_131_zone_boundaries,
-                    assign_all_zone_defenders
-                )
                 from BackEnd.constants import HCO_STRING_SPOTS
                 from BackEnd.utils.shared import get_away_player_coords
-                
+
                 # Get ball handler's location from the skeleton step where steal occurs
                 ball_handler_spot = "key"  # Default fallback
                 if skeleton and "steps" in skeleton:
@@ -8593,14 +8627,6 @@ def resolve_half_court_offense_logic(game):
                 is_away_offense = off_team.team_id == game.away_team.team_id
                 if is_away_offense:
                     ball_handler_coords = get_away_player_coords(ball_handler_coords)
-                
-                # Get zone boundaries based on ball location (applies shifts)
-                if def_call == "3-2 Zone":
-                    zone_boundaries = _get_32_zone_boundaries(ball_handler_spot, is_away_offense)
-                elif def_call == "1-3-1 Zone":
-                    zone_boundaries = _get_131_zone_boundaries(ball_handler_spot, is_away_offense)
-                else:
-                    zone_boundaries = _get_23_zone_boundaries(ball_handler_spot, is_away_offense)
                 
                 # Build offensive players list for zone assignment
                 ball_handler_id = getattr(ball_handler, "player_id", None)
@@ -8643,22 +8669,18 @@ def resolve_half_court_offense_logic(game):
                 aggression_map = {0: "passive", 1: "passive", 2: "normal", 3: "aggressive", 4: "aggressive"}
                 aggression = aggression_map.get(aggression_level, "normal")
                 
-                # Call zone assignment logic to get actual defender assignments
-                _, defender_to_offensive_player = assign_all_zone_defenders(
-                    zone_boundaries,
+                # Which defender(s) the zone assigns to the ball handler, with the called
+                # zone's own shell geometry.
+                defenders_guarding_ball_handler = _zone_ball_handler_guards(
+                    def_call,
                     offensive_players,
                     ball_handler_coords,
                     ball_handler_spot,
+                    ball_handler_id,
                     aggression,
-                    is_away_offense
+                    is_away_offense,
                 )
-                
-                # Find which defender(s) are actually guarding the ball handler
-                defenders_guarding_ball_handler = []
-                for def_pos, guarded_player_id in defender_to_offensive_player.items():
-                    if guarded_player_id == ball_handler_id:
-                        defenders_guarding_ball_handler.append(def_pos)
-                
+
                 # Handle overlapping zones per user requirements:
                 # 1. If only one defender is guarding the ball handler, use that one
                 # 2. If two defenders are guarding the ball handler, randomly pick one
