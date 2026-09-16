@@ -4279,6 +4279,12 @@ function updatePlayButton(data) {
   } else if (week === 35) {
     playNowBtn.textContent = 'Run Signing Day';
     playNowBtn.dataset.mode = 'week35-recruiting';
+  } else if (week === 36 && !wire.week_36_results_seen) {
+    // Signing Day has run and the league list is the payoff — it comes BEFORE the
+    // rollover, which is irreversible. The hub stamps the view server-side (season-
+    // stamped), so the next load falls through to Go To Next Season below.
+    playNowBtn.textContent = 'View Recruiting Results';
+    playNowBtn.dataset.mode = 'view-recruiting-results';
   } else if (week === 36) {
     playNowBtn.textContent = 'Go To Next Season';
     playNowBtn.dataset.mode = 'new-season';
@@ -4372,8 +4378,14 @@ function updateRecruitingButton(data) {
     btnLabel = 'Open Signing Board';
   } else if (phase === 'results') {
     text = 'Signings are final';
-    showButton = true;
-    btnLabel = 'View Signings';
+    // While #play-now reads "View Recruiting Results" it goes to this exact page, so a
+    // second button beneath it would only restate where green already goes — the same
+    // rule the ghost Edit button follows. It comes back once green flips to Go To Next
+    // Season. Scoped to week 36: from week 37 green is the rollover, so this is the only
+    // way back to the signing list.
+    const greenOwnsResults = week === 36 && !(data?.recruiting_wire || {}).week_36_results_seen;
+    showButton = !greenOwnsResults;
+    btnLabel = showButton ? 'View Signings' : null;
   } else { // passive
     text = week >= 27 ? `Passive · Wk ${week} — postseason. Signing Day is Week 35.`
       : week === 19 ? 'Passive · Wk 19 — Invite Season begins next week.'
@@ -4498,6 +4510,13 @@ playNowBtn.addEventListener('click', async () => {
   }
 
   if (mode === 'recruit-invites') {
+    await openRecruitingSurface();
+    return;
+  }
+
+  if (mode === 'view-recruiting-results') {
+    // Week 36: the hub's results phase renders the league signing list (user's
+    // conference first). Same handoff the invite modes use.
     await openRecruitingSurface();
     return;
   }

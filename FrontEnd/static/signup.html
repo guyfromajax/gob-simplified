@@ -17,7 +17,7 @@
 <body>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
   <!-- Alpha Badge (shown when IS_ALPHA=true) -->
   <img id="alpha-badge" class="alpha-badge" src="/images/alpha_badge_gold.png" alt="Alpha">
@@ -27,133 +27,412 @@
     <h1 class="auth-title">CREATE ACCOUNT</h1>
 
     <form id="signup-form" class="auth-form">
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      <div id="signup-step-code">
+        <div class="form-group">
+          <label for="otp-code">Alpha Access Code</label>
+          <input type="text" id="otp-code" name="otp_code" placeholder="Enter your code" autocomplete="off" spellcheck="false" autocapitalize="characters">
+          <div id="code-status-row" class="code-status-row auth-hidden">
+            <span id="code-accepted-msg" class="code-accepted">Code accepted</span>
+            <a href="#" id="change-code-link" class="code-change-link">change</a>
+          </div>
+          <div id="code-error" class="error-message" role="alert"></div>
+          <div id="code-hint" class="form-hint">No code? <a href="#" id="request-access-link">Request access</a></div>
+        </div>
+        <button type="button" id="continue-code-btn" class="auth-button">
+          <span id="continue-button-text">Continue</span>
+          <span id="continue-button-loading" class="auth-hidden">Checking...</span>
+        </button>
       </div>
-      
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" required minlength="8" maxlength="128" placeholder="At least 8 characters">
-        <div class="form-hint">8–128 characters with at least one letter and one number</div>
+
+      <div id="signup-step-account" class="auth-hidden">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" placeholder="you@example.com">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="password-field">
+            <input type="password" id="password" name="password" minlength="8" maxlength="128" placeholder="At least 8 characters" autocomplete="new-password">
+            <button type="button" class="password-toggle" aria-controls="password" aria-label="Show password" aria-pressed="false"></button>
+          </div>
+          <div class="form-hint">8–128 characters with at least one letter and one number</div>
+        </div>
+
+        <div id="confirm-group" class="form-group auth-hidden">
+          <label for="confirm-password">Confirm Password</label>
+          <div class="password-field">
+            <input type="password" id="confirm-password" name="confirm-password" placeholder="Confirm your password">
+            <button type="button" class="password-toggle" aria-controls="confirm-password" aria-label="Show password" aria-pressed="false"></button>
+          </div>
+        </div>
+
+        <div id="error-message" class="error-message"></div>
+
+        <button type="submit" class="auth-button">
+          <span id="button-text">SIGN UP</span>
+          <span id="button-loading" class="auth-hidden">Creating account...</span>
+        </button>
       </div>
-      
-      <div class="form-group">
-        <label for="confirm-password">Confirm Password</label>
-        <input type="password" id="confirm-password" name="confirm-password" required placeholder="Confirm your password">
-      </div>
-      
-      <!-- OTP field (shown when IS_ALPHA=true) -->
-      <div id="otp-group" class="form-group" style="display: none;">
-        <label for="otp-code">Alpha Access Code</label>
-        <input type="text" id="otp-code" name="otp_code" placeholder="Enter your code">
-        <div class="form-hint">Don't have one? <a href="#" id="request-access-link">Request access</a></div>
-      </div>
-      
-      <div id="error-message" class="error-message"></div>
-      
-      <button type="submit" class="auth-button">
-        <span id="button-text">SIGN UP</span>
-        <span id="button-loading" style="display: none;">Creating account...</span>
-      </button>
     </form>
 
-    <p id="alpha-warnline" class="auth-warnline" style="display: none;">Alpha build — your data may be wiped during testing.</p>
+    <p id="alpha-warnline" class="auth-warnline auth-hidden">Alpha build — your data may be wiped during testing.</p>
 
     <div class="auth-footer">
       Already have an account? <a href="/login.html">Log in</a>
     </div>
   </div>
 
-  <!-- Thanks popup (shown after successful Request Access Code) -->
   <div id="access-request-modal-backdrop" class="access-request-modal-backdrop" aria-hidden="true">
-    <div class="access-request-modal" role="dialog" aria-labelledby="access-request-modal-title">
-      <p id="access-request-modal-title" class="access-request-modal-text">Thanks Coach, we'll send your access code shortly.</p>
-      <button type="button" id="access-request-modal-close" class="auth-button access-request-modal-close">OK</button>
+    <div class="access-request-modal" role="dialog" aria-modal="true" aria-label="Request Access">
+      <div id="request-modal-form-state">
+        <form id="request-access-form" class="auth-form">
+          <div class="form-group">
+            <label for="request-email">Email</label>
+            <input type="email" id="request-email" name="request-email" placeholder="you@example.com" autocomplete="email">
+          </div>
+          <div id="request-modal-error" class="error-message" role="alert"></div>
+          <button type="submit" class="auth-button" id="request-access-submit">
+            <span id="request-button-text">Request Access</span>
+            <span id="request-button-loading" class="auth-hidden">Sending...</span>
+          </button>
+        </form>
+      </div>
+      <div id="request-modal-success-state" class="auth-hidden">
+        <h2 id="access-request-success-title" class="access-request-modal-title">You're on the list, Coach.</h2>
+        <p id="access-request-success-body" class="access-request-modal-text"></p>
+        <button type="button" id="access-request-modal-close" class="auth-button access-request-modal-close">Got it</button>
+      </div>
     </div>
   </div>
-  
+
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/analytics.js"></script>
+  <script src="/js/shared/passwordToggle.js"></script>
   <script>
-    // Check if alpha mode and show/hide OTP field
+    const signupForm = document.getElementById('signup-form');
+    const stepCode = document.getElementById('signup-step-code');
+    const stepAccount = document.getElementById('signup-step-account');
+    const confirmGroup = document.getElementById('confirm-group');
+    const otpInput = document.getElementById('otp-code');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const confirmInput = document.getElementById('confirm-password');
+    const codeError = document.getElementById('code-error');
+    const codeStatusRow = document.getElementById('code-status-row');
+    const codeHint = document.getElementById('code-hint');
+    const changeCodeLink = document.getElementById('change-code-link');
+    const continueBtn = document.getElementById('continue-code-btn');
+    const continueText = document.getElementById('continue-button-text');
+    const continueLoading = document.getElementById('continue-button-loading');
+    const errorEl = document.getElementById('error-message');
+    const warnline = document.getElementById('alpha-warnline');
+    const modalBackdrop = document.getElementById('access-request-modal-backdrop');
+    const modalFormState = document.getElementById('request-modal-form-state');
+    const modalSuccessState = document.getElementById('request-modal-success-state');
+    const modalError = document.getElementById('request-modal-error');
+    const requestEmail = document.getElementById('request-email');
+    const requestSubmit = document.getElementById('request-access-submit');
+    const requestButtonText = document.getElementById('request-button-text');
+    const requestButtonLoading = document.getElementById('request-button-loading');
+
+    let isAlpha = false;
+    let codeAccepted = false;
+    let exhaustedSource = null;
+
+    function show(el) {
+      el.classList.remove('auth-hidden');
+    }
+
+    function hide(el) {
+      el.classList.add('auth-hidden');
+    }
+
+    function apiDetail(data) {
+      if (!data) return 'Request failed';
+      if (typeof data.detail === 'string') return data.detail;
+      if (Array.isArray(data.detail)) return data.detail[0]?.msg || 'Request failed';
+      if (data.detail && typeof data.detail === 'object' && data.detail.message) {
+        return data.detail.message;
+      }
+      return data.message || 'Request failed';
+    }
+
+    function urlSource() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('utm_source') || params.get('ref') || null;
+    }
+
+    function requestSource() {
+      if (exhaustedSource) return exhaustedSource.slice(0, 64);
+      return urlSource();
+    }
+
+    function normalizeCode(value) {
+      return (value || '').trim().toUpperCase();
+    }
+
+    function clearCodeError() {
+      codeError.textContent = '';
+      codeError.style.display = 'none';
+    }
+
+    function setCodeError(message, options) {
+      codeError.textContent = '';
+      if (!message) {
+        codeError.style.display = 'none';
+        return;
+      }
+      codeError.appendChild(document.createTextNode(message));
+      if (options && options.requestAccess) {
+        codeError.appendChild(document.createTextNode(' '));
+        const link = document.createElement('a');
+        link.href = '#';
+        link.id = 'exhausted-request-link';
+        link.textContent = 'Request access';
+        link.addEventListener('click', function (event) {
+          event.preventDefault();
+          openRequestModal();
+        });
+        codeError.appendChild(link);
+      }
+      codeError.style.display = 'block';
+    }
+
+    function showExhaustedState(code) {
+      exhaustedSource = normalizeCode(code);
+      codeAccepted = false;
+      otpInput.readOnly = false;
+      hide(codeStatusRow);
+      show(codeHint);
+      show(continueBtn);
+      hide(stepAccount);
+      hide(warnline);
+      emailInput.required = false;
+      passwordInput.required = false;
+      setCodeError("All spots on this code are claimed.", { requestAccess: true });
+    }
+
+    function acceptCode() {
+      codeAccepted = true;
+      exhaustedSource = null;
+      otpInput.value = normalizeCode(otpInput.value);
+      otpInput.readOnly = true;
+      show(codeStatusRow);
+      hide(codeHint);
+      hide(continueBtn);
+      show(stepAccount);
+      show(warnline);
+      emailInput.required = true;
+      passwordInput.required = true;
+      confirmInput.required = false;
+      clearCodeError();
+      emailInput.focus();
+    }
+
+    function resetCodeStep() {
+      codeAccepted = false;
+      exhaustedSource = null;
+      otpInput.readOnly = false;
+      hide(codeStatusRow);
+      show(codeHint);
+      show(continueBtn);
+      hide(stepAccount);
+      hide(warnline);
+      emailInput.required = false;
+      passwordInput.required = false;
+      confirmInput.required = false;
+      clearCodeError();
+      otpInput.focus();
+    }
+
+    async function continueCode() {
+      const code = normalizeCode(otpInput.value);
+      otpInput.value = code;
+      clearCodeError();
+      if (!code) {
+        setCodeError("That code isn't valid.");
+        return;
+      }
+      continueText.classList.add('auth-hidden');
+      continueLoading.classList.remove('auth-hidden');
+      continueBtn.disabled = true;
+      try {
+        const response = await fetch(API_CONFIG.buildUrl('/api/auth/check-access-code'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          setCodeError(apiDetail(data));
+          return;
+        }
+        if (data.valid) {
+          acceptCode();
+          return;
+        }
+        if (data.reason === 'exhausted') {
+          showExhaustedState(code);
+          return;
+        }
+        setCodeError("That code isn't valid.");
+      } catch (err) {
+        setCodeError('Something went wrong. Please try again.');
+      } finally {
+        continueText.classList.remove('auth-hidden');
+        continueLoading.classList.add('auth-hidden');
+        continueBtn.disabled = false;
+      }
+    }
+
+    function applyNonAlphaLayout() {
+      hide(stepCode);
+      show(stepAccount);
+      show(confirmGroup);
+      hide(warnline);
+      emailInput.required = true;
+      passwordInput.required = true;
+      confirmInput.required = true;
+      otpInput.required = false;
+    }
+
+    function applyAlphaLayout() {
+      show(stepCode);
+      hide(confirmGroup);
+      confirmInput.required = false;
+      if (codeAccepted) {
+        acceptCode();
+      } else {
+        hide(stepAccount);
+        hide(warnline);
+        emailInput.required = false;
+        passwordInput.required = false;
+      }
+    }
+
+    function openRequestModal() {
+      hide(modalSuccessState);
+      show(modalFormState);
+      modalError.textContent = '';
+      modalError.style.display = 'none';
+      requestEmail.value = '';
+      modalBackdrop.classList.add('open');
+      modalBackdrop.setAttribute('aria-hidden', 'false');
+      requestEmail.focus();
+    }
+
+    function closeRequestModal() {
+      modalBackdrop.classList.remove('open');
+      modalBackdrop.setAttribute('aria-hidden', 'true');
+    }
+
+    function showRequestSuccess(email) {
+      hide(modalFormState);
+      show(modalSuccessState);
+      document.getElementById('access-request-success-body').textContent =
+        'Alpha spots are limited and we open them in small batches. If a spot opens for you, your code goes to ' + email + '.';
+    }
+
     async function initPage() {
       try {
         const config = await API_CONFIG.loadAppConfig();
-        
-        if (config.isAlpha) {
-          // Show alpha badge and the quiet data-wipe caveat line
+        isAlpha = !!config.isAlpha;
+        if (isAlpha) {
           document.getElementById('alpha-badge').classList.add('visible');
-          document.getElementById('alpha-warnline').style.display = 'block';
-          // Show OTP field
-          document.getElementById('otp-group').style.display = 'block';
-          document.getElementById('otp-code').required = true;
+          applyAlphaLayout();
+          const prefill = normalizeCode(new URLSearchParams(window.location.search).get('code'));
+          if (prefill) {
+            otpInput.value = prefill;
+            await continueCode();
+          }
+        } else {
+          applyNonAlphaLayout();
         }
       } catch (error) {
         console.error('Failed to load config:', error);
       }
     }
-    
-    // Handle form submission
-    document.getElementById('signup-form').addEventListener('submit', async (e) => {
+
+    otpInput.addEventListener('input', function () {
+      const start = otpInput.selectionStart;
+      const end = otpInput.selectionEnd;
+      otpInput.value = otpInput.value.toUpperCase();
+      if (start != null && end != null) {
+        otpInput.setSelectionRange(start, end);
+      }
+    });
+
+    continueBtn.addEventListener('click', function () {
+      continueCode();
+    });
+
+    changeCodeLink.addEventListener('click', function (event) {
+      event.preventDefault();
+      resetCodeStep();
+    });
+
+    document.getElementById('request-access-link').addEventListener('click', function (event) {
+      event.preventDefault();
+      openRequestModal();
+    });
+
+    signupForm.addEventListener('submit', async function (e) {
       e.preventDefault();
-      
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
-      const confirmPassword = document.getElementById('confirm-password').value;
-      const otpCode = document.getElementById('otp-code').value.trim();
-      
-      const errorEl = document.getElementById('error-message');
+      if (isAlpha && !codeAccepted) {
+        await continueCode();
+        return;
+      }
+
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      const confirmPassword = confirmInput.value;
+      const otpCode = normalizeCode(otpInput.value);
       const buttonText = document.getElementById('button-text');
       const buttonLoading = document.getElementById('button-loading');
-      const submitBtn = document.querySelector('button[type="submit"]');
-      
-      // Clear previous error
+      const submitBtn = signupForm.querySelector('button[type="submit"]');
+
       errorEl.textContent = '';
       errorEl.style.display = 'none';
-      
-      // Validate passwords match
-      if (password !== confirmPassword) {
+
+      if (!isAlpha && password !== confirmPassword) {
         errorEl.textContent = 'Passwords do not match';
         errorEl.style.display = 'block';
         return;
       }
-      
-      // Show loading state
-      buttonText.style.display = 'none';
-      buttonLoading.style.display = 'inline';
+
+      buttonText.classList.add('auth-hidden');
+      buttonLoading.classList.remove('auth-hidden');
       submitBtn.disabled = true;
-      
+
       try {
         const body = { email, password };
-        if (otpCode) {
+        if (isAlpha) {
           body.otp_code = otpCode;
         }
-        
+
         const response = await fetch(API_CONFIG.buildUrl('/api/auth/signup'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
-          const msg = Array.isArray(data.detail)
-            ? (data.detail[0]?.msg || JSON.stringify(data.detail))
-            : (data.detail || 'Signup failed');
+          const msg = apiDetail(data);
+          if (isAlpha && msg === 'All spots on this code are claimed.') {
+            showExhaustedState(otpCode);
+            return;
+          }
           throw new Error(msg);
         }
-        
-        // Store token and user info
+
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('auth_user', JSON.stringify(data.user));
 
         if (window.GOB_Analytics) window.GOB_Analytics.signup();
 
-        // Route directly to the user's current tutorial step. Avoids a
-        // mode-select flash for new users whose first stop is the FTE
-        // persona-intro screen.
         var nextHref = '/mode-select.html';
         try {
           var u = data.user || {};
@@ -170,81 +449,75 @@
               case 'situation':
                 nextHref = '/tutorial-situation.html';
                 break;
-              // set_lineup / in_game / complete fall through to mode-select;
-              // mode-select's auth handler will route from there.
             }
           }
         } catch (_) { /* defensive: any failure falls back to mode-select */ }
         window.location.href = nextHref;
-        
       } catch (error) {
         errorEl.textContent = error.message;
         errorEl.style.display = 'block';
       } finally {
-        // Reset button state
-        buttonText.style.display = 'inline';
-        buttonLoading.style.display = 'none';
+        buttonText.classList.remove('auth-hidden');
+        buttonLoading.classList.add('auth-hidden');
         submitBtn.disabled = false;
       }
     });
-    
-    // Request Access Code: validate email, POST, show thanks popup
-    document.getElementById('request-access-link').addEventListener('click', async (e) => {
-      e.preventDefault();
-      const emailEl = document.getElementById('email');
-      const email = emailEl.value.trim();
-      const errorEl = document.getElementById('error-message');
-      errorEl.textContent = '';
-      errorEl.style.display = 'none';
+
+    document.getElementById('request-access-form').addEventListener('submit', async function (event) {
+      event.preventDefault();
+      const email = requestEmail.value.trim();
+      modalError.textContent = '';
+      modalError.style.display = 'none';
 
       if (!email) {
-        errorEl.textContent = 'Please enter your email above to request an access code.';
-        errorEl.style.display = 'block';
+        modalError.textContent = 'Please enter a valid email address.';
+        modalError.style.display = 'block';
         return;
       }
-      if (!emailEl.checkValidity()) {
-        errorEl.textContent = 'Please enter a valid email address.';
-        errorEl.style.display = 'block';
+      if (!requestEmail.checkValidity()) {
+        modalError.textContent = 'Please enter a valid email address.';
+        modalError.style.display = 'block';
         return;
       }
 
+      requestButtonText.classList.add('auth-hidden');
+      requestButtonLoading.classList.remove('auth-hidden');
+      requestSubmit.disabled = true;
+
       try {
+        const payload = { email };
+        const source = requestSource();
+        if (source) payload.source = source;
+
         const response = await fetch(API_CONFIG.buildUrl('/api/auth/request-access-code'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
+          body: JSON.stringify(payload)
         });
         const data = await response.json();
         if (!response.ok) {
-          const msg = data.detail || (Array.isArray(data.detail) ? data.detail[0]?.msg : 'Request failed');
-          errorEl.textContent = msg;
-          errorEl.style.display = 'block';
+          modalError.textContent = apiDetail(data);
+          modalError.style.display = 'block';
           return;
         }
-        const modalTitle = document.getElementById('access-request-modal-title');
-        modalTitle.textContent = data.status === 'waitlisted'
-          ? "Thanks Coach — we're at capacity with the alpha. You're on the list, and we'll email your code when a spot opens."
-          : "Thanks Coach, we'll send your access code shortly.";
-        document.getElementById('access-request-modal-backdrop').classList.add('open');
-        document.getElementById('access-request-modal-backdrop').setAttribute('aria-hidden', 'false');
+        showRequestSuccess(email);
       } catch (err) {
-        errorEl.textContent = 'Something went wrong. Please try again.';
-        errorEl.style.display = 'block';
+        modalError.textContent = 'Something went wrong. Please try again.';
+        modalError.style.display = 'block';
+      } finally {
+        requestButtonText.classList.remove('auth-hidden');
+        requestButtonLoading.classList.add('auth-hidden');
+        requestSubmit.disabled = false;
       }
     });
 
-    document.getElementById('access-request-modal-close').addEventListener('click', () => {
-      document.getElementById('access-request-modal-backdrop').classList.remove('open');
-      document.getElementById('access-request-modal-backdrop').setAttribute('aria-hidden', 'true');
-    });
-    document.getElementById('access-request-modal-backdrop').addEventListener('click', (e) => {
-      if (e.target.id === 'access-request-modal-backdrop') {
-        document.getElementById('access-request-modal-backdrop').classList.remove('open');
-        document.getElementById('access-request-modal-backdrop').setAttribute('aria-hidden', 'true');
+    document.getElementById('access-request-modal-close').addEventListener('click', closeRequestModal);
+    modalBackdrop.addEventListener('click', function (event) {
+      if (event.target.id === 'access-request-modal-backdrop') {
+        closeRequestModal();
       }
     });
 
-    // Initialize page
     initPage();
   </script>
 </body>

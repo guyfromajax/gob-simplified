@@ -32,6 +32,7 @@ from BackEnd.db import (
     users_collection,
     password_reset_tokens_collection,
     access_code_requests_collection,
+    alpha_access_requests_collection,
     franchises_collection,
     franchise_team_data_collection,
     teams_collection,
@@ -44,9 +45,11 @@ from BackEnd.utils.auth import (
     get_user_by_email
 )
 from BackEnd.utils.otp_validator import (
+    inspect_code,
     is_alpha_mode,
-    validate_otp,
-    consume_otp
+    normalize_otp_code,
+    release_code,
+    reserve_code,
 )
 from BackEnd.utils.email_sender import send_password_reset_email
 from BackEnd.utils.user_tracking import default_user_tracking, compute_lead_archetype, TUTORIAL_ALERT_IDS
@@ -66,6 +69,8 @@ ACCESS_CODE_WAITLIST_MESSAGE = (
     "Thanks Coach — we're at capacity with the alpha. "
     "You're on the list, and we'll email your code when a spot opens."
 )
+ACCESS_CODE_QUEUED_MESSAGE = "Request received."
+SOURCE_MAX_LENGTH = 64
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -227,8 +232,14 @@ class ResetRequest(BaseModel):
 
 
 class RequestAccessCodeRequest(BaseModel):
-    """Request an alpha access code (signup page). Stores request for admin to process manually."""
+    """Request an alpha access code (signup page)."""
     email: EmailStr
+    source: Optional[str] = None
+
+
+class CheckAccessCodeRequest(BaseModel):
+    """Read-only check of an alpha access code."""
+    code: str
 
 
 class UpdateAccountSettingsRequest(BaseModel):
@@ -361,17 +372,132 @@ def _record_access_code_request(
     access_code_requests_collection.insert_one(doc)
 
 
+def _alpha_auto_send_codes() -> bool:
+    return os.getenv("ALPHA_AUTO_SEND_CODES", "false").lower() == "true"
+
+
+def _sanitize_source(value: Optional[str]) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    cleaned = "".join(ch for ch in value.strip() if ch.isprintable())
+    cleaned = cleaned[:SOURCE_MAX_LENGTH]
+    return cleaned or None
+
+
+def _queued_access_response() -> JSONResponse:
+    return JSONResponse(
+        content={"status": "queued", "message": ACCESS_CODE_QUEUED_MESSAGE},
+        status_code=200,
+    )
+
+
+def _upsert_alpha_access_request(*, email: str, now: datetime, source: Optional[str]) -> dict:
+    insert_fields = {
+        "email": email,
+        "status": "pending",
+        "first_requested_at": now,
+        "otp_code": None,
+        "granted_at": None,
+        "granted_by": None,
+        "source": source,
+    }
+    alpha_access_requests_collection.update_one(
+        {"email": email},
+        {
+            "$set": {"last_requested_at": now},
+            "$inc": {"request_count": 1},
+            "$setOnInsert": insert_fields,
+        },
+        upsert=True,
+    )
+    if source:
+        alpha_access_requests_collection.update_one(
+            {
+                "email": email,
+                "$or": [
+                    {"source": None},
+                    {"source": ""},
+                    {"source": {"$exists": False}},
+                ],
+            },
+            {"$set": {"source": source}},
+        )
+    doc = alpha_access_requests_collection.find_one({"email": email})
+    return doc or {"email": email, "status": "pending"}
+
+
+def _queue_access_code_request(*, email: str, now: datetime, source: Optional[str]) -> JSONResponse:
+    doc = _upsert_alpha_access_request(email=email, now=now, source=source)
+    if doc.get("status") == "granted":
+        otp_code = doc.get("otp_code")
+        if otp_code:
+            ok, _reason = inspect_code(otp_code)
+            if ok:
+                sent = send_alpha_welcome_email(email, otp_code)
+                status = "resent" if sent else "failed"
+                _record_access_code_request(
+                    email=email,
+                    now=now,
+                    status=status,
+                    otp_code=otp_code,
+                    sent_at=now if sent else None,
+                )
+                if not sent:
+                    logger.warning(
+                        "Failed to resend granted alpha code to %s", _redact_email(email)
+                    )
+                return _queued_access_response()
+
+    if doc.get("status") == "pending":
+        already_notified = access_code_requests_collection.find_one(
+            {"email": email, "status": "waitlisted"}
+        )
+        if already_notified:
+            _record_access_code_request(email=email, now=now, status="queued")
+            return _queued_access_response()
+
+        sent = send_alpha_waitlist_email(email)
+        status = "waitlisted" if sent else "failed"
+        _record_access_code_request(
+            email=email,
+            now=now,
+            status=status,
+            sent_at=now if sent else None,
+        )
+        if not sent:
+            logger.warning(
+                "Failed to send waitlist email to %s", _redact_email(email)
+            )
+        return _queued_access_response()
+
+    _record_access_code_request(email=email, now=now, status="queued")
+    return _queued_access_response()
+
+
+@router.post("/check-access-code")
+@_auth_rate_limit
+async def check_access_code(request: Request, body: CheckAccessCodeRequest):
+    """Read-only check of whether an alpha access code can still be redeemed."""
+    _ok, reason = inspect_code(body.code)
+    if reason is None:
+        return JSONResponse(content={"valid": True, "reason": None})
+    return JSONResponse(content={"valid": False, "reason": reason})
+
+
 @router.post("/request-access-code")
 @_auth_rate_limit
 async def request_access_code(request: Request, body: RequestAccessCodeRequest):
     """
-    Request an alpha access code.
+    Request alpha access.
 
-    Sends a welcome email with OTP when capacity exists, a waitlist email when not,
-    or triggers password reset when the email is already registered.
+    Default (ALPHA_AUTO_SEND_CODES=false): upsert the grant queue and send the
+    waitlist confirmation email. Does not email a new code. If the email is
+    already registered, trigger password reset.
+    Legacy auto-send emails a pool code or the waitlist template.
     """
     email = body.email.lower().strip()
     now = datetime.now(timezone.utc)
+    source = _sanitize_source(body.source)
 
     if _access_code_rate_limit_exceeded(email, now):
         raise HTTPException(
@@ -389,6 +515,9 @@ async def request_access_code(request: Request, body: RequestAccessCodeRequest):
             },
             status_code=200,
         )
+
+    if not _alpha_auto_send_codes():
+        return _queue_access_code_request(email=email, now=now, source=source)
 
     existing_otp = find_otp_for_email(email)
     if existing_otp:
@@ -471,6 +600,7 @@ async def signup(request: Request, body: SignupRequest):
     Rate limited: 10/minute per IP (prevents brute force OTP guessing).
     """
     email = body.email.lower().strip()
+    reserved_code = None
     
     # Check if alpha mode requires OTP
     if is_alpha_mode():
@@ -479,11 +609,6 @@ async def signup(request: Request, body: SignupRequest):
                 status_code=400,
                 detail="Alpha access code is required for signup"
             )
-        
-        # Validate OTP
-        is_valid, error = validate_otp(body.otp_code)
-        if not is_valid:
-            raise HTTPException(status_code=400, detail=error)
     
     # Check if email already exists
     existing_user = get_user_by_email(email)
@@ -492,6 +617,17 @@ async def signup(request: Request, body: SignupRequest):
             status_code=400,
             detail="An account with this email already exists"
         )
+
+    if is_alpha_mode():
+        reserved, reason = reserve_code(body.otp_code, email)
+        if not reserved:
+            if reason == "exhausted":
+                raise HTTPException(
+                    status_code=400,
+                    detail="All spots on this code are claimed.",
+                )
+            raise HTTPException(status_code=400, detail="Invalid alpha access code")
+        reserved_code = normalize_otp_code(body.otp_code)
     
     # Create user document
     now = datetime.now(timezone.utc)
@@ -522,16 +658,19 @@ async def signup(request: Request, body: SignupRequest):
     }
     
     # Insert user
-    result = users_collection.insert_one(user_doc)
+    try:
+        result = users_collection.insert_one(user_doc)
+    except Exception:
+        if reserved_code:
+            release_code(reserved_code, email)
+        raise
     user_id = str(result.inserted_id)
-    
-    # Consume OTP (mark as used) after successful user creation
-    if is_alpha_mode() and body.otp_code:
-        success, error = consume_otp(body.otp_code, email)
-        if not success:
-            # User was created but OTP consumption failed (race condition)
-            # Log this but don't fail the signup
-            print(f"⚠️ [AUTH] OTP consumption failed for {email}: {error}")
+
+    if reserved_code:
+        alpha_access_requests_collection.update_one(
+            {"email": email},
+            {"$set": {"status": "registered", "otp_code": reserved_code}},
+        )
     
     # Create JWT token
     token = create_access_token({

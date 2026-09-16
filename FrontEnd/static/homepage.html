@@ -121,6 +121,8 @@
   }
   .btn-ghost:hover{border-color:rgba(238,241,247,.6); background:rgba(238,241,247,.05);}
   .hero-micro{font:500 13px/1 var(--inter); color:var(--muted); letter-spacing:.02em;}
+  .alpha-code-micro{font:500 13px/1.45 var(--inter); color:var(--muted); letter-spacing:.02em; text-align:center;}
+  .final .alpha-code-micro{margin-top:16px;}
   .hero-tertiary{font:600 13px/1 var(--inter); color:var(--muted); border-bottom:1px solid rgba(152,162,184,.4); padding-bottom:2px; transition:color .15s;}
   .hero-tertiary:hover{color:var(--text);}
 
@@ -350,7 +352,7 @@
   </div>
   <img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">
   <div class="auth-bar-right">
-    <a href="./mode-select.html" class="nav-cta" id="nav-cta" aria-label="Play The Alpha">Play The Alpha</a>
+    <a href="/signup.html" class="nav-cta" id="nav-cta" aria-label="Get Alpha Access">Get Alpha Access</a>
     <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube">
       <img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24">
     </a>
@@ -376,9 +378,10 @@
     <h1>Build Your Blue Blood Program</h1>
     <p class="hero-sub">The deep basketball management sim for the fans mainstream games left behind. Recruit your roster, install your system, and coach every possession — live.</p>
     <div class="cta-row">
-      <a class="btn-primary" id="hero-cta" href="./mode-select.html">Play the Alpha</a>
+      <a class="btn-primary" id="hero-cta" href="/signup.html" aria-label="Get Alpha Access">Get Alpha Access</a>
       <a class="btn-ghost" href="https://store.steampowered.com/app/5148870/GeekedOut_Basketball/">Wishlist on Steam</a>
     </div>
+    <p class="alpha-code-micro">Alpha access is limited and by code only.</p>
     <a class="hero-tertiary" href="https://discord.gg/mTXvY37p22" target="_blank" rel="noopener noreferrer">Join the Discord</a>
   </div>
 </header>
@@ -583,9 +586,10 @@
     <h2>Ready To Build Your Program?</h2>
     <p class="final-micro">Win on skill alone</p>
     <div class="cta-row">
-      <a class="btn-primary" href="./mode-select.html">Play the Alpha</a>
+      <a class="btn-primary" id="final-cta" href="/signup.html" aria-label="Get Alpha Access">Get Alpha Access</a>
       <a class="btn-ghost" href="https://store.steampowered.com/app/5148870/GeekedOut_Basketball/">Wishlist on Steam</a>
     </div>
+    <p class="alpha-code-micro">Alpha access is limited and by code only.</p>
   </section>
 </main>
 
@@ -626,12 +630,40 @@
   const nav = document.getElementById('auth-bar');
   const heroCta = document.getElementById('hero-cta');
   const navCta = document.getElementById('nav-cta');
+  const finalCta = document.getElementById('final-cta');
   let heroBottom = 0;
+  function hasStoredAuth() {
+    try { return !!(localStorage.getItem('auth_token') && localStorage.getItem('auth_user')); } catch (e) { return false; }
+  }
+  function signupHref() {
+    const params = new URLSearchParams(window.location.search);
+    const out = new URLSearchParams();
+    const utm = params.get('utm_source');
+    const ref = params.get('ref');
+    if (utm) out.set('utm_source', utm);
+    if (ref) out.set('ref', ref);
+    const q = out.toString();
+    return q ? '/signup.html?' + q : '/signup.html';
+  }
+  function applyAlphaCtas() {
+    const loggedIn = hasStoredAuth();
+    const href = loggedIn ? './mode-select.html' : signupHref();
+    const label = loggedIn ? 'Play the Alpha' : 'Get Alpha Access';
+    [navCta, heroCta, finalCta].forEach(function (el) {
+      if (!el) return;
+      el.href = href;
+      el.textContent = label;
+      el.setAttribute('aria-label', label);
+    });
+    document.querySelectorAll('.alpha-code-micro').forEach(function (el) {
+      el.hidden = loggedIn;
+    });
+  }
   function updateLogoDestination() {
-    let isLoggedIn = false;
-    try { isLoggedIn = !!(localStorage.getItem('auth_token') && localStorage.getItem('auth_user')); } catch (e) {}
+    const isLoggedIn = hasStoredAuth();
     document.querySelectorAll('.logo-link').forEach(link => { link.href = isLoggedIn ? '/mode-select.html' : '/homepage.html'; });
   }
+  applyAlphaCtas();
   updateLogoDestination();
   function measure() { if (heroCta) heroBottom = heroCta.getBoundingClientRect().bottom + window.scrollY; }
   function onScroll() {

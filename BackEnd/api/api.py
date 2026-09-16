@@ -655,6 +655,7 @@ try:
         try:
             from BackEnd.db import (
                 ensure_users_username_index,
+                ensure_alpha_access_requests_email_index,
                 ensure_ftd_index,
                 ensure_fpd_index,
                 ensure_frd_index,
@@ -664,6 +665,7 @@ try:
                 ensure_tutorial_game_ttl_index,
             )
             ensure_users_username_index()
+            ensure_alpha_access_requests_email_index()
             ensure_ftd_index()
             ensure_fpd_index()
             ensure_frd_index()

@@ -203,9 +203,114 @@ body::after {
   color: var(--gob-text-faint);
 }
 
+.form-group input[readonly] {
+  color: var(--gob-text-dim);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.password-field {
+  position: relative;
+  display: block;
+}
+
+.password-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 48px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--gob-text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-toggle:hover,
+.password-toggle:focus {
+  color: var(--gob-text);
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid var(--gob-orange);
+  outline-offset: -4px;
+  border-radius: 8px;
+}
+
+.password-toggle-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  flex: 0 0 20px;
+}
+
+.password-toggle[aria-pressed="false"] .password-toggle-icon-hide,
+.password-toggle[aria-pressed="true"] .password-toggle-icon-show {
+  display: none;
+}
+
+.code-status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.code-accepted {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8af07f;
+}
+
+.code-change-link {
+  font-size: 12px;
+  color: var(--gob-orange);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.code-change-link:hover {
+  text-decoration: underline;
+}
+
+.error-message a {
+  color: #ffc680;
+  font-weight: 600;
+}
+
+.auth-hidden {
+  display: none !important;
+}
+
 .form-hint {
   font-size: 12px;
+  line-height: 1.4;
   color: rgba(255, 255, 255, 0.42);
+}
+
+/* Code step: keep the hint as a caption of the field (12px), then give
+   Continue its own 22px beat so it does not sit on the helper. */
+#signup-step-code {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+#signup-step-code .form-group {
+  gap: 8px;
+}
+
+#signup-step-code .form-hint {
+  margin-top: 4px;
 }
 
 .form-hint a {
@@ -393,11 +498,23 @@ body::after {
   background: var(--gob-orange);
 }
 
+.access-request-modal-title {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 1px;
+  color: var(--gob-text);
+  margin: 4px 0 12px;
+}
+
 .access-request-modal-text {
   margin: 4px 0 20px 0;
   font-size: 15px;
   color: var(--gob-text);
   line-height: 1.45;
+}
+
+.access-request-modal .form-group {
+  text-align: left;
 }
 
 .access-request-modal-close {

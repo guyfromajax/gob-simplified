@@ -3823,6 +3823,10 @@ RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_seas
 # watched, so a refresh after submitting does not replay it. Mirrors the modal flag
 # above rather than inventing a second convention.
 WEEK_35_REVEAL_SEEN_SEASON_FIELD = "week_35_reveal_seen_season"
+# Week 36 league signing list (Recruiting Hub results phase). Separate from the reveal
+# above: that one is stamped during week 35 when the Signing Day playback ends, so it is
+# already true by the time the week-36 results exist and cannot gate them.
+WEEK_36_RESULTS_SEEN_SEASON_FIELD = "week_36_results_seen_season"
 # Season the "your board is pre-populated" Sammy modal was shown. Season-stamped rather
 # than boolean, like the reveal above, so a new season re-arms it with nothing having to
 # clear the flag.
@@ -4139,7 +4143,7 @@ def _build_recruiting_wire_payload(
         return {
             "seen_week": 0, "unseen_count": 0, "counts": {"moved": 0, "dropped": 0},
             "events": [], "board_saved_week": 0, "has_saved_board": False,
-            "week_35_orders_submitted": False,
+            "week_35_orders_submitted": False, "week_36_results_seen": False,
         }
 
     week = int(franchise_doc.get("week", 1) or 1)
@@ -4246,6 +4250,11 @@ def _build_recruiting_wire_payload(
         "board_saved_week": int(franchise_doc.get(RECRUITING_BOARD_SAVED_WEEK_FIELD, 0) or 0),
         "has_saved_board": has_saved_board,
         "week_35_orders_submitted": week_35_orders_submitted,
+        # Gates the FCC week-36 green button: View Recruiting Results -> Go To Next Season.
+        "week_36_results_seen": (
+            int(franchise_doc.get(WEEK_36_RESULTS_SEEN_SEASON_FIELD, 0) or 0)
+            == _franchise_current_season(franchise_doc)
+        ),
     }
 
 
@@ -17524,6 +17533,10 @@ class Week35RevealSeenRequest(BaseModel):
     franchise_id: str
 
 
+class Week36ResultsSeenRequest(BaseModel):
+    franchise_id: str
+
+
 class InviteSeedModalSeenRequest(BaseModel):
     franchise_id: str
 
@@ -17586,6 +17599,26 @@ def mark_week_35_reveal_seen(
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
         {"$set": {WEEK_35_REVEAL_SEEN_SEASON_FIELD: season}},
+    )
+    return {"seen_season": season}
+
+
+@router.patch("/franchise/week-36-results-seen")
+def mark_week_36_results_seen(
+    req: Week36ResultsSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Stamp the week-36 league signing list as viewed for this season.
+
+    The FCC green button reads this: before it is stamped the button is "View Recruiting
+    Results", after it is "Go To Next Season". Season-stamped rather than boolean so the
+    next season gets its own viewing without anything having to clear the flag.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    season = _franchise_current_season(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {WEEK_36_RESULTS_SEEN_SEASON_FIELD: season}},
     )
     return {"seen_season": season}
 

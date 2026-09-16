@@ -1,179 +1,230 @@
 """
 OTP Validation Utility
 
-Provides functions for validating and consuming alpha OTP codes.
-Used by the authentication system during signup when IS_ALPHA=true.
+Alpha access codes are redeemable when:
+  active != false AND used != true AND use_count < max_uses
+Missing max_uses is treated as 1. A used:true document is full.
 
-USAGE:
-    from BackEnd.utils.otp_validator import validate_otp, consume_otp, is_alpha_mode
-
-    # Check if alpha mode is enabled
-    if is_alpha_mode():
-        # Validate OTP before signup
-        is_valid, error = validate_otp(otp_code)
-        if not is_valid:
-            return {"error": error}
-        
-        # After successful user creation, consume the OTP
-        consume_otp(otp_code, user_email)
+Signup claims a spot with reserve_code() before creating the user, then
+release_code() if user creation fails.
 """
+
+from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from typing import Tuple, Optional
+from typing import Any, Optional, Tuple
+
+from pymongo import ReturnDocument
 
 from BackEnd.db import alpha_otps_collection
 
+MIN_OTP_LENGTH = 4
+
 
 def is_alpha_mode() -> bool:
-    """
-    Check if the application is running in alpha mode.
-    
-    Returns:
-        True if IS_ALPHA environment variable is set to 'true' (case-insensitive)
-    """
     return os.getenv("IS_ALPHA", "false").lower() == "true"
 
 
-def validate_otp(otp_code: str) -> Tuple[bool, Optional[str]]:
-    """
-    Validate an OTP code without consuming it.
-    
-    This should be called BEFORE creating the user account to ensure the OTP
-    is valid. If valid, call consume_otp() AFTER the user is created.
-    
-    Args:
-        otp_code: The OTP code to validate
-        
-    Returns:
-        Tuple of (is_valid, error_message)
-        - (True, None) if the OTP is valid and unused
-        - (False, "error message") if invalid
-    """
+def normalize_otp_code(otp_code: Optional[str]) -> str:
     if not otp_code:
-        return False, "Alpha access code is required"
-    
-    # Normalize: strip whitespace, uppercase
-    otp_code = otp_code.strip().upper()
-    
-    if len(otp_code) < 6:
-        return False, "Invalid alpha access code format"
-    
-    # Look up OTP in database
-    otp_doc = alpha_otps_collection.find_one({"otp_code": otp_code})
-    
-    if not otp_doc:
-        return False, "Invalid alpha access code"
-    
-    if otp_doc.get("used"):
-        # Check if it was used by this same code (duplicate signup attempt)
-        used_by = otp_doc.get("used_by_email")
-        if used_by:
-            return False, f"This alpha access code has already been used"
-        return False, "This alpha access code has already been used"
-    
+        return ""
+    return otp_code.strip().upper()
+
+
+def _max_uses(doc: dict[str, Any]) -> int:
+    value = doc.get("max_uses")
+    if isinstance(value, bool):
+        return 1
+    if isinstance(value, int) and value >= 1:
+        return value
+    if isinstance(value, float) and value >= 1:
+        return int(value)
+    return 1
+
+
+def _use_count(doc: dict[str, Any]) -> int:
+    value = doc.get("use_count")
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int) and value >= 0:
+        return value
+    if isinstance(value, float) and value >= 0:
+        return int(value)
+    return 0
+
+
+def is_code_redeemable(doc: dict[str, Any]) -> bool:
+    if doc.get("active") is False:
+        return False
+    if doc.get("used") is True:
+        return False
+    return _use_count(doc) < _max_uses(doc)
+
+
+def inspect_code(otp_code: str) -> Tuple[bool, Optional[str]]:
+    """Read-only check. Returns (True, None) or (False, reason)."""
+    code = normalize_otp_code(otp_code)
+    if len(code) < MIN_OTP_LENGTH:
+        return False, "invalid"
+
+    doc = alpha_otps_collection.find_one({"otp_code": code})
+    if not doc:
+        return False, "invalid"
+    if doc.get("active") is False:
+        return False, "inactive"
+    if not is_code_redeemable(doc):
+        return False, "exhausted"
     return True, None
 
 
-def consume_otp(otp_code: str, email: str) -> Tuple[bool, Optional[str]]:
+def _redeemable_filter(code: str) -> dict[str, Any]:
+    return {
+        "otp_code": code,
+        "active": {"$ne": False},
+        "used": {"$ne": True},
+        "$expr": {
+            "$lt": [
+                {"$ifNull": ["$use_count", 0]},
+                {"$ifNull": ["$max_uses", 1]},
+            ]
+        },
+    }
+
+
+def reserve_code(otp_code: str, email: str) -> Tuple[bool, Optional[str]]:
     """
-    Mark an OTP as used by a specific email.
-    
-    This should be called AFTER successfully creating the user account.
-    The OTP is permanently linked to this email for tracking purposes.
-    
-    Args:
-        otp_code: The OTP code to consume
-        email: The email address of the user who used this OTP
-        
-    Returns:
-        Tuple of (success, error_message)
-        - (True, None) if successfully consumed
-        - (False, "error message") if failed
+    Atomically claim one use of a code.
+
+    Returns (True, None) on success, or (False, "invalid"|"exhausted"|"inactive").
+    Two concurrent callers cannot both take the last remaining spot.
     """
-    if not otp_code or not email:
-        return False, "OTP code and email are required"
-    
-    # Normalize
-    otp_code = otp_code.strip().upper()
-    email = email.strip().lower()
-    
+    code = normalize_otp_code(otp_code)
+    if len(code) < MIN_OTP_LENGTH:
+        return False, "invalid"
+    normalized_email = (email or "").strip().lower()
+    if not normalized_email:
+        return False, "invalid"
+
+    existing = alpha_otps_collection.find_one({"otp_code": code})
+    if not existing:
+        return False, "invalid"
+    if existing.get("active") is False:
+        return False, "inactive"
+
     now = datetime.now(timezone.utc)
-    
-    # Atomically update OTP - only if it's still unused
-    result = alpha_otps_collection.update_one(
+    pipeline = [
         {
-            "otp_code": otp_code,
-            "used": False
+            "$set": {
+                "use_count": {"$add": [{"$ifNull": ["$use_count", 0]}, 1]},
+                "redemptions": {
+                    "$concatArrays": [
+                        {"$ifNull": ["$redemptions", []]},
+                        [{"email": normalized_email, "used_at": now}],
+                    ]
+                },
+                "used_by_email": {"$ifNull": ["$used_by_email", normalized_email]},
+                "used_at": {"$ifNull": ["$used_at", now]},
+            }
         },
         {
             "$set": {
-                "used": True,
-                "used_by_email": email,
-                "used_at": now
+                "used": {
+                    "$gte": ["$use_count", {"$ifNull": ["$max_uses", 1]}]
+                }
             }
-        }
+        },
+    ]
+    doc = alpha_otps_collection.find_one_and_update(
+        _redeemable_filter(code),
+        pipeline,
+        return_document=ReturnDocument.AFTER,
     )
-    
-    if result.modified_count == 0:
-        # OTP was already used (race condition) or doesn't exist
-        return False, "Alpha access code is no longer available"
-    
+    if not doc:
+        return False, "exhausted"
     return True, None
 
 
+def release_code(otp_code: str, email: str) -> bool:
+    """Roll back one reservation after a failed user create."""
+    code = normalize_otp_code(otp_code)
+    normalized_email = (email or "").strip().lower()
+    if not code or not normalized_email:
+        return False
+
+    result = alpha_otps_collection.update_one(
+        {"otp_code": code, "redemptions.email": normalized_email},
+        {
+            "$inc": {"use_count": -1},
+            "$pull": {"redemptions": {"email": normalized_email}},
+            "$set": {"used": False},
+        },
+    )
+    if result.modified_count != 1:
+        return False
+    alpha_otps_collection.update_one(
+        {"otp_code": code, "used_by_email": normalized_email},
+        {"$set": {"used_by_email": None, "used_at": None}},
+    )
+    return True
+
+
+def validate_otp(otp_code: str) -> Tuple[bool, Optional[str]]:
+    """Read-only legacy wrapper around inspect_code."""
+    if not otp_code:
+        return False, "Alpha access code is required"
+    ok, reason = inspect_code(otp_code)
+    if ok:
+        return True, None
+    if reason == "exhausted":
+        return False, "All spots on this code are claimed."
+    if reason == "inactive":
+        return False, "Invalid alpha access code"
+    if len(normalize_otp_code(otp_code)) < MIN_OTP_LENGTH:
+        return False, "Invalid alpha access code format"
+    return False, "Invalid alpha access code"
+
+
+def consume_otp(otp_code: str, email: str) -> Tuple[bool, Optional[str]]:
+    """Legacy one-shot consume. Prefer reserve_code for signup."""
+    ok, reason = reserve_code(otp_code, email)
+    if ok:
+        return True, None
+    if reason == "exhausted":
+        return False, "Alpha access code is no longer available"
+    return False, "Invalid alpha access code"
+
+
 def get_otp_status(otp_code: str) -> Optional[dict]:
-    """
-    Get the status of an OTP code.
-    
-    Args:
-        otp_code: The OTP code to check
-        
-    Returns:
-        Dict with OTP status or None if not found
-    """
     if not otp_code:
         return None
-    
-    otp_code = otp_code.strip().upper()
-    otp_doc = alpha_otps_collection.find_one({"otp_code": otp_code})
-    
+    code = normalize_otp_code(otp_code)
+    otp_doc = alpha_otps_collection.find_one({"otp_code": code})
     if not otp_doc:
         return None
-    
     return {
         "otp_code": otp_doc["otp_code"],
         "used": otp_doc.get("used", False),
         "used_by_email": otp_doc.get("used_by_email"),
         "used_at": otp_doc.get("used_at"),
-        "created_at": otp_doc.get("created_at")
+        "created_at": otp_doc.get("created_at"),
+        "max_uses": _max_uses(otp_doc),
+        "use_count": _use_count(otp_doc),
+        "active": otp_doc.get("active") is not False,
     }
 
 
 def get_available_otp_count() -> int:
-    """
-    Get the number of unused OTPs remaining.
-    
-    Returns:
-        Count of unused OTPs
-    """
     return alpha_otps_collection.count_documents({"used": False})
 
 
 def get_otp_stats() -> dict:
-    """
-    Get overall OTP statistics.
-    
-    Returns:
-        Dict with total, used, and available counts
-    """
     total = alpha_otps_collection.count_documents({})
     used = alpha_otps_collection.count_documents({"used": True})
     available = alpha_otps_collection.count_documents({"used": False})
-    
     return {
         "total": total,
         "used": used,
         "available": available,
-        "usage_rate": (used / total * 100) if total > 0 else 0
+        "usage_rate": (used / total * 100) if total > 0 else 0,
     }

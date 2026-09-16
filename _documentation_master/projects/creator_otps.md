@@ -1,0 +1,23 @@
+# Remaining creator OTPs (6)
+
+Generated: 2026-09-16 12:51:33 UTC
+V9SP6HC6KH
+GRM3DAUCYB
+HP4NZTJZBU
+HGZGMQTWT4
+266DSUH4H7
+XTB4XTN353
+
+# Production vanity codes (gob)
+
+Created: 2026-09-16
+max_uses: 1 each
+ITSGOOD
+OCTY
+POPBOY
+SHADY
+DANNY
+DECATHALON
+CRUSHABLE
+FLYER
+
