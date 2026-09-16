@@ -190,6 +190,10 @@ if (modeParam === 'tutorial') {
 
     const actions = saveBtn ? saveBtn.parentElement : document.querySelector('.sliders-container');
     if (!actions || document.getElementById('btn-tutorial-gameplan-continue')) return;
+    // A failed save is silent to the engine — the sim just falls back to the seeded
+    // defaults (every slider 2). Count failures so the first one is surfaced and
+    // retryable, while a second never strands the user mid-funnel.
+    let tutorialSaveFailures = 0;
     const cta = document.createElement('button');
     cta.id = 'btn-tutorial-gameplan-continue';
     cta.type = 'button';
@@ -202,8 +206,11 @@ if (modeParam === 'tutorial') {
       // script, so uiSfx comes in by dynamic import like the modals above.
       import('/js/shared/uiSfx.js').then((m) => m.playAdvance()).catch(() => {});
       cta.disabled = true;
+      // saveSettingsQuietly() swallows its own errors and returns false — the try/catch
+      // alone would miss the common failure (a non-OK PUT), so branch on the return value.
+      let saved = false;
       try {
-        await saveSettingsQuietly();
+        saved = await saveSettingsQuietly();
         await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
           method: 'POST',
           headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -213,6 +220,17 @@ if (modeParam === 'tutorial') {
         // A failed save must not strand the user mid-funnel; the sim falls back to
         // the seeded defaults, which is a worse game but not a broken one.
         console.warn('[tutorial] game plan save/advance failed:', e);
+      }
+      if (!saved) {
+        tutorialSaveFailures += 1;
+        if (tutorialSaveFailures === 1) {
+          // Say it out loud rather than playing a game that ignores the plan the user
+          // just set. PLAY NOW stays live, so the press is the retry.
+          showModal("Your game plan couldn't be saved. Press PLAY NOW to try again — otherwise this game uses the default plan.");
+          cta.disabled = false;
+          return;
+        }
+        console.warn('[tutorial] game plan save failed twice — continuing on the default plan');
       }
       // Forward the query string VERBATIM. It carries the chosen five as
       // home_pg / home_sg / … — rebuilding it here would drop the lineup and leave

@@ -1191,9 +1191,13 @@ def autoset_strategy_settings(team: TeamManager, game_state=None):
     Returns:
         dict: The team's effective strategy settings
     """
-    # USER TEAMS: full sim only (PR0.5). Outside full sim the user owns their playcalls and this
-    # must not touch them (governor spec A2). Inside full sim the sit-on-the-lead damping applies
-    # to them exactly as it does to a CPU team — see _blowout_lineup_active for the evidence.
+    # USER TEAMS: this guard ALLOWS a user team through during a full sim, but no caller
+    # actually sends one — every call site gates on `if not team.is_user_team`
+    # (main.py:431, game_manager.py:494 / :502 / :713). So in practice the user's saved game
+    # plan is never damped, in full sim or out of it; this is defence-in-depth, not the
+    # behaviour. Do not cite it as evidence that user sliders get damped — audited 2026-09-16
+    # after a report that a Fast Break slider of 3 looked ignored (it was not damped here).
+    # If a caller ever does pass a user team in, the sit-on-the-lead rolls below WOULD apply.
     #
     # SAFE BY CONSTRUCTION, not by avoidance: `strategy_settings_base` below holds the pristine
     # plan and `strategy_settings` is a per-call damped VIEW recomputed on every lineup rebuild.
