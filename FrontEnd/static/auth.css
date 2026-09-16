@@ -482,7 +482,9 @@ body::after {
   border-radius: 14px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   padding: 26px 24px 24px;
+  width: min(400px, calc(100vw - 32px));
   max-width: 400px;
+  box-sizing: border-box;
   text-align: center;
   overflow: hidden;
 }
@@ -513,13 +515,17 @@ body::after {
   line-height: 1.45;
 }
 
+.access-request-modal .auth-form,
+.access-request-modal .auth-button {
+  width: 100%;
+}
+
 .access-request-modal .form-group {
   text-align: left;
 }
 
 .access-request-modal-close {
   margin: 0;
-  width: 100%;
 }
 
 /* Responsive */
