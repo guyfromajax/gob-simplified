@@ -308,7 +308,7 @@ Tutorial follows the `single` path through `finalizeGame.js` (no franchise/tourn
 |---|---|
 | `js/shared/teamCoachAsset.js` | Team → Sammy image path |
 | ~~`js/shared/tutorialProgressThread.js` + `css/tutorial-progress.css`~~ | **DELETED 2026-09-12** — progress indicator, overlapped the action buttons |
-| `js/shared/tutorialLineupModals.js` + `css/tutorial-lineup-modal.css` | Set-lineup intro + post-lineup feedback modals; also exports `pickLineupFeedbackMessage` (the algorithm) |
+| `js/shared/tutorialLineupModals.js` + `css/tutorial-lineup-modal.css` | Set-lineup intro + post-lineup feedback modals; also exports `pickLineupFeedbackMessage` (the algorithm). Modals append only after their CSS applies (`js/shared/stylesheetReady.js`, 2s cap) — appending earlier painted the 3000px Sammy PNG unsized for a CSS round trip |
 | `js/shared/attributeTour.js` + `css/attribute-tour.css` | First-run attribute-discovery tour on tutorial set-lineup (scrim + lifted header row + shimmer cues + Sammy coach-mark + X-of-N counter) |
 | `js/shared/coachMark.js` + `css/coach-mark.css` | Spotlight tooltip primitive — **available but not currently used in the FTE flow** (set-lineup intro switched to a centered Functional modal); kept for future tutorials |
 | `js/shared/getGameMode.js` | Single source of truth for the mode value passed to EOG popup (see §8) |

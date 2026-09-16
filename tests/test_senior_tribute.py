@@ -20,7 +20,7 @@ def test_senior_tribute_active_seniors_rt_desc(monkeypatch):
     fpd.find.return_value = [
         {
             "player_id": "star",
-            "meta": {"first_name": "Ace", "last_name": "Walker", "year": "Senior"},
+            "meta": {"first_name": "Ace", "last_name": "Walker", "year": "Senior", "jersey": 7},
             "career": {"GP": 30, "PTS": 540, "REB": 210, "AST": 120, "DEF_S": 80, "DEF_A": 100},
             "position_ratings": {"SG": 88, "PG": 70},
             "titles": {"conf_rs": 1, "conf_t": 0, "region": 0, "national": 0},
@@ -67,11 +67,21 @@ def test_senior_tribute_active_seniors_rt_desc(monkeypatch):
     assert star["def_pct"] == 80
     assert star["titles"]["conf_rs"] == 1
     assert star["titles"]["national"] == 0
+    assert star["first_name"] == "Ace"
+    assert star["last_name"] == "Walker"
+    assert star["jersey_number"] == 7
+    assert star["position"] == "SG"  # best-rated key of position_ratings
+    assert star["games_played"] == 30
+    assert star["career_points"] == 540
     role = payload["players"][1]
     assert role["ppg"] == 5.0
     assert role["rpg"] == 2.5
     assert role["def_pct"] == 0
     assert role["titles"] == {"conf_rs": 0, "conf_t": 0, "region": 0, "national": 0}
+    assert role["jersey_number"] is None  # absent on meta — never synthesised
+    assert role["position"] == "PF"
+    assert role["games_played"] == 10
+    assert role["career_points"] == 50
 
 
 def test_senior_tribute_empty_without_team():

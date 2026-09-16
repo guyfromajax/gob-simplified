@@ -4,7 +4,7 @@
  * Shows on all screens EXCEPT gameplay (court, set-lineup) and training screens.
  *
  * - Injects auth bar HTML if not present
- * - Loads auth-bar.css
+ * - Loads auth-bar.css, and injects the bar only once it has applied
  * - Initializes auth state (email, logout)
  * - Alpha badge visibility via AlphaBanner or app config
  */
@@ -59,14 +59,41 @@
     return true;
   }
 
-  function ensureAuthBarStyles() {
-    if (document.getElementById('auth-bar-styles-link')) return;
-    if (document.querySelector('link[href*="auth-bar.css"]')) return;
-    var link = document.createElement('link');
-    link.id = 'auth-bar-styles-link';
-    link.rel = 'stylesheet';
-    link.href = '/css/auth-bar.css';
-    document.head.appendChild(link);
+  // Max wait for auth-bar.css before injecting anyway. Inline copy of the contract in
+  // js/shared/stylesheetReady.js (this is a classic script and cannot import it).
+  var AUTH_BAR_CSS_WAIT_MAX_MS = 2000;
+
+  // Calls back once auth-bar.css has applied: synchronously when it already has (pages
+  // that link it in <head>), else on load / error / timeout. The logo's 40px height lives
+  // in that file; injected earlier, the 3892px logo PNG paints at natural size until the
+  // CSS round trip returns.
+  function whenAuthBarStylesReady(callback) {
+    var link = document.getElementById('auth-bar-styles-link') ||
+      document.querySelector('link[href*="auth-bar.css"]');
+    var applied = false;
+    try { applied = !!(link && link.sheet); } catch (e) { applied = false; }
+    if (applied) {
+      callback();
+      return;
+    }
+    if (!link) {
+      link = document.createElement('link');
+      link.id = 'auth-bar-styles-link';
+      link.rel = 'stylesheet';
+      link.href = '/css/auth-bar.css';
+      document.head.appendChild(link);
+    }
+    var fired = false;
+    var timer = null;
+    function done() {
+      if (fired) return;
+      fired = true;
+      clearTimeout(timer);
+      callback();
+    }
+    timer = setTimeout(done, AUTH_BAR_CSS_WAIT_MAX_MS);
+    link.addEventListener('load', done);
+    link.addEventListener('error', done);
   }
 
   function getLogoDestination(isLoggedIn) {
@@ -1110,14 +1137,19 @@
   function initAuthBar() {
     applyGlobalDisplayColor(normalizeAccountSettings((getStoredAuthUser() || {}).account_settings).display_color);
     if (!shouldShowAuthBar()) return;
-    ensureAuthBarStyles();
-    injectAuthBar();
-    injectFooter();
-    initAccountSettingsModal();
-    initAuthState();
-    ensureTutorialAlertExperience();
-    initAlphaBadge();
-    initFeedbackModal();
+    // Set now, not at inject: the bar is coming, and consumers that read the class
+    // (maintenance banner offset, team-builder's 72px chrome fallback) must not see a
+    // bar-less page while we wait for the stylesheet.
+    document.body.classList.add('has-auth-bar');
+    whenAuthBarStylesReady(function () {
+      injectAuthBar();
+      injectFooter();
+      initAccountSettingsModal();
+      initAuthState();
+      ensureTutorialAlertExperience();
+      initAlphaBadge();
+      initFeedbackModal();
+    });
   }
 
   function run() {

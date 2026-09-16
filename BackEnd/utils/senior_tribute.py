@@ -53,6 +53,34 @@ def _best_rt(position_ratings: Any) -> float:
     return best
 
 
+def _best_position(position_ratings: Any) -> str | None:
+    """Best-rated position key (e.g. ``"SG"``); the first key wins a tie. ``None`` when unrated.
+
+    Same rule as ``franchise_routes._best_position`` — the tribute shows the position the
+    player rates highest at, which is also what orders the slides (via ``_best_rt``).
+    """
+    if not isinstance(position_ratings, dict):
+        return None
+    best_pos: str | None = None
+    best = None
+    for pos, value in position_ratings.items():
+        try:
+            rating = float(value)
+        except (TypeError, ValueError):
+            continue
+        if best is None or rating > best:
+            best_pos, best = str(pos), rating
+    return best_pos
+
+
+def _jersey_number(meta: dict[str, Any]) -> Any:
+    """``meta.jersey`` as stored, or ``None`` when absent/blank. Never synthesised."""
+    value = meta.get("jersey")
+    if value is None or str(value).strip() == "":
+        return None
+    return value
+
+
 def _player_name(meta: dict[str, Any]) -> str:
     first = str(meta.get("first_name") or "").strip()
     last = str(meta.get("last_name") or "").strip()
@@ -117,12 +145,20 @@ def build_senior_tribute_payload(
             {
                 "player_id": player_id,
                 "name": _player_name(meta),
+                # Split name: the slide sets the given name and surname on separate lines,
+                # and splitting ``name`` would misplace multi-word first names.
+                "first_name": str(meta.get("first_name") or "").strip(),
+                "last_name": str(meta.get("last_name") or "").strip(),
                 "rt": _best_rt(fpd.get("position_ratings")),
                 "ppg": _per_game(_stat_float(career, "PTS"), games),
                 "rpg": _per_game(_career_rebounds(career), games),
                 "apg": _per_game(_stat_float(career, "AST"), games),
                 "def_pct": _season_def_pct_whole(career),
                 "titles": titles,
+                "jersey_number": _jersey_number(meta),
+                "position": _best_position(fpd.get("position_ratings")),
+                "games_played": games,
+                "career_points": int(round(_stat_float(career, "PTS"))),
             }
         )
 

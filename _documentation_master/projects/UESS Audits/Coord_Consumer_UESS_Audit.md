@@ -1,5 +1,7 @@
 # Coord-Consumer UESS Audit — `player.coords` vs render
 
+> **Findings as of 2026-07-05 (updates through 2026-09-06). Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Question:** which game-logic consumers decide from `player.coords` (animator row-end, set by `apply_coords_from_animations_list`) instead of the emitter's rendered coord — the same defect that mis-scored 2PT/3PT classification? (2026-07-05, 3 parallel traces + probes.)
 
 ## Root cause (one line)
@@ -62,7 +64,7 @@ HCO now freezes a `ShotAttemptGeometry` before `resolve_shot()`:
   mutable defender coords once the contract exists.
 
 This is deliberately a shot-attempt slice, not yet a universal stop-state migration. Its value-object
-shape is reusable for the broader resolve-once work in `hco_roles_audit.md` after shot behavior is
+shape is reusable for the broader resolve-once work in `../Z-Completed/hco_roles_audit.md` (archived) after shot behavior is
 validated.
 
 **Accepted-gaps rationale:** #5-#7 are all *attribution / second-order shot-difficulty* effects, not binary-outcome (contest/possession) flips. The four HIGH holes (#1-#4) that flip actual outcomes are closed. Revisit #5 if a zone-double-team or zone-FG% anomaly surfaces in tuning.

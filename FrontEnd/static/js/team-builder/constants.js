@@ -126,7 +126,7 @@
    * Portrait picker skin-tone chips (display layer only).
    * Classifier keys are unchanged underneath — each chip maps to one or more
    * keys for matching. Fills are measured mean RGB from the 450-image pool
-   * (face crop; see team-builder-v2-plan.md §6.5b). Do not normalise chroma:
+   * (face crop; see projects/Z-Completed/team-builder-v2-plan.md §6.5b). Do not normalise chroma:
    * ends are duller (C* ~12–16) than the mid chip (C* ~24) by measurement.
    * Never put classifier taxonomy in rendered markup (labels, titles, aria,
    * class names, or data-* attributes).

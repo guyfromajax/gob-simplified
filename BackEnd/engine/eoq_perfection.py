@@ -390,6 +390,8 @@ def combine_eoq_origin_prefix(result: Dict[str, Any]) -> None:
                         0.0, float(prefix_shot_clock) - (float(source_shot_start) - float(value))
                     )
 
+    _seed_flss_start_from_prefix_end(prefix, flss_steps)
+
     combined = prefix + flss_steps
     for index, step in enumerate(combined):
         end = step.get("end") or {}
@@ -398,6 +400,66 @@ def combine_eoq_origin_prefix(result: Dict[str, Any]) -> None:
     result["animation_steps"] = combined
     result["eoq_origin_prefix_step_count"] = len(prefix)
     result["eoq_shortened_turn"] = True
+
+
+def _seed_flss_start_from_prefix_end(
+    prefix: List[Dict[str, Any]],
+    flss_steps: List[Dict[str, Any]],
+) -> int:
+    """UESS §8.1 at the EOQ join: ``flss[0].start.coords`` ← ``prefix[-1].end.coords``.
+
+    Same merge HCO already does inline (``skeleton_step_emitter.py:2143-2145``,
+    ``{**anim_start, **prior_end}``). Prior end wins. Does not rewrite
+    ``time_elapsed`` / ``T_game_seconds`` / tween_durations — those were
+    written at emit from the pre-join start (``:2449``). Changing T here
+    would move the clock.
+    """
+    if not prefix or not flss_steps:
+        return 0
+    prior_end = ((prefix[-1].get("end") or {}).get("coords")) or {}
+    if not isinstance(prior_end, dict) or not prior_end:
+        return 0
+    flss0 = flss_steps[0].setdefault("start", {})
+    if not isinstance(flss0, dict):
+        return 0
+    start_coords = flss0.get("coords")
+    if not isinstance(start_coords, dict):
+        start_coords = {}
+        flss0["coords"] = start_coords
+    moved = 0
+    for pid, pe in prior_end.items():
+        if not isinstance(pe, dict):
+            continue
+        try:
+            px, py = float(pe.get("x")), float(pe.get("y"))
+        except (TypeError, ValueError):
+            continue
+        cc = start_coords.get(pid)
+        if isinstance(cc, dict):
+            try:
+                sx, sy = float(cc.get("x")), float(cc.get("y"))
+            except (TypeError, ValueError):
+                sx, sy = None, None
+            if sx is not None and sy is not None and abs(sx - px) <= 1e-6 and abs(sy - py) <= 1e-6:
+                continue
+            logging.warning(
+                "[EOQ FLSS MERGE] player %s start=(%.2f,%.2f) -> prefix end=(%.2f,%.2f)",
+                pid,
+                float(sx) if sx is not None else float("nan"),
+                float(sy) if sy is not None else float("nan"),
+                px,
+                py,
+            )
+        else:
+            logging.warning(
+                "[EOQ FLSS MERGE] player %s start=missing -> prefix end=(%.2f,%.2f)",
+                pid,
+                px,
+                py,
+            )
+        start_coords[pid] = {"x": px, "y": py}
+        moved += 1
+    return moved
 
 
 @dataclass(frozen=True)
@@ -564,6 +626,39 @@ def _flss_defender_coords(shooter_coords: Dict[str, float], *, is_home_offense: 
     return {"x": round(max(1, sx - 3), 2), "y": sy}
 
 
+def _place_flss_penalty_defender(
+    shooter_coords: Dict[str, float],
+    def_lineup: Dict[str, Any],
+    *,
+    is_home_offense: bool,
+):
+    """Pick the nearest defender and stand him on the authored FLSS contest spot.
+
+    The selector reads live ``player.coords`` (item 24). The write is
+    ``_flss_defender_coords`` — shooter x ± 3, same y — not a read of where
+    he was, and not ``{50, 25}``. ``resolve_shot`` then measures contest from
+    those coords (``_player_xy``, radius 11). A missing pick must not invent
+    a defender.
+    """
+    if not def_lineup:
+        return None
+    defender = select_defender_closest_to_victim(shooter_coords, def_lineup, None)
+    if defender is None:
+        raise RuntimeError(
+            "FLSS penalty: no defender has a usable coordinate; "
+            "refusing to invent a contest position"
+        )
+    d_pos = get_player_position(def_lineup, defender)
+    if not d_pos:
+        raise RuntimeError(
+            "FLSS penalty: closest defender is not in the defensive lineup"
+        )
+    defender.coords = dict(
+        _flss_defender_coords(shooter_coords, is_home_offense=is_home_offense)
+    )
+    return defender
+
+
 def _resolve_flss_heave(
     shooter, shooter_x: float, *, is_home_offense: bool
 ) -> Tuple[bool, int, float, int]:
@@ -708,12 +803,9 @@ def resolve_flss_shot_logic(
 
     defender = None
     if zone == "penalty" and def_lineup:
-        defender = select_defender_closest_to_victim(shooter_coords, def_lineup, None)
-        if defender:
-            d_pos = get_player_position(def_lineup, defender)
-            if d_pos:
-                d_coords = _flss_defender_coords(shooter_coords, is_home_offense=is_home_off)
-                defender.coords = dict(d_coords)
+        defender = _place_flss_penalty_defender(
+            shooter_coords, def_lineup, is_home_offense=is_home_off
+        )
 
     if zone == "heave":
         from BackEnd.constants.shot_variants import (

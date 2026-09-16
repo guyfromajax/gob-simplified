@@ -11,7 +11,7 @@
 (function (global) {
   'use strict';
 
-  // Verbatim from team-builder-v2-plan.md §5.1 — conference-level geography.
+  // Verbatim from projects/Z-Completed/team-builder-v2-plan.md §5.1 — conference-level geography.
   // Does not replace or overload region A–H.
   var CONFERENCE_GEOGRAPHY = {
     1: ['Pennsylvania', 'New Jersey', 'Delaware'],

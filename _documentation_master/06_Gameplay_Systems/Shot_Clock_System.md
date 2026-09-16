@@ -72,18 +72,20 @@ The frontend snaps the shot clock using the same pattern as the game clock: use 
 
 ## Shot clock violation vs forced shot attempt
 
-When a clock-enforced turn would hit shot clock 0, the backend decides between a violation and a forced shot attempt (`phase_resolution.py` ~L4605):
+When a clock-enforced turn would hit shot clock 0, the backend decides between a violation and a forced shot attempt (`resolve_half_court_offense_logic` → `_shot_clock_iq_threshold`):
 
 ```
 chemistry    = offense team's chemistry value (7–25)
 discipline   = offense team's discipline value (−10 to 10)
-intelligence = int(ball handler's IQ attribute / 4)   (0–25)
+intelligence = min(25, int(ball-holder IQ / 4))
 
 violation_threshold = 60 + chemistry + discipline + intelligence
 x = random.randint(1, 100)
 if x > violation_threshold: violation = True
 else:                       shot attempt = True
 ```
+
+**Whose IQ.** The holder on the pin step. `get_ball_handler_from_skeleton` accepts only `handle_ball` / `receive` / `shoot` and invents the PG on a `drive` pin. After `x` is drawn, `recompute_shot_clock_threshold_from_pin_driver` rereads the pin step's `drive` action and recomputes the threshold from that driver's IQ. Same `x`. No extra draw. No drive pin is a no-op (rule 26). See bugs.md item 59. Do not teach the resolver `drive` — that desyncs zone RNG (item 60).
 
 If a shot attempt results, the ball handler shoots from his location at the point the turn ends, with **+100 added to the shot threshold** when calculating shot success.
 
@@ -159,7 +161,7 @@ Both are clamped to `>= 0`.
 ## Key files
 
 - `BackEnd/models/turn_manager.py` — shot-clock derivation (`shot_clock_end`, `game_seconds_at_shot`), contract attach, reset-for-next-turn.
-- `BackEnd/engine/phase_resolution.py` — shot-clock-0 handling in `resolve_half_court_offense_logic`: violation vs forced shot (`violation_threshold`), Motion second-chance recalibration (`recalibration_score`, `_motion_shot_recalibrated`); dynamic HCO/set-play walks may stamp `_hco_shot_clock_est` for finer at-attempt tier diagnostics.
+- `BackEnd/engine/phase_resolution.py` — shot-clock-0 handling in `resolve_half_court_offense_logic`: violation vs forced shot (`_shot_clock_iq_threshold`, `recompute_shot_clock_threshold_from_pin_driver`), Motion second-chance recalibration (`recalibration_score`, `_motion_shot_recalibrated`); dynamic HCO/set-play walks may stamp `_hco_shot_clock_est` for finer at-attempt tier diagnostics.
 - `BackEnd/utils/shot_split_tracker.py` — end-of-game **HCO shot-clock tier** report (`hco_shot_tier_counts`): every HCO FGA via `record_shot_split` / `ShotManager._record_shot_diagnostics`. At-attempt clock: dynamic `_hco_shot_clock_est` when stamped, else `shot_clock_remaining − elapsed_to_shot_step` (same detach math as `turn_manager._shot_detach_elapsed_seconds`). Grep `END-OF-GAME SHOT DIAGNOSTICS`.
 - `BackEnd/api/api.py` — `/api/call-timeout` min-reconciliation; `/api/simulate-quarter?resume_from_timeout=true` restore.
 - Frontend clock display / snap: `FrontEnd/static/js/phaser/utils/gameClock.js`, `court.html`; see `clock_sync_system.md` §9.

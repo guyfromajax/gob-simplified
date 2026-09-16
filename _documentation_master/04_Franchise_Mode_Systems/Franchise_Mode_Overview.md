@@ -52,6 +52,13 @@ tutorial funnel. Recruit-set consumption and all roster/progression state remain
 per-franchise. Soft archive, per-slot career ledgers, and more than two slots are
 not supported.
 
+**Open before wide rollout (capacity):** a dual-active user carries ~2× franchise-scoped
+storage (FTD×128 + FPD/FRD + games dominate), and there is no retention code.
+1. Measure disk for one mid-season franchise (FTD + games); budget 2× per active user.
+2. Decide on pruning old `games` docs and/or warning when both slots are deep into seasons.
+3. Watch the worker pool when both slots run complete-week / CPU sims in parallel
+   (FE single-flight is per `franchise_id:week`, so that part is safe).
+
 Season initialization (`FranchiseManager.initialize_season`, `BackEnd/models/franchise_manager.py`) generates the 26-week schedule, sets `week = 1`, and seeds FTD/FPD for all 128 teams from the universal collections. `FRANCHISE_START_WEEK` env var can start a franchise at a later week for testing.
 
 Roster size rule: teams carry **12–15 players** from post-recruiting through the season transition; after week-1 training camp the roster must be cut to a legal 12 before gameplay resumes (`cut-players.html`, `cut_required` on the command-center payload).

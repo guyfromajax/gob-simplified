@@ -4648,10 +4648,16 @@ playNowBtn.addEventListener('click', async () => {
       window.SeniorTribute.start({
         players: seniors,
         season: tribute.season || commandCenterTopDataCache?.current_season || 1,
+        // Atmosphere only (one soft radial on the tribute host).
+        teamColor: normalizeHexColor(commandCenterTopDataCache?.primary_color) || undefined,
         onAdvance: async () => {
           let overlay = null;
           if (finishState === 'pending') {
             overlay = showSeasonAdvanceOverlay(nextSeasonNumber());
+            // The cover (z 4000) sits below the tribute (z 10010), so it would open
+            // invisibly behind it. Remove the tribute so this screen matches the
+            // no-seniors path exactly. failAdvance already tears it down on error.
+            window.SeniorTribute.teardown();
           }
           try {
             await finishPromise;

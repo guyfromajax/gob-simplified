@@ -7,7 +7,7 @@ object per (portrait x team look), shared by every franchise — and stamps
 ``meta.uniform_key`` so the client addresses it directly instead of missing and
 waiting on a paint.
 
-See _documentation_master/projects/Uniform_Archive_Brief.md.
+See _documentation_master/00_Operations/Player_Image_System.md § Uniform archive.
 
 WHY THIS RUNS BEFORE THE PER-GAME WARM: with the debt cleared the warm paints
 nothing in the steady state, so no user ever waits on a paint. Run it lazily instead

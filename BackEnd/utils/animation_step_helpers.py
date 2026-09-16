@@ -124,8 +124,14 @@ def stamp_idle_wander_on_still_players(
     min_step_ms: float = IDLE_STILL_MIN_STEP_MS,
     default_style: str = IDLE_STILL_DEFAULT_STYLE,
 ) -> int:
-    """Give every STILL player on ``steps`` a render-space ``idle_wander`` flourish. Returns the
+    """Give still players on ``steps`` a render-space ``idle_wander`` flourish. Returns the
     number of player-stamps written.
+
+    ONE DENSITY CAP, PER STEP. ``cap`` bounds the total concurrent ``idle_wander`` stamps
+    already on the step plus the ones this pass writes. A second call (HCO's ``make_hold``
+    after ``hco_still``) must not take its own fresh ``[:cap]`` of the remaining still
+    men — that is item 30, 334 HCO/MAKE steps carrying 10 idlers. Arrival fill already
+    honoured the leftover headroom; this writer now does the same.
 
     ``family`` is stamped onto each flourish so ``animation_config.js`` can override style and
     amplitude per family without a backend round-trip.
@@ -189,6 +195,14 @@ def stamp_idle_wander_on_still_players(
             continue
 
         flourish = start.get("flourish") or {}
+        # ONE cap, per step, across every still-player pass. A second family
+        # (HCO's make_hold after hco_still) used to take its own [:cap] of the
+        # remaining still men and the court carried 10 idlers. Arrival fill
+        # already counted existing idle_wander; this pass did not.
+        existing_idlers = sum(
+            1 for f in flourish.values()
+            if isinstance(f, dict) and f.get("kind") == "idle_wander"
+        )
         candidates = [
             pid for pid in still_now
             if pid not in excluded
@@ -199,7 +213,10 @@ def stamp_idle_wander_on_still_players(
             continue
         candidates.sort(key=lambda pid: (-still_runs.get(pid, 0), _idle_crc(pid)))
         if cap is not None and cap >= 0:
-            candidates = candidates[:cap]
+            headroom = cap - existing_idlers
+            if headroom <= 0:
+                continue
+            candidates = candidates[:headroom]
 
         target = step.setdefault("start", {}).setdefault("flourish", {})
         for pid in candidates:
@@ -1627,3 +1644,153 @@ def announce_post_steal_premature_attach(
 def json_owner(owner: str) -> str:
     """Quote empty-string owners so they do not render as nothing."""
     return '""' if owner == "" else owner
+
+
+def _fe_claimed_owner(ball: Any) -> Optional[str]:
+    """FE ``claimedBallOwnerId`` — VALUE, not key presence. ``""`` is unattached."""
+    if not isinstance(ball, dict) or "owner_player_id" not in ball:
+        return None
+    owner = ball.get("owner_player_id")
+    if owner is None or str(owner) == "":
+        return None
+    return str(owner)
+
+
+def authored_ball_xy(ball: Any) -> Optional[GridCoord]:
+    """Read ``current_coords`` or ``coords``. Never infer from an owner."""
+    if not isinstance(ball, dict):
+        return None
+    for key in ("current_coords", "coords"):
+        c = ball.get(key)
+        if not isinstance(c, dict):
+            continue
+        x, y = c.get("x"), c.get("y")
+        if x is None or y is None:
+            continue
+        try:
+            return {"x": float(x), "y": float(y)}
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _real_final_ball_xy(coord: Any) -> Optional[GridCoord]:
+    return authored_ball_xy({"coords": coord}) if isinstance(coord, dict) else None
+
+
+def carry_ball_coord_continuity(
+    steps: Optional[List[Dict[str, Any]]],
+    *,
+    prior_final_ball_coords: Any = None,
+    context: str = "",
+) -> int:
+    """UESS ball continuity — the ball has no §8.1 rule; this is that hole.
+
+    An unplaced loose boundary (no claimed owner, no ``coords`` /
+    ``current_coords``) inherits the last authored ball coord in the
+    rendered walk, or the prior turn's ``final_ball_coords`` when the
+    unplaced run is still at the front of the turn.
+
+    A READ of an existing write. Does not compute a position from a
+    player, a shot spot, or a basket. Skips a carry that would open a
+    new loose-loose *seam* (existing seam-static pairs stay put).
+
+    Policy 26b: every carry logs the source, the xy, and the owner
+    encoding it replaced. Returns the carry count.
+    """
+    order = rendered_step_indices(steps)
+    if not order:
+        return 0
+    index_in_order = {i: n for n, i in enumerate(order)}
+    prior_xy = _real_final_ball_xy(prior_final_ball_coords)
+    carries = 0
+    cursor: Optional[GridCoord] = None
+    seen_placed = False
+    block_run = False
+    prev: Optional[Tuple[int, str, Any]] = None
+
+    def _outgoing_loose_pos(idx: int) -> bool:
+        """True when the next rendered step already starts loose+positioned."""
+        pos = index_in_order.get(idx)
+        if pos is None or pos + 1 >= len(order):
+            return False
+        nxt = steps[order[pos + 1]]
+        nball = (nxt.get("start") or {}).get("ball") if isinstance(nxt, dict) else None
+        return _fe_claimed_owner(nball) is None and authored_ball_xy(nball) is not None
+
+    for idx in order:
+        step = steps[idx]
+        if not isinstance(step, dict):
+            continue
+        for side in ("start", "end"):
+            container = step.get(side)
+            ball = container.get("ball") if isinstance(container, dict) else None
+            claimed = _fe_claimed_owner(ball)
+            xy = authored_ball_xy(ball)
+
+            if claimed is not None:
+                # Keep ``cursor`` — an earlier authored ball write is still
+                # a legal read. Clearing it would invent from the owner.
+                seen_placed = True
+                block_run = False
+                prev = (idx, side, ball)
+                continue
+            if xy is not None:
+                cursor = dict(xy)
+                seen_placed = True
+                block_run = False
+                prev = (idx, side, ball)
+                continue
+            if not isinstance(ball, dict):
+                prev = (idx, side, ball)
+                continue
+
+            source = dict(cursor) if cursor is not None else None
+            src_kind = "same_turn_authored"
+            if source is None and not seen_placed and prior_xy is not None:
+                source = dict(prior_xy)
+                src_kind = "prior_turn_final_ball_coords"
+
+            seam_block = False
+            if (
+                source is not None
+                and prev is not None
+                and prev[0] != idx
+                and _fe_claimed_owner(prev[2]) is None
+                and authored_ball_xy(prev[2]) is not None
+            ):
+                seam_block = True
+            if source is not None and _outgoing_loose_pos(idx):
+                # Filling this step would open a seam onto an already-placed
+                # loose ball (inbound rest → shot landing). Leave it.
+                seam_block = True
+
+            if source is None or seam_block or block_run:
+                if seam_block:
+                    block_run = True
+                prev = (idx, side, ball)
+                continue
+
+            replaced = (
+                json_owner(str(ball.get("owner_player_id")))
+                if "owner_player_id" in ball
+                else "<absent>"
+            )
+            ball.pop("owner_player_id", None)
+            ball["coords"] = {"x": float(source["x"]), "y": float(source["y"])}
+            logging.warning(
+                "[UESS BALL CONTINUITY] carried authored coord%s: step %d %s "
+                "source=%s xy=(%.2f,%.2f) replaced_owner=%s",
+                (" " + context) if context else "",
+                idx,
+                side,
+                src_kind,
+                float(source["x"]),
+                float(source["y"]),
+                replaced,
+            )
+            carries += 1
+            cursor = dict(ball["coords"])
+            seen_placed = True
+            prev = (idx, side, ball)
+    return carries

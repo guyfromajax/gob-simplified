@@ -403,7 +403,7 @@ def _walk_ball_owners(
     # step hardcoded it (dead-ball fumble fired + announced BEFORE the ball reached the receiver on
     # split reversals — some-but-not-all DBTOs). Flipping on the receive step keeps flight geometry
     # correct (meet-point resolves from the receiver's actual catch motion). See the DBTO timing trace
-    # in projects/hco_roles_audit.md.
+    # in projects/Z-Completed/hco_roles_audit.md.
     pending_pass = False
     for step in skeleton_steps:
         pos_actions = step.get("pos_actions") or {}
@@ -413,7 +413,7 @@ def _walk_ball_owners(
         # (PG-first) `handle_ball`/`pass` pos, which let a NOMINAL `PG: handle_ball` in the loop skeleton
         # override a receiver who genuinely held the ball after a reversal — so on non-shot outcomes the
         # ball snapped back to the passer even though ownership had legitimately moved (bug #5 second
-        # half; the jitter victim was already fixed separately). See projects/hco_roles_audit.md.
+        # half; the jitter victim was already fixed separately). See projects/Z-Completed/hco_roles_audit.md.
         if current_owner is None:
             for pos in _OFFENSE_POSITIONS:
                 action = (pos_actions.get(pos) or {}).get("action")
@@ -443,6 +443,13 @@ def _walk_ball_owners(
             # Lone `pass` (no same-step receive): the ball is in flight — owner stays with the passer
             # until the matching `receive` step flips it above.
             pending_pass = True
+        # Shot-at-1 clock truncate dropped a receive. The glued shoot step carries
+        # `_sa1_within_step_pass` so ownership still flips on this step (catch-and-
+        # shoot) without restoring pos_actions. Assist-neutral.
+        sa1_xfer = step.get("_sa1_within_step_pass")
+        if isinstance(sa1_xfer, dict) and sa1_xfer.get("receiver_pos"):
+            current_owner = sa1_xfer["receiver_pos"]
+            pending_pass = False
         end_owner = current_owner
         walks.append((start_owner, end_owner))
     return walks
@@ -2237,16 +2244,23 @@ def build_skeleton_animation_steps(
                 break
 
         ball_handler_role = roles.get("ball_handler")
-        bh_id_fallback = _safe_id(ball_handler_role) or ""
+        bh_id_fallback = _safe_id(ball_handler_role) or None
 
-        ball_start: BallState = (
-            {"owner_player_id": owner_id_start} if owner_id_start
-            else {"owner_player_id": bh_id_fallback}
-        )
-        ball_end: BallState = (
-            {"owner_player_id": owner_id_end} if owner_id_end
-            else {"owner_player_id": bh_id_fallback}
-        )
+        # Omit the owner key when nobody holds the ball. ``or ""`` was the
+        # item 44 encoding (key present, lookup is coords[""]). Continuity
+        # coords land in carry_ball_coord_continuity, not here.
+        if owner_id_start:
+            ball_start = {"owner_player_id": owner_id_start}
+        elif bh_id_fallback:
+            ball_start = {"owner_player_id": bh_id_fallback}
+        else:
+            ball_start = {}
+        if owner_id_end:
+            ball_end = {"owner_player_id": owner_id_end}
+        elif bh_id_fallback:
+            ball_end = {"owner_player_id": bh_id_fallback}
+        else:
+            ball_end = {}
 
         # Final Turn step 0 (alignment): the ball is on the SKELETON BH. In handoff /
         # best-effort modes the handoff-first prepend already delivered it to the PG

@@ -1,5 +1,7 @@
 # SIP (Side Inbound Pass) — UESS Compliance Audit
 
+> **Findings as of 2026-07-05. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Verdict: LARGELY COMPLIANT — cleaner than BIP.** One real defect (entry ball teleport, HIGH) — the exact BIP-Task 3 fix SIP never received. Everything else is clean or shared-with-BIP MED/LOW. (2026-07-05, 4-dimension parallel trace.)
 
 ## Topline (human-scannable)

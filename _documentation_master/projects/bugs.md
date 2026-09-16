@@ -1,4 +1,5 @@
 ##Marketing
+1. Wave 1 creator outreach
 
 
 ##Monetization
@@ -24,10 +25,17 @@
 4. Stronger week 36 CTA to review all Recrutiing results -- and carry forward results chart, not just report/rankings. Order chart within each conference by top to bottom team recruiting performance
 6. Replace Kobe look alike image and add more walk on images
 7. Auto train button on FCC
+8. Position & Archetype assignmnents for players
+9. Depth charts
 
 
 ##Animation
 1. Evolve animation from annoying to rewarding
+2. **POST-LAUNCH — §8.1 for the ball.** Emitters author a ball position
+   on every step. The 2026-09-14 continuity carry is a mitigation that
+   reads a neighbour; the remaining 30/28 unplaced steps are what is
+   left of a missing rule, not what is left of a bug. See bugs.md
+   item 57.
 
 
 ##Operations
@@ -65,24 +73,23 @@
 2a. Fast Break animation is still sloppy and inconsistent with defenders in particular not moving on shot steps or freezing before the shot step then teleporting
 2b. Still reading fouled 3 pt attempts as 2 pt shots in some instances
 2c. some HCO turnovers are still mismatched on BE and FE as to who the ball handler is. Note teh BE logic + turnover animation jiggle are synced, but sometimes a different player is holding teh ball.
+    _(Possibly related, untraced: the ~4% interception stale-victim fallback in `06_Gameplay_Systems/Dynamic_HCO_System.md` §4, and the step-0 owner bootstrap disagreement in `projects/UESS Audits/HCO_UESS_Audit.md`.)_
 2d. Sometimes the deleting franchise gets stuck in an infinite loop
-3. OPEN — a shooting foul hands off to FREE_THROW but no FREE_THROW turn follows (~0.5/game)
-   - Surfaced while measuring the fouled-3PT free-throw misaward (fixed 2026-09-07, see below).
-     After that fix the residual misaward rate is entirely this family: 6 of 221 fouled attempts
-     (played) and 7 of 203 (sim) over 12 seeded games per arm, seeds 8000-8011.
-   - Shape: the shot turn carries `next_turn == "FREE_THROW"` and the branch set a non-zero
-     `free_throws`, but zero FREE_THROW turns appear after it in `gm.turns`.
-   - NOT the count bug and NOT direction-specific: it hits 2PT and 3PT, made and missed, at
-     similar rates, and it was present at the same shape BEFORE the count fix. Independent.
-   - Two qualifications, neither excluded yet:
-     (a) the free throws may genuinely never be taken (a real dropped-possession bug), or
-     (b) the trip may be non-adjacent in the turn list — an intervening turn (foul-out
-         substitution, timeout, period bookkeeping) would break the probe's adjacency
-         assumption and make this a measurement artifact rather than a bug.
-   - Ruled out: end-of-quarter truncation. Every instance has `near_quarter_end=False` and
-     `current_turn == "HCO"`, spread through the game rather than clustered at period ends.
-   - To diagnose: record the result_type of the turn that actually follows, which distinguishes
-     (a) from (b) in one run. Probe: `scratch_ft3.py` / `scratch_ft3_run.py`.
+3. CLOSED — the "~0.5 missing FT/game" family is gone. **0 missing across 382 awards.**
+   - Published (2026-09-07): a shooting foul hands off to FREE_THROW but no FREE_THROW
+     turn follows (~0.5/game). That residual after the fouled-3PT count fix was 6 of 221
+     fouled attempts (played) and 7 of 203 (sim) over 12 seeded games per arm, seeds
+     8000-8011 — a different footing (12 games, no consume wrap).
+   - **CURRENT, 2026-09-15.** **0 missing across 382 awards.** Footing (rule 6e):
+     consuming-worker PlayedState `PLAYED=1` (`_is_full_simulation` false) and
+     equiv-v3 wrap `PLAYED=0` (`_is_full_simulation` true), `PYTHONHASHSEED=0`,
+     seeds 1–8, `0xB40000`, Lancaster vs Bentley-Truman, sliders 2 / traps 5,
+     consume wrap. Do not reopen from the ~0.5/game headline.
+   - Published shape (2026-09-07, superseded by the 0/382 harvest): the shot turn
+     carries `next_turn == "FREE_THROW"` and a non-zero `free_throws`, but zero
+     FREE_THROW turns appear after it in `gm.turns`. Qualifications (a) dropped
+     possession vs (b) non-adjacent trip are moot at zero instances. Do not
+     re-diagnose from `scratch_ft3.py`.
 
 4. FIXED 2026-09-07 — fouled 3PT attempts awarded 2 free throws instead of 3
    - Jamie's original symptom ("some 3s register as 2s"). The classification was never wrong:
@@ -605,22 +612,28 @@
      render-nothing turns. It is FLSS (item 11). And **(d) the whole call-site theory for item 10**,
      which was measured to be a no-op before any code was written.
 
-15. OPEN, LARGER THAN WHAT WAS FIXED — `time_remaining` disagrees with `clock_end` on 17.4% of
-    MID-QUARTER turns (measured 2026-09-08)
-   - The terminal case is fixed in item 10. The general case is not, and it is bigger:
-     **`time_remaining != clock_end` on 497 of 2,864 non-boundary turns (17.4%)**, versus 8 of 32
-     boundary turns before the fix.
+15. OPEN, LARGER THAN WHAT WAS FIXED — `time_remaining` disagrees with `clock_end` on
+    **16.9% Played / 14.1% wrap** of mid-quarter turns, **never at a boundary**
+    (re-harvest 2026-09-15). Published 2026-09-08 was 17.4%.
+   - The terminal case is fixed in item 10. The general case is not. Published:
+     **`time_remaining != clock_end` on 497 of 2,864 non-boundary turns (17.4%)**, versus
+     8 of 32 boundary turns before the fix.
+   - **CURRENT, 2026-09-15.** **16.9% Played / 14.1% wrap**, and **never at a boundary**
+     (the item-10 class does not recur). Footing (rule 6e): consuming-worker PlayedState
+     `PLAYED=1` (`_is_full_simulation` false) / wrap `PLAYED=0` (`_is_full_simulation`
+     true), `PYTHONHASHSEED=0`, seeds 1–8, `0xB40000`, consume wrap.
    - Same shape as item 10 — one fact, five fields, and a renderer that resolves
      `time_remaining` → `clock` → `clock_end` (`gameScene.js:2671-2677`), so it reads the field
      most likely to be stale.
-   - The ONLY reason this is invisible mid-quarter is that the next turn's payload overwrites it a
-     moment later. At a boundary there is no next turn, which is why the terminal case was the one
-     anybody noticed. That makes this latent, not benign: any consumer that reads a single turn in
-     isolation — a replay, an export, a paused frame, a resumed game — gets the wrong clock.
-   - DELIBERATELY OUT OF SCOPE for the item 10 increment, on the reasoning that fixing it moves the
-     displayed clock on roughly one turn in six across the whole game, which is a balance-visible
-     change that wants its own before/after. `tests/test_terminal_clock_contract.py` is scoped to
-     terminal turns for the same reason and would fail the tree today if widened.
+   - Mid-quarter disagreement is still real (16.9% / 14.1%). The 2026-09-08 claim that it
+     becomes visible at a boundary is **wrong on the current harvest — never at a
+     boundary.** It remains latent for any consumer that reads a single mid-quarter turn
+     in isolation (replay, export, paused frame).
+   - DELIBERATELY OUT OF SCOPE for the item 10 increment: fixing it moves the displayed
+     clock on a mid-quarter slice (now 16.9% Played / 14.1% wrap, not "one in six"), a
+     balance-visible change that wants its own before/after.
+     `tests/test_terminal_clock_contract.py` is scoped to terminal turns and would fail
+     the tree today if widened.
    - Owner of the general path is `turn_manager._attach_clock_contract` (`:205`), the only other
      writer of `clock_end` in `BackEnd/`.
 
@@ -906,11 +919,14 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       | frozen AND content-free | 1 across 8 games | 636 (79.5/game) | 636x |
       | visible loose-ball slice | ~79 player-steps/game over 4.8 s | **782/game over 39.8 s** | 9.9x / 8.3x |
 
-      **THIS REVERSES A LIVE DECISION.** "One of the SMALLEST remaining items" was the basis for
-      ranking MISS 4th of 4, below the `bounce` beat and below the design work. At 39.8 s/game of
-      visible loose-ball stillness it is the LARGEST remaining defect after defect 2, and it is
-      re-ranked 3rd in `rewarding_animation_fix.md`. Nothing had been built on the wrong number,
-      which is the only reason this is a correction and not a rework.
+      **THIS REVERSED A LIVE DECISION — and the 39.8 s re-rank is itself RETRACTED
+      (item 32).** "One of the SMALLEST remaining items" was the basis for ranking MISS
+      4th of 4. The PLAYED re-measure put the visible slice at 39.8 s/game. **82% of
+      that was correct basketball; residue is 6.9 s/game.** The bounce "empty beat"
+      (17.1 s) used as the counterweight is also wrong (item 28: **517 Played,
+      517/517 ball travels**). Footing of those later harvests (rule 6e): `PLAYED=1`
+      / wrap `PLAYED=0`, seeds 1–8, `0xB40000`, consume wrap. `rewarding_animation_fix.md`
+      no longer carries 39.8 as a live rank.
 
       **WHAT SURVIVES.** The destination split still reads **0.0% `elsewhere`** (56.9% no
       destination, 43.1% already there, against a published 50.2/49.8/0.0), so the authoring-
@@ -1058,17 +1074,22 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       carries no 2-vs-3 determination of its own (grep `is_three|isThree|three_point|threePoint`
       across `FrontEnd/static/js`: one test file, no production reader).
 
-22. OPEN hazard, not currently a bug — 22.3% of shots are classified by a knife-edge comparison
+22. OPEN hazard, not currently a bug — **26.8% Played / 27.6% wrap** of shots sit on a
+    knife-edge comparison (published 22.3%, 2026-09-08)
     - The authored arc spots sit EXACTLY on the classification boundary. The `key` spot
       normalizes to x=64.0 and `_three_point_boundary_x(25.0)` returns 64.0
       (`shot_geometry.py:12-22`). The test is `normalized_x <= boundary_x` (`:80`), so equality
       resolves as a three.
-    - MEASURED: 153 of 686 attempts (22.3%) have a pre-micro coord sitting exactly on the
+    - PUBLISHED: 153 of 686 attempts (22.3%) had a pre-micro coord sitting exactly on the
       boundary — 65 at `key`, plus `upper wing`, `lower wing`, both midwings, all the
-      midcorners. They currently resolve correctly as threes only because the comparison is
+      midcorners. They resolve correctly as threes only because the comparison is
       `<=` rather than `<`.
+    - **CURRENT, 2026-09-15.** **26.8% Played / 27.6% wrap.** Footing (rule 6e):
+      consuming-worker PlayedState `PLAYED=1` (`_is_full_simulation` false) / wrap
+      `PLAYED=0` (`_is_full_simulation` true), `PYTHONHASHSEED=0`, seeds 1–8,
+      `0xB40000`, consume wrap.
     - THE HAZARD: a 0.01-unit change to the arc table, the normalization, or the authored spot
-      coords reflips 22.3% of the shot population in one direction, and a `<=`→`<` edit — the
+      coords reflips that on-boundary population in one direction, and a `<=`→`<` edit — the
       kind of change that looks like a tidy-up — silently converts every arc spot to a two.
       Nothing in the suite asserts the value of a resolved classification, which is item 6's
       territory: the coordinate-assertion gap logged there covers this exactly.
@@ -1232,13 +1253,25 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       `defender.coords` — so an arbitrarily chosen defender would be teleported to the FLSS
       defender position. The fix covers it, since it is inside the function.
 
+      **AMENDED 2026-09-15 — Phase 4 item 1, latent-shape, not a live defect.**
+      The one historical firing (Played seed 1, pre-O_FOUL) was a real nearest-defender
+      pick (item 24 / live ``player.coords``), not a fabricated player. The write is
+      authored ``_flss_defender_coords`` (shooter x ± 3, same y), not ``{50,25}``.
+      ``resolve_shot`` reads those coords via ``_player_xy`` (radius 11); offset 3 is
+      inside the radius, so the write can decide contest. Success path is correct FLSS
+      penalty design. At this HEAD the path is n=0 across 8+8 (O_FOUL moved it).
+      Failure mode is now explicit: ``_place_flss_penalty_defender`` raises if the
+      selector returns None or the pick is not in the lineup. Success behaviour
+      unchanged.
+
 25. LOGGED, NOT FIXED — found by the item 24 Part 1 search, which is why the search came first
     - `defender_coords_by_pos_from_lineup` (`phase_resolution.py:596`) already existed and
       builds exactly the position→coords map item 24 needed. It routes through
-      `grid_coords_from_player` (`:580`), whose fallback is `{"x": 50.0, "y": 25.0}` — so it
-      carries the same fabrication one layer down. It could not be reused for the item 24 fix
+      `grid_coords_from_player` (`:580`), whose fallback was `{"x": 50.0, "y": 25.0}` — so it
+      carried the same fabrication one layer down. It could not be reused for the item 24 fix
       without reintroducing the defect, which is why `_usable_grid_coord` was added beside it
-      rather than the existing helper being called.
+      rather than the existing helper being called. Swept 2026-09-15: the helper now raises
+      instead of inventing centre court (Phase 4 item 2).
     - Not currently harmful: measured 0 collapses at `turn_manager.py:619`, its consumer, across
       8 played games, because all ten players always had coords. It is a hazard, not a bug.
     - THE REST OF THE SEARCH CAME BACK CLEAN, and that is the useful half. The three other live
@@ -1287,6 +1320,40 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       Jamie's balance pass. This entry is the policy only; `_usable_grid_coord`
       (`phase_resolution.py`) is the shape the eventual fix should take.
 
+      **AMENDED 2026-09-15 — Phase 4 item 2, the 26 `.get()` sites +
+      `grid_coords_from_player`.** Poison measured zero on both footings
+      **for the `{50,25}` coordinate sites.** That zero is not a slogan about
+      every fallback in this class. **The PG fallback on
+      `get_ball_handler_from_skeleton` was 49 Played / 32 wrap** (drive pin
+      omitted; resolver invents the PG). Do not write "{50,25} and PG
+      fallback are zero-instance." Footing (rule 6e): consuming-worker
+      PlayedState `PLAYED=1` (`_is_full_simulation` false) / wrap `PLAYED=0`
+      (`_is_full_simulation` true), seeds 1–8, `0xB40000`, `PYTHONHASHSEED=0`,
+      consume wrap. ``require_hco_spot`` raises on a miss (centre court remains
+      a real named spot). ``grid_coords_from_player`` raises when neither live
+      coords nor the caller fallback is usable. Movement-step ``coords``
+      misses raise rather than invent. No substitute default (rule 26).
+      ``{64,25}`` key fallbacks were left alone. equiv-v3 n=40 vs
+      ``c70f92ac1``: 80/80 byte-identical. Seam-static holds at the
+      re-recorded 2,754 Played / 2,323 wrap (seam-moved 0/0; re-baselines
+      when game paths shift). If this had not been identical, the `{50,25}`
+      zero was wrong and the sweep would have been a live defect.
+
+    - EXTENSION, owner field, recorded 2026-09-14. The same shape, a new field.
+      **An owner fallback never invents a holder — it abstains or it fails.**
+      A fabricated owner is invisible because the invented name is always a real
+      player on the floor, exactly as `{50,25}` is always a real court position.
+      First instance: `dynamic_hct_step_emitter.py` walk-up seed
+      (`prior_final_bh_id or bh_id`). A made FT / putback correctly stamps
+      `None` (ball through the net, unattached). The `or play_bh` fallback
+      attached a live teammate and walked the ball up as if he had inbounded.
+      Abstain: skip the walk-up. Do not author an entry pass. The inbound
+      receiver is who SHOULD have it (`build_bip_animation_steps` SF→PG); that
+      turn is scheduled (`next_play_type=BASELINE_INBOUND`) and does establish
+      the holder on the 26/74 HCT entries that actually get an inbound. The
+      other 48 HCT fire with the FT/putback still as prior — Pattern A never
+      inserted the inbound. Seeding from play_bh is not that establishment.
+
 26b. POLICY, adopted 2026-09-09 — a guard that corrects must announce
     - The companion to 26, and the same failure wearing the opposite costume. Where a fallback
       invents a value nobody asked for, a **silent corrector destroys evidence of a value that was
@@ -1334,32 +1401,60 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       comparison derive from the same expression. If they do, the instrument is void and
       the next comparison has to be against a field that *can* disagree.
 
-27. CLOSED — both proposed mechanisms for symptom #3 are eliminated. Do not re-derive them.
+27. REOPENED 2026-09-14 — mechanisms A and B stay eliminated; mechanism C was live and is
+    now fixed. Do not read the 2026-09-09 close as "symptom #3 has no mechanism."
     - Symptom #3 is Jamie's long-standing report that TURNOVERS ARE ATTRIBUTED TO THE WRONG BALL
-      HANDLER. Two mechanisms were proposed on separate evidence and both are now dead. Recorded
-      together so nobody spends a third session rebuilding either one.
+      HANDLER. Two early candidates are dead. A third, found at item 47 (ea2c382da) and charged
+      here, was the live write.
     - MECHANISM A — the `offense_play_type` sunset up-front event tables (item 18). The theory
       was that `_check_steal_attempt` and `_check_dead_ball_turnover` name the handler by a
       different rule than the live per-step moment walk, so any turn taking the sunset path
       would attribute turnovers inconsistently. MEASURED LATENT: the positive-list flag at
       `phase_resolution.py:3308-3310` never admitted a falsy read across 8 seeded games, with a
       null control proving the probe did not perturb the sim. The path does not execute, so it
-      cannot be the mechanism.
+      cannot be the mechanism. Still dead.
     - MECHANISM B — item 24's arbitrary nearest-defender selector. The theory was that a
       selector which picks by iteration order while appearing to pick by distance could be
       naming the wrong player on a turnover. ELIMINATED BY INSPECTION AND MEASUREMENT: the
       turnover path names the handler from `get_ball_handler_from_skeleton`, not by distance
       (item 25), and item 24's selector chooses a CONTESTING DEFENDER, not a ball handler and
-      not a fouler. Wrong player, wrong decision, wrong path.
-    - SO SYMPTOM #3 STILL HAS NO TRACED MECHANISM, and the two obvious candidates are spent. A
-      future trace should start from the attribution WRITE — where a turnover stat is credited to
-      a player id — and work backwards, rather than from selectors that look suspicious.
+      not a fouler. Wrong player, wrong decision, wrong path. Still dead.
+    - MECHANISM C — HCO `drive_contact` → `DEAD_BALL_TURNOVER` (`phase_resolution.py:8011-8017`).
+      The stopper pins `step_index` on the drive step. `get_ball_handler_from_skeleton`
+      accepts only `handle_ball` / `receive` / `shoot`, misses the drive, and falls back to
+      the PG. `_resolve_ball_handler_id` then writes victim, flourish, and both fumble
+      owners from that id. 6 of 6 hops on ea2c382da; 10 of 10 fumble seams on this tree
+      (Jamie's in-flight block-threshold edit is in the working tree; same class). The
+      other two HCO dead-ball writers (on-ball moment, scenario-3 trap) were already
+      clean 20 of 20.
+    - WHY NOT TEACH THE SHARED RESOLVER `drive`. Tried. `get_ball_handler_from_skeleton`
+      also feeds shot-clock IQ (explicit pin) and the post-stop zone-defender
+      `random.choice`. Adding `drive` there moved scores, draws, possessions, and team
+      TO totals across 7 of 8 seeds. `_motion_bh_at_step` omits `drive` for a different
+      reason — the walk skips those steps so `drive_contact` owns them — and must stay
+      omitted. Three lists, three jobs. Do not unify them.
+      **AMENDED 2026-09-15.** Shot-clock IQ is closed post-draw (item 59): keep `x`,
+      recompute the threshold from the pin step's drive action. Zone `random.choice`
+      is LEFT BY DECISION (item 60) — 0 fires, overwrite before flourish. Teaching
+      the resolver remains the expensive path. Do not.
+    - FIX 2026-09-14. Credit the driver from the drive-contact payload
+      (`_hco_drive_contact_driver_id`) immediately before `resolve_turnover_logic`,
+      after the pre-credit RNG. Guard: `assert_dead_ball_victim_had_ball` — the charged
+      player's action on that step must be handle_ball / receive / shoot / drive.
+      Literal accept list, not the resolver's, so poisoning the resolver cannot
+      silence it (26c). Played arm, PLAYED=1, PYTHONHASHSEED=0, 8 seeds, `0xB40000`:
+      scores / draws / steps / possessions / team TO held 8/8; PG TO 66→56 (−10);
+      SG 33→41, SF 29→30, C 8→9; fumble hops 10→0; PRP 48 held; §8.4 58→48. No
+      pass authored. No equiv-v3 (principle 8 did not fire on the payload path).
+    - A and B are spent. C is the traced write and it is closed. A future symptom #3
+      report is a new mechanism, not a reason to rebuild A or B.
 
-28. NOT SWEPT, deletion candidate — the `bounce` empty beat
+28. NOT A DELETION CANDIDATE — the `bounce` beat is not empty.
+      Published "455 steps / 17.1 s, no ball movement" is **wrong.**
 
-      51 steps per game of `advance_trigger.metadata.kind == "bounce"`, 300 ms each, carrying no
-      content: no ball movement, no sound, no announcement, and no player movement. About 15
-      seconds a game of nothing.
+      Published (early): 51 steps per game of `advance_trigger.metadata.kind == "bounce"`,
+      300 ms each, carrying no content. About 15 seconds a game of nothing. The 455 / 17.1 s
+      figure was the same claim on an 8-game wall.
 
       Deliberately NOT touched by the defect 2 fill (2026-09-09). Filling it with an idle would
       paper over a beat that probably should not exist, and **deleting it moves step counts**,
@@ -1369,6 +1464,31 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       Establish before deleting: whether the step count feeds any RNG draw or clock burn. The
       earlier padding census asked the same question of the putback emitter's 9 non-content steps
       and it has not been answered for `bounce`.
+
+      **PHASE 3 CLOCK GATE, 2026-09-14 — NOT DELETED.** Re-harvest on the
+      consuming worker (PLAYED=1) and equiv-v3 wrap, seeds 1–8,
+      `0xB40000`, consume wrap. Published 455 steps / 17.1 s per 8 games
+      (unnamed worker, "no ball movement") is **wrong**. Played **517**
+      bounce steps, **517/517 ball travels**, 303 with player overlay
+      motion, 517 with flourish. 0 wholly empty. Clock: 469/517 decrement
+      `clock_remaining` (`_build_ball_motion_sub_step:3064-3065`,
+      `time_elapsed = step_t` at `:3095`). HCO `time_elapsed` is
+      first-start minus last-end clock (`turn_manager.py:4026-4036`), so
+      the bounce is inside the turn burn. 48/517 are FT-pinned
+      (`_pin_ft_clock:143`) — wall-clock overlay on a GAME-CLOCK writer.
+      **GAME-CLOCK. Leave it.** Fill, don't delete, if Jamie wants the
+      300 ms to carry more. Wrap 433 (428 GC / 5 wall; 431 ball-moved).
+
+      **PHASE 4 (recorded 2026-09-14, do not sweep).** Same class as
+      item 26 / rule 26 — a fallback that invents a holder or a
+      position. Do not run with Phase 3.
+        · `{50,25}` coordinate fallbacks (item 26's five instances and
+          the 26 further `.get()` sites)
+        · `get_ball_handler_from_skeleton` PG fallback when the pinned
+          step's action is omitted (item 47; `drive` was the first)
+        · `covert_release_step_emitter.py:1340` still writes
+          `{"owner_player_id": ""}` when `fb_bh_id` is missing — last
+          unswept empty-owner site, outside the 46/36 population
 
 29. RESOLVED 2026-09-09 — the three "zero-stamp" families were a HARNESS defect, and it
     invalidated a whole session of measurements. Case (a): production is fine.
@@ -1425,14 +1545,42 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       identity, including for families with no gap at all. The emitter is called ~2x per HCO turn,
       so double-counting is the leading explanation. It is not being recorded as a loss.
 
-30. OPEN, pre-existing — the idle density cap is exceeded on the played arm
+30. CLOSED 2026-09-14 — the idle density cap leaked because two still-player passes
+      each honoured 6 independently
 
-      `IDLE_STILL_DENSITY_CAP` is 6, but **344 steps across 8 played games carry more than six
-      idlers**. Identical in both arms of the defect-2 gate (344 before, 344 after), so the
-      arrival fill does not cause it and does not worsen it — the fill shares one cap correctly.
-      The still-player pass itself is what exceeds it, presumably because several families stamp
-      the same step from different emitters and each only counts its own. Invisible until the
-      arm bug above was fixed, because HCO never emitted on the sim arm.
+      `IDLE_STILL_DENSITY_CAP` is 6, but **334 steps across 8 played games carried more than six
+      idlers** (published 344 on an earlier catalogue; same shape). Identical in both arms of the
+      defect-2 gate (344 before, 344 after), so the arrival fill does not cause it and does not
+      worsen it — the fill shares one cap correctly (`stamp_arrival_settle`
+      `animation_step_helpers.py:340-343` counts existing `idle_wander` and fills leftover
+      headroom).
+
+      **POPULATION.** The leak is per-step, not per-family and not per-turn. Census (played arm,
+      PLAYED=1, 8 seeds, `0xB40000` / `0x8F0000` identical): **334 / 334 over-cap steps are
+      `HCO/MAKE` carrying families `hco_still,make_hold` and exactly 10 idlers.** Arrival is on
+      none of them (`arrival_on_over=0`). `make_hold` stamps 1,336 = 334 × 4: the first pass
+      writes 6, the second writes 4 more of the remaining still men.
+
+      **CAUSE.** `stamp_idle_wander_on_still_players` (`animation_step_helpers.py:116`) applied
+      `candidates[:cap]` against *unstamped* still players and did not subtract idlers already
+      on the step. HCO calls it twice on the same list (`skeleton_step_emitter.py:2804`
+      `family="hco_still"`, then `:2815` `family="make_hold"` `only_step_kinds=["make_hold"]`).
+      Two independent caps sum past 6. HCT/FCP/OREB/FT/inbound each call once, so they held.
+
+      **FIX.** The still-player writer now counts existing `idle_wander` and slices leftover
+      headroom, same as arrival fill (`animation_step_helpers.py:202-219`). One cap bounds
+      total concurrent idlers per step. After: **0 / 8 games over the cap.** The 334 leaked
+      steps are now in the cap-6 bucket (11,247 at 6 + 334 at 10 → 11,581 at 6). `make_hold`
+      stamps dropped from 1,336 to 0 on the plays-seeded catalogue — the first pass had
+      already filled the cap, so the second pass correctly writes nothing.
+
+      **GATE.** Played arm, PLAYED=1, `scratch_gate_idle.py` (no plays seed), 8 seeds.
+      Flourish is the only key that differed, all 8. Draws 1,134,978 = 1,134,978. Steps
+      15,986 = 15,986. Stamp-count delta **−848** (71,708 → 70,860) at the shipped cap of 6.
+      No second key. No frame-time counter in this harness; draws and step counts held, so
+      the sim clock did not move. Guard: `tests/test_idle_wander_stillness.py` — two
+      HCO-shaped passes stay at 6; the independent-`[:cap]` poison produces 10.
+      Pytest: `-o addopts= --maxfail=99`, 27 passed.
 
 31. BLAST RADIUS of the PLAYED=1 shim bug (item 29) — audited 2026-09-09, no re-measurement yet
 
@@ -1478,7 +1626,7 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 
       | figure | published (SIM) | corrected (PLAYED) | changes a DECISION, or only the RECORD? |
       |---|---|---|---|
-      | MISS re-keying | 15.9 s/game; ~79 visible player-steps over 4.8 s | **247.0 s/game; 782 visible player-steps over 39.8 s** | **DECISION.** MISS was ranked last of four as "one of the smallest remaining items". It is the largest remaining defect after defect 2 and is re-ranked 3rd. See item 19. |
+      | MISS re-keying | 15.9 s/game; ~79 visible player-steps over 4.8 s | **247.0 s/game; 782 visible player-steps over 39.8 s** | **DECISION then; RETRACTED later.** Item 32: 39.8 is not a defect size (residue 6.9 s/game). Bounce 17.1 s is not empty (item 28: 517 Played, 517/517 ball travels). |
       | item 23 lookup census | 619,038 lookups, 43 sites, **0 crossings** -> LATENT | 643,746 lookups, 42 sites, **0 crossings** -> still LATENT | **RECORD only, and the decision is CONFIRMED.** The decisive field is unchanged at zero on the real arm, so the choice not to sweep the 26 fabricating-fallback sites stands on played-arm evidence rather than sim-arm evidence. |
       | continuity classification | 63,995 player-steps, ONE_STEP_JOURNEY 42.9% | 164,640 player-steps; ONE_STEP_JOURNEY 12.4% of all, 24.8% of moving, 51.9% of journeys | **RECORD only.** The easing assigns curves from continuity at runtime; the measurement only described it, so a wrong description never produced wrong code. Corroborates the preserved `.arm/ease` artefact (158,338 / 12.8%) rather than the published figure. |
 
@@ -1572,16 +1720,18 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       a correct observer should report. His eye was right and the measurement was wrong.
 
       **CONSEQUENCE FOR THE RANKING.** MISS was re-ranked 3rd this morning on 39.8 s/game. The
-      defensible figure is **6.9 s/game**, which is below the `bounce` empty beat (17.1 s/game).
-      MISS should drop to last on measured size, and "author rebound-crash and leak-out
-      destinations for the whole family" is NOT the fix — the overlays already do that job on
-      84.4% of turns. The remaining question is narrow: why does a MISS with no `shot_type`
-      skip overlay authoring? That is a scoping question for a separate brief, and at 6.9 s/game
+      defensible figure is **6.9 s/game**. Do **not** rank it against a `bounce` "empty beat"
+      of 17.1 s/game — that unit is wrong (item 28): **517 Played bounce steps, 517/517 the
+      ball travels**, 0 wholly empty. Footing (rule 6e): `PLAYED=1` / wrap `PLAYED=0`,
+      seeds 1–8, `0xB40000`, consume wrap. "Author rebound-crash and leak-out destinations
+      for the whole family" is NOT the fix — the overlays already do that job on 84.4% of
+      turns. The remaining question is narrow: why does a MISS with no `shot_type` skip
+      overlay authoring? That is a scoping question for a separate brief, and at 6.9 s/game
       it may not be worth one.
 
-      NOT FIXED, NOT SCOPED. `rewarding_animation_fix.md` still carries the retracted 39.8 s/game
-      at rank 3 and needs the same correction; it was left untouched because this brief made
-      bugs.md the only writable file.
+      `rewarding_animation_fix.md` carried the retracted 39.8 s/game at rank 3 for weeks.
+      **Corrected 2026-09-15** in that file: 39.8 marked RETRACTED, bounce 455/17.1 replaced
+      with 517 Played / 517/517 ball travels, scoring stick moved to `b2982fce1`.
 
 33. **THE STILLNESS DETECTOR DOES NOT TRACK WHAT A HUMAN SEES — it inverts.** Measured
       2026-09-09, played arm, `PLAYED=1`, probe `scratch_calibrate_holds.py`, 8 games.
@@ -1707,8 +1857,9 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       the fix is to make that drift proportionate to the play, NOT to author destinations from
       scratch.
 
-37. **Turns end with fully-frozen steps — ~88 s/game of it, and it is NOT BIP-specific.**
-      Measured 2026-09-09, played arm, same probe. This explains Jamie's BIP pause.
+37. **Turns end with fully-frozen steps — player-frozen tails are ~87 s/game Played;
+      wholly-empty is 4.1 s across 8 games, not "~30 s".** Measured 2026-09-09, played
+      arm; clock-gate re-harvest 2026-09-14. This explains Jamie's BIP pause.
 
       His hypothesis was that the pause sits at the BIP→HCO transition rather than inside the
       BIP step. **He is right about where it is and wrong about the mechanism, and the cheap
@@ -1741,6 +1892,17 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       CAVEAT: measured in the same frozen-step units that invert against the observer (item 33),
       so this size must NOT be used to rank it against other work. It is recorded because it
       explains a specific complaint a human actually made.
+
+      **PHASE 3 CLOCK GATE, 2026-09-14 — NOT DELETED.** Same footing as
+      item 28's re-harvest. Player-frozen tails (the published unit):
+      **3,632 Played / 2,213 wrap** steps, **86.7 / 64.0 s/game** wall
+      (published ~88 s/game was close). Wholly-empty predicate (no player
+      displacement AND no ball motion AND no announcement AND no SFX AND
+      no flourish): **82 Played / 46 wrap** tail steps, all 0.05 s,
+      **82/82 and 46/46 GAME-CLOCK**. Samples are unnamed HCO/FOUL and
+      HCO/CHARGE beats (`kind=""`, `T=0.05`, clock decrements). The
+      "~30 s wholly empty" guess evaporated — 4.1 s te / 8 games. **Leave
+      it.** Filling is the next conversation; deleting retimes the game.
 
 38. **The ball was UNTRACKED, not static. The last surviving measure was an artifact, and the
       search for an instrument is now CLOSED.** Measured 2026-09-09, played arm, PLAYED=1,
@@ -1996,7 +2158,10 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       | dead steps after ``turn_stop`` | 20 | **0** |
       | FAST_BREAK within-turn continuity | 98.94% | **100.00%** |
 
-      All eight families are now 100.00% continuous over 169,318 player-step pairs.
+      All eight families measured 100.00% continuous over 169,318 player-step pairs
+      **on this cut.** That row did **not** survive: FCP carried **21 Played / 24 wrap**
+      discontinuities until `e9c2a720a` (see the 2026-09-14 amendment below). Do not
+      quote "all nine emitters 100% continuous" as current.
 
       **⚠ THE GATE MOVED, AND THAT IS THE FINDING.** Step counts and draw counts were expected
       to hold if this only removed dead payload. They did not:
@@ -2072,10 +2237,25 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       | ``skeleton_step_emitter`` (HCO, the model) | ``dreb``, ``dynamic_fcp``, ``dynamic_hct``, ``fb_drive``, ``fb_outlet_pass``, ``ft``, ``hct``, ``oreb``, ``triangle`` |
       | ``rim_runner``, ``after_steal_fast_break``, ``covert_release`` (added here) | |
 
-      The nine are **LATENT, not live**: every family they emit measures 100.00% continuous
-      today, and DREB's is vacuous because it emits one step per turn (item 39). They are
-      unguarded rather than broken, so a future edit could reintroduce this with nothing
-      objecting. One shape, one fix, one set of measurements — they are not touched here.
+      The nine were logged as **LATENT, not live** — "every family they emit measures
+      100.00% continuous today." **That sentence is FALSE.** FCP carried **21 Played /
+      24 wrap** until `e9c2a720a`. DREB's 100% is vacuous (one step per turn, item 39).
+      They were unguarded, and one of them was live.
+
+      **AMENDED 2026-09-14 — FCP/FLSS join was live; the nine are now wired.** The published
+      "all nine emitters 100% continuous" row was wrong: `combine_eoq_origin_prefix`
+      concatenated an FCP prefix onto an independently seeded FLSS list (clocks only).
+      That is the 21 Played / 24 wrap gap (up to 50.2 ft). Footing (rule 6e):
+      `PLAYED=1` (`_is_full_simulation` false) / wrap `PLAYED=0` (`_is_full_simulation`
+      true), seeds 1–8, `0xB40000`, consume wrap. Closed by seeding
+      `flss[0].start.coords` from `prefix[-1].end.coords` (prior end wins; T not
+      recomputed). Then, and only then, `enforce_step_start_continuity` was added at
+      the outermost return of the nine. After the merge the guard is a no-op
+      (0 corrections). Reverting the merge returns the wrap FCP/MISS gaps; a wrong merge
+      coord is what the guard fires on. Phase 6 stick is
+      ``b2982fce1`` (74.97 ±2.91 / 83.39 ±3.02); do not recut it
+      from a seam-only change. `{50,25}` poison was zero; the PG fallback was not
+      (49 Played / 32 wrap — item 26).
 
       **GUARD TEST**, the durable part: ``tests/test_step_start_continuity.py``, 7 cases. Asserts
       exact equality rather than a tolerance, and fails on ABSORBED discontinuities too, not just
@@ -2171,8 +2351,14 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       of 40 (seeded) are completely unchanged on the played arm**, which is the expected shape for
       a defect that selected 6.5% of fast breaks.
 
-      **THE RE-CUT REFERENCE.** Cut at **``094f36ca2``**, which contains ``63eb72b6c`` (dedupe) and
-      ``a2fb4365c`` (§8.1 guard). Supersedes 57.48 played / 67.88 sim, which predates this fix.
+      **THE RE-CUT REFERENCE — RETIRED AS A MEASURING STICK.** Cut at **``094f36ca2``**,
+      which contains ``63eb72b6c`` (dedupe) and ``a2fb4365c`` (§8.1 guard). It superseded
+      57.48 / 67.88. **Do not tune against it.** ``094f36ca2`` 75.16 / 87.65 and
+      ``bbabe427d`` 75.76 / 83.69 are both RETIRED. Current baseline is ``b2982fce1``:
+      **[PLAYED] 74.97 ±2.91 / [SIM] 83.39 ±3.02** (Phase 6). Footing (rule 6e):
+      equiv-v3 n=40, seeds 8000–8039, ``scratch_equiv3_fbdedupe.py``,
+      ``PYTHONHASHSEED=0``, Played ``_is_full_simulation`` false / wrap true,
+      published CI = 1.96 × SEM. The block below is the historical item-42 cut.
 
       > **REFERENCE, points per team, 2026-09-09, cut at ``094f36ca2``, equiv-v3, n=40, seeds
       > 8000-8039, ``scratch_equiv3_fbdedupe.py``, Lancaster vs Bentley-Truman, all sliders 2 except
@@ -2321,6 +2507,82 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       real measured value rather than a convenient one. Harness: ``scratch_ballownerwarn.mjs``
       (extracts the shipped function source — the repo has ``.test.js`` files but no jest binary).
 
+      **AMENDED 2026-09-14 — Phase 1 item 44. The backend omit is INVALIDATED; the FE half landed.**
+      Played arm, PLAYED=1, PYTHONHASHSEED=0, 8 seeds, Lancaster vs Bentley-Truman. Same empty-string
+      population on both ``0x8F0000`` (item 46 catalogue) and ``0xB40000`` (item 48 catalogue):
+      **70 / 70 empty-string boundaries carry neither ``ball.coords`` nor ``ball.current_coords``.**
+      Ball keys are only ``owner_player_id``. Confined to HCO/MAKE + HCO/MISS + HCO/BLOCK, start and
+      end of the same step. Detectors fired 8/8 (empty-string inject moved the counter).
+
+      The correct loose encoding is "key absent + ball.coords" (10,416 / 26.71% in item 46).
+      Omitting the key on these 70 leaves the loose branch empty — the ball has no position at
+      all. That is a different and larger change (author the loose position from the last real
+      owner or the shot spot). Not done here.
+
+      ``build_final_ball_handler_id`` and ``build_final_ball_coords`` were measured against an
+      in-process omit-the-key copy: **0 / 8 games moved on either.** Empty string is already
+      falsy in the handler reader (``if owner:``) and ``coords[""]`` already misses in the
+      coords reader, so the payload-side finals already treat these as unowned. Coords / step
+      counts / draw counts are untouched — this commit is frontend only. No equiv-v3.
+
+      FE: ``isBallAttached`` now tests the VALUE (``animationPlayback.js``, ``claimedBallOwnerId``).
+      Both silent exits — ``!coord`` at snap start/end and the missing ``else`` on no-sprite —
+      ``detachBall`` AND ``warnUnresolvableBallOwner`` (policy 26b). The announcement from
+      ``28f97cec4`` was already on; the detach is new. What is DRAWN on those 70 boundaries
+      changes (ball unparents instead of following the previous man) and that is the point.
+
+      **AMENDED 2026-09-14 — loose-ball residue 46 = this item, not a new bug.**
+      FE-today definition (``claimedBallOwnerId`` null + no ``coords`` /
+      ``current_coords``), rendered walk, consume wrap, ``0xB40000`` seeds 1–8:
+      **46 Played / 36 wrap**. Encoding is 46/46 (36/36) ``owner_player_id: ""``
+      with keys ``[owner_player_id]`` only — start and end of the same
+      ``player_reaches_position`` step (23 / 18 steps). Families this draw:
+      HCO/MISS 24, FCP/MISS 8, HCO/MAKE 6, FCP/MAKE 4, HCT/MISS 4 (Played).
+      Writer: ``bh_id_fallback = _safe_id(...) or ""`` at
+      ``skeleton_step_emitter.py:2246`` (HCO/FCP) and
+      ``hct_step_emitter.py:354`` (HCT). Poison (strip coords off one
+      positioned loose ball) moved the missing counter 8/8. Do not reopen
+      from a loose-ball census as a new item. ``ft_return_teleport`` is
+      item 53, closed by design.
+
+      **AMENDED 2026-09-14 — V1/V2 + continuity carry.** Same footing.
+      V1 (existing writes only): 4 Played / 4 wrap have a prior same-turn
+      ``ball.coords`` / ``current_coords``; 20 / 18 are step-0 and the
+      prior turn's ``final_ball_coords`` (``build_final_ball_coords`` at
+      ``animation_step_helpers.py:572``, stamped in ``_append_turn``) is
+      a real xy (20/20, 18/18). 22 / 14 have neither in the pre-fix
+      payload. V2: the two named sites were the missed ``or ""`` writers.
+      One more unswept empty-owner site remained and was NOT in this
+      population: ``covert_release_step_emitter.py:1340``
+      (``{"owner_player_id": ""}`` when ``fb_bh_id`` is missing).
+      Swept 2026-09-15 — the key is omitted, same as item 44 / ``bbabe427d``.
+      Measured zero on both footings; equiv-v3 n=40 vs ``c70f92ac1`` 80/80.
+
+      Carry is a READ of those writes
+      (``carry_ball_coord_continuity``). It does not compute a position
+      from a player, a shot spot, or a basket. A carry that would open
+      a new loose-loose seam (incoming or onto an already-placed loose
+      ball) is left unplaced — that is how seam-static stays
+      **2,754 / 2,754 Played and 2,323 / 2,323 wrap** (seam-moved 0/0).
+      Re-recorded 2026-09-15 at HEAD after the O_FOUL path shift
+      (``98a4132c3``). The previous 3,185 / 2,203 pair moved with game
+      paths, not with any seam write. This invariant re-baselines
+      whenever a commit changes which turns exist; a changed count
+      after an outcome-moving commit is not a ball-continuity
+      regression.
+      Encoding: both writers omit the key. Empty-string owners on this
+      census: **0**. Unplaced after carry: **30 Played / 28 wrap**, all
+      ``key_absent``. Those 30/28 stay: after an attached owner with no
+      authored ball coord, or a source that cannot be applied without
+      inventing a seam. Named in the V1 leftover (FCP/MISS after
+      inbound attach; HCO/HCT step 0 when the next step already has a
+      loose coord; the rest of an unplaced run after an isolated fill).
+      26b: each carry logs ``[UESS BALL CONTINUITY]``. Poison (strip
+      coords off one positioned loose ball) 8/8. Step count = draw
+      count (no new tails). Clock untouched. No decision path reads
+      the carried ``ball.coords`` — the write is in ``_append_turn``
+      after the turn is built.
+
 45. **OPEN OBSERVATION, awaiting specificity — Jamie: HCO "seems off in some places".** 2026-09-09.
       Recorded so it is not lost, explicitly NOT actionable yet. Too vague to trace, and the one
       hard measurement pointed at HCO says it is clean: **100.00% within-turn coordinate
@@ -2348,8 +2610,12 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 
       **STEP 2 — THE TEXT-KEYED INSTRUMENT. Poison fires at 100.0% on 8 of 8 seeds** (827
       comparisons); names are matched against the ten on the floor and ``turnover_type`` is not
-      trusted anywhere. Headline: **101 of 827 (12.2%)** — which is close to Jamie's 15-20% and is
-      nevertheless **not the symptom**, because of where it sits:
+      trusted anywhere. Published headline: **101 of 827 (12.2%)** — close to Jamie's 15-20%
+      and nevertheless **not the symptom**, because of where it sits. **CURRENT, 2026-09-15:
+      89/318. Not like-for-like** with 101/827 (different comparable cut, not a drop).
+      Footing (rule 6e): consuming-worker PlayedState `PLAYED=1` (`_is_full_simulation`
+      false) / wrap `PLAYED=0` (`_is_full_simulation` true), seeds 1–8, `0xB40000`,
+      consume wrap. Do not brief from 101/827 as the live rate.
 
       | family | comparable | mismatch | rate | is a mismatch WRONG here? |
       |---|---|---|---|---|
@@ -2411,9 +2677,13 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 
       **(B) IS THE LOOSE BALL'S POSITION AUTHORED? YES — presence is PERFECT. Movement is not.**
       **11,509 of 11,509 loose boundaries carry a position; zero are missing.** The loose branch
-      is never reached empty. But presence and a trajectory are different things, and separating
-      them is the finding: **4,233 of 9,167 consecutive loose transitions (46.2%) do not move the
-      ball at all.** Whole families never move it:
+      is never reached empty. Published finding: **4,233 of 9,167 consecutive loose transitions
+      (46.2%) do not move the ball at all.** **RETIRED, 2026-09-15.** That 46.2% was measuring
+      §8.1 working (holds and recovers on purpose; seam continuity static). Do not scope
+      "loose balls animate weirdly" from 46.2%. Footing of the retirement harvest (rule 6e):
+      consuming-worker PlayedState `PLAYED=1` (`_is_full_simulation` false) / wrap
+      `PLAYED=0` (`_is_full_simulation` true), seeds 1–8, `0xB40000`, consume wrap.
+      Historical family split (the retired walk):
 
       | family | loose boundaries | moved | static |
       |---|---|---|---|
@@ -2432,12 +2702,28 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       only for the encoding half.** Fixing (A) is small and two-sided — stop emitting ``""``, and
       give the renderer the missing ``else`` so an unresolvable owner detaches loudly instead of
       leaving the ball on the previous man (policy 26b). Jamie's separate report that **loose
-      balls animate weirdly generally** is NOT that fix: it is the 46.2% static figure, which is a
-      position that exists but does not describe a trajectory. That is authoring work on the
-      order of the off-ball destination item, not an encoding change. **They should be scoped
-      separately — the encoding fix will not make loose balls look better.**
+      balls animate weirdly generally** is NOT that fix, and it is also **not the retired
+      46.2% static figure** (that walk was measuring §8.1 working). Encoding and feel
+      remain separate jobs. **The encoding fix will not make loose balls look better.**
 
-47. **SYMPTOM #3, THIRD PASS — Jamie's "the defence's SF plays the jiggle" hypothesis is
+47. **CLOSED 2026-09-14 — payload credit, no pass. Do not teach the resolver ``drive``.**
+
+      **CURRENT: 0 hops on both footings** (Played+consume 70 fumbles / 0 hops; wrap 84 / 0).
+      Poison moved hops to 70/70 and 84/84 — real zero. Footing (rule 6e):
+      consuming-worker PlayedState `PLAYED=1` (`_is_full_simulation` false) / wrap
+      `PLAYED=0` (`_is_full_simulation` true), seeds 1–8, `0xB40000`, consume wrap.
+
+      Teaching ``get_ball_handler_from_skeleton`` ``drive`` moved scores, draws,
+      possessions, and team TO on 7 of 8 seeds across three attempts (items 27 /
+      59 / 60). The driver is taken from the drive-contact payload and written
+      onto ``roles["ball_handler"]`` only at the TO credit, after that RNG.
+      Item 27 mechanism C. No ``dead_ball_fumble.py`` change. No 3a / 3b /
+      fumble-pass.
+
+      Historical diagnostic (2026-09-09) below. A skim that hits "teach the
+      resolver" in that pass is reading the **rejected** approach.
+
+      **SYMPTOM #3, THIRD PASS — Jamie's "the defence's SF plays the jiggle" hypothesis is
       REFUTED on every limb, but the pass found a REAL defect at his reported rate: the fumble
       beat re-parents the ball to a different player with no animated handover, on 16% of
       dead-ball fumbles.** 2026-09-09, played arm, PLAYED=1, 8 games, 50 fumble turns.
@@ -2520,13 +2806,49 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       is not established here** and wants its own scoping — deciding it requires knowing whether
       the HCO walk intended the SF to have the ball at that moment.
 
-      **CLASS SIZE, 2026-09-09 (item 48).** The §8.4 seam guard makes this visible as a class,
-      not an instance. Item 47's 8 HCO fumbles are **8 of 92** unaccounted attached-owner
-      seam swaps across 16,925 rendered pairs (0.54%) in 8 played games. The other 84 sit
-      on STEAL (39), ``player_reaches_position`` beats (46, mostly HCO/HCT shot families),
-      and 10 unlabeled HCO/STEAL "loose ball" recoveries. A fumble-only authoring fix
-      addresses the instance Jamie saw and leaves the class. Scope the fix against that
-      number, not against 8 of 50.
+      **AMENDED 2026-09-14 — Phase 2 application 1 STOPPED. The handover is not real.**
+      Played arm, PLAYED=1, PYTHONHASHSEED=0, 8 seeds, ``0xB40000``. 40 fumble turns, **6 hops**
+      (published 8; same class). Poison on the hop detector fired 8/8.
+
+      The HCO walk has three DEAD_BALL writers. On-ball moment
+      (``_resolve_hco_moment`` / ``:6863-6876``) and scenario-3 trap
+      (``_resolve_hco_dead_ball:4697-4706``) **agree with the emitted last owner and the
+      fumble target** on every turn they produce (walk_eq_prev and walk_eq_fum, 20/20).
+      Those are not item 47.
+
+      **All 6 hops are ``drive_contact`` → ``DEAD_BALL_TURNOVER``**
+      (``phase_resolution.py:8011-8017``). The walk intended the driver
+      (SG 4 / PF 1 / C 1). Skeleton last step and the emitted anchor owner are that
+      same man, 6/6. ``victim_id``, the flourish, and the fumble start/end are the
+      **PG**, 6/6. ``walk_eq_prev=6/6``, ``walk_eq_fum=0/6``.
+
+      Why the PG: ``get_ball_handler_from_skeleton:392`` accepts only
+      ``handle_ball`` / ``receive`` / ``shoot``. The pinned drive step's action is
+      ``drive``. Explicit ``step_index`` inspects only that step, finds nothing,
+      and **falls back to PG** (``:399``). ``_motion_bh_at_step:4740`` also omits
+      ``drive`` (receive > handle_ball > pass). The TO credit, the narrative, and
+      the flourish are written from that fallback — they are the same local, not
+      three independent witnesses. The flavour text is ``random.choice`` in
+      ``resolve_turnover_logic:2711-2718`` and does not mean a pass occurred.
+
+      Authoring start=driver / end=PG would animate a transfer the walk never
+      made. The brief's assumed-real handover is false. The anchor is correct;
+      the **credit is stale**. **Rejected candidate:** teach the resolver that
+      ``drive`` is possession. **Chosen:** credit the driver from the
+      drive-contact payload (see the close at the top of this item). No
+      ``dead_ball_fumble.py`` change.
+
+      On the close tree (played arm, 8 seeds, ``0xB40000``; block-threshold
+      edit in the worktree): **10 of 10 fumble hops closed**, PRP 48 held,
+      §8.4 58→48, team TO / scores / draws / steps / possessions held.
+      Published residue 54→46 was 46 PRP + 8 fumble; that HEAD's residue was
+      48 PRP + 10 fumble and became 48 PRP.
+
+      **CLASS SIZE, 2026-09-09 (item 48).** The §8.4 seam guard made this visible as a
+      class. Published: item 47's 8 HCO fumbles were **8 of 92** unaccounted
+      attached-owner seam swaps. **CURRENT: fumble hops 0/0 both footings.** The
+      other 84 sat on STEAL (39), ``player_reaches_position`` (46), and 10 unlabeled
+      HCO/STEAL recoveries. Do not scope a fumble pass from 8 of 50.
 
 48. **TWO GUARDS LANDED — unrendered tails (item 42) and the §8.4 ball-owner seam
       (item 47's class).** 2026-09-09, played arm, PLAYED=1, 8 games. Log-and-assert,
@@ -2566,7 +2888,7 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       | HCO/STEAL | 95 | 675 | 27 | 4.0% | steal 17, none 10 |
       | HCO/MISS | 465 | 5442 | 17 | 0.3% | player_reaches_position 17 |
       | HCT/HCO | 19 | 88 | 9 | 10.2% | player_reaches_position 9 |
-      | HCO/DEAD BALL | 103 | 747 | **8** | 1.1% | **fumble 8** — item 47 |
+      | HCO/DEAD BALL | 103 | 747 | **8** | 1.1% | **fumble 8** — item 47, **now 0/0 both footings** |
       | HCT/STEAL | 9 | 42 | 8 | 19.0% | steal 7, player_reaches_position 1 |
       | HCO/MAKE | 349 | 4313 | 5 | 0.1% | player_reaches_position 5 |
       | HCT/FOUL | 21 | 67 | 4 | 6.0% | player_reaches_position 4 |
@@ -2579,11 +2901,10 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       Zero on DREB, OREB, FREE_THROW, both inbound families, FCP non-steal, FAST_BREAK,
       HCO/FOUL, HCO/CHARGE. Poison fired on 8/8 seeds.
 
-      **WHAT THIS DOES TO ITEM 47.** The 8 fumbles are real and they are 8.7% of the
-      class. Steals (39) and ``player_reaches_position`` shot-family seams (46) are
-      larger. A fix that authors a pass on the fumble beat, or that restales the
-      anchor to the PG, closes the instance Jamie recorded and leaves 84 others.
-      That is the number the design decision is made against.
+      **WHAT THIS DOES TO ITEM 47.** At this census the 8 fumbles were 8.7% of the
+      class. **CURRENT: 0 on both footings** (item 47 close). Steals (39) and
+      ``player_reaches_position`` shot-family seams (46) were larger. Do not
+      author a fumble pass from this table.
 
       **PRP IS NOT FULLY CHARACTERISED (logged 2026-09-09, do not chase here).**
       Seed 1's six ``player_reaches_position`` swaps split 3 / 2 / 1: HCT
@@ -2628,12 +2949,13 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       | seam swaps | **92** | **54** |
       | steal + none (this writer) | 28 + 10 | **0** |
       | ``player_reaches_position`` | 46 | **46** (held) |
-      | fumble (item 47) | 8 | **8** (untouched) |
+      | fumble (item 47) | 8 | **8** (untouched *at this commit*) — **CURRENT 0/0 both footings** |
       | unrendered extra | 0 | 0 |
       | within-step transfers | 1,867 | 1,905 (+38, the accounted handovers) |
 
-      Residue of the 92: **46 PRP + 8 fumble = 54.** PRP did not move.
-      HCT/STEAL still has its 1 PRP swap.
+      Residue of the 92 at this commit: **46 PRP + 8 fumble = 54.** PRP did
+      not move. HCT/STEAL still has its 1 PRP swap. **The fumble 8 is closed
+      (item 47): 0 on both footings.** Do not treat 54 as the live residue.
 
       **FINAL HANDLER.** Seed 1, 13/13 STEAL turns:
       ``final_ball_handler_id`` unchanged, last-drawn end owner
@@ -2645,8 +2967,285 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       **PRINCIPLE 8.** Seed 1: step count 2581/2581, drawn 2581/2581,
       per-steal coord checksum 13/13 identical. 8-seed pair count
       held at 16,925. Coords, step counts and draw counts did not
-      move. No poison-stash / equiv-v3 arm. Reference remains
-      ``094f36ca2`` [PLAYED] 75.16 / [SIM] 87.65.
+      move. No poison-stash / equiv-v3 arm. The item-49 stick
+      ``094f36ca2`` 75.16 / 87.65 is **RETIRED**. Current baseline
+      ``b2982fce1``: **[PLAYED] 74.97 ±2.91 / [SIM] 83.39 ±3.02**
+      (Phase 6). Footing (rule 6e): equiv-v3 n=40, seeds 8000–8039,
+      ``scratch_equiv3_fbdedupe.py``, ``PYTHONHASHSEED=0``, Played
+      ``_is_full_simulation`` false / wrap true.
+
+50. **PHASE 2 SCOPE — the 1,905 within-step transfers already exist. Diagnostic only,
+      2026-09-14.** Played arm, PLAYED=1, PYTHONHASHSEED=0, 8 seeds, Lancaster vs
+      Bentley-Truman, ``game_id`` ``0xB40000`` (item 48 catalogue). Live count on this
+      HEAD: **1,938** accounted within-step attached A→B transfers (published 1,905 after
+      item 49; +33 is catalogue/HEAD drift, not a new writer). Detectors fired 8/8.
+      Mirrored in [`animation_worklist.md`](animation_worklist.md) § Phase 2.
+
+      **1. WHAT AUTHORS THEM.** They are not ``BallInFlight``. 0 / 1,938 carry
+      ``from_player_id`` / ``to_player_id``. The payload is:
+
+          start.ball = {owner_player_id: A}
+          end.ball   = {owner_player_id: B}
+          start.ball_motion_style = "pass"          # 1,905 / 1,938
+          start.ball_arrival_coord = meet point     # 1,904 / 1,938
+          start.action includes pass and/or receive # 1,911 / 1,938
+
+      Writer: ``_walk_ball_owners`` (``skeleton_step_emitter.py:375``) produces
+      ``(start_owner_pos, end_owner_pos)``; the emit loop resolves ids
+      (``:2182-2249``) and, when they differ, sets ``is_pass_step`` (``:2299-2303``),
+      stamps ``ball_motion_style="pass"`` and ``ball_arrival_coord`` via
+      ``_compute_pass_meet_point`` (``:2574-2607``, helper at ``:2822``). The FE
+      (``animationPlayback.js`` ``isSchemaPassStep`` + ``renderBallTransition``)
+      detaches, tweens A→B, and ``snapBallToEndState`` re-parents to B.
+
+      The other 33 have the A→B owner pair and no ``ball_motion_style``: 24 are
+      ``post_steal_hco_transition`` (item 49's end-only attach, now a within-step
+      transfer); 9 have neither pass action nor that kind. HCT's
+      ``_build_loop_step`` (``dynamic_hct_step_emitter.py:357``) uses the same
+      attached-owner shape for a *single* owner (start = end), not a transfer.
+
+      **2. CAN 3a / 3b / FUMBLE USE IT AS-IS?** Yes, as a payload shape. None of
+      the three currently authors start A / end B on the beat that hops.
+
+      - **3a (HCT entry).** Published 23 / this-tree 27. **CLOSED.**
+        Consuming-worker PlayedState census: **27 → 3 hops / 8 games.**
+        Those 3 are parked (item 51). Footing (rule 6e): `PLAYED=1`
+        (`_is_full_simulation` false), consume wrap, seeds 1–8,
+        `0xB40000`. Walk-up (``transition_bridge.py:351``,
+        ``bh_id=walk_up_bh_id`` from ``dynamic_hct_step_emitter.py:1118``)
+        ends attached to the prior BH. Loop step 0 starts attached to the
+        play BH. **Do not author an entry pass** (Policy 26). The 23/27
+        counts were harvest artifact + missing BIP.
+
+      - **3b (HCO shot-micro).** Published 21 / 1,018 / 929. **Cause is
+        ``phase_resolution.py:8197-8198``** (clock truncate discards the
+        receive). **1,313 HCO micros = 21 hop + 1,292 clean.** Footing
+        (rule 6e): `PLAYED=1` (`_is_full_simulation` false), seeds 1–8,
+        `0xB40000`. The 1,018/929 cut included the travel-shoot insert
+        path that returns before `:1804`. ``shot_micro_movements.py:1563``
+        pins the shooter on the first micro beat; the hop is the truncate,
+        not a missing catalogue pass.
+
+      - **Fumble (item 47).** Published **8**. **CURRENT: 0 on both
+        footings** (Played 70/0, wrap 84/0). Credit fix, not a pass.
+        ``dead_ball_fumble.py:149`` / ``:171`` still write start and end
+        from the same local; the hop is gone because the credit is the
+        driver.
+
+      **3. WHAT THE LOOSE-BALL CASE NEEDS THAT THE ATTACHED CASE DOES NOT.**
+      Item 46 published 4,233 / 9,167 consecutive *loose* transitions
+      (46.2%). **RETIRED** — that walk measured §8.1 working, not a missing
+      trajectory. Presence was perfect (11,509 / 11,509). Loose boundaries
+      omit ``owner_player_id`` and carry ``coords`` / ``current_coords``.
+      The 1,905 path cannot fill this — it requires two owners. Do not
+      scope new authoring from 46.2%.
+
+      **4. COST, PER APPLICATION.**
+
+      | application | cost | why |
+      |---|---|---|
+      | 3a HCT entry (published 23 / this-tree 27) | **CLOSED; 3 survivors parked** | Consuming-worker PlayedState: 27 → 3 / 8 games (item 51). `PLAYED=1`, consume wrap, seeds 1–8, `0xB40000`. Not a pass. |
+      | 3b catch-and-shoot (published 21 / 1,018 / 929) | **cause `:8197-8198`** | **1,313 HCO micros = 21 hop + 1,292 clean.** `PLAYED=1`, seeds 1–8, `0xB40000`. Not the micro writer. |
+      | fumble handover (published 8) | **CLOSED — 0 both footings** | Item 27 mechanism C. Played 70/0, wrap 84/0. Credit, not a pass. |
+      | loose-ball trajectory (published 46.2%) | **RETIRED** | Was measuring §8.1 working. Do not author from 46.2%. |
+
+      Item 47 is not a Phase 2 pass (**0/0 both footings**). 3a is closed
+      except 3 parked TIMEOUT hops (item 51). 3b's cause is
+      ``phase_resolution.py:8197-8198`` (1,313 HCO micros = 21 hop +
+      1,292 clean). Loose 46.2% is retired (§8.1 working).
+
+51. **PARKED — 3a's remaining 3 hops after the harvest-artifact close, 2026-09-14.**
+    Consuming-worker PlayedState census closed the 27-count as sticky pending +
+    missing BIP. Re-census: **27 → 3 hops / 8 games**. Those 3 are real, not
+    harvest. Mechanism: TIMEOUT emits no `final_ball_handler_id`
+    (`turn_manager.py` timeout path; `build_final_ball_handler_id` → None).
+    Emitter `prior_turns[-1]` is that TIMEOUT (`dynamic_hct_step_emitter.py:1098`),
+    so `prior_final_bh_id` is None and `:1118` takes `or bh_id` — the **play BH**
+    (SF/C after a pass; `hct_bh_pos` stamped post-loop at
+    `phase_resolution.py:11618`). Loop step 0 starts on the **PG** (engine entry
+    `bh_pos = "PG"` at `dynamic_hct.py:2257`; first segment
+    `ball_owner_pos="PG"`). 149/149 post-`BASELINE_INBOUND` inherits produce no
+    hop — that is the control. Side effect: `:1153` writes the play BH to engage,
+    then `:1154-1157` overwrite him with `other_offense_targets` (built excluding
+    entry PG, not the final SF/C), so **nobody occupies the ball-handler spot**.
+    Parked because the honest fix (seed walk-up from the loop's step-0 PG)
+    retimes the step: PG walks to engage, gate T changes, every interrupted end
+    moves. Owner-only attach puts the ball on a PG still standing at the TIMEOUT
+    leftover while the SF/C walks `handle_ball` — worse than the hop, will not
+    ship. equiv-v3 cannot see this seam (`_is_full_simulation` is true at
+    Pattern A; pending never set). No harness prices the body/T/clock change.
+    The only probe that sees the hops is the consuming-worker PlayedState hop
+    census (3 → 0).
+
+52. **PARKED — BIP is lost, not deferred, when Pattern A sees pending, 2026-09-14.**
+    Live chain: `game_manager.py:2124` sets `pending_computer_timeout` with
+    `turn_type=BASELINE_INBOUND` and **returns without appending the BIP**.
+    `:2026` then skips BIP for the rest of that call if pending is already set.
+    The live API (`api.py:5741-5785`) consumes pending on the *next* request and
+    `setup_timeout_turn` forces `SIDE_INBOUND` — the scheduled BIP never
+    appears. BIP-only pending rate on the TBT setter path: **26/8 = 3.25/game**.
+    Rules question (what inbound type follows a timeout after a make) parked by
+    Jamie. Animation consequence (3a's 3 hops ride the missing TIMEOUT stamp
+    that a BIP would have written) parked on cost — see item 51.
+
+53. **CLOSED BY DESIGN — `ft_return_teleport` is an intentional snap, 2026-09-14.**
+    Jamie watched a missed first free throw: ball travels to the bounce
+    spot, then teleports to the shooter at the line. Confirmed. Writer:
+    `_build_ft_return_teleport_step` (`ft_step_emitter.py:392`) and FE
+    `isFtReturnTeleportStep` (`animationPlayback.js:401`, snap at `:1171`).
+    Both landed in `6257f7292` (2026-05-25) as a named exception
+    ("instant ball snap", `T=0`, no tween). That commit *deleted* a working
+    `distance/12` `_ball_motion_step` return. The Free Throw UESS Audit
+    (2026-07-05) later marked the snap LOW / acceptable by design.
+
+    Jamie's decision (2026-09-14): the snap stays. No tween, no style
+    stamp, no FE-branch removal. Do not implement against either writer.
+    The UESS table in `Free_Throw_System.md` still described the deleted
+    travel — that drift is the hazard; the row now names the snap and
+    points at `6257f7292`'s parent for when ref sprites arrive.
+
+    Do not reopen from a loose-ball census. The 92 Played
+    `ft_return_teleport` seam-static counts are incoming continuity
+    (bounce_hold end = teleport start). The step is L→A, not a missing
+    trajectory.
+
+54. **CLOSED BY DESIGN — `bounce_hold` is an intentional park, 2026-09-14.**
+    5 Played steps (10 loose boundaries), 0 wrap. Writer:
+    `_ft_ball_stationary_hold_step` (`ft_step_emitter.py:319`). Start=end
+    authored bounce, key-absent + `coords`, T≈2.857, flourish +
+    "No Good". FE same-coord return. Hold, not missing travel. Do not
+    reopen from a loose-ball census.
+
+55. **CLOSED BY DESIGN — `airball_oob` travel is expressed, 2026-09-14.**
+    8 Played / 9 wrap steps, all of which travel (flight-end →
+    `AIRBALL_OOB_*` or FLSS OOB, T≈1.14). The static counts were
+    incoming seams. Do not reopen from a loose-ball census.
+
+56. **Rattle-hop arrival cue suppressed on zero-distance hops, 2026-09-14.**
+    101 Played / 82 wrap RIM-start hops have hop 0 start = first hop
+    target. The step-end fallback at `animationPlayback.js:1570` was
+    firing `rattle-leather.wav` on a snap that never moves. Guard:
+    `hopKind !== "rattle_hop"`. Step not dropped. Deletion of the hops
+    themselves is Phase 3 with item 28 + item 37.
+
+    **PHASE 3 CLOCK GATE, 2026-09-14 — hops NOT DELETED.** Re-census
+    101 Played / 82 wrap confirmed. Writer is `_append_motion` →
+    `_build_ball_motion_sub_step` with `RATTLE_HOP_GAME_SECONDS`
+    (`40/350`). 73/101 Played and 82/82 wrap decrement
+    `clock_remaining` (`skeleton_step_emitter.py:3064-3065`,
+    `time_elapsed = step_t` at `:3095`). 28 Played are FT-pinned
+    (`_pin_ft_clock:143`), not a different writer. All 101/82 stamp
+    arrival SFX (FE suppresses the cue; the step remains). **GAME-CLOCK.
+    Leave the hops.** Phase 3 deletion is closed at the clock gate; no
+    equiv-v3 arm (nothing removed).
+
+    **H1 2026-09-14 — kind-scope == distance-scope on this population.**
+    FE-modelled `rattle-leather.wav` fires (tween arrival + step-end
+    fallback; same footing as the residue census): Played **1644 →
+    1543** (drop **101**); wrap **1054 → 972** (drop **82**). Moving
+    hops that hit the fallback: **0 / 0**. Do not re-scope.
+
+57. **POST-LAUNCH — the ball has no §8.1 rule, 2026-09-14.**
+    `carry_ball_coord_continuity` is a mitigation: it reads a
+    neighbour's authored coord onto an unplaced boundary. The backend
+    still authors no ball position on the remaining **30 Played / 28
+    wrap** steps. Those are not residue of item 44. They are what is
+    left of a missing rule. The durable fix is emitters authoring a
+    ball position on every step — effectively §8.1 for the ball. Do
+    not treat a future census of 30/28 as a reopen of the empty-string
+    omit.
+
+58. **CLOSED — post-draw O_FOUL charge to the driver.** 2026-09-14. Same
+    root as the D_FOUL write (`get_ball_handler_from_skeleton` omits
+    `drive`). `select_foul_player` 60%-weights the fabricated BH; the
+    slot is correct, the identity is not. `_apply_drive_contact_o_foul_charge`
+    substitutes AFTER the draw when `foul_player` is that BH and the
+    drive-contact stash is present. Stash tuple at the pin now includes
+    `O_FOUL`. Does not rewrite `ball_handler` before the draw (that
+    desynced 7 of 8 seeds). Does not touch the 40% off-ball slot, the
+    resolver, or zone. IQ closed separately, post-draw (item 59). Q1 at
+    ``bbabe427d``: 3 Played / 2 wrap per 8
+    games; fabricated F incremented 3/3 and 2/2; wrap seed 5 Von Sanborn
+    fouled out on a later foul that needed the fabricated +1.
+
+## 59. Shot-clock IQ — fabricated PG closed post-draw (Phase 4 A)
+
+**CLOSED.** `get_ball_handler_from_skeleton` still omits `drive`. After
+`x = random.randint(1, 100)` the threshold is recomputed from the pin
+step's drive action (`_drv_id` at `:8330`, not the resolver). Same `x`.
+No extra draw. Absence of a drive pin is a no-op (rule 26). Every
+recomputation is logged (26b): fabricated PG, driver, both thresholds,
+`x`, whether the branch flipped.
+
+Rationale for closing despite "inert in evidence": fabricated-pin count
+moved 5 → 2 between footings this week; would-flip is 0 on a sample of 2.
+A close that costs nothing and only diverges when it corrects a real
+error belongs in the baseline.
+
+**Would-flip.** Seeds 1–8 (`0xB40000`): 0. Played 47 IQ evals / 2
+fabricated pins (seeds 3 and 8); wrap 33 / 0. Both pins recomputed
+from the driver (84→83 x=13; 102→97 x=94). Neither flipped. The
+other 45 / 33 are untouched (byte-identical scores and draws vs HEAD).
+
+**equiv-v3 n=40 vs HEAD is not identical — a real flip landed.**
+Played seed 8037 (`0xE0025`): Xenon Fletcher (fabricated PG) thr=91
+→ Ronnie Rozier (driver) thr=84, x=89, flipped=True. HEAD took
+shot-at-1 (`x ≤ 91`); the driver takes the violation (`x > 84`).
+That seed 85.0 → 76.5 ppt, 437 → 448 turns, 32 → 44 possessions.
+The other 39 played seeds and all 40 wrap seeds are byte-identical
+(wrap 83.39 ±3.02 held). Played mean 75.19 → 74.97 ±2.91. The flip
+is the point: the driver has the ball, so his IQ governs whether
+he forces one up.
+
+`BackEnd/engine/phase_resolution.py` (`_driver_on_skeleton_step`,
+`_shot_clock_iq_threshold`, `recompute_shot_clock_threshold_from_pin_driver`).
+`tests/test_shot_clock_iq_driver.py`.
+
+## 60. Zone `random.choice` — LEFT BY DECISION
+
+**LEFT BY DECISION.** Not latent.
+
+The fabricated-BH `random.choice` at the zone flourish (`:8591` /
+`:8897`) fires **0 times** on both footings. The pick is overwritten by
+`_hco_moment_defender_id` (`:8873–8878`) before the flourish. The fouler
+is independent and already post-draw corrected (`98a4132c3`).
+
+Poison: `zone_last` 8/8 Played (and wrap). `zone_driver` 2/8 Played
+(BH rewrite at `:8479` before `select_foul_player` reweights the 60%
+slot). The only available correction is a pre-draw identity swap that
+reweights that slot and desyncs the stream — expensive, cosmetic gain.
+
+Leave the resolver untaught. Do not swap identity before the draw.
+
+## PHASE 6 REFERENCE — cut 2026-09-15 at ``b2982fce1``
+
+Supersedes ``bbabe427d`` 75.76 / 83.69 as the measuring stick. Tune
+against this cut. The older item-42 recut at ``094f36ca2`` (75.16 /
+87.65) is a different footing (pre-O_FOUL, pre-IQ-close) and is not
+this stick.
+
+> **REFERENCE, points per team, 2026-09-15, cut at ``b2982fce1``,
+> equiv-v3, n=40, seeds 8000–8039, ``scratch_equiv3_fbdedupe.py``,
+> Lancaster vs Bentley-Truman, all sliders 2 except ``hc_trap`` /
+> ``fc_press`` 5, plays catalogue SEEDED, ``PYTHONHASHSEED=0``,
+> game_id ``0xE0000+(seed-8000)``, published CI = 1.96 × SEM
+> (sample SD / √n):**
+>
+> - **[PLAYED] 74.97 ±2.91**, possessions 46.62 ±2.32, draws 62476.6 ±541.6
+> - **[SIM] 83.39 ±3.02**, possessions 47.17 ±2.10, draws 60581.6 ±687.9
+> - arm gap (sim − played) 8.42
+>
+> **Gates.** Independence: seed 8000 × 3 processes, both arms
+> byte-identical (played 76.5 / 427 / 62598; sim 93.0 / 498 / 61187),
+> and those rows match the n=40 cells. FT-honour: played 99.8%
+> (2592/2596), sim 99.5% (2796/2810), gap 0.3pp. 0 errors.
+>
+> **Seam-static invariant at this SHA:** 2,754 Played / 2,323 wrap,
+> seam-moved 0/0. Re-baselines when game paths shift (item 44 / H).
+
+One played seed moved vs the pre-close HEAD (8037 / ``0xE0025``):
+shot-at-1 → shot-clock violation. That is item 59. Wrap was
+byte-identical.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
@@ -2662,12 +3261,16 @@ Stale pre-refactor FB tests were deleted 6-12-26; suite is green. **Still open:*
 `_prepend_final_turn_handoff_if_needed` path. Its monotonic/no-self-loop contract remains
 covered. The separate `roll_anchor_clock` debt was resolved earlier.
 
-## P0 — HCO contract clock overruns (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
+## P0 — HCO contract clock overruns [CODE-CLEANUP] — **CLOSED 2026-09-15**
 
-Two critical issues from the animation blueprint's "Known HCO Turn Issues" list (`projects/Unified_Animation_System.md`):
+`Unified_Animation_System.md` is not in the tree (retired August 2026; see
+`animation_worklist.md` Source of truth). **Traced: not a paying-user crash on
+the Played schema path** (0/1159 contract turns entered `playTurnAnimation`).
+Do not re-litigate from the P0 label. Orphans #2–#8 stay open as post-launch
+tech debt (re-verified 2026-09-15). Details: `animation_worklist.md`.
 
-1. **HCO resolution hard overrun:** observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on a `DEAD BALL` path. **Partial mitigation (Option A):** turn-boundary guards in `turnAnimation.js` use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`). Throws still exist; needs live validation before closing.
-2. **HCO step-pass hard overrun in BATCH/DEAD BALL sub-turns:** observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6`. **Still uncapped** — step-pass guard uses raw `Date.now() - stepStartMs` (no Option A). Track separately from #1.
+1. **HCO resolution (`:4344`):** leftover no-steps path. Option A caps wall elapsed.
+2. **HCO step-pass (`:5211`):** warn-only. No per-step `real_time_elapsed_ms`; tab-hide must not abort the turn.
 
 ## Animation timing pauses
 

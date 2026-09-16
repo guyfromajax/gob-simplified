@@ -232,7 +232,7 @@ def build_fb_outlet_pass_step(
             project_animation_step_through_fast_break_state,
         )
 
-        return project_animation_step_through_fast_break_state(
+        step = project_animation_step_through_fast_break_state(
             step,
             index=0,
             result={"current_turn": "FAST_BREAK"},
@@ -245,4 +245,10 @@ def build_fb_outlet_pass_step(
             receiver_id,
             e,
         )
-        return step
+    try:
+        from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+        enforce_step_start_continuity([step] if step else None, context="fb_outlet_pass")
+    except Exception:
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
+    return step

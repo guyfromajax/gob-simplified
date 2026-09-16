@@ -1,6 +1,6 @@
 # Multi-Franchise Slots Brief
 
-> **Status:** Phases 0–4 done and documented; **Phase 5 capacity/retention remains open** (re-audited 2026-08-08).
+> **Status:** ARCHIVED 2026-09-14. Phases 0–4 shipped; canonical contract in `04_Franchise_Mode_Systems/Franchise_Mode_Overview.md` § Two-slot account contract (the open Phase 5 capacity items moved there), `01_Data_Persistence/Cache_Usage_Documentation.md` §9, and `Franchise_Delete_System.md`. The §3 decisions and §9 open questions are settled by the shipped state.
 > **Goal:** Let each account hold **two** concurrent franchise slots so a user can run two careers at once.  
 > **Constraint:** Protect ownership isolation and session identity. Do not invent soft-archive in v1 unless product demands it.
 

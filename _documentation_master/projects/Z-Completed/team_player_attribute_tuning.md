@@ -1,5 +1,7 @@
 # Team & Player Attribute Tuning — measured season
 
+> **ARCHIVED 2026-09-14.** Measurement record; outcomes are folded into Training_System.md, Team_Attribute_System.md, End_Of_Game_System.md and In_Season_Training_Summary.md.
+
 **Latest run: 2026-08-15, PRODUCTION (`gob`).** Full 26-week regular season plus postseason,
 played through the UI — not simmed.
 
@@ -176,6 +178,6 @@ guard was verified engaged (`ProdWriteBlocked`) before any query ran.
 ## Related
 
 * [`team_attribute_testing.md`](./team_attribute_testing.md) — earlier staging franchises, same rail methodology
-* [`cpu_identity_design.md`](./cpu_identity_design.md) — the allocation system
-* [`../09_Training_Systems/In_Season_Training_Summary.md`](../09_Training_Systems/In_Season_Training_Summary.md) — the fit model these numbers test
-* [`../06_Gameplay_Systems/End_Of_Game_System.md`](../06_Gameplay_Systems/End_Of_Game_System.md) — the EOG bands
+* [`cpu_identity_design.md`](../cpu_identity_design.md) — the allocation system
+* [`../09_Training_Systems/In_Season_Training_Summary.md`](../../09_Training_Systems/In_Season_Training_Summary.md) — the fit model these numbers test
+* [`../06_Gameplay_Systems/End_Of_Game_System.md`](../../06_Gameplay_Systems/End_Of_Game_System.md) — the EOG bands

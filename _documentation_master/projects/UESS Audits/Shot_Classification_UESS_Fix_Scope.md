@@ -1,6 +1,8 @@
 # Shot Classification → UESS Single-Coord-Source Fix (Option C)
 
-**Scope:** Make 2PT/3PT classification read the **same terminal shoot coord the FE renders**, for all skeleton-shot turn types (HCO, Final Turn, FCP, HCT). Supersedes the "prefer explicit coords / named-spot" framing in Phase 1/3 of [three_pointer_classification.md](../three_pointer_classification.md).
+> **Findings as of 2026-07-05. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
+**Scope:** Make 2PT/3PT classification read the **same terminal shoot coord the FE renders**, for all skeleton-shot turn types (HCO, Final Turn, FCP, HCT). Supersedes the "prefer explicit coords / named-spot" framing in Phase 1/3 of [three_pointer_classification.md](../Z-Completed/three_pointer_classification.md).
 
 > **STATUS (2026-07-05): ~98% variant SHIPPED, exact Option C DEFERRED.** HCO / Final Turn / FCP now classify from the emitter's terminal shoot coord via an RNG-neutral throwaway pre-pass (`_uess_terminal_shoot_coord`), cutting misclassification from ~25% → ~2-3% (regression-clean). The **exact 0%** version (§4d pin) was deferred because the pre-pass can't perfectly reproduce the late render context (see §"Reality check" below); true parity needs pinning the coord into the emitter core. Residual gap documented in `UESS_System.md` §12.1.
 >

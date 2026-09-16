@@ -1,5 +1,12 @@
 # Three-Pointer Classification Work Plan
 
+> **ARCHIVED 2026-09-14 — implemented.** Its own Phase 8 called for archiving once the rules reached
+> the canonical doc; they have. Rules: `06_Gameplay_Systems/Shot_System.md` (classification section).
+> Coverage: `tests/test_three_point_arc_boundary.py`, `tests/test_shot_geometry_classification.py`,
+> `tests/test_motion_shot_spot_classification.py`, `tests/test_shot_system_regressions.py`. The Phase 1/3
+> "prefer explicit coords" framing is further superseded by
+> `projects/UESS Audits/Shot_Classification_UESS_Fix_Scope.md`.
+
 ## Purpose
 
 Define the work plan for hardening how the backend classifies made and missed shot attempts as 1-point, 2-point, or 3-point attempts across HCO, Dynamic HCT, FCP, Fast Break, OREB, Free Throw, and Final Shot paths.

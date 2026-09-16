@@ -64,6 +64,19 @@ from BackEnd.engine.rim_runner_step_emitter import (
 )
 
 
+def _triangle_guarded(steps):
+    """UESS §8.1 at the triangle emitter return. RR finalize already
+    enforces; this second pass is the nine-emitter contract and a no-op
+    once the FCP/FLSS merge lands."""
+    try:
+        from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+        enforce_step_start_continuity(steps, context="triangle")
+    except Exception:
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
+    return steps
+
+
 def _next_step_index(steps: List[AnimationStep]) -> int:
     return len(steps) + 1
 
@@ -972,7 +985,7 @@ def build_triangle_animation_steps(
 
             rebase_animation_step_next_indices(dr_steps, len(steps))
             steps.extend(dr_steps)
-            return _finalize_rr_steps(turn_result, game, steps)
+            return _triangle_guarded(_finalize_rr_steps(turn_result, game, steps))
 
     shot_motion = _build_triangle_shot_motion_step(
         turn_result=turn_result,
@@ -987,4 +1000,4 @@ def build_triangle_animation_steps(
     if shot_motion is not None:
         steps.append(shot_motion)
 
-    return _finalize_rr_steps(turn_result, game, steps)
+    return _triangle_guarded(_finalize_rr_steps(turn_result, game, steps))

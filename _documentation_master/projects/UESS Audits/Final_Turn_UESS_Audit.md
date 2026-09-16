@@ -1,5 +1,7 @@
 # Final Turn (+ FLSS) ↔ UESS Compliance Audit
 
+> **Findings as of 2026-07-04. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Date:** 2026-07-04 · **Scope:** Final Turn (end-of-quarter ≤30s shot) **and its FLSS / EOQ-Perfection sub-branch** · **Method:** read-only trace, 4 parallel audits (single-coord-source, clock/EOQ, ball-seam, player-coord) · **Audit only — no code changed.** · Turn #1 of the 11-turn UESS sweep (after HCO).
 
 **FLSS confirmed part of Final Turn:** `turn_manager.resolve_final_turn_shot` → `resolve_final_turn_shot_logic` → if `route_flss` → `eoq_perfection.resolve_flss_shot_logic` → shared `_emit_hco_animation_steps`. Both audited here.

@@ -13,39 +13,51 @@ The animation assessment already exists and is NOT superseded by this file:
 | Doc | What it is |
 |---|---|
 | [`animation_cleanup_findings.md`](animation_cleanup_findings.md) | **Primary.** Trace findings, 2026-08-27/28. Verdict: no overhaul needed; the missing 30% concentrates in 3 root causes. §§10-18 are implemented passes. |
-| [`animation_cleanup_brief.md`](animation_cleanup_brief.md) | Symptoms + references, in the user's words. The "what good feels like" doc. |
+| [`animation_cleanup_findings.md`](animation_cleanup_findings.md) **Appendix A** | Symptoms + references, in the user's words. The "what good feels like" doc. Merged into findings 2026-09-14 (was `animation_cleanup_brief.md`). |
 | [`UESS_Backlog.md`](UESS_Backlog.md) | Legacy audit remediation items 5, 7, 8, 9, 10, 12-17 still open |
 | [`step_transition_centralization.md`](step_transition_centralization.md) | Proposed work plan, implementation not started |
 | [`UESS Audits/`](UESS%20Audits/) | Per-path audits (BIP, DREB, FCP, FB, Final Turn, FT, HCO, HCT, OREB, Coord Consumer) |
-| `Unified_Animation_System.md` | Blueprint referenced by the P0 items below |
+| ~~`Unified_Animation_System.md`~~ | **Not in the tree.** Retired August 2026 (was `00_General_Systems/`, then `projects/`). Durable UESS principles and the hybrid `unitCompletionContract.js` layer live in [`UESS_System.md`](../05_UESS_System/UESS_System.md), [`Core_Animation_System.md`](../05_UESS_System/Core_Animation_System.md), and [`UESS_Backlog.md`](UESS_Backlog.md) (hybrid-layer section). Orphan #1 (P0 HCO clock) closed 2026-09-15 — not a paying-user crash. See `Z-Completed/_documentation_sweep.md`. |
 
 **The three root causes** (`animation_cleanup_findings.md` §§2-4):
 
-1. **Freeze-by-default** — `transition_bridge.build_pass_step(continuing_targets=None)`
-   freezes everyone but passer/receiver. Explains 4 of 8 symptoms. Named the
-   highest-leverage change in the project: invert the default, promote
-   `_initialize_continuing_movement` to a shared builder base.
+1. **Freeze-by-default — SHIPPED 2026-08-27 for the FB/transition family** (`animation_cleanup_findings.md` §12). `build_pass_step` now defaults to `CONTINUE_FROM_PREVIOUS` (`transition_bridge.py:780`). Explicit `None` still freezes (a caller decision). HCO stationary / SIP-BIP passer holds were left as-is in that pass. **Do not re-implement. Not the highest-leverage open change.**
 2. **Geometry-free actor selection** — distant steals/fouls; resolution-layer, not animation.
 3. **No shot-release timing model** — shot timing is a byproduct of traversal time.
 
 ---
 
-## Orphans — open animation items that lived only in `bugs.md`
+## Orphans — animation items that lived only in `bugs.md`
 
-**Reconciled against `animation_cleanup_findings.md` on 2026-09-04 — all eight confirmed still
-open.** That doc mentions neither `SUBTLE_STEP_ELAPSED_BY_TEMPO` nor the HCO clock-overrun
-contracts anywhere (grepped). The two items previously flagged as possible duplicates are not.
+**2026-09-04 said "all eight confirmed still open." That line is retired.**
+Re-verified against the tree 2026-09-15. Same trap as item 47 (fixed before anyone
+scoped it). Do not brief from the 2026-09-04 sentence.
 
-### P0 — HCO contract clock overruns (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
+| # | orphan | status 2026-09-15 | tree check |
+|---|---|---|---|
+| 1 | P0 HCO clock overruns | **CLOSED 2026-09-15** | Traced. **Not a paying-user crash on the Played schema path** (0/1159 Played contract turns entered `playTurnAnimation`). Do not re-litigate from the old P0 label. `:4344` still throws but is Option-A capped (`getGuardedTurnElapsedMs`). `:5211` step-pass clock is **warn-only** on HCO — no per-step `real_time_elapsed_ms`, so Option A cannot cap it; aborting a tab-hide makes the turn worse. |
+| 2 | Motion / Bucket 1 subtle-step pauses | **OPEN** | `SUBTLE_STEP_ELAPSED_BY_TEMPO` still `{slow:(2,4), normal:(2,3), fast:(1,3)}` (`motion_step_decision.py:43`). Not decoupled from visual `time_elapsed`. |
+| 3 | Fast Break legacy backlog | **OPEN** (UESS is primary) | `runFastBreakSequence` still in `fastBreak.js:1809`; `AnimationEngine.js` and `turnoverAdapter.js` still import it. |
+| 4 | Legacy shot handler / `runSetupTween` | **emission SUPERSEDED 2026-09-08; FE unguard OPEN** | bugs.md item 11 closed the FLSS stranded-skeleton emit (5 render-nothing / 8 games → 0). `ShotAnimationSystem.js:572` / `:666` still iterate `turnData.animations` unguarded. |
+| 5 | Steal → HCO setup dead compute | **OPEN** | `phase_resolution.py:8868-8874` still stamps `is_steal_hco_setup` / `ball_handler_hco_setup_*` / `other_players_hco_setup_movements`. No FE readers. |
+| 6 | Legacy steal-entry FB + `STEAL_ENTRY_*` | **OPEN** | after_steal returns at `:1549`. Steal-entry block at `:1858-1882` is still in the file. Constants still in `fast_break_constants.py:196-200` and `fastBreakConstants.js:104-108`. |
+| 7 | Invalid HalfCourt → HalfCourt `safeTransition` | **OPEN** | `handleBaselineInbound` still calls `safeTransition(..., States.HalfCourt)` unconditionally (`AnimationEngine.js:1268`). No `is(HalfCourt)` guard. |
+| 8 | Stale FB test suite follow-up | **PARTIAL** | `test_after_steal_fast_break_stats.py` and `test_steal_fast_break_routing.py` now exist. `test_fast_break_rr_triangle_updates.py` still the RR/Triangle coverage. CR resolver path still thin. |
 
-*Not in the findings doc's table of contents. Treat as a genuine orphan.*
+Orphans **#2–#8 stay open as post-launch tech debt** (tree check 2026-09-15 above). #1 is closed — do not re-brief it as a P0 player crash.
 
-Two critical issues from the animation blueprint's "Known HCO Turn Issues" list (`projects/Unified_Animation_System.md`):
+Freeze-by-default is **not** one of the eight and is **not open** as a re-implement (root cause #1 above).
 
-1. **HCO resolution hard overrun:** observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on a `DEAD BALL` path. **Partial mitigation (Option A):** turn-boundary guards in `turnAnimation.js` use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`). Throws still exist; needs live validation before closing.
-2. **HCO step-pass hard overrun in BATCH/DEAD BALL sub-turns:** observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6`. **Still uncapped** — step-pass guard uses raw `Date.now() - stepStartMs` (no Option A). Track separately from #1.
+### P0 — HCO contract clock overruns [CODE-CLEANUP] — **CLOSED 2026-09-15**
 
-### Motion step pauses (Bucket 1)
+*Not in the findings doc's table of contents. Genuine orphan. Blueprint cite retired — see Source of truth.*
+
+**Traced 2026-09-15. Not a paying-user crash on the Played schema path.** Schema `playTurn` never reaches these contracts. Played seeds 1–8: 0/1159 `isStepContractTurn` rows entered `playTurnAnimation`. Do not re-open from the P0 keyword.
+
+1. **HCO resolution hard overrun (`:4344`):** leftover on the no-steps `playTurnAnimation` path. Option A caps elapsed (`min(wall, real_time_elapsed_ms + 1500)`). Still throws if that cap exceeds budget.
+2. **HCO step-pass hard overrun (`:5211`):** **warn-only** as of 2026-09-15. `real_time_elapsed_ms` is turn-level, not a step-pass contract, so Option A cannot gate this. A backgrounded tab is a normal player action; aborting the turn is worse than a warn.
+
+### Motion step pauses (Bucket 1) — **OPEN** (2026-09-15)
 
 *✅ RECONCILED 2026-09-04 — **not a duplicate, and probably the largest single source of dead
 air in the game.** §5d's backend-hold inventory does not list `SUBTLE_STEP_ELAPSED_BY_TEMPO`;
@@ -63,7 +75,7 @@ dead-air ledger as its own category before tuning.*
 - **Fix:** Decouple sim clock from visual time — keep 2–4s on game ledger, stamp small visual `time_elapsed`. Optional: off-ball drift during BH hold so 9 players don't read as frozen.
 - **Secondary:** Confirm BH hold doesn't block the other 9 from moving; consider idle organic sprite animation on truly stationary steps.
 
-### Fast Break animation backlog (legacy path) [CODE-CLEANUP]
+### Fast Break animation backlog (legacy path) [CODE-CLEANUP] — **OPEN** (2026-09-15)
 
 *✅ RECONCILED 2026-09-04 — **not superseded.** §15 fixed the board-crash early-out on the
 SCHEMA path (`transition_shot_board_crash.py`). Every item below is about the LEGACY
@@ -78,7 +90,7 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 - Charge/blocking foul on FB: stop animation immediately (don't wait for defensive spot) — see Bugs §14.
 - Full phase map and backend sites: archived refactor doc.
 
-### Legacy shot handler crashes on turns with no animations[] (`ShotAnimationSystem.runSetupTween`)
+### Legacy shot handler crashes on turns with no animations[] (`ShotAnimationSystem.runSetupTween`) — **emission SUPERSEDED 2026-09-08; FE unguard OPEN**
 
 *Moved from `bugs.md` Bugs §5. A live diagnostic is armed and waiting to fire.*
 
@@ -102,7 +114,7 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
      bare at 352/455/572/666). Sites 572/666 remain unguarded on the final_turn-skips-setup path.
    - Pre-existing; unrelated to the animation cleanup pass.
 
-### Steal -> HCO setup: backend computes positioning the frontend no longer renders [CODE-CLEANUP]
+### Steal -> HCO setup: backend computes positioning the frontend no longer renders [CODE-CLEANUP] — **OPEN** (2026-09-15)
 
 *Related to root cause #2 (the `apply_coords` antipattern) but is a separate dead-compute cleanup.*
 
@@ -111,14 +123,14 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 - **Action**: Remove the Steal → HCO setup positioning computation and its emitted fields from the backend resolver. Confirm no other consumer reads those fields first.
 - **Priority**: Low (dead/unrendered compute, not causing bugs)
 
-### Legacy steal-entry Fast Break dead code + unused `STEAL_ENTRY_*` constants [CODE-CLEANUP]
+### Legacy steal-entry Fast Break dead code + unused `STEAL_ENTRY_*` constants [CODE-CLEANUP] — **OPEN** (2026-09-15)
 
 - **Issue**: All steals are short-circuited to the UESS-migrated `after_steal` resolver early in `resolve_fast_break_logic` (~L1205), which makes the legacy steal-entry movement block later in the same function (~L1517–1541) unreachable dead code. The `STEAL_ENTRY_MOVE_*` / `STEAL_ENTRY_Y_*` constants that block relied on are now unused on the rendered path in both `BackEnd/constants/fast_break_constants.py` and `FrontEnd/static/js/phaser/constants/fastBreakConstants.js`.
 - **Impact**: Low — unreachable code + orphaned constants. No runtime effect, just bloat/confusion for anyone reading the FB resolver.
 - **Action**: Delete the unreachable steal-entry block in `resolve_fast_break_logic` and remove the unused `STEAL_ENTRY_*` constants from both the backend and frontend constants files. Verify nothing on the live `after_steal` path references those constants before removing.
 - **Priority**: Low (dead code; tie in with the FB-coverage follow-up noted in the "Stale FB test suite" item above)
 
-### Invalid State Transition Warning [CODE-CLEANUP]
+### Invalid State Transition Warning [CODE-CLEANUP] — **OPEN** (2026-09-15)
 
 - **Issue**: State machine attempts no-op transition (HalfCourt -> HalfCourt)
 - **Location**: `FrontEnd/static/js/phaser/animation/AnimationEngine.js` → `handleBaselineInbound()` still calls `safeTransition` unconditionally (tip path has an `is(HalfCourt)` guard; BIP does not)
@@ -126,9 +138,12 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 - **Action**: Review `handleBaselineInbound()` to avoid calling `safeTransition()` when already in target state
 - **Priority**: Low (code cleanup)
 
-### Stale FB test suite — open follow-up [CODE-CLEANUP]
+### Stale FB test suite — open follow-up [CODE-CLEANUP] — **PARTIAL** (2026-09-15)
 
-Stale pre-refactor FB tests were deleted 6-12-26; suite is green. **Still open:** current-engine FB coverage is thin — `test_fast_break_rr_triangle_updates.py` covers RR/Triangle emitters, but the CR resolver path and `after_steal_fast_break.py` (resolver + emitter) have little/no direct test coverage. Write new tests against the current resolvers when FB work resumes.
+Stale pre-refactor FB tests were deleted 6-12-26; suite is green. **2026-09-15:**
+`test_after_steal_fast_break_stats.py` and `test_steal_fast_break_routing.py` now
+exist. `test_fast_break_rr_triangle_updates.py` still covers RR/Triangle.
+**Still thin:** the CR resolver path. Write those when FB work resumes.
 
 ---
 
@@ -174,3 +189,29 @@ and a `|| []` guard would have hidden exactly those 5. **Worth considering as it
 schema→legacy fallback, surfaced rather than swallowed, so the rate is visible instead of
 inferred. Today a fallback is indistinguishable from normal operation until a user reports a
 teleport.
+
+---
+
+## Phase 2 — within-step ball travel (scoped 2026-09-14, not started)
+
+Founder's Mode moved to 1 Nov. Phases 2–4 move outcomes and must land before Jamie's
+balance pass. Full diagnostic: [`bugs.md`](bugs.md) item 50. **No design and no code
+in that entry — what exists, and what each application would take.**
+
+The mechanism is already live: **1,938 within-step attached A→B transfers per 8
+played games** (published 1,905). Payload is ``start.ball.owner_player_id=A``,
+``end.ball.owner_player_id=B``, ``ball_motion_style="pass"``,
+``ball_arrival_coord``. Writer: ``_walk_ball_owners`` + the HCO emit loop
+(``skeleton_step_emitter.py:375``, ``:2242``, ``:2574``). Not ``BallInFlight``.
+
+| application | n | cost | use the 1,905 as-is? |
+|---|---|---|---|
+| 3a HCT entry | published 23 / this-tree 27 → **CLOSED; 3 survivors parked** (bugs.md item 51) | **not a pass.** Consuming-worker PlayedState `PLAYED=1` (`_is_full_simulation` false), consume wrap, seeds 1–8, `0xB40000`: 27 → 3. Walk-up skipped when `prior_final_bh_id` is None. Do not author an entry pass. | no — inventing a handover is the same lie as `or play_bh` |
+| 3b catch-and-shoot | published 21 / 1,018 / 929 | **cause `phase_resolution.py:8197-8198`.** **1,313 HCO micros = 21 hop + 1,292 clean.** Footing: `PLAYED=1`, seeds 1–8, `0xB40000`. Not the micro writer. | no — truncate discarded the receive; do not thread a new inbound owner in the micro |
+| item 47 fumble handover | published 8 (10 this tree; 6 at ea2c382da) | **CLOSED — 0 hops both footings** (Played 70/0, wrap 84/0). Credit fix, not a pass. `PLAYED=1` / wrap `PLAYED=0`, seeds 1–8, `0xB40000`, consume wrap. | no |
+| loose-ball trajectory | published 46.2% | **RETIRED.** That walk measured §8.1 working, not a missing trajectory. | no — parked ``coords``, no owners; do not author from 46.2% |
+
+Item 47 is not a Phase 2 pass (closed by the TO-credit write; **0/0 both footings**).
+3a is **closed** except 3 parked TIMEOUT hops (item 51). 3b's cause is the
+shot-at-1 truncate at `:8197-8198`, not a catalogue gap. Loose is retired as
+a Phase 2 size.

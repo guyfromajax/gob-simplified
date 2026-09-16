@@ -398,7 +398,7 @@ Input is `technical_drills.rebounding + scrimmages`, summed and applied **once**
 >
 > Measured over a full season after the change: mean **0.54** from a 0.5 init. Before, it was
 > headed for 1.19 with ~40% of the league railed. See
-> `projects/team_player_attribute_tuning.md`.
+> `projects/Z-Completed/team_player_attribute_tuning.md`.
 
 **Shot Threshold:**
 - 0 points: `+= random.randint(5, 15)`
@@ -996,4 +996,4 @@ survived unnoticed.
   *opponent* does, not what the team chooses.
 
 Full design and measured results: [`../projects/cpu_identity_design.md`](../projects/cpu_identity_design.md) Part A.
-Season outcomes: [`../projects/team_player_attribute_tuning.md`](../projects/team_player_attribute_tuning.md).
+Season outcomes: [`../projects/Z-Completed/team_player_attribute_tuning.md`](../projects/Z-Completed/team_player_attribute_tuning.md).

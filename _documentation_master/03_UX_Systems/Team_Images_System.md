@@ -41,6 +41,46 @@ FrontEnd/static/images/teams/
 
 **Court generator:** `scripts/generate_non_a1_courts.mjs` produced 120 of 129 courts from fixed geometry constants. The eight Conference 1 / A1 reference courts are excluded and hand-authored: `bentley_truman`, `lancaster`, `four_corners`, `morristown`, `ocean_city`, `little_york`, `xavien`, `south_lancaster`. Team Builder custom programs use the browser canvas port `FrontEnd/static/js/shared/teamCourtGenerator.js` (same geometry); Phaser loads the result as a **blob/object URL**, never a data URI.
 
+### Court design variation (the 120 generated courts)
+
+*(Merged from `projects/court_redesign_brief.md`, 2026-09-14.)* The 120 non-Conference-1 courts
+vary hardwood and branding, using the eight Conference 1 courts as the reference for what is
+possible (hardwood texture, center / deep-wing logo marks, overhead-light reflections).
+
+**Never change:** court colour schemes; court spec, dimensions and naming convention.
+
+**Roll per team, independently:** center-court treatment, non-center treatment, hardwood. Repeats
+are allowed; apply compatibility rules after rolling. Percentages are **per-team random weights,
+not portfolio quotas** — do not rebalance later courts to hit them (parquet need not land on 5%).
+
+| Center court | Weight | | Non-center team logo | Weight | | Hardwood | Weight |
+|---|---|---|---|---|---|---|---|
+| None | 10% | | None | 50% | | Classic | 15% |
+| Team logo | 60% | | Deep wing ×2 | 10% | | Gloss | 40% |
+| Team wordmark | 30% | | Deep wing ×4 | 5% | | Fine plank | 25% |
+| | | | Inside 3-pt arc ×2 | 25% | | Alternating board | 15% |
+| | | | Inside 3-pt arc ×4 | 10% | | Parquet | 5% |
+
+**Branding rules**
+
+- A team logo normally appears **once**. The non-center ×2 / ×4 options explicitly override this and
+  repeat it in symmetric locations; other decorative spots may stay unbranded.
+- A wordmark (school/team name **or** mascot name) may appear **only at center court** — alone, or
+  paired with one non-repeated logo elsewhere.
+- **Exceptions:** 20 new courts plus Ocean City (**21 total**) carry one wordmark in a single deep-wing
+  position; vary school-name vs mascot-name and placement (upper/lower × left/right) at random.
+  **IDA** keeps its five shield placements as an intentional organic outlier.
+- **Deep wing** = the open midcourt channel outside a 3-pt arc, between the arc and the center line
+  (reference: Ocean City's lower-right school-name placement). **Not** the corner/short-wing area
+  between an arc and the baseline.
+- No full logo/mascot wordmarks rotated into the baseline border bands. **Baseline branding is
+  tabled** for this rollout; the earlier 10% max / Bentley-Truman direction remains a future option.
+- Abilene is included in the 120.
+- Overhead-light reflections keep the slightly imperfect, human placement of the Conference 1
+  courts: only very subtle variation in spacing, vertical alignment, size, intensity and softness —
+  never mechanically exact, never exaggerated enough to look accidental.
+
+
 ---
 
 ## How paths are built in code

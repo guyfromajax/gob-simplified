@@ -1,5 +1,7 @@
 # Timeout — UESS Compliance Audit
 
+> **Findings as of 2026-07-05. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Verdict: benign non-animated state event — but the sweep's ONE genuine §1 (FE-logic) violation.** Timeout has zero coord/animation content (it doesn't need schema migration); the resume seam is clean for players; §5 is correct (0 burn, shot clock *preserved*). The real finding: the **FE owns the "when can a timeout fire" rule**, un-mirrored backend-side. (2026-07-05, 3 focused traces.)
 
 > **Unmigrated (benign):** Timeout emits NO schema `animation_steps`. `setup_timeout_turn` (turn_manager.py:4136) returns a plain result dict (result_type "TIMEOUT", `time_elapsed:0`, timeout counts, resume state); the FE renders a modal + navigates to the lineup screen. `uess_ownership_contract applicable:false`. It's inherently a non-animated dead-ball event — the schema doesn't apply, and it does NOT need migration.

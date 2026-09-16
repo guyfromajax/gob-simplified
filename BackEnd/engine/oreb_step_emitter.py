@@ -696,6 +696,13 @@ def build_oreb_animation_steps(
             rebounder_id=str(turn_result.get("shooter") or "").strip() or None,
             second_rebounder_id=str(turn_result.get("rebounderId") or "").strip() or None,
         )
+    try:
+        from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+        enforce_step_start_continuity(steps, context="oreb")
+    except Exception:
+        import logging
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps
 
 

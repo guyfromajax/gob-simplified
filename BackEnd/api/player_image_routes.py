@@ -150,7 +150,7 @@ def ensure_player_image(req: EnsurePlayerImageRequest, user: dict = Depends(get_
 
     The painted artifact lives at ``uniforms/<image_id>__<color_key>.png`` and is
     shared by every franchise whose player wears that portrait in those colours —
-    see _documentation_master/projects/Uniform_Archive_Brief.md. The legacy
+    see _documentation_master/00_Operations/Player_Image_System.md § Uniform archive. The legacy
     ``players/master/<player_id>.png`` key is MIRRORED from it with a server-side
     copy so existing read paths keep resolving while payloads are threaded with
     uniform_key. The mirror is migration scaffolding, not the artifact; once every
@@ -264,7 +264,7 @@ def warm_teams_now(franchise_id: str, team_refs: list[str]) -> dict:
     Idempotent and cheap in the steady state: a player already carrying
     ``meta.uniform_key`` is skipped without touching R2, so once the backfill has
     run this is one indexed query and no paints. It exists as a safety net, not as
-    the primary mechanism — see Uniform_Archive_Brief.md.
+    the primary mechanism — see Player_Image_System.md § Uniform archive.
     """
     from concurrent.futures import ThreadPoolExecutor
 

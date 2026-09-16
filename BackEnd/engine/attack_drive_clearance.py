@@ -8,7 +8,7 @@ from BackEnd.utils.sim_random import sim_rng as random
 from BackEnd.utils.team_attr_scale import core8_gameplay
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS, CONTEST_EUCLIDEAN_RADIUS
+from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS, CONTEST_EUCLIDEAN_RADIUS, require_hco_spot
 from BackEnd.utils.defense_identity import defense_zone_shell_variant
 from BackEnd.utils.defense_utils import is_zone_defense
 from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
@@ -74,7 +74,7 @@ def _euclid(a: Dict[str, float], b: Dict[str, float]) -> float:
 
 
 def _home_spot_coords(location: str) -> Dict[str, float]:
-    raw = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+    raw = require_hco_spot(location)
     return {"x": float(raw["x"]), "y": float(raw["y"])}
 
 

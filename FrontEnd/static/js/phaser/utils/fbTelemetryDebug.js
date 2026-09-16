@@ -1,3 +1,5 @@
+import { resolveHcoStepStrictMode } from "./hcoStepStrictContract.js";
+
 const globalScope =
   (typeof window !== "undefined" && window) ||
   (typeof globalThis !== "undefined" && globalThis) ||
@@ -197,39 +199,27 @@ function installGlobalHelpers() {
       return config;
     };
   }
-  if (typeof globalScope.showHcoStepStrictConfig !== "function") {
-    globalScope.showHcoStepStrictConfig = () => {
-      const modeRaw = globalScope.HCO_STEP_MOVEMENT_STRICT_CONTRACT;
-      const isLocalHost =
-        globalScope?.location?.hostname === "localhost" ||
-        globalScope?.location?.hostname === "127.0.0.1";
-      const strictMode =
-        modeRaw === "throw" || modeRaw === "warn" || modeRaw === "off"
-          ? modeRaw
-          : modeRaw === true
-            ? "warn"
-            : modeRaw === false
-              ? "off"
-              : isLocalHost
-                ? "throw (auto)"
-                : "warn (auto)";
-      const toleranceRaw = Number(globalScope.UESS_HCO_STEP_MOVEMENT_TOLERANCE_PX);
-      const maxWaitRaw = Number(globalScope.UESS_HCO_STEP_MOVEMENT_MAX_GAME_SECONDS);
-      const config = {
-        strictMode,
-        tolerancePx:
-          Number.isFinite(toleranceRaw) && toleranceRaw > 0 ? toleranceRaw : 18,
-        maxWaitGameSeconds:
-          Number.isFinite(maxWaitRaw) && maxWaitRaw > 0 ? maxWaitRaw : 8,
-        debugFlags: {
-          DEBUG_FB_TELEMETRY: Boolean(globalScope.DEBUG_FB_TELEMETRY),
-          DEBUG_ANIM: Boolean(globalScope.DEBUG_ANIM),
-        },
-      };
-      console.log("[HCO step strict config]", config);
-      return config;
-    };
-  }
+  globalScope.showHcoStepStrictConfig = showHcoStepStrictConfig;
+}
+
+export function showHcoStepStrictConfig() {
+  const scope = globalScope || {};
+  const strictMode = resolveHcoStepStrictMode(scope);
+  const toleranceRaw = Number(scope.UESS_HCO_STEP_MOVEMENT_TOLERANCE_PX);
+  const maxWaitRaw = Number(scope.UESS_HCO_STEP_MOVEMENT_MAX_GAME_SECONDS);
+  const config = {
+    strictMode,
+    tolerancePx:
+      Number.isFinite(toleranceRaw) && toleranceRaw > 0 ? toleranceRaw : 18,
+    maxWaitGameSeconds:
+      Number.isFinite(maxWaitRaw) && maxWaitRaw > 0 ? maxWaitRaw : 8,
+    debugFlags: {
+      DEBUG_FB_TELEMETRY: Boolean(scope.DEBUG_FB_TELEMETRY),
+      DEBUG_ANIM: Boolean(scope.DEBUG_ANIM),
+    },
+  };
+  console.log("[HCO step strict config]", config);
+  return config;
 }
 
 function getSession(scene) {

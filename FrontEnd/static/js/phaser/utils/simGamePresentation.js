@@ -91,6 +91,36 @@ function portraitSrc(id) {
   return '';
 }
 
+async function courtSrc(teamNameOrSlug) {
+  const fallbackPath = '/images/teams/general/general_court.jpg';
+  const visual = typeof getActiveTeamBuilderVisual === 'function'
+    ? getActiveTeamBuilderVisual()
+    : null;
+  const isCustomCourt =
+    visual &&
+    typeof teamBuilderVisualMatchesName === 'function' &&
+    teamBuilderVisualMatchesName(visual, teamNameOrSlug);
+
+  if (isCustomCourt) {
+    const courtUrlFn =
+      (window.TeamGeneratedArt && window.TeamGeneratedArt.courtObjectUrl) ||
+      (window.TeamCourtGenerator && window.TeamCourtGenerator.courtObjectUrl);
+    if (typeof courtUrlFn === 'function') {
+      try {
+        const primary = visual.primary_color || visual.primary || '#27408E';
+        const secondary = visual.secondary_color || visual.secondary || '#15181f';
+        return await courtUrlFn({ primary, secondary, court: visual.court || null, ...(visual.court || {}) });
+      } catch (e) {
+        return fallbackPath;
+      }
+    }
+  }
+
+  return typeof getTeamAssetPath === 'function'
+    ? getTeamAssetPath(teamNameOrSlug, 'court')
+    : fallbackPath;
+}
+
 function calloutColor(name) {
   return CALLOUT_COLORS[String(name || '').toLowerCase()] || GREEN;
 }
@@ -242,7 +272,8 @@ function ensureStyles() {
     .sgp-root .w4-cap.poss{color:var(--orange)}
     .sgp-root .w4-team{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;letter-spacing:.04em}
     .sgp-root .w4-plot{position:relative;height:208px;margin:4px 0;overflow:hidden}
-    .sgp-root .w4-plot svg.wormsvg{display:block;position:absolute;inset:0;width:100%;height:100%;margin:0}
+    .sgp-root .w4-court{position:absolute;z-index:0;left:50%;top:50%;height:80%;width:auto;max-width:100%;transform:translate(-50%,-50%);object-fit:contain;pointer-events:none}
+    .sgp-root .w4-plot svg.wormsvg{display:block;position:absolute;z-index:1;inset:0;width:100%;height:100%;margin:0}
     .sgp-root .w4-axis{height:12px;display:flex;justify-content:space-between;font-family:ui-monospace,Menlo,monospace;font-size:8px;letter-spacing:.06em;color:var(--w25)}
     .sgp-root .w4-axis.endgame span{color:rgba(255,255,255,.12);transition:color .4s}
     .sgp-root .w4-axis.endgame span:last-child{color:var(--w70);font-weight:700}
@@ -433,6 +464,7 @@ function buildSkeleton(teams) {
             <span class="w4-team" data-wteam></span>
           </div>
           <div class="w4-plot" data-plot>
+            <img class="w4-court" data-court alt="" aria-hidden="true">
             <div class="pretip-lbl">TIP OFF</div>
           </div>
           <div class="w4-axis" data-waxis><span>TIP</span><span>Q1</span><span>HALF</span><span>Q3</span><span>FINAL</span></div>
@@ -768,6 +800,11 @@ export function showSimGamePresentation(timeline, opts = {}) {
 
   const root = buildSkeleton(teams);
   mount.appendChild(root);
+
+  const courtEl = root.querySelector('[data-court]');
+  courtSrc(teams.home.teamName || teams.home.name).then((src) => {
+    if (courtEl && root.isConnected) courtEl.src = src;
+  });
 
   const fitEl = root.querySelector('[data-fit]');
   const overlayEl = root.querySelector('.overlay');

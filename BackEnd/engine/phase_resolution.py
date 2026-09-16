@@ -4,6 +4,7 @@ import copy
 import time
 import json
 from typing import TYPE_CHECKING, Dict
+from BackEnd.constants import require_hco_spot
 from BackEnd.constants.momentum import (
     MO_STEAL_DELTA,
     MO_FT_ALL_MISS_DELTA,
@@ -349,6 +350,23 @@ def _find_most_recent_shot_turn(game, max_turns=10):
 
     return None
 
+# Possession for DEAD-BALL CREDIT. Drive is possession: the driver has
+# the ball. apply_stopper_system_to_skeleton already treats it that way
+# (HCO S2b). get_ball_handler_from_skeleton does NOT use this set —
+# teaching that function drive moved scores, draws, possessions and
+# team TO totals (shot-clock IQ at the explicit drive pin, then the
+# zone-defender random.choice that keys off the returned BH). Credit
+# the driver from the drive-contact payload AFTER that RNG, via
+# _apply_drive_contact_dead_ball_credit (TOs),
+# _apply_drive_contact_foul_credit (D_FOUL text / FT shooter), and
+# _apply_drive_contact_o_foul_charge (O_FOUL identity, post-draw).
+#
+# Distinct from _motion_bh_at_step (receive > handle_ball > pass, no
+# drive) so the walk skips drive steps and drive_contact owns them.
+# Three lists, three jobs. Do not unify them.
+SKELETON_POSSESSION_ACTIONS = frozenset({"handle_ball", "receive", "shoot", "drive"})
+
+
 def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
     """
     Determine the ball handler from skeleton steps.
@@ -388,7 +406,11 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
         # Find who has ball at this step (normalize action so we don't miss due to casing)
         for pos, action_info in pos_actions.items():
             action = (action_info.get("action") or "").lower().strip()
-            # Actions that indicate ball possession
+            # Shot-clock IQ and post-stop defender assignment consume this
+            # return. Drive is possession for CREDIT (see
+            # SKELETON_POSSESSION_ACTIONS) but must stay out of this list
+            # or an explicit pin on a drive step changes IQ / zone RNG
+            # and moves the game.
             if action in ["handle_ball", "receive", "shoot"]:
                 # Found ball handler position
                 ball_handler_player = off_lineup.get(pos)
@@ -397,6 +419,274 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
     
     # Fallback: use PG or first player (only when no step had a clear ball handler)
     return off_lineup.get("PG", list(off_lineup.values())[0])
+
+
+def assert_dead_ball_victim_had_ball(skeleton, step_index, player, off_lineup):
+    """The player charged with a dead-ball TO must have had the ball on that step.
+
+    Drive is possession. A pin on a drive step that credits the PG (who is
+    stationary / absent) is symptom #3 mechanism C. The accept list here is a
+    literal, not ``SKELETON_POSSESSION_ACTIONS``: poisoning the resolver set
+    must still fail this check (26c — shared list would void the instrument).
+    """
+    if player is None or step_index is None or not skeleton:
+        return
+    steps = skeleton.get("steps") or []
+    if not (isinstance(step_index, int) and 0 <= step_index < len(steps)):
+        return
+    pid = str(getattr(player, "player_id", "") or "")
+    if not pid:
+        return
+    action = None
+    for pos, candidate in (off_lineup or {}).items():
+        if candidate is None:
+            continue
+        if candidate is player or str(getattr(candidate, "player_id", "") or "") == pid:
+            info = (steps[step_index].get("pos_actions") or {}).get(pos) or {}
+            action = ((info.get("action") or "").lower().strip() or None)
+            break
+    if action not in ("handle_ball", "receive", "shoot", "drive"):
+        raise AssertionError(
+            "dead-ball TO charged to %s (action=%r) who did not have the ball "
+            "on step %s" % (pid, action, step_index)
+        )
+
+
+def assert_fouled_handler_had_ball(skeleton, step_index, player, off_lineup):
+    """The player named as the fouled man must have had the ball on that step.
+
+    Same literal accept list as assert_dead_ball_victim_had_ball (26c — do
+    not share SKELETON_POSSESSION_ACTIONS). A pin on a drive step that
+    names the PG is the foul/FT twin of symptom #3 mechanism C.
+    """
+    if player is None or step_index is None or not skeleton:
+        return
+    steps = skeleton.get("steps") or []
+    if not (isinstance(step_index, int) and 0 <= step_index < len(steps)):
+        return
+    pid = str(getattr(player, "player_id", "") or "")
+    if not pid:
+        return
+    action = None
+    for pos, candidate in (off_lineup or {}).items():
+        if candidate is None:
+            continue
+        if candidate is player or str(getattr(candidate, "player_id", "") or "") == pid:
+            info = (steps[step_index].get("pos_actions") or {}).get(pos) or {}
+            action = ((info.get("action") or "").lower().strip() or None)
+            break
+    if action not in ("handle_ball", "receive", "shoot", "drive"):
+        raise AssertionError(
+            "foul/FT credited to %s (action=%r) who did not have the ball "
+            "on step %s" % (pid, action, step_index)
+        )
+
+
+def assert_o_foul_charger_had_ball(skeleton, step_index, player, off_lineup):
+    """The player charged with an offensive foul must have had the ball.
+
+    Same literal accept list as assert_fouled_handler_had_ball (26c — do
+    not share SKELETON_POSSESSION_ACTIONS). A pin on a drive step that
+    charges the fabricated PG is item 58.
+    """
+    if player is None or step_index is None or not skeleton:
+        return
+    steps = skeleton.get("steps") or []
+    if not (isinstance(step_index, int) and 0 <= step_index < len(steps)):
+        return
+    pid = str(getattr(player, "player_id", "") or "")
+    if not pid:
+        return
+    action = None
+    for pos, candidate in (off_lineup or {}).items():
+        if candidate is None:
+            continue
+        if candidate is player or str(getattr(candidate, "player_id", "") or "") == pid:
+            info = (steps[step_index].get("pos_actions") or {}).get(pos) or {}
+            action = ((info.get("action") or "").lower().strip() or None)
+            break
+    if action not in ("handle_ball", "receive", "shoot", "drive"):
+        raise AssertionError(
+            "O_FOUL charged to %s (action=%r) who did not have the ball "
+            "on step %s" % (pid, action, step_index)
+        )
+
+
+def _driver_on_skeleton_step(skeleton, off_lineup, step_index):
+    """The player whose action on ``step_index`` is ``drive``, or None.
+
+    Same read as the drive-contact pin (``_drv_id``). Does not go through
+    ``get_ball_handler_from_skeleton``. Absence of a drive is a no-op
+    (rule 26) — do not guess a handler.
+    """
+    steps = (skeleton or {}).get("steps") or []
+    if not (isinstance(step_index, int) and 0 <= step_index < len(steps)):
+        return None
+    pos_actions = steps[step_index].get("pos_actions") or {}
+    drv_pos = next(
+        (
+            pos
+            for pos, info in pos_actions.items()
+            if ((info or {}).get("action") or "").lower().strip() == "drive"
+        ),
+        None,
+    )
+    if not drv_pos:
+        return None
+    return (off_lineup or {}).get(drv_pos)
+
+
+def _shot_clock_iq_threshold(player, chemistry, discipline):
+    iq = int((getattr(player, "attributes", None) or {}).get("IQ", 0) or 0)
+    intelligence = min(25, iq // 4)
+    return 60 + int(chemistry) + int(discipline) + intelligence
+
+
+def recompute_shot_clock_threshold_from_pin_driver(
+    fabricated_threshold,
+    x,
+    skeleton,
+    off_lineup,
+    step_index,
+    fabricated_bh,
+    chemistry,
+    discipline,
+):
+    """Post-draw IQ close. Keep ``x``; swap the threshold if the pin is a drive.
+
+    ``get_ball_handler_from_skeleton`` omits ``drive`` and falls back to the
+    PG. Teaching that resolver ``drive`` desyncs zone RNG. This reads the
+    pin step's drive action instead. No drive pin → return the fabricated
+    threshold unchanged (rule 26).
+    """
+    driver = _driver_on_skeleton_step(skeleton, off_lineup, step_index)
+    if driver is None:
+        return fabricated_threshold
+    driver_threshold = _shot_clock_iq_threshold(driver, chemistry, discipline)
+    flipped = (x > fabricated_threshold) != (x > driver_threshold)
+    logging.warning(
+        "[SHOT-CLOCK IQ] fabricated %s (%s) thr=%s -> driver %s (%s) thr=%s x=%s flipped=%s",
+        getattr(fabricated_bh, "player_id", None),
+        get_name_safe(fabricated_bh) if fabricated_bh is not None else None,
+        fabricated_threshold,
+        getattr(driver, "player_id", None),
+        get_name_safe(driver),
+        driver_threshold,
+        x,
+        flipped,
+    )
+    return driver_threshold
+
+
+def _apply_drive_contact_dead_ball_credit(roles, game_state, skeleton, off_lineup):
+    """Charge the driver for a drive-contact dead-ball TO.
+
+    Runs AFTER the zone / steal-setup RNG that still keys off the PG
+    fallback from get_ball_handler_from_skeleton. Swapping earlier
+    desyncs the stream. Consumes ``_hco_drive_contact_driver_id``.
+    """
+    drv_id = game_state.pop("_hco_drive_contact_driver_id", None)
+    if not drv_id or not roles:
+        return
+    driver = next(
+        (p for p in (off_lineup or {}).values()
+         if p is not None and str(getattr(p, "player_id", "") or "") == str(drv_id)),
+        None,
+    )
+    if driver is None:
+        return
+    roles["ball_handler"] = driver
+    roles["ball_handler_id"] = drv_id
+    stop_idx = (
+        game_state.get("steal_stop_step_index")
+        or game_state.get("turnover_stop_step_index")
+        or game_state.get("stop_step_index")
+    )
+    assert_dead_ball_victim_had_ball(skeleton, stop_idx, driver, off_lineup)
+
+
+def _apply_drive_contact_foul_credit(roles, game_state, off_lineup, skeleton=None):
+    """Name the driver as the fouled man on a drive-contact D_FOUL.
+
+    Runs at the top of resolve_non_shooting_foul, AFTER the zone /
+    select_foul_player RNG that still keys off the PG fallback.
+    Consumes ``_hco_drive_contact_driver_id``. Absence of the stash
+    is a no-op (rule 26 — do not guess).
+    """
+    drv_id = game_state.pop("_hco_drive_contact_driver_id", None)
+    if not drv_id or not roles:
+        return
+    driver = next(
+        (p for p in (off_lineup or {}).values()
+         if p is not None and str(getattr(p, "player_id", "") or "") == str(drv_id)),
+        None,
+    )
+    if driver is None:
+        return
+    fabricated = roles.get("ball_handler")
+    fabricated_id = getattr(fabricated, "player_id", None) if fabricated is not None else None
+    if str(fabricated_id or "") != str(drv_id):
+        logging.warning(
+            "[DRIVE-CONTACT FOUL] ball_handler %s (%s) -> driver %s (%s)",
+            fabricated_id,
+            get_name_safe(fabricated) if fabricated is not None else None,
+            drv_id,
+            get_name_safe(driver),
+        )
+    roles["ball_handler"] = driver
+    roles["ball_handler_id"] = drv_id
+    if skeleton is None:
+        steps = roles.get("steps")
+        skeleton = roles.get("skeleton") or ({"steps": steps} if steps else None)
+    stop_idx = (
+        game_state.get("steal_stop_step_index")
+        or game_state.get("turnover_stop_step_index")
+        or game_state.get("stop_step_index")
+    )
+    assert_fouled_handler_had_ball(skeleton, stop_idx, driver, off_lineup)
+
+
+def _apply_drive_contact_o_foul_charge(
+    foul_player, ball_handler, game_state, off_lineup, skeleton=None,
+):
+    """Charge the driver when select_foul_player picked the fabricated BH.
+
+    Runs AFTER the weighted draw. The 60% slot is correct; only the
+    identity behind it is wrong. Does not rewrite ``ball_handler``
+    (that would change the weights and desync the stream). Consumes
+    ``_hco_drive_contact_driver_id`` so the D_FOUL consume cannot see
+    an O_FOUL stash. Absence of the stash is a no-op (rule 26). The
+    40% off-ball pick is returned unchanged.
+    """
+    drv_id = game_state.pop("_hco_drive_contact_driver_id", None)
+    if not drv_id:
+        return foul_player
+    driver = next(
+        (p for p in (off_lineup or {}).values()
+         if p is not None and str(getattr(p, "player_id", "") or "") == str(drv_id)),
+        None,
+    )
+    if driver is None:
+        return foul_player
+    fab_id = str(getattr(ball_handler, "player_id", "") or "") if ball_handler is not None else ""
+    fp_id = str(getattr(foul_player, "player_id", "") or "") if foul_player is not None else ""
+    if not fab_id or fp_id != fab_id:
+        return foul_player
+    if str(drv_id) != fab_id:
+        logging.warning(
+            "[DRIVE-CONTACT O_FOUL] foul_player %s (%s) -> driver %s (%s)",
+            fab_id,
+            get_name_safe(ball_handler),
+            drv_id,
+            get_name_safe(driver),
+        )
+    stop_idx = (
+        game_state.get("steal_stop_step_index")
+        or game_state.get("turnover_stop_step_index")
+        or game_state.get("stop_step_index")
+    )
+    assert_o_foul_charger_had_ball(skeleton, stop_idx, driver, off_lineup)
+    return driver
 
 
 def _get_fcp_hct_post_inbound_start_index(skeleton, game):
@@ -487,8 +777,8 @@ def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_p
     ball_handler_location = ball_handler_action.get("location") or ball_handler_action.get("spot") or "key"
     
     # Convert location string to coordinates
-    from BackEnd.constants import HCO_STRING_SPOTS
-    ball_handler_coords = HCO_STRING_SPOTS.get(ball_handler_location, {"x": 50, "y": 25})
+    from BackEnd.constants import HCO_STRING_SPOTS, require_hco_spot
+    ball_handler_coords = require_hco_spot(ball_handler_location)
     
     # Calculate defender's position based on ball handler's position
     from BackEnd.utils.shared_defense import get_defender_coords
@@ -580,11 +870,9 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, rol
 def _usable_grid_coord(coords):
     """``(x, y)`` floats from a grid-coord dict, or None if there is no real coordinate there.
 
-    Deliberately unlike ``grid_coords_from_player`` below, which always returns a coordinate and
-    substitutes ``{50, 25}`` when it has none. That contract is right for placing a sprite and
-    wrong for MEASURING between players: a stand-in shared by several candidates makes every
-    distance between them equal, so a comparison silently becomes a coin toss. Callers that
-    compare distances need to be able to tell "no coordinate" apart from "centre court".
+    Deliberately unlike ``grid_coords_from_player`` below, which returns a live or caller-supplied
+    coordinate and raises when it has none. Callers that compare distances need to be able to
+    tell "no coordinate" apart from "centre court".
     """
     if not isinstance(coords, dict):
         return None
@@ -598,7 +886,7 @@ def _usable_grid_coord(coords):
 
 
 def grid_coords_from_player(player, fallback=None):
-    """Return ``{x, y}`` grid coords from a player's current ``coords`` attribute."""
+    """Return ``{x, y}`` from ``player.coords``, or ``fallback``. Raises if neither is usable."""
     coords = getattr(player, "coords", None) or {}
     if isinstance(coords, dict) and coords.get("x") is not None and coords.get("y") is not None:
         try:
@@ -610,7 +898,7 @@ def grid_coords_from_player(player, fallback=None):
             return {"x": float(fallback["x"]), "y": float(fallback["y"])}
         except (TypeError, ValueError):
             pass
-    return {"x": 50.0, "y": 25.0}
+    raise ValueError("player has no usable grid coords; refusing to invent centre court")
 
 
 def defender_coords_by_pos_from_lineup(def_lineup):
@@ -708,6 +996,7 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
     time_elapsed_override: if provided (e.g. situational Force Foul), use instead of tempo-based time.
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    _apply_drive_contact_foul_credit(roles, game_state, off_lineup)
     foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
     
     ball_handler = roles["ball_handler"]
@@ -2910,7 +3199,7 @@ def _check_steal_attempt(game, skeleton, calibrated_hard_steal, calibrated_soft_
                                         player_spot = action_info.get("location") or action_info.get("spot") or "key"
                             
                             # Convert spot to coordinates
-                            spot_coords = HCO_STRING_SPOTS.get(player_spot, {"x": 50, "y": 25})
+                            spot_coords = require_hco_spot(player_spot)
                             if is_away_offense:
                                 spot_coords = get_away_player_coords(spot_coords)
                             
@@ -3092,7 +3381,7 @@ def _check_dead_ball_turnover(game, skeleton, calibrated_dead_ball_to):
                                         player_spot = action_info.get("location") or action_info.get("spot") or "key"
                             
                             # Convert spot to coordinates
-                            spot_coords = HCO_STRING_SPOTS.get(player_spot, {"x": 50, "y": 25})
+                            spot_coords = require_hco_spot(player_spot)
                             if is_away_offense:
                                 spot_coords = get_away_player_coords(spot_coords)
                             
@@ -4066,13 +4355,13 @@ def _find_closest_receiver(ball_handler_location, receivers, off_lineup):
         return receivers[0]
     
     # Get ball handler coordinates
-    bh_coords = HCO_STRING_SPOTS.get(ball_handler_location, {"x": 50, "y": 25})
+    bh_coords = require_hco_spot(ball_handler_location)
     
     # Calculate distances
     receiver_distances = []
     for receiver in receivers:
         receiver_location = receiver["location"]
-        receiver_coords = HCO_STRING_SPOTS.get(receiver_location, {"x": 50, "y": 25})
+        receiver_coords = require_hco_spot(receiver_location)
         
         # Euclidean distance
         distance = ((bh_coords["x"] - receiver_coords["x"]) ** 2 + 
@@ -4137,6 +4426,79 @@ def _create_pass_receive_step(passer_pos, receiver_pos, passer_location, receive
         },
         "events": []
     }
+
+
+def _shooter_pos_from_step(step):
+    for pos, info in ((step or {}).get("pos_actions") or {}).items():
+        if ((info or {}).get("action") or "").lower() == "shoot":
+            return pos
+    return None
+
+
+def _pass_receive_on_step(step):
+    """Return (passer_pos, receiver_pos) when the step is a same-step dish, else None."""
+    pa = (step or {}).get("pos_actions") or {}
+    passer = receiver = None
+    for pos, info in pa.items():
+        action = ((info or {}).get("action") or "").lower()
+        if action == "pass":
+            passer = pos
+        elif action == "receive":
+            receiver = pos
+    if passer and receiver:
+        return passer, receiver
+    return None
+
+
+def stamp_sa1_within_step_pass(pre_steps, j, truncated_steps):
+    """If shot-at-1 discarded a receive, stamp a within-step transfer on the glued shoot.
+
+    Animation only: ``_sa1_within_step_pass`` on ``truncated_steps[-1]``. Does not
+    restore pos_actions, does not add a step, does not touch derive_passer.
+    The viewer should see the ball arrive with the shooter (catch-and-shoot),
+    so the merge lands on the glued shoot step — not prefix j, which would
+    show the pass during an earlier cut and then a jump-cut to the shot.
+
+    Returns the stamp dict or None. Invariants (step count, pos_actions, shooter)
+    are checked; violations log and still return the stamp so a bad game does
+    not crash.
+    """
+    if not pre_steps or not truncated_steps or j is None or j < 0:
+        return None
+    discarded = pre_steps[j + 1 : -1]
+    if not discarded:
+        return None
+    shoot_step = truncated_steps[-1]
+    shooter_pos = _shooter_pos_from_step(shoot_step)
+    chosen = None
+    last_any = None
+    for step in discarded:
+        pair = _pass_receive_on_step(step)
+        if not pair:
+            continue
+        last_any = pair
+        if shooter_pos and pair[1] == shooter_pos:
+            chosen = pair
+    chosen = chosen or last_any
+    if not chosen:
+        return None
+
+    pre_n = len(truncated_steps)
+    pre_shooter = shooter_pos
+    pre_pa = dict(shoot_step.get("pos_actions") or {})
+    stamp = {
+        "passer_pos": chosen[0],
+        "receiver_pos": chosen[1],
+    }
+    shoot_step["_sa1_within_step_pass"] = stamp
+
+    if len(truncated_steps) != pre_n:
+        logging.error("[SA1 XFER] step count moved on stamp (%s -> %s)", pre_n, len(truncated_steps))
+    if dict(shoot_step.get("pos_actions") or {}) != pre_pa:
+        logging.error("[SA1 XFER] pos_actions mutated on stamp — assist path touched")
+    if _shooter_pos_from_step(shoot_step) != pre_shooter:
+        logging.error("[SA1 XFER] shooter identity moved on stamp")
+    return stamp
 
 
 def _create_shoot_step(shooter_pos, shooter_location, timestamp):
@@ -4262,7 +4624,7 @@ def _apply_attack_penalty(shot_location, is_away_offense):
         return 0.0
     
     # Get shot location coordinates
-    shot_coords = HCO_STRING_SPOTS.get(shot_location, {"x": 50, "y": 25})
+    shot_coords = require_hco_spot(shot_location)
     
     # Get basket spot coordinates
     if is_away_offense:
@@ -4435,12 +4797,16 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
         # Legacy named-spot fallback: HCO_STRING_SPOTS is home-oriented → mirror for away.
         location = (pa.get("location") or pa.get("spot") or "key").strip()
         # Case-insensitive lookup (skeleton may use "upper midwing" vs constant "upper midWing")
-        coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
-        if coords == {"x": 50, "y": 25} and location.lower() != "key":
+        try:
+            coords = require_hco_spot(location)
+        except KeyError:
+            coords = None
             for k, v in HCO_STRING_SPOTS.items():
                 if k.lower() == location.lower():
-                    coords = v
+                    coords = {"x": float(v["x"]), "y": float(v["y"])}
                     break
+            if coords is None:
+                raise KeyError("HCO_STRING_SPOTS has no usable coords for %r" % (location,))
         if game.offense_team.team_id == game.away_team.team_id:
             coords = get_away_player_coords(coords)
     shooter.coords = coords
@@ -4735,6 +5101,12 @@ def _motion_bh_at_step(step):
     player, producing the doubled pass animation. The dynamic walk evaluates every step, so it
     lands on pass steps and must resolve the actual holder (the legacy resolver only sampled one
     random step, so it rarely hit this).
+
+    Drive is omitted on purpose. A pure drive step returns ``(None, None)`` so the
+    walk ``continue``s and ``drive_contact`` owns that beat (HCO S2b). That is
+    not the credit-resolver contract — ``get_ball_handler_from_skeleton`` treats
+    drive as possession. Do not add drive here to "match" the credit list; the
+    walk would start rolling moments on drive steps and move outcomes.
     """
     pos_actions = step.get("pos_actions") or {}
     for wanted in ("receive", "handle_ball", "pass"):
@@ -6804,6 +7176,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     _moment_rt_map = {"STEAL": "STEAL", "DEAD BALL": "DEAD_BALL_TURNOVER",
                       "O_FOUL": "O_FOUL", "D_FOUL": "D_FOUL"}
     game_state.pop("_hco_moment_stop_index", None)  # clear any stale pin from a prior turn
+    game_state.pop("_hco_drive_contact_driver_id", None)  # credit stash; never leak into the next walk
 
     def _apply_dish_contest(decision, result, step, passer_pos):
         """§4 Stage 2: if the executed decision threw a pass (dish/kickout), contest it. On an
@@ -8021,6 +8394,8 @@ def resolve_half_court_offense_logic(game):
                 _drv_pos = next((p for p, a in _dpa.items()
                                  if ((a or {}).get("action") or "").lower() == "drive"), None)
                 _drv_id = getattr(off_lineup.get(_drv_pos), "player_id", None) if _drv_pos else None
+                if result in ("DEAD_BALL_TURNOVER", "D_FOUL", "O_FOUL") and _drv_id:
+                    game_state["_hco_drive_contact_driver_id"] = _drv_id
                 stamp_foul_contact_rattle(
                     _dsteps[_dc_pin], [_walk.get("drive_contact_defender_id"), _drv_id])
                 logging.debug("💥 [DRIVE CONTACT] %s → %s (pin=%s def=%s driver=%s)",
@@ -8084,10 +8459,22 @@ def resolve_half_court_offense_logic(game):
                     from BackEnd.utils.shot_clock_policy import can_commit_shot_clock_violation
 
                     ball_handler_at_step = get_ball_handler_from_skeleton(final_skeleton, off_lineup, step_index=i)
-                    iq = int(getattr(ball_handler_at_step, "attributes", {}).get("IQ", 0) or 0)
-                    intelligence = min(25, iq // 4)  # int(IQ/4), cap 0-25 (Shot_Clock_System.md)
-                    violation_threshold = 60 + chemistry + discipline + intelligence
+                    violation_threshold = _shot_clock_iq_threshold(
+                        ball_handler_at_step, chemistry, discipline
+                    )
                     x = random.randint(1, 100)
+                    # Post-draw: if this pin is a drive, the resolver invented
+                    # the PG. Keep x; recompute the threshold from the driver.
+                    violation_threshold = recompute_shot_clock_threshold_from_pin_driver(
+                        violation_threshold,
+                        x,
+                        final_skeleton,
+                        off_lineup,
+                        i,
+                        ball_handler_at_step,
+                        chemistry,
+                        discipline,
+                    )
                     if (
                         can_commit_shot_clock_violation(game_state)
                         and x > violation_threshold
@@ -8109,6 +8496,12 @@ def resolve_half_court_offense_logic(game):
                         if j < 0:
                             j = 0
                         truncated_steps = steps[: j + 1] + [steps[-1]]
+                        # Animation-only: if the discarded middle held a receive, stamp a
+                        # within-step transfer on the glued shoot. j is unchanged; no new
+                        # step; pos_actions untouched (assist-neutral). Contest already
+                        # ran on the discarded dish (_apply_dish_contest) — this metadata
+                        # is not a pos_actions pass, so :8977 will not re-roll it.
+                        stamp_sa1_within_step_pass(steps, j, truncated_steps)
                         final_skeleton["steps"] = truncated_steps
                         game_state["shot_at_one_second"] = True
                         game_state["_shot_at_one_second_time_elapsed"] = shot_remaining - 1
@@ -8194,7 +8587,7 @@ def resolve_half_court_offense_logic(game):
                                 break
                 
                 # Get ball handler's coordinates
-                ball_handler_coords = HCO_STRING_SPOTS.get(ball_handler_spot, {"x": 50, "y": 25})
+                ball_handler_coords = require_hco_spot(ball_handler_spot)
                 
                 # Determine court orientation
                 is_away_offense = off_team.team_id == game.away_team.team_id
@@ -8228,7 +8621,7 @@ def resolve_half_court_offense_logic(game):
                                     break
                     
                     # Convert spot to coordinates
-                    spot_coords = HCO_STRING_SPOTS.get(player_spot, {"x": 50, "y": 25})
+                    spot_coords = require_hco_spot(player_spot)
                     if is_away_offense:
                         spot_coords = get_away_player_coords(spot_coords)
                     
@@ -8549,10 +8942,12 @@ def resolve_half_court_offense_logic(game):
         # Dynamic HCO: the per-step moment stashed the ACTUAL contesting defender (the man matchup
         # OR the resolved zone defender). PREFER it — override the defender-override block's
         # position-on-position recompute, which is wrong on ~half of non-shot outcomes (measured 69%
-        # in zone; hco_roles_audit.md Seam 3). The `and not roles.get("defender")` guard used to
+        # in zone; projects/Z-Completed/hco_roles_audit.md Seam 3). The `and not roles.get("defender")` guard used to
         # demote this to a never-taken fallback (the override block always pre-set roles["defender"]),
-        # so the credited defender + reach-in lunge landed on the wrong player. Attribution-only /
-        # draw-neutral: the recompute (incl. its zone-tie draw) still ran; we just keep the stash.
+        # so the credited defender + reach-in lunge landed on the wrong player. NOT draw-neutral, even
+        # though the recompute (incl. its zone-tie draw) still runs: the credited defender feeds fouls →
+        # foul-outs → substitutions (seeded check: 8 of 12 games diverged). Verify changes here
+        # distributionally, not by exact diff.
         _moment_def_id = game_state.pop("_hco_moment_defender_id", None)
         if _moment_def_id:
             for _dp in def_lineup.values():
@@ -8587,6 +8982,9 @@ def resolve_half_court_offense_logic(game):
         if event_type in ["O_FOUL", "D_FOUL"]:
             foul_team_type = "OFFENSE" if event_type == "O_FOUL" else "DEFENSE"
             foul_player = select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, roles=roles)
+            if event_type == "O_FOUL":
+                foul_player = _apply_drive_contact_o_foul_charge(
+                    foul_player, ball_handler, game_state, off_lineup, skeleton=skeleton)
             roles["foul_player"] = foul_player
             # Ensure shooter is set (needed by resolve_non_shooting_foul)
             if "shooter" not in roles or not roles["shooter"]:
@@ -8641,6 +9039,8 @@ def resolve_half_court_offense_logic(game):
             # Use result to determine turnover type (STEAL vs DEAD BALL vs SHOT_CLOCK)
             if result == "DEAD_BALL_TURNOVER":
                 turnover_type = "DEAD BALL"
+                _apply_drive_contact_dead_ball_credit(
+                    roles, game_state, skeleton, off_lineup)
             elif result == "SHOT_CLOCK_VIOLATION":
                 turnover_type = "SHOT_CLOCK"
             elif result == "STEAL":

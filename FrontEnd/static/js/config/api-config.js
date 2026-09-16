@@ -285,7 +285,7 @@ const API_CONFIG = {
   },
 
   // Object prefix for the cross-franchise uniform archive.
-  // See _documentation_master/projects/Uniform_Archive_Brief.md
+  // See _documentation_master/00_Operations/Player_Image_System.md § Uniform archive
   UNIFORM_IMAGE_PREFIX: 'uniforms',
 
   /**
@@ -377,7 +377,7 @@ const API_CONFIG = {
   // Franchise id for the current page. Every franchise screen carries it as the
   // `franchise_id` query param (source of truth for multi-slot). No localStorage
   // fallback — inventing an id from bare LS cross-contaminates slots
-  // (multi_franchises_brief Phase 1 thin Phase 3 warm-up).
+  // (Cache_Usage_Documentation.md §9; history: projects/Z-Completed/multi_franchises_brief.md Phase 3).
   currentFranchiseId() {
     try {
       const q = new URLSearchParams(window.location.search).get('franchise_id');

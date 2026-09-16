@@ -1,5 +1,5 @@
 /**
- * Namespaced franchise localStorage (multi_franchises_brief Phase 3 hybrid).
+ * Namespaced franchise localStorage (Cache_Usage_Documentation.md §9; history: projects/Z-Completed/multi_franchises_brief.md Phase 3 hybrid).
  *
  * Identity: URL `?franchise_id=` only — never store a bare "current" franchise id.
  * Context cache: `franchise:{id}:week|user_team|user_team_id|user_team_primary_color|

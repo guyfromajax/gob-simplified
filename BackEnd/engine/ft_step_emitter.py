@@ -917,6 +917,13 @@ def build_ft_animation_steps(
     # Last, so the coord backfill above is included in the stillness comparison.
     _stamp_ft_idles(steps, off_lineup, def_lineup, shooter_id)
 
+    try:
+        from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+        enforce_step_start_continuity(steps, context="ft")
+    except Exception:
+        import logging
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps
 
 

@@ -18,7 +18,7 @@ _plays_by_type_focus_cache: dict[tuple[str, str | None], list] = {}
 _play_doc_by_name_cache: dict[str, dict | None] = {}
 from collections import defaultdict
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
-from BackEnd.constants import ACTIONS
+from BackEnd.constants import ACTIONS, require_hco_spot
 from BackEnd.constants import (
     OREB_PUTBACK_MIN_TIME_ELAPSED,
     PLAYCALL_ATTRIBUTE_WEIGHTS,
@@ -1113,11 +1113,11 @@ class TurnManager:
                 # HCT (legacy static mapping)
                 o_dest_home = {}
                 for pos, location in setup_locations.items():
-                    coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                    coords = require_hco_spot(location)
                     o_dest_home[pos] = coords.copy()
                     self.logger.log(f"destAssigned:{pos}")
                 sf_location = setup_locations.get("SF", "inbound_left")
-                inbound_spot_home = HCO_STRING_SPOTS.get(sf_location, {"x": 50, "y": 25})
+                inbound_spot_home = require_hco_spot(sf_location)
 
             # Flip offensive coordinates if the away team has possession.
             o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
@@ -3754,7 +3754,7 @@ class TurnManager:
                 shooter_action = final_step.get("pos_actions", {}).get(projected_shooter_pos, {})
                 shooter_spot = shooter_action.get("location") or shooter_action.get("spot") or "key"
             
-            shooter_coords = HCO_STRING_SPOTS.get(shooter_spot, {"x": 50, "y": 25})
+            shooter_coords = require_hco_spot(shooter_spot)
             is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
             if is_away_offense:
                 shooter_coords = get_away_player_coords(shooter_coords)
@@ -6176,7 +6176,7 @@ class TurnManager:
                         step_owner = pos
                         # MongoDB skeletons use "location", old skeletons use "spot"
                         location_key = action_info.get("location") or action_info.get("spot", "key")
-                        step_coords = HCO_STRING_SPOTS.get(location_key, {"x": 50, "y": 25})
+                        step_coords = require_hco_spot(location_key)
                         
                         if action == "receive":
                             current_owner_pos = pos
@@ -6363,7 +6363,7 @@ class TurnManager:
                 shooter_spot = shooter_action.get("location") or shooter_action.get("spot") or "key"
             
             # Get shooter's coordinates
-            shooter_coords = HCO_STRING_SPOTS.get(shooter_spot, {"x": 50, "y": 25})
+            shooter_coords = require_hco_spot(shooter_spot)
             
             # Determine court orientation (away team is on offense if offense team ID matches away team ID)
             game = self.game

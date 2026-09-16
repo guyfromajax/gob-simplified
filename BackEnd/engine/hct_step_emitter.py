@@ -349,14 +349,21 @@ def build_hct_animation_steps(
         owner_id_start = _player_id_at_pos(off_lineup, start_owner_pos) if start_owner_pos else None
         owner_id_end = _player_id_at_pos(off_lineup, end_owner_pos) if end_owner_pos else None
 
-        ball_start: BallState = (
-            {"owner_player_id": owner_id_start} if owner_id_start
-            else {"owner_player_id": ball_handler_id or ""}
-        )
-        ball_end: BallState = (
-            {"owner_player_id": owner_id_end} if owner_id_end
-            else {"owner_player_id": ball_handler_id or ""}
-        )
+        # Omit the owner key when nobody holds the ball. ``or ""`` was the
+        # item 44 encoding. Continuity coords land in
+        # carry_ball_coord_continuity, not here.
+        if owner_id_start:
+            ball_start = {"owner_player_id": owner_id_start}
+        elif ball_handler_id:
+            ball_start = {"owner_player_id": ball_handler_id}
+        else:
+            ball_start = {}
+        if owner_id_end:
+            ball_end = {"owner_player_id": owner_id_end}
+        elif ball_handler_id:
+            ball_end = {"owner_player_id": ball_handler_id}
+        else:
+            ball_end = {}
 
         t = float(step_clock_seconds[i])
         clock_start: ClockState = {
@@ -436,6 +443,13 @@ def build_hct_animation_steps(
         steps, turn_result, away_offense=away_offense,
     )
 
+    try:
+        from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+        enforce_step_start_continuity(steps, context="hct")
+    except Exception:
+        import logging
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps
 
 

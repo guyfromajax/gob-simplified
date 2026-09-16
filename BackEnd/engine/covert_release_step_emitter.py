@@ -1337,7 +1337,7 @@ def _build_step_back_step(
         archetype[pid] = "standard"
 
     ball_state: BallState = (
-        {"owner_player_id": fb_bh_id} if fb_bh_id else {"owner_player_id": ""}
+        {"owner_player_id": fb_bh_id} if fb_bh_id else {}
     )
 
     clock_start: ClockState = {

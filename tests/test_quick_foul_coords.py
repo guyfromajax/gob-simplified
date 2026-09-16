@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from BackEnd.engine.phase_resolution import (
     defender_coords_by_pos_from_lineup,
     grid_coords_from_player,
@@ -19,6 +21,14 @@ def test_grid_coords_from_player_falls_back_to_overlay_map():
     player = SimpleNamespace(coords={})
     fallback = {"x": 12, "y": 31}
     assert grid_coords_from_player(player, fallback) == {"x": 12.0, "y": 31.0}
+
+
+def test_grid_coords_from_player_refuses_to_invent_centre_court():
+    player = SimpleNamespace(coords=None)
+    with pytest.raises(ValueError, match="no usable grid coords"):
+        grid_coords_from_player(player)
+    with pytest.raises(ValueError, match="no usable grid coords"):
+        grid_coords_from_player(player, {"x": None, "y": 25})
 
 
 def test_select_defender_closest_uses_live_defender_coords():

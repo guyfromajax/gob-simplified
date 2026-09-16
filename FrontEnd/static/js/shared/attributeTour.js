@@ -46,6 +46,7 @@
  */
 
 import { getTeamSammyImage } from '/js/shared/teamCoachAsset.js';
+import { loadStylesheets } from './stylesheetReady.js';
 
 // set-lineup.html links NEITHER of these, so the module injects them itself —
 // the same pattern tutorialLineupModals.js uses. gob-buttons is required now that
@@ -66,16 +67,6 @@ const FALLBACK_ATTR_KEYS = new Set([
   'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'FT', 'ND', 'IQ',
   'HT', 'WT', 'NG', 'RT',
 ]);
-
-function ensureStylesheet() {
-  STYLESHEETS.forEach((href) => {
-    if (document.querySelector(`link[href="${href}"]`)) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    document.head.appendChild(link);
-  });
-}
 
 function alreadySeen(persistKey) {
   try { return sessionStorage.getItem(persistKey) === '1'; }
@@ -108,7 +99,7 @@ export function showAttributeTour(opts = {}) {
   const onDismiss = typeof opts.onDismiss === 'function' ? opts.onDismiss : null;
   if (alreadySeen(persistKey)) return { close: () => {}, skipped: true };
 
-  ensureStylesheet();
+  const stylesReady = loadStylesheets(STYLESHEETS);
 
   // Identify the tooltipped header cells in source order. Lift ALL header
   // cells (so the row reads as a single lit band), but only attach the
@@ -173,8 +164,6 @@ export function showAttributeTour(opts = {}) {
       <button type="button" class="gob-btn gob-btn--action attribute-tour__sammy-dismiss" id="attribute-tour-dismiss">GOT IT</button>
     </div>
   `;
-  document.body.appendChild(sammy);
-
   const countEl = sammy.querySelector('#attribute-tour-count');
   const dismissBtn = sammy.querySelector('#attribute-tour-dismiss');
 
@@ -201,11 +190,20 @@ export function showAttributeTour(opts = {}) {
     sammy.style.setProperty('--sammy-arrow-x', `${Math.max(20, Math.min(arrowX, sammyRect.width - 20))}px`);
   }
 
-  // Reveal sammy on next frame so the entrance transition runs.
-  requestAnimationFrame(() => {
-    sammy.classList.add('is-visible');
-    // Position after the first paint so getBoundingClientRect is accurate.
-    requestAnimationFrame(positionSammy);
+  // Append only once attribute-tour.css has applied: the 64px portrait size and the
+  // card's width/centering live there. Appended earlier, the 3000px team Sammy PNG
+  // painted at natural size for a CSS round trip. The lift/dim/cue classes above are
+  // inert until the same stylesheet lands, so they switch on together with Sammy.
+  let closed = false;
+  stylesReady.then(() => {
+    if (closed) return;
+    document.body.appendChild(sammy);
+    // Reveal sammy on next frame so the entrance transition runs.
+    requestAnimationFrame(() => {
+      sammy.classList.add('is-visible');
+      // Position after the first paint so getBoundingClientRect is accurate.
+      requestAnimationFrame(positionSammy);
+    });
   });
 
   const reposition = () => positionSammy();
@@ -261,6 +259,7 @@ export function showAttributeTour(opts = {}) {
   });
 
   function close() {
+    closed = true;
     markSeen(persistKey);
     sammy.classList.remove('is-visible');
     // Lift the dim immediately so the page comes back into focus while

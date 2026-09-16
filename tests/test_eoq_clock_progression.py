@@ -28,6 +28,7 @@ from BackEnd.utils.eoq_clock_progression import (
 )
 from BackEnd.engine.final_turn_pacing import evaluate_final_turn_pacing, roll_anchor_clock
 from BackEnd.engine.eoq_perfection import (
+    _seed_flss_start_from_prefix_end,
     animation_schema_game_seconds,
     calculate_flss_runway,
     combine_eoq_origin_prefix,
@@ -251,6 +252,97 @@ def test_combine_eoq_prefix_rebases_flss_clock_and_next_indices():
         "index": 1,
     }
     assert result["eoq_shortened_turn"] is True
+
+
+def _coord_step(start_clock, end_clock, seconds, start_coords, end_coords, *, terminal=False):
+    step = _schema_step(start_clock, end_clock, seconds, terminal=terminal)
+    step["start"]["coords"] = {pid: dict(xy) for pid, xy in start_coords.items()}
+    step["end"]["coords"] = {pid: dict(xy) for pid, xy in end_coords.items()}
+    return step
+
+
+def test_combine_eoq_prefix_seeds_flss_start_from_prefix_end_prior_end_wins(caplog):
+    """UESS §8.1 at the EOQ join: prefix[-1].end.coords overwrite flss[0].start.
+
+    Does not rewrite time_elapsed — T was written at emit from the pre-join
+    start. Recomputing it here would move the clock.
+    """
+    prefix_end = {"a": {"x": 10.0, "y": 20.0}, "b": {"x": 30.0, "y": 40.0}}
+    fabricated = {"a": {"x": 90.0, "y": 10.0}, "b": {"x": 50.0, "y": 50.0}}
+    authored_dest = {"a": {"x": 80.0, "y": 25.0}, "b": {"x": 55.0, "y": 45.0}}
+    result = {
+        "eoq_origin_prefix_steps": [
+            _coord_step(9, 6, 3, {"a": {"x": 1.0, "y": 1.0}}, prefix_end),
+        ],
+        "animation_steps": [
+            _coord_step(9, 6, 3, fabricated, authored_dest),
+            _coord_step(6, 5, 1, authored_dest, authored_dest, terminal=True),
+        ],
+    }
+    result["animation_steps"][0]["end"]["time_elapsed"] = 3.0
+    result["animation_steps"][0]["start"]["tween_durations"] = {"a": 2.5}
+
+    with caplog.at_level("WARNING"):
+        combine_eoq_origin_prefix(result)
+
+    flss0 = result["animation_steps"][1]
+    assert flss0["start"]["coords"]["a"] == prefix_end["a"]
+    assert flss0["start"]["coords"]["b"] == prefix_end["b"]
+    assert flss0["end"]["coords"] == authored_dest
+    assert flss0["end"]["time_elapsed"] == 3.0
+    assert flss0["start"]["tween_durations"] == {"a": 2.5}
+    assert flss0["start"]["clock"]["clock_remaining"] == 6
+    logs = [r.getMessage() for r in caplog.records if "[EOQ FLSS MERGE]" in r.getMessage()]
+    assert len(logs) == 2
+    assert "player a start=(90.00,10.00) -> prefix end=(10.00,20.00)" in logs[0]
+    assert "player b start=(50.00,50.00) -> prefix end=(30.00,40.00)" in logs[1]
+
+
+def test_combine_eoq_prefix_merge_off_leaves_the_gap(monkeypatch):
+    """POISON — revert the merge and the fabricated start survives."""
+    monkeypatch.setattr(
+        "BackEnd.engine.eoq_perfection._seed_flss_start_from_prefix_end",
+        lambda prefix, flss_steps: 0,
+    )
+    fabricated = {"a": {"x": 90.0, "y": 10.0}}
+    prefix_end = {"a": {"x": 10.0, "y": 20.0}}
+    result = {
+        "eoq_origin_prefix_steps": [
+            _coord_step(9, 6, 3, {"a": {"x": 1.0, "y": 1.0}}, prefix_end),
+        ],
+        "animation_steps": [
+            _coord_step(9, 6, 3, fabricated, {"a": {"x": 80.0, "y": 25.0}}),
+        ],
+    }
+    combine_eoq_origin_prefix(result)
+    assert result["animation_steps"][1]["start"]["coords"]["a"] == fabricated["a"]
+
+
+def test_seed_flss_start_skips_unmoved_players_and_does_not_invent():
+    prefix = [{"end": {"coords": {"a": {"x": 10.0, "y": 20.0}, "ghost": "nope"}}}]
+    flss = [{"start": {"coords": {"a": {"x": 10.0, "y": 20.0}}}}]
+    assert _seed_flss_start_from_prefix_end(prefix, flss) == 0
+    assert flss[0]["start"]["coords"] == {"a": {"x": 10.0, "y": 20.0}}
+    assert "ghost" not in flss[0]["start"]["coords"]
+
+
+def test_wrong_merge_coord_is_what_the_81_guard_corrects():
+    """POISON — a bad seed at the join is the shape enforce_step_start_continuity fires on."""
+    from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+    prefix_end = {"a": {"x": 10.0, "y": 20.0}}
+    result = {
+        "eoq_origin_prefix_steps": [
+            _coord_step(9, 6, 3, {"a": {"x": 1.0, "y": 1.0}}, prefix_end),
+        ],
+        "animation_steps": [
+            _coord_step(9, 6, 3, {"a": {"x": 90.0, "y": 10.0}}, {"a": {"x": 80.0, "y": 25.0}}),
+        ],
+    }
+    combine_eoq_origin_prefix(result)
+    result["animation_steps"][1]["start"]["coords"]["a"] = {"x": -1.0, "y": -1.0}
+    assert enforce_step_start_continuity(result["animation_steps"], context="poison") == 1
+    assert result["animation_steps"][1]["start"]["coords"]["a"] == prefix_end["a"]
 
 
 def test_non_hco_preview_discards_speculative_outcome_and_hands_prefix_to_flss(monkeypatch):

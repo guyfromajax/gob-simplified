@@ -185,6 +185,15 @@ An SVG margin chart above the rows: home above the axis, away below, gradient-fi
 
 `prefers-reduced-motion: reduce` fast-forwards playback (live frames ~40ms, holds ~400ms), disables the bar transition, the spotlight pulse, the flame flicker and the fade-in, and removes the dissolve delay.
 
+### 5.8 Team stat rows (tug-of-war)
+
+`updateTeamPanel()`. Seven rows — FG%, 3PT, PTS IN PAINT, FAST BREAK, REBOUNDS, TURNOVERS, TEAM FOULS — each
+showing both absolute values with a centre-anchored bar that pulls toward the leading team.
+
+- Bar width = `min(46, 8 + |away − home| × 2.5)` % of the row; zero width when tied. Eased by the same 0.5s transition as the player bars.
+- The leading value renders white (`.lead`); for TO and fouls, *lower* leads.
+- TO / fouls still pull toward the **higher** total, but in the **opponent's** colour — the team benefiting from the trouble.
+
 ---
 
 ## 6. Pacing
@@ -195,7 +204,7 @@ Per-turn hold is `QUARTER_MS ÷ turns-in-quarter`, clamped to `[FRAME_MIN_MS, FR
 
 `LINEUP_CHANGE_MS` overrides the normal hold on any frame where a player carries `sub` or `out`, so foul-out swaps read. Because `out` persists for every frame a fouled-out player remains in the lineup before the swap lands, a foul-out can hold across more than one consecutive frame.
 
-**Whole game ≈ 80–85s.**
+**Whole game ≈ 80–85s.** There is no user speed control; the current pace is the intended maximum speed.
 
 ---
 

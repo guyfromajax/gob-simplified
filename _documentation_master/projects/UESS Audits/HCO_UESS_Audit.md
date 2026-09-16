@@ -1,5 +1,7 @@
 # HCO ↔ UESS Compliance Audit
 
+> **Findings as of 2026-07-04. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Date:** 2026-07-04 · **Scope:** HCO turns (shared emitter path with FCP / Final Shot) · **Method:** read-only trace, 4 parallel audits (ball-seam, player-coord, single-coord-source, entry+clock) · **Result of audit only — no code changed.**
 
 ---
@@ -115,7 +117,7 @@ Both the contested/uncontested boolean **and** the contesting-defender identity 
 The clearest teleport candidate inside the emitter.
 
 - **Resolver A** — `get_ball_handler_from_skeleton(step_index=0)` (`phase_resolution.py:348-395`): matches actions `{handle_ball, receive, shoot}`, iterates `pos_actions.items()` in **dict order**. Used for `step0_bh_id` (`skeleton_step_emitter.py:1094`), the delivery target for Handoff/Walk-Up.
-- **Resolver B** — `_walk_ball_owners` (`skeleton_step_emitter.py`, ~L369): matches `{handle_ball, pass}`, iterates `_OFFENSE_POSITIONS` (PG,SG,SF,PF,C) order. Produces per-step owners. **UPDATED 2026-07-19:** the PG-first scan now runs only to BOOTSTRAP the owner (when there's no running owner), then the owner CARRIES — changing only via a pass→receive transition. It previously re-scanned every step and reset to the first PG-order `handle_ball`/`pass`, so a nominal `PG: handle_ball` in the loop skeleton overrode a receiver who genuinely held the ball after a reversal → ball snapped back to the passer on non-shot outcomes (bug #5; see [hco_roles_audit.md](../hco_roles_audit.md)). The step-0 A-vs-B disagreement below is NOT resolved by this — bootstrap still uses B's PG-first rule.
+- **Resolver B** — `_walk_ball_owners` (`skeleton_step_emitter.py`, ~L369): matches `{handle_ball, pass}`, iterates `_OFFENSE_POSITIONS` (PG,SG,SF,PF,C) order. Produces per-step owners. **UPDATED 2026-07-19:** the PG-first scan now runs only to BOOTSTRAP the owner (when there's no running owner), then the owner CARRIES — changing only via a pass→receive transition. It previously re-scanned every step and reset to the first PG-order `handle_ball`/`pass`, so a nominal `PG: handle_ball` in the loop skeleton overrode a receiver who genuinely held the ball after a reversal → ball snapped back to the passer on non-shot outcomes (bug #5; see [hco_roles_audit.md](../Z-Completed/hco_roles_audit.md)). The step-0 A-vs-B disagreement below is NOT resolved by this — bootstrap still uses B's PG-first rule.
 - The i==0 seam override sets **only the start owner**: `owner_id_start = prepended_owner` (`1495-1498`) but `owner_id_end = ball_walks[0].end_owner` (`1485-1487`) stays resolver-B-derived. If A ≠ B, `is_pass_step` (`1536-1540`, `owner_id_start != owner_id_end`) turns true and step 0 renders an **unintended pass / ownership jump across the seam**.
 - **Repro:** skeleton step 0 tags the playcall BH via `receive`/`shoot` (counted by A, not B), or first `handle_ball` in dict order ≠ PG-first order → entry delivers to `step0_bh_id`, then step 0 emits a spurious pass to the ball-walk owner.
 - **Fix direction:** resolve step-0 owner once; assert `step0_bh_id == ball_walks[0]` owner, or override `owner_id_end` at the seam too.
@@ -292,18 +294,20 @@ Order: **1 → 2 → 3 → 4.**
 
 ### Task 3 — Close the two ball seams (fixes MED-1 + MED-2, §8.4 inv.2 & inv.4)
 
-**Status (2026-07-04):** 3a ✅ done & verified. 3b split: **snapshot ✅ done & verified**; **entry consumer ⏸ pending decision** (risky rendering change vs. unobserved edge case — see below).
+**Status (2026-07-04, amended 2026-09-15).** 3a seam reconcile **shipped**. 3b snapshot **shipped**. 3b entry consumer remains gated on `[UESS SEAM]` evidence. **Do not read the struck work-plan below as pending work.**
 
-- **3a DONE** — [`skeleton_step_emitter.py:1495-1517`](../../BackEnd/engine/skeleton_step_emitter.py#L1495): at the entry→skeleton step-0 seam, `owner_id_end` is now reconciled to the delivered owner unless the skeleton genuinely transfers in-step, killing the phantom step-0 pass. Verified no-op on the common path (identical before/after emit signature `51bacd8`).
-- **3b snapshot DONE** — [`animation_step_helpers.py build_final_ball_coords`](../../BackEnd/utils/animation_step_helpers.py) + stamp in [`game_manager.py:797-808`](../../BackEnd/models/game_manager.py#L797). Resolves the ball's true rest position (attached→owner coord, loose/in-flight→explicit) at every turn end. Verified 12/12 against emitted last-step ball rest. Additive — nothing consumes it yet, zero behavioral risk.
-- **3b entry consumer — GATED ON EVIDENCE (decision 2026-07-04).** Instead of shipping the risky entry-gather rendering change up front, added **detection-only logging** ([`skeleton_step_emitter.py`](../../BackEnd/engine/skeleton_step_emitter.py), `UESS_SEAM_TELEPORT_GRID_EPSILON = 1.5`): when the HCO entry BH's coord diverges from prior `final_ball_coords` by > 1.5 grid, logs `🎯 [UESS SEAM] HCO entry ball teleport candidate…`. Behavior-neutral (emit signature unchanged). **Next:** watch logs/prototype — if it fires, build the guarded entry-gather reconciliation; if it never fires, MED-2 is a non-issue for HCO and the consumer can be dropped. Grep `[UESS SEAM]` to measure.
+- **3a SHIPPED** — [`skeleton_step_emitter.py:1495-1517`](../../BackEnd/engine/skeleton_step_emitter.py#L1495): at the entry→skeleton step-0 seam, `owner_id_end` is reconciled to the delivered owner unless the skeleton genuinely transfers in-step, killing the phantom step-0 pass. Verified no-op on the common path (identical before/after emit signature `51bacd8`). That is the shipped 3a. It is **not** a resolver unify.
+- **3b snapshot SHIPPED** — [`animation_step_helpers.py build_final_ball_coords`](../../BackEnd/utils/animation_step_helpers.py) + stamp in [`game_manager.py:797-808`](../../BackEnd/models/game_manager.py#L797). Resolves the ball's true rest position (attached→owner coord, loose/in-flight→explicit) at every turn end. Verified 12/12 against emitted last-step ball rest. Additive — nothing consumes it yet, zero behavioral risk.
+- **3b entry consumer — GATED ON EVIDENCE (decision 2026-07-04).** Detection-only logging (`UESS_SEAM_TELEPORT_GRID_EPSILON = 1.5`). Behavior-neutral. Build the consumer only if the log fires.
 
-Two independent sub-parts; ship together or as 3a then 3b.
+**3a — STRIKE: "pick one action-set as canonical" between `get_ball_handler_from_skeleton` and `_walk_ball_owners`.** Unifying was measured and rejected (bugs.md item 27). Teaching the resolver `drive` moved scores on 7 of 8 seeds across three attempts (items 27 / 59 / 60).
 
-**3a — Unify step-0 ball-owner resolution (MED-1, phantom-pass teleport):**
-1. Reconcile the two resolvers: `get_ball_handler_from_skeleton` (actions `{handle_ball,receive,shoot}`, dict order; `phase_resolution.py:348-395`) vs `_walk_ball_owners` (actions `{handle_ball,pass}`, PG-first; `skeleton_step_emitter.py:294-337`). Pick one action-set + ordering as canonical for step 0.
-2. At the i==0 seam override (`skeleton_step_emitter.py:1495-1498`), reconcile `owner_id_end` too — today only `owner_id_start` is overridden, so `is_pass_step` (`1536-1540`) can turn true when the resolvers disagree.
-3. Add a temporary assert/log `step0_bh_id == ball_walks[0].end_owner` to catch disagreement in the wild; remove once clean.
+**Standing rule: CORRECT THE CONSUMER, NOT THE RESOLVER.** The three post-draw writes that fixed the same fabrication with the RNG stream intact are `bbabe427d` (empty-owner omit), `98a4132c3` (O_FOUL charge to the driver), and `b2982fce1` (shot-clock IQ threshold from the pin-step driver). Leave the resolver's accept list as `handle_ball` / `receive` / `shoot`. Do not unify it with `_walk_ball_owners`.
+
+~~**3a work-plan (HISTORICAL — do not implement):**~~
+~~1. Reconcile the two resolvers… Pick one action-set + ordering as canonical for step 0.~~
+~~2. At the i==0 seam override, reconcile `owner_id_end` too.~~ ← this half shipped; see 3a SHIPPED above.
+~~3. Add a temporary assert/log `step0_bh_id == ball_walks[0].end_owner`.~~
 
 **3b — Carry `final_ball_coords` across the turn seam (MED-2, §8.4 inv.4 build target):**
 1. Add `build_final_ball_coords(turn_result)` in `animation_step_helpers.py` — resolve the ball's rest position from `animation_steps[-1].end.ball` (attached→owner coord; loose/in-flight→explicit coord).

@@ -38,7 +38,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from BackEnd.constants import HCO_STRING_SPOTS, PASS_GRID_SPOTS_PER_GAME_SECOND
+from BackEnd.constants import HCO_STRING_SPOTS, PASS_GRID_SPOTS_PER_GAME_SECOND, require_hco_spot
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
@@ -207,7 +207,7 @@ def _fb_basket_spot(is_away_offense: bool) -> GridCoord:
     Mirrors ``rim_runner_step_emitter._fb_spot_coords("basketSpot", ...)`` so
     the crash-to-basket target matches the lane-pass off-ball target.
     """
-    coords = dict(HCO_STRING_SPOTS.get("basketSpot", {"x": 50, "y": 25}))
+    coords = dict(require_hco_spot("basketSpot"))
     if is_away_offense:
         coords = get_away_player_coords(coords)
     return {"x": float(coords["x"]), "y": float(coords["y"])}
@@ -616,4 +616,11 @@ def build_fb_drive_resolution_steps(
         "stealer_id=%s n_steps=%d",
         kind_prefix, result_type, outcome, uses_meet_step, stealer_id, len(steps),
     )
+    if steps:
+        try:
+            from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+            enforce_step_start_continuity(steps, context="fb_drive")
+        except Exception:
+            logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps or None

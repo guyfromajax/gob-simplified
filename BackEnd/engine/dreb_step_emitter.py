@@ -281,4 +281,12 @@ def build_dreb_animation_steps(
     }
     if tween_durations:
         step["start"]["tween_durations"] = tween_durations
-    return [step]
+    out = [step]
+    try:
+        from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+        enforce_step_start_continuity(out, context="dreb")
+    except Exception:
+        import logging
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
+    return out

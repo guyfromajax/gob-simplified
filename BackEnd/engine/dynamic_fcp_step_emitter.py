@@ -25,4 +25,11 @@ def build_dynamic_fcp_animation_steps(
     from BackEnd.engine.dead_ball_fumble import propagate_fumble_turn_flags
 
     propagate_fumble_turn_flags(payload, turn_result)
+    try:
+        from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
+
+        enforce_step_start_continuity(steps, context="dynamic_fcp")
+    except Exception:
+        import logging
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps
