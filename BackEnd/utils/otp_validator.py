@@ -19,7 +19,7 @@ from pymongo import ReturnDocument
 
 from BackEnd.db import alpha_otps_collection
 
-MIN_OTP_LENGTH = 6
+MIN_OTP_LENGTH = 4
 
 
 def is_alpha_mode() -> bool:

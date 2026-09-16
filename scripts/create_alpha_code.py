@@ -28,7 +28,7 @@ from scripts.generate_alpha_otps import (
 )
 
 
-MIN_CODE_LENGTH = 6
+MIN_CODE_LENGTH = 4
 
 
 def _normalize_code(code: str) -> str:
