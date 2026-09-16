@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Any, Dict, Optional, Tuple
 
 from bson import ObjectId
@@ -146,29 +147,76 @@ _oid_to_defense_id: Dict[str, str] = {}
 # When gob-staging.defenses was emptied by an unguarded test, that turned a cached lookup
 # into 4,664 DB reads per game — 374 s of a 397 s profile, 94.4% of wall time, a ~60x sim
 # slowdown with no error and no log line. See projects/Sim_Perf_Capstone.md.
-_cache_loaded: bool = False
-_empty_catalog_warned: bool = False
+#
+# But an empty or failed load is NOT final. It used to be: a process that read the
+# catalog while it was empty (gob-staging.defenses was emptied four times by unguarded
+# tests) played man for every zone call until restart, with one log line. An unreachable
+# database raised out of every lookup instead; it now degrades the same way.
+# No real database has a legitimate empty window — publish_defenses upserts and the
+# staging copy renames a temp collection — so "empty" and "failed" are both DEGRADED.
+# Degraded states retry on the next lookup once DEFENSE_CATALOG_RETRY_SECONDS have
+# passed: at most one catalog read per window, which keeps the perf guard above.
+DEFENSE_CATALOG_RETRY_SECONDS = 30.0
+
+_CATALOG_UNLOADED = "unloaded"
+_CATALOG_LOADED = "loaded"
+_CATALOG_EMPTY = "empty"
+_CATALOG_FAILED = "failed"
+
+_catalog_status: str = _CATALOG_UNLOADED
+_catalog_next_retry_at: float = 0.0
 
 
 def clear_defense_identity_cache() -> None:
     """Test helper / rare admin use."""
-    global _by_defense_id, _name_to_defense_id, _oid_to_defense_id, _cache_loaded
+    global _by_defense_id, _name_to_defense_id, _oid_to_defense_id
+    global _catalog_status, _catalog_next_retry_at
     with _lock:
         _by_defense_id = {}
         _name_to_defense_id = {}
         _oid_to_defense_id = {}
-        _cache_loaded = False
+        _catalog_status = _CATALOG_UNLOADED
+        _catalog_next_retry_at = 0.0
 
 
-def refresh_defense_identity_cache() -> None:
-    """Load all universal defenses and rebuild lookup maps."""
+def _read_catalog_documents():
+    """The one place the catalog is read. Raises if the database cannot be read."""
     from BackEnd.db import defenses_collection
+
+    return list(defenses_collection.find({}))
+
+
+def _load_catalog(*, raise_on_error: bool) -> str:
+    """Read the catalog and publish it. Returns the resulting catalog status.
+
+    The status comes from what the READ did, not from guessing at the maps: an exception
+    is ``failed``, a successful read with no usable documents is ``empty``.
+    """
+    global _by_defense_id, _name_to_defense_id, _oid_to_defense_id
+    global _catalog_status, _catalog_next_retry_at
+
+    with _lock:
+        previous = _catalog_status
+    try:
+        docs = _read_catalog_documents()
+    except Exception as exc:
+        with _lock:
+            _catalog_status = _CATALOG_FAILED
+            _catalog_next_retry_at = time.monotonic() + DEFENSE_CATALOG_RETRY_SECONDS
+        logger.error(
+            "🛑 [DEFENSE-IDENTITY] Could not read the defense catalog (%s: %s). Zone calls "
+            "will be played as MAN until it loads; retrying in %.0fs.",
+            type(exc).__name__, exc, DEFENSE_CATALOG_RETRY_SECONDS,
+        )
+        if raise_on_error:
+            raise
+        return _CATALOG_FAILED
 
     by_id: Dict[str, Dict[str, Any]] = {}
     name_map: Dict[str, str] = {}
     oid_map: Dict[str, str] = {}
 
-    for doc in defenses_collection.find({}):
+    for doc in docs:
         if not isinstance(doc, dict):
             continue
         did = doc.get("defense_id")
@@ -183,36 +231,112 @@ def refresh_defense_identity_cache() -> None:
         if oid is not None:
             oid_map[str(oid)] = did
 
+    status = _CATALOG_LOADED if by_id else _CATALOG_EMPTY
     with _lock:
-        global _by_defense_id, _name_to_defense_id, _oid_to_defense_id, _cache_loaded
-        _cache_loaded = True
         _by_defense_id = by_id
         _name_to_defense_id = name_map
         _oid_to_defense_id = oid_map
+        _catalog_status = status
+        _catalog_next_retry_at = (
+            0.0 if status == _CATALOG_LOADED
+            else time.monotonic() + DEFENSE_CATALOG_RETRY_SECONDS
+        )
+
+    if status == _CATALOG_EMPTY:
+        # Loud on every attempt. Attempts are already bounded to one per retry window.
+        logger.error(
+            "🛑 [DEFENSE-IDENTITY] Loaded the defense catalog and found ZERO usable "
+            "documents (need a string `defense_id` field). Zone calls will be played as "
+            "MAN until it loads; retrying in %.0fs. This is a DATA problem — the "
+            "`defenses` collection is empty or malformed. Repopulate it.",
+            DEFENSE_CATALOG_RETRY_SECONDS,
+        )
+    elif previous in (_CATALOG_EMPTY, _CATALOG_FAILED):
+        logger.warning(
+            "✅ [DEFENSE-IDENTITY] Defense catalog recovered after a %s load: %d documents.",
+            previous, len(by_id),
+        )
+    return status
+
+
+def refresh_defense_identity_cache() -> None:
+    """Load all universal defenses and rebuild lookup maps. Raises if the read fails."""
+    _load_catalog(raise_on_error=True)
 
 
 def _ensure_cache() -> None:
-    """Load the catalog ONCE. A genuinely empty catalog is a loaded state, not a miss."""
-    global _empty_catalog_warned
+    """Load the catalog on first use; retry a degraded (empty/failed) load after backoff."""
     with _lock:
-        loaded = _cache_loaded
-    if loaded:
+        status = _catalog_status
+        due = time.monotonic() >= _catalog_next_retry_at
+    if status == _CATALOG_LOADED:
         return
-    refresh_defense_identity_cache()
+    if status != _CATALOG_UNLOADED and not due:
+        return
+    _load_catalog(raise_on_error=False)
+
+
+def defense_catalog_status() -> str:
+    """``loaded`` / ``empty`` / ``failed`` after ensuring a load was attempted."""
+    _ensure_cache()
     with _lock:
-        still_empty = not _by_defense_id
-        warn = still_empty and not _empty_catalog_warned
-        if warn:
-            _empty_catalog_warned = True
-    if warn:
-        # Loud ONCE. Silence here is what made the perf collapse undiagnosable: the sim
-        # ran correctly, just 60x slower, with nothing in the output to explain it.
-        logger.error(
-            "🛑 [DEFENSE-IDENTITY] Loaded the defense catalog and found ZERO usable "
-            "documents (need a string `defense_id` field). Defense lookups will fall back "
-            "and anything keyed on the catalog will misbehave. This is a DATA problem — "
-            "the `defenses` collection is empty or malformed. Repopulate it."
+        return _catalog_status
+
+
+# Canonical zone call → short shell label. Recognises that a ZONE WAS CALLED; it never
+# decides whether a zone is played (that stays with the catalog via is_zone_defense).
+_ZONE_CALL_SHORT_LABEL: Dict[str, str] = {
+    "2-3-zone": "2-3",
+    "3-2-zone": "3-2",
+    "1-3-1-zone": "1-3-1",
+    "zone_23": "2-3",
+    "zone_32": "3-2",
+    "zone_131": "1-3-1",
+}
+
+
+def zone_call_played_as_man(raw_call: Any) -> Optional[str]:
+    """If ``raw_call`` is a zone call that will be placed as MAN, return its short label.
+
+    That happens when the catalog is degraded or lacks the id. Returns None when the call
+    is not a zone call or the zone resolves normally.
+    """
+    if not isinstance(raw_call, str):
+        return None
+    short = _ZONE_CALL_SHORT_LABEL.get(raw_call.strip())
+    if short is None:
+        return None
+    from BackEnd.utils.defense_utils import is_zone_defense
+
+    if is_zone_defense(raw_call):
+        return None
+    return short
+
+
+def announce_zone_played_as_man(raw_call: Any, context: str) -> Optional[str]:
+    """Log every zone call that is being substituted with man placement (policy 26b)."""
+    short = zone_call_played_as_man(raw_call)
+    if short is not None:
+        with _lock:
+            status = _catalog_status
+        logger.warning(
+            "⚠️ [DEFENSE-IDENTITY SUBSTITUTION] %s called %r but the defense catalog is %s → "
+            "playing MAN placement for this possession.",
+            context, raw_call, status,
         )
+    return short
+
+
+def defense_playcall_display_label(defense_id: str) -> str:
+    """User-facing label for the defense actually being played.
+
+    While a zone call is substituted with man, say so instead of naming the zone. The
+    label deliberately avoids the word "zone" so the scoreboard buckets it as Man.
+    """
+    short = zone_call_played_as_man(defense_id)
+    if short is not None:
+        return f"Man ({short} unavailable)"
+    return defense_display_name(defense_id)
 
 
 def get_defense_doc(defense_id: str) -> Optional[Dict[str, Any]]:

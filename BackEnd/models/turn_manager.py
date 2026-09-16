@@ -45,7 +45,9 @@ from BackEnd.utils.defense_utils import defender_player_from_random_slot_fallbac
 from BackEnd.utils.defense_identity import (
     DEFENSE_ID_TO_PLAYBOOK_ZONE_KEY,
     PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID,
+    announce_zone_played_as_man,
     defense_display_name,
+    defense_playcall_display_label,
     defense_scouting_row_key,
     defense_zone_shell_variant,
     offense_vs_key_from_defense_input,
@@ -1939,6 +1941,7 @@ class TurnManager:
                 calls = self.set_playcalls()
                 self.game.game_state["current_playcall"] = calls["offense"]
                 self.game.game_state["defense_playcall"] = calls["defense"]
+                announce_zone_played_as_man(calls["defense"], "HCO possession")
             
                 # Track defensive playcall usage
                 def_team = self.game.defense_team
@@ -2048,7 +2051,7 @@ class TurnManager:
                 # This ensures Motion play overrides (like "3-2 Motion") are reflected in the result
                 result["offensive_playcall"] = self.game.game_state.get("current_playcall", calls["offense"])
                 result["defensive_playcall"] = calls["defense"]
-                result["defensive_playcall_display"] = defense_display_name(calls["defense"])
+                result["defensive_playcall_display"] = defense_playcall_display_label(calls["defense"])
                 # ✅ PERFORMANCE: Skip playcall logging during full simulations
                 if not is_full_simulation:
                     offense_name = calls["offense"]
@@ -4499,6 +4502,7 @@ class TurnManager:
             },
         )
         self.game.game_state["defense_playcall"] = zone_playcall
+        announce_zone_played_as_man(zone_playcall, "Final Turn")
         log_eoq_step(self.game, "FINAL_SHOT", "resolve_final_turn_shot_logic", "START", extra={"bh_pos": bh_pos})
         result = resolve_final_turn_shot_logic(
             self.game, o_dest, d_dest, position_to_spot, bh_pos
