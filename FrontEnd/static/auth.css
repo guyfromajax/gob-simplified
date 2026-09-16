@@ -293,7 +293,24 @@ body::after {
 
 .form-hint {
   font-size: 12px;
+  line-height: 1.4;
   color: rgba(255, 255, 255, 0.42);
+}
+
+/* Code step: keep the hint as a caption of the field (12px), then give
+   Continue its own 22px beat so it does not sit on the helper. */
+#signup-step-code {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+#signup-step-code .form-group {
+  gap: 8px;
+}
+
+#signup-step-code .form-hint {
+  margin-top: 4px;
 }
 
 .form-hint a {
