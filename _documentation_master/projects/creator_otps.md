@@ -8,3 +8,16 @@ HGZGMQTWT4
 266DSUH4H7
 XTB4XTN353
 
+# Production vanity codes (gob)
+
+Created: 2026-09-16
+max_uses: 1 each
+ITSGOOD
+OCTY
+POPBOY
+SHADY
+DANNY
+DECATHALON
+CRUSHABLE
+FLYER
+
