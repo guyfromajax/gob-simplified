@@ -34,7 +34,10 @@
       
       <div class="form-group">
         <label for="password">Password</label>
-        <input type="password" id="password" name="password" required placeholder="Your password">
+        <div class="password-field">
+          <input type="password" id="password" name="password" required placeholder="Your password">
+          <button type="button" class="password-toggle" aria-controls="password" aria-label="Show password" aria-pressed="false"></button>
+        </div>
       </div>
 
       <div class="form-group" style="margin-top: -0.5rem;">
@@ -58,6 +61,7 @@
   
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/analytics.js"></script>
+  <script src="/js/shared/passwordToggle.js"></script>
   <script>
     // Check if alpha mode and show badge
     async function initPage() {

@@ -102,6 +102,42 @@
     });
   }
 
+  /* ─── Alpha CTA labels / hrefs (logged-out default in markup) ─── */
+  function hasStoredAuth() {
+    try {
+      return !!(localStorage.getItem('auth_token') && localStorage.getItem('auth_user'));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function signupHref() {
+    var params = new URLSearchParams(window.location.search);
+    var out = new URLSearchParams();
+    var utm = params.get('utm_source');
+    var ref = params.get('ref');
+    if (utm) out.set('utm_source', utm);
+    if (ref) out.set('ref', ref);
+    var q = out.toString();
+    return q ? '/signup.html?' + q : '/signup.html';
+  }
+
+  function initAlphaCtas() {
+    var loggedIn = hasStoredAuth();
+    var href = loggedIn ? './mode-select.html' : signupHref();
+    var label = loggedIn ? 'Play the Alpha' : 'Get Alpha Access';
+    ['nav-cta', 'hero-cta', 'final-cta'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.setAttribute('href', href);
+      el.textContent = label;
+      el.setAttribute('aria-label', label);
+    });
+    document.querySelectorAll('.alpha-code-micro').forEach(function (el) {
+      el.hidden = loggedIn;
+    });
+  }
+
   /* ─── CTA sound effects ─── */
   function initCtaSounds() {
     document.querySelectorAll('.hero-cta, .nav-cta, .community-cta').forEach(function (el) {
@@ -131,6 +167,7 @@
 
   /* ─── Init ─── */
   function init() {
+    initAlphaCtas();
     initStickyNav();
     initScrollAnimations();
     initCtaSounds();
