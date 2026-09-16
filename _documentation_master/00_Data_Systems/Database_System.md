@@ -47,8 +47,9 @@ Top-level map of the MongoDB layer: every collection, what owns it, and the iden
 |---|---|
 | `users` | Auth + profile; career `record`, coaching `archetypes`, `lead_archetype` (see `00_General_Systems/Coaching_Archetype_System.md`) |
 | `password_reset_tokens` | Password reset flow |
-| `alpha_otps` | OTP codes for gated alpha signup |
-| `access_code_requests` | "Request Access Code" submissions (admin fulfills manually) |
+| `alpha_otps` | Alpha access codes. Redeemable when `active != false`, `used != true`, and `use_count < max_uses` (missing `max_uses` = 1). Pool codes used by `grant_alpha_access.py` have `sent=false` until claimed. Creator/vanity codes are created with `sent=true` so the pool never hands them out. |
+| `access_code_requests` | Append-only log of each request-access-code call |
+| `alpha_access_requests` | One-doc-per-email grant queue (`pending` / `granted` / `registered`) |
 | `alpha_feedback` | Alpha feedback survey responses (lazily created on first insert) |
 | `press_conference_sessions` | Press conference session state |
 | `community_highlights` | Community highlights feed entries |
@@ -83,10 +84,12 @@ Note: Mongo creates collections lazily on first write. As of 2026-06, `training_
 - `games`: `franchise_id`
 - `franchises`: `user_id`
 - `users`: unique sparse `username_lower`
+- `alpha_access_requests`: unique `email`
 
 ## Related Docs
 
 - `_documentation_master/00_Data_Systems/O_&_D_Plays_Collections.md` — play/defense storage model (canonical)
 - `_documentation_master/00_Data_Systems/Games_Collection.md`
+- `_documentation_master/00_Operations/Alpha_Access_Runbook.md`
 - `_documentation_master/03_Data_Persistence/Data_Persistence_System.md`
 - `_documentation_master/06_GMO_Supporting_Systems/Mode_Init_System.md`

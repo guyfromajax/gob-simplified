@@ -51,6 +51,34 @@ def generate_otp_code() -> str:
     return ''.join(secrets.choice(OTP_CHARS) for _ in range(OTP_LENGTH))
 
 
+def build_alpha_otp_document(
+    code: str,
+    *,
+    now,
+    max_uses: int = 1,
+    sent: bool = False,
+    allocated_to: str | None = None,
+    allocated_at=None,
+) -> dict:
+    """Canonical fields for a new alpha_otps document."""
+    return {
+        "otp_code": code,
+        "used": False,
+        "used_by_email": None,
+        "used_at": None,
+        "created_at": now,
+        "sent": sent,
+        "sent_to_email": None,
+        "sent_at": None,
+        "max_uses": max_uses,
+        "use_count": 0,
+        "redemptions": [],
+        "allocated_to": allocated_to,
+        "allocated_at": allocated_at,
+        "active": True,
+    }
+
+
 def generate_otps(collection, db_name: str, count: int, dry_run: bool = False) -> list[dict]:
     """
     Generate OTP codes and insert into database.
@@ -97,13 +125,7 @@ def generate_otps(collection, db_name: str, count: int, dry_run: bool = False) -
             continue
         
         generated_codes.add(code)
-        otps.append({
-            "otp_code": code,
-            "used": False,
-            "used_by_email": None,
-            "used_at": None,
-            "created_at": now
-        })
+        otps.append(build_alpha_otp_document(code, now=now))
     
     if len(otps) < count:
         print(f"⚠️  Warning: Could only generate {len(otps)} unique OTPs")
