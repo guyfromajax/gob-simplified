@@ -272,7 +272,7 @@ function ensureStyles() {
     .sgp-root .w4-cap.poss{color:var(--orange)}
     .sgp-root .w4-team{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;letter-spacing:.04em}
     .sgp-root .w4-plot{position:relative;height:208px;margin:4px 0;overflow:hidden}
-    .sgp-root .w4-court{position:absolute;z-index:0;left:50%;top:50%;height:50%;width:auto;max-width:100%;transform:translate(-50%,-50%);object-fit:contain;pointer-events:none}
+    .sgp-root .w4-court{position:absolute;z-index:0;left:50%;top:50%;height:80%;width:auto;max-width:100%;transform:translate(-50%,-50%);object-fit:contain;pointer-events:none}
     .sgp-root .w4-plot svg.wormsvg{display:block;position:absolute;z-index:1;inset:0;width:100%;height:100%;margin:0}
     .sgp-root .w4-axis{height:12px;display:flex;justify-content:space-between;font-family:ui-monospace,Menlo,monospace;font-size:8px;letter-spacing:.06em;color:var(--w25)}
     .sgp-root .w4-axis.endgame span{color:rgba(255,255,255,.12);transition:color .4s}
