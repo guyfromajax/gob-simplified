@@ -3705,10 +3705,16 @@ def _sim_crash_apply_enabled() -> bool:
 
 
 def _sim_crash_clock_enabled() -> bool:
-    """``GOB_SIM_CRASH_CLOCK`` (default OFF): add the derived post-shot window to a sim HCO shot turn's
-    ``time_elapsed``. Independent of ``GOB_SIM_CRASH_APPLY`` — measure them separately."""
+    """``GOB_SIM_CRASH_CLOCK`` (default ON): add the derived post-shot window to a sim HCO shot turn's
+    ``time_elapsed`` — the live-ball time after the shot leaves the hand, which the legacy
+    ``calc_skeleton_step_timing_contract`` estimate never burned. Independent of
+    ``GOB_SIM_CRASH_APPLY``; set either to 0 alone.
+
+    Worth ~4 possessions a game: it moved the sim/played arm gap from +11.39 to +1.80 pts/team
+    (SEED_DEFENSES=1) on its own, and the two flags are NOT additive — both on lands at +3.61
+    (reports/flags-on-2026-09-17.md)."""
     import os
-    return os.environ.get("GOB_SIM_CRASH_CLOCK", "0").strip().lower() in ("1", "true", "yes", "on")
+    return os.environ.get("GOB_SIM_CRASH_CLOCK", "1").strip().lower() in ("1", "true", "yes", "on")
 
 
 def sim_post_shot_window_seconds(turn_result: Dict[str, Any], away_offense: bool,
