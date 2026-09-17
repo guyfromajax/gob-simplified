@@ -344,6 +344,12 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 - **Scope:** Game results, stats, inbox entries, and tournament bracket advancement still persist normally. In-game NG effects may still change live game state during play; the frozen values are the postgame anchor team attributes.
 - **Reversibility:** The freeze is controlled by a centralized postseason policy in `BackEnd/api/franchise_routes.py` so future postseason EOG team attribute changes can be re-enabled without rewriting the EOG formulas.
 
+### Player EM (Emotion)
+
+Franchise EOG writes **FPD** `attributes.EM` / `anchor_EM` for **both teams** on every franchise game, **including weeks 27–36** when team attributes are frozen. Practice Squad games are skipped. Idempotent via `player_em_eog_applied` on the game doc.
+
+Each player gets one roll from roster RT (max FPD `position_ratings`), displayed box minutes (`floor(MIN seconds / 60)`, DNP = 0), and FPD CH. Clamp 1–100. Table and training rules: `projects/Player_EM_Overview.md`. Code: `BackEnd/utils/player_em.py` (`apply_franchise_eog_player_em`), called from `_finalize_team_attributes_for_game`.
+
 ### EOG Persistence Guardrails (February 2026)
 
 - **Issue observed:** EOG logs showed `totals_source=none` and zero team totals/scouting during `complete-week`, causing incorrect deltas (for example PT/FB opponent modifiers and discipline).

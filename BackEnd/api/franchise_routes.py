@@ -1635,10 +1635,19 @@ def _finalize_team_attributes_for_game(
     week: int | None = None,
 ) -> None:
     """
-    Run update_team_attributes_after_game once for this game and persist
+    Apply player EM EOG to FPD (all franchise weeks, including postseason freeze),
+    then run update_team_attributes_after_game once and persist
     team_attribute_changes on the game doc so the box score can display them.
     game_id: string or ObjectId (game doc _id).
     """
+    try:
+        from BackEnd.utils.player_em import apply_franchise_eog_player_em
+        apply_franchise_eog_player_em(game_id, franchise_id)
+    except Exception as e:
+        logger.error(
+            "[PLAYER-EM-EOG-FAILURE] game_id=%s week=%s exc_type=%s exc=%s",
+            str(game_id), str(week), type(e).__name__, e,
+        )
     try:
         gid = game_id
         game_id_str = str(game_id) if not isinstance(game_id, str) else game_id
