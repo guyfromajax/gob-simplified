@@ -3693,6 +3693,146 @@ def apply_coords_from_animations_list(game: Any, animations: Optional[List[Any]]
                     break
 
 
+def _sim_crash_apply_enabled() -> bool:
+    """``GOB_SIM_CRASH_APPLY`` (default OFF): on a full simulation, move the post-shot overlay players
+    toward the crash / get-back / release destinations the turn already carries, the way the played
+    arm's emitted sub-steps do. OFF leaves them where the possession left them (pre-fix behaviour)."""
+    import os
+    return os.environ.get("GOB_SIM_CRASH_APPLY", "0").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _sim_crash_clock_enabled() -> bool:
+    """``GOB_SIM_CRASH_CLOCK`` (default OFF): add the derived post-shot window to a sim HCO shot turn's
+    ``time_elapsed``. Independent of ``GOB_SIM_CRASH_APPLY`` — measure them separately."""
+    import os
+    return os.environ.get("GOB_SIM_CRASH_CLOCK", "0").strip().lower() in ("1", "true", "yes", "on")
+
+
+def sim_post_shot_window_seconds(turn_result: Dict[str, Any], away_offense: bool,
+                                 shot_spot: Optional[Dict[str, Any]]) -> Optional[float]:
+    """Game-seconds the ball is live after the shot leaves the shooter's hands, derived from the turn
+    result alone: ball flight (``_variant_flight_end`` / arc rate) + RATTLE hops (+ the make settle) +
+    the miss/block bounce step.
+
+    The played arm gets this from its emitted sub-steps; a full simulation emits none, so it is
+    recomputed here from fields the resolver already wrote (``shot_variant``, the rattle start /
+    progression, ``uses_shot_arc``, ``ball_bounce_x/y``). Pure arithmetic over existing data: the
+    emitter helpers it calls take no RNG (`_build_post_shot_sub_steps` measures 0 sim_rng draws), and
+    nothing here builds placement or animations. Returns None when the turn is not a shot attempt.
+
+    NOT the same number played burns: played's window also carries its shoot-step duration, which is an
+    emitter construct. Measured ratio derived/emitted ~0.80 on HCO MISS (see
+    reports/crash-parity-2026-09-17.md).
+    """
+    result_type = str((turn_result or {}).get("result_type") or "").upper()
+    if result_type not in ("MAKE", "MISS", "BLOCK") or not isinstance(shot_spot, dict):
+        return None
+    if shot_spot.get("x") is None or shot_spot.get("y") is None:
+        return None
+    from BackEnd.constants import (
+        BOUNCE_STEP_GAME_SECONDS,
+        RATTLE_HOP_GAME_SECONDS,
+        RATTLE_MAKE_SETTLE_GAME_SECONDS,
+    )
+    from BackEnd.engine.skeleton_step_emitter import (
+        _RATTLE_VARIANTS,
+        _rattle_hop_targets,
+        _variant_flight_end,
+    )
+    from BackEnd.utils.shot_ball_arc import shot_ball_flight_grid_rate
+
+    variant = None if turn_result.get("foul_block_contact") else turn_result.get("shot_variant")
+    variant_upper = str(variant or "").upper()
+    flight_end = _variant_flight_end(variant, result_type, away_offense, turn_result)
+    rate = shot_ball_flight_grid_rate(
+        uses_arc=(result_type != "BLOCK" and bool(turn_result.get("uses_shot_arc")))
+    )
+    dx = float(flight_end["x"]) - float(shot_spot["x"])
+    dy = float(flight_end["y"]) - float(shot_spot["y"])
+    seconds = max(0.05, math.sqrt(dx * dx + dy * dy) / float(rate))
+    if variant_upper in _RATTLE_VARIANTS:
+        seconds += len(_rattle_hop_targets(variant_upper, away_offense, turn_result)) * float(RATTLE_HOP_GAME_SECONDS)
+        if result_type == "MAKE":
+            seconds += float(RATTLE_MAKE_SETTLE_GAME_SECONDS)
+    if (result_type in ("MISS", "BLOCK") and variant_upper != "AIRBALL"
+            and turn_result.get("ball_bounce_x") is not None):
+        seconds += float(BOUNCE_STEP_GAME_SECONDS)
+    return seconds
+
+
+def apply_sim_crash_destinations(game: Any, turn_result: Dict[str, Any],
+                                 positions: Dict[str, Dict[str, float]]) -> int:
+    """Full simulation only: advance each post-shot overlay player toward his destination, into
+    ``positions`` (the map ``sync_lineup_coords_from_turn`` is about to write to ``Player.coords``).
+
+    The played arm reaches the same positions through the emitter's [shoot] / [ball_flight] / [rattle]
+    / [bounce] sub-steps, each interrupting the player toward the same destination at the same
+    archetype rate; the sequence collapses to ONE interruption over the post-shot window. A turn that
+    produced ``animation_steps`` (fast break, HCT, FCP on both arms) already carries those positions
+    and is skipped, so this only fills the HCO family, where a full simulation emits nothing.
+
+    Reads only what the turn already carries; no placement build, no animation build, no RNG draw.
+    Role exclusivity is the caller's ``canonicalize_post_shot_overlays`` — not reimplemented here.
+    Returns the number of players moved.
+    """
+    game_state = getattr(game, "game_state", None) or {}
+    if not game_state.get("_is_full_simulation") or not _sim_crash_apply_enabled():
+        return 0
+    # Rendered output of ANY kind means this turn already carries post-shot positions: schema steps
+    # (fast break / HCT / FCP, which emit on both arms) or the legacy ``animations`` list. A full
+    # simulation produces neither for the HCO family. Both are checked because the played arm still
+    # carries ``animations`` on the rare turn whose emitter returns None, and that turn must not move.
+    if turn_result.get("animation_steps") or turn_result.get("animations"):
+        return 0
+    from BackEnd.engine.skeleton_step_emitter import _OVERLAY_ARCHETYPES, _interpolate_step_end
+    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+
+    maps = [(key, arch, turn_result.get(key)) for key, arch in _OVERLAY_ARCHETYPES]
+    if not any(isinstance(m, dict) and m for _k, _a, m in maps):
+        return 0
+    shooter_id = _norm_player_id(turn_result.get("shooter_id"))
+    shot_spot = turn_result.get("shot_spot")
+    if not isinstance(shot_spot, dict) and shooter_id and shooter_id in positions:
+        shot_spot = positions[shooter_id]
+    away_offense = str(turn_result.get("offense_team_id") or "") == str(
+        getattr(getattr(game, "away_team", None), "team_id", "")
+    )
+    seconds = sim_post_shot_window_seconds(turn_result, away_offense, shot_spot)
+    if not seconds:
+        return 0
+    by_id = {}
+    for team in (game.home_team, game.away_team):
+        for player in (getattr(team, "lineup", None) or {}).values():
+            if player is not None and getattr(player, "player_id", None) is not None:
+                by_id[_norm_player_id(player.player_id)] = player
+    moved = 0
+    for _key, archetype, overlay in maps:
+        if not isinstance(overlay, dict):
+            continue
+        for pid, dest in overlay.items():
+            ns = _norm_player_id(pid)
+            player = by_id.get(ns)
+            start = positions.get(ns)
+            if player is None or not start or not isinstance(dest, dict):
+                continue
+            if dest.get("x") is None or dest.get("y") is None:
+                continue
+            rate = _ag_grid_per_game_sec(player, archetype)
+            end, _dur = _interpolate_step_end(
+                {"x": float(start["x"]), "y": float(start["y"])},
+                {"x": float(dest["x"]), "y": float(dest["y"])},
+                rate, seconds,
+            )
+            positions[ns] = {"x": float(end["x"]), "y": float(end["y"])}
+            moved += 1
+    if moved:
+        logging.info(
+            "[SIM CRASH] %s/%s: advanced %d overlay players over a %.2fs post-shot window",
+            turn_result.get("current_turn"), turn_result.get("result_type"), moved, seconds,
+        )
+    return moved
+
+
 def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None:
     """
     After a turn is finalized, align all ten active players' ``Player.coords`` with the
@@ -3832,6 +3972,13 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
     # longer override schema end.coords below — DREB/legacy callers still
     # read the overlay maps directly.)
     canonicalize_post_shot_overlays(turn_result)
+
+    # Full-sim crash parity (flag-gated, default OFF): the played arm renders the post-shot crash /
+    # get-back / release motion through its emitted sub-steps; a full simulation emits none for the
+    # HCO family, so the same destinations are applied here by arithmetic. Runs AFTER canonicalize so
+    # the shooter / get-back / release exclusions are already applied, and writes into `positions`,
+    # which the loop below assigns to Player.coords.
+    apply_sim_crash_destinations(game, turn_result, positions)
 
     # Overlay maps DELIBERATELY DO NOT override `animation_steps[-1].end.coords`
     # anymore. UESS §9.5: non-gate movers freeze at their interrupted coord,
