@@ -125,6 +125,80 @@ def _uninstall_played_arm():
             setattr(AN.Animator, meth, _PATCHED[meth])
 
 
+class PlayedState(dict):
+    """game_state that refuses ``_is_full_simulation``: the production turn-by-turn footing.
+    ARM=played only clears the flag inside GATED_METHODS; ARM=played_full never sets it."""
+    def __setitem__(self, k, v):
+        if k == "_is_full_simulation":
+            return
+        dict.__setitem__(self, k, v)
+
+    def setdefault(self, k, *a):
+        if k == "_is_full_simulation":
+            return None
+        return dict.setdefault(self, k, *a)
+
+    def update(self, *a, **kw):
+        src = dict(*a, **kw)
+        src.pop("_is_full_simulation", None)
+        dict.update(self, src)
+
+
+# ── ALIGN_RNG=1: arm-gated regions draw from a SIDE stream (harness only) ─────────────────
+# Each region below draws sim_rng only when animation is live (a `_is_full_simulation`
+# early return, or data that only exists when it is live). Running them on a side stream on
+# BOTH arms leaves the main sim_rng stream arm-independent, so the two arms' main streams
+# agree until a genuine behavioural difference. The sim arm draws nothing inside them, so
+# the wrap is a no-op there. Production draw behaviour is untouched; the ALIGNED played arm
+# is a diagnostic footing, not the production one.
+ALIGN_RNG = os.environ.get("ALIGN_RNG", "0") == "1"
+ALIGN_REGIONS = (
+    ("BackEnd.models.animator", "Animator.capture_fast_break_animation"),
+    ("BackEnd.models.animator", "Animator.capture_free_throw_animation"),
+    ("BackEnd.models.animator", "Animator.capture_halfcourt_animation"),
+    ("BackEnd.models.animator", "Animator.skeleton_to_animations"),
+    ("BackEnd.engine.skeleton_step_emitter", "build_skeleton_animation_steps"),
+    ("BackEnd.engine.step_state", "_diagnose"),
+    ("BackEnd.engine.ft_step_emitter", "build_ft_animation_steps"),
+    ("BackEnd.engine.triangle_step_emitter", "build_triangle_animation_steps"),
+    ("BackEnd.engine.phase_resolution", "get_fcp_skeleton"),
+    ("BackEnd.engine.phase_resolution", "get_hct_skeleton"),
+)
+SIDE = {"state": None, "depth": 0, "draws": 0, "calls": {}}
+
+
+def _install_align_regions():
+    import importlib
+    for mod_name, attr in ALIGN_REGIONS:
+        owner = importlib.import_module(mod_name)
+        name = attr
+        if "." in attr:
+            cls, name = attr.split(".")
+            owner = getattr(owner, cls)
+        orig = getattr(owner, name)
+
+        def make(orig=orig, label=attr):
+            def wrapped(*a, **k):
+                if SIDE["depth"]:
+                    return orig(*a, **k)
+                rng = sim_random.sim_rng
+                main = rng.getstate()
+                rng.setstate(SIDE["state"])
+                SIDE["depth"] = 1
+                box = getattr(rng, "_equiv_draws", None)
+                before = box[0] if box else 0
+                try:
+                    return orig(*a, **k)
+                finally:
+                    SIDE["draws"] += (box[0] if box else 0) - before
+                    SIDE["calls"][label] = SIDE["calls"].get(label, 0) + 1
+                    SIDE["state"] = rng.getstate()
+                    rng.setstate(main)
+                    SIDE["depth"] = 0
+            return wrapped
+        setattr(owner, name, make())
+
+
 def ft_invariant(turns, window=3):
     awards = strict = windowed = 0
     for i, t in enumerate(turns):
@@ -263,21 +337,28 @@ def run_arm(played: bool):
                 sim_random.sim_rng.random = _rnd_c
                 sim_random.sim_rng._equiv_draws = _box
             sim_random.sim_rng._equiv_draws[0] = 0
+            SIDE.update({"state": _stdlib.Random(seed ^ 0x51DE).getstate(), "depth": 0,
+                         "draws": 0, "calls": {}})
             DCENSUS.update({"poss": [], "final_turn": [], "untagged_placements": 0,
                             "sub_log_lines": 0})
             gm = GameManager("Lancaster", "Bentley-Truman")
+            if ARM == "played_full":
+                gm.game_state = PlayedState(gm.game_state)
             d = {"defense": 2, "tempo": 2, "aggression": 2, "fast_break": 2,
                  "hc_trap": 5, "fc_press": 5}
             gm.home_team.strategy_settings = d.copy()
             gm.away_team.strategy_settings = d.copy()
             gid = "%024x" % (0xE0000 + (seed - 8000))
             err = None
+            import time as _time
+            _t0 = _time.perf_counter()
             for _q in range(4):
                 try:
                     simulate_quarter(gm, game_id=gid)
                 except Exception as e:  # noqa: BLE001
                     err = "%s: %s" % (type(e).__name__, e)
                     break
+            wall_s = _time.perf_counter() - _t0
             turns = gm.turns or []
             score = dict(gm.score or {})
             poss = sum(1 for t in turns if t.get("possession_flips"))
@@ -289,6 +370,8 @@ def run_arm(played: bool):
                 "points_per_team": sum(score.values()) / 2.0,
                 "possessions": poss,
                 "draws": draws[0] if draws else None,
+                "arm": ARM, "align_rng": ALIGN_RNG, "wall_s": round(wall_s, 3),
+                "side_draws": SIDE["draws"], "side_calls": dict(SIDE["calls"]),
                 "ft_awards": aw, "ft_strict": st, "ft_windowed": wi,
                 "fp": turns_fingerprint(turns, score),
                 "defenses_seeded": SEED_DEFENSES,
@@ -313,6 +396,8 @@ def published_ci95(vals):
 if __name__ == "__main__":
     label = "%s_%s" % (COND, ARM)
     _install_defense_census()
+    if ALIGN_RNG:
+        _install_align_regions()
     rows = run_arm(ARM == "played")
     json.dump({"rows": {label: rows}}, open(OUT, "w"), indent=1)
     pts = [r["points_per_team"] for r in rows if r.get("err") is None]
