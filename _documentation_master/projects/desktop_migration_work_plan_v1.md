@@ -1,3 +1,5 @@
+> **Superseded by [desktop_migration_work_plan_v2.md](./desktop_migration_work_plan_v2.md) (14 Sept 2026). Kept for history — do not follow.**
+
 # Desktop Migration Work Plan — GOB
 
 **Purpose:** Practical work plan for migrating GOB from an online-only web app to the hybrid model: a standalone desktop build for single-player franchise play, with the online layer (accounts, community, recruit packs, subscription, PvP) remaining on remote infrastructure.
