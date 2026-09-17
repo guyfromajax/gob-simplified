@@ -3694,11 +3694,14 @@ def apply_coords_from_animations_list(game: Any, animations: Optional[List[Any]]
 
 
 def _sim_crash_apply_enabled() -> bool:
-    """``GOB_SIM_CRASH_APPLY`` (default OFF): on a full simulation, move the post-shot overlay players
+    """``GOB_SIM_CRASH_APPLY`` (default ON): on a full simulation, move the post-shot overlay players
     toward the crash / get-back / release destinations the turn already carries, the way the played
-    arm's emitted sub-steps do. OFF leaves them where the possession left them (pre-fix behaviour)."""
+    arm's emitted sub-steps do. Set it to 0 for the pre-fix behaviour, which leaves them where the
+    possession left them — 13.3 grid units from where played puts them, and the reason over-the-back
+    was in play 25.9 times a game on sim against played's 39.0
+    (reports/crash-parity-2026-09-17.md)."""
     import os
-    return os.environ.get("GOB_SIM_CRASH_APPLY", "0").strip().lower() in ("1", "true", "yes", "on")
+    return os.environ.get("GOB_SIM_CRASH_APPLY", "1").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _sim_crash_clock_enabled() -> bool:
