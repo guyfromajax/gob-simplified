@@ -3958,6 +3958,49 @@ class TurnManager:
             pass
         return result
 
+    def _maybe_add_sim_post_shot_clock(self, result):
+        """Full simulation only, ``GOB_SIM_CRASH_CLOCK`` (default OFF): add the derived post-shot
+        window to an HCO shot turn's ``time_elapsed``.
+
+        The played arm takes its whole HCO clock from the emitted steps (UESS §5 clock authority,
+        below), which include the ball-flight / rattle / bounce beats. A full simulation emits none,
+        so its legacy ``calc_skeleton_step_timing_contract`` estimate stops at the shot and never
+        burns the live-ball time after it. This adds that slice only — derived from the turn result
+        by ``sim_post_shot_window_seconds``, no build and no draw. Independent of
+        ``GOB_SIM_CRASH_APPLY``."""
+        from BackEnd.utils.shared import _sim_crash_clock_enabled, sim_post_shot_window_seconds
+
+        game_state = getattr(self.game, "game_state", None) or {}
+        if not game_state.get("_is_full_simulation") or not _sim_crash_clock_enabled():
+            return
+        if not isinstance(result, dict) or result.get("final_turn") or result.get("flss"):
+            return
+        # Any rendered output means the clock already came from it (or will): only a turn with no
+        # schema steps AND no legacy ``animations`` is a full-sim HCO turn. The played arm keeps
+        # ``animations`` even when its emitter returns None, so this leaves played untouched.
+        if result.get("animation_steps") or result.get("animations"):
+            return
+        shot_spot = result.get("shot_spot")
+        if not isinstance(shot_spot, dict):
+            shooter_id = str(result.get("shooter_id") or "")
+            for team in (self.game.home_team, self.game.away_team):
+                for player in (getattr(team, "lineup", None) or {}).values():
+                    if player is not None and str(getattr(player, "player_id", "")) == shooter_id:
+                        shot_spot = getattr(player, "coords", None)
+                        break
+        away_offense = str(result.get("offense_team_id") or "") == str(
+            getattr(getattr(self.game, "away_team", None), "team_id", "")
+        )
+        seconds = sim_post_shot_window_seconds(result, away_offense, shot_spot)
+        if not seconds:
+            return
+        before = int(result.get("time_elapsed") or 0)
+        result["time_elapsed"] = before + int(round(seconds))
+        logging.info(
+            "[SIM POST-SHOT CLOCK] %s: time_elapsed %d → %d (+%.2fs live-ball window)",
+            result.get("result_type"), before, result["time_elapsed"], seconds,
+        )
+
     def _emit_hco_animation_steps(self, result):
         """Single injection point for HCO-tagged turn results — both the normal
         ``resolve_half_court_offense`` path and the ``resolve_final_turn_shot``
@@ -3986,6 +4029,7 @@ class TurnManager:
             anim_steps = build_skeleton_animation_steps(result, self.game)
             if anim_steps is None:
                 self._assert_eoq_animation_steps(result, anim_steps=None, context="emit_none")
+                self._maybe_add_sim_post_shot_clock(result)
                 return
             result["animation_steps"] = anim_steps
             # HCO batted-OOB: append the schema ball trajectory (deflector
