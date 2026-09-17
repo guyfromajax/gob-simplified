@@ -465,6 +465,29 @@ def calc_skeleton_step_timing_contract(
     behavior at unmigrated call sites — at AG=50 the AG-driven path produces
     identical timing to the legacy path, so migrating one caller at a time is
     safe.
+
+    ⚠️ THE WHOLE-SECOND ROUNDING AND THE 1s STEP FLOOR BELOW ARE LOAD-BEARING. DO NOT REMOVE THEM
+    ON THEIR OWN. Measured per HCO turn on the played arm, paired against its own emitted clock
+    (reports/clock-and-crash-scope-2026-09-17.md §A2, equiv-v3 n=40, SEED_DEFENSES=1):
+
+        this contract, rounded      9.43 s   ← what a full simulation burns
+        the same contract, unrounded 6.10 s   (rounding + the 1s floor add ~3.33 s)
+        played's emitted clock      11.14 s
+
+    The rounding inflates this estimate by ~3.33 s/turn, and a full simulation is separately
+    missing ~5.18 s/turn that played burns: entry orchestration (~3.15 — walk-up / handoff /
+    kickout, which only the emitter builds), post-shot sub-steps (~1.03 — now supplied on sim by
+    GOB_SIM_CRASH_CLOCK) and per-step model differences (~1.0 — placement coords vs skeleton spots,
+    archetype rates, the emitter's 0.5s floor, ball-flight time).
+
+    So the rounding is currently STANDING IN for the missing entry time, and the two very nearly
+    cancel. Dropping the rounding by itself takes sim from ~9.4 s to ~6.1 s per half-court turn
+    against played's ~11.1 and makes the arm gap sharply WORSE. Entry orchestration must not be
+    added to the sim clock without removing the rounding in the SAME change, and vice versa.
+
+    The gate set is NOT the explanation for the rest: played gates its HCO skeleton steps on the
+    shooter, the drive driver or the slowest offensive mover, never on defenders, and re-timing
+    this contract on played's gate set moves it by only −0.13 s/turn (§A2 (b)).
     """
     if not steps:
         one_step = FALLBACK_STEP_SECONDS
@@ -3729,9 +3752,19 @@ def sim_post_shot_window_seconds(turn_result: Dict[str, Any], away_offense: bool
     emitter helpers it calls take no RNG (`_build_post_shot_sub_steps` measures 0 sim_rng draws), and
     nothing here builds placement or animations. Returns None when the turn is not a shot attempt.
 
-    NOT the same number played burns: played's window also carries its shoot-step duration, which is an
-    emitter construct. Measured ratio derived/emitted ~0.80 on HCO MISS (see
-    reports/crash-parity-2026-09-17.md).
+    NOT the same number played burns: played's window also carries its shoot-step duration (an emitter
+    construct) and its clock-pinned beats (the make hold freezes players). Measured ratio of this
+    derived window to played's emitted one, equiv-v3 n=40, SEED_DEFENSES=1
+    (reports/crash-parity-2026-09-17.md):
+
+        HCO MISS   0.80   (1.84 s vs 2.28 s)
+        HCO MAKE   0.57   (0.93 s vs 1.55 s)  ← the systematically wrong one
+        HCO BLOCK  1.62   (1.21 s vs 0.76 s)
+
+    Overall position accuracy of the crash write that consumes this window, against played's actual
+    post-shot coords: 2.17 units mean (0.81 on MISS, 3.66 on MAKE, 3.08 on BLOCK; 13.31 with the
+    write disabled). Anyone tightening this derivation should start with MAKE — and should expect it
+    to move the sim clock too, because GOB_SIM_CRASH_CLOCK adds this same number to time_elapsed.
     """
     result_type = str((turn_result or {}).get("result_type") or "").upper()
     if result_type not in ("MAKE", "MISS", "BLOCK") or not isinstance(shot_spot, dict):
