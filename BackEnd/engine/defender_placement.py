@@ -1302,3 +1302,34 @@ def defender_grid_from_animations(anims, def_lineup, num_steps):
                 row[dpos] = {"x": float(c["x"]), "y": float(c["y"])}
         grid[i] = row
     return grid
+
+
+def offense_grid_from_animations(anims, off_lineup, steps):
+    """Extract ``{step_idx: {off_pos: {x, y}}}`` for the offense from the same ``animations`` list.
+
+    Not ``defender_grid_from_animations``: an offensive player's ``movement`` only gains an entry on
+    steps where he has a ``pos_action``, so ``movement[i]`` is not step ``i``. Each entry carries its
+    step's ``timestamp``; a player's position at step ``i`` is his last entry at or before that
+    timestamp, which is where ``apply_coords_from_animations_list`` would leave him on a skeleton
+    ending at ``i``. Players with no entry by step ``i`` are omitted.
+    """
+    move_by_pid = {a.get("playerId"): (a.get("movement") or [])
+                   for a in (anims or []) if a.get("playerId")}
+    step_ts = [float((step or {}).get("timestamp", 0) or 0) for step in (steps or [])]
+    grid = {}
+    for i, ts in enumerate(step_ts):
+        row = {}
+        for pos, player in (off_lineup or {}).items():
+            pid = getattr(player, "player_id", None) if player is not None else None
+            if not pid:
+                continue
+            last = None
+            for entry in move_by_pid.get(pid) or []:
+                c = (entry or {}).get("coords")
+                if float((entry or {}).get("timestamp", 0) or 0) <= ts and isinstance(c, dict) \
+                        and "x" in c and "y" in c:
+                    last = c
+            if last is not None:
+                row[pos] = {"x": float(last["x"]), "y": float(last["y"])}
+        grid[i] = row
+    return grid

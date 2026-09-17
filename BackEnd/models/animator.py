@@ -44,6 +44,7 @@ from BackEnd.constants.fast_break_constants import (
 from BackEnd.engine.defender_placement import (
     build_all_animations,
     defender_grid_from_animations,
+    offense_grid_from_animations,
 )
 # Re-exported for existing importers: scripts/s1_openness_monte_carlo.py and
 # tests/test_motion_subtle_defense.py import these FROM animator, and this commit is not
@@ -1258,15 +1259,29 @@ class Animator:
         computation" claim above is aspirational — the contest's grid and the render's animations are
         still two separate computations that both draw from ``sim_rng``. That is what commit 2 fixes;
         this commit only moved the code."""
+        defense, _offense = self.compute_placement_grids(
+            skeleton, off_lineup, def_lineup, is_fcp=is_fcp, is_hct=is_hct, with_offense=False)
+        return defense
+
+    def compute_placement_grids(self, skeleton, off_lineup, def_lineup, is_fcp=False, is_hct=False,
+                                with_offense=True):
+        """``compute_defender_grid``'s single build, returning ``(defense_grid, offense_grid)``.
+
+        Same build, same draws: the offense rows are already in the animations it builds and were
+        previously discarded. ``offense_grid`` is ``{}`` when ``with_offense`` is False.
+        """
         import copy as _copy
         if not skeleton or "steps" not in skeleton:
-            return {}
+            return {}, {}
         try:
             anims = self._build_all_animations(
                 _copy.deepcopy(skeleton), off_lineup, def_lineup, add_defenders=True, is_fcp=is_fcp, is_hct=is_hct)
         except Exception:
-            return {}
-        return self.defender_grid_from_animations(anims, def_lineup, len((skeleton.get("steps") or [])))
+            return {}, {}
+        steps = skeleton.get("steps") or []
+        defense = self.defender_grid_from_animations(anims, def_lineup, len(steps))
+        offense = offense_grid_from_animations(anims, off_lineup, steps) if with_offense else {}
+        return defense, offense
 
     @staticmethod
     def defender_grid_from_animations(anims, def_lineup, num_steps):

@@ -4933,6 +4933,59 @@ def _dynamic_hco_defense_enabled():
     return os.environ.get("GOB_DYNAMIC_HCO_DEFENSE", "1").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _sim_hco_coord_write_enabled():
+    """``GOB_SIM_HCO_COORD_WRITE`` (default ON): on a full simulation, write all ten players' coords
+    from the HCO placement stamp. Off reverts to shooter-only (the pre-fix behaviour), for measurement."""
+    import os
+    return os.environ.get("GOB_SIM_HCO_COORD_WRITE", "1").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _write_sim_hco_placement_coords(game, skeleton, off_lineup, def_lineup, context):
+    """Full simulation only: write every on-court player's ``player.coords`` from the placement build
+    already stamped on the skeleton (``_step_state`` defense + offense), at the point in the HCO turn
+    where the played arm writes them from its render (``apply_coords_from_animations_list``).
+
+    Played builds animations and never reaches this; the full-sim animation skip is untouched. The
+    stamp is the ``_stamp_contest_defender_grid`` build the sim contest already reads, so no new
+    placement build and no new draw. Uses the last step carrying a complete stamp for both lineups
+    (a stopper step is appended after stamping, so stopper turns use the stop step). Returns the
+    number of players written."""
+    import math
+    game_state = getattr(game, "game_state", None) or {}
+    if not game_state.get("_is_full_simulation") or not _sim_hco_coord_write_enabled():
+        return 0
+    steps = (skeleton or {}).get("steps") or []
+    off_on = {pos: pl for pos, pl in (off_lineup or {}).items() if pl is not None}
+    def_on = {pos: pl for pos, pl in (def_lineup or {}).items() if pl is not None}
+    for back, i in enumerate(range(len(steps) - 1, -1, -1)):
+        ss = steps[i].get("_step_state") or {}
+        defense, offense = ss.get("defense") or {}, ss.get("offense") or {}
+        if set(def_on) <= set(defense) and set(off_on) <= set(offense):
+            break
+    else:
+        logging.warning(
+            "⚠️ [SIM HCO COORDS] %s: no step with a complete placement stamp (%d steps) → only the "
+            "shooter's coords update this possession. game=%s",
+            context, len(steps), game_state.get("game_id"))
+        return 0
+    moved = []
+    for rows, lineup in ((offense, off_on), (defense, def_on)):
+        for pos, player in lineup.items():
+            c = rows[pos]
+            new = {"x": float(c["x"]), "y": float(c["y"])}
+            old = getattr(player, "coords", None) or {}
+            try:
+                d = math.hypot(new["x"] - float(old["x"]), new["y"] - float(old["y"]))
+            except (KeyError, TypeError, ValueError):
+                d = float("nan")
+            moved.append((pos, round(d, 1)))
+            player.coords = new
+    logging.info(
+        "[SIM HCO COORDS] %s: wrote %d players from step %d of %d (%d back); moved %s",
+        context, len(moved), i, len(steps), back, moved)
+    return len(moved)
+
+
 # Interim posture pick — a team-wide loose/normal/tight per turn (Dynamic_MM_Brief §5A). Later
 # replaced by the chosen tight/loose playcall variant (P6).
 _HCO_DEFENSE_POSTURES = ("loose", "normal", "tight")
@@ -6350,7 +6403,9 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         if not steps:
             return
         from BackEnd.models.animator import Animator
-        grid = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
+        # One build; the offense rows it already contains are kept so the sim arm can write all ten
+        # players' coords from this same placement (_write_sim_hco_placement_coords).
+        grid, _off_grid = Animator(game).compute_placement_grids(skeleton, off_lineup, def_lineup)
         # The zone who-guards-whom map is freshly populated on game.zone_defender_assignments_by_step
         # by the compute_defender_grid above (its zone branch). Stamp it per step — ZONE ONLY, since the
         # shared ledger is stale/irrelevant for man — so the on-ball moment + pass-contest read the
@@ -6364,6 +6419,7 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
             ss = step.get("_step_state") or {"index": i}
             _dfn = grid.get(i) or {}
             ss["defense"] = _dfn
+            ss["offense"] = _off_grid.get(i) or {}
             if _is_zone_stamp:
                 ss["guard"] = _guard_by_step.get(i)
             step["_step_state"] = ss
@@ -9024,6 +9080,8 @@ def resolve_half_court_offense_logic(game):
             )
         if animations:
             apply_coords_from_animations_list(game, animations)
+        else:
+            _write_sim_hco_placement_coords(game, skeleton, off_lineup, def_lineup, "HCO stopper")
 
         # ✅ FIX: Extract stealer position from generated animations (SS&S approach)
         # This uses the actual calculated defensive position from the animation system,
@@ -9413,6 +9471,8 @@ def resolve_half_court_offense_logic(game):
             add_defenders=True,
         )
     apply_coords_from_animations_list(game, animations)
+    if not animations:
+        _write_sim_hco_placement_coords(game, skeleton, off_lineup, def_lineup, "HCO shot")
     # UESS single-coord-source: sync ALL players (shooter + defenders) to the
     # emitter's rendered shoot-step coords so classification (2PT/3PT) AND the
     # contest loop read the on-screen geometry, not the animator row-end.
