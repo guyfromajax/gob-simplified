@@ -186,18 +186,40 @@ Split out of the old WS-5 because it is cheap, unblocks WS-2, and proves the loc
 
 `eog_band_log` is EOG band instrumentation with a 180-day TTL (`db.py:376`), ~36,600 rows / ~13 MiB per franchise-season. Writing that into a user's save is pure cost to them. **Decision: disabled in desktop release builds, enabled in the January beta build** so the beta still produces calibration data.
 
-### WS-8: Local object store and portrait generation — *folded into WS-1's sprint*
+### WS-8: Local object store and portrait painting — *its own workstream*
 
-Not a separate workstream in practice: it is a second adapter behind the same seam, and doing it alongside WS-1 costs far less than doing it later.
+Not a small adapter. It contains a local object store, two paint paths, a bundled kit library, three compiled numeric dependencies, a bundled font, and a resolution decision that moves both size and CPU by an order of magnitude.
 
-Portraits are **not** a static set. `BackEnd/api/franchise_routes.py:18095–18200` composites them at runtime — `resolve_kit_keys(image_id)` → R2 get kit + mask → `recruit_image.make_signed_master(kit, mask, primary, secondary, mascot)` → R2 put → `meta.image_painted`. Team colors and mascot are inputs, and **Team Builder is in scope for offline play**, so the output set is unbounded and cannot be pre-baked at build time.
+**What does and does not get painted.** The base league is *not* in the paint pipeline: `player_image_routes.py:91` — *"original/universal players carry no image_id"* — so the 128 base rosters ship as finished static portraits. Painting applies only to **recruits who sign, walk-ons promoted onto a roster, and Team Builder players.** This bounds the runtime work to a trickle during recruiting weeks rather than a cliff at franchise creation.
 
-- Implement a **local object store** behind the same interface as `BackEnd/services/r2_images.py` (`get` / `put` / `exists` / `is_configured`), writing into the save directory.
-- Bundle the kit/mask source set and `Pillow` (already in `requirements.txt`).
-- **Replace the silent `is_configured()` skip with a real failure path in the desktop profile.** Today an unconfigured store logs a warning and returns a summary; a desktop build that hits that path ships missing portraits with nothing the user can act on.
-- **Measure local render cost.** `gob-asset-architecture.md` §3.2 flags this as explicitly unverified. The case to time is a full roster paint at franchise creation, on low-end hardware. If it is slow the architecture does not change — a disposable cache is added.
+**Two paint operations, both needed offline** (`BackEnd/services/recruit_image.py`):
+- `make_white_master(kit)` — un-signed recruit display portrait, no recolor.
+- `make_signed_master(kit, mask, primary, secondary, wordmark)` — team recolor plus mascot wordmark stamp.
 
-**Good news that makes this small:** there are **no file upload endpoints anywhere in the API** (`UploadFile` / multipart: zero hits), and Team Builder collects only name, mascot, primary, secondary. Everything it produces is derivable, so `gob-asset-architecture.md` §4.1's stated offline degradation does not bite today. **Keep it that way as long as possible** — the day logo upload ships, offline play gets a permanent asterisk.
+**The cross-franchise cache must be replicated locally.** `BackEnd/utils/uniform_archive.py` keys the paint by what determines the pixels — `uniforms/<image_id>__<color_key>.png`, where `color_key` is a SHA-256 of normalized primary, secondary and mascot. `player_id` is deliberately **not** an input: the legacy per-player scheme repainted byte-identical images per user forever, at ~1 s CPU and 10.5 MB each. **The local store must use the same keying.** A naive per-player scheme reintroduces exactly the bug this module was written to kill, on far weaker hardware. Colour normalization (`_norm_color`, `_norm_mascot`) comes along with it.
+
+**Measured inventory (14 Sept 2026):**
+
+| | Count | Note |
+|---|---:|---|
+| Portrait `image_id` library | **521** | `set_0001` 300 + `builder_set_0001` 150 + walk-ons 71 |
+| Base league team looks | 128 | `<image_id>__<color_key>` cross product = 66,688 — **not bakeable** |
+| Master resolution | 3530×3412 RGBA PNG | ~10.5 MB each; Cloudflare shrinks to 128/256/512 for display |
+| Base league static portraits | 98 files / 443 MB | avg 4.6 MB — WS-7's target, not WS-8's |
+
+**The resolution decision (Open Decision 9) is the highest-leverage question here.** The web stores print-resolution masters because Cloudflare Image Transformations resize them on the fly. **The desktop build has no Cloudflare.** Painting and storing at display resolution (512px) instead of 3530px is ~1/47th the pixels: a stored portrait goes from ~10.5 MB to perhaps 30–80 KB as WebP, and the paint itself gets dramatically cheaper — which is what relieves the §10.1 CPU pressure of painting while a live game runs.
+
+**Scope:**
+- Local object store behind the `r2_images` interface (`get` / `put` / `exists` / `is_configured`), writing to the save directory, keyed by `uniform_archive`.
+- Bundle the **521 kits + masks** at the chosen paint resolution. This is WS-8's bundle floor — measure it, the kits live in R2 and are not in the repo.
+- Bundle **`LiberationSans-Bold.ttf`** for the wordmark stamp. `_find_wm_font()` falls back to `/usr/share/fonts/truetype/liberation/` which will not exist on a player's machine — the bundled copy must resolve first.
+- **Replace the silent `is_configured()` skip with a real failure path in the desktop profile.** Today an unconfigured store logs a warning and returns a summary; a desktop build hitting that path ships missing portraits with nothing the user can act on.
+- **Local GC.** `collect_franchise_master_keys` / `delete_master_keys` exist because *"a league-wide franchise can carry hundreds of walk-on masters."* The local store needs the equivalent, or a long save accretes orphaned portraits in the user's save directory.
+- **Measure paint cost at the chosen resolution**, on low-end hardware, concurrently with a live game (§10.1).
+
+**Dependency warning — heavier than Pillow.** `recolor_and_stamp` and `_finish_rgba` import **NumPy and SciPy** (`scipy.ndimage` for binary erosion and gaussian filter) alongside Pillow. SciPy is a large, heavily-compiled scientific package and a materially harder Nuitka target. If it will not compile, the fallbacks are unattractive: rewrite the alpha-edge cleanup without `ndimage`, or ship part of the engine uncompiled. **This is the third question for the WS-2 spike.**
+
+**Good news that keeps this tractable:** the paint is a **deterministic recolor with no AI**, and there are **no file upload endpoints anywhere in the API** (`UploadFile` / multipart: zero hits) — Team Builder collects only name, mascot, primary and secondary. Everything is derivable, so bundled kits produce byte-identical output offline with nothing to sync, and `gob-asset-architecture.md` §4.1's offline degradation does not bite today. **Keep it that way as long as possible** — the day logo upload ships, offline play gets a permanent asterisk.
 
 ### WS-2: Engine localization
 
@@ -208,7 +230,7 @@ Portraits are **not** a static set. `BackEnd/api/franchise_routes.py:18095–182
 - Compile with **Nuitka** (fallback Cython; last resort PyInstaller + PyArmor).
 - **Spike the compile early, and spike the process pool inside it.** Two things must be proven against a compiled binary, in priority order:
   - **The spawn-based process pool must survive compilation.** `cpu_week_pool.py` spawns workers, which means the child re-executes the binary and must enter worker mode rather than launching a second copy of the app. This is a known hard problem for frozen/compiled Python. **If it fails, a 63-game week goes from 34.6 s pooled to ~225 s single-core** — a product-quality cliff, not a regression. This is the highest-value thing to learn in September.
-  - **Pillow** — a C-extension package and a known Nuitka friction point (WS-8 depends on it).
+  - **SciPy, NumPy and Pillow** — the paint stack (`recolor_and_stamp`, `_finish_rgba`). SciPy is the hard one: large, heavily compiled, and a materially harder Nuitka target than Pillow. Fallbacks are unattractive (rewrite the alpha-edge cleanup without `ndimage`, or ship part of the engine uncompiled), so learn this in September.
   - **Phase A under a live game on a 4-core reference machine** — find the worker count that keeps the frame rate clean (§10.1). That number is the desktop default.
 - **Gate:** a full franchise season — init, turn-by-turn court play, timeouts and resume, box score, week advancement, training, recruiting, EOS — runs against loopback + SQLite with **zero remote calls**, verified by network monitor, at acceptable performance on a low-end reference machine.
 
@@ -250,15 +272,25 @@ FranchiseContext  — single read/write API for the whole frontend
 
 ### WS-7: Asset payload — *new; runs as a continuous grind*
 
-`FrontEnd/static/images` is **1.1 GB across ~1,100 files** — 443 MB players, 377 MB teams, 207 MB coaches, plus a 25 MB loading GIF, a 12 MB `resize.gif`, a 9.7 MB second loader, and ~25 MB of homepage marketing art. Average ~1 MB per image: these are unoptimized. Electron adds ~150 MB.
+**The repo tree is 1.1 GB of images, but the three big directories are three different problems.** Measured 14 Sept 2026:
 
-Why this is a launch blocker and not a polish task:
-- **A >1 GB Next Fest demo download measurably hurts conversion.** Next Fest traffic is impulse traffic; download size is a funnel step.
-- Steam depot build and upload time scales with it, on every iteration.
-- `gob-asset-architecture.md` §5 puts static league assets at ~300 MB and recommends git → R2 → serve from R2 for web. **The desktop build has no R2.** Bundled vs first-run-download is undecided.
-- ~50 MB is loading GIFs and marketing art that should not be in a game bundle at all.
+| Directory | Size | Serves from | Desktop problem |
+|---|---:|---|---|
+| `images/players` | 443 MB / **98 files, avg 4.6 MB** | **R2** via `assets.geekedoutgames.com` | Local copies are a dev fallback — likely **deletable**, definitely convertible |
+| `images/teams` | 377 MB | **local static only** | No remote path, no seam. Ships in the bundle or not at all |
+| `images/coaches` | 207 MB | **local static only** | Same |
+| `static/sounds` | **53.8 MB (131 LFS files)** | local static only | Ships in the bundle; 64 uncompressed WAVs |
+| Loading GIFs + marketing art | ~50 MB | local static | Should not be in a game bundle at all |
 
-**Scope:** (1) audit game-required vs web-marketing-only; (2) convert to WebP/AVIF at target display resolution — on a 1 MB average, 70–85% reduction is routine; (3) decide bundled vs first-run-download for the static league set; (4) hold an installer size budget (§9, Open Decision 1).
+**Players are the easy case and already have the seam.** `api-config.js` carries `PLAYER_IMAGE_REMOTE_BASE` (the R2 custom domain) and `usePlayerImageRemote()` — localhost serves local static, staging and prod serve from R2 with **Cloudflare Image Transformations** resizing and converting to AVIF/WebP on the fly at named sizes (`thumb` 128, `card` 256, `modal` 512, `full`). So production does not ship those 443 MB. **Confirm the local set is genuinely dev-only, then delete rather than convert** — deleting always beats compressing. At display resolution those 98 portraits are a few MB total.
+
+**Teams and coaches are the real problem and have no seam.** Verified: the remote path exists *only* for players — every `usePlayerImageRemote()` call site in `api-config.js` is a player function. Team images are hardcoded `images/teams/...` paths across **31 files**, coaches across **6**, with no config layer and no remote fallback. 584 MB, compression the only lever.
+
+> **Sequencing note worth a decision:** `gob-asset-architecture.md` §5 already argues for moving static league assets to R2 for the web. Building that seam for teams and coaches **before** the desktop build means building it once and getting both. Doing it after means building it twice.
+
+**Audio ships in the bundle and the build must fetch it.** `.gitattributes` puts `FrontEnd/static/sounds/*.{mp3,wav,ogg,mp4}` on Git LFS — 131 files, **53.8 MB real** (66 mp3, 64 wav, 1 mp4). LFS is confined to this one directory; nothing else in the tree is a pointer. The 64 uncompressed WAVs are an obvious conversion target.
+
+**Scope:** (1) confirm and delete the redundant player set; (2) audit game-required vs web-marketing-only across the rest; (3) convert teams, coaches and remaining assets to WebP/AVIF at display resolution — on these averages, 90%+ reduction is routine; (4) convert WAV SFX; (5) hold an installer size budget (§9, Open Decision 1).
 
 **Hard exclusion — anything the animation system takes measurements from.** Court art, player sprites, and any asset whose dimensions feed coordinate math are **out of scope for compression**. A sprite sheet that changes dimensions during a WebP conversion breaks coordinate math and presents as a UESS regression, which is an expensive thing to debug from the wrong end. If such an asset must be touched, it is re-verified against the animation harness in the same PR.
 
@@ -272,6 +304,7 @@ Why this is a launch blocker and not a polish task:
 
 ### WS-6: Build pipeline and distribution
 
+- **`git lfs pull` is a mandatory build step.** All 131 audio files are LFS pointers. A clean CI checkout without it produces a build that ships 131 text files named `.wav` — the game boots, animations run, and every sound silently fails. This passes automated tests and gets found by a tester. Same trap applies to any spike or agent working from a fresh clone.
 - Reproducible build script: compile engine → bundle frontend, shell, and assets → installer artifacts.
 - SteamPipe depot configuration; internal branch first; install and play through the Steam client as a real tester.
 - Direct-download variant from the same build — one standalone build, two storefronts.
@@ -309,7 +342,7 @@ Two tracks, because solo-dev reality is that grind work fills the gaps around bi
 | WS-1's 69-file migration silently drops the prod access guard | Medium | Guard expressed in the adapter interface as an explicit requirement; `test_db_read_only_proxy.py` extended to cover the adapter |
 | **Spawn-based process pool does not survive Nuitka compilation** | **Medium–High** | **Spiked in September as the first WS-2 task.** Failure means ~225 s weeks instead of 34.6 s. Fallbacks: worker-mode entry point, or a separate uncompiled engine launcher |
 | **Phase A CPU sims degrade the live animated game on a player's machine** | **High if unaddressed** | §10.1 pool-sizing policy: live game is the priority workload, phase A sized from cores minus a renderer reserve and allowed to spill into phase B. The default of 8 is a Railway number, not a laptop number. Measured in the WS-2 spike |
-| Nuitka fails on Pillow or another C extension | Medium | Compile spike in Sept, not December; fallbacks identified |
+| **Nuitka fails on SciPy** (or NumPy/Pillow) | **Medium** | Spiked in September. SciPy is the likeliest failure of the three. Fallback: drop `ndimage` from the alpha-edge cleanup, or ship the paint service uncompiled |
 | Engine assumes Mongo-specific behavior beyond the seam (ObjectId semantics, implicit ordering) | Medium | Gate 1 on live cloud catches most; full-season local sim catches the rest |
 | WS-3 grind stalls at ~70% and the desktop build ships with mixed state paths | Medium | Grep gate in CI from day one, failing on new direct URL access |
 | Asset payload discovered late, forcing a rushed conversion after packaging | Medium | WS-7 runs Oct–Nov as grind work, before WS-4 |
@@ -370,7 +403,9 @@ Two tracks, because solo-dev reality is that grind work fills the gaps around bi
 5. **Split `ONLINE_COMMUNITY` into read and participate?** §1.3. *Needed when billing gating goes live.*
 6. **Direct-build auto-update mechanism** — updater vs manual. *Deferrable past launch.*
 7. **Minimum spec — cores and RAM.** The WS-2 spike (§10.1) outputs two numbers: worker count per core tier, and the hardware floor below which the parallel phase A week is not promised at all. Needed for the Steam store page regardless, so it is not extra work. *Needed by the WS-2 spike (Sept–Oct).*
-8. **Demo scope limit** — season, team, or time cap. Decide with the Demo build in December, informed by alpha engagement data.
+8. **Desktop paint and store resolution (§WS-8).** The web keeps 3530×3412 masters because Cloudflare resizes on demand; desktop has no Cloudflare. Painting and storing at display resolution (512px) is ~1/47th the pixels — it moves both installer size and paint CPU by more than an order of magnitude, and it is the single highest-leverage choice in WS-8. Needs the installer budget (Decision 1) to settle. *Needed before WS-8 begins.*
+9. **Move teams and coaches to R2 for the web before the desktop build?** 584 MB with no remote seam today. Building it once serves both web and desktop; building it after the migration means building it twice. *Needed before WS-7 conversion work.*
+10. **Demo scope limit** — season, team, or time cap. Decide with the Demo build in December, informed by alpha engagement data.
 
 ---
 

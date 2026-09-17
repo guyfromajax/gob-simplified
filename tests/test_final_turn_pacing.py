@@ -285,3 +285,93 @@ def test_evaluate_final_turn_pacing_reserves_micro_seconds():
     assert plan.micro_reserve_seconds == pytest.approx(
         worst_case_final_turn_micro_reserve("Outside")
     )
+
+
+def test_dest_and_pass_fits_when_already_aligned():
+    from BackEnd.engine.final_turn_pacing import can_fit_final_shot_dest_and_pass
+
+    prior = {
+        "final_coords": {f"home_{pos}": {"x": 64.0, "y": 25.0} for pos in POSITIONS},
+        "final_ball_handler_id": "home_PG",
+    }
+    game = _game(time_remaining=18, prior_turn=prior)
+    o_dest = {pos: {"x": 64.0, "y": 25.0} for pos in POSITIONS}
+    assert can_fit_final_shot_dest_and_pass(
+        game,
+        o_destinations=o_dest,
+        bh_pos="PG",
+        shooter_pos="SG",
+        prior_turn=prior,
+    ) is True
+
+
+def test_dest_and_pass_fails_when_clock_shorter_than_travel():
+    from BackEnd.engine.final_turn_pacing import can_fit_final_shot_dest_and_pass
+
+    prior = {
+        "final_coords": {
+            "home_PG": {"x": 10.0, "y": 25.0},
+            **{f"home_{pos}": {"x": 12.0, "y": 25.0} for pos in POSITIONS if pos != "PG"},
+        },
+        "final_ball_handler_id": "home_PG",
+    }
+    game = _game(time_remaining=1, prior_turn=prior)
+    o_dest = {pos: {"x": 64.0, "y": 25.0} for pos in POSITIONS}
+    assert can_fit_final_shot_dest_and_pass(
+        game,
+        o_destinations=o_dest,
+        bh_pos="PG",
+        shooter_pos="SG",
+        prior_turn=prior,
+    ) is False
+
+
+def test_dest_and_pass_bh_is_shooter_skips_pass_time():
+    from BackEnd.engine.final_turn_pacing import dest_and_pass_seconds
+
+    prior = {
+        "final_coords": {f"home_{pos}": {"x": 64.0, "y": 25.0} for pos in POSITIONS},
+        "final_ball_handler_id": "home_PG",
+    }
+    game = _game(time_remaining=18, prior_turn=prior)
+    o_dest = {pos: {"x": 64.0, "y": 25.0} for pos in POSITIONS}
+    o_dest["SG"] = {"x": 80.0, "y": 5.0}
+    same = dest_and_pass_seconds(
+        game, o_destinations=o_dest, bh_pos="PG", shooter_pos="PG", prior_turn=prior
+    )
+    other = dest_and_pass_seconds(
+        game, o_destinations=o_dest, bh_pos="PG", shooter_pos="SG", prior_turn=prior
+    )
+    assert other > same
+
+
+def test_resolve_reuses_gate_shooter_without_repick(monkeypatch):
+    _patch_resolve(monkeypatch)
+    calls = {"n": 0}
+
+    def _boom(*args, **kwargs):
+        calls["n"] += 1
+        raise AssertionError("gate pick must not be rolled again")
+
+    monkeypatch.setattr(
+        "BackEnd.engine.phase_resolution.pick_final_turn_shot_type_and_shooter",
+        _boom,
+    )
+    monkeypatch.setattr("BackEnd.utils.sim_random.sim_rng.choice", lambda values: values[0])
+    monkeypatch.setattr("BackEnd.utils.sim_random.sim_rng.shuffle", lambda values: None)
+
+    game = _game(time_remaining=18)
+    result = phase_resolution.resolve_final_turn_shot_logic(
+        game,
+        o_destinations={pos: {"x": 64, "y": 25} for pos in POSITIONS},
+        d_destinations={},
+        position_to_spot={pos: "deep upper wing" for pos in POSITIONS},
+        bh_pos="PG",
+        shot_type="Outside",
+        shooter_pos="SG",
+    )
+    assert calls["n"] == 0
+    if result.get("route_flss"):
+        return
+    assert result.get("shooter_pos") == "SG" or game.game_state.get("current_playcall") == "Outside"
+
