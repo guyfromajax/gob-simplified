@@ -269,3 +269,53 @@ def seed_universal_plays(plays_collection) -> None:
         _tm._plays_by_type_focus_cache.clear()
     except Exception:  # noqa: BLE001
         pass
+
+
+# The six universal defenses, verbatim from gob-staging.defenses (read 2026-09-17; Jamie
+# verified staging matches gob). MongoDB Extended JSON so ``_id`` stays an ObjectId.
+# `tests/test_defense_catalog_retry.py` uses a 4-doc stand-in with string ids and no
+# man-tight / man-loose; it is not this catalogue.
+DEFENSES_EXPORT = Path(__file__).resolve().parent.parent / "defenses_export.json"
+CANONICAL_DEFENSE_IDS = frozenset(
+    {"base-man", "man-tight", "man-loose", "2-3-zone", "3-2-zone", "1-3-1-zone"}
+)
+
+
+def canonical_defense_rows() -> list[dict]:
+    """The real universal defenses, straight off the export."""
+    from bson import json_util
+
+    with open(DEFENSES_EXPORT) as fh:
+        rows = json_util.loads(fh.read())
+    ids = [r.get("defense_id") for r in rows]
+    if len(ids) != len(set(ids)) or set(ids) != CANONICAL_DEFENSE_IDS:
+        raise ValueError(f"defenses_export.json does not hold the six canonical defenses: {ids}")
+    return rows
+
+
+def seed_universal_defenses(defenses_collection) -> None:
+    """Upsert the universal defense catalogue into a MONGOMOCK collection.
+
+    Cannot empty a collection by construction: it issues ``replace_one(..., upsert=True)``
+    per document and nothing else — no delete, drop or rename. It also refuses outright
+    unless ``defenses_collection`` is a mongomock collection, so pointing it at a real
+    database raises before any write (gob-staging.defenses was emptied four times by
+    unguarded tests).
+
+    Invalidates the ``defense_identity`` cache afterwards: an empty load is retried only
+    after a 30 s backoff, so a caller that looked up a defense before seeding would
+    otherwise keep playing zones as man.
+    """
+    import mongomock
+
+    if not isinstance(defenses_collection, mongomock.collection.Collection):
+        raise RuntimeError(
+            "seed_universal_defenses refuses to write to a non-mongomock collection: "
+            f"{type(defenses_collection).__module__}.{type(defenses_collection).__name__}"
+        )
+    for doc in canonical_defense_rows():
+        defenses_collection.replace_one({"_id": doc["_id"]}, doc, upsert=True)
+
+    from BackEnd.utils import defense_identity
+
+    defense_identity.clear_defense_identity_cache()
