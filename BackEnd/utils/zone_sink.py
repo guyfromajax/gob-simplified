@@ -63,6 +63,14 @@ PERIMETER_RIM_DISTANCE = 20.0     # anchor further than this -> "perimeter"
 # How far the ball can be, in y, before a defender counts as fully weak side.
 SIDE_SPAN = 30.0
 
+# Ball centrality: with the ball in the middle of the floor there is no weak side,
+# so every defender is treated as strong side. Full effect inside the plateau,
+# ramping LINEARLY to zero at the outer bounds - a hard edge would make defenders
+# snap as the ball drifted across the boundary, which is the exact discontinuity
+# this whole model exists to remove.
+CENTRALITY_PLATEAU = (23.0, 28.0)
+CENTRALITY_OUTER = (18.0, 33.0)
+
 WEIGHT_PRESETS: Dict[str, Dict[str, float]] = {
     # reach_*  : how far (grid units) a defender of that class may leave his anchor
     # ball_*   : fraction of the anchor->ball distance pulled, strong / weak side
@@ -87,8 +95,17 @@ WEIGHT_PRESETS: Dict[str, Dict[str, float]] = {
         "ball_strong": 0.15, "ball_weak": 0.05,
         "basket_strong": 0.35, "basket_weak": 0.75,
     },
+    # The chosen one. Strong side and the middle shade toward the ball moderately
+    # (the `balanced` strong-side pair); the weak side is RIM HUNGRY - it sinks hard
+    # to the basket rather than chasing across the floor (the `rim_heavy` weak-side
+    # pair and reaches). A ball-hungry weak side was considered and rejected.
+    "shape": {
+        "reach_perimeter": 8.0, "reach_spanning": 7.0, "reach_interior": 5.0,
+        "ball_strong": 0.25, "ball_weak": 0.05,
+        "basket_strong": 0.15, "basket_weak": 0.75,
+    },
 }
-DEFAULT_PRESET = "balanced"
+DEFAULT_PRESET = "shape"
 
 
 def enabled() -> bool:
@@ -156,6 +173,25 @@ def pole_of_inaccessibility(ring: Sequence[Point], precision: float = 0.05) -> T
                 if d > best[0]:
                     best = (d, bx + dx, by + dy)
     return (round(best[1], 3), round(best[2], 3)), round(best[0], 3)
+
+
+def ball_centrality(ball_y: float) -> float:
+    """1.0 with the ball in the middle of the floor, 0.0 out at either sideline.
+
+    Linear ramp, never a step: 0 at ``CENTRALITY_OUTER[0]``, rising to 1 across the
+    lower shoulder, flat through the plateau, falling back to 0 at
+    ``CENTRALITY_OUTER[1]``. Continuous everywhere, so a defender's position moves
+    smoothly as the ball drifts across the band rather than snapping at an edge.
+    """
+    lo_out, hi_out = CENTRALITY_OUTER
+    lo_in, hi_in = CENTRALITY_PLATEAU
+    if ball_y <= lo_out or ball_y >= hi_out:
+        return 0.0
+    if lo_in <= ball_y <= hi_in:
+        return 1.0
+    if ball_y < lo_in:
+        return (ball_y - lo_out) / (lo_in - lo_out)
+    return (hi_out - ball_y) / (hi_out - hi_in)
 
 
 def role_class(anchor: Point, rim: Point) -> str:
@@ -239,8 +275,17 @@ def sink_position(
     d_rim = math.dist(anchor, rim)
 
     # Continuous strong-side measure: 1 when the ball is at the defender's own y,
-    # 0 when it is a full court-width away across the floor.
+    # 0 when it is a full court-width away across the floor. Side is taken from the
+    # ANCHOR, never from the defender's live position - his live position is the
+    # output of this function, so reading it would make the model self-referential
+    # and path-dependent across steps.
     strongness = 1.0 - min(1.0, abs(ball[1] - anchor[1]) / SIDE_SPAN)
+
+    # With the ball in the middle there is no weak side: push strongness toward 1
+    # in proportion to centrality. Composed with the term above rather than
+    # replacing it, so off-centre geometry still shows through a partial ramp.
+    centrality = ball_centrality(ball[1])
+    strongness += (1.0 - strongness) * centrality
 
     w_ball = w["ball_weak"] + (w["ball_strong"] - w["ball_weak"]) * strongness
     w_basket = w["basket_weak"] + (w["basket_strong"] - w["basket_weak"]) * strongness
