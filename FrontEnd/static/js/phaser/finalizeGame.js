@@ -45,8 +45,8 @@ async function recoverFranchiseWeek(franchiseId) {
   return null;
 }
 
-export async function finalizeGame({ simData, tournamentId, franchiseId, game }) {
-  console.warn('[COMPLETE-WEEK TRACE] finalizeGame ENTRY', { hasSimData: !!simData, franchiseId, tournamentId });
+export async function finalizeGame({ simData, franchiseId, game }) {
+  console.warn('[COMPLETE-WEEK TRACE] finalizeGame ENTRY', { hasSimData: !!simData, franchiseId });
   // ✅ UNIFIED STRUCTURE: Extract team names with priority: unified structure > backward compatibility
   // Unified structure: simData.teams[home_team_id].name (preferred)
   // Backward compatibility: simData.home_team (object with name) or simData.home_team (string) or simData.homeTeam (object)
@@ -114,7 +114,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
 
   // Franchise: prefer sim payload week over URL/localStorage so EOS complete-week matches
   // the slate the server simmed (stale ?week= or franchise_week can sit one week ahead).
-  if (franchiseId && !tournamentId) {
+  if (franchiseId) {
     if (simData?.final_game_document?.week != null) {
       week = parseInt(simData.final_game_document.week, 10);
     }
@@ -140,143 +140,17 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   if ((!Number.isInteger(week) || week < 1) && simData?.final_game_document?.week != null) {
     week = parseInt(simData.final_game_document.week, 10);
   }
-  if ((!Number.isInteger(week) || week < 1) && franchiseId && !tournamentId) {
+  if ((!Number.isInteger(week) || week < 1) && franchiseId) {
     week = await recoverFranchiseWeek(franchiseId);
     if (Number.isInteger(week) && week >= 1 && franchiseId && window.FranchiseLS) {
       window.FranchiseLS.setWeek(franchiseId, week);
     }
   }
 
-  // POST to /tournament/save-result if needed
-  console.log('🔍 [FINALIZE_GAME] Checking tournamentId:', {
-    tournamentId: tournamentId,
-    franchiseId: franchiseId,
-    hasTournamentId: !!tournamentId,
-    willCallSaveResult: !!tournamentId
-  });
-  
-  if (tournamentId) {
-    try {
-      console.log('✅ [FINALIZE_GAME] tournamentId present, calling /tournament/save-result');
-      
-      // ✅ SS&S: Build request body (matches Franchise mode pattern)
-      const requestBody = {
-        tournament_id: tournamentId,
-        game_id: simData.game_id || simData._id,
-        winner: winner,
-        score: {
-          [homeKey]: homeScore,
-          [awayKey]: awayScore,
-        },
-      };
-      
-      // ✅ FIX: Pass game_document if available (from simulate-quarter when is_final=True)
-      // This eliminates race condition where save-result is called before Q4 save completes
-      // Matches Franchise mode pattern exactly
-      // Also handle case where simData itself IS the game document (from bootGame.js "Sim Full Game")
-      if (simData && simData.final_game_document) {
-        console.log('✅ Passing final_game_document to tournament/save-result (eliminates race condition)');
-        requestBody.game_document = simData.final_game_document;
-      } else if (simData && simData.box_score && (simData.game_id || simData._id)) {
-        // ✅ FIX: If simData itself is a complete game document (has box_score and game_id),
-        // use it directly as game_document (handles "Sim Full Game" flow from bootGame.js)
-        console.log('✅ Using simData as game_document (Sim Full Game flow)');
-        requestBody.game_document = simData;
-      }
-      
-      const saveResultUrl = API_CONFIG.buildUrl("/tournament/save-result");
-      console.log('📤 [FINALIZE_GAME] POSTing to:', saveResultUrl);
-      console.log('📤 [FINALIZE_GAME] Request body (stringified):', JSON.stringify(requestBody, null, 2));
-      console.log('📤 [FINALIZE_GAME] Has game_document?', !!requestBody.game_document);
-      if (requestBody.game_document) {
-        console.log('📤 [FINALIZE_GAME] game_document keys:', Object.keys(requestBody.game_document));
-        console.log('📤 [FINALIZE_GAME] game_document has box_score?', !!requestBody.game_document.box_score);
-      }
-      
-      // ✅ Show "Simulating Computer Games" when transitioning to computer games
-      showStatus('Simulating Computer Games...');
-      
-      const res = await fetch(saveResultUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
-      
-      // Hide status after response (whether success or error)
-      hideStatus();
-      console.log('📥 [FINALIZE_GAME] Response status:', res.status, res.statusText);
-      console.log('📥 [FINALIZE_GAME] Response ok?', res.ok);
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("❌ Failed to save tournament result. Status:", res.status);
-        console.error("❌ Error response text:", errorText);
-      } else {
-        const responseData = await res.json().catch((e) => {
-          console.warn("⚠️ Could not parse JSON response:", e);
-          return null;
-        });
-        console.log("✅ Tournament result saved successfully!");
-        console.log("✅ Response data:", JSON.stringify(responseData, null, 2));
-        try {
-          const updated = await fetch(`${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${encodeURIComponent(tournamentId)}`).then((r) =>
-            r.json()
-          );
-          if (window.opener && window.opener.handleTournamentUpdate) {
-            if (DEBUG_BRACKET)
-              console.log("[DebugBracket] invoking handleTournamentUpdate", {
-                id: updated?._id,
-                current_round: updated?.current_round,
-              });
-            window.opener.handleTournamentUpdate(updated);
-            window.opener.refreshLeaders?.();
-          } else if (window.handleTournamentUpdate) {
-            if (DEBUG_BRACKET)
-              console.log("[DebugBracket] invoking handleTournamentUpdate", {
-                id: updated?._id,
-                current_round: updated?.current_round,
-              });
-            window.handleTournamentUpdate(updated);
-            window.refreshLeaders?.();
-          } else {
-            localStorage.setItem("activeTournament", JSON.stringify(updated));
-            // ✅ PHASE 2: Include tournament_id and team_id in navigation URL
-            const params = new URLSearchParams();
-            if (tournamentId) {
-              params.set('tournament_id', tournamentId);
-              // Try to get team_id from URL, updated tournament state, or simData
-              const urlParams = new URLSearchParams(window.location.search);
-              const teamId = urlParams.get('team_id') || 
-                            updated?.user_team_id || 
-                            updated?.user_team_object_id ||
-                            simData?.user_team_id ||
-                            (game && game.user_team_id);
-              if (teamId) {
-                params.set('team_id', teamId);
-              }
-            }
-            const url = params.toString() ? `/tournament.html?${params.toString()}` : '/tournament.html';
-            window.location.href = url;
-          }
-        } catch (e) {
-          console.error("Failed to update tournament state", e);
-        }
-      }
-    } catch (err) {
-      console.error("🚨 Error during tournament result save!");
-      console.error("🚨 Error message:", err.message);
-      console.error("🚨 Error stack:", err.stack);
-      console.error("🚨 Tournament ID:", tournamentId);
-      console.error("🚨 Game ID:", simData.game_id || simData._id);
-    }
-  } else {
-    console.log('⚠️ [FINALIZE_GAME] tournamentId is missing, skipping /tournament/save-result call');
-  }
-
-  // POST to /franchise/complete-week if needed (only if NOT in tournament mode)
-  const canCompleteWeek = franchiseId && !tournamentId && Number.isInteger(week) && week >= 1;
-  if (!franchiseId || tournamentId) {
-    console.warn('[COMPLETE-WEEK TRACE] Skipping complete-week: not franchise mode', { franchiseId, tournamentId });
+  // POST to /franchise/complete-week if needed
+  const canCompleteWeek = franchiseId && Number.isInteger(week) && week >= 1;
+  if (!franchiseId) {
+    console.warn('[COMPLETE-WEEK TRACE] Skipping complete-week: not franchise mode', { franchiseId });
   } else if (!canCompleteWeek) {
     console.warn('[COMPLETE-WEEK TRACE] Skipping complete-week: missing or invalid week', {
       week,

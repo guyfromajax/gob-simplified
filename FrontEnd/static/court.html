@@ -5216,7 +5216,6 @@
       };
       if (ctx.gameId) body.game_id = ctx.gameId;
       if (ctx.franchiseId) body.franchise_id = ctx.franchiseId;
-      if (ctx.tournamentId) body.tournament_id = ctx.tournamentId;
       const headers = { 'Content-Type': 'application/json' };
       if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.getAuthHeaders === 'function') {
         Object.assign(headers, API_CONFIG.getAuthHeaders());
@@ -5589,21 +5588,12 @@
           debug_playcall: urlParams.get('debug_playcall'),
         });
       }
-      // ✅ FIX: Mode detection with fallback logic (matches Franchise pattern)
-      // Priority: 1) URL param, 2) tournament_id present → 'tournament', 3) franchise_id present → 'franchise', 4) default 'single'
-      // This ensures mode is correctly detected even if mode param is missing from URL
-      const tournamentId = urlParams.get('tournament_id');
+      // Mode detection: URL param, else franchise_id → franchise, else single
       const franchiseId = urlParams.get('franchise_id');
       let mode = urlParams.get('mode');
+      if (mode === 'tournament') mode = null;
       if (!mode) {
-        // Fallback: detect mode from tournament_id or franchise_id
-        if (tournamentId) {
-          mode = 'tournament';
-        } else if (franchiseId) {
-          mode = 'franchise';
-        } else {
-          mode = 'single';
-        }
+        mode = franchiseId ? 'franchise' : 'single';
       }
       
       // SS&S: Same team_id resolution as set-lineup / playbookTeamId, then bootGame-aligned fallback.
@@ -5643,13 +5633,11 @@
         return;
       }
 
-      const needsActiveGameDoc =
-        (mode === 'franchise' && !!franchiseId) || (mode === 'tournament' && !!tournamentId);
+      const needsActiveGameDoc = mode === 'franchise' && !!franchiseId;
       if (needsActiveGameDoc && !gameId) {
         console.warn('⚠️ [PLAYCALL CENTER] Waiting for game_id before GET /api/playbooks', {
           mode,
           franchiseId,
-          tournamentId,
           game_id: gameId,
           teamId,
         });
@@ -5657,7 +5645,7 @@
         return;
       }
 
-      const loadSig = `${mode}|${teamId}|${gameId || ''}|${franchiseId || ''}|${tournamentId || ''}`;
+      const loadSig = `${mode}|${teamId}|${gameId || ''}|${franchiseId || ''}`;
       // With debug_pc=1, always refetch so backend tracing runs (signature skip would prevent GET entirely).
       if (
         !__debugPc &&
@@ -5700,9 +5688,6 @@
         // plays — Playcall Center renders blank.
         if ((mode === 'single' || mode === 'tutorial') && gameId) {
           params.set('game_id', gameId);
-        } else if (mode === 'tournament' && tournamentId) {
-          params.set('tournament_id', tournamentId);
-          if (gameId) params.set('game_id', gameId);
         } else if (mode === 'franchise' && franchiseId) {
           params.set('franchise_id', franchiseId);
           if (gameId) params.set('game_id', gameId);
@@ -5757,7 +5742,6 @@
             mode,
             gameId,
             franchiseId,
-            tournamentId,
             offensePcOrderLen: Array.isArray(offensePcOrder) ? offensePcOrder.length : 0,
             slotAssignmentKeyCount: Object.keys(slotAssignments).length,
             motionPlays: (data.motion || []).length,
@@ -5847,7 +5831,7 @@
         lastPlaybookDataForSave = {
           playNameToPlayId,
           playbookPayload,
-          requestContext: { mode, teamId, gameId, franchiseId, tournamentId }
+          requestContext: { mode, teamId, gameId, franchiseId }
         };
         
         // Get scroller element
@@ -6619,9 +6603,7 @@
       const params = new URLSearchParams();
       const mode = urlParams.get('mode');
       const franchiseId = urlParams.get('franchise_id');
-      const tournamentId = urlParams.get('tournament_id');
       if (mode === 'franchise' && franchiseId) params.append('franchise_id', franchiseId);
-      if (mode === 'tournament' && tournamentId) params.append('tournament_id', tournamentId);
       params.append('profile', '1');
       const query = params.toString() ? `?${params.toString()}` : '';
 

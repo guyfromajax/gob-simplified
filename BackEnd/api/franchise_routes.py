@@ -16912,7 +16912,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         # For tournament mode, determine round from backend state if not provided
         if mode == "tournament":
             from BackEnd.db import tournaments_collection
-            from BackEnd.api.tournament_routes import get_user_team_from_tournament
+            from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
             doc_id_obj = ObjectId(doc_id)
             doc = tournaments_collection.find_one({"_id": doc_id_obj})
             if not doc:
@@ -17104,7 +17104,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
         else:  # tournament mode
             from BackEnd.db import tournaments_collection, teams_collection
-            from BackEnd.api.tournament_routes import get_user_team_from_tournament
+            from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
             doc_id_obj = ObjectId(doc_id)
             doc = tournaments_collection.find_one({"_id": doc_id_obj})
             if not doc:

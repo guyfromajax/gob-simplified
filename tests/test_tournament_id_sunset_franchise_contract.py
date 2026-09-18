@@ -8,6 +8,7 @@ identifier while that legacy mode is removed.
 
 from pathlib import Path
 
+import pytest
 from bson import ObjectId
 
 from BackEnd.api.franchise_routes import (
@@ -122,18 +123,35 @@ def test_standalone_tournament_router_is_unmounted():
         "/tournament/roster",
         "/tournament/sim-remaining",
         "/tournament/run-training",
+        "/tournament/active",
     }
 
     assert legacy_paths.isdisjoint(mounted_api_paths)
 
 
-def test_standalone_tournament_pages_are_redirect_only_fallbacks():
+def test_standalone_tournament_router_module_is_gone():
+    import importlib
+
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("BackEnd.api.tournament_routes")
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("BackEnd.tournament.tournament_manager")
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("BackEnd.tournament.bracket_logic")
+
+
+def test_standalone_tournament_pages_are_gone_and_redirected():
     for relative_path in (
         "FrontEnd/static/tournament-select.html",
         "FrontEnd/static/tournament.html",
+        "FrontEnd/static/tournament-select.js",
+        "FrontEnd/static/tournament.js",
+        "FrontEnd/static/tournament-select.css",
+        "FrontEnd/static/tournament.css",
     ):
-        html = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
-        assert "window.location.replace('/mode-select.html')" in html
-        assert '<meta http-equiv="refresh" content="0;url=/mode-select.html">' in html
-        assert "tournament.js" not in html
-        assert "tournament-select.js" not in html
+        assert not (PROJECT_ROOT / relative_path).exists()
+
+    netlify = (PROJECT_ROOT / "netlify.toml").read_text(encoding="utf-8")
+    assert 'from = "/tournament-select.html"' in netlify
+    assert 'from = "/tournament.html"' in netlify
+    assert "to = \"/mode-select.html\"" in netlify

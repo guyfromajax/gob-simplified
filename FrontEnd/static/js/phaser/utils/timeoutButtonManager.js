@@ -888,7 +888,6 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     const userTeamIdParam = urlParams.get('user_team_id'); // Keep for backward compatibility
     const franchiseId = urlParams.get('franchise_id');
     const weekParam = urlParams.get('week');
-    const tournamentId = urlParams.get('tournament_id');
     const modeParam = urlParams.get('mode') || 'single';
     
     const currentQuarter = scene.simData?.quarter || scene.quarter || 1;
@@ -983,7 +982,6 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
             user_team_id: userTeamIdParam, // Keep for backward compatibility
             franchise_id: franchiseId,
             week: weekParam,
-            tournament_id: tournamentId,
             mode: modeParam,
             timeout_trace_id: timeoutResult?.timeout_trace_id || undefined,
             home_score: homeScore ?? undefined,

@@ -68,7 +68,6 @@ const userTeamIdParam = window.StateTelemetry ? window.StateTelemetry.logUrlRead
 const teamIdParam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('team_id', urlParams.get('team_id')) : urlParams.get('team_id');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', urlParams.get('franchise_id')) : urlParams.get('franchise_id');
 const weekParam = urlParams.get('week');
-const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
 const modeParam = urlParams.get('mode');
 const DEBUG = urlParams.has('debug');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
@@ -131,7 +130,6 @@ function buildPlayerDetailUrl(playerId) {
   qs.set('id', playerId);
   if (modeParam) qs.set('mode', modeParam);
   if (franchiseId) qs.set('franchise_id', franchiseId);
-  if (tournamentId) qs.set('tournament_id', tournamentId);
   if (gameId) qs.set('game_id', gameId);
   qs.set('return_url', window.location.pathname + window.location.search);
   return `/player-detail.html?${qs.toString()}`;
@@ -243,7 +241,7 @@ function applyPlayerDetailLinkBehavior(linkEl, playerId) {
 
 // ✅ PHASE 2: Validate pointers on page load (if present)
 // Note: game_id is optional for new Q1 games, but if present must be valid
-// franchise_id and tournament_id are required for their respective modes
+// franchise_id is required for franchise mode
 async function validatePointersOnLoad() {
   const mode = modeParam || 'single';
   const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
@@ -332,41 +330,6 @@ async function validatePointersOnLoad() {
             message: `Invalid franchise_id: ${franchiseId}. ${error.message}`,
             mode: mode,
             recoveryAction: 'redirect_to_franchise_select'
-          });
-        }
-        return false;
-      }
-    }
-  }
-  
-  // Validate tournament_id if in tournament mode
-  if (mode === 'tournament') {
-    if (!tournamentId) {
-      const errorMsg = `tournament_id is required for tournament mode but missing from URL.`;
-      console.error(`❌ [SET-LINEUP] ${errorMsg}`);
-      if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
-        window.ErrorHandler.showMissingPointerError({
-          missingPointer: 'tournament_id',
-          message: errorMsg,
-          mode: mode,
-          recoveryAction: 'redirect_to_tournament_select'
-        });
-      }
-      return false;
-    }
-    
-    if (window.PointerValidation) {
-      try {
-        await window.PointerValidation.validateTournamentId(tournamentId);
-        console.log(`✅ [SET-LINEUP] tournament_id validated: ${tournamentId}`);
-      } catch (error) {
-        console.error(`❌ [SET-LINEUP] Invalid tournament_id: ${error.message}`);
-        if (window.ErrorHandler && window.ErrorHandler.showMissingPointerError) {
-          window.ErrorHandler.showMissingPointerError({
-            missingPointer: 'tournament_id',
-            message: `Invalid tournament_id: ${tournamentId}. ${error.message}`,
-            mode: mode,
-            recoveryAction: 'redirect_to_tournament_select'
           });
         }
         return false;
@@ -526,7 +489,6 @@ function getLineupPlaybookUrl() {
   params.set('mode', modeParam || 'single');
   if (resolvedTeamId) params.set('team_id', resolvedTeamId);
   if (franchiseId) params.set('franchise_id', franchiseId);
-  if (tournamentId) params.set('tournament_id', tournamentId);
   const currentGameId = getActiveGameId();
   if (currentGameId) params.set('game_id', currentGameId);
   if (typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(qp)) {
@@ -559,7 +521,6 @@ async function fetchLineupPlaybooksData() {
       mode: modeParam || 'single',
       gameId: gameId || null,
       franchiseId: franchiseId || null,
-      tournamentId: tournamentId || null,
       myTeamSide: myTeamSide || null,
       teamIdParam: teamIdParam || null,
       userTeamIdParam: userTeamIdParam || null,
@@ -802,12 +763,8 @@ async function loadRoster() {
   if (!teamName) return;
   
   // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
-  // Supports tournament_id and franchise_id query parameters
   let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}`);
   const params = new URLSearchParams();
-  if (tournamentId) {
-    params.append('tournament_id', tournamentId);
-  }
   if (franchiseId) {
     params.append('franchise_id', franchiseId);
   }
@@ -815,7 +772,7 @@ async function loadRoster() {
   if (params.toString()) {
     url += `?${params.toString()}`;
   }
-  console.log("Loading roster for lineup", franchiseId ? "(franchise mode)" : tournamentId ? "(tournament mode)" : "(single game mode)");
+  console.log("Loading roster for lineup", franchiseId ? "(franchise mode)" : "(single game mode)");
   
   const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
   if (abortIfAccessDenied(res)) return;
@@ -870,10 +827,7 @@ async function loadRoster() {
         initPayload.user_team_side = myTeamSide; // "home" or "away"
       }
       
-      // Add mode-specific IDs for playbook settings persistence
-      if (mode === 'tournament' && tournamentId) {
-        initPayload.tournament_id = tournamentId;
-      } else if (mode === 'franchise' && franchiseId) {
+      if (mode === 'franchise' && franchiseId) {
         initPayload.franchise_id = franchiseId;
       }
       
@@ -2396,8 +2350,7 @@ function wireLineupNavButtons() {
           const mode = modeParam || 'single';
           const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: mode };
           attachMatchupTeamIds(initPayload);
-          if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
-          else if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
+          if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
           const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
             method: 'POST',
             headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },

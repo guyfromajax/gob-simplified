@@ -1017,13 +1017,6 @@ backBtn.addEventListener('click', function() {
         })
       : `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ''}`;
     window.location.href = finalUrl;
-  } else if (mode === 'tournament') {
-    // Use same pattern as franchise mode - tournament.html is the command center
-    const tournamentId = urlParams.get('tournament_id');
-    const teamId = urlParams.get('team_id');
-    const url = `/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
-    const finalUrl = teamId ? `${url}&team_id=${encodeURIComponent(teamId)}` : url;
-    window.location.href = finalUrl;
   } else if (from === 'game-plan') {
     window.location.href = '/game-plan.html?' + urlParams.toString();
   } else {
@@ -1195,7 +1188,6 @@ submitBtn.addEventListener('click', async function() {
   const urlParams = new URLSearchParams(window.location.search);
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
-  const tournamentId = urlParams.get('tournament_id');
   const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
   
   // Prepare payload based on mode
@@ -1211,16 +1203,6 @@ submitBtn.addEventListener('click', async function() {
     if (teamId) {
       payload.team_id = teamId;
     }
-  } else if (mode === 'tournament' && tournamentId) {
-    payload = {
-      tournament_id: tournamentId,
-      training_data: trainingData
-    };
-    // Only include team_id if it's not null/undefined
-    if (teamId) {
-      payload.team_id = teamId;
-    }
-    endpoint = '/tournament/run-training';
   } else {
     // Single game mode or default
     payload = {
@@ -1339,9 +1321,6 @@ submitBtn.addEventListener('click', async function() {
             teamId: urlParams.get('team_id')
           })
         : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}`;
-    } else if (mode === 'tournament' && tournamentId) {
-      // Use same pattern as franchise mode - tournament.html is the command center
-      window.location.href = `/tournament.html?tournament_id=${tournamentId}`;
     } else {
       window.location.href = '/game-plan.html';
     }

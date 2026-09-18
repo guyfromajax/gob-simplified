@@ -1095,7 +1095,7 @@ try:
         """
         from BackEnd.db import franchises_collection
         from BackEnd.api.franchise_routes import get_user_team_from_franchise
-        from BackEnd.api.tournament_routes import get_user_team_from_tournament
+        from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
         
         # Resolve team_id from team_name if not provided
         if not team_id and team_name:
@@ -7693,7 +7693,7 @@ try:
             )
         elif mode == "tournament" and tournament_id:
             # ✅ PHASE 5.7: Copy master settings from tournament doc to game doc as baseline
-            from BackEnd.api.tournament_routes import get_user_team_from_tournament
+            from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
             from BackEnd.db import tournaments_collection
             
             try:
@@ -7965,21 +7965,6 @@ try:
             "team": team_doc.get("name", team_id) if team_doc else team_id,
             "players": players_data,
         }
-    
-    
-    @app.get("/tournament/active")
-    def get_active_tournament(user_team_id: Optional[str] = "BENTLEY-TRUMAN"):
-        # Fetch the most recently created active tournament or create one.
-        doc = tournaments_collection.find_one({"completed": False}, sort=[("created_at", -1)])
-        if not doc:
-            manager = TournamentManager(user_team_id=user_team_id, tournaments_collection=tournaments_collection)
-            doc = manager.create_tournament()
-        else:
-            doc["_id"] = str(doc["_id"])
-        # ✅ SS&S: Serialize all ObjectIds in nested structures (consistent with /tournament/state)
-        from bson import ObjectId
-        from fastapi.encoders import jsonable_encoder
-        return jsonable_encoder(doc, custom_encoder={ObjectId: str})
     
     
     class SimQuarterDiagnosticRequest(BaseModel):

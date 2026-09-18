@@ -1,13 +1,12 @@
 // Team Roster View - Displays any team's roster with attributes and season stats
-// Supports both Franchise and Tournament modes
+// Supports Franchise and practice-squad contexts
 
 const urlParams = new URLSearchParams(window.location.search);
-const mode = urlParams.get('mode'); // 'franchise' or 'tournament' or 'practice_squad'
+const mode = urlParams.get('mode'); // 'franchise' or 'practice_squad'
 const teamId = urlParams.get('team_id'); // Team ObjectId or name
 const teamName = urlParams.get('team_name'); // Team display name
 const psTeamId = urlParams.get('ps_team_id');
 const franchiseId = urlParams.get('franchise_id');
-const tournamentId = urlParams.get('tournament_id');
 const returnTab = urlParams.get('return_tab'); // 'standings-tab' or 'schedule-tab'
 const returnUrl = urlParams.get('return_url'); // Full return URL
 
@@ -54,7 +53,6 @@ function getRosterReturnStorageKey() {
     'roster_return_url',
     mode || 'base',
     franchiseId || '',
-    tournamentId || '',
     teamId || teamName || ''
   ].join(':');
 }
@@ -91,7 +89,6 @@ function buildPlayerDetailUrl(playerId) {
   qs.set('id', playerId);
   if (mode) qs.set('mode', mode);
   if (franchiseId) qs.set('franchise_id', franchiseId);
-  if (tournamentId) qs.set('tournament_id', tournamentId);
   qs.set('return_url', window.location.pathname + window.location.search);
   return `/player-detail.html?${qs.toString()}`;
 }
@@ -130,11 +127,6 @@ function setupBackButton() {
       let returnPath = '';
       if (mode === 'franchise' && franchiseId) {
         returnPath = `/franchise-command-center.html?franchise_id=${franchiseId}`;
-        if (returnTab) {
-          returnPath += `&tab=${returnTab}`;
-        }
-      } else if (mode === 'tournament' && tournamentId) {
-        returnPath = `/tournament.html?tournament_id=${tournamentId}`;
         if (returnTab) {
           returnPath += `&tab=${returnTab}`;
         }
@@ -213,12 +205,9 @@ async function loadRoster() {
     let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(rosterLookup)}`);
     const params = new URLSearchParams();
     
-    // Support franchise, tournament, or base mode (no mode parameter)
     if (mode === 'franchise' && franchiseId) {
       params.append('franchise_id', franchiseId);
       if (teamId) params.append('team_id', teamId);
-    } else if (mode === 'tournament' && tournamentId) {
-      params.append('tournament_id', tournamentId);
     }
     params.append('profile', '1');
     if (params.toString()) {
@@ -312,9 +301,7 @@ async function loadRoster() {
     trainingSquadData = psPlayers.concat(psRecruits);
     practiceSquadRecruitingDone = !!data.practice_squad_recruiting_done;
 
-    projectedStartingFive = (mode === 'tournament')
-      ? []
-      : (Array.isArray(data.projected_starting_five) ? data.projected_starting_five : []);
+    projectedStartingFive = Array.isArray(data.projected_starting_five) ? data.projected_starting_five : [];
     trRenderLockup(data);
     renderStartingFive();
     renderTrTable();
@@ -386,10 +373,6 @@ async function loadStats() {
         // Fallback: use user team endpoint
         url = `${API_CONFIG.buildUrl('/franchise/team-player-stats')}?franchise_id=${franchiseId}&scope=season`;
       }
-    } else if (mode === 'tournament' && tournamentId) {
-      // ✅ FIX: Tournament mode - use tournament state endpoint to get tournament document and merge stats
-      // Matches Franchise mode pattern (fetch roster + tournament document, merge stats)
-      url = `${API_CONFIG.buildUrl('/tournament/state')}?tournament_id=${tournamentId}`;
     } else {
       document.getElementById('stats-body').innerHTML = '<tr><td colspan="23">Invalid mode or missing IDs</td></tr>';
       return;
@@ -430,32 +413,6 @@ async function loadStats() {
         });
         statsData = Array.from(allPlayers.values());
       }
-    } else if (mode === 'tournament') {
-      // ✅ FIX: Tournament mode - merge stats from tournament document (matches Franchise mode pattern)
-      // Tournament state endpoint returns full tournament document with players object
-      const tournamentPlayers = data.players || {};
-      
-      // Map roster players to stats from tournament document
-      statsData = teamPlayerIds.map(pid => {
-        const tournamentPlayer = tournamentPlayers[pid];
-        const rosterPlayer = rosterData.find(p => p._id === pid);
-        
-        if (tournamentPlayer && tournamentPlayer.season) {
-          // Player has stats in tournament document
-          return {
-            _id: pid,
-            name: rosterPlayer ? rosterPlayer.name : `${tournamentPlayer.meta?.first_name || ''} ${tournamentPlayer.meta?.last_name || ''}`.trim(),
-            stats: tournamentPlayer.season || {}
-          };
-        } else {
-          // Player doesn't have stats yet (team hasn't played)
-          return {
-            _id: pid,
-            name: rosterPlayer ? rosterPlayer.name : '',
-            stats: {}
-          };
-        }
-      });
     }
     
     renderTrTable();
@@ -499,10 +456,6 @@ function getAttrSortValue(attrs, attr) {
 function renderStartingFive() {
   const section = document.getElementById('starting-five-section');
   if (!section) return;
-  if (mode === 'tournament') {
-    section.style.display = 'none';
-    return;
-  }
   const rows = projectedStartingFive || [];
   if (!rows.length || typeof renderProjectedStartingFiveCards !== 'function') {
     section.style.display = 'none';

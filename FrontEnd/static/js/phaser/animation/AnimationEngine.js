@@ -1462,7 +1462,6 @@ export class AnimationEngine {
           const clock = responseData.clock || turnData.clock || this.scene.simData?.clock;
           const mode = this.scene.mode || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mode') : null) || 'single';
           const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : { get: () => null };
-          const tournamentId = urlParams.get?.('tournament_id') || null;
           const franchiseId = urlParams.get?.('franchise_id') || null;
           const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
           const homeId = this.scene.homeTeamId || urlParams.get?.('home_id');
@@ -1477,7 +1476,6 @@ export class AnimationEngine {
             mode,
             quarter,
             clock,
-            tournamentId,
             franchiseId,
             homeTeam,
             awayTeam,

@@ -10,11 +10,14 @@
  * Precedence:
  *   1. scene.mode (already set on GameScene from sceneData.mode in init())
  *   2. urlParams.get('mode')  — canonical for fresh page loads
- *   3. tournamentId/franchiseId fallback for legacy callers without scene/URL
+ *   3. franchiseId fallback for callers without scene/URL
+ *
+ * Standalone Tournament Mode is retired. A leftover mode=tournament value
+ * is ignored so Franchise weeks keyed on franchise_id still resolve correctly.
  */
-export function getGameMode({ scene, urlParams, tournamentId, franchiseId } = {}) {
+export function getGameMode({ scene, urlParams, franchiseId } = {}) {
   const sceneMode = scene && typeof scene === 'object' ? scene.mode : null;
-  if (sceneMode) return sceneMode;
+  if (sceneMode && sceneMode !== 'tournament') return sceneMode;
 
   let urlMode = null;
   if (urlParams && typeof urlParams.get === 'function') {
@@ -22,9 +25,8 @@ export function getGameMode({ scene, urlParams, tournamentId, franchiseId } = {}
   } else if (typeof window !== 'undefined' && window.location?.search) {
     urlMode = new URLSearchParams(window.location.search).get('mode');
   }
-  if (urlMode) return urlMode;
+  if (urlMode && urlMode !== 'tournament') return urlMode;
 
-  if (tournamentId) return 'tournament';
   if (franchiseId) return 'franchise';
   return 'single';
 }

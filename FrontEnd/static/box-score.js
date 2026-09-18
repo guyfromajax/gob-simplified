@@ -136,7 +136,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const homeTeamName = urlParams.get('home');
   const awayTeamName = urlParams.get('away');
   const franchiseId = urlParams.get('franchise_id');
-  const tournamentId = urlParams.get('tournament_id');
   const mode = urlParams.get('mode');
   
   console.log('📋 Box Score page loaded:', {
@@ -145,7 +144,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     homeTeamName,
     awayTeamName,
     franchiseId,
-    tournamentId,
     mode,
     fullUrl: window.location.href,
     allParams: Object.fromEntries(urlParams.entries())
@@ -158,7 +156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     try {
-      await loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tournamentId, mode });
+      await loadPreGameData({ homeTeamName, awayTeamName, franchiseId, mode });
       renderBoxScore();
       setupTabs();
     } catch (e) {
@@ -251,16 +249,15 @@ async function loadGameData(gameId) {
                        (typeof gameData.away_team === 'object' ? gameData.away_team?.name : gameData.away_team) ||
                        gameData.away_team?.name;
   const franchiseId = urlParams.get('franchise_id');
-  const tournamentId = urlParams.get('tournament_id');
   const mode = urlParams.get('mode');
   
   if (homeTeamName && awayTeamName) {
-    await mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode, homeTeamId, awayTeamId);
+    await mergeFullRosters(homeTeamName, awayTeamName, franchiseId, mode, homeTeamId, awayTeamId);
   }
 }
 
 // Fetch and merge full rosters with game data to ensure all 12 players are shown
-async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournamentId, mode, homeTeamId = null, awayTeamId = null) {
+async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, mode, homeTeamId = null, awayTeamId = null) {
   if (mode === 'practice_squad') {
     return;
   }
@@ -268,7 +265,6 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
     homeTeamName,
     awayTeamName,
     franchiseId,
-    tournamentId,
     mode,
     homeTeamId,
     awayTeamId,
@@ -283,8 +279,6 @@ async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId, tournam
     const params = new URLSearchParams();
     if (mode === 'franchise' && franchiseId) {
       params.append('franchise_id', franchiseId);
-    } else if (mode === 'tournament' && tournamentId) {
-      params.append('tournament_id', tournamentId);
     }
     // Note: Single game mode has no params (loads from universal collection)
     if (params.toString()) {
@@ -579,15 +573,13 @@ function isGameCompleteForPotg(data) {
 }
 
 // Build zeroed box score data from rosters when viewing pre-game
-async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tournamentId, mode }) {
+async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, mode }) {
   const fetchRoster = async (team) => {
     // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
     let path = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(team)}`);
     const params = new URLSearchParams();
     if (mode === 'franchise' && franchiseId) {
       params.append('franchise_id', franchiseId);
-    } else if (mode === 'tournament' && tournamentId) {
-      params.append('tournament_id', tournamentId);
     }
     if (params.toString()) {
       path += `?${params.toString()}`;
@@ -2072,7 +2064,6 @@ function setupLockerRoomButton() {
   const from = urlParams.get('from');
   // ✅ SS&S: Read mode parameter first (most reliable), then fall back to IDs
   const mode = urlParams.get('mode');
-  const tournamentId = urlParams.get('tournament_id');
   const franchiseId = urlParams.get('franchise_id');
   const home = urlParams.get('home');
   const away = urlParams.get('away');
@@ -2214,26 +2205,10 @@ function setupLockerRoomButton() {
   let navMode = mode || 'single';
   let lockerRoomUrl;
   
-  // Determine mode and IDs with priority: URL params > localStorage
-  const urlTournamentId = tournamentId || urlParams.get('tournament_id');
   const urlFranchiseId = franchiseId || urlParams.get('franchise_id');
   const urlTeamId = urlParams.get('team_id');
   
-  // If mode is explicitly set in URL, use it
-  if (navMode === 'tournament' || (navMode === 'single' && urlTournamentId)) {
-    navMode = 'tournament';
-    lockerRoomUrl = '/tournament.html';
-    const tournamentParams = new URLSearchParams();
-    if (urlTournamentId) {
-      tournamentParams.set('tournament_id', urlTournamentId);
-    }
-    if (urlTeamId) {
-      tournamentParams.set('team_id', urlTeamId);
-    }
-    if (tournamentParams.toString()) {
-      lockerRoomUrl += `?${tournamentParams.toString()}`;
-    }
-  } else if (navMode === 'franchise' || (navMode === 'single' && urlFranchiseId)) {
+  if (navMode === 'franchise' || (navMode === 'single' && urlFranchiseId)) {
     navMode = 'franchise';
     lockerRoomUrl = typeof resolveFranchiseLockerRoomUrl === 'function'
       ? resolveFranchiseLockerRoomUrl({
