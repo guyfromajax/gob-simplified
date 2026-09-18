@@ -9,7 +9,11 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from BackEnd.db import alpha_feedback_collection, users_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+alpha_feedback_collection = _store.alpha_feedback_collection
+users_collection = _store.users_collection
+
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.resend_sender import send_alpha_feedback_email
 

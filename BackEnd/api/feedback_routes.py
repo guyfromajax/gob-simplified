@@ -8,7 +8,10 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from BackEnd.db import db
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+
 from BackEnd.utils.resend_sender import send_feedback_email
 
 router = APIRouter()

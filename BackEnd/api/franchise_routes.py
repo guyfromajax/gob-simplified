@@ -23,15 +23,20 @@ from collections import defaultdict
 from urllib.parse import urlencode
 from BackEnd.main import run_simulation, simulate_quarter
 
-from BackEnd.db import (
-    db,
-    franchise_state_collection,
-    franchise_team_data_collection,
-    franchise_players_data_collection,
-    franchise_recruits_data_collection,
-    games_collection,
-    press_conference_sessions_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+franchise_state_collection = _store.franchise_state_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_recruits_data_collection = _store.franchise_recruits_data_collection
+games_collection = _store.games_collection
+press_conference_sessions_collection = _store.press_conference_sessions_collection
+eog_band_log_collection = _store.eog_band_log_collection
+tournaments_collection = _store.tournaments_collection
+teams_collection = _store.teams_collection
+players_collection = _store.players_collection
+
 
 from BackEnd.constants.multi_franchise import MAX_FRANCHISES_PER_USER
 
@@ -1568,7 +1573,6 @@ def _emit_eog_band_record(record: dict) -> None:
         return
     try:
         if mode == "mongo":
-            from BackEnd.db import eog_band_log_collection
             doc = dict(record)
             doc["created_at"] = datetime.utcnow()      # TTL anchor
             doc["git_sha"] = _eog_band_git_sha()
@@ -1612,7 +1616,6 @@ def flush_eog_band_buffer() -> int:
             if not _EOG_BAND_BUFFER:
                 return 0
             batch, _EOG_BAND_BUFFER[:] = list(_EOG_BAND_BUFFER), []
-        from BackEnd.db import eog_band_log_collection
         eog_band_log_collection.insert_many(batch, ordered=False)
         return len(batch)
     except Exception:
@@ -15186,7 +15189,6 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
         actual_team_id = str(team_doc["_id"])
     
     # ✅ FTD: Load team data from FTD collection instead of franchise doc
-    from BackEnd.db import franchise_team_data_collection
     
     try:
         team_object_id = ObjectId(actual_team_id)
@@ -15669,7 +15671,6 @@ def get_scouting_report(franchise_id: str, team_name: str):
     team_id_field = team_doc.get("team_id")
     
     # ✅ FTD: Get team attributes from FTD collection instead of franchise doc
-    from BackEnd.db import franchise_team_data_collection
     ftd_doc = franchise_team_data_collection.find_one(
         {"franchise_id": fid, "team_id": team_object_id},
         {"team_attributes": 1}
@@ -16911,7 +16912,6 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         
         # For tournament mode, determine round from backend state if not provided
         if mode == "tournament":
-            from BackEnd.db import tournaments_collection
             from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
             doc_id_obj = ObjectId(doc_id)
             doc = tournaments_collection.find_one({"_id": doc_id_obj})
@@ -17103,7 +17103,6 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             }
             
         else:  # tournament mode
-            from BackEnd.db import tournaments_collection, teams_collection
             from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
             doc_id_obj = ObjectId(doc_id)
             doc = tournaments_collection.find_one({"_id": doc_id_obj})
@@ -17175,7 +17174,6 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 
                 if not has_all_attrs:
                     # Merge with core collection for backward compatibility
-                    from BackEnd.db import players_collection
                     # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
                     core_player = players_collection.find_one({"_id": pid_str}, {"attributes": 1})
                     if core_player:

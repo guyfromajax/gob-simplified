@@ -30,6 +30,11 @@ from BackEnd.services.stripe_client import (
 )
 from BackEnd.utils.auth import get_current_user
 
+from BackEnd.persistence import get_store
+_store = get_store()
+stripe_events_collection = _store.stripe_events_collection
+
+
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 
@@ -66,7 +71,6 @@ async def stripe_webhook(request: Request):
     # Idempotency by construction: Stripe's event id IS the document _id, so a
     # redelivery is a duplicate-key no-op rather than a second application of the
     # same event. Stripe retries on any non-2xx, so redelivery is normal traffic.
-    from BackEnd.db import stripe_events_collection
 
     already_seen = False
     try:
