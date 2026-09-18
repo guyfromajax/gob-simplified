@@ -808,7 +808,7 @@ def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_p
 
 
 def _foul_on_ball_weight_enabled() -> bool:
-    """``GOB_FOUL_ON_BALL_WEIGHT`` - default OFF.
+    """``GOB_FOUL_ON_BALL_WEIGHT`` - **default ON**.
 
     ON resolves the ball handler's position from ``off_lineup`` instead of the
     non-existent ``Player.position``, which is what makes the 60/40 on-ball
@@ -817,7 +817,7 @@ def _foul_on_ball_weight_enabled() -> bool:
     always False.
     """
     import os
-    return os.environ.get("GOB_FOUL_ON_BALL_WEIGHT", "0") == "1"
+    return os.environ.get("GOB_FOUL_ON_BALL_WEIGHT", "1") == "1"
 
 
 def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, roles=None):
