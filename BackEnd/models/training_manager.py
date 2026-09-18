@@ -5,7 +5,13 @@ from typing import List, Dict
 # training results depend on unrelated DB activity. See BackEnd/utils/training_random.
 from BackEnd.utils.training_random import training_rng as random
 from pymongo.collection import Collection
-from BackEnd.db import players_collection, teams_collection, training_log_collection  # adjust if needed
+
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+teams_collection = _store.teams_collection
+training_log_collection = _store.training_log_collection
+
 from datetime import datetime
 
 

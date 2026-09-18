@@ -23,6 +23,16 @@ from BackEnd.utils.franchise_rank_prestige import (
     rank_teams_for_week,
 )
 
+from BackEnd.persistence import get_store
+_store = get_store()
+franchise_team_data_collection = _store.franchise_team_data_collection
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_recruits_data_collection = _store.franchise_recruits_data_collection
+ensure_ftd_index = _store.ensure_ftd_index
+ensure_fpd_index = _store.ensure_fpd_index
+ensure_frd_index = _store.ensure_frd_index
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -660,14 +670,6 @@ class FranchiseManager:
 
         # ✅ FTD/FPD/FRD: Create franchise_team_data, franchise_players_data, franchise_recruits_data
         # *after* franchise insert so we have franchise_id.
-        from BackEnd.db import (
-            franchise_team_data_collection,
-            franchise_players_data_collection,
-            franchise_recruits_data_collection,
-            ensure_ftd_index,
-            ensure_fpd_index,
-            ensure_frd_index,
-        )
 
         ensure_ftd_index()
         ensure_fpd_index()
