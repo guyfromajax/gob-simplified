@@ -24,7 +24,13 @@ RULE_EXCEPTIONS: dict[str, frozenset[str]] = {
             "BackEnd/script_db.py",
         }
     ),
-    "mongo_client": frozenset({"BackEnd/db.py", "BackEnd/script_db.py"}),
+    "mongo_client": frozenset(
+        {
+            "BackEnd/db.py",
+            "BackEnd/script_db.py",
+            "BackEnd/persistence/mongo.py",
+        }
+    ),
     # These boundaries inspect and reject file-supplied authorization; they never
     # grant it. Tests cover that fail-closed behavior.
     "file_db_authorization": frozenset(

@@ -62,6 +62,17 @@ def test_dotenv_cannot_grant_database_access_or_mock_mode(tmp_path: Path):
         resolve_database_environment(pristine_env={}, repo_root=tmp_path, target_environ={})
 
 
+def test_dotenv_cannot_grant_persistence_backend(tmp_path: Path):
+    (tmp_path / ".env.local").write_text(
+        "GOB_PERSISTENCE=sqlite\n"
+        "ENVIRONMENT=development\n"
+        f"MONGO_URI={_uri('gob-staging')}\n"
+        "MONGO_DB_NAME=gob-staging\n"
+    )
+    with pytest.raises(EnvironmentConfigurationError, match="cannot come from .env.local"):
+        resolve_database_environment(pristine_env={}, repo_root=tmp_path, target_environ={})
+
+
 def test_uri_and_explicit_database_name_must_agree(tmp_path: Path):
     with pytest.raises(EnvironmentConfigurationError, match="identity mismatch"):
         resolve_database_environment(
@@ -100,6 +111,7 @@ def test_explicit_mongomock_requires_test_identity_and_safe_name(tmp_path: Path)
     )
     assert config.db_mode == "mongomock"
     assert config.mongo_uri is None
+    assert config.persistence == "mongo"
 
     with pytest.raises(EnvironmentConfigurationError, match="must not be gob"):
         resolve_database_environment(
