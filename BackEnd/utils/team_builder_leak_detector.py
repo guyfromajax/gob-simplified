@@ -27,6 +27,11 @@ from starlette.responses import Response
 
 from BackEnd.utils.franchise_team_display import TEAM_BUILDER_FIELD, get_team_builder_overlay
 
+from BackEnd.persistence import get_store
+_store = get_store()
+games_collection = _store.games_collection
+teams_collection = _store.teams_collection
+
 logger = logging.getLogger(__name__)
 
 # Field-path suffixes that intentionally carry the replaced core name / palette.
@@ -386,7 +391,6 @@ def franchise_id_from_game_doc(game_id: str) -> Optional[str]:
     if not game_id:
         return None
     try:
-        from BackEnd.db import games_collection
         from BackEnd.utils.game_id_utils import normalize_game_id
 
         gid = normalize_game_id(game_id)
@@ -496,7 +500,6 @@ def replaced_core_only_palette(franchise_id: str) -> frozenset[str]:
     if not replaced:
         return frozenset()
     try:
-        from BackEnd.db import teams_collection
 
         core = teams_collection.find_one(
             {"_id": ObjectId(str(replaced))},

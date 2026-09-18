@@ -13,15 +13,15 @@ from typing import Any
 
 from bson import ObjectId
 
-from BackEnd.db import (
-    community_highlights_collection,
-    franchise_state_collection,
-    franchise_team_data_collection,
-    franchises_collection,
-    games_collection,
-    teams_collection,
-    users_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+community_highlights_collection = _store.community_highlights_collection
+franchise_state_collection = _store.franchise_state_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+franchises_collection = _store.franchises_collection
+games_collection = _store.games_collection
+teams_collection = _store.teams_collection
+users_collection = _store.users_collection
 from BackEnd.utils.franchise_geek_points import teams_match_for_franchise
 from BackEnd.utils.franchise_standings import calculate_franchise_standings
 

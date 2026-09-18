@@ -17,12 +17,12 @@ from typing import Any
 
 from bson import ObjectId
 
-from BackEnd.db import (
-    db,
-    franchise_players_data_collection,
-    franchise_team_data_collection,
-    users_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+users_collection = _store.users_collection
 from BackEnd.utils.franchise_geek_points import (
     geek_points_team_key_for_franchise_user,
     teams_match_for_franchise,

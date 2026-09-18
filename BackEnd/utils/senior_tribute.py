@@ -10,7 +10,10 @@ from typing import Any
 
 from bson import ObjectId
 
-from BackEnd.db import franchise_players_data_collection, franchise_team_data_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
 from BackEnd.utils.franchise_championships import normalize_titles
 from BackEnd.utils.scouting_utils import _season_def_pct_whole, _season_total_rebounds
 

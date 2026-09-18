@@ -16,6 +16,12 @@ import logging
 from typing import Optional, Dict, Tuple
 from BackEnd.utils.franchise_geek_points import gm_team_matches_ref
 
+from BackEnd.persistence import get_store
+_store = get_store()
+games_collection = _store.games_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+franchises_collection = _store.franchises_collection
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,7 +61,6 @@ def save_team_settings(
         if mode == "single" and game_id:
             # Game-scoped save - resolve to canonical format
             actual_team_id = normalize_team_id_to_canonical(team_id, mode, None)
-            from BackEnd.db import games_collection
             collection = games_collection
             doc_id = game_id
             update_path = f"teams.{actual_team_id}.{settings_type}"
@@ -128,7 +133,6 @@ def save_team_settings(
             else:
                 # ✅ FTD: Saving to FTD collection (FCC / pre-game). Always use authoritative user_team_object_id
                 # from franchise doc so save and load use the same FTD doc (request team_id can differ).
-                from BackEnd.db import franchise_team_data_collection, franchises_collection
                 from BackEnd.api.franchise_routes import get_user_team_from_franchise
                 try:
                     franchise_id_obj = ObjectId(franchise_id)

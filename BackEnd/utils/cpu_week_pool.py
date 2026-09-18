@@ -43,6 +43,11 @@ from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 
+from BackEnd.persistence import get_store
+_store = get_store()
+_FPD = _store.franchise_players_data_collection
+_FRD = _store.franchise_recruits_data_collection
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_POOL_WORKERS = 8
@@ -421,8 +426,6 @@ def _ps_sim_worker(task: tuple) -> tuple:
     if collect_guard:
         sim_random.install_global_draw_guard()
         sim_random.reset_global_draw_guard()
-    from BackEnd.db import (franchise_players_data_collection as _FPD,
-                            franchise_recruits_data_collection as _FRD)
     from BackEnd.practice_squad.sim import run_ps_full_simulation
 
     fpd_ids: list[str] = []

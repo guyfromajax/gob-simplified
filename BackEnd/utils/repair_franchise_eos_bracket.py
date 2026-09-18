@@ -12,7 +12,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from bson import ObjectId
 
-from BackEnd.db import db as default_db
+from BackEnd.persistence import get_store
+_store = get_store()
+default_db = _store.db
 from BackEnd.tournament import bracket_engine
 from BackEnd.tournament import franchise_tournament as ft
 

@@ -36,6 +36,10 @@ import logging
 import threading
 from typing import Any, Optional
 
+from BackEnd.persistence import get_store
+_store = get_store()
+plays_collection = _store.plays_collection
+
 logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
@@ -52,7 +56,6 @@ def _ensure_loaded() -> None:
     with _lock:
         if _loaded:
             return
-        from BackEnd.db import plays_collection
 
         docs = list(plays_collection.find({}))
         by_name: dict[str, dict] = {}

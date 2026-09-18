@@ -14,6 +14,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from BackEnd.utils.home_crowd import home_crowd_shot_threshold_delta_for_offense
 from BackEnd.pgpc_context import build_franchise_context_for_pgpc
 from BackEnd.constants import (
+
+from BackEnd.persistence import get_store
+_store = get_store()
+games_collection = _store.games_collection
+
     TURNOVER_CALC_DICT,
     POSITION_LIST,
     HCO_STRING_SPOTS,
@@ -2735,7 +2740,6 @@ def summarize_game_state(
     # This ensures settings are available in both frontend response AND DB save
     if hasattr(game, 'game_id') and game.game_id:
         try:
-            from BackEnd.db import games_collection
             from bson import ObjectId
             from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical
             

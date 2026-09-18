@@ -27,14 +27,16 @@ from bson import ObjectId
 from pymongo import ReturnDocument, UpdateOne
 
 from BackEnd.constants import BOX_SCORE_KEYS
-from BackEnd.db import (
-    db,
-    players_collection,
-    tournaments_collection,
-    games_collection,
-    teams_collection,
-    franchise_players_data_collection,
-)
+
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+players_collection = _store.players_collection
+tournaments_collection = _store.tournaments_collection
+games_collection = _store.games_collection
+teams_collection = _store.teams_collection
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
 from BackEnd.utils.game_id_utils import franchise_matchup_claim_key
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.team_play_utils import iter_team_plays
@@ -109,7 +111,6 @@ def _build_franchise_team_maps_from_ftd(
     is added from ``franchises.team_builder`` (one franchise-document read) —
     not from FTD, which does not store identity.
     """
-    from BackEnd.db import franchise_team_data_collection, teams_collection
     from BackEnd.utils.franchise_team_display import get_team_builder_overlay
 
     doc_id = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
@@ -882,7 +883,6 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
     logger.info(f"🔍 [UPDATE_PLAY_STATS] Processing {len(teams_obj)} teams, mode={mode}, doc_id={doc_id}")
     logger.info(f"🔍 [UPDATE_PLAY_STATS] Teams keys: {list(teams_obj.keys())}")
     
-    from BackEnd.db import tournaments_collection
 
     # ✅ FTD: For franchise mode, build team_name -> ObjectId and team_id (canonical) -> ObjectId maps from FTD.
     # Game document uses team_id strings (e.g. "LITTLE_YORK") or names as keys; we map to ObjectId for FTD updates.
@@ -1004,7 +1004,6 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
     if mode == "franchise" and ftd_updates:
         try:
             doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
-            from BackEnd.db import franchise_team_data_collection
             
             for team_object_id_str, team_updates in ftd_updates.items():
                 team_object_id = ObjectId(team_object_id_str)
@@ -1133,7 +1132,6 @@ def _update_defensive_playcall_season_stats(game: Dict[str, Any], mode: str = No
             if mode == "franchise" and doc_id:
                 # ✅ FTD: Update FTD collection instead of teams_collection
                 try:
-                    from BackEnd.db import franchise_team_data_collection
                     doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
                     
                     # Resolve team_id_key to ObjectId (map stores ObjectId strings)
@@ -1156,7 +1154,6 @@ def _update_defensive_playcall_season_stats(game: Dict[str, Any], mode: str = No
             elif mode == "tournament" and doc_id:
                 # Tournament mode: update tournament document
                 try:
-                    from BackEnd.db import tournaments_collection
                     doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
                     base_path = f"teams.{team_id_key}.scouting_data.defense"
                     

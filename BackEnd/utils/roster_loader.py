@@ -2,13 +2,13 @@ import json
 from pathlib import Path
 from typing import Tuple, List, Dict
 
-from BackEnd.db import (
-    players_collection,
-    teams_collection,
-    franchises_collection,
-    franchise_players_data_collection,
-    franchise_team_data_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+teams_collection = _store.teams_collection
+franchises_collection = _store.franchises_collection
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
 from pymongo.errors import PyMongoError
 from bson import ObjectId
 
