@@ -16,7 +16,7 @@ ZONE_23_NORMAL = {
     "SG": ["key", "midLane", "topLane", "lower midCorner", "lower wing", "lower midWing"],
     "SF": ["lower apex", "lower midCorner", "lower corner", "lower midBaseline", "lower bird", "lower lowPost", "lower midPost"],
     "PF": ["upper midPost", "upper lowPost", "upper bird", "upper midBaseline", "upper corner", "upper midCorner", "upper apex"],
-    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
+    "C": ["upper lowPost", "basketSpot", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # Lower shift (ball on lower wing, lower midCorner, or lower corner)
@@ -25,7 +25,7 @@ ZONE_23_LOWER_SHIFT = {
     "SG": ["lower wing", "lower midCorner", "lower corner", "lower midBaseline", "lower apex", "lower bird", "lower midPost", "lower highPost"],
     "SF": ["lower apex", "lower midCorner", "lower corner", "lower midBaseline", "lower bird", "lower lowPost", "lower midPost"],
     "PF": ["upper midPost", "upper lowPost", "upper bird", "upper midBaseline", "upper corner", "upper midCorner", "upper apex"],
-    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
+    "C": ["upper lowPost", "basketSpot", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # Upper shift (ball on upper wing, upper midCorner, or upper corner)
@@ -34,7 +34,7 @@ ZONE_23_UPPER_SHIFT = {
     "PG": ["upper wing", "upper highPost", "upper midPost", "upper bird", "upper apex", "upper midBaseline", "upper corner", "upper midCorner"],  # Added upper corner, upper midPost, upper apex, upper bird, upper midBaseline to mirror Lower SG
     "SF": ["lower apex", "lower midCorner", "lower corner", "lower midBaseline", "lower bird", "lower lowPost", "lower midPost"],
     "PF": ["upper midPost", "upper lowPost", "upper bird", "upper midBaseline", "upper corner", "upper midCorner", "upper apex"],
-    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
+    "C": ["upper lowPost", "basketSpot", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # 3-2 Zone Defense: Zone definitions (using spot names from HCO_STRING_SPOTS)
