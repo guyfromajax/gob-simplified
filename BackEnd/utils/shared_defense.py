@@ -112,6 +112,46 @@ ZONE_131_UPPER_CORNER_SHIFT = {
 }
 
 
+# ==================== Zone sink (empty-zone rung) ====================
+# Anchors are the poles of inaccessibility of the eleven shift tables above. Zones
+# are static data, so they are computed ONCE here at import - 55 rings - and never
+# per step. See BackEnd/utils/zone_sink.py.
+def _warm_zone_sink_anchors():
+    from BackEnd.utils import zone_sink
+
+    return zone_sink.warm_anchor_cache([
+        {p: _get_zone_coords(s, flip) for p, s in table.items()}
+        for table in (ZONE_23_NORMAL, ZONE_23_LOWER_SHIFT, ZONE_23_UPPER_SHIFT,
+                      ZONE_32_NORMAL, ZONE_32_LOWER_SHIFT, ZONE_32_UPPER_SHIFT,
+                      ZONE_131_NORMAL, ZONE_131_LOWER_SHIFT, ZONE_131_LOWER_CORNER_SHIFT,
+                      ZONE_131_UPPER_SHIFT, ZONE_131_UPPER_CORNER_SHIFT)
+        for flip in (False, True)   # both court orientations
+    ])
+
+
+def _zone_sink_iq_error(defender_pos):
+    """Directional calibration error for the empty-zone sink. **Stage A: neutral.**
+
+    A low-IQ defender is pulled TOO FAR toward the ball and gives up his help toward
+    the rim; a high-IQ defender holds the correct balance. It is an error in
+    calibration, not in magnitude, which is why it is signed and applied to the
+    weights rather than to the travel distance.
+
+    When this is enabled it must be rolled **once per defender per zone possession**
+    (~5 rolls a possession, ~282 a game, ~0.4% on a ~69,000-draw base), NOT per
+    step - a defender either has his attention for that trip down the floor or he
+    does not, and per-step rolls would be ~11,200 draws a game.
+
+    Team ``defensive_efficiency`` scales the unit's overall discipline and belongs
+    here too, multiplying the rolled error before it is returned.
+
+    Stage A returns 0.0 unconditionally and **draws nothing**, so enabling
+    GOB_ZONE_SINK on its own is draw-neutral against the flag being off and the
+    sink's geometry can be tuned before attribute variance is layered on.
+    """
+    return 0.0
+
+
 # ==================== HCT (Half Court Trap) Zone Defense ====================
 # Stored in home-defending orientation (right-half, x > 50). _get_zone_coords
 # flips when away team is on offense, mirroring the HCO zone constants above.
@@ -855,7 +895,32 @@ def assign_zone_defender_coords(
         else:
             return result
     else:
-        # No players in zone - position at spot in zone closest to ball handler
+        # No players in zone. Two behaviours, selected by GOB_ZONE_SINK (default OFF):
+        #
+        #   ON  - zone_sink.sink_position: anchor (the zone's pole of inaccessibility)
+        #         plus a pull toward the ball and a pull toward the rim, clamped to
+        #         stay inside this defender's own polygon. Continuous, and it reads
+        #         how far the ball is and which side it is on.
+        #   OFF - the legacy menu pick below: snap to whichever LISTED SPOT is
+        #         nearest the ball, which gave each defender 2-6 discrete positions.
+        #
+        # Both run in the ZONE frame (boundaries and ball_handler_coords are already
+        # flipped together when the away team is on offense), so the rim passed in is
+        # the defended rim flipped to match, and the result is unflipped once below.
+        from BackEnd.utils import zone_sink as _zone_sink
+
+        if _zone_sink.enabled():
+            _rim = (float(HOME_RIM_COORDS["x"]), float(HOME_RIM_COORDS["y"]))
+            if is_away_offense:
+                _rim = (100.0 - _rim[0], _rim[1])
+            sunk = _zone_sink.sink_position(
+                defender_zone_coords_list,
+                (float(ball_handler_coords["x"]), float(ball_handler_coords["y"])),
+                _rim,
+                iq_error=_zone_sink_iq_error(defender_pos),
+            )
+            return get_away_player_coords(sunk) if is_away_offense else sunk
+
         # ✅ Zone coords are in same orientation as ball_handler_coords (both flipped if away offense)
         # _find_closest_spot_in_zone_to_point assumes zones are in home orientation, so it flips target
         # But our zones are now in away orientation if away offense, so pass False (don't flip target)
@@ -1988,3 +2053,8 @@ def get_defender_coords(
             result, offensive_coords, ball_handler_coords, is_ball_handler, spot, posture,
             is_away_offense)
     return result
+
+
+# Zone sink anchors: computed once, at import, for both court orientations.
+# Defined here rather than beside the tables because it needs _get_zone_coords.
+ZONE_SINK_ANCHOR_COUNT = _warm_zone_sink_anchors()
