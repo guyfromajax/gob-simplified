@@ -807,6 +807,19 @@ def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_p
     return stealer_coords
 
 
+def _foul_on_ball_weight_enabled() -> bool:
+    """``GOB_FOUL_ON_BALL_WEIGHT`` - default OFF.
+
+    ON resolves the ball handler's position from ``off_lineup`` instead of the
+    non-existent ``Player.position``, which is what makes the 60/40 on-ball
+    defensive-foul weighting actually run. OFF reproduces the legacy behaviour
+    exactly: uniform weights across all five defenders, and ``foul_is_on_ball``
+    always False.
+    """
+    import os
+    return os.environ.get("GOB_FOUL_ON_BALL_WEIGHT", "0") == "1"
+
+
 def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, roles=None):
     """
     Select which player committed the foul based on probabilistic logic.
@@ -843,9 +856,33 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, rol
     else:  # DEFENSE
         # 60% chance it's the defender matched to ball handler's position
         # 40% distributed among other 4 defenders (10% each)
-        ball_handler_pos = getattr(ball_handler, 'position', None)
-        matched_defender = def_lineup.get(ball_handler_pos) if ball_handler_pos else None
-        
+        #
+        # ``Player`` has no ``position`` attribute - it defines ``position_ratings``
+        # and nothing else - so the legacy lookup below resolved to None on 100% of
+        # selections (316/316 sim, 315/315 played, n=40) and every defender got 0.1.
+        # The 60/40 split had never run. The lineup is authoritative for position;
+        # ``off_lineup`` is already a parameter. Same pattern as
+        # ``covert_release_step_emitter.py:1215``.
+        matched_defender = None
+        if _foul_on_ball_weight_enabled():
+            ball_handler_pos = next(
+                (pos for pos, p in (off_lineup or {}).items() if p is ball_handler),
+                None,
+            )
+            if ball_handler_pos is None:
+                # Ball handler is not in the offensive lineup (substitution edge
+                # cases). Fall back to the legacy uniform behaviour, but say so.
+                logging.warning(
+                    "[FOUL ON-BALL] ball handler %s not found in off_lineup; "
+                    "falling back to uniform defensive foul weights",
+                    get_name_safe(ball_handler),
+                )
+            else:
+                matched_defender = (def_lineup or {}).get(ball_handler_pos)
+        else:
+            ball_handler_pos = getattr(ball_handler, 'position', None)
+            matched_defender = def_lineup.get(ball_handler_pos) if ball_handler_pos else None
+
         players = list(def_lineup.values())
         weights = []
         for player in players:
@@ -853,16 +890,25 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, rol
                 weights.append(0.6)
             else:
                 weights.append(0.1)
-        
+
         foul_player = random.choices(players, weights=weights)[0]
 
     if isinstance(roles, dict):
-        from BackEnd.engine.foul_announcement_language import defensive_foul_is_on_ball
-        roles["foul_is_on_ball"] = (
-            defensive_foul_is_on_ball(foul_player, ball_handler)
-            if str(foul_team_type or "").upper() == "DEFENSE"
-            else True
-        )
+        is_defense = str(foul_team_type or "").upper() == "DEFENSE"
+        if is_defense and _foul_on_ball_weight_enabled():
+            # Stamp from what this function actually knows. The old route,
+            # ``defensive_foul_is_on_ball``, compares ``foul_player.position`` to
+            # ``ball_handler.position`` - both always None - so it returned False
+            # on every defensive foul and the announcement copy always picked
+            # off-ball language.
+            roles["foul_is_on_ball"] = bool(
+                matched_defender is not None and foul_player is matched_defender
+            )
+        elif is_defense:
+            from BackEnd.engine.foul_announcement_language import defensive_foul_is_on_ball
+            roles["foul_is_on_ball"] = defensive_foul_is_on_ball(foul_player, ball_handler)
+        else:
+            roles["foul_is_on_ball"] = True
 
     return foul_player
 
