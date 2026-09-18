@@ -90,7 +90,7 @@ ZONE_131_LOWER_CORNER_SHIFT = {
     "SG": ["key", "upper midWing", "upper wing", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost", "upper midPost", "upper highPost"],
     "SF": ["lower midWing", "lower wing", "lower midCorner"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["lower corner"],
+    "C": ["lower bird", "lower corner", "lower midBaseline", "basketSpot", "lower lowPost"],
 }
 
 # Upper shift (ball on upper wing, upper midWing, upper midCorner)
@@ -108,7 +108,7 @@ ZONE_131_UPPER_CORNER_SHIFT = {
     "SG": ["upper midWing", "upper wing", "upper midCorner"],
     "SF": ["key", "lower midWing", "lower wing", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "lower midPost", "lower highPost"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["upper corner"],
+    "C": ["upper bird", "upper lowPost", "basketSpot", "upper midBaseline", "upper corner"],
 }
 
 
