@@ -720,10 +720,16 @@ def position_zone_defenders(game, offensive_animations, def_lineup, skeleton_ste
         _get_32_zone_boundaries,
         _get_131_zone_boundaries,
         assign_all_zone_defenders,
+        zone_sink_begin_possession,
         _point_in_zone
     )
     from BackEnd.utils.shared import get_away_player_coords
-    
+
+    # One zone-sink IQ roll per defender per POSSESSION, not per build and not per
+    # step. Cached against a possession key inside, so the several builds a turn
+    # makes reuse the same roll. No-op unless GOB_ZONE_SINK_IQ is on.
+    zone_sink_begin_possession(game, def_lineup)
+
     defensive_animations = []
     
     # Determine court orientation

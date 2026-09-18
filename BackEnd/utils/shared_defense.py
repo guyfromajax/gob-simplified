@@ -129,27 +129,90 @@ def _warm_zone_sink_anchors():
     ])
 
 
+ZONE_SINK_IQ_LAPSE_ERROR = 0.60   # how far off a lapsed defender is pulled
+ZONE_SINK_IQ_MAX_LAPSE = 0.45     # lapse chance at IQ 0, before the team scale
+ZONE_SINK_IQ_TEAM_SPAN = 0.40     # how much team defensive_efficiency moves it
+
+_ZONE_SINK_IQ = {"key": None, "err": {}}
+
+
+def _zone_sink_iq_enabled():
+    """``GOB_ZONE_SINK_IQ`` - default OFF. Independent of ``GOB_ZONE_SINK`` so the
+    sink's geometry can be measured on its own before attribute variance lands."""
+    import os
+    return os.environ.get("GOB_ZONE_SINK_IQ", "0") == "1"
+
+
+def zone_sink_begin_possession(game, def_lineup):
+    """Roll each zone defender's calibration error for THIS possession.
+
+    Called once per placement build from ``position_zone_defenders``. The rolls are
+    cached against a possession key - (quarter, clock, both team ids) - so the
+    several builds a turn makes all reuse one roll per defender. That is what keeps
+    this at ~5 draws a possession instead of ~5 per build or ~5 per step.
+
+    A defender either has his attention for that trip down the floor or he does not:
+    one Bernoulli per defender, lapse chance falling with IQ and with the unit's
+    ``defensive_efficiency``. A lapse pulls him TOO FAR toward the ball and costs
+    him his help toward the rim (see ``zone_sink.sink_position``); a defender who
+    does not lapse is perfectly calibrated.
+    """
+    # Gated on the SINK as well as on IQ: with the sink off the error is never
+    # consumed, so rolling would burn draws and move the stream for nothing.
+    from BackEnd.utils import zone_sink as _zs
+    if not (_zs.enabled() and _zone_sink_iq_enabled()):
+        _ZONE_SINK_IQ["key"], _ZONE_SINK_IQ["err"] = None, {}
+        return
+    gs = getattr(game, "game_state", None) or {}
+    key = (gs.get("quarter"), gs.get("time_remaining"),
+           getattr(getattr(game, "offense_team", None), "team_id", None),
+           getattr(getattr(game, "defense_team", None), "team_id", None))
+    if _ZONE_SINK_IQ["key"] == key:
+        return                                   # already rolled for this possession
+    team_attrs = getattr(getattr(game, "defense_team", None), "team_attributes", None) or {}
+    try:
+        def_eff = float(team_attrs.get("defensive_efficiency") or 0.0)
+    except (TypeError, ValueError):
+        def_eff = 0.0
+    # 0 def-eff leaves the lapse chance untouched; a disciplined unit lapses less.
+    team_scale = max(0.0, 1.0 - (def_eff / 100.0) * ZONE_SINK_IQ_TEAM_SPAN)
+
+    err = {}
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        player = (def_lineup or {}).get(pos)
+        attrs = getattr(player, "attributes", None) or {}
+        try:
+            iq = float(attrs.get("IQ", 50) or 50)
+        except (TypeError, ValueError):
+            iq = 50.0
+        lapse_chance = ZONE_SINK_IQ_MAX_LAPSE * max(0.0, 1.0 - iq / 100.0) * team_scale
+        err[pos] = ZONE_SINK_IQ_LAPSE_ERROR if random.random() < lapse_chance else 0.0
+    _ZONE_SINK_IQ["key"], _ZONE_SINK_IQ["err"] = key, err
+
+
 def _zone_sink_iq_error(defender_pos):
-    """Directional calibration error for the empty-zone sink. **Stage A: neutral.**
+    """Directional calibration error for the empty-zone sink.
 
     A low-IQ defender is pulled TOO FAR toward the ball and gives up his help toward
     the rim; a high-IQ defender holds the correct balance. It is an error in
-    calibration, not in magnitude, which is why it is signed and applied to the
-    weights rather than to the travel distance.
+    calibration, not in magnitude, which is why it is applied to the weights rather
+    than to the travel distance.
 
-    When this is enabled it must be rolled **once per defender per zone possession**
-    (~5 rolls a possession, ~282 a game, ~0.4% on a ~69,000-draw base), NOT per
-    step - a defender either has his attention for that trip down the floor or he
-    does not, and per-step rolls would be ~11,200 draws a game.
+    Rolled **once per defender per zone possession** by
+    ``zone_sink_begin_possession`` (~5 rolls a possession, ~282 a game, ~0.4% on a
+    ~69,000-draw base), NOT per step - per-step rolls would be ~11,200 a game.
 
-    Team ``defensive_efficiency`` scales the unit's overall discipline and belongs
-    here too, multiplying the rolled error before it is returned.
+    Returns 0.0 and draws nothing when ``GOB_ZONE_SINK_IQ`` is off, so the sink's
+    geometry is measurable on its own.
 
-    Stage A returns 0.0 unconditionally and **draws nothing**, so enabling
-    GOB_ZONE_SINK on its own is draw-neutral against the flag being off and the
-    sink's geometry can be tuned before attribute variance is layered on.
+    KNOWN LIMIT, not papered over: the resolution-side callers of
+    ``assign_all_zone_defenders`` in ``phase_resolution.py`` do not go through
+    ``position_zone_defenders``, so if one of them runs before that possession's
+    first placement build it sees error 0.0 while the render sees the rolled value.
+    Three of those four call sites discard the coordinates and keep only the
+    guard map, so the exposure is the legacy fallback at ``phase_resolution.py:5485``.
     """
-    return 0.0
+    return _ZONE_SINK_IQ["err"].get(defender_pos, 0.0)
 
 
 # ==================== HCT (Half Court Trap) Zone Defense ====================
