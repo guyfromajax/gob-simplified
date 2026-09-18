@@ -1,46 +1,247 @@
 /**
  * Centralized API Configuration
- * 
+ *
  * This module provides a single source of truth for API base URLs across all environments.
  * All frontend API calls should use API_CONFIG.getBaseUrl() instead of hardcoded URLs.
- * 
- * Environment Detection:
+ *
+ * ---------------------------------------------------------------------------
+ * Routing table — two axes, not a per-build switch
+ * ---------------------------------------------------------------------------
+ *
+ * Axis 1 is the route category. Some requests are account/server concerns and
+ * are ALWAYS remote, regardless of where the current franchise lives:
+ *   always remote: auth, billing, email, admin, feedback, alpha_feedback,
+ *                  leaderboard, community_highlights
+ *   routable:      franchise, gameplan, play, skeleton, training, api.py
+ *
+ * Axis 2 is the franchise runtime. THIS is the part that is easy to get wrong.
+ * Routing is NOT just per-build. A single user in a single session can hold
+ * one LOCAL franchise (engine on their machine, SQLite) and one HOSTED
+ * franchise (engine on our server, Mongo) and switch between them. A routable
+ * request therefore resolves by the runtime of the franchise it belongs to:
+ *   runtime 'local'  -> loopback base (http://127.0.0.1:<port>)
+ *   runtime 'hosted' -> remote base (today's hostname sniff)
+ *
+ * Implementing this as a per-BUILD switch instead of per-FRANCHISE is the
+ * failure mode this table exists to prevent. The desktop build profile only
+ * *enables* the loopback cell; it does not pick a host for every request.
+ * window.GOB_BUILD_PROFILE === 'desktop' is dormant until WS-2; nothing sets
+ * runtime='local' until WS-3 FranchiseContext. Until then every cell of the
+ * web profile, and every hosted cell of the desktop profile, is 'remote', so
+ * getBaseUrl() with no context reproduces today's behaviour exactly.
+ *
+ * Environment Detection (the remote base — Axis 2 'hosted'):
  * - Production: www.geekedoutbasketball.com
  * - Staging: staging.geekedoutbasketball.com
  * - Local: localhost (any other hostname)
- * 
+ *
  * Default Domains (for initial deployment):
  * - Railway default: *.railway.app
  * - Netlify default: *.netlify.app
- * 
+ *
  * Custom Domains (after DNS configuration):
  * - Production API: api.geekedoutbasketball.com
  * - Staging API: api-staging.geekedoutbasketball.com
- * 
+ *
  * Alpha Mode:
  * - Use API_CONFIG.isAlpha() to check if app is in alpha mode
  * - Use API_CONFIG.loadAppConfig() to fetch and cache app configuration
  */
 
+// Always-remote categories — account/server concerns. Never follow a local
+// franchise onto loopback. Order is documentary; lookup is by set membership.
+const ALWAYS_REMOTE_CATEGORIES = Object.freeze([
+  'auth',
+  'billing',
+  'email',
+  'admin',
+  'feedback',
+  'alpha_feedback',
+  'leaderboard',
+  'community_highlights',
+]);
+
+// Routable categories — engine/franchise concerns. Resolve by franchise runtime.
+const ROUTABLE_CATEGORIES = Object.freeze([
+  'franchise',
+  'gameplan',
+  'play',
+  'skeleton',
+  'training',
+  'api',
+]);
+
+// Longest-prefix-first classifier. Unmatched paths are treated as api.py
+// (routable) so the desktop+local cell can reach loopback for engine routes
+// that do not live under /api/*.
+const CATEGORY_PREFIXES = Object.freeze([
+  ['/api/alpha-feedback', 'alpha_feedback'],
+  ['/api/community', 'community_highlights'],
+  ['/api/leaderboard', 'leaderboard'],
+  ['/api/feedback', 'feedback'],
+  ['/api/billing', 'billing'],
+  ['/api/email', 'email'],
+  ['/api/admin', 'admin'],
+  ['/api/auth', 'auth'],
+  ['/app-config', 'auth'],
+  ['/api/playbooks', 'gameplan'],
+  ['/api/gameplan', 'gameplan'],
+  ['/api/fcp-skeletons', 'skeleton'],
+  ['/api/hct-skeletons', 'skeleton'],
+  ['/api/run_training', 'training'],
+  ['/api/plays', 'play'],
+  ['/api/play/', 'play'],
+  ['/franchise', 'franchise'],
+  ['/api/', 'api'],
+]);
+
+/**
+ * ROUTING_TABLE[buildProfile][axis1][franchiseRuntime] -> 'remote' | 'loopback'
+ *
+ * web     : every cell is remote. Today's web build is byte-identical.
+ * desktop : always-remote stays remote; routable + local is the only loopback
+ *           cell. The profile is dormant (unreachable) until WS-2 sets
+ *           window.GOB_BUILD_PROFILE = 'desktop'.
+ */
+const ROUTING_TABLE = Object.freeze({
+  web: {
+    always_remote: { hosted: 'remote', local: 'remote' },
+    routable: { hosted: 'remote', local: 'remote' },
+  },
+  desktop: {
+    always_remote: { hosted: 'remote', local: 'remote' },
+    routable: { hosted: 'remote', local: 'loopback' },
+  },
+});
+
+const ALWAYS_REMOTE_SET = {};
+ALWAYS_REMOTE_CATEGORIES.forEach(function (c) { ALWAYS_REMOTE_SET[c] = true; });
+const ROUTABLE_SET = {};
+ROUTABLE_CATEGORIES.forEach(function (c) { ROUTABLE_SET[c] = true; });
+
 const API_CONFIG = {
   // Cached app config (loaded once from backend)
   _appConfig: null,
   _appConfigLoading: null,
+  ALWAYS_REMOTE_CATEGORIES: ALWAYS_REMOTE_CATEGORIES,
+  ROUTABLE_CATEGORIES: ROUTABLE_CATEGORIES,
+  ROUTING_TABLE: ROUTING_TABLE,
+
   /**
-   * Get the base URL for API requests based on current environment
+   * Get the base URL for API requests.
+   *
+   * No-argument callers (the existing 99 files) get today's remote base:
+   * hostname sniff, default runtime 'hosted'. Passing { category, runtime }
+   * consults the two-axis table. On the web profile every cell is remote, so
+   * the host is unchanged even when context is supplied.
+   *
+   * @param {Object} [context]
+   * @param {string} [context.category] - route category (see header)
+   * @param {string} [context.runtime] - 'local' | 'hosted' (franchise, not build)
+   * @param {string} [context.endpoint] - used to classify when category omitted
    * @returns {string} Base URL for API requests (e.g., "https://api.geekedoutbasketball.com")
    */
-  getBaseUrl() {
+  getBaseUrl(context) {
     // Check for explicit override (useful for testing or manual configuration)
     if (window.API_BASE_URL) {
       return window.API_BASE_URL;
     }
-    
+
     const hostname = window.location.hostname;
     // DEBUG: remove after troubleshooting
-    const baseUrl = this._resolveBaseUrl(hostname);
+    const remoteBase = this._resolveBaseUrl(hostname);
+    // No context: default runtime is 'hosted'. Reproduce today's host exactly.
+    if (!context) {
+      console.log('[API_CONFIG] hostname=', hostname, 'baseUrl=', remoteBase);
+      return remoteBase;
+    }
+
+    const category = context.category || this.classifyEndpoint(context.endpoint);
+    const runtime = context.runtime === 'local' || context.runtime === 'hosted'
+      ? context.runtime
+      : (this._peekFranchiseRuntime() || 'hosted');
+    const baseUrl = this.resolveRouteBase(category, runtime, { remoteBase: remoteBase });
     console.log('[API_CONFIG] hostname=', hostname, 'baseUrl=', baseUrl);
     return baseUrl;
+  },
+
+  /**
+   * Classify an endpoint path into a routing-table category.
+   * Always-remote prefixes win; everything else is routable ('api').
+   * @param {string} endpoint
+   * @returns {string}
+   */
+  classifyEndpoint(endpoint) {
+    if (!endpoint) return 'api';
+    const raw = String(endpoint);
+    const path = (raw.charAt(0) === '/' ? raw : '/' + raw).split('?')[0];
+    for (let i = 0; i < CATEGORY_PREFIXES.length; i++) {
+      const prefix = CATEGORY_PREFIXES[i][0];
+      if (path === prefix || path.indexOf(prefix) === 0) {
+        return CATEGORY_PREFIXES[i][1];
+      }
+    }
+    return 'api';
+  },
+
+  /**
+   * web | desktop. Desktop is dormant until something sets GOB_BUILD_PROFILE.
+   * @returns {'web'|'desktop'}
+   */
+  getBuildProfile() {
+    if (typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop') {
+      return 'desktop';
+    }
+    return 'web';
+  },
+
+  /**
+   * Loopback base for a local-franchise routable request. Port is overridable
+   * so WS-2 can pick a free port without another api-config change.
+   * @returns {string}
+   */
+  getLoopbackBase() {
+    const port = (typeof window !== 'undefined' && window.GOB_LOOPBACK_PORT) || 8000;
+    return 'http://127.0.0.1:' + port;
+  },
+
+  /**
+   * Table lookup: (category, franchise runtime) -> base URL.
+   * @param {string} category
+   * @param {string} runtime - 'local' | 'hosted'
+   * @param {Object} [opts]
+   * @param {string} [opts.remoteBase]
+   * @param {string} [opts.profile]
+   * @returns {string}
+   */
+  resolveRouteBase(category, runtime, opts) {
+    const options = opts || {};
+    const profile = options.profile || this.getBuildProfile();
+    const remoteBase = options.remoteBase || this._resolveBaseUrl(
+      (typeof window !== 'undefined' && window.location && window.location.hostname) || ''
+    );
+    const axis1 = ALWAYS_REMOTE_SET[category]
+      ? 'always_remote'
+      : (ROUTABLE_SET[category] ? 'routable' : 'routable');
+    const rt = runtime === 'local' ? 'local' : 'hosted';
+    const profileTable = ROUTING_TABLE[profile] || ROUTING_TABLE.web;
+    const cell = profileTable[axis1][rt];
+    return cell === 'loopback' ? this.getLoopbackBase() : remoteBase;
+  },
+
+  /**
+   * Optional peek at FranchiseContext.runtime (WS-3). Unused until something
+   * sets it; getBaseUrl() with no context never consults this.
+   * @returns {'local'|'hosted'|null}
+   */
+  _peekFranchiseRuntime() {
+    try {
+      const ctx = typeof window !== 'undefined' ? window.FranchiseContext : null;
+      if (ctx && (ctx.runtime === 'local' || ctx.runtime === 'hosted')) {
+        return ctx.runtime;
+      }
+    } catch (e) { /* ignore */ }
+    return null;
   },
 
   _resolveBaseUrl(hostname) {
@@ -76,12 +277,18 @@ const API_CONFIG = {
   /**
    * Build a full API URL from an endpoint path
    * @param {string} endpoint - API endpoint path (e.g., "/api/teams" or "api/teams")
+   * @param {Object} [context] - optional { category, runtime }; classified from
+   *   the endpoint when omitted. On the web profile the host is still the
+   *   remote base, so existing callers stay byte-identical.
    * @returns {string} Full API URL
    */
-  buildUrl(endpoint) {
+  buildUrl(endpoint, context) {
     // Ensure endpoint starts with /
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    return `${this.getBaseUrl()}${normalizedEndpoint}`;
+    const ctx = context
+      ? Object.assign({ endpoint: normalizedEndpoint }, context)
+      : { endpoint: normalizedEndpoint };
+    return `${this.getBaseUrl(ctx)}${normalizedEndpoint}`;
   },
   
   /**
@@ -407,6 +614,8 @@ window.API_CONFIG = API_CONFIG;
 // its normal fallback (generic / initials / hide) runs exactly as before.
 (function installPaintOnMiss() {
   if (typeof document === 'undefined') return;
+  if (window.__GOB_PAINT_ON_MISS) return;
+  window.__GOB_PAINT_ON_MISS = true;
   const MASTER_RE = /players\/master\/([^/.?]+)\.png/;
   const WHITE_RE = /recruits\/white\/([^/.?]+)\.png/;
 
