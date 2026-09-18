@@ -522,10 +522,11 @@ try:
     
     templates = Jinja2Templates(directory="FrontEnd/static")
     
-    # Conditionally mount static files (only in development)
-    # In production, Netlify serves static files
+    # Conditionally mount static files (local development and test).
+    # In production/staging, Netlify serves static files. Test must mount too
+    # so mongomock Playwright can load /static/*.html.
     environment = os.getenv("ENVIRONMENT", "development")
-    if environment == "development":
+    if environment in ("development", "test"):
         @app.middleware("http")
         async def local_static_html_redirect(request: Request, call_next):
             """
@@ -591,7 +592,7 @@ try:
             return await call_next(request)
 
         app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
-        print("✅ Static files mounted (development mode)")
+        print("✅ Static files mounted (development/test mode)")
     
     # ✅ PERFORMANCE: Removed debug print statements
     
