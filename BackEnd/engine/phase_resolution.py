@@ -7985,28 +7985,17 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
     return _finish_shot(last_coords)
 
 
-def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position_to_spot, bh_pos):
-    """
-    Final Turn shot: build minimal skeleton (alignment -> pass/receive -> shoot), pick shooter by
-    SH (outside) or SC+AG (attack) with weights 50/30/20/9/1, then resolve_shot. Attach alignment
-    and time_elapsed = time_remaining to result. Clock runs to 0 on this turn, so quarter/game end
-    triggers after the shot (or after FTs if shooting foul); blocking foul on attack awards 2 FTs only.
-    """
+def pick_final_turn_shot_type_and_shooter(game, bh_pos):
+    """Same shot-type + weighted shooter pick as a live Final Turn (consumes sim_rng)."""
     from BackEnd.utils.sim_random import sim_rng as random
-    from BackEnd.constants import ACTIONS
-    from BackEnd.engine.eoq_debug_log import log_eoq_step
     from BackEnd.utils import situational_logic as sl
-    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    log_eoq_step(game, "FINAL_SHOT", "pick_shooter", "START", extra={"bh_pos": bh_pos})
-    # Shot type: 50% outside, 50% attack, except in Q4/OT when trailing by exactly 3:
-    # Final Shot must be an outside three-point attempt (no drive/attack branch).
+
+    off_lineup = game.offense_team.lineup
     delta = sl.get_score_delta(game)
     if getattr(game, "quarter", None) is not None and int(getattr(game, "quarter", 0)) >= 4 and delta == -3:
         shot_type = "Outside"
     else:
         shot_type = "Outside" if random.random() < 0.5 else "Attack"
-    game_state["current_playcall"] = shot_type
-    # Shooter: rank by SH (outside) or SC+AG (attack), weighted random 50/30/20/9/1
     weights = [0.50, 0.30, 0.20, 0.09, 0.01]
     candidates = []
     for pos, player in off_lineup.items():
@@ -8022,20 +8011,48 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     if not candidates:
         for pos in ["PG", "SG", "SF", "PF", "C"]:
             if off_lineup.get(pos):
-                shooter, shooter_pos = off_lineup[pos], pos
-                break
-        else:
-            shooter, shooter_pos = None, "PG"
+                return shot_type, off_lineup[pos], pos
+        return shot_type, None, "PG"
+    r = random.random()
+    cum = 0
+    shooter, shooter_pos = candidates[0][0], candidates[0][1]
+    for i, (player, pos, _) in enumerate(candidates):
+        w = weights[i] if i < len(weights) else (1.0 - cum)
+        cum += w
+        if r <= cum:
+            shooter, shooter_pos = player, pos
+            break
+    return shot_type, shooter, shooter_pos
+
+
+def resolve_final_turn_shot_logic(
+    game,
+    o_destinations,
+    d_destinations,
+    position_to_spot,
+    bh_pos,
+    *,
+    shot_type=None,
+    shooter_pos=None,
+):
+    """
+    Final Turn shot: build minimal skeleton (alignment -> pass/receive -> shoot), pick shooter by
+    SH (outside) or SC+AG (attack) with weights 50/30/20/9/1, then resolve_shot. Attach alignment
+    and time_elapsed = time_remaining to result. Clock runs to 0 on this turn, so quarter/game end
+    triggers after the shot (or after FTs if shooting foul); blocking foul on attack awards 2 FTs only.
+    """
+    from BackEnd.utils.sim_random import sim_rng as random
+    from BackEnd.constants import ACTIONS
+    from BackEnd.engine.eoq_debug_log import log_eoq_step
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    log_eoq_step(game, "FINAL_SHOT", "pick_shooter", "START", extra={"bh_pos": bh_pos})
+    if shot_type is None or shooter_pos is None:
+        shot_type, shooter, shooter_pos = pick_final_turn_shot_type_and_shooter(game, bh_pos)
     else:
-        r = random.random()
-        cum = 0
-        shooter, shooter_pos = candidates[0][0], candidates[0][1]
-        for i, (player, pos, _) in enumerate(candidates):
-            w = weights[i] if i < len(weights) else (1.0 - cum)
-            cum += w
-            if r <= cum:
-                shooter, shooter_pos = player, pos
-                break
+        shooter = off_lineup.get(shooter_pos)
+        if shooter is None:
+            shot_type, shooter, shooter_pos = pick_final_turn_shot_type_and_shooter(game, bh_pos)
+    game_state["current_playcall"] = shot_type
     shot_wing = random.choice(["upper wing", "lower wing"])
     bh_is_shooter = bh_pos == shooter_pos
     log_eoq_step(

@@ -250,7 +250,7 @@ The training execution system applies pre-training conditions, allocates trainin
 #### Community Engagement (`culture-builder-community`)
 
 - **Franchise only** (no training in Single Game / Tournament).
-- **Immediate training effect:** small EM bump for all players (see `training_execution_v2.py`).
+- **Immediate training effect:** each player **EM** `+random.randint(2, 5)` (clamped 1–100 with the breaks EM roll; not shown on the report changes grid). See **Player EM** below.
 - **Next franchise game (home crowd roll):** sets **`pending_community_engagement`** on that team’s **FTD** (`franchise_team_data`). When a franchise game is started (`/api/init-game` or new-game `simulate-quarter` path), the engine reads pending flags for **both** teams, resolves a single band shift for the **home crowd weight table** (see `Home_Crowd_System.md`), then clears both teams’ flags.
 - **User home:** shift crowd weights **up** one chemistry band vs the user’s current `team_chemistry` for the home team in that game; if already in **21–25**, use the **Upper Bonus Range** row from `Home_Crowd_System.md` instead.
 - **User away:** shift **down** one band vs the **home opponent’s** `team_chemistry`; if opponent chemistry is in **7–10**, no downward effect.
@@ -418,30 +418,40 @@ Input is `technical_drills.rebounding + scrimmages`, summed and applied **once**
 2. **Install training (play/defense effectiveness only):** Authoritarian **Execution** and **Teamwork** use one session roll of the same `[1.5, 1.6, 1.7, 1.8]` values on integer **effectiveness** (Command) increments only, via `_scale_install_training_effectiveness_points`—not on momentum/cloaking (install does not allocate to those).
 
 **Authoritarian (all four sub-options implemented):**
-- **Discipline:** Amplifies BH, `fight`, `discipline` (drill / team-attribute mechanism *#1*). Also adds flat `discipline += random.randint(1, 2)` once per training session (shared with Rebounding and Execution only — not Teamwork).
-- **Rebounding:** Amplifies RB, `rebound_modifier` (mechanism *#1*). Receives the shared flat `discipline += random.randint(1, 2)` once per session.
-- **Teamwork:** Amplifies PS, IQ (mechanism *#1*). Also amplifies install **effectiveness** gains on **motion** plays and **zone** defenses only (mechanism *#2*). Man and set plays receive base install gains only under this focus. Adds flat **`team_chemistry += random.randint(0, 1)`** once per session (clamped). Does **not** add the shared Authoritarian **discipline** flat.
-- **Execution:** Amplifies install **effectiveness** gains on **set plays** and **Man** only (mechanism *#2*). Motion and zone defenses receive base install gains only under this focus. Receives the shared flat `discipline += random.randint(1, 2)` once per session.
+- **Discipline:** Amplifies BH, `fight`, `discipline` (drill / team-attribute mechanism *#1*). Also adds flat `discipline += random.randint(1, 2)` once per training session (shared with Rebounding and Execution only — not Teamwork). Player EM `+random.randint(-5, 0)`.
+- **Rebounding:** Amplifies RB, `rebound_modifier` (mechanism *#1*). Receives the shared flat `discipline += random.randint(1, 2)` once per session. No focus EM.
+- **Teamwork:** Amplifies PS, IQ (mechanism *#1*). Also amplifies install **effectiveness** gains on **motion** plays and **zone** defenses only (mechanism *#2*). Man and set plays receive base install gains only under this focus. Adds flat **`team_chemistry += random.randint(0, 1)`** once per session (clamped). Does **not** add the shared Authoritarian **discipline** flat. No focus EM.
+- **Execution:** Amplifies install **effectiveness** gains on **set plays** and **Man** only (mechanism *#2*). Motion and zone defenses receive base install gains only under this focus. Receives the shared flat `discipline += random.randint(1, 2)` once per session. Player EM `+random.randint(-3, 0)`.
 
 **Systems Coach:**
 - Offense / Defense: Drill gains to `offensive_efficiency` / `defensive_efficiency` use mechanism *#1* above. Install: multiplies offense or defense **play point pool** by the same `[1.5, 1.6, 1.7, 1.8]` band before `_apply_offense_play_training` / `_apply_defense_training` when `systems-coach-offense` or `systems-coach-defense` is selected.
 - Fast Breaks: Amplifies `fb_efficiency` and `fb_opp_modifier` drill gains (mechanism *#1*).
 - Presses/Traps: Amplifies `pt_efficiency` and `pt_opp_modifier` drill gains (mechanism *#1*).
+- Any Systems Coach leaf also applies Player EM `+random.randint(-2, 0)`.
 
 **Player Maximizer:**
 - Top 3 Attributes: Amplifies gains to player's top 3 attributes (excluding CH, EM, MO, NG)
 - Attributes 4-6: Amplifies gains to player's 4th–6th highest attributes among the same set as Top 3 (excluding CH, EM, MO, NG)
 - **Positional Focus** (`player-maximizer-positional-focus`): Primary position from highest **RT** (ties PG→SG→SF→PF→C); fixed triple per primary—PG: PS/BH/IQ; SG: SH/OD/AG; SF: SC/ST/AG; PF: RB/ID/ST; C: SC/ID/ST. Same focus multiplier on drill gains to those attrs.
 - **Custom:** User picks **three** distinct attributes per player (same ranking set as Top 3 / 4–6). Franchise UI sends `coaching_focus_custom_by_player` with `{ player_id: [attrA, attrB, attrC] }` for every roster player. Roster rows include `attrs` and `position_ratings`; list order **highest RT** descending.
+- Any Player Maximizer leaf also applies Player EM `+random.randint(0, 2)`.
 
 **Culture Builder:**
-- Inspire: **Flat block:** each player gets **EM** `+random.randint(2, 5)` and **MO** `+random.randint(1, 2)` (caps apply); no focus multiplier on those. **team_chemistry** training gains use `random.choice([1.5, 1.6, 1.7, 1.8])` under Inspire.
-- Community Engagement: Improves EM, affects crowd factors (carried to next game)
-- **Team Building** (`culture-builder-teamwork`): **Team chemistry** `+random.randint(1, 3)` once per session (clamped like other team attrs). UI label only; API `value` unchanged. Does **not** add the shared Culture Builder **`fight`** flat (that applies only to Inspire, Confidence, and Community Engagement).
-- **Build Confidence:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use the standard focus multiplier `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coefficient). No flat EM/MO block; no Inspire-style team chemistry mult.
+- Inspire: **Flat block:** each player gets **MO** `+random.randint(1, 2)` (MO scale clamp); **EM** uses the shared Player EM focus band `+random.randint(2, 5)` (additive with breaks, then clamp 1–100). No focus multiplier on those. **team_chemistry** training gains use `random.choice([1.5, 1.6, 1.7, 1.8])` under Inspire.
+- Community Engagement: **EM** `+random.randint(2, 5)` (shared Player EM helper); crowd band shift via `pending_community_engagement` (next home game).
+- **Team Building** (`culture-builder-teamwork`): **Team chemistry** `+random.randint(1, 3)` once per session (clamped like other team attrs). UI label only; API `value` unchanged. Does **not** add the shared Culture Builder **`fight`** flat (that applies only to Inspire, Confidence, and Community Engagement). No focus EM.
+- **Build Confidence:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use the standard focus multiplier `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coefficient). Focus EM `+random.randint(0, 2)`. No Inspire-style team chemistry mult.
 - **Inspire**, **Confidence**, and **Community Engagement** also add flat **`fight += random.randint(1, 2)`** once per training session (Culture Builder shared block; Team Building excluded).
 - **Culture Builder**, except **Confidence**, also adds flat **`discipline += random.randint(-2, -1)`** once per training session.
 - **Authoritarian**, except **Rebounding**, also adds flat **`fight += random.randint(-2, -1)`** once per training session.
+
+#### Player EM (Emotion)
+
+Canonical rules: `_documentation_master/projects/Player_EM_Overview.md` and `BackEnd/utils/player_em.py`.
+
+Weeks 1–26 (user and CPU auto-train): each player gets **two independent rolls** (coaching-focus band + breaks band), then clamp **1–100**. Missing breaks = 0 (`randint(-5, -3)`). The training-report **changes grid does not show EM**. Inspire still ticks MO separately.
+
+Breaks EM bands: 0 → `(-5, -3)`; 1 → `(-2, 0)`; 2 → `(0, 2)`; >2 → `(2, 5)`.
 
 #### Breaks Effect
 

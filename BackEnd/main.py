@@ -122,8 +122,15 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
             player.reset_stats()
             if _start_fouls:
                 player.stats["game"]["F"] = _start_fouls
-            # Randomize EM, CH, MO for new game instance
-            player.attributes = Player.randomize_game_attributes(player.attributes)
+            # Franchise: keep FPD EM. Single/tournament: re-roll EM 1–100.
+            # CH still re-rolls; MO still zeros.
+            preserve_emotion = bool(
+                getattr(gm.home_team, "franchise_id", None)
+                or getattr(gm.away_team, "franchise_id", None)
+            )
+            player.attributes = Player.randomize_game_attributes(
+                player.attributes, preserve_emotion=preserve_emotion
+            )
             affected.append(player.player_id)
 
     gm.game_state["game_stats_initialized"] = True

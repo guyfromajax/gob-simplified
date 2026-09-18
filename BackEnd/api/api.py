@@ -7580,9 +7580,9 @@ try:
         else:
             logging.debug(f"⚠️ [INIT-GAME] No user_team_side provided - override checking will not work!")
         
-        # Initialize game stats (this randomizes EM, CH, MO for all players)
+        # Initialize game stats (CH re-roll, MO=0; franchise keeps FPD EM, others re-roll EM)
         stats_start = time.time()
-        _initialize_game_stats(gm, game_id=None)  # None = new game, will randomize
+        _initialize_game_stats(gm, game_id=None)  # None = new game
         stats_time = (time.time() - stats_start) * 1000
         # logging.warning(f"⏱️ [PERF] /api/init-game - Game stats initialized: {stats_time:.2f}ms")
         gm_time = (time.time() - gm_start) * 1000

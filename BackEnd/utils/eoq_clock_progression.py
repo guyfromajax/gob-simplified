@@ -117,6 +117,7 @@ def clear_late_clock_eoq_chain(game_state: Dict[str, Any]) -> None:
     game_state.pop("eoq_trace_seq", None)
     game_state.pop("eoq_trace_turn_in_seq", None)
     game_state.pop("_debug_final_hold_streak", None)
+    game_state.pop("_eoq_final_shot_gate", None)
 
 
 def _late_chain_active(game: Any, result: Dict[str, Any]) -> bool:
@@ -366,7 +367,11 @@ def schedule_flss_after_dreb(
     dreb_source_turn: Optional[Dict[str, Any]],
     rebounder: Any = None,
 ) -> None:
-    """After discrete DREB in an EOQ chain when clock remains, next possession is FLSS."""
+    """After discrete DREB in an EOQ chain when clock remains, arm pending FLSS.
+
+    The next HCO entry may override to Final Shot when dest+pass still fits
+    (``can_fit_final_shot_dest_and_pass``).
+    """
     if not isinstance(dreb_source_turn, dict):
         return
     gs = game.game_state
@@ -404,11 +409,14 @@ def schedule_flss_after_dreb(
 
 
 def schedule_flss_after_inbound(game: Any, inbound_source_turn: Optional[Dict[str, Any]]) -> None:
-    """After BIP/SIP when clock remains, next possession is FLSS sprint-and-shoot.
+    """After BIP/SIP when clock remains, arm pending FLSS for the next live entry.
 
     Arms when the source turn is tagged ``late_clock_eoq`` **or** the EOQ chain
     is already active (covers FOUL/CHARGE→SIP that historically lacked the
     turn-level tag). Always stamps the source turn for observability.
+
+    The next HCO entry overrides to Final Shot when dest travel + BH→shooter
+    pass still fits remaining clock; otherwise the pending FLSS runs.
     """
     if not isinstance(inbound_source_turn, dict):
         return

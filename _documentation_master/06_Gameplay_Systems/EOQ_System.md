@@ -59,9 +59,10 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `late_clock_eoq_chain_active` | EOQ window opens (HCO Final Shot arm **or** HCT/FCP window-only); extended during chain | `clear_late_clock_eoq_chain()` at quarter boundary | Marks ≤30 EOQ window in progress. Blocks first gate for non-HCO; HCO may still arm first Final Shot if `final_shot_ran_this_chain` is false |
 | `final_turn_shot_this_turn` | **HCO only** — first gate Final Shot arm or §6b follow-up Final Turn | Popped when turn resolves | Routes HCO to `resolve_final_turn_shot()`. **Never set on HCT/FCP** |
 | `final_shot_possession_active` | Same as above (HCO only) | Cleared after turn stamped | Internal arming guard for Final Shot execute |
-| `suppress_final_shot_sfx` | Follow-up Final Turn armed (`EOQ_FOLLOWUP_FINAL_TURN`); **and all FLSS turns** (stamped by `resolve_flss_shot_logic`) | Popped when turn resolves; stamped on turn payload | FE skips the Final Shot stinger — on repeat full Final Turns, and on **every FLSS** (which fires its own heave/launch VO instead) |
-| `flss_possession_pending` | FLSS follow-up chosen; or `schedule_flss_after_inbound` after chain make | Popped at FLSS turn start | Next offense turn → FLSS (may be overridden at entry by runway check) |
-| `final_shot_ran_this_chain` | First EOQ terminal shot completes (`final_turn` or FLSS w/ `final_shot_possession`) | Quarter break clear | Enables runway-based follow-up routing |
+| `suppress_final_shot_sfx` | Dest+pass Final Shot when a shot already ran this chain (`EOQ_DEST_PASS_FINAL_TURN`); **and all FLSS turns** | Popped when turn resolves; stamped on turn payload | FE skips the Final Shot stinger on repeat full Final Turns, and on **every FLSS** |
+| `flss_possession_pending` | FLSS follow-up chosen; or `schedule_flss_after_inbound` / `schedule_flss_after_dreb` | Popped at FLSS start, dest+pass Final Shot arm, or quarter clear | Next HCO entry: dest+pass → Final Shot, else FLSS |
+| `final_shot_ran_this_chain` | First EOQ terminal shot completes (`final_turn` or FLSS w/ `final_shot_possession`) | Quarter break clear | Repeat dest+pass routing (suppress Final Shot stinger) |
+| `_eoq_final_shot_gate` | Dest+pass arm consumes alignment + live shooter pick | Consumed in `resolve_final_turn_shot`; quarter clear | Prevents a second shooter/alignment roll |
 | `flss_from_dreb` | After discrete DREB when EOQ chain + clock > 2s | Popped at FLSS resolve | Rebounder = BH; post-DREB FLSS sprint |
 | `pending_oreb` | Miss/block OREB | Consumed on putback turn | Putback possession |
 | `eoq_trace_seq` / `eoq_trace_turn_in_seq` | EOQ trace enabled | Quarter break clear | Correlate logs FE ↔ BE |
@@ -105,13 +106,12 @@ On quarter break, `api.py` clears EOQ flags (`clear_late_clock_eoq_chain`, drops
 flowchart TD
     A[Possession entry HCO/HCT/FCP/Fast Break] --> B{time <= 30?}
     B -->|No| Z[Normal possession]
-    B -->|Yes| C{final_shot_ran_this_chain?}
-    C -->|Yes| R[Apply situational priority and runway]
-    R -->|HCO runway OK| G2[Arm Final Turn suppress SFX]
-    R -->|non-HCO fits| Z2[Run normal turn]
-    R -->|non-HCO overruns| L[Safe prefix then FLSS]
+    B -->|Yes| C{pending FLSS or shot already ran?}
+    C -->|Yes HCO| R[Dest+pass vs remaining clock]
+    R -->|Fits| G2[Arm Final Shot; reuse gate pick]
+    R -->|Does not fit| L[FLSS]
     C -->|No| D{chain_active?}
-    D -->|Yes| E[Follow-up FLSS / OREB / terminal DREB]
+    D -->|Yes HCT/FCP| Z2[Measured preview / first gate]
     D -->|No| F{final_turn_eligible?}
     F -->|Q4 situational| H[Force Foul / Run Out / Quick Shot]
     F -->|Yes Qs1-3 or Q4| G[Arm first Final Shot]
@@ -123,7 +123,7 @@ flowchart TD
     K --> M{clock > 0 after shot?}
     M -->|Make| N[BIP -> may schedule FLSS]
     M -->|Miss OREB| O[Putback if chain active]
-    M -->|Miss DREB clock > 2s| P2[DREB -> FLSS from rebounder]
+    M -->|Miss DREB clock > 2s| P2[DREB -> pending; dest+pass at next HCO]
     M -->|Miss DREB clock <= 2s| P[Terminal DREB]
     M -->|No| Q[quarter_ends_after]
     N --> R
@@ -193,7 +193,7 @@ When the first gate passes (trailing/tied path; Q4 situational branches may shor
 | **HCO** | `activate_late_clock_eoq_chain`; set `final_turn_shot_this_turn` + `final_shot_possession_active` | `FINAL_SHOT_TRIGGERED` |
 | **HCT / FCP** | `activate_late_clock_eoq_chain` only — **no** Final Shot execute flags; continue normal trap/press | `EOQ_WINDOW_OPENED` |
 
-After an HCT/FCP window-open, a later **HCO** entry with `final_shot_ran_this_chain` still false may still pass the first gate and arm Final Shot (fixes BIP→HCT@30 then later HCO without poisoning the quarter).
+After an HCT/FCP window-open, a later **HCO** entry with `final_shot_ran_this_chain` still false may still pass the first gate and arm Final Shot **unless** `flss_possession_pending` is set. Pending inbound/DREB uses the dest+pass gate instead of the first gate (so an aborted Final Shot / pressure foul→SIP cannot force FLSS when a full Final Shot still fits).
 
 After the turn completes, if `final_turn` **or** (`flss` and `final_shot_possession`), set **`final_shot_ran_this_chain`**.
 
@@ -216,12 +216,11 @@ ball owner, and applicable entry costs, then resolves FLSS from that state. If
 the previewed turn fits, the live resolver runs normally from the unchanged RNG
 stream.
 
-For an HCO follow-up after an executed EOQ shot,
-`can_run_final_turn_followup()` still decides repeat Final Turn versus FLSS. HCO
-then uses `evaluate_final_turn_pacing()` for its structured alignment/handoff
-decision. If the structured Final Turn cannot release inside the available
-clock, it routes to FLSS at every positive clock value. The measured preview
-rule provides the equivalent overrun protection for HCT/FCP/Fast Break.
+For an HCO entry with `flss_possession_pending` (BIP/SIP after foul/TO/make, or post-DREB) **or** `final_shot_ran_this_chain`, dest+pass is the Final Shot vs FLSS gate — not “one Final Shot per quarter.”
+
+`can_fit_final_shot_dest_and_pass()` (`final_turn_pacing.py`): slowest offense player **start → Final Shot destinations**, then **ball-handler dest → shooter dest** pass (0 if BH is the shooter). Start coords are `prior_turn.final_coords`, else live `player.coords`. Does **not** include the late-clock shoot/drive anchor. The gate consumes the live Final Turn shot-type + weighted shooter pick (`pick_final_turn_shot_type_and_shooter`) and stashes `_eoq_final_shot_gate` so the execute path does not re-roll them.
+
+If dest+pass fits → arm Final Shot (`EOQ_DEST_PASS_FINAL_TURN`). If it does not → keep/set `flss_possession_pending` (`EOQ_DEST_PASS_FLSS`). A started Final Shot still uses `evaluate_final_turn_pacing()`; if that structured choreography cannot release, it routes to FLSS at any positive clock. HCT/FCP/Fast Break keep the measured preview rule.
 
 **What the clone copies.** The clone exists so impure resolvers can run
 speculatively; it does not need a private copy of the already-emitted turn log,
@@ -313,10 +312,10 @@ When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCour
 
 | Condition | Source |
 |-----------|--------|
-| Follow-up runway check fails (`EOQ_FOLLOWUP_FLSS`) | `turn_manager.run_micro_turn()` after `final_shot_ran_this_chain` |
-| `flss_possession_pending` after late-clock BIP/SIP (make **or** FOUL/CHARGE→SIP in chain) | `schedule_flss_after_inbound()` — arms when source has `late_clock_eoq` **or** `late_clock_eoq_chain_active`; may be cleared at entry if follow-up runway favors Final Turn |
+| Dest+pass does not fit (`EOQ_DEST_PASS_FLSS`) | `turn_manager.run_micro_turn()` HCO entry with pending inbound/DREB FLSS or after an executed EOQ shot |
+| `flss_possession_pending` after late-clock BIP/SIP (make **or** FOUL/CHARGE→SIP in chain) | `schedule_flss_after_inbound()` — arms when source has `late_clock_eoq` **or** `late_clock_eoq_chain_active`; next HCO dest+pass may override to Final Shot |
 | Final Turn preflight budget fail at any positive clock | `resolve_final_turn_shot()` |
-| Post-DREB when chain active and clock > 2s | `schedule_flss_after_dreb()` |
+| Post-DREB when chain active and clock > 2s | `schedule_flss_after_dreb()` arms pending; next HCO dest+pass may override to Final Shot |
 | **HCT / FCP / FAST_BREAK** preview exceeds measured runway | Safe complete prefix → FLSS (`RUNWAY_SHORTENED_FLSS`) |
 | Non-HCO preview unavailable at `0 < clock ≤ 8` | Fixed-cutoff fail-safe → FLSS (`LOW_CLOCK_FLSS`) |
 
@@ -421,12 +420,11 @@ Enabled by default (`game_state['eoq_trace'] !== false`). Filter logs: **`[EOQ-T
 |-------|---------|
 | `CHAIN` / `FINAL_SHOT_TRIGGERED` | **First** full Final Shot **armed on HCO** — must appear before HCO runs Final Shot |
 | `CHAIN` / `EOQ_WINDOW_OPENED` | EOQ window opened on HCT/FCP without Final Shot execute flags |
-| `CHAIN` / `EOQ_FOLLOWUP_DEFER_FINAL_TURN` | Follow-up runway would allow Final Turn but entry is HCT/FCP — deferred |
-| `CHAIN` / `EOQ_FOLLOWUP_FINAL_TURN` | Runway check passed → repeat full Final Turn (SFX suppressed) |
-| `CHAIN` / `EOQ_FOLLOWUP_FLSS` | Runway check failed → FLSS on this entry |
+| `CHAIN` / `EOQ_DEST_PASS_FINAL_TURN` | Dest+pass fit → HCO Final Shot (pending inbound/DREB cleared; gate pick stashed) |
+| `CHAIN` / `EOQ_DEST_PASS_FLSS` | Dest+pass did not fit → pending FLSS |
 | `CHAIN` / `FLSS_POSSESSION_START` | FLSS turn starting |
-| `CHAIN` / `FLSS_SCHEDULED_AFTER_INBOUND` | Make + time left → inbound; next entry may override via §6b |
-| `CHAIN` / `FLSS_SCHEDULED_AFTER_DREB` | Chain DREB + time left → FLSS (no outlet) |
+| `CHAIN` / `FLSS_SCHEDULED_AFTER_INBOUND` | Make/foul/TO + time left → inbound; next HCO dest+pass may override |
+| `CHAIN` / `FLSS_SCHEDULED_AFTER_DREB` | Chain DREB + time left → pending FLSS; next HCO dest+pass may override |
 | `TURN` role `FINAL_SHOT` | Turn has `final_turn` or `final_shot_possession` |
 | `TURN` role `EOQ_CHAIN` | `late_clock_eoq` only — **not** full Final Shot |
 | `STEP` flow `FINAL_SHOT` / `FLSS` | Pipeline substeps |
@@ -434,7 +432,7 @@ Enabled by default (`game_state['eoq_trace'] !== false`). Filter logs: **`[EOQ-T
 **Debugging checklist when Final Shot “didn’t trigger”:**
 
 1. Was `FINAL_SHOT_TRIGGERED` logged? If no → first gate failed (see below).
-2. Was `final_shot_ran_this_chain` already true? → look for `EOQ_FOLLOWUP_FINAL_TURN` or `EOQ_FOLLOWUP_FLSS` instead.
+2. Was `flss_possession_pending` or `final_shot_ran_this_chain` already true? → look for `EOQ_DEST_PASS_FINAL_TURN` or `EOQ_DEST_PASS_FLSS` instead.
 3. Was `late_clock_eoq_chain_active` true **before** first Final Shot? → premature chain (FT trip or early OREB bug).
 4. Did possession **start** above 30s?
 5. Which Q4 situational-priority branch won (Force Foul, Run Out, Quick Shot, Final Shot)?
@@ -450,8 +448,9 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 |---------|----------------|
 | No Final Shot all quarter | `late_clock_eoq_chain_active` stuck true before first ≤30 possession (FT trip or early OREB) |
 | Trace says `FINAL_SHOT` but no announcement | Trace role was `EOQ_CHAIN` mislabeled or `late_clock_eoq` without `final_turn` |
-| FLSS loop, never saw first Final Turn | Chain started on FT path before fix; or every entry fails §6b runway (check clock after BIP runoff) |
-| Full Final Turn after make when expecting FLSS | §6b runway check passed; `EOQ_FOLLOWUP_FINAL_TURN` in trace |
+| FLSS loop, never saw first Final Turn | Chain started on FT path before fix; or dest+pass fails after BIP (check clock after BIP runoff) |
+| Full Final Turn after make/SIP when expecting FLSS | Dest+pass fit; `EOQ_DEST_PASS_FINAL_TURN` in trace |
+| Handler holds at FLSS spot with lots of clock | Dest+pass skipped or failed; FLSS burns remaining clock — check pending inbound without `EOQ_DEST_PASS_*` |
 | Final Shot stinger twice in last 30s | Missing `suppress_final_shot_sfx` on follow-up Final Turn |
 | Quarter ends at 0:01, no airhorn | Missing `quarter_ends_after` on terminal turn (check `ensure_quarter_end_clock_drain` when clock already 0); or turn index missing so dedupe key is empty; or `scene.skipToEnd` |
 | Full HCO outlet after Final Shot DREB in chain | `flss_after_dreb` not set or FE ran outlet despite `skip_dreb_outlet_lead_in` |
@@ -464,7 +463,7 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 
 | Date | Note |
 |------|------|
-| 2026-06 | Runway-based follow-up routing (`can_run_final_turn_followup`, §6b); repeat Final Turn SFX suppress |
+| 2026-09 | HCO dest+pass gate (`can_fit_final_shot_dest_and_pass`) overrides pending inbound/DREB FLSS when start→dest + BH→shooter pass still fits; live shooter pick stashed on `_eoq_final_shot_gate` |
 | 2026-06 | FT last-shot routing no longer starts chain (`late_clock_ft_resolution`); first Final Shot preserved after FT/OREB paths |
 | 2026-06 | Post-DREB FLSS when chain active and clock > 2s; terminal DREB at ≤ 2s |
 | 2026-07 | Unified `signalQuarterEnded` airhorn helper; `quarter_ends_after` playback path for FT / hold / Run Out |

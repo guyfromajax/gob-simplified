@@ -52,7 +52,6 @@
 128. Add a badass design appraoch to New Stories
 131. Centralized Turn Transition Helper / System
 139. Mod system for uploading custom leagues
-140. Better logic and impact to player EM
 142. Logic and impact for play scores
 143. Nail player plumbing for Mod Teams
 144. Nail mod team balance, league-wide
@@ -61,9 +60,8 @@
 200. PvP live
 
 ##Continuous Evolution (base is built)
-1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
-2. Advanced Topics tutorials
-5. Players as Characters
+1. Advanced Topics tutorials
+2. Players as Characters
 
 
 ##Bugs

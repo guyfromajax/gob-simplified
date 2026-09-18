@@ -350,6 +350,79 @@ def _estimate_entry_pass_seconds(
     return converge_seconds + pass_seconds, True
 
 
+def _live_offense_coords(off_lineup: Dict[str, Any]) -> Dict[str, Dict[str, float]]:
+    out: Dict[str, Dict[str, float]] = {}
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        pid = _player_id_at_pos(off_lineup, pos)
+        player = off_lineup.get(pos) if off_lineup else None
+        coords = getattr(player, "coords", None) if player is not None else None
+        if not pid or not isinstance(coords, dict):
+            continue
+        try:
+            out[pid] = {"x": float(coords["x"]), "y": float(coords["y"])}
+        except (TypeError, ValueError, KeyError):
+            continue
+    return out
+
+
+def dest_and_pass_seconds(
+    game: Any,
+    *,
+    o_destinations: Dict[str, Dict[str, float]],
+    bh_pos: str,
+    shooter_pos: str,
+    prior_turn: Optional[Dict[str, Any]] = None,
+) -> float:
+    """Game seconds for offense start → Final Shot dests, then BH pass to shooter.
+
+    Alignment is the slowest player start→dest. After that the BH is at his dest
+    and passes to the shooter at theirs (0 if BH is the shooter). Does not include
+    the late-clock shoot/drive anchor or shot micro-reserve.
+    """
+    off_lineup = game.offense_team.lineup
+    alignment_by_id = _alignment_coords_by_player_id(o_destinations, off_lineup)
+    start_turn = prior_turn if isinstance(prior_turn, dict) else {}
+    if not (start_turn.get("final_coords") or {}):
+        live = _live_offense_coords(off_lineup)
+        start_turn = {**start_turn, "final_coords": live}
+    align_t = _estimate_alignment_seconds(game, start_turn, alignment_by_id)
+    if str(bh_pos) == str(shooter_pos):
+        return float(align_t)
+    bh_dest = o_destinations.get(bh_pos)
+    sh_dest = o_destinations.get(shooter_pos)
+    shooter = off_lineup.get(shooter_pos)
+    if not isinstance(bh_dest, dict) or not isinstance(sh_dest, dict) or shooter is None:
+        return float(align_t)
+    pass_t = _estimate_pass_step_seconds(
+        {"x": float(bh_dest["x"]), "y": float(bh_dest["y"])},
+        {"x": float(sh_dest["x"]), "y": float(sh_dest["y"])},
+        {"x": float(sh_dest["x"]), "y": float(sh_dest["y"])},
+        shooter,
+        move_seconds=0.0,
+    )
+    return float(align_t) + float(pass_t)
+
+
+def can_fit_final_shot_dest_and_pass(
+    game: Any,
+    *,
+    o_destinations: Dict[str, Dict[str, float]],
+    bh_pos: str,
+    shooter_pos: str,
+    prior_turn: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """True when dest travel + BH→shooter pass fits in ``time_remaining``."""
+    time_remaining = float((getattr(game, "game_state", None) or {}).get("time_remaining") or 0)
+    needed = dest_and_pass_seconds(
+        game,
+        o_destinations=o_destinations,
+        bh_pos=bh_pos,
+        shooter_pos=shooter_pos,
+        prior_turn=prior_turn,
+    )
+    return needed <= time_remaining + 1e-6
+
+
 def _estimate_pre_anchor_move_seconds(
     skeleton_steps: List[Dict[str, Any]],
     anchor_index: int,

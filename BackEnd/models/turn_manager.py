@@ -1615,6 +1615,44 @@ class TurnManager:
             chain_active=chain_active,
             final_shot_ran_this_chain=bool(game_state.get("final_shot_ran_this_chain")),
         )
+        dest_pass_decided = False
+        if (
+            result is None
+            and state == "HCO"
+            and time_remaining_sec is not None
+            and 0 < int(time_remaining_sec) <= 30
+            and (
+                game_state.get("flss_possession_pending")
+                or game_state.get("final_shot_ran_this_chain")
+            )
+        ):
+            dest_pass_decided = True
+            ran = bool(game_state.get("final_shot_ran_this_chain"))
+            if self._try_arm_final_shot_from_dest_pass(
+                game_state, suppress_sfx=ran
+            ):
+                activate_late_clock_eoq_chain(game_state)
+                begin_eoq_trace_sequence(self.game)
+                log_eoq_chain_event(
+                    self.game,
+                    "EOQ_DEST_PASS_FINAL_TURN",
+                    extra={
+                        "time_remaining_sec": time_remaining_sec,
+                        "final_shot_ran_this_chain": ran,
+                    },
+                )
+            else:
+                if not game_state.get("flss_possession_pending"):
+                    game_state["flss_possession_pending"] = True
+                begin_eoq_trace_sequence(self.game)
+                log_eoq_chain_event(
+                    self.game,
+                    "EOQ_DEST_PASS_FLSS",
+                    extra={
+                        "time_remaining_sec": time_remaining_sec,
+                        "final_shot_ran_this_chain": ran,
+                    },
+                )
         final_turn_eligible = (
             quarter is not None
             and time_remaining_sec is not None
@@ -1622,6 +1660,7 @@ class TurnManager:
             and state != "FAST_BREAK"
             and state in ("HCO", "HCT", "FCP")
             and result is None
+            and not dest_pass_decided
             and not game_state.get("flss_possession_pending")
             and first_gate_open
         )
@@ -1652,55 +1691,6 @@ class TurnManager:
                     begin_eoq_trace_sequence=begin_eoq_trace_sequence,
                     log_eoq_chain_event=log_eoq_chain_event,
                     activate_late_clock_eoq_chain=activate_late_clock_eoq_chain,
-                )
-
-        elif (
-            result is None
-            and game_state.get("final_shot_ran_this_chain")
-            and time_remaining_sec is not None
-            and int(time_remaining_sec) <= 30
-            and state != "FAST_BREAK"
-            and state in ("HCO", "HCT", "FCP")
-        ):
-            # After the first EOQ terminal shot, pick full Final Turn vs FLSS by runway.
-            # Final Turn execute flags are HCO-only; HCT/FCP with runway defer to a
-            # later HCO entry (or FLSS at ≤8). Runway-fail → flss_possession_pending.
-            if self._eoq_followup_can_run_final_turn():
-                if state == "HCO":
-                    game_state.pop("flss_possession_pending", None)
-                    game_state["final_turn_shot_this_turn"] = True
-                    game_state["final_shot_possession_active"] = True
-                    game_state["suppress_final_shot_sfx"] = True
-                    begin_eoq_trace_sequence(self.game)
-                    log_eoq_chain_event(
-                        self.game,
-                        "EOQ_FOLLOWUP_FINAL_TURN",
-                        extra={
-                            "time_remaining_sec": time_remaining_sec,
-                            "offensive_state": state,
-                        },
-                    )
-                else:
-                    begin_eoq_trace_sequence(self.game)
-                    log_eoq_chain_event(
-                        self.game,
-                        "EOQ_FOLLOWUP_DEFER_FINAL_TURN",
-                        extra={
-                            "time_remaining_sec": time_remaining_sec,
-                            "offensive_state": state,
-                            "reason": "final_shot_hco_only",
-                        },
-                    )
-            elif not game_state.get("flss_possession_pending"):
-                game_state["flss_possession_pending"] = True
-                begin_eoq_trace_sequence(self.game)
-                log_eoq_chain_event(
-                    self.game,
-                    "EOQ_FOLLOWUP_FLSS",
-                    extra={
-                        "time_remaining_sec": time_remaining_sec,
-                        "offensive_state": state,
-                    },
                 )
 
         clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
@@ -4442,6 +4432,46 @@ class TurnManager:
         offense["Fast_Break_Entries"] += 1
         defense["vs_Fast_Break"]["used"] += 1
 
+    def _try_arm_final_shot_from_dest_pass(self, game_state, *, suppress_sfx: bool) -> bool:
+        """Arm HCO Final Shot when dest travel + BH→shooter pass fits remaining clock.
+
+        Consumes sim_rng for alignment and the live Final Turn shooter pick. On fit,
+        stashes those picks so ``resolve_final_turn_shot`` does not roll them again.
+        """
+        from BackEnd.engine.final_turn_pacing import can_fit_final_shot_dest_and_pass
+        from BackEnd.engine.phase_resolution import pick_final_turn_shot_type_and_shooter
+
+        o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
+        shot_type, _shooter, shooter_pos = pick_final_turn_shot_type_and_shooter(
+            self.game, bh_pos
+        )
+        prior_turns = getattr(self.game, "turns", None) or []
+        prior_turn = prior_turns[-1] if prior_turns else None
+        if not can_fit_final_shot_dest_and_pass(
+            self.game,
+            o_destinations=o_dest,
+            bh_pos=bh_pos,
+            shooter_pos=shooter_pos,
+            prior_turn=prior_turn if isinstance(prior_turn, dict) else None,
+        ):
+            return False
+        game_state["_eoq_final_shot_gate"] = {
+            "shot_type": shot_type,
+            "shooter_pos": shooter_pos,
+            "o_destinations": o_dest,
+            "position_to_spot": position_to_spot,
+            "bh_pos": bh_pos,
+        }
+        game_state.pop("flss_possession_pending", None)
+        game_state.pop("flss_from_dreb", None)
+        game_state["final_turn_shot_this_turn"] = True
+        game_state["final_shot_possession_active"] = True
+        if suppress_sfx:
+            game_state["suppress_final_shot_sfx"] = True
+        else:
+            game_state.pop("suppress_final_shot_sfx", None)
+        return True
+
     def _enter_eoq_first_gate(
         self,
         game_state,
@@ -4509,16 +4539,20 @@ class TurnManager:
         )
 
     def _eoq_followup_can_run_final_turn(self) -> bool:
-        from BackEnd.engine.final_turn_pacing import can_run_final_turn_followup
+        from BackEnd.engine.final_turn_pacing import can_fit_final_shot_dest_and_pass
+        from BackEnd.engine.phase_resolution import pick_final_turn_shot_type_and_shooter
 
         prior_turns = getattr(self.game, "turns", None) or []
         prior_turn = prior_turns[-1] if prior_turns else None
         o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
-        return can_run_final_turn_followup(
+        _shot_type, _shooter, shooter_pos = pick_final_turn_shot_type_and_shooter(
+            self.game, bh_pos
+        )
+        return can_fit_final_shot_dest_and_pass(
             self.game,
             o_destinations=o_dest,
-            position_to_spot=position_to_spot,
             bh_pos=bh_pos,
+            shooter_pos=shooter_pos,
             prior_turn=prior_turn if isinstance(prior_turn, dict) else None,
         )
 
@@ -4528,9 +4562,15 @@ class TurnManager:
         from BackEnd.engine.phase_resolution import resolve_final_turn_shot_logic
 
         suppress_sfx = bool(self.game.game_state.pop("suppress_final_shot_sfx", False))
+        gate = self.game.game_state.pop("_eoq_final_shot_gate", None) or {}
 
         log_eoq_step(self.game, "FINAL_SHOT", "alignment_build", "START")
-        o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
+        if gate.get("o_destinations"):
+            o_dest = gate["o_destinations"]
+            position_to_spot = gate["position_to_spot"]
+            bh_pos = gate.get("bh_pos") or "PG"
+        else:
+            o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
         d_dest, zone_playcall = self._build_final_turn_defense_alignment()
         log_eoq_step(
             self.game,
@@ -4549,7 +4589,13 @@ class TurnManager:
         announce_zone_played_as_man(zone_playcall, "Final Turn")
         log_eoq_step(self.game, "FINAL_SHOT", "resolve_final_turn_shot_logic", "START", extra={"bh_pos": bh_pos})
         result = resolve_final_turn_shot_logic(
-            self.game, o_dest, d_dest, position_to_spot, bh_pos
+            self.game,
+            o_dest,
+            d_dest,
+            position_to_spot,
+            bh_pos,
+            shot_type=gate.get("shot_type"),
+            shooter_pos=gate.get("shooter_pos"),
         )
         if isinstance(result, dict) and result.get("route_flss"):
             from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step

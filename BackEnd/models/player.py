@@ -126,7 +126,12 @@ class Player:
                 pass
     
     @staticmethod
-    def randomize_game_attributes(attributes: dict, *, preserve_character: bool = False) -> dict:
+    def randomize_game_attributes(
+        attributes: dict,
+        *,
+        preserve_character: bool = False,
+        preserve_emotion: bool = False,
+    ) -> dict:
         """
         Initialize player attributes for a new mode instance.
         Copies exact values from universal collection for most attributes,
@@ -137,6 +142,8 @@ class Player:
         Args:
             attributes: Player attributes dict (from universal players collection)
             preserve_character: When True, keep an existing CH value (e.g. recruit generation).
+            preserve_emotion: When True, keep existing EM / anchor_EM (franchise game init
+                seeds from FPD instead of re-rolling 1–100).
             
         Returns:
             Modified attributes dict with:
@@ -144,7 +151,7 @@ class Player:
             - NG = 1.0
             - CH (Character) = random.randint(1, 100) unless preserve_character and CH set
             - MO (Momentum) = 0 (always 0 at game init)
-            - EM (Emotion) = random.randint(1, 100)
+            - EM (Emotion) = random.randint(1, 100) unless preserve_emotion and EM set
         """
         # NG is always 1.0 at start of new mode instance
         attributes["NG"] = 1.0
@@ -160,9 +167,12 @@ class Player:
         attributes["MO"] = 0
         attributes["anchor_MO"] = 0
         
-        # EM is random 1-100
-        attributes["EM"] = random.randint(1, 100)
-        attributes["anchor_EM"] = attributes["EM"]
+        if preserve_emotion and attributes.get("EM") is not None:
+            if attributes.get("anchor_EM") is None:
+                attributes["anchor_EM"] = attributes["EM"]
+        else:
+            attributes["EM"] = random.randint(1, 100)
+            attributes["anchor_EM"] = attributes["EM"]
         
         return attributes
 
