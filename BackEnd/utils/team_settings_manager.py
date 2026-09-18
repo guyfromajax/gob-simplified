@@ -202,7 +202,7 @@ def save_team_settings(
                 update_path = f"teams.{actual_team_id}.{settings_type}"
             else:
                 # Saving to tournament master doc - use authoritative user_team_object_id (same key as load path)
-                from BackEnd.api.tournament_routes import get_user_team_from_tournament
+                from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
                 try:
                     doc_id_obj = ObjectId(doc_id)
                 except Exception as e:

@@ -8,6 +8,7 @@ identifier while that legacy mode is removed.
 
 from pathlib import Path
 
+import pytest
 from bson import ObjectId
 
 from BackEnd.api.franchise_routes import (
@@ -122,9 +123,21 @@ def test_standalone_tournament_router_is_unmounted():
         "/tournament/roster",
         "/tournament/sim-remaining",
         "/tournament/run-training",
+        "/tournament/active",
     }
 
     assert legacy_paths.isdisjoint(mounted_api_paths)
+
+
+def test_standalone_tournament_router_module_is_gone():
+    import importlib
+
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("BackEnd.api.tournament_routes")
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("BackEnd.tournament.tournament_manager")
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("BackEnd.tournament.bracket_logic")
 
 
 def test_standalone_tournament_pages_are_redirect_only_fallbacks():

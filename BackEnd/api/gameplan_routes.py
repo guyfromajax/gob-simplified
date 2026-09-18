@@ -8,9 +8,11 @@ from typing import Optional
 
 from BackEnd.db import db, games_collection, franchise_team_data_collection, players_collection, tournaments_collection, franchises_collection
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
-from BackEnd.api.tournament_routes import get_user_team_from_tournament
 from BackEnd.utils.franchise_geek_points import gm_team_matches_ref
-from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical as unified_resolve_team_id_to_canonical
+from BackEnd.utils.team_id_resolver import (
+    get_user_team_from_tournament,
+    resolve_team_id_to_canonical as unified_resolve_team_id_to_canonical,
+)
 from BackEnd.utils.defense_identity import (
     PLAYBOOK_MAN_KEY_TO_DEFENSE_ID,
     PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID,

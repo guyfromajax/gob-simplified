@@ -1,6 +1,6 @@
 # `tournament_id` Sunset
 
-**Status:** Phases 0–2A completed; standalone router unmounted
+**Status:** Phases 0–2B completed; standalone router deleted; Phase 3 next
 **Created:** July 24, 2026  
 **Scope:** Retire the legacy standalone Tournament Mode and its
 `tournament_id` compatibility surface without disrupting Franchise tournament
@@ -526,6 +526,93 @@ Phase 2A is complete. The next step is a discussion checkpoint before Phase 2B.
 Phase 2B is not a no-risk deletion. It requires extracting or replacing shared
 helpers, removing endpoint-only implementation, and updating legacy tests
 without changing active Franchise or normal game behavior.
+
+---
+
+## 7A. Phase 2B Execution Record
+
+**Completed:** 18 September 2026
+
+Phase 2B extracts the one shared helper that kept `tournament_routes.py`
+importable, then deletes the standalone router, manager, and standalone-only
+bracket wrapper.
+
+### 7A.1 Helper decision
+
+`get_user_team_from_tournament()` had remaining callers in:
+
+- `BackEnd/api/api.py` (2)
+- `BackEnd/api/franchise_routes.py` (2)
+- `BackEnd/api/gameplan_routes.py` (module import + several uses)
+- `BackEnd/utils/team_id_resolver.py`
+- `BackEnd/utils/team_settings_manager.py`
+
+Every call site is a leftover `mode == "tournament"` compatibility branch.
+Those branches are Phase 4 work and were left intact. The helper therefore had
+to move, not disappear, or application import of `gameplan_routes` would fail.
+
+It now lives in `BackEnd/utils/team_id_resolver.py` (already the team-id
+resolution boundary; no new `BackEnd.db` import file). Franchise tournament
+weeks continue to use `get_user_team_from_franchise`.
+
+### 7A.2 Deleted standalone implementation
+
+Verified no remaining production caller, then deleted:
+
+- `BackEnd/api/tournament_routes.py`
+- `BackEnd/tournament/tournament_manager.py`
+- `BackEnd/tournament/bracket_logic.py`
+
+Franchise code uses `bracket_engine` and `franchise_tournament`, not
+`bracket_logic`.
+
+Also removed the leftover `GET /tournament/active` handler from `api.py`. It
+was not on `tournament_router` but it created standalone tournament documents
+via `TournamentManager` and was the last production manager caller.
+
+### 7A.3 Tests belonging solely to the router
+
+Removed:
+
+- `tests/test_tournament_state_scores.py`
+- `tests/test_tournament_sim_remaining.py`
+- `tests/test_tournament_save_results.py`
+- `tests/test_tournament_leaders_endpoint.py`
+- `tests/test_tournament_full_bracket_progression.py`
+- `tests/test_tournament_bracket_update.py`
+- `tests/test_tournament_active_returns_progress.py`
+- `tests/test_simulate_round_results.py`
+- `tests/test_tournament_manager.py`
+- `tests/test_tournament_progression.py`
+- `test_tournament_create_tournament_teams_use_seed_based_attributes` in
+  `tests/test_mode_init_system.py`
+
+`TeamManager.init_team_attributes(mode="tournament")` tests remain; that is
+engine init, not the retired router. Phase 4 can drop them.
+
+Sunset contract tests now also assert `/tournament/active` is unmounted and
+that the three deleted modules fail to import.
+
+### 7A.4 Intentionally not done in Phase 2B
+
+- shared `mode == "tournament"` backend branches (Phase 4)
+- frontend `tournament_id` / `mode === "tournament"` branches (Phase 3)
+- storage, ownership, retention (Phase 5)
+- Franchise tournament weeks, `bracket_engine`, `franchise_tournament*`
+
+### 7A.5 Phase 2B checkpoint
+
+Application import succeeds (181 routes). Isolated mongomock
+`tournament_sunset_test`, `PYTHONHASHSEED=0`:
+
+```text
+38 passed, 1 skipped
+```
+
+Same four files as the Phase 2A 37-test checkpoint, plus one new assertion
+that the deleted modules no longer import. The skip is the existing week-26
+integration that needs a live Mongo. Persisted standalone documents were not
+deleted.
 
 ---
 
