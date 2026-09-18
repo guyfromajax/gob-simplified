@@ -109,8 +109,12 @@ DEFAULT_PRESET = "shape"
 
 
 def enabled() -> bool:
-    """``GOB_ZONE_SINK`` - default OFF. Read per call so tests can flip it."""
-    return os.environ.get("GOB_ZONE_SINK", "0") == "1"
+    """``GOB_ZONE_SINK`` - **default ON**. Read per call so tests can flip it.
+
+    ``GOB_ZONE_SINK=0`` restores the legacy menu pick
+    (``_find_closest_spot_in_zone_to_point``) and is the escape hatch.
+    """
+    return os.environ.get("GOB_ZONE_SINK", "1") == "1"
 
 
 def active_weights() -> Dict[str, float]:
