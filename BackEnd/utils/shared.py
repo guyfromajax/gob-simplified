@@ -14,11 +14,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from BackEnd.utils.home_crowd import home_crowd_shot_threshold_delta_for_offense
 from BackEnd.pgpc_context import build_franchise_context_for_pgpc
 from BackEnd.constants import (
-
-from BackEnd.persistence import get_store
-_store = get_store()
-games_collection = _store.games_collection
-
     TURNOVER_CALC_DICT,
     POSITION_LIST,
     HCO_STRING_SPOTS,
@@ -36,6 +31,10 @@ games_collection = _store.games_collection
     BURST_GRID_PER_GAME_SEC,
     CONTEST_EUCLIDEAN_RADIUS,
 )
+
+from BackEnd.persistence import get_store
+_store = get_store()
+games_collection = _store.games_collection
 
 # Legacy pace-rate fallbacks (Phase 4d). Used only when a caller doesn't
 # provide AG context (player= or off_lineup=) — preserves pre-Phase-4 timing
