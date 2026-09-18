@@ -4,7 +4,6 @@ const reportState = {
   mode: reportParams.get('mode') || 'single',
   teamId: reportParams.get('team_id') || reportParams.get('user_team_id') || '',
   franchiseId: reportParams.get('franchise_id') || '',
-  tournamentId: reportParams.get('tournament_id') || '',
   gameId: reportParams.get('game_id') || '',
   homeTeam: reportParams.get('home') || '',
   awayTeam: reportParams.get('away') || '',
@@ -138,7 +137,6 @@ function getPlaybookUrl() {
   params.set('mode', reportState.mode);
   if (reportState.teamId) params.set('team_id', reportState.teamId);
   if (reportState.franchiseId) params.set('franchise_id', reportState.franchiseId);
-  if (reportState.tournamentId) params.set('tournament_id', reportState.tournamentId);
   if (reportState.gameId) params.set('game_id', reportState.gameId);
   return `${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`;
 }
@@ -330,7 +328,6 @@ function configureButtons() {
     params.set('mode', reportState.mode);
     if (reportState.teamId) params.set('team_id', reportState.teamId);
     if (reportState.franchiseId) params.set('franchise_id', reportState.franchiseId);
-    if (reportState.tournamentId) params.set('tournament_id', reportState.tournamentId);
     params.set('return_url', getCurrentRelativeUrl());
     window.location.href = `/playbooks.html?${params.toString()}`;
   });

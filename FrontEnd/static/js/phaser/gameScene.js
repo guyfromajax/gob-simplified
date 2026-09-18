@@ -862,7 +862,6 @@ export function createGameScene(Phaser) {
     }
 
     init(data) {
-        this.tournamentId = data.tournamentId;
         this.franchiseId = data.franchiseId;
         this.animate = data.animate;
         this.mode = data.mode;
@@ -901,7 +900,6 @@ export function createGameScene(Phaser) {
           const teams = gameStore.getTeams();
           console.log("🧠 Game initialized with:", {
             rosters: gameStore.getRosters(),
-            tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
             homeTeam: teams.home,
             awayTeam: teams.away,
@@ -1142,9 +1140,6 @@ export function createGameScene(Phaser) {
       // This ensures backend sets correct mode on game document for finalize_game() processing
       if (this.mode) {
         payload.mode = this.mode;
-      }
-      if (this.tournamentId) {
-        payload.tournament_id = this.tournamentId;
       }
       if (this.franchiseId) {
         payload.franchise_id = this.franchiseId;
@@ -2880,7 +2875,6 @@ export function createGameScene(Phaser) {
             // Get game context from scene
             const mode = this.mode || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mode') : null) || 'single';
             const urlParams = new URLSearchParams(window.location.search);
-            const tournamentId = urlParams.get('tournament_id') || null;
             const franchiseId = urlParams.get('franchise_id') || null;
             
             // Get team information from gameStore or URL
@@ -2897,7 +2891,6 @@ export function createGameScene(Phaser) {
               mode: mode,
               quarter: liveQuarter,
               clock: liveClock, // ✅ Pass current clock time to preserve it
-              tournamentId: tournamentId,
               franchiseId: franchiseId,
               homeTeam: homeTeam,
               awayTeam: awayTeam,
@@ -3114,15 +3107,13 @@ export function createGameScene(Phaser) {
         if (this.finalized) return this.finalScore;
         const finalScore = await finalizeGame({
           simData,
-          tournamentId: this.tournamentId,
           franchiseId: this.franchiseId,
           game: this.game,
         });
         this.finalScore = finalScore;
         this.finalized = true;
         if (window.GOB_Analytics) {
-          if (this.tournamentId) window.GOB_Analytics.tournamentGameCompleted();
-          else if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
+          if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
           else window.GOB_Analytics.singleGameCompleted();
         }
         // Show game completion popup (absolute path for Netlify/module resolution)
@@ -3130,8 +3121,7 @@ export function createGameScene(Phaser) {
         const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
           showGameCompletionPopup({
             gameId: this.gameId || simData.game_id,
-            mode: getGameMode({ scene: this, tournamentId: this.tournamentId, franchiseId: this.franchiseId }),
-            tournamentId: this.tournamentId,
+            mode: getGameMode({ scene: this, franchiseId: this.franchiseId }),
             franchiseId: this.franchiseId,
             teamId: this.teamId,
             userTeamSide: this.userTeamSide,
@@ -3342,7 +3332,6 @@ export function createGameScene(Phaser) {
                   home: teams.home,
                   away: teams.away,
                   mode: this.mode,
-                  tournament_id: this.tournamentId,
                   franchise_id: this.franchiseId,
                   team_id: this.teamId
                 }
@@ -4507,7 +4496,6 @@ export function createGameScene(Phaser) {
           }
           
           console.log('🔍 [GAMESCENE] Calling finalizeGame with:', {
-            tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
             game_id: updatedSimData.game_id || updatedSimData._id,
             hasFinalGameDocument: !!updatedSimData.final_game_document
@@ -4515,15 +4503,13 @@ export function createGameScene(Phaser) {
           
           const finalScore = await finalizeGame({
             simData: updatedSimData,
-            tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
             game: this.game,
           });
           this.finalScore = finalScore;
           this.finalized = true;
           if (window.GOB_Analytics) {
-            if (this.tournamentId) window.GOB_Analytics.tournamentGameCompleted();
-            else if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
+            if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
             else window.GOB_Analytics.singleGameCompleted();
           }
           // Show game completion popup (absolute path for Netlify/module resolution)
@@ -4531,8 +4517,7 @@ export function createGameScene(Phaser) {
           const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
           showGameCompletionPopup({
             gameId: gameId,
-            mode: getGameMode({ scene: this, tournamentId: this.tournamentId, franchiseId: this.franchiseId }),
-            tournamentId: this.tournamentId,
+            mode: getGameMode({ scene: this, franchiseId: this.franchiseId }),
             franchiseId: this.franchiseId,
             teamId: this.teamId,
             userTeamSide: this.userTeamSide,
@@ -4581,7 +4566,6 @@ export function createGameScene(Phaser) {
             home: teams.home,
             away: teams.away,
             mode: this.mode,
-            tournament_id: this.tournamentId,
             franchise_id: this.franchiseId,
             team_id: this.teamId
           }

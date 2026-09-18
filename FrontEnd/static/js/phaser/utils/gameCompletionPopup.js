@@ -121,15 +121,14 @@ function syncBackgroundScoreboardFromFinalScore(finalScore) {
  * Shows a game completion popup with Box Score and Go To Locker Room buttons
  * @param {Object} options
  * @param {string} options.gameId - The game ID
- * @param {string} options.mode - Game mode: 'single', 'tournament', or 'franchise'
- * @param {string} [options.tournamentId] - Tournament ID (for tournament mode)
+ * @param {string} options.mode - Game mode: 'single' or 'franchise'
  * @param {string} [options.franchiseId] - Franchise ID (for franchise mode)
  * @param {string} [options.teamId] - Team ID (ObjectId) for navigation anchor
  * @param {'home'|'away'|string} [options.userTeamSide] - User's bench side (from URL/scene); used for WIN/LOSS when IDs match fails
  * @param {Object} [options.finalScore] - Final score object with homeTeam, awayTeam, homeScore, awayScore
  * @param {Object} [options.gameData] - Full game document for POTG calculation (optional)
  */
-export async function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseId, teamId, userTeamSide, finalScore, homeTeam, awayTeam, gameData }) {
+export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamId, userTeamSide, finalScore, homeTeam, awayTeam, gameData }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.game-completion-popup');
   if (existingPopup) {
@@ -155,20 +154,6 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   // Determine locker room URL based on mode
   let lockerRoomUrl;
   switch (mode) {
-    case 'tournament':
-      lockerRoomUrl = '/tournament.html';
-      const tournamentParams = new URLSearchParams();
-      if (tournamentId) {
-        tournamentParams.set('tournament_id', tournamentId);
-      }
-      // ✅ SS&S: Include team_id (ObjectId) for complete navigation anchor
-      if (teamId) {
-        tournamentParams.set('team_id', teamId);
-      }
-      if (tournamentParams.toString()) {
-        lockerRoomUrl += `?${tournamentParams.toString()}`;
-      }
-      break;
     case 'franchise':
       lockerRoomUrl = '/franchise-command-center.html';
       const franchiseParams = new URLSearchParams();
@@ -416,7 +401,6 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   if (homeParam) boxScoreParams.set('home', homeParam);
   if (awayParam) boxScoreParams.set('away', awayParam);
   if (mode) boxScoreParams.set('mode', mode);
-  if (tournamentId) boxScoreParams.set('tournament_id', tournamentId);
   if (franchiseId) boxScoreParams.set('franchise_id', franchiseId);
   if (teamId) boxScoreParams.set('team_id', teamId);
   if (resolvedUserTeamSide === 'home' || resolvedUserTeamSide === 'away') {

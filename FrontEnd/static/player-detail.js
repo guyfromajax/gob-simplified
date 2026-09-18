@@ -637,7 +637,6 @@
     const recruitId = params.get('recruit_id');
     const mode = params.get('mode');
     const franchiseId = params.get('franchise_id');
-    const tournamentId = params.get('tournament_id');
     const gameId = params.get('game_id');
 
     // Recruit mode: un-signed recruits live in FRD, not the players collection.
@@ -655,7 +654,6 @@
       const qs = new URLSearchParams();
       if (mode) qs.set('mode', mode);
       if (franchiseId) qs.set('franchise_id', franchiseId);
-      if (tournamentId) qs.set('tournament_id', tournamentId);
       if (gameId) qs.set('game_id', gameId);
 
       const apiUrl = API_CONFIG.buildUrl(`/player/${encodeURIComponent(playerId)}`);

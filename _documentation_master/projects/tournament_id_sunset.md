@@ -1,6 +1,6 @@
 # `tournament_id` Sunset
 
-**Status:** Phases 0–2B completed; standalone router deleted; Phase 3 next
+**Status:** Phases 0–3 completed; stop before Phase 4
 **Created:** July 24, 2026  
 **Scope:** Retire the legacy standalone Tournament Mode and its
 `tournament_id` compatibility surface without disrupting Franchise tournament
@@ -613,6 +613,66 @@ Same four files as the Phase 2A 37-test checkpoint, plus one new assertion
 that the deleted modules no longer import. The skip is the existing week-26
 integration that needs a live Mongo. Persisted standalone documents were not
 deleted.
+
+---
+
+## 7B. Phase 3 Execution Record
+
+**Completed:** 18 September 2026
+
+Phase 3 removes standalone Tournament Mode from shared frontend screens. Franchise
+tournament weeks stay keyed on `franchise_id`. The surviving contract is
+normal vs Franchise; leftover `mode=tournament` / `tournament_id` values are
+ignored so they cannot skip Franchise complete-week.
+
+### 7B.1 Frontend `tournament_id` file count
+
+| When | Files under `FrontEnd/static` |
+|---|---|
+| Before Phase 3 | 23 |
+| After Phase 3 | 0 |
+
+Every remaining `tournament_id` read, write, payload, query string, and
+`mode === "tournament"` feature branch was removed from shared screens. Court
+pages still neutralize a stale `mode=tournament` URL value so it cannot win
+over `franchise_id`.
+
+### 7B.2 Deleted legacy-only assets
+
+- `tournament-select.html`, `tournament-select.js`, `tournament-select.css`
+- `tournament.html`, `tournament.js`, `tournament.css`
+
+Netlify / `_redirects` still send `/tournament.html` and
+`/tournament-select.html` to Mode Select. Leftover stylesheet links on
+set-lineup, brackets, practice-squad-bracket, and the unused `FrontEnd/roster.html`
+were dropped; those pages do not use the TCC classes.
+
+### 7B.3 Intentionally not done in Phase 3
+
+- shared backend `mode == "tournament"` branches (Phase 4)
+- storage, ownership, retention (Phase 5)
+- dead implementation sweep beyond the six legacy assets (Phase 6)
+- repository guard (Phase 7)
+- Franchise tournament weeks, `franchise-command-center.js`,
+  `franchise-tournament-brackets-render.js`, `schedule.html`,
+  `franchise_routes.py`, `franchise_tournament.py`
+
+### 7B.4 Phase 3 checkpoint
+
+Application import still succeeds. Isolated mongomock `tournament_sunset_test`,
+`PYTHONHASHSEED=0`. Phase 3 is frontend-only: no engine-loop or RNG-order
+change; draw count is unchanged and no refstats rebaseline.
+
+```text
+38 passed, 1 skipped
+```
+
+Startup: 181 routes. Same four-file checkpoint as Phase 2B. Gate B tightened
+from 313 lines / 79 files to 294 lines / 78 files; `tournament.js` dropped
+off the list entirely.
+
+Gate B allowlist tightened after files cleared. Persisted standalone documents
+were not deleted.
 
 ---
 

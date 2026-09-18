@@ -39,7 +39,6 @@ const myTeamSide = urlParams.get('my_team');
 const userTeamIdParam = urlParams.get('user_team_id');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', urlParams.get('franchise_id')) : urlParams.get('franchise_id');
 const weekParam = urlParams.get('week');
-const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
 const modeParam = urlParams.get('mode');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 const periodLabel = urlParams.get('period') || `Q${quarter}`;
@@ -54,7 +53,7 @@ const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
 
 // ✅ PHASE 1.1: Fail loudly if game_id is required but missing
 // For single mode, game_id is required for ALL quarters (Q1 must be created by init-game)
-// For tournament/franchise mode, game_id is optional (may not exist yet)
+// For franchise mode, game_id is optional (may not exist yet)
 const isGameIdRequired = (modeParam === 'single') || (quarter > 1) || resumeFromTimeout;
 if (isGameIdRequired && !gameId) {
   const errorMsg = `game_id is required but missing from URL. Mode: ${modeParam}, Quarter: ${quarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
@@ -76,8 +75,7 @@ if (isGameIdRequired && !gameId) {
           my_team: myTeamSide || 'home',
           mode: modeParam || 'single',
           quarter: quarter,
-          franchise_id: franchiseId || undefined,
-          tournament_id: tournamentId || undefined
+          franchise_id: franchiseId || undefined
         },
         redirectLabel: 'Return to Lineup'
       }
@@ -93,7 +91,6 @@ if (isGameIdRequired && !gameId) {
       if (homeDisplayParam) lineupUrl += `&home_display=${encodeURIComponent(homeDisplayParam)}`;
       if (awayDisplayParam) lineupUrl += `&away_display=${encodeURIComponent(awayDisplayParam)}`;
       if (franchiseId) lineupUrl += `&franchise_id=${encodeURIComponent(franchiseId)}`;
-      if (tournamentId) lineupUrl += `&tournament_id=${encodeURIComponent(tournamentId)}`;
       window.location.href = lineupUrl;
     }
   }
@@ -538,9 +535,6 @@ async function loadSettings() {
     if (mode === 'franchise' && franchiseId) {
       params.set('franchise_id', franchiseId);
       if (gameId) params.set('game_id', gameId);
-    } else if (mode === 'tournament' && tournamentId) {
-      params.set('tournament_id', tournamentId);
-      if (gameId) params.set('game_id', gameId);
     } else if ((mode === 'single' || mode === 'tutorial') && gameId) {
       // Tutorial games are stored in games_collection like single mode; the
       // backend aliases mode=tutorial → single and requires game_id.
@@ -583,16 +577,16 @@ async function loadSettings() {
         if (res.status === 404 && errorDetail.includes('not found')) {
           // Document not found - show missing truth error
           if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
-            const pointerType = mode === 'single' ? 'game_id' : (mode === 'franchise' ? 'franchise_id' : 'tournament_id');
-            const pointerValue = mode === 'single' ? gameId : (mode === 'franchise' ? franchiseId : tournamentId);
+            const pointerType = mode === 'franchise' ? 'franchise_id' : 'game_id';
+            const pointerValue = mode === 'franchise' ? franchiseId : gameId;
             window.ErrorHandler.showMissingTruthError({
               pointerType,
               pointerValue: pointerValue || 'unknown',
               message: errorDetail,
               mode: mode,
               recoveryOptions: {
-                redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
-                redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
+                redirectTo: mode === 'franchise' ? 'franchise-select' : 'mode-select',
+                redirectLabel: mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Mode Select'
               }
             });
           }
@@ -666,8 +660,6 @@ async function saveSettingsQuietly() {
     
     if (mode === 'franchise' && franchiseId) {
       payload.franchise_id = franchiseId;
-    } else if (mode === 'tournament' && tournamentId) {
-      payload.tournament_id = tournamentId;
     }
     
     // ✅ PHASE 1.3: Log backend write
@@ -905,16 +897,9 @@ function executeNavigateToCommandCenter() {
   // ✅ TASK 0: Commented out save logic - nav-only button
   // await saveSettingsQuietly();
   
-  // Return to command center (tournament or franchise)
   const mode = modeParam || 'single';
   
-  if (mode === 'tournament' && tournamentId) {
-    // Include team_id in URL for tournament command center
-    const teamIdParam = teamId || userTeamIdParam || teamName;
-    const url = `/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
-    const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
-    window.location.href = finalUrl;
-  } else if (mode === 'franchise' && franchiseId) {
+  if (mode === 'franchise' && franchiseId) {
     const teamIdParam = teamId || userTeamIdParam || teamName;
     const finalUrl = typeof resolveFranchiseLockerRoomUrl === 'function'
       ? resolveFranchiseLockerRoomUrl({

@@ -1,6 +1,6 @@
 /**
  * Pointer Validation Utility
- * Phase 2: Validate that pointers (game_id, franchise_id, tournament_id) point to existing documents
+ * Phase 2: Validate that pointers (game_id, franchise_id) point to existing documents
  * 
  * This utility provides functions to validate pointers before making API calls or navigating,
  * ensuring we fail loudly when pointers are invalid.
@@ -9,7 +9,7 @@
 /**
  * Validate a pointer by checking if it points to an existing document
  * 
- * @param {string} pointerType - Type of pointer ('game_id', 'franchise_id', 'tournament_id')
+ * @param {string} pointerType - Type of pointer ('game_id', 'franchise_id')
  * @param {string} pointerValue - Value of the pointer to validate
  * @returns {Promise<boolean>} - True if valid, throws error if invalid
  */
@@ -49,8 +49,8 @@ async function validatePointer(pointerType, pointerValue) {
           message: errorMsg,
           mode,
           recoveryOptions: {
-            redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
-            redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
+            redirectTo: mode === 'franchise' ? 'franchise-select' : 'mode-select',
+            redirectLabel: mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Mode Select'
           }
         });
       }
@@ -78,17 +78,10 @@ async function validateFranchiseId(franchiseId) {
 }
 
 /**
- * Validate tournament_id
- */
-async function validateTournamentId(tournamentId) {
-  return validatePointer('tournament_id', tournamentId);
-}
-
-/**
  * Validate all pointers in URL params based on mode
  * 
  * @param {URLSearchParams} urlParams - URL parameters
- * @param {string} mode - Game mode ('single', 'franchise', 'tournament')
+ * @param {string} mode - Game mode ('single', 'franchise')
  * @returns {Promise<boolean>} - True if all required pointers are valid
  */
 async function validatePointersForMode(urlParams, mode) {
@@ -103,11 +96,6 @@ async function validatePointersForMode(urlParams, mode) {
     const franchiseId = urlParams.get('franchise_id');
     if (franchiseId) {
       validations.push(validateFranchiseId(franchiseId));
-    }
-  } else if (mode === 'tournament') {
-    const tournamentId = urlParams.get('tournament_id');
-    if (tournamentId) {
-      validations.push(validateTournamentId(tournamentId));
     }
   }
 
@@ -131,7 +119,6 @@ if (typeof window !== 'undefined') {
     validatePointer,
     validateGameId,
     validateFranchiseId,
-    validateTournamentId,
     validatePointersForMode
   };
 }

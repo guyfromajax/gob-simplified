@@ -55,13 +55,12 @@ if (typeof window !== 'undefined') {
 // ✅ REFACTOR: Removed event system for scores - now using direct DOM updates in gameScene.js
 // This matches the pattern used for fouls, timeouts, and clock (consistent approach)
 
-function getMode({ tournamentId, franchiseId }) {
-  if (tournamentId) return 'tournament';
+function getMode({ franchiseId }) {
   if (franchiseId) return 'franchise';
   return 'single'; // ✅ SS&S: Explicitly return 'single' for Single Game mode
   // Note: FTE v2 'tutorial' mode is set via URL param `mode=tutorial` and
-  // picked up by the `urlMode || getMode(...)` fallback on line 154.
-  // It rides on single-mode infrastructure (no franchise/tournament writes,
+  // picked up by the `urlMode || getMode(...)` fallback.
+  // It rides on single-mode infrastructure (no franchise writes,
   // game doc deleted on completion) but the backend injects mid-Q4 state.
 }
 
@@ -130,8 +129,6 @@ const bootGameParams = {
   allParams: Object.fromEntries(urlParams.entries())
 };
 
-// ✅ PHASE 1.3: Instrument state reads
-const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
 const homeId = urlParams.get('home_id');
@@ -207,8 +204,8 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
     window.FranchiseLS.setWeek(franchiseId, weekParam);
   }
 }
-// ✅ SS&S: Explicitly set mode to 'single' if not provided and not tournament/franchise
-const mode = urlMode || getMode({ tournamentId, franchiseId });
+// ✅ SS&S: Explicitly set mode to 'single' if not provided and not franchise
+const mode = (urlMode && urlMode !== 'tournament') ? urlMode : getMode({ franchiseId });
 // Ensure mode is always explicit (never undefined)
 if (!mode) {
   console.warn('⚠️ [BOOTGAME] Mode was undefined, defaulting to "single"');
@@ -308,9 +305,9 @@ async function loadGamePlanSettings() {
     return;
   }
 
-  const liveMode = p.get('mode') || getMode({ tournamentId: p.get('tournament_id'), franchiseId: p.get('franchise_id') });
   const liveFranchiseId = p.get('franchise_id');
-  const liveTournamentId = p.get('tournament_id');
+  const rawLiveMode = p.get('mode');
+  const liveMode = (rawLiveMode && rawLiveMode !== 'tournament') ? rawLiveMode : getMode({ franchiseId: liveFranchiseId });
   const liveGameId = p.get('game_id');
 
   const teamId =
@@ -337,8 +334,6 @@ async function loadGamePlanSettings() {
     }
     if (liveMode === 'franchise' && liveFranchiseId) {
       params.set('franchise_id', liveFranchiseId);
-    } else     if (liveMode === 'tournament' && liveTournamentId) {
-      params.set('tournament_id', liveTournamentId);
     }
     if (typeof window !== 'undefined' && typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(p)) {
       params.set('debug_pc', '1');
@@ -363,9 +358,9 @@ async function loadPlaybookSettings() {
     return;
   }
 
-  const liveMode = p.get('mode') || getMode({ tournamentId: p.get('tournament_id'), franchiseId: p.get('franchise_id') });
   const liveFranchiseId = p.get('franchise_id');
-  const liveTournamentId = p.get('tournament_id');
+  const rawLiveMode = p.get('mode');
+  const liveMode = (rawLiveMode && rawLiveMode !== 'tournament') ? rawLiveMode : getMode({ franchiseId: liveFranchiseId });
   const liveGameId = p.get('game_id');
 
   const teamId =
@@ -392,8 +387,6 @@ async function loadPlaybookSettings() {
     }
     if (liveMode === 'franchise' && liveFranchiseId) {
       params.set('franchise_id', liveFranchiseId);
-    } else if (liveMode === 'tournament' && liveTournamentId) {
-      params.set('tournament_id', liveTournamentId);
     }
     if (typeof window !== 'undefined' && typeof window.isDebugPlaycallSearch === 'function' && window.isDebugPlaycallSearch(p)) {
       params.set('debug_pc', '1');
@@ -425,8 +418,7 @@ const awayLineup = {};
   if (a) awayLineup[pos.toUpperCase()] = a;
 });
 
-console.log("🏀 Tournament launch params:", {
-  tournamentId,
+console.log("🏀 Court launch params:", {
   franchiseId,
   homeTeam,
   awayTeam,
@@ -584,7 +576,6 @@ function redirectResumeAnchorToSetLineup(resumeState) {
     team_id: sourceParams.get('team_id') || teamId || '',
     user_team_id: sourceParams.get('user_team_id') || sourceParams.get('team_id') || teamId || '',
     franchise_id: sourceParams.get('franchise_id') || '',
-    tournament_id: sourceParams.get('tournament_id') || '',
     week: sourceParams.get('week') || '',
     home_score: resumeState.home_score,
     away_score: resumeState.away_score
@@ -2174,7 +2165,6 @@ async function createFreshGameForPreAnchorQ1Refresh() {
   };
   attachMatchupTeamIds(initPayload);
   if (userTeamSide) initPayload.user_team_side = userTeamSide;
-  if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
   if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
 
   const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
@@ -2216,7 +2206,6 @@ async function createFreshGameForPreAnchorQ1Refresh() {
     game_id: gameId,
     mode,
     franchise_id: franchiseId || null,
-    tournament_id: tournamentId || null,
   });
   return gameId;
 }
@@ -2234,11 +2223,7 @@ async function ensureFreshGameForPreAnchorQ1Refresh() {
 
 async function fetchTeamRoster(teamName) {
   // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
-  // Supports tournament_id and franchise_id query parameters
   const params = new URLSearchParams();
-  if (mode === 'tournament' && tournamentId) {
-    params.append('tournament_id', tournamentId);
-  }
   if (mode === 'franchise' && franchiseId) {
     params.append('franchise_id', franchiseId);
   }
@@ -2356,7 +2341,6 @@ async function startGame({ homeRoster, awayRoster, animate = true, resumeActive 
   }
 
   const sceneData = {
-    tournamentId,
     franchiseId,
     animate,
     homeLineup,
@@ -2407,7 +2391,6 @@ async function showPopup(score) {
     homeTeam,
     awayTeam,
     mode,
-    tournamentId,
     franchiseId
   });
   
@@ -2422,8 +2405,7 @@ async function showPopup(score) {
   const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
   showGameCompletionPopup({
     gameId: popupGameId || '',
-    mode: getGameMode({ urlParams, tournamentId, franchiseId }),
-    tournamentId: tournamentId,
+    mode: getGameMode({ urlParams, franchiseId }),
     franchiseId: franchiseId,
     teamId: teamId,
     userTeamSide: userTeamSide,
@@ -2457,7 +2439,6 @@ async function handleButtonClick(animate, options = {}) {
   if (window.GOB_Analytics) {
     window.GOB_Analytics.quarterAdvance('play_quarter');
     if (quarter === 0 && mode === 'single') window.GOB_Analytics.singleGameStarted();
-    if (quarter === 0 && mode === 'tournament') window.GOB_Analytics.tournamentGameStarted();
     if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
   }
 
@@ -2517,8 +2498,8 @@ async function handleButtonClick(animate, options = {}) {
  * ✅ SS&S: Shared function to handle game completion (finalize and show popup)
  * Used by both handleSimQuarter and handleSimFullGame to avoid code duplication
  */
-async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchiseId, teamId, homeTeam, awayTeam }) {
-  console.warn('[COMPLETE-WEEK TRACE] handleGameCompletion ENTRY', { gameId, franchiseId, tournamentId });
+async function handleGameCompletion({ gameId, lastSummary, franchiseId, teamId, homeTeam, awayTeam }) {
+  console.warn('[COMPLETE-WEEK TRACE] handleGameCompletion ENTRY', { gameId, franchiseId });
   console.log('✅ Game complete - finalizing game');
   
   // ✅ SS&S FIX: Use lastSummary directly as single source of truth (has correct final scores)
@@ -2560,23 +2541,21 @@ async function handleGameCompletion({ gameId, lastSummary, tournamentId, franchi
   }
 
   // Finalize the game and show completion popup
-  console.warn('[COMPLETE-WEEK TRACE] About to call finalizeGame', { gameId, franchiseId, tournamentId });
-  const finalScore = await finalizeGame({ simData: finalGameData, tournamentId, franchiseId });
+  console.warn('[COMPLETE-WEEK TRACE] About to call finalizeGame', { gameId, franchiseId });
+  const finalScore = await finalizeGame({ simData: finalGameData, franchiseId });
   console.warn('[COMPLETE-WEEK TRACE] finalizeGame returned');
   console.log('🏆 Final score object:', finalScore);
   
   const base = (typeof window !== 'undefined' && window.API_CONFIG) ? window.API_CONFIG.getStaticPath() : '';
   const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
-  const popupMode = getGameMode({ urlParams, tournamentId, franchiseId });
+  const popupMode = getGameMode({ urlParams, franchiseId });
   if (window.GOB_Analytics) {
-    if (tournamentId) window.GOB_Analytics.tournamentGameCompleted();
-    else if (franchiseId) window.GOB_Analytics.franchiseGameCompleted();
+    if (franchiseId) window.GOB_Analytics.franchiseGameCompleted();
     else window.GOB_Analytics.singleGameCompleted();
   }
   showGameCompletionPopup({
     gameId: gameId,
     mode: popupMode,
-    tournamentId: tournamentId,
     franchiseId: franchiseId,
     teamId: teamId, // ✅ SS&S: Include team_id (ObjectId) for navigation anchor preservation
     userTeamSide: userTeamSide,
@@ -2634,7 +2613,6 @@ async function handleSimQuarter() {
   if (window.GOB_Analytics) {
     window.GOB_Analytics.quarterAdvance('sim_quarter');
     if (quarter === 0 && mode === 'single') window.GOB_Analytics.singleGameStarted();
-    if (quarter === 0 && mode === 'tournament') window.GOB_Analytics.tournamentGameStarted();
     if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
   }
 
@@ -2669,9 +2647,6 @@ async function handleSimQuarter() {
     // This ensures backend sets correct mode on game document for finalize_game() processing
     if (mode) {
       payload.mode = mode;
-    }
-    if (tournamentId) {
-      payload.tournament_id = tournamentId;
     }
     // ✅ FIX: Only pass franchise_id if mode is explicitly 'franchise'
     // This prevents Single Game mode from accidentally passing franchise_id from localStorage
@@ -2791,7 +2766,6 @@ async function handleSimQuarter() {
       await handleGameCompletion({
         gameId,
         lastSummary,
-        tournamentId,
         franchiseId,
         teamId,
         homeTeam,
@@ -2923,7 +2897,6 @@ async function handleSimFullGame() {
     const currentQ = Math.max(0, quarter);
     window.GOB_Analytics.quarterAdvance(currentQ >= 2 ? 'sim_rest_of_game' : 'sim_full_game');
     if (quarter === 0 && mode === 'single') window.GOB_Analytics.singleGameStarted();
-    if (quarter === 0 && mode === 'tournament') window.GOB_Analytics.tournamentGameStarted();
     if (quarter === 0 && mode === 'franchise') window.GOB_Analytics.franchiseGameStarted();
   }
 
@@ -3045,9 +3018,6 @@ async function handleSimFullGame() {
       // This ensures backend sets correct mode on game document for finalize_game() processing
       if (mode) {
         payload.mode = mode;
-      }
-      if (tournamentId) {
-        payload.tournament_id = tournamentId;
       }
       // ✅ FIX: Only pass franchise_id if mode is explicitly 'franchise'
       // This prevents Single Game mode from accidentally passing franchise_id from localStorage
@@ -3211,7 +3181,6 @@ async function handleSimFullGame() {
     await handleGameCompletion({
       gameId,
       lastSummary,
-      tournamentId,
       franchiseId,
       teamId,
       homeTeam,

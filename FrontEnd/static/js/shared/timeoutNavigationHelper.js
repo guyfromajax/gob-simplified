@@ -76,7 +76,7 @@
     if (awayId) params.set('away_id', awayId);
     if (myTeam) params.set('my_team', myTeam);
 
-    const isFranchiseOrTournament = mode === 'franchise' || mode === 'tournament';
+    const isFranchise = mode === 'franchise';
 
     let resolvedNavTeamId = teamId;
     if (!resolvedNavTeamId) {
@@ -89,8 +89,8 @@
       }
     }
     if (resolvedNavTeamId) params.set('team_id', resolvedNavTeamId);
-    // ✅ PHASE 1: Only include user_team_id for franchise/tournament mode (not redundant in single mode)
-    if (isFranchiseOrTournament && userTeamId && userTeamId !== resolvedNavTeamId) {
+    // Only include user_team_id for franchise mode (not redundant in single mode)
+    if (isFranchise && userTeamId && userTeamId !== resolvedNavTeamId) {
       params.set('user_team_id', userTeamId);
     }
     
@@ -167,22 +167,13 @@
     }
     
     // ============================================
-    // 8. MODE/TOURNAMENT/FRANCHISE PARAMS
+    // 8. MODE/FRANCHISE PARAMS
     // ============================================
-    // ✅ FIX: mode already declared above (line 62) - use existing variable
-    // const mode = overrides.mode || sourceParams.get('mode'); // Already declared above
-    const tournamentId = overrides.tournament_id || sourceParams.get('tournament_id');
     const franchiseId = overrides.franchise_id || sourceParams.get('franchise_id');
     const week = overrides.week || sourceParams.get('week');
+    const resolvedMode = (mode && mode !== 'tournament') ? mode : (franchiseId ? 'franchise' : mode);
     
-    if (mode) params.set('mode', mode);
-    // ✅ PHASE 1.3: Log state writes (URL parameter writes)
-    if (tournamentId) {
-      if (window.StateTelemetry) {
-        window.StateTelemetry.logStateWrite('tournament_id', window.StateTelemetry.SOURCE_TYPES.URL, tournamentId, 'timeoutNavigationHelper.js');
-      }
-      params.set('tournament_id', tournamentId);
-    }
+    if (resolvedMode && resolvedMode !== 'tournament') params.set('mode', resolvedMode);
     if (franchiseId) {
       if (window.StateTelemetry) {
         window.StateTelemetry.logStateWrite('franchise_id', window.StateTelemetry.SOURCE_TYPES.URL, franchiseId, 'timeoutNavigationHelper.js');
