@@ -1,22 +1,7 @@
 {
   "gate_a": {
     "description": "WS-1: import statements that resolve to BackEnd.db. Count may fall, never rise.",
-    "files": {
-      "BackEnd/engine/phase_resolution.py": 5,
-      "BackEnd/flask_app.py": 1,
-      "BackEnd/main.py": 2,
-      "BackEnd/models/franchise_manager.py": 1,
-      "BackEnd/models/game_manager.py": 2,
-      "BackEnd/models/team_manager.py": 2,
-      "BackEnd/models/training_manager.py": 1,
-      "BackEnd/models/turn_manager.py": 3,
-      "BackEnd/pgpc_context.py": 1,
-      "BackEnd/practice_squad/manager.py": 1,
-      "BackEnd/practice_squad/stats.py": 1,
-      "BackEnd/tournament/eos_tournament.py": 1,
-      "BackEnd/tournament/franchise_tournament.py": 1,
-      "BackEnd/tournament/franchise_tournament_progression.py": 1
-    }
+    "files": {}
   },
   "gate_b": {
     "description": "WS-3: FrontEnd/static lines matching URLSearchParams, location.search, or .searchParams. Count may fall, never rise.",

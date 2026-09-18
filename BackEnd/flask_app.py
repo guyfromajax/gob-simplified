@@ -1,7 +1,11 @@
 from flask import Flask, request, redirect, send_from_directory, jsonify
 from pathlib import Path
 
-from BackEnd.db import db, franchise_state_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+franchise_state_collection = _store.franchise_state_collection
+
 from BackEnd.models.franchise_manager import FranchiseManager, RecruitManager
 
 BASE_DIR = Path(__file__).resolve().parents[1]

@@ -8,11 +8,13 @@ from typing import Any
 from bson import ObjectId
 
 from BackEnd.constants import BOX_SCORE_KEYS
-from BackEnd.db import (
-    franchise_players_data_collection,
-    franchise_recruits_data_collection,
-    games_collection,
-)
+
+from BackEnd.persistence import get_store
+_store = get_store()
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_recruits_data_collection = _store.franchise_recruits_data_collection
+games_collection = _store.games_collection
+
 
 logger = logging.getLogger(__name__)
 
