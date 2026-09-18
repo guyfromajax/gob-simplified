@@ -137,10 +137,11 @@ _ZONE_SINK_IQ = {"key": None, "err": {}}
 
 
 def _zone_sink_iq_enabled():
-    """``GOB_ZONE_SINK_IQ`` - default OFF. Independent of ``GOB_ZONE_SINK`` so the
-    sink's geometry can be measured on its own before attribute variance lands."""
+    """``GOB_ZONE_SINK_IQ`` - **default ON**. Separate from ``GOB_ZONE_SINK`` so the
+    sink's geometry stays measurable on its own: ``GOB_ZONE_SINK_IQ=0`` leaves the
+    sink running with every defender perfectly calibrated."""
     import os
-    return os.environ.get("GOB_ZONE_SINK_IQ", "0") == "1"
+    return os.environ.get("GOB_ZONE_SINK_IQ", "1") == "1"
 
 
 def zone_sink_begin_possession(game, def_lineup):
