@@ -12,28 +12,28 @@ from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS
 # ==================== ZONE DEFENSE LOGIC ====================
 
 ZONE_23_NORMAL = {
-    "PG": ["key", "midLane", "topLane", "upper midCorner", "upper wing", "upper midWing"],
+    "PG": ["key", "topLane", "midLane", "upper midCorner", "upper wing", "upper midWing"],
     "SG": ["key", "midLane", "topLane", "lower midCorner", "lower wing", "lower midWing"],
-    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost", "lower apex", "lower bird", "lower midBaseline"],
-    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost", "upper apex", "upper bird", "upper midBaseline"],
+    "SF": ["lower apex", "lower midCorner", "lower corner", "lower midBaseline", "lower bird", "lower lowPost", "lower midPost"],
+    "PF": ["upper midPost", "upper lowPost", "upper bird", "upper midBaseline", "upper corner", "upper midCorner", "upper apex"],
     "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # Lower shift (ball on lower wing, lower midCorner, or lower corner)
 ZONE_23_LOWER_SHIFT = {
     "PG": ["lower midWing", "lower highPost", "upper midCorner", "upper wing", "upper midWing", "key"],
-    "SG": ["lower corner", "lower midCorner", "lower wing", "lower midPost", "lower highPost", "lower apex", "lower bird", "lower midBaseline"],
-    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost", "lower apex", "lower bird", "lower midBaseline"],
-    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost", "upper apex", "upper bird", "upper midBaseline"],
+    "SG": ["lower wing", "lower midCorner", "lower corner", "lower midBaseline", "lower apex", "lower bird", "lower midPost", "lower highPost"],
+    "SF": ["lower apex", "lower midCorner", "lower corner", "lower midBaseline", "lower bird", "lower lowPost", "lower midPost"],
+    "PF": ["upper midPost", "upper lowPost", "upper bird", "upper midBaseline", "upper corner", "upper midCorner", "upper apex"],
     "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # Upper shift (ball on upper wing, upper midCorner, or upper corner)
 ZONE_23_UPPER_SHIFT = {
     "SG": ["upper midWing", "upper highPost", "lower midCorner", "lower wing", "lower midWing", "key"],  # Removed midLane to mirror Lower PG
-    "PG": ["upper corner", "upper midCorner", "upper wing", "upper midPost", "upper highPost", "upper apex", "upper bird", "upper midBaseline"],  # Added upper corner, upper midPost, upper apex, upper bird, upper midBaseline to mirror Lower SG
-    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost", "lower apex", "lower bird", "lower midBaseline"],
-    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost", "upper apex", "upper bird", "upper midBaseline"],
+    "PG": ["upper wing", "upper highPost", "upper midPost", "upper bird", "upper apex", "upper midBaseline", "upper corner", "upper midCorner"],  # Added upper corner, upper midPost, upper apex, upper bird, upper midBaseline to mirror Lower SG
+    "SF": ["lower apex", "lower midCorner", "lower corner", "lower midBaseline", "lower bird", "lower lowPost", "lower midPost"],
+    "PF": ["upper midPost", "upper lowPost", "upper bird", "upper midBaseline", "upper corner", "upper midCorner", "upper apex"],
     "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
@@ -52,7 +52,7 @@ ZONE_32_LOWER_SHIFT = {
     "PG": ["key", "upper midWing", "upper highPost", "midLane", "lower highPost", "lower midWing"],
     "SG": ["upper wing", "upper midWing", "upper highPost", "upper midPost", "upper bird", "upper midCorner"],
     "SF": ["lower wing", "lower midWing", "lower highPost", "lower midPost", "lower bird", "lower midCorner"],
-    "PF": ["basketSpot", "midLane", "upper midPost", "upper bird", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost", "basketSpot", "midLane", "lower corner"],
+    "PF": ["midLane", "lower corner", "upper midBaseline", "basketSpot", "upper bird", "upper lowPost", "upper corner", "upper midCorner", "upper midPost"],
     "C": ["basketSpot", "midLane", "lower midPost", "lower bird", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost"],
 }
 
@@ -62,7 +62,7 @@ ZONE_32_UPPER_SHIFT = {
     "SG": ["upper wing", "upper midWing", "upper highPost", "upper midPost", "upper bird", "upper midCorner"],
     "SF": ["lower wing", "lower midWing", "lower highPost", "lower midPost", "lower bird", "lower midCorner"],
     "PF": ["basketSpot", "midLane", "upper midPost", "upper bird", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost"],
-    "C": ["basketSpot", "midLane", "lower midPost", "lower bird", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "basketSpot", "midLane", "upper corner"],
+    "C": ["lower midPost", "lower midCorner", "lower corner", "lower lowPost", "lower bird", "basketSpot", "lower midBaseline", "upper corner", "midLane"],
 }
 
 # 1-3-1 Zone Defense: Zone definitions (using spot names from HCO_STRING_SPOTS)
@@ -72,7 +72,7 @@ ZONE_131_NORMAL = {
     "SG": ["upper apex", "upper wing", "upper midCorner", "upper bird"],
     "SF": ["lower apex", "lower wing", "lower midCorner", "lower bird"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["basketSpot", "upper corner", "upper midBaseline", "upper lowPost", "basketSpot", "lower lowPost", "lower midBaseline", "lower corner", "lower midCorner", "lower bird", "lower midPost", "midLane", "basketSpot"],
+    "C": ["lower midPost", "lower midCorner", "lower corner", "lower midBaseline", "upper midBaseline", "lower lowPost", "lower bird", "upper lowPost", "basketSpot", "upper corner", "midLane"],
 }
 
 # Lower shift (ball on lower wing, lower midWing, lower midCorner)
@@ -81,7 +81,7 @@ ZONE_131_LOWER_SHIFT = {
     "SG": ["upper midWing", "upper wing", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost", "upper midPost", "upper highPost"],
     "SF": ["lower midWing", "lower wing", "lower midCorner"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["basketSpot", "lower lowPost", "lower midBaseline", "lower corner"],
+    "C": ["lower lowPost", "lower corner", "lower midBaseline", "basketSpot"],
 }
 
 # Lower corner shift (ball on lower corner)
@@ -99,7 +99,7 @@ ZONE_131_UPPER_SHIFT = {
     "SG": ["upper midWing", "upper wing", "upper midCorner"],
     "SF": ["lower midWing", "lower wing", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "lower midPost", "lower highPost"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["basketSpot", "upper lowPost", "upper midBaseline", "upper corner"],
+    "C": ["upper lowPost", "basketSpot", "upper midBaseline", "upper corner"],
 }
 
 # Upper corner shift (ball on upper corner)
