@@ -249,6 +249,10 @@
     return new URLSearchParams();
   };
 
+  FranchiseContext.prototype.parseSearch = function (search) {
+    return paramsFromSearch(search);
+  };
+
   function resolveBuildProfile(opts) {
     if (opts && opts.buildProfile) return opts.buildProfile;
     if (typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop') {
@@ -271,6 +275,7 @@
     FranchiseContext: FranchiseContext,
     createFranchiseContext: createFranchiseContext,
     createParams: function () { return new URLSearchParams(); },
+    parseSearch: function (search) { return paramsFromSearch(search); },
   };
 
   global.FranchiseContextLib = api;

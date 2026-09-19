@@ -263,6 +263,16 @@ function main() {
     assertEqual(loc.pathname, '/static/court.html', 'path unchanged after commitParams');
   }
 
+  // --- parseSearch reads an arbitrary query without touching the live URL ---
+  {
+    const { lib, loc } = loadLib({ search: '?franchise_id=LIVE' });
+    const ctx = lib.createFranchiseContext({ buildProfile: 'web', location: loc });
+    const bag = ctx.parseSearch('?team_id=t9&game_id=g3');
+    assertEqual(bag.get('team_id'), 't9', 'parseSearch team_id');
+    assertEqual(bag.get('game_id'), 'g3', 'parseSearch game_id');
+    assertEqual(ctx.get('franchise_id'), 'LIVE', 'parseSearch does not write live context');
+  }
+
   // --- Routing: peek FranchiseContext.runtime; no-args never peeks ---
   {
     const { lib, loc, window: win } = loadLib({ GOB_BUILD_PROFILE: 'desktop' });
