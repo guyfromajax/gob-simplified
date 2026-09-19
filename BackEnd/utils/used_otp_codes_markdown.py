@@ -9,11 +9,10 @@ from pathlib import Path
 
 OTP_CODE_PATTERN = re.compile(r"^([A-Z0-9]{10})(?:\s|$|\s-)")
 
-DEFAULT_MARKDOWN_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "_documentation_master"
-    / "projects"
-    / "used_otp_codes.md"
+from BackEnd.runtime_paths import bundle_path
+
+DEFAULT_MARKDOWN_PATH = bundle_path(
+    "_documentation_master", "projects", "used_otp_codes.md"
 )
 
 

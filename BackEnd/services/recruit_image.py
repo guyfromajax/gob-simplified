@@ -25,10 +25,11 @@ CROP_KEEP_FRAC = 0.966          # fraction of bust height the finish crop keeps
 WM_VISIBLE_FRAC = 0.50          # fraction of wordmark letter-height shown above the crop
 WM_WIDTH_FRAC = 0.72            # wordmark width as a fraction of tank width
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+from BackEnd.runtime_paths import bundle_path
+
 # Bundled first (deterministic across OSes), then common system locations.
 WM_FONT_CANDIDATES = [
-    os.path.join(_HERE, "..", "assets", "fonts", "LiberationSans-Bold.ttf"),
+    str(bundle_path("BackEnd", "assets", "fonts", "LiberationSans-Bold.ttf")),
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
 ]

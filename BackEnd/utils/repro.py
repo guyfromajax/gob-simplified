@@ -51,7 +51,8 @@ connection, re-executed, and opened a second one. The fix was to load this modul
 **by path** so no package ``__init__`` runs:
 
     import os as _os, sys as _sys, importlib.util as _ilu
-    _GOB_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+    from BackEnd.runtime_paths import bundle_root as _bundle_root
+    _GOB_ROOT = str(_bundle_root())
     _sys.path.insert(0, _GOB_ROOT)
     _spec = _ilu.spec_from_file_location(
         "_gob_repro", _os.path.join(_GOB_ROOT, "BackEnd", "utils", "repro.py"))

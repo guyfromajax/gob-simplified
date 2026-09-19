@@ -55,7 +55,9 @@ from datetime import datetime
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+from BackEnd.runtime_paths import bundle_path
+
+STATIC_DIR = bundle_path("FrontEnd", "static")
 
 
 def _franchise_playbook_snapshot_meaningful(pb: dict | None) -> bool:

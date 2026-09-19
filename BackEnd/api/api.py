@@ -6,9 +6,12 @@ import copy
 import logging
 # ✅ PERFORMANCE: Removed debug print statements - use logger instead
 
+from BackEnd.loopback_env import is_loopback
+from BackEnd.runtime_paths import bundle_path
+
 # Sentry - init before FastAPI (captures unhandled exceptions)
 _sentry_dsn = os.getenv("SENTRY_DSN")
-if _sentry_dsn:
+if _sentry_dsn and not is_loopback():
     import sentry_sdk
     sentry_sdk.init(
         dsn=_sentry_dsn,
@@ -469,24 +472,27 @@ try:
     limiter = None
     SIM_RATE_LIMIT = "30/minute"
     SIM_TURN_RATE_LIMIT = "300/minute"
-    try:
-        from slowapi.errors import RateLimitExceeded
-        from BackEnd.utils.rate_limiter import (
-            limiter as _limiter,
-            rate_limit_exceeded_handler,
-            SIM_RATE_LIMIT as _SIM_RATE_LIMIT,
-            SIM_TURN_RATE_LIMIT as _SIM_TURN_RATE_LIMIT,
-        )
-        limiter = _limiter
-        SIM_RATE_LIMIT = _SIM_RATE_LIMIT
-        SIM_TURN_RATE_LIMIT = _SIM_TURN_RATE_LIMIT
-        app.state.limiter = limiter
-        app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-        print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
-    except Exception as e:
-        print(f"⚠️ [RATE LIMIT] Failed to enable rate limiting: {e}", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+    if is_loopback():
+        print("🖥️ [LOOPBACK] rate limiting omitted", file=sys.stderr, flush=True)
+    else:
+        try:
+            from slowapi.errors import RateLimitExceeded
+            from BackEnd.utils.rate_limiter import (
+                limiter as _limiter,
+                rate_limit_exceeded_handler,
+                SIM_RATE_LIMIT as _SIM_RATE_LIMIT,
+                SIM_TURN_RATE_LIMIT as _SIM_TURN_RATE_LIMIT,
+            )
+            limiter = _limiter
+            SIM_RATE_LIMIT = _SIM_RATE_LIMIT
+            SIM_TURN_RATE_LIMIT = _SIM_TURN_RATE_LIMIT
+            app.state.limiter = limiter
+            app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+            print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
+        except Exception as e:
+            print(f"⚠️ [RATE LIMIT] Failed to enable rate limiting: {e}", file=sys.stderr, flush=True)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
     
     def _no_limit(f):
         """No-op when rate limiter is disabled."""
@@ -499,28 +505,35 @@ try:
     app.include_router(franchise_router)
     app.include_router(player_image_router)
     app.include_router(press_conference_router)
-    app.include_router(community_highlights_router)
     app.include_router(gameplan_router)
     app.include_router(play_router)
     app.include_router(skeleton_router)
     app.include_router(pointer_validation_router)
-    app.include_router(auth_router)
-    app.include_router(leaderboard_router)
-    app.include_router(admin_router)
-    app.include_router(feedback_router)
-    app.include_router(alpha_feedback_router)
-    app.include_router(email_router)
-    app.include_router(billing_router)
+    if is_loopback():
+        print("🖥️ [LOOPBACK] omitting always-remote routers (auth/billing/email/admin/community)",
+              file=sys.stderr, flush=True)
+        from BackEnd.loopback_app import configure_loopback
+        configure_loopback(app)
+    else:
+        app.include_router(community_highlights_router)
+        app.include_router(auth_router)
+        app.include_router(leaderboard_router)
+        app.include_router(admin_router)
+        app.include_router(feedback_router)
+        app.include_router(alpha_feedback_router)
+        app.include_router(email_router)
+        app.include_router(billing_router)
 
     # One line at startup naming the billing posture (enabled? which Stripe mode?).
     # Cheap, and it makes "is prod still on test keys?" answerable from the logs
     # rather than from someone's memory of what they set in Railway.
-    try:
-        from BackEnd.services.stripe_client import log_configuration_at_boot
-        log_configuration_at_boot()
-    except Exception as _billing_log_exc:
-        print(f"⚠️ [BILLING] could not log configuration: {_billing_log_exc}",
-              file=sys.stderr, flush=True)
+    if not is_loopback():
+        try:
+            from BackEnd.services.stripe_client import log_configuration_at_boot
+            log_configuration_at_boot()
+        except Exception as _billing_log_exc:
+            print(f"⚠️ [BILLING] could not log configuration: {_billing_log_exc}",
+                  file=sys.stderr, flush=True)
 
     @app.get("/debug/server-state")
     def debug_server_state():
@@ -532,7 +545,7 @@ try:
             "ongoing_games_count": len(ongoing_games),
         }
     
-    templates = Jinja2Templates(directory="FrontEnd/static")
+    templates = Jinja2Templates(directory=str(bundle_path("FrontEnd", "static")))
     
     # Conditionally mount static files (local development and test).
     # In production/staging, Netlify serves static files. Test must mount too

@@ -281,7 +281,9 @@ def connect_script_database(
         raise ScriptDatabaseError("Access intent must be 'read' or 'write'")
 
     pristine = dict(os.environ if pristine_env is None else pristine_env)
-    root = repo_root or Path(__file__).resolve().parent.parent
+    from BackEnd.runtime_paths import bundle_root
+
+    root = repo_root or bundle_root()
     mode = str(pristine.get("GOB_DB_MODE") or "mongo").strip().lower()
     if mode not in {"mongo", "mongomock"}:
         raise ScriptDatabaseError("GOB_DB_MODE must be 'mongo' or 'mongomock'")

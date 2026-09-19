@@ -6,6 +6,14 @@
 (function () {
   'use strict';
 
+  function isDesktopProfile() {
+    if (window.GOB_BUILD_PROFILE === 'desktop') return true;
+    return /(?:^|; )GOB_BUILD_PROFILE=desktop(?:;|$)/.test(document.cookie || '');
+  }
+  if (isDesktopProfile()) {
+    return;
+  }
+
   // /app-config is always-remote (classified as auth). sentryInit loads before
   // api-config on most pages; pull the table in rather than keep a second sniff.
   function withApiConfig(done) {

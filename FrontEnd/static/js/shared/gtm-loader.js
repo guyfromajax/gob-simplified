@@ -5,6 +5,8 @@
  */
 (function () {
   'use strict';
+  if (window.GOB_BUILD_PROFILE === 'desktop') return;
+  if (/(?:^|; )GOB_BUILD_PROFILE=desktop(?:;|$)/.test(document.cookie || '')) return;
   var h = window.location.hostname;
   var isProduction = h === 'www.geekedoutbasketball.com' || h === 'geekedoutbasketball.com';
   if (typeof window.dataLayer === 'undefined') {
