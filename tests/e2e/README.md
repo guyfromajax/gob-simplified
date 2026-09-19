@@ -17,7 +17,7 @@ These Playwright tests verify the Grid-based layout refactor works correctly acr
 ## Requirements
 
 - **Pre-game test** passes without starting the game (scoreboard, playcall center, stats panels, Play button visible).
-- **Layout/viewport tests** that start the game require the backend to have **rosters** for the teams in the URL (e.g. `Lancaster`, `Four-Corners`). If `/roster/Lancaster` or `/roster/Four-Corners` fails, the canvas never appears and those tests will timeout. Ensure your local DB has those teams (or change the test URL to use teams you have).
+- **Layout/viewport tests** that start the game need canonical rosters (`Lancaster`, `Four-Corners`). Playwright's webServer now runs `tests/e2e/helpers/seed_and_serve.py`, which seeds the same mongomock fixtures as pytest (`tests/roster_fixtures.py`) in the server process, then serves with `reload=False` so uvicorn does not fork an empty child.
 
 ## Running Tests
 
@@ -62,11 +62,12 @@ Tests run at these viewport sizes (matching refactor plan exit criteria):
 
 Tests are configured in `playwright.config.js`:
 - Base URL: `http://localhost:8000` (or `BASE_URL` env var)
-- **webServer**: Playwright auto-starts the dev server (`python dev.py`) before tests and waits for it at port 8000. If a server is already running on 8000, it is reused (`reuseExistingServer: true` when not in CI).
+- **webServer**: Playwright auto-starts `tests/e2e/helpers/seed_and_serve.py` (same `.venv` / `PYTHON_PATH` fallback as before) and waits for port 8000. If a server is already running on 8000, it is reused (`reuseExistingServer: true` when not in CI).
+- Court-layout specs stub auth via `helpers/auth.js` and wait for seeded rosters via `helpers/rosters.js`.
 - Screenshots on failure
 - Trace collection on retry
 
-**Manual option:** You can instead start the server yourself in another terminal (`python dev.py`) and run tests; Playwright will reuse the existing server.
+**Warning:** `reuseExistingServer` will reuse a bare `dev.py` on :8000 (empty mongomock, roster 404s, no Phaser canvas). Kill that process first so Playwright can start `seed_and_serve.py`.
 
 ## CI/CD Integration
 
