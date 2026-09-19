@@ -1,5 +1,26 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 // Parse URL parameters
-const urlParams = new URLSearchParams(window.location.search);
+const urlParams = liveParams();
 
 function playSound(filename) {
   try {
@@ -232,7 +253,7 @@ if (modeParam === 'tutorial') {
       // Forward the query string VERBATIM. It carries the chosen five as
       // home_pg / home_sg / … — rebuilding it here would drop the lineup and leave
       // the pre-game card empty.
-      const fwd = new URLSearchParams(window.location.search);
+      const fwd = liveParams();
       window.location.href = '/tutorial-situation.html?' + fwd.toString();
     });
     actions.appendChild(cta);
@@ -261,7 +282,7 @@ const TOAST_POST_LAND_BUFFER_MS = 100;
 
 /** True when game-plan was opened from FCC / TCC (not from set-lineup). */
 function isGamePlanFromCommandCenter() {
-  const p = new URLSearchParams(window.location.search);
+  const p = liveParams();
   const from = p.get('from') || 'lineup';
   return (
     from === 'command_center' ||
@@ -468,9 +489,10 @@ const recoverTutorialGameId = async () => {
       gameId = recovered;
       // Repair the URL in place so every later read — including the save on
       // PLAY NOW and anything that forwards the query string — sees it.
-      const u = new URL(window.location.href);
-      u.searchParams.set('game_id', recovered);
-      window.history.replaceState({}, '', u.toString());
+      const bag = liveParams();
+      bag.set('game_id', recovered);
+      // In-place: repair game_id on the current game-plan URL. Do not navigate.
+      franchiseCtx().commitParams(bag);
       console.warn('[tutorial] recovered game_id from tutorial_state:', recovered);
     }
     return recovered;
@@ -528,7 +550,7 @@ async function loadSettings() {
     let mode = modeParam || 'single';
     
     // ✅ SS&S: Always load from database (single source of truth for all modes)
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('mode', mode);
     params.set('team_id', teamId);
     
@@ -748,9 +770,9 @@ function executeNavigateToCourt() {
   // ✅ TASK 0: Commented out save logic - nav-only button
   // await saveSettingsQuietly();
   
-  // ✅ CRITICAL FIX: Read URL params directly from window.location.search
+  // ✅ CRITICAL FIX: Read URL params directly from currentSearch()
   // Don't rely on module-level urlParams which might be stale
-  const currentUrlParams = new URLSearchParams(window.location.search);
+  const currentUrlParams = liveParams();
   const currentParamsObj = Object.fromEntries(currentUrlParams.entries());
   console.log('🚀 [GAME-PLAN] Current URL params:', currentParamsObj);
   console.error('🚀🚀🚀 [GAME-PLAN] executeNavigateToCourt() - game_id:', currentUrlParams.get('game_id'), 'resume_from_timeout:', currentUrlParams.get('resume_from_timeout'));
@@ -853,9 +875,9 @@ function executeNavigateBack() {
     return;
   }
   
-  // ✅ CRITICAL FIX: Read URL params directly from window.location.search
+  // ✅ CRITICAL FIX: Read URL params directly from currentSearch()
   // Don't rely on module-level urlParams which might be stale
-  const currentUrlParams = new URLSearchParams(window.location.search);
+  const currentUrlParams = liveParams();
   
   const currentGameId = helper.getGameId(currentUrlParams);
   const resumeFromTimeout = helper.getResumeFromTimeout(currentUrlParams);
@@ -1052,7 +1074,7 @@ async function init() {
   await loadSettings();
   
   // Check where user came from (command_center vs lineup)
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const from = urlParams.get('from') || 'lineup';  // Default to lineup for backwards compatibility
   
   // Button event listeners

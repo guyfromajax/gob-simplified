@@ -1,4 +1,25 @@
-const urlParams = new URLSearchParams(window.location.search);
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
+const urlParams = liveParams();
 console.log('✅ set-lineup.js loaded at', new Date().toISOString());
 // Append cache buster to any dynamic loads if present
 (function(){
@@ -73,11 +94,11 @@ const DEBUG = urlParams.has('debug');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
 // game_id is optional for new games (will be created by init-game), but if present must be in URL
-// Note: This is a snapshot of initial URL state - always read from window.location.search when needed
+// Note: This is a snapshot of initial URL state - always read from currentSearch() when needed
 const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 /** game_id from URL (updated by init-game replaceState); falls back to page-load snapshot. */
 function getActiveGameId() {
-  const fromUrl = new URLSearchParams(window.location.search).get('game_id');
+  const fromUrl = liveParams().get('game_id');
   return fromUrl || gameId || null;
 }
 let exhaustedUserLineupLocked = urlParams.get('locked_exhausted_user_lineup') === 'true';
@@ -126,12 +147,12 @@ async function redirectIfFranchiseGameplayAlreadyCommitted() {
 }
 
 function buildPlayerDetailUrl(playerId) {
-  const qs = new URLSearchParams();
+  const qs = emptyParams();
   qs.set('id', playerId);
   if (modeParam) qs.set('mode', modeParam);
   if (franchiseId) qs.set('franchise_id', franchiseId);
   if (gameId) qs.set('game_id', gameId);
-  qs.set('return_url', window.location.pathname + window.location.search);
+  qs.set('return_url', window.location.pathname + currentSearch());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -176,12 +197,13 @@ function buildExhaustedUserLineupIfNeeded() {
   }
 
   exhaustedUserLineupLocked = true;
-  const currentParams = new URLSearchParams(window.location.search);
+  const currentParams = liveParams();
   currentParams.set('locked_exhausted_user_lineup', 'true');
   ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
     currentParams.set(`${myTeamSide}_${pos.toLowerCase()}`, lineup[pos]);
   });
-  history.replaceState(null, '', `${window.location.pathname}?${currentParams.toString()}`);
+  // In-place: stamp the exhausted-lineup lock onto the current set-lineup URL.
+  franchiseCtx().commitParams(currentParams);
   return true;
 }
 
@@ -364,11 +386,11 @@ if (gameId && quarter === 1 && !urlParams.has('resume_from_timeout')) {
   
   if (isNewMatchup) {
     // Teams changed = definitely a new matchup, clear game_id from URL
-    if (typeof history !== 'undefined' && history.replaceState) {
-      const clean = new URLSearchParams(urlParams);
+    if (franchiseCtx()) {
+      const clean = cloneParams(urlParams);
       clean.delete('game_id');
-      const qs = clean.toString();
-      history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+      // In-place: drop a stale game_id for a new matchup. Do not navigate.
+      franchiseCtx().commitParams(clean);
     }
     // Update stored teams for next check
     if (typeof localStorage !== 'undefined') {
@@ -473,8 +495,8 @@ function getLineupPlaybookEffClass(value) {
 }
 
 function getLineupPlaybookUrl() {
-  const params = new URLSearchParams();
-  const qp = new URLSearchParams(window.location.search);
+  const params = emptyParams();
+  const qp = liveParams();
   let resolvedTeamId =
     typeof window.resolvePlaybookTeamIdFromSearch === 'function'
       ? window.resolvePlaybookTeamIdFromSearch(qp)
@@ -511,7 +533,7 @@ async function fetchLineupPlaybooksData() {
     let qsTeamId = null;
     try {
       const u = new URL(apiUrl, typeof window !== 'undefined' ? window.location.origin : 'http://local');
-      qsTeamId = u.searchParams.get('team_id');
+      qsTeamId = franchiseCtx().parseSearch(u.search).get('team_id');
     } catch (e) {
       qsTeamId = null;
     }
@@ -764,7 +786,7 @@ async function loadRoster() {
   
   // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
   let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}`);
-  const params = new URLSearchParams();
+  const params = emptyParams();
   if (franchiseId) {
     params.append('franchise_id', franchiseId);
   }
@@ -852,12 +874,11 @@ async function loadRoster() {
         }
         
         // ✅ SS&S: URL is the source of truth - update URL with gameId (without page reload)
-        // Button handlers will read from window.location.search, not from module-level variable
-        const newParams = new URLSearchParams(window.location.search);
+        // Button handlers will read from currentSearch(), not from module-level variable
+        const newParams = liveParams();
         newParams.set('game_id', newGameId);
-        if (typeof history !== 'undefined' && history.replaceState) {
-          history.replaceState(null, '', `${window.location.pathname}?${newParams.toString()}`);
-        }
+        // In-place: stamp init-game id onto the current set-lineup URL.
+        franchiseCtx().commitParams(newParams);
       } else {
         console.warn("Failed to initialize game:", initRes.status, initRes.statusText);
       }
@@ -2341,7 +2362,7 @@ function wireLineupNavButtons() {
     gameplanBtn.addEventListener('click', async () => {
       playSound('positive-beep.wav');
       console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
-      const currentUrlParams = new URLSearchParams(window.location.search);
+      const currentUrlParams = liveParams();
       let currentGameId = currentUrlParams.get('game_id');
       const resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
       if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !initGameInProgress) {
@@ -2364,9 +2385,8 @@ function wireLineupNavButtons() {
             const initData = await initRes.json();
             currentGameId = initData.game_id;
             currentUrlParams.set('game_id', currentGameId);
-            if (typeof history !== 'undefined' && history.replaceState) {
-              history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
-            }
+            // In-place: stamp init-game id before leaving for game-plan.
+            franchiseCtx().commitParams(currentUrlParams);
           }
         } catch (err) {
           console.error('❌ [SET-LINEUP] Error initializing game for Game Plan navigation:', err);
@@ -2380,7 +2400,7 @@ function wireLineupNavButtons() {
         while (initGameInProgress && waitCount < 50) {
           await new Promise(r => setTimeout(r, 100));
           waitCount++;
-          currentGameId = new URLSearchParams(window.location.search).get('game_id');
+          currentGameId = liveParams().get('game_id');
           if (currentGameId) break;
         }
         if (!currentGameId) {
@@ -2423,7 +2443,7 @@ function wireLineupNavButtons() {
         console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
         return;
       }
-      const currentUrlParams = new URLSearchParams(window.location.search);
+      const currentUrlParams = liveParams();
       const currentGameId = helper.getGameId(currentUrlParams);
       const resumeFromTimeout = helper.getResumeFromTimeout(currentUrlParams);
       const params = helper.buildGameNavigationParams({
@@ -2657,7 +2677,7 @@ async function init() {
       }
       
       // ✅ PHASE 1.1: Read from current URL (source of truth), not stale module-level urlParams
-      const currentUrlParams = new URLSearchParams(window.location.search);
+      const currentUrlParams = liveParams();
       let currentGameId = currentUrlParams.get('game_id') || null;
       let resumeFromTimeout = currentUrlParams.get('resume_from_timeout') === 'true';
       const resumeFromAnchor = currentUrlParams.get('resume_from_anchor') === 'true' || currentUrlParams.get('consume_resume_anchor') === 'true';
@@ -2695,9 +2715,8 @@ async function init() {
               const initData = await initRes.json();
               currentGameId = initData.game_id;
               currentUrlParams.set('game_id', currentGameId);
-              if (typeof history !== 'undefined' && history.replaceState) {
-                history.replaceState(null, '', `${window.location.pathname}?${currentUrlParams.toString()}`);
-              }
+              // In-place: stamp init-game id before PLAY GAME navigation.
+              franchiseCtx().commitParams(currentUrlParams);
               console.log('✅ [SET-LINEUP] PLAY GAME: Initialized game_id:', currentGameId);
             }
           } catch (e) {
@@ -2710,7 +2729,7 @@ async function init() {
           while (initGameInProgress && waitCount < 50) {
             await new Promise(r => setTimeout(r, 100));
             waitCount++;
-            const u = new URLSearchParams(window.location.search);
+            const u = liveParams();
             currentGameId = u.get('game_id');
             if (currentGameId) break;
           }
@@ -2794,18 +2813,18 @@ async function init() {
         // ⚠️ CARRY `params`, DO NOT REBUILD IT.
         // `buildGameNavigationParams` writes the chosen five into the query string as
         // home_pg / home_sg / … (timeoutNavigationHelper.js). An earlier build of this
-        // branch constructed a fresh URLSearchParams and silently dropped them, so the
+        // branch constructed a fresh query bag and silently dropped them, so the
         // court received no lineup, `snapshot_opening_lineups_to_game_state` skipped
         // ("need 5 starters"), and the pre-game card rendered empty. Every tutorial
         // screen from here forwards the string verbatim.
-        const nextParams = new URLSearchParams(params);
+        const nextParams = cloneParams(params);
         nextParams.set('mode', 'tutorial');
         nextParams.set('team_id', homeTeam);
         nextParams.delete('resume_from_timeout');
         // Read straight off the live URL first. `currentGameId` is captured earlier
         // in this handler and has been observed empty on this path, which produced
         // `GET /api/gameplan?...` with no game_id -> 400, and a PUT -> 500.
-        const tutGameId = new URLSearchParams(window.location.search).get('game_id')
+        const tutGameId = liveParams().get('game_id')
           || currentGameId
           || nextParams.get('game_id');
         if (tutGameId) {

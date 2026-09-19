@@ -11,9 +11,7 @@
       "FrontEnd/static/common.js": 6,
       "FrontEnd/static/court (1).html": 6,
       "FrontEnd/static/cut-players.js": 2,
-      "FrontEnd/static/franchise-command-center.js": 27,
       "FrontEnd/static/franchise-select-team.js": 10,
-      "FrontEnd/static/game-plan.js": 8,
       "FrontEnd/static/game-plans.html": 1,
       "FrontEnd/static/homepage-v3.js": 2,
       "FrontEnd/static/homepage.html": 2,
@@ -64,7 +62,6 @@
       "FrontEnd/static/reset-password.html": 1,
       "FrontEnd/static/schedule.html": 1,
       "FrontEnd/static/scouting.html": 1,
-      "FrontEnd/static/set-lineup.js": 18,
       "FrontEnd/static/signup.html": 2,
       "FrontEnd/static/standings.html": 1,
       "FrontEnd/static/stats.html": 1,
@@ -77,7 +74,6 @@
       "FrontEnd/static/training-playbooks.js": 5,
       "FrontEnd/static/training-report.js": 2,
       "FrontEnd/static/training-squad-report.js": 2,
-      "FrontEnd/static/training.js": 15,
       "FrontEnd/static/tutorial-pick-opponent.js": 1,
       "FrontEnd/static/tutorial-situation.js": 3
     }

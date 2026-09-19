@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 // Training Page JavaScript
 let TOTAL_POINTS = 24; // Will be updated from API for franchise mode
 
@@ -52,7 +73,7 @@ function trainingFormDraftStorageKey(urlParams) {
 }
 
 function saveTrainingFormDraft() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const key = trainingFormDraftStorageKey(urlParams);
   if (!key) return;
   const sliders = {};
@@ -75,7 +96,7 @@ function saveTrainingFormDraft() {
 }
 
 function clearTrainingFormDraftForCurrentContext() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const key = trainingFormDraftStorageKey(urlParams);
   if (!key) return;
   try {
@@ -94,7 +115,7 @@ function clearTutorialResumeContext() {
 }
 
 function currentTrainingReturnUrl() {
-  return window.location.pathname + window.location.search + (window.location.hash || '');
+  return window.location.pathname + currentSearch() + (window.location.hash || '');
 }
 
 function navigateToTrainingTutorial() {
@@ -285,7 +306,7 @@ async function fetchFranchiseCommandCenterData(franchiseId) {
 }
 
 async function redirectIfTrainingAlreadyCommitted() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
   const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
@@ -294,7 +315,7 @@ async function redirectIfTrainingAlreadyCommitted() {
   try {
     const data = await fetchFranchiseCommandCenterData(franchiseId);
     if (!data || !data.training_completed) return false;
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('mode', 'franchise');
     params.set('franchise_id', franchiseId);
     if (teamId) params.set('team_id', teamId);
@@ -438,7 +459,7 @@ function resetCustomFocusCommitted() {
 
 function openCustomFocusModal() {
   if (!customFocusModal || !customFocusThead || !customFocusTbody) return;
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   if (urlParams.get('mode') !== 'franchise' || !urlParams.get('franchise_id')) {
     showMessageModal('Choose Attributes is available in franchise mode after roster data loads.');
     return;
@@ -861,7 +882,7 @@ function applyCoachingFocusArchetypeUi(value) {
 }
 
 function restoreTrainingFormDraft() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const key = trainingFormDraftStorageKey(urlParams);
   if (!key) return;
   let raw;
@@ -1000,7 +1021,7 @@ if (customFocusCancelBtn) {
 backBtn.addEventListener('click', function() {
   clearTutorialResumeContext();
   // Get URL parameters to determine where to navigate back
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const from = urlParams.get('from');
   
@@ -1029,7 +1050,7 @@ backBtn.addEventListener('click', function() {
  * Collect all training data for submission
  */
 function collectTrainingData() {
-  const pageParams = new URLSearchParams(window.location.search);
+  const pageParams = liveParams();
   const data = {
     // Player Drills
     player_drills: {
@@ -1185,7 +1206,7 @@ submitBtn.addEventListener('click', async function() {
   }
   
   // Get URL parameters for context
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
   const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
@@ -1308,8 +1329,10 @@ submitBtn.addEventListener('click', async function() {
         const safeReturnUrl = typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(returnUrl) : returnUrl;
         if (safeReturnUrl) {
           const redirect = new URL(redirectUrl, window.location.origin);
-          redirect.searchParams.set('return_url', safeReturnUrl);
-          redirectUrl = `${redirect.pathname}${redirect.search}${redirect.hash || ''}`;
+          const bag = franchiseCtx().parseSearch(redirect.search);
+          bag.set('return_url', safeReturnUrl);
+          const qs = bag.toString();
+          redirectUrl = `${redirect.pathname}${qs ? '?' + qs : ''}${redirect.hash || ''}`;
         }
       }
       window.location.href = redirectUrl;
@@ -1378,7 +1401,7 @@ async function resumeCpuTraining(franchiseId) {
  * Fetch training points from API for franchise mode
  */
 async function initializeTrainingPoints() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
   const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
@@ -1476,7 +1499,7 @@ function syncPlaybookModeToggleUi() {
 }
 
 function wireCustomTrainingPlaybook() {
-  const pageParams = new URLSearchParams(window.location.search);
+  const pageParams = liveParams();
   if (pageParams.get('mode') !== 'franchise') {
     const wrap = document.querySelector('.playbook-mode-selection');
     if (wrap) wrap.style.display = 'none';
@@ -1508,8 +1531,8 @@ function wireCustomTrainingPlaybook() {
           })
         );
       } catch (_e) {}
-      const p = new URLSearchParams(window.location.search);
-      const q = new URLSearchParams();
+      const p = liveParams();
+      const q = emptyParams();
       q.set('mode', p.get('mode') || 'franchise');
       if (p.get('franchise_id')) q.set('franchise_id', p.get('franchise_id'));
       const tid = p.get('team_id') || p.get('user_team_id');

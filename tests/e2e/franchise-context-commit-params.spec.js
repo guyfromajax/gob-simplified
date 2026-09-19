@@ -105,3 +105,102 @@ test.describe('FranchiseContext.commitParams must not navigate', () => {
     expect(await page.evaluate(() => window.FranchiseContext.get('game_id'))).toBe('probe-qbreak');
   });
 });
+
+/**
+ * Slice 3 reads the flags slice 2 writes. A mismatch here is silent: each
+ * file looks fine in isolation and the game just never resumes.
+ */
+async function openSetLineup(page, search) {
+  await page.goto(`/static/set-lineup.html?${search}`);
+  await page.waitForFunction(() => window.FranchiseContext && window.FranchiseContext.get);
+}
+
+test.describe('set-lineup reads the resume bag slice 2 writes', () => {
+  test('timeout path: lineup reads resume_from_timeout and href back to court keeps it', async ({ page }) => {
+    await openSetLineup(
+      page,
+      'home=Lancaster&away=Four-Corners&resume_from_timeout=true&resume_from_anchor=true&quarter_break_from=mid_game_resume&locked_exhausted_user_lineup=true&game_id=probe-timeout-roundtrip&my_team=home'
+    );
+
+    const read = await page.evaluate(() => ({
+      resume: window.FranchiseContext.get('resume_from_timeout'),
+      anchor: window.FranchiseContext.get('resume_from_anchor'),
+      qbreak: window.FranchiseContext.get('quarter_break_from'),
+      locked: window.FranchiseContext.get('locked_exhausted_user_lineup'),
+    }));
+    expect(read.resume).toBe('true');
+    expect(read.anchor).toBe('true');
+    expect(read.qbreak).toBe('mid_game_resume');
+    expect(read.locked).toBe('true');
+
+    await page.evaluate(() => {
+      const p = window.FranchiseContext.toSearchParams();
+      p.set('lineup_checkpoint', 'true');
+      if (p.get('quarter_break_from') === 'mid_game_resume') {
+        p.set('consume_resume_anchor', 'true');
+        p.set('resume_from_anchor', 'true');
+      }
+      window.location.href = `/court.html?${p.toString()}`;
+    });
+    await page.waitForURL('**/court.html**');
+    await page.waitForFunction(() => window.FranchiseContext && window.FranchiseContext.get);
+
+    expect(await page.evaluate(() => window.FranchiseContext.get('resume_from_timeout'))).toBe('true');
+    expect(await page.evaluate(() => window.FranchiseContext.get('resume_from_anchor'))).toBe('true');
+    expect(await page.evaluate(() => window.FranchiseContext.get('lineup_checkpoint'))).toBe('true');
+
+    const documentLoads = await commitAndHold(page, () => {
+      const p = window.FranchiseContext.toSearchParams();
+      p.set('resume_from_timeout', 'false');
+      p.delete('resume_from_anchor');
+      p.delete('consume_resume_anchor');
+      p.delete('active_resume');
+      window.FranchiseContext.commitParams(p);
+    });
+    expect(documentLoads).toBe(0);
+    expect(await sentinelAlive(page)).toBe(true);
+    expect(page.url()).toContain('court.html');
+    expect(await page.evaluate(() => window.FranchiseContext.get('resume_from_timeout'))).toBe('false');
+  });
+
+  test('quarter-break path: lineup reads quarter_break_from and href back to court keeps it', async ({ page }) => {
+    await openSetLineup(
+      page,
+      'home=Lancaster&away=Four-Corners&resume_from_timeout=false&quarter_break_from=play_quarter&lineup_checkpoint=true&game_id=probe-qbreak-roundtrip&my_team=home&quarter=2'
+    );
+
+    const read = await page.evaluate(() => ({
+      resume: window.FranchiseContext.get('resume_from_timeout'),
+      qbreak: window.FranchiseContext.get('quarter_break_from'),
+      checkpoint: window.FranchiseContext.get('lineup_checkpoint'),
+    }));
+    expect(read.resume).toBe('false');
+    expect(read.qbreak).toBe('play_quarter');
+    expect(read.checkpoint).toBe('true');
+
+    await page.evaluate(() => {
+      const p = window.FranchiseContext.toSearchParams();
+      p.set('lineup_checkpoint', 'true');
+      const qbreak = p.get('quarter_break_from');
+      if (qbreak) p.set('quarter_break_from', qbreak);
+      window.location.href = `/court.html?${p.toString()}`;
+    });
+    await page.waitForURL('**/court.html**');
+    await page.waitForFunction(() => window.FranchiseContext && window.FranchiseContext.get);
+
+    expect(await page.evaluate(() => window.FranchiseContext.get('quarter_break_from'))).toBe('play_quarter');
+    expect(await page.evaluate(() => window.FranchiseContext.get('lineup_checkpoint'))).toBe('true');
+
+    const documentLoads = await commitAndHold(page, () => {
+      const p = window.FranchiseContext.toSearchParams();
+      p.delete('quarter_break_from');
+      p.delete('lineup_checkpoint');
+      window.FranchiseContext.commitParams(p);
+    });
+    expect(documentLoads).toBe(0);
+    expect(await sentinelAlive(page)).toBe(true);
+    expect(page.url()).toContain('court.html');
+    expect(await page.evaluate(() => window.FranchiseContext.get('quarter_break_from'))).toBeNull();
+  });
+});
+
