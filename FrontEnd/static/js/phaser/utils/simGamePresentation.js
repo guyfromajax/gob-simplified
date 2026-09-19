@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Sim Game Presentation — Act 2 broadcast overlay (Mockup 4 · wide worm).
  *
@@ -727,7 +748,7 @@ function calloutsDebugEnabled() {
   try {
     if (typeof window === 'undefined') return false;
     if (window.DEBUG_CARDS || window.DEBUG_CALLOUTS) return true;
-    const q = new URLSearchParams(window.location.search);
+    const q = liveParams();
     return q.has('debug_cards') || q.has('debug_callouts');
   } catch (e) {
     return false;

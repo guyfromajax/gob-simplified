@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Defense Matchups Popup + franchise Q1 pre-game handoff.
  *
@@ -58,14 +79,14 @@ function isFranchiseContext(scene, payload) {
   if (payload?.isFranchise) return true;
   if (scene?.franchiseId) return true;
   if (typeof window === "undefined") return false;
-  const params = new URLSearchParams(window.location.search);
+  const params = liveParams();
   return params.get("mode") === "franchise" || !!params.get("franchise_id");
 }
 
 function isQ1StartContext(scene, options = {}) {
   if (typeof options.isQ1Start === "boolean") return options.isQ1Start;
   if (typeof window === "undefined") return false;
-  const params = new URLSearchParams(window.location.search);
+  const params = liveParams();
   const resumeFromTimeout = params.get("resume_from_timeout") === "true";
   const activeResume = params.get("active_resume") === "true" || !!scene?.resumeActive;
   return Number(scene?.quarter) === 1 && !resumeFromTimeout && !activeResume;
@@ -368,7 +389,7 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
  */
 export async function showDefenseMatchupsPopup(gameId, scene, options = {}) {
   if (typeof window !== "undefined") {
-    const urlMode = new URLSearchParams(window.location.search).get("mode");
+    const urlMode = liveParams().get("mode");
     if (urlMode === "tutorial") {
       return;
     }

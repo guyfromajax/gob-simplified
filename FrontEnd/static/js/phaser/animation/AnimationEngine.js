@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * AnimationEngine - Centralized Animation System
  * 
@@ -1461,7 +1482,7 @@ export class AnimationEngine {
           const responseData = turnData._responseData || {};
           const clock = responseData.clock || turnData.clock || this.scene.simData?.clock;
           const mode = this.scene.mode || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mode') : null) || 'single';
-          const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : { get: () => null };
+          const urlParams = typeof window !== 'undefined' && window.FranchiseContext ? window.FranchiseContext.toSearchParams() : { get: () => null };
           const franchiseId = urlParams.get?.('franchise_id') || null;
           const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
           const homeId = this.scene.homeTeamId || urlParams.get?.('home_id');

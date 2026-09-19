@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Shows a foul out popup when a player reaches 5 fouls
  * @param {Object} options
@@ -23,7 +44,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
 
   // ✅ SS&S: Use unified navigation helper for consistent parameter building
   // Fallback: try to get team info and CURRENT LINEUP from current URL if not provided
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   if (!homeTeam) homeTeam = urlParams.get('home');
   if (!awayTeam) awayTeam = urlParams.get('away');
   if (!homeId) homeId = urlParams.get('home_id');

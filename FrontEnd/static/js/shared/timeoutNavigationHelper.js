@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Unified Timeout Navigation Helper
  * 
@@ -21,7 +42,7 @@
    * Builds URL parameters for game navigation with consistent SS&S logic
    * 
    * @param {Object} options
-   * @param {URLSearchParams} options.sourceParams - Current page URL params
+   * @param {Object} options.sourceParams - Current page URL params
    * @param {number} options.targetQuarter - Quarter to navigate to
    * @param {string|null} options.gameId - Game ID (from URL or localStorage)
    * @param {boolean} options.resumeFromTimeout - Whether resuming from timeout/foul out
@@ -29,7 +50,7 @@
    * @param {string|null} options.myTeamSide - 'home' or 'away'
    * @param {string|null} [options.clock] - Clock time to preserve
    * @param {Object} [options.overrides={}] - Optional param overrides
-   * @returns {URLSearchParams} Built parameters ready for navigation
+   * @returns {Object} Built parameters ready for navigation
    */
   function buildGameNavigationParams({
     sourceParams,
@@ -43,7 +64,7 @@
     computerTeamName = null,
     overrides = {}
   }) {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     
     // ============================================
     // 1. CORE GAME PARAMS (Always needed)
@@ -80,7 +101,7 @@
 
     let resolvedNavTeamId = teamId;
     if (!resolvedNavTeamId) {
-      const qpNav = new URLSearchParams();
+      const qpNav = emptyParams();
       if (myTeam) qpNav.set('my_team', myTeam);
       if (homeId) qpNav.set('home_id', homeId);
       if (awayId) qpNav.set('away_id', awayId);
@@ -242,7 +263,7 @@
   /**
    * Helper to extract resume_from_timeout from URL params
    * 
-   * @param {URLSearchParams} urlParams - URL parameters
+   * @param {Object} urlParams - URL parameters
    * @returns {boolean} Whether resuming from timeout/foul out
    */
   function getResumeFromTimeout(urlParams) {
@@ -252,7 +273,7 @@
   /**
    * Helper to get game ID from URL params only (PHASE 1.1: Removed localStorage fallback)
    * 
-   * @param {URLSearchParams} urlParams - URL parameters
+   * @param {Object} urlParams - URL parameters
    * @returns {string|null} Game ID or null (from URL only)
    */
   function getGameId(urlParams) {

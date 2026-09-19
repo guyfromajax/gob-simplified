@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Animation Playback Engine — pure renderer for the unified animation
  * step schema. See:
@@ -175,7 +196,7 @@ function shouldDebugOobAnchors(scene = null) {
   if (window.DEBUG_OOB_ANCHORS === false) return false;
   if (window.DEBUG_OOB_ANCHORS === true) return true;
   try {
-    const raw = new URLSearchParams(window.location.search).get("debug_oob");
+    const raw = liveParams().get("debug_oob");
     if (raw != null && raw !== "") {
       return !["0", "false", "no", "off"].includes(String(raw).toLowerCase());
     }
