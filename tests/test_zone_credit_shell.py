@@ -29,7 +29,23 @@ CATALOG = [
 # A layout whose credit is identical across RNG seeds (no overlap tie-breaks) and differs per shell.
 BH_SPOT = "key"
 LAYOUT = [BH_SPOT, "upper midWing", "upper wing", "upper corner", "lower corner"]
-EXPECTED = {"2-3-zone": ["SG", "C"], "3-2-zone": ["PG", "SF"], "1-3-1-zone": ["PG", "PF"]}
+
+# RE-DERIVED after cd2a08c3e ("Turn the zone sink on by default"), 2026-09-19.
+#
+# This map depends on SINK PLACEMENT, not just on the shell's polygons. The credited
+# defender comes from `defender_to_offensive_player`, which is built by asking "which
+# offensive player is nearest this defender's assigned coordinate" - so moving the
+# defenders moves the credit. The sink changed where empty-zone defenders stand, and
+# the 1-3-1 entry went from ["PG", "PF"] to ["PG"] as a result: the PF no longer lands
+# close enough to the ball handler to be credited with him.
+#
+# So a change to the sink's weights, its anchors or the zone spot lists can legitimately
+# change these values. If this test fails after such a change, re-derive rather than
+# assume a regression - but check the shells still differ from each other, because that
+# (not the exact positions) is what the test exists to prove.
+# Derived with GOB_ZONE_SINK at its shipped default (ON); GOB_ZONE_SINK=0 gives the
+# pre-sink map and is expected to fail here.
+EXPECTED = {"2-3-zone": ["SG", "C"], "3-2-zone": ["PG", "SF"], "1-3-1-zone": ["PG"]}
 
 LEGACY_LITERAL = re.compile(r'==\s*"(3-2|1-3-1|2-3) Zone"')
 

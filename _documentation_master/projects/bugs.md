@@ -4270,3 +4270,38 @@ Why it went rather than being brought in line with the attribute-tile work:
 
 Residual risk accepted: an external bookmark or link would now 404. If that surfaces,
 the fix is a 301 to `/team-roster-view.html` rather than restoring the page.
+
+---
+
+## Test-suite hygiene — 129 pre-existing failures [CODE-CLEANUP] — post-Founders
+
+`pytest tests/ --ignore=tests/e2e --maxfail=1000` reports **129 failures that predate the
+animation-reward workstream** (measured 2026-09-19 at `f4c018924`; the baseline run at
+`ecc5399fc`, the commit before the workstream began, has the same set).
+
+**Grouped by cause in `reports/test-triage-2026-09-19.md`** — 118 pre-existing plus 11
+environmental, not 129 separate problems:
+
+- ~20 pin constants that were later retuned (e.g. `BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE`
+  changed by `2f33be164`, test still asserts the old value)
+- ~25 assert behaviour that was intentionally changed
+- ~14 call signatures whose arity or keywords moved
+- ~13 assert old API response shapes
+- 5 UESS seam guards asserting on messages that moved
+- ~4 reference removed or renamed symbols
+- ~37 singletons
+- **11 environmental**: 10 node-harness `ERR_MODULE_NOT_FOUND` (the loader imports
+  `tests/js/…` as a bare specifier and `package.json` has no `imports` map) and 1 from
+  `slowapi` not being installed, which degrades the auth rate limiter to a no-op so the
+  429 test can never pass locally
+
+The common shape is a **stale test, not broken code** — an assertion frozen against a
+constant, signature, message or response body that was changed on purpose afterwards. That
+is not verified individually for all 118.
+
+**Note `pytest.ini` sets `--maxfail=2`**, so a plain run reports "2 failed" and the real
+total is invisible. That is why a genuine regression (`test_zone_credit_shell`, introduced
+by the zone sink flip `cd2a08c3e`) went unnoticed for a day. It has since been re-derived;
+the rest of this list has not been touched.
+
+**Do not fix piecemeal.** Post-Founders cleanup: work the groups, not the 129 lines.
