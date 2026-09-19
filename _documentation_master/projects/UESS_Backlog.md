@@ -581,3 +581,31 @@ Sequenced by what unblocks the most + what is safest to cut first. Each item is 
 9. **Bug 14 STEAL→HCO Reset?** `build_reset_steps` exists with steal mention in docstring; no grep hit shows it being called from `skeleton_step_emitter`. Orchestrator path used instead. Intentional, or should Reset wrap the steal→HCO seam?
 10. **Bug 1 root cause** — step T floor vs animator-coord mismatch — both candidates plausible; runtime trace needed to disambiguate before remediation item 1 ships.
 11. **HCT outlet_passer role?** HCT has no outlet_passer concept; lack of re-`canonicalize_post_shot_overlays` in `hct_step_emitter` plausibly intentional but asymmetric with covert_release/rim_runner. Confirm scope.
+
+---
+
+## 8. Rebound / movement tuning items (opened 2026-09-19, `456e2cdd9`)
+
+Logged from the rebound-from-arrival flip. **All three are reported, not fixed** — tuning
+happens once, at the end. Evidence: `reports/rebound-arrival-flip-2026-09-19.md`,
+`reports/rebound-race-2026-09-19.md`.
+
+1. **`_ag_grid_per_game_sec` AG sensitivity is nearly flat.** AG 10 → 12.88 grid units per
+   game-second, AG 90 → 15.12: a **17% spread across the entire attribute range**. This is
+   why arrival barely separates players (82–87% of crashers reach their destination, and the
+   three AG bands cover 95.0 / 94.3 / 95.1% of the way) and why the dormant race term can
+   only ever be a ~±7% lever against the `randint(1,6)`'s 6× swing. **Changing it moves ALL
+   movement — every emitter, every archetype — not just rebounding.** That blast radius is
+   the reason it is a tuning-pass item and not a rebound fix.
+2. **`OREB_REBOUND_SCORE_DISCOUNT` (0.8) is calibrated against a head start that no longer
+   exists.** It was set when the defense stood **3.33 (sim) / 3.93 (played)** grid units
+   nearer the bounce than the offense at the shot moment. Arrival collapses that gap to
+   **1.00 / 1.12**, so the discount is now the only brake on offensive rebounding — which is
+   why OREB share rose 3.06 (sim) / 5.50 (played) points on the production footing. Re-deriving
+   0.8 against the new gap is the natural tuning move.
+3. **Shot-moment coordinate mismatch between the arms — correctness queue, not tuning.**
+   Played's defenders stand **1.60** grid units nearer the bounce and its crashers **1.13**
+   units nearer their destinations than sim's, at the same instant. Arrival amplifies that
+   pre-existing difference into a rebound-outcome difference between arms. The window
+   derivation was ruled out as a cause (identical on both arms: mean 1.550 s, same p10/p90),
+   so this is a **coord-parity** item.
