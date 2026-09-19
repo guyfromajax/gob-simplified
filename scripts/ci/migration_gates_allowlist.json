@@ -6,10 +6,8 @@
   "gate_b": {
     "description": "WS-3: FrontEnd/static lines matching URLSearchParams, location.search, or .searchParams. Count may fall, never rise.",
     "files": {
-      "FrontEnd/static/box-score.js": 9,
       "FrontEnd/static/brackets-page.js": 3,
       "FrontEnd/static/cut-players.js": 2,
-      "FrontEnd/static/franchise-select-team.js": 10,
       "FrontEnd/static/homepage-v3.js": 2,
       "FrontEnd/static/leaders.js": 1,
       "FrontEnd/static/mode-select.js": 2,
@@ -19,12 +17,8 @@
       "FrontEnd/static/player-detail.js": 4,
       "FrontEnd/static/practice-squad-bracket.js": 3,
       "FrontEnd/static/practice-squad-standings.js": 4,
-      "FrontEnd/static/recruiting-common.js": 5,
-      "FrontEnd/static/team-builder.js": 9,
       "FrontEnd/static/team-roster-view.js": 4,
-      "FrontEnd/static/team-select.js": 1,
       "FrontEnd/static/team-stats.js": 1,
-      "FrontEnd/static/training-playbooks.js": 5,
       "FrontEnd/static/training-report.js": 2,
       "FrontEnd/static/training-squad-report.js": 2,
       "FrontEnd/static/tutorial-pick-opponent.js": 1,

@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Program Select + Claim — replaces the old TeamPicker-mounted franchise entry.
  *
@@ -11,12 +32,12 @@
 (function () {
   'use strict';
 
-  var TUTORIAL_MODE = new URLSearchParams(window.location.search).get('mode') === 'tutorial';
+  var TUTORIAL_MODE = liveParams().get('mode') === 'tutorial';
   var HOME_SLOT_PARAM = (function () {
-    var n = parseInt(new URLSearchParams(window.location.search).get('home_slot'), 10);
+    var n = parseInt(liveParams().get('home_slot'), 10);
     return n === 1 || n === 2 ? n : null;
   })();
-  var BUILDER_PARAM = new URLSearchParams(window.location.search).get('builder') === '1';
+  var BUILDER_PARAM = liveParams().get('builder') === '1';
 
   var TIERS = {
     talent: ['Loaded', 'Deep', 'Average', 'Thin', 'Rebuilding'],
@@ -121,7 +142,7 @@
   }
 
   function buildReturnUrl() {
-    return window.location.pathname + window.location.search;
+    return window.location.pathname + currentSearch();
   }
 
   function syncStickyOffsets() {
@@ -160,10 +181,11 @@
     }
     // Deep-linkable builder flag without losing home_slot / tutorial.
     try {
-      var url = new URL(window.location.href);
-      if (state.builder) url.searchParams.set('builder', '1');
-      else url.searchParams.delete('builder');
-      window.history.replaceState({}, '', url.pathname + url.search);
+      var bag = liveParams();
+      if (state.builder) bag.set('builder', '1');
+      else bag.delete('builder');
+      // In-place: deep-linkable builder flag. Do not navigate.
+      franchiseCtx().commitParams(bag);
     } catch (e) {}
     // Draft card ↔ Open Team Builder exclusivity lives in renderDraftCard.
     if (TUTORIAL_MODE || !state.teamBuilderEnabled) {
@@ -305,7 +327,7 @@
   }
 
   function resumeDraft(draft) {
-    var params = new URLSearchParams();
+    var params = emptyParams();
     params.set('replaced_object_id', draft.replaced_object_id);
     params.set('draft_id', draft.draft_id || '');
     params.set('chapter', draft.chapter || 'identity');
@@ -541,7 +563,7 @@
 
   function takeThisPlace(team) {
     playSound('click-beep.wav');
-    var params = new URLSearchParams();
+    var params = emptyParams();
     params.set('replaced_object_id', team.object_id);
     params.set('chapter', 'identity');
     if (HOME_SLOT_PARAM) params.set('home_slot', String(HOME_SLOT_PARAM));
@@ -632,7 +654,7 @@
   function scoutTeam(team) {
     var name = team && team.name ? team.name : team;
     playSound('click-beep.wav');
-    var scoutParams = new URLSearchParams();
+    var scoutParams = emptyParams();
     scoutParams.set('team_name', name);
     scoutParams.set('return_url', buildReturnUrl());
     if (TUTORIAL_MODE) scoutParams.set('mode', 'tutorial');
@@ -783,9 +805,10 @@
     if (!state.teamBuilderEnabled) {
       state.builder = false;
       try {
-        var clearUrl = new URL(window.location.href);
-        clearUrl.searchParams.delete('builder');
-        window.history.replaceState({}, '', clearUrl.pathname + clearUrl.search);
+        var clearBag = liveParams();
+        clearBag.delete('builder');
+        // In-place: drop builder flag when Team Builder is disabled.
+        franchiseCtx().commitParams(clearBag);
       } catch (e2) {}
     }
 
