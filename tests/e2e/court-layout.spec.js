@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { stubAuth } = require('./helpers/auth');
 
 /**
  * Frontend Layout Refactor Tests
@@ -7,6 +8,10 @@ const { test, expect } = require('@playwright/test');
  * across different viewport sizes, preventing the "court covers playcall"
  * bug that occurred on large screens (e.g., iMac).
  */
+
+test.beforeEach(async ({ page }) => {
+  await stubAuth(page);
+});
 
 // Viewport sizes to test (matching exit criteria from refactor plan)
 const VIEWPORTS = [
@@ -28,7 +33,7 @@ const VIEWPORTS = [
  * 5. Wait for canvas with longer timeout
  */
 async function startGame(page) {
-  const playButton = page.locator('.play-button');
+  const playButton = page.getByRole('button', { name: 'Play Quarter' });
   await expect(playButton).toBeVisible({ timeout: 15000 });
   await page.waitForTimeout(3000); // Give bootGame.js time to attach handler and load
 
@@ -59,7 +64,7 @@ test.describe('Court Layout - Basic Structure', () => {
     await expect(page.locator('#playcall-center')).toBeVisible();
     await expect(page.locator('.player-stats-panel.away')).toBeVisible();
     await expect(page.locator('.player-stats-panel.home')).toBeVisible();
-    await expect(page.locator('.play-button')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play Quarter' })).toBeVisible();
   });
 
   test('court view shows canvas after Play Quarter (requires backend rosters)', async ({ page }) => {
@@ -256,7 +261,7 @@ test.describe('Court Layout - Grid Constraints', () => {
 test.describe('Regression - No infinite hang', () => {
   test('court page loads and shows Play button within 25s (no hang)', async ({ page }) => {
     await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
-    await expect(page.locator('.play-button')).toBeVisible({ timeout: 25000 });
+    await expect(page.getByRole('button', { name: 'Play Quarter' })).toBeVisible({ timeout: 25000 });
   });
 });
 
