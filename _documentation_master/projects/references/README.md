@@ -18,13 +18,14 @@ Animator methods at Pattern A.
 
 | file | tree | what it baselines |
 |---|---|---|
-| **`equiv_v3_reference_456e2cdd9_reboundarrival.json`** | `456e2cdd9` | **CURRENT, both arms.** Rebounder selected from crash ARRIVAL positions (`GOB_REBOUND_FROM_ARRIVAL` ON). `GOB_REBOUND_RACE` off and dormant. |
+| **`equiv_v3_reference_ec4f5acfc_poslookup2.json`** | `ec4f5acfc` | **CURRENT, both arms.** Positions resolved by lineup identity across the backend (`GOB_LINEUP_POSITION_LOOKUP` ON). The played arm is byte-identical to the previous reference on both footings; the sim arm differs on exactly one seed per footing (8002 at `SEED_DEFENSES=1`, 8038 at `=0`), both from `turn_manager._execute_forced_shot` no longer letting an off-offense `last_ball_handler` take the forced shot under the PG label. |
 
 ## Superseded — kept deliberately
 
 | file | tree | superseded by | reproduced today by |
 |---|---|---|---|
-| `equiv_v3_reference_bf7ed1181_crashmodela.json` | `bf7ed1181` | `456e2cdd9` | `GOB_REBOUND_FROM_ARRIVAL=0` — verified 40/40 on all four cells at the flip |
+| `equiv_v3_reference_456e2cdd9_reboundarrival.json` | `456e2cdd9` | `ec4f5acfc` | `GOB_LINEUP_POSITION_LOOKUP=0` — verified 40/40 on all four cells at `ec4f5acfc` |
+| `equiv_v3_reference_bf7ed1181_crashmodela.json` | `bf7ed1181` | `456e2cdd9` | `GOB_REBOUND_FROM_ARRIVAL=0` — verified 40/40 on all four cells at that flip |
 | `equiv_v3_reference_d91679bef_foulweight.json` | `d91679bef` | `bf7ed1181` | `GOB_CRASH_SHOT_AWARE=0` — verified 40/40 at that flip |
 | `equiv_v3_reference_c1958f8f6_rings.json` | `c1958f8f6` | `d91679bef` | `GOB_FOUL_ON_BALL_WEIGHT=0` — verified 40/40 at that flip |
 | `equiv_v3_reference_1fd08c080_zonesink.json` | `1fd08c080` | `c1958f8f6` | `GOB_ZONE_SINK=0` reproduces the pre-sink rings tree 40/40 |
