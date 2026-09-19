@@ -192,6 +192,10 @@ def test_adapter_wraps_collections_when_production_read(tmp_path: Path):
         store.games_collection.delete_many({})
     with pytest.raises(ProdWriteBlocked, match="insert_one"):
         store.franchises_collection.insert_one({"_id": ObjectId()})
+    # First-class franchise write must hit the same wrap — this is the
+    # silent-until-prod failure mode if the adapter ever bypasses the guard.
+    with pytest.raises(ProdWriteBlocked):
+        store.write_franchise(ObjectId(), {"franchise": {"user_id": "blocked"}})
 
 
 def test_persistence_modules_do_not_use_random():

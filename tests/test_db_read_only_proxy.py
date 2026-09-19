@@ -100,4 +100,6 @@ def test_adapter_store_wraps_real_mongo_collections_when_access_is_read(tmp_path
         store.players_collection.insert_one({"_id": ObjectId()})
     with pytest.raises(AdapterProdWriteBlocked, match="delete_many"):
         store.delete_franchise(ObjectId())
+    with pytest.raises(AdapterProdWriteBlocked):
+        store.write_franchise(ObjectId(), {"franchise": {"user_id": "blocked"}})
 
