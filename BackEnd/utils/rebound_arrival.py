@@ -41,8 +41,13 @@ FALLBACK_WINDOW_SECONDS = 1.8
 
 
 def enabled() -> bool:
-    """``GOB_REBOUND_FROM_ARRIVAL`` - default OFF."""
-    return os.environ.get("GOB_REBOUND_FROM_ARRIVAL", "0") == "1"
+    """``GOB_REBOUND_FROM_ARRIVAL`` - **default ON**.
+
+    ``GOB_REBOUND_FROM_ARRIVAL=0`` is the kill switch: it restores the legacy
+    selection exactly (score every candidate from his SHOT-MOMENT position, with the
+    crash destinations authored afterwards and therefore cosmetic).
+    """
+    return os.environ.get("GOB_REBOUND_FROM_ARRIVAL", "1") == "1"
 
 
 def race_enabled() -> bool:
