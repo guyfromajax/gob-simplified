@@ -1694,7 +1694,15 @@ def _rebound_distance(player, bounce_spot):
     return ((px - bx) ** 2 + (py - by) ** 2) ** 0.5
 
 
-def _rebound_entries(lineup, team, bounce_spot, exclude_player_ids):
+def _rebound_entries(lineup, team, bounce_spot, exclude_player_ids, arrival_coords=None):
+    """Rebound candidates with their distance to the bounce.
+
+    ``arrival_coords`` (``{player_id: {x, y}}``) overrides a player's live coords for
+    the distance term only. That is how GOB_REBOUND_FROM_ARRIVAL scores a crasher from
+    where he actually GETS TO rather than where he stood when the shot went up. It is
+    an override, not a mutation: ``player.coords`` is left alone, so nothing else in
+    the turn sees a moved player.
+    """
     entries = []
     excluded = {str(pid) for pid in (exclude_player_ids or set()) if pid is not None}
     for player in (lineup or {}).values():
@@ -1703,15 +1711,25 @@ def _rebound_entries(lineup, team, bounce_spot, exclude_player_ids):
         pid = getattr(player, "player_id", None)
         if pid is not None and str(pid) in excluded:
             continue
+        at = (arrival_coords or {}).get(str(pid)) if pid is not None else None
         entries.append(
             {
                 "player": player,
                 "team": team,
                 "stat": None,
-                "distance": _rebound_distance(player, bounce_spot),
+                "distance": (_distance_between(at, bounce_spot) if at
+                             else _rebound_distance(player, bounce_spot)),
+                "scored_from": dict(at) if at else None,
             }
         )
     return entries
+
+
+def _distance_between(a, b):
+    try:
+        return math.hypot(float(a["x"]) - float(b["x"]), float(a["y"]) - float(b["y"]))
+    except (TypeError, KeyError, ValueError):
+        return 0.0
 
 
 def _entries_with_stat(off_entries, def_entries):
@@ -1766,6 +1784,7 @@ def select_rebounder_by_score(
     fallback_def_lineup=None,
     fallback_start_distance=20,
     fallback_step=5,
+    arrival_coords=None,
 ):
     """Select the rebound winner from all eligible players by final rebound value.
 
@@ -1777,8 +1796,10 @@ def select_rebounder_by_score(
     exclude_player_ids = exclude_player_ids or set()
     penalized = {str(pid) for pid in (penalize_player_ids or set()) if pid is not None}
 
-    off_entries = _rebound_entries(off_lineup, off_team, bounce_spot, exclude_player_ids)
-    def_entries = _rebound_entries(def_lineup, def_team, bounce_spot, exclude_player_ids)
+    off_entries = _rebound_entries(off_lineup, off_team, bounce_spot, exclude_player_ids,
+                                   arrival_coords)
+    def_entries = _rebound_entries(def_lineup, def_team, bounce_spot, exclude_player_ids,
+                                   arrival_coords)
     entries = _entries_with_stat(off_entries, def_entries)
 
     if max_distance_from_bounce is not None:
@@ -1789,8 +1810,10 @@ def select_rebounder_by_score(
         fallback_off = fallback_off_lineup if fallback_off_lineup is not None else off_lineup
         fallback_def = fallback_def_lineup if fallback_def_lineup is not None else def_lineup
         fallback_entries = _entries_with_stat(
-            _rebound_entries(fallback_off, off_team, bounce_spot, exclude_player_ids),
-            _rebound_entries(fallback_def, def_team, bounce_spot, exclude_player_ids),
+            _rebound_entries(fallback_off, off_team, bounce_spot, exclude_player_ids,
+                             arrival_coords),
+            _rebound_entries(fallback_def, def_team, bounce_spot, exclude_player_ids,
+                             arrival_coords),
         )
         radius = float(fallback_start_distance)
         while radius <= 150:
