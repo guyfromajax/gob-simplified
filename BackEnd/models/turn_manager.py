@@ -77,6 +77,7 @@ from BackEnd.engine.phase_resolution import (
     resolve_half_court_trap_logic
 )
 from typing import TYPE_CHECKING, Any, Dict, Optional
+from BackEnd.utils.lineup_position import lineup_position_lookup_enabled, lineup_slot
 if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
 
@@ -2628,6 +2629,15 @@ class TurnManager:
         off_lineup = self.game.offense_team.lineup
         def_lineup = self.game.defense_team.lineup
         ball_handler = self.game.game_state.get("last_ball_handler")
+        # last_ball_handler holds whoever LAST touched the ball, which after a possession
+        # flip or a substitution can be someone not on the current offense. Same guard and
+        # same reason as eoq_perfection.resolve_flss_shot_logic: keep it only if it is
+        # actually on the floor for this team. Without it the forced shot was taken by an
+        # off-floor player while `shooter_pos` fell back to the literal "PG" slot, so the
+        # skeleton animated the wrong man.
+        if (lineup_position_lookup_enabled() and ball_handler is not None
+                and not get_player_position(off_lineup, ball_handler)):
+            ball_handler = None
         if not ball_handler:
             ball_handler = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
 
@@ -2635,7 +2645,9 @@ class TurnManager:
             return self._build_shot_clock_violation_result(current_state)
 
         shooter = ball_handler
-        shooter_pos = get_player_position(off_lineup, shooter) or "PG"
+        shooter_pos = get_player_position(off_lineup, shooter)
+        if shooter_pos is None and not lineup_position_lookup_enabled():
+            shooter_pos = "PG"  # legacy last resort, kill switch only
         shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25}) or {"x": 50, "y": 25}
         shooter_spot = self._coords_to_nearest_spot(shooter_coords)
         defender = select_defender_closest_to_victim(shooter_coords, def_lineup, None) if def_lineup else None

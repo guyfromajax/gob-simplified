@@ -820,57 +820,17 @@ def _foul_on_ball_weight_enabled() -> bool:
     return os.environ.get("GOB_FOUL_ON_BALL_WEIGHT", "1") == "1"
 
 
-def _lineup_position_lookup_enabled() -> bool:
-    """``GOB_LINEUP_POSITION_LOOKUP`` - **default ON**.
-
-    ON resolves a player's lineup slot by identity lookup in the lineup dict that owns
-    them. OFF reproduces the legacy reads exactly: ``getattr(player, 'position', None)``
-    falling back to a hard-coded constant.
-
-    ``Player`` has no ``position`` attribute and nothing in the backend ever assigns one,
-    so every legacy read returned ``None`` and every site took its constant unconditionally.
-    See ``_resolve_lineup_position`` for why no site falls back to a constant when ON.
-    """
-    import os
-    return os.environ.get("GOB_LINEUP_POSITION_LOOKUP", "1") == "1"
-
-
-# One warning per (game, site). Bounded so a long-lived process cannot grow it without limit.
-_POS_LOOKUP_WARNED: "dict[str, set]" = {}
-_POS_LOOKUP_WARNED_MAX_GAMES = 8
-
-
-def _warn_position_unresolved(site: str, player, game) -> None:
-    key = str(getattr(game, "game_id", None) or id(getattr(game, "game_state", None)))
-    seen = _POS_LOOKUP_WARNED.get(key)
-    if seen is None:
-        if len(_POS_LOOKUP_WARNED) >= _POS_LOOKUP_WARNED_MAX_GAMES:
-            _POS_LOOKUP_WARNED.pop(next(iter(_POS_LOOKUP_WARNED)), None)
-        seen = _POS_LOOKUP_WARNED[key] = set()
-    if site in seen:
-        return
-    seen.add(site)
-    logging.warning(
-        "[POS LOOKUP] %s: player %s is not in the lineup dict; leaving the position "
-        "unresolved rather than guessing a constant",
-        site, getattr(player, "player_id", None),
-    )
-
-
-def _resolve_lineup_position(player, lineup, site, legacy_constant, game):
-    """The lineup slot ``player`` occupies in ``lineup``, by identity.
-
-    Returns ``None`` when the player is not in the lineup. That is deliberate: every
-    caller already guards on a falsy position, and a wrong constant is worse than no
-    position - it silently credits the wrong player. The kill switch
-    ``GOB_LINEUP_POSITION_LOOKUP=0`` restores the constant.
-    """
-    if not _lineup_position_lookup_enabled():
-        return getattr(player, "position", None) or legacy_constant
-    pos = next((p for p, q in (lineup or {}).items() if q is player), None)
-    if pos is None:
-        _warn_position_unresolved(site, player, game)
-    return pos
+# Position resolution moved to BackEnd/utils/lineup_position.py so the engine, the models
+# and utils.shared can all share one implementation. Re-exported under the original private
+# names because existing call sites and tests reach for them here.
+from BackEnd.utils.lineup_position import (  # noqa: E402
+    lineup_position_lookup_enabled as _lineup_position_lookup_enabled,
+    lineup_slot as _lineup_slot,
+    resolve_lineup_position as _resolve_lineup_position,
+    warn_position_unresolved as _warn_position_unresolved,
+    POS_LOOKUP_WARNED as _POS_LOOKUP_WARNED,
+    POS_LOOKUP_WARNED_MAX_GAMES as _POS_LOOKUP_WARNED_MAX_GAMES,
+)
 
 
 def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, roles=None):
@@ -959,7 +919,8 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, rol
             )
         elif is_defense:
             from BackEnd.engine.foul_announcement_language import defensive_foul_is_on_ball
-            roles["foul_is_on_ball"] = defensive_foul_is_on_ball(foul_player, ball_handler)
+            roles["foul_is_on_ball"] = defensive_foul_is_on_ball(
+                foul_player, ball_handler, off_lineup=off_lineup, def_lineup=def_lineup)
         else:
             roles["foul_is_on_ball"] = True
 

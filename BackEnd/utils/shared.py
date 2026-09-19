@@ -34,6 +34,7 @@ from BackEnd.constants import (
 )
 
 from BackEnd.persistence import get_store
+from BackEnd.utils.lineup_position import lineup_position_lookup_enabled, lineup_slot
 _store = get_store()
 games_collection = _store.games_collection
 
@@ -2637,7 +2638,15 @@ def summarize_game_state(
                     "name": getattr(player_obj, "name", None) or f"{getattr(player_obj, 'first_name', '')} {getattr(player_obj, 'last_name', '')}".strip(),
                     "team": team_key,
                     "team_id": team_obj.team_id,
-                    "pos": getattr(player_obj, "position", None) or getattr(player_obj, "pos", None),
+                    # Same contract as the lineup loop above and as gameScene.js:1669
+                    # ("Only include players in current lineup"): the slot when this player
+                    # is on the floor, else None. The old read was
+                    # `getattr(player_obj, "position", None) or getattr(player_obj, "pos", None)`,
+                    # neither of which Player carries, so it was always None by accident.
+                    "pos": (lineup_slot(team_obj.lineup, player_obj)
+                            if lineup_position_lookup_enabled()
+                            else (getattr(player_obj, "position", None)
+                                  or getattr(player_obj, "pos", None))),
                     "jersey": player_obj.jersey,
                     "height": getattr(player_obj, "height", None),  # Integer inches; used by v2 player sprite (height-linked headshot radius)
                     "photo": getattr(player_obj, "photo", None),  # Player headshot image

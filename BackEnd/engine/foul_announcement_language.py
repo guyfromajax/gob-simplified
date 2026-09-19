@@ -23,6 +23,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Sequence, Tuple
 
 from BackEnd.utils.sim_random import announcement_rng as _default_rng
+from BackEnd.utils.lineup_position import lineup_position_lookup_enabled, lineup_slot
 
 # --- Defender role vocabulary ------------------------------------------------
 
@@ -119,16 +120,34 @@ def is_post_up_context(turn_result: Dict[str, Any]) -> bool:
     return _matches_location_set(turn_result, POST_UP_LOCATIONS)
 
 
-def defensive_foul_is_on_ball(foul_player: Any, ball_handler: Any) -> bool:
+def defensive_foul_is_on_ball(
+    foul_player: Any,
+    ball_handler: Any,
+    *,
+    off_lineup: Any = None,
+    def_lineup: Any = None,
+) -> bool:
     """Was the fouler the defender matched to the ball handler?
 
     Mirrors ``select_foul_player``'s own matching rule: the on-ball defender is
     the one occupying the ball handler's lineup position.
+
+    Positions come from the lineup dicts. The previous implementation read
+    ``foul_player.position`` / ``ball_handler.position`` - attributes ``Player``
+    does not have - so it returned False on every defensive foul.
+
+    NOTE: only reachable with ``GOB_FOUL_ON_BALL_WEIGHT=0``. On the shipped default
+    ``select_foul_player`` stamps ``foul_is_on_ball`` from the matched defender it
+    already computed, and never calls this.
     """
     if foul_player is None or ball_handler is None:
         return False
-    fouler_pos = _norm(getattr(foul_player, "position", None))
-    bh_pos = _norm(getattr(ball_handler, "position", None))
+    if lineup_position_lookup_enabled():
+        fouler_pos = _norm(lineup_slot(def_lineup, foul_player))
+        bh_pos = _norm(lineup_slot(off_lineup, ball_handler))
+    else:
+        fouler_pos = _norm(getattr(foul_player, "position", None))
+        bh_pos = _norm(getattr(ball_handler, "position", None))
     if not fouler_pos or not bh_pos:
         return False
     return fouler_pos == bh_pos
