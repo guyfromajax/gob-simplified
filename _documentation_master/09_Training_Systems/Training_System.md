@@ -203,6 +203,8 @@ Position fit and class affect **gain, never price**. They are stored directly as
 
 This moved the fractional component off the budget so the user always sees and spends whole points while retaining the original cross-position granularity. Shape floors and `resolve_training_position()` are unchanged.
 
+**Player-facing surface:** the position-fit percentages are published to coaches as a read-only chart at `FrontEnd/static/tutorial-advanced-training-by-position.html` (Tutorials → Advanced Topics → Training by Position; hub id `training-by-position`). The page is hand-authored from `TRAINING_GAIN_PERCENTAGES` — **it does not read the table at runtime, so any retune of those percentages must be mirrored there.** Class-year taper is deliberately omitted from that page.
+
 ### Coaching Focus Selection
 
 - All radios in the Coaching Focus section are part of ONE global radio group

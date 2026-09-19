@@ -143,3 +143,37 @@
   .handoff { flex-direction: column; align-items: flex-start; }
   .tier-bar { display: none; }
 }
+
+/* ---------- position fit grid (training value by position) ---------- */
+/* Single-hue intensity, deliberately NOT the brand ramp: blue is RT and the
+   green/yellow/red ramp is energy. Here the only variable is "how much of a
+   trained point this position keeps", so it rides one channel — orange density —
+   and colours the exception (full value, and the 25% walls) rather than the default. */
+.fitgrid-wrap { overflow-x: auto; padding: 4px; }
+.fitgrid { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 540px; }
+.fitgrid th, .fitgrid td { text-align: center; padding: 0; }
+.fitgrid thead th { font-family: var(--display); font-size: 21px; letter-spacing: .04em; color: var(--text); padding: 0 0 12px; }
+.fitgrid thead th.fg-corner { text-align: left; font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; color: var(--muted-3); }
+.fitgrid tbody th { text-align: left; padding: 0 16px 0 4px; white-space: nowrap; }
+.fitgrid .fg-attr { font-size: 14px; font-weight: 600; color: var(--text); }
+.fitgrid .fg-code { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--muted-3); margin-left: 7px; }
+.fitgrid td { padding: 3px; }
+.fitgrid .fg-cell { display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 9px; font-family: var(--display); font-size: 19px; letter-spacing: .02em; border: 1px solid var(--hair); background: rgba(255,255,255,0.03); color: var(--muted-2); }
+/* density steps — brand rating scale: blue = strong fit, green = standard,
+   muted orange = partial, unhighlighted = poor fit. */
+.fitgrid .fg-cell[data-band="low"]  { background: rgba(255,255,255,0.03); color: var(--muted-3); }
+.fitgrid .fg-cell[data-band="mid"]  { background: rgba(247,148,32,.10); border-color: rgba(247,148,32,.24); color: var(--muted); }
+.fitgrid .fg-cell[data-band="high"] { background: rgba(52,236,39,.20); border-color: rgba(52,236,39,.40); color: var(--text); }
+.fitgrid .fg-cell[data-band="full"] { background: rgba(74,144,217,.34); border-color: rgba(74,144,217,.62); color: var(--text); box-shadow: 0 0 12px rgba(74,144,217,.16); }
+.fitgrid-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; padding: 0 4px; }
+.fitgrid-legend .fl-item { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted-2); }
+.fitgrid-legend .fl-sw { width: 26px; height: 13px; border-radius: 5px; border: 1px solid var(--hair); }
+.fitgrid-legend .fl-sw[data-band="low"]  { background: rgba(255,255,255,0.03); }
+.fitgrid-legend .fl-sw[data-band="mid"]  { background: rgba(247,148,32,.10); border-color: rgba(247,148,32,.24); }
+.fitgrid-legend .fl-sw[data-band="high"] { background: rgba(52,236,39,.20); border-color: rgba(52,236,39,.40); }
+.fitgrid-legend .fl-sw[data-band="full"] { background: rgba(74,144,217,.34); border-color: rgba(74,144,217,.62); }
+@media (max-width: 560px) {
+  .fitgrid thead th { font-size: 18px; }
+  .fitgrid .fg-cell { height: 34px; font-size: 16px; }
+  .fitgrid .fg-attr { font-size: 13px; }
+}

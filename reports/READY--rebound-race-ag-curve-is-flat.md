@@ -1,0 +1,1 @@
+Rebound race (Stage 1b) done. See reports/rebound-race-2026-09-19.md + trace (feature/animation-reward). Race barely moves anything: AG->speed curve is nearly flat (AG 10->90 = 17% speed). Arm split = pre-existing shot-moment coord difference, not a bug in this pass. OREB rise = offense closes defense head start. Both flags OFF. Awaiting Jamie.

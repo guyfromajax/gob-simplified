@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Training by Position — Advanced Topics | Geeked Out Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/auth-bar.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/gob-tutorial.css">
+  <link rel="stylesheet" href="/css/gob-advanced.css">
+  <link rel="stylesheet" href="/css/fonts.css">
+</head>
+<body class="gob-tut has-auth-bar has-footer" data-gob-nav="players">
+
+  <div class="gob-shell">
+
+    <header class="gob-head">
+      <button class="gob-back" data-gob-back type="button"><span class="chev">‹</span> Back</button>
+      <span class="spacer"></span>
+    </header>
+
+    <!-- LESSON HERO -->
+    <section class="lesson-hero" data-screen-label="Training by Position — hero">
+      <nav class="crumb" aria-label="Breadcrumb">
+        <a href="/tutorial.html">Tutorials</a>
+        <span class="sep">›</span>
+        <a href="/tutorial.html#advanced-topics">Advanced Topics</a>
+        <span class="sep">›</span>
+        <span class="here">Training by Position</span>
+      </nav>
+      <div class="meta">
+        <span class="depth advanced">Advanced Topic</span>
+      </div>
+      <h1>TRAINING BY POSITION</h1>
+      <p class="intro">Players train differently based on position and archetype.</p>
+    </section>
+
+    <!-- THE GRID -->
+    <section class="lsec" id="fit-grid">
+      <div class="panel" style="padding:22px 20px;">
+        <div class="fitgrid-wrap">
+          <table class="fitgrid">
+            <thead>
+              <tr>
+                <th class="fg-corner" scope="col">Attribute</th>
+                <th scope="col">PG</th>
+                <th scope="col">SG</th>
+                <th scope="col">SF</th>
+                <th scope="col">PF</th>
+                <th scope="col">C</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><span class="fg-attr">Scoring</span><span class="fg-code">SC</span></th>
+                <td><span class="fg-cell" data-band="mid">40%</span></td>
+                <td><span class="fg-cell" data-band="mid">55%</span></td>
+                <td><span class="fg-cell" data-band="full">82%</span></td>
+                <td><span class="fg-cell" data-band="mid">55%</span></td>
+                <td><span class="fg-cell" data-band="high">68%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Shooting</span><span class="fg-code">SH</span></th>
+                <td><span class="fg-cell" data-band="mid">45%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="high">64%</span></td>
+                <td><span class="fg-cell" data-band="mid">47%</span></td>
+                <td><span class="fg-cell" data-band="mid">40%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Passing</span><span class="fg-code">PS</span></th>
+                <td><span class="fg-cell" data-band="full">85%</span></td>
+                <td><span class="fg-cell" data-band="high">70%</span></td>
+                <td><span class="fg-cell" data-band="low">39%</span></td>
+                <td><span class="fg-cell" data-band="low">35%</span></td>
+                <td><span class="fg-cell" data-band="low">33%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Ball Handling</span><span class="fg-code">BH</span></th>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="high">70%</span></td>
+                <td><span class="fg-cell" data-band="low">39%</span></td>
+                <td><span class="fg-cell" data-band="low">25%</span></td>
+                <td><span class="fg-cell" data-band="low">25%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Inside Defense</span><span class="fg-code">ID</span></th>
+                <td><span class="fg-cell" data-band="low">25%</span></td>
+                <td><span class="fg-cell" data-band="low">25%</span></td>
+                <td><span class="fg-cell" data-band="mid">50%</span></td>
+                <td><span class="fg-cell" data-band="high">67%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Outside Defense</span><span class="fg-code">OD</span></th>
+                <td><span class="fg-cell" data-band="high">70%</span></td>
+                <td><span class="fg-cell" data-band="high">60%</span></td>
+                <td><span class="fg-cell" data-band="full">91%</span></td>
+                <td><span class="fg-cell" data-band="low">35%</span></td>
+                <td><span class="fg-cell" data-band="mid">40%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Rebounding</span><span class="fg-code">RB</span></th>
+                <td><span class="fg-cell" data-band="low">25%</span></td>
+                <td><span class="fg-cell" data-band="low">25%</span></td>
+                <td><span class="fg-cell" data-band="mid">50%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Strength</span><span class="fg-code">ST</span></th>
+                <td><span class="fg-cell" data-band="low">35%</span></td>
+                <td><span class="fg-cell" data-band="low">35%</span></td>
+                <td><span class="fg-cell" data-band="mid">40%</span></td>
+                <td><span class="fg-cell" data-band="full">99%</span></td>
+                <td><span class="fg-cell" data-band="high">77%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Agility</span><span class="fg-code">AG</span></th>
+                <td><span class="fg-cell" data-band="full">83%</span></td>
+                <td><span class="fg-cell" data-band="high">68%</span></td>
+                <td><span class="fg-cell" data-band="mid">53%</span></td>
+                <td><span class="fg-cell" data-band="mid">45%</span></td>
+                <td><span class="fg-cell" data-band="low">25%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Free Throws</span><span class="fg-code">FT</span></th>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Basketball IQ</span><span class="fg-code">IQ</span></th>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="fg-attr">Endurance</span><span class="fg-code">ND</span></th>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+                <td><span class="fg-cell" data-band="full">100%</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="fitgrid-legend">
+          <span class="fl-item"><span class="fl-sw" data-band="full"></span> Strong Fit</span>
+          <span class="fl-item"><span class="fl-sw" data-band="high"></span> Standard</span>
+          <span class="fl-item"><span class="fl-sw" data-band="mid"></span> Partial</span>
+          <span class="fl-item"><span class="fl-sw" data-band="low"></span> Poor Fit</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- HANDOFF -->
+    <section class="handoff panel">
+      <div class="h-l">
+        <div class="lbl">You're all caught up</div>
+        <div class="nx">More advanced topics coming soon</div>
+      </div>
+      <div class="h-actions">
+        <a class="gob-btn gob-btn--action gob-btn--lg" href="/tutorial.html#advanced-topics">All topics</a>
+        <a class="gob-btn gob-btn--ghost gob-btn--lg" href="/tutorial-advanced-momentum.html">Revisit: Momentum</a>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="gob-bottomnav" aria-label="Tutorial sections">
+    <div class="navwrap" id="bottomnav"></div>
+  </nav>
+
+  <!-- TOAST -->
+  <div class="gob-toast" id="toast" role="status" aria-live="polite">
+    <span class="ti">✓</span>
+    <span><span class="tt"></span><br><span class="ts"></span></span>
+  </div>
+
+  <!-- global auth-bar + footer (injected by authBarInit) -->
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script src="/js/shared/authBarInit.js"></script>
+  <!-- tutorial nav + progress behavior -->
+  <script src="/js/shared/gobTutorialNav.js"></script>
+  <script>
+    if (window.GOB && window.GOB.markSeen) window.GOB.markSeen('training-by-position');
+  </script>
+</body>
+</html>
