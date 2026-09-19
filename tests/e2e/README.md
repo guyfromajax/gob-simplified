@@ -21,6 +21,13 @@ These Playwright tests verify the Grid-based layout refactor works correctly acr
 
 ## Running Tests
 
+**Do not reuse a bare `dev.py` on :8000.** Playwright's `reuseExistingServer` (on when not in CI) will attach to whatever is already listening. A leftover `python dev.py` has empty mongomock: `/roster/Lancaster` 404s, Phaser never draws a canvas, and the court-layout `startGame()` specs time out. Kill that process first so Playwright can start `tests/e2e/helpers/seed_and_serve.py`.
+
+```bash
+lsof -iTCP:8000 -sTCP:LISTEN
+# then: kill <pid>
+```
+
 ### Run all tests
 ```bash
 npm test
@@ -62,12 +69,10 @@ Tests run at these viewport sizes (matching refactor plan exit criteria):
 
 Tests are configured in `playwright.config.js`:
 - Base URL: `http://localhost:8000` (or `BASE_URL` env var)
-- **webServer**: Playwright auto-starts `tests/e2e/helpers/seed_and_serve.py` (same `.venv` / `PYTHON_PATH` fallback as before) and waits for port 8000. If a server is already running on 8000, it is reused (`reuseExistingServer: true` when not in CI).
+- **webServer**: Playwright auto-starts `tests/e2e/helpers/seed_and_serve.py` (same `.venv` / `PYTHON_PATH` fallback as before) and waits for port 8000. If a server is already running on 8000, it is reused (`reuseExistingServer: true` when not in CI) — see the `:8000` gotcha under **Running Tests**.
 - Court-layout specs stub auth via `helpers/auth.js` and wait for seeded rosters via `helpers/rosters.js`.
 - Screenshots on failure
 - Trace collection on retry
-
-**Warning:** `reuseExistingServer` will reuse a bare `dev.py` on :8000 (empty mongomock, roster 404s, no Phaser canvas). Kill that process first so Playwright can start `seed_and_serve.py`.
 
 ## CI/CD Integration
 
