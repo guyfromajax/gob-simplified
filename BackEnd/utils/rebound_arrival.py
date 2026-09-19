@@ -45,6 +45,18 @@ def enabled() -> bool:
     return os.environ.get("GOB_REBOUND_FROM_ARRIVAL", "0") == "1"
 
 
+def race_enabled() -> bool:
+    """``GOB_REBOUND_RACE`` - default OFF, and only meaningful with the arrival flag on.
+
+    Scores the distance term on TIME to the ball rather than distance to it: two
+    players equidistant from the bounce are not equally likely to get there, and this
+    is the quantity that separates them. Selection may read the bounce - it is the
+    resolution of the rebound. ``crash_destination`` still may not, and its guard is
+    untouched.
+    """
+    return (os.environ.get("GOB_REBOUND_RACE", "0") == "1") and enabled()
+
+
 def travel_rate(player: Any) -> float:
     """Grid units per game-second for this player, at the rebound archetype."""
     from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec

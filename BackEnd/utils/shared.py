@@ -20,6 +20,7 @@ from BackEnd.constants import (
     OREB_REBOUND_SCORE_DISCOUNT,
     REBOUND_TEAM_CHEMISTRY_FACTOR,
     REBOUND_DISTANCE_SCALE,
+    REBOUND_RACE_TIME_SCALE,
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
@@ -1712,17 +1713,36 @@ def _rebound_entries(lineup, team, bounce_spot, exclude_player_ids, arrival_coor
         if pid is not None and str(pid) in excluded:
             continue
         at = (arrival_coords or {}).get(str(pid)) if pid is not None else None
+        dist = (_distance_between(at, bounce_spot) if at
+                else _rebound_distance(player, bounce_spot))
         entries.append(
             {
                 "player": player,
                 "team": team,
                 "stat": None,
-                "distance": (_distance_between(at, bounce_spot) if at
-                             else _rebound_distance(player, bounce_spot)),
+                "distance": dist,
                 "scored_from": dict(at) if at else None,
+                "time_to_ball": _time_to_ball(player, dist),
             }
         )
     return entries
+
+
+def _rebound_race_enabled():
+    from BackEnd.utils.rebound_arrival import race_enabled
+    return race_enabled()
+
+
+def _time_to_ball(player, distance):
+    """Game-seconds for this player to cover ``distance`` at his own movement rate.
+
+    The race term. Two players the same distance from the ball are not equally likely
+    to reach it first; this is the quantity that separates them.
+    """
+    from BackEnd.utils.rebound_arrival import travel_rate
+
+    rate = travel_rate(player)
+    return float(distance) / rate if rate > 0 else float(distance)
 
 
 def _distance_between(a, b):
@@ -1837,7 +1857,15 @@ def select_rebounder_by_score(
         value = calculate_rebound_score(player) + _team_rebound_bonus(team)
         # Smooth distance discount — closer to bounce → stronger score; replaces
         # the former blunt upper-/lower-half multiplier.
-        value *= 1.0 / (1.0 + float(entry["distance"]) / distance_scale)
+        if _rebound_race_enabled():
+            # RACE: score on TIME to the ball, not distance to it. Same curve shape, so
+            # the only change is which quantity feeds it. REBOUND_RACE_TIME_SCALE is a
+            # unit conversion, not a retune - it is set so the league-average
+            # time_to_ball lands on the same term value the league-average arrival
+            # distance lands on today. See reports/rebound-race-2026-09-19.md.
+            value *= 1.0 / (1.0 + float(entry.get("time_to_ball", 0.0)) / REBOUND_RACE_TIME_SCALE)
+        else:
+            value *= 1.0 / (1.0 + float(entry["distance"]) / distance_scale)
         # Offensive rebounders are discounted — defense's box-out / positioning edge on a
         # miss (otherwise offense and defense were scored equally). See OREB_REBOUND_SCORE_DISCOUNT.
         if off_team_id is not None and getattr(team, "team_id", None) == off_team_id:
