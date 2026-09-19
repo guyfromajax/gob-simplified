@@ -26,7 +26,7 @@ WHY THIS FUNCTION TAKES WHAT IT TAKES - read before changing the signature.
     signature grows an outcome-bearing parameter. Do not "improve" this by passing the
     bounce in - the divergence between the two draws IS the model.
 
-``GOB_CRASH_SHOT_AWARE`` gates it, default OFF.
+``GOB_CRASH_SHOT_AWARE`` gates it, default ON. ``=0`` restores the legacy flat box.
 """
 
 from __future__ import annotations
@@ -65,8 +65,12 @@ CLAMP_COUNTER: Dict[str, int] = {"calls": 0, "clamped": 0}
 
 
 def enabled() -> bool:
-    """``GOB_CRASH_SHOT_AWARE`` - default OFF."""
-    return os.environ.get("GOB_CRASH_SHOT_AWARE", "0") == "1"
+    """``GOB_CRASH_SHOT_AWARE`` - **default ON**.
+
+    ``GOB_CRASH_SHOT_AWARE=0`` restores the legacy flat box exactly and is the
+    escape hatch.
+    """
+    return os.environ.get("GOB_CRASH_SHOT_AWARE", "1") == "1"
 
 
 def active_tightness() -> float:
@@ -92,8 +96,15 @@ def crash_destination(
     ONLY the shot is an input. See the module docstring for why; the test suite
     enforces it.
 
-    Consumes exactly two ``randint`` draws, the same count as the flat box it
-    replaces, so turning the model on is draw-neutral.
+    Consumes exactly two ``randint`` CALLS, the same count as the flat box it
+    replaces - verified live at 2.000 calls per crasher with the flag both off and on.
+
+    That is call-neutral, NOT draw-neutral, and the difference was measured rather
+    than assumed: ``randint`` rejection-samples, so the underlying draw count depends
+    on the width of the range. The legacy pair (8 and 11 values) costs 3.44 draws per
+    crasher; Model A's narrower, shot-dependent ranges cost 3.20. No model that
+    changes the ranges can be neutral on the raw draw counter - that is a property of
+    ``randint``, not of this design.
     """
     t = active_tightness() if tightness is None else float(tightness)
     t = max(0.0, min(1.0, t))
