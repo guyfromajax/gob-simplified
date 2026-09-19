@@ -81,8 +81,20 @@ function generateMongoObjectId() {
   return timestamp + randomPart + counter + extraRandom;
 }
 
+function franchiseCtx() {
+  return window.FranchiseContext;
+}
+
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+
 function buildQuery(params = {}) {
-  const search = new URLSearchParams();
+  const search = emptyParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value) search.append(key, value);
   });
@@ -90,11 +102,11 @@ function buildQuery(params = {}) {
   return str ? `?${str}` : '';
 }
 
-const urlParams = new URLSearchParams(window.location.search);
+const urlParams = liveParams();
 
-/** Read current query string — this module stays loaded; history.replaceState may add game_id after first parse. */
+/** Read current query string — this module stays loaded; commitParams may add game_id after first parse. */
 function readLiveSearchParams() {
-  return new URLSearchParams(window.location.search);
+  return liveParams();
 }
 
 /** Milestone 2: first franchise play/sim for this week kicks off parallel CPU week sims (once per session). */
@@ -324,7 +336,7 @@ async function loadGamePlanSettings() {
 
   // ✅ SS&S: Always load from database (single source of truth for all modes)
   try {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('mode', liveMode);
     params.set('team_id', teamId);
 
@@ -377,7 +389,7 @@ async function loadPlaybookSettings() {
 
   // ✅ SS&S: Always load from database (single source of truth for all modes)
   try {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('mode', liveMode);
     params.set('team_id', teamId);
 
@@ -482,9 +494,9 @@ async function hasBackendResumeAnchor(gameIdToCheck) {
 }
 
 function normalizeCourtBootUrl(bootMode) {
-  if (typeof window === 'undefined' || typeof history === 'undefined' || !history.replaceState) return;
+  if (typeof window === 'undefined' || !franchiseCtx()) return;
   if (bootMode !== COURT_BOOT_MODES.LIVE_QUARTER_ENTRY) return;
-  const params = new URLSearchParams(window.location.search);
+  const params = liveParams();
   let changed = false;
   ['active_resume', 'resume_from_anchor', 'consume_resume_anchor', 'anchor_type'].forEach((key) => {
     if (params.has(key)) {
@@ -497,7 +509,8 @@ function normalizeCourtBootUrl(bootMode) {
     changed = true;
   }
   if (changed) {
-    history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+    // In-place: live quarter entry stays on court.html. Do not navigate.
+    franchiseCtx().commitParams(params);
     console.warn('[COURT BOOT MODE] normalized stale resume flags for live quarter entry', {
       boot_mode: bootMode,
       quarter_break_from: params.get('quarter_break_from'),
@@ -510,8 +523,8 @@ function normalizeCourtBootUrl(bootMode) {
 import { showStatus, hideStatus } from './utils/statusDisplay.js';
 
 function applyResumeStateToUrl(resumeState) {
-  if (!resumeState || typeof window === 'undefined') return;
-  const params = new URLSearchParams(window.location.search);
+  if (!resumeState || typeof window === 'undefined' || !franchiseCtx()) return;
+  const params = liveParams();
   const resumeQuarter = Number(resumeState.quarter) || quarter || 1;
   quarter = resumeQuarter;
   periodLabel = resumeQuarter <= 4 ? `Q${resumeQuarter}` : `OT${resumeQuarter - 4}`;
@@ -532,9 +545,8 @@ function applyResumeStateToUrl(resumeState) {
   };
   applyLineup('home', resumeState.home_lineup);
   applyLineup('away', resumeState.away_lineup);
-  if (typeof history !== 'undefined' && history.replaceState) {
-    history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
-  }
+  // In-place: stamp resume flags onto the current court URL. Do not navigate.
+  franchiseCtx().commitParams(params);
   console.warn('[RESUME-ANCHOR-CLIENT] applied anchor URL state', {
     quarter: resumeQuarter,
     clock: resumeState.clock,
@@ -563,7 +575,7 @@ function redirectResumeAnchorToSetLineup(resumeState) {
   if (!supportedAnchorTypes.has(anchorType)) return false;
   const resumeQuarter = Number(resumeState.quarter) || quarter || 1;
   const helper = window.TimeoutNavigationHelper;
-  const sourceParams = new URLSearchParams(window.location.search);
+  const sourceParams = liveParams();
   const shouldResumeFromTimeout = anchorType === 'timeout' || anchorType === 'foul_out' || !!resumeState.resume_from_timeout || !!resumeState.timeout_next_play_type;
   const overrides = {
     home: resumeState.home_team_name || sourceParams.get('home') || homeTeam,
@@ -594,7 +606,7 @@ function redirectResumeAnchorToSetLineup(resumeState) {
       overrides
     });
   } else {
-    params = new URLSearchParams();
+    params = emptyParams();
     params.set('quarter', String(resumeQuarter));
     params.set('period', resumeQuarter <= 4 ? `Q${resumeQuarter}` : `OT${resumeQuarter - 4}`);
     Object.entries(overrides).forEach(([key, value]) => {
@@ -1968,8 +1980,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     }
     
     // Get game ID from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const gameId = urlParams.get('game_id');
+    const gameId = franchiseCtx().get('game_id');
     
     // Send diagnostic data to backend
     try {
@@ -2058,8 +2069,7 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     }
     
     // Get game ID from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const gameId = urlParams.get('game_id');
+    const gameId = franchiseCtx().get('game_id');
     
     // Send diagnostic data to backend
     try {
@@ -2132,8 +2142,8 @@ function isPreAnchorQ1RefreshPending() {
 }
 
 function replaceGameIdInUrl(newGameId) {
-  if (!newGameId || typeof window === 'undefined' || typeof history === 'undefined' || !history.replaceState) return;
-  const params = new URLSearchParams(window.location.search);
+  if (!newGameId || typeof window === 'undefined' || !franchiseCtx()) return;
+  const params = liveParams();
   params.set('game_id', String(newGameId));
   params.set('quarter', '1');
   params.set('period', 'Q1');
@@ -2141,7 +2151,8 @@ function replaceGameIdInUrl(newGameId) {
   ['active_resume', 'resume_from_anchor', 'consume_resume_anchor', 'anchor_type', 'clock'].forEach((key) => {
     params.delete(key);
   });
-  history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+  // In-place: same court page, new game_id. Do not navigate.
+  franchiseCtx().commitParams(params);
 }
 
 function resetPreAnchorScoreChrome() {
@@ -2223,7 +2234,7 @@ async function ensureFreshGameForPreAnchorQ1Refresh() {
 
 async function fetchTeamRoster(teamName) {
   // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
-  const params = new URLSearchParams();
+  const params = emptyParams();
   if (mode === 'franchise' && franchiseId) {
     params.append('franchise_id', franchiseId);
   }
@@ -2373,8 +2384,7 @@ async function startGame({ homeRoster, awayRoster, animate = true, resumeActive 
 async function showPopup(score) {
   // ✅ PHASE 1.1: URL is source of truth - read from URL first, then module-level variable
   // Module-level gameId can be valid if updated from server response after simulation
-  const urlParams = new URLSearchParams(window.location.search);
-  let popupGameId = urlParams.get('game_id') || gameId; // URL first, then module variable
+  let popupGameId = franchiseCtx().get('game_id') || gameId; // door first, then module variable
   
   // ❌ COMMENTED OUT: score.gameId check - not used by "Play Quarter" flow (goes through gameScene.js)
   // if (!popupGameId && score && score.gameId) {
@@ -2446,8 +2456,7 @@ async function handleButtonClick(animate, options = {}) {
 
   // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
   if (!gameId) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlGameId = urlParams.get('game_id');
+    const urlGameId = franchiseCtx().get('game_id');
     if (urlGameId) {
       gameId = urlGameId;
       console.log('✅ [BOOTGAME] Retrieved gameId from URL:', gameId);
@@ -2806,7 +2815,7 @@ async function handleSimQuarter() {
       window.location.href = `/set-lineup.html?${params.toString()}`;
     } else {
       // Fallback: Build params manually if helper not available
-      const params = new URLSearchParams();
+      const params = emptyParams();
       params.set('home', homeTeam);
       params.set('away', awayTeam);
       if (homeDisplay) params.set('home_display', homeDisplay);
@@ -2855,8 +2864,7 @@ async function handleSimFullGame() {
   
   // ✅ PHASE 1.1: URL is source of truth - read from URL if module-level gameId is missing
   if (!gameId) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlGameId = urlParams.get('game_id');
+    const urlGameId = franchiseCtx().get('game_id');
     if (urlGameId) {
       gameId = urlGameId;
       console.log('✅ [BOOTGAME] Retrieved gameId from URL:', gameId);
@@ -3223,10 +3231,10 @@ async function initGame() {
   // 1. If it's a new Q1 game, param is intentionally omitted → false is correct
   // 2. If gameId exists but param is missing (stale URL), false is safer than true
   // 3. If it's truly a timeout resume, the helper should have set it to 'true'
-  const bootParams = new URLSearchParams(window.location.search);
+  const bootParams = liveParams();
   const bootMode = classifyCourtBootMode(bootParams);
   normalizeCourtBootUrl(bootMode);
-  const normalizedBootParams = new URLSearchParams(window.location.search);
+  const normalizedBootParams = liveParams();
   const urlResumeFromTimeoutParam = normalizedBootParams.get('resume_from_timeout');
   const resumeFromTimeout = urlResumeFromTimeoutParam === 'true';
   const liveQuarterStart = bootMode === COURT_BOOT_MODES.LIVE_QUARTER_ENTRY;
@@ -3459,7 +3467,7 @@ async function initGame() {
     // Gated on `sim_full_game=1` + mode=tutorial, so a tutorial game opened by any
     // other route keeps normal buttons and no auto-start.
     try {
-      const wantsSimOnly = new URLSearchParams(window.location.search).get('sim_full_game') === '1';
+      const wantsSimOnly = franchiseCtx().get('sim_full_game') === '1';
       if (wantsSimOnly && mode === 'tutorial' && currentQuarter < 2) {
         // Play Quarter is not an option in the tutorial.
         const playBtnTut = document.querySelector('.play-button');

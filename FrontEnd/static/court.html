@@ -11,6 +11,7 @@
   <title>GOB Court</title>
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/franchiseLocalStorage.js"></script>
+  <script src="/js/shared/franchiseContext.js"></script>
   <script src="/common.js"></script>
   <script src="/js/shared/teamCourtGenerator.js"></script>
   <script src="/js/shared/teamGeneratedArt.js"></script>
@@ -5111,7 +5112,7 @@
     }
 
     function getCourtGameContext() {
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = window.FranchiseContext.toSearchParams();
       return {
         gameId: urlParams.get('game_id'),
         userTeamSide: urlParams.get('my_team')
@@ -5251,7 +5252,7 @@
       }
       
       const playOptions = document.querySelectorAll('#offense-play-scroller .play-option');
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = window.FranchiseContext.toSearchParams();
       
       // Get user team side and lineup — live scene first, URL second.
       const userTeamSide = urlParams.get('my_team'); // "home" or "away"
@@ -5567,7 +5568,7 @@
     
     // Load slot assignments from playbooks and dynamically build Playcall Center DOM
     async function loadAndApplySlotAssignments() {
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = window.FranchiseContext.toSearchParams();
       const __debugPcRaw = (urlParams.get('debug_pc') || '').trim().toLowerCase();
       const __debugPc =
         __debugPcRaw === '1' ||
@@ -5678,7 +5679,7 @@
           endPlaycallPlaybookLoad(false);
           return;
         }
-        const params = new URLSearchParams();
+        const params = window.FranchiseContext.createParams();
         params.set('mode', mode);
         params.set('team_id', teamId);
         // FTE v2 tutorial games live in the games_collection like single mode,
@@ -6600,7 +6601,7 @@
     async function hydrateCourtColorsFromRoster(homeTeamName, awayTeamName) {
       if (!homeTeamName || !awayTeamName) return false;
 
-      const params = new URLSearchParams();
+      const params = window.FranchiseContext.createParams();
       const mode = urlParams.get('mode');
       const franchiseId = urlParams.get('franchise_id');
       if (mode === 'franchise' && franchiseId) params.append('franchise_id', franchiseId);
@@ -6616,7 +6617,7 @@
 
         const [homeRoster, awayRoster] = await Promise.all([homeRes.json(), awayRes.json()]);
         // Capture the user team's conference/region for the scoreboard emblem value.
-        const mtRoster = new URLSearchParams(window.location.search).get('my_team');
+        const mtRoster = window.FranchiseContext.get('my_team');
         const userRoster = mtRoster === 'away' ? awayRoster : homeRoster;
         if (userRoster) {
           eosUserConference = (userRoster.conference === 0 || userRoster.conference) ? userRoster.conference : null;
@@ -6670,7 +6671,7 @@
           applyVibrantRgbCssVarsFromHex(homeColor, awayColor);
         }
         try {
-          const mt = new URLSearchParams(window.location.search).get('my_team');
+          const mt = window.FranchiseContext.get('my_team');
           const tri =
             mt === 'away'
               ? hexToVibrantRgbTriplet(awayColor)
@@ -6718,7 +6719,7 @@
       const sb = document.getElementById('scoreboard');
       const strip = document.getElementById('sb-eos-strip');
       if (!sb || !strip || !window.GOBTierEmblem) return;
-      const p = new URLSearchParams(window.location.search);
+      const p = window.FranchiseContext.toSearchParams();
       const tier = (p.get('mode') === 'franchise')
         ? window.GOBTierEmblem.tierForWeek(p.get('week'))
         : null;
@@ -6780,7 +6781,7 @@
       return false;
     }
     
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = window.FranchiseContext.toSearchParams();
     const homeTeam = urlParams.get('home');
     const awayTeam = urlParams.get('away');
     // URL *_display is chrome fallback only — hydrated visual is authority.
@@ -6952,7 +6953,7 @@
         var teamSide = info && info.team;
         if (teamSide !== 'home' && teamSide !== 'away') {
           try {
-            var params = new URLSearchParams(window.location.search);
+            var params = window.FranchiseContext.toSearchParams();
             var myTeam = params.get('my_team');
             if (myTeam === 'home' || myTeam === 'away') teamSide = myTeam;
           } catch (e) { /* ignore */ }

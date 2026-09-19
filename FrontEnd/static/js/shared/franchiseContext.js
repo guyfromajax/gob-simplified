@@ -15,8 +15,10 @@
  * `runtime` ('local' | 'hosted') travels with franchise_id. api-config.js
  * peeks FranchiseContext.runtime when a call supplies routing context.
  *
- * Classic script (IIFE). Slice 1 ships the door only — no existing screen
- * includes this file yet.
+ * Classic script (IIFE). Screens read and commit through this door.
+ * `createParams` builds an outbound query bag; `commitParams` writes in place
+ * (replaceState on web). A caller that navigates must assign location.href
+ * itself — never convert that into commitParams.
  */
 (function (global) {
   'use strict';
@@ -45,12 +47,20 @@
     var pathname = (loc && loc.pathname) || '';
     var hash = (loc && loc.hash) || '';
     var next = pathname + qs + hash;
+    var usedReplace = false;
     if (history && typeof history.replaceState === 'function') {
       try {
         history.replaceState(history.state, '', next);
+        usedReplace = true;
       } catch (e) { /* jsdom / about:blank stubs */ }
     }
-    if (loc) loc.search = qs;
+    // Assigning window.location.search navigates (reload). After a successful
+    // replaceState the live Location is already updated. Only write loc.search
+    // on stubs (unit tests) or when replaceState is unavailable.
+    var isLiveLocation = typeof window !== 'undefined' && loc === window.location;
+    if (loc && (!usedReplace || !isLiveLocation)) {
+      loc.search = qs;
+    }
   }
 
   function UrlContextProvider(opts) {
@@ -100,6 +110,14 @@
 
   UrlContextProvider.prototype.toSearchParams = function () {
     return paramsFromSearch(liveSearch(this._loc));
+  };
+
+  UrlContextProvider.prototype.commitParams = function (params) {
+    applySearchToLocation(
+      this._loc,
+      this._history,
+      params && typeof params.toString === 'function' ? params.toString() : ''
+    );
   };
 
   function SessionContextProvider(opts) {
@@ -175,6 +193,18 @@
     return params;
   };
 
+  SessionContextProvider.prototype.commitParams = function (params) {
+    var next = {};
+    if (params && typeof params.forEach === 'function') {
+      params.forEach(function (value, key) {
+        next[key] = value;
+      });
+    }
+    if (!isRuntime(next.runtime)) next.runtime = this.get('runtime') || defaultRuntime();
+    this._state = next;
+    this._save();
+  };
+
   function FranchiseContext(provider) {
     this._provider = provider;
   }
@@ -211,6 +241,14 @@
     return this._provider.toSearchParams();
   };
 
+  FranchiseContext.prototype.commitParams = function (params) {
+    return this._provider.commitParams(params);
+  };
+
+  FranchiseContext.prototype.createParams = function () {
+    return new URLSearchParams();
+  };
+
   function resolveBuildProfile(opts) {
     if (opts && opts.buildProfile) return opts.buildProfile;
     if (typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop') {
@@ -232,6 +270,7 @@
     SessionContextProvider: SessionContextProvider,
     FranchiseContext: FranchiseContext,
     createFranchiseContext: createFranchiseContext,
+    createParams: function () { return new URLSearchParams(); },
   };
 
   global.FranchiseContextLib = api;

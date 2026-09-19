@@ -211,6 +211,58 @@ function main() {
     assert(storage.getItem(firstPage.lib.SESSION_STORAGE_KEY), 'wrote the session blob');
   }
 
+  // --- commitParams writes the whole bag in place (no navigation) ---
+  {
+    const { lib, loc, history } = loadLib({ search: '?franchise_id=f1&resume_from_timeout=true' });
+    const ctx = lib.createFranchiseContext({
+      buildProfile: 'web',
+      location: loc,
+      history,
+    });
+    const bag = ctx.toSearchParams();
+    bag.set('resume_from_timeout', 'false');
+    bag.delete('active_resume');
+    ctx.commitParams(bag);
+    assertEqual(ctx.get('franchise_id'), 'f1', 'commitParams keeps franchise_id');
+    assertEqual(ctx.get('resume_from_timeout'), 'false', 'commitParams updated flag');
+    assertEqual(loc.pathname, '/static/court.html', 'commitParams does not change path');
+  }
+
+  // --- commitParams must not assign live location.search (that navigates) ---
+  {
+    const { lib, window: win } = loadLib({ search: '?franchise_id=f1' });
+    let searchAssigns = 0;
+    const loc = {
+      pathname: '/static/court.html',
+      hash: '',
+      hostname: 'localhost',
+      _search: '?franchise_id=f1&resume_from_timeout=true',
+      get search() { return this._search; },
+      set search(v) { searchAssigns += 1; this._search = v; },
+    };
+    win.location = loc;
+    const history = {
+      state: null,
+      replaceState(_state, _title, url) {
+        const parsed = new URL(url, 'http://localhost');
+        loc.pathname = parsed.pathname;
+        loc._search = parsed.search;
+        loc.hash = parsed.hash;
+      },
+    };
+    const ctx = lib.createFranchiseContext({
+      buildProfile: 'web',
+      location: loc,
+      history,
+    });
+    const bag = ctx.toSearchParams();
+    bag.set('resume_from_timeout', 'false');
+    ctx.commitParams(bag);
+    assertEqual(searchAssigns, 0, 'commitParams must not assign live location.search');
+    assertEqual(ctx.get('resume_from_timeout'), 'false', 'commitParams still updated query');
+    assertEqual(loc.pathname, '/static/court.html', 'path unchanged after commitParams');
+  }
+
   // --- Routing: peek FranchiseContext.runtime; no-args never peeks ---
   {
     const { lib, loc, window: win } = loadLib({ GOB_BUILD_PROFILE: 'desktop' });
