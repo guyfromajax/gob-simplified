@@ -20,7 +20,9 @@ import os
 
 router = APIRouter()
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+from BackEnd.runtime_paths import bundle_path
+
+STATIC_DIR = bundle_path("FrontEnd", "static")
 
 
 def get_staging_collection(collection_name: str):

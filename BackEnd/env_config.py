@@ -122,7 +122,9 @@ def resolve_database_environment(
     values; Task 5 removes those independent loaders.
     """
     pristine = dict(os.environ if pristine_env is None else pristine_env)
-    root = repo_root or Path(__file__).resolve().parent.parent
+    from BackEnd.runtime_paths import bundle_root
+
+    root = repo_root or bundle_root()
     target = os.environ if target_environ is None else target_environ
     mode = str(pristine.get("GOB_DB_MODE") or "mongo").strip().lower()
 

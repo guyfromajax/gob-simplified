@@ -135,7 +135,9 @@ from BackEnd.utils.franchise_rank_prestige import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+from BackEnd.runtime_paths import bundle_path, bundle_root
+
+STATIC_DIR = bundle_path("FrontEnd", "static")
 RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
 # DEPRECATED — superseded by RECRUITING_LEAN_EVENTS_FIELD ("recruiting_lean_events").
 # This field CANNOT represent a drop: every reader re-intersects it against the
@@ -1533,7 +1535,7 @@ def _eog_band_git_sha() -> str:
             import subprocess
             sha = subprocess.check_output(
                 ["git", "rev-parse", "--short", "HEAD"],
-                cwd=os.path.dirname(os.path.abspath(__file__)),
+                cwd=str(bundle_root()),
                 stderr=subprocess.DEVNULL,
             ).decode().strip()
         except Exception:

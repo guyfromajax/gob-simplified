@@ -17,8 +17,10 @@ from BackEnd.persistence.protocol import PersistenceStore
 # prod-access opt-in and GOB_PERSISTENCE are read from this snapshot only, so
 # dropping those keys into .env / .env.local cannot permanently disarm the
 # guard for every local script.
+from BackEnd.runtime_paths import bundle_root
+
 _PRISTINE_ENV = dict(os.environ)
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_REPO_ROOT = bundle_root()
 
 _STORE: PersistenceStore | None = None
 _STORE_LOCK = threading.Lock()
