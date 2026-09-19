@@ -468,3 +468,30 @@ class NullCollection:
 
     def __repr__(self) -> str:
         return f"<NullCollection {self.name!r}>"
+
+
+class RemoteUnavailable:
+    """Refuse remote collections outside the test profile.
+
+    Desktop/loopback must not answer auth, billing, community, or user-record
+    reads from an empty in-memory store. Tests keep mongomock remotes.
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+        self.database = None
+
+    def _refuse(self, *_args, **_kwargs):
+        raise RuntimeError(
+            f"SQLite profile refuses remote collection {self.name!r}. "
+            "Auth, billing, community, and user records are served by the remote "
+            "backend. This process must not answer from an empty in-memory store."
+        )
+
+    def __getattr__(self, name: str):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return self._refuse
+
+    def __repr__(self) -> str:
+        return f"<RemoteUnavailable {self.name!r}>"

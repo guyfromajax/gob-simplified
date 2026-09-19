@@ -17,7 +17,11 @@ from BackEnd.persistence.guards import (
 )
 from BackEnd.persistence.mongo import MongoStore
 from BackEnd.persistence.sqlite import SqliteStore
-from BackEnd.persistence.sqlite_collection import NullCollection, SqliteCollection
+from BackEnd.persistence.sqlite_collection import (
+    NullCollection,
+    RemoteUnavailable,
+    SqliteCollection,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -335,6 +339,35 @@ def test_sqlite_never_refuses_as_production_mongo(tmp_path: Path):
     assert store.DB_ACCESS == "write"
     store.games_collection.insert_one({"_id": "ok"})
     assert store.games_collection.find_one({"_id": "ok"})["_id"] == "ok"
+
+
+def test_sqlite_refuses_remote_collections_outside_test(tmp_path: Path):
+    env = _production_env(tmp_path, GOB_PERSISTENCE="sqlite", GOB_SQLITE_PATH=str(tmp_path / "local.sqlite"))
+    store = SqliteStore(env)
+    assert isinstance(store.users_collection, RemoteUnavailable)
+    with pytest.raises(RuntimeError, match="refuses remote collection 'users'"):
+        store.users_collection.find_one({"email": "a@b.c"})
+    with pytest.raises(RuntimeError, match="refuses remote collection 'users'"):
+        store.users_collection.insert_one({"email": "a@b.c"})
+    with pytest.raises(RuntimeError, match="refuses remote"):
+        store.db["feedback_submissions"].insert_one({"message": "hi"})
+
+
+def test_sqlite_refuses_remote_collections_in_development(tmp_path: Path):
+    env = resolve_database_environment(
+        pristine_env={
+            "ENVIRONMENT": "development",
+            "MONGO_URI": "mongodb://example.invalid/gob-staging",
+            "MONGO_DB_NAME": "gob-staging",
+            "GOB_PERSISTENCE": "sqlite",
+            "GOB_SQLITE_PATH": str(tmp_path / "desktop.sqlite"),
+        },
+        repo_root=tmp_path,
+        target_environ={},
+    )
+    store = SqliteStore(env)
+    with pytest.raises(RuntimeError, match="refuses remote collection 'users'"):
+        store.users_collection.find_one({})
 
 
 def test_sqlite_collection_round_trip_queries(tmp_path: Path):

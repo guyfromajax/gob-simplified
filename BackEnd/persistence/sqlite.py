@@ -20,7 +20,11 @@ from bson import ObjectId
 from BackEnd.env_config import DatabaseEnvironment
 from BackEnd.persistence.guards import _ReadOnlyCollection
 from BackEnd.persistence.protocol import FranchiseBundle
-from BackEnd.persistence.sqlite_collection import NullCollection, SqliteCollection
+from BackEnd.persistence.sqlite_collection import (
+    NullCollection,
+    RemoteUnavailable,
+    SqliteCollection,
+)
 
 
 LOCAL_COLLECTIONS: tuple[str, ...] = (
@@ -128,9 +132,11 @@ class SqliteDatabase:
     def _collection(self, name: str):
         if name in self._collections:
             return self._collections[name]
-        # Unknown names stay out of the save file (remote / in-memory only).
+        # Unknown names stay out of the save file.
         if self._remote_db is None:
-            raise KeyError(name)
+            handle = RemoteUnavailable(name)
+            self._collections[name] = handle
+            return handle
         handle = self._remote_db[name]
         self._collections[name] = handle
         return handle
@@ -208,14 +214,23 @@ class SqliteStore:
             for name in LOCAL_COLLECTIONS
         }
 
-        import mongomock
-        remote_client = mongomock.MongoClient()
-        remote_db = remote_client["gob-remote-memory"]
-        remote = {name: remote_db[name] for name in REMOTE_COLLECTIONS}
+        allow_remote_memory = db_env.environment == "test"
+        remote_db = None
+        if allow_remote_memory:
+            import mongomock
+            remote_client = mongomock.MongoClient()
+            remote_db = remote_client["gob-remote-memory"]
+            remote = {name: remote_db[name] for name in REMOTE_COLLECTIONS}
+        else:
+            remote = {name: RemoteUnavailable(name) for name in REMOTE_COLLECTIONS}
 
         if _eog_enabled(db_env.process_environment):
             # January beta: keep producing calibration data, but never in the save.
-            eog = remote_db["eog_band_log"]
+            if remote_db is not None:
+                eog = remote_db["eog_band_log"]
+            else:
+                import mongomock
+                eog = mongomock.MongoClient()["gob-eog-memory"]["eog_band_log"]
         else:
             eog = NullCollection("eog_band_log")
 
