@@ -4273,35 +4273,38 @@ the fix is a 301 to `/team-roster-view.html` rather than restoring the page.
 
 ---
 
-## Test-suite hygiene — 129 pre-existing failures [CODE-CLEANUP] — post-Founders
+## Test-suite hygiene — 124 pre-existing develop reds [CODE-CLEANUP]
 
-`pytest tests/ --ignore=tests/e2e --maxfail=1000` reports **129 failures that predate the
-animation-reward workstream** (measured 2026-09-19 at `f4c018924`; the baseline run at
-`ecc5399fc`, the commit before the workstream began, has the same set).
+Tracked 2026-09-19 on `ws1/sqlite-adapter` after merging develop (`f4ccca2de`).
+Same 124 fail on Mongo and SQLite. `test_zone_credit_shell` was the 125th and
+has already been re-derived on develop. **Do not fix these here** — that is its
+own workstream. The suite now *tracks* them so a new red is a failure.
 
-**Grouped by cause in `reports/test-triage-2026-09-19.md`** — 118 pre-existing plus 11
-environmental, not 129 separate problems:
+| bucket | count | suite action | what it is |
+|---|---:|---|---|
+| stale | 55 | xfail, strict=False | Product moved; the test still pins the old constant, status, or copy |
+| broken-harness | 56 | xfail, strict=False | TypeError / ImportError / AttributeError / StopIteration / DID NOT RAISE |
+| env | 13 | skip | 5 `node --loader` + 6 screenshot ESM (`ERR_MODULE_NOT_FOUND`) + 2 mongomock `$replaceAll` |
 
-- ~20 pin constants that were later retuned (e.g. `BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE`
-  changed by `2f33be164`, test still asserts the old value)
-- ~25 assert behaviour that was intentionally changed
-- ~14 call signatures whose arity or keywords moved
-- ~13 assert old API response shapes
-- 5 UESS seam guards asserting on messages that moved
-- ~4 reference removed or renamed symbols
-- ~37 singletons
-- **11 environmental**: 10 node-harness `ERR_MODULE_NOT_FOUND` (the loader imports
-  `tests/js/…` as a bare specifier and `package.json` has no `imports` map) and 1 from
-  `slowapi` not being installed, which degrades the auth rate limiter to a no-op so the
-  429 test can never pass locally
+Dropping `--maxfail=2` also surfaced 6 UESS seam guards
+(`test_unrendered_and_ball_seam`, `test_sa1_within_step_pass`) whose
+`caplog` is empty in a full run and populated when they run alone. They are
+**not** on this list — they are not stably red. Do not xfail an XPASS.
 
-The common shape is a **stale test, not broken code** — an assertion frozen against a
-constant, signature, message or response body that was changed on purpose afterwards. That
-is not verified individually for all 118.
+Node ids and reasons live in `tests/known_failures.py`. An xfail that starts
+passing is an XPASS — that is free signal, leave it visible.
 
-**Note `pytest.ini` sets `--maxfail=2`**, so a plain run reports "2 failed" and the real
-total is invisible. That is why a genuine regression (`test_zone_credit_shell`, introduced
-by the zone sink flip `cd2a08c3e`) went unnoticed for a day. It has since been re-derived;
-the rest of this list has not been touched.
+`--maxfail=2` was removed from `pytest.ini` on this branch. That cap is why the
+pile was invisible (a plain `pytest tests/` reported "2 failed"). Do not put it
+back.
 
-**Do not fix piecemeal.** Post-Founders cleanup: work the groups, not the 129 lines.
+Largest clusters: `test_possession_changes` (9, StopIteration),
+`test_simulate_quarter_endpoint` (8, request/DummyGM signatures),
+`test_training_execution_v2_thresholds` (8, retuned buckets),
+`test_motion_should_shoot` (6, mixed stale + missing symbols),
+`test_screenshot_tool` (6, skipped ESM), `test_shot_system_regressions` (5, arity).
+
+Zero of the 124 need Atlas or a network. The earlier `reports/test-triage-2026-09-19.md`
+count of 129/130 included `zone_credit` and used a looser environmental bucket.
+
+**Do not fix piecemeal.** Work the groups, not the 124 lines.

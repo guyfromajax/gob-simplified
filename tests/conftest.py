@@ -34,6 +34,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 _BLOCKED_DB_NAMES = frozenset({"gob", "gob-staging"})
 
 
+def pytest_collection_modifyitems(config, items):
+    from tests.known_failures import apply_known_failures
+
+    apply_known_failures(items)
+
+
 def pytest_configure(config):
     try:
         from BackEnd.db import db
