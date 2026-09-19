@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="/js/shared/franchiseContext.js"></script>
   <script src="/js/shared/authGuard.js"></script>
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Stats</title>
@@ -104,7 +105,7 @@
   <script src="/common.js"></script>
   <script>
 (function() {
-  const params = new URLSearchParams(window.location.search);
+  const params = window.FranchiseContext.toSearchParams();
   const franchiseId = params.get('franchise_id');
   const teamId = params.get('team_id');
   const backBtn = document.getElementById('back-btn');

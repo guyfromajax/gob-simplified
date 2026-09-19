@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Shared tab management for Franchise and Tournament command centers (Phase 4.4).
  * Expects DOM: .tab-buttons elements with data-tab, and .tab-content elements with id matching data-tab.
@@ -14,7 +35,7 @@ function initCommandCenterTabs(options) {
   var tabContents = document.querySelectorAll('.tab-content');
   if (!tabButtons.length || !tabContents.length) return;
 
-  var urlParams = new URLSearchParams(window.location.search);
+  var urlParams = liveParams();
   var activeTab = urlParams.get('tab') || defaultTab;
 
   function setActive(tabName) {
@@ -27,9 +48,11 @@ function initCommandCenterTabs(options) {
   }
 
   function updateUrl(tabName) {
-    var newUrl = new URL(window.location);
-    newUrl.searchParams.set('tab', tabName);
-    window.history.pushState({}, '', newUrl);
+    var bag = liveParams();
+    bag.set('tab', tabName);
+    var qs = bag.toString();
+    // Keep pushState (back button between tabs). commitParams would replaceState.
+    window.history.pushState({}, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
   }
 
   var hasMatchingTab = Array.prototype.some.call(tabButtons, function (b) {

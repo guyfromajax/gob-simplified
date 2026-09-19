@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Namespaced franchise localStorage (Cache_Usage_Documentation.md §9; history: projects/Z-Completed/multi_franchises_brief.md Phase 3 hybrid).
  *
@@ -35,10 +56,8 @@
 
   function resolveFranchiseIdFromUrl(search) {
     try {
-      var q = new URLSearchParams(
-        search != null ? search : (typeof window !== 'undefined' ? window.location.search : '')
-      );
-      return q.get('franchise_id') || null;
+      if (search != null) return franchiseCtx().parseSearch(search).get('franchise_id');
+      return franchiseCtx() ? franchiseCtx().get('franchise_id') : null;
     } catch (e) {
       return null;
     }

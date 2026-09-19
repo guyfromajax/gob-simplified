@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Pointer Validation Utility
  * Phase 2: Validate that pointers (game_id, franchise_id) point to existing documents
@@ -25,10 +46,9 @@ async function validatePointer(pointerType, pointerValue) {
       throw new Error('API configuration not available');
     }
 
-    const params = new URLSearchParams({
-      pointer_type: pointerType,
-      pointer_value: pointerValue
-    });
+    const params = emptyParams();
+    params.set('pointer_type', pointerType);
+    params.set('pointer_value', pointerValue);
 
     const response = await fetch(`${API_CONFIG.buildUrl('/api/validate-pointer')}?${params.toString()}`);
     
@@ -42,7 +62,7 @@ async function validatePointer(pointerType, pointerValue) {
       
       // ✅ Phase 4: Show missing truth error screen for 404 (document not found)
       if (response.status === 404 && window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
-        const mode = new URLSearchParams(window.location.search).get('mode') || 'single';
+        const mode = liveParams().get('mode') || 'single';
         window.ErrorHandler.showMissingTruthError({
           pointerType,
           pointerValue,
@@ -80,7 +100,7 @@ async function validateFranchiseId(franchiseId) {
 /**
  * Validate all pointers in URL params based on mode
  * 
- * @param {URLSearchParams} urlParams - URL parameters
+ * @param {Object} urlParams - URL parameters
  * @param {string} mode - Game mode ('single', 'franchise')
  * @returns {Promise<boolean>} - True if all required pointers are valid
  */

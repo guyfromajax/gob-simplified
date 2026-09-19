@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Centralized API Configuration
  *
@@ -587,7 +608,7 @@ const API_CONFIG = {
   // (Cache_Usage_Documentation.md §9; history: projects/Z-Completed/multi_franchises_brief.md Phase 3).
   currentFranchiseId() {
     try {
-      const q = new URLSearchParams(window.location.search).get('franchise_id');
+      const q = liveParams().get('franchise_id');
       return q || null;
     } catch (e) {
       return null;

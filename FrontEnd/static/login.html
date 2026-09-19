@@ -4,6 +4,7 @@
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
+  <script src="/js/shared/franchiseContext.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8">
@@ -137,7 +138,7 @@
         if (window.GOB_Analytics) window.GOB_Analytics.login();
         
         // Check for redirect URL in query params
-        const urlParams = new URLSearchParams(window.location.search);
+        const urlParams = window.FranchiseContext.toSearchParams();
         const redirectUrl = urlParams.get('redirect') || '/mode-select.html';
         
         // Redirect

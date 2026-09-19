@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Team Builder replaced-name DOM leak detector (dev / staging).
  *
@@ -476,7 +497,7 @@
   function autoArm() {
     if (!envEnabled()) return;
     try {
-      var params = new URLSearchParams(global.location.search || '');
+      var params = liveParams();
       if (!params.get('franchise_id') && !(global.location.pathname || '').match(/franchise|mode-select|court|set-lineup|standings|rankings|box-score/)) {
         return;
       }

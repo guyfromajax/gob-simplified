@@ -1,3 +1,28 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  var ctx = franchiseCtx();
+  if (!ctx) return emptyParams();
+  return ctx.toSearchParams();
+}
+function emptyParams() {
+  var ctx = franchiseCtx();
+  if (ctx) return ctx.createParams();
+  return { toString: function () { return ''; }, get: function () { return null; }, set: function () {}, delete: function () {}, forEach: function () {} };
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Auth Guard - Protects pages from unauthenticated access
  *
@@ -85,7 +110,7 @@
 
   var token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
   if (!token) {
-    var redirectParam = encodeURIComponent(logicalPath + (window.location.search || ""));
+    var redirectParam = encodeURIComponent(logicalPath + (currentSearch() || ""));
     window.location.replace("/login.html?redirect=" + redirectParam);
   }
 

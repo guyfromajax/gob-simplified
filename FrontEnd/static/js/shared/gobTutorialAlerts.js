@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Tutorial Alerts — contextual Sammy modals + nav glow on skip.
  *
@@ -64,7 +85,7 @@
     try {
       var fid = window.FranchiseLS
         ? window.FranchiseLS.resolveFranchiseIdFromUrl()
-        : new URLSearchParams(window.location.search).get('franchise_id');
+        : liveParams().get('franchise_id');
       if (fid && window.FranchiseLS) {
         team = window.FranchiseLS.get(fid, 'user_team') || '';
       }
@@ -241,7 +262,7 @@
   }
 
   function currentRelativeReturnUrl() {
-    var params = new URLSearchParams(window.location.search);
+    var params = liveParams();
     params.delete('tut_alert');
     var qs = params.toString();
     return window.location.pathname + (qs ? '?' + qs : '') + (window.location.hash || '');
@@ -249,7 +270,7 @@
 
   function defaultReturnUrl(id) {
     if (isFcc()) return currentRelativeReturnUrl();
-    return window.location.pathname + window.location.search + (window.location.hash || '');
+    return window.location.pathname + currentSearch() + (window.location.hash || '');
   }
 
   function stashAlertResume(alertId, returnUrl) {
@@ -275,7 +296,7 @@
     try {
       var fid = window.FranchiseLS
         ? window.FranchiseLS.resolveFranchiseIdFromUrl()
-        : new URLSearchParams(window.location.search).get('franchise_id');
+        : liveParams().get('franchise_id');
       var tid =
         fid && window.FranchiseLS
           ? window.FranchiseLS.get(fid, 'user_team_id')
@@ -304,7 +325,7 @@
       /* team-attributes / playbooks / scouting / recruiting: already on FCC — no navigation */
     }
     if (!url) return;
-    var current = window.location.pathname + window.location.search + (window.location.hash || '');
+    var current = window.location.pathname + currentSearch() + (window.location.hash || '');
     var resolved = url.charAt(0) === '/' ? url : url.replace(/^\.\//, '/');
     if (resolved === current) return;
     window.location.href = url;
@@ -515,7 +536,7 @@
 
   function onFccDomReady() {
     if (!isFcc()) return;
-    var params = new URLSearchParams(window.location.search);
+    var params = liveParams();
     var franchiseId = params.get('franchise_id');
     var evt = params.get('tut_alert');
     if (!franchiseId) return;
@@ -531,9 +552,8 @@
     }).then(function () {
       if (evt) {
         params.delete('tut_alert');
-        var qs = params.toString();
-        var next = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
-        try { history.replaceState(null, '', next); } catch (e) {}
+        // In-place: consume one-shot tut_alert. Do not navigate.
+        franchiseCtx().commitParams(params);
       }
       /* Evaluate FCC-return alerts on EVERY load (param-independent): the server
          counters (games / training_returns) + dismissed state gate them, so

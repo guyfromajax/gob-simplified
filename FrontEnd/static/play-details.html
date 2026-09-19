@@ -4,6 +4,7 @@
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
+  <script src="/js/shared/franchiseContext.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8">
@@ -424,7 +425,7 @@
     }
 
     // Get play name and team info from URL
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = window.FranchiseContext.toSearchParams();
     const playName = urlParams.get('play_name');
     const playId = urlParams.get('play_id');
     const teamId = urlParams.get('team_id') || urlParams.get('user_team_id') || urlParams.get('home_id') || urlParams.get('away_id');
@@ -488,7 +489,7 @@
         return;
       }
       
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = window.FranchiseContext.toSearchParams();
       const currentGameId = helper.getGameId(urlParams);
       const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
       const currentQuarter = parseInt(urlParams.get('quarter'), 10) || 1;

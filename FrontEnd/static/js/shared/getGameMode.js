@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Single source of truth for resolving the game mode in the court / EOG paths.
  *
@@ -23,7 +44,7 @@ export function getGameMode({ scene, urlParams, franchiseId } = {}) {
   if (urlParams && typeof urlParams.get === 'function') {
     urlMode = urlParams.get('mode');
   } else if (typeof window !== 'undefined' && window.location?.search) {
-    urlMode = new URLSearchParams(window.location.search).get('mode');
+    urlMode = liveParams().get('mode');
   }
   if (urlMode && urlMode !== 'tournament') return urlMode;
 

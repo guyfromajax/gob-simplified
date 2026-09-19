@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Error Handler Utility for State & Persistence Errors
  * Phase 1.1 & Phase 4: Provides explicit error screens with recovery flows and telemetry
@@ -173,7 +194,7 @@ function showMissingPointerError({
  * Build lineup URL from params
  */
 function buildLineupUrl(params) {
-  const urlParams = new URLSearchParams();
+  const urlParams = emptyParams();
   
   if (params.home) urlParams.set('home', params.home);
   if (params.away) urlParams.set('away', params.away);

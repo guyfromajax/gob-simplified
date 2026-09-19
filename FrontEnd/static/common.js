@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 function formatTeamName(name) {
   return (name || '')
     .toLowerCase()
@@ -197,7 +218,7 @@ function setActiveTeamBuilderVisual(visual) {
 function _franchiseIdFromLocation() {
   try {
     if (typeof window === 'undefined' || !window.location) return null;
-    var sp = new URLSearchParams(window.location.search || '');
+    var sp = liveParams();
     return sp.get('franchise_id') || null;
   } catch (e) {
     return null;
@@ -1116,7 +1137,7 @@ function formatNameWithJersey(jersey, rawName) {
 }
 
 function getCurrentRelativeUrl() {
-  return `${window.location.pathname}${window.location.search}${window.location.hash || ''}`;
+  return `${window.location.pathname}${currentSearch()}${window.location.hash || ''}`;
 }
 
 function getSafeReturnUrl(rawReturnUrl) {
@@ -1132,7 +1153,7 @@ function getSafeReturnUrl(rawReturnUrl) {
 }
 
 function buildFranchiseLockerRoomUrl(franchiseId, teamId, extraParams = {}) {
-  const params = new URLSearchParams();
+  const params = emptyParams();
   params.set('mode', 'franchise');
   if (franchiseId) params.set('franchise_id', franchiseId);
   if (teamId) params.set('team_id', teamId);
@@ -1146,9 +1167,9 @@ function buildFranchiseLockerRoomUrl(franchiseId, teamId, extraParams = {}) {
 }
 
 function resolveFranchiseLockerRoomUrl(options = {}) {
-  const params = options.params instanceof URLSearchParams
+  const params = options.params && typeof options.params.get === 'function'
     ? options.params
-    : new URLSearchParams(window.location.search);
+    : liveParams();
   const extraParams = options.extraParams || {};
   const explicitReturnUrl = options.returnUrl != null ? options.returnUrl : params.get('return_url');
   const safeReturnUrl = getSafeReturnUrl(explicitReturnUrl);
@@ -1157,12 +1178,14 @@ function resolveFranchiseLockerRoomUrl(options = {}) {
     if (!extraParams || !Object.keys(extraParams).length) return safeReturnUrl;
     try {
       const merged = new URL(safeReturnUrl, window.location.origin);
+      const bag = franchiseCtx().parseSearch(merged.search);
       Object.keys(extraParams).forEach(function (key) {
         if (extraParams[key] != null && extraParams[key] !== '') {
-          merged.searchParams.set(key, extraParams[key]);
+          bag.set(key, extraParams[key]);
         }
       });
-      return `${merged.pathname}${merged.search}${merged.hash || ''}`;
+      const qs = bag.toString();
+      return `${merged.pathname}${qs ? '?' + qs : ''}${merged.hash || ''}`;
     } catch (_e) {
       return safeReturnUrl;
     }

@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Auth Bar Init - Shared top nav: logo (left) | Alpha badge (center) | YouTube, X, account (right).
  *
@@ -53,7 +74,7 @@
     // (team-select most notably; situation + set-lineup are already in
     // PAGES_WITHOUT_AUTH_BAR above).
     try {
-      var urlMode = new URLSearchParams(window.location.search).get('mode');
+      var urlMode = liveParams().get('mode');
       if (urlMode === 'tutorial') return false;
     } catch (_) {}
     return true;
@@ -262,17 +283,16 @@
     // Shared query string for the post-init screens. The user is ALWAYS home in the
     // tutorial game (fte_inject_state.md §1-§2).
     function tutorialGameParams() {
-      var p = new URLSearchParams({
-        mode: 'tutorial',
-        home: teamPick,
-        away: opponentPick || '',
-        my_team: 'home',
-        // Required by game-plan.js / set-lineup.js in tutorial mode — without it
-        // GET /api/gameplan receives the string "null" and 400s. Must match what
-        // tutorial-pick-opponent.js sends, or a RESUMED funnel breaks where a
-        // straight-through one works.
-        team_id: teamPick
-      });
+      var p = emptyParams();
+      p.set('mode', 'tutorial');
+      p.set('home', teamPick);
+      p.set('away', opponentPick || '');
+      p.set('my_team', 'home');
+      // Required by game-plan.js / set-lineup.js in tutorial mode — without it
+      // GET /api/gameplan receives the string "null" and 400s. Must match what
+      // tutorial-pick-opponent.js sends, or a RESUMED funnel breaks where a
+      // straight-through one works.
+      p.set('team_id', teamPick);
       if (tutorialGameId) p.set('game_id', tutorialGameId);
       return p;
     }
@@ -283,7 +303,7 @@
     // the user isn't bounced back to their current step (e.g. Scout opens
     // team-roster-view from team-select; we must let them stay there).
     var TUTORIAL_SHOULDER_PAGES = ['/team-roster-view.html'];
-    var urlMode = new URLSearchParams(window.location.search).get('mode');
+    var urlMode = liveParams().get('mode');
     if (urlMode === 'tutorial' && TUTORIAL_SHOULDER_PAGES.indexOf(currentPath) !== -1) return;
 
     var targetPath;
@@ -508,7 +528,7 @@
         fid = window.FranchiseLS.resolveFranchiseIdFromUrl();
       } else {
         try {
-          fid = new URLSearchParams(window.location.search).get('franchise_id');
+          fid = liveParams().get('franchise_id');
         } catch (e2) {}
       }
       // Hybrid C: only paint franchise team chrome when URL has franchise_id
@@ -598,7 +618,7 @@
         try {
           var fid = window.FranchiseLS
             ? window.FranchiseLS.resolveFranchiseIdFromUrl()
-            : new URLSearchParams(window.location.search).get('franchise_id');
+            : liveParams().get('franchise_id');
           if (!fid || !window.FranchiseLS) return false;
           var ctx = window.FranchiseLS.getTeamContext(fid);
           return !!(ctx && (ctx.teamName || ctx.teamId));
@@ -1081,7 +1101,7 @@
         for (var k in authHeaders) headers[k] = authHeaders[k];
       }
 
-      var urlParams = new URLSearchParams(window.location.search || '');
+      var urlParams = liveParams();
       var payload = {
         category: categoryEl.value || 'general',
         message: message,

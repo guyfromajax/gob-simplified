@@ -10,6 +10,7 @@
   <!-- Google Tag Manager -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
+  <script src="/js/shared/franchiseContext.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <link rel="stylesheet" href="/css/auth-bar.css">
@@ -636,8 +637,8 @@
     try { return !!(localStorage.getItem('auth_token') && localStorage.getItem('auth_user')); } catch (e) { return false; }
   }
   function signupHref() {
-    const params = new URLSearchParams(window.location.search);
-    const out = new URLSearchParams();
+    const params = window.FranchiseContext.toSearchParams();
+    const out = window.FranchiseContext.createParams();
     const utm = params.get('utm_source');
     const ref = params.get('ref');
     if (utm) out.set('utm_source', utm);

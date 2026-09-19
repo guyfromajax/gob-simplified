@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * FCC "Big News" modals — Bracket Reveal & Recruiting Results (shared Arena Card shell).
  */
@@ -47,7 +68,7 @@
   }
 
   function franchiseId() {
-    return global.franchiseId || new URLSearchParams(window.location.search).get('franchise_id');
+    return global.franchiseId || liveParams().get('franchise_id');
   }
 
   function authHeaders() {

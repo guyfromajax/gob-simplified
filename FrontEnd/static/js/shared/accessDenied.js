@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Shared access-denied handler for 401/403 responses.
  * Use when fetching user-specific data (franchise, tournament).
@@ -51,7 +72,7 @@
       : 'Access denied. Redirecting...';
     var redirectTo = is401 ? '/login.html' : '/mode-select.html';
 
-    var currentPath = window.location.pathname + window.location.search;
+    var currentPath = window.location.pathname + currentSearch();
     if (is401 && currentPath && currentPath !== '/login.html') {
       redirectTo += '?redirect=' + encodeURIComponent(currentPath);
     }
