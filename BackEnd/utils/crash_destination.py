@@ -47,7 +47,16 @@ COURT_Y_MIN, COURT_Y_MAX = 3.0, 47.0
 #: from exactly the distribution the ball is drawn from. Below 1.0 they hedge toward
 #: the rim - covering the likely area rather than the full range the ball can reach,
 #: which is what real crashers do.
-DEFAULT_TIGHTNESS = 1.0
+#:
+#: 0.7 chosen by Jamie from reports/crash-model-a-visual-2026-09-19.md: crashers go
+#: where a miss from that shot PROBABLY goes rather than covering its full range.
+#: Static sampling had it beating 1.0 on every distance band and on both axes
+#: (euclidean median to the bounce 4.0 / 4.0 / 7.3 / 9.8 / 11.0 across the bands,
+#: against 4.2 / 4.2 / 8.2 / 11.0 / 12.1). Note that scoring crashers on distance to
+#: where the ball ENDED UP always favours a tighter model - it is a coverage-versus-
+#: accuracy trade, not an optimisation, and 0.7 is the judgement, not the optimum.
+#: ``GOB_CRASH_TIGHTNESS=1.0`` keeps the full-spread variant selectable.
+DEFAULT_TIGHTNESS = 0.7
 
 RIM_Y = 25.0
 
