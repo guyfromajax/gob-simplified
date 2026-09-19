@@ -380,6 +380,40 @@ class ShotManager:
             }
         return None
 
+    def _crash_coords(self, roles, shooter, is_home_team_shooting, min_x=None, max_x=None):
+        """Where one crasher is sent on a shot attempt.
+
+        ``GOB_CRASH_SHOT_AWARE`` off: the legacy flat box - randint(85,92)/(8,15) by x
+        and randint(20,30) by y, independent of everything about the shot.
+
+        On: Model A, sampled from the rebound distribution FOR THAT SHOT. The model is
+        handed only the shot origin and the rim side; it is structurally incapable of
+        reading the bounce, which is already in scope here (``bounce_spot`` is computed
+        at :2465, before the HCO authoring at :2550). See
+        ``BackEnd/utils/crash_destination.py`` and ``tests/test_crash_destination.py``.
+
+        Two ``randint`` draws either way, so the flag is draw-neutral.
+        """
+        from BackEnd.utils import crash_destination as CDEST
+
+        if CDEST.enabled():
+            rim_x = 91.0 if is_home_team_shooting else 9.0
+            origin = self._shooter_grid_for_bounce(roles, shooter) or {"x": rim_x, "y": 25.0}
+            coords = CDEST.crash_destination(
+                shooter_x=origin["x"], shooter_y=origin["y"], rim_x=rim_x,
+            )
+            if min_x is not None and max_x is not None:
+                coords["x"] = max(min_x, min(max_x, coords["x"]))
+            return coords
+
+        if is_home_team_shooting:
+            rebounder_x = random.randint(85, 92)
+        else:
+            rebounder_x = random.randint(8, 15)
+        if min_x is not None and max_x is not None:
+            rebounder_x = max(min_x, min(max_x, rebounder_x))
+        return {"x": rebounder_x, "y": random.randint(20, 30)}
+
     def _compute_miss_bounce_spot(self, roles, shooter, off_team):
         """Grid coord where a missed shot's ball rests for schema ``[bounce]``."""
         foul_block_spot_used = getattr(self, "_foul_block_spot", None)
@@ -2053,12 +2087,8 @@ class ShotManager:
                 # their step.end.coords stays at the skeleton's shot spot).
                 if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
                     continue
-                if is_home_team_shooting:
-                    rebounder_x = random.randint(85, 92)
-                else:
-                    rebounder_x = random.randint(8, 15)
-                rebounder_x = max(min_x, min(max_x, rebounder_x))
-                rebounder_coords = {"x": rebounder_x, "y": random.randint(20, 30)}
+                rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting, min_x, max_x)
+                rebounder_x = rebounder_coords["x"]
                 offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
             result["offense_rebounder_coords"] = offense_rebounder_coords
 
@@ -2072,12 +2102,8 @@ class ShotManager:
                 rebounder_player = def_team.lineup.get(pos)
                 if rebounder_player is None:
                     continue
-                if is_home_team_shooting:
-                    rebounder_x = random.randint(85, 92)
-                else:
-                    rebounder_x = random.randint(8, 15)
-                rebounder_x = max(min_x, min(max_x, rebounder_x))
-                rebounder_coords = {"x": rebounder_x, "y": random.randint(20, 30)}
+                rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting, min_x, max_x)
+                rebounder_x = rebounder_coords["x"]
                 defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
             result["defense_rebounder_coords"] = defense_rebounder_coords
 
@@ -2156,10 +2182,7 @@ class ShotManager:
                         continue
                     if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
                         continue
-                    if is_home_team_shooting:
-                        rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                    else:
-                        rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                    rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting)
                     offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                 result["offense_rebounder_coords"] = offense_rebounder_coords
 
@@ -2168,10 +2191,7 @@ class ShotManager:
                     rebounder_player = def_team.lineup.get(pos)
                     if rebounder_player is None:
                         continue
-                    if is_home_team_shooting:
-                        rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                    else:
-                        rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                    rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting)
                     defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                 result["defense_rebounder_coords"] = defense_rebounder_coords
 
@@ -2440,20 +2460,14 @@ class ShotManager:
                             continue
                         if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
                             continue
-                        if is_home_team_shooting:
-                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                        else:
-                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting)
                         offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                     result["offense_rebounder_coords"] = offense_rebounder_coords
 
                     defense_rebounder_coords = {}
                     for pos, rebounder_player in d_rebounder_lineup.items():
                         if rebounder_player:
-                            if is_home_team_shooting:
-                                rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                            else:
-                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                            rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting)
                             defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                     result["defense_rebounder_coords"] = defense_rebounder_coords
                 else:
@@ -2546,10 +2560,7 @@ class ShotManager:
                             continue
                         if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
                             continue
-                        if is_home_team_shooting:
-                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                        else:
-                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting)
                         offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                     result["offense_rebounder_coords"] = offense_rebounder_coords
 
@@ -2561,10 +2572,7 @@ class ShotManager:
                         rebounder_player = def_team.lineup.get(pos)
                         if rebounder_player is None:
                             continue
-                        if is_home_team_shooting:
-                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                        else:
-                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting)
                         defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                     result["defense_rebounder_coords"] = defense_rebounder_coords
                 
