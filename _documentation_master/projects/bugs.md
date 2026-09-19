@@ -48,7 +48,6 @@
 113. Bring logic to screens
 114. Better individual player defense stat tracking
 116. User account -- link X & Facebook?
-127. Get Aggressive / Get Conservative settings and Playcall Center buttons
 128. Add a badass design appraoch to New Stories
 131. Centralized Turn Transition Helper / System
 139. Mod system for uploading custom leagues
@@ -66,9 +65,6 @@
 
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
-2. Still missing EOQ perfection
-2a. Fast Break animation is still sloppy and inconsistent with defenders in particular not moving on shot steps or freezing before the shot step then teleporting
-2b. Still reading fouled 3 pt attempts as 2 pt shots in some instances
 2c. some HCO turnovers are still mismatched on BE and FE as to who the ball handler is. Note teh BE logic + turnover animation jiggle are synced, but sometimes a different player is holding teh ball.
     _(Possibly related, untraced: the ~4% interception stale-victim fallback in `06_Gameplay_Systems/Dynamic_HCO_System.md` §4, and the step-0 owner bootstrap disagreement in `projects/UESS Audits/HCO_UESS_Audit.md`.)_
 2d. Sometimes the deleting franchise gets stuck in an infinite loop
