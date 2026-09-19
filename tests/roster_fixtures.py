@@ -308,7 +308,11 @@ def seed_universal_defenses(defenses_collection) -> None:
     """
     import mongomock
 
-    if not isinstance(defenses_collection, mongomock.collection.Collection):
+    from BackEnd.persistence.sqlite_collection import SqliteCollection
+
+    if not isinstance(
+        defenses_collection, (mongomock.collection.Collection, SqliteCollection)
+    ):
         raise RuntimeError(
             "seed_universal_defenses refuses to write to a non-mongomock collection: "
             f"{type(defenses_collection).__module__}.{type(defenses_collection).__name__}"

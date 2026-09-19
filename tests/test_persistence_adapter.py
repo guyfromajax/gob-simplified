@@ -16,6 +16,8 @@ from BackEnd.persistence.guards import (
     _ReadOnlyDatabase,
 )
 from BackEnd.persistence.mongo import MongoStore
+from BackEnd.persistence.sqlite import SqliteStore
+from BackEnd.persistence.sqlite_collection import NullCollection, SqliteCollection
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,10 +66,12 @@ def test_unknown_persistence_value_errors(tmp_path: Path):
         _mongomock_env(tmp_path, GOB_PERSISTENCE="postgres")
 
 
-def test_sqlite_backend_is_not_implemented(tmp_path: Path):
-    env = _mongomock_env(tmp_path, GOB_PERSISTENCE="sqlite")
-    with pytest.raises(EnvironmentConfigurationError, match="not implemented"):
-        create_store(env)
+def test_sqlite_backend_is_selected(tmp_path: Path):
+    env = _mongomock_env(tmp_path, GOB_PERSISTENCE="sqlite", GOB_SQLITE_PATH=str(tmp_path / "save.sqlite"))
+    store = create_store(env)
+    assert isinstance(store, SqliteStore)
+    assert store.USING_MONGOMOCK is False
+    assert store.sqlite_path.endswith("save.sqlite")
 
 
 def test_get_store_is_singleton():
@@ -107,7 +111,11 @@ def test_get_store_exposes_all_legacy_collection_handles():
         assert getattr(store, name) is not None, name
     assert store.db is not None
     assert store.client is not None
-    assert store.USING_MONGOMOCK is True
+    if getattr(store.DB_ENV, "persistence", "mongo") == "sqlite":
+        assert store.USING_MONGOMOCK is False
+        assert isinstance(store, SqliteStore)
+    else:
+        assert store.USING_MONGOMOCK is True
 
 
 def test_franchise_scoped_round_trip_on_mongomock(tmp_path: Path):
@@ -214,3 +222,147 @@ def test_persistence_modules_do_not_use_random():
             elif isinstance(node, ast.Name) and node.id == "random":
                 offenders.append(f"{path.name}:{node.lineno}: name 'random'")
     assert offenders == []
+
+
+def _sqlite_env(tmp_path: Path, **extra):
+    return _mongomock_env(tmp_path, GOB_PERSISTENCE="sqlite", GOB_SQLITE_PATH=str(tmp_path / "save.sqlite"), **extra)
+
+
+def test_sqlite_path_reads_pristine_env(tmp_path: Path):
+    config = _mongomock_env(tmp_path, GOB_PERSISTENCE="sqlite", GOB_SQLITE_PATH="/tmp/franchise.db")
+    assert config.sqlite_path == "/tmp/franchise.db"
+
+
+def test_sqlite_franchise_scoped_round_trip(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    fid = ObjectId()
+    bundle = {
+        "franchise": {"user_id": "u1", "week": 4},
+        "franchise_team_data": [{"team_id": "t1", "wins": 2}],
+        "franchise_players_data": [{"player_id": "p1", "season_stats": {}}],
+        "franchise_recruits_data": [{"recruit_id": "r1"}],
+        "games": [{"_id": "g1", "week": 4}],
+        "press_conference_sessions": [{"topic": "win"}],
+        "training_sessions": [{"session_type": "lift"}],
+        "tournaments": [{"name": "eos"}],
+        "franchise_state": [{"week": 4}],
+        "eog_band_log": [{"week": 4, "record_type": "band"}],
+    }
+    store.write_franchise(fid, bundle)
+    read = store.read_franchise(str(fid))
+
+    assert read["franchise"]["user_id"] == "u1"
+    assert read["franchise"]["_id"] == fid
+    assert read["franchise_team_data"][0]["franchise_id"] == fid
+    assert read["franchise_players_data"][0]["franchise_id"] == str(fid)
+    assert read["games"][0]["franchise_id"] == str(fid)
+    assert read["franchise_state"][0]["franchise_id"] == str(fid)
+    assert read["eog_band_log"] == []
+
+    other = ObjectId()
+    store.write_franchise(other, {
+        "franchise": {"user_id": "u2"},
+        "games": [{"_id": "g-other"}],
+    })
+    store.delete_franchise(fid)
+    gone = store.read_franchise(fid)
+    assert gone["franchise"] is None
+    assert gone["games"] == []
+    remaining = store.read_franchise(other)
+    assert remaining["franchise"]["user_id"] == "u2"
+    assert remaining["games"][0]["_id"] == "g-other"
+
+
+def test_sqlite_franchise_state_is_per_save_not_global(tmp_path: Path):
+    """Mongo's _id=state singleton is not reproduced. State lives in this file."""
+    first = SqliteStore(_mongomock_env(tmp_path, GOB_PERSISTENCE="sqlite", GOB_SQLITE_PATH=str(tmp_path / "a.sqlite")))
+    second = SqliteStore(_mongomock_env(tmp_path, GOB_PERSISTENCE="sqlite", GOB_SQLITE_PATH=str(tmp_path / "b.sqlite")))
+    first.franchise_state_collection.replace_one({"_id": "state"}, {"_id": "state", "week": 12}, upsert=True)
+    assert first.franchise_state_collection.find_one({"_id": "state"})["week"] == 12
+    assert second.franchise_state_collection.find_one({"_id": "state"}) is None
+    fid = ObjectId()
+    first.write_franchise(fid, {"franchise_state": [{"_id": "state", "week": 12}]})
+    bundle = first.read_franchise(fid)
+    assert bundle["franchise_state"][0]["week"] == 12
+    assert second.read_franchise(fid)["franchise_state"] == []
+
+
+def test_sqlite_eog_band_log_is_not_in_the_save(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    assert isinstance(store.eog_band_log_collection, NullCollection)
+    store.eog_band_log_collection.insert_one({"week": 1, "record_type": "band"})
+    assert store.eog_band_log_collection.find_one({}) is None
+    fid = ObjectId()
+    store.write_franchise(fid, {"eog_band_log": [{"week": 1}]})
+    assert store.read_franchise(fid)["eog_band_log"] == []
+
+
+def test_sqlite_eog_band_can_be_enabled_off_the_save(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path, GOB_EOG_BAND_ENABLED="1"))
+    assert not isinstance(store.eog_band_log_collection, NullCollection)
+    store.eog_band_log_collection.insert_one({"week": 2})
+    assert store.eog_band_log_collection.find_one({"week": 2})["week"] == 2
+    fid = ObjectId()
+    store.write_franchise(fid, {"eog_band_log": [{"week": 9}]})
+    assert store.read_franchise(fid)["eog_band_log"] == []
+
+
+def test_sqlite_remote_collections_are_not_in_the_save_file(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    store.users_collection.insert_one({"_id": "u", "email": "a@b.c"})
+    assert store.users_collection.find_one({"_id": "u"})["email"] == "a@b.c"
+    import sqlite3
+    store.db["feedback_submissions"].insert_one({"message": "hi"})
+    names = {row[0] for row in sqlite3.connect(store.sqlite_path).execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "users" not in names
+    assert "feedback_submissions" not in names
+    assert "players" in names
+
+
+def test_sqlite_read_access_blocks_local_writes(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path, GOB_DB_ACCESS="read"))
+    assert store.DB_ACCESS == "read"
+    assert isinstance(store.games_collection, _ReadOnlyCollection)
+    with pytest.raises(ProdWriteBlocked):
+        store.games_collection.insert_one({"_id": "g"})
+    with pytest.raises(ProdWriteBlocked):
+        store.write_franchise(ObjectId(), {"franchise": {"user_id": "blocked"}})
+
+
+def test_sqlite_never_refuses_as_production_mongo(tmp_path: Path):
+    env = _production_env(tmp_path, GOB_PERSISTENCE="sqlite", GOB_SQLITE_PATH=str(tmp_path / "local.sqlite"))
+    store = SqliteStore(env)
+    assert store.DB_ACCESS == "write"
+    store.games_collection.insert_one({"_id": "ok"})
+    assert store.games_collection.find_one({"_id": "ok"})["_id"] == "ok"
+
+
+def test_sqlite_collection_round_trip_queries(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    coll = store.players_collection
+    assert isinstance(coll, SqliteCollection)
+    coll.insert_many([
+        {"_id": "p1", "team": "Lancaster", "rt": 10},
+        {"_id": "p2", "team": "Bentley-Truman", "rt": 20},
+    ])
+    assert coll.count_documents({"team": {"$in": ["Lancaster", "Bentley-Truman"]}}) == 2
+    coll.update_one({"_id": "p1"}, {"$set": {"rt": 11}})
+    assert coll.find_one({"_id": "p1"})["rt"] == 11
+    ids = {doc["_id"] for doc in coll.find({"team": "Lancaster"}, {"_id": 1})}
+    assert ids == {"p1"}
+    ranked = list(coll.aggregate([
+        {"$match": {"rt": {"$gt": 0}}},
+        {"$project": {"team": 1, "value": {"$ifNull": ["$rt", 0]}}},
+        {"$sort": {"value": -1}},
+        {"$limit": 1},
+    ]))
+    assert ranked[0]["team"] == "Bentley-Truman"
+    assert ranked[0]["value"] == 20
+    coll.update_one(
+        {"slug": "p3", "team": "Lancaster"},
+        {"$set": {"rt": 5}},
+        upsert=True,
+    )
+    created = coll.find_one({"slug": "p3"})
+    assert created["team"] == "Lancaster"
+    assert created["rt"] == 5

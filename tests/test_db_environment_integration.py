@@ -18,6 +18,8 @@ def _run_db_import(extra_env: dict[str, str]) -> subprocess.CompletedProcess[str
             "ENVIRONMENT",
             "GOB_DB_MODE",
             "GOB_DB_ACCESS",
+            "GOB_PERSISTENCE",
+            "GOB_SQLITE_PATH",
             "RAILWAY_ENVIRONMENT",
         }
         and not key.startswith("RAILWAY_")
