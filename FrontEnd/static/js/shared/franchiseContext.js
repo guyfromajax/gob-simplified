@@ -1,0 +1,243 @@
+/**
+ * FranchiseContext — one door for screen state.
+ *
+ * URL-as-identity is an invariant, not sprawl. The web build keeps reading the
+ * query string; screens must do it through this door. Deleting URL state would
+ * break the MPA (80 HTML pages, 133 hard navigations) and multi-tab /
+ * multi-franchise on the web build we are keeping.
+ *
+ * Two backends, selected at boot by window.GOB_BUILD_PROFILE:
+ *   UrlContextProvider      — web. Query-string. Bit-identical to today's reads.
+ *   SessionContextProvider  — desktop. localStorage singleton (one franchise
+ *                             per window). Persisted, not in-memory: Electron
+ *                             performs the same 133 hard navigations.
+ *
+ * `runtime` ('local' | 'hosted') travels with franchise_id. api-config.js
+ * peeks FranchiseContext.runtime when a call supplies routing context.
+ *
+ * Classic script (IIFE). Slice 1 ships the door only — no existing screen
+ * includes this file yet.
+ */
+(function (global) {
+  'use strict';
+
+  var SESSION_STORAGE_KEY = 'gob:franchise_context';
+
+  function isRuntime(value) {
+    return value === 'local' || value === 'hosted';
+  }
+
+  function defaultRuntime() {
+    return 'hosted';
+  }
+
+  function liveSearch(loc) {
+    if (!loc) return '';
+    return loc.search == null ? '' : String(loc.search);
+  }
+
+  function paramsFromSearch(search) {
+    return new URLSearchParams(search || '');
+  }
+
+  function applySearchToLocation(loc, history, search) {
+    var qs = search ? (search.charAt(0) === '?' ? search : '?' + search) : '';
+    var pathname = (loc && loc.pathname) || '';
+    var hash = (loc && loc.hash) || '';
+    var next = pathname + qs + hash;
+    if (history && typeof history.replaceState === 'function') {
+      try {
+        history.replaceState(history.state, '', next);
+      } catch (e) { /* jsdom / about:blank stubs */ }
+    }
+    if (loc) loc.search = qs;
+  }
+
+  function UrlContextProvider(opts) {
+    opts = opts || {};
+    this._loc = opts.location || (typeof window !== 'undefined' ? window.location : { search: '' });
+    this._history = opts.history || (typeof window !== 'undefined' ? window.history : null);
+  }
+
+  UrlContextProvider.prototype._params = function () {
+    return paramsFromSearch(liveSearch(this._loc));
+  };
+
+  UrlContextProvider.prototype.get = function (key) {
+    if (key === 'runtime') {
+      var fromUrl = this._params().get('runtime');
+      return isRuntime(fromUrl) ? fromUrl : defaultRuntime();
+    }
+    var value = this._params().get(key);
+    return value == null ? null : value;
+  };
+
+  UrlContextProvider.prototype.getAll = function () {
+    var out = {};
+    this._params().forEach(function (value, key) {
+      out[key] = value;
+    });
+    if (!isRuntime(out.runtime)) out.runtime = defaultRuntime();
+    return out;
+  };
+
+  UrlContextProvider.prototype.set = function (key, value) {
+    var params = this._params();
+    if (value == null || value === '') params.delete(key);
+    else params.set(key, String(value));
+    applySearchToLocation(this._loc, this._history, params.toString());
+  };
+
+  UrlContextProvider.prototype.setMany = function (values) {
+    var params = this._params();
+    Object.keys(values || {}).forEach(function (key) {
+      var value = values[key];
+      if (value == null || value === '') params.delete(key);
+      else params.set(key, String(value));
+    });
+    applySearchToLocation(this._loc, this._history, params.toString());
+  };
+
+  UrlContextProvider.prototype.toSearchParams = function () {
+    return paramsFromSearch(liveSearch(this._loc));
+  };
+
+  function SessionContextProvider(opts) {
+    opts = opts || {};
+    this._storage = opts.storage || (typeof localStorage !== 'undefined' ? localStorage : null);
+    this._state = this._load();
+  }
+
+  SessionContextProvider.prototype._load = function () {
+    var fallback = { runtime: defaultRuntime() };
+    if (!this._storage || typeof this._storage.getItem !== 'function') return fallback;
+    try {
+      var raw = this._storage.getItem(SESSION_STORAGE_KEY);
+      if (!raw) return fallback;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fallback;
+      if (!isRuntime(parsed.runtime)) parsed.runtime = defaultRuntime();
+      return parsed;
+    } catch (e) {
+      return fallback;
+    }
+  };
+
+  SessionContextProvider.prototype._save = function () {
+    if (!this._storage || typeof this._storage.setItem !== 'function') return;
+    this._storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(this._state));
+  };
+
+  SessionContextProvider.prototype.get = function (key) {
+    if (key === 'runtime') {
+      return isRuntime(this._state.runtime) ? this._state.runtime : defaultRuntime();
+    }
+    if (!Object.prototype.hasOwnProperty.call(this._state, key)) return null;
+    var value = this._state[key];
+    return value == null ? null : String(value);
+  };
+
+  SessionContextProvider.prototype.getAll = function () {
+    var out = {};
+    Object.keys(this._state).forEach(function (key) {
+      if (this._state[key] != null) out[key] = String(this._state[key]);
+    }, this);
+    if (!isRuntime(out.runtime)) out.runtime = defaultRuntime();
+    return out;
+  };
+
+  SessionContextProvider.prototype.set = function (key, value) {
+    if (value == null || value === '') delete this._state[key];
+    else this._state[key] = String(value);
+    if (key === 'runtime' && !isRuntime(this._state.runtime)) {
+      this._state.runtime = defaultRuntime();
+    }
+    this._save();
+  };
+
+  SessionContextProvider.prototype.setMany = function (values) {
+    Object.keys(values || {}).forEach(function (key) {
+      var value = values[key];
+      if (value == null || value === '') delete this._state[key];
+      else this._state[key] = String(value);
+    }, this);
+    if (!isRuntime(this._state.runtime)) this._state.runtime = defaultRuntime();
+    this._save();
+  };
+
+  SessionContextProvider.prototype.toSearchParams = function () {
+    var params = new URLSearchParams();
+    Object.keys(this._state).forEach(function (key) {
+      if (this._state[key] != null && this._state[key] !== '') {
+        params.set(key, String(this._state[key]));
+      }
+    }, this);
+    return params;
+  };
+
+  function FranchiseContext(provider) {
+    this._provider = provider;
+  }
+
+  Object.defineProperty(FranchiseContext.prototype, 'runtime', {
+    get: function () {
+      return this._provider.get('runtime') || defaultRuntime();
+    },
+  });
+
+  Object.defineProperty(FranchiseContext.prototype, 'franchiseId', {
+    get: function () {
+      return this._provider.get('franchise_id');
+    },
+  });
+
+  FranchiseContext.prototype.get = function (key) {
+    return this._provider.get(key);
+  };
+
+  FranchiseContext.prototype.getAll = function () {
+    return this._provider.getAll();
+  };
+
+  FranchiseContext.prototype.set = function (key, value) {
+    return this._provider.set(key, value);
+  };
+
+  FranchiseContext.prototype.setMany = function (values) {
+    return this._provider.setMany(values);
+  };
+
+  FranchiseContext.prototype.toSearchParams = function () {
+    return this._provider.toSearchParams();
+  };
+
+  function resolveBuildProfile(opts) {
+    if (opts && opts.buildProfile) return opts.buildProfile;
+    if (typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop') {
+      return 'desktop';
+    }
+    return 'web';
+  }
+
+  function createFranchiseContext(opts) {
+    opts = opts || {};
+    var profile = resolveBuildProfile(opts);
+    var Provider = profile === 'desktop' ? SessionContextProvider : UrlContextProvider;
+    return new FranchiseContext(new Provider(opts));
+  }
+
+  var api = {
+    SESSION_STORAGE_KEY: SESSION_STORAGE_KEY,
+    UrlContextProvider: UrlContextProvider,
+    SessionContextProvider: SessionContextProvider,
+    FranchiseContext: FranchiseContext,
+    createFranchiseContext: createFranchiseContext,
+  };
+
+  global.FranchiseContextLib = api;
+  global.FranchiseContext = createFranchiseContext();
+
+  if (typeof module === 'object' && module.exports) {
+    module.exports = api;
+  }
+})(typeof window !== 'undefined' ? window : globalThis);

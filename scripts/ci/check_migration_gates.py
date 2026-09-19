@@ -8,7 +8,8 @@ a gate, new code keeps adding to the pile and the migration never finishes.
                  Use the persistence adapter, not a direct db import.
 
   Gate B (WS-3): no NEW URL-state reads in FrontEnd/static (URLSearchParams,
-                 location.search, .searchParams).
+                 location.search, .searchParams) outside the provider
+                 (FrontEnd/static/js/shared/franchiseContext.js is skipped).
                  Use FranchiseContext, not location.search.
 
 Allowlist: scripts/ci/migration_gates_allowlist.json
@@ -53,6 +54,8 @@ SKIP_DIR_NAMES = frozenset(
 )
 SKIP_FILE_PREFIXES = ("scratch_",)
 SKIP_FILE_NAMES = frozenset({"BackEnd/db.py"})
+# The door is the one legal URL reader. Everything else is the Gate B pile.
+GATE_B_SKIP_FILES = frozenset({"FrontEnd/static/js/shared/franchiseContext.js"})
 TEST_FILE_RE = re.compile(r"(^|/)(test_[^/]+|[^/]+_test)\.py$")
 
 GATE_A_HINT = "use the persistence adapter, not a direct db import"
@@ -175,6 +178,8 @@ def scan_gate_b(root: Path) -> Scan:
         return scan
     for path in _walk_files(static, GATE_B_SUFFIXES):
         rel = _rel(path, root)
+        if rel in GATE_B_SKIP_FILES:
+            continue
         for lineno, raw in enumerate(
             path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
         ):
