@@ -36,6 +36,7 @@ class DatabaseEnvironment:
     source: str
     process_environment: Mapping[str, str]
     persistence: str = "mongo"
+    sqlite_path: str | None = None
 
 
 def resolve_runtime_db_access(
@@ -84,6 +85,11 @@ def _resolve_persistence(pristine: Mapping[str, str]) -> str:
             "GOB_PERSISTENCE must be 'mongo' or 'sqlite'"
         )
     return raw
+
+
+def _resolve_sqlite_path(pristine: Mapping[str, str]) -> str | None:
+    raw = str(pristine.get("GOB_SQLITE_PATH") or "").strip()
+    return raw or None
 
 
 def _load_local_values(repo_root: Path) -> dict[str, str]:
@@ -146,6 +152,7 @@ def resolve_database_environment(
             source="explicit-mongomock",
             process_environment=pristine,
             persistence=_resolve_persistence(pristine),
+            sqlite_path=_resolve_sqlite_path(pristine),
         )
 
     if _is_railway(pristine):
@@ -201,4 +208,5 @@ def resolve_database_environment(
         source=source,
         process_environment=pristine,
         persistence=_resolve_persistence(pristine),
+        sqlite_path=_resolve_sqlite_path(pristine),
     )

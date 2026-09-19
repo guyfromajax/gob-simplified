@@ -25,12 +25,11 @@ _STORE_LOCK = threading.Lock()
 
 
 def create_store(db_env) -> PersistenceStore:
-    """Build a store for ``db_env.persistence``. SQLite is not implemented yet."""
+    """Build a store for ``db_env.persistence``."""
     backend = getattr(db_env, "persistence", None) or "mongo"
     if backend == "sqlite":
-        raise EnvironmentConfigurationError(
-            "SQLite persistence is not implemented yet"
-        )
+        from BackEnd.persistence.sqlite import SqliteStore
+        return SqliteStore(db_env)
     if backend != "mongo":
         raise EnvironmentConfigurationError(
             f"Unknown persistence backend {backend!r}"

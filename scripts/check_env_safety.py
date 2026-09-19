@@ -29,6 +29,8 @@ RULE_EXCEPTIONS: dict[str, frozenset[str]] = {
             "BackEnd/db.py",
             "BackEnd/script_db.py",
             "BackEnd/persistence/mongo.py",
+            # In-memory mongomock only: remote collections never enter the save file.
+            "BackEnd/persistence/sqlite.py",
         }
     ),
     # These boundaries inspect and reject file-supplied authorization; they never
