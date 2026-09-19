@@ -7,7 +7,7 @@
 - [`gob-asset-architecture.md`](./gob-asset-architecture.md) — asset storage and delivery rules. WS-7 and WS-8 are this document's desktop consequences.
 - [`tournament_id_sunset.md`](./tournament_id_sunset.md) — sequenced as WS-0 below.
 
-**Last updated:** 14 September 2026 — full revision against `develop` @ `801aa5f`. Supersedes the August draft.
+**Last updated:** 19 September 2026 — local-finalize write path decided; pytest `--maxfail` removed. Base revision 14 September 2026 against `develop` @ `801aa5f`. Supersedes the August draft.
 **Spike of record:** [`nuitka_spike_findings.md`](./nuitka_spike_findings.md) — 17 Sept 2026, both compile questions PASS (`42f1bb0`).
 **Audit of record:** [`desktop_migration_plan_audit.md`](./desktop_migration_plan_audit.md) — the code-grounded evidence behind this revision. Every count cited here comes from that audit.
 
@@ -57,6 +57,8 @@ This is the single rule from which everything else in §1 follows.
 - The exported save carries a **flag marking it as an offline copy**, surfaced in the UI, so a user two years on is not confused about why this franchise cannot join a league.
 
 **What this costs today: one sentence in WS-1.** Franchise-scoped read and write must be a first-class operation on the adapter interface, not something reached through. A franchise is already a bounded document set keyed on `franchise_id`, so this is free to specify now and annoying to retrofit later. It preserves the option at zero price and commits to nothing.
+
+**Local finalize writes nothing to the account.** On a local franchise, `commit_user_game_record` and `community_highlights._push_entries` write nothing. That is correct by design: a local franchise is not leaderboard-eligible (§1.1) and local bytes never become hosted (§1.2), so career record and the community feed are hosted-account concerns. The local SQLite file already holds the game. Today the mechanism is raise-and-swallow (`RemoteUnavailable` on the SQLite remotes, then the callers catch `Exception` and log). A WS-5b cleanup should skip those calls when `runtime='local'` instead of raising and ignoring.
 
 ### 1.3 Subscription and community packaging
 
@@ -138,6 +140,8 @@ Stated plainly, because the August draft's calendar assumed progress that did no
 1. **`API_CONFIG` adoption is near-total** — 99 files route through it, only 2 hardcode a URL (`adminGuard.js`, `sentryInit.js`, both server-only concerns excluded from the desktop profile anyway). The routing seam is a days-not-weeks task.
 2. **`entitlements.py` already exists** as the capability choke point, with the vocabulary §1.3 needs already defined.
 3. **The validation tooling for every gate below already exists** — 337 Python test files, 28 Playwright specs, `scripts/season_advance_harness.py`, `scripts/perf_sim_baseline.py`. This is the strongest argument that WS-1 is genuinely low-risk rather than merely large.
+
+**Pytest baseline (19 Sept 2026, `c5c5c5a78`).** `pytest.ini` carried `--maxfail=2`, which meant the suite reported "2 failed" regardless of true state and hid 124 reds. That cap is removed. Current baseline: **2704 passed, 6 failed, 20 skipped, 111 xfailed.** The 6 are UESS seam guards with suite-order logging pollution, left visible. The 111 are tracked in `tests/known_failures.py` and `_documentation_master/projects/bugs.md`. WS-2's pytest gate must not put `--maxfail` back.
 
 **One thing is worse:** the asset payload and the portrait pipeline (WS-7, WS-8) are launch blockers that the August draft did not contain at all.
 
