@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 function playSound(filename) {
   try {
     var a = new Audio('/sounds/' + encodeURIComponent(filename));
@@ -1126,7 +1147,7 @@ function formatCpuSimProgress(cpuSimResume, franchiseData) {
 
 function buildActiveGameCourtUrl(franchiseData, resume) {
   if (!franchiseData || !franchiseData.franchise_id || !resume || !resume.game_id) return null;
-  const params = new URLSearchParams();
+  const params = emptyParams();
   params.set('mode', 'franchise');
   params.set('active_resume', 'true');
   params.set('franchise_id', franchiseData.franchise_id);
@@ -1412,7 +1433,7 @@ function goToFranchiseCommandCenter(franchiseId) {
       return;
     }
     if (runtime.cpuSimResume) {
-      const params = new URLSearchParams();
+      const params = emptyParams();
       params.set('franchise_id', franchiseData.franchise_id);
       params.set('finish_cpu_sims', '1');
       if (runtime.cpuSimResume.week) params.set('week', String(runtime.cpuSimResume.week));

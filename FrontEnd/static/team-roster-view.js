@@ -1,7 +1,28 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 // Team Roster View - Displays any team's roster with attributes and season stats
 // Supports Franchise and practice-squad contexts
 
-const urlParams = new URLSearchParams(window.location.search);
+const urlParams = liveParams();
 const mode = urlParams.get('mode'); // 'franchise' or 'practice_squad'
 const teamId = urlParams.get('team_id'); // Team ObjectId or name
 const teamName = urlParams.get('team_name'); // Team display name
@@ -85,11 +106,11 @@ function resolveRosterReturnUrl() {
 }
 
 function buildPlayerDetailUrl(playerId) {
-  const qs = new URLSearchParams();
+  const qs = emptyParams();
   qs.set('id', playerId);
   if (mode) qs.set('mode', mode);
   if (franchiseId) qs.set('franchise_id', franchiseId);
-  qs.set('return_url', window.location.pathname + window.location.search);
+  qs.set('return_url', window.location.pathname + currentSearch());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -203,7 +224,7 @@ async function loadRoster() {
     
     const rosterLookup = (mode === 'franchise' && teamId) ? teamId : (teamName || teamId);
     let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(rosterLookup)}`);
-    const params = new URLSearchParams();
+    const params = emptyParams();
     
     if (mode === 'franchise' && franchiseId) {
       params.append('franchise_id', franchiseId);

@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function () {
   const ATTRIBUTE_LAYOUT = [
     ['SC', 'ID', 'PS', 'RB', 'AG', 'IQ'],
@@ -210,7 +231,7 @@
   }
 
   function goBack() {
-    const params = new URLSearchParams(window.location.search);
+    const params = liveParams();
     // Same-origin guard: return_url is attacker-controllable via the query string.
     const returnUrl = typeof getSafeReturnUrl === 'function'
       ? getSafeReturnUrl(params.get('return_url'))
@@ -392,7 +413,7 @@
     const img = document.getElementById('pd-player-portrait');
     if (!img) return;
     const api = window.API_CONFIG;
-    const franchiseId = new URLSearchParams(window.location.search).get('franchise_id');
+    const franchiseId = liveParams().get('franchise_id');
     const url = api.getPlayerImageUrl(playerId, { size: 'modal' });
     const generic = api.getGenericHeadshotUrl({ size: 'modal' });
     img.onerror = () => {
@@ -632,7 +653,7 @@
   }
 
   async function loadPlayerData() {
-    const params = new URLSearchParams(window.location.search);
+    const params = liveParams();
     const playerId = params.get('id');
     const recruitId = params.get('recruit_id');
     const mode = params.get('mode');
@@ -651,7 +672,7 @@
     }
 
     try {
-      const qs = new URLSearchParams();
+      const qs = emptyParams();
       if (mode) qs.set('mode', mode);
       if (franchiseId) qs.set('franchise_id', franchiseId);
       if (gameId) qs.set('game_id', gameId);

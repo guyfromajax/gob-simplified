@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 // Training Report Page JavaScript
 
 function playSound(filename) {
@@ -9,7 +30,7 @@ function playSound(filename) {
   } catch (e) {}
 }
 
-const urlParams = new URLSearchParams(window.location.search);
+const urlParams = liveParams();
 const mode = urlParams.get('mode');
 const franchiseId = urlParams.get('franchise_id');
 const teamId = urlParams.get('team_id');
@@ -426,10 +447,9 @@ function setupLockerRoomButton() {
 
 async function loadTrainingReport() {
   try {
-    const params = new URLSearchParams({
-      mode: mode,
-      team_id: teamId
-    });
+    const params = emptyParams();
+    params.set('mode', mode);
+    params.set('team_id', teamId);
     
     if (franchiseId) {
       params.set('franchise_id', franchiseId);

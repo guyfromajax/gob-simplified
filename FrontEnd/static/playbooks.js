@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function () {
   const MOTION_FOCUS_OPTIONS = [
     { value: "balanced", label: "Balanced" },
@@ -184,7 +205,7 @@
   }
 
   function buildPlayDetailsUrl(context, play) {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set("mode", context.mode);
     params.set("team_id", context.teamId);
     if (context.franchiseId) params.set("franchise_id", context.franchiseId);
@@ -205,7 +226,7 @@
   }
 
   function buildPlaybookReportUrl(context) {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set("mode", context.mode);
     params.set("team_id", context.teamId);
     if (context.franchiseId) params.set("franchise_id", context.franchiseId);
@@ -262,7 +283,7 @@
 
   class PlaybooksPage {
     constructor() {
-      this.params = new URLSearchParams(window.location.search);
+      this.params = liveParams();
       this.context = {
         params: this.params,
         mode: this.params.get("mode") || "single",
@@ -497,7 +518,7 @@
     }
 
     async loadData() {
-      const params = new URLSearchParams();
+      const params = emptyParams();
       params.set("mode", this.context.mode);
       params.set("team_id", this.context.teamId);
       if (this.context.franchiseId) params.set("franchise_id", this.context.franchiseId);

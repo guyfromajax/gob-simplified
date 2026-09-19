@@ -1,7 +1,28 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function () {
   'use strict';
 
-  var params = new URLSearchParams(window.location.search);
+  var params = liveParams();
   var franchiseId = params.get('franchise_id');
   var teamId = params.get('team_id');
   var storyId = params.get('story');
@@ -28,7 +49,7 @@
   }
 
   function baseQuery() {
-    var q = new URLSearchParams();
+    var q = emptyParams();
     if (franchiseId) q.set('franchise_id', franchiseId);
     if (teamId) q.set('team_id', teamId);
     return q;

@@ -1,5 +1,26 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function () {
-  const params = new URLSearchParams(window.location.search);
+  const params = liveParams();
   const franchiseId = params.get('franchise_id');
   const teamId = params.get('team_id');
   const root = document.getElementById('all-brackets-root');
@@ -8,13 +29,13 @@
 
   function resourceQuery() {
     if (!franchiseId || !teamId) return '';
-    const p = new URLSearchParams();
+    const p = emptyParams();
     p.set('franchise_id', franchiseId);
     p.set('team_id', teamId);
     if (typeof getCurrentRelativeUrl === 'function') {
       p.set('return_url', getCurrentRelativeUrl());
     } else {
-      p.set('return_url', window.location.pathname + window.location.search);
+      p.set('return_url', window.location.pathname + currentSearch());
     }
     return `?${p.toString()}`;
   }
