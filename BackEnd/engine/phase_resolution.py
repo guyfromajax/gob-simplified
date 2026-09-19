@@ -820,6 +820,59 @@ def _foul_on_ball_weight_enabled() -> bool:
     return os.environ.get("GOB_FOUL_ON_BALL_WEIGHT", "1") == "1"
 
 
+def _lineup_position_lookup_enabled() -> bool:
+    """``GOB_LINEUP_POSITION_LOOKUP`` - **default ON**.
+
+    ON resolves a player's lineup slot by identity lookup in the lineup dict that owns
+    them. OFF reproduces the legacy reads exactly: ``getattr(player, 'position', None)``
+    falling back to a hard-coded constant.
+
+    ``Player`` has no ``position`` attribute and nothing in the backend ever assigns one,
+    so every legacy read returned ``None`` and every site took its constant unconditionally.
+    See ``_resolve_lineup_position`` for why no site falls back to a constant when ON.
+    """
+    import os
+    return os.environ.get("GOB_LINEUP_POSITION_LOOKUP", "1") == "1"
+
+
+# One warning per (game, site). Bounded so a long-lived process cannot grow it without limit.
+_POS_LOOKUP_WARNED: "dict[str, set]" = {}
+_POS_LOOKUP_WARNED_MAX_GAMES = 8
+
+
+def _warn_position_unresolved(site: str, player, game) -> None:
+    key = str(getattr(game, "game_id", None) or id(getattr(game, "game_state", None)))
+    seen = _POS_LOOKUP_WARNED.get(key)
+    if seen is None:
+        if len(_POS_LOOKUP_WARNED) >= _POS_LOOKUP_WARNED_MAX_GAMES:
+            _POS_LOOKUP_WARNED.pop(next(iter(_POS_LOOKUP_WARNED)), None)
+        seen = _POS_LOOKUP_WARNED[key] = set()
+    if site in seen:
+        return
+    seen.add(site)
+    logging.warning(
+        "[POS LOOKUP] %s: player %s is not in the lineup dict; leaving the position "
+        "unresolved rather than guessing a constant",
+        site, getattr(player, "player_id", None),
+    )
+
+
+def _resolve_lineup_position(player, lineup, site, legacy_constant, game):
+    """The lineup slot ``player`` occupies in ``lineup``, by identity.
+
+    Returns ``None`` when the player is not in the lineup. That is deliberate: every
+    caller already guards on a falsy position, and a wrong constant is worse than no
+    position - it silently credits the wrong player. The kill switch
+    ``GOB_LINEUP_POSITION_LOOKUP=0`` restores the constant.
+    """
+    if not _lineup_position_lookup_enabled():
+        return getattr(player, "position", None) or legacy_constant
+    pos = next((p for p, q in (lineup or {}).items() if q is player), None)
+    if pos is None:
+        _warn_position_unresolved(site, player, game)
+    return pos
+
+
 def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, roles=None):
     """
     Select which player committed the foul based on probabilistic logic.
@@ -9087,7 +9140,8 @@ def resolve_half_court_offense_logic(game):
             ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
             roles["ball_handler"] = ball_handler
         
-        ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+        ball_handler_pos = _resolve_lineup_position(
+            ball_handler, off_lineup, "HCO:non-shot ball handler", "PG", game)
         
         # Dynamic HCO: the per-step moment stashed the ACTUAL contesting defender (the man matchup
         # OR the resolved zone defender). PREFER it — override the defender-override block's
@@ -10077,7 +10131,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
             if not shooter:
                 ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
                 shooter = ball_handler
-                shooter_pos = getattr(ball_handler, 'position', None) or "PG"
+                shooter_pos = _resolve_lineup_position(
+                    ball_handler, off_lineup, "FCP:shot fallback shooter", "PG", game)
             
             # Find passer using derive_passer_from_steps (same logic as HCO)
             if shooter_pos:
@@ -10088,10 +10143,12 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Fallback: use hardcoded values if skeleton doesn't have shooter/passer
         if not shooter:
             shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
-            shooter_pos = getattr(shooter, 'position', None) or "PF"
+            shooter_pos = _resolve_lineup_position(
+                shooter, off_lineup, "FCP:hardcoded shooter", "PF", game)
         if not passer:
             passer = off_lineup.get("PG", list(off_lineup.values())[0])
-            passer_pos = getattr(passer, 'position', None) or "PG"
+            passer_pos = _resolve_lineup_position(
+                passer, off_lineup, "FCP:hardcoded passer", "PG", game)
         
         # ✅ Find shooter's coordinates at the time of the shot
         shooter_coords = None
@@ -10247,7 +10304,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     # ✅ Determine ball handler from skeleton (who actually has the ball)
     ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
-    ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+    ball_handler_pos = _resolve_lineup_position(
+        ball_handler, off_lineup, "FCP:non-shot ball handler", "PG", game)
     
     # ✅ Determine defender based on ball handler position (position matching for now)
     _fb = defender_player_from_random_slot_fallback(def_lineup)
@@ -12221,7 +12279,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             if not shooter:
                 ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
                 shooter = ball_handler
-                shooter_pos = getattr(ball_handler, 'position', None) or "PG"
+                shooter_pos = _resolve_lineup_position(
+                    ball_handler, off_lineup, "HCT:shot fallback shooter", "PG", game)
             
             # Find passer using derive_passer_from_steps (same logic as HCO)
             if shooter_pos:
@@ -12232,10 +12291,12 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Fallback: use hardcoded values if skeleton doesn't have shooter/passer
         if not shooter:
             shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
-            shooter_pos = getattr(shooter, 'position', None) or "PF"
+            shooter_pos = _resolve_lineup_position(
+                shooter, off_lineup, "HCT:hardcoded shooter", "PF", game)
         if not passer:
             passer = off_lineup.get("PG", list(off_lineup.values())[0])
-            passer_pos = getattr(passer, 'position', None) or "PG"
+            passer_pos = _resolve_lineup_position(
+                passer, off_lineup, "HCT:hardcoded passer", "PG", game)
         
         # ✅ Find shooter's coordinates at the time of the shot
         shooter_coords = None
@@ -12384,7 +12445,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     # ✅ Determine ball handler from skeleton (who actually has the ball)
     ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
-    ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+    ball_handler_pos = _resolve_lineup_position(
+        ball_handler, off_lineup, "HCT:non-shot ball handler", "PG", game)
     
     # ✅ Determine defender based on ball handler position (position matching for now)
     _fb = defender_player_from_random_slot_fallback(def_lineup)
