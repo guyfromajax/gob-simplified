@@ -472,24 +472,27 @@ try:
     limiter = None
     SIM_RATE_LIMIT = "30/minute"
     SIM_TURN_RATE_LIMIT = "300/minute"
-    try:
-        from slowapi.errors import RateLimitExceeded
-        from BackEnd.utils.rate_limiter import (
-            limiter as _limiter,
-            rate_limit_exceeded_handler,
-            SIM_RATE_LIMIT as _SIM_RATE_LIMIT,
-            SIM_TURN_RATE_LIMIT as _SIM_TURN_RATE_LIMIT,
-        )
-        limiter = _limiter
-        SIM_RATE_LIMIT = _SIM_RATE_LIMIT
-        SIM_TURN_RATE_LIMIT = _SIM_TURN_RATE_LIMIT
-        app.state.limiter = limiter
-        app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-        print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
-    except Exception as e:
-        print(f"⚠️ [RATE LIMIT] Failed to enable rate limiting: {e}", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+    if is_loopback():
+        print("🖥️ [LOOPBACK] rate limiting omitted", file=sys.stderr, flush=True)
+    else:
+        try:
+            from slowapi.errors import RateLimitExceeded
+            from BackEnd.utils.rate_limiter import (
+                limiter as _limiter,
+                rate_limit_exceeded_handler,
+                SIM_RATE_LIMIT as _SIM_RATE_LIMIT,
+                SIM_TURN_RATE_LIMIT as _SIM_TURN_RATE_LIMIT,
+            )
+            limiter = _limiter
+            SIM_RATE_LIMIT = _SIM_RATE_LIMIT
+            SIM_TURN_RATE_LIMIT = _SIM_TURN_RATE_LIMIT
+            app.state.limiter = limiter
+            app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+            print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
+        except Exception as e:
+            print(f"⚠️ [RATE LIMIT] Failed to enable rate limiting: {e}", file=sys.stderr, flush=True)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
     
     def _no_limit(f):
         """No-op when rate limiter is disabled."""

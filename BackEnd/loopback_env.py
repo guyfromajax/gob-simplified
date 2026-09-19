@@ -30,12 +30,14 @@ def apply_loopback_env() -> None:
     refuse (not mongomock). MONGO_* satisfies env_config only — local collections
     live in the SQLite file.
     """
-    os.environ.setdefault("GOB_LOOPBACK", "1")
-    os.environ.setdefault("GOB_BUILD_PROFILE", "desktop")
-    os.environ.setdefault("GOB_PERSISTENCE", "sqlite")
-    os.environ.setdefault("ENVIRONMENT", "development")
+    os.environ["GOB_LOOPBACK"] = "1"
+    os.environ["GOB_BUILD_PROFILE"] = "desktop"
+    os.environ["GOB_PERSISTENCE"] = "sqlite"
+    os.environ["ENVIRONMENT"] = "development"
     os.environ.setdefault("GOB_SQLITE_PATH", str(default_sqlite_path()))
-    os.environ.setdefault("MONGO_URI", "mongodb://127.0.0.1:27017/gob-staging")
-    os.environ.setdefault("MONGO_DB_NAME", "gob-staging")
+    # Placeholders for env_config only — force a matching pair so a leftover
+    # test/web export cannot leave URI=staging and NAME=test for spawn children.
+    os.environ["MONGO_URI"] = "mongodb://127.0.0.1:27017/gob-staging"
+    os.environ["MONGO_DB_NAME"] = "gob-staging"
     os.environ.pop("SENTRY_DSN", None)
     os.environ.pop("GOB_DB_MODE", None)

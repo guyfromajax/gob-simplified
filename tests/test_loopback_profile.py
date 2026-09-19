@@ -1,4 +1,5 @@
 import importlib
+import os
 
 import pytest
 from fastapi import Depends, FastAPI
@@ -77,3 +78,27 @@ def test_is_loopback_reads_profile(monkeypatch):
     monkeypatch.delenv("GOB_LOOPBACK", raising=False)
     monkeypatch.setenv("GOB_BUILD_PROFILE", "desktop")
     assert is_loopback() is True
+
+
+def test_prove_pool_cli_exits_clean():
+    """In-process spawn inherits pytest's MONGO_* and dies. Drive the CLI instead."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    env = os.environ.copy()
+    env.pop("MONGO_URI", None)
+    env.pop("MONGO_DB_NAME", None)
+    env.pop("ENVIRONMENT", None)
+    env["GOB_LOOPBACK"] = "1"
+    root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "-m", "BackEnd.loopback", "--prove-pool"],
+        cwd=root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "STATUS=OK" in result.stdout
