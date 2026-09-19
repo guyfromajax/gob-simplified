@@ -41,7 +41,9 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from BackEnd.db import users_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+users_collection = _store.users_collection
 
 
 # JWT Configuration

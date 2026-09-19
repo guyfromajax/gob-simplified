@@ -20,11 +20,14 @@ import re
 from typing import Optional
 from bson import ObjectId
 
+from BackEnd.persistence import get_store
+_store = get_store()
+teams_collection = _store.teams_collection
+
 logger = logging.getLogger(__name__)
 
 # Try to import database collections (optional, for database lookups)
 try:
-    from BackEnd.db import teams_collection
     HAS_DB = True
 except ImportError:
     HAS_DB = False

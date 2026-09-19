@@ -22,6 +22,12 @@ from BackEnd.utils.transition_registry import TurnType
 import logging
 import uuid
 
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+games_collection = _store.games_collection
+
+
 
 class GameManager:
     _POST_MAKE_BIP_CLOCK_RUN_THRESHOLD_SECONDS = 60
@@ -120,7 +126,6 @@ class GameManager:
                     )
 
         if bulk_operations:
-            from BackEnd.db import players_collection
             players_collection.bulk_write(bulk_operations, ordered=False)
     
     def setup_opening_tip(self):
@@ -1442,7 +1447,6 @@ class GameManager:
         if self.game_id:
             try:
                 from BackEnd.utils.shared import summarize_game_state
-                from BackEnd.db import games_collection
                 # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log before save (Hypothesis 2)
                 logging.debug(
                     "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout saving: game_id=%s, type=%s",

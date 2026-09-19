@@ -175,6 +175,8 @@ Split out of the old WS-5 because it is cheap, unblocks WS-2, and proves the loc
 - Implement the **SQLite adapter** (documents as JSON via JSON1; one DB file per local franchise).
 - **Gate 2:** SQLite adapter passes the same engine test suite.
 
+**Known Mongo artifact for the SQLite slice.** Today's `franchise_state` collection is a process-global singleton (`_id: "state"`), not a per-franchise document. `read_franchise` / `write_franchise` only include rows that carry `franchise_id`; they do not treat that singleton as part of a franchise bundle. The SQLite adapter must store franchise state **per save file**, not reproduce the global row. That is a deliberate divergence to resolve in the SQLite slice, not something to discover there.
+
 **Collection classification:**
 
 | Local (in the save file) | Remote only |

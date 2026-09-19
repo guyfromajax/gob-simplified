@@ -9,7 +9,9 @@ from typing import Any, Optional
 
 from pymongo import ReturnDocument
 
-from BackEnd.db import alpha_otps_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+alpha_otps_collection = _store.alpha_otps_collection
 
 
 def _otps(collection=None):

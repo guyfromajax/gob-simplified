@@ -14,6 +14,11 @@ from typing import Any, Dict, List, Tuple
 
 from BackEnd.constants import FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE
 
+from BackEnd.persistence import get_store
+_store = get_store()
+teams_collection = _store.teams_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+
 # --- Weight tables (source of truth: Home_Crowd_System.md) ---
 _CROWD_WEIGHTS_BY_BAND: List[List[int]] = [
     [30, 40, 15, 10, 5],  # Team Chemistry 7–10
@@ -82,7 +87,6 @@ def community_engagement_crowd_shift(user_ce: bool, cpu_ce: bool, user_is_home: 
 
 
 def _team_object_ids_for_names(home_team_name: str, away_team_name: str) -> Tuple[Any, Any]:
-    from BackEnd.db import teams_collection
 
     home_doc = teams_collection.find_one({"name": home_team_name}, {"_id": 1})
     away_doc = teams_collection.find_one({"name": away_team_name}, {"_id": 1})
@@ -95,7 +99,6 @@ def _team_object_id_from_ref(team_id: Any = None, team_name: str | None = None, 
     """Resolve ObjectId from explicit id, core name, or Team Builder overlay name."""
     from bson import ObjectId
 
-    from BackEnd.db import teams_collection
     from BackEnd.utils.franchise_geek_points import _resolve_to_object_id_str
 
     if team_id is not None:
@@ -139,7 +142,6 @@ def consume_franchise_community_engagement_for_matchup(
         return "none"
     from bson import ObjectId
 
-    from BackEnd.db import franchise_team_data_collection
 
     try:
         fid_oid = ObjectId(str(franchise_id))

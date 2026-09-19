@@ -6,7 +6,10 @@ from typing import List, Dict, Any, Optional, Tuple
 
 from bson import ObjectId
 
-from BackEnd.db import teams_collection, players_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+teams_collection = _store.teams_collection
+players_collection = _store.players_collection
 from BackEnd.utils.roster_builder import build_roster_players, ATTR_KEYS as SCOUTING_CORE_ATTR_KEYS
 from BackEnd.utils.team_play_utils import iter_team_plays
 

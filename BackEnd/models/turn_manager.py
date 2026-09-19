@@ -8,7 +8,16 @@ from BackEnd.utils.team_attr_scale import core8_gameplay
 import json
 import logging
 import uuid
-from BackEnd.db import players_collection, teams_collection, plays_collection
+
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+teams_collection = _store.teams_collection
+plays_collection = _store.plays_collection
+games_collection = _store.games_collection
+tournaments_collection = _store.tournaments_collection
+franchises_collection = _store.franchises_collection
+
 from BackEnd.utils import plays_catalog
 from BackEnd.models.player import Player, player_to_dict
 
@@ -3100,7 +3109,6 @@ class TurnManager:
         is_offense_team = str(team_id) == str(getattr(offense_team, "team_id", None))
         is_defense_team = str(team_id) == str(getattr(defense_team, "team_id", None))
         logging.error(f"🔴🔴🔴 [DIAG] FALLING BACK TO DB - GameManager missing playbook_settings! offense_team={is_offense_team}, defense_team={is_defense_team}")
-        from BackEnd.db import games_collection, tournaments_collection, franchises_collection
         from bson import ObjectId
         
         # Get game document
@@ -3581,7 +3589,6 @@ class TurnManager:
         from BackEnd.utils.sim_random import sim_rng as random
         
         # Implement EV calculation
-        from BackEnd.db import plays_collection
         from BackEnd.engine.phase_resolution import get_hco_skeleton
         from BackEnd.utils.shared_defense import (
             _get_23_zone_boundaries,

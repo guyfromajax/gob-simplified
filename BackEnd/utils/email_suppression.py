@@ -13,6 +13,10 @@ import hmac
 import os
 from datetime import datetime, timedelta, timezone
 
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+
 try:
     from BackEnd.utils.auth import JWT_SECRET_KEY as _JWT_SECRET_KEY
 except Exception:  # pragma: no cover - auth import is always available in app context
@@ -25,7 +29,6 @@ UNSUBSCRIBE_LINK_BASE_URL = os.getenv(
 def _database(db_override=None):
     if db_override is not None:
         return db_override
-    from BackEnd.db import db
 
     return db
 

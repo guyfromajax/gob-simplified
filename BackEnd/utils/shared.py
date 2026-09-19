@@ -32,6 +32,10 @@ from BackEnd.constants import (
     CONTEST_EUCLIDEAN_RADIUS,
 )
 
+from BackEnd.persistence import get_store
+_store = get_store()
+games_collection = _store.games_collection
+
 # Legacy pace-rate fallbacks (Phase 4d). Used only when a caller doesn't
 # provide AG context (player= or off_lineup=) — preserves pre-Phase-4 timing
 # at unmigrated call sites. Once all callers route through the AG-driven
@@ -2735,7 +2739,6 @@ def summarize_game_state(
     # This ensures settings are available in both frontend response AND DB save
     if hasattr(game, 'game_id') and game.game_id:
         try:
-            from BackEnd.db import games_collection
             from bson import ObjectId
             from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical
             

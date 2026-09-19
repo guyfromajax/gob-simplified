@@ -2,7 +2,13 @@ import os
 import random
 import json
 import logging
-from BackEnd.db import players_collection, teams_collection, games_collection
+
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+teams_collection = _store.teams_collection
+games_collection = _store.games_collection
+
 from BackEnd.utils.db_utils import build_lineup_from_mongo, assign_lineup_from_ids
 from BackEnd.models.player import Player
 from BackEnd.models.game_manager import GameManager
@@ -635,7 +641,6 @@ def simulate_quarter(
             # This prevents stale timeout state from affecting future games
             if game_id:
                 try:
-                    from BackEnd.db import games_collection
                     
                     unset_fields = {
                         "timeout_next_play_type": "",

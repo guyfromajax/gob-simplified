@@ -14,6 +14,10 @@ import re
 import threading
 from typing import Optional
 
+from BackEnd.persistence import get_store
+_store = get_store()
+teams_collection = _store.teams_collection
+
 _NAME_TO_TEAM_ID: dict[str, str] | None = None
 _NAME_TO_TEAM_ID_LOCK = threading.Lock()
 
@@ -49,7 +53,6 @@ def _load_name_to_team_id_map() -> dict[str, str]:
             return _NAME_TO_TEAM_ID
         mapping: dict[str, str] = {}
         try:
-            from BackEnd.db import teams_collection
 
             for doc in teams_collection.find({}, {"name": 1, "team_id": 1}):
                 name = doc.get("name")

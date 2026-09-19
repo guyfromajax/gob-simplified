@@ -11,7 +11,10 @@ from typing import Any
 
 from bson import ObjectId
 
-from BackEnd.db import db, users_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+users_collection = _store.users_collection
 from BackEnd.tournament import franchise_tournament as ft
 
 logger = logging.getLogger(__name__)

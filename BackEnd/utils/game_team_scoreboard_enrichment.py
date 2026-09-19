@@ -14,6 +14,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from BackEnd.persistence import get_store
+_store = get_store()
+franchise_team_data_collection = _store.franchise_team_data_collection
+franchises_collection = _store.franchises_collection
+teams_collection = _store.teams_collection
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +51,6 @@ def resolve_mongo_team_id_string(raw: Any, teams_obj: dict[str, Any] | None = No
             return None
         t = str(q).strip()
         try:
-            from BackEnd.db import teams_collection
 
             doc = teams_collection.find_one(
                 {"$or": [{"name": t}, {"team_id": t}, {"code": t}]},
@@ -117,7 +122,6 @@ def enrich_franchise_teams_scoreboard_meta(
     from bson import ObjectId
     from bson.errors import InvalidId
 
-    from BackEnd.db import franchise_team_data_collection, franchises_collection
     from BackEnd.utils.franchise_standings import calculate_franchise_standings
 
     try:

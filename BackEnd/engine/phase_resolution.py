@@ -1180,6 +1180,15 @@ from BackEnd.constants.fast_break_constants import (
     STEAL_HCO_SETUP_OTHER_PLAYERS_Y_MAX,
 )
 
+from BackEnd.persistence import get_store
+_store = get_store()
+fcp_skeletons_collection = _store.fcp_skeletons_collection
+hct_skeletons_collection = _store.hct_skeletons_collection
+games_collection = _store.games_collection
+tournaments_collection = _store.tournaments_collection
+franchises_collection = _store.franchises_collection
+
+
 def _record_fast_break_stats(fb_roles, turn_result, game):
     """
     Record Fast Break statistics for release player (offensive) and get-back players (defensive).
@@ -10527,7 +10536,6 @@ def get_fcp_skeleton(result_type, game_context=None):
             return None
     
     from BackEnd.utils.sim_random import sim_rng as random
-    from BackEnd.db import fcp_skeletons_collection
     
     # Map result_type to variant name
     # All non-shot results use "base" variant (has step 0 with press break positions)
@@ -10628,7 +10636,6 @@ def get_hct_skeleton(result_type, game_context=None):
             return None
     
     from BackEnd.utils.sim_random import sim_rng as random
-    from BackEnd.db import hct_skeletons_collection
     
     # Map result_type to variant name
     # All non-shot results use "base" variant (has step 0 with trap break positions)
@@ -10830,7 +10837,6 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
     if not game_context or not playcall or not isinstance(playcall, str):
         return playcall
 
-    from BackEnd.db import games_collection
     from BackEnd.utils import plays_catalog
     from BackEnd.utils.team_play_utils import resolve_team_play
 
@@ -10907,7 +10913,6 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
     Returns:
         dict: Selected skeleton with steps
     """
-    from BackEnd.db import games_collection, tournaments_collection, franchises_collection
 
     if game_context:
         _sync_current_playcall_to_canonical_name(game_context)
@@ -11028,7 +11033,6 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
     Returns:
         dict: Selected skeleton, or None if not found
     """
-    from BackEnd.db import games_collection, tournaments_collection, franchises_collection
     from bson import ObjectId
     from BackEnd.utils.team_play_utils import resolve_team_play
     

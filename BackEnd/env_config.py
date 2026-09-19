@@ -17,7 +17,8 @@ from dotenv import dotenv_values
 
 
 ALLOWED_ENVIRONMENTS = frozenset({"development", "test", "staging", "production"})
-PROTECTED_DOTENV_KEYS = frozenset({"GOB_DB_ACCESS", "GOB_DB_MODE"})
+ALLOWED_PERSISTENCE = frozenset({"mongo", "sqlite"})
+PROTECTED_DOTENV_KEYS = frozenset({"GOB_DB_ACCESS", "GOB_DB_MODE", "GOB_PERSISTENCE"})
 REAL_DB_CONFIG_KEYS = frozenset({"MONGO_URI", "MONGO_DB_NAME"})
 PRODUCTION_DB_NAMES = frozenset({"gob"})
 
@@ -34,6 +35,7 @@ class DatabaseEnvironment:
     mongo_uri: str | None
     source: str
     process_environment: Mapping[str, str]
+    persistence: str = "mongo"
 
 
 def resolve_runtime_db_access(
@@ -73,6 +75,15 @@ def database_name_from_uri(uri: str) -> str:
 
 def _is_railway(pristine: Mapping[str, str]) -> bool:
     return any(key.startswith("RAILWAY_") for key in pristine)
+
+
+def _resolve_persistence(pristine: Mapping[str, str]) -> str:
+    raw = str(pristine.get("GOB_PERSISTENCE") or "mongo").strip().lower()
+    if raw not in ALLOWED_PERSISTENCE:
+        raise EnvironmentConfigurationError(
+            "GOB_PERSISTENCE must be 'mongo' or 'sqlite'"
+        )
+    return raw
 
 
 def _load_local_values(repo_root: Path) -> dict[str, str]:
@@ -134,6 +145,7 @@ def resolve_database_environment(
             mongo_uri=None,
             source="explicit-mongomock",
             process_environment=pristine,
+            persistence=_resolve_persistence(pristine),
         )
 
     if _is_railway(pristine):
@@ -188,4 +200,5 @@ def resolve_database_environment(
         mongo_uri=uri,
         source=source,
         process_environment=pristine,
+        persistence=_resolve_persistence(pristine),
     )

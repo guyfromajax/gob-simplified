@@ -124,16 +124,28 @@ try:
     from BackEnd.main import run_simulation, simulate_quarter
     from BackEnd.models.game_manager import GameManager
     # ✅ PERFORMANCE: Removed debug print statements
-    from BackEnd.db import (
-        players_collection,
-        teams_collection,
-        games_collection,
-        tournaments_collection,
-        franchises_collection,
-        franchise_players_data_collection,
-        franchise_team_data_collection,
-        franchise_recruits_data_collection,
-    )
+    from BackEnd.persistence import get_store
+    _store = get_store()
+    players_collection = _store.players_collection
+    teams_collection = _store.teams_collection
+    games_collection = _store.games_collection
+    tournaments_collection = _store.tournaments_collection
+    franchises_collection = _store.franchises_collection
+    franchise_players_data_collection = _store.franchise_players_data_collection
+    franchise_team_data_collection = _store.franchise_team_data_collection
+    franchise_recruits_data_collection = _store.franchise_recruits_data_collection
+    ensure_users_username_index = _store.ensure_users_username_index
+    ensure_alpha_access_requests_email_index = _store.ensure_alpha_access_requests_email_index
+    ensure_ftd_index = _store.ensure_ftd_index
+    ensure_fpd_index = _store.ensure_fpd_index
+    ensure_frd_index = _store.ensure_frd_index
+    ensure_games_franchise_index = _store.ensure_games_franchise_index
+    ensure_franchises_user_id_index = _store.ensure_franchises_user_id_index
+    ensure_eog_band_log_index = _store.ensure_eog_band_log_index
+    ensure_tutorial_game_ttl_index = _store.ensure_tutorial_game_ttl_index
+    client = _store.client
+    DB_NAME = _store.DB_NAME
+    TUTORIAL_GAME_TTL_DAYS = _store.TUTORIAL_GAME_TTL_DAYS
     from BackEnd.utils.roster_loader import load_roster
     from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
     from BackEnd.utils.game_summary_builder import build_game_summary
@@ -654,17 +666,6 @@ try:
 
         # Ensure indexes exist (idempotent; safe on every deploy)
         try:
-            from BackEnd.db import (
-                ensure_users_username_index,
-                ensure_alpha_access_requests_email_index,
-                ensure_ftd_index,
-                ensure_fpd_index,
-                ensure_frd_index,
-                ensure_games_franchise_index,
-                ensure_franchises_user_id_index,
-                ensure_eog_band_log_index,
-                ensure_tutorial_game_ttl_index,
-            )
             ensure_users_username_index()
             ensure_alpha_access_requests_email_index()
             ensure_ftd_index()
@@ -684,7 +685,7 @@ try:
         # Check MongoDB connection status (non-blocking, don't crash if it fails)
         # MongoDB connections are lazy - this just verifies the client exists
         try:
-            from BackEnd.db import client, DB_NAME
+            _ = (client, DB_NAME)
             # ✅ PERFORMANCE: Removed verbose startup debug prints
             
             # NOTE: We don't test actual DB connection here to avoid blocking startup
@@ -814,7 +815,6 @@ try:
     # Helper functions for tournament/franchise mode
     def load_player_attributes_from_doc(mode: str, doc_id: str, player_id: str):
         """Load player attributes (EM, CH, MO) from tournament/franchise doc."""
-        from BackEnd.db import franchises_collection
         
         if mode == "tournament":
             try:
@@ -851,7 +851,6 @@ try:
     
     def load_plays_from_doc(mode: str, doc_id: str, team_id: str):
         """Load plays data from tournament/franchise doc."""
-        from BackEnd.db import franchises_collection
         
         if mode == "tournament":
             try:
@@ -882,7 +881,6 @@ try:
     
     def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_name: str):
         """Load team_attributes from tournament/franchise doc, fallback to core teams doc."""
-        from BackEnd.db import franchises_collection
         
         # Resolve team_id from team_name if not provided
         if not team_id and team_name:
@@ -910,7 +908,6 @@ try:
         elif mode == "franchise":
             try:
                 # ✅ FTD: Load team_attributes from franchise_team_data collection instead of franchise doc
-                from BackEnd.db import franchise_team_data_collection
                 # (module-level ObjectId — a local import here shadowed it for the whole
                 # function, breaking the tournament lookup at L814)
                 
@@ -1004,7 +1001,6 @@ try:
             dict with keys: team_attributes, strategy_settings, playbook_settings, plays, scouting_data
             or None if not found
         """
-        from BackEnd.db import franchise_team_data_collection, teams_collection
         from bson import ObjectId
         
         try:
@@ -1094,7 +1090,6 @@ try:
         
         ✅ PHASE 5.7: For franchise/tournament mode, tries game doc first, then falls back to master doc.
         """
-        from BackEnd.db import franchises_collection
         from BackEnd.api.franchise_routes import get_user_team_from_franchise
         from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
         
@@ -1159,7 +1154,6 @@ try:
         # If settings not loaded from game doc, load from master doc (FTD for franchise, extract for tournament)
         if strategy_settings is None and playbook_settings is None:
             from BackEnd.utils.team_settings_manager import extract_team_settings
-            from BackEnd.db import franchise_team_data_collection
             
             if mode == "franchise":
                 # ✅ FTD: Load strategy_settings and playbook_settings from FTD
@@ -1273,7 +1267,6 @@ try:
     
     def load_game_from_nested_structure(mode: str, doc_id: str, game_id: str, round_key: str = None, week: int = None):
         """Load game data from tournament/franchise nested structure."""
-        from BackEnd.db import franchises_collection
         
         game_data = None
         
@@ -1300,7 +1293,6 @@ try:
     
     def save_game_to_nested_structure(mode: str, doc_id: str, game_id: str, game_data: dict, round_key: str = None, week: int = None):
         """Save game data to tournament/franchise nested structure."""
-        from BackEnd.db import franchises_collection
         
         if mode == "tournament":
             try:
@@ -1489,7 +1481,6 @@ try:
         Returns:
             dict: Consistent timeout response format with saved data from DB
         """
-        from BackEnd.db import games_collection
         
         # ✅ DIAGNOSTIC: Log GameManager state before saving during timeout
         debug_prefix = "USER" if timeout_reason == "USER" else "COMPUTER"
@@ -3097,7 +3088,6 @@ try:
         Reads the persisted saved doc first (the screen renders before resume
         applies state), falling back to live GameManager state.
         """
-        from BackEnd.db import games_collection
         from bson import ObjectId
 
         next_is_ft = False
@@ -3140,7 +3130,6 @@ try:
         Falls back to DB if game is not in memory.
         Returns format compatible with /api/playbooks for frontend consistency.
         """
-        from BackEnd.db import games_collection
         from bson import ObjectId
         
         # ✅ SS&S: GameManager is single source of truth during gameplay
@@ -6752,7 +6741,6 @@ try:
                     resolve_mongo_team_id_string,
                 )
                 from BackEnd.utils.franchise_standings import calculate_franchise_standings
-                from BackEnd.db import franchise_team_data_collection
 
                 fr = franchises_collection.find_one(
                     {"_id": ObjectId(franchise_id)},
@@ -7695,7 +7683,6 @@ try:
         elif mode == "tournament" and tournament_id:
             # ✅ PHASE 5.7: Copy master settings from tournament doc to game doc as baseline
             from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
-            from BackEnd.db import tournaments_collection
             
             try:
                 tournament_doc = tournaments_collection.find_one(
@@ -7766,7 +7753,6 @@ try:
             # Local import: api.py only pulls in `datetime` (line 182); timezone and
             # timedelta are not in scope here and would NameError at runtime.
             from datetime import timedelta, timezone as _tz
-            from BackEnd.db import TUTORIAL_GAME_TTL_DAYS
             summary["tutorial_expires_at"] = datetime.now(_tz.utc) + timedelta(
                 days=TUTORIAL_GAME_TTL_DAYS
             )

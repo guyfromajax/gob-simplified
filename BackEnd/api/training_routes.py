@@ -3,7 +3,13 @@ from pydantic import BaseModel
 from typing import Dict, Any
 
 from BackEnd.models.training_manager import TrainingManager, save_training_results
-from BackEnd.db import players_collection, teams_collection, training_log_collection
+
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+teams_collection = _store.teams_collection
+training_log_collection = _store.training_log_collection
+
 
 router = APIRouter()
 

@@ -25,7 +25,10 @@ from typing import Any, Iterable
 
 from bson import ObjectId
 
-from BackEnd.db import db, franchise_team_data_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+franchise_team_data_collection = _store.franchise_team_data_collection
 from BackEnd.utils.franchise_standings import calculate_franchise_standings
 
 logger = logging.getLogger(__name__)

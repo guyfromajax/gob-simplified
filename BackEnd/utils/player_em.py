@@ -11,6 +11,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+franchise_players_data_collection = _store.franchise_players_data_collection
+
 logger = logging.getLogger(__name__)
 
 EM_MIN = 1
@@ -241,7 +246,6 @@ def apply_franchise_eog_player_em(
         import random as rng  # EOG uses the global stream, same as team-attr EOG.
 
     if games_col is None or fpd_col is None:
-        from BackEnd.db import db, franchise_players_data_collection
 
         if games_col is None:
             games_col = db.games

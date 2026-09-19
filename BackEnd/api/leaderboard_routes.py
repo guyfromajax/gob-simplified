@@ -5,7 +5,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from BackEnd.db import users_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+users_collection = _store.users_collection
+
 from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.user_tracking import ARCHETYPE_KEYS
 

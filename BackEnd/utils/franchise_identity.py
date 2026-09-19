@@ -63,6 +63,11 @@ from pymongo.operations import UpdateOne
 
 from BackEnd.utils.team_identity import CONSTANTS_VERSION, assign_identity
 
+from BackEnd.persistence import get_store
+_store = get_store()
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+
 logger = logging.getLogger(__name__)
 
 
@@ -107,7 +112,6 @@ def ensure_franchise_identities(
     Idempotent: teams whose identity already matches ``season`` and the current
     ``CONSTANTS_VERSION`` are skipped unless ``force``. Returns a summary dict.
     """
-    from BackEnd.db import franchise_players_data_collection, franchise_team_data_collection
 
     fid = _as_oid(franchise_id)
     ftd_docs = list(
@@ -192,7 +196,6 @@ def ensure_franchise_identities(
 def franchise_identity_summary(franchise_id) -> dict[str, Any]:
     """Read-only view used by measurement gates: vision distribution and slider variance
     across the league. Zero variance means the treatment is NOT active."""
-    from BackEnd.db import franchise_team_data_collection
 
     fid = _as_oid(franchise_id)
     docs = list(

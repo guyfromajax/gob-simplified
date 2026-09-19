@@ -6,7 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
-from BackEnd.db import fcp_skeletons_collection, hct_skeletons_collection, client, DB_NAME
+
+from BackEnd.persistence import get_store
+_store = get_store()
+fcp_skeletons_collection = _store.fcp_skeletons_collection
+hct_skeletons_collection = _store.hct_skeletons_collection
+client = _store.client
+DB_NAME = _store.DB_NAME
+
 from BackEnd.utils.auth import require_admin_for_builder
 from pathlib import Path
 import os

@@ -14,6 +14,12 @@ from bson import ObjectId
 from BackEnd.models.pgpc_snapshot import FranchiseContextForPGPC
 from BackEnd.utils.franchise_standings import calculate_franchise_standings
 
+from BackEnd.persistence import get_store
+_store = get_store()
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+
+
 logger = logging.getLogger(__name__)
 
 _REGULAR_SEASON_WEEKS = 26
@@ -215,7 +221,8 @@ def attach_pgpc_rank_and_player_rt(
 ) -> None:
     """Mutate ``ctx`` with ``user_natl_rank``, ``opponent_natl_rank``, ``player_overall_rt`` from Mongo."""
     try:
-        from BackEnd.db import franchise_players_data_collection, franchise_team_data_collection
+        franchise_players_data_collection
+        franchise_team_data_collection
     except Exception:
         return
 
