@@ -2718,12 +2718,13 @@ class TurnManager:
         offense_call = None
         user_team_side = self.game.game_state.get("user_team_side")
         is_offense_user = (user_team_side == "home" and self.game.offense_team.is_home_team) or (user_team_side == "away" and not self.game.offense_team.is_home_team)
+        is_defense_user = (user_team_side == "home" and self.game.defense_team.is_home_team) or (user_team_side == "away" and not self.game.defense_team.is_home_team)
         
         logging.debug(f"🎮 [PLAYCALL CHECK] Checking for overrides in set_playcalls()")
         logging.debug(f"   - Offense team: {self.game.offense_team.name} (team_id: {self.game.offense_team.team_id}, object_id: {id(self.game.offense_team)}, is_home_team: {self.game.offense_team.is_home_team})")
         # logging.debug(f"   - Home team: {self.game.home_team.name} (team_id: {self.game.home_team.team_id}, object_id: {id(self.game.home_team)})")
         # logging.debug(f"   - Away team: {self.game.away_team.name} (team_id: {self.game.away_team.team_id}, object_id: {id(self.game.away_team)})")
-        logging.debug(f"   - user_team_side={user_team_side}, is_offense_user={is_offense_user}")
+        logging.debug(f"   - user_team_side={user_team_side}, is_offense_user={is_offense_user}, is_defense_user={is_defense_user}")
         logging.debug(f"   - game_object_id: {id(self.game)}")
         if is_offense_user:
             offense_call = self.game.offense_team.strategy_calls.get("offense_call")
@@ -2738,8 +2739,9 @@ class TurnManager:
         else:
             logging.debug(f"🎮 [PLAYCALL DEBUG] Offense team {self.game.offense_team.name} is NOT user team (user_team_side={user_team_side}), skipping offense_call check")
         
-        # Check if user team has defense_call set (regardless of current offense/defense)
-        # Defense override can be set when user is on offense (for next time they're on defense)
+        # Defense override may be set while the user is on offense (stash for their next
+        # defensive possession). Apply it only when the user team is actually on defense —
+        # never as this turn's call when the CPU is defending (Playcall_Center.md).
         defense_call = None
         user_team = None
         if user_team_side == "home":
@@ -2753,6 +2755,7 @@ class TurnManager:
             logging.debug(f"   - User team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
             logging.debug(f"   - defense_call value: {defense_call}, type: {type(defense_call)}")
             logging.debug(f"   - Full strategy_calls: {user_team.strategy_calls}")
+            logging.debug(f"   - is_defense_user={is_defense_user}")
             if defense_call:
                 logging.debug(f"🎮 [PLAYCALL CHECK] ✅ Found user defense call: '{defense_call}'")
             else:
@@ -2762,7 +2765,8 @@ class TurnManager:
         
         # Legacy support: Also check game_state for backward compatibility (will be removed)
         user_offense = self.game.game_state.get("user_offense_override") or offense_call
-        user_defense = self.game.game_state.get("user_defense_override") or defense_call
+        stored_user_defense = self.game.game_state.get("user_defense_override") or defense_call
+        user_defense = stored_user_defense if is_defense_user else None
         
         # If user provided an offense call, use the specific play name
         if user_offense:
@@ -2829,7 +2833,7 @@ class TurnManager:
                 self.game.game_state["user_defense_override"] = None  # Legacy clear
                 logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (defense_team={self.game.defense_team.name}, persistent until manually cleared)")
             else:
-                logging.info(f"🎮 [PLAYCALL DEBUG] No user_defense override found (user_defense={user_defense}), will use normal selection or check strategy_calls")
+                logging.info(f"🎮 [PLAYCALL DEBUG] No user_defense override for this turn (is_defense_user={is_defense_user}, stored={stored_user_defense}), using defending team's normal selection")
                 # No user defense override - choose defense normally
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
                 pick = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
@@ -2911,7 +2915,7 @@ class TurnManager:
                 "offense_override_cleared": offense_override_cleared  # ✅ SS&S: Flag for frontend button un-highlighting
             }
         
-        # If only defense call (user on offense, setting defense for next possession)
+        # User defense override applies only while the user team is on defense.
         if user_defense:
             chosen_defense = self._coerce_hco_defense_id(user_defense)
             # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
@@ -2971,41 +2975,23 @@ class TurnManager:
                 )
                 chosen_playcall = selected_play["name"]
         
-        # Defense setting - use override if set, otherwise choose normally
-        # NOTE: This must happen BEFORE offense attempt tracking so we know the correct defense
-        if chosen_defense is None:  # Not set by user override above
-            # ✅ SS&S: Check for defense_call in user_team.strategy_calls (regardless of current offense/defense)
-            # Defense override can be set when user is on offense (for next time they're on defense)
-            logging.info(f"🎮 [PLAYCALL DEBUG] chosen_defense is None, checking defense_call in user_team.strategy_calls")
-            user_team = self.game.home_team if self.game.home_team.is_user_team else (self.game.away_team if self.game.away_team.is_user_team else None)
-            if user_team:
-                defense_call = user_team.strategy_calls.get("defense_call")
-                logging.info(f"🎮 [PLAYCALL DEBUG] defense_call from user_team ({user_team.name}) strategy_calls: {defense_call}")
-                if defense_call:
-                    chosen_defense = self._coerce_hco_defense_id(defense_call)
-                    # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
-                    logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (persistent until manually cleared)")
-                else:
-                    logging.info(f"🎮 [PLAYCALL DEBUG] defense_call is None or empty, will use normal selection")
+        # Defense setting - use override if set above (user on defense), otherwise the
+        # defending team's normal process. NOTE: must happen BEFORE offense attempt tracking.
+        if chosen_defense is None:
+            defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
+            logging.info(f"🎮 [PLAYCALL DEBUG] Using normal defense selection (defense_setting={defense_setting}, is_defense_user={is_defense_user})")
+            pick = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+            logging.info(f"🎮 [PLAYCALL DEBUG] Normal selection chose: {pick}")
+            if pick == STRATEGY_DEFENSE_ZONE_SENTINEL:
+                chosen_defense = self._select_zone_defense_with_playbook_weights()
+                logging.info(f"🎮 [PLAYCALL DEBUG] Expanded zone sentinel to: {chosen_defense}")
+            elif pick == "man":
+                # CPU: expand bare "man" to a variant (Base/Deny/Loose) by the team's playbook % —
+                # symmetric to the zone-sentinel expansion (integrating_new_d_plays.md Phase 3).
+                chosen_defense = self._select_man_defense_with_playbook_weights()
+                logging.info(f"🎮 [PLAYCALL DEBUG] Expanded man to: {chosen_defense}")
             else:
-                logging.info(f"🎮 [PLAYCALL DEBUG] No user team found, skipping defense_call check")
-            
-            # If still no override, use normal process
-            if chosen_defense is None:
-                defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
-                logging.info(f"🎮 [PLAYCALL DEBUG] Using normal defense selection (defense_setting={defense_setting})")
-                pick = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
-                logging.info(f"🎮 [PLAYCALL DEBUG] Normal selection chose: {pick}")
-                if pick == STRATEGY_DEFENSE_ZONE_SENTINEL:
-                    chosen_defense = self._select_zone_defense_with_playbook_weights()
-                    logging.info(f"🎮 [PLAYCALL DEBUG] Expanded zone sentinel to: {chosen_defense}")
-                elif pick == "man":
-                    # CPU: expand bare "man" to a variant (Base/Deny/Loose) by the team's playbook % —
-                    # symmetric to the zone-sentinel expansion (integrating_new_d_plays.md Phase 3).
-                    chosen_defense = self._select_man_defense_with_playbook_weights()
-                    logging.info(f"🎮 [PLAYCALL DEBUG] Expanded man to: {chosen_defense}")
-                else:
-                    chosen_defense = pick
+                chosen_defense = pick
         
         # Record playcall attempt under new buckets
         try:

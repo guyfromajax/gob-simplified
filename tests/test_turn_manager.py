@@ -191,6 +191,45 @@ def test_playcalls_are_set():
     assert calls["defense"] in ["Man", "Zone"]
 
 
+def _user_home_on_offense_with_stashed_defense(monkeypatch):
+    """Home is user + offense; away (CPU) always picks Base Man."""
+    game = build_mock_game()
+    game.game_state["user_team_side"] = "home"
+    game.away_team.strategy_settings["defense"] = 0
+    game.home_team.strategy_calls["defense_call"] = "2-3 Zone"
+    tm = TurnManager(game)
+    monkeypatch.setattr(tm, "_select_man_defense_with_playbook_weights", lambda: "man")
+    return game, tm
+
+
+def test_user_defense_call_is_not_applied_to_cpu_defense(monkeypatch):
+    game, tm = _user_home_on_offense_with_stashed_defense(monkeypatch)
+    calls = tm.set_playcalls()
+    assert calls["defense"] == "man"
+    assert game.home_team.strategy_calls["defense_call"] == "2-3 Zone"
+
+
+def test_user_offense_override_does_not_apply_stashed_defense_to_cpu(monkeypatch):
+    game, tm = _user_home_on_offense_with_stashed_defense(monkeypatch)
+    game.home_team.strategy_calls["offense_call"] = "Inside"
+    calls = tm.set_playcalls()
+    assert calls["offense"] == "Inside"
+    assert calls["defense"] == "man"
+    assert game.home_team.strategy_calls["defense_call"] == "2-3 Zone"
+    assert game.home_team.strategy_calls["offense_call"] is None
+
+
+def test_user_defense_call_applies_when_user_is_on_defense():
+    game = build_mock_game()
+    game.game_state["user_team_side"] = "home"
+    game.offense_team, game.defense_team = game.away_team, game.home_team
+    game.home_team.strategy_calls["defense_call"] = "2-3 Zone"
+    tm = TurnManager(game)
+    calls = tm.set_playcalls()
+    assert calls["defense"] == tm._coerce_hco_defense_id("2-3 Zone")
+    assert game.home_team.strategy_calls["defense_call"] == "2-3 Zone"
+
+
 def test_turn_result_has_possession_flips():
     game = build_mock_game()
     tm = TurnManager(game)
