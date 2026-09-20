@@ -11,11 +11,12 @@ every offseason growth on any attribute it did not itself train, and RT masked i
 """
 import contextlib
 import logging
+
+import pytest
 import os
 import random
 import statistics
 
-logging.disable(logging.CRITICAL)
 
 from BackEnd.utils import player_development as dev
 from BackEnd.utils import player_generation as gen
@@ -26,6 +27,28 @@ from BackEnd.api.franchise_routes import _coaching_quality_reference_allocation,
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 GROWTH = list(dev.GROWTH_ATTRS)
 _NULL = open(os.devnull, "w")
+
+
+@pytest.fixture(autouse=True)
+def _quiet_chatty_training_logs():
+    """Silence this module's tests only.
+
+    This was ``logging.disable(logging.CRITICAL)`` at module scope. That switch is
+    process-wide and was never restored, so once pytest imported this file during
+    COLLECTION every later test in the run lost its log records - which is why the
+    UESS seam guards (test_unrendered_and_ball_seam, test_sa1_within_step_pass)
+    asserted against an empty ``caplog.text`` in a full run and passed on their own.
+    See reports/test-uncovered-2026-09-20.md.
+
+    Scoped here and restored on teardown. The previous value is restored rather than
+    NOTSET so nesting cannot clobber an outer disable.
+    """
+    previous = logging.root.manager.disable
+    logging.disable(logging.CRITICAL)
+    try:
+        yield
+    finally:
+        logging.disable(previous)
 
 
 def _cpu_train_week(fpd, year, weeks=26):
