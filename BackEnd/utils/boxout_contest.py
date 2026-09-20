@@ -16,7 +16,7 @@ SHAPE COPIED FROM ``engine/pass_contest.py``, the house's other two-stage contes
 ``find_pass_contester`` does pure geometry to pick who is eligible, then
 ``resolve_pass_contest`` scores it as ``(weighted attributes) x rand(1,6)``. The same
 split is used here - ``find_boxout_pairs`` is pure geometry with no RNG at all, and
-``resolve_boxout`` is one ``ST x rand(1,6)`` roll each. That idiom is everywhere in
+``resolve_boxout`` is one weighted-composite ``x rand(1,6)`` roll each. That idiom is everywhere in
 this engine (``calculate_rebound_score``, ``calculate_outlet_pass_score``,
 ``calculate_defender_pressure_score``, the D8 cutoff in ``dynamic_hct._resolve_moment``)
 and it is what keeps a big attribute edge a strong tilt rather than a certainty.
@@ -47,6 +47,15 @@ BOXOUT_PAIR_RADIUS = 8.0
 #: box-out means, and it is why the fraction is 0.5 rather than a number picked to hit an
 #: OREB target. NOT TUNED.
 BOXOUT_PUSHBACK_FRACTION = 0.5
+
+#: The box-out contest's attribute weights. **This is the one place to edit for tuning.**
+#: Stage 2 (Jamie's call) replaced pure ST with this composite: boxing out is rebounding
+#: instinct as much as strength, so RB carries equal weight to ST, with IQ and CH as the
+#: small awareness/competitiveness terms - the same four attributes and the same shape as
+#: ``shared.calculate_rebound_score``, at different weights. Weights sum to 1.0, which is
+#: the house contract for a composite that gets multiplied by ``rand(1, 6)``
+#: (see ``shared.scale_score_to_100``).
+BOXOUT_SCORE_WEIGHTS = {"RB": 0.4, "ST": 0.4, "IQ": 0.1, "CH": 0.1}
 
 #: Court clamp, identical to ``crash_destination``'s, so a push-back cannot put a player
 #: out of bounds or on the baseline.
@@ -117,17 +126,21 @@ def find_boxout_pairs(
     return pairs
 
 
-def boxout_score(player: Any, rng: Any = None) -> int:
-    """``ST x rand(1,6)`` - the house composite shape with ST at weight 1.0.
+def boxout_score(player: Any, rng: Any = None) -> float:
+    """``(0.4*RB + 0.4*ST + 0.1*IQ + 0.1*CH) x rand(1,6)`` - see ``BOXOUT_SCORE_WEIGHTS``.
 
-    Same idiom as ``shared.calculate_rebound_score`` and friends. The d6 is what keeps a
-    strength edge a tilt: at a 30-point ST gap the stronger man wins ~72% of the time,
-    not ~100%. Jamie's ``randint(1, 6)`` is untouched; this is a NEW roll of the same
-    kind, not a change to an existing one.
+    Same idiom as ``shared.calculate_rebound_score``, ``calculate_outlet_pass_score`` and
+    the D8 cutoff in ``dynamic_hct._resolve_moment``: a weighted attribute composite
+    multiplied by one d6. The d6 is what keeps an attribute edge a tilt rather than a
+    certainty. Jamie's ``randint(1, 6)`` is untouched - same roll, new multiplicand.
+
+    Stage 1 used pure ST. Stage 2 swapped in the composite above; nothing else about the
+    model changed. Measured in reports/boxout-stage2-2026-09-20.md.
     """
     r = _default_rng if rng is None else rng
-    st = (getattr(player, "attributes", None) or {}).get("ST", 0) or 0
-    return int(st) * r.randint(1, 6)
+    attrs = getattr(player, "attributes", None) or {}
+    composite = sum(float(attrs.get(k, 0) or 0) * w for k, w in BOXOUT_SCORE_WEIGHTS.items())
+    return composite * r.randint(1, 6)
 
 
 def resolve_boxout(defender: Any, offensive_crasher: Any, *, rng: Any = None) -> Dict[str, Any]:
