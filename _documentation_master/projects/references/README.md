@@ -18,12 +18,13 @@ Animator methods at Pattern A.
 
 | file | tree | what it baselines |
 |---|---|---|
-| **`equiv_v3_reference_ec4f5acfc_poslookup2.json`** | `ec4f5acfc` | **CURRENT, both arms.** Positions resolved by lineup identity across the backend (`GOB_LINEUP_POSITION_LOOKUP` ON). The played arm is byte-identical to the previous reference on both footings; the sim arm differs on exactly one seed per footing (8002 at `SEED_DEFENSES=1`, 8038 at `=0`), both from `turn_manager._execute_forced_shot` no longer letting an off-offense `last_ball_handler` take the forced shot under the PG label. |
+| **`equiv_v3_reference_70f7dd021_b1a.json`** | `70f7dd021` | **CURRENT, both arms.** B1-A: the sim arm builds animations for its coordinate pipeline (`GOB_SIM_BUILD_ANIM_FOR_EMITTER` ON), so its HCO shot geometry is `hco-emitter-shot-step` — the frame the played arm already read. **The played arm is byte-identical to the superseded file on both footings** (the flag is sim-only by construction); **every sim seed differs**, because the animator's defender-placement draw re-phases the sim stream (draws/game +19.7% at `SEED_DEFENSES=1`, +14.0% at `=0`, converging on played). See `reports/b1a-adopt-2026-09-20.md`. |
 
 ## Superseded — kept deliberately
 
 | file | tree | superseded by | reproduced today by |
 |---|---|---|---|
+| `equiv_v3_reference_ec4f5acfc_poslookup2.json` | `ec4f5acfc` | `70f7dd021` | **`GOB_SIM_BUILD_ANIM_FOR_EMITTER=0`** — verified 40/40 on all four cells at `70f7dd021`. `GOB_SIM_HCO_COORD_WRITE` and `GOB_SIM_CRASH_APPLY` are kept as this switch's partners: they are what write the sim arm's HCO coords when B1-A is off. |
 | `equiv_v3_reference_456e2cdd9_reboundarrival.json` | `456e2cdd9` | `ec4f5acfc` | `GOB_LINEUP_POSITION_LOOKUP=0` — verified 40/40 on all four cells at `ec4f5acfc` |
 | `equiv_v3_reference_bf7ed1181_crashmodela.json` | `bf7ed1181` | `456e2cdd9` | `GOB_REBOUND_FROM_ARRIVAL=0` — verified 40/40 on all four cells at that flip |
 | `equiv_v3_reference_d91679bef_foulweight.json` | `d91679bef` | `bf7ed1181` | `GOB_CRASH_SHOT_AWARE=0` — verified 40/40 at that flip |
