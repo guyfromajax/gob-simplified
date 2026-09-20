@@ -16,10 +16,16 @@ from BackEnd.utils import boxout_contest as BO
 
 
 class _P:
-    def __init__(self, pid, x, y, st=50):
+    def __init__(self, pid, x, y, st=50, rb=None, iq=None, ch=None):
         self.player_id = pid
         self.coords = {"x": float(x), "y": float(y)}
-        self.attributes = {"ST": st}
+        # Stage 2: the contest scores a composite, so a player needs all four. Defaulting
+        # RB/IQ/CH to ST keeps the single-argument `_P(pid, x, y, st=N)` calls meaningful -
+        # such a player has composite == N, so the ST-gap tests still read as written.
+        self.attributes = {"ST": st,
+                           "RB": st if rb is None else rb,
+                           "IQ": st if iq is None else iq,
+                           "CH": st if ch is None else ch}
 
 
 @pytest.fixture(autouse=True)
@@ -109,11 +115,26 @@ def test_players_without_coords_are_skipped_not_guessed():
 
 # ── Stage 2: the ST roll ────────────────────────────────────────────────────────────────
 
-def test_score_is_st_times_a_d6():
-    p = _P("p", 0, 0, st=40)
+def test_score_is_the_weighted_composite_times_a_d6():
+    """Stage 2: (0.4*RB + 0.4*ST + 0.1*IQ + 0.1*CH) x rand(1,6), not pure ST."""
+    p = _P("p", 0, 0, st=40, rb=80, iq=20, ch=60)
+    composite = 0.4 * 80 + 0.4 * 40 + 0.1 * 20 + 0.1 * 60   # = 56.0
     seen = {BO.boxout_score(p, rng=random.Random(i)) for i in range(200)}
-    assert seen <= {40 * k for k in range(1, 7)}
+    assert seen <= {composite * k for k in range(1, 7)}
     assert len(seen) == 6
+
+
+def test_the_weights_are_named_sum_to_one_and_are_the_only_tuning_surface():
+    assert BO.BOXOUT_SCORE_WEIGHTS == {"RB": 0.4, "ST": 0.4, "IQ": 0.1, "CH": 0.1}
+    assert sum(BO.BOXOUT_SCORE_WEIGHTS.values()) == pytest.approx(1.0)
+
+
+def test_rebounding_now_counts_where_it_did_not_before():
+    """The point of Stage 2: a better rebounder beats an equally strong man."""
+    strong_only = _P("s", 0, 0, st=70, rb=30, iq=50, ch=50)
+    rebounder = _P("r", 1, 0, st=70, rb=90, iq=50, ch=50)
+    assert BO.boxout_score(rebounder, rng=random.Random(3)) > \
+           BO.boxout_score(strong_only, rng=random.Random(3))
 
 
 def test_a_tie_goes_to_the_defender():
@@ -128,17 +149,20 @@ def test_a_tie_goes_to_the_defender():
     assert r["defender_wins"] is True and r["winner"] is d and r["loser"] is o
 
 
-def test_strength_tilts_but_does_not_dominate():
-    """A big ST edge wins clearly more often, and clearly not always."""
+def test_the_composite_tilts_but_does_not_dominate():
+    """A big composite edge wins clearly more often, and clearly not always.
+
+    `_P(..., st=N)` sets all four attributes to N, so the gap here is a composite gap.
+    """
     def rate(st_d, st_o):
         rng = random.Random(7)
         w = sum(BO.resolve_boxout(_P("d", 0, 0, st_d), _P("o", 1, 0, st_o),
                                   rng=rng)["defender_wins"] for _ in range(4000))
         return 100.0 * w / 4000
     even, edge, big = rate(50, 50), rate(65, 50), rate(85, 50)
-    assert edge > even, "a strength edge must raise the win rate"
+    assert edge > even, "a composite edge must raise the win rate"
     assert big > edge, "a bigger edge must raise it further"
-    assert big < 90.0, "ST must not dominate - the d6 keeps it human"
+    assert big < 90.0, "the composite must not dominate - the d6 keeps it human"
 
 
 def test_the_loser_is_the_other_player():
