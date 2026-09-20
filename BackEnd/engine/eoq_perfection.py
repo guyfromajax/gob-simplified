@@ -25,6 +25,7 @@ from BackEnd.constants import (
 )
 from BackEnd.engine.phase_resolution import select_defender_closest_to_victim
 from BackEnd.utils.shared import apply_scoring, get_away_player_coords, get_name_safe, get_player_position
+from BackEnd.utils.lineup_position import lineup_position_lookup_enabled, lineup_slot
 
 logger = logging.getLogger(__name__)
 
@@ -140,9 +141,17 @@ def build_run_out_clock_destinations(game) -> Tuple[Dict[str, Dict], Dict[str, D
     is_away = not _is_home_offense(game)
 
     bh = game.game_state.get("last_ball_handler")
+    # Same guard as resolve_flss_shot_logic below: at an end-of-quarter flip
+    # last_ball_handler can be a defender or a substituted-out player. Measured on the
+    # shipped footing it was off the current offense on 30% (sim) / 41% (played) of calls,
+    # and the old `or "PG"` handed the deep run-out spot to the offense's PG anyway.
+    if lineup_position_lookup_enabled() and bh is not None and not get_player_position(off_lineup, bh):
+        bh = None
     if not bh:
         bh = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
-    bh_pos = get_player_position(off_lineup, bh) or "PG"
+    bh_pos = get_player_position(off_lineup, bh)
+    if bh_pos is None and not lineup_position_lookup_enabled():
+        bh_pos = "PG"  # legacy last resort, kill switch only
 
     o_assign: Dict[str, Dict[str, float]] = {}
     for pos in POSITION_LIST:
@@ -733,7 +742,12 @@ def resolve_flss_shot_logic(
         )
 
     shooter = ball_handler
-    shooter_pos = get_player_position(off_lineup, shooter) or "PG"
+    # The guard at the top of this function already dropped any ball handler not on the
+    # current offense, so the lookup cannot miss. The old `or "PG"` was dead: measured
+    # 0 fires in 256 calls across 80 games.
+    shooter_pos = get_player_position(off_lineup, shooter)
+    if shooter_pos is None and not lineup_position_lookup_enabled():
+        shooter_pos = "PG"  # legacy last resort, kill switch only
     shooter_coords = getattr(shooter, "coords", None) or {"x": 50, "y": 25}
     sx = float(shooter_coords.get("x", 50))
     sy = float(shooter_coords.get("y", 25))

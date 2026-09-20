@@ -1,0 +1,84 @@
+"""A player's position is the lineup slot they occupy, not an attribute they carry.
+
+``Player`` has no ``position`` (or ``pos``) attribute and nothing in the backend ever
+assigns one, so every ``getattr(player, "position", None)`` read in the engine returned
+``None`` and whatever constant followed the ``or`` was taken unconditionally. See
+``reports/position-lookup-2026-09-19.md`` and ``reports/position-lookup-2-2026-09-19.md``.
+
+Everything here is gated on ``GOB_LINEUP_POSITION_LOOKUP`` (default ON) so a single kill
+switch reverts every site to its legacy read.
+
+Deliberately a leaf module: only ``os`` and ``logging``, so the engine, the models and
+``utils.shared`` can all import it without a cycle.
+"""
+import logging
+import os
+from typing import Any, Dict, Optional
+
+__all__ = [
+    "lineup_position_lookup_enabled",
+    "lineup_slot",
+    "resolve_lineup_position",
+    "warn_position_unresolved",
+    "POS_LOOKUP_WARNED",
+    "POS_LOOKUP_WARNED_MAX_GAMES",
+]
+
+
+def lineup_position_lookup_enabled() -> bool:
+    """``GOB_LINEUP_POSITION_LOOKUP`` - **default ON**.
+
+    ON resolves a player's lineup slot by identity lookup in the lineup dict that owns
+    them. OFF reproduces the legacy reads exactly: ``getattr(player, 'position', None)``
+    falling back to a hard-coded constant.
+    """
+    return os.environ.get("GOB_LINEUP_POSITION_LOOKUP", "1") == "1"
+
+
+def lineup_slot(lineup: Optional[Dict[str, Any]], player: Any) -> Optional[str]:
+    """The slot ``player`` occupies in ``lineup``, by identity, else ``None``.
+
+    Identity (``is``), not equality: ``Player`` does not define ``__eq__`` today, but a
+    lookup that would silently return the wrong slot if it ever did is not worth having.
+    """
+    if not isinstance(lineup, dict) or player is None:
+        return None
+    return next((pos for pos, p in lineup.items() if p is player), None)
+
+
+# One warning per (game, site). Bounded so a long-lived process cannot grow it without limit.
+POS_LOOKUP_WARNED: Dict[str, set] = {}
+POS_LOOKUP_WARNED_MAX_GAMES = 8
+
+
+def warn_position_unresolved(site: str, player: Any, game: Any = None) -> None:
+    key = str(getattr(game, "game_id", None) or id(getattr(game, "game_state", None)))
+    seen = POS_LOOKUP_WARNED.get(key)
+    if seen is None:
+        if len(POS_LOOKUP_WARNED) >= POS_LOOKUP_WARNED_MAX_GAMES:
+            POS_LOOKUP_WARNED.pop(next(iter(POS_LOOKUP_WARNED)), None)
+        seen = POS_LOOKUP_WARNED[key] = set()
+    if site in seen:
+        return
+    seen.add(site)
+    logging.warning(
+        "[POS LOOKUP] %s: player %s is not in the lineup dict; leaving the position "
+        "unresolved rather than guessing a constant",
+        site, getattr(player, "player_id", None),
+    )
+
+
+def resolve_lineup_position(player, lineup, site, legacy_constant, game=None):
+    """The lineup slot ``player`` occupies in ``lineup``, by identity.
+
+    Returns ``None`` when the player is not in the lineup. That is deliberate: every
+    caller already guards on a falsy position, and a wrong constant is worse than no
+    position - it silently credits the wrong player. The kill switch
+    ``GOB_LINEUP_POSITION_LOOKUP=0`` restores the constant.
+    """
+    if not lineup_position_lookup_enabled():
+        return getattr(player, "position", None) or legacy_constant
+    pos = lineup_slot(lineup, player)
+    if pos is None:
+        warn_position_unresolved(site, player, game)
+    return pos

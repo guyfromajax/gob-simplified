@@ -47,6 +47,7 @@ from BackEnd.constants import (
 )
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.engine.fb_uess_debug import mark_fb_emitter_fallback
+from BackEnd.utils.lineup_position import lineup_position_lookup_enabled, lineup_slot
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -1215,8 +1216,13 @@ def _build_step_back_step(
     # Resolve position from lineup (authoritative), not from Player.position
     # (which is not always set on real-game Player objects).
     fb_bh_pos = _resolve_position_from_lineup(fb_bh_id, off_lineup)
-    if fb_bh_pos is None:
-        # Fallback: try Player.position attribute as a last resort.
+    if fb_bh_pos is None and lineup_position_lookup_enabled():
+        # The id match above cannot work when the ball handler has no player_id.
+        # Identity against the lineup that owns him can, and it is the same answer.
+        fb_bh_pos = lineup_slot(off_lineup, fb_bh)
+    if fb_bh_pos is None and not lineup_position_lookup_enabled():
+        # Legacy last resort, kept only for the kill switch: Player has no `position`
+        # attribute, so on a real Player this branch could never produce one.
         attr_pos = (getattr(fb_bh, "position", None) or "").upper()
         if attr_pos in _LINEUP_ORDER:
             fb_bh_pos = attr_pos
