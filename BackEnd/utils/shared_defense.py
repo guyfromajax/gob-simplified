@@ -1255,6 +1255,21 @@ def assign_all_zone_defenders(
                 overlap_guarded_by[assigned_player_id] = def_pos
     
     # Second pass: Assign coordinates for each defender
+    # Who has the ball. HOISTED out of the per-defender loop below, where it used to be
+    # recomputed identically on every iteration from `offensive_players` - which this
+    # function never mutates, so this is the same value, computed once.
+    #
+    # Hoisted rather than merely defaulted, because it is also READ by the ball-handler
+    # assignment block AFTER the loop. When `zone_boundaries` was missing all five slots,
+    # every iteration hit the `continue` below, the name was never bound, and that later
+    # read raised `UnboundLocalError` - a crash, mid-game. Seed 8093 hit it with
+    # GOB_BOXOUT_CONTEST=1. See reports/zone-crash-and-arrival-cap-2026-09-20.md.
+    ball_handler_id = None
+    for p in offensive_players:
+        if p.get("is_ball_handler"):
+            ball_handler_id = p.get("player_id")
+            break
+
     for defender_pos in ["PG", "SG", "SF", "PF", "C"]:
         if defender_pos not in zone_boundaries:
             continue
@@ -1308,12 +1323,7 @@ def assign_all_zone_defenders(
         # If not in overlap, use standard priority logic (excluding overlap players already assigned)
         players_to_consider = offensive_players.copy()
         
-        # Find ball handler player_id
-        ball_handler_id = None
-        for p in offensive_players:
-            if p.get("is_ball_handler"):
-                ball_handler_id = p.get("player_id")
-                break
+        # (ball_handler_id is resolved once, above the loop)
         
         # If this defender is involved in an overlap but not guarding the overlap player,
         # exclude ALL overlap players from their consideration (except ball handler if not already guarded)
