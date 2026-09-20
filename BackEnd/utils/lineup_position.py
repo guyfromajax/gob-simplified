@@ -27,7 +27,7 @@ __all__ = [
 
 
 def sim_build_anim_for_emitter_enabled() -> bool:
-    """``GOB_SIM_BUILD_ANIM_FOR_EMITTER`` - **default OFF**. Spike flag, B1-A.
+    """``GOB_SIM_BUILD_ANIM_FOR_EMITTER`` - **default ON** (B1-A, adopted 2026-09-20).
 
     ON lets ``Animator.skeleton_to_animations`` build on the SIM arm when the caller is
     part of the coordinate pipeline (``for_emitter=True``), so the HCO schema emitter and
@@ -36,11 +36,16 @@ def sim_build_anim_for_emitter_enabled() -> bool:
     own gates, and ``turn_manager``'s ``result["animations"]`` write is NOT marked
     ``for_emitter``.
 
-    This RE-PHASES the sim RNG stream - the animator draws a defender-placement shade -
-    so turning it on invalidates the current reference. Measured in
-    reports/coord-parity-spike-2026-09-20.md. Do not flip without a re-cut.
+    OFF is the kill switch and reproduces equiv_v3_reference_ec4f5acfc_poslookup2.json.
+    It is also the configuration ``GOB_SIM_HCO_COORD_WRITE`` and ``GOB_SIM_CRASH_APPLY``
+    exist for: with B1-A ON the sim arm carries real ``animation_steps``, so both of those
+    substitutes are dormant on the HCO path. They are KEPT as B1-A's kill-switch partners.
+
+    Measured in reports/coord-parity-spike-2026-09-20.md and
+    reports/b1a-adopt-2026-09-20.md: ~+7% engine-sim CPU, written document +0.45%,
+    and the sim arm's shot geometry becomes the played arm's.
     """
-    return os.environ.get("GOB_SIM_BUILD_ANIM_FOR_EMITTER", "0") == "1"
+    return os.environ.get("GOB_SIM_BUILD_ANIM_FOR_EMITTER", "1") == "1"
 
 
 def lineup_position_lookup_enabled() -> bool:

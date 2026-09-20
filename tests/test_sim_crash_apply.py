@@ -20,6 +20,19 @@ POSITIONS = ("PG", "SG", "SF", "PF", "C")
 HOME_ID, AWAY_ID = "home-1", "away-1"
 
 
+@pytest.fixture(autouse=True)
+def _b1a_off(monkeypatch):
+    """These guards describe the B1-A-OFF configuration, so pin it.
+
+    ``GOB_SIM_BUILD_ANIM_FOR_EMITTER`` is ON by default since 2026-09-20, which gives the
+    sim arm real ``animation_steps`` and leaves this module's subject dormant - the guards
+    then measure 0-1 overlay players and correctly refuse to draw a conclusion. Forcing the
+    flag off keeps them running against the configuration they are written for (B1-A's kill
+    switch), rather than skipping and losing the coverage. No assertion is weakened.
+    """
+    monkeypatch.setenv("GOB_SIM_BUILD_ANIM_FOR_EMITTER", "0")
+
+
 def _player(pid, x=50.0, y=25.0, ag=50):
     return SimpleNamespace(player_id=pid, coords={"x": x, "y": y}, attributes={"AG": ag})
 
