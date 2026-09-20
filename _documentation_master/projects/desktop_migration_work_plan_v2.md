@@ -193,6 +193,12 @@ Split out of the old WS-5 because it is cheap, unblocks WS-2, and proves the loc
 
 `eog_band_log` is EOG band instrumentation with a 180-day TTL (`db.py:376`), ~36,600 rows / ~13 MiB per franchise-season. Writing that into a user's save is pure cost to them. **Decision: disabled in desktop release builds, enabled in the January beta build** so the beta still produces calibration data.
 
+**Catalog sidecar (closed 20 Sept 2026, do not build in WS-2).** `plays`, `defenses`, `fcp_skeletons`, and `hct_skeletons` are universal rulebook collections, not franchise-private rows. Hosted they live in Atlas and are shared by every franchise. A fresh SQLite save creates the four tables empty and seeds nothing — a new desktop player's first franchise has no playbook. That is a product hole.
+
+Mechanism: a **read-only bundled catalog** (sidecar `catalog.sqlite` or equivalent JSON) shipped next to the Nuitka binary. `SqliteStore` routes those four names to the sidecar. The user save stays franchise-private. One shared rulebook; a play/defense patch is an **app update, not a save migration**. Seed-at-save-creation is rejected because it copies the rulebook into every file and turns catalog updates into save migrations.
+
+**Export gap, part of this decision, not a later surprise.** `plays` and `defenses` are **not** in `PUBLISHABLE_COLLECTIONS` (`scripts/publish_universal_data.py`). They live as operational catalogs in Atlas. The repo export used by tests (`play_skeletons_export.json`) is **7 plays** against ~23 hosted. FCP/HCT already have in-repo Python fallbacks and *are* publishable. Building the sidecar needs an export path that does not exist yet — a publish/export of the live hosted `plays` and `defenses` collections into the bundle. Do not treat `play_skeletons_export.json` as the shipping catalog.
+
 ### WS-8: Local object store and portrait painting — *its own workstream*
 
 Not a small adapter. It contains a local object store, two paint paths, a bundled kit library, three compiled numeric dependencies, a bundled font, and a resolution decision that moves both size and CPU by an order of magnitude.
@@ -403,6 +409,7 @@ Two tracks, because solo-dev reality is that grind work fills the gaps around bi
 11. **WS-3 gate is grep-based, not `StateTelemetry`** — §WS-3.
 12. **Compile approach is confirmed, not assumed** (spiked 17 Sept 2026). Nuitka standalone handles both the spawn pool and the SciPy paint stack. §2's "compile the engine" decision now rests on evidence rather than expectation. Production builds target `scipy.ndimage`, not all of SciPy.
 13. **Animation quality outranks phase A throughput on constrained hardware** (decided 14 Sept 2026). On a weak machine, phase A gets fewer workers and spills into phase B. The user may wait after their game; they must not watch a degraded one. The tradeoff is chosen; **the worker count that delivers it is not yet measured** — WS-2 spike sets it, the §7.2 beta gate confirms it.
+14. **Desktop playbook is a read-only bundled catalog sidecar** (decided 20 Sept 2026). `SqliteStore` routes `plays`, `defenses`, `fcp_skeletons`, `hct_skeletons` to a bundled file, not into the user save. One shared rulebook; catalog patches ship as app updates. Not built in WS-2. Building it later needs a hosted `plays`/`defenses` export that does not exist yet (those two are not in `PUBLISHABLE_COLLECTIONS`; the repo fixture is 7 plays vs ~23 hosted). See the collection-table note under WS-1.
 
 ---
 
@@ -446,9 +453,13 @@ Desktop requires a **policy, not a constant**, built on one rule:
 
 **Measure it in the WS-2 spike:** on a 4-core reference machine, run phase A concurrently with a live animated game and find the worker count that keeps the frame rate clean. That number, not the Railway default, is the desktop default.
 
-### 10.2 SQLite improves sim performance
+### 10.2 SQLite improves sim performance — *assumption contradicted for EOG persist*
 
-The capstone's figures normalize DB wait to Railway's colocated Atlas (~1–3 ms). **Local SQLite is sub-millisecond with no network hop**, so every DB wait in those tables shrinks. The persistence migration is a performance *tailwind* for the sim, not a cost.
+The capstone's figures normalize DB wait to Railway's colocated Atlas (~1–3 ms). The plan assumed **local SQLite is sub-millisecond with no network hop**, so every DB wait shrinks and the persistence migration is a performance *tailwind* for the sim.
+
+**WS-2 measurement (20 Sept 2026) contradicts that for EOG persist, not for the sim.** Catalog-loaded loopback + spawn pool: 63 CPU games sim in 42.4 s (`engine=pool workers=4`). The same week's persist ran ~36 minutes — ~50× the sim. A 26-week season at that persist rate is ~15 hours. January beta testers hit this in week one. §10.2's tailwind still holds for **reads during the sim**; it does **not** hold for EOG persist as the SQLite adapter is written today. That means the persist path is pathological, not "SQLite is slower than Atlas." Do not grind a 26-week season against the unfixed adapter.
+
+Call-count diagnosis (one already-played game on a 4-week save, 257 game docs / 20.4 MB JSON): `journal_mode=wal`, `synchronous=FULL` (2), **no SQL indexes** (`create_index` is a no-op). Every `find`/`update_one` does `SELECT id, doc FROM table` and decodes the whole table in process. `bulk_write` calls `update_one` per op, each of which scans + `_commit()`. One EOG persist: **31 commits**, **12 full `games` scans** (3,084 docs / 277 MB decoded), **23 full `franchise_players_data` scans** (32,384 docs / 77 MB), **14 full `franchise_team_data` scans** (1,792 docs / 153 MB). ×63 games ≈ 756 `games` scans and **17.5 GB** of game-JSON decode per week, and it grows as `games` accumulates. WAL+fsync is real (1,953 commits/week) but cannot be the 50×; the time is the full-table JSON decode. Fix (not applied): point lookups by primary key / `json_extract`, one transaction around persist, and a `bulk_write` that does not per-op scan+commit. That does not change sim draw order; re-run the 40773 exact-diff only if a patch touches write ordering the sim can observe.
 
 ### 10.3 RNG isolation is what makes WS-1 verifiable — protect it
 
