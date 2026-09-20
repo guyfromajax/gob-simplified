@@ -442,6 +442,7 @@ class ShotManager:
         away. It affects HOW FAR a crasher gets, never WHERE he was aiming.
         """
         from BackEnd.utils import rebound_arrival as RA
+        from BackEnd.utils import boxout_contest as BOXOUT
 
         if not RA.enabled():
             return None
@@ -460,6 +461,37 @@ class ShotManager:
                 continue
             players_by_id[pid] = player
             prepared[pid] = self._crash_coords(roles, shooter, is_home)
+
+        # Box-out contest (GOB_BOXOUT_CONTEST, default OFF). Resolves HERE, from the two
+        # players' shot-moment coords, their just-authored destinations and their ST -
+        # and NOTHING else. `result` and `bounce_spot` are in scope on the lines below
+        # and are deliberately NOT passed: a box-out that knew where the ball was going
+        # would be the same clairvoyance `crash_destination` exists to refuse. The loser's
+        # destination is pushed back away from the rim, which is a visible change to where
+        # he stands, not a scoring bonus. See BackEnd/utils/boxout_contest.py.
+        self._boxout_log = []
+        if BOXOUT.enabled():
+            rim_x = 91.0 if is_home else 9.0
+            for defender, crasher, gap in BOXOUT.find_boxout_pairs(def_players, off_players):
+                outcome = BOXOUT.resolve_boxout(defender, crasher)
+                loser = outcome["loser"]
+                lid = getattr(loser, "player_id", None)
+                before = prepared.get(lid)
+                origin = BOXOUT._xy(loser)
+                if not isinstance(before, dict) or origin is None:
+                    continue
+                after = BOXOUT.push_back(before, origin, rim_x)
+                prepared[lid] = after
+                self._boxout_log.append({
+                    "defender_id": getattr(defender, "player_id", None),
+                    "crasher_id": getattr(crasher, "player_id", None),
+                    "gap": round(gap, 3),
+                    "def_st": (getattr(defender, "attributes", None) or {}).get("ST", 0),
+                    "off_st": (getattr(crasher, "attributes", None) or {}).get("ST", 0),
+                    "def_score": outcome["def_score"], "off_score": outcome["off_score"],
+                    "defender_wins": outcome["defender_wins"],
+                    "loser_id": lid, "before": dict(before), "after": dict(after),
+                })
 
         probe = dict(result or {})
         probe.setdefault("result_type", "MISS")
