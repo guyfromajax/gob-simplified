@@ -1611,6 +1611,7 @@ def build_skeleton_animation_steps(
                 add_defenders=True,
                 is_fcp=(turn_type == "FCP"),
                 is_hct=False,
+                for_emitter=True,   # this IS the emitter
             )
         except Exception as _anim_err:
             import logging as _anim_log

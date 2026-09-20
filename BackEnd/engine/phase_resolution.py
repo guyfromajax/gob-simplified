@@ -8323,7 +8323,8 @@ def resolve_final_turn_shot_logic(
         final_turn_animations = None
         try:
             final_turn_animations = Animator(game).skeleton_to_animations(
-                skeleton, off_lineup, def_lineup, add_defenders=True
+                skeleton, off_lineup, def_lineup, add_defenders=True,
+                for_emitter=True,   # coordinate pipeline: feeds coord-sync for the final turn
             )
             apply_coords_from_animations_list(game, final_turn_animations)
         except Exception as _ft_sync_err:
@@ -9163,7 +9164,8 @@ def resolve_half_court_offense_logic(game):
                 skeleton,
                 off_lineup,
                 def_lineup,
-                add_defenders=True
+                add_defenders=True,
+                for_emitter=True,   # coordinate pipeline: feeds apply_coords_from_animations_list
             )
         if animations:
             apply_coords_from_animations_list(game, animations)
@@ -9556,6 +9558,7 @@ def resolve_half_court_offense_logic(game):
             off_lineup,
             def_lineup,
             add_defenders=True,
+            for_emitter=True,   # coordinate pipeline: feeds coord-sync + resolve_shot + emitter
         )
     apply_coords_from_animations_list(game, animations)
     if not animations:

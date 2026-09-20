@@ -16,6 +16,7 @@ import os
 from typing import Any, Dict, Optional
 
 __all__ = [
+    "sim_build_anim_for_emitter_enabled",
     "lineup_position_lookup_enabled",
     "lineup_slot",
     "resolve_lineup_position",
@@ -23,6 +24,23 @@ __all__ = [
     "POS_LOOKUP_WARNED",
     "POS_LOOKUP_WARNED_MAX_GAMES",
 ]
+
+
+def sim_build_anim_for_emitter_enabled() -> bool:
+    """``GOB_SIM_BUILD_ANIM_FOR_EMITTER`` - **default OFF**. Spike flag, B1-A.
+
+    ON lets ``Animator.skeleton_to_animations`` build on the SIM arm when the caller is
+    part of the coordinate pipeline (``for_emitter=True``), so the HCO schema emitter and
+    ``_uess_sync_emitted_shot_coords`` see the same animations the played arm sees. The
+    FE animation packet stays unbuilt for sims: the three ``capture_*`` methods keep their
+    own gates, and ``turn_manager``'s ``result["animations"]`` write is NOT marked
+    ``for_emitter``.
+
+    This RE-PHASES the sim RNG stream - the animator draws a defender-placement shade -
+    so turning it on invalidates the current reference. Measured in
+    reports/coord-parity-spike-2026-09-20.md. Do not flip without a re-cut.
+    """
+    return os.environ.get("GOB_SIM_BUILD_ANIM_FOR_EMITTER", "0") == "1"
 
 
 def lineup_position_lookup_enabled() -> bool:

@@ -1196,7 +1196,8 @@ class Animator:
 
         return animations
 
-    def skeleton_to_animations(self, skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False):
+    def skeleton_to_animations(self, skeleton, off_lineup, def_lineup, add_defenders=True,
+                               is_fcp=False, is_hct=False, *, for_emitter=False):
         """
         Convert skeleton data to animation format.
         
@@ -1212,8 +1213,14 @@ class Animator:
         """
         # ✅ PERFORMANCE: Skip animation generation for full simulations
         if self.game.game_state.get("_is_full_simulation", False):
-            return []
-        
+            # B1-A spike (GOB_SIM_BUILD_ANIM_FOR_EMITTER, default OFF): `for_emitter` is an
+            # EXPLICIT parameter set by the four coordinate-pipeline call sites, not inferred
+            # from the call stack. Everything else - notably turn_manager's
+            # `result["animations"]` FE payload write - stays skipped for sims.
+            from BackEnd.utils.lineup_position import sim_build_anim_for_emitter_enabled
+            if not (for_emitter and sim_build_anim_for_emitter_enabled()):
+                return []
+
         if not skeleton or "steps" not in skeleton:
             return []
         return self._build_all_animations(
