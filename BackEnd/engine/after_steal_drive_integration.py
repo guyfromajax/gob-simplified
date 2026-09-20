@@ -42,6 +42,7 @@ from BackEnd.utils.free_throw_rules import (
     shooting_foul as ft_shooting_foul,
 )
 from BackEnd.utils.shot_split_tracker import record_shot_split
+from BackEnd.engine.foul_announcement_language import stamp_fb_foul_on_ball
 
 
 def _safe_id(p: Any) -> Optional[str]:
@@ -512,6 +513,7 @@ def _stamp_fb_shooting_foul_on_turn(
     turn_result["next_play_type"] = "FREE_THROW"
     turn_result["foul_team"] = "DEFENSE"
     turn_result["is_shooting_foul"] = True
+    stamp_fb_foul_on_ball(turn_result, foul_team="DEFENSE", is_shooting_foul=True)
     foul_player_id = _safe_id(shot.get("foul_player"))
     if foul_player_id:
         turn_result["foul_player_id"] = foul_player_id
@@ -912,6 +914,11 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         }
         if outcome in ("CHARGE", "O_FOUL", "D_FOUL", "BLOCKING_FOUL"):
             turn_result["foul_team"] = foul_team if outcome != "DEAD BALL" else None
+            if outcome != "DEAD BALL":
+                stamp_fb_foul_on_ball(
+                    turn_result, foul_team=foul_team,
+                    foul_player=foul_player, stopper=stopper,
+                )
             if foul_transition is not None:
                 if foul_transition.get("foul_player_id"):
                     turn_result["foul_player_id"] = foul_transition["foul_player_id"]

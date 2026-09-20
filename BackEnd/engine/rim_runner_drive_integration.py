@@ -37,6 +37,7 @@ from BackEnd.utils.fb_geo_helpers import (
 from BackEnd.utils.shared import apply_scoring, get_name_safe
 from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
 from BackEnd.utils.position_snapshot_ledger import attach_position_snapshots, build_fast_break_pre_shot_snapshot
+from BackEnd.engine.foul_announcement_language import stamp_fb_foul_on_ball
 
 
 def _drive_onset_coord(
@@ -341,6 +342,10 @@ def resolve_attack_drive_finisher_turn(
         )
         if result_type in ("FOUL", "CHARGE"):
             turn_result["foul_team"] = game_state.get("foul_team")
+            stamp_fb_foul_on_ball(
+                turn_result, foul_team=game_state.get("foul_team"),
+                foul_player=foul_player, stopper=stopper,
+            )
             if foul_transition is not None:
                 if foul_transition.get("foul_player_id"):
                     turn_result["foul_player_id"] = foul_transition["foul_player_id"]
