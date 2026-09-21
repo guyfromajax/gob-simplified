@@ -1,0 +1,1 @@
+Position lookup done: reports/position-lookup-2026-09-19.md. 9 sites fixed, all dead code in shipped config, byte-identical 40/40, no re-cut. Same bug LIVE in 5 other files (foul announcement language dead, game_manager BENCH). Not merged.

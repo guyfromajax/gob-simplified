@@ -1,0 +1,1 @@
+Test-uncovered fix done: reports/test-uncovered-2026-09-20.md. Suite now 0 failed / 0 XPASS. slowapi installed in venv (no repo change); 4 test modules leaked logging.disable at import — now scoped fixtures + a guard test. The 2 XPASS entries stay (they were an artifact of missing slowapi). Engine untouched; reference reproduces 40/40. Not merged.

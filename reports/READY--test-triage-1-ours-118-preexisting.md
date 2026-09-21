@@ -1,0 +1,1 @@
+Test triage done: reports/test-triage-2026-09-19.md (feature/animation-reward). 130 failures: 1 ours (stale zone-credit test after sink), 0 from merges, 118 pre-existing (mostly stale tests), 11 environmental (node harness 10, slowapi 1). pytest.ini maxfail=2 hides the count.

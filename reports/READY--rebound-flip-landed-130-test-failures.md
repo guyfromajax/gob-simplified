@@ -1,0 +1,1 @@
+Stage 2 flip landed at 456e2cdd9 (feature/animation-reward). Arrival ON, race OFF, kill switch 40/40, new reference double re-baselined, gates pass, crash plays on all shots. 130 pre-existing suite failures; 1 is ours (zone sink vs test_zone_credit_shell). See reports/rebound-arrival-flip-2026-09-19.md. Not merged.
