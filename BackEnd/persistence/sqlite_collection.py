@@ -59,6 +59,43 @@ def decode_doc(raw: str) -> dict[str, Any]:
     return json.loads(raw, object_hook=_hook)
 
 
+def _safe_json_path(field: str) -> str | None:
+    if not field or "." in field or not field.isidentifier():
+        return None
+    return f"$.{field}"
+
+
+def inclusion_projection_fields(projection: dict[str, Any] | None) -> list[str] | None:
+    """Top-level inclusion keys, or None if SQL projection is unsafe."""
+    if not projection:
+        return None
+    include_id = projection.get("_id", 1) not in (0, False)
+    non_id = {key: value for key, value in projection.items() if key != "_id"}
+    if any(value not in (0, False, 1, True) for value in non_id.values()):
+        return None
+    if any(value in (0, False) for value in non_id.values()):
+        return None
+    fields = [key for key, value in non_id.items() if value in (1, True)]
+    if include_id:
+        fields = ["_id", *fields]
+    if not fields or any(_safe_json_path(field) is None for field in fields):
+        return None
+    return fields
+
+
+def _extracted_value(raw: Any) -> Any:
+    if raw is None:
+        return None
+    if isinstance(raw, bytes):
+        raw = raw.decode()
+    if isinstance(raw, str):
+        text = raw.strip()
+        if text[:1] in "{[":
+            return json.loads(text, object_hook=_hook)
+        return raw
+    return raw
+
+
 def encode_id(value: Any) -> str:
     if isinstance(value, ObjectId):
         return f"oid:{value}"
@@ -130,6 +167,7 @@ class SqliteCollection:
         filt: dict[str, Any] | None = None,
         *,
         one: bool = False,
+        projection: dict[str, Any] | None = None,
     ) -> list[tuple[str, dict[str, Any]]]:
         """Decode only the rows SQL can narrow to; residual-match in Python.
 
@@ -137,26 +175,51 @@ class SqliteCollection:
         clause compiled, that is a ``LIMIT 1`` index seek — Mongo ``find_one``
         semantics. Without the limit, ``find_one({franchise_id})`` would still
         decode every game in the franchise.
+
+        Inclusion projections on a fully compiled filter extract only those
+        JSON fields in SQL so FTD/FPD ``find({franchise_id}, {team_id: 1})``
+        does not decode the full document.
         """
         compiled = compile_filter(filt)
-        limit_sql = one and filter_fully_compiled(filt)
+        fully = filter_fully_compiled(filt)
+        limit_sql = one and fully
+        fields = inclusion_projection_fields(projection) if fully else None
         with self._lock:
             if compiled is None:
-                sql = f'SELECT id, doc FROM "{self.name}"'
+                where_sql = ""
                 params: list[Any] = []
             else:
                 where, params = compiled
-                sql = f'SELECT id, doc FROM "{self.name}" WHERE {where}'
+                where_sql = f" WHERE {where}"
+            if fields:
+                extracts = ", ".join(
+                    f"json_extract(doc, '{_safe_json_path(field)}')" for field in fields
+                )
+                sql = f'SELECT id, {extracts} FROM "{self.name}"{where_sql}'
+            else:
+                sql = f'SELECT id, doc FROM "{self.name}"{where_sql}'
             if limit_sql:
                 sql += " LIMIT 1"
             cur = self._conn.execute(sql, params)
             matched: list[tuple[str, dict[str, Any]]] = []
-            for row_id, raw in cur:
-                doc = decode_doc(raw)
-                if match_query(doc, filt):
+            if fields:
+                for row in cur:
+                    row_id = row[0]
+                    doc = {
+                        field: value
+                        for field, raw in zip(fields, row[1:])
+                        if (value := _extracted_value(raw)) is not None
+                    }
                     matched.append((row_id, doc))
                     if one:
                         break
+            else:
+                for row_id, raw in cur:
+                    doc = decode_doc(raw)
+                    if match_query(doc, filt):
+                        matched.append((row_id, doc))
+                        if one:
+                            break
         return matched
 
     def _rows(self) -> list[tuple[str, dict[str, Any]]]:
@@ -186,15 +249,20 @@ class SqliteCollection:
             self._conn.commit()
 
     def find(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None):
-        matched = [copy.deepcopy(doc) for _row_id, doc in self._select(filter)]
-        if projection:
+        projected = inclusion_projection_fields(projection) if filter_fully_compiled(filter) else None
+        matched = [
+            copy.deepcopy(doc)
+            for _row_id, doc in self._select(filter, projection=projection)
+        ]
+        if projection and not projected:
             matched = [project_doc(doc, projection) for doc in matched]
         return SqliteCursor(matched)
 
     def find_one(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None):
-        for _row_id, doc in self._select(filter, one=True):
+        projected = inclusion_projection_fields(projection) if filter_fully_compiled(filter) else None
+        for _row_id, doc in self._select(filter, one=True, projection=projection):
             out = copy.deepcopy(doc)
-            if projection:
+            if projection and not projected:
                 out = project_doc(out, projection)
             return out
         return None

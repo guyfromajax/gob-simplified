@@ -471,6 +471,31 @@ def test_sqlite_generated_columns_and_real_indexes(tmp_path: Path):
     assert week_val == "2"
 
 
+def test_sqlite_projection_skips_full_doc_decode(tmp_path: Path, monkeypatch):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    fat = {"_id": "p1", "franchise_id": "fid", "team_id": "t1", "blob": "x" * 5000}
+    store.franchise_team_data_collection.insert_one(fat)
+    decoded = []
+    from BackEnd.persistence import sqlite_collection as sc
+
+    orig = sc.decode_doc
+
+    def counting(raw):
+        decoded.append(len(raw) if isinstance(raw, str) else 0)
+        return orig(raw)
+
+    monkeypatch.setattr(sc, "decode_doc", counting)
+    docs = list(
+        store.franchise_team_data_collection.find(
+            {"franchise_id": "fid"},
+            {"team_id": 1},
+        )
+    )
+    assert docs[0]["team_id"] == "t1"
+    assert "blob" not in docs[0]
+    assert decoded == []
+
+
 def test_sqlite_persist_transaction_is_one_commit(tmp_path: Path):
     store = SqliteStore(_sqlite_env(tmp_path))
     path = store.sqlite_path
