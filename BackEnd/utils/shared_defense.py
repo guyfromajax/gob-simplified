@@ -828,7 +828,8 @@ def assign_zone_defender_coords(
     ball_handler_coords,
     ball_spot,
     aggression_level,
-    is_away_offense
+    is_away_offense,
+    placed_defenders=None,
 ):
     """
     Assign defensive coordinates for a zone defender based on priorities and zone logic.
@@ -977,11 +978,25 @@ def assign_zone_defender_coords(
             _rim = (float(HOME_RIM_COORDS["x"]), float(HOME_RIM_COORDS["y"]))
             if is_away_offense:
                 _rim = (100.0 - _rim[0], _rim[1])
+            # GOB_ZONE_SINK_ESCAPE only: the separation guardrail needs the defenders
+            # already placed this step. `assignments` is filled in a fixed order
+            # (PG,SG,SF,PF,C), so each defender separates from those before him and
+            # those after him separate from him — deterministic, and no pass is needed.
+            # They are stored in HOME orientation; the sink works in the zone frame, so
+            # they are flipped back for away offense (the flip is an involution).
+            _others = None
+            if _zone_sink.escape_enabled():
+                _others = []
+                for _c in (placed_defenders or {}).values():
+                    if isinstance(_c, dict) and "x" in _c and "y" in _c:
+                        _p = get_away_player_coords(_c) if is_away_offense else _c
+                        _others.append((float(_p["x"]), float(_p["y"])))
             sunk = _zone_sink.sink_position(
                 defender_zone_coords_list,
                 (float(ball_handler_coords["x"]), float(ball_handler_coords["y"])),
                 _rim,
                 iq_error=_zone_sink_iq_error(defender_pos),
+                others=_others,
             )
             return get_away_player_coords(sunk) if is_away_offense else sunk
 
@@ -1349,7 +1364,8 @@ def assign_all_zone_defenders(
             ball_handler_coords,
             ball_spot,
             aggression_level,
-            is_away_offense
+            is_away_offense,
+            placed_defenders=assignments,
         )
         if coords:
             assignments[defender_pos] = coords

@@ -628,6 +628,16 @@ def position_hct_zone_defenders(game, offensive_animations, def_lineup, skeleton
             def_action = "guard_offball"
 
             if zone_polygon and len(zone_polygon) >= 3:
+                # GOB_ZONE_SINK_ESCAPE: the sink's separation guardrail needs the
+                # defenders already placed at THIS step. `step_coords` holds them in the
+                # CURRENT orientation; the contract for `placed_defenders` is HOME, so
+                # they are unflipped here. The existing collision pass below only splits
+                # EXACT (x, y) ties, so it does not subsume a minimum separation.
+                _placed = {
+                    k: (get_away_player_coords(v) if is_away_offense else v)
+                    for k, v in step_coords.items()
+                    if isinstance(v, dict) and "x" in v and "y" in v
+                }
                 coords = assign_zone_defender_coords(
                     def_pos,
                     zone_boundaries,
@@ -636,6 +646,7 @@ def position_hct_zone_defenders(game, offensive_animations, def_lineup, skeleton
                     ball_spot,
                     aggression,
                     is_away_offense,
+                    placed_defenders=_placed,
                 )
                 if coords:
                     # assign_zone_defender_coords returns HOME orientation; flip
