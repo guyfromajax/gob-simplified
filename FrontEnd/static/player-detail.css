@@ -519,3 +519,20 @@ input[type="reset"] {
     font-size: 60px;
   }
 }
+
+/* ── Development Focus (read-only) ────────────────────────────────────────────
+   Sits under the position-ratings list; the roster screens are the editors. */
+.pd-attitude-line { margin-top: 6px; font-size: 20px; line-height: 1; }
+.pd-dev-grid { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.pd-dev-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.pd-dev-key { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255, 255, 255, .5); }
+.pd-dev-val { font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: .02em; color: #fff; }
+/* Marks WHERE HE IS COACHED inside the list of where he RATES. */
+.pd-pos-training-tag {
+  margin-left: 8px; flex-shrink: 0;
+  font-size: 8.5px; font-weight: 800; letter-spacing: .12em;
+  padding: 2px 6px; border-radius: 999px;
+  color: var(--orange, #f79420);
+  border: 1px solid rgba(247, 148, 32, .45);
+  background: rgba(247, 148, 32, .12);
+}

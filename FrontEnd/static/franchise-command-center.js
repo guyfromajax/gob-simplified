@@ -3055,7 +3055,108 @@ function fccRosterRowHtml(p, opts) {
     '<td>' + escapeHomeHtml(p.year == null ? '--' : p.year) + '</td>' +
     '<td>' + escapeHomeHtml(p.height == null ? '--' : p.height) + '</td>' +
     '<td>' + escapeHomeHtml(p.weight == null ? '--' : p.weight) + '</td>' +
+    fccDevelopmentCellsHtml(p) +
     '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>';
+}
+
+/** Players ticked for a bulk set. Kept outside the row markup so a sort or scope switch
+ *  does not silently drop a selection the coach has made. */
+const FCC_DEVFOCUS_SELECTED = new Set();
+
+/** Development Focus cells. The roster tab is the user's own team, so they always render
+ *  here; the guard is the shared module's absence (script not loaded) rather than a flag. */
+function fccDevelopmentCellsHtml(p) {
+  const api = window.GOBDevelopmentFocus;
+  // Practice-squad rows get no controls: the practice payload does not carry the two
+  // fields, so a rendered control would show an invented default as if it were his
+  // setting. Varsity is the roster Development Focus governs.
+  if (!api || FCC_ROSTER_STATE.scope === 'practice') {
+    return '<td class="c-devpos"></td><td class="c-devfocus"></td>';
+  }
+  const pid = String(p._id || p.player_id || '');
+  const checked = FCC_DEVFOCUS_SELECTED.has(pid) ? ' checked' : '';
+  return '<td class="c-devpos">' +
+      '<label class="devfocus-pick"><input type="checkbox" class="devfocus-check" data-player-id="' +
+      pid + '"' + checked + ' aria-label="Select for bulk focus"></label>' +
+      api.positionSelectHtml(p) +
+    '</td>' +
+    '<td class="c-devfocus">' + api.focusSelectHtml(p) + '</td>';
+}
+
+function fccDevFocusFranchiseId() {
+  return (typeof franchiseId !== 'undefined' && franchiseId)
+    || new URLSearchParams(window.location.search).get('franchise_id')
+    || '';
+}
+
+/** Keep the cached roster objects in step with a saved change, so re-renders show it. */
+function fccDevFocusApplyToCache(playerId, field, value) {
+  const resolvedKey = field === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position';
+  [userRosterDataCache && userRosterDataCache.players, userRosterPlayersCache, rosterTableDataForSorting]
+    .forEach((list) => {
+      (list || []).forEach((p) => {
+        if (String(p._id || p.player_id) === String(playerId)) {
+          p[field] = value;
+          p[resolvedKey] = value;
+        }
+      });
+    });
+}
+
+function fccBindDevelopmentFocus(tbody) {
+  const api = window.GOBDevelopmentFocus;
+  if (!api || !tbody) return;
+  api.bind(tbody, fccDevFocusFranchiseId, fccDevFocusApplyToCache);
+
+  tbody.querySelectorAll('.devfocus-check').forEach((box) => {
+    if (box.dataset.devfocusBound) return;
+    box.dataset.devfocusBound = '1';
+    box.addEventListener('change', () => {
+      const pid = String(box.dataset.playerId || '');
+      if (box.checked) FCC_DEVFOCUS_SELECTED.add(pid); else FCC_DEVFOCUS_SELECTED.delete(pid);
+      fccUpdateDevFocusBulkBar();
+    });
+  });
+  fccUpdateDevFocusBulkBar();
+}
+
+function fccUpdateDevFocusBulkBar() {
+  const api = window.GOBDevelopmentFocus;
+  const bar = document.getElementById('devfocus-bulk');
+  const count = document.getElementById('devfocus-bulk-count');
+  const select = document.getElementById('devfocus-bulk-value');
+  if (!api || !bar || !count || !select) return;
+  const n = FCC_DEVFOCUS_SELECTED.size;
+  bar.hidden = n === 0;
+  count.textContent = n + ' selected';
+  if (!select.options.length) {
+    select.innerHTML = api.FOCUSES
+      .map((f) => '<option value="' + f.value + '">' + f.label + '</option>').join('');
+  }
+  const apply = document.getElementById('devfocus-bulk-apply');
+  const clear = document.getElementById('devfocus-bulk-clear');
+  if (apply && !apply.dataset.bound) {
+    apply.dataset.bound = '1';
+    apply.addEventListener('click', () => {
+      const ids = Array.from(FCC_DEVFOCUS_SELECTED);
+      if (!ids.length) return;
+      apply.disabled = true;
+      api.bulkSetFocus(fccDevFocusFranchiseId(), ids, select.value, fccDevFocusApplyToCache)
+        .then(() => {
+          FCC_DEVFOCUS_SELECTED.clear();
+          fccRosterSortBy(FCC_ROSTER_STATE.sortKey, FCC_ROSTER_STATE.sortDir);
+        })
+        .finally(() => { apply.disabled = false; });
+    });
+  }
+  if (clear && !clear.dataset.bound) {
+    clear.dataset.bound = '1';
+    clear.addEventListener('click', () => {
+      FCC_DEVFOCUS_SELECTED.clear();
+      document.querySelectorAll('.devfocus-check').forEach((b) => { b.checked = false; });
+      fccUpdateDevFocusBulkBar();
+    });
+  }
 }
 
 /** Grouped 2-row attribute header + its per-attribute sort controls. */
@@ -3108,6 +3209,11 @@ function fccNormalizePracticePlayer(p) {
     attributes: p.attributes || {},
     rt: best.rating != null ? best.rating : null,
     potential_rt_ratcheted: p.potential_rt_ratcheted != null ? p.potential_rt_ratcheted : null,
+    position_ratings: p.position_ratings || {},
+    training_position: p.training_position || null,
+    training_focus: p.training_focus || null,
+    resolved_training_position: p.resolved_training_position || null,
+    resolved_training_focus: p.resolved_training_focus || null,
   };
 }
 
@@ -3132,6 +3238,9 @@ function bindFccRosterScope() {
     btn.dataset.scopeBound = '1';
     btn.addEventListener('click', () => {
       FCC_ROSTER_STATE.scope = btn.dataset.rosterScope;
+      // A selection made on Varsity has no rows on Practice Squad; leaving the bar up
+      // would offer to set a focus on players the coach can no longer see.
+      FCC_DEVFOCUS_SELECTED.clear();
       buttons.forEach((b) => b.setAttribute('aria-pressed',
         b.dataset.rosterScope === FCC_ROSTER_STATE.scope ? 'true' : 'false'));
       renderFccRosterBody();
@@ -3147,8 +3256,9 @@ function renderFccRosterBody() {
     const rows = fccPracticeSquadPlayers().map(fccNormalizePracticePlayer);
     tbody.innerHTML = rows.length
       ? rows.map((p) => '<tr>' + fccRosterRowHtml(p, { link: false }) + '</tr>').join('')
-      : '<tr><td colspan="7" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No practice-squad players.</td></tr>';
+      : '<tr><td colspan="9" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No practice-squad players.</td></tr>';
     updateFccRosterCounts();
+    fccBindDevelopmentFocus(tbody);
     if (typeof initAttributeTooltips !== 'undefined') {
       initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
     }
@@ -3188,6 +3298,13 @@ function renderTeam(data) {
         has_playing_time_promise: !!p.has_playing_time_promise,
         is_graduating: !!p.is_graduating,
         walk_on: !!p.walk_on,
+        // Development Focus. Carried explicitly: this mapper cherry-picks fields, so an
+        // omission here reaches the control as a blank rather than as his real setting.
+        position_ratings: p.position_ratings || {},
+        training_position: p.training_position || null,
+        training_focus: p.training_focus || null,
+        resolved_training_position: p.resolved_training_position || null,
+        resolved_training_focus: p.resolved_training_focus || null,
       };
       return player;
     } catch (error) {
@@ -3209,6 +3326,7 @@ function renderTeam(data) {
   });
   renderFccRosterAttrHeader();
   bindFccRosterScope();
+  fccBindDevelopmentFocus(tbody);
 
   // Initialize tooltips. Scoped to the parent table so the grouped header's sort
   // controls and every tile get their hover copy.
@@ -3439,6 +3557,15 @@ function sortRosterTable(columnName, direction) {
     } else if (dataKey === 'weight') {
       val1 = parseInt(a.weight) || 0;
       val2 = parseInt(b.weight) || 0;
+    } else if (dataKey === 'TrainPos' || dataKey === 'Focus') {
+      // Both sort by the RESOLVED value, which is what the control shows — sorting on the
+      // raw field would scatter every legacy player who has nothing stored.
+      const api = window.GOBDevelopmentFocus;
+      if (!api) return 0;
+      const order = dataKey === 'TrainPos' ? api.POSITIONS : api.FOCUSES.map((f) => f.value);
+      const rank = (p) => order.indexOf(dataKey === 'TrainPos' ? api.positionOf(p) : api.focusOf(p));
+      val1 = rank(a);
+      val2 = rank(b);
     } else {
       // Attribute columns
       const attrsA = a.attributes || {};
@@ -3464,6 +3591,9 @@ rosterTableDataForSorting.forEach((p) => {
     tr.innerHTML = fccRosterRowHtml(p);
     tbody.appendChild(tr);
   });
+
+  // The rows are new DOM nodes, so the previous listeners went with the old ones.
+  fccBindDevelopmentFocus(tbody);
 
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);

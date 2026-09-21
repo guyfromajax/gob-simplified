@@ -37,9 +37,10 @@ training_position → position_intent → highest current position rating → SF
 The backend training-player producer carries `training_position`, `position_intent`, and
 `resolved_training_position`. Browser pricing consumes the server-resolved field; user budget
 validation, execution floors, CPU grouping/reference focus, Team Builder floor validation, and
-offseason development call the same canonical resolver. There is currently no product/UI write
-path that lets a user change `training_position`; generation supplies `position_intent`, and
+offseason development call the same canonical resolver. Generation supplies `position_intent`;
 rollover defaults a missing `training_position` to that intent and then carries it forward.
+A coach **can** change `training_position` from the roster surfaces — see **Development Focus**
+below. `position_intent` (the natural fit) is never rewritten by that change.
 
 Player Maximizer **Positional Focus is intentionally separate**: it selects its fixed attribute
 triple from the player's highest current RT, not from `training_position`.
@@ -199,11 +200,45 @@ While training runs, `PageLoadOverlay` uses its separate `newswire` variant to r
 
 ### Position fit and class taper
 
-Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO 91%, JR 95%, SR 100% (JR/SR raised from 80/71 on 2026-08-14 — flat decay was making upperclassmen regress in-season; the bump flips JR/SR net positive without touching FR/SO or decay). The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`.
+Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO 91%, JR 95%, SR 100% (JR/SR raised from 80/71 on 2026-08-14 — flat decay was making upperclassmen regress in-season; the bump flips JR/SR net positive without touching FR/SO or decay). The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`. Since Development Focus, `position_fit` is the profile lookup `TRAINING_FOCUS_PERCENTAGES[position][focus][attr]` — **one** multiplier, not a fit term times a focus term. `standard` aliases `TRAINING_GAIN_PERCENTAGES[position]`, so a player on the default focus trains exactly as before.
 
 This moved the fractional component off the budget so the user always sees and spends whole points while retaining the original cross-position granularity. Shape floors and `resolve_training_position()` are unchanged.
 
 **Player-facing surface:** the position-fit percentages are published to coaches as a read-only chart at `FrontEnd/static/tutorial-advanced-training-by-position.html` (Tutorials → Advanced Topics → Training by Position; hub id `training-by-position`). The page is hand-authored from `TRAINING_GAIN_PERCENTAGES` — **it does not read the table at runtime, so any retune of those percentages must be mirrored there.** Class-year taper is deliberately omitted from that page.
+
+### Development Focus
+
+Per-player training profile, selected by **position × focus**. Replaces the position-only
+lookup. FPD is authoritative; changing either value affects **future** training only.
+
+| | |
+|---|---|
+| Positions | PG SG SF PF C |
+| Focuses | `standard` `offensive` `defensive` `athletic` `fundamentals` `rebounding` |
+| Profiles | 30 (5 × 6), each totalling **808** across the 12 attributes |
+| Locked at 100% in every profile | FT, IQ, ND |
+| Stored on FPD | `training_position`, `training_focus` |
+| Resolvers | `resolve_training_position()`, `resolve_training_focus()` — a missing or unknown stored value degrades to the default rather than raising mid-week |
+| Multiplier | `training_attr_gain_multiplier(position, attr, focus)`; `player_attr_gain_multiplier(player, attr)` resolves both off the player |
+
+**Where a coach sets it.** FCC roster tab and the roster page: inline **TRAIN** and **DEV
+FOCUS** dropdowns, plus a bulk set (tick rows → choose a focus → Set focus). Player detail
+shows both read-only, under the position ratings, with the training position tagged inside
+the ratings list. All three save through `POST /franchise/player/development-focus`, which
+validates against `POSITIONS` / `TRAINING_FOCUSES` and **rejects** an unknown value rather
+than coercing it.
+
+**User's own team only.** `/roster/{team}` returns `is_user_team` and attaches the four
+development keys only for that team, so another team's roster cannot render a control the
+write route would reject. Ownership is `_player_on_user_team` (`api.py`): the franchise doc
+holds `user_team_id` (team **name**) and `user_team_object_id` (**id**), FPD `meta` mirrors
+both as `meta.team` / `meta.team_id` — compare like with like. Practice-squad rows are
+outside the editor; that payload does not carry the two fields.
+
+**Player Maximizer** resolves its positional-focus triple from the same
+`resolve_training_position`, so the two features cannot disagree about a converted player.
+
+Full design, phases and settled decisions: `_documentation_master/projects/GOB_DEVELOPMENT_FOCUS_PLAN.md`.
 
 ### Coaching Focus Selection
 
@@ -867,7 +902,8 @@ Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shap
 **FPD / Franchise Player Data:**
 - `attributes.anchor_{attr}` and `attributes.{attr}` - Updated player attribute values
 - `position_ratings` - Recalculated position ratings after training
-- `training_position`, `position_intent` - Persisted position identity used by the canonical resolver
+- `training_position`, `position_intent` - Persisted position identity used by the canonical resolver. `training_position` is coach-editable; `position_intent` is the natural fit and is not rewritten by that edit
+- `training_focus` - One of the six Development Focus values; defaults to `standard`. Backfilled additively onto existing FPDs by `scripts/backfill_development_focus.py`
 - `training_gain_remainders.{attr}` - Fractional positive-gain carry stored beside, never inside, `attributes`; read and written only by franchise training and carried across season rollover through `PLAYER_DEV_CARRY_FIELDS`. It is never stored on universal/core `players`.
 - `attributes.NG` - Updated NG value when conditioning or scrimmages apply energy reduction
 - `meta.height` and `meta.weight` (integer inches / pounds) — carried on the FPD; **career HT/WT growth is applied at offseason rollover** (`develop_one_offseason`), not at training camp. If `meta` omitted height/weight (legacy or lazy FPD row), `run_franchise_training` backfills missing values from the universal `players` document before training runs; `finalize_game` lazy FPD inserts also copy height/weight/year/jersey from `players` into `meta`.
@@ -897,13 +933,16 @@ Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shap
 - `FrontEnd/static/training-report.html` - Training report display page
 - `FrontEnd/static/training-report.css` - Report page styling
 - `FrontEnd/static/training-report.js` - Report data loading and rendering
-- `FrontEnd/static/franchise-command-center.js` - Schedule rendering with training report links
+- `FrontEnd/static/franchise-command-center.js` - Schedule rendering with training report links; roster-tab Development Focus columns and bulk set
+- `FrontEnd/static/js/shared/developmentFocus.js` - The one implementation of the Development Focus controls (FCC roster tab, roster page, player detail)
+- `FrontEnd/static/team-roster-view.js` - Roster page Development Focus columns (user's own team only)
 
 **Backend:**
 - `BackEnd/models/training_execution_v2.py` - Core training execution logic (gains, remainder, floor clamp)
-- `BackEnd/constants/training_shape.py` - Camp weeks/flat budgets/gain scale, position-fit divisors, class gain taper, P6 floors, `training_points_spent`
+- `BackEnd/constants/training_shape.py` - Camp weeks/flat budgets/gain scale, position-fit divisors, class gain taper, P6 floors, `training_points_spent`, the 30 Development Focus profiles
+- `scripts/backfill_development_focus.py` - Additive, idempotent FPD backfill for `training_position` / `training_focus`
 - `BackEnd/models/training_notes.py` - Structured training-notes generation for report sections
-- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/cpu-train`) and CPU auto-training/idempotency; also `GET /franchise/training-report`, `GET /franchise/schedule`, and `GET /franchise/league-news`.
+- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/cpu-train`, `player/development-focus`) and CPU auto-training/idempotency; also `GET /franchise/training-report`, `GET /franchise/schedule`, and `GET /franchise/league-news`.
 - `BackEnd/utils/franchise_league_news.py` - Consolidated, pre-ranked training newswire payload
 - `BackEnd/utils/franchise_training_state.py` - Split-phase completion helpers for FCC and cuts
 - `BackEnd/utils/franchise_coaching_focus_counts.py` - FTD `coaching_focus` archetype counters (user team)

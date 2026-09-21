@@ -80,23 +80,23 @@ lookup, it does not multiply with it.
 
 Each phase is independently shippable.
 
-### Phase 1 — Matrix + resolver (no behaviour change)
+### Phase 1 — Matrix + resolver (no behaviour change) — **SHIPPED**
 - Add the 30 profiles to `BackEnd/constants/training_shape.py` as `TRAINING_FOCUS_PERCENTAGES[pos][focus][attr]`.
 - `training_attr_gain_multiplier(position, attr, focus="standard")`; `player_attr_gain_multiplier` resolves focus off the player.
 - `resolve_training_focus(player)` mirroring `resolve_training_position`, defaulting to `standard`.
 - **Gate:** `standard` output is byte-identical to today for all 5 positions × 12 attrs.
 
-### Phase 2 — Data model + backfill
+### Phase 2 — Data model + backfill — **SHIPPED**
 - FPD reads/writes for both fields; validation against the six stored values (reject, don't coerce silently).
 - Backfill script in `scripts/` (repo already has `backfill_*.py` precedent), **idempotent, additive-only, never deletes or replaces existing docs**.
 - Creation paths default both fields: franchise init, recruit signing, walk-ons, transfers, season rollover.
 
-### Phase 3 — Execution wiring
+### Phase 3 — Execution wiring — **SHIPPED**
 - Focus flows through camp + in-season.
 - Align `positional_focus_attrs_for_player()` (`training_execution_v2.py:251`) to the same resolved position, so Player Maximizer and Development Focus can't disagree.
 - CPU autotrain reads the field (all `standard` for now).
 
-### Phase 4 — Roster UI (the editor) + player detail (read-only)
+### Phase 4 — Roster UI (the editor) + player detail (read-only) — **SHIPPED**
 **Roster — the only editor.**
 - `franchise-command-center.html` `#roster-tab` + `team-roster-view.html`: **Position** and **Development Focus** columns, user's team only.
 - Inline dropdowns, no modal. Multi-select → bulk set.
@@ -107,6 +107,35 @@ Each phase is independently shippable.
 - The training position is **marked inside the ratings list** so "where he rates" and "where he is coached" read in one glance.
 - **User's team only.** Opponent and scouted players show nothing at all — not an empty block, not a dash. **Recruits keep the existing recruiting block**, which occupies the same slot and has no FPD training fields until they sign.
 - **STATUS section removed**, with it `momentum` (it resets to zero at the end of every game, so a profile page shows `0` nearly always). The **attitude emoji moves to the identity line** — `SR · #37 · 😐` — keeping its tooltip.
+
+**As built.**
+
+| Piece | Where |
+|---|---|
+| Shared controls (one implementation) | `FrontEnd/static/js/shared/developmentFocus.js` |
+| FCC roster tab | `franchise-command-center.js` — `fccDevelopmentCellsHtml`, `fccBindDevelopmentFocus`, `fccUpdateDevFocusBulkBar` |
+| Roster page | `team-roster-view.js` — `trShowDevelopment`, columns in `trAttrHeadHtml` / `trAttrRowHtml` |
+| Player detail (read-only) | `player-detail.js` — `buildDevelopmentBlock` |
+| Styles | `css/attr-tiles.css` — `.devfocus-*` |
+| Write route | `POST /franchise/player/development-focus` (`franchise_routes.py`) |
+
+**Ownership gate — the one thing everything hangs off.** The franchise document carries
+`user_team_id` (the team **name**) and `user_team_object_id` (the **id**); FPD `meta`
+mirrors both as `meta.team` / `meta.team_id`. Compare like with like. The first revision
+compared `meta.team_id` against `user_team_id`, which matches nothing — the player-page
+block never rendered and every save returned 403. Now one helper, `_player_on_user_team`
+(`api.py`), accepts either pairing; `/roster/{team}` emits `is_user_team` and attaches the
+four development keys **only** for the user's own team, so no view can render a control
+the write route would reject. Verified against gob-staging: exactly 12 own-team FPD docs
+per franchise out of 1,536.
+
+**Scope of the controls.** Varsity, user's own team, attributes view. Practice-squad rows
+render nothing — the practice payload does not carry the two fields, so a control there
+would show an invented default as if the coach had chosen it.
+
+**Re-render discipline.** First paint, sort and scope switch each replace every row, so
+each rebinds; a save writes back into the in-memory roster caches, so the next sort does
+not repaint the pre-change value. A failed save reverts the control and says so.
 
 ### Phase 5 — Training page
 Prototyped and approved:
@@ -171,4 +200,5 @@ focus-aware floors · changing `position_intent` semantics · any gameplay/lineu
 ## 8. Open items
 
 1. **Desktop build asset path** — if the packaging step needs a manifest entry, the generator should write where it expects.
-2. **Roster bulk-set interaction** — multi-select then apply is specified; exact affordance is a UI detail for Phase 4.
+2. ~~**Roster bulk-set interaction**~~ — settled in Phase 4: a checkbox in the TRAIN cell, with a count + focus select + Set focus / Clear bar in the roster toolbar, shown only while something is selected. Selection clears on a scope switch.
+3. **Practice-squad development** — PS players carry no training position/focus on the roster payload, so they are outside the editor. Revisit if PS training is ever meant to be shaped.

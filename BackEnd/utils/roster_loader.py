@@ -12,6 +12,8 @@ franchise_team_data_collection = _store.franchise_team_data_collection
 from pymongo.errors import PyMongoError
 from bson import ObjectId
 
+from BackEnd.constants.training_shape import training_position_projection
+
 
 
 def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict | None, List[Dict]]:
@@ -67,8 +69,13 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                         # entry_tier + potential_factor feed the Potential Rating display
                         # projection (§Phase 4). A narrow projection here silently dropped
                         # them before — see the Mongo-projection audit note in the dev docs.
+                        # training_position / training_focus feed the Development Focus
+                        # columns (GOB_DEVELOPMENT_FOCUS_PLAN.md phase 4). Same trap as the
+                        # note above: omit them here and the roster silently shows every
+                        # player as Standard, because the read-side resolver defaults.
                         {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1,
-                         "entry_tier": 1, "potential_factor": 1}
+                         "entry_tier": 1, "potential_factor": 1,
+                         "training_position": 1, "training_focus": 1}
                     ))
                     franchise_query_time = (time.time() - franchise_query_start) * 1000
                     # logger.warning(f"⏱️ [DB TIMING] franchise_players_data find (franchise_id={franchise_id}): {franchise_query_time:.2f}ms, found {len(fpd_docs)} FPD docs")
@@ -114,6 +121,9 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                             # /roster payload can compute the projected ceiling (§Phase 4).
                             base_player["entry_tier"] = franchise_player_data.get("entry_tier")
                             base_player["potential_factor"] = franchise_player_data.get("potential_factor")
+                            # Development Focus: raw values plus the resolved pair, so the UI
+                            # shows what training will actually use for a legacy player.
+                            base_player.update(training_position_projection(franchise_player_data))
                             if meta.get("height") is not None:
                                 base_player["height"] = meta.get("height")
                             if meta.get("weight") is not None:

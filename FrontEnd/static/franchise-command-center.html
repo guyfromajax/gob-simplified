@@ -164,6 +164,14 @@
           <button type="button" class="scope-btn" data-roster-scope="varsity" aria-pressed="true">Varsity<span class="n" data-scope-count="varsity">0</span></button>
           <button type="button" class="scope-btn" data-roster-scope="practice" aria-pressed="false">Practice Squad<span class="n" data-scope-count="practice">0</span></button>
           <span class="attr-rowcount" id="roster-rowcount"></span>
+          <!-- Bulk set: a 12-man roster set one dropdown at a time is the thing that makes
+               a coach stop using the feature. -->
+          <span class="devfocus-bulk" id="devfocus-bulk" hidden>
+            <span class="devfocus-bulk-count" id="devfocus-bulk-count">0 selected</span>
+            <select id="devfocus-bulk-value" aria-label="Development focus for selected players"></select>
+            <button type="button" class="devfocus-bulk-apply" id="devfocus-bulk-apply">Set focus</button>
+            <button type="button" class="devfocus-bulk-clear" id="devfocus-bulk-clear">Clear</button>
+          </span>
         </div>
         <section class="fcc-data-card">
           <div class="fcc-data-card-body scroll-x">
@@ -176,6 +184,9 @@
                   <th data-sort-col="Year">YR</th>
                   <th data-sort-col="Height">HT</th>
                   <th data-sort-col="Weight">WT</th>
+                  <!-- Development Focus: user's own roster only, hidden for every other team. -->
+                  <th class="c-devpos" data-sort-col="TrainPos">TRAIN</th>
+                  <th class="c-devfocus" data-sort-col="Focus">DEV FOCUS</th>
                   <!-- Grouped 2-row header (pair labels + per-attribute sort controls) is a
                        CSS grid inside this one cell, so it sticks as a single unit. -->
                   <th class="attr-tiles-head" id="fcc-roster-attr-head"></th>
@@ -552,6 +563,7 @@
   <script src="/js/shared/recruitingButtonState.js"></script>
   <script src="/js/shared/bigNewsModals.js"></script>
   <script src="/js/shared/tierEmblem.js"></script>
+  <script src="/js/shared/developmentFocus.js"></script>
   <script src="/franchise-command-center.js"></script>
 </body>
 </html>

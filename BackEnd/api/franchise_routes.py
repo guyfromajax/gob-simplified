@@ -9670,7 +9670,8 @@ def set_player_development_focus(
         oid = ObjectId(body.franchise_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
-    franchise = db.franchises.find_one({"_id": oid}, {"user_id": 1, "user_team_id": 1})
+    franchise = db.franchises.find_one(
+        {"_id": oid}, {"user_id": 1, "user_team_id": 1, "user_team_object_id": 1})
     if not franchise:
         raise HTTPException(status_code=404, detail="Franchise not found")
     if str(franchise.get("user_id") or "") != str(user["user_id"]):
@@ -9683,9 +9684,18 @@ def set_player_development_focus(
     if not fpd:
         raise HTTPException(status_code=404, detail="Player not found in this franchise")
 
-    user_team_id = str(franchise.get("user_team_id") or "")
-    player_team_id = str((fpd.get("meta") or {}).get("team_id") or "")
-    if not user_team_id or player_team_id != user_team_id:
+    # user_team_id is the team NAME; user_team_object_id is the id. FPD meta carries both
+    # (meta.team / meta.team_id), so compare like with like — an earlier revision compared
+    # meta.team_id against the name and rejected every write with 403.
+    user_team_name, user_team_object_id = get_user_team_from_franchise(franchise)
+    meta = fpd.get("meta") or {}
+    player_team_object_id = str(meta.get("team_id") or "")
+    player_team_name = str(meta.get("team") or "")
+    on_user_team = (
+        (user_team_object_id and player_team_object_id == str(user_team_object_id))
+        or (user_team_name and player_team_name == str(user_team_name))
+    )
+    if not on_user_team:
         raise HTTPException(status_code=403, detail="Player is not on your team")
 
     updates["updated_at"] = datetime.utcnow()

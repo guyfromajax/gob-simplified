@@ -49,6 +49,24 @@ def _persisted_strategy_settings(team) -> dict:
     return getattr(team, "strategy_settings", {}) or {}
 
 
+def _player_on_user_team(franchise_doc, player_meta) -> bool:
+    """Is this FPD player on the franchise owner's OWN team?
+
+    Development Focus renders and saves for the user's team alone. The franchise document
+    stores BOTH identifiers — ``user_team_id`` is the team NAME and ``user_team_object_id``
+    is the id — and FPD ``meta`` mirrors them as ``team`` / ``team_id``. Either pairing is
+    accepted; comparing across the two (name vs id) matches nothing, which is exactly how
+    an earlier revision hid the development block from every player.
+    """
+    fr = franchise_doc or {}
+    meta = player_meta or {}
+    team_name = str(fr.get("user_team_id") or "")
+    team_oid = str(fr.get("user_team_object_id") or "")
+    if team_oid and str(meta.get("team_id") or "") == team_oid:
+        return True
+    return bool(team_name) and str(meta.get("team") or "") == team_name
+
+
 def _saved_player_pts_by_side(saved: dict | None) -> tuple[int, int]:
     """Sum ``players[].stats.PTS`` for home / away sides."""
     home_pts = 0
@@ -6971,11 +6989,23 @@ try:
         # Training Camp is complete. Display gate only — the player keeps its
         # archetype ("Walk On") in the data regardless.
         show_walk_on = False
+        # Development Focus renders for the user's OWN team only. This endpoint serves every
+        # team, so the answer travels with the payload rather than being guessed in the view.
+        is_user_team = False
         if franchise_id:
             try:
                 from BackEnd.utils.franchise_training_state import franchise_training_fully_complete_for_week
-                franchise_doc = franchises_collection.find_one({"_id": ObjectId(franchise_id)}, {"week": 1, "training_status": 1})
+                franchise_doc = franchises_collection.find_one(
+                    {"_id": ObjectId(franchise_id)},
+                    {"week": 1, "training_status": 1, "user_team_id": 1, "user_team_object_id": 1},
+                )
                 franchise_week = franchise_doc.get("week") if franchise_doc else None
+                # `team`, not `team_doc`: team_doc is None for an unmatched lookup, and this
+                # check must not be the thing that throws past franchise_week/show_walk_on.
+                is_user_team = bool(franchise_doc) and (
+                    str(team.get("_id") or "") == str(franchise_doc.get("user_team_object_id") or "")
+                    or str(team.get("name") or "") == str(franchise_doc.get("user_team_id") or "")
+                )
                 try:
                     _wk = int(franchise_week or 1)
                 except (TypeError, ValueError):
@@ -7034,6 +7064,15 @@ try:
                 # preseason, drops once Training Camp completes, and never returns
                 # once they advance past Freshman (the archetype stays in the data).
                 "walk_on": bool(p.get("walk_on")) and show_walk_on and str(p.get("year") or "").strip().lower() == "freshman",
+                # Development Focus (GOB_DEVELOPMENT_FOCUS_PLAN.md phase 4). The user's own
+                # franchise roster only: another team's roster carries no development keys at
+                # all, so no view can render a control the write route would reject.
+                **({
+                    "training_position": p.get("training_position"),
+                    "training_focus": p.get("training_focus"),
+                    "resolved_training_position": p.get("resolved_training_position"),
+                    "resolved_training_focus": p.get("resolved_training_focus"),
+                } if is_user_team else {}),
             })
             
             # ✅ DEBUG: Log final attributes for first player (or Kevin Nelson)
@@ -7261,6 +7300,7 @@ try:
             "practice_squad_recruits": practice_squad_recruits,
             "practice_squad_recruiting_done": practice_squad_recruiting_done,
             "projected_starting_five": projected_starting_five,
+            "is_user_team": is_user_team,
         }
 
         # Record + conference/national rank for the roster page's identity lockup.
@@ -7906,7 +7946,8 @@ try:
             if mode == "franchise" and franchise_id:
                 fpd_doc = franchise_players_data_collection.find_one(
                     {"franchise_id": str(franchise_id), "player_id": str(player_id)},
-                    {"attributes": 1, "position_ratings": 1, "meta": 1, "season": 1, "career": 1},
+                    {"attributes": 1, "position_ratings": 1, "meta": 1, "season": 1, "career": 1,
+                     "training_position": 1, "training_focus": 1},
                 )
                 if fpd_doc:
                     if isinstance(fpd_doc.get("attributes"), dict):
@@ -7921,6 +7962,18 @@ try:
                         player["season"] = fpd_doc["season"]
                     if isinstance(fpd_doc.get("career"), dict):
                         player["career"] = fpd_doc["career"]
+                    # Development Focus, read-only on the player page and shown for the
+                    # user's OWN team only (GOB_DEVELOPMENT_FOCUS_PLAN.md phase 4). The
+                    # franchise doc decides whose team it is; an opponent's player simply
+                    # carries no development block.
+                    _fr = franchises_collection.find_one(
+                        {"_id": ObjectId(str(franchise_id))},
+                        {"user_team_id": 1, "user_team_object_id": 1},
+                    ) if ObjectId.is_valid(str(franchise_id)) else None
+                    if _player_on_user_team(_fr, fpd_doc.get("meta")):
+                        from BackEnd.constants.training_shape import training_position_projection
+                        player.update(training_position_projection(fpd_doc))
+                        player["is_user_team_player"] = True
 
             # Debug logging removed - was cluttering logs
             # logging.debug(f"✅ Player found: {player.get('first_name')} {player.get('last_name')}")

@@ -340,15 +340,16 @@ function cloneParams(params) {
     return Math.max(...ratings);
   }
 
-  function getPlayerMomentum(player) {
-    const momentum = player?.attributes?.MO ?? player?.MO ?? player?.mo ?? player?.momentum;
-    return momentum === undefined || momentum === null || momentum === '' ? '--' : momentum;
-  }
-
   function renderPositionRatingsBlock(player, primaryPosition) {
     const ratings = getPositionRatings(player);
     if (!ratings) return '';
 
+    // Where he is COACHED, marked against where he RATES — the pair a coach needs once a
+    // guard can be developed as a rebounder. User's team only; nothing to mark otherwise.
+    const devApi = window.GOBDevelopmentFocus;
+    const trainingPosition = (player && player.is_user_team_player && devApi)
+      ? devApi.positionOf(player)
+      : null;
     const order = ['PG', 'SG', 'SF', 'PF', 'C'];
     const rows = order.map((position) => {
       const rawValue = ratings[position];
@@ -365,6 +366,7 @@ function cloneParams(params) {
             <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${getRtColor(safeRating)};width:0;"></div>
           </div>
           <div class="pd-pos-rating-value ${isPrimary ? 'is-primary' : ''}">${Number.isFinite(rating) ? formatRtDisplay(rating) : '--'}</div>
+          ${position === trainingPosition ? '<span class="pd-pos-training-tag" title="Training position">TRAINING</span>' : ''}
         </div>
       `;
     }).join('');
@@ -486,7 +488,38 @@ function cloneParams(params) {
     return `<p class="pd-scouting-text">${escaped}</p>`;
   }
 
-  function renderPlayerPage(player) {
+  /**
+ * DEVELOPMENT — read-only training position + Development Focus.
+ *
+ * Sits directly beneath the position-ratings list on purpose: the ratings are the evidence
+ * for the choice, so a coach reads the grades and the decision together. The roster screens
+ * are the only editors (GOB_DEVELOPMENT_FOCUS_PLAN.md phase 4).
+ *
+ * Renders for the USER'S OWN team only — the endpoint omits these fields entirely for an
+ * opponent, so an opponent's page shows nothing here rather than an empty block.
+ */
+function buildDevelopmentBlock(player) {
+  if (!player || !player.is_user_team_player) return '';
+  const api = window.GOBDevelopmentFocus;
+  if (!api) return '';
+  const position = api.positionOf(player);
+  const focus = api.focusLabel(player);
+  return `
+          <div class="pd-divider"></div>
+          <div class="pd-status-label">DEVELOPMENT</div>
+          <div class="pd-dev-grid">
+            <div class="pd-dev-row">
+              <span class="pd-dev-key">Position</span>
+              <span class="pd-dev-val">${position}</span>
+            </div>
+            <div class="pd-dev-row">
+              <span class="pd-dev-key">Focus</span>
+              <span class="pd-dev-val">${focus}</span>
+            </div>
+          </div>`;
+}
+
+function renderPlayerPage(player) {
     const content = document.getElementById('pd-content');
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const staticPrefix = isLocalhost ? '/static' : '';
@@ -520,7 +553,6 @@ function cloneParams(params) {
     const positionAbbrev = getHighestPosition(player);
     const positionConfig = getPositionConfig(positionAbbrev);
     const rtValue = getPlayerOverall(player);
-    const momentumValue = getPlayerMomentum(player);
     const emotionEmoji = getEmotionEmoji(player);
     const portraitBackground = getPortraitBackground(player, staticPrefix);
     const teamPrimaryColor = player.primary_color || POSITION_CONFIG[positionAbbrev]?.color || '';
@@ -543,24 +575,13 @@ function cloneParams(params) {
           <div class="pd-player-name">${fullName}</div>
           <div class="pd-pos-line">${yearJerseyLine}</div>
           <div class="pd-pos-line">${heightWeightLine}</div>
+          ${isRecruit ? '' : `<div class="pd-attitude-line" title="Attitude"><span class="pd-attitude-emoji">${emotionEmoji}</span></div>`}
           <div class="pd-overall">
             <div class="pd-overall-label">OVERALL</div>
             <div class="pd-overall-value">${formatRtDisplay(rtValue)}</div>
           </div>
           ${positionRatingsBlock}
-          ${isRecruit ? buildRecruitingBlock(player) : `
-          <div class="pd-divider"></div>
-          <div class="pd-status-label">STATUS</div>
-          <div class="pd-status-grid">
-            <div class="pd-status-cell">
-              <div class="pd-status-cell-label">ATTITUDE</div>
-              <div class="pd-status-emoji">${emotionEmoji}</div>
-            </div>
-            <div class="pd-status-cell">
-              <div class="pd-status-cell-label">MOMENTUM</div>
-              <div class="pd-status-value">${momentumValue}</div>
-            </div>
-          </div>`}
+          ${isRecruit ? buildRecruitingBlock(player) : buildDevelopmentBlock(player)}
         </aside>
 
         <div class="pd-right-column">

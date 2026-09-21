@@ -41,6 +41,9 @@ let statsSortColumn = 'PTS';
 let statsSortDirection = 'desc';
 // True once Week 35 Recruiting Day has run — recruits join the Practice Squad section.
 let practiceSquadRecruitingDone = false;
+// Development Focus is the user's own roster only. The server decides — this page serves
+// every team, so the flag rides in with the payload rather than being inferred from the URL.
+let trIsUserTeam = false;
 
 const ROSTER_ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
@@ -243,7 +246,8 @@ async function loadRoster() {
     const response = await fetch(url, { headers: authHeaders });
     if (!response.ok) throw new Error(`Failed to load roster: ${response.status}`);
     const data = await response.json();
-    
+    trIsUserTeam = !!data.is_user_team;
+
     rosterData = (data.players || []).map(p => {
       const attrs = p.attributes || {};
       const posRatings = p.position_ratings || {};
@@ -280,7 +284,13 @@ async function loadRoster() {
         highestPos: highestPos || (p.position || '--'),
         photo: p.photo || null,
         hasPlayingTimePromise: !!p.has_playing_time_promise,
-        isGraduating: !!p.is_graduating
+        isGraduating: !!p.is_graduating,
+        // Development Focus: absent entirely on another team's roster, which is what makes
+        // the controls disappear there rather than render an invented default.
+        training_position: p.training_position || null,
+        training_focus: p.training_focus || null,
+        resolved_training_position: p.resolved_training_position || null,
+        resolved_training_focus: p.resolved_training_focus || null
       };
     });
     
@@ -566,6 +576,9 @@ function trAttrHeadHtml() {
     th('name', 'Player', 'c-ident') +
     '<th class="c-rt" data-tr-sort="RT">RT<span class="rt-caption">cur &rarr; pot</span></th>' +
     th('pos', 'POS') + th('year', 'YR') + th('height', 'HT') + th('weight', 'WT') +
+    (trShowDevelopment()
+      ? th('trainpos', 'TRAIN', 'c-devpos') + th('devfocus', 'DEV FOCUS', 'c-devfocus')
+      : '') +
     '<th class="attr-tiles-head">' + grouped + '</th></tr>';
 }
 
@@ -576,8 +589,28 @@ function trAttrRowHtml(p) {
     '<td>' + escapeTrHtml(p.year || '--') + '</td>' +
     '<td>' + escapeTrHtml(p.height || '--') + '</td>' +
     '<td>' + escapeTrHtml(p.weight == null ? '--' : p.weight) + '</td>' +
+    (trShowDevelopment()
+      ? '<td class="c-devpos">' + window.GOBDevelopmentFocus.positionSelectHtml(p) + '</td>' +
+        '<td class="c-devfocus">' + window.GOBDevelopmentFocus.focusSelectHtml(p) + '</td>'
+      : '') +
     '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>' +
     '</tr>';
+}
+
+/** Varsity rows on the user's own franchise roster, and nowhere else. Practice-squad rows
+ *  are excluded because the practice payload does not carry the two fields — a control
+ *  there would show a default as if the coach had chosen it. */
+function trShowDevelopment() {
+  return !!(trIsUserTeam && window.GOBDevelopmentFocus
+    && TR_STATE.view !== 'stats' && TR_STATE.scope !== 'practice');
+}
+
+/** Keep the in-memory row in step with a saved change, so the next sort re-renders it. */
+function trDevFocusApplyToCache(playerId, field, value) {
+  const resolvedKey = field === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position';
+  (rosterData || []).forEach((p) => {
+    if (String(p._id) === String(playerId)) { p[field] = value; p[resolvedKey] = value; }
+  });
 }
 
 // ---------- Season Stats view ----------
@@ -632,6 +665,14 @@ function trSortRows(rows) {
     if (key === 'height') return p.heightRaw || 0;
     if (key === 'weight') return p.weight != null ? p.weight : -1;
     if (key === 'RT') return p.highestRT != null ? p.highestRT : -1;
+    if (key === 'trainpos' || key === 'devfocus') {
+      // Sort on the RESOLVED value — the one the control shows. The raw field is null for
+      // every player who has never been changed, which would sort them all together.
+      const dev = window.GOBDevelopmentFocus;
+      if (!dev) return -1;
+      const order = key === 'trainpos' ? dev.POSITIONS : dev.FOCUSES.map((f) => f.value);
+      return order.indexOf(key === 'trainpos' ? dev.positionOf(p) : dev.focusOf(p));
+    }
     if (tiles.ATTR_KEYS.indexOf(key) !== -1) {
       const v = tiles.tileValue(p.attributes || {}, key);
       return v == null ? -1 : v;
@@ -657,7 +698,9 @@ function renderTrTable() {
   const isStats = TR_STATE.view === 'stats';
   head.innerHTML = isStats ? trStatsHeadHtml() : trAttrHeadHtml();
   if (!rows.length) {
-    const span = isStats ? 1 + TR_STAT_GROUPS.reduce((n, g) => n + g.cols.length, 0) : 7;
+    const span = isStats
+      ? 1 + TR_STAT_GROUPS.reduce((n, g) => n + g.cols.length, 0)
+      : (trShowDevelopment() ? 9 : 7);
     body.innerHTML = '<tr><td colspan="' + span + '" class="tr-empty">No players to show.</td></tr>';
   } else if (isStats) {
     const statsByPid = trStatsByPid();
@@ -670,6 +713,10 @@ function renderTrTable() {
   if (per) per.style.display = isStats ? 'inline-flex' : 'none';
   trUpdateCounts(rows.length);
   trBindSortControls();
+  if (trShowDevelopment()) {
+    // Fresh DOM nodes every render, so this rebinds rather than tops up.
+    window.GOBDevelopmentFocus.bind(body, () => franchiseId || '', trDevFocusApplyToCache);
+  }
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(document.getElementById('roster-table'), ['td', 'th', '.attr-tile', '.attr-abbr']);
   }
