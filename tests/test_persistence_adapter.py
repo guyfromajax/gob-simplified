@@ -1,4 +1,5 @@
 import ast
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -399,3 +400,100 @@ def test_sqlite_collection_round_trip_queries(tmp_path: Path):
     created = coll.find_one({"slug": "p3"})
     assert created["team"] == "Lancaster"
     assert created["rt"] == 5
+
+
+def test_sqlite_generated_columns_and_real_indexes(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    fid = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    store.games_collection.insert_many(
+        [
+            {"_id": "g1", "franchise_id": fid, "week": 1},
+            {"_id": "g2", "franchise_id": fid, "week": 2},
+            {"_id": "g3", "franchise_id": "bbbbbbbbbbbbbbbbbbbbbbbb", "week": 1},
+        ]
+    )
+    cols = {
+        row[1]
+        for row in store._conn.execute('PRAGMA table_xinfo("games")').fetchall()
+    }
+    assert {"g_franchise_id", "g_player_id", "g_team_id"} <= cols
+    indexes = [
+        row[1]
+        for row in store._conn.execute("PRAGMA index_list(games)").fetchall()
+    ]
+    assert any("g_franchise_id" in name for name in indexes)
+    extracted = store._conn.execute(
+        "SELECT g_franchise_id FROM games WHERE id = ?",
+        ('raw:"g1"',),
+    ).fetchone()
+    assert extracted[0] == fid
+    decoded = []
+
+    def counting_select(self, filt=None, **kwargs):
+        rows = orig_select(self, filt, **kwargs)
+        if self.name == "games":
+            decoded.append(len(rows))
+        return rows
+
+    from BackEnd.persistence.sqlite_collection import SqliteCollection
+
+    orig_select = SqliteCollection._select
+    SqliteCollection._select = counting_select
+    try:
+        hits = list(store.games_collection.find({"franchise_id": fid}))
+        by_id = store.games_collection.find_one({"_id": "g2"})
+        residual = store.games_collection.find_one({"_id": "g1", "week": 1})
+        first = store.games_collection.find_one({"franchise_id": fid})
+    finally:
+        SqliteCollection._select = orig_select
+    assert {doc["_id"] for doc in hits} == {"g1", "g2"}
+    assert by_id["week"] == 2
+    assert residual["_id"] == "g1"
+    assert first["franchise_id"] == fid
+    assert decoded == [2, 1, 1, 1]
+
+
+def test_sqlite_persist_transaction_is_one_commit(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    path = store.sqlite_path
+    with store.transaction():
+        store.games_collection.insert_one({"_id": "a", "franchise_id": "f"})
+        store.games_collection.update_one({"_id": "a"}, {"$set": {"week": 1}})
+        store.games_collection.update_one({"_id": "a"}, {"$set": {"week": 2}})
+        other = sqlite3.connect(path)
+        unseen = other.execute("SELECT COUNT(*) FROM games").fetchone()[0]
+        other.close()
+        assert unseen == 0
+    assert store.games_collection.find_one({"_id": "a"})["week"] == 2
+    other = sqlite3.connect(path)
+    seen = other.execute("SELECT COUNT(*) FROM games").fetchone()[0]
+    other.close()
+    assert seen == 1
+
+
+def test_sqlite_migrates_nonempty_legacy_table(tmp_path: Path):
+    path = tmp_path / "save.sqlite"
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE games (id TEXT PRIMARY KEY, doc TEXT NOT NULL)")
+    con.execute(
+        "INSERT INTO games(id, doc) VALUES (?, ?)",
+        ('raw:"g1"', '{"_id":"g1","franchise_id":"fid"}'),
+    )
+    con.commit()
+    con.close()
+    store = SqliteStore(_sqlite_env(tmp_path))
+    assert store.games_collection.find_one({"franchise_id": "fid"})["_id"] == "g1"
+    assert store._conn.execute("SELECT g_franchise_id FROM games").fetchone()[0] == "fid"
+
+
+def test_sqlite_generated_schema_survives_reopen(tmp_path: Path):
+    env = _sqlite_env(tmp_path)
+    first = SqliteStore(env)
+    first.games_collection.insert_one({"_id": "g1", "franchise_id": "fid"})
+    first._conn.close()
+    second = SqliteStore(env)
+    row = second._conn.execute(
+        "SELECT g_franchise_id FROM games WHERE id = ?",
+        ('raw:"g1"',),
+    ).fetchone()
+    assert row[0] == "fid"

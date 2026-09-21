@@ -124,9 +124,25 @@ The paid base game is standalone and requires neither an account nor a network c
 
 ---
 
-## 3. Where the work actually stands (14 Sept 2026)
+## 3. Where the work actually stands (20 Sept 2026)
 
-Stated plainly, because the August draft's calendar assumed progress that did not happen: **WS-1 through WS-6 are unstarted.** Not behind — unstarted.
+**WS-2 engine-localization gate is met (20 Sept 2026).** Evidence, on `ws2/engine-loopback` / PR #594, catalog-loaded loopback + SQLite + spawn pool:
+
+- Full franchise season completed: init / resume, court play, timeouts, training, recruiting weeks 20–26 (20-rank board, 128 visits persisted each week including the user team), EOS 27–34, week 35 recruiting (50-point board, `signed_players` persisted), `finish_season`. Harness: `scripts/ws2_loopback_season.py`.
+- **Zero non-loopback TCP** for the whole run (`scripts/ws2_lsof_sample.sh` on the server and pool children, `remote=0` every sample).
+- Seeded exact-diff **40773** identical across mongo / sqlite / loopback (Lancaster 32 / Bentley-Truman 22).
+- Persist rewritten: generated columns + indexes + persist transactions. One-game finalize+EOG **31 → 2 commits**, **17.5 GB → 354 MB** games-JSON/week, wall **~36 min → 152 s/week** at 257 games and **163 s/week** at 1,600 games (flat). Mongo adapter on the same work is 14.6 s/week (hosted estimate ~21 s); leftover is SQLite full-doc decode of projected FTD/FPD finds — queued, not a WS-2 blocker.
+- Player-wait through a persist-fixed season on this machine: **~6.0 hours** (339 min measured weeks 5→`finish_season`; ~20 min estimated for weeks 1–4 at the week-5 rate). `start-cpu-sims` is 268 of those minutes (sim + persist of the 63-game slate). Projection pushdown is the January-beta cut, not a merge blocker.
+- Spawn pool is the desktop default in code: `apply_loopback_env` `os.environ.setdefault("FRANCHISE_CPU_SIM_USE_POOL", "1")`. Hosted still defaults off.
+
+WS-1 (Mongo/SQLite adapter, PR #593) and WS-2 (this PR) are implemented and unmerged. WS-3 through WS-8, the catalog sidecar, and the projection persist cut are not started as product work. The August-draft claim that WS-1–WS-6 were unstarted is no longer true for WS-1/WS-2.
+
+| | Evidence |
+|---|---|
+| Persistence adapter | `BackEnd/persistence/` — Mongo + SQLite JSON1 stores; franchise-scoped read/write; remotes refuse outside test |
+| Engine localization | Loopback FastAPI factory, local principal, bundle-root paths, desktop pool policy, Nuitka compile spike PASS, season gate PASS |
+| No shell | No Electron, no Tauri, no forge config. `package.json` has one devDependency: `@playwright/test` |
+| No routing split | `api-config.js` still resolves a single base URL by hostname sniffing |
 
 | | Evidence |
 |---|---|
@@ -249,6 +265,7 @@ Not a small adapter. It contains a local object store, two paint paths, a bundle
   - **This bug was masked on the dev machine.** macOS fell through to Arial Bold and looked fine. Windows has neither Arial Bold at that path nor the Liberation fonts, so `ImageFont.truetype` raises and wordmark stamping dies offline. Classic works-on-my-machine, landing on the platform we ship to and do not develop on — and the strongest argument yet for acquiring the Windows reference machine early.
 - **Toolchain is x86_64 under Rosetta 2** (`platform.machine()` → `x86_64`, `uname -m` → `arm64`). Does not affect the spike's conclusions — both were mechanism questions — but it means (a) all recorded spike and capstone timings are translated and therefore pessimistic, the engine is likely faster natively; and (b) compiling today would produce an x86_64 Mac binary running under translation on every Apple Silicon Mac. **If macOS is in scope for March (Open Decision 3), install a native arm64 Python and toolchain before this ships.** Flagged, not fixed here. Clean install, not a migration.
 - **Gate (extended by the spike):** the *full-app* compiled binary spawns pool workers correctly with FastAPI and pymongo in the import graph — the one pool question the minimal reproduction could not answer. Plus: a full franchise season — init, turn-by-turn court play, timeouts and resume, box score, week advancement, training, recruiting, EOS — runs against loopback + SQLite with **zero remote calls**, verified by network monitor, at acceptable performance on a low-end reference machine.
+- **Season half of that gate — MET 20 Sept 2026.** Loopback + SQLite + spawn pool + catalog-loaded save; `SEASON_COMPLETE`; `lsof` remote=0 throughout; exact-diff 40773 three-arm identical. Compiled full-app spawn (FastAPI+pymongo in the import graph) was proven earlier in this workstream. Low-end reference hardware / live-game pool sizing remains §10.1 / January beta, not this merge. Re-run `scripts/ws2_loopback_season.py` after any later loopback-path change.
 
 ### WS-3: Franchise context provider — *reframed; runs as a continuous grind*
 
@@ -453,13 +470,32 @@ Desktop requires a **policy, not a constant**, built on one rule:
 
 **Measure it in the WS-2 spike:** on a 4-core reference machine, run phase A concurrently with a live animated game and find the worker count that keeps the frame rate clean. That number, not the Railway default, is the desktop default.
 
-### 10.2 SQLite improves sim performance — *assumption contradicted for EOG persist*
+### 10.2 SQLite is a tailwind only for point lookups — *measured*
 
-The capstone's figures normalize DB wait to Railway's colocated Atlas (~1–3 ms). The plan assumed **local SQLite is sub-millisecond with no network hop**, so every DB wait shrinks and the persistence migration is a performance *tailwind* for the sim.
+The capstone's figures normalize DB wait to Railway's colocated Atlas (~1–3 ms). The plan assumed **local SQLite is sub-millisecond with no network hop**, so every DB wait shrinks and the persistence migration is a performance *tailwind*.
 
-**WS-2 measurement (20 Sept 2026) contradicts that for EOG persist, not for the sim.** Catalog-loaded loopback + spawn pool: 63 CPU games sim in 42.4 s (`engine=pool workers=4`). The same week's persist ran ~36 minutes — ~50× the sim. A 26-week season at that persist rate is ~15 hours. January beta testers hit this in week one. §10.2's tailwind still holds for **reads during the sim**; it does **not** hold for EOG persist as the SQLite adapter is written today. That means the persist path is pathological, not "SQLite is slower than Atlas." Do not grind a 26-week season against the unfixed adapter.
+That is true for **point lookups** (`find_one` / `update_one` by `_id`, `franchise_id`, `player_id`, `team_id`) and false for a full-table JSON decode. The adapter as first written did the latter on every call: `SELECT id, doc FROM table`, Python-decode every row, `create_index` a no-op, `_commit()` after every write. A 4-week save (257 game docs / 20.4 MB JSON) paid **31 commits** and **12 full `games` scans** (3,084 docs / 277 MB) per persist — **~1,953 commits** and **17.5 GB** of game-JSON decode per 63-game week, growing with table size. Live persist of that week was **~36 minutes** against a **42.4 s** sim (`engine=pool workers=4`). The tailwind was not "SQLite vs Atlas"; it was the access pattern.
 
-Call-count diagnosis (one already-played game on a 4-week save, 257 game docs / 20.4 MB JSON): `journal_mode=wal`, `synchronous=FULL` (2), **no SQL indexes** (`create_index` is a no-op). Every `find`/`update_one` does `SELECT id, doc FROM table` and decodes the whole table in process. `bulk_write` calls `update_one` per op, each of which scans + `_commit()`. One EOG persist: **31 commits**, **12 full `games` scans** (3,084 docs / 277 MB decoded), **23 full `franchise_players_data` scans** (32,384 docs / 77 MB), **14 full `franchise_team_data` scans** (1,792 docs / 153 MB). ×63 games ≈ 756 `games` scans and **17.5 GB** of game-JSON decode per week, and it grows as `games` accumulates. WAL+fsync is real (1,953 commits/week) but cannot be the 50×; the time is the full-table JSON decode. Fix (not applied): point lookups by primary key / `json_extract`, one transaction around persist, and a `bulk_write` that does not per-op scan+commit. That does not change sim draw order; re-run the 40773 exact-diff only if a patch touches write ordering the sim can observe.
+**Fix applied (20 Sept 2026).** STORED generated columns `g_franchise_id` / `g_player_id` / `g_team_id` (legacy non-empty saves are rewritten on first open — SQLite refuses `ALTER ADD STORED` on a populated table) plus real indexes; SQL compile of `_id` / those three fields with `match_query` residual; `find_one` `LIMIT 1` when the filter fully compiled; one nestable transaction around `finalize_game` and around `_finalize_team_attributes_for_game`. 40773 exact-diff re-run after the rewrite: mongo == sqlite == loopback (Lancaster 32 / Bentley-Truman 22).
+
+**After the fix, same persist path (finalize + EOG), two table sizes:**
+
+| | before (257 games) | after, 4-week (257) | after, late-season (1,600) |
+|---|---|---|---|
+| commits / game | 31 | **2** | **2** |
+| commits / week (×63) | ~1,953 | **126** | **126** |
+| games docs decoded / persist | 3,084 | **63** | **63** |
+| games JSON decoded / week | 17.5 GB | **354 MB** | **354 MB** |
+| persist wall / game | ~34 s (36 min / 63) | **2.42 s** | **2.59 s** |
+| persist wall / week | ~36 min | **152 s** | **163 s** |
+
+The curve is flat. Growing `games` no longer scales persist: 257 → 1,600 game docs is +7% wall, identical decode counts. Remaining decode is FTD/FPD `find({franchise_id})` (whole roster / whole league-team set, does not grow with the season) plus small full scans of `teams` / `defenses`. Total JSON decode is ~2.85 GB/week, dominated by those FTD roster finds, not the games table.
+
+**Sim reads had the same disease and the same fix.** Every `find_one` on a growing table used to full-scan. After: `games.find_one({_id})` and `games.find_one({franchise_id})` decode **1 doc** at both sizes (~5 ms); `find_one({_id, players.playerId})` (the per-play `update_game_stats` residual) is an index seek. 0.67 s/game at week 4 was not going to hold through week 26 on the old adapter. It does now, for any path that is a point lookup. A `find({})` or a `find` whose filter cannot compile still decodes the table — the tailwind is the adapter doing point lookups, not the file format.
+
+A 26-week season at the late-season rate is ~70 minutes of persist, not ~15 hours.
+
+**Mongo adapter baseline (same finalize+EOG, same 257-game save, mongomock — not Atlas).** Persist wall **0.232 s/game / 14.6 s/week**. Writes 16/game (1,008/week); 53 round-trips/game. Hosted add-on at the capstone's 1–3 ms colocated RTT is ~6.7 s/week, so Atlas-shaped persist is ~**21 s/week**. Bytes decoded **48 MB/week** vs SQLite's **2.85 GB** — Mongo applies projections in the engine (`{team_id: 1}` etc.); SQLite still decodes the full JSON document and projects in process. Mongo is materially faster (~10× in-process, ~7× with RTT). The leftover is worth chasing: push projections before decode on FTD/FPD `find({franchise_id})`. Persist is not "just expensive at parity." Capstone hosted week target was 90 s; desktop is still ~195 s (42 s sim + 152 s persist) until that decode is cut. Season resumed 20 Sept 2026 on the catalog-loaded save; do not block it on this follow-up.
 
 ### 10.3 RNG isolation is what makes WS-1 verifiable — protect it
 

@@ -25,6 +25,11 @@ from BackEnd.persistence.sqlite_collection import (
     RemoteUnavailable,
     SqliteCollection,
 )
+from BackEnd.persistence.sqlite_schema import (
+    SqliteConnState,
+    ensure_generated_schema,
+    store_transaction,
+)
 
 
 LOCAL_COLLECTIONS: tuple[str, ...] = (
@@ -209,10 +214,15 @@ class SqliteStore:
         self._conn.execute("PRAGMA foreign_keys=ON")
 
         writable = self.DB_ACCESS != "read"
+        self._state = SqliteConnState(self._conn, self._lock)
         local: dict[str, Any] = {
-            name: SqliteCollection(self._conn, name, writable=writable, lock=self._lock)
+            name: SqliteCollection(
+                self._conn, name, writable=writable, lock=self._lock, state=self._state
+            )
             for name in LOCAL_COLLECTIONS
         }
+        ensure_generated_schema(self._conn, list(LOCAL_COLLECTIONS))
+        self._conn.commit()
 
         allow_remote_memory = db_env.environment == "test"
         remote_db = None
@@ -365,6 +375,10 @@ class SqliteStore:
         self.tournaments_collection.delete_many(either)
         self.franchise_state_collection.delete_many(either)
         self.franchises_collection.delete_one({"_id": oid})
+
+    def transaction(self):
+        """One commit for a persist batch. Nested calls share the same txn."""
+        return store_transaction(self._state)
 
     def ensure_ftd_index(self) -> None:
         self.franchise_team_data_collection.create_index(

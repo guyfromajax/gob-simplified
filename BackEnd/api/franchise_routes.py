@@ -1645,6 +1645,44 @@ def _finalize_team_attributes_for_game(
     team_attribute_changes on the game doc so the box score can display them.
     game_id: string or ObjectId (game doc _id).
     """
+    tx = getattr(_store, "transaction", None)
+    if callable(tx):
+        with tx():
+            return _finalize_team_attributes_for_game_impl(
+                game_id,
+                franchise_id,
+                home_team_id,
+                away_team_id,
+                winner_id,
+                loser_id,
+                winner_score,
+                loser_score,
+                week=week,
+            )
+    return _finalize_team_attributes_for_game_impl(
+        game_id,
+        franchise_id,
+        home_team_id,
+        away_team_id,
+        winner_id,
+        loser_id,
+        winner_score,
+        loser_score,
+        week=week,
+    )
+
+
+def _finalize_team_attributes_for_game_impl(
+    game_id,
+    franchise_id: ObjectId,
+    home_team_id: str,
+    away_team_id: str,
+    winner_id: str,
+    loser_id: str,
+    winner_score: int,
+    loser_score: int,
+    week: int | None = None,
+) -> None:
     try:
         from BackEnd.utils.player_em import apply_franchise_eog_player_em
         apply_franchise_eog_player_em(game_id, franchise_id)

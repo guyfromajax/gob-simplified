@@ -35,6 +35,9 @@ def apply_loopback_env() -> None:
     os.environ["GOB_PERSISTENCE"] = "sqlite"
     os.environ["ENVIRONMENT"] = "development"
     os.environ.setdefault("GOB_SQLITE_PATH", str(default_sqlite_path()))
+    # Desktop default is spawn, not threads. The hosted kill-switch defaults
+    # to "0"; without this setdefault the shipped app pays ~136s/week.
+    os.environ.setdefault("FRANCHISE_CPU_SIM_USE_POOL", "1")
     # Placeholders for env_config only — force a matching pair so a leftover
     # test/web export cannot leave URI=staging and NAME=test for spawn children.
     os.environ["MONGO_URI"] = "mongodb://127.0.0.1:27017/gob-staging"
