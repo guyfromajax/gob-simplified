@@ -4924,6 +4924,13 @@ def _freeze_hco_shot_attempt_geometry(game, skeleton, roles, *, emitted_sync_suc
                 (((steps[shot_step_index].get("_step_state") or {}).get("defense")) or {})
             )
         if not by_position and shot_step_index is not None:
+            # Rule 26b — this fallback is a whole fresh placement build for the shot
+            # contest's defender selection. Announce before redrawing.
+            from BackEnd.utils import placement_freeze as _pf
+            _pf.announce_freeze_miss(
+                "shot_contest_defender_selection",
+                steps[shot_step_index] if shot_step_index < len(steps) else None,
+                shot_step_index, game=game)
             from BackEnd.models.animator import Animator
             grid = Animator(game).compute_defender_grid(
                 skeleton, game.offense_team.lineup, def_lineup
@@ -5539,6 +5546,13 @@ def _hco_step_def_xy(step, bh_pos, off_lineup, def_lineup, off_to_def,
         def _pt(xy):
             return xy
         return stamped_xy, _coord, _loc, _pt
+
+    # Rule 26b — everything below this line is a FRESH get_defender_coords draw, i.e.
+    # the defect Stage 2a removes, reintroduced. Never let it be silent.
+    from BackEnd.utils import placement_freeze as _pf
+    _pf.announce_freeze_miss(
+        "_hco_step_def_xy", step, (step.get("_step_state") or {}).get("index"),
+        extra="zone=%s" % bool(zone))
 
     if zone:
         # Legacy fallback: assign_all_zone_defenders returns HOME frame → flip offense to HOME.
@@ -6457,6 +6471,12 @@ def _hco_resolve_loose_ball(step, contest, passer, off_lineup, def_lineup, off_t
     }
 
 
+def _pf_module():
+    """placement_freeze, imported lazily — this module is imported by it indirectly."""
+    from BackEnd.utils import placement_freeze as _pf
+    return _pf
+
+
 def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
     """Stamp the render's ACTUAL defender placement (``compute_defender_grid`` = the animator's code)
     on each skeleton step as ``step["_step_state"]["defense"]``, so the interception contest
@@ -6471,6 +6491,17 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         steps = (skeleton or {}).get("steps") or []
         if not steps:
             return
+        from BackEnd.utils import placement_freeze as _pf
+        # Stage 3 (GOB_PLACEMENT_SINGLE_BUILD, requires the freeze): under write-once a
+        # build whose every step is already covered is computed and then discarded in
+        # full. Skip it. The predicate demands BOTH rows, and placement is sequential
+        # (defender_placement.py:1219 seeds step N from step N-1), so this skips the
+        # build WHOLE or not at all — there is no partial build here.
+        _skippable = _pf.stamp_build_is_discardable(steps)
+        _skip_now = _skippable and _pf.single_build_enabled()
+        _pf.note_stamp_build(_skippable, _skip_now)
+        if _skip_now:
+            return
         from BackEnd.models.animator import Animator
         # One build; the offense rows it already contains are kept so the sim arm can write all ten
         # players' coords from this same placement (_write_sim_hco_placement_coords).
@@ -6484,10 +6515,25 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         _is_zone_stamp = is_zone_defense((getattr(game, "game_state", {}) or {}).get("defense_playcall"))
         _guard_by_step = (getattr(game, "zone_defender_assignments_by_step", {}) or {}) if _is_zone_stamp else {}
         _empty_pass_drive = []
+        # Stage 2a (GOB_PLACEMENT_FREEZE): WRITE-ONCE on `defense` ONLY. This pass still
+        # runs at all three call sites and still fills gaps — the coverage stamp is
+        # load-bearing (~18% of interceptions) — it just stops OVERWRITING a defender row
+        # that is already there.
+        #
+        # `offense` and `guard` keep refreshing deliberately. They carry no placement
+        # draw, and blocking them too would strip `offense` from the post-subtle beats
+        # that arrive pre-seeded with `defense` alone (:7683) — which would break the
+        # backward scan at :5030 that the SIM arm's coord write depends on, trading a
+        # small cross-build inconsistency for a wrong-moment one.
+        _freeze = _pf.enabled()
+        _blocked = 0
         for i, step in enumerate(steps):
             ss = step.get("_step_state") or {"index": i}
             _dfn = grid.get(i) or {}
-            ss["defense"] = _dfn
+            if _freeze and (ss.get("defense") or {}):
+                _blocked += 1
+            else:
+                ss["defense"] = _dfn
             ss["offense"] = _off_grid.get(i) or {}
             if _is_zone_stamp:
                 ss["guard"] = _guard_by_step.get(i)
@@ -6495,7 +6541,10 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
             # DIAGNOSTIC (2026-07-13): an EMPTY stamped grid for a PASS/DRIVE step makes _hco_step_def_xy
             # fall back to LEGACY reconstruction — which for zone+away emits HOME-frame coords → the
             # batted-OOB / steal contact mirror (ball + deflector fly to the wrong court end). Flag it.
-            if not _dfn:
+            # Under the freeze the effective row is what the step KEPT, not this build's
+            # `_dfn` — otherwise a blocked write with an empty fresh grid would report a
+            # gap on a step that has a perfectly good frozen row.
+            if not (ss.get("defense") or {}):
                 _acts = {((a or {}).get("action") or "").lower() for a in (step.get("pos_actions") or {}).values()}
                 if step.get("_attack_drive") or (_acts & {"pass", "receive"}):
                     _empty_pass_drive.append((i, "drive" if step.get("_attack_drive") else "pass"))
@@ -6504,6 +6553,9 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
                 "🗺️ [STAMP GAP] no stamped defender grid for pass/drive steps %s (whole_grid_empty=%s) → "
                 "these fall back to LEGACY reconstruction (zone+away = the bat-OOB/steal contact mirror). "
                 "game=%s", _empty_pass_drive, not grid, game.game_state.get("game_id"))
+        # "Single producer" is FALSE by design here — a step's row belongs to whoever
+        # created the step. Say so out loud rather than letting the claim drift.
+        _pf.announce_blocked_write("_stamp_contest_defender_grid", _blocked, game)
     except Exception:
         pass
 
@@ -7680,10 +7732,19 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     output_step_index=len(output_steps) - 1,
                 )
                 if _post_def_xy:
-                    beat["_step_state"] = {
-                        "index": len(output_steps) - 1,
-                        "defense": _post_def_xy,
-                    }
+                    # MERGE, not replace. This is the one writer that can clobber a row
+                    # another producer already wrote (reports/placement-freeze-2a §11):
+                    # a wholesale assignment discards `offense` and `guard` alongside
+                    # `defense`, and the SIM arm's coord write scans for `offense`
+                    # (:5030). Under write-once a `defense` already present wins, so the
+                    # beat's own draw is used only where there is nothing to keep.
+                    _beat_ss = beat.get("_step_state")
+                    if not isinstance(_beat_ss, dict):
+                        _beat_ss = {}
+                    _beat_ss["index"] = len(output_steps) - 1
+                    if not (_pf_module().enabled() and (_beat_ss.get("defense") or {})):
+                        _beat_ss["defense"] = _post_def_xy
+                    beat["_step_state"] = _beat_ss
                     _post_def_xy, _post_coord, _post_loc, _post_pt = _hco_step_def_xy(
                         beat, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
                         _def_aggr_call, zone, game_state.get("defense_playcall"),
