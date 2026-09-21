@@ -218,6 +218,8 @@ def training_report_display_movement(old_value: Any, new_value: Any) -> int:
 PLAYER_MAXIMIZER_RANKING_ATTRS = tuple(a for a in TRAINABLE_PLAYER_ATTRS if a != "CH")
 
 # Primary position from max RT → three focus attrs (Player Maximizer / Positional Focus)
+from BackEnd.constants.training_shape import resolve_training_position
+
 POSITIONAL_FOCUS_ATTRS_BY_PRIMARY: Dict[str, Tuple[str, str, str]] = {
     "PG": ("PS", "BH", "IQ"),
     "SG": ("SH", "OD", "AG"),
@@ -249,8 +251,17 @@ def primary_position_from_position_ratings(ratings: Optional[dict]) -> str:
 
 
 def positional_focus_attrs_for_player(player: dict) -> Tuple[str, str, str]:
-    ratings = player.get("position_ratings") or {}
-    pos = primary_position_from_position_ratings(ratings)
+    """The three attrs Player Maximizer / Positional Focus amplifies.
+
+    Uses the player's TRAINING position (coach's choice, then natural fit, then best RT) so
+    this and Development Focus cannot disagree about where a player is being coached: a
+    guard converted to PF should have Maximizer amplify PF attributes, not the guard
+    attributes his ratings still favour. Falls back to the RT-argmax for a player carrying
+    no training position at all.
+    """
+    pos = resolve_training_position(player)
+    if pos not in POSITIONAL_FOCUS_ATTRS_BY_PRIMARY:
+        pos = primary_position_from_position_ratings(player.get("position_ratings") or {})
     return POSITIONAL_FOCUS_ATTRS_BY_PRIMARY.get(pos, POSITIONAL_FOCUS_ATTRS_BY_PRIMARY["PG"])
 
 

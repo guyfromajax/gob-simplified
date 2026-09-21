@@ -339,11 +339,20 @@ def resolve_training_position(player: Mapping) -> str:
 
 
 def training_position_projection(player: Mapping) -> dict[str, Optional[str]]:
-    """Fields every training-player producer must carry into execution/UI."""
+    """Fields every training-player producer must carry into execution/UI.
+
+    Development Focus rides here for the same reason the position does: the builders that
+    assemble training-player dicts (user training, CPU autotrain, the report) cherry-pick
+    fields, so a field that is not in this projection is simply absent by the time
+    execution reads it — and ``resolve_training_focus`` would then silently see every
+    player as ``standard``. Declaring it once means both builders get it.
+    """
     return {
         "training_position": player.get("training_position"),
         "position_intent": player.get("position_intent"),
         "resolved_training_position": resolve_training_position(player),
+        "training_focus": player.get("training_focus"),
+        "resolved_training_focus": resolve_training_focus(player),
     }
 
 
