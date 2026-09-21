@@ -4340,3 +4340,29 @@ global stream.
 
 Present on `develop` (`gob-simplified` `BackEnd/eog_attr_rules.py`, same
 `rng=random` defaults). Not introduced by WS-2.
+
+## [DESKTOP] Phase-b FTD growth (momentum / rank / leans / news) — polish backlog
+
+Logged 2026-09-21 on `ws2/persist-maps-week-projection`. **Do not fix in this PR.**
+Growth is bounded per season because `finish_season` resets FTD, so this is
+polish, not a scaling risk.
+
+After memoize + `g_week` + inclusion projection, a full loopback season is
+49.8 min player-wait (week 5 **128 s**, week 26 **142 s**). The old phase-b
+31 s → 240 s curve was the 63 `games.find_one({week, franchise_id, $or})`
+residual-scanning every franchise game; `g_week` flattened that to ~2.8 s at
+both week 5 and week 26. What still grows (7.8 s → 34.6 s) is FTD-sized:
+
+- **FTD momentum cache.** One `find({franchise_id})` with dotted
+  `team_attributes.*` plus `players`. Inclusion projection does not push down
+  dotted paths, so SQLite decodes all 128 full FTD docs (55.3 MB / 432 KB per
+  team at week 26) to return 0.05 MB. `json_extract` supports dotted paths —
+  likely cheap.
+- **Rank/prestige.** 128 `update_one`s rewriting the whole ~432 KB FTD doc
+  each week.
+- **Recruiting leans.** 0.48 s → 8.98 s over weeks 20–26.
+- **News.** Growing franchise / story blob.
+
+Measured against a true week-26 FTD (snapshot before `finish_season` reset it
+to 2 MB). 40773 identical across mongo / sqlite / loopback after the three
+fixes. `remote=0` on all 239 lsof samples.
