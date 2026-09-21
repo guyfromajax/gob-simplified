@@ -120,17 +120,107 @@ def class_gain_multiplier(year: Optional[str]) -> float:
     return float(pct / 100)
 
 
-def training_attr_gain_multiplier(position: str, attr: str) -> float:
-    """Fraction of raw gain retained from the direct percentage table."""
-    pos = position if position in TRAINING_GAIN_PERCENTAGES else "SF"
-    return float(TRAINING_GAIN_PERCENTAGES[pos].get(attr, 100) / 100)
+
+# ── Development Focus (GOB_DEVELOPMENT_FOCUS_PLAN.md) ────────────────────────
+# A per-player training profile selected by POSITION + FOCUS. The focus redistributes the
+# same cumulative budget as the position profile — every profile totals 808 and FT/IQ/ND stay
+# at 100 — so a focus changes WHERE a trained point lands, never how much development the
+# roster receives in aggregate.
+#
+# `standard` is NOT authored here: it is the live position table above, aliased in below, so
+# the two can never drift and a standard-focus player trains exactly as he did before this
+# feature existed.
+#
+# Focus profiles may break the TRAINING_PHYSICAL_WALLS quarter-value floors ON PURPOSE
+# (Rebounding lifts PG/SG rebounding from 25 to 75). That is the coach converting a player,
+# and it is why the locked wall/ordering invariants stay strict for `standard` and carry a
+# separate, looser rule for focus profiles (tests/test_training_shape_framework.py).
+TRAINING_FOCUSES: Tuple[str, ...] = (
+    "standard", "offensive", "defensive", "athletic", "fundamentals", "rebounding",
+)
+DEFAULT_TRAINING_FOCUS = "standard"
+
+_FOCUS_OVERRIDES: Dict[str, Dict[str, Dict[str, float]]] = {
+    "PG": {
+        "offensive": {"SC": 75, "SH": 80, "PS": 70, "BH": 85, "ID": 25, "OD": 60, "RB": 25, "ST": 25, "AG": 63, "FT": 100, "IQ": 100, "ND": 100},
+        "defensive": {"SC": 30, "SH": 35, "PS": 75, "BH": 90, "ID": 55, "OD": 100, "RB": 25, "ST": 25, "AG": 73, "FT": 100, "IQ": 100, "ND": 100},
+        "athletic": {"SC": 35, "SH": 40, "PS": 68, "BH": 85, "ID": 25, "OD": 60, "RB": 25, "ST": 70, "AG": 100, "FT": 100, "IQ": 100, "ND": 100},
+        "fundamentals": {"SC": 35, "SH": 45, "PS": 100, "BH": 100, "ID": 25, "OD": 70, "RB": 25, "ST": 35, "AG": 73, "FT": 100, "IQ": 100, "ND": 100},
+        "rebounding": {"SC": 30, "SH": 35, "PS": 70, "BH": 85, "ID": 25, "OD": 55, "RB": 75, "ST": 70, "AG": 63, "FT": 100, "IQ": 100, "ND": 100},
+    },
+    "SG": {
+        "offensive": {"SC": 85, "SH": 100, "PS": 62, "BH": 63, "ID": 25, "OD": 55, "RB": 25, "ST": 30, "AG": 63, "FT": 100, "IQ": 100, "ND": 100},
+        "defensive": {"SC": 45, "SH": 90, "PS": 60, "BH": 60, "ID": 55, "OD": 90, "RB": 25, "ST": 25, "AG": 58, "FT": 100, "IQ": 100, "ND": 100},
+        "athletic": {"SC": 40, "SH": 85, "PS": 58, "BH": 55, "ID": 25, "OD": 50, "RB": 25, "ST": 70, "AG": 100, "FT": 100, "IQ": 100, "ND": 100},
+        "fundamentals": {"SC": 45, "SH": 85, "PS": 100, "BH": 100, "ID": 25, "OD": 50, "RB": 25, "ST": 25, "AG": 53, "FT": 100, "IQ": 100, "ND": 100},
+        "rebounding": {"SC": 45, "SH": 85, "PS": 55, "BH": 55, "ID": 25, "OD": 50, "RB": 75, "ST": 70, "AG": 48, "FT": 100, "IQ": 100, "ND": 100},
+    },
+    "SF": {
+        "offensive": {"SC": 100, "SH": 90, "PS": 34, "BH": 34, "ID": 45, "OD": 81, "RB": 45, "ST": 35, "AG": 44, "FT": 100, "IQ": 100, "ND": 100},
+        "defensive": {"SC": 72, "SH": 54, "PS": 34, "BH": 34, "ID": 80, "OD": 100, "RB": 50, "ST": 35, "AG": 49, "FT": 100, "IQ": 100, "ND": 100},
+        "athletic": {"SC": 65, "SH": 49, "PS": 29, "BH": 34, "ID": 45, "OD": 81, "RB": 40, "ST": 75, "AG": 90, "FT": 100, "IQ": 100, "ND": 100},
+        "fundamentals": {"SC": 72, "SH": 54, "PS": 75, "BH": 75, "ID": 40, "OD": 81, "RB": 40, "ST": 30, "AG": 41, "FT": 100, "IQ": 100, "ND": 100},
+        "rebounding": {"SC": 67, "SH": 49, "PS": 34, "BH": 34, "ID": 45, "OD": 81, "RB": 90, "ST": 75, "AG": 33, "FT": 100, "IQ": 100, "ND": 100},
+    },
+    "PF": {
+        "offensive": {"SC": 85, "SH": 77, "PS": 30, "BH": 25, "ID": 57, "OD": 30, "RB": 90, "ST": 89, "AG": 25, "FT": 100, "IQ": 100, "ND": 100},
+        "defensive": {"SC": 45, "SH": 37, "PS": 30, "BH": 25, "ID": 97, "OD": 65, "RB": 90, "ST": 89, "AG": 30, "FT": 100, "IQ": 100, "ND": 100},
+        "athletic": {"SC": 45, "SH": 37, "PS": 30, "BH": 25, "ID": 62, "OD": 30, "RB": 94, "ST": 100, "AG": 85, "FT": 100, "IQ": 100, "ND": 100},
+        "fundamentals": {"SC": 45, "SH": 37, "PS": 75, "BH": 65, "ID": 57, "OD": 25, "RB": 90, "ST": 89, "AG": 25, "FT": 100, "IQ": 100, "ND": 100},
+        "rebounding": {"SC": 54, "SH": 47, "PS": 35, "BH": 25, "ID": 67, "OD": 35, "RB": 100, "ST": 100, "AG": 45, "FT": 100, "IQ": 100, "ND": 100},
+    },
+    "C": {
+        "offensive": {"SC": 95, "SH": 70, "PS": 25, "BH": 25, "ID": 100, "OD": 25, "RB": 83, "ST": 60, "AG": 25, "FT": 100, "IQ": 100, "ND": 100},
+        "defensive": {"SC": 58, "SH": 30, "PS": 28, "BH": 25, "ID": 100, "OD": 80, "RB": 95, "ST": 67, "AG": 25, "FT": 100, "IQ": 100, "ND": 100},
+        "athletic": {"SC": 50, "SH": 25, "PS": 25, "BH": 25, "ID": 100, "OD": 28, "RB": 90, "ST": 100, "AG": 65, "FT": 100, "IQ": 100, "ND": 100},
+        "fundamentals": {"SC": 48, "SH": 25, "PS": 75, "BH": 65, "ID": 100, "OD": 25, "RB": 80, "ST": 65, "AG": 25, "FT": 100, "IQ": 100, "ND": 100},
+        "rebounding": {"SC": 58, "SH": 35, "PS": 28, "BH": 25, "ID": 100, "OD": 37, "RB": 100, "ST": 100, "AG": 25, "FT": 100, "IQ": 100, "ND": 100},
+    },
+}
+
+TRAINING_FOCUS_PERCENTAGES: Dict[str, Dict[str, Dict[str, float]]] = {
+    pos: {"standard": dict(TRAINING_GAIN_PERCENTAGES[pos]), **_FOCUS_OVERRIDES[pos]}
+    for pos in TRAINING_GAIN_PERCENTAGES
+}
+
+
+def resolve_training_focus(player: Mapping) -> str:
+    """The player's Development Focus, or ``standard``.
+
+    Legacy docs carry no ``training_focus``; an unknown or malformed value resolves to
+    ``standard`` rather than raising, because a bad stored string must never stop a week of
+    training from resolving. API writes validate against ``TRAINING_FOCUSES`` at the edge
+    (see the FPD write path) so junk cannot be stored in the first place.
+    """
+    raw = player.get("training_focus")
+    if raw is None and isinstance(player.get("meta"), Mapping):
+        raw = player["meta"].get("training_focus")
+    focus = str(raw or "").strip().lower()
+    return focus if focus in TRAINING_FOCUSES else DEFAULT_TRAINING_FOCUS
+
+def training_attr_gain_multiplier(position: str, attr: str, focus: Optional[str] = None) -> float:
+    """Fraction of raw gain retained for one position + Development Focus.
+
+    ``focus=None`` resolves to ``standard``, which IS the position-only table — so every
+    pre-Development-Focus caller keeps its exact behaviour.
+    """
+    pos = position if position in TRAINING_FOCUS_PERCENTAGES else "SF"
+    foc = focus or DEFAULT_TRAINING_FOCUS
+    if foc not in TRAINING_FOCUSES:
+        foc = DEFAULT_TRAINING_FOCUS
+    return float(TRAINING_FOCUS_PERCENTAGES[pos][foc].get(attr, 100) / 100)
 
 
 def player_attr_gain_multiplier(player: Mapping, attr: str) -> float:
-    """Combined position-fit and class-year multiplier for one player's gain."""
+    """Combined profile (position + focus) and class-year multiplier for one player's gain.
+
+    This is the ONLY multiplier applied for profile fit: the position + focus profile
+    REPLACES the old position-only lookup, it does not stack with it.
+    """
     position = resolve_training_position(player)
+    focus = resolve_training_focus(player)
     year = player.get("year") or ((player.get("meta") or {}).get("year"))
-    return training_attr_gain_multiplier(position, attr) * class_gain_multiplier(year)
+    return training_attr_gain_multiplier(position, attr, focus) * class_gain_multiplier(year)
 
 
 def floor_mult(position: str, attr: str) -> float:
