@@ -21,6 +21,7 @@ FRANCHISE_SRC = (ROOT / "BackEnd" / "api" / "franchise_routes.py").read_text()
 SHARED_JS = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "developmentFocus.js").read_text()
 FCC_JS = (ROOT / "FrontEnd" / "static" / "franchise-command-center.js").read_text()
 TRV_JS = (ROOT / "FrontEnd" / "static" / "team-roster-view.js").read_text()
+FCC_HTML = (ROOT / "FrontEnd" / "static" / "franchise-command-center.html").read_text()
 
 
 def _strip_js_comments(source: str) -> str:
@@ -122,6 +123,62 @@ def test_roster_development_keys_ride_on_ownership_not_on_franchise_mode():
 def test_roster_view_reads_the_flag_rather_than_the_url():
     assert "trIsUserTeam = !!data.is_user_team" in TRV_JS
     assert "function trShowDevelopment()" in TRV_JS
+
+
+# ── one POS column, not a derived one plus a training one ───────────────────
+
+def test_fcc_has_a_single_position_column_titled_pos():
+    head = FCC_HTML[FCC_HTML.index('<th class="c-ident" data-sort-col="Name">'):]
+    head = head[:head.index("</thead>")]
+    assert head.count('data-sort-col="POS"') == 1
+    assert 'data-sort-col="TrainPos"' not in head, "the duplicate training column is gone"
+    assert ">POS<" in head and ">TRAIN<" not in head
+
+
+def test_pos_and_dev_focus_are_adjacent_and_sit_right_after_rt():
+    """One decision, two cells, in the slot POS has always occupied — the vitals follow."""
+    head = FCC_HTML[FCC_HTML.index('<th class="c-ident" data-sort-col="Name">'):]
+    head = head[:head.index("</thead>")]
+    order = [head.index(m) for m in ('data-sort-col="RT"', 'data-sort-col="POS"',
+                                     'data-sort-col="Focus"', 'data-sort-col="Year"')]
+    assert order == sorted(order)
+
+
+def test_the_pos_cell_falls_back_to_the_chip_where_the_control_does_not_apply():
+    """Practice-squad rows must still show a position, just not an editable one."""
+    fn = FCC_JS[FCC_JS.index("function fccDevelopmentCellsHtml"):]
+    fn = fn[:fn.index("\n}")]
+    assert "fccPosChipHtml(p.pos)" in fn
+    assert "FCC_ROSTER_STATE.scope === 'practice'" in fn
+
+
+def test_roster_view_pos_cell_does_the_same():
+    fn = TRV_JS[TRV_JS.index("function trPositionCellHtml"):]
+    fn = fn[:fn.index("\n}")]
+    assert "trPosChipHtml(p.pos)" in fn
+    assert "positionSelectHtml(p)" in fn
+
+
+def test_a_converted_player_still_says_where_his_rt_came_from():
+    """RT is the rating at the NATURAL best position. Once POS shows the training
+    position, a divergence would leave RT labelled by a position the row no longer names."""
+    assert "function fccNaturalPositionHintHtml" in FCC_JS
+    for src in (FCC_JS, TRV_JS):
+        assert "devfocus-natural" in src
+        assert "positionOf(p)" in src
+
+
+def test_the_hint_is_silent_when_the_two_agree():
+    fn = FCC_JS[FCC_JS.index("function fccNaturalPositionHintHtml"):]
+    fn = fn[:fn.index("\n}")]
+    assert "natural === api.positionOf(p)) return ''" in fn
+
+
+def test_pos_sorting_was_broken_and_is_now_wired():
+    """'POS' mapped to 'pos', fell through to the attribute branch, read a non-existent
+    anchor_pos and scored every row 0 — clicking the header did nothing."""
+    assert "dataKey === 'pos' || dataKey === 'Focus'" in FCC_JS
+    assert "if (key === 'pos')" in TRV_JS
 
 
 # ── every re-render rebinds ─────────────────────────────────────────────────

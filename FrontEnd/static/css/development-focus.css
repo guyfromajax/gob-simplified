@@ -107,3 +107,15 @@
 .devfocus-toast.is-open { opacity: 1; transform: translate(-50%, 0); }
 .devfocus-toast.is-error { border-color: rgba(229, 87, 73, .55); background: #2a1a18; }
 @media (prefers-reduced-motion: reduce) { .devfocus-toast { transition: opacity .16s ease; } }
+
+/* Natural best position, shown only when it is no longer the position POS displays.
+   RT is the rating AT the natural position, so a converted player would otherwise carry
+   an RT labelled by a position the row no longer names. Silent when the two agree. */
+.devfocus-natural {
+  margin-left: 6px;
+  font: 600 10px/1 'Inter', sans-serif;
+  letter-spacing: .04em;
+  color: rgba(255, 255, 255, .34);
+  cursor: help;
+}
+.devfocus-natural::before { content: 'nat '; opacity: .7; }

@@ -3051,11 +3051,10 @@ function fccRosterRowHtml(p, opts) {
       name: p.name, jersey: p.jersey, href: href, flags: fccRosterFlagsHtml(p),
     }) + '</td>' +
     '<td class="c-rt">' + fccRtLockupHtml(p.rt, p.potential_rt_ratcheted) + '</td>' +
-    '<td>' + fccPosChipHtml(p.pos) + '</td>' +
+    fccDevelopmentCellsHtml(p) +
     '<td>' + escapeHomeHtml(p.year == null ? '--' : p.year) + '</td>' +
     '<td>' + escapeHomeHtml(p.height == null ? '--' : p.height) + '</td>' +
     '<td>' + escapeHomeHtml(p.weight == null ? '--' : p.weight) + '</td>' +
-    fccDevelopmentCellsHtml(p) +
     '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>';
 }
 
@@ -3065,13 +3064,22 @@ const FCC_DEVFOCUS_SELECTED = new Set();
 
 /** Development Focus cells. The roster tab is the user's own team, so they always render
  *  here; the guard is the shared module's absence (script not loaded) rather than a flag. */
+/**
+ * POS and DEV FOCUS: one decision, two adjacent cells, sitting where POS has always sat.
+ *
+ * There is no separate derived-position column. POS shows the TRAINING position — the one
+ * that actually governs how he develops — as an editable control, and falls back to the
+ * read-only chip wherever the control does not apply. A second column repeating the
+ * natural best position read as duplicated data, because for most players it is.
+ *
+ * Practice-squad rows get the chip: the practice payload does not carry the two fields,
+ * so a control there would show an invented default as if it were his setting.
+ */
 function fccDevelopmentCellsHtml(p) {
   const api = window.GOBDevelopmentFocus;
-  // Practice-squad rows get no controls: the practice payload does not carry the two
-  // fields, so a rendered control would show an invented default as if it were his
-  // setting. Varsity is the roster Development Focus governs.
   if (!api || FCC_ROSTER_STATE.scope === 'practice') {
-    return '<td class="c-devpos"></td><td class="c-devfocus"></td>';
+    return '<td class="c-devpos">' + fccPosChipHtml(p.pos) + '</td>' +
+           '<td class="c-devfocus"></td>';
   }
   const pid = String(p._id || p.player_id || '');
   const checked = FCC_DEVFOCUS_SELECTED.has(pid) ? ' checked' : '';
@@ -3079,8 +3087,21 @@ function fccDevelopmentCellsHtml(p) {
       '<label class="devfocus-pick"><input type="checkbox" class="devfocus-check" data-player-id="' +
       pid + '"' + checked + ' aria-label="Select for bulk focus"></label>' +
       api.positionSelectHtml(p) +
+      fccNaturalPositionHintHtml(p, api) +
     '</td>' +
     '<td class="c-devfocus">' + api.focusSelectHtml(p) + '</td>';
+}
+
+/**
+ * RT is the rating at his NATURAL best position. Once POS shows where he is coached
+ * instead, a converted player's RT would silently label itself with the wrong position —
+ * so the natural fit is named, and only when the two actually differ.
+ */
+function fccNaturalPositionHintHtml(p, api) {
+  const natural = String(p.pos || '').trim();
+  if (!natural || natural === api.positionOf(p)) return '';
+  return '<span class="devfocus-natural" title="Natural fit; RT is his rating here">' +
+    escapeHomeHtml(natural) + '</span>';
 }
 
 function fccDevFocusFranchiseId() {
@@ -3256,7 +3277,7 @@ function renderFccRosterBody() {
     const rows = fccPracticeSquadPlayers().map(fccNormalizePracticePlayer);
     tbody.innerHTML = rows.length
       ? rows.map((p) => '<tr>' + fccRosterRowHtml(p, { link: false }) + '</tr>').join('')
-      : '<tr><td colspan="9" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No practice-squad players.</td></tr>';
+      : '<tr><td colspan="8" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No practice-squad players.</td></tr>';
     updateFccRosterCounts();
     fccBindDevelopmentFocus(tbody);
     if (typeof initAttributeTooltips !== 'undefined') {
@@ -3557,15 +3578,20 @@ function sortRosterTable(columnName, direction) {
     } else if (dataKey === 'weight') {
       val1 = parseInt(a.weight) || 0;
       val2 = parseInt(b.weight) || 0;
-    } else if (dataKey === 'TrainPos' || dataKey === 'Focus') {
-      // Both sort by the RESOLVED value, which is what the control shows — sorting on the
-      // raw field would scatter every legacy player who has nothing stored.
+    } else if (dataKey === 'pos' || dataKey === 'Focus') {
+      // Sort on what the column DISPLAYS. POS previously fell through to the attribute
+      // branch, read a non-existent anchor_pos and scored every row 0, so clicking it did
+      // nothing; it now ranks PG→C on the same value the cell shows. Focus sorts on the
+      // RESOLVED value for the same reason — the raw field is null for anyone unchanged.
       const api = window.GOBDevelopmentFocus;
       if (!api) return 0;
-      const order = dataKey === 'TrainPos' ? api.POSITIONS : api.FOCUSES.map((f) => f.value);
-      const rank = (p) => order.indexOf(dataKey === 'TrainPos' ? api.positionOf(p) : api.focusOf(p));
-      val1 = rank(a);
-      val2 = rank(b);
+      const isPos = dataKey === 'pos';
+      const order = isPos ? api.POSITIONS : api.FOCUSES.map((f) => f.value);
+      const shown = (p) => (isPos
+        ? (FCC_ROSTER_STATE.scope === 'practice' ? (p.pos || '') : api.positionOf(p))
+        : api.focusOf(p));
+      val1 = order.indexOf(shown(a));
+      val2 = order.indexOf(shown(b));
     } else {
       // Attribute columns
       const attrsA = a.attributes || {};

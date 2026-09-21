@@ -575,26 +575,42 @@ function trAttrHeadHtml() {
   return '<tr>' +
     th('name', 'Player', 'c-ident') +
     '<th class="c-rt" data-tr-sort="RT">RT<span class="rt-caption">cur &rarr; pot</span></th>' +
-    th('pos', 'POS') + th('year', 'YR') + th('height', 'HT') + th('weight', 'WT') +
-    (trShowDevelopment()
-      ? th('trainpos', 'TRAIN', 'c-devpos') + th('devfocus', 'DEV FOCUS', 'c-devfocus')
-      : '') +
+    th('pos', 'POS', 'c-devpos') +
+    (trShowDevelopment() ? th('devfocus', 'DEV FOCUS', 'c-devfocus') : '') +
+    th('year', 'YR') + th('height', 'HT') + th('weight', 'WT') +
     '<th class="attr-tiles-head">' + grouped + '</th></tr>';
 }
 
 function trAttrRowHtml(p) {
   return '<tr>' + trIdentityCellHtml(p, { link: TR_STATE.scope !== 'practice' }) +
     '<td class="c-rt">' + trRtLockupHtml(p.highestRT, p.potential_rt_ratcheted) + '</td>' +
-    '<td>' + trPosChipHtml(p.pos) + '</td>' +
+    trPositionCellHtml(p) +
     '<td>' + escapeTrHtml(p.year || '--') + '</td>' +
     '<td>' + escapeTrHtml(p.height || '--') + '</td>' +
     '<td>' + escapeTrHtml(p.weight == null ? '--' : p.weight) + '</td>' +
-    (trShowDevelopment()
-      ? '<td class="c-devpos">' + window.GOBDevelopmentFocus.positionSelectHtml(p) + '</td>' +
-        '<td class="c-devfocus">' + window.GOBDevelopmentFocus.focusSelectHtml(p) + '</td>'
-      : '') +
     '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>' +
     '</tr>';
+}
+
+/**
+ * POS shows the TRAINING position, editable, on the user's own roster; the read-only chip
+ * everywhere else. One column rather than two, because a separate derived-position column
+ * repeats the same letters for most players. DEV FOCUS follows it: one decision, two cells.
+ */
+function trPositionCellHtml(p) {
+  if (!trShowDevelopment()) {
+    return '<td class="c-devpos">' + trPosChipHtml(p.pos) + '</td>';
+  }
+  const dev = window.GOBDevelopmentFocus;
+  // RT is the rating at his NATURAL best position, so name that position whenever it is
+  // no longer the one POS shows. Silent on the common case where they agree.
+  const natural = String(p.pos || '').trim();
+  const hint = (natural && natural !== dev.positionOf(p))
+    ? '<span class="devfocus-natural" title="Natural fit; RT is his rating here">' +
+        escapeTrHtml(natural) + '</span>'
+    : '';
+  return '<td class="c-devpos">' + dev.positionSelectHtml(p) + hint + '</td>' +
+    '<td class="c-devfocus">' + dev.focusSelectHtml(p) + '</td>';
 }
 
 /** Varsity rows on the user's own franchise roster, and nowhere else. Practice-squad rows
@@ -665,13 +681,20 @@ function trSortRows(rows) {
     if (key === 'height') return p.heightRaw || 0;
     if (key === 'weight') return p.weight != null ? p.weight : -1;
     if (key === 'RT') return p.highestRT != null ? p.highestRT : -1;
-    if (key === 'trainpos' || key === 'devfocus') {
+    if (key === 'devfocus') {
       // Sort on the RESOLVED value — the one the control shows. The raw field is null for
       // every player who has never been changed, which would sort them all together.
       const dev = window.GOBDevelopmentFocus;
       if (!dev) return -1;
-      const order = key === 'trainpos' ? dev.POSITIONS : dev.FOCUSES.map((f) => f.value);
-      return order.indexOf(key === 'trainpos' ? dev.positionOf(p) : dev.focusOf(p));
+      return dev.FOCUSES.map((f) => f.value).indexOf(dev.focusOf(p));
+    }
+    if (key === 'pos') {
+      // Rank PG→C on whatever the cell shows: the training position where the control
+      // renders, the derived chip where it does not.
+      const dev = window.GOBDevelopmentFocus;
+      const shown = (dev && trShowDevelopment()) ? dev.positionOf(p) : (p.pos || '');
+      const order = dev ? dev.POSITIONS : ['PG', 'SG', 'SF', 'PF', 'C'];
+      return order.indexOf(shown);
     }
     if (tiles.ATTR_KEYS.indexOf(key) !== -1) {
       const v = tiles.tileValue(p.attributes || {}, key);
@@ -700,7 +723,7 @@ function renderTrTable() {
   if (!rows.length) {
     const span = isStats
       ? 1 + TR_STAT_GROUPS.reduce((n, g) => n + g.cols.length, 0)
-      : (trShowDevelopment() ? 9 : 7);
+      : (trShowDevelopment() ? 8 : 7);
     body.innerHTML = '<tr><td colspan="' + span + '" class="tr-empty">No players to show.</td></tr>';
   } else if (isStats) {
     const statsByPid = trStatsByPid();
