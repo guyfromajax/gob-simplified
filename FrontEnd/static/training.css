@@ -217,9 +217,12 @@ input[type="reset"] {
   flex-direction: column;
 }
 
-/* One min-height for all three, so no column dictates the others' height. */
+/* No fixed floor. Each column is as tall as its own content, and the grid stretches all
+   three to match the tallest — so the page never reserves height nothing is using.
+   (`body.training-page .section-container` already zeroes min-height; this is the same
+   intent stated where the column rules live.) */
 .main-content-grid .section-container {
-  min-height: 520px;
+  min-height: 0;
   flex: 1;
 }
 
@@ -1160,14 +1163,16 @@ body.training-page .playbook-mode-btn.is-ghost:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
+/* Pulled up under the install rows it governs. The old 22/20px stack pushed it toward
+   the bottom of a column that is now shorter than the other two. */
 body.training-page .playbook-mode-selection {
-  margin-top: 22px;
-  padding-top: 20px;
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 body.training-page .archetypes-grid {

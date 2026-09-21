@@ -182,6 +182,31 @@ def test_playbook_toggle_sits_under_the_installs_it_governs():
     assert installs < toggle < general
 
 
+def test_the_coaching_focus_nag_line_stays_out():
+    """Removed once before and reintroduced by a later rebuild. The requirements pill in
+    the header already says a focus is needed; the subtitle explains what a focus IS."""
+    assert "Required to submit" not in HTML
+    assert "Sets what you emphasize across drills" in HTML
+
+
+def test_scrimmages_moved_to_the_general_column():
+    """It is a whole-team activity, not a scheme install, and it reads as a General row."""
+    general = HTML.index('content-section general-section')
+    assert HTML.index('id="team-scrimmages"') > general
+    assert HTML.index('id="general-breaks"') < HTML.index('id="team-scrimmages"')
+
+
+def test_no_column_reserves_height_it_is_not_using():
+    """The grid stretches all three to the tallest; a fixed floor on top of that reserved
+    space nothing filled."""
+    block = CSS[CSS.index(".main-content-grid .section-container {"):]
+    block = block[:block.index("}")]
+    assert "min-height: 0" in block
+    body_rule = CSS[CSS.index("body.training-page .section-container {"):]
+    body_rule = body_rule[:body_rule.index("}")]
+    assert "min-height: 0" in body_rule
+
+
 def test_the_before_you_submit_bar_became_a_pill():
     assert 'class="req-bar"' not in HTML
     assert 'class="req-pill"' in HTML
