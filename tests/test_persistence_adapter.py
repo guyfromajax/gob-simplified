@@ -416,7 +416,7 @@ def test_sqlite_generated_columns_and_real_indexes(tmp_path: Path):
         row[1]
         for row in store._conn.execute('PRAGMA table_xinfo("games")').fetchall()
     }
-    assert {"g_franchise_id", "g_player_id", "g_team_id"} <= cols
+    assert {"g_franchise_id", "g_player_id", "g_team_id", "g_week"} <= cols
     indexes = [
         row[1]
         for row in store._conn.execute("PRAGMA index_list(games)").fetchall()
@@ -451,6 +451,24 @@ def test_sqlite_generated_columns_and_real_indexes(tmp_path: Path):
     assert residual["_id"] == "g1"
     assert first["franchise_id"] == fid
     assert decoded == [2, 1, 1, 1]
+    from BackEnd.persistence.sqlite_schema import compile_filter, filter_fully_compiled
+
+    setup_filt = {
+        "week": 2,
+        "franchise_id": fid,
+        "$or": [
+            {"team1_id": "A", "team2_id": "B"},
+            {"team1_id": "B", "team2_id": "A"},
+        ],
+    }
+    sql, _params = compile_filter(setup_filt)
+    assert "g_week" in sql and "g_franchise_id" in sql
+    assert filter_fully_compiled(setup_filt) is False
+    week_val = store._conn.execute(
+        "SELECT g_week FROM games WHERE id = ?",
+        ('raw:"g2"',),
+    ).fetchone()[0]
+    assert week_val == "2"
 
 
 def test_sqlite_persist_transaction_is_one_commit(tmp_path: Path):

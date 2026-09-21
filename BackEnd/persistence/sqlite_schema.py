@@ -1,8 +1,8 @@
 """STORED generated columns + real indexes for SQLite JSON1 tables.
 
 ``json_extract`` in a WHERE clause still walks every row in C. Generated
-columns persist franchise_id / player_id / team_id as real columns so the
-query planner can seek. Filters that cannot be compiled fall back to a
+columns persist franchise_id / player_id / team_id / week as real columns so
+the query planner can seek. Filters that cannot be compiled fall back to a
 full-table decode; ``match_query`` always remains the correctness gate.
 """
 
@@ -32,11 +32,12 @@ def encode_id(value: Any) -> str:
     return f"raw:{json.dumps(value, default=_json_default, separators=(',', ':'))}"
 
 
-INDEXED_FIELDS: tuple[str, ...] = ("franchise_id", "player_id", "team_id")
+INDEXED_FIELDS: tuple[str, ...] = ("franchise_id", "player_id", "team_id", "week")
 COLUMN_FOR_FIELD: dict[str, str] = {
     "franchise_id": "g_franchise_id",
     "player_id": "g_player_id",
     "team_id": "g_team_id",
+    "week": "g_week",
 }
 
 # Prefer $oid (Mongo-shaped), then a bare JSON scalar (string ids on FPD/games).
@@ -46,6 +47,8 @@ _GENERATED_EXPR = (
 
 
 def generated_sql(field: str) -> str:
+    if field == "week":
+        return "CAST(json_extract(doc, '$.week') AS TEXT)"
     return _GENERATED_EXPR.format(field=field)
 
 
@@ -83,6 +86,10 @@ def ensure_indexes(conn: sqlite3.Connection, name: str) -> None:
     conn.execute(
         f'CREATE INDEX IF NOT EXISTS "idx_{name}_fid_tid" '
         f'ON "{name}" (g_franchise_id, g_team_id)'
+    )
+    conn.execute(
+        f'CREATE INDEX IF NOT EXISTS "idx_{name}_fid_week" '
+        f'ON "{name}" (g_franchise_id, g_week)'
     )
 
 
