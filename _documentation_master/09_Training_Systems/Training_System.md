@@ -210,7 +210,7 @@ This moved the fractional component off the budget so the user always sees and s
 |---|---|
 | Generator | `scripts/generate_training_matrix_asset.py` |
 | Asset | `FrontEnd/static/js/generated/trainingMatrix.js` (a `<script src>`, not a fetch, so the desktop build needs no special case) |
-| Renderer | `FrontEnd/static/js/shared/trainingMatrixGrid.js` — **By Position** (one position, six focuses) / **By Focus** (one focus, five positions), default By Position → PG |
+| Renderer | `FrontEnd/static/js/shared/trainingMatrixGrid.js` — **By Position** (one position, six focuses) / **By Focus** (one focus, five positions), landing on By Focus → Standard |
 | Drift guard | `tests/test_training_matrix_asset.py` fails if the asset does not match `training_shape.py` |
 
 **After any retune of `TRAINING_FOCUS_PERCENTAGES` or `TRAINING_GAIN_PERCENTAGES`, run `python scripts/generate_training_matrix_asset.py` and commit the asset.** The guard test will fail until you do — it replaces the old "must be mirrored by hand" warning, which was a warning rather than a guard and was exactly how the page would have gone stale. Class-year taper is deliberately omitted from that page.

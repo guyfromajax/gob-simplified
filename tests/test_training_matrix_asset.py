@@ -114,10 +114,21 @@ def test_both_orientations_exist_and_read_the_same_data():
     assert GRID_JS.count("DATA.matrix[") == 2, "one lookup per orientation, one source"
 
 
-def test_it_defaults_to_by_position_pg():
-    assert "mode: 'position', position: DATA.positions[0]" in GRID_JS
-    head = PAGE[PAGE.index('data-fg-mode="position"') - 200:PAGE.index('data-fg-mode="focus"')]
-    assert 'aria-selected="true"' in head
+def test_it_lands_on_by_focus_standard():
+    """Five positions under the default focus — the table this page has always shown, and
+    the state every player is actually in. The focus dimension is opted into, not landed in.
+
+    The markup's pressed state and the renderer's initial state are set in two different
+    files; a mismatch would show one tab highlighted while the other tab's table rendered."""
+    assert "mode: 'focus'" in GRID_JS
+    assert "focus: DATA.focuses[0].value" in GRID_JS
+    assert TRAINING_FOCUSES[0] == "standard", "focuses[0] is what the page lands on"
+
+    focus_btn = PAGE[PAGE.index('class="fg-mode is-on"'):]
+    focus_btn = focus_btn[:focus_btn.index("</button>")]
+    assert 'data-fg-mode="focus"' in focus_btn
+    assert 'aria-selected="true"' in focus_btn
+    assert PAGE.count('class="fg-mode is-on"') == 1, "exactly one tab starts pressed"
 
 
 def test_the_archetype_subhead_is_gone():

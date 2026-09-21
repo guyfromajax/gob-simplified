@@ -6,7 +6,11 @@
  *   By Focus    — pick a focus, compare the five positions under it.
  *
  * Both read the same generated asset, so the page cannot disagree with the engine and the
- * two views cannot disagree with each other. Defaults to By Position → PG.
+ * two views cannot disagree with each other.
+ *
+ * Lands on By Focus → Standard: five positions under the default focus, which is the table
+ * this page has always shown and the state every player is actually in. The focus
+ * dimension is then something a coach opts into rather than something he arrives inside.
  */
 (function () {
   'use strict';
@@ -19,7 +23,7 @@
   var caption = document.getElementById('fg-caption');
   if (!DATA || !head || !body || !picks) return;
 
-  var state = { mode: 'position', position: DATA.positions[0], focus: DATA.focuses[0].value };
+  var state = { mode: 'focus', position: DATA.positions[0], focus: DATA.focuses[0].value };
 
   function esc(v) {
     return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {

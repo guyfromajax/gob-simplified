@@ -166,7 +166,7 @@ Prototyped and approved:
 
 ### Phase 6 — Tutorial — **SHIPPED**
 - Generator writes the matrix to a static asset; **guard test fails if it drifts** from Python.
-- Rebuild `tutorial-advanced-training-by-position.html` as **By Position / By Focus**, default By Position → PG.
+- Rebuild `tutorial-advanced-training-by-position.html` as **By Position / By Focus**, landing on **By Focus → Standard** (the five-position table the page has always shown, and the state every player is in; the focus dimension is opted into).
 - Remove the archetype subhead.
 - Update the doc note in `09_Training_Systems/Training_System.md`, which currently says the page is hand-authored.
 
