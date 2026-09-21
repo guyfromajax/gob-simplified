@@ -4364,5 +4364,20 @@ both week 5 and week 26. What still grows (7.8 s → 34.6 s) is FTD-sized:
 - **News.** Growing franchise / story blob.
 
 Measured against a true week-26 FTD (snapshot before `finish_season` reset it
-to 2 MB). 40773 identical across mongo / sqlite / loopback after the three
-fixes. `remote=0` on all 239 lsof samples.
+to 2 MB). Persist-maps re-runs at 46896, not 40773 — see the 21 Sept exact-diff
+baseline note in the desktop work plan. `remote=0` on all 239 lsof samples.
+
+## [TEST] Three new pytest reds on develop — not from the sidecar PR
+
+Logged 2026-09-21 while verifying `desktop/catalog-sidecar`. **Do not treat
+these as sidecar or persist-maps failures.** They fail on current `develop`
+(`c79520ae3`) with no sidecar checkout:
+
+- `BackEnd/tests/test_eog_and_training_rule_updates.py::TestEOGAndTrainingRuleUpdates::test_pre_training_decay_ranges_match_doc` — `(-1, 0) != (-2, 0)`
+- `BackEnd/tests/test_team_builder_court_persist.py::TestCustomNameJoinMap::test_custom_name_joins_without_ftd_identity_fields` — `KeyError: 'Concord'`
+- `BackEnd/tests/test_team_builder_court_persist.py::TestCustomNameJoinMap::test_without_overlay_custom_name_absent` — `None != '507f1f77bcf86cd799439011'`
+
+Full suite on the sidecar worktree: 3114 passed / 3 failed / 20 skipped / 112
+xfailed. The same three fail when pointed at `gob-simplified` develop. They
+are new reds on the default pytest run — the reason `--maxfail` came out —
+and need a develop-side triage, not a desktop adapter change.

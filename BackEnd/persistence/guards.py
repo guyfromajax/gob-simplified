@@ -17,6 +17,10 @@ class ProdWriteBlocked(RuntimeError):
     """Raised when a GOB_DB_ACCESS=read process attempts a write."""
 
 
+class CatalogWriteBlocked(RuntimeError):
+    """Raised when a process tries to write a bundled desktop catalog collection."""
+
+
 _MUTATORS = frozenset({
     "insert_one", "insert_many", "update_one", "update_many", "replace_one",
     "delete_one", "delete_many", "bulk_write", "find_one_and_update",

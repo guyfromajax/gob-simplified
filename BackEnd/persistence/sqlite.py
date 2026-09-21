@@ -18,6 +18,13 @@ from typing import Any
 from bson import ObjectId
 
 from BackEnd.env_config import DatabaseEnvironment
+from BackEnd.persistence.catalog import (
+    bind_catalog_collections,
+    empty_memory_catalog,
+    open_catalog_connection,
+    read_catalog_meta,
+    resolve_catalog_sqlite_path,
+)
 from BackEnd.persistence.guards import _ReadOnlyCollection
 from BackEnd.persistence.protocol import FranchiseBundle
 from BackEnd.persistence.sqlite_collection import (
@@ -36,8 +43,6 @@ LOCAL_COLLECTIONS: tuple[str, ...] = (
     "players",
     "teams",
     "games",
-    "plays",
-    "defenses",
     "franchises",
     "franchise_state",
     "franchise_team_data",
@@ -45,9 +50,8 @@ LOCAL_COLLECTIONS: tuple[str, ...] = (
     "franchise_recruits_data",
     "training_sessions",
     "press_conference_sessions",
-    "fcp_skeletons",
-    "hct_skeletons",
     "tournaments",
+    "save_meta",
 )
 
 REMOTE_COLLECTIONS: tuple[str, ...] = (
@@ -224,6 +228,35 @@ class SqliteStore:
         ensure_generated_schema(self._conn, list(LOCAL_COLLECTIONS))
         self._conn.commit()
 
+        explicit_catalog = str(
+            db_env.process_environment.get("GOB_CATALOG_SQLITE") or ""
+        ).strip()
+        catalog_path = resolve_catalog_sqlite_path(db_env.process_environment)
+        # Test isolation: do not auto-bind a shipping sidecar at bundle_root.
+        # Pytest seeds plays on mongomock; sqlite tests that omit GOB_CATALOG_SQLITE
+        # get an empty in-memory catalog so a committed catalog.sqlite cannot
+        # change unit-test behaviour or block fixture writes.
+        if str(db_env.environment).lower() == "test" and not explicit_catalog:
+            self._catalog_conn = empty_memory_catalog()
+            self.catalog_path = None
+        elif catalog_path is None:
+            from BackEnd.runtime_paths import bundle_path
+
+            raise FileNotFoundError(
+                "Bundled catalog.sqlite is missing at "
+                f"{bundle_path('catalog.sqlite')}. Desktop reads plays/defenses/"
+                "fcp_skeletons/hct_skeletons from that sidecar, not the save. "
+                "Export with scripts/export_catalog_sidecar.py."
+            )
+        else:
+            if not catalog_path.is_file():
+                raise FileNotFoundError(f"Catalog sidecar is not a file: {catalog_path}")
+            self._catalog_conn = open_catalog_connection(catalog_path)
+            self.catalog_path = catalog_path
+        catalog = bind_catalog_collections(self._catalog_conn, self._lock)
+        self.catalog_version = str(read_catalog_meta(self._catalog_conn).get("version") or "unknown")
+        local.update(catalog)
+
         allow_remote_memory = db_env.environment == "test"
         remote_db = None
         if allow_remote_memory:
@@ -263,6 +296,13 @@ class SqliteStore:
 
         for attr, name in _COLLECTION_BINDINGS:
             setattr(self, attr, collections[name])
+
+        if writable:
+            existing = local["save_meta"].find_one({"_id": "catalog_sidecar"})
+            if existing is None:
+                local["save_meta"].insert_one(
+                    {"_id": "catalog_sidecar", "catalog_version": self.catalog_version}
+                )
 
         print(
             f"🔵 [DEBUG] db.py: SQLite collections initialized path={self.sqlite_path}",
