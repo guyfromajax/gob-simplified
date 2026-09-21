@@ -31,6 +31,7 @@ import logging
 import os
 
 FLAG = "GOB_PLACEMENT_FREEZE"
+FLAG_SINGLE_BUILD = "GOB_PLACEMENT_SINGLE_BUILD"
 
 # Reasons a consumer can reach a step with no frozen row. Truncation is deliberately
 # NOT among them: truncation removes steps, it cannot leave one unstamped.
@@ -45,6 +46,9 @@ _COUNTERS = {
     "blocked_steps": 0,         # steps whose row a stamp declined to overwrite
     "frozen_applied": 0,        # defender rows the emit rendered from the freeze
     "frozen_absent": 0,         # emit steps with no frozen row (rendered its own draw)
+    "builds_total": 0,          # Stage 3: stamp calls seen
+    "builds_skippable": 0,      # Stage 3: whose build would be discarded in full (the ceiling)
+    "builds_skipped": 0,        # Stage 3: whose build was actually not run
 }
 
 _log = logging.getLogger(__name__)
@@ -53,6 +57,38 @@ _log = logging.getLogger(__name__)
 def enabled():
     """True when the stage is switched on. Default OFF."""
     return os.environ.get(FLAG, "0") == "1"
+
+
+def single_build_enabled():
+    """Stage 3. Default OFF, and **inert unless the freeze is also on** — the dependency
+    is enforced here, in one place, by conjunction rather than by documentation: with
+    write-once off, every build's result is still consumed, so nothing is discardable
+    and skipping one would change what consumers read."""
+    return enabled() and os.environ.get(FLAG_SINGLE_BUILD, "0") == "1"
+
+
+def stamp_build_is_discardable(steps):
+    """Stage 3 — would this stamp's build be thrown away in its entirety?
+
+    True only when EVERY step already carries both a defender row and an offense row.
+    Defence alone is not enough: a post-subtle beat (phase_resolution.py:7683) arrives
+    pre-seeded with `defense` and no `offense`, and skipping the build there would
+    strip the offense row the SIM arm's coord write scans for at :5030.
+
+    Placement is SEQUENTIAL — ``position_standard_defenders`` seeds step N from
+    ``def_movement[-1]`` (defender_placement.py:1219) — so a build can only be skipped
+    WHOLE. There is no correct partial build here, and this function deliberately does
+    not pretend otherwise.
+    """
+    if not steps:
+        return False
+    for step in steps:
+        if not isinstance(step, dict):
+            return False
+        ss = step.get("_step_state") or {}
+        if not (ss.get("defense") or {}) or not (ss.get("offense") or {}):
+            return False
+    return True
 
 
 def frozen_defense(step):
@@ -151,6 +187,19 @@ def apply_frozen_grid_to_animations(animations, def_lineup, steps, game=None):
     return animations
 
 
+def note_stamp_build(skippable, skipped):
+    """Stage 3 tally, recorded on EVERY stamp call in every configuration.
+
+    ``skippable`` is the ceiling — how many builds *could* be skipped — and is counted
+    even with the flags off, so an OFF run states the opportunity next to an ON run's
+    realised saving instead of leaving it to be inferred."""
+    _COUNTERS["builds_total"] += 1
+    if skippable:
+        _COUNTERS["builds_skippable"] += 1
+    if skipped:
+        _COUNTERS["builds_skipped"] += 1
+
+
 def counters():
     """A copy of the running tallies. ``freeze_miss`` reading ~0 is the stage's
     acceptance test: if it is not, the freeze does not cover the steps consumers
@@ -163,6 +212,9 @@ def counters():
         "blocked_steps": _COUNTERS["blocked_steps"],
         "frozen_applied": _COUNTERS["frozen_applied"],
         "frozen_absent": _COUNTERS["frozen_absent"],
+        "builds_total": _COUNTERS["builds_total"],
+        "builds_skippable": _COUNTERS["builds_skippable"],
+        "builds_skipped": _COUNTERS["builds_skipped"],
     }
 
 
@@ -173,3 +225,6 @@ def reset_counters():
     _COUNTERS["blocked_steps"] = 0
     _COUNTERS["frozen_applied"] = 0
     _COUNTERS["frozen_absent"] = 0
+    _COUNTERS["builds_total"] = 0
+    _COUNTERS["builds_skippable"] = 0
+    _COUNTERS["builds_skipped"] = 0

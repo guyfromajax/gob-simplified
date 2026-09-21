@@ -6485,6 +6485,17 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         steps = (skeleton or {}).get("steps") or []
         if not steps:
             return
+        from BackEnd.utils import placement_freeze as _pf
+        # Stage 3 (GOB_PLACEMENT_SINGLE_BUILD, requires the freeze): under write-once a
+        # build whose every step is already covered is computed and then discarded in
+        # full. Skip it. The predicate demands BOTH rows, and placement is sequential
+        # (defender_placement.py:1219 seeds step N from step N-1), so this skips the
+        # build WHOLE or not at all — there is no partial build here.
+        _skippable = _pf.stamp_build_is_discardable(steps)
+        _skip_now = _skippable and _pf.single_build_enabled()
+        _pf.note_stamp_build(_skippable, _skip_now)
+        if _skip_now:
+            return
         from BackEnd.models.animator import Animator
         # One build; the offense rows it already contains are kept so the sim arm can write all ten
         # players' coords from this same placement (_write_sim_hco_placement_coords).
@@ -6508,7 +6519,6 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         # that arrive pre-seeded with `defense` alone (:7683) — which would break the
         # backward scan at :5030 that the SIM arm's coord write depends on, trading a
         # small cross-build inconsistency for a wrong-moment one.
-        from BackEnd.utils import placement_freeze as _pf
         _freeze = _pf.enabled()
         _blocked = 0
         for i, step in enumerate(steps):
