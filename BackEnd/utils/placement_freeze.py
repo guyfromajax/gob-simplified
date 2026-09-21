@@ -55,16 +55,26 @@ _log = logging.getLogger(__name__)
 
 
 def enabled():
-    """True when the stage is switched on. Default OFF."""
-    return os.environ.get(FLAG, "0") == "1"
+    """True when the stage is switched on. **Default ON** since 2026-09-21.
+
+    Kill switch: ``GOB_PLACEMENT_FREEZE=0`` restores the pre-freeze behaviour and
+    reproduces ``equiv_v3_reference_70f7dd021_b1a.json`` — verified 40/40 on
+    fingerprint AND draws in all four cells at the flip.
+    """
+    return os.environ.get(FLAG, "1") == "1"
 
 
 def single_build_enabled():
-    """Stage 3. Default OFF, and **inert unless the freeze is also on** — the dependency
-    is enforced here, in one place, by conjunction rather than by documentation: with
-    write-once off, every build's result is still consumed, so nothing is discardable
-    and skipping one would change what consumers read."""
-    return enabled() and os.environ.get(FLAG_SINGLE_BUILD, "0") == "1"
+    """Stage 3. **Default ON** since 2026-09-21, and **inert unless the freeze is also
+    on** — the dependency is enforced here, in one place, by conjunction rather than by
+    documentation: with write-once off, every build's result is still consumed, so
+    nothing is discardable and skipping one would change what consumers read.
+
+    Two kill switches, both live: ``GOB_PLACEMENT_SINGLE_BUILD=0`` drops back to 2a
+    (freeze without the build skip), and ``GOB_PLACEMENT_FREEZE=0`` turns both off
+    whatever this one says.
+    """
+    return enabled() and os.environ.get(FLAG_SINGLE_BUILD, "1") == "1"
 
 
 def stamp_build_is_discardable(steps):
