@@ -436,11 +436,91 @@
     </div>
   </div>
 
-  <script src="/js/config/api-config.js"></script>
-  <script src="/common.js"></script>
-  <script src="/js/shared/trainingNewswire.js"></script>
-  <script src="/js/shared/gobTutorialAlertResume.js"></script>
+
   <script src="/js/shared/developmentFocus.js"></script>
-  <script src="/training.js"></script>
+  <script>
+  /* PREVIEW ONLY — no network, no auth. Renders the real controls against fake data so
+     the layout can be judged. Delete this file once the layout is signed off. */
+  var TOTAL = 24;
+  var sliders = Array.prototype.slice.call(document.querySelectorAll('.slider'));
+  function spent() { return sliders.reduce(function (n, s) { return n + (parseInt(s.value,10)||0); }, 0); }
+  function paint() {
+    sliders.forEach(function (s) {
+      var wrap = s.closest('.slider-container');
+      var row = wrap.querySelector('.pipstep');
+      if (!row) {
+        row = document.createElement('div'); row.className = 'pipstep';
+        for (var i = 0; i <= 5; i++) {
+          var b = document.createElement('button');
+          b.type = 'button'; b.className = 'pipstep-pip'; b.dataset.value = String(i);
+          b.textContent = String(i); b.setAttribute('aria-hidden','true'); b.tabIndex = -1;
+          (function (v) { b.addEventListener('click', function () { s.value = String(v); paint(); }); })(i);
+          row.appendChild(b);
+        }
+        wrap.appendChild(row);
+        var ro = document.createElement('span'); ro.className = 'pipstep-readout'; wrap.appendChild(ro);
+      }
+      var val = parseInt(s.value, 10) || 0;
+      var head = TOTAL - spent() + val;
+      row.querySelectorAll('.pipstep-pip').forEach(function (pip, i) {
+        pip.classList.toggle('is-filled', i <= val);
+        pip.classList.toggle('is-current', i === val);
+        pip.disabled = i > head;
+      });
+      wrap.querySelector('.pipstep-readout').textContent = String(val);
+    });
+    var used = spent();
+    document.getElementById('req-points-used').textContent = used;
+    document.getElementById('points-remaining').textContent = TOTAL - used;
+    document.getElementById('req-points-meter').style.width = (used / TOTAL * 100) + '%';
+    document.getElementById('req-points').classList.toggle('is-complete', used === TOTAL);
+    document.getElementById('req-readout').textContent = used === TOTAL ? '1 of 2 ready' : '0 of 2 ready';
+  }
+  paint();
+
+  var NAMES = ['Marcus Fain','DeAndre Cobb','Tyrell Vance','Jonah Brick','Ivan Petrov',
+               'Cole Hartley','Sam Okafor','Luis Madrigal','Bryce Whitten','Nate Solberg',
+               'Omar Haddad','Finn Gallagher'];
+  var POS = ['PG','SG','SF','PF','C'];
+  var FOC = ['standard','offensive','defensive','athletic','fundamentals','rebounding'];
+  var roster = NAMES.map(function (n, i) {
+    return { player_id: 'p' + i, name: n,
+             position_ratings: { PG: 70 - i, SG: 66 - i, SF: 62, PF: 58, C: 54 },
+             resolved_training_position: POS[i % 5],
+             resolved_training_focus: FOC[i % 6] };
+  });
+  var dev = window.GOBDevelopmentFocus;
+  document.getElementById('player-dev-section').hidden = false;
+  document.getElementById('player-dev-grid').innerHTML = roster.map(function (r, i) {
+    return '<div class="player-dev-card">' +
+      '<span class="player-dev-name">' + r.name + '</span>' +
+      '<span class="player-dev-rt">' + (70 - i) + '</span>' +
+      '<span class="player-dev-controls">' + dev.positionSelectHtml(r) + dev.focusSelectHtml(r) + '</span>' +
+    '</div>';
+  }).join('');
+  function tally() {
+    var bp = {}, bf = {};
+    roster.forEach(function (r) {
+      var p = dev.positionOf(r), f = dev.focusOf(r);
+      bp[p] = (bp[p]||0)+1; bf[f] = (bf[f]||0)+1;
+    });
+    var item = function (l, n) {
+      return '<span class="player-dev-tally-item' + (n ? '' : ' is-zero') + '">' + l + ' <b>' + n + '</b></span>';
+    };
+    document.getElementById('player-dev-tally-positions').innerHTML =
+      dev.POSITIONS.map(function (p) { return item(p, bp[p]||0); }).join('');
+    document.getElementById('player-dev-tally-focuses').innerHTML =
+      dev.FOCUSES.map(function (f) { return item(f.label, bf[f.value]||0); }).join('');
+  }
+  tally();
+  document.getElementById('player-dev-grid').addEventListener('change', function (e) {
+    var sel = e.target.closest('.devfocus-select');
+    if (!sel) return;
+    var row = roster.filter(function (r) { return r.player_id === sel.dataset.playerId; })[0];
+    if (!row) return;
+    row[sel.dataset.devfocusField === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position'] = sel.value;
+    tally();
+  });
+  </script>
 </body>
 </html>

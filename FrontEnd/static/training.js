@@ -143,6 +143,134 @@ function wireTrainingTutorialButton() {
   btn.addEventListener('click', navigateToTrainingTutorial);
 }
 
+/**
+ * Player Development: the 12 active players, their training position and focus.
+ *
+ * Data comes from `custom_focus_roster` on /franchise/training-points — the same rows the
+ * Player Maximizer modal uses, already RT-descending and already carrying both fields, so
+ * this section costs no extra request. Controls are the shared Development Focus module.
+ */
+const playerDevSection = document.getElementById('player-dev-section');
+const playerDevGrid = document.getElementById('player-dev-grid');
+
+function playerDevFranchiseId() {
+  return liveParams().get('franchise_id') || '';
+}
+
+function playerDevMaxRt(row) {
+  const ratings = (row && row.position_ratings) || {};
+  let best = null;
+  Object.keys(ratings).forEach(function (pos) {
+    const v = Number(ratings[pos]);
+    if (isFinite(v) && (best === null || v > best)) best = v;
+  });
+  return best;
+}
+
+function renderPlayerDevelopment() {
+  const dev = window.GOBDevelopmentFocus;
+  if (!playerDevSection || !playerDevGrid || !dev) return;
+  const rows = Array.isArray(customFocusRoster) ? customFocusRoster : [];
+  if (!rows.length) {
+    playerDevSection.hidden = true;
+    return;
+  }
+  playerDevSection.hidden = false;
+
+  playerDevGrid.innerHTML = rows.map(function (row) {
+    const player = {
+      _id: row.player_id,
+      player_id: row.player_id,
+      position_ratings: row.position_ratings || {},
+      training_position: row.training_position || null,
+      training_focus: row.training_focus || null,
+      resolved_training_position: row.resolved_training_position || null,
+      resolved_training_focus: row.resolved_training_focus || null,
+    };
+    const rt = playerDevMaxRt(row);
+    return '<div class="player-dev-card">' +
+      '<span class="player-dev-name" title="' + escapeTrainingAttr(row.name) + '">' +
+        escapeTrainingAttr(row.name) + '</span>' +
+      '<span class="player-dev-rt">' + (rt == null ? '--' : Math.round(rt)) + '</span>' +
+      '<span class="player-dev-controls">' +
+        dev.positionSelectHtml(player) + dev.focusSelectHtml(player) +
+      '</span>' +
+    '</div>';
+  }).join('');
+
+  dev.bind(playerDevGrid, playerDevFranchiseId, function (playerId, field, value) {
+    const key = field === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position';
+    rows.forEach(function (r) {
+      if (String(r.player_id) === String(playerId)) { r[field] = value; r[key] = value; }
+    });
+    renderPlayerDevelopmentTally();
+  });
+  renderPlayerDevelopmentTally();
+}
+
+/** Positions left, focuses right — how the squad is being coached, in one line. */
+function renderPlayerDevelopmentTally() {
+  const dev = window.GOBDevelopmentFocus;
+  const posEl = document.getElementById('player-dev-tally-positions');
+  const focEl = document.getElementById('player-dev-tally-focuses');
+  if (!dev || !posEl || !focEl) return;
+  const rows = Array.isArray(customFocusRoster) ? customFocusRoster : [];
+
+  const item = function (label, n) {
+    return '<span class="player-dev-tally-item' + (n ? '' : ' is-zero') + '">' +
+      escapeTrainingAttr(label) + ' <b>' + n + '</b></span>';
+  };
+
+  const byPos = {};
+  const byFocus = {};
+  rows.forEach(function (r) {
+    const p = dev.positionOf(r);
+    const f = dev.focusOf(r);
+    byPos[p] = (byPos[p] || 0) + 1;
+    byFocus[f] = (byFocus[f] || 0) + 1;
+  });
+
+  posEl.innerHTML = dev.POSITIONS.map(function (p) { return item(p, byPos[p] || 0); }).join('');
+  focEl.innerHTML = dev.FOCUSES.map(function (f) {
+    return item(f.label, byFocus[f.value] || 0);
+  }).join('');
+}
+
+function escapeTrainingAttr(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+/**
+ * "Training by Position" leaves the page, so the in-progress allocation is saved as a
+ * draft first and a resume context is set — the same pattern the Training Tutorial button
+ * uses. A coach who reads the chart comes back to the points he had already spent.
+ */
+function wirePlayerDevelopmentTutorialButton() {
+  const btn = document.getElementById('player-dev-tutorial-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    playSound('click-tiny.wav');
+    saveTrainingFormDraft();
+    const returnUrl = currentTrainingReturnUrl();
+    if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
+      window.GOBTutorialAlertResume.setTrainingPageContext(returnUrl);
+    } else {
+      try {
+        sessionStorage.setItem('gob_tut_alert_resume', JSON.stringify({
+          entrySource: 'training-page',
+          alertId: 'training',
+          lessonId: 'training',
+          returnUrl: returnUrl
+        }));
+      } catch (_e) {}
+    }
+    window.location.href = '/tutorial-advanced-training-by-position.html';
+  });
+}
+wirePlayerDevelopmentTutorialButton();
+
 /** Main PM radio value; modal assigns a concrete leaf here before submit */
 const CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
 
@@ -334,61 +462,86 @@ allSliders.forEach(slider => {
   slider.dataset.prev = '0';
 });
 
+/**
+ * Build the 6-pip stepper for one drill.
+ *
+ * The <input type="range"> stays the model. Everything that reads a drill value — the
+ * points counter, the draft save/restore, Auto-Train, collectTrainingData — still reads
+ * `slider.value`, so the swap is visual plus a click target and changes no contract. The
+ * input is clipped out of sight but stays focusable, so arrow keys still work.
+ */
 function ensureTrainingSliderVisual(slider) {
   const wrapper = slider?.closest('.slider-container');
   if (!wrapper) return null;
-  let shell = wrapper.querySelector('.training-slider-shell');
-  if (shell) return shell;
+  let row = wrapper.querySelector('.pipstep');
+  if (row) return row;
 
-  shell = document.createElement('div');
-  shell.className = 'training-slider-shell';
-  shell.setAttribute('aria-hidden', 'true');
-  shell.innerHTML = `
-    <div class="training-slider-track"></div>
-    <div class="training-slider-nodes">
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-    </div>
-    <div class="training-slider-scale">
-      <span class="training-slider-scale-value">0</span>
-      <span class="training-slider-scale-value">1</span>
-      <span class="training-slider-scale-value">2</span>
-      <span class="training-slider-scale-value">3</span>
-      <span class="training-slider-scale-value">4</span>
-      <span class="training-slider-scale-value">5</span>
-    </div>
-  `;
-  wrapper.appendChild(shell);
-  return shell;
+  row = document.createElement('div');
+  row.className = 'pipstep';
+  for (let i = 0; i <= 5; i++) {
+    const pip = document.createElement('button');
+    pip.type = 'button';
+    pip.className = 'pipstep-pip';
+    pip.dataset.value = String(i);
+    pip.textContent = String(i);
+    // The range input carries the accessible name and value; the pips are a shortcut
+    // to it, so they stay out of the accessibility tree rather than repeating it.
+    pip.setAttribute('aria-hidden', 'true');
+    pip.tabIndex = -1;
+    pip.addEventListener('click', function () {
+      setSliderValueFromPip(slider, i);
+    });
+    row.appendChild(pip);
+  }
+  wrapper.appendChild(row);
+
+  const readout = document.createElement('span');
+  readout.className = 'pipstep-readout';
+  readout.setAttribute('aria-hidden', 'true');
+  readout.textContent = String(parseInt(slider.value, 10) || 0);
+  wrapper.appendChild(readout);
+  return row;
+}
+
+/**
+ * A pip click routes through the input's own `input` handler, so over-allocation is
+ * refused by the one rule that already guards dragging and keyboard use.
+ */
+function setSliderValueFromPip(slider, value) {
+  if (slider.disabled) return;
+  const next = Math.max(0, Math.min(5, Number(value) || 0));
+  if (next === (parseInt(slider.value, 10) || 0)) return;
+  slider.value = String(next);
+  slider.dispatchEvent(new Event('input', { bubbles: true }));
+  slider.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function updateTrainingSliderVisual(slider, rawValue) {
-  const shell = ensureTrainingSliderVisual(slider);
-  if (!shell) return;
+  const row = ensureTrainingSliderVisual(slider);
+  if (!row) return;
   const value = Math.max(0, Math.min(5, Number(rawValue) || 0));
-  shell.querySelectorAll('.training-slider-node').forEach((node, index) => {
-    node.classList.toggle('is-selected', index === value);
+  const spent = calculateTotalPoints();
+  const headroom = TOTAL_POINTS - spent + value;   // what this drill alone could reach
+  row.querySelectorAll('.pipstep-pip').forEach((pip, index) => {
+    pip.classList.toggle('is-filled', index <= value);
+    pip.classList.toggle('is-current', index === value);
+    // Dimming what the budget cannot reach beats letting a click silently do nothing.
+    pip.disabled = index > headroom;
+  });
+  const readout = row.parentElement.querySelector('.pipstep-readout');
+  if (readout) readout.textContent = String(value);
+}
+
+/** Repaint every stepper's reachable range after the budget moves. */
+function refreshAllTrainingSliderVisuals() {
+  allSliders.forEach(function (slider) {
+    updateTrainingSliderVisual(slider, slider.value);
   });
 }
 
-function updateTrainingSliderValuePosition(slider) {
-  const wrapper = slider?.closest('.slider-container');
-  if (!wrapper) return;
-  const valueSpan = wrapper.querySelector('.slider-value');
-  if (!valueSpan) return;
-  const min = Number(slider.min || 0);
-  const max = Number(slider.max || 0);
-  const current = Number(slider.value || 0);
-  const range = max - min;
-  const percent = range > 0 ? (current - min) / range : 0;
-  const thumbOffset = percent * slider.offsetWidth;
-  valueSpan.style.left = `${thumbOffset}px`;
-  valueSpan.style.transform = 'translateX(-50%)';
-}
+/** No-op since the pip swap: there is no range thumb to position a bubble against.
+ *  Kept as a seam so the call sites (resize, restore, auto-train) stay one shape. */
+function updateTrainingSliderValuePosition(_slider) {}
 
 /**
  * Utility: set slider value and update display/cache
@@ -655,6 +808,9 @@ function updatePointsRemaining() {
   }
 
   updateRequirementsBar();
+  // Spending on one drill shrinks every other drill's reachable range, so the disabled
+  // pips are repainted across the page, not just on the stepper that moved.
+  refreshAllTrainingSliderVisuals();
 
   return remaining;
 }
@@ -1418,6 +1574,9 @@ async function initializeTrainingPoints() {
         prefetchTrainingNewswire(franchiseId);
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
+          // Same 12 rows, already RT-descending, already carrying training_position /
+          // training_focus through training_position_projection — no second fetch.
+          renderPlayerDevelopment();
         }
         if (Array.isArray(data.player_maximizer_ranking_attrs)) {
           customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
