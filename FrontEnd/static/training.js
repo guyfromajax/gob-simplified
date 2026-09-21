@@ -494,12 +494,6 @@ function ensureTrainingSliderVisual(slider) {
     row.appendChild(pip);
   }
   wrapper.appendChild(row);
-
-  const readout = document.createElement('span');
-  readout.className = 'pipstep-readout';
-  readout.setAttribute('aria-hidden', 'true');
-  readout.textContent = String(parseInt(slider.value, 10) || 0);
-  wrapper.appendChild(readout);
   return row;
 }
 
@@ -528,8 +522,6 @@ function updateTrainingSliderVisual(slider, rawValue) {
     // Dimming what the budget cannot reach beats letting a click silently do nothing.
     pip.disabled = index > headroom;
   });
-  const readout = row.parentElement.querySelector('.pipstep-readout');
-  if (readout) readout.textContent = String(value);
 }
 
 /** Repaint every stepper's reachable range after the budget moves. */
@@ -1896,11 +1888,16 @@ function buildFocusTooltipHtml(value, f) {
     '<div class="tt-desc">' + f.desc + '</div>' + modes;
 }
 
-/* --- Attribute code chips on single-attribute drills --- */
+/* --- Attribute code chips on single-attribute drills ---
+   The chip hangs off the drill's NAME, which is the .label-text on a drill that sits
+   inside a titled group and the .drill-title on a solo drill. Requiring .label-text alone
+   silently dropped the chip from every General drill once they became solo rows. */
 function injectAttributeChip(slider, d) {
   if (!d || !d.code) return;
   const label = slider.closest('.slider-label');
-  const lt = label && label.querySelector('.label-text');
+  const group = slider.closest('.drill-group');
+  const lt = (label && label.querySelector('.label-text'))
+    || (group && group.classList.contains('drill-group--solo') && group.querySelector('.drill-title'));
   if (!lt || lt.querySelector('.attr-chip')) return;
   const chip = document.createElement('span');
   chip.className = 'attr-chip';

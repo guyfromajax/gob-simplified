@@ -606,15 +606,8 @@ function trPositionCellHtml(p) {
   if (!trShowDevelopment()) {
     return '<td class="c-devpos">' + trPosChipHtml(p.pos) + '</td>';
   }
-  const dev = window.GOBDevelopmentFocus;
-  // RT is the rating at his NATURAL best position, so name that position whenever it is
-  // no longer the one POS shows. Silent on the common case where they agree.
-  const natural = String(p.pos || '').trim();
-  const hint = (natural && natural !== dev.positionOf(p))
-    ? '<span class="devfocus-natural" title="Natural fit; RT is his rating here">' +
-        escapeTrHtml(natural) + '</span>'
-    : '';
-  return '<td class="c-devpos">' + dev.positionTextHtml(p) + hint + '</td>';
+  return '<td class="c-devpos">' +
+    window.GOBDevelopmentFocus.positionTextHtml(p) + '</td>';
 }
 
 /** DEV FOCUS trails the attribute tiles: the evidence first, then the coaching call. */

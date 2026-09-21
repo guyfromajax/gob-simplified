@@ -457,7 +457,6 @@
           row.appendChild(b);
         }
         wrap.appendChild(row);
-        var ro = document.createElement('span'); ro.className = 'pipstep-readout'; wrap.appendChild(ro);
       }
       var val = parseInt(s.value, 10) || 0;
       var head = TOTAL - spent() + val;
@@ -466,7 +465,6 @@
         pip.classList.toggle('is-current', i === val);
         pip.disabled = i > head;
       });
-      wrap.querySelector('.pipstep-readout').textContent = String(val);
     });
     var used = spent();
     document.getElementById('req-points-used').textContent = used;

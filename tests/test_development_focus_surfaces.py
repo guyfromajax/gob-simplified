@@ -215,19 +215,14 @@ def test_the_shared_module_still_owns_both_renderings():
         assert name + ":" in SHARED_JS, name
 
 
-def test_a_converted_player_still_says_where_his_rt_came_from():
-    """RT is the rating at the NATURAL best position. Since POS shows the training
-    position, a divergence would leave RT labelled by a position the row no longer names."""
-    assert "function fccNaturalPositionHintHtml" in FCC_JS
+def test_the_pos_cell_carries_nothing_but_the_position():
+    """A "nat SF" callout naming the natural best position was built and removed — it put
+    a second value in a column asked to hold one. POS shows the training position, full
+    stop; RT is still the rating at the natural position, which the page does not restate."""
     for src in (FCC_JS, TRV_JS):
-        assert "devfocus-natural" in src
-        assert "positionOf(p)" in src
-
-
-def test_the_hint_is_silent_when_the_two_agree():
-    fn = FCC_JS[FCC_JS.index("function fccNaturalPositionHintHtml"):]
-    fn = fn[:fn.index("\n}")]
-    assert "natural === api.positionOf(p)) return ''" in fn
+        assert "devfocus-natural" not in src
+    css = (ROOT / "FrontEnd" / "static" / "css" / "development-focus.css").read_text()
+    assert "devfocus-natural" not in css
 
 
 def test_pos_sorting_was_broken_and_is_now_wired():

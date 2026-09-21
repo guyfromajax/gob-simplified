@@ -227,8 +227,9 @@ change through `POST /franchise/player/development-focus`, which validates again
 `POSITIONS` / `TRAINING_FOCUSES` and **rejects** an unknown value rather than coercing it.
 
 Every other surface is **read-only**: the FCC roster tab and the roster page show **POS**
-(third column, where it has always sat) and **DEV FOCUS** (trailing the attribute tiles —
-the evidence, then the coaching call); player detail shows both under the position ratings.
+(third column, where it has always sat, showing the training position and nothing else)
+and **DEV FOCUS** (trailing the attribute tiles — the evidence, then the coaching call);
+player detail shows both under the position ratings.
 Rosters are for scanning and comparing; a live control in a twelve-tile-wide row invites a
 stray click that writes with no undo. Those surfaces carry **no link** to the editor yet —
 deliberate, pending testing of the one-editor flow.

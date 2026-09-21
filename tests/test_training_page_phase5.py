@@ -81,6 +81,31 @@ def test_the_hidden_range_stays_focusable():
     assert "display: none" not in block
 
 
+def test_no_trailing_tally_on_a_pip_row():
+    """The last lit pip already says the value; a number after it restated it twenty times."""
+    assert "pipstep-readout" not in JS
+    assert "pipstep-readout" not in CSS
+
+
+def test_every_drill_row_has_the_same_shape():
+    """Name left, pips hard right — the layout the General column's solo drills already
+    used. The labelled rows in Player Drills and Scheme Installs stacked label over pips."""
+    block = CSS[CSS.index("body.training-page .slider-label {\n  flex-direction: row;"):]
+    block = block[:block.index("}")]
+    assert "justify-content: space-between" in block
+    container = CSS[CSS.index("body.training-page .slider-container {\n  flex: 0 0 auto;"):]
+    container = container[:container.index("}")]
+    assert "width: auto" in container
+
+
+def test_solo_drills_still_get_their_attribute_chip():
+    """Strength/Agility/Conditioning/Free Throws carry codes (ST/AG/ND/FT). Making them
+    solo rows removed their .label-text, and the chip silently stopped rendering."""
+    fn = JS[JS.index("function injectAttributeChip"):]
+    fn = fn[:fn.index("\n}")]
+    assert "drill-group--solo" in fn and "drill-title" in fn
+
+
 def test_six_pips_per_stepper():
     build = JS[JS.index("function ensureTrainingSliderVisual"):JS.index("function setSliderValueFromPip")]
     assert "i <= 5" in build

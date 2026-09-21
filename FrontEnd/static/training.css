@@ -2017,15 +2017,25 @@ body.training-page .slider-container .slider:focus-visible ~ .pipstep {
   border-radius: 8px;
 }
 
-body.training-page .pipstep-readout {
-  min-width: 14px;
-  text-align: right;
-  font: 700 13px/1 'Inter', sans-serif;
-  color: rgba(255, 255, 255, 0.82);
-  font-variant-numeric: tabular-nums;
+/* Every drill row reads the same way, whichever column it is in: name on the left, pips
+   hard right. The General column's solo drills already did this; the labelled rows in
+   Player Drills and Scheme Installs stacked their label above the pips instead. */
+body.training-page .slider-label {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+body.training-page .slider-label .label-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+body.training-page .slider-container {
+  flex: 0 0 auto;
+  width: auto;
 }
 
-/* A solo drill puts its title and its pips on one line. */
+/* A solo drill puts its title and its pips on one line — the group IS the row. */
 body.training-page .drill-group--solo {
   flex-direction: row;
   align-items: center;
@@ -2033,6 +2043,7 @@ body.training-page .drill-group--solo {
   gap: var(--spacing-sm);
 }
 body.training-page .drill-group--solo .drill-title { margin-bottom: 0; }
+body.training-page .drill-group--solo .slider-label { flex: 0 0 auto; }
 
 /* --- Player Development --------------------------------------------------- */
 body.training-page .player-dev-section {

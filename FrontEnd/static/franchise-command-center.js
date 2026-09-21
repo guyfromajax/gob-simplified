@@ -3077,8 +3077,7 @@ function fccPositionCellHtml(p) {
   if (!api || FCC_ROSTER_STATE.scope === 'practice') {
     return '<td class="c-devpos">' + fccPosChipHtml(p.pos) + '</td>';
   }
-  return '<td class="c-devpos">' +
-    api.positionTextHtml(p) + fccNaturalPositionHintHtml(p, api) + '</td>';
+  return '<td class="c-devpos">' + api.positionTextHtml(p) + '</td>';
 }
 
 /** DEV FOCUS trails the attribute tiles: the evidence first, then what he is coached
@@ -3087,18 +3086,6 @@ function fccFocusCellHtml(p) {
   const api = window.GOBDevelopmentFocus;
   if (!api || FCC_ROSTER_STATE.scope === 'practice') return '<td class="c-devfocus"></td>';
   return '<td class="c-devfocus">' + api.focusTextHtml(p) + '</td>';
-}
-
-/**
- * RT is the rating at his NATURAL best position. Since POS shows where he is coached
- * instead, a converted player's RT would silently label itself with the wrong position —
- * so the natural fit is named, and only when the two actually differ.
- */
-function fccNaturalPositionHintHtml(p, api) {
-  const natural = String(p.pos || '').trim();
-  if (!natural || natural === api.positionOf(p)) return '';
-  return '<span class="devfocus-natural" title="Natural fit; RT is his rating here">' +
-    escapeHomeHtml(natural) + '</span>';
 }
 
 /** Grouped 2-row attribute header + its per-attribute sort controls. */
