@@ -12,6 +12,15 @@ published staging→production; production is the last published snapshot.
   GOB_DB_ACCESS=read python scripts/export_catalog_sidecar.py
   GOB_DB_ACCESS=read python scripts/export_catalog_sidecar.py --from-repo-fixtures
 
+Production read (Jamie). Scratch paths only — never the committed sidecar::
+
+  GOB_DB_ACCESS=read ENVIRONMENT=production MONGO_DB_NAME=gob \\
+    MONGO_URI='mongodb+srv://…/gob' \\
+    python scripts/export_catalog_sidecar.py --target gob \\
+      --output /tmp/catalog-prod.sqlite --json-output /tmp/catalog-prod.json
+
+Compare printed ``version=`` to ``c4dcc375ce01f3b7fd89cf29b8d0db949f6bcf4da4a22763e1ebca072998be8c``.
+
 Two exports of the same documents produce byte-identical ``catalog.sqlite``
 and ``catalog.json`` files (stable ordering, fixed exported_at).
 """
