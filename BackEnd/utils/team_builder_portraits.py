@@ -19,7 +19,9 @@ from typing import Any, Mapping, Sequence
 
 logger = logging.getLogger(__name__)
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+from BackEnd.runtime_paths import bundle_root
+
+_REPO_ROOT = bundle_root()
 _SCRIPTS = _REPO_ROOT / "scripts"
 _SETS = _SCRIPTS / "recruit_sets"
 

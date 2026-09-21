@@ -18,7 +18,9 @@ from typing import Any, Iterable, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
-_REPO_DATA = Path(__file__).resolve().parents[1] / "data" / "walk_on_portraits_manifest.json"
+from BackEnd.runtime_paths import bundle_path
+
+_REPO_DATA = bundle_path("BackEnd", "data", "walk_on_portraits_manifest.json")
 WALK_ON_KIT_PREFIX = "portrait-kits/walk_on_portraits"
 FRANCHISE_USED_FIELD = "walk_on_image_ids_used"
 

@@ -25,7 +25,9 @@ from BackEnd.utils.auth import get_admin_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+from BackEnd.runtime_paths import bundle_path
+
+STATIC_DIR = bundle_path("FrontEnd", "static")
 
 
 class ResetUserStateRequest(BaseModel):

@@ -124,9 +124,25 @@ The paid base game is standalone and requires neither an account nor a network c
 
 ---
 
-## 3. Where the work actually stands (14 Sept 2026)
+## 3. Where the work actually stands (20 Sept 2026)
 
-Stated plainly, because the August draft's calendar assumed progress that did not happen: **WS-1 through WS-6 are unstarted.** Not behind — unstarted.
+**WS-2 engine-localization gate is met (20 Sept 2026).** Evidence, on `ws2/engine-loopback` / PR #594, catalog-loaded loopback + SQLite + spawn pool:
+
+- Full franchise season completed: init / resume, court play, timeouts, training, recruiting weeks 20–26 (20-rank board, 128 visits persisted each week including the user team), EOS 27–34, week 35 recruiting (50-point board, `signed_players` persisted), `finish_season`. Harness: `scripts/ws2_loopback_season.py`.
+- **Zero non-loopback TCP** for the whole run (`scripts/ws2_lsof_sample.sh` on the server and pool children, `remote=0` every sample).
+- Seeded exact-diff **40773** identical across mongo / sqlite / loopback (Lancaster 32 / Bentley-Truman 22).
+- Persist rewritten: generated columns + indexes + persist transactions. One-game finalize+EOG **31 → 2 commits**, **17.5 GB → 354 MB** games-JSON/week, wall **~36 min → 152 s/week** at 257 games and **163 s/week** at 1,600 games (flat). Mongo adapter on the same work is 14.6 s/week (hosted estimate ~21 s); leftover is SQLite full-doc decode of projected FTD/FPD finds — queued, not a WS-2 blocker.
+- Player-wait through a persist-fixed season on this machine: **~6.0 hours** (339 min measured weeks 5→`finish_season`; ~20 min estimated for weeks 1–4 at the week-5 rate). `start-cpu-sims` is 268 of those minutes (sim + persist of the 63-game slate). Projection pushdown is the January-beta cut, not a merge blocker.
+- Spawn pool is the desktop default in code: `apply_loopback_env` `os.environ.setdefault("FRANCHISE_CPU_SIM_USE_POOL", "1")`. Hosted still defaults off.
+
+WS-1 (Mongo/SQLite adapter, PR #593) and WS-2 (this PR) are implemented and unmerged. WS-3 through WS-8, the catalog sidecar, and the projection persist cut are not started as product work. The August-draft claim that WS-1–WS-6 were unstarted is no longer true for WS-1/WS-2.
+
+| | Evidence |
+|---|---|
+| Persistence adapter | `BackEnd/persistence/` — Mongo + SQLite JSON1 stores; franchise-scoped read/write; remotes refuse outside test |
+| Engine localization | Loopback FastAPI factory, local principal, bundle-root paths, desktop pool policy, Nuitka compile spike PASS, season gate PASS |
+| No shell | No Electron, no Tauri, no forge config. `package.json` has one devDependency: `@playwright/test` |
+| No routing split | `api-config.js` still resolves a single base URL by hostname sniffing |
 
 | | Evidence |
 |---|---|
@@ -193,6 +209,12 @@ Split out of the old WS-5 because it is cheap, unblocks WS-2, and proves the loc
 
 `eog_band_log` is EOG band instrumentation with a 180-day TTL (`db.py:376`), ~36,600 rows / ~13 MiB per franchise-season. Writing that into a user's save is pure cost to them. **Decision: disabled in desktop release builds, enabled in the January beta build** so the beta still produces calibration data.
 
+**Catalog sidecar (closed 20 Sept 2026, do not build in WS-2).** `plays`, `defenses`, `fcp_skeletons`, and `hct_skeletons` are universal rulebook collections, not franchise-private rows. Hosted they live in Atlas and are shared by every franchise. A fresh SQLite save creates the four tables empty and seeds nothing — a new desktop player's first franchise has no playbook. That is a product hole.
+
+Mechanism: a **read-only bundled catalog** (sidecar `catalog.sqlite` or equivalent JSON) shipped next to the Nuitka binary. `SqliteStore` routes those four names to the sidecar. The user save stays franchise-private. One shared rulebook; a play/defense patch is an **app update, not a save migration**. Seed-at-save-creation is rejected because it copies the rulebook into every file and turns catalog updates into save migrations.
+
+**Export gap, part of this decision, not a later surprise.** `plays` and `defenses` are **not** in `PUBLISHABLE_COLLECTIONS` (`scripts/publish_universal_data.py`). They live as operational catalogs in Atlas. The repo export used by tests (`play_skeletons_export.json`) is **7 plays** against ~23 hosted. FCP/HCT already have in-repo Python fallbacks and *are* publishable. Building the sidecar needs an export path that does not exist yet — a publish/export of the live hosted `plays` and `defenses` collections into the bundle. Do not treat `play_skeletons_export.json` as the shipping catalog.
+
 ### WS-8: Local object store and portrait painting — *its own workstream*
 
 Not a small adapter. It contains a local object store, two paint paths, a bundled kit library, three compiled numeric dependencies, a bundled font, and a resolution decision that moves both size and CPU by an order of magnitude.
@@ -231,7 +253,7 @@ Not a small adapter. It contains a local object store, two paint paths, a bundle
 ### WS-2: Engine localization
 
 - Stand up the FastAPI app as a **local loopback service** launched by the shell. Note the app is assembled in **`BackEnd/api/api.py:486–501`**, not `BackEnd/main.py` (which has no routes and no app factory).
-- Resolve **`BackEnd/flask_app.py`** — it exists alongside the FastAPI app and imports `db` directly. Establish whether it is live and needs a desktop story, or is dead weight to delete before migration.
+- **`BackEnd/flask_app.py` is dead weight — deleted in WS-2.** Nothing imported it. The routes were leftover Flask wrappers around the old process-global `franchise_state` singleton, with comments calling themselves legacy. FastAPI `franchise_routes` is the live path. No desktop story.
 - Strip from the local profile: Sentry, GTM, email, admin, maintenance polling (4 frontend files reference `Sentry`/`gtm`/`dataLayer`, plus `sentry-sdk[fastapi]`; roughly half a day).
 - **Offline identity — decision: inject a local principal.** There are **91 route-level auth dependencies, 48 of them in `franchise_routes.py`**, the router that must run locally with no account. The desktop profile injects a synthetic local user via a dependency override in the app factory — roughly one file, zero changes to 48 call sites, and auth code stays uniform across both builds.
 - Compile with **Nuitka** (fallback Cython; last resort PyInstaller + PyArmor).
@@ -241,8 +263,9 @@ Not a small adapter. It contains a local object store, two paint paths, a bundle
   - **Phase A under a live game on a 4-core reference machine** — deferred, needs Windows hardware. Find the worker count that keeps the frame rate clean (§10.1). That number is the desktop default.
 - **Path resolution audit — NEW, found by the spike.** `_find_wm_font()` failed to resolve the bundled `LiberationSans-Bold.ttf` in the compiled binary: the candidate path is `__file__` + `../assets/fonts/...`, and **`os.path.exists` returns False when `services/` does not exist**, because the kernel will not walk through a missing path component. Nuitka compiles modules into the binary and never creates those directories. Fix is cheap (`os.path.normpath`, or resolve from a bundle root instead of `__file__` + `..`) — but **the bug is a class, not an instance.** There are **19 `__file__`-relative path sites in `BackEnd/` (non-test)**, including the portrait manifests (`walk_on_portraits.py`, `team_builder_portraits.py`), the name data (`franchise_manager.py`), and five routers resolving `FrontEnd/static` via `parents[2]`. **Route all of them through one bundle-root helper that is correct in both source and compiled mode.** One helper plus 19 call sites now, versus debugging it from a January crash log.
   - **This bug was masked on the dev machine.** macOS fell through to Arial Bold and looked fine. Windows has neither Arial Bold at that path nor the Liberation fonts, so `ImageFont.truetype` raises and wordmark stamping dies offline. Classic works-on-my-machine, landing on the platform we ship to and do not develop on — and the strongest argument yet for acquiring the Windows reference machine early.
-- **Toolchain is x86_64 under Rosetta 2** (`platform.machine()` → `x86_64`, `uname -m` → `arm64`). Does not affect the spike's conclusions — both were mechanism questions — but it means (a) all recorded spike and capstone timings are translated and therefore pessimistic, the engine is likely faster natively; and (b) compiling today would produce an x86_64 Mac binary running under translation on every Apple Silicon Mac. **If macOS is in scope for March (Open Decision 3), install a native arm64 Python and toolchain before WS-2 proper.** Clean install, not a migration — but not a December discovery.
+- **Toolchain is x86_64 under Rosetta 2** (`platform.machine()` → `x86_64`, `uname -m` → `arm64`). Does not affect the spike's conclusions — both were mechanism questions — but it means (a) all recorded spike and capstone timings are translated and therefore pessimistic, the engine is likely faster natively; and (b) compiling today would produce an x86_64 Mac binary running under translation on every Apple Silicon Mac. **If macOS is in scope for March (Open Decision 3), install a native arm64 Python and toolchain before this ships.** Flagged, not fixed here. Clean install, not a migration.
 - **Gate (extended by the spike):** the *full-app* compiled binary spawns pool workers correctly with FastAPI and pymongo in the import graph — the one pool question the minimal reproduction could not answer. Plus: a full franchise season — init, turn-by-turn court play, timeouts and resume, box score, week advancement, training, recruiting, EOS — runs against loopback + SQLite with **zero remote calls**, verified by network monitor, at acceptable performance on a low-end reference machine.
+- **Season half of that gate — MET 20 Sept 2026.** Loopback + SQLite + spawn pool + catalog-loaded save; `SEASON_COMPLETE`; `lsof` remote=0 throughout; exact-diff 40773 three-arm identical. Compiled full-app spawn (FastAPI+pymongo in the import graph) was proven earlier in this workstream. Low-end reference hardware / live-game pool sizing remains §10.1 / January beta, not this merge. Re-run `scripts/ws2_loopback_season.py` after any later loopback-path change.
 
 ### WS-3: Franchise context provider — *reframed; runs as a continuous grind*
 
@@ -403,6 +426,7 @@ Two tracks, because solo-dev reality is that grind work fills the gaps around bi
 11. **WS-3 gate is grep-based, not `StateTelemetry`** — §WS-3.
 12. **Compile approach is confirmed, not assumed** (spiked 17 Sept 2026). Nuitka standalone handles both the spawn pool and the SciPy paint stack. §2's "compile the engine" decision now rests on evidence rather than expectation. Production builds target `scipy.ndimage`, not all of SciPy.
 13. **Animation quality outranks phase A throughput on constrained hardware** (decided 14 Sept 2026). On a weak machine, phase A gets fewer workers and spills into phase B. The user may wait after their game; they must not watch a degraded one. The tradeoff is chosen; **the worker count that delivers it is not yet measured** — WS-2 spike sets it, the §7.2 beta gate confirms it.
+14. **Desktop playbook is a read-only bundled catalog sidecar** (decided 20 Sept 2026). `SqliteStore` routes `plays`, `defenses`, `fcp_skeletons`, `hct_skeletons` to a bundled file, not into the user save. One shared rulebook; catalog patches ship as app updates. Not built in WS-2. Building it later needs a hosted `plays`/`defenses` export that does not exist yet (those two are not in `PUBLISHABLE_COLLECTIONS`; the repo fixture is 7 plays vs ~23 hosted). See the collection-table note under WS-1.
 
 ---
 
@@ -446,9 +470,32 @@ Desktop requires a **policy, not a constant**, built on one rule:
 
 **Measure it in the WS-2 spike:** on a 4-core reference machine, run phase A concurrently with a live animated game and find the worker count that keeps the frame rate clean. That number, not the Railway default, is the desktop default.
 
-### 10.2 SQLite improves sim performance
+### 10.2 SQLite is a tailwind only for point lookups — *measured*
 
-The capstone's figures normalize DB wait to Railway's colocated Atlas (~1–3 ms). **Local SQLite is sub-millisecond with no network hop**, so every DB wait in those tables shrinks. The persistence migration is a performance *tailwind* for the sim, not a cost.
+The capstone's figures normalize DB wait to Railway's colocated Atlas (~1–3 ms). The plan assumed **local SQLite is sub-millisecond with no network hop**, so every DB wait shrinks and the persistence migration is a performance *tailwind*.
+
+That is true for **point lookups** (`find_one` / `update_one` by `_id`, `franchise_id`, `player_id`, `team_id`) and false for a full-table JSON decode. The adapter as first written did the latter on every call: `SELECT id, doc FROM table`, Python-decode every row, `create_index` a no-op, `_commit()` after every write. A 4-week save (257 game docs / 20.4 MB JSON) paid **31 commits** and **12 full `games` scans** (3,084 docs / 277 MB) per persist — **~1,953 commits** and **17.5 GB** of game-JSON decode per 63-game week, growing with table size. Live persist of that week was **~36 minutes** against a **42.4 s** sim (`engine=pool workers=4`). The tailwind was not "SQLite vs Atlas"; it was the access pattern.
+
+**Fix applied (20 Sept 2026).** STORED generated columns `g_franchise_id` / `g_player_id` / `g_team_id` (legacy non-empty saves are rewritten on first open — SQLite refuses `ALTER ADD STORED` on a populated table) plus real indexes; SQL compile of `_id` / those three fields with `match_query` residual; `find_one` `LIMIT 1` when the filter fully compiled; one nestable transaction around `finalize_game` and around `_finalize_team_attributes_for_game`. 40773 exact-diff re-run after the rewrite: mongo == sqlite == loopback (Lancaster 32 / Bentley-Truman 22).
+
+**After the fix, same persist path (finalize + EOG), two table sizes:**
+
+| | before (257 games) | after, 4-week (257) | after, late-season (1,600) |
+|---|---|---|---|
+| commits / game | 31 | **2** | **2** |
+| commits / week (×63) | ~1,953 | **126** | **126** |
+| games docs decoded / persist | 3,084 | **63** | **63** |
+| games JSON decoded / week | 17.5 GB | **354 MB** | **354 MB** |
+| persist wall / game | ~34 s (36 min / 63) | **2.42 s** | **2.59 s** |
+| persist wall / week | ~36 min | **152 s** | **163 s** |
+
+The curve is flat. Growing `games` no longer scales persist: 257 → 1,600 game docs is +7% wall, identical decode counts. Remaining decode is FTD/FPD `find({franchise_id})` (whole roster / whole league-team set, does not grow with the season) plus small full scans of `teams` / `defenses`. Total JSON decode is ~2.85 GB/week, dominated by those FTD roster finds, not the games table.
+
+**Sim reads had the same disease and the same fix.** Every `find_one` on a growing table used to full-scan. After: `games.find_one({_id})` and `games.find_one({franchise_id})` decode **1 doc** at both sizes (~5 ms); `find_one({_id, players.playerId})` (the per-play `update_game_stats` residual) is an index seek. 0.67 s/game at week 4 was not going to hold through week 26 on the old adapter. It does now, for any path that is a point lookup. A `find({})` or a `find` whose filter cannot compile still decodes the table — the tailwind is the adapter doing point lookups, not the file format.
+
+A 26-week season at the late-season rate is ~70 minutes of persist, not ~15 hours.
+
+**Mongo adapter baseline (same finalize+EOG, same 257-game save, mongomock — not Atlas).** Persist wall **0.232 s/game / 14.6 s/week**. Writes 16/game (1,008/week); 53 round-trips/game. Hosted add-on at the capstone's 1–3 ms colocated RTT is ~6.7 s/week, so Atlas-shaped persist is ~**21 s/week**. Bytes decoded **48 MB/week** vs SQLite's **2.85 GB** — Mongo applies projections in the engine (`{team_id: 1}` etc.); SQLite still decodes the full JSON document and projects in process. Mongo is materially faster (~10× in-process, ~7× with RTT). The leftover is worth chasing: push projections before decode on FTD/FPD `find({franchise_id})`. Persist is not "just expensive at parity." Capstone hosted week target was 90 s; desktop is still ~195 s (42 s sim + 152 s persist) until that decode is cut. Season resumed 20 Sept 2026 on the catalog-loaded save; do not block it on this follow-up.
 
 ### 10.3 RNG isolation is what makes WS-1 verifiable — protect it
 

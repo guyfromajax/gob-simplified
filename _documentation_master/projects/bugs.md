@@ -4308,3 +4308,35 @@ Zero of the 124 need Atlas or a network. The earlier `reports/test-triage-2026-0
 count of 129/130 included `zone_credit` and used a looser environmental bucket.
 
 **Do not fix piecemeal.** Work the groups, not the 124 lines.
+
+---
+
+## [RNG LEAK] EOG player EM (`eog_em_delta`) — pre-existing on develop
+
+Logged 2026-09-20 on `ws2/engine-loopback`. **Do not fix in this PR.** Converting
+the draw to `sim_rng` changes the EOG stream and needs its own change plus a
+deliberate re-baseline.
+
+`BackEnd/utils/player_em.py` `eog_em_delta` takes a caller-supplied `rng` and
+calls `rng.randint`. `apply_franchise_eog_player_em` defaults that argument
+with `import random as rng` ("EOG uses the global stream, same as team-attr
+EOG"). The live franchise path therefore draws player EM off the process-global
+`random` module, not `sim_rng`.
+
+Present on `develop` (`gob-simplified` `BackEnd/utils/player_em.py`) with the
+same default. Not introduced by WS-2.
+
+## [RNG LEAK] EOG team-attr bands (`eog_attr_rules._roll`) — pre-existing on develop
+
+Logged 2026-09-20 on `ws2/engine-loopback`. **Do not fix in this PR.** Same
+reason as the EM leak: `sim_rng` conversion changes the draw stream.
+
+`BackEnd/eog_attr_rules.py` `_roll` calls `rng.randint`. Every public band
+helper (`shot_threshold_change`, `discipline_change`, `fight_change`,
+`rebound_modifier_change`, the efficiency / opp-modifier helpers) defaults
+`rng=random` (the module). The live apply in `franchise_routes.py` (~2064)
+calls those helpers with no `rng`, so EOG team-attr deltas also consume the
+global stream.
+
+Present on `develop` (`gob-simplified` `BackEnd/eog_attr_rules.py`, same
+`rng=random` defaults). Not introduced by WS-2.

@@ -45,7 +45,9 @@ def _load_franchise_names_payload(filename: str, env_var: str | None = None) -> 
     if env_path:
         paths_to_try.append(Path(env_path).expanduser())
 
-    paths_to_try.append(Path(__file__).resolve().parents[1] / "data" / "names" / filename)
+    from BackEnd.runtime_paths import bundle_path
+
+    paths_to_try.append(bundle_path("BackEnd", "data", "names", filename))
     paths_to_try.append(Path("BackEnd/data/names") / filename)
 
     try:

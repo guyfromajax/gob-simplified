@@ -190,16 +190,17 @@ def _team_file_path(team_name: str) -> Path:
 
     snake = path_slug_for_display_name(team_name)
     filename = f"{snake}.json"
-    current = Path(__file__).resolve()
+    from BackEnd.runtime_paths import bundle_path, bundle_root
 
-    for parent in current.parents:
+    bundled = bundle_path("teams", filename)
+    if bundled.exists():
+        return bundled
+    current = bundle_root()
+    for parent in [current, *current.parents]:
         candidate = parent / "teams" / filename
         if candidate.exists():
             return candidate
-
-    # Preserve the old behaviour (which effectively pointed one level up) so
-    # that callers still receive a sensible path even if the file is missing.
-    return current.parents[1] / "teams" / filename
+    return bundled
 
 
 def _load_from_file(team_name: str) -> Tuple[Dict | None, List[Dict]]:

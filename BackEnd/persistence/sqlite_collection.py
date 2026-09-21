@@ -24,6 +24,15 @@ from BackEnd.persistence.sqlite_query import (
     project_doc,
     sort_docs,
 )
+from BackEnd.persistence.sqlite_schema import (
+    COLUMN_FOR_FIELD,
+    SqliteConnState,
+    compile_filter,
+    create_table_sql,
+    ensure_generated_schema,
+    filter_fully_compiled,
+    store_transaction,
+)
 
 
 def _default(obj: Any) -> Any:
@@ -80,7 +89,13 @@ class SqliteCursor:
 
 
 class SqliteCollection:
-    """One JSON1 table. Documents are stored whole; queries run in process."""
+    """One JSON1 table with generated-column indexes for hot equality filters.
+
+    Queries that compile to ``id`` / ``g_franchise_id`` / ``g_player_id`` /
+    ``g_team_id`` are index seeks. Everything else still full-scans. Python
+    ``match_query`` always re-checks decoded rows so a SQL miss is never a
+    correctness miss.
+    """
 
     def __init__(
         self,
@@ -89,17 +104,17 @@ class SqliteCollection:
         *,
         writable: bool = True,
         lock: threading.RLock | None = None,
+        state: SqliteConnState | None = None,
     ):
         self.name = name
         self.database = None
         self._conn = conn
         self._writable = writable
-        self._lock = lock or threading.RLock()
+        self._state = state
+        self._lock = (state.lock if state is not None else lock) or threading.RLock()
         self._indexes: list[dict[str, Any]] = []
         with self._lock:
-            self._conn.execute(
-                f'CREATE TABLE IF NOT EXISTS "{name}" (id TEXT PRIMARY KEY, doc TEXT NOT NULL)'
-            )
+            self._conn.execute(create_table_sql(name))
             self._commit()
 
     def _require_write(self) -> None:
@@ -109,6 +124,40 @@ class SqliteCollection:
                 f"Write blocked on local SQLite collection '{self.name}' "
                 f"(GOB_DB_ACCESS=read)."
             )
+
+    def _select(
+        self,
+        filt: dict[str, Any] | None = None,
+        *,
+        one: bool = False,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """Decode only the rows SQL can narrow to; residual-match in Python.
+
+        ``one=True`` stops at the first residual match. When every filter
+        clause compiled, that is a ``LIMIT 1`` index seek — Mongo ``find_one``
+        semantics. Without the limit, ``find_one({franchise_id})`` would still
+        decode every game in the franchise.
+        """
+        compiled = compile_filter(filt)
+        limit_sql = one and filter_fully_compiled(filt)
+        with self._lock:
+            if compiled is None:
+                sql = f'SELECT id, doc FROM "{self.name}"'
+                params: list[Any] = []
+            else:
+                where, params = compiled
+                sql = f'SELECT id, doc FROM "{self.name}" WHERE {where}'
+            if limit_sql:
+                sql += " LIMIT 1"
+            cur = self._conn.execute(sql, params)
+            matched: list[tuple[str, dict[str, Any]]] = []
+            for row_id, raw in cur:
+                doc = decode_doc(raw)
+                if match_query(doc, filt):
+                    matched.append((row_id, doc))
+                    if one:
+                        break
+        return matched
 
     def _rows(self) -> list[tuple[str, dict[str, Any]]]:
         with self._lock:
@@ -131,22 +180,27 @@ class SqliteCollection:
             self._conn.execute(f'DELETE FROM "{self.name}" WHERE id = ?', (row_id,))
 
     def _commit(self) -> None:
+        if self._state is not None and self._state.tx_depth > 0:
+            return
         with self._lock:
             self._conn.commit()
 
     def find(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None):
-        matched = [copy.deepcopy(doc) for row_id, doc in self._rows() if match_query(doc, filter)]
+        matched = [copy.deepcopy(doc) for _row_id, doc in self._select(filter)]
         if projection:
             matched = [project_doc(doc, projection) for doc in matched]
         return SqliteCursor(matched)
 
     def find_one(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None):
-        for doc in self.find(filter, projection):
-            return doc
+        for _row_id, doc in self._select(filter, one=True):
+            out = copy.deepcopy(doc)
+            if projection:
+                out = project_doc(out, projection)
+            return out
         return None
 
     def count_documents(self, filter: dict[str, Any] | None = None) -> int:
-        return sum(1 for _row_id, doc in self._rows() if match_query(doc, filter))
+        return sum(1 for _row_id, _doc in self._select(filter))
 
     def estimated_document_count(self) -> int:
         with self._lock:
@@ -176,7 +230,7 @@ class SqliteCollection:
 
     def replace_one(self, filter: dict[str, Any], replacement: dict[str, Any], upsert: bool = False) -> UpdateResult:
         self._require_write()
-        for row_id, doc in self._rows():
+        for row_id, doc in self._select(filter, one=True):
             if match_query(doc, filter):
                 stored = copy.deepcopy(replacement)
                 if "_id" not in stored:
@@ -202,7 +256,7 @@ class SqliteCollection:
         matched = 0
         modified = 0
         upserted = None
-        for row_id, doc in self._rows():
+        for row_id, doc in self._select(filter, one=not many):
             if not match_query(doc, filter):
                 continue
             matched += 1
@@ -242,7 +296,7 @@ class SqliteCollection:
     def delete_one(self, filter: dict[str, Any] | None = None) -> DeleteResult:
         self._require_write()
         deleted = 0
-        for row_id, doc in self._rows():
+        for row_id, doc in self._select(filter, one=True):
             if match_query(doc, filter):
                 self._delete_id(row_id)
                 deleted = 1
@@ -253,7 +307,7 @@ class SqliteCollection:
     def delete_many(self, filter: dict[str, Any] | None = None) -> DeleteResult:
         self._require_write()
         deleted = 0
-        for row_id, doc in self._rows():
+        for row_id, doc in self._select(filter):
             if match_query(doc, filter):
                 self._delete_id(row_id)
                 deleted += 1
@@ -282,6 +336,12 @@ class SqliteCollection:
 
     def bulk_write(self, operations, ordered: bool = True):
         self._require_write()
+        if self._state is not None:
+            with store_transaction(self._state):
+                return self._bulk_write_ops(operations)
+        return self._bulk_write_ops(operations)
+
+    def _bulk_write_ops(self, operations):
         inserted = 0
         matched = 0
         modified = 0
@@ -332,6 +392,19 @@ class SqliteCollection:
         name = kwargs.get("name") or "idx"
         key_spec = keys if isinstance(keys, list) else [(keys, 1)]
         self._indexes.append({"key": dict(key_spec), "name": name})
+        columns: list[str] = []
+        for field, _direction in key_spec:
+            if field not in COLUMN_FOR_FIELD:
+                return name
+            columns.append(COLUMN_FOR_FIELD[field])
+        unique = "UNIQUE " if kwargs.get("unique") else ""
+        safe_name = str(name).replace('"', "")
+        with self._lock:
+            self._conn.execute(
+                f'CREATE {unique}INDEX IF NOT EXISTS "{safe_name}" '
+                f'ON "{self.name}" ({", ".join(columns)})'
+            )
+            self._commit()
         return name
 
     def create_indexes(self, indexes, **kwargs):
@@ -353,15 +426,14 @@ class SqliteCollection:
         self._require_write()
         with self._lock:
             self._conn.execute(f'DROP TABLE IF EXISTS "{self.name}"')
-            self._conn.execute(
-                f'CREATE TABLE IF NOT EXISTS "{self.name}" (id TEXT PRIMARY KEY, doc TEXT NOT NULL)'
-            )
+            self._conn.execute(create_table_sql(self.name))
+            ensure_generated_schema(self._conn, [self.name])
             self._conn.commit()
 
     def distinct(self, key: str, filter: dict[str, Any] | None = None):
         from BackEnd.persistence.sqlite_query import get_path, has_path
         seen = []
-        for _row_id, doc in self._rows():
+        for _row_id, doc in self._select(filter):
             if not match_query(doc, filter):
                 continue
             if not has_path(doc, key):

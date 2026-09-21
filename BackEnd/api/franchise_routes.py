@@ -135,7 +135,9 @@ from BackEnd.utils.franchise_rank_prestige import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+from BackEnd.runtime_paths import bundle_path, bundle_root
+
+STATIC_DIR = bundle_path("FrontEnd", "static")
 RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
 # DEPRECATED — superseded by RECRUITING_LEAN_EVENTS_FIELD ("recruiting_lean_events").
 # This field CANNOT represent a drop: every reader re-intersects it against the
@@ -1533,7 +1535,7 @@ def _eog_band_git_sha() -> str:
             import subprocess
             sha = subprocess.check_output(
                 ["git", "rev-parse", "--short", "HEAD"],
-                cwd=os.path.dirname(os.path.abspath(__file__)),
+                cwd=str(bundle_root()),
                 stderr=subprocess.DEVNULL,
             ).decode().strip()
         except Exception:
@@ -1643,6 +1645,44 @@ def _finalize_team_attributes_for_game(
     team_attribute_changes on the game doc so the box score can display them.
     game_id: string or ObjectId (game doc _id).
     """
+    tx = getattr(_store, "transaction", None)
+    if callable(tx):
+        with tx():
+            return _finalize_team_attributes_for_game_impl(
+                game_id,
+                franchise_id,
+                home_team_id,
+                away_team_id,
+                winner_id,
+                loser_id,
+                winner_score,
+                loser_score,
+                week=week,
+            )
+    return _finalize_team_attributes_for_game_impl(
+        game_id,
+        franchise_id,
+        home_team_id,
+        away_team_id,
+        winner_id,
+        loser_id,
+        winner_score,
+        loser_score,
+        week=week,
+    )
+
+
+def _finalize_team_attributes_for_game_impl(
+    game_id,
+    franchise_id: ObjectId,
+    home_team_id: str,
+    away_team_id: str,
+    winner_id: str,
+    loser_id: str,
+    winner_score: int,
+    loser_score: int,
+    week: int | None = None,
+) -> None:
     try:
         from BackEnd.utils.player_em import apply_franchise_eog_player_em
         apply_franchise_eog_player_em(game_id, franchise_id)

@@ -6,6 +6,8 @@ import os
 import sys
 from fastapi import FastAPI, Response
 from BackEnd.env_config import resolve_runtime_db_access
+from BackEnd.loopback_env import is_loopback
+from BackEnd.runtime_paths import bundle_root
 
 app = FastAPI()
 
@@ -24,7 +26,7 @@ def _deployed_commit() -> str:
             import subprocess
             sha = subprocess.check_output(
                 ["git", "rev-parse", "--short", "HEAD"],
-                cwd=os.path.dirname(os.path.abspath(__file__)),
+                cwd=str(bundle_root()),
                 stderr=subprocess.DEVNULL,
             ).decode().strip()
         except Exception:
@@ -41,15 +43,25 @@ def health_check():
     exposed this; scripts/verify_deploy.py reads it."""
     print("🔵 [HEALTH] GET /health", file=sys.stderr, flush=True)
     db_name = os.environ.get("MONGO_DB_NAME", "")
-    return {
+    payload = {
         "status": "healthy",
-        "port": os.getenv("PORT", "?"),
+        "port": os.getenv("PORT") or os.getenv("GOB_LOOPBACK_PORT") or "?",
         "commit": _deployed_commit(),
         "hash_seed": os.environ.get("PYTHONHASHSEED", "unset"),
         "environment": os.environ.get("ENVIRONMENT", "unknown"),
         "database": db_name or "unknown",
         "db_access": resolve_runtime_db_access(db_name, os.environ),
     }
+    if is_loopback():
+        payload.update(
+            {
+                "profile": "loopback",
+                "ready": True,
+                "persistence": os.environ.get("GOB_PERSISTENCE", "sqlite"),
+                "host": "127.0.0.1",
+            }
+        )
+    return payload
 
 
 @app.head("/health")

@@ -1272,6 +1272,32 @@ def finalize_game(
     if mode in (None, "scrimmage"):
         # Explicitly skip aggregation for scrimmages and unspecified modes.
         return
+    tx = getattr(_store, "transaction", None)
+    if mode == "franchise" and callable(tx):
+        with tx():
+            return _finalize_game_impl(
+                game_id,
+                mode=mode,
+                tournament_id=tournament_id,
+                franchise_id=franchise_id,
+            )
+    return _finalize_game_impl(
+        game_id,
+        mode=mode,
+        tournament_id=tournament_id,
+        franchise_id=franchise_id,
+    )
+
+
+def _finalize_game_impl(
+    game_id: str,
+    *,
+    mode: str | None = None,
+    tournament_id: str | None = None,
+    franchise_id: str | None = None,
+) -> None:
+    if mode in (None, "scrimmage"):
+        return
     if mode == "tournament" and tournament_id:
         import logging
         logger = logging.getLogger(__name__)

@@ -13,7 +13,9 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from BackEnd.models.pgpc_snapshot import FranchiseContextForPGPC
 from BackEnd.pgpc_context import _team_blob_from_game_doc
 
-_PCQ_PATH = Path(__file__).resolve().parent / "utils" / "press_conference_questions.py"
+from BackEnd.runtime_paths import bundle_path
+
+_PCQ_PATH = bundle_path("BackEnd", "utils", "press_conference_questions.py")
 _QUESTION_BANK_CACHE: Optional[List[Dict[str, Any]]] = None
 
 TIER_C_CONDITIONS = frozenset(
