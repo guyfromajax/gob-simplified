@@ -1632,8 +1632,23 @@ def build_skeleton_animation_steps(
     # match; sharing this one draw makes contest == render by construction.
     # Sims never reach here (animations == [] above) → StepState falls back to
     # compute_defender_grid's own single draw (no render to match).
+    # Stage 2a (GOB_PLACEMENT_FREEZE): the direction reverses. Instead of the render's
+    # draw flowing BACKWARDS into StepState via this stash, the emit RENDERS the frozen
+    # row the contest already judged against — so contest == render because there is one
+    # draw, not because two draws were made to agree. The stash is then dead and is not
+    # written (``build_step_states`` stops reading it under the same flag).
     try:
-        setattr(game, "_hco_render_animations", animations)
+        from BackEnd.utils import placement_freeze as _pf
+        if _pf.enabled():
+            # Resolved here, not reused from the build branch above: that branch only
+            # runs when the caller passed no animations, so its locals are not bound on
+            # the other path and a NameError would be swallowed into a silent skip.
+            _def_team = getattr(game, "defense_team", None)
+            _def_lineup = getattr(_def_team, "lineup", {}) if _def_team else {}
+            _pf.apply_frozen_grid_to_animations(
+                animations, _def_lineup or {}, skeleton_steps, game)
+        else:
+            setattr(game, "_hco_render_animations", animations)
     except Exception:
         pass
 
