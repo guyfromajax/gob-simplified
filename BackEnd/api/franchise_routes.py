@@ -8513,7 +8513,8 @@ def _complete_week_finish_cpu_and_persist(
         _sub = {"games_write": 0.0, "finalize_game": 0.0, "records": 0.0,
                 "team_attrs": 0.0, "momentum": 0.0}
         stat_updater.reset_finalize_subtiming()  # [FINALIZE-SUBTIMING] split finalize_game internals
-        for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+        with stat_updater.franchise_team_maps_scope():
+          for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
             if job_idx in sim_err:
                 logger.error(
                     "❌ [COMPLETE-WEEK] Parallel full-sim core failed; random fallback + bracket sync. franchise_id=%s week=%s idx=%s",
@@ -17891,7 +17892,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         _sub = {"games_write": 0.0, "finalize_game": 0.0, "records": 0.0,
                 "team_attrs": 0.0, "momentum": 0.0}
         stat_updater.reset_finalize_subtiming()
-        for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+        with stat_updater.franchise_team_maps_scope():
+          for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
             g = week_games_meta[job_idx] if job_idx < len(week_games_meta) else None
             if job_idx in sim_err:
                 logger.error(
