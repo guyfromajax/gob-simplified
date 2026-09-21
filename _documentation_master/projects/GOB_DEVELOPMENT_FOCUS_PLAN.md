@@ -50,7 +50,8 @@ explicitly (UI deferred to a later pass)**." This workstream is that pass.
 | Matrix delivery | Python canonical → **generated static file** + guard test. Works offline in the desktop build |
 | Surfaces | Roster (FCC tab + roster page) is the editor; training page mirrors it |
 | Roster list | **12 active players only** — no injured, no practice squad |
-| Position editing | Editable from day one |
+| Visibility | **User's team only, everywhere.** Development Focus and training position are never shown for opponent, CPU or scouted players on any surface (roster, player detail, training page) |
+| Position editing | Editable from day one — on the roster surfaces. Player detail is **read-only** |
 | Walls | Deliberately breakable. Rebounding focus lifts PG/SG rebounding 25 → 75 |
 
 **Consequence to document, not a bug:** changing `training_position` also changes which **shape
@@ -95,10 +96,17 @@ Each phase is independently shippable.
 - Align `positional_focus_attrs_for_player()` (`training_execution_v2.py:251`) to the same resolved position, so Player Maximizer and Development Focus can't disagree.
 - CPU autotrain reads the field (all `standard` for now).
 
-### Phase 4 — Roster UI (the editor)
+### Phase 4 — Roster UI (the editor) + player detail (read-only)
+**Roster — the only editor.**
 - `franchise-command-center.html` `#roster-tab` + `team-roster-view.html`: **Position** and **Development Focus** columns, user's team only.
 - Inline dropdowns, no modal. Multi-select → bulk set.
 - Immediate save to FPD + toast.
+
+**Player detail (`player-detail.js`) — read-only display.**
+- A **DEVELOPMENT** block directly beneath the position-ratings list (`renderPositionRatingsBlock`), showing Position and Development Focus as values, not controls. Adjacency is the point: the ratings are the evidence for the choice.
+- The training position is **marked inside the ratings list** so "where he rates" and "where he is coached" read in one glance.
+- **User's team only.** Opponent and scouted players show nothing at all — not an empty block, not a dash. **Recruits keep the existing recruiting block**, which occupies the same slot and has no FPD training fields until they sign.
+- **STATUS section removed**, with it `momentum` (it resets to zero at the end of every game, so a profile page shows `0` nearly always). The **attitude emoji moves to the identity line** — `SR · #37 · 😐` — keeping its tooltip.
 
 ### Phase 5 — Training page
 Prototyped and approved:

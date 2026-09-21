@@ -1,0 +1,1 @@
+# Placement freeze + single build FLIPPED. Reference re-cut: equiv_v3_reference_5cc98ee3e_freeze.json (b1a superseded, reproduce with GOB_PLACEMENT_FREEZE=0). Kill switch 40/40, double re-baseline 40/40 x2, freeze-miss 2.20, same-moment 100%, suite 2858/0/0. Ready for Jamie to merge.
