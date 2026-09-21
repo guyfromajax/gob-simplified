@@ -1945,7 +1945,6 @@ const reqPointsMeterEl = document.getElementById('req-points-meter');
 const reqFocusChip = document.getElementById('req-focus');
 const reqFocusValueEl = document.getElementById('req-focus-value');
 const reqFocusNudgeBtn = document.getElementById('req-focus-nudge');
-const reqReadoutEl = document.getElementById('req-readout');
 
 function friendlyFocusName(radio) {
   const v = radio.value;
@@ -1995,11 +1994,9 @@ function updateRequirementsBar() {
   if (reqFocusChip) reqFocusChip.classList.toggle('is-nudge', nudge);
   if (reqFocusNudgeBtn) reqFocusNudgeBtn.hidden = !nudge;
 
-  const readyCount = (pointsComplete ? 1 : 0) + (focusComplete ? 1 : 0);
-  if (reqReadoutEl) {
-    reqReadoutEl.textContent = readyCount === 2 ? 'Ready to submit' : (readyCount + ' of 2 ready');
-    reqReadoutEl.classList.toggle('is-ready', readyCount === 2);
-  }
+  // No "n of 2 ready" tally: the two chips already show their own state, and Submit
+  // stays disabled until both are met, which says the same thing in the place a coach
+  // is actually looking when he wants to submit.
 }
 
 function scrollToCoachingFocus() {

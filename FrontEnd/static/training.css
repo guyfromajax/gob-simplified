@@ -765,12 +765,16 @@ body.training-page #points-remaining {
   color: currentColor;
 }
 
+/* Back over Training Tutorial. Stacking them keeps the left cluster narrow, so the
+   requirements pill in the centre column has the width it needs to stay on one line. */
 body.training-page .training-header-left {
   justify-self: start;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  /* Each sizes to its own content: Back is a bare text link, Training Tutorial is a
+     ghost button — stretching would give the link a button-width hit area. */
+  align-items: flex-start;
+  gap: 10px;
 }
 
 body.training-page .training-tutorial-btn {
@@ -1585,15 +1589,6 @@ body.training-page .req-focus-nudge:hover {
   color: #ffffff;
 }
 
-body.training-page .req-readout {
-  flex: 0 0 auto;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 18px;
-  letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.66);
-  white-space: nowrap;
-}
-body.training-page .req-readout.is-ready { color: #6cd07f; }
 
 /* Flash when the nudge scrolls to the coaching section */
 @keyframes coachingFlash {
@@ -1840,7 +1835,7 @@ body.training-page .has-tooltip { cursor: help; }
   }
 
   body.training-page .training-header-left {
-    justify-content: center;
+    align-items: center;
   }
 
   body.training-page .header-actions {
@@ -1932,7 +1927,6 @@ body.training-page .req-pill .points-display {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-body.training-page .req-pill .req-readout { font-size: 15px; }
 body.training-page .req-pill .req-focus-nudge { margin-left: 2px; }
 
 /* The focus value can be long ("Community Engagement · Culture Builder"). */

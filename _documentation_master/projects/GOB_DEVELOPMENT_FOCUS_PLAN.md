@@ -157,9 +157,9 @@ not repaint the pre-change value. A failed save reverts the control and says so.
 Prototyped and approved:
 - Remove the "Before you submit" bar; Points Remaining + Coaching Focus status move to a centred pill under the page title.
 - **6-pip steppers** replace all 20 range inputs.
-- Three columns: **Player Drills · Scheme Installs · General**, equal height.
-- Player Drills: Offense, Defense, Technical. Weight Room retired — **Strength Training / Agility Training** move to the top of General.
-- Team Drills → **Scheme Installs**: Core (Offense/Defense), Fast Breaks (Offense/Defense), Press/Trap (Offense/Defense), Scrimmages. Playbook toggle sits directly under the rows.
+- Three columns: **Player Drills · Scheme Installs · Full Team Sessions**, equal height.
+- Player Drills: Offense, Defense, Technical. Weight Room retired — **Strength Training / Agility Training** move to the top of Full Team Sessions.
+- Team Drills → **Scheme Installs**: Core (Offense/Defense), Fast Breaks (Offense/Defense), Press/Trap (Offense/Defense). Playbook toggle sits directly under the rows. **Scrimmages** moved to Full Team Sessions, under Breaks.
 - **Player Development** section below Coaching Focus: 4 × 3, RT-descending, column-first. Position + focus tally split left/right above the grid. "Training by Position ↗" button right-justified in the header row, reusing `navigateToTrainingTutorial`'s draft-save + resume pattern (`training.js:121`).
 
 **Regression surface:** `training.js` reads `input[type=range]`. The pip swap needs the read/write path, Auto-Train and the points counter updated.

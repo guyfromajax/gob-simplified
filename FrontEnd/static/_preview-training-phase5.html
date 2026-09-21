@@ -53,7 +53,6 @@
             <span class="req-chip-value" id="req-focus-value">Not selected</span>
             <button type="button" class="req-focus-nudge" id="req-focus-nudge" hidden>Choose one &rarr;</button>
           </span>
-          <span class="req-readout" id="req-readout">0 of 2 ready</span>
         </div>
       </div>
       <div class="header-actions">
@@ -200,7 +199,7 @@
       </div>
 
       <div class="content-section general-section">
-        <h2 class="section-header">General</h2>
+        <h2 class="section-header">Full Team Sessions</h2>
         <div class="section-container">
           <div class="drill-stack">
             <div class="drill-group drill-group--solo">
@@ -471,7 +470,6 @@
     document.getElementById('points-remaining').textContent = TOTAL - used;
     document.getElementById('req-points-meter').style.width = (used / TOTAL * 100) + '%';
     document.getElementById('req-points').classList.toggle('is-complete', used === TOTAL);
-    document.getElementById('req-readout').textContent = used === TOTAL ? '1 of 2 ready' : '0 of 2 ready';
   }
   paint();
 

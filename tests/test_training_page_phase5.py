@@ -122,6 +122,15 @@ def test_unreachable_pips_are_disabled_everywhere_not_just_locally():
 
 # ── layout ──────────────────────────────────────────────────────────────────
 
+def test_the_third_column_is_named_for_what_it_holds():
+    """"General" was a catch-all label; these are whole-squad sessions, not per-player
+    drills. The class and every drill id stay `general-*` — the payload depends on them."""
+    assert ">Full Team Sessions<" in HTML
+    assert ">General<" not in HTML
+    assert 'class="content-section general-section"' in HTML
+    assert 'id="general-conditioning"' in HTML
+
+
 def test_three_columns_not_two_plus_a_strip():
     assert 'class="content-section player-drills-section"' in HTML
     assert 'class="content-section scheme-installs-section"' in HTML
@@ -213,8 +222,23 @@ def test_the_before_you_submit_bar_became_a_pill():
     # Same ids, so the same updateRequirementsBar drives it.
     for el_id in ("requirements-bar", "req-points", "req-focus", "req-points-used",
                   "req-points-total", "req-points-meter", "req-focus-value",
-                  "req-focus-nudge", "req-readout", "points-remaining"):
+                  "req-focus-nudge", "points-remaining"):
         assert f'id="{el_id}"' in HTML, el_id
+
+
+def test_no_ready_tally():
+    """Each chip already shows its own state, and Submit stays disabled until both are
+    met — the tally said a third time what two controls and a button already said."""
+    for src in (HTML, JS, CSS):
+        assert "req-readout" not in src
+
+
+def test_back_stacks_above_the_tutorial_button():
+    """A narrow left cluster leaves the centre column the width its pill needs."""
+    assert HTML.index('id="back-btn"') < HTML.index('id="training-tutorial-btn"')
+    block = CSS[CSS.index("body.training-page .training-header-left {"):]
+    block = block[:block.index("}")]
+    assert "flex-direction: column" in block
 
 
 def test_the_pill_sits_under_the_page_title():
