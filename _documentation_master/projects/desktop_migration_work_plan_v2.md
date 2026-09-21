@@ -172,8 +172,8 @@ python scripts/export_catalog_sidecar.py \
 | WS-1 persistence adapter | Done (PR #593) |
 | WS-2 engine localization | Done (PR #594) |
 | WS-3 FranchiseContext | Done and merged (PRs #589–#592; Gate B 0/0) |
-| Catalog sidecar | In review (`desktop/catalog-sidecar`, PR #596) |
-| WS-4 shell | Not started |
+| Catalog sidecar | Done (PR #596) |
+| WS-4 shell | In review (`desktop/electron-shell`) |
 | WS-6 pipeline / Demo variant | Not started |
 | WS-7 asset payload | Not started |
 | WS-8 local object store + portraits | Not started |
@@ -373,6 +373,8 @@ FranchiseContext  — single read/write API for the whole frontend
 - **Default: Electron.** Chromium bundled means Phaser behavior is identical to today — lowest behavioral risk for a Phaser game. Tauri is lighter but uses the OS webview; only evaluate it with explicit WebView2/WKWebView testing of Phaser, audio, and canvas. Revisit only if bundle size proves painful after WS-7.
 - Shell responsibilities: launch and supervise the local engine process, port selection, splash while the engine boots, save-file location in the OS user-data dir, crash recovery, app menus, auto-update.
 - Windows first. macOS timing is Open Decision 3.
+
+**Minimal Mac shell (21 Sept 2026, `desktop/electron-shell`).** Own `desktop/package.json`, Electron 34.5.8. Source mode first (`python -m BackEnd.loopback`); binary mode is a config switch. Stable port **8765** — refuse to start if taken (ephemeral port would wipe localStorage). Auth approach: **bypass the client login gate when `window.GOB_BUILD_PROFILE === 'desktop'`** (preload sets that via contextBridge before any page script). Planting a fake `auth_token` is not enough — `authBarInit` and `mode-select.js` call always-remote `/api/auth/me` and strip the token / send the user to login on failure. The web build never sets the flag, so its guard is unchanged. First launch seeds the 128-team league into the user-data SQLite (same helper as the WS-2 season harness); the sidecar supplies plays/defenses only.
 
 ### WS-6: Build pipeline and distribution
 

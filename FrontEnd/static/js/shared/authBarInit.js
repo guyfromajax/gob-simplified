@@ -884,6 +884,30 @@ function cloneParams(params) {
     var logoutBtn = document.getElementById('logout-btn');
     if (!authLoggedOut && !authLoggedIn) return;
 
+    if (typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop') {
+      var localUser = {
+        username: 'Coach',
+        email: 'local@desktop',
+        user_id: 'local-desktop-user',
+        account_settings: { display_color: 'default' },
+        fte_v2_complete: true
+      };
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('auth_user', JSON.stringify(localUser));
+          if (!localStorage.getItem('auth_token')) {
+            localStorage.setItem('auth_token', 'local-desktop');
+          }
+        }
+      } catch (e) { /* ignore */ }
+      if (authLoggedOut) authLoggedOut.style.display = 'none';
+      if (authLoggedIn) authLoggedIn.style.display = 'flex';
+      updateLogoDestination(true);
+      setAuthMeData(localUser);
+      refreshAccountSettingsModal();
+      return;
+    }
+
     var authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
     var authUser = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_user') : null;
     updateLogoDestination(hasStoredAuthCredentials());

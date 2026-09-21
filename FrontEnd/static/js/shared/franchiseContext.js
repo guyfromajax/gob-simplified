@@ -30,6 +30,11 @@
   }
 
   function defaultRuntime() {
+    // Desktop first play is a local franchise. Web stays hosted unless the
+    // query string (Url) or session (Session) says otherwise.
+    if (typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop') {
+      return 'local';
+    }
     return 'hosted';
   }
 
@@ -123,22 +128,35 @@
   function SessionContextProvider(opts) {
     opts = opts || {};
     this._storage = opts.storage || (typeof localStorage !== 'undefined' ? localStorage : null);
+    this._loc = opts.location || (typeof window !== 'undefined' ? window.location : { search: '' });
     this._state = this._load();
+    this._save();
   }
 
   SessionContextProvider.prototype._load = function () {
     var fallback = { runtime: defaultRuntime() };
-    if (!this._storage || typeof this._storage.getItem !== 'function') return fallback;
-    try {
-      var raw = this._storage.getItem(SESSION_STORAGE_KEY);
-      if (!raw) return fallback;
-      var parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fallback;
-      if (!isRuntime(parsed.runtime)) parsed.runtime = defaultRuntime();
-      return parsed;
-    } catch (e) {
-      return fallback;
+    var stored = fallback;
+    if (this._storage && typeof this._storage.getItem === 'function') {
+      try {
+        var raw = this._storage.getItem(SESSION_STORAGE_KEY);
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) stored = parsed;
+        }
+      } catch (e) { /* keep fallback */ }
     }
+    // Screens still navigate with ?franchise_id= on the href (133 hard
+    // navigations). Session is the store, but an inbound query is how this
+    // navigation names the franchise — absorb it, then persist.
+    var fromUrl = {};
+    try {
+      paramsFromSearch(liveSearch(this._loc)).forEach(function (value, key) {
+        if (value != null && value !== '') fromUrl[key] = String(value);
+      });
+    } catch (e) { /* ignore */ }
+    var merged = Object.assign({}, stored, fromUrl);
+    if (!isRuntime(merged.runtime)) merged.runtime = defaultRuntime();
+    return merged;
   };
 
   SessionContextProvider.prototype._save = function () {
