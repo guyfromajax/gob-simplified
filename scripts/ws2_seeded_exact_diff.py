@@ -40,6 +40,16 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--arm", required=True, choices=("mongo", "sqlite", "loopback"))
     parser.add_argument("--sqlite-path", default="")
+    parser.add_argument(
+        "--no-catalog-seed",
+        action="store_true",
+        help="Do not seed plays/defenses; sqlite/loopback read the sidecar, mongo must already hold them.",
+    )
+    parser.add_argument(
+        "--catalog-json",
+        default="",
+        help="Seed mongo plays/defenses/fcp/hct from an export_catalog_sidecar JSON dump.",
+    )
     args = parser.parse_args()
     sqlite_path = Path(args.sqlite_path or f"/tmp/ws2-exact-{args.arm}.sqlite")
     if args.arm != "mongo" and sqlite_path.exists():
@@ -83,8 +93,24 @@ def main() -> int:
         setattr(sim_rng, name, _wrap(name, original))
 
     seed_universal_rosters(teams_collection, players_collection, module_name="ws2_exact_diff")
-    seed_universal_plays(plays_collection)
-    seed_universal_defenses(defenses_collection)
+    if args.catalog_json:
+        from BackEnd.db import fcp_skeletons_collection, hct_skeletons_collection
+
+        from bson import json_util
+
+        payload = json_util.loads(Path(args.catalog_json).read_text())
+        collections = payload.get("collections") or payload
+        for coll, rows in (
+            (plays_collection, collections.get("plays") or []),
+            (defenses_collection, collections.get("defenses") or []),
+            (fcp_skeletons_collection, collections.get("fcp_skeletons") or []),
+            (hct_skeletons_collection, collections.get("hct_skeletons") or []),
+        ):
+            for row in rows:
+                coll.replace_one({"_id": row["_id"]}, row, upsert=True)
+    elif not args.no_catalog_seed:
+        seed_universal_plays(plays_collection)
+        seed_universal_defenses(defenses_collection)
     seed_sim(20260918)
     gm = GameManager("Lancaster", "Bentley-Truman", persist_position_ratings=False)
     simulate_quarter(gm)

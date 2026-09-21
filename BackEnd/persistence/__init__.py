@@ -5,6 +5,7 @@ Callers should use ``get_store()`` rather than importing ``BackEnd.db``.
 """
 
 from BackEnd.persistence.guards import (
+    CatalogWriteBlocked,
     ProdAccessBlocked,
     ProdWriteBlocked,
     _CLIENT_MUTATORS,
@@ -18,6 +19,7 @@ from BackEnd.persistence.protocol import FranchiseBundle, PersistenceStore
 from BackEnd.persistence.store import create_store, get_store
 
 __all__ = [
+    "CatalogWriteBlocked",
     "FranchiseBundle",
     "PersistenceStore",
     "ProdAccessBlocked",

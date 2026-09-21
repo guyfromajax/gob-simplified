@@ -135,7 +135,7 @@ The paid base game is standalone and requires neither an account nor a network c
 - Player-wait is **start-cpu-sims + phase-a + phase-b**, not start-cpu-sims alone. Fixed-adapter season (memoize + `g_week` + projection, 21 Sept 2026): **49.8 min** player-wait, **59.4 min** all HTTP. Week 5 **128 s**; week 26 **142 s**; curve near-flat. Measured against a true week-26 FTD (**55.3 MB**, 432 KB/team) — `finish_season` had reset FTD to 2 MB on the previous run, so persist had never been timed at late-season size. `remote=0` on all 239 lsof samples. 40773 identical across mongo / sqlite / loopback after all three fixes. Remaining FTD-growth (momentum dotted-path decode, 128 rank rewrites, recruiting leans, news blob) is polish backlog in bugs.md; `finish_season` resets FTD so it does not scale across seasons.
 - Spawn pool is the desktop default in code: `apply_loopback_env` `os.environ.setdefault("FRANCHISE_CPU_SIM_USE_POOL", "1")`. Hosted still defaults off.
 
-WS-1 (Mongo/SQLite adapter, PR #593) and WS-2 (PR #594) are on develop. WS-3 through WS-8, the catalog sidecar, and the projection persist cut are not started as product work. The August-draft claim that WS-1–WS-6 were unstarted is no longer true for WS-1/WS-2.
+WS-1 (Mongo/SQLite adapter, PR #593) and WS-2 (PR #594) are on develop. The catalog sidecar is implemented on `desktop/catalog-sidecar` and verified 21 Sept 2026: shipping sidecar is `gob-staging` (this process has no production identity) — **23 / 6 / 1 / 1**, `catalog.sqlite` **1 028 096 bytes**, version `c4dcc375ce01f3b7fd89cf29b8d0db949f6bcf4da4a22763e1ebca072998be8c`. Fresh save, no hand-seed: store `plays=23` `defenses=6`, `[PLAYS-CATALOG] loaded EMPTY` absent, save has **zero** catalog tables. Catalog-equivalence exact-diff (Lancaster vs Bentley-Truman, `PYTHONHASHSEED=0`, seed `20260918`): mongo seeded from the export == sqlite/loopback reading the sidecar, **55629** draws, byte-identical (Bentley-Truman 22 / Lancaster 21). The 7/6 fixture sidecar is mechanism-neutral: three-arm identical at **46896** (Bentley-Truman 28 / Lancaster 16). That is not 40773 — current `develop` already draws 46896 on the mongo 7/6 seed path with no sidecar; do not treat 46896 as a sidecar regression. Sidecar-backed season (not hand-seeded): `SEASON_COMPLETE` in **65.1 min**, `remote=0` on all **261** lsof samples, week 5 player-wait **83.2 s**, week 26 **168.7 s**. Playwright **392 passed / 3 failed** (the same three). Pytest **3114 passed / 3 failed** — the same three failures as `develop`. Play-builder (`play_router`) stays mounted on loopback; `delete_play` raises `CatalogWriteBlocked` → HTTP 400. WS-3 through WS-8 are not started as product work. The August-draft claim that WS-1–WS-6 were unstarted is no longer true for WS-1/WS-2.
 
 | | Evidence |
 |---|---|
@@ -199,21 +199,19 @@ Split out of the old WS-5 because it is cheap, unblocks WS-2, and proves the loc
 
 **Collection classification:**
 
-| Local (in the save file) | Remote only |
-|---|---|
-| `players`, `teams`, `games`, `plays`, `defenses` | `users`, `password_reset_tokens` |
-| `franchises`, `franchise_state`, `franchise_team_data` | `alpha_otps`, `access_code_requests` |
-| `franchise_players_data`, `franchise_recruits_data` | `alpha_feedback`, `community_highlights` |
-| `training_sessions`, `press_conference_sessions` | `around_the_league`, `stripe_events` |
-| `fcp_skeletons`, `hct_skeletons`, `tournaments` | `eog_band_log` — see below |
+| Local (in the save file) | Bundled catalog sidecar (not in the save) | Remote only |
+|---|---|---|
+| `players`, `teams`, `games`, `tournaments` | `plays`, `defenses` | `users`, `password_reset_tokens` |
+| `franchises`, `franchise_state`, `franchise_team_data` | `fcp_skeletons`, `hct_skeletons` | `alpha_otps`, `access_code_requests` |
+| `franchise_players_data`, `franchise_recruits_data` | | `alpha_feedback`, `community_highlights` |
+| `training_sessions`, `press_conference_sessions`, `save_meta` | | `around_the_league`, `stripe_events` |
+| | | `eog_band_log` — see below |
 
 `eog_band_log` is EOG band instrumentation with a 180-day TTL (`db.py:376`), ~36,600 rows / ~13 MiB per franchise-season. Writing that into a user's save is pure cost to them. **Decision: disabled in desktop release builds, enabled in the January beta build** so the beta still produces calibration data.
 
-**Catalog sidecar (closed 20 Sept 2026, do not build in WS-2).** `plays`, `defenses`, `fcp_skeletons`, and `hct_skeletons` are universal rulebook collections, not franchise-private rows. Hosted they live in Atlas and are shared by every franchise. A fresh SQLite save creates the four tables empty and seeds nothing — a new desktop player's first franchise has no playbook. That is a product hole.
+**Catalog sidecar (closed 20 Sept 2026; built 21 Sept 2026).** `plays`, `defenses`, `fcp_skeletons`, and `hct_skeletons` are universal rulebook collections, not franchise-private rows. Hosted they live in Atlas and are shared by every franchise. Desktop reads them from bundled `catalog.sqlite` (`bundle_path`, SQLite URI `mode=ro`). The user save never holds those rows. A play/defense patch is an **app update, not a save migration**.
 
-Mechanism: a **read-only bundled catalog** (sidecar `catalog.sqlite` or equivalent JSON) shipped next to the Nuitka binary. `SqliteStore` routes those four names to the sidecar. The user save stays franchise-private. One shared rulebook; a play/defense patch is an **app update, not a save migration**. Seed-at-save-creation is rejected because it copies the rulebook into every file and turns catalog updates into save migrations.
-
-**Export gap, part of this decision, not a later surprise.** `plays` and `defenses` are **not** in `PUBLISHABLE_COLLECTIONS` (`scripts/publish_universal_data.py`). They live as operational catalogs in Atlas. The repo export used by tests (`play_skeletons_export.json`) is **7 plays** against ~23 hosted. FCP/HCT already have in-repo Python fallbacks and *are* publishable. Building the sidecar needs an export path that does not exist yet — a publish/export of the live hosted `plays` and `defenses` collections into the bundle. Do not treat `play_skeletons_export.json` as the shipping catalog.
+Export: `scripts/export_catalog_sidecar.py` (requires `GOB_DB_ACCESS=read`; `script_db` wraps Atlas in `ReadOnlyClient`). Default `--target` is production `gob`. This machine has no production identity, so the shipping sidecar was read from `gob-staging` (23 plays / 6 defenses / 1 fcp / 1 hct — matches the hosted ~23). FCP/HCT are publishable staging→prod, so staging is the last-authored snapshot we can read. Runtime format is SQLite (same `SqliteCollection` surface + real `mode=ro`); `catalog.json` is the byte-diffable release dump. Writes to the four names raise `CatalogWriteBlocked`. `ENVIRONMENT=test` does not auto-bind a committed sidecar unless `GOB_CATALOG_SQLITE` is set.
 
 ### WS-8: Local object store and portrait painting — *its own workstream*
 
@@ -426,7 +424,7 @@ Two tracks, because solo-dev reality is that grind work fills the gaps around bi
 11. **WS-3 gate is grep-based, not `StateTelemetry`** — §WS-3.
 12. **Compile approach is confirmed, not assumed** (spiked 17 Sept 2026). Nuitka standalone handles both the spawn pool and the SciPy paint stack. §2's "compile the engine" decision now rests on evidence rather than expectation. Production builds target `scipy.ndimage`, not all of SciPy.
 13. **Animation quality outranks phase A throughput on constrained hardware** (decided 14 Sept 2026). On a weak machine, phase A gets fewer workers and spills into phase B. The user may wait after their game; they must not watch a degraded one. The tradeoff is chosen; **the worker count that delivers it is not yet measured** — WS-2 spike sets it, the §7.2 beta gate confirms it.
-14. **Desktop playbook is a read-only bundled catalog sidecar** (decided 20 Sept 2026). `SqliteStore` routes `plays`, `defenses`, `fcp_skeletons`, `hct_skeletons` to a bundled file, not into the user save. One shared rulebook; catalog patches ship as app updates. Not built in WS-2. Building it later needs a hosted `plays`/`defenses` export that does not exist yet (those two are not in `PUBLISHABLE_COLLECTIONS`; the repo fixture is 7 plays vs ~23 hosted). See the collection-table note under WS-1.
+14. **Desktop playbook is a read-only bundled catalog sidecar** (decided 20 Sept 2026; built 21 Sept 2026). `SqliteStore` routes `plays`, `defenses`, `fcp_skeletons`, `hct_skeletons` to bundled `catalog.sqlite` (`bundle_path`, SQLite `mode=ro`). The user save never holds those rows. Export: `scripts/export_catalog_sidecar.py` (`GOB_DB_ACCESS=read`; default `--target gob`; this build exported `gob-staging` because production credentials are not in process). Writes fail with `CatalogWriteBlocked`. Play-builder (`play_router`) stays mounted on loopback; `delete_play` is the only live plays writer and is refused. See the collection-table note under WS-1.
 
 ---
 

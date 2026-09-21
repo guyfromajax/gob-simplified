@@ -9,9 +9,9 @@ week 35 recruiting (50-point board + signed_players), finish_season.
 The client talks only to 127.0.0.1. Pair with ``scripts/ws2_lsof_sample.sh``
 on the loopback PID — zero non-loopback TCP is the network half of the gate.
 
-Catalogs are loaded from the repo exports (``play_skeletons_export.json``,
-``defenses_export.json``). That is the test fixture path, not the desktop
-product mechanism (read-only bundled sidecar, not built in WS-2).
+Catalogs come from the read-only bundled sidecar (``catalog.sqlite`` via
+``bundle_path`` / ``GOB_CATALOG_SQLITE``). This harness does not hand-seed
+plays or defenses into the save.
 
 How to run a fresh season::
 
@@ -124,17 +124,16 @@ def seed_catalogs_and_league(sqlite_path: Path) -> None:
     apply_loopback_env()
     from BackEnd.persistence import get_store
     from bson import ObjectId
-    from tests.roster_fixtures import seed_universal_defenses, seed_universal_plays
 
     store = get_store()
-    seed_universal_plays(store.plays_collection)
-    seed_universal_defenses(store.defenses_collection)
     print(
         "CATALOG "
         f"plays={store.plays_collection.count_documents({})} "
         f"defenses={store.defenses_collection.count_documents({})} "
         f"fcp={store.fcp_skeletons_collection.count_documents({})} "
-        f"hct={store.hct_skeletons_collection.count_documents({})}",
+        f"hct={store.hct_skeletons_collection.count_documents({})} "
+        f"sidecar={getattr(store, 'catalog_path', None)} "
+        f"version={getattr(store, 'catalog_version', None)}",
         flush=True,
     )
 

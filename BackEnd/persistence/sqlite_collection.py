@@ -142,6 +142,7 @@ class SqliteCollection:
         writable: bool = True,
         lock: threading.RLock | None = None,
         state: SqliteConnState | None = None,
+        ensure_schema: bool = True,
     ):
         self.name = name
         self.database = None
@@ -150,9 +151,10 @@ class SqliteCollection:
         self._state = state
         self._lock = (state.lock if state is not None else lock) or threading.RLock()
         self._indexes: list[dict[str, Any]] = []
-        with self._lock:
-            self._conn.execute(create_table_sql(name))
-            self._commit()
+        if ensure_schema:
+            with self._lock:
+                self._conn.execute(create_table_sql(name))
+                self._commit()
 
     def _require_write(self) -> None:
         if not self._writable:
