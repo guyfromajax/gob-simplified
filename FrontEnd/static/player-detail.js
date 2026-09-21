@@ -344,12 +344,9 @@ function cloneParams(params) {
     const ratings = getPositionRatings(player);
     if (!ratings) return '';
 
-    // Where he is COACHED, marked against where he RATES — the pair a coach needs once a
-    // guard can be developed as a rebounder. User's team only; nothing to mark otherwise.
-    const devApi = window.GOBDevelopmentFocus;
-    const trainingPosition = (player && player.is_user_team_player && devApi)
-      ? devApi.positionOf(player)
-      : null;
+    // The training position is NOT marked in this list. It was, and the badge broke the
+    // column's symmetry for the one row that carried it; the DEVELOPMENT block below
+    // states it plainly instead.
     const order = ['PG', 'SG', 'SF', 'PF', 'C'];
     const rows = order.map((position) => {
       const rawValue = ratings[position];
@@ -366,7 +363,6 @@ function cloneParams(params) {
             <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${getRtColor(safeRating)};width:0;"></div>
           </div>
           <div class="pd-pos-rating-value ${isPrimary ? 'is-primary' : ''}">${Number.isFinite(rating) ? formatRtDisplay(rating) : '--'}</div>
-          ${position === trainingPosition ? '<span class="pd-pos-training-tag" title="Training position">TRAINING</span>' : ''}
         </div>
       `;
     }).join('');

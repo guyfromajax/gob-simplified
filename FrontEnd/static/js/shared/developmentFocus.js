@@ -94,6 +94,28 @@
     });
   }
 
+  /**
+   * Read-only renderings, for the roster surfaces.
+   *
+   * The roster tables are reference: you scan and compare there, you do not develop
+   * there. The one editor is the training page's Player Development grid, where the
+   * setting sits beside the points it governs. A live control in a twelve-tile-wide row
+   * also invites a stray click that writes to the database with no undo.
+   */
+  function positionTextHtml(player) {
+    return '<span class="devfocus-value devfocus-value--pos">' +
+      escapeAttr(positionOf(player)) + '</span>';
+  }
+
+  function focusTextHtml(player) {
+    var value = focusOf(player);
+    // Standard is the default nearly everyone sits on; muting it lets the players who
+    // have actually been given a focus stand out in a twelve-row scan.
+    var muted = value === 'standard' ? ' is-default' : '';
+    return '<span class="devfocus-value devfocus-value--focus' + muted + '">' +
+      escapeAttr(FOCUS_LABELS[value]) + '</span>';
+  }
+
   /** Persist one field for one player. Resolves to the server's echo of what it stored. */
   function save(franchiseId, playerId, field, value) {
     var body = { franchise_id: String(franchiseId), player_id: String(playerId) };
@@ -158,33 +180,6 @@
     });
   }
 
-  /** Apply one focus to many players at once (roster bulk set). */
-  function bulkSetFocus(franchiseId, playerIds, focus, onSaved) {
-    var ids = (playerIds || []).map(String);
-    return Promise.all(ids.map(function (pid) {
-      return save(franchiseId, pid, 'training_focus', focus)
-        .then(function (result) {
-          if (typeof onSaved === 'function') onSaved(pid, 'training_focus', focus, result);
-          return { player_id: pid, ok: true };
-        })
-        .catch(function (err) { return { player_id: pid, ok: false, error: err.message }; });
-    })).then(function (results) {
-      var failed = results.filter(function (r) { return !r.ok; });
-      if (failed.length) {
-        toast(failed.length + ' of ' + results.length + ' could not be saved', true);
-      } else {
-        toast(results.length + ' player' + (results.length === 1 ? '' : 's') + ' set to ' + FOCUS_LABELS[focus]);
-      }
-      return results;
-    });
-  }
-
-  /**
-   * Self-contained confirmation. None of the three host pages defines a toast, and the
-   * pages that do define ``showToast`` disagree about its signature — calling into one
-   * would put an error string into a subtitle slot. This one is small enough to own.
-   */
-  var toastTimer = null;
   function toast(message, isError) {
     var el = document.getElementById('devfocus-toast');
     if (!el) {
@@ -209,8 +204,9 @@
     focusLabel: focusLabel,
     positionSelectHtml: positionSelectHtml,
     focusSelectHtml: focusSelectHtml,
+    positionTextHtml: positionTextHtml,
+    focusTextHtml: focusTextHtml,
     save: save,
-    bind: bind,
-    bulkSetFocus: bulkSetFocus
+    bind: bind
   };
 })();

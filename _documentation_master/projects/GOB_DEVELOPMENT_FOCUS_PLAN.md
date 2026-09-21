@@ -97,9 +97,9 @@ Each phase is independently shippable.
 - CPU autotrain reads the field (all `standard` for now).
 
 ### Phase 4 — Roster UI (the editor) + player detail (read-only) — **SHIPPED**
-**Roster — the only editor.**
+**Roster — read-only (superseded: the roster was originally specced as the only editor).**
 - `franchise-command-center.html` `#roster-tab` + `team-roster-view.html`: **Position** and **Development Focus** columns, user's team only.
-- Inline dropdowns, no modal. Multi-select → bulk set.
+- Inline dropdowns, no modal. Every change saves on selection. **Later moved to the training page** — see "One editor" below.
 - Immediate save to FPD + toast.
 
 **Player detail (`player-detail.js`) — read-only display.**
@@ -113,7 +113,7 @@ Each phase is independently shippable.
 | Piece | Where |
 |---|---|
 | Shared controls (one implementation) | `FrontEnd/static/js/shared/developmentFocus.js` |
-| FCC roster tab | `franchise-command-center.js` — `fccDevelopmentCellsHtml`, `fccBindDevelopmentFocus`, `fccUpdateDevFocusBulkBar` |
+| FCC roster tab | `franchise-command-center.js` — `fccDevelopmentCellsHtml`, `fccBindDevelopmentFocus` |
 | Roster page | `team-roster-view.js` — `trShowDevelopment`, columns in `trAttrHeadHtml` / `trAttrRowHtml` |
 | Player detail (read-only) | `player-detail.js` — `buildDevelopmentBlock` |
 | Styles | `css/attr-tiles.css` — `.devfocus-*` |
@@ -128,6 +128,22 @@ block never rendered and every save returned 403. Now one helper, `_player_on_us
 four development keys **only** for the user's own team, so no view can render a control
 the write route would reject. Verified against gob-staging: exactly 12 own-team FPD docs
 per franchise out of 1,536.
+
+**One editor.** Editing lives on the training page's Player Development grid and nowhere
+else. The roster surfaces and player detail render the same two values read-only, and
+deliberately carry **no** link to the editor for now — a "Set development →" affordance was
+built and pulled back out, to be revisited once the one-editor flow has been used in anger. Reasons: the setting only does anything at training, so it belongs beside the points
+it governs; the roster tables are reference surfaces twelve attribute tiles wide, where a
+live `<select>` adds weight to every row and invites a stray write with no undo; and one
+editor is one place for state to drift instead of three.
+
+**Known gap from that choice.** The training page is not always reachable —
+`redirectIfTrainingAlreadyCommitted()` bounces to the training report once the week's
+training is submitted, and `/franchise/training-points` returns 400 after week 26. So
+"switchable any week" (settled decision 7) is in practice "switchable between a new week
+opening and submitting that week's training", and not at all through the postseason.
+Functionally mild — a change after training is inert until the next run, and the value
+carries through rollover — but it is a narrowing, recorded here rather than buried.
 
 **Scope of the controls.** Varsity, user's own team, attributes view. Practice-squad rows
 render nothing — the practice payload does not carry the two fields, so a control there
@@ -200,5 +216,5 @@ focus-aware floors · changing `position_intent` semantics · any gameplay/lineu
 ## 8. Open items
 
 1. **Desktop build asset path** — if the packaging step needs a manifest entry, the generator should write where it expects.
-2. ~~**Roster bulk-set interaction**~~ — settled in Phase 4: a checkbox in the TRAIN cell, with a count + focus select + Set focus / Clear bar in the roster toolbar, shown only while something is selected. Selection clears on a scope switch.
+2. ~~**Roster bulk-set interaction**~~ — **dropped.** Built in Phase 4 as a per-row tick plus a toolbar apply, then removed: an unlabelled checkbox beside a control that already saves on change read as a save confirmation, and the toolbar that explained it only appeared *after* the first tick. Every change is one dropdown, saved immediately. Revisit only if setting a whole squad one player at a time proves to be real friction — and if so, with a visible affordance, not a hidden one.
 3. **Practice-squad development** — PS players carry no training position/focus on the roster payload, so they are outside the editor. Revisit if PS training is ever meant to be shaped.

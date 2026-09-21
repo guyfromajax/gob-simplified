@@ -135,18 +135,36 @@ def test_fcc_has_a_single_position_column_titled_pos():
     assert ">POS<" in head and ">TRAIN<" not in head
 
 
-def test_pos_and_dev_focus_are_adjacent_and_sit_right_after_rt():
-    """One decision, two cells, in the slot POS has always occupied — the vitals follow."""
+def test_pos_keeps_its_slot_and_dev_focus_trails_the_attributes():
+    """POS stays in the third column it has always occupied — the edit moved to the
+    training page, so the column is a plain value again. DEV FOCUS sits past the attribute
+    tiles: read the evidence, then the coaching call."""
     head = FCC_HTML[FCC_HTML.index('<th class="c-ident" data-sort-col="Name">'):]
     head = head[:head.index("</thead>")]
     order = [head.index(m) for m in ('data-sort-col="RT"', 'data-sort-col="POS"',
-                                     'data-sort-col="Focus"', 'data-sort-col="Year"')]
+                                     'data-sort-col="Year"', 'attr-tiles-head',
+                                     'data-sort-col="Focus"')]
     assert order == sorted(order)
 
 
-def test_the_pos_cell_falls_back_to_the_chip_where_the_control_does_not_apply():
-    """Practice-squad rows must still show a position, just not an editable one."""
-    fn = FCC_JS[FCC_JS.index("function fccDevelopmentCellsHtml"):]
+def test_the_row_builders_emit_the_same_order_as_the_header():
+    """Header and row are built in different places; a mismatch shifts every cell."""
+    row = FCC_JS[FCC_JS.index("function fccRosterRowHtml"):]
+    row = row[:row.index("\n}")]
+    order = [row.index(m) for m in ("fccRtLockupHtml", "fccPositionCellHtml",
+                                    "p.weight", "attr-tiles-cell", "fccFocusCellHtml")]
+    assert order == sorted(order)
+
+    trow = TRV_JS[TRV_JS.index("function trAttrRowHtml"):]
+    trow = trow[:trow.index("\n}")]
+    torder = [trow.index(m) for m in ("trPositionCellHtml", "p.weight",
+                                      "attr-tiles-cell", "trFocusCellHtml")]
+    assert torder == sorted(torder)
+
+
+def test_the_pos_cell_falls_back_to_the_chip_where_development_does_not_apply():
+    """Practice-squad rows must still show a position, just not a development one."""
+    fn = FCC_JS[FCC_JS.index("function fccPositionCellHtml"):]
     fn = fn[:fn.index("\n}")]
     assert "fccPosChipHtml(p.pos)" in fn
     assert "FCC_ROSTER_STATE.scope === 'practice'" in fn
@@ -156,11 +174,49 @@ def test_roster_view_pos_cell_does_the_same():
     fn = TRV_JS[TRV_JS.index("function trPositionCellHtml"):]
     fn = fn[:fn.index("\n}")]
     assert "trPosChipHtml(p.pos)" in fn
-    assert "positionSelectHtml(p)" in fn
+    assert "positionTextHtml(p)" in fn
+
+
+# ── one editor: the training page ───────────────────────────────────────────
+
+TRAINING_JS = (ROOT / "FrontEnd" / "static" / "training.js").read_text()
+
+
+def test_the_roster_surfaces_are_read_only():
+    """The rosters are for scanning and comparing. A live control in a twelve-tile-wide
+    row also invites a stray click that writes to the database with no undo."""
+    for src in (FCC_JS, TRV_JS):
+        assert "positionSelectHtml" not in src
+        assert "focusSelectHtml" not in src
+        assert "GOBDevelopmentFocus.bind" not in src
+
+
+def test_the_training_page_is_the_editor():
+    assert "dev.positionSelectHtml(player)" in TRAINING_JS
+    assert "dev.focusSelectHtml(player)" in TRAINING_JS
+    assert "dev.bind(playerDevGrid" in TRAINING_JS
+
+
+def test_the_rosters_carry_no_route_to_the_editor_yet():
+    """Deliberate, pending testing: the rosters display the two values and nothing else.
+    A "Set development" link was built and pulled back out — revisit once the one-editor
+    flow has been used in anger. Discoverability is the open question, not a settled one."""
+    for html_name in ("franchise-command-center.html", "team-roster-view.html"):
+        html = (ROOT / "FrontEnd" / "static" / html_name).read_text()
+        assert "devfocus-goto" not in html, html_name
+    for src in (FCC_JS, TRV_JS):
+        assert "devfocus-goto-training" not in src
+    # (The FCC's own Run Training button links to training.html; that is unrelated.)
+
+
+def test_the_shared_module_still_owns_both_renderings():
+    """Read-only and editable are two renderings of one contract, not two features."""
+    for name in ("positionTextHtml", "focusTextHtml", "positionSelectHtml", "focusSelectHtml"):
+        assert name + ":" in SHARED_JS, name
 
 
 def test_a_converted_player_still_says_where_his_rt_came_from():
-    """RT is the rating at the NATURAL best position. Once POS shows the training
+    """RT is the rating at the NATURAL best position. Since POS shows the training
     position, a divergence would leave RT labelled by a position the row no longer names."""
     assert "function fccNaturalPositionHintHtml" in FCC_JS
     for src in (FCC_JS, TRV_JS):
@@ -183,17 +239,8 @@ def test_pos_sorting_was_broken_and_is_now_wired():
 
 # ── every re-render rebinds ─────────────────────────────────────────────────
 
-@pytest.mark.parametrize("marker", [
-    "fccBindDevelopmentFocus(tbody);",
-])
-def test_fcc_rebinds_after_each_render_path(marker):
-    """First paint, the sort re-render and the scope switch all replace the rows, so a
-    single bind at load would leave the dropdowns dead after the first sort."""
-    assert FCC_JS.count(marker) >= 3
-
-
-def test_roster_view_rebinds_after_render():
-    assert "GOBDevelopmentFocus.bind(body," in TRV_JS
+def test_the_training_grid_binds_its_controls():
+    assert "dev.bind(playerDevGrid" in (ROOT / "FrontEnd" / "static" / "training.js").read_text()
 
 
 def test_fcc_mappers_carry_the_development_fields():
@@ -227,6 +274,24 @@ def test_every_save_goes_to_the_one_route():
     for src in (FCC_JS, TRV_JS):
         assert "development-focus" not in _strip_js_comments(src), \
             "surfaces must save through the shared module"
+
+
+# ── the control saves itself; nothing else does ────────────────────────────
+
+def test_changing_a_dropdown_is_the_whole_interaction():
+    """No confirm step, no apply button, no row ticks. Bulk set was built and then removed:
+    an unlabelled checkbox beside a control that already saves read as a save confirmation,
+    and the toolbar explaining it only appeared after the first tick."""
+    for src in (SHARED_JS, FCC_JS, TRV_JS, (ROOT / "FrontEnd" / "static" / "training.js").read_text()):
+        assert "devfocus-check" not in src
+        assert "bulkSetFocus" not in src
+    html = (ROOT / "FrontEnd" / "static" / "franchise-command-center.html").read_text()
+    assert "devfocus-bulk" not in html
+    assert "devfocus-bulk" not in (ROOT / "FrontEnd" / "static" / "css" / "development-focus.css").read_text()
+
+
+def test_the_save_is_bound_to_the_change_event():
+    assert "select.addEventListener('change'" in SHARED_JS
 
 
 def test_a_failed_save_reverts_the_control():

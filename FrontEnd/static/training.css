@@ -78,6 +78,7 @@ input[type="reset"] {
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-xs);
+  min-width: 0;          /* lets the pill ellipsise rather than widen the header */
 }
 
 .header-actions {
@@ -197,9 +198,8 @@ input[type="reset"] {
   margin-bottom: var(--spacing-md);
 }
 
-@media (max-width: 1100px) {
-  .main-content-grid { grid-template-columns: 1fr; }
-}
+/* Narrow-width collapse lives with the other body.training-page responsive rules, which
+   outrank anything written at plain-class specificity here. */
 
 .content-section {
   display: flex;
@@ -858,13 +858,20 @@ body.training-page .custom-focus-assign-btn:hover:not(:disabled) {
 }
 
 body.training-page .main-content-grid,
-body.training-page .general-section,
 body.training-page .coaching-section {
   grid-column: 1 / -1;
 }
 
+/* General is the THIRD COLUMN now, not a full-width strip: it must not span, and the
+   column count has to be declared at this specificity or the base rule is overridden. */
 body.training-page .main-content-grid {
+  grid-template-columns: repeat(3, 1fr);
   gap: 18px;
+  margin-bottom: 0;
+}
+
+body.training-page .general-section {
+  grid-column: auto;
   margin-bottom: 0;
 }
 
@@ -973,7 +980,9 @@ body.training-page .slider-container {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 74px;
+  /* Sized by the pip row. The old 74px floor fitted the range track, the node row and
+     the 0-5 scale beneath it; none of those exist now. */
+  min-height: 0;
 }
 
 body.training-page .slider {
@@ -1592,11 +1601,13 @@ body.training-page .coaching-section.coaching-flash {
   animation: coachingFlash 1.5s ease-out;
 }
 
-/* --- Feature 5: equal-height Player / Team drill panels --- */
+/* --- Equal-height panels across all three columns --- */
 body.training-page .player-drills-section,
-body.training-page .team-drills-section { height: 100%; }
+body.training-page .scheme-installs-section,
+body.training-page .general-section { height: 100%; }
 body.training-page .player-drills-section .section-container,
-body.training-page .team-drills-section .section-container { flex: 1 1 auto; }
+body.training-page .scheme-installs-section .section-container,
+body.training-page .general-section .section-container { flex: 1 1 auto; }
 
 /* --- Feature 1: Coaching Focus premium card treatment --- */
 body.training-page .coaching-subtitle {
@@ -1855,11 +1866,12 @@ body.training-page .has-tooltip { cursor: help; }
 body.training-page .req-pill {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   max-width: 100%;
-  flex-wrap: wrap;
+  /* One line. Wrapping turned the pill into two stacked lozenges taller than the title. */
+  flex-wrap: nowrap;
   justify-content: center;
-  padding: 7px 14px;
+  padding: 6px 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   background:
@@ -1903,10 +1915,16 @@ body.training-page .req-pill .req-meter {
   width: 46px;
   flex: 0 0 auto;
 }
+/* "N left" is the same fact as the x/y readout beside it, so it is not drawn — but the
+   element stays, because updatePointsRemaining() writes to it and a screen reader still
+   gets the plain-language count. */
 body.training-page .req-pill .points-display {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 body.training-page .req-pill .req-readout { font-size: 15px; }
@@ -1914,7 +1932,7 @@ body.training-page .req-pill .req-focus-nudge { margin-left: 2px; }
 
 /* The focus value can be long ("Community Engagement · Culture Builder"). */
 body.training-page .req-chip--focus .req-chip-value {
-  max-width: 34ch;
+  max-width: 28ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

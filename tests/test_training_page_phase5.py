@@ -110,6 +110,41 @@ def test_general_is_a_column_not_a_full_width_row():
     assert "grid-column: 1 / -1" not in block[:block.index("}")]
 
 
+def test_the_three_columns_are_declared_at_the_overriding_specificity():
+    """training.css carries a whole `body.training-page` block that outranks the plain
+    `.main-content-grid` rules above it. The rebuild edited only the plain rules, so on
+    the deployed page General still spanned the grid, dropped to a second row and left the
+    third column empty. Declare the columns where the cascade actually lands."""
+    block = CSS[CSS.index("body.training-page .main-content-grid {"):]
+    block = block[:block.index("}")]
+    assert "repeat(3, 1fr)" in block
+
+
+def test_general_does_not_span_the_page_grid():
+    spanning = CSS[CSS.index("body.training-page .main-content-grid,"):]
+    spanning = spanning[:spanning.index("}")]
+    assert "general-section" not in spanning, "General is a column, not a full-width strip"
+
+
+def test_the_sliders_old_height_floor_is_gone():
+    """74px fitted the range track, the node row and the 0-5 scale. With a 20px pip row it
+    left ~50px of dead space under every one of the twenty labels."""
+    block = CSS[CSS.index("body.training-page .slider-container {\n  position: relative;"):]
+    block = block[:block.index("}")]
+    assert "min-height: 0" in block
+
+
+def test_all_three_panels_are_equal_height():
+    assert "body.training-page .scheme-installs-section .section-container" in CSS
+    assert "body.training-page .team-drills-section" not in CSS
+
+
+def test_the_pill_stays_on_one_line():
+    block = CSS[CSS.index("body.training-page .req-pill {"):]
+    block = block[:block.index("}")]
+    assert "flex-wrap: nowrap" in block
+
+
 def test_team_drills_renamed_to_scheme_installs():
     assert "Scheme Installs" in HTML
     assert ">Team Drills<" not in HTML

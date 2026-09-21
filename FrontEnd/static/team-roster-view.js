@@ -576,9 +576,10 @@ function trAttrHeadHtml() {
     th('name', 'Player', 'c-ident') +
     '<th class="c-rt" data-tr-sort="RT">RT<span class="rt-caption">cur &rarr; pot</span></th>' +
     th('pos', 'POS', 'c-devpos') +
-    (trShowDevelopment() ? th('devfocus', 'DEV FOCUS', 'c-devfocus') : '') +
     th('year', 'YR') + th('height', 'HT') + th('weight', 'WT') +
-    '<th class="attr-tiles-head">' + grouped + '</th></tr>';
+    '<th class="attr-tiles-head">' + grouped + '</th>' +
+    (trShowDevelopment() ? th('devfocus', 'DEV FOCUS', 'c-devfocus') : '') +
+    '</tr>';
 }
 
 function trAttrRowHtml(p) {
@@ -589,13 +590,17 @@ function trAttrRowHtml(p) {
     '<td>' + escapeTrHtml(p.height || '--') + '</td>' +
     '<td>' + escapeTrHtml(p.weight == null ? '--' : p.weight) + '</td>' +
     '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>' +
+    trFocusCellHtml(p) +
     '</tr>';
 }
 
 /**
- * POS shows the TRAINING position, editable, on the user's own roster; the read-only chip
- * everywhere else. One column rather than two, because a separate derived-position column
- * repeats the same letters for most players. DEV FOCUS follows it: one decision, two cells.
+ * POS shows the TRAINING position on the user's own roster, the read-only chip elsewhere.
+ * One column rather than two, because a separate derived-position column repeats the same
+ * letters for most players. DEV FOCUS follows it: one decision, two cells.
+ *
+ * Both are READ-ONLY here. The editor is the training page's Player Development grid,
+ * where the setting sits beside the points it governs; the toolbar links to it.
  */
 function trPositionCellHtml(p) {
   if (!trShowDevelopment()) {
@@ -609,8 +614,13 @@ function trPositionCellHtml(p) {
     ? '<span class="devfocus-natural" title="Natural fit; RT is his rating here">' +
         escapeTrHtml(natural) + '</span>'
     : '';
-  return '<td class="c-devpos">' + dev.positionSelectHtml(p) + hint + '</td>' +
-    '<td class="c-devfocus">' + dev.focusSelectHtml(p) + '</td>';
+  return '<td class="c-devpos">' + dev.positionTextHtml(p) + hint + '</td>';
+}
+
+/** DEV FOCUS trails the attribute tiles: the evidence first, then the coaching call. */
+function trFocusCellHtml(p) {
+  if (!trShowDevelopment()) return '';
+  return '<td class="c-devfocus">' + window.GOBDevelopmentFocus.focusTextHtml(p) + '</td>';
 }
 
 /** Varsity rows on the user's own franchise roster, and nowhere else. Practice-squad rows
@@ -621,12 +631,12 @@ function trShowDevelopment() {
     && TR_STATE.view !== 'stats' && TR_STATE.scope !== 'practice');
 }
 
-/** Keep the in-memory row in step with a saved change, so the next sort re-renders it. */
-function trDevFocusApplyToCache(playerId, field, value) {
-  const resolvedKey = field === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position';
-  (rosterData || []).forEach((p) => {
-    if (String(p._id) === String(playerId)) { p[field] = value; p[resolvedKey] = value; }
-  });
+/** Varsity rows on the user's own franchise roster, and nowhere else. Practice-squad rows
+ *  are excluded because the practice payload does not carry the two fields — a control
+ *  there would show a default as if the coach had chosen it. */
+function trShowDevelopment() {
+  return !!(trIsUserTeam && window.GOBDevelopmentFocus
+    && TR_STATE.view !== 'stats' && TR_STATE.scope !== 'practice');
 }
 
 // ---------- Season Stats view ----------
@@ -736,10 +746,6 @@ function renderTrTable() {
   if (per) per.style.display = isStats ? 'inline-flex' : 'none';
   trUpdateCounts(rows.length);
   trBindSortControls();
-  if (trShowDevelopment()) {
-    // Fresh DOM nodes every render, so this rebinds rather than tops up.
-    window.GOBDevelopmentFocus.bind(body, () => franchiseId || '', trDevFocusApplyToCache);
-  }
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(document.getElementById('roster-table'), ['td', 'th', '.attr-tile', '.attr-abbr']);
   }

@@ -33,57 +33,6 @@
 .devfocus-select:disabled { opacity: .45; cursor: progress; }
 .devfocus-select option { background: #14161c; color: #fff; }
 
-/* The row tick lives next to the training position so one cell carries "who" and
-   "what", and the bulk bar has a single column to line up under. */
-.devfocus-pick { display: inline-flex; align-items: center; margin-right: 6px; vertical-align: middle; }
-.devfocus-check { accent-color: #F79420; width: 13px; height: 13px; cursor: pointer; }
-
-.devfocus-bulk {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(247, 148, 32, .3);
-  background: rgba(247, 148, 32, .08);
-}
-.devfocus-bulk[hidden] { display: none; }
-.devfocus-bulk-count {
-  font: 700 11px/1 'Inter', sans-serif;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, .72);
-  font-variant-numeric: tabular-nums;
-}
-.devfocus-bulk select {
-  min-height: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, .14);
-  background: rgba(255, 255, 255, .06);
-  color: #fff;
-  font: 600 11px/1 'Inter', sans-serif;
-  cursor: pointer;
-}
-.devfocus-bulk select option { background: #14161c; color: #fff; }
-.devfocus-bulk button {
-  min-height: 28px;
-  padding: 0 11px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  font: 700 11px/1 'Inter', sans-serif;
-  letter-spacing: .04em;
-  cursor: pointer;
-  transition: background .14s ease, color .14s ease;
-}
-.devfocus-bulk-apply { background: #F79420; color: #14161c; }
-.devfocus-bulk-apply:hover { background: #ffa939; }
-.devfocus-bulk-apply:disabled { opacity: .5; cursor: progress; }
-.devfocus-bulk-clear { background: rgba(255, 255, 255, .06); color: rgba(255, 255, 255, .7); }
-.devfocus-bulk-clear:hover { background: rgba(255, 255, 255, .12); color: #fff; }
-.devfocus-bulk button:focus-visible,
-.devfocus-bulk select:focus-visible { outline: 2px solid #F79420; outline-offset: 2px; }
-
 /* Development Focus confirmation. Bottom-centre so it never covers the control the coach
    just used, and aria-live so a save is announced rather than only seen. */
 .devfocus-toast {
@@ -119,3 +68,16 @@
   cursor: help;
 }
 .devfocus-natural::before { content: 'nat '; opacity: .7; }
+
+/* --- Read-only renderings (roster surfaces) ------------------------------
+   The roster tables are for scanning and comparing; the one editor is the training
+   page's Player Development grid. These read as data, not as dormant controls. */
+.devfocus-value {
+  font: 600 11px/1 'Inter', sans-serif;
+  letter-spacing: .03em;
+  color: rgba(255, 255, 255, .86);
+  white-space: nowrap;
+}
+.devfocus-value--pos { font-weight: 700; }
+/* Standard is where nearly everyone sits; muting it lets a real choice stand out. */
+.devfocus-value--focus.is-default { color: rgba(255, 255, 255, .42); font-weight: 500; }

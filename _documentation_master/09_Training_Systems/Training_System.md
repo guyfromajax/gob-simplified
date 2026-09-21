@@ -221,12 +221,17 @@ lookup. FPD is authoritative; changing either value affects **future** training 
 | Resolvers | `resolve_training_position()`, `resolve_training_focus()` — a missing or unknown stored value degrades to the default rather than raising mid-week |
 | Multiplier | `training_attr_gain_multiplier(position, attr, focus)`; `player_attr_gain_multiplier(player, attr)` resolves both off the player |
 
-**Where a coach sets it.** FCC roster tab and the roster page: inline **TRAIN** and **DEV
-FOCUS** dropdowns, plus a bulk set (tick rows → choose a focus → Set focus). Player detail
-shows both read-only, under the position ratings, with the training position tagged inside
-the ratings list. All three save through `POST /franchise/player/development-focus`, which
-validates against `POSITIONS` / `TRAINING_FOCUSES` and **rejects** an unknown value rather
-than coercing it.
+**Where a coach sets it.** The **training page only** — the Player Development grid under
+Coaching Focus, where the setting sits beside the points it governs. Each dropdown saves on
+change through `POST /franchise/player/development-focus`, which validates against
+`POSITIONS` / `TRAINING_FOCUSES` and **rejects** an unknown value rather than coercing it.
+
+Every other surface is **read-only**: the FCC roster tab and the roster page show **POS**
+(third column, where it has always sat) and **DEV FOCUS** (trailing the attribute tiles —
+the evidence, then the coaching call); player detail shows both under the position ratings.
+Rosters are for scanning and comparing; a live control in a twelve-tile-wide row invites a
+stray click that writes with no undo. Those surfaces carry **no link** to the editor yet —
+deliberate, pending testing of the one-editor flow.
 
 **User's own team only.** `/roster/{team}` returns `is_user_team` and attaches the four
 development keys only for that team, so another team's roster cannot render a control the
@@ -933,7 +938,7 @@ Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shap
 - `FrontEnd/static/training-report.html` - Training report display page
 - `FrontEnd/static/training-report.css` - Report page styling
 - `FrontEnd/static/training-report.js` - Report data loading and rendering
-- `FrontEnd/static/franchise-command-center.js` - Schedule rendering with training report links; roster-tab Development Focus columns and bulk set
+- `FrontEnd/static/franchise-command-center.js` - Schedule rendering with training report links; roster-tab Development Focus columns
 - `FrontEnd/static/js/shared/developmentFocus.js` - The one implementation of the Development Focus controls (FCC roster tab, roster page, player detail)
 - `FrontEnd/static/team-roster-view.js` - Roster page Development Focus columns (user's own team only)
 
