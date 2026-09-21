@@ -6471,6 +6471,12 @@ def _hco_resolve_loose_ball(step, contest, passer, off_lineup, def_lineup, off_t
     }
 
 
+def _pf_module():
+    """placement_freeze, imported lazily — this module is imported by it indirectly."""
+    from BackEnd.utils import placement_freeze as _pf
+    return _pf
+
+
 def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
     """Stamp the render's ACTUAL defender placement (``compute_defender_grid`` = the animator's code)
     on each skeleton step as ``step["_step_state"]["defense"]``, so the interception contest
@@ -7726,10 +7732,19 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     output_step_index=len(output_steps) - 1,
                 )
                 if _post_def_xy:
-                    beat["_step_state"] = {
-                        "index": len(output_steps) - 1,
-                        "defense": _post_def_xy,
-                    }
+                    # MERGE, not replace. This is the one writer that can clobber a row
+                    # another producer already wrote (reports/placement-freeze-2a §11):
+                    # a wholesale assignment discards `offense` and `guard` alongside
+                    # `defense`, and the SIM arm's coord write scans for `offense`
+                    # (:5030). Under write-once a `defense` already present wins, so the
+                    # beat's own draw is used only where there is nothing to keep.
+                    _beat_ss = beat.get("_step_state")
+                    if not isinstance(_beat_ss, dict):
+                        _beat_ss = {}
+                    _beat_ss["index"] = len(output_steps) - 1
+                    if not (_pf_module().enabled() and (_beat_ss.get("defense") or {})):
+                        _beat_ss["defense"] = _post_def_xy
+                    beat["_step_state"] = _beat_ss
                     _post_def_xy, _post_coord, _post_loc, _post_pt = _hco_step_def_xy(
                         beat, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
                         _def_aggr_call, zone, game_state.get("defense_playcall"),
