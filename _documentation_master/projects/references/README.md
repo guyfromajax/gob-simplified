@@ -18,12 +18,13 @@ Animator methods at Pattern A.
 
 | file | tree | what it baselines |
 |---|---|---|
-| **`equiv_v3_reference_70f7dd021_b1a.json`** | `70f7dd021` | **CURRENT, both arms.** B1-A: the sim arm builds animations for its coordinate pipeline (`GOB_SIM_BUILD_ANIM_FOR_EMITTER` ON), so its HCO shot geometry is `hco-emitter-shot-step` — the frame the played arm already read. **The played arm is byte-identical to the superseded file on both footings** (the flag is sim-only by construction); **every sim seed differs**, because the animator's defender-placement draw re-phases the sim stream (draws/game +19.7% at `SEED_DEFENSES=1`, +14.0% at `=0`, converging on played). See `reports/b1a-adopt-2026-09-20.md`. |
+| **`equiv_v3_reference_5cc98ee3e_freeze.json`** | `5cc98ee3e` (2026-09-21) | **CURRENT, both arms, both footings.** Placement freeze + single build ON by default. **One placement draw per step**, written once by whoever creates the step and never redrawn; the HCO emit renders that frozen row instead of its own draw and the `_hco_render_animations` back-pipe is gone; stamp builds whose entire output write-once discards are no longer run. Every seed differs on both arms — a contest reading a different coordinate re-routes the turn, and Stage 3 removes draws (−5.6%/game at `SEED_DEFENSES=1`). See `reports/placement-freeze-flip-2026-09-21.md`. |
 
 ## Superseded — kept deliberately
 
 | file | tree | superseded by | reproduced today by |
 |---|---|---|---|
+| `equiv_v3_reference_70f7dd021_b1a.json` | `70f7dd021` | `5cc98ee3e` | **`GOB_PLACEMENT_FREEZE=0 GOB_PLACEMENT_SINGLE_BUILD=0`** — verified 40/40 on fingerprint AND draws in all four cells at `5cc98ee3e`, before the re-cut. `GOB_PLACEMENT_FREEZE=0` alone is sufficient: Stage 3 is inert unless the freeze is on. |
 | `equiv_v3_reference_ec4f5acfc_poslookup2.json` | `ec4f5acfc` | `70f7dd021` | **`GOB_SIM_BUILD_ANIM_FOR_EMITTER=0`** — verified 40/40 on all four cells at `70f7dd021`. `GOB_SIM_HCO_COORD_WRITE` and `GOB_SIM_CRASH_APPLY` are kept as this switch's partners: they are what write the sim arm's HCO coords when B1-A is off. |
 | `equiv_v3_reference_456e2cdd9_reboundarrival.json` | `456e2cdd9` | `ec4f5acfc` | `GOB_LINEUP_POSITION_LOOKUP=0` — verified 40/40 on all four cells at `ec4f5acfc` |
 | `equiv_v3_reference_bf7ed1181_crashmodela.json` | `bf7ed1181` | `456e2cdd9` | `GOB_REBOUND_FROM_ARRIVAL=0` — verified 40/40 on all four cells at that flip |
