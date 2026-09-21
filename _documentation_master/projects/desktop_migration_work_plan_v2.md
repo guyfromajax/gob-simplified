@@ -131,19 +131,22 @@ The paid base game is standalone and requires neither an account nor a network c
 - Full franchise season completed: init / resume, court play, timeouts, training, recruiting weeks 20–26 (20-rank board, 128 visits persisted each week including the user team), EOS 27–34, week 35 recruiting (50-point board, `signed_players` persisted), `finish_season`. Harness: `scripts/ws2_loopback_season.py`.
 - **Zero non-loopback TCP** for the whole run (`scripts/ws2_lsof_sample.sh` on the server and pool children, `remote=0` every sample).
 - Seeded exact-diff on the WS-2 feature branch (`efc9bed7b`) was **40773** (Lancaster 32 / Bentley-Truman 22). That number is retired — see the 21 Sept baseline note below.
-- Persist rewritten: generated columns + indexes + persist transactions. One-game finalize+EOG **31 → 2 commits**. The 152 s/week figure was week-4 FTD on a grown games table; live persist grew 196 s → 804 s because `_build_franchise_team_maps_from_ftd` ran 189 times/week and SQLite decoded full FTD/franchise docs. **Hosted does not grow that way** (Mongo projections; maps 4.3 ms at both sizes). Desktop follow-up 20 Sept: memoize maps per persist batch (189→1), `g_week` generated column, SQL inclusion projection. Persist-maps re-runs today at **46896**, not 40773 — those commits sit after `d0c378d0f`.
+- Persist rewritten: generated columns + indexes + persist transactions. One-game finalize+EOG **31 → 2 commits**. The 152 s/week figure was week-4 FTD on a grown games table; live persist grew 196 s → 804 s because `_build_franchise_team_maps_from_ftd` ran 189 times/week and SQLite decoded full FTD/franchise docs. **Hosted does not grow that way** (Mongo projections; maps 4.3 ms at both sizes). Desktop follow-up 20 Sept: memoize maps per persist batch (189→1), `g_week` generated column, SQL inclusion projection. Persist-maps (`235d06d4f`) re-runs today at **46896**, not 40773 — it already sits after `70f7dd021`.
 - Player-wait is **start-cpu-sims + phase-a + phase-b**, not start-cpu-sims alone. Fixed-adapter season (memoize + `g_week` + projection, 21 Sept 2026): **49.8 min** player-wait, **59.4 min** all HTTP. Week 5 **128 s**; week 26 **142 s**; curve near-flat. Measured against a true week-26 FTD (**55.3 MB**, 432 KB/team) — `finish_season` had reset FTD to 2 MB on the previous run, so persist had never been timed at late-season size. `remote=0` on all 239 lsof samples. Remaining FTD-growth (momentum dotted-path decode, 128 rank rewrites, recruiting leans, news blob) is polish backlog in bugs.md; `finish_season` resets FTD so it does not scale across seasons.
 - Spawn pool is the desktop default in code: `apply_loopback_env` `os.environ.setdefault("FRANCHISE_CPU_SIM_USE_POOL", "1")`. Hosted still defaults off.
 
 WS-1 (Mongo/SQLite adapter, PR #593) and WS-2 (PR #594) are on develop. The catalog sidecar is implemented on `desktop/catalog-sidecar` and verified 21 Sept 2026: shipping sidecar is `gob-staging` (this process has no production identity) — **23 / 6 / 1 / 1**, `catalog.sqlite` **1 028 096 bytes**, version `c4dcc375ce01f3b7fd89cf29b8d0db949f6bcf4da4a22763e1ebca072998be8c`. Fresh save, no hand-seed: store `plays=23` `defenses=6`, `[PLAYS-CATALOG] loaded EMPTY` absent, save has **zero** catalog tables. Catalog-equivalence exact-diff (Lancaster vs Bentley-Truman, `PYTHONHASHSEED=0`, seed `20260918`): mongo seeded from the export == sqlite/loopback reading the sidecar, **55629** draws, byte-identical (Bentley-Truman 22 / Lancaster 21). The 7/6 fixture sidecar is mechanism-neutral: three-arm identical at **46896** (Bentley-Truman 28 / Lancaster 16). Sidecar-backed season (not hand-seeded): `SEASON_COMPLETE` in **65.1 min**, `remote=0` on all **261** lsof samples, week 5 player-wait **83.2 s**, week 26 **168.7 s**. Playwright **392 passed / 3 failed** (the same three). Pytest **3114 passed / 3 failed** — the same three failures as `develop` (logged in bugs.md). Play-builder (`play_router`) stays mounted on loopback; `delete_play` raises `CatalogWriteBlocked` → HTTP 400.
 
-**Exact-diff baselines (bisected 21 Sept 2026).** 40773 last reproduces on `efc9bed7b` (WS-2 season gate, feature branch). The first commit that draws **46896** on the 7/6 fixture is `d0c378d0f` (merge `ws2/engine-loopback` into develop). Its first parent `ff587f34a` already carried `feature/animation-reward` (B1-A sim-arm builds, box-out, lineup identity). Persist-maps (`aad7d614d` / `235d06d4f`) re-runs at 46896 — the morning 40773 confirmation does not reproduce on those commits. This is the intentional animation re-baseline, not a sidecar or persist bug.
+**Exact-diff baselines (git bisect, 21 Sept 2026).** Seeded 7/6 fixture, `PYTHONHASHSEED=0`, seed `20260918`, mongo arm, clean env. Persist-maps (`235d06d4f`) already draws **46896** — the morning 40773 confirmation does not reproduce on that commit. Current `origin/develop` (`c79520ae3`) draws **43136**, not 46896.
 
-Current 7/6 and full-catalog numbers (Lancaster vs Bentley-Truman, `PYTHONHASHSEED=0`, seed `20260918`):
+- **40773 → 46896:** first bad `70f7dd021` (*Adopt B1-A: build animations for the sim arm's coordinate pipeline*). Parent `06d39c595` (B1-A spike, default OFF) is still 40773. Intentional animation work; the next commit re-cuts the reference. Not persist-maps, not the sidecar, not `188ae8d1a` (frontend-only) or `e931b5b91` (FPD/training write path; isolated `Random` for a tie-break, no `sim_rng`).
+- **46896 → 43136:** first bad `5cc98ee3e` (*Flip `GOB_PLACEMENT_FREEZE` and `GOB_PLACEMENT_SINGLE_BUILD` to ON by default*). Persist-maps → develop bisect; `e931b5b91` and `188ae8d1a` stay at 46896. Intentional animation work; equiv-v3 was re-cut in `52c999893`.
 
-- **7/6 catalog: 46896** — post-`d0c378d0f`, persist-maps through sidecar-era `9910cdaca`.
+Current 7/6 and full-catalog numbers (Lancaster vs Bentley-Truman, same seed):
+
+- **7/6 catalog: 46896** — first at `70f7dd021`; persist-maps through sidecar-era `9910cdaca`.
 - **Full hosted catalog (~23 plays): 55629** — sidecar measurement, same era.
-- Current `origin/develop` (`c79520ae3`) 7/6 draws **43136** after `5cc98ee3e` (placement-freeze + single-build defaults ON). That is a second intentional animation re-baseline; do not treat 43136 vs 46896 as a desktop regression.
+- Current `origin/develop` (`c79520ae3`) 7/6 draws **43136** after `5cc98ee3e`. Do not treat 43136 vs 46896 as a desktop regression.
 
 **Production catalog export — pre-beta requirement.** Jamie has production read access; this process does not. From a checkout that contains `scripts/export_catalog_sidecar.py`, with production identity in the *process* (not `.env.local`):
 
@@ -160,7 +163,20 @@ python scripts/export_catalog_sidecar.py \
 
 `--output` must stay a scratch path — never the committed `catalog.sqlite`. The script prints `version=<sha256>`. Compare to `c4dcc375ce01f3b7fd89cf29b8d0db949f6bcf4da4a22763e1ebca072998be8c`. Equal → staging == production, committed sidecar stays. Differ → the production export ships before the January beta. **Either way this check is a pre-beta gate.**
 
-WS-3 through WS-8 are not started as product work. The August-draft claim that WS-1–WS-6 were unstarted is no longer true for WS-1/WS-2.
+**Workstream status (21 Sept 2026):**
+
+| | Status |
+|---|---|
+| WS-0 `tournament_id` sunset | Done |
+| WS-5a routing seam | Done |
+| WS-1 persistence adapter | Done (PR #593) |
+| WS-2 engine localization | Done (PR #594) |
+| WS-3 FranchiseContext | Done and merged (PRs #589–#592; Gate B 0/0) |
+| Catalog sidecar | In review (`desktop/catalog-sidecar`, PR #596) |
+| WS-4 shell | Not started |
+| WS-6 pipeline / Demo variant | Not started |
+| WS-7 asset payload | Not started |
+| WS-8 local object store + portraits | Not started |
 
 | | Evidence |
 |---|---|
@@ -288,7 +304,7 @@ Not a small adapter. It contains a local object store, two paint paths, a bundle
   - **This bug was masked on the dev machine.** macOS fell through to Arial Bold and looked fine. Windows has neither Arial Bold at that path nor the Liberation fonts, so `ImageFont.truetype` raises and wordmark stamping dies offline. Classic works-on-my-machine, landing on the platform we ship to and do not develop on — and the strongest argument yet for acquiring the Windows reference machine early.
 - **Toolchain is x86_64 under Rosetta 2** (`platform.machine()` → `x86_64`, `uname -m` → `arm64`). Does not affect the spike's conclusions — both were mechanism questions — but it means (a) all recorded spike and capstone timings are translated and therefore pessimistic, the engine is likely faster natively; and (b) compiling today would produce an x86_64 Mac binary running under translation on every Apple Silicon Mac. **If macOS is in scope for March (Open Decision 3), install a native arm64 Python and toolchain before this ships.** Flagged, not fixed here. Clean install, not a migration.
 - **Gate (extended by the spike):** the *full-app* compiled binary spawns pool workers correctly with FastAPI and pymongo in the import graph — the one pool question the minimal reproduction could not answer. Plus: a full franchise season — init, turn-by-turn court play, timeouts and resume, box score, week advancement, training, recruiting, EOS — runs against loopback + SQLite with **zero remote calls**, verified by network monitor, at acceptable performance on a low-end reference machine.
-- **Season half of that gate — MET 20 Sept 2026.** Loopback + SQLite + spawn pool + catalog-loaded save; `SEASON_COMPLETE`; `lsof` remote=0 throughout. Exact-diff 40773 was the WS-2 feature-branch number (`efc9bed7b`); develop's 7/6 baseline is now 46896 (`d0c378d0f`) / 43136 after `5cc98ee3e` — see §3. Compiled full-app spawn (FastAPI+pymongo in the import graph) was proven earlier in this workstream. Low-end reference hardware / live-game pool sizing remains §10.1 / January beta, not this merge. Re-run `scripts/ws2_loopback_season.py` after any later loopback-path change.
+- **Season half of that gate — MET 20 Sept 2026.** Loopback + SQLite + spawn pool + catalog-loaded save; `SEASON_COMPLETE`; `lsof` remote=0 throughout. Exact-diff 40773 was the WS-2 feature-branch number (`efc9bed7b`); 46896 starts at `70f7dd021` (B1-A adopt); current develop is 43136 after `5cc98ee3e` — see §3. Compiled full-app spawn (FastAPI+pymongo in the import graph) was proven earlier in this workstream. Low-end reference hardware / live-game pool sizing remains §10.1 / January beta, not this merge. Re-run `scripts/ws2_loopback_season.py` after any later loopback-path change.
 
 ### WS-3: Franchise context provider — *reframed; runs as a continuous grind*
 
