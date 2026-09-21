@@ -7,6 +7,7 @@ developed snapshot.
 from __future__ import annotations
 
 import math
+import random
 from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 # ── Core-12 (growth attrs used for shape / floors) ──────────────────────────
@@ -184,6 +185,36 @@ TRAINING_FOCUS_PERCENTAGES: Dict[str, Dict[str, Dict[str, float]]] = {
 }
 
 
+def derive_training_position(doc: Mapping) -> Optional[str]:
+    """The training position a NEW or UNMIGRATED player doc should be given, or None.
+
+    ``position_intent`` (the natural fit drawn at generation) wins; otherwise the highest
+    ``position_ratings`` entry. Ties are broken deterministically from the document id, so
+    the same doc always resolves the same way — that is what lets the backfill's dry run
+    predict its own writes, and what keeps the backfill and the runtime creation paths in
+    agreement instead of drifting into two rules.
+
+    Returns None when there is neither an intent nor a usable rating. Callers must NOT
+    substitute a position in that case (rule 26): an unknown position stays unknown, and
+    ``resolve_training_position`` applies its own read-time fallback.
+    """
+    intent = doc.get("position_intent")
+    if isinstance(intent, str) and intent.strip() in POSITIONS:
+        return intent.strip()
+
+    ratings = doc.get("position_ratings")
+    if isinstance(ratings, Mapping) and ratings:
+        usable = {p: v for p, v in ratings.items() if p in POSITIONS and isinstance(v, (int, float))}
+        if usable:
+            best = max(usable.values())
+            tied = sorted(p for p, v in usable.items() if v == best)
+            if len(tied) == 1:
+                return tied[0]
+            key = doc.get("_id") or doc.get("player_id") or ""
+            return random.Random(f"development-focus:{key}").choice(tied)
+    return None
+
+
 def resolve_training_focus(player: Mapping) -> str:
     """The player's Development Focus, or ``standard``.
 
@@ -292,9 +323,13 @@ def apply_floor_clamp_to_anchors(player: dict, position: Optional[str] = None) -
 
 
 def resolve_training_position(player: Mapping) -> str:
-    pos = player.get("training_position") or player.get("position_intent")
-    if pos in TRAINING_GAIN_PERCENTAGES:
-        return pos
+    # Each candidate is tested in turn rather than `a or b`: an invalid stored
+    # training_position used to swallow the fallback chain, so a doc carrying junk in that
+    # field skipped its own position_intent and landed on the SF default. Precedence is
+    # unchanged for valid data — coach's choice, then natural fit, then best rating.
+    for pos in (player.get("training_position"), player.get("position_intent")):
+        if pos in TRAINING_GAIN_PERCENTAGES:
+            return pos
     ratings = player.get("position_ratings") or {}
     if ratings:
         best = max(ratings, key=ratings.get)

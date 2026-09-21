@@ -25,7 +25,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import random
 import sys
 from collections import Counter
 from pathlib import Path
@@ -41,6 +40,7 @@ from BackEnd.constants.training_shape import (  # noqa: E402
     DEFAULT_TRAINING_FOCUS,
     POSITIONS,
     TRAINING_FOCUSES,
+    derive_training_position,
 )
 
 COLLECTION = "franchise_players_data"
@@ -58,26 +58,25 @@ MISSING_FILTER = {"$or": [{"training_position": {"$exists": False}},
 def resolve_position(doc: Mapping[str, Any]) -> tuple[Optional[str], str]:
     """Return ``(position, source)`` for one FPD doc.
 
+    The VALUE comes from ``derive_training_position`` — the same helper the runtime
+    creation paths use (``carry_dev_fields``), so a backfilled doc and a newly created one
+    can never disagree. This function only adds the reporting label.
+
     source is one of: intent | ratings | ratings-tie | none
     """
+    position = derive_training_position(doc)
+    if position is None:
+        return None, "none"
+
     intent = doc.get("position_intent")
     if isinstance(intent, str) and intent.strip() in POSITIONS:
-        return intent.strip(), "intent"
+        return position, "intent"
 
-    ratings = doc.get("position_ratings")
-    if isinstance(ratings, Mapping) and ratings:
-        usable = {p: v for p, v in ratings.items() if p in POSITIONS and isinstance(v, (int, float))}
-        if usable:
-            best = max(usable.values())
-            tied = sorted(p for p, v in usable.items() if v == best)
-            if len(tied) == 1:
-                return tied[0], "ratings"
-            # deterministic per document, arbitrary across the population
-            rng = random.Random(f"development-focus:{doc.get('_id')}")
-            return rng.choice(tied), "ratings-tie"
-
-    # No intent and no usable ratings: do NOT invent a position.
-    return None, "none"
+    ratings = doc.get("position_ratings") or {}
+    usable = {p: v for p, v in ratings.items() if p in POSITIONS and isinstance(v, (int, float))}
+    best = max(usable.values())
+    tied = [p for p, v in usable.items() if v == best]
+    return position, "ratings-tie" if len(tied) > 1 else "ratings"
 
 
 def backfill(*, db_name: str, dry_run: bool) -> dict[str, Any]:

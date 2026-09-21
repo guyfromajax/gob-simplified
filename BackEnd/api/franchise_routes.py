@@ -9612,6 +9612,88 @@ def delete_franchise_by_id(franchise_id: str, user: dict = Depends(get_current_u
             "franchise_id": str(oid)}
 
 
+class DevelopmentFocusUpdateRequest(BaseModel):
+    """One player's Development Focus settings. Both fields optional; at least one required."""
+
+    franchise_id: str
+    player_id: str
+    training_position: str | None = None
+    training_focus: str | None = None
+
+
+@router.post("/franchise/player/development-focus")
+def set_player_development_focus(
+    body: DevelopmentFocusUpdateRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Set a player's training position / Development Focus on his FPD document.
+
+    FPD is authoritative for both fields (GOB_DEVELOPMENT_FOCUS_PLAN.md): training reads
+    them from here, and every UI surface writes here.
+
+    Guards, in order:
+      * the franchise must belong to the caller (403 otherwise);
+      * the player must be on the caller's OWN team — a coach cannot set development for an
+        opponent's roster, which is the same rule the UI applies by only rendering the
+        controls for his team;
+      * values are validated against POSITIONS / TRAINING_FOCUSES and REJECTED when unknown,
+        never silently coerced, so junk cannot reach the database. (The read-side resolver
+        still degrades a bad legacy value to ``standard`` so a stored surprise can never
+        stop a week of training from resolving.)
+
+    Changing a focus affects FUTURE training only; nothing already developed is recomputed.
+    """
+    from BackEnd.constants.training_shape import POSITIONS, TRAINING_FOCUSES
+
+    if body.training_position is None and body.training_focus is None:
+        raise HTTPException(status_code=400, detail="training_position or training_focus is required")
+
+    updates: dict[str, Any] = {}
+    if body.training_position is not None:
+        pos = str(body.training_position).strip()
+        if pos not in POSITIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid training_position {body.training_position!r}; expected one of {', '.join(POSITIONS)}",
+            )
+        updates["training_position"] = pos
+    if body.training_focus is not None:
+        foc = str(body.training_focus).strip().lower()
+        if foc not in TRAINING_FOCUSES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid training_focus {body.training_focus!r}; expected one of {', '.join(TRAINING_FOCUSES)}",
+            )
+        updates["training_focus"] = foc
+
+    try:
+        oid = ObjectId(body.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise_id")
+    franchise = db.franchises.find_one({"_id": oid}, {"user_id": 1, "user_team_id": 1})
+    if not franchise:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    if str(franchise.get("user_id") or "") != str(user["user_id"]):
+        raise HTTPException(status_code=403, detail="Access denied to this franchise")
+
+    fpd = franchise_players_data_collection.find_one(
+        {"franchise_id": str(body.franchise_id), "player_id": str(body.player_id)},
+        {"meta": 1},
+    )
+    if not fpd:
+        raise HTTPException(status_code=404, detail="Player not found in this franchise")
+
+    user_team_id = str(franchise.get("user_team_id") or "")
+    player_team_id = str((fpd.get("meta") or {}).get("team_id") or "")
+    if not user_team_id or player_team_id != user_team_id:
+        raise HTTPException(status_code=403, detail="Player is not on your team")
+
+    updates["updated_at"] = datetime.utcnow()
+    franchise_players_data_collection.update_one({"_id": fpd["_id"]}, {"$set": updates})
+    updates.pop("updated_at", None)
+    return {"updated": True, "player_id": str(body.player_id), **updates}
+
+
 @router.get("/franchise/command-center/data")
 def command_center_data(
     franchise_id: str = None,

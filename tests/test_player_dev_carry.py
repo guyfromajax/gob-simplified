@@ -25,8 +25,15 @@ def test_carry_dev_fields_carries_present_and_omits_absent():
     out = carry_dev_fields(src)
     assert set(out) == set(PLAYER_DEV_CARRY_FIELDS)  # every declared field carried
     assert "unrelated" not in out                    # nothing else leaks through
-    assert carry_dev_fields({}) == {}                # absent → omitted (backfilled downstream)
-    assert carry_dev_fields({"entry_tier": None}) == {}  # None → omitted
+    # Absent → omitted, with ONE documented exception: Development Focus defaults are
+    # applied here because this is the single hop every player doc passes through
+    # (GOB_DEVELOPMENT_FOCUS_PLAN.md phase 2). training_focus always lands as "standard";
+    # training_position lands only when it can be DERIVED (intent / ratings) and is still
+    # omitted otherwise, so an unknown position is never invented.
+    assert carry_dev_fields({}) == {"training_focus": "standard"}
+    assert carry_dev_fields({"entry_tier": None}) == {"training_focus": "standard"}
+    assert "training_position" not in carry_dev_fields({})   # not invented
+    assert carry_dev_fields({"position_intent": "PG"})["training_position"] == "PG"
 
 
 def test_pool_carry_is_a_subset_of_player_dev_carry():
