@@ -164,11 +164,21 @@ Prototyped and approved:
 
 **Regression surface:** `training.js` reads `input[type=range]`. The pip swap needs the read/write path, Auto-Train and the points counter updated.
 
-### Phase 6 — Tutorial
+### Phase 6 — Tutorial — **SHIPPED**
 - Generator writes the matrix to a static asset; **guard test fails if it drifts** from Python.
 - Rebuild `tutorial-advanced-training-by-position.html` as **By Position / By Focus**, default By Position → PG.
 - Remove the archetype subhead.
 - Update the doc note in `09_Training_Systems/Training_System.md`, which currently says the page is hand-authored.
+
+**As built.** Generator `scripts/generate_training_matrix_asset.py` → asset
+`FrontEnd/static/js/generated/trainingMatrix.js` → renderer
+`js/shared/trainingMatrixGrid.js`. The asset is a `<script src>` rather than JSON fetched
+at runtime, so the downloadable build needs no special case (open item 1, closed). The
+asset publishes the band thresholds too, so cells and legend cannot disagree; the band
+formerly labelled "Standard" is now "Solid Fit", because the page gained a Standard
+**focus** and one word cannot mean both. `tests/test_training_matrix_asset.py` compares
+the committed asset to `render()` byte for byte and names the regenerate command on
+failure.
 
 ---
 
@@ -215,6 +225,6 @@ focus-aware floors · changing `position_intent` semantics · any gameplay/lineu
 
 ## 8. Open items
 
-1. **Desktop build asset path** — if the packaging step needs a manifest entry, the generator should write where it expects.
+1. ~~**Desktop build asset path**~~ — closed in Phase 6: the asset is a plain `<script src>` beside the other static JS, so there is no fetch, no CORS and no manifest entry to keep in step.
 2. ~~**Roster bulk-set interaction**~~ — **dropped.** Built in Phase 4 as a per-row tick plus a toolbar apply, then removed: an unlabelled checkbox beside a control that already saves on change read as a save confirmation, and the toolbar that explained it only appeared *after* the first tick. Every change is one dropdown, saved immediately. Revisit only if setting a whole squad one player at a time proves to be real friction — and if so, with a visible affordance, not a hidden one.
 3. **Practice-squad development** — PS players carry no training position/focus on the roster payload, so they are outside the editor. Revisit if PS training is ever meant to be shaped.

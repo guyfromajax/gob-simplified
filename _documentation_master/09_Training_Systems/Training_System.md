@@ -204,7 +204,16 @@ Position fit and class affect **gain, never price**. They are stored directly as
 
 This moved the fractional component off the budget so the user always sees and spends whole points while retaining the original cross-position granularity. Shape floors and `resolve_training_position()` are unchanged.
 
-**Player-facing surface:** the position-fit percentages are published to coaches as a read-only chart at `FrontEnd/static/tutorial-advanced-training-by-position.html` (Tutorials → Advanced Topics → Training by Position; hub id `training-by-position`). The page is hand-authored from `TRAINING_GAIN_PERCENTAGES` — **it does not read the table at runtime, so any retune of those percentages must be mirrored there.** Class-year taper is deliberately omitted from that page.
+**Player-facing surface:** the percentages are published to coaches as a read-only chart at `FrontEnd/static/tutorial-advanced-training-by-position.html` (Tutorials → Advanced Topics → Training by Position; hub id `training-by-position`). The page **reads all 30 profiles from a generated asset** — nothing on it is typed by hand:
+
+| | |
+|---|---|
+| Generator | `scripts/generate_training_matrix_asset.py` |
+| Asset | `FrontEnd/static/js/generated/trainingMatrix.js` (a `<script src>`, not a fetch, so the desktop build needs no special case) |
+| Renderer | `FrontEnd/static/js/shared/trainingMatrixGrid.js` — **By Position** (one position, six focuses) / **By Focus** (one focus, five positions), default By Position → PG |
+| Drift guard | `tests/test_training_matrix_asset.py` fails if the asset does not match `training_shape.py` |
+
+**After any retune of `TRAINING_FOCUS_PERCENTAGES` or `TRAINING_GAIN_PERCENTAGES`, run `python scripts/generate_training_matrix_asset.py` and commit the asset.** The guard test will fail until you do — it replaces the old "must be mirrored by hand" warning, which was a warning rather than a guard and was exactly how the page would have gone stale. Class-year taper is deliberately omitted from that page.
 
 ### Development Focus
 

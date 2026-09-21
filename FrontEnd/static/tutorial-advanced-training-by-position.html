@@ -38,131 +38,34 @@
         <span class="depth advanced">Advanced Topic</span>
       </div>
       <h1>TRAINING BY POSITION</h1>
-      <p class="intro">Players train differently based on position and archetype.</p>
+      <p class="intro">Players train differently based on position and development focus.</p>
     </section>
 
-    <!-- THE GRID -->
+    <!-- THE GRID — rendered from /js/generated/trainingMatrix.js, which is written
+         from BackEnd/constants/training_shape.py. Nothing here is typed by hand. -->
     <section class="lsec" id="fit-grid">
       <div class="panel" style="padding:22px 20px;">
+
+        <div class="fitgrid-controls">
+          <div class="fg-modes" role="tablist" aria-label="Matrix orientation">
+            <button type="button" class="fg-mode is-on" role="tab" aria-selected="true"
+                    data-fg-mode="position">By Position</button>
+            <button type="button" class="fg-mode" role="tab" aria-selected="false"
+                    data-fg-mode="focus">By Focus</button>
+          </div>
+          <div class="fg-picks" id="fg-picks" role="tablist" aria-label="Selection"></div>
+        </div>
+
+        <p class="fg-caption" id="fg-caption"></p>
+
         <div class="fitgrid-wrap">
-          <table class="fitgrid">
-            <thead>
-              <tr>
-                <th class="fg-corner" scope="col">Attribute</th>
-                <th scope="col">PG</th>
-                <th scope="col">SG</th>
-                <th scope="col">SF</th>
-                <th scope="col">PF</th>
-                <th scope="col">C</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row"><span class="fg-attr">Scoring</span><span class="fg-code">SC</span></th>
-                <td><span class="fg-cell" data-band="mid">40%</span></td>
-                <td><span class="fg-cell" data-band="mid">55%</span></td>
-                <td><span class="fg-cell" data-band="full">82%</span></td>
-                <td><span class="fg-cell" data-band="mid">55%</span></td>
-                <td><span class="fg-cell" data-band="high">68%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Shooting</span><span class="fg-code">SH</span></th>
-                <td><span class="fg-cell" data-band="mid">45%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="high">64%</span></td>
-                <td><span class="fg-cell" data-band="mid">47%</span></td>
-                <td><span class="fg-cell" data-band="mid">40%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Passing</span><span class="fg-code">PS</span></th>
-                <td><span class="fg-cell" data-band="full">85%</span></td>
-                <td><span class="fg-cell" data-band="high">70%</span></td>
-                <td><span class="fg-cell" data-band="low">39%</span></td>
-                <td><span class="fg-cell" data-band="low">35%</span></td>
-                <td><span class="fg-cell" data-band="low">33%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Ball Handling</span><span class="fg-code">BH</span></th>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="high">70%</span></td>
-                <td><span class="fg-cell" data-band="low">39%</span></td>
-                <td><span class="fg-cell" data-band="low">25%</span></td>
-                <td><span class="fg-cell" data-band="low">25%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Inside Defense</span><span class="fg-code">ID</span></th>
-                <td><span class="fg-cell" data-band="low">25%</span></td>
-                <td><span class="fg-cell" data-band="low">25%</span></td>
-                <td><span class="fg-cell" data-band="mid">50%</span></td>
-                <td><span class="fg-cell" data-band="high">67%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Outside Defense</span><span class="fg-code">OD</span></th>
-                <td><span class="fg-cell" data-band="high">70%</span></td>
-                <td><span class="fg-cell" data-band="high">60%</span></td>
-                <td><span class="fg-cell" data-band="full">91%</span></td>
-                <td><span class="fg-cell" data-band="low">35%</span></td>
-                <td><span class="fg-cell" data-band="mid">40%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Rebounding</span><span class="fg-code">RB</span></th>
-                <td><span class="fg-cell" data-band="low">25%</span></td>
-                <td><span class="fg-cell" data-band="low">25%</span></td>
-                <td><span class="fg-cell" data-band="mid">50%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Strength</span><span class="fg-code">ST</span></th>
-                <td><span class="fg-cell" data-band="low">35%</span></td>
-                <td><span class="fg-cell" data-band="low">35%</span></td>
-                <td><span class="fg-cell" data-band="mid">40%</span></td>
-                <td><span class="fg-cell" data-band="full">99%</span></td>
-                <td><span class="fg-cell" data-band="high">77%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Agility</span><span class="fg-code">AG</span></th>
-                <td><span class="fg-cell" data-band="full">83%</span></td>
-                <td><span class="fg-cell" data-band="high">68%</span></td>
-                <td><span class="fg-cell" data-band="mid">53%</span></td>
-                <td><span class="fg-cell" data-band="mid">45%</span></td>
-                <td><span class="fg-cell" data-band="low">25%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Free Throws</span><span class="fg-code">FT</span></th>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Basketball IQ</span><span class="fg-code">IQ</span></th>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-              </tr>
-              <tr>
-                <th scope="row"><span class="fg-attr">Endurance</span><span class="fg-code">ND</span></th>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-                <td><span class="fg-cell" data-band="full">100%</span></td>
-              </tr>
-            </tbody>
+          <table class="fitgrid" id="fitgrid">
+            <thead id="fitgrid-head"></thead>
+            <tbody id="fitgrid-body"></tbody>
           </table>
         </div>
 
-        <div class="fitgrid-legend">
-          <span class="fl-item"><span class="fl-sw" data-band="full"></span> Strong Fit</span>
-          <span class="fl-item"><span class="fl-sw" data-band="high"></span> Standard</span>
-          <span class="fl-item"><span class="fl-sw" data-band="mid"></span> Partial</span>
-          <span class="fl-item"><span class="fl-sw" data-band="low"></span> Poor Fit</span>
-        </div>
+        <div class="fitgrid-legend" id="fitgrid-legend"></div>
       </div>
     </section>
 
@@ -197,6 +100,8 @@
   <script src="/js/shared/authBarInit.js"></script>
   <!-- tutorial nav + progress behavior -->
   <script src="/js/shared/gobTutorialNav.js"></script>
+  <script src="/js/generated/trainingMatrix.js"></script>
+  <script src="/js/shared/trainingMatrixGrid.js"></script>
   <script>
     if (window.GOB && window.GOB.markSeen) window.GOB.markSeen('training-by-position');
   </script>
