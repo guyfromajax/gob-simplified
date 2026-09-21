@@ -235,6 +235,99 @@ def warm_anchor_cache(tables: Sequence[Dict[str, List[Point]]]) -> int:
 
 # ---------------------------------------------------------------- the model ----
 
+FLAG_ESCAPE = "GOB_ZONE_SINK_ESCAPE"
+
+# --- Escape guardrails. Both DERIVED from measured geometry, not chosen. -------------
+#
+# RIM_FLOOR = the distance from the rim to ``basketSpot`` — the nearest NAMED on-court
+# spot an offensive player can occupy. A defender should never stand closer to the
+# basket than a man standing at the basket. HCO_STRING_SPOTS["basketSpot"] (87,25) vs
+# HOME_RIM_COORDS (91,25) = exactly 4.00. Measured against today's geometry the sink's
+# own minimum rim distance is 4.03 over 235k placements, so this floor does not bind on
+# anything the sink does today — it exists only to bound the new, deeper positions.
+RIM_FLOOR = 4.0
+#
+# MIN_SEPARATION = the 5th percentile of today's nearest-other-defender distance on zone
+# turns (p5 = 1.41 home offense / 2.00 away, 235k placements). Choosing the p5 means the
+# guardrail permits essentially everything the current geometry already does and only
+# stops the ESCAPE from creating a tighter overlap than the game already tolerates.
+MIN_SEPARATION = 2.0
+
+_ESCAPE_COUNTS = {
+    "clamp_would_bind": 0,   # the polygon clamp had something to pull back
+    "not_rim_ward": 0,       # ...but the discarded movement was not rim-ward -> clamped
+    "escaped": 0,            # he ended up outside his polygon
+    "rim_floor_bound": 0,    # guardrail 1 stopped him
+    "separation_bound": 0,   # guardrail 2 stopped him
+    "escape_nulled": 0,      # a guardrail walked him all the way back to the clamp
+}
+
+
+def escape_enabled() -> bool:
+    """``GOB_ZONE_SINK_ESCAPE`` — **default OFF**. When on, an empty-area zone defender
+    may leave his own polygon, but only to the extent the movement takes him CLOSER TO
+    THE RIM. Movement that is not rim-ward is still clamped into the zone."""
+    return os.environ.get(FLAG_ESCAPE, "0") == "1"
+
+
+def escape_counters() -> Dict[str, int]:
+    return dict(_ESCAPE_COUNTS)
+
+
+def reset_escape_counters() -> None:
+    for k in _ESCAPE_COUNTS:
+        _ESCAPE_COUNTS[k] = 0
+
+
+def _min_separation(p: Point, others: Sequence[Point]) -> float:
+    return min((math.dist(p, o) for o in others), default=float("inf"))
+
+
+def _walk_back(anchor: Point, target: Point, ok) -> Optional[Point]:
+    """Largest fraction of anchor->target that still satisfies ``ok``. None if none does."""
+    if ok(target):
+        return target
+    lo, hi, found = 0.0, 1.0, None
+    for _ in range(24):
+        mid = (lo + hi) / 2.0
+        p = (anchor[0] + (target[0] - anchor[0]) * mid,
+             anchor[1] + (target[1] - anchor[1]) * mid)
+        if ok(p):
+            lo = mid; found = p
+        else:
+            hi = mid
+    return found
+
+
+def _rim_ward_escape(anchor, target, clamped, rim, others):
+    """Jamie's call (2026-09-21): a defender with nobody in his area may stand outside
+    his zone when the pull is taking him to the basket.
+
+    Keeps the clamp for everything else — if the movement the polygon discarded was not
+    rim-ward, the old behaviour stands. A guardrail that binds is itself a clamp and is
+    counted as one.
+    """
+    if math.dist(target, clamped) < 1e-9:
+        return clamped                              # the clamp never bound
+    _ESCAPE_COUNTS["clamp_would_bind"] += 1
+    if math.dist(target, rim) >= math.dist(clamped, rim) - 1e-9:
+        _ESCAPE_COUNTS["not_rim_ward"] += 1
+        return clamped                              # not rim-ward -> still clamped
+    cand = target
+    if math.dist(cand, rim) < RIM_FLOOR:
+        _ESCAPE_COUNTS["rim_floor_bound"] += 1
+        cand = _walk_back(anchor, cand, lambda p: math.dist(p, rim) >= RIM_FLOOR) or clamped
+    if others and _min_separation(cand, others) < MIN_SEPARATION:
+        _ESCAPE_COUNTS["separation_bound"] += 1
+        cand = _walk_back(anchor, cand,
+                          lambda p: _min_separation(p, others) >= MIN_SEPARATION) or clamped
+    if math.dist(cand, clamped) < 1e-9:
+        _ESCAPE_COUNTS["escape_nulled"] += 1
+    else:
+        _ESCAPE_COUNTS["escaped"] += 1
+    return cand
+
+
 def _clamp_into(anchor: Point, target: Point, ring: Sequence[Point]) -> Point:
     """Walk back from ``target`` toward ``anchor`` until inside the polygon.
 
@@ -262,6 +355,7 @@ def sink_position(
     rim: Point,
     weights: Optional[Dict[str, float]] = None,
     iq_error: float = 0.0,
+    others: Optional[Sequence[Point]] = None,
 ) -> Dict[str, float]:
     """Where an empty-zone defender stands.
 
@@ -311,5 +405,8 @@ def sink_position(
         dx *= reach / travel
         dy *= reach / travel
 
-    spot = _clamp_into(anchor, (anchor[0] + dx, anchor[1] + dy), ring)
+    target = (anchor[0] + dx, anchor[1] + dy)
+    spot = _clamp_into(anchor, target, ring)
+    if escape_enabled():
+        spot = _rim_ward_escape(anchor, target, spot, rim, others or ())
     return {"x": spot[0], "y": spot[1]}
