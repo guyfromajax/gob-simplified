@@ -18,12 +18,13 @@ Animator methods at Pattern A.
 
 | file | tree | what it baselines |
 |---|---|---|
-| **`equiv_v3_reference_5cc98ee3e_freeze.json`** | `5cc98ee3e` (2026-09-21) | **CURRENT, both arms, both footings.** Placement freeze + single build ON by default. **One placement draw per step**, written once by whoever creates the step and never redrawn; the HCO emit renders that frozen row instead of its own draw and the `_hco_render_animations` back-pipe is gone; stamp builds whose entire output write-once discards are no longer run. Every seed differs on both arms — a contest reading a different coordinate re-routes the turn, and Stage 3 removes draws (−5.6%/game at `SEED_DEFENSES=1`). See `reports/placement-freeze-flip-2026-09-21.md`. |
+| **`equiv_v3_reference_5ea94694f_sinkescape.json`** | `5ea94694f` (2026-09-22) | **CURRENT, both arms, both footings.** Zone sink escape ON by default: an empty-area zone defender may leave his own polygon to the extent the movement takes him **closer to the rim**; movement that is not rim-ward is still clamped. Guardrails `RIM_FLOOR` 4.0 and `MIN_SEPARATION` 2.0, both derived from measured geometry. No reach constant or sink weight changed. **`SEED_DEFENSES=0` is byte-identical to the superseded file** (40/40 fp and draws, both arms) — zone does not exist there, so the escape cannot fire. At `SEED_DEFENSES=1`, 36/40 sim and 37/40 played seeds differ. See `reports/zone-sink-escape-flip-2026-09-22.md`. |
 
 ## Superseded — kept deliberately
 
 | file | tree | superseded by | reproduced today by |
 |---|---|---|---|
+| `equiv_v3_reference_5cc98ee3e_freeze.json` | `5cc98ee3e` | `5ea94694f` | **`GOB_ZONE_SINK_ESCAPE=0`** — verified 40/40 on fingerprint AND draws in all four cells at `5ea94694f`, before the re-cut, with every escape counter at zero. |
 | `equiv_v3_reference_70f7dd021_b1a.json` | `70f7dd021` | `5cc98ee3e` | **`GOB_PLACEMENT_FREEZE=0 GOB_PLACEMENT_SINGLE_BUILD=0`** — verified 40/40 on fingerprint AND draws in all four cells at `5cc98ee3e`, before the re-cut. `GOB_PLACEMENT_FREEZE=0` alone is sufficient: Stage 3 is inert unless the freeze is on. |
 | `equiv_v3_reference_ec4f5acfc_poslookup2.json` | `ec4f5acfc` | `70f7dd021` | **`GOB_SIM_BUILD_ANIM_FOR_EMITTER=0`** — verified 40/40 on all four cells at `70f7dd021`. `GOB_SIM_HCO_COORD_WRITE` and `GOB_SIM_CRASH_APPLY` are kept as this switch's partners: they are what write the sim arm's HCO coords when B1-A is off. |
 | `equiv_v3_reference_456e2cdd9_reboundarrival.json` | `456e2cdd9` | `ec4f5acfc` | `GOB_LINEUP_POSITION_LOOKUP=0` — verified 40/40 on all four cells at `ec4f5acfc` |
