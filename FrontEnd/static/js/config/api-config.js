@@ -104,7 +104,7 @@ const CATEGORY_PREFIXES = Object.freeze([
   ['/api/email', 'email'],
   ['/api/admin', 'admin'],
   ['/api/auth', 'auth'],
-  ['/app-config', 'auth'],
+  ['/app-config', 'api'],
   ['/api/playbooks', 'gameplan'],
   ['/api/gameplan', 'gameplan'],
   ['/api/fcp-skeletons', 'skeleton'],
@@ -356,22 +356,26 @@ const API_CONFIG = {
       return this._appConfigLoading;
     }
     
-    // Fetch config from backend
+    // Desktop: always the loopback engine. /app-config is feature flags
+    // (alpha badge, Team Builder, Sentry DSN) — not auth. A no-context
+    // buildUrl() stays on the remote host even under the desktop profile.
     this._appConfigLoading = (async () => {
-      const url = this.buildUrl('/app-config');
-      console.log('[API_CONFIG] Fetching app-config from', url); // DEBUG: remove after troubleshooting
+      const desktop = this.getBuildProfile() === 'desktop';
+      const fallback = { isAlpha: false, alphaDisclaimer: null, version: '1.0', sentryDsn: null, teamBuilderEnabled: true };
+      const url = desktop
+        ? (this.getLoopbackBase() + '/app-config')
+        : this.buildUrl('/app-config');
       try {
         const response = await fetch(url);
         if (!response.ok) {
           console.error('[API_CONFIG] Failed to load app config:', response.status, response.statusText);
-          return { isAlpha: false, alphaDisclaimer: null, version: '1.0', teamBuilderEnabled: true };
+          return fallback;
         }
         this._appConfig = await response.json();
-        console.log('[API_CONFIG] app-config loaded:', this._appConfig); // DEBUG: remove after troubleshooting
         return this._appConfig;
       } catch (error) {
         console.error('[API_CONFIG] Error loading app config:', error.message, error);
-        return { isAlpha: false, alphaDisclaimer: null, version: '1.0', teamBuilderEnabled: true };
+        return fallback;
       } finally {
         this._appConfigLoading = null;
       }

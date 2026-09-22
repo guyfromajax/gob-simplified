@@ -1677,41 +1677,50 @@ document.addEventListener('DOMContentLoaded', async function () {
   const authLoggedIn = document.getElementById('auth-logged-in');
   const authUserEmail = document.getElementById('auth-user-email');
   const logoutBtn = document.getElementById('logout-btn');
+  const isDesktop = typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop';
   const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
   const authUser = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_user') : null;
   let currentUsername = '';
 
-  if (!authToken || !authUser) {
+  if (!isDesktop && (!authToken || !authUser)) {
     redirectToLogin();
     return;
   }
 
   try {
-    const user = JSON.parse(authUser);
-    currentUsername = user.username || user.email || '';
-    if (authLoggedOut) authLoggedOut.style.display = 'none';
-    if (authLoggedIn) authLoggedIn.style.display = 'flex';
-    if (authUserEmail) authUserEmail.textContent = user.username || user.email;
+    if (isDesktop) {
+      currentUsername = 'Coach';
+      atlCurrentUserId = 'local-desktop-user';
+      if (authLoggedOut) authLoggedOut.style.display = 'none';
+      if (authLoggedIn) authLoggedIn.style.display = 'flex';
+      if (authUserEmail) authUserEmail.textContent = 'Coach';
+    } else {
+      const user = JSON.parse(authUser);
+      currentUsername = user.username || user.email || '';
+      if (authLoggedOut) authLoggedOut.style.display = 'none';
+      if (authLoggedIn) authLoggedIn.style.display = 'flex';
+      if (authUserEmail) authUserEmail.textContent = user.username || user.email;
 
-    const meRes = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: getAuthHeaders() });
-    if (!meRes.ok) {
-      if (meRes.status === 401 || meRes.status === 403) {
-        redirectToLogin();
-        return;
+      const meRes = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: getAuthHeaders() });
+      if (!meRes.ok) {
+        if (meRes.status === 401 || meRes.status === 403) {
+          redirectToLogin();
+          return;
+        }
+        throw new Error('/api/auth/me failed with status ' + meRes.status);
       }
-      throw new Error('/api/auth/me failed with status ' + meRes.status);
-    }
 
-    const meData = await meRes.json();
-    if (meData.user_id) {
-      atlCurrentUserId = String(meData.user_id);
-    }
-    if (meData.username && meData.username.trim()) {
-      currentUsername = meData.username;
-      if (authUserEmail) authUserEmail.textContent = meData.username;
-      const stored = JSON.parse(authUser);
-      stored.username = meData.username;
-      localStorage.setItem('auth_user', JSON.stringify(stored));
+      const meData = await meRes.json();
+      if (meData.user_id) {
+        atlCurrentUserId = String(meData.user_id);
+      }
+      if (meData.username && meData.username.trim()) {
+        currentUsername = meData.username;
+        if (authUserEmail) authUserEmail.textContent = meData.username;
+        const stored = JSON.parse(authUser);
+        stored.username = meData.username;
+        localStorage.setItem('auth_user', JSON.stringify(stored));
+      }
     }
   } catch (e) {
     console.error('[AUTH] Mode select auth validation failed:', e);

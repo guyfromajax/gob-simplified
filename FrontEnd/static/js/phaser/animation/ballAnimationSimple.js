@@ -17,7 +17,7 @@
  * - Step 3: Simple ball movement functions (animateBallToPosition, animateBallToPlayer)
  */
 
-import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js';
+import * as Phaser from '/js/vendor/phaser-3.70.0.esm.js';
 // Lazy import cancelBallTweenAndClearOwner to avoid circular dependency (imported dynamically in animateShotToRim)
 // Import BallController adapter for delegation
 import { getBallController } from './BallControllerAdapter.js';

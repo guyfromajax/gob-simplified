@@ -172,6 +172,7 @@ function main() {
     assert(web.auto._provider instanceof web.lib.UrlContextProvider, 'web boot → Url');
     const desk = loadLib({ GOB_BUILD_PROFILE: 'desktop' });
     assert(desk.auto._provider instanceof desk.lib.SessionContextProvider, 'desktop boot → Session');
+    assertEqual(desk.auto.runtime, 'local', 'desktop Session defaults runtime=local');
   }
 
   // --- Session persists across a new instance (hard navigation) ---
@@ -183,7 +184,7 @@ function main() {
       storage,
       location: firstPage.loc,
     });
-    assertEqual(ctx1.get('franchise_id'), null, 'Session ignores query string');
+    assertEqual(ctx1.get('franchise_id'), 'FROM_URL', 'Session hydrates inbound query');
     ctx1.setMany({
       franchise_id: 'f-desk',
       game_id: 'g-desk',

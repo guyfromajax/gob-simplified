@@ -14,8 +14,9 @@
     return;
   }
 
-  // /app-config is always-remote (classified as auth). sentryInit loads before
-  // api-config on most pages; pull the table in rather than keep a second sniff.
+  // Web only (desktop returns above). Sentry DSN lives on the hosted
+  // /app-config; force the auth cell so this never follows a local franchise
+  // onto loopback. Desktop loadAppConfig talks to loopback instead.
   function withApiConfig(done) {
     if (window.API_CONFIG) {
       done(window.API_CONFIG);

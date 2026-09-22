@@ -781,11 +781,18 @@ function renderLineupTierEmblem() {
   slot.innerHTML = window.GOBTierEmblem.renderLockup({ tier, value, size: 34, variant: 'stack', l1: 13, l2: 8 });
 }
 
+function rosterLookupKey() {
+  const oid = userTeamIdParam || teamIdParam;
+  if (oid && /^[0-9a-fA-F]{24}$/.test(oid)) return oid;
+  return teamName;
+}
+
 async function loadRoster() {
-  if (!teamName) return;
-  
-  // ✅ UNIFIED: Use app-level /roster/{team_name} endpoint for all modes
-  let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamName)}`);
+  const rosterKey = rosterLookupKey();
+  if (!rosterKey) return;
+
+  // ObjectId hits Strategy 2; a display name still uses the name-normalization aggregate.
+  let url = API_CONFIG.buildUrl(`/roster/${encodeURIComponent(rosterKey)}`);
   const params = emptyParams();
   if (franchiseId) {
     params.append('franchise_id', franchiseId);

@@ -5,7 +5,7 @@
  * vertical column. Used by username, situation card, set-lineup intro, and
  * the tutorial post-game modal.
  */
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap');
+@import url('/fonts/app-fonts.css');
 
 .sammy-modal-backdrop {
   position: fixed;

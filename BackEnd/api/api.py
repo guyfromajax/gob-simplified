@@ -135,7 +135,8 @@ _startup_error = None
 try:
     from fastapi import Depends, FastAPI, HTTPException, Query, Response
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+    from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, FileResponse
+    from pathlib import Path
     from fastapi.templating import Jinja2Templates
     from fastapi import Request
     from BackEnd.constants import POSITION_LIST
@@ -573,10 +574,12 @@ try:
         @app.middleware("http")
         async def local_static_html_redirect(request: Request, call_next):
             """
-            Local dev convenience: frontend uses root static paths
-            (e.g. /set-lineup.html, /mode-select.css, /js/..., /images/...),
-            while FastAPI serves static files at /static/*.
-            Redirect those requests to /static/* in development only.
+            Local/dev convenience: frontend uses root static paths
+            (e.g. /set-lineup.html, /js/..., /fonts/...), while FastAPI also
+            mounts the same tree at /static/*. Serve the file at the root URL
+            when it exists — do not 307. Browser ESM imports (Phaser, shared
+            modules) do not follow redirects, so a /js → /static/js bounce
+            leaves the module graph dead and the court canvas never mounts.
             """
             path = request.url.path or ""
             method = (request.method or "").upper()
@@ -585,12 +588,28 @@ try:
             if path.startswith("/static/") or path.startswith("/api/") or path.startswith("/health"):
                 return await call_next(request)
 
+            static_root = Path(bundle_path("FrontEnd", "static")).resolve()
+
+            def _file_at(url_path: str):
+                rel = url_path.lstrip("/")
+                candidate = (static_root / rel).resolve()
+                try:
+                    candidate.relative_to(static_root)
+                except ValueError:
+                    return None
+                if candidate.is_file():
+                    return FileResponse(candidate)
+                return None
+
             static_page_aliases = {
                 "/privacy": "/privacy.html",
                 "/terms": "/terms.html",
             }
             aliased_path = static_page_aliases.get(path)
             if aliased_path:
+                served = _file_at(aliased_path)
+                if served is not None:
+                    return served
                 query = request.url.query
                 target = f"/static{aliased_path}"
                 if query:
@@ -602,6 +621,8 @@ try:
                 "/images/",
                 "/sounds/",
                 "/styles/",
+                "/fonts/",
+                "/css/",
             )
             static_exts = (
                 ".html",
@@ -622,11 +643,15 @@ try:
                 ".woff",
                 ".woff2",
                 ".ttf",
+                ".otf",
             )
             if (
                 path.startswith(static_dirs)
                 or path.endswith(static_exts)
             ):
+                served = _file_at(path)
+                if served is not None:
+                    return served
                 query = request.url.query
                 target = f"/static{path}"
                 if query:

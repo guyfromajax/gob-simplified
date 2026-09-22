@@ -4,7 +4,7 @@
  * to ensure consistent pass animation across all turn types (HCO shots, fouls, turnovers, etc.)
  */
 
-import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
+import * as Phaser from "/js/vendor/phaser-3.70.0.esm.js";
 import { gridToPixels } from '../utils/gridToPixels.js';
 import { BALL_ATTACH_OFFSET, playerBallPos } from '../setup/markerConfig.js';
 
