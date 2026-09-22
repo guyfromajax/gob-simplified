@@ -36,6 +36,14 @@ def _new_bucket():
         "sag_ball_axis": Counter(),   # component of (def-man) along unit(ball-man)
         "sag_rim_axis": Counter(),    # component of (def-man) along unit(rim-man)
         "lane_offset": Counter(),     # distance from the man->ball segment (deny check)
+        "man_dist_to_rim": Counter(),  # the MAN's own rim distance (the help defender's yardstick)
+        "man_dist_to_ball": Counter(),
+        "strongness": Counter(),       # the zone shade's own ramp, reused here as a yardstick
+        # gap to man and defender rim distance, split by the SAME strong/weak ramp the zone
+        # help shade uses, so "does man read ball side?" is answered on the zone's terms.
+        "gap_by_side": {"strong": Counter(), "middle": Counter(), "weak": Counter()},
+        "defrim_by_side": {"strong": Counter(), "middle": Counter(), "weak": Counter()},
+        "manrim_by_side": {"strong": Counter(), "middle": Counter(), "weak": Counter()},
         "in_lane": 0,                 # lane_offset <= 1.0 AND between man and ball
         "samples": [],
     }
@@ -116,6 +124,21 @@ def _record(out, off_coords, ball_coords, o_spot, posture, is_away_offense, insi
         if off_lane <= 1.0 and 0.0 <= t <= 1.0:
             b["in_lane"] += 1
 
+    # strong/weak side, on the zone help shade's own ramp (zone_sink.SIDE_SPAN +
+    # ball_centrality): 1.0 = strong side / central ball, 0.0 = far weak side.
+    import BackEnd.utils.zone_sink as _zs
+    strongness = 1.0 - min(1.0, abs(by - oy) / _zs.SIDE_SPAN)
+    strongness += (1.0 - strongness) * _zs.ball_centrality(by)
+    side = "strong" if strongness >= 0.66 else ("weak" if strongness < 0.33 else "middle")
+    b["strongness"][round(strongness / 0.05) * 0.05] += 1
+    gap = math.hypot(vx, vy)
+    man_rim = math.hypot(ox - rx, oy - ry)
+    b["man_dist_to_rim"][round(man_rim / BUCKET) * BUCKET] += 1
+    b["man_dist_to_ball"][round(math.hypot(ox - bx, oy - by) / BUCKET) * BUCKET] += 1
+    b["gap_by_side"][side][round(gap / BUCKET) * BUCKET] += 1
+    b["defrim_by_side"][side][round(math.hypot(dx - rx, dy - ry) / BUCKET) * BUCKET] += 1
+    b["manrim_by_side"][side][round(man_rim / BUCKET) * BUCKET] += 1
+
     # which anchor dimension was pinned by HELP_ANCHOR_FLOOR (shared_defense.py:2085-2086)
     if posture in ("normal", "loose"):
         off_x, off_y = abs(ox - rx), abs(oy - ry)
@@ -177,6 +200,28 @@ def summary():
             "anchor_floor_y": b["anchor_floor_y"],
             "anchor_floor_either": b["anchor_floor_either"],
             "anchor_floor_both": b["anchor_floor_both"],
+        }
+    return out
+
+
+_DISTS = ("gap_to_man", "dist_to_ball", "dist_to_rim", "sag_ball_axis",
+          "sag_rim_axis", "lane_offset", "man_dist_to_rim", "man_dist_to_ball",
+          "strongness")
+_SPLITS = ("gap_by_side", "defrim_by_side", "manrim_by_side")
+
+
+def raw():
+    """The Counters themselves, so several games can be POOLED before quantiles are
+    taken. Per-game p50/p90 averaged across games is not the pooled p50/p90."""
+    out = {}
+    for posture, b in CENSUS.items():
+        out[posture] = {
+            "counts": {k: b[k] for k in ("calls", "inside_lock", "in_lane",
+                                         "anchor_floor_x", "anchor_floor_y",
+                                         "anchor_floor_either", "anchor_floor_both")},
+            "dists": {k: {("%.2f" % v): c for v, c in b[k].items()} for k in _DISTS},
+            "splits": {k: {side: {("%.2f" % v): c for v, c in cc.items()}
+                           for side, cc in b[k].items()} for k in _SPLITS},
         }
     return out
 
