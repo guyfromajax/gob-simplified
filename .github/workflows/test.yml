@@ -30,8 +30,6 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest
-          npm ci
-          npx playwright install --with-deps chromium
       - name: Run tests
         # Select in-memory Mongo explicitly. Missing or failed real Mongo config never
         # falls back to mongomock.
