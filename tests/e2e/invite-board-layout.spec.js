@@ -200,6 +200,12 @@ test.describe('Invite Board layout', () => {
 
   test('a ranked row shows headshot, name and archetype stacked', async ({ page }) => {
     await mountPool(page, { week: 22 });
+    // Invite week + leans seeds the board, so Sammy explains it. The modal
+    // used to be dead (ESM 307); now it works and sits on top of .pool-add.
+    const seedModal = page.locator('.sammy-modal-backdrop');
+    await expect(seedModal).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Got It' }).click();
+    await expect(seedModal).toHaveCount(0);
     await page.click('#hub-pool tbody tr.rec:first-child .pool-add');
     // Asserted on the MECHANISM, not on measured tops. The board is lean-seeded and
     // twenty rows tall, so row one sits above the viewport, and reading boxes up there

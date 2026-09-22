@@ -69,6 +69,14 @@ function cloneParams(params) {
  * - Use API_CONFIG.loadAppConfig() to fetch and cache app configuration
  */
 
+// sentryInit.js injects this file when window.API_CONFIG is missing at parse
+// time; pages then load it again via their own <script> tag. A second classic-
+// script evaluation must not redeclare the consts below (SyntaxError on court,
+// FCC, tutorials, and every other page that ships both tags).
+if (typeof window !== 'undefined' && window.API_CONFIG) {
+  // already initialized
+} else {
+
 // Always-remote categories — account/server concerns. Never follow a local
 // franchise onto loopback. Order is documentary; lookup is by set membership.
 const ALWAYS_REMOTE_CATEGORIES = Object.freeze([
@@ -672,4 +680,6 @@ window.API_CONFIG = API_CONFIG;
     ensure.then(retry, retry);
   }, true);
 })();
+
+} // end first-load guard
 

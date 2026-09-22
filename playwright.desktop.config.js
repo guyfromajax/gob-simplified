@@ -28,7 +28,7 @@ module.exports = defineConfig({
       ? `${process.env.PYTHON_PATH} tests/e2e/helpers/seed_and_serve_desktop.py`
       : "sh -c '(.venv/bin/python tests/e2e/helpers/seed_and_serve_desktop.py) || (venv/bin/python tests/e2e/helpers/seed_and_serve_desktop.py) || python3 tests/e2e/helpers/seed_and_serve_desktop.py'",
     url: `http://127.0.0.1:${PORT}/app-config`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: process.env.PW_REUSE_SERVER === '1',
     timeout: 180 * 1000,
     env: {
       ...process.env,
