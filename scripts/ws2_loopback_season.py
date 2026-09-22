@@ -13,6 +13,9 @@ Catalogs come from the read-only bundled sidecar (``catalog.sqlite`` via
 ``bundle_path`` / ``GOB_CATALOG_SQLITE``). This harness does not hand-seed
 plays or defenses into the save.
 
+The 128-team league is copied into an empty save by ``SqliteStore`` from
+``base_league.sqlite``. This harness does not write placeholder teams.
+
 How to run a fresh season::
 
     # Terminal 1 — loopback. apply_loopback_env setdefaults the spawn pool.
@@ -123,7 +126,6 @@ def seed_catalogs_and_league(sqlite_path: Path) -> None:
 
     apply_loopback_env()
     from BackEnd.persistence import get_store
-    from bson import ObjectId
 
     store = get_store()
     print(
@@ -136,70 +138,21 @@ def seed_catalogs_and_league(sqlite_path: Path) -> None:
         f"version={getattr(store, 'catalog_version', None)}",
         flush=True,
     )
-
-    teams = store.teams_collection
-    players = store.players_collection
-    if teams.count_documents({}) >= 128 and players.count_documents({}) >= 640:
-        for doc in players.find({}):
-            if isinstance(doc.get("year"), int):
-                players.update_one({"_id": doc["_id"]}, {"$set": {"year": "So"}})
-        fpd = store.franchise_players_data_collection
-        for doc in fpd.find({}):
-            year = doc.get("year")
-            meta = dict(doc.get("meta") or {})
-            patch = {}
-            if isinstance(year, int):
-                patch["year"] = "So"
-            if isinstance(meta.get("year"), int):
-                meta["year"] = "So"
-                patch["meta"] = meta
-            if patch:
-                fpd.update_one({"_id": doc["_id"]}, {"$set": patch})
-        print(
-            f"SEED already present teams={teams.count_documents({})} players={players.count_documents({})}",
-            flush=True,
-        )
-        return
-
-    teams.delete_many({})
-    players.delete_many({})
-    attrs = {k: 70 for k in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]}
-    team_docs = []
-    player_docs = []
-    for i in range(128):
-        oid = ObjectId()
-        name = "Lancaster" if i == 0 else f"Team{i:03d}"
-        team_docs.append(
-            {
-                "_id": oid,
-                "name": name,
-                "team_id": name.upper().replace(" ", "_"),
-                "record": {"W": 0, "L": 0},
-                "PF": 0,
-                "PA": 0,
-                "conference": (i % 16) + 1,
-                "region": chr(ord("A") + ((i % 16) // 2)),
-                "prestige": 500,
-                "player_ids": [f"{name}_{j}" for j in range(8)],
-            }
-        )
-        for j in range(8):
-            player_docs.append(
-                {
-                    "_id": f"{name}_{j}",
-                    "player_id": f"{name}_{j}",
-                    "first_name": f"P{j}",
-                    "last_name": name,
-                    "team": name,
-                    "team_id": oid,
-                    "year": "So",
-                    "attributes": attrs.copy(),
-                    "position_ratings": {"PG": 70, "SG": 70, "SF": 70, "PF": 70, "C": 70},
-                }
-            )
-    teams.insert_many(team_docs)
-    players.insert_many(player_docs)
-    print(f"SEED wrote teams={len(team_docs)} players={len(player_docs)}", flush=True)
+    stamp = store.db["save_meta"].find_one({"_id": "base_league"}) or {}
+    names = sorted(
+        str(doc.get("name") or "")
+        for doc in store.teams_collection.find({}, {"name": 1})
+    )
+    print(
+        "LEAGUE "
+        f"teams={store.teams_collection.count_documents({})} "
+        f"players={store.players_collection.count_documents({})} "
+        f"version={stamp.get('league_version') or getattr(store, 'league_version', None)} "
+        f"source={stamp.get('source')} "
+        f"names={len(names)} "
+        f"sample={names[:8]}",
+        flush=True,
+    )
 
 
 def _score_from_sim(payload: dict, home: str, away: str) -> tuple[int, int]:

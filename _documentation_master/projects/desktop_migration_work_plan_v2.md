@@ -173,7 +173,39 @@ python scripts/export_catalog_sidecar.py \
 | WS-2 engine localization | Done (PR #594) |
 | WS-3 FranchiseContext | Done and merged (PRs #589–#592; Gate B 0/0) |
 | Catalog sidecar | Done (PR #596) |
-| WS-4 shell | In review (`desktop/electron-shell`) |
+| WS-4 shell | In review (`desktop/electron-shell`); base league on `desktop/base-league` |
+
+### Pre-beta production hash checklist (Jamie)
+
+This process has no production identity. Before the January beta, run **both** exports from a checkout that contains the scripts, with production credentials in the *process* (not `.env.local`). `--output` is always a scratch path — never overwrite the committed files.
+
+**1. Catalog sidecar** (plays / defenses / FCP / HCT). Compare `version=` to `c4dcc375ce01f3b7fd89cf29b8d0db949f6bcf4da4a22763e1ebca072998be8c`.
+
+```
+GOB_DB_ACCESS=read \
+ENVIRONMENT=production \
+MONGO_DB_NAME=gob \
+MONGO_URI='mongodb+srv://…/gob' \
+python scripts/export_catalog_sidecar.py \
+  --target gob \
+  --output /tmp/catalog-prod.sqlite \
+  --json-output /tmp/catalog-prod.json
+```
+
+**2. Base league** (128 teams / 1536 players). Compare `version=` to `35e43c9a2970cb105fef35505fbc9536d856392ca0bf88e53758856d54a1a63c`.
+
+```
+GOB_DB_ACCESS=read \
+ENVIRONMENT=production \
+MONGO_DB_NAME=gob \
+MONGO_URI='mongodb+srv://…/gob' \
+python scripts/export_base_league.py \
+  --target gob \
+  --output /tmp/base-league-prod.sqlite \
+  --json-output /tmp/base-league-prod.json
+```
+
+Equal on both → staging == production; the committed `catalog.sqlite` and `base_league.sqlite` stay. Differ on either → that production export ships before the January beta. **Either way both checks are a pre-beta gate.**
 | WS-6 pipeline / Demo variant | Not started |
 | WS-7 asset payload | Not started |
 | WS-8 local object store + portraits | Not started |
@@ -253,6 +285,8 @@ Split out of the old WS-5 because it is cheap, unblocks WS-2, and proves the loc
 **Catalog sidecar (closed 20 Sept 2026; built 21 Sept 2026).** `plays`, `defenses`, `fcp_skeletons`, and `hct_skeletons` are universal rulebook collections, not franchise-private rows. Hosted they live in Atlas and are shared by every franchise. Desktop reads them from bundled `catalog.sqlite` (`bundle_path`, SQLite URI `mode=ro`). The user save never holds those rows. A play/defense patch is an **app update, not a save migration**.
 
 Export: `scripts/export_catalog_sidecar.py` (requires `GOB_DB_ACCESS=read`; `script_db` wraps Atlas in `ReadOnlyClient`). Default `--target` is production `gob`. This machine has no production identity, so the shipping sidecar was read from `gob-staging` (23 plays / 6 defenses / 1 fcp / 1 hct — matches the hosted ~23). FCP/HCT are publishable staging→prod, so staging is the last-authored snapshot we can read. Runtime format is SQLite (same `SqliteCollection` surface + real `mode=ro`); `catalog.json` is the byte-diffable release dump. Writes to the four names raise `CatalogWriteBlocked`. `ENVIRONMENT=test` does not auto-bind a committed sidecar unless `GOB_CATALOG_SQLITE` is set.
+
+**Base league bundle (21 Sept 2026).** `teams` and `players` are the universal 128-program league. Hosted they live in Atlas. Desktop copies them into each new save at creation (`SqliteStore` → collection `insert_many`) because play mutates those rows — a template, not a live sidecar. Export: `scripts/export_base_league.py` (`GOB_DB_ACCESS=read`; default `--target gob`). This machine has no production identity, so the committed bundle was read from `gob-staging`. **Canonical source is production** (`gob`): that is the league hosted players already run. Staging can hold unpublished roster or Team Builder work. **Pre-beta:** Jamie runs the production export to `/tmp/base-league-prod.sqlite` (never overwrite the committed bundle) and compares `version=` to `35e43c9a2970cb105fef35505fbc9536d856392ca0bf88e53758856d54a1a63c`. Equal → staging == prod. Differ → the prod export ships before the January beta. `save_meta._id=base_league` records which league version a save was created from. `ENVIRONMENT=test` does not auto-copy a committed bundle unless `GOB_BASE_LEAGUE_SQLITE` is set.
 
 ### WS-8: Local object store and portrait painting — *its own workstream*
 
@@ -374,7 +408,9 @@ FranchiseContext  — single read/write API for the whole frontend
 - Shell responsibilities: launch and supervise the local engine process, port selection, splash while the engine boots, save-file location in the OS user-data dir, crash recovery, app menus, auto-update.
 - Windows first. macOS timing is Open Decision 3.
 
-**Minimal Mac shell (21 Sept 2026, `desktop/electron-shell`).** Own `desktop/package.json`, Electron 34.5.8. Source mode first (`python -m BackEnd.loopback`); binary mode is a config switch. Stable port **8765** — refuse to start if taken (ephemeral port would wipe localStorage). Auth approach: **bypass the client login gate when `window.GOB_BUILD_PROFILE === 'desktop'`** (preload sets that via contextBridge before any page script). Planting a fake `auth_token` is not enough — `authBarInit` and `mode-select.js` call always-remote `/api/auth/me` and strip the token / send the user to login on failure. The web build never sets the flag, so its guard is unchanged. First launch seeds the 128-team league into the user-data SQLite (same helper as the WS-2 season harness); the sidecar supplies plays/defenses only.
+**Minimal Mac shell (21 Sept 2026, `desktop/electron-shell`).** Own `desktop/package.json`, Electron 34.5.8. Source mode first (`python -m BackEnd.loopback`); binary mode is a config switch. Stable port **8765** — refuse to start if taken (ephemeral port would wipe localStorage). Auth approach: **bypass the client login gate when `window.GOB_BUILD_PROFILE === 'desktop'`** (preload sets that via contextBridge before any page script). Planting a fake `auth_token` is not enough — `authBarInit` and `mode-select.js` call always-remote `/api/auth/me` and strip the token / send the user to login on failure. The web build never sets the flag, so its guard is unchanged. First launch copies the bundled 128-team league (`base_league.sqlite` via `bundle_path`) into the user-data SQLite through `SqliteStore` — not the WS-2 season harness. The catalog sidecar still supplies plays/defenses only.
+
+**Base league bundle (21 Sept 2026, `desktop/base-league`).** `teams` and `players` are the universal 128-program league. Hosted they live in Atlas. Desktop copies them into each new save at creation because play mutates those rows — unlike the catalog, this is a template, not a live sidecar. Export: `scripts/export_base_league.py` (`GOB_DB_ACCESS=read`; default `--target gob`). This machine has no production identity, so the committed bundle was read from `gob-staging`. **Canonical source is production** (`gob`): that is the league hosted players already run. Staging can hold unpublished roster or Team Builder work. **Pre-beta:** Jamie runs the production export to `/tmp/base-league-prod.sqlite` (never overwrite the committed bundle) and compares `version=` to `35e43c9a2970cb105fef35505fbc9536d856392ca0bf88e53758856d54a1a63c`. Equal → staging == prod. Differ → the prod export ships before the January beta. `save_meta._id=base_league` records which league version a save was created from. `ENVIRONMENT=test` does not auto-copy a committed bundle unless `GOB_BASE_LEAGUE_SQLITE` is set.
 
 ### WS-6: Build pipeline and distribution
 

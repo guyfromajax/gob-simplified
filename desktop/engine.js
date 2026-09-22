@@ -88,25 +88,6 @@ async function waitForReady({ readyPath, port, timeoutMs, child }) {
   throw new Error(`Engine did not become ready on 127.0.0.1:${port} within ${timeoutMs || READY_TIMEOUT_MS}ms. ${lastErr}`);
 }
 
-function seedSaveIfNeeded({ repoRoot, python, sqlitePath, env, logPath }) {
-  const { spawnSync } = require('child_process');
-  const result = spawnSync(
-    python,
-    ['scripts/ws2_loopback_season.py', '--sqlite-path', sqlitePath, '--seed-only'],
-    {
-      cwd: repoRoot,
-      env,
-      encoding: 'utf8',
-    },
-  );
-  try {
-    fs.appendFileSync(logPath, `\n--- seed ---\n${result.stdout || ''}${result.stderr || ''}\n`);
-  } catch (_) { /* ignore */ }
-  if (result.status !== 0) {
-    throw new Error(`First-launch league seed failed.\n${result.stderr || result.stdout || ''}`);
-  }
-}
-
 function startEngine({ repoRoot, userData, port, mode, logPath }) {
   const env = { ...process.env };
   env.GOB_LOOPBACK = '1';
@@ -120,27 +101,14 @@ function startEngine({ repoRoot, userData, port, mode, logPath }) {
   if (fs.existsSync(catalog)) {
     env.GOB_CATALOG_SQLITE = catalog;
   }
+  const league = path.join(repoRoot, 'base_league.sqlite');
+  if (fs.existsSync(league)) {
+    env.GOB_BASE_LEAGUE_SQLITE = league;
+  }
   env.PYTHONUNBUFFERED = '1';
   const python = resolvePython(repoRoot);
-  if (mode !== 'binary') {
-    if (!python) {
-      throw new Error('Source mode needs a virtualenv at .venv (see desktop/README.md).');
-    }
-    seedSaveIfNeeded({
-      repoRoot,
-      python,
-      sqlitePath: env.GOB_SQLITE_PATH,
-      env,
-      logPath,
-    });
-  } else if (python) {
-    seedSaveIfNeeded({
-      repoRoot,
-      python,
-      sqlitePath: env.GOB_SQLITE_PATH,
-      env,
-      logPath,
-    });
+  if (mode !== 'binary' && !python) {
+    throw new Error('Source mode needs a virtualenv at .venv (see desktop/README.md).');
   }
 
   try {
