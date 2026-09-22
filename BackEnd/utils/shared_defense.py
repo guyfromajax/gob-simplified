@@ -821,6 +821,74 @@ def _map_deep_location_to_zone_location(ball_spot):
     return deep_location_map.get(ball_spot, ball_spot)
 
 
+# ── Zone weak-side help shade (GOB_ZONE_HELP_SHADE, default OFF) ──────────────────────
+# A zone defender WITH a man in his area is placed by the "key" branch of
+# calculate_defender_coords, which has no basket shade at all: the only basket shade in
+# the codebase lives in `_apply_defender_posture`, and the zone path never calls it.
+# Measured (reports/zone-help-shade-2026-09-22.md): on the weak side he sits 11.14 from
+# his man and 14.02 from the rim, sagging toward neither.
+#
+# This adds the MISSING shade and nothing else. It reuses HELP_BASKET_SHADE for the
+# magnitude and the SINK's own strong/weak ramp for the weighting, so there is no new
+# constant. Scaling by (1 - strongness) scopes it to the weak side, which is where the
+# complaint is: the strong-side defender should pressure his area, not sag off it.
+# Continuous by construction, so a man drifting across the middle never teleports.
+#
+# NOTE, deliberately NOT done: he is not clamped into his own polygon. He is already
+# outside it on 58.9% of placements today, and those are the ones ALREADY nearest the
+# rim (11.66 vs 16.29) - introducing a clamp would push exactly the right defenders
+# back out, and would move 58.9% of placements with zero shade applied.
+ZONE_HELP_SHADE_FLAG = "GOB_ZONE_HELP_SHADE"
+
+
+def zone_help_shade_enabled():
+    import os  # local, matching _zone_sink_iq_enabled above - this module has no top-level os
+    return os.environ.get(ZONE_HELP_SHADE_FLAG, "0") == "1"
+
+
+_ZONE_SHADE_COUNTS = {"considered": 0, "shaded": 0, "no_shade_middle": 0}
+
+
+def zone_help_shade_counters():
+    return dict(_ZONE_SHADE_COUNTS)
+
+
+def reset_zone_help_shade_counters():
+    for k in _ZONE_SHADE_COUNTS:
+        _ZONE_SHADE_COUNTS[k] = 0
+
+
+def _apply_zone_help_shade(coords, man_coords, ball_coords, is_away_offense):
+    """Sag a weak-side zone defender toward the rim he is defending.
+
+    ``coords``/``man_coords``/``ball_coords`` are all in the caller's (zone) frame, and
+    the defended rim is taken in that same frame.
+    """
+    if not zone_help_shade_enabled():
+        return coords
+    try:
+        from BackEnd.utils import zone_sink as _zs
+        _ZONE_SHADE_COUNTS["considered"] += 1
+        bx, by = float(ball_coords["x"]), float(ball_coords["y"])
+        mx, my = float(man_coords["x"]), float(man_coords["y"])
+        rim_x = (100.0 - float(HOME_RIM_COORDS["x"])) if is_away_offense else float(HOME_RIM_COORDS["x"])
+        rim_y = float(HOME_RIM_COORDS["y"])
+        # The sink's measure, unchanged: 1 on the defender's own side, 0 a full
+        # court-width away, then pushed toward 1 as the ball nears the middle.
+        strongness = 1.0 - min(1.0, abs(by - my) / _zs.SIDE_SPAN)
+        strongness += (1.0 - strongness) * _zs.ball_centrality(by)
+        weakness = max(0.0, 1.0 - strongness)
+        if weakness <= 1e-9:
+            _ZONE_SHADE_COUNTS["no_shade_middle"] += 1
+            return coords
+        _ZONE_SHADE_COUNTS["shaded"] += 1
+        k = HELP_BASKET_SHADE * weakness
+        return {"x": float(coords["x"]) + k * (rim_x - mx),
+                "y": float(coords["y"]) + k * (rim_y - my)}
+    except Exception:
+        return coords
+
+
 def assign_zone_defender_coords(
     defender_pos,
     zone_boundaries,
@@ -932,6 +1000,7 @@ def assign_zone_defender_coords(
             ball_handler_coords,
             is_ball_handler=False
         )
+        result = _apply_zone_help_shade(result, target_coords, ball_handler_coords, is_away_offense)
         # get_defender_coords returns in same orientation as input (away if away offense)
         # Convert to HOME orientation for consistency with zone defense
         if is_away_offense:
@@ -953,6 +1022,8 @@ def assign_zone_defender_coords(
             ball_handler_coords,
             is_ball_handler=False
         )
+        result = _apply_zone_help_shade(
+            result, closest_to_basket["coords"], ball_handler_coords, is_away_offense)
         # get_defender_coords returns in same orientation as input (away if away offense)
         # Convert to HOME orientation for consistency with zone defense
         if is_away_offense:
