@@ -52,6 +52,8 @@ LOCAL_COLLECTIONS: tuple[str, ...] = (
     "press_conference_sessions",
     "tournaments",
     "save_meta",
+    "team_builder_wizard_drafts",
+    "recruit_sets",
 )
 
 REMOTE_COLLECTIONS: tuple[str, ...] = (

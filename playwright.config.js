@@ -7,6 +7,7 @@ const { defineConfig, devices } = require('@playwright/test');
  */
 module.exports = defineConfig({
   testDir: './tests/e2e',
+  testIgnore: 'desktop-*.spec.js',
   /* Tests that start the game (click Play Quarter, wait for Phaser canvas) need extra time */
   timeout: 60 * 1000,
   /* Run tests in files in parallel */

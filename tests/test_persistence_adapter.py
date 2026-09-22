@@ -372,6 +372,37 @@ def test_sqlite_refuses_remote_collections_in_development(tmp_path: Path):
         store.users_collection.find_one({})
 
 
+def test_sqlite_team_builder_drafts_are_local_outside_test(tmp_path: Path):
+    env = _production_env(
+        tmp_path, GOB_PERSISTENCE="sqlite", GOB_SQLITE_PATH=str(tmp_path / "local.sqlite")
+    )
+    store = SqliteStore(env)
+    coll = store.db["team_builder_wizard_drafts"]
+    assert isinstance(coll, SqliteCollection)
+    coll.insert_one(
+        {"_id": "d1", "user_id": "local-desktop-user", "schema_version": 2}
+    )
+    found = store.db["team_builder_wizard_drafts"].find_one({"_id": "d1"})
+    assert found["user_id"] == "local-desktop-user"
+    names = {
+        row[0]
+        for row in sqlite3.connect(store.sqlite_path).execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )
+    }
+    assert "team_builder_wizard_drafts" in names
+
+
+def test_sqlite_recruit_sets_are_local_empty_outside_test(tmp_path: Path):
+    env = _production_env(
+        tmp_path, GOB_PERSISTENCE="sqlite", GOB_SQLITE_PATH=str(tmp_path / "local.sqlite")
+    )
+    store = SqliteStore(env)
+    coll = store.db["recruit_sets"]
+    assert isinstance(coll, SqliteCollection)
+    assert list(coll.find({})) == []
+
+
 def test_sqlite_collection_round_trip_queries(tmp_path: Path):
     store = SqliteStore(_sqlite_env(tmp_path))
     coll = store.players_collection
