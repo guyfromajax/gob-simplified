@@ -128,12 +128,11 @@ test.describe('desktop sqlite play flow', () => {
     await expect(page.locator('body')).not.toContainText('No players');
 
     await page.goto(`/court.html?${lineupQs}`);
-    await expect(page.locator('canvas, #game-container, #phaser-game').first()).toBeVisible({ timeout: 30000 });
-
-    const phaserRequests = [];
-    page.on('request', (req) => {
-      if (req.url().includes('phaser')) phaserRequests.push(req.url());
-    });
+    await expect(page.locator('#phaser-container')).toBeVisible();
+    await expect(page.locator('#scoreboard')).toBeVisible();
+    const boot = await page.request.get('/js/phaser/bootGame.js');
+    expect(boot.status()).toBe(200);
+    expect(await boot.text()).toContain('/js/vendor/phaser-3.60.0.esm.js');
     expect(remoteHits, `unexpected remote: ${remoteHits.join('\n')}`).toEqual([]);
   });
 });
