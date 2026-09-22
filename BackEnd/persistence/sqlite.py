@@ -18,6 +18,10 @@ from typing import Any
 from bson import ObjectId
 
 from BackEnd.env_config import DatabaseEnvironment
+from BackEnd.persistence.base_league import (
+    resolve_base_league_sqlite_path,
+    seed_empty_save,
+)
 from BackEnd.persistence.catalog import (
     bind_catalog_collections,
     empty_memory_catalog,
@@ -303,12 +307,72 @@ class SqliteStore:
                 local["save_meta"].insert_one(
                     {"_id": "catalog_sidecar", "catalog_version": self.catalog_version}
                 )
+            self._seed_base_league_if_needed(
+                local,
+                db_env,
+                writable=writable,
+            )
 
         print(
             f"🔵 [DEBUG] db.py: SQLite collections initialized path={self.sqlite_path}",
             file=sys.stderr,
             flush=True,
         )
+
+    def _seed_base_league_if_needed(
+        self,
+        local: dict[str, Any],
+        db_env: DatabaseEnvironment,
+        *,
+        writable: bool,
+    ) -> None:
+        """Copy the bundled 128-team league into a brand-new save.
+
+        Test isolation: do not auto-copy a committed bundle at bundle_root
+        unless GOB_BASE_LEAGUE_SQLITE is set. Existing saves are never
+        overwritten — play mutates teams and players.
+        """
+        self.league_path = None
+        self.league_version = None
+        if not writable:
+            return
+        if local["teams"].count_documents({}) > 0:
+            stamp = local["save_meta"].find_one({"_id": "base_league"})
+            if stamp:
+                self.league_version = stamp.get("league_version")
+            return
+        explicit = str(db_env.process_environment.get("GOB_BASE_LEAGUE_SQLITE") or "").strip()
+        if str(db_env.environment).lower() == "test" and not explicit:
+            return
+        league_path = resolve_base_league_sqlite_path(db_env.process_environment)
+        if league_path is None:
+            from BackEnd.runtime_paths import bundle_path
+
+            raise FileNotFoundError(
+                "Bundled base_league.sqlite is missing at "
+                f"{bundle_path('base_league.sqlite')}. A new desktop save copies "
+                "the universal teams and players from that bundle. "
+                "Export with scripts/export_base_league.py."
+            )
+        if not league_path.is_file():
+            raise FileNotFoundError(f"Base league bundle is not a file: {league_path}")
+        stamp = seed_empty_save(
+            teams_coll=local["teams"],
+            players_coll=local["players"],
+            save_meta=local["save_meta"],
+            league_path=league_path,
+        )
+        self.league_path = league_path
+        if stamp:
+            self.league_version = stamp.get("league_version")
+            print(
+                "LEAGUE seeded "
+                f"path={league_path} version={self.league_version} "
+                f"teams={local['teams'].count_documents({})} "
+                f"players={local['players'].count_documents({})}",
+                file=sys.stderr,
+                flush=True,
+            )
 
     @staticmethod
     def _resolve_path(db_env: DatabaseEnvironment) -> str:

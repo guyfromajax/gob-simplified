@@ -59,7 +59,7 @@ The app must stay next to this checkout. It starts the engine from `.venv` in th
 
 ## What to do
 
-1. Wait for the splash to finish. The first launch also writes the 128-team league into your save, so it can take a little longer.
+1. Wait for the splash to finish. The first launch copies the real 128-team league into your save, so it can take a little longer.
 2. Create a franchise and pick a team.
 3. Play a game on the court.
 4. Advance a week.
@@ -68,6 +68,8 @@ The app must stay next to this checkout. It starts the engine from `.venv` in th
 Your save is a file on this Mac:
 
 `~/Library/Application Support/GOB/local.sqlite`
+
+The first launch copies the real 128-team league (names, colors, mascots, rosters) into that save. If you already played the placeholder league (Lancaster + Team001…), delete that save file first so the real league can load.
 
 ---
 
@@ -93,3 +95,18 @@ GOB_ENGINE_MODE=binary npm start
 ```
 
 Source mode (`python -m BackEnd.loopback` from `.venv`) is the default and is what you should use first.
+
+---
+
+## Production league check (Jamie, before beta)
+
+This checkout’s league was read from staging. Production is the canonical league. From a machine that can read prod:
+
+```
+GOB_DB_ACCESS=read ENVIRONMENT=production MONGO_DB_NAME=gob \
+  MONGO_URI='mongodb+srv://…/gob' \
+  python scripts/export_base_league.py --target gob \
+    --output /tmp/base-league-prod.sqlite --json-output /tmp/base-league-prod.json
+```
+
+Compare the printed `version=` to `35e43c9a2970cb105fef35505fbc9536d856392ca0bf88e53758856d54a1a63c`. Same → staging matches prod. Different → ship the prod file as `base_league.sqlite` before beta. Never overwrite the committed file with a scratch path by accident.
