@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/css/training-newswire.css">
   <link rel="stylesheet" href="/css/fonts.css">
   <link rel="stylesheet" href="/css/development-focus.css">
+  <link rel="stylesheet" href="/css/player-development-grid.css">
 </head>
 <body class="training-page">
   <!-- Google Tag Manager (noscript) -->
@@ -376,11 +377,14 @@
           Training by Position &#8599;
         </button>
       </div>
-      <div class="player-dev-tally">
-        <div class="player-dev-tally-group player-dev-tally--positions" id="player-dev-tally-positions"></div>
-        <div class="player-dev-tally-group player-dev-tally--focuses" id="player-dev-tally-focuses"></div>
+      <!-- Summaries ABOVE the roster: a summary belongs before the detail it summarises,
+           and twelve rows would otherwise push it below the fold. Markup and rendering are
+           shared with the FCC Training tab (js/shared/playerDevelopmentGrid.js). -->
+      <div class="pdg-tally">
+        <div class="pdg-tally-group pdg-tally-positions"></div>
+        <div class="pdg-tally-group pdg-tally-focuses"></div>
       </div>
-      <div class="player-dev-grid" id="player-dev-grid"></div>
+      <div class="pdg-grid"></div>
     </section>
   </div>
 
@@ -440,6 +444,7 @@
   <script src="/js/shared/trainingNewswire.js"></script>
   <script src="/js/shared/gobTutorialAlertResume.js"></script>
   <script src="/js/shared/developmentFocus.js"></script>
+  <script src="/js/shared/playerDevelopmentGrid.js"></script>
   <script src="/training.js"></script>
 </body>
 </html>

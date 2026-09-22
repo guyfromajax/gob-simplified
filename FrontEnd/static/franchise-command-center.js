@@ -1717,28 +1717,38 @@ async function renderNewsTab() {
     fccNewsListCache = Array.isArray(data.news) ? data.news : [];
   }
   const news = fccNewsListCache;
-  if (!news.length) {
+  if (!news.length && !fccTeamDispatches(commandCenterTopDataCache).length) {
     host.innerHTML = '<div class="fcc-news-tab-empty">No News To Report</div>';
     return;
   }
-  // Group stories by release week, newest week first (season_news is newest first).
+  // Group by release week, newest first. Your team's own dispatches (training report,
+  // Practice Squad report, results) are interleaved into the same cards, above that week's
+  // league headlines and styled apart — one week reads as one story, and the Inbox tab that
+  // used to hold them separately is retired.
+  const mine = fccTeamDispatches(commandCenterTopDataCache);
   const byWeek = new Map();
-  news.forEach((story) => {
-    const week = Number(story.week || 0);
-    if (!byWeek.has(week)) byWeek.set(week, []);
-    byWeek.get(week).push(story);
-  });
+  const bucket = (week) => {
+    const w = Number(week || 0);
+    if (!byWeek.has(w)) byWeek.set(w, { mine: [], stories: [] });
+    return byWeek.get(w);
+  };
+  mine.forEach((m) => { if (Number.isFinite(m.week)) bucket(m.week).mine.push(m.html); });
+  news.forEach((story) => bucket(story.week).stories.push(story));
+
   const weeks = [...byWeek.keys()].sort((a, b) => b - a);
-  host.innerHTML = weeks.map((week) => `
+  host.innerHTML = weeks.map((week) => {
+    const b = byWeek.get(week);
+    return `
     <section class="fcc-data-card fcc-news-tab-week">
       <div class="fcc-news-tab-week-title">Week ${week}</div>
       <div class="fcc-news-tab-week-body">
-        ${byWeek.get(week).map((story) => `
+        ${b.mine.join('')}
+        ${b.stories.map((story) => `
           <a class="fcc-news-tab-headline" href="${buildStandaloneNewsUrl(story.story_id)}">${escapeHomeHtml(story.headline || '--')}</a>
         `).join('')}
       </div>
     </section>
-  `).join('');
+  `; }).join('');
 }
 
 async function renderHomeTab() {
@@ -3860,7 +3870,7 @@ async function init() {
   if (playbooksTab && playbooksTab.classList.contains('active')) {
     void renderFccPlaybooksSummary();
   }
-  renderFccInbox(topData);
+  // Your team's dispatches render inside News now; nothing to paint on load.
   const pendingMoments = Array.isArray(topData?.pending_championship_moments)
     ? topData.pending_championship_moments
     : [];
@@ -4942,87 +4952,154 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'team-stats-tab') {
           renderTeamReport();
         }
-        if (tabName === 'tutorials-tab' && commandCenterTopDataCache) {
-          renderFccInbox(commandCenterTopDataCache);
+        if (tabName === 'training-tab') {
+          renderFccTrainingTab();
         }
       }
     });
   }
 });
 
-function renderFccInbox(topData) {
-  const el = document.getElementById('fcc-inbox-body');
-  if (!el) return;
-  el.innerHTML = '';
-  const inboxItems = Array.isArray(topData?.season_inbox) ? topData.season_inbox : [];
-  const w = topData && topData.last_training_report_week;
+/**
+ * Training tab — the second and only other place development is editable.
+ *
+ * Source is the roster the FCC already holds, NOT /franchise/training-points. That
+ * endpoint 400s after week 26 and is the training page's own dependency; using it here
+ * would reproduce the very gap this tab closes, where development becomes unreachable once
+ * the week's training is submitted and for the whole postseason. The roster payload
+ * already carries attributes, year, height, weight, position ratings and both development
+ * fields, so nothing extra is fetched.
+ */
+function renderFccTrainingTab() {
+  const host = document.getElementById('fcc-training-dev');
+  const grid = window.GOBPlayerDevelopmentGrid;
+  wireFccTrainingTutorialButton();
+  if (!host || !grid) return;
+  const players = (userRosterDataCache && userRosterDataCache.players) || userRosterPlayersCache || [];
+  const rows = players.map((p) => ({
+    id: p._id || p.player_id,
+    _id: p._id || p.player_id,
+    player_id: p._id || p.player_id,
+    name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+    year: p.year,
+    height: p.height,
+    weight: p.weight,
+    attributes: p.attributes || {},
+    position_ratings: p.position_ratings || {},
+    training_position: p.training_position || null,
+    training_focus: p.training_focus || null,
+    resolved_training_position: p.resolved_training_position || null,
+    resolved_training_focus: p.resolved_training_focus || null,
+  }));
+  // Same order the roster tab shows: best-position RT, descending, fixed while editing.
+  rows.sort((a, b) => fccMaxPositionRating(b) - fccMaxPositionRating(a));
+
+  grid.render(host, rows, {
+    getFranchiseId: () => (typeof franchiseId !== 'undefined' && franchiseId)
+      || new URLSearchParams(window.location.search).get('franchise_id') || '',
+    // Keep the roster caches in step so the Roster tab's read-only columns agree.
+    onSaved: (playerId, field, value) => {
+      const key = field === 'training_focus'
+        ? 'resolved_training_focus' : 'resolved_training_position';
+      [userRosterDataCache && userRosterDataCache.players, userRosterPlayersCache,
+       rosterTableDataForSorting].forEach((list) => {
+        (list || []).forEach((p) => {
+          if (String(p._id || p.player_id) === String(playerId)) { p[field] = value; p[key] = value; }
+        });
+      });
+    },
+  });
+}
+
+/**
+ * "Training by Position" leaves the FCC, so a return context is set the same way the
+ * training page sets one — the tutorial's footer uses it to come back here. Unlike the
+ * training page there is no draft to protect: every change on this tab is already saved.
+ */
+function wireFccTrainingTutorialButton() {
+  const btn = document.getElementById('fcc-training-tutorial-btn');
+  if (!btn || btn.dataset.bound) return;
+  btn.dataset.bound = '1';
+  btn.addEventListener('click', () => {
+    const returnUrl = (typeof getCurrentRelativeUrl === 'function')
+      ? getCurrentRelativeUrl()
+      : window.location.pathname + window.location.search;
+    if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
+      window.GOBTutorialAlertResume.setTrainingPageContext(returnUrl);
+    }
+    window.location.href = '/tutorial-advanced-training-by-position.html';
+  });
+}
+
+function fccMaxPositionRating(player) {
+  const r = player.position_ratings || {};
+  let best = -Infinity;
+  Object.keys(r).forEach((k) => {
+    const v = Number(r[k]);
+    if (isFinite(v) && v > best) best = v;
+  });
+  return best === -Infinity ? -1 : best;
+}
+
+/**
+ * Your team's own dispatches — training report, Practice Squad development report, game
+ * results with box scores. These used to live in a separate Inbox tab; the Inbox is gone
+ * and they now run inside News, interleaved into the same week cards as league headlines
+ * so one week reads as one story.
+ *
+ * Returns entries keyed by week: { week, html }. Rendering belongs to renderNewsTab.
+ */
+function fccTeamDispatches(topData) {
+  const out = [];
+  const items = Array.isArray(topData?.season_inbox) ? topData.season_inbox : [];
   const tid = (topData && topData.team_id) || userTeamId;
+  const w = topData && topData.last_training_report_week;
+
+  const entry = (week, href, text, linkText) => {
+    const a = href
+      ? '<a class="fcc-news-mine-link" href="' + href + '">' + escapeHomeHtml(linkText) + '</a>'
+      : '';
+    out.push({
+      week: Number(week),
+      html: '<div class="fcc-news-mine">' + escapeHomeHtml(text) + (a ? ' ' + a : '') + '</div>',
+    });
+  };
 
   if (w != null && w !== '' && franchiseId && tid) {
     const weekNum = Number(w);
     if (Number.isFinite(weekNum) && weekNum >= 1) {
-      const reportParams = emptyParams();
-      reportParams.set('mode', 'franchise');
-      reportParams.set('franchise_id', String(franchiseId));
-      reportParams.set('team_id', String(tid));
-      reportParams.set('week', String(weekNum));
-      reportParams.set('from', 'inbox');
-      const href = `/training-report.html?${reportParams.toString()}`;
-      const p = document.createElement('p');
-      p.className = 'fcc-inbox-message';
-      p.appendChild(document.createTextNode(`Week ${weekNum} training report `));
-      const a = document.createElement('a');
-      a.href = href;
-      a.className = 'fcc-inbox-link';
-      a.textContent = 'here';
-      p.appendChild(a);
-      p.appendChild(document.createTextNode('.'));
-      el.appendChild(p);
+      const q = emptyParams();
+      q.set('mode', 'franchise');
+      q.set('franchise_id', String(franchiseId));
+      q.set('team_id', String(tid));
+      q.set('week', String(weekNum));
+      q.set('from', 'news');
+      entry(weekNum, '/training-report.html?' + q.toString(),
+        'Week ' + weekNum + ' training report', 'view');
     }
   }
 
-  inboxItems.forEach((item) => {
+  items.forEach((item) => {
     if (!item) return;
     if (item.type === 'training_squad_report') {
-      const tsParams = emptyParams();
-      tsParams.set('franchise_id', String(franchiseId || ''));
-      tsParams.set('team_id', String(tid || ''));
-      tsParams.set('from', 'inbox');
-      const p = document.createElement('p');
-      p.className = 'fcc-inbox-message';
-      p.appendChild(document.createTextNode(`Week #${Number(item.week)} Practice Squad Development report `));
-      const a = document.createElement('a');
-      a.href = `/training-squad-report.html?${tsParams.toString()}`;
-      a.className = 'fcc-inbox-link';
-      a.textContent = 'here';
-      p.appendChild(a);
-      p.appendChild(document.createTextNode('.'));
-      el.appendChild(p);
+      const q = emptyParams();
+      q.set('franchise_id', String(franchiseId || ''));
+      q.set('team_id', String(tid || ''));
+      q.set('from', 'news');
+      entry(item.week, '/training-squad-report.html?' + q.toString(),
+        'Week ' + Number(item.week) + ' Practice Squad development report', 'view');
       return;
     }
     if (item.type !== 'game_result') return;
-    const itemWeek = Number(item.week);
     const verb = item.result === 'win' ? 'defeated' : 'lost to';
-    const text = Number.isFinite(itemWeek) && item.user_team_name && item.opponent_team_name
-      ? `Week #${itemWeek}: ${item.user_team_name} ${verb} ${item.opponent_team_name} ${item.user_score}-${item.opponent_score}`
+    const text = (Number.isFinite(Number(item.week)) && item.user_team_name && item.opponent_team_name)
+      ? `${item.user_team_name} ${verb} ${item.opponent_team_name} ${item.user_score}-${item.opponent_score}`
       : item.copy;
     if (!text) return;
-    const p = document.createElement('p');
-    p.className = 'fcc-inbox-message';
-    p.appendChild(document.createTextNode(`${text} `));
-    if (item.box_score_url) {
-      const a = document.createElement('a');
-      a.href = item.box_score_url;
-      a.className = 'fcc-inbox-link';
-      a.textContent = 'box score';
-      p.appendChild(a);
-    }
-    el.appendChild(p);
+    entry(item.week, item.box_score_url || '', text, 'box score');
   });
 
-  if (!el.childElementCount) {
-    el.innerHTML = '<p class="fcc-inbox-empty">Inbox is empty.</p>';
-  }
+  return out;
 }
 
 // Team Report and Playbook Summary functions (adapted from training-report.js)

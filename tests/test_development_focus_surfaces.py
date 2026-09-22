@@ -192,9 +192,12 @@ def test_the_roster_surfaces_are_read_only():
 
 
 def test_the_training_page_is_the_editor():
-    assert "dev.positionSelectHtml(player)" in TRAINING_JS
-    assert "dev.focusSelectHtml(player)" in TRAINING_JS
-    assert "dev.bind(playerDevGrid" in TRAINING_JS
+    """The controls themselves moved into js/shared/playerDevelopmentGrid.js when the FCC
+    Training tab became the second editor — one module, two hosts."""
+    grid = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "playerDevelopmentGrid.js").read_text()
+    assert "dev.positionSelectHtml(player)" in grid
+    assert "dev.focusSelectHtml(player)" in grid
+    assert "GOBPlayerDevelopmentGrid" in TRAINING_JS
 
 
 def test_the_rosters_carry_no_route_to_the_editor_yet():
@@ -235,12 +238,14 @@ def test_pos_sorting_was_broken_and_is_now_wired():
 # ── every re-render rebinds ─────────────────────────────────────────────────
 
 def test_the_training_grid_binds_its_controls():
-    assert "dev.bind(playerDevGrid" in (ROOT / "FrontEnd" / "static" / "training.js").read_text()
+    grid = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "playerDevelopmentGrid.js").read_text()
+    assert "dev.bind(grid," in grid
 
 
 def test_fcc_mappers_carry_the_development_fields():
-    """The projection trap, front-end edition: both FCC mappers cherry-pick fields."""
-    assert FCC_JS.count("resolved_training_focus: p.resolved_training_focus") == 2
+    """The projection trap, front-end edition: every FCC mapper cherry-picks fields —
+    varsity rows, practice-squad rows, and the Training tab's grid rows."""
+    assert FCC_JS.count("resolved_training_focus: p.resolved_training_focus") == 3
 
 
 def test_practice_scope_renders_no_controls():

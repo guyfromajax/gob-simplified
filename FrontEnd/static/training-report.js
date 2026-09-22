@@ -36,7 +36,10 @@ const franchiseId = urlParams.get('franchise_id');
 const teamId = urlParams.get('team_id');
 const week = parseInt(urlParams.get('week'), 10);
 /** `inbox` = opened from FCC Inbox (Back only). `training` = from training submit / default (Go To Locker Room). */
-const reportFrom = urlParams.get('from') === 'inbox' ? 'inbox' : 'training';
+// 'news' is where these links come from now that the Inbox tab is retired; 'inbox' is
+// still accepted so already-shared and bookmarked links keep their Back button.
+const _reportFromRaw = urlParams.get('from');
+const reportFrom = (_reportFromRaw === 'news' || _reportFromRaw === 'inbox') ? 'news' : 'training';
 
 let reportData = null;
 let currentView = 'changes'; // 'attributes' or 'changes'
@@ -415,7 +418,7 @@ function setupLockerRoomButton() {
   const btn = document.getElementById('locker-room-btn');
   if (!btn) return;
 
-  if (reportFrom === 'inbox' && mode === 'franchise') {
+  if (reportFrom === 'news' && mode === 'franchise') {
     btn.textContent = 'Back';
     btn.classList.add('training-report-back-btn');
   } else {
@@ -426,10 +429,10 @@ function setupLockerRoomButton() {
   btn.addEventListener('click', () => {
     playSound('click-strong.wav');
     if (mode === 'franchise') {
-      if (reportFrom === 'inbox') {
+      if (reportFrom === 'news') {
         const lockerRoomUrl = (typeof buildFranchiseLockerRoomUrl === 'function')
-          ? buildFranchiseLockerRoomUrl(franchiseId, teamId, { tab: 'tutorials-tab' })
-          : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tab=tutorials-tab`;
+          ? buildFranchiseLockerRoomUrl(franchiseId, teamId, { tab: 'press-tab' })
+          : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tab=press-tab`;
         window.location.href = lockerRoomUrl;
         return;
       }
