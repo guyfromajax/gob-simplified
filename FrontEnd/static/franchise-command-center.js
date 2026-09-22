@@ -4996,7 +4996,7 @@ function renderFccTrainingTab() {
 
   grid.render(host, rows, {
     getFranchiseId: () => (typeof franchiseId !== 'undefined' && franchiseId)
-      || new URLSearchParams(window.location.search).get('franchise_id') || '',
+      || liveParams().get('franchise_id') || '',
     // Keep the roster caches in step so the Roster tab's read-only columns agree.
     onSaved: (playerId, field, value) => {
       const key = field === 'training_focus'
