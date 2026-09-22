@@ -141,6 +141,80 @@ def test_both_editors_link_to_the_training_by_position_chart():
     assert "saveTrainingFormDraft();" in train_fn[:train_fn.index("window.location.href")]
 
 
+# ── the hover card is always fully on screen ────────────────────────────────
+
+PLACE_HARNESS = """
+'use strict';
+// Replays the real placement arithmetic from showHoverCard against a fake viewport.
+const VH = 900, VW = 1400, GAP = 8, EDGE = 8;
+const CARD = { w: 252, h: 210 };
+
+function place(anchorTop, anchorLeft) {
+  const a = { top: anchorTop, bottom: anchorTop + 18, left: anchorLeft };
+  const above = a.top - GAP - CARD.h;
+  const below = a.bottom + GAP;
+  let top;
+  if (above >= EDGE) top = above;
+  else if (below + CARD.h <= VH - EDGE) top = below;
+  else top = Math.max(EDGE, VH - EDGE - CARD.h);
+  const left = Math.min(Math.max(EDGE, a.left), VW - EDGE - CARD.w);
+  return { top, left, bottom: top + CARD.h, right: left + CARD.w };
+}
+
+const cases = {
+  topRow:     place(120, 180),    // near the panel top — used to clip upward
+  bottomRow:  place(830, 180),    // near the page bottom — used to fall off
+  middle:     place(500, 180),
+  farRight:   place(500, 1330),   // would overflow the right edge
+  farLeft:    place(500, 2),
+};
+const fits = {};
+Object.keys(cases).forEach((k) => {
+  const c = cases[k];
+  fits[k] = c.top >= EDGE && c.bottom <= VH - EDGE && c.left >= EDGE && c.right <= VW - EDGE;
+});
+process.stdout.write(JSON.stringify({ cases, fits }));
+"""
+
+
+@pytestmark_node
+def test_the_hover_card_never_leaves_the_viewport():
+    """The two shipped bugs: the top row's card clipped against the panel edge, and the
+    bottom row's flipped downward off the page. Both are placement, so both are tested as
+    placement — plus the horizontal edges, which the old markup never handled at all."""
+    out = json.loads(subprocess.check_output(
+        ["node", "-e", textwrap.dedent(PLACE_HARNESS)], text=True, timeout=30))
+    for case, ok in out["fits"].items():
+        assert ok, f"{case} placed off-screen: {out['cases'][case]}"
+
+
+@pytestmark_node
+def test_it_prefers_above_but_flips_below_when_there_is_no_room():
+    out = json.loads(subprocess.check_output(
+        ["node", "-e", textwrap.dedent(PLACE_HARNESS)], text=True, timeout=30))
+    assert out["cases"]["middle"]["bottom"] < 500, "roomy anchor opens upward"
+    assert out["cases"]["topRow"]["top"] > 120, "no room above, so it opens downward"
+
+
+def test_the_card_is_not_inside_the_row_it_describes():
+    """An ancestor that clips is unfixable by choosing a better side, so the card lives on
+    <body> at position:fixed instead."""
+    assert "document.body.appendChild(cardEl)" in GRID_JS
+    css = (S / "css" / "player-development-grid.css").read_text()
+    block = css[css.index(".pdg-hovercard {"):]
+    block = block[:block.index("}")]
+    assert "position: fixed" in block
+    import re as _re
+    code = _re.sub(r"/\*.*?\*/", "", css, flags=_re.S)   # the comment explains the fix
+    assert "nth-child" not in code, "the old flip-by-position rule was the bug"
+
+
+def test_scrolling_dismisses_it_rather_than_stranding_it():
+    """Fixed coordinates are taken once; a scroll would leave the card pointing at nothing."""
+    assert "window.addEventListener('scroll', hideHoverCard, true)" in GRID_JS
+    assert "window.addEventListener('resize', hideHoverCard)" in GRID_JS
+
+
 # ── the Inbox is retired cleanly ────────────────────────────────────────────
 
 def test_the_inbox_tab_is_gone_with_nothing_dangling():

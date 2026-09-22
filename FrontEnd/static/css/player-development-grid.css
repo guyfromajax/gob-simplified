@@ -64,9 +64,8 @@
 /* The name is the hover target, so it gets a focus ring and keyboard access — a card that
    only appears on mouseover is invisible to anyone not using a mouse. */
 .pdg-name {
-  position: relative;
   min-width: 0;
-  overflow: visible;
+  overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   font: 600 13px/1.2 'Inter', sans-serif;
@@ -93,13 +92,16 @@
   font: 500 13px/1.4 'Inter', sans-serif;
 }
 
-/* ---- Hover card: year, height, weight and the core 12 ---- */
+/* ---- Hover card: year, height, weight and the core 12 ----
+   Lives on <body> at position:fixed, placed by JS from the space actually available on
+   screen. It used to sit inside the row and flip by nth-child, which clipped the top row
+   against the panel edge and pushed the bottom row off the page — no static side can win
+   when the card is inside something that clips it. */
 .pdg-hovercard {
-  position: absolute;
+  position: fixed;
+  top: 0;
   left: 0;
-  bottom: calc(100% + 8px);
-  z-index: 60;
-  display: block;
+  z-index: 9999;
   width: 252px;
   padding: 10px 12px;
   border-radius: 10px;
@@ -107,20 +109,12 @@
   background: #161920;
   box-shadow: 0 14px 34px rgba(0, 0, 0, .5);
   opacity: 0;
-  visibility: hidden;
-  transform: translateY(4px);
-  transition: opacity .13s ease, transform .13s ease, visibility .13s;
   pointer-events: none;
   white-space: normal;
+  transition: opacity .12s ease;
 }
-.pdg-name:hover .pdg-hovercard,
-.pdg-name:focus-visible .pdg-hovercard {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-/* The last row of cards would push the card off the bottom of the panel, so those flip. */
-.pdg-grid > .pdg-card:nth-child(4n) .pdg-hovercard { bottom: auto; top: calc(100% + 8px); }
+.pdg-hovercard.is-open { opacity: 1; }
+.pdg-hovercard[hidden] { display: none; }
 
 .pdg-hc-head {
   display: block;
@@ -159,5 +153,5 @@
   font-variant-numeric: tabular-nums;
 }
 @media (prefers-reduced-motion: reduce) {
-  .pdg-hovercard { transition: opacity .13s ease, visibility .13s; transform: none; }
+  .pdg-hovercard { transition: none; }
 }

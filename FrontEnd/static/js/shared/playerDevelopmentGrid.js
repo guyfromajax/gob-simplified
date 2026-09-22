@@ -60,21 +60,92 @@
       return '<span class="pdg-hc-attr"><b>' + esc(code) + '</b>' +
         '<i>' + (v == null ? '--' : v) + '</i></span>';
     }).join('');
-    return '<span class="pdg-hovercard" role="tooltip">' +
-      '<span class="pdg-hc-head">' + esc(player.name) + '</span>' +
+    return '<span class="pdg-hc-head">' + esc(player.name) + '</span>' +
       '<span class="pdg-hc-vitals">' +
         esc(player.year || '--') + ' &middot; ' + esc(formatHeight(player.height)) +
         ' &middot; ' + esc(player.weight == null ? '--' : player.weight) + ' lb' +
       '</span>' +
-      '<span class="pdg-hc-attrs">' + rows + '</span>' +
-    '</span>';
+      '<span class="pdg-hc-attrs">' + rows + '</span>';
+  }
+
+  /**
+   * ONE hover card, fixed-position, appended to <body>.
+   *
+   * It used to render inside the row and flip by nth-child. Two ways that failed: the top
+   * row opened upward into the panel's edge and was clipped, and the bottom row flipped
+   * downward off the bottom of the page. Neither is fixable by choosing a better static
+   * side — the card is inside an element that clips it. Living on <body> at position:fixed
+   * removes every ancestor's overflow and stacking context from the question, and the side
+   * is then chosen from the space actually available on screen.
+   */
+  var cardEl = null;
+  var GAP = 8;
+  var EDGE = 8;
+
+  function hoverCardEl() {
+    if (cardEl && cardEl.isConnected) return cardEl;
+    cardEl = document.createElement('div');
+    cardEl.className = 'pdg-hovercard';
+    cardEl.setAttribute('role', 'tooltip');
+    cardEl.hidden = true;
+    document.body.appendChild(cardEl);
+    return cardEl;
+  }
+
+  function showHoverCard(anchor, player) {
+    var el = hoverCardEl();
+    el.innerHTML = hoverCardHtml(player);
+    el.hidden = false;
+    // Measure only after the content is in: the card's height depends on the name wrapping.
+    var a = anchor.getBoundingClientRect();
+    var c = el.getBoundingClientRect();
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+
+    var above = a.top - GAP - c.height;
+    var below = a.bottom + GAP;
+    var top;
+    if (above >= EDGE) top = above;                       // preferred: above the name
+    else if (below + c.height <= vh - EDGE) top = below;   // else below it
+    else top = Math.max(EDGE, vh - EDGE - c.height);       // else clamp; never off-screen
+
+    var left = Math.min(Math.max(EDGE, a.left), vw - EDGE - c.width);
+    el.style.top = Math.round(top) + 'px';
+    el.style.left = Math.round(left) + 'px';
+    el.classList.add('is-open');
+  }
+
+  function hideHoverCard() {
+    if (!cardEl) return;
+    cardEl.classList.remove('is-open');
+    cardEl.hidden = true;
+  }
+
+  /** Anchored to viewport coordinates, so any scroll invalidates the position. */
+  function bindHoverCard(grid, byId) {
+    var open = function (e) {
+      var name = e.target.closest ? e.target.closest('.pdg-name') : null;
+      if (!name) return;
+      var card = name.closest('.pdg-card');
+      var lookup = grid._pdgById || byId;
+      var player = card && lookup[String(card.dataset.pdgPlayer)];
+      if (player) showHoverCard(name, player);
+    };
+    grid.addEventListener('mouseover', open);
+    grid.addEventListener('focusin', open);
+    grid.addEventListener('mouseout', function (e) {
+      if (e.target.closest && e.target.closest('.pdg-name')) hideHoverCard();
+    });
+    grid.addEventListener('focusout', hideHoverCard);
+    window.addEventListener('scroll', hideHoverCard, true);
+    window.addEventListener('resize', hideHoverCard);
   }
 
   function cardHtml(player) {
     var dev = window.GOBDevelopmentFocus;
     var rt = rtAtTrainingPosition(player);
     return '<div class="pdg-card" data-pdg-player="' + esc(player.id) + '">' +
-      '<span class="pdg-name" tabindex="0">' + esc(player.name) + hoverCardHtml(player) + '</span>' +
+      '<span class="pdg-name" tabindex="0">' + esc(player.name) + '</span>' +
       '<span class="pdg-rt" data-pdg-rt>' + (rt == null ? '--' : rt) + '</span>' +
       '<span class="pdg-controls">' +
         dev.positionSelectHtml(player) + dev.focusSelectHtml(player) +
@@ -116,6 +187,16 @@
       : '<div class="pdg-empty">No active players.</div>';
     paintTallies(host, rows);
 
+    var byId = {};
+    rows.forEach(function (r) { byId[String(r.id)] = r; });
+    if (!grid.dataset.pdgHoverBound) {
+      grid.dataset.pdgHoverBound = '1';
+      bindHoverCard(grid, byId);
+    } else {
+      grid._pdgById = byId;
+    }
+    grid._pdgById = byId;
+
     dev.bind(grid, o.getFranchiseId || function () { return ''; }, function (playerId, field, value) {
       var row = null;
       rows.forEach(function (r) { if (String(r.id) === String(playerId)) row = r; });
@@ -150,5 +231,6 @@
     rtAtTrainingPosition: rtAtTrainingPosition,
     formatHeight: formatHeight,
     attrValue: attrValue,
+    hideHoverCard: hideHoverCard,
   };
 })();

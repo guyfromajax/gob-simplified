@@ -35,21 +35,20 @@ from BackEnd.constants.training_shape import (  # noqa: E402
 
 ASSET = ROOT / "FrontEnd" / "static" / "js" / "generated" / "trainingMatrix.js"
 
-# Row order is the tutorial's, not the dict's: offense, defense, body, mind. It reads as
-# a scouting report rather than as whatever order the constants happen to be written in.
+# Row order is the tutorial's, not the dict's. Same sequence on By Position and By Focus.
 ATTR_ROWS = [
     ("SC", "Scoring"),
     ("SH", "Shooting"),
-    ("PS", "Passing"),
-    ("BH", "Ball Handling"),
     ("ID", "Inside Defense"),
     ("OD", "Outside Defense"),
+    ("PS", "Passing"),
+    ("BH", "Ball Handling"),
     ("RB", "Rebounding"),
     ("ST", "Strength"),
     ("AG", "Agility"),
-    ("FT", "Free Throws"),
-    ("IQ", "Basketball IQ"),
     ("ND", "Endurance"),
+    ("IQ", "Basketball IQ"),
+    ("FT", "Free Throws"),
 ]
 
 FOCUS_LABELS = {
