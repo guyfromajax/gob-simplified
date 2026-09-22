@@ -2048,7 +2048,7 @@ _POSTURE_INSIDE_SPOTS = frozenset({
 })
 
 
-# ── Man weak-side help shade (GOB_MAN_HELP_SHADE; default OFF) ──────────────────────────────
+# ── Man weak-side help shade (GOB_MAN_HELP_SHADE; default ON since 2026-09-22) ──────────────
 # Man off-ball help has exactly one rim-ward term, HELP_BASKET_SHADE, and it is FLAT: it reads
 # neither posture nor ball side. That is why Loose buys +3.79 gap toward the BALL and -0.34
 # toward the rim - the helper floats, guarding neither his man nor the basket
@@ -2072,10 +2072,14 @@ MAN_HELP_SHADE_FLAG = "GOB_MAN_HELP_SHADE"
 
 
 def man_help_shade_enabled():
-    """``GOB_MAN_HELP_SHADE`` - **default OFF**. Set to "1" to scale the man off-ball basket
-    shade by weak-sideness. OFF reproduces ``equiv_v3_reference_32db56c77_helpshade.json``."""
+    """``GOB_MAN_HELP_SHADE`` - **default ON** since 2026-09-22.
+
+    Kill switch: ``GOB_MAN_HELP_SHADE=0`` restores the flat ``HELP_BASKET_SHADE`` and
+    reproduces ``equiv_v3_reference_32db56c77_helpshade.json`` - verified 40/40 on
+    fingerprint AND draws in all four cells at the flip.
+    """
     import os  # local, matching zone_help_shade_enabled above - this module has no top-level os
-    return os.environ.get(MAN_HELP_SHADE_FLAG, "0") == "1"
+    return os.environ.get(MAN_HELP_SHADE_FLAG, "1") == "1"
 
 
 _MAN_SHADE_COUNTS = {"considered": 0, "shaded": 0, "no_shade_middle": 0}
