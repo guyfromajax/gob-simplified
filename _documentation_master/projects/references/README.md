@@ -18,12 +18,13 @@ Animator methods at Pattern A.
 
 | file | tree | what it baselines |
 |---|---|---|
-| **`equiv_v3_reference_5ea94694f_sinkescape.json`** | `5ea94694f` (2026-09-22) | **CURRENT, both arms, both footings.** Zone sink escape ON by default: an empty-area zone defender may leave his own polygon to the extent the movement takes him **closer to the rim**; movement that is not rim-ward is still clamped. Guardrails `RIM_FLOOR` 4.0 and `MIN_SEPARATION` 2.0, both derived from measured geometry. No reach constant or sink weight changed. **`SEED_DEFENSES=0` is byte-identical to the superseded file** (40/40 fp and draws, both arms) — zone does not exist there, so the escape cannot fire. At `SEED_DEFENSES=1`, 36/40 sim and 37/40 played seeds differ. See `reports/zone-sink-escape-flip-2026-09-22.md`. |
+| **`equiv_v3_reference_32db56c77_helpshade.json`** | `32db56c77` (2026-09-22) | **CURRENT, both arms, both footings.** Zone weak-side help shade ON by default: a zone defender **with a man in his area** now sags toward the rim he is defending, scaled by how weak-side he is — `coords += HELP_BASKET_SHADE × (1 − strongness) × (rim − man)`, reusing `HELP_BASKET_SHADE`, `SIDE_SPAN` and `ball_centrality`. No new constant, and **no clamp was added**. Weak side 13.83 → 11.74 from the rim, strong side −0.60, a central ball untouched. **`SEED_DEFENSES=0` is byte-identical to the superseded file** (40/40 fp and draws, both arms) — zone does not exist there. At `SEED_DEFENSES=1` **every** seed differs on both arms. See `reports/zone-help-shade-flip-2026-09-22.md`. |
 
 ## Superseded — kept deliberately
 
 | file | tree | superseded by | reproduced today by |
 |---|---|---|---|
+| `equiv_v3_reference_5ea94694f_sinkescape.json` | `5ea94694f` | `32db56c77` | **`GOB_ZONE_HELP_SHADE=0`** — verified 40/40 on fingerprint AND draws in all four cells at `32db56c77`, before the re-cut. It baselines the zone sink escape: an empty-area zone defender may leave his polygon to the extent the movement is rim-ward, guardrails `RIM_FLOOR` 4.0 and `MIN_SEPARATION` 2.0. |
 | `equiv_v3_reference_5cc98ee3e_freeze.json` | `5cc98ee3e` | `5ea94694f` | **`GOB_ZONE_SINK_ESCAPE=0`** — verified 40/40 on fingerprint AND draws in all four cells at `5ea94694f`, before the re-cut, with every escape counter at zero. |
 | `equiv_v3_reference_70f7dd021_b1a.json` | `70f7dd021` | `5cc98ee3e` | **`GOB_PLACEMENT_FREEZE=0 GOB_PLACEMENT_SINGLE_BUILD=0`** — verified 40/40 on fingerprint AND draws in all four cells at `5cc98ee3e`, before the re-cut. `GOB_PLACEMENT_FREEZE=0` alone is sufficient: Stage 3 is inert unless the freeze is on. |
 | `equiv_v3_reference_ec4f5acfc_poslookup2.json` | `ec4f5acfc` | `70f7dd021` | **`GOB_SIM_BUILD_ANIM_FOR_EMITTER=0`** — verified 40/40 on all four cells at `70f7dd021`. `GOB_SIM_HCO_COORD_WRITE` and `GOB_SIM_CRASH_APPLY` are kept as this switch's partners: they are what write the sim arm's HCO coords when B1-A is off. |
