@@ -1,7 +1,28 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function () {
   'use strict';
 
-  var urlParams = new URLSearchParams(window.location.search);
+  var urlParams = liveParams();
   var franchiseId = urlParams.get('franchise_id');
   var teamId = urlParams.get('team_id');
   var selectedIds = new Set();
@@ -29,7 +50,7 @@
         teamId: teamId
       });
     }
-    var params = new URLSearchParams();
+    var params = emptyParams();
     params.set('mode', 'franchise');
     if (franchiseId) params.set('franchise_id', franchiseId);
     if (teamId) params.set('team_id', teamId);

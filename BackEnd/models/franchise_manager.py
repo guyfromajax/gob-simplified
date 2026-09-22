@@ -23,6 +23,16 @@ from BackEnd.utils.franchise_rank_prestige import (
     rank_teams_for_week,
 )
 
+from BackEnd.persistence import get_store
+_store = get_store()
+franchise_team_data_collection = _store.franchise_team_data_collection
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_recruits_data_collection = _store.franchise_recruits_data_collection
+ensure_ftd_index = _store.ensure_ftd_index
+ensure_fpd_index = _store.ensure_fpd_index
+ensure_frd_index = _store.ensure_frd_index
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +45,9 @@ def _load_franchise_names_payload(filename: str, env_var: str | None = None) -> 
     if env_path:
         paths_to_try.append(Path(env_path).expanduser())
 
-    paths_to_try.append(Path(__file__).resolve().parents[1] / "data" / "names" / filename)
+    from BackEnd.runtime_paths import bundle_path
+
+    paths_to_try.append(bundle_path("BackEnd", "data", "names", filename))
     paths_to_try.append(Path("BackEnd/data/names") / filename)
 
     try:
@@ -170,6 +182,11 @@ POOL_TO_FPD_PROJECTION = {
     **{_f: 1 for _f in POOL_TO_FPD_CARRY_FIELDS},
 }
 
+from BackEnd.constants.training_shape import (
+    DEFAULT_TRAINING_FOCUS,
+    derive_training_position,
+)
+
 # ── Player identity/development carry — single source of truth ────────────────
 # The identity + development fields that must survive EVERY player-doc hop:
 # recruit → signed_player → FPD, and FPD → FPD at each season rollover. Declared
@@ -181,7 +198,7 @@ POOL_TO_FPD_PROJECTION = {
 PLAYER_DEV_CARRY_FIELDS = (
     "entry_tier", "position_intent", "potential_factor",
     "development", "training_position", "coaching_quality",
-    "training_gain_remainders",
+    "training_gain_remainders", "training_focus",
 )
 assert set(POOL_TO_FPD_CARRY_FIELDS) <= set(PLAYER_DEV_CARRY_FIELDS)
 
@@ -190,8 +207,26 @@ def carry_dev_fields(src: dict) -> dict:
     """Cherry-pick the canonical dev-carry fields from any recruit/player-shaped
     source, omitting absent ones (develop_rollover backfills a missing field). A
     PRESENT value is carried, so authored intent/tier/potential survive signing
-    instead of being re-derived from argmax RT / a fresh uuid."""
-    return {f: src[f] for f in PLAYER_DEV_CARRY_FIELDS if src.get(f) is not None}
+    instead of being re-derived from argmax RT / a fresh uuid.
+
+    Development Focus defaults are applied HERE rather than at each insert site, because
+    this is the one place every player-doc hop passes through (franchise init, signing,
+    walk-ons, team builder, season rollover). A carried value always wins, so a coach's
+    own choice survives every hop:
+
+      training_focus    defaults to ``standard`` — the documented default, and identical
+                        to how a missing value already resolves at read time.
+      training_position derived from position_intent / position_ratings via the SAME
+                        helper the backfill uses, and OMITTED when neither exists. An
+                        unknown position is left unknown rather than invented (rule 26).
+    """
+    carried = {f: src[f] for f in PLAYER_DEV_CARRY_FIELDS if src.get(f) is not None}
+    carried.setdefault("training_focus", DEFAULT_TRAINING_FOCUS)
+    if "training_position" not in carried:
+        derived = derive_training_position(src)
+        if derived is not None:
+            carried["training_position"] = derived
+    return carried
 
 
 RECRUIT_YEAR_ADVANCE = {
@@ -660,14 +695,6 @@ class FranchiseManager:
 
         # ✅ FTD/FPD/FRD: Create franchise_team_data, franchise_players_data, franchise_recruits_data
         # *after* franchise insert so we have franchise_id.
-        from BackEnd.db import (
-            franchise_team_data_collection,
-            franchise_players_data_collection,
-            franchise_recruits_data_collection,
-            ensure_ftd_index,
-            ensure_fpd_index,
-            ensure_frd_index,
-        )
 
         ensure_ftd_index()
         ensure_fpd_index()

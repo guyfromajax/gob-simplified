@@ -109,11 +109,15 @@ def build_fb_terminal_announcement(
             text = pick_offensive_foul_text(turn_result, rng)
             team = defense_side
         else:
-            text = pick_defensive_foul_text(
-                turn_result,
-                is_on_ball=bool(turn_result.get("foul_is_on_ball", True)),
-                rng=rng,
-            )
+            # KEY PRESENT: use it, including a None meaning "role unknown" -> neutral
+            # copy. KEY ABSENT: the legacy default, which assumed on-ball for every
+            # fast-break defensive foul. GOB_FB_FOUL_ON_BALL_TEXT=0 leaves it absent.
+            if "foul_is_on_ball" in turn_result:
+                on_ball = turn_result["foul_is_on_ball"]
+                on_ball = None if on_ball is None else bool(on_ball)
+            else:
+                on_ball = True
+            text = pick_defensive_foul_text(turn_result, is_on_ball=on_ball, rng=rng)
             team = offense_side
         return _announcement(text, team, fouler, _FOUL_WHISTLE_SFX)
 

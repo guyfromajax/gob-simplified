@@ -23,6 +23,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Sequence, Tuple
 
 from BackEnd.utils.sim_random import announcement_rng as _default_rng
+from BackEnd.utils.lineup_position import lineup_position_lookup_enabled, lineup_slot
 
 # --- Defender role vocabulary ------------------------------------------------
 
@@ -119,24 +120,107 @@ def is_post_up_context(turn_result: Dict[str, Any]) -> bool:
     return _matches_location_set(turn_result, POST_UP_LOCATIONS)
 
 
-def defensive_foul_is_on_ball(foul_player: Any, ball_handler: Any) -> bool:
+def defensive_foul_is_on_ball(
+    foul_player: Any,
+    ball_handler: Any,
+    *,
+    off_lineup: Any = None,
+    def_lineup: Any = None,
+) -> bool:
     """Was the fouler the defender matched to the ball handler?
 
     Mirrors ``select_foul_player``'s own matching rule: the on-ball defender is
     the one occupying the ball handler's lineup position.
+
+    Positions come from the lineup dicts. The previous implementation read
+    ``foul_player.position`` / ``ball_handler.position`` - attributes ``Player``
+    does not have - so it returned False on every defensive foul.
+
+    NOTE: only reachable with ``GOB_FOUL_ON_BALL_WEIGHT=0``. On the shipped default
+    ``select_foul_player`` stamps ``foul_is_on_ball`` from the matched defender it
+    already computed, and never calls this.
     """
     if foul_player is None or ball_handler is None:
         return False
-    fouler_pos = _norm(getattr(foul_player, "position", None))
-    bh_pos = _norm(getattr(ball_handler, "position", None))
+    if lineup_position_lookup_enabled():
+        fouler_pos = _norm(lineup_slot(def_lineup, foul_player))
+        bh_pos = _norm(lineup_slot(off_lineup, ball_handler))
+    else:
+        fouler_pos = _norm(getattr(foul_player, "position", None))
+        bh_pos = _norm(getattr(ball_handler, "position", None))
     if not fouler_pos or not bh_pos:
         return False
     return fouler_pos == bh_pos
 
 
-def _role_is_eligible(role: str, *, is_on_ball: bool, post_up: bool) -> bool:
+def fb_foul_on_ball_text_enabled() -> bool:
+    """``GOB_FB_FOUL_ON_BALL_TEXT`` - **default ON**.
+
+    ON stamps ``foul_is_on_ball`` onto fast-break foul turn results so the terminal
+    announcement can pick role-correct copy. OFF leaves the key absent, which is what
+    the fast-break path did before: ``build_fb_terminal_announcement`` then falls back
+    to ``True`` and every FB defensive foul gets on-ball language.
+    """
+    import os
+    return os.environ.get("GOB_FB_FOUL_ON_BALL_TEXT", "1") == "1"
+
+
+def fb_defensive_foul_is_on_ball(foul_player: Any, stopper: Any) -> Optional[bool]:
+    """Was the fast-break fouler the defender on the ball? ``None`` when unknowable.
+
+    A fast break has no man matchup to compare lineup slots against - that is what
+    ``defensive_foul_is_on_ball`` does for half court, and it cannot answer here. What
+    the fast break has instead is the STOPPER: the defender who cut the ball handler
+    off at the meet point. He is the on-ball defender by construction, so a foul by
+    anyone else (the drive integrations use ``credited or stopper``) is a help foul.
+
+    With no stopper there is nothing to compare against, so the answer is ``None`` -
+    unknown - and the caller must not turn that into ``True``.
+    """
+    if foul_player is None or stopper is None:
+        return None
+    return foul_player is stopper
+
+
+def stamp_fb_foul_on_ball(
+    turn_result: Dict[str, Any],
+    *,
+    foul_team: Any,
+    foul_player: Any = None,
+    stopper: Any = None,
+    is_shooting_foul: bool = False,
+) -> None:
+    """Put the defender-role axis on a fast-break foul turn result.
+
+    The fast-break integrations build their own ``turn_result`` and never went through
+    ``select_foul_player``, so ``foul_is_on_ball`` was missing on every one of them and
+    the terminal announcement defaulted to on-ball copy. This is the bridge.
+
+    Writes ``None`` when the role is genuinely unknown; the key being PRESENT is what
+    tells ``build_fb_terminal_announcement`` to use neutral copy rather than the legacy
+    ``True`` default.
+    """
+    if not fb_foul_on_ball_text_enabled():
+        return
+    if str(foul_team or "").upper() == "OFFENSE":
+        # Offensive fouls carry no defender-role axis; pick_offensive_foul_text never
+        # reads this. Stamped anyway so the key is present, matching select_foul_player.
+        turn_result["foul_is_on_ball"] = True
+        return
+    if is_shooting_foul:
+        # A shooting foul is committed on the player taking the shot, who has the ball.
+        turn_result["foul_is_on_ball"] = True
+        return
+    turn_result["foul_is_on_ball"] = fb_defensive_foul_is_on_ball(foul_player, stopper)
+
+
+def _role_is_eligible(role: str, *, is_on_ball: Optional[bool], post_up: bool) -> bool:
     if role == EITHER:
         return True
+    if is_on_ball is None:
+        # Genuinely unknown: no role-specific line can be justified, so only the
+        # role-neutral copy is eligible. Never silently assume on-ball.
+        return False
     if role == ON_BALL:
         return is_on_ball
     if role == OFF_BALL:
@@ -163,7 +247,7 @@ def _weighted_pick(rows: Sequence[Tuple[str, int]], rng) -> Optional[str]:
 def pick_defensive_foul_text(
     turn_result: Dict[str, Any],
     *,
-    is_on_ball: bool = True,
+    is_on_ball: Optional[bool] = True,
     rng=_default_rng,
 ) -> str:
     """Pick defensive foul copy matching the fouler's role and court region.

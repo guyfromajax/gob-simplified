@@ -19,6 +19,7 @@ const CSS = read('recruiting-spine.css') + read('recruiting-signing.css') + read
 // Same order recruiting.html loads them; common.js supplies getBestPosition, which
 // RecruitingCommon.normalizeRecruits depends on.
 const SCRIPTS = [
+  'js/shared/franchiseContext.js',
   'common.js',
   'js/shared/attrTiles.js', 'js/shared/rtBucket.js',
   'js/shared/playerYear.js',

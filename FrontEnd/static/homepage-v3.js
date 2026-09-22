@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Homepage v3 — Sticky nav CTA, FAQ accordion, scroll entrance animations.
  * No dependencies. Vanilla JS, passive listeners throughout.
@@ -112,8 +133,8 @@
   }
 
   function signupHref() {
-    var params = new URLSearchParams(window.location.search);
-    var out = new URLSearchParams();
+    var params = liveParams();
+    var out = emptyParams();
     var utm = params.get('utm_source');
     var ref = params.get('ref');
     if (utm) out.set('utm_source', utm);

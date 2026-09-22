@@ -6,7 +6,11 @@ from typing import Any
 
 from bson import ObjectId
 
-from BackEnd.db import db, franchise_players_data_collection, franchise_team_data_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
 from BackEnd.utils.franchise_standings import calculate_franchise_standings
 from BackEnd.utils.franchise_team_display import resolve_team_name_map
 

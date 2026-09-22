@@ -1,3 +1,28 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  var ctx = franchiseCtx();
+  if (!ctx) return emptyParams();
+  return ctx.toSearchParams();
+}
+function emptyParams() {
+  var ctx = franchiseCtx();
+  if (ctx) return ctx.createParams();
+  return { toString: function () { return ''; }, get: function () { return null; }, set: function () {}, delete: function () {}, forEach: function () {} };
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Auth Guard - Protects pages from unauthenticated access
  *
@@ -17,7 +42,7 @@
         var fontLink = document.createElement("link");
         fontLink.id = "gob-bebas-neue-font";
         fontLink.rel = "stylesheet";
-        fontLink.href = "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap";
+        fontLink.href = "/fonts/app-fonts.css";
         head.appendChild(fontLink);
       }
 
@@ -83,10 +108,17 @@
     return;
   }
 
-  var token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
-  if (!token) {
-    var redirectParam = encodeURIComponent(logicalPath + (window.location.search || ""));
-    window.location.replace("/login.html?redirect=" + redirectParam);
+  // Desktop: the loopback engine injects a local principal server-side.
+  // Login is always-remote, so sending the user there strands them offline.
+  // window.GOB_BUILD_PROFILE is set by the Electron preload before any page
+  // script runs. The web build never sets it, so this branch is dead there.
+  var isDesktop = typeof window !== "undefined" && window.GOB_BUILD_PROFILE === "desktop";
+  if (!isDesktop) {
+    var token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (!token) {
+      var redirectParam = encodeURIComponent(logicalPath + (currentSearch() || ""));
+      window.location.replace("/login.html?redirect=" + redirectParam);
+    }
   }
 
   /* Franchise LS helper before auth bar (multi-slot Phase 3). */

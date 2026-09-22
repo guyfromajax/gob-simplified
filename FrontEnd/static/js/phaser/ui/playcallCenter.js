@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Playcall Center Module
  * 
@@ -119,7 +140,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // Tempo/Aggression highlights are user-intent driven in court.html handlers.
   const stackZone = document.getElementById('pcc-stacks-zone');
   if (stackZone) {
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = liveParams();
     const userTeamSide = urlParams.get('my_team');
     const offId = turnData.offense_team_id != null ? String(turnData.offense_team_id) : null;
     const homeId = homeTeamId != null ? String(homeTeamId) : null;

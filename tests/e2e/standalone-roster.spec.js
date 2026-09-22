@@ -24,6 +24,7 @@ async function mount(page, opts = {}) {
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/?mode=franchise&franchise_id=f1&team_id=t1');
   await page.setContent(`<style>${CSS}</style><style>body{margin:0;background:#0b0d14}</style>${BODY}`);
+  await page.addScriptTag({ content: read('js/shared/franchiseContext.js') });
   await page.addScriptTag({ content: read('js/shared/playerYear.js') });
   await page.addScriptTag({ content: read('js/shared/rtBucket.js') });
   await page.addScriptTag({ content: read('js/shared/attrTiles.js') });

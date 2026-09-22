@@ -17,7 +17,9 @@ from typing import Any, Optional, Tuple
 
 from pymongo import ReturnDocument
 
-from BackEnd.db import alpha_otps_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+alpha_otps_collection = _store.alpha_otps_collection
 
 MIN_OTP_LENGTH = 4
 

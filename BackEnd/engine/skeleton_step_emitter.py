@@ -55,6 +55,7 @@ from BackEnd.utils.animation_step_helpers import (
     stamp_idle_wander_on_still_players,
     stamp_tween_durations,
 )
+from BackEnd.utils.lineup_position import lineup_position_lookup_enabled, lineup_slot
 from BackEnd.utils.animation_step_schema import (
     AdvanceTrigger,
     AnimationStep,
@@ -978,15 +979,24 @@ def _resolve_fcp_stopper_gate_ids(
     return []
 
 
-def _bh_defender_pos(roles: Dict[str, Any]) -> Optional[str]:
-    """Resolve the position of the defender on the ball handler from
-    ``roles{}``. HCO/FCP roles carry a ``defender`` player object; we read
-    its ``.position`` attribute. Returns None if not resolvable.
+def _bh_defender_pos(roles: Dict[str, Any], def_lineup: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """Resolve the lineup slot of the defender on the ball handler from ``roles{}``.
+
+    HCO/FCP roles carry a ``defender`` player object; the slot is looked up by identity
+    in the DEFENSE lineup, which is the dict that owns him. Returns None when there is no
+    defender in ``roles`` (the common case - roughly 55% of calls) or when he is not in
+    the lineup.
+
+    Was ``getattr(defender, "position", None)``, an attribute ``Player`` does not have, so
+    this returned None on every call and no defender was ever tagged ``guard_ball``.
     """
     defender = roles.get("defender")
     if defender is None:
         return None
-    pos = getattr(defender, "position", None)
+    if lineup_position_lookup_enabled():
+        pos = lineup_slot(def_lineup, defender)
+    else:
+        pos = getattr(defender, "position", None)
     return pos if pos in _OFFENSE_POSITIONS else None
 
 
@@ -1601,6 +1611,7 @@ def build_skeleton_animation_steps(
                 add_defenders=True,
                 is_fcp=(turn_type == "FCP"),
                 is_hct=False,
+                for_emitter=True,   # this IS the emitter
             )
         except Exception as _anim_err:
             import logging as _anim_log
@@ -1621,8 +1632,23 @@ def build_skeleton_animation_steps(
     # match; sharing this one draw makes contest == render by construction.
     # Sims never reach here (animations == [] above) → StepState falls back to
     # compute_defender_grid's own single draw (no render to match).
+    # Stage 2a (GOB_PLACEMENT_FREEZE): the direction reverses. Instead of the render's
+    # draw flowing BACKWARDS into StepState via this stash, the emit RENDERS the frozen
+    # row the contest already judged against — so contest == render because there is one
+    # draw, not because two draws were made to agree. The stash is then dead and is not
+    # written (``build_step_states`` stops reading it under the same flag).
     try:
-        setattr(game, "_hco_render_animations", animations)
+        from BackEnd.utils import placement_freeze as _pf
+        if _pf.enabled():
+            # Resolved here, not reused from the build branch above: that branch only
+            # runs when the caller passed no animations, so its locals are not bound on
+            # the other path and a NameError would be swallowed into a silent skip.
+            _def_team = getattr(game, "defense_team", None)
+            _def_lineup = getattr(_def_team, "lineup", {}) if _def_team else {}
+            _pf.apply_frozen_grid_to_animations(
+                animations, _def_lineup or {}, skeleton_steps, game)
+        else:
+            setattr(game, "_hco_render_animations", animations)
     except Exception:
         pass
 
@@ -1638,7 +1664,7 @@ def build_skeleton_animation_steps(
     off_lineup = getattr(off_team, "lineup", {}) if off_team else {}
     def_lineup = getattr(def_team, "lineup", {}) if def_team else {}
 
-    bh_def_pos = _bh_defender_pos(roles)
+    bh_def_pos = _bh_defender_pos(roles, def_lineup)
 
     game_state = getattr(game, "game_state", {}) or {}
     clock_remaining_at_turn_start = float(game_state.get("time_remaining", 0) or 0)

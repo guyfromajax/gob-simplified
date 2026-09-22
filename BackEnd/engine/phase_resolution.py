@@ -807,6 +807,32 @@ def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_p
     return stealer_coords
 
 
+def _foul_on_ball_weight_enabled() -> bool:
+    """``GOB_FOUL_ON_BALL_WEIGHT`` - **default ON**.
+
+    ON resolves the ball handler's position from ``off_lineup`` instead of the
+    non-existent ``Player.position``, which is what makes the 60/40 on-ball
+    defensive-foul weighting actually run. OFF reproduces the legacy behaviour
+    exactly: uniform weights across all five defenders, and ``foul_is_on_ball``
+    always False.
+    """
+    import os
+    return os.environ.get("GOB_FOUL_ON_BALL_WEIGHT", "1") == "1"
+
+
+# Position resolution moved to BackEnd/utils/lineup_position.py so the engine, the models
+# and utils.shared can all share one implementation. Re-exported under the original private
+# names because existing call sites and tests reach for them here.
+from BackEnd.utils.lineup_position import (  # noqa: E402
+    lineup_position_lookup_enabled as _lineup_position_lookup_enabled,
+    lineup_slot as _lineup_slot,
+    resolve_lineup_position as _resolve_lineup_position,
+    warn_position_unresolved as _warn_position_unresolved,
+    POS_LOOKUP_WARNED as _POS_LOOKUP_WARNED,
+    POS_LOOKUP_WARNED_MAX_GAMES as _POS_LOOKUP_WARNED_MAX_GAMES,
+)
+
+
 def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, roles=None):
     """
     Select which player committed the foul based on probabilistic logic.
@@ -843,9 +869,33 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, rol
     else:  # DEFENSE
         # 60% chance it's the defender matched to ball handler's position
         # 40% distributed among other 4 defenders (10% each)
-        ball_handler_pos = getattr(ball_handler, 'position', None)
-        matched_defender = def_lineup.get(ball_handler_pos) if ball_handler_pos else None
-        
+        #
+        # ``Player`` has no ``position`` attribute - it defines ``position_ratings``
+        # and nothing else - so the legacy lookup below resolved to None on 100% of
+        # selections (316/316 sim, 315/315 played, n=40) and every defender got 0.1.
+        # The 60/40 split had never run. The lineup is authoritative for position;
+        # ``off_lineup`` is already a parameter. Same pattern as
+        # ``covert_release_step_emitter.py:1215``.
+        matched_defender = None
+        if _foul_on_ball_weight_enabled():
+            ball_handler_pos = next(
+                (pos for pos, p in (off_lineup or {}).items() if p is ball_handler),
+                None,
+            )
+            if ball_handler_pos is None:
+                # Ball handler is not in the offensive lineup (substitution edge
+                # cases). Fall back to the legacy uniform behaviour, but say so.
+                logging.warning(
+                    "[FOUL ON-BALL] ball handler %s not found in off_lineup; "
+                    "falling back to uniform defensive foul weights",
+                    get_name_safe(ball_handler),
+                )
+            else:
+                matched_defender = (def_lineup or {}).get(ball_handler_pos)
+        else:
+            ball_handler_pos = getattr(ball_handler, 'position', None)
+            matched_defender = def_lineup.get(ball_handler_pos) if ball_handler_pos else None
+
         players = list(def_lineup.values())
         weights = []
         for player in players:
@@ -853,16 +903,26 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, rol
                 weights.append(0.6)
             else:
                 weights.append(0.1)
-        
+
         foul_player = random.choices(players, weights=weights)[0]
 
     if isinstance(roles, dict):
-        from BackEnd.engine.foul_announcement_language import defensive_foul_is_on_ball
-        roles["foul_is_on_ball"] = (
-            defensive_foul_is_on_ball(foul_player, ball_handler)
-            if str(foul_team_type or "").upper() == "DEFENSE"
-            else True
-        )
+        is_defense = str(foul_team_type or "").upper() == "DEFENSE"
+        if is_defense and _foul_on_ball_weight_enabled():
+            # Stamp from what this function actually knows. The old route,
+            # ``defensive_foul_is_on_ball``, compares ``foul_player.position`` to
+            # ``ball_handler.position`` - both always None - so it returned False
+            # on every defensive foul and the announcement copy always picked
+            # off-ball language.
+            roles["foul_is_on_ball"] = bool(
+                matched_defender is not None and foul_player is matched_defender
+            )
+        elif is_defense:
+            from BackEnd.engine.foul_announcement_language import defensive_foul_is_on_ball
+            roles["foul_is_on_ball"] = defensive_foul_is_on_ball(
+                foul_player, ball_handler, off_lineup=off_lineup, def_lineup=def_lineup)
+        else:
+            roles["foul_is_on_ball"] = True
 
     return foul_player
 
@@ -1179,6 +1239,15 @@ from BackEnd.constants.fast_break_constants import (
     STEAL_HCO_SETUP_OTHER_PLAYERS_Y_MIN,
     STEAL_HCO_SETUP_OTHER_PLAYERS_Y_MAX,
 )
+
+from BackEnd.persistence import get_store
+_store = get_store()
+fcp_skeletons_collection = _store.fcp_skeletons_collection
+hct_skeletons_collection = _store.hct_skeletons_collection
+games_collection = _store.games_collection
+tournaments_collection = _store.tournaments_collection
+franchises_collection = _store.franchises_collection
+
 
 def _record_fast_break_stats(fb_roles, turn_result, game):
     """
@@ -4855,6 +4924,13 @@ def _freeze_hco_shot_attempt_geometry(game, skeleton, roles, *, emitted_sync_suc
                 (((steps[shot_step_index].get("_step_state") or {}).get("defense")) or {})
             )
         if not by_position and shot_step_index is not None:
+            # Rule 26b — this fallback is a whole fresh placement build for the shot
+            # contest's defender selection. Announce before redrawing.
+            from BackEnd.utils import placement_freeze as _pf
+            _pf.announce_freeze_miss(
+                "shot_contest_defender_selection",
+                steps[shot_step_index] if shot_step_index < len(steps) else None,
+                shot_step_index, game=game)
             from BackEnd.models.animator import Animator
             grid = Animator(game).compute_defender_grid(
                 skeleton, game.offense_team.lineup, def_lineup
@@ -4931,6 +5007,59 @@ def _dynamic_hco_defense_enabled():
     NOTE: in-development (P1 = man-defense posture placement only); enabled in prod per owner request."""
     import os
     return os.environ.get("GOB_DYNAMIC_HCO_DEFENSE", "1").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _sim_hco_coord_write_enabled():
+    """``GOB_SIM_HCO_COORD_WRITE`` (default ON): on a full simulation, write all ten players' coords
+    from the HCO placement stamp. Off reverts to shooter-only (the pre-fix behaviour), for measurement."""
+    import os
+    return os.environ.get("GOB_SIM_HCO_COORD_WRITE", "1").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _write_sim_hco_placement_coords(game, skeleton, off_lineup, def_lineup, context):
+    """Full simulation only: write every on-court player's ``player.coords`` from the placement build
+    already stamped on the skeleton (``_step_state`` defense + offense), at the point in the HCO turn
+    where the played arm writes them from its render (``apply_coords_from_animations_list``).
+
+    Played builds animations and never reaches this; the full-sim animation skip is untouched. The
+    stamp is the ``_stamp_contest_defender_grid`` build the sim contest already reads, so no new
+    placement build and no new draw. Uses the last step carrying a complete stamp for both lineups
+    (a stopper step is appended after stamping, so stopper turns use the stop step). Returns the
+    number of players written."""
+    import math
+    game_state = getattr(game, "game_state", None) or {}
+    if not game_state.get("_is_full_simulation") or not _sim_hco_coord_write_enabled():
+        return 0
+    steps = (skeleton or {}).get("steps") or []
+    off_on = {pos: pl for pos, pl in (off_lineup or {}).items() if pl is not None}
+    def_on = {pos: pl for pos, pl in (def_lineup or {}).items() if pl is not None}
+    for back, i in enumerate(range(len(steps) - 1, -1, -1)):
+        ss = steps[i].get("_step_state") or {}
+        defense, offense = ss.get("defense") or {}, ss.get("offense") or {}
+        if set(def_on) <= set(defense) and set(off_on) <= set(offense):
+            break
+    else:
+        logging.warning(
+            "⚠️ [SIM HCO COORDS] %s: no step with a complete placement stamp (%d steps) → only the "
+            "shooter's coords update this possession. game=%s",
+            context, len(steps), game_state.get("game_id"))
+        return 0
+    moved = []
+    for rows, lineup in ((offense, off_on), (defense, def_on)):
+        for pos, player in lineup.items():
+            c = rows[pos]
+            new = {"x": float(c["x"]), "y": float(c["y"])}
+            old = getattr(player, "coords", None) or {}
+            try:
+                d = math.hypot(new["x"] - float(old["x"]), new["y"] - float(old["y"]))
+            except (KeyError, TypeError, ValueError):
+                d = float("nan")
+            moved.append((pos, round(d, 1)))
+            player.coords = new
+    logging.info(
+        "[SIM HCO COORDS] %s: wrote %d players from step %d of %d (%d back); moved %s",
+        context, len(moved), i, len(steps), back, moved)
+    return len(moved)
 
 
 # Interim posture pick — a team-wide loose/normal/tight per turn (Dynamic_MM_Brief §5A). Later
@@ -5417,6 +5546,13 @@ def _hco_step_def_xy(step, bh_pos, off_lineup, def_lineup, off_to_def,
         def _pt(xy):
             return xy
         return stamped_xy, _coord, _loc, _pt
+
+    # Rule 26b — everything below this line is a FRESH get_defender_coords draw, i.e.
+    # the defect Stage 2a removes, reintroduced. Never let it be silent.
+    from BackEnd.utils import placement_freeze as _pf
+    _pf.announce_freeze_miss(
+        "_hco_step_def_xy", step, (step.get("_step_state") or {}).get("index"),
+        extra="zone=%s" % bool(zone))
 
     if zone:
         # Legacy fallback: assign_all_zone_defenders returns HOME frame → flip offense to HOME.
@@ -6335,6 +6471,12 @@ def _hco_resolve_loose_ball(step, contest, passer, off_lineup, def_lineup, off_t
     }
 
 
+def _pf_module():
+    """placement_freeze, imported lazily — this module is imported by it indirectly."""
+    from BackEnd.utils import placement_freeze as _pf
+    return _pf
+
+
 def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
     """Stamp the render's ACTUAL defender placement (``compute_defender_grid`` = the animator's code)
     on each skeleton step as ``step["_step_state"]["defense"]``, so the interception contest
@@ -6349,8 +6491,21 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         steps = (skeleton or {}).get("steps") or []
         if not steps:
             return
+        from BackEnd.utils import placement_freeze as _pf
+        # Stage 3 (GOB_PLACEMENT_SINGLE_BUILD, requires the freeze): under write-once a
+        # build whose every step is already covered is computed and then discarded in
+        # full. Skip it. The predicate demands BOTH rows, and placement is sequential
+        # (defender_placement.py:1219 seeds step N from step N-1), so this skips the
+        # build WHOLE or not at all — there is no partial build here.
+        _skippable = _pf.stamp_build_is_discardable(steps)
+        _skip_now = _skippable and _pf.single_build_enabled()
+        _pf.note_stamp_build(_skippable, _skip_now)
+        if _skip_now:
+            return
         from BackEnd.models.animator import Animator
-        grid = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
+        # One build; the offense rows it already contains are kept so the sim arm can write all ten
+        # players' coords from this same placement (_write_sim_hco_placement_coords).
+        grid, _off_grid = Animator(game).compute_placement_grids(skeleton, off_lineup, def_lineup)
         # The zone who-guards-whom map is freshly populated on game.zone_defender_assignments_by_step
         # by the compute_defender_grid above (its zone branch). Stamp it per step — ZONE ONLY, since the
         # shared ledger is stale/irrelevant for man — so the on-ball moment + pass-contest read the
@@ -6360,17 +6515,36 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         _is_zone_stamp = is_zone_defense((getattr(game, "game_state", {}) or {}).get("defense_playcall"))
         _guard_by_step = (getattr(game, "zone_defender_assignments_by_step", {}) or {}) if _is_zone_stamp else {}
         _empty_pass_drive = []
+        # Stage 2a (GOB_PLACEMENT_FREEZE): WRITE-ONCE on `defense` ONLY. This pass still
+        # runs at all three call sites and still fills gaps — the coverage stamp is
+        # load-bearing (~18% of interceptions) — it just stops OVERWRITING a defender row
+        # that is already there.
+        #
+        # `offense` and `guard` keep refreshing deliberately. They carry no placement
+        # draw, and blocking them too would strip `offense` from the post-subtle beats
+        # that arrive pre-seeded with `defense` alone (:7683) — which would break the
+        # backward scan at :5030 that the SIM arm's coord write depends on, trading a
+        # small cross-build inconsistency for a wrong-moment one.
+        _freeze = _pf.enabled()
+        _blocked = 0
         for i, step in enumerate(steps):
             ss = step.get("_step_state") or {"index": i}
             _dfn = grid.get(i) or {}
-            ss["defense"] = _dfn
+            if _freeze and (ss.get("defense") or {}):
+                _blocked += 1
+            else:
+                ss["defense"] = _dfn
+            ss["offense"] = _off_grid.get(i) or {}
             if _is_zone_stamp:
                 ss["guard"] = _guard_by_step.get(i)
             step["_step_state"] = ss
             # DIAGNOSTIC (2026-07-13): an EMPTY stamped grid for a PASS/DRIVE step makes _hco_step_def_xy
             # fall back to LEGACY reconstruction — which for zone+away emits HOME-frame coords → the
             # batted-OOB / steal contact mirror (ball + deflector fly to the wrong court end). Flag it.
-            if not _dfn:
+            # Under the freeze the effective row is what the step KEPT, not this build's
+            # `_dfn` — otherwise a blocked write with an empty fresh grid would report a
+            # gap on a step that has a perfectly good frozen row.
+            if not (ss.get("defense") or {}):
                 _acts = {((a or {}).get("action") or "").lower() for a in (step.get("pos_actions") or {}).values()}
                 if step.get("_attack_drive") or (_acts & {"pass", "receive"}):
                     _empty_pass_drive.append((i, "drive" if step.get("_attack_drive") else "pass"))
@@ -6379,6 +6553,9 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
                 "🗺️ [STAMP GAP] no stamped defender grid for pass/drive steps %s (whole_grid_empty=%s) → "
                 "these fall back to LEGACY reconstruction (zone+away = the bat-OOB/steal contact mirror). "
                 "game=%s", _empty_pass_drive, not grid, game.game_state.get("game_id"))
+        # "Single producer" is FALSE by design here — a step's row belongs to whoever
+        # created the step. Say so out loud rather than letting the claim drift.
+        _pf.announce_blocked_write("_stamp_contest_defender_grid", _blocked, game)
     except Exception:
         pass
 
@@ -7555,10 +7732,19 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     output_step_index=len(output_steps) - 1,
                 )
                 if _post_def_xy:
-                    beat["_step_state"] = {
-                        "index": len(output_steps) - 1,
-                        "defense": _post_def_xy,
-                    }
+                    # MERGE, not replace. This is the one writer that can clobber a row
+                    # another producer already wrote (reports/placement-freeze-2a §11):
+                    # a wholesale assignment discards `offense` and `guard` alongside
+                    # `defense`, and the SIM arm's coord write scans for `offense`
+                    # (:5030). Under write-once a `defense` already present wins, so the
+                    # beat's own draw is used only where there is nothing to keep.
+                    _beat_ss = beat.get("_step_state")
+                    if not isinstance(_beat_ss, dict):
+                        _beat_ss = {}
+                    _beat_ss["index"] = len(output_steps) - 1
+                    if not (_pf_module().enabled() and (_beat_ss.get("defense") or {})):
+                        _beat_ss["defense"] = _post_def_xy
+                    beat["_step_state"] = _beat_ss
                     _post_def_xy, _post_coord, _post_loc, _post_pt = _hco_step_def_xy(
                         beat, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
                         _def_aggr_call, zone, game_state.get("defense_playcall"),
@@ -7929,28 +8115,17 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
     return _finish_shot(last_coords)
 
 
-def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position_to_spot, bh_pos):
-    """
-    Final Turn shot: build minimal skeleton (alignment -> pass/receive -> shoot), pick shooter by
-    SH (outside) or SC+AG (attack) with weights 50/30/20/9/1, then resolve_shot. Attach alignment
-    and time_elapsed = time_remaining to result. Clock runs to 0 on this turn, so quarter/game end
-    triggers after the shot (or after FTs if shooting foul); blocking foul on attack awards 2 FTs only.
-    """
+def pick_final_turn_shot_type_and_shooter(game, bh_pos):
+    """Same shot-type + weighted shooter pick as a live Final Turn (consumes sim_rng)."""
     from BackEnd.utils.sim_random import sim_rng as random
-    from BackEnd.constants import ACTIONS
-    from BackEnd.engine.eoq_debug_log import log_eoq_step
     from BackEnd.utils import situational_logic as sl
-    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    log_eoq_step(game, "FINAL_SHOT", "pick_shooter", "START", extra={"bh_pos": bh_pos})
-    # Shot type: 50% outside, 50% attack, except in Q4/OT when trailing by exactly 3:
-    # Final Shot must be an outside three-point attempt (no drive/attack branch).
+
+    off_lineup = game.offense_team.lineup
     delta = sl.get_score_delta(game)
     if getattr(game, "quarter", None) is not None and int(getattr(game, "quarter", 0)) >= 4 and delta == -3:
         shot_type = "Outside"
     else:
         shot_type = "Outside" if random.random() < 0.5 else "Attack"
-    game_state["current_playcall"] = shot_type
-    # Shooter: rank by SH (outside) or SC+AG (attack), weighted random 50/30/20/9/1
     weights = [0.50, 0.30, 0.20, 0.09, 0.01]
     candidates = []
     for pos, player in off_lineup.items():
@@ -7966,20 +8141,48 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     if not candidates:
         for pos in ["PG", "SG", "SF", "PF", "C"]:
             if off_lineup.get(pos):
-                shooter, shooter_pos = off_lineup[pos], pos
-                break
-        else:
-            shooter, shooter_pos = None, "PG"
+                return shot_type, off_lineup[pos], pos
+        return shot_type, None, "PG"
+    r = random.random()
+    cum = 0
+    shooter, shooter_pos = candidates[0][0], candidates[0][1]
+    for i, (player, pos, _) in enumerate(candidates):
+        w = weights[i] if i < len(weights) else (1.0 - cum)
+        cum += w
+        if r <= cum:
+            shooter, shooter_pos = player, pos
+            break
+    return shot_type, shooter, shooter_pos
+
+
+def resolve_final_turn_shot_logic(
+    game,
+    o_destinations,
+    d_destinations,
+    position_to_spot,
+    bh_pos,
+    *,
+    shot_type=None,
+    shooter_pos=None,
+):
+    """
+    Final Turn shot: build minimal skeleton (alignment -> pass/receive -> shoot), pick shooter by
+    SH (outside) or SC+AG (attack) with weights 50/30/20/9/1, then resolve_shot. Attach alignment
+    and time_elapsed = time_remaining to result. Clock runs to 0 on this turn, so quarter/game end
+    triggers after the shot (or after FTs if shooting foul); blocking foul on attack awards 2 FTs only.
+    """
+    from BackEnd.utils.sim_random import sim_rng as random
+    from BackEnd.constants import ACTIONS
+    from BackEnd.engine.eoq_debug_log import log_eoq_step
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    log_eoq_step(game, "FINAL_SHOT", "pick_shooter", "START", extra={"bh_pos": bh_pos})
+    if shot_type is None or shooter_pos is None:
+        shot_type, shooter, shooter_pos = pick_final_turn_shot_type_and_shooter(game, bh_pos)
     else:
-        r = random.random()
-        cum = 0
-        shooter, shooter_pos = candidates[0][0], candidates[0][1]
-        for i, (player, pos, _) in enumerate(candidates):
-            w = weights[i] if i < len(weights) else (1.0 - cum)
-            cum += w
-            if r <= cum:
-                shooter, shooter_pos = player, pos
-                break
+        shooter = off_lineup.get(shooter_pos)
+        if shooter is None:
+            shot_type, shooter, shooter_pos = pick_final_turn_shot_type_and_shooter(game, bh_pos)
+    game_state["current_playcall"] = shot_type
     shot_wing = random.choice(["upper wing", "lower wing"])
     bh_is_shooter = bh_pos == shooter_pos
     log_eoq_step(
@@ -8181,7 +8384,8 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
         final_turn_animations = None
         try:
             final_turn_animations = Animator(game).skeleton_to_animations(
-                skeleton, off_lineup, def_lineup, add_defenders=True
+                skeleton, off_lineup, def_lineup, add_defenders=True,
+                for_emitter=True,   # coordinate pipeline: feeds coord-sync for the final turn
             )
             apply_coords_from_animations_list(game, final_turn_animations)
         except Exception as _ft_sync_err:
@@ -8959,7 +9163,8 @@ def resolve_half_court_offense_logic(game):
             ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
             roles["ball_handler"] = ball_handler
         
-        ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+        ball_handler_pos = _resolve_lineup_position(
+            ball_handler, off_lineup, "HCO:non-shot ball handler", "PG", game)
         
         # Dynamic HCO: the per-step moment stashed the ACTUAL contesting defender (the man matchup
         # OR the resolved zone defender). PREFER it — override the defender-override block's
@@ -9020,10 +9225,13 @@ def resolve_half_court_offense_logic(game):
                 skeleton,
                 off_lineup,
                 def_lineup,
-                add_defenders=True
+                add_defenders=True,
+                for_emitter=True,   # coordinate pipeline: feeds apply_coords_from_animations_list
             )
         if animations:
             apply_coords_from_animations_list(game, animations)
+        else:
+            _write_sim_hco_placement_coords(game, skeleton, off_lineup, def_lineup, "HCO stopper")
 
         # ✅ FIX: Extract stealer position from generated animations (SS&S approach)
         # This uses the actual calculated defensive position from the animation system,
@@ -9411,8 +9619,11 @@ def resolve_half_court_offense_logic(game):
             off_lineup,
             def_lineup,
             add_defenders=True,
+            for_emitter=True,   # coordinate pipeline: feeds coord-sync + resolve_shot + emitter
         )
     apply_coords_from_animations_list(game, animations)
+    if not animations:
+        _write_sim_hco_placement_coords(game, skeleton, off_lineup, def_lineup, "HCO shot")
     # UESS single-coord-source: sync ALL players (shooter + defenders) to the
     # emitter's rendered shoot-step coords so classification (2PT/3PT) AND the
     # contest loop read the on-screen geometry, not the animator row-end.
@@ -9945,7 +10156,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
             if not shooter:
                 ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
                 shooter = ball_handler
-                shooter_pos = getattr(ball_handler, 'position', None) or "PG"
+                shooter_pos = _resolve_lineup_position(
+                    ball_handler, off_lineup, "FCP:shot fallback shooter", "PG", game)
             
             # Find passer using derive_passer_from_steps (same logic as HCO)
             if shooter_pos:
@@ -9956,10 +10168,12 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Fallback: use hardcoded values if skeleton doesn't have shooter/passer
         if not shooter:
             shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
-            shooter_pos = getattr(shooter, 'position', None) or "PF"
+            shooter_pos = _resolve_lineup_position(
+                shooter, off_lineup, "FCP:hardcoded shooter", "PF", game)
         if not passer:
             passer = off_lineup.get("PG", list(off_lineup.values())[0])
-            passer_pos = getattr(passer, 'position', None) or "PG"
+            passer_pos = _resolve_lineup_position(
+                passer, off_lineup, "FCP:hardcoded passer", "PG", game)
         
         # ✅ Find shooter's coordinates at the time of the shot
         shooter_coords = None
@@ -10115,7 +10329,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     # ✅ Determine ball handler from skeleton (who actually has the ball)
     ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
-    ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+    ball_handler_pos = _resolve_lineup_position(
+        ball_handler, off_lineup, "FCP:non-shot ball handler", "PG", game)
     
     # ✅ Determine defender based on ball handler position (position matching for now)
     _fb = defender_player_from_random_slot_fallback(def_lineup)
@@ -10450,7 +10665,6 @@ def get_fcp_skeleton(result_type, game_context=None):
             return None
     
     from BackEnd.utils.sim_random import sim_rng as random
-    from BackEnd.db import fcp_skeletons_collection
     
     # Map result_type to variant name
     # All non-shot results use "base" variant (has step 0 with press break positions)
@@ -10551,7 +10765,6 @@ def get_hct_skeleton(result_type, game_context=None):
             return None
     
     from BackEnd.utils.sim_random import sim_rng as random
-    from BackEnd.db import hct_skeletons_collection
     
     # Map result_type to variant name
     # All non-shot results use "base" variant (has step 0 with trap break positions)
@@ -10753,7 +10966,6 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
     if not game_context or not playcall or not isinstance(playcall, str):
         return playcall
 
-    from BackEnd.db import games_collection
     from BackEnd.utils import plays_catalog
     from BackEnd.utils.team_play_utils import resolve_team_play
 
@@ -10830,7 +11042,6 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
     Returns:
         dict: Selected skeleton with steps
     """
-    from BackEnd.db import games_collection, tournaments_collection, franchises_collection
 
     if game_context:
         _sync_current_playcall_to_canonical_name(game_context)
@@ -10951,7 +11162,6 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
     Returns:
         dict: Selected skeleton, or None if not found
     """
-    from BackEnd.db import games_collection, tournaments_collection, franchises_collection
     from bson import ObjectId
     from BackEnd.utils.team_play_utils import resolve_team_play
     
@@ -12094,7 +12304,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             if not shooter:
                 ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
                 shooter = ball_handler
-                shooter_pos = getattr(ball_handler, 'position', None) or "PG"
+                shooter_pos = _resolve_lineup_position(
+                    ball_handler, off_lineup, "HCT:shot fallback shooter", "PG", game)
             
             # Find passer using derive_passer_from_steps (same logic as HCO)
             if shooter_pos:
@@ -12105,10 +12316,12 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Fallback: use hardcoded values if skeleton doesn't have shooter/passer
         if not shooter:
             shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
-            shooter_pos = getattr(shooter, 'position', None) or "PF"
+            shooter_pos = _resolve_lineup_position(
+                shooter, off_lineup, "HCT:hardcoded shooter", "PF", game)
         if not passer:
             passer = off_lineup.get("PG", list(off_lineup.values())[0])
-            passer_pos = getattr(passer, 'position', None) or "PG"
+            passer_pos = _resolve_lineup_position(
+                passer, off_lineup, "HCT:hardcoded passer", "PG", game)
         
         # ✅ Find shooter's coordinates at the time of the shot
         shooter_coords = None
@@ -12257,7 +12470,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     # ✅ Determine ball handler from skeleton (who actually has the ball)
     ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
-    ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+    ball_handler_pos = _resolve_lineup_position(
+        ball_handler, off_lineup, "HCT:non-shot ball handler", "PG", game)
     
     # ✅ Determine defender based on ball handler position (position matching for now)
     _fb = defender_player_from_random_slot_fallback(def_lineup)

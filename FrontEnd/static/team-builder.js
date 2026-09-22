@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Team Builder chaptered SPA — Identity → Gate → Roster → Review → Establish.
  *
@@ -8,7 +29,7 @@
   'use strict';
 
   var C = window.TeamBuilderConstants;
-  var params = new URLSearchParams(window.location.search);
+  var params = liveParams();
   var HOME_SLOT = (function () {
     var n = parseInt(params.get('home_slot'), 10);
     return n === 1 || n === 2 ? n : null;
@@ -66,7 +87,7 @@
   }
 
   function claimUrl() {
-    var q = new URLSearchParams();
+    var q = emptyParams();
     q.set('builder', '1');
     if (HOME_SLOT) q.set('home_slot', String(HOME_SLOT));
     return '/franchise-select-team.html?' + q.toString();
@@ -390,14 +411,15 @@
       next = 'gate';
     }
     state.chapter = next;
-    var url = new URL(window.location.href);
-    url.searchParams.set('chapter', next);
-    url.searchParams.set('replaced_object_id', REPLACED_OID);
-    if (HOME_SLOT) url.searchParams.set('home_slot', String(HOME_SLOT));
-    if (state.draftId) url.searchParams.set('draft_id', state.draftId);
-    if (state.buildMode) url.searchParams.set('mode', state.buildMode);
+    var bag = liveParams();
+    bag.set('chapter', next);
+    bag.set('replaced_object_id', REPLACED_OID);
+    if (HOME_SLOT) bag.set('home_slot', String(HOME_SLOT));
+    if (state.draftId) bag.set('draft_id', state.draftId);
+    if (state.buildMode) bag.set('mode', state.buildMode);
     if (!(opts && opts.replace === false)) {
-      window.history.replaceState({}, '', url.pathname + '?' + url.searchParams.toString());
+      // In-place: chapter is identity on this page. Do not navigate.
+      franchiseCtx().commitParams(bag);
     }
     render();
     scheduleSave();
@@ -891,7 +913,7 @@
         applyFranchise: applyFranchise,
       },
       onEnter: function (franchiseId) {
-        var q = new URLSearchParams();
+        var q = emptyParams();
         q.set('franchise_id', String(franchiseId));
         window.location.href = '/franchise-command-center.html?' + q.toString();
       },

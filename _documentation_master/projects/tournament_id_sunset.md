@@ -1,6 +1,6 @@
 # `tournament_id` Sunset
 
-**Status:** Phases 0–2A completed; standalone router unmounted
+**Status:** Phases 0–3 completed; stop before Phase 4
 **Created:** July 24, 2026  
 **Scope:** Retire the legacy standalone Tournament Mode and its
 `tournament_id` compatibility surface without disrupting Franchise tournament
@@ -529,7 +529,265 @@ without changing active Franchise or normal game behavior.
 
 ---
 
-## 8. Proposed Retirement Sequence
+## 8. Phase 2B Execution Record
+
+**Completed:** 18 September 2026  
+**Commit:** `80b12bf03`
+
+Phase 2B extracts the one shared helper that kept `tournament_routes.py`
+importable, then deletes the standalone router, manager, and standalone-only
+bracket wrapper.
+
+### 8.1 Helper decision
+
+`get_user_team_from_tournament()` had remaining callers in:
+
+- `BackEnd/api/api.py` (2)
+- `BackEnd/api/franchise_routes.py` (2)
+- `BackEnd/api/gameplan_routes.py` (module import + several uses)
+- `BackEnd/utils/team_id_resolver.py`
+- `BackEnd/utils/team_settings_manager.py`
+
+Every call site is a leftover `mode == "tournament"` compatibility branch.
+Those branches are Phase 4 work and were left intact. The helper therefore had
+to move, not disappear, or application import of `gameplan_routes` would fail.
+
+It now lives in `BackEnd/utils/team_id_resolver.py` (already the team-id
+resolution boundary; no new `BackEnd.db` import file). Franchise tournament
+weeks continue to use `get_user_team_from_franchise`.
+
+### 8.2 Deleted standalone implementation
+
+Verified no remaining production caller, then deleted:
+
+- `BackEnd/api/tournament_routes.py`
+- `BackEnd/tournament/tournament_manager.py`
+- `BackEnd/tournament/bracket_logic.py`
+
+Franchise code uses `bracket_engine` and `franchise_tournament`, not
+`bracket_logic`.
+
+Also removed the leftover `GET /tournament/active` handler from `api.py`. It
+was not on `tournament_router` but it created standalone tournament documents
+via `TournamentManager` and was the last production manager caller.
+
+### 8.3 Tests belonging solely to the router
+
+Removed:
+
+- `tests/test_tournament_state_scores.py`
+- `tests/test_tournament_sim_remaining.py`
+- `tests/test_tournament_save_results.py`
+- `tests/test_tournament_leaders_endpoint.py`
+- `tests/test_tournament_full_bracket_progression.py`
+- `tests/test_tournament_bracket_update.py`
+- `tests/test_tournament_active_returns_progress.py`
+- `tests/test_simulate_round_results.py`
+- `tests/test_tournament_manager.py`
+- `tests/test_tournament_progression.py`
+- `test_tournament_create_tournament_teams_use_seed_based_attributes` in
+  `tests/test_mode_init_system.py`
+
+`TeamManager.init_team_attributes(mode="tournament")` tests remain; that is
+engine init, not the retired router. Phase 4 can drop them.
+
+Sunset contract tests now also assert `/tournament/active` is unmounted and
+that the three deleted modules fail to import.
+
+### 8.4 Intentionally retained
+
+- shared backend `mode == "tournament"` branches (Phase 4)
+- frontend `tournament_id` / `mode === "tournament"` branches (Phase 3, still
+  live at this commit)
+- storage, ownership, retention (Phase 5)
+- Franchise tournament weeks, `bracket_engine`, `franchise_tournament*`
+- historical standalone documents (no data deletion)
+
+The three deleted modules each imported `BackEnd.db`. Gate A therefore fell
+from the original freeze of 120 statements / 64 files to 117 / 61. The
+allowlist in `scripts/ci/migration_gates_allowlist.json` was tightened in this
+same commit so those three slots cannot be refilled.
+
+### 8.5 Behavior after Phase 2B
+
+- application startup still succeeds (181 routes)
+- no standalone tournament route remains mounted, including `/tournament/active`
+- the three deleted modules raise `ModuleNotFoundError`
+- shared Phase 4 leftover branches still import the moved helper
+- active Franchise tournament routes remain mounted
+- no persisted standalone documents were deleted
+
+### 8.6 Phase 2B regression coverage
+
+Isolated mongomock `tournament_sunset_test`, `PYTHONHASHSEED=0`. Same four
+files as the Phase 2A 37-test checkpoint, plus the new “modules are gone”
+assertion:
+
+- `tests/test_tournament_id_sunset_franchise_contract.py`
+- `tests/test_franchise_eos_bracket_invariant.py`
+- `tests/test_week26_completion_regression.py`
+- `tests/test_eos_region_week30_meta.py`
+
+```text
+38 passed, 1 skipped
+```
+
+The skip is `test_week26_completion_integration_no_delete` in
+`tests/test_week26_completion_regression.py`. It is skipped when `MONGO_URI`
+is unset (`@pytest.mark.skipif` since `dff5f515c3`, March 2026). The same skip
+is on `develop`; this change did not introduce it.
+
+### 8.7 Phase 2B checkpoint
+
+Phase 2B is complete. The standalone router, manager, and unused
+`bracket_logic` wrapper are gone. Gate A’s floor is 117 / 61.
+
+The next boundary is Phase 3: remove shared frontend `tournament_id` and
+`mode === "tournament"` branches without touching Franchise tournament weeks.
+
+---
+
+## 9. Phase 3 Execution Record
+
+**Completed:** 18 September 2026  
+**Commit:** `1ebf785db`
+
+Phase 3 removes standalone Tournament Mode from shared frontend screens. The
+surviving contract distinguishes normal vs Franchise. Leftover
+`mode=tournament` / `tournament_id` values are ignored so they cannot skip
+Franchise complete-week.
+
+### 9.1 Frontend `tournament_id` file count
+
+| When | Files under `FrontEnd/static` |
+|---|---|
+| Before Phase 3 | 23 |
+| After Phase 3 | 0 |
+
+Removed, by branch rather than by file name:
+
+- `mode === "tournament"` feature branches and their dead sides
+- `tournament_id` reads from URL, localStorage, and sessionStorage
+- `tournament_id` on request payloads and constructed query strings
+
+Court pages still neutralize a stale `mode=tournament` URL value so it cannot
+win over `franchise_id`. That is a guard, not a standalone mode branch.
+
+A follow-up `rg` of `FrontEnd/static` for `tournament_id` returns no matches.
+
+### 9.2 Deleted legacy-only assets
+
+- `tournament-select.html`, `tournament-select.js`, `tournament-select.css`
+- `tournament.html`, `tournament.js`, `tournament.css`
+
+Netlify / `_redirects` still send `/tournament.html` and
+`/tournament-select.html` to Mode Select. Leftover stylesheet links on
+set-lineup, brackets, practice-squad-bracket, and the unused
+`FrontEnd/roster.html` were dropped; those pages do not use the TCC classes.
+
+### 9.3 Intentionally retained
+
+- shared backend `mode == "tournament"` branches (Phase 4)
+- storage, ownership, retention (Phase 5)
+- dead-implementation sweep beyond the six legacy assets (Phase 6)
+- repository guard (Phase 7)
+- Franchise tournament weeks and their files: `franchise-command-center.js`,
+  `franchise-tournament-brackets-render.js`, `schedule.html`,
+  `franchise_routes.py`, `franchise_tournament.py`
+- historical standalone documents (no data deletion)
+
+Phases 4–7 are not started.
+
+### 9.4 Behavior after Phase 3
+
+- application startup still succeeds (181 routes)
+- shared screens no longer send or require `tournament_id`
+- old standalone page URLs still redirect to Mode Select
+- Franchise locker-room, schedule, and EOS routes still key on `franchise_id`
+- Phase 3 is frontend-only: no engine-loop or RNG-order change; draw count is
+  unchanged and no refstats rebaseline
+
+### 9.5 Gate B drop reconciliation
+
+Gate B counts lines matching `URLSearchParams`, `location.search`, or
+`.searchParams`. It does not count `.get('tournament_id')` calls.
+
+On `develop` there were 30 `.get('tournament_id')` / equivalent URL reads
+across the 23 files (the ~29 call-site figure). Most of those sat on a line
+that already constructed `URLSearchParams` for `franchise_id` / `game_id`.
+Removing the `.get('tournament_id')` therefore does not drop the Gate B line.
+
+The 313 → 294 drop (19 lines) is exactly:
+
+| Change | Gate B lines |
+|---|---|
+| Delete `tournament.js` | −15 (file had 15 URL-state lines) |
+| `box-score.js` | 10 → 9 (−1) |
+| `finalizeGame.js` | 3 → 1 (−2) |
+| `gameCompletionPopup.js` | 7 → 6 (−1) |
+
+Allowlist: 313 lines / 79 files → 294 / 78. `tournament.js` is off the list.
+
+Gate A remains 117 / 61 (tightened in Phase 2B; Phase 3 did not add or restore
+`BackEnd.db` imports).
+
+### 9.6 Franchise tournament-week verification (section 11.1)
+
+These checks were run against isolated mongomock `tournament_sunset_test` with
+`PYTHONHASHSEED=0`. “Exercised” means a test invoked the path. “Inferred”
+means code was read and not executed.
+
+| 11.1 check | Status | Evidence |
+|---|---|---|
+| Franchise reaches a tournament week | Exercised | `test_week26_builds_update_fields_week_27_and_16_conference_tournaments` sets week 27 and `conference_tournaments`; `test_eos_init_uses_bracket_engine` builds the EOS bracket |
+| Tournament schedule and context load | Exercised | `test_franchise_eos_schedule_uses_week_and_bracket_metadata_without_legacy_id`; HTTP `GET /franchise/schedule` in `test_franchise_game_scoping.py` |
+| User game launches | Partial | `PlayGameRequest` is `{franchise_id}` only and `POST /franchise/play-next-game` remains mounted. No full EOS play-next HTTP create was run |
+| User game resumes | Exercised | `test_resume_anchor_franchise_identity.py` — merge keeps `franchise_id` |
+| CPU games simulate | Exercised | `test_complete_week_saves_and_simulates`; `test_start_cpu_then_phase_a_phase_b_advances_week`; `test_franchise_eos_sim_policy.py` |
+| User and CPU results persist | Exercised | same complete-week / phase-A-B tests plus `_save_user_eos_bracket_result` in `test_franchise_eos_sim_policy.py` |
+| Bracket advances | Exercised | `test_eos_save_advance_round1_to_2`; `test_eos_save_advance_to_final_and_champion`; `test_eos_advance_conference_when_four_r1_winners_and_round2_empty` |
+| Next Franchise week selected | Exercised | complete-week advances `week`; week-26 payload writes `week = 27` |
+| Roster / scouting / game-plan / playbook / training use Franchise data | Exercised | `test_franchise_team_player_stats.py`; `test_scouting_usage_unlocks.py` (tournament weeks unlock without training); `test_gameplan_game_doc_precedence.py` (4 passed); `test_playbooks_game_doc_precedence.py` unit cases plus HTTP GET with `mode=franchise&franchise_id`; `test_training_report_franchise_roster.py` |
+| Refresh / direct-navigation preserve `franchise_id` | Inferred | no browser session. `franchise-command-center.js` still builds court / lineup / roster URLs with `franchise_id` and was not edited |
+| No surviving request requires `tournament_id` | Exercised (frontend) | `FrontEnd/static` has zero `tournament_id` matches. Backend request models still accept the field on leftover Phase 4 branches |
+
+One extra playbooks HTTP assertion
+(`test_get_playbooks_franchise_with_game_id_returns_game_doc_slot_assignments`)
+failed on this branch and fails identically on `develop`. It is a pre-existing
+FTD/game-doc merge issue, not introduced by Phases 2B or 3.
+
+No browser walkthrough of a live Franchise tournament week was performed.
+
+### 9.7 Phase 3 regression coverage
+
+Original four-file checkpoint, same as Phase 2B:
+
+```text
+38 passed, 1 skipped
+```
+
+The skip is again `test_week26_completion_integration_no_delete` (needs
+`MONGO_URI`; present on `develop` before this work).
+
+Wider Franchise / EOS / data-source suite run for section 11.1:
+
+```text
+104 passed, 1 failed, 1 skipped
+```
+
+The one failure is the pre-existing playbooks game-doc slot assertion above.
+
+### 9.8 Phase 3 checkpoint
+
+Phase 3 is complete. Shared frontend no longer carries a standalone tournament
+branch. Gate B’s floor is 294 / 78. Frontend `tournament_id` file count is 0.
+
+The next boundary is Phase 4: remove shared backend `tournament_id` request
+fields and `mode == "tournament"` branches. Phases 4–7 are not started.
+
+---
+
+## 10. Proposed Retirement Sequence
 
 ### Phase 0 — Freeze and inventory
 
@@ -666,9 +924,9 @@ active.
 
 ---
 
-## 9. Verification Plan
+## 11. Verification Plan
 
-### 9.1 Franchise tournament-week regressions
+### 11.1 Franchise tournament-week regressions
 
 Verify at minimum:
 
@@ -684,7 +942,7 @@ Verify at minimum:
 - refresh and direct-navigation flows preserve `franchise_id`;
 - no surviving request requires `tournament_id`.
 
-### 9.2 Normal-mode regressions
+### 11.2 Normal-mode regressions
 
 Verify:
 
@@ -693,7 +951,7 @@ Verify:
   expect a tournament identifier;
 - game retention and cleanup still apply their intended normal-mode policies.
 
-### 9.3 Intentional legacy behavior
+### 11.3 Intentional legacy behavior
 
 Verify:
 
@@ -705,7 +963,7 @@ Verify:
   created;
 - no persisted records are deleted by the code-removal deployment.
 
-### 9.4 Performance and determinism
+### 11.4 Performance and determinism
 
 This is primarily a context and persistence cleanup, but it touches simulation
 entry points. Follow `Sim_Perf_Capstone.md`:
@@ -721,7 +979,7 @@ The sunset should be performance-neutral or a small improvement.
 
 ---
 
-## 10. Acceptance Criteria
+## 12. Acceptance Criteria
 
 The sunset is complete only when:
 
@@ -744,7 +1002,7 @@ The sunset is complete only when:
 
 ---
 
-## 11. Non-Goals
+## 13. Non-Goals
 
 This project does not:
 
@@ -758,7 +1016,7 @@ This project does not:
 
 ---
 
-## 12. Recommended First Implementation Slice
+## 14. Recommended First Implementation Slice
 
 After the old-save policy is confirmed, begin with a reversible boundary slice:
 

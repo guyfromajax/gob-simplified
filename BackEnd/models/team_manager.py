@@ -1,6 +1,11 @@
 from BackEnd.utils.sim_random import sim_rng as random
 from copy import deepcopy
-from BackEnd.db import teams_collection
+
+from BackEnd.persistence import get_store
+_store = get_store()
+teams_collection = _store.teams_collection
+plays_collection = _store.plays_collection
+
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
@@ -248,7 +253,6 @@ def _get_cached_plays():
     """Get all plays from database, using cache if available."""
     global _plays_cache
     if _plays_cache is None:
-        from BackEnd.db import plays_collection
         _plays_cache = list(plays_collection.find({}))
     return _plays_cache
 

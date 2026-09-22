@@ -20,6 +20,10 @@ closes). Wrapped so it can never break a turn.
 import logging
 
 
+class _SkipLegacySource(Exception):
+    """Control-flow marker: under the freeze there is no legacy grid source to pick."""
+
+
 def build_step_states(result, game):
     """Compute + stamp per-step ``StepState`` for a resolved HCO turn. ``defense`` = the render's
     exact defender grid via ``Animator.compute_defender_grid`` (man + zone, sim-safe). Additive."""
@@ -40,6 +44,11 @@ def build_step_states(result, game):
     def_lineup = game.defense_team.lineup
     zone = is_zone_defense(game_state.get("defense_playcall"))
     posture = game_state.get("_hco_defense_posture")
+
+    # Stage 2a (GOB_PLACEMENT_FREEZE): the stash is gone and so is the fallback rebuild.
+    # The row already on the step IS the one draw; this function only reports it.
+    from BackEnd.utils import placement_freeze as _pf
+    _freeze = _pf.enabled()
 
     # Option A: prefer the emitter's ACTUAL draw. build_step_states runs right after the HCO emit,
     # which stashed the exact per-player ``animations`` it drew from on the game. Extract the grid
@@ -69,9 +78,14 @@ def build_step_states(result, game):
     # Animated games are untouched: they take the render-stash branch above, which never
     # called compute_defender_grid.
     is_full_sim = bool(game_state.get("_is_full_simulation"))
-    anim_source = ("emitter-draw" if render_anims
-                   else ("stamp-reuse-full-sim" if is_full_sim else "compute_grid-fallback"))
+    anim_source = ("frozen-row" if _freeze else
+                   ("emitter-draw" if render_anims
+                    else ("stamp-reuse-full-sim" if is_full_sim else "compute_grid-fallback")))
     try:
+        if _freeze:
+            # No source to choose between: there is one row per step and it is on the step.
+            grid_by_step = {}
+            raise _SkipLegacySource
         if render_anims:
             grid_by_step = Animator.defender_grid_from_animations(render_anims, def_lineup, len(steps))
         elif is_full_sim:
@@ -95,12 +109,28 @@ def build_step_states(result, game):
             }
         else:
             grid_by_step = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
+    except _SkipLegacySource:
+        grid_by_step = {}
     except Exception:
         grid_by_step = {}
 
     step_states = []
     stamped = 0
     for i, step in enumerate(steps):
+        if _freeze:
+            # Stage 2a: this function is a READER. It used to overwrite every step's
+            # `_step_state` with a post-emit rebuild — a fourth snapshot no decision was
+            # ever made on, and one that clobbered the row the contest actually used
+            # (acknowledged at phase_resolution.py:7381). Under the freeze it reports
+            # what is already there and writes nothing; a step with no row is reported
+            # as having none rather than given an invented empty one (rule 26).
+            existing = step.get("_step_state")
+            if not isinstance(existing, dict):
+                continue
+            if existing.get("defense"):
+                stamped += 1
+            step_states.append(existing)
+            continue
         defense = grid_by_step.get(i) or {}
         if defense:
             stamped += 1

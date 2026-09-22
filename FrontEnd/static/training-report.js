@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 // Training Report Page JavaScript
 
 function playSound(filename) {
@@ -9,13 +30,11 @@ function playSound(filename) {
   } catch (e) {}
 }
 
-const urlParams = new URLSearchParams(window.location.search);
+const urlParams = liveParams();
 const mode = urlParams.get('mode');
 const franchiseId = urlParams.get('franchise_id');
-const tournamentId = urlParams.get('tournament_id');
 const teamId = urlParams.get('team_id');
 const week = parseInt(urlParams.get('week'), 10);
-const round = parseInt(urlParams.get('round'), 10); // For tournament mode (optional - backend will determine if not provided)
 /** `inbox` = opened from FCC Inbox (Back only). `training` = from training submit / default (Go To Locker Room). */
 const reportFrom = urlParams.get('from') === 'inbox' ? 'inbox' : 'training';
 
@@ -422,33 +441,19 @@ function setupLockerRoomButton() {
           })
         : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tut_alert=training_return`;
       window.location.href = lockerRoomUrl;
-    } else if (mode === 'tournament') {
-      // Use same pattern as franchise mode - tournament.html is the command center
-      window.location.href = `/tournament.html?tournament_id=${tournamentId}&team_id=${teamId}`;
     }
   });
 }
 
 async function loadTrainingReport() {
   try {
-    const params = new URLSearchParams({
-      mode: mode,
-      team_id: teamId
-    });
+    const params = emptyParams();
+    params.set('mode', mode);
+    params.set('team_id', teamId);
     
     if (franchiseId) {
       params.set('franchise_id', franchiseId);
       params.set('week', week);
-    }
-    if (tournamentId) {
-      params.set('tournament_id', tournamentId);
-      // SS&S: Only send round/week if provided - backend will determine from state if not provided
-      if (round) {
-        params.set('round', round);
-      } else if (week) {
-        params.set('week', week); // Backward compatibility
-      }
-      // If neither round nor week provided, backend will determine from training_status
     }
     
     const response = await fetch(`${API_CONFIG.buildUrl('/franchise/training-report')}?${params.toString()}`);
@@ -486,9 +491,8 @@ function renderPage() {
 }
 
 function renderHeader() {
-  // For tournament mode, display "Round X"; for franchise mode, display "Week X"
-  const periodLabel = mode === 'tournament' ? 'Round' : 'Week';
-  const periodValue = mode === 'tournament' ? (reportData.round || round) : reportData.week;
+  const periodLabel = 'Week';
+  const periodValue = reportData.week;
   document.getElementById('week-number').textContent = periodValue || '--';
   
   // Update label

@@ -2,7 +2,10 @@ import logging
 from BackEnd.utils.sim_random import sim_rng as random
 from typing import List, Dict, Union, Optional
 
-from BackEnd.db import players_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
 from BackEnd.models.player import Player
 from BackEnd.models.team_manager import TeamManager
 
@@ -407,7 +410,6 @@ def compute_fill_order_for_franchise_team(franchise_id, team_id) -> Optional[Lis
         return None
     try:
         from bson import ObjectId
-        from BackEnd.db import franchise_team_data_collection
 
         def _oid(v):
             try:

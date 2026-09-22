@@ -33,10 +33,14 @@ def test_one_training_position_priority_contract():
 def test_producer_projection_and_floors_use_the_same_resolver(monkeypatch):
     player = _player()
     projection = training_shape.training_position_projection(player)
+    # Exact shape is pinned on purpose: a producer that drops a key here drops it from
+    # execution. Development Focus rides along for the same reason (phase 3).
     assert projection == {
         "training_position": "C",
         "position_intent": "PG",
         "resolved_training_position": "C",
+        "training_focus": None,
+        "resolved_training_focus": "standard",
     }
 
     seen = []

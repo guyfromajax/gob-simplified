@@ -1,0 +1,10 @@
+{
+  "gate_a": {
+    "description": "WS-1: import statements that resolve to BackEnd.db. Count may fall, never rise.",
+    "files": {}
+  },
+  "gate_b": {
+    "description": "WS-3: FrontEnd/static lines matching URLSearchParams, location.search, or .searchParams. Count may fall, never rise.",
+    "files": {}
+  }
+}

@@ -1,17 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
+  <script src="/js/shared/franchiseContext.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Sign Up - Geeked Out Basketball</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/auth.css">
+<link rel="stylesheet" href="/auth.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
 <body>
@@ -159,7 +160,7 @@
     }
 
     function urlSource() {
-      const params = new URLSearchParams(window.location.search);
+      const params = window.FranchiseContext.toSearchParams();
       return params.get('utm_source') || params.get('ref') || null;
     }
 
@@ -341,7 +342,7 @@
         if (isAlpha) {
           document.getElementById('alpha-badge').classList.add('visible');
           applyAlphaLayout();
-          const prefill = normalizeCode(new URLSearchParams(window.location.search).get('code'));
+          const prefill = normalizeCode(window.FranchiseContext.toSearchParams().get('code'));
           if (prefill) {
             otpInput.value = prefill;
             await continueCode();

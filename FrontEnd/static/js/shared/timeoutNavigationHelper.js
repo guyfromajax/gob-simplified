@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Unified Timeout Navigation Helper
  * 
@@ -21,7 +42,7 @@
    * Builds URL parameters for game navigation with consistent SS&S logic
    * 
    * @param {Object} options
-   * @param {URLSearchParams} options.sourceParams - Current page URL params
+   * @param {Object} options.sourceParams - Current page URL params
    * @param {number} options.targetQuarter - Quarter to navigate to
    * @param {string|null} options.gameId - Game ID (from URL or localStorage)
    * @param {boolean} options.resumeFromTimeout - Whether resuming from timeout/foul out
@@ -29,7 +50,7 @@
    * @param {string|null} options.myTeamSide - 'home' or 'away'
    * @param {string|null} [options.clock] - Clock time to preserve
    * @param {Object} [options.overrides={}] - Optional param overrides
-   * @returns {URLSearchParams} Built parameters ready for navigation
+   * @returns {Object} Built parameters ready for navigation
    */
   function buildGameNavigationParams({
     sourceParams,
@@ -43,7 +64,7 @@
     computerTeamName = null,
     overrides = {}
   }) {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     
     // ============================================
     // 1. CORE GAME PARAMS (Always needed)
@@ -76,11 +97,11 @@
     if (awayId) params.set('away_id', awayId);
     if (myTeam) params.set('my_team', myTeam);
 
-    const isFranchiseOrTournament = mode === 'franchise' || mode === 'tournament';
+    const isFranchise = mode === 'franchise';
 
     let resolvedNavTeamId = teamId;
     if (!resolvedNavTeamId) {
-      const qpNav = new URLSearchParams();
+      const qpNav = emptyParams();
       if (myTeam) qpNav.set('my_team', myTeam);
       if (homeId) qpNav.set('home_id', homeId);
       if (awayId) qpNav.set('away_id', awayId);
@@ -89,8 +110,8 @@
       }
     }
     if (resolvedNavTeamId) params.set('team_id', resolvedNavTeamId);
-    // ✅ PHASE 1: Only include user_team_id for franchise/tournament mode (not redundant in single mode)
-    if (isFranchiseOrTournament && userTeamId && userTeamId !== resolvedNavTeamId) {
+    // Only include user_team_id for franchise mode (not redundant in single mode)
+    if (isFranchise && userTeamId && userTeamId !== resolvedNavTeamId) {
       params.set('user_team_id', userTeamId);
     }
     
@@ -167,22 +188,13 @@
     }
     
     // ============================================
-    // 8. MODE/TOURNAMENT/FRANCHISE PARAMS
+    // 8. MODE/FRANCHISE PARAMS
     // ============================================
-    // ✅ FIX: mode already declared above (line 62) - use existing variable
-    // const mode = overrides.mode || sourceParams.get('mode'); // Already declared above
-    const tournamentId = overrides.tournament_id || sourceParams.get('tournament_id');
     const franchiseId = overrides.franchise_id || sourceParams.get('franchise_id');
     const week = overrides.week || sourceParams.get('week');
+    const resolvedMode = (mode && mode !== 'tournament') ? mode : (franchiseId ? 'franchise' : mode);
     
-    if (mode) params.set('mode', mode);
-    // ✅ PHASE 1.3: Log state writes (URL parameter writes)
-    if (tournamentId) {
-      if (window.StateTelemetry) {
-        window.StateTelemetry.logStateWrite('tournament_id', window.StateTelemetry.SOURCE_TYPES.URL, tournamentId, 'timeoutNavigationHelper.js');
-      }
-      params.set('tournament_id', tournamentId);
-    }
+    if (resolvedMode && resolvedMode !== 'tournament') params.set('mode', resolvedMode);
     if (franchiseId) {
       if (window.StateTelemetry) {
         window.StateTelemetry.logStateWrite('franchise_id', window.StateTelemetry.SOURCE_TYPES.URL, franchiseId, 'timeoutNavigationHelper.js');
@@ -251,7 +263,7 @@
   /**
    * Helper to extract resume_from_timeout from URL params
    * 
-   * @param {URLSearchParams} urlParams - URL parameters
+   * @param {Object} urlParams - URL parameters
    * @returns {boolean} Whether resuming from timeout/foul out
    */
   function getResumeFromTimeout(urlParams) {
@@ -261,7 +273,7 @@
   /**
    * Helper to get game ID from URL params only (PHASE 1.1: Removed localStorage fallback)
    * 
-   * @param {URLSearchParams} urlParams - URL parameters
+   * @param {Object} urlParams - URL parameters
    * @returns {string|null} Game ID or null (from URL only)
    */
   function getGameId(urlParams) {

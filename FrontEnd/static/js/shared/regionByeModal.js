@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Week-30 regional-bye Sammy modal.
  *
@@ -54,7 +75,7 @@
     }
 
     presented = true;
-    var franchiseId = window.franchiseId || new URLSearchParams(window.location.search).get('franchise_id');
+    var franchiseId = window.franchiseId || liveParams().get('franchise_id');
 
     Promise.all([
       import('/js/shared/sammyModal.js'),

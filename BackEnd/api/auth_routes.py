@@ -28,15 +28,17 @@ try:
 except Exception:
     def _auth_rate_limit(f):
         return f
-from BackEnd.db import (
-    users_collection,
-    password_reset_tokens_collection,
-    access_code_requests_collection,
-    alpha_access_requests_collection,
-    franchises_collection,
-    franchise_team_data_collection,
-    teams_collection,
-)
+
+from BackEnd.persistence import get_store
+_store = get_store()
+users_collection = _store.users_collection
+password_reset_tokens_collection = _store.password_reset_tokens_collection
+access_code_requests_collection = _store.access_code_requests_collection
+alpha_access_requests_collection = _store.alpha_access_requests_collection
+franchises_collection = _store.franchises_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+teams_collection = _store.teams_collection
+
 from BackEnd.utils.auth import (
     hash_password,
     verify_password,

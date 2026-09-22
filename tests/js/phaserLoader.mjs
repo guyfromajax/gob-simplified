@@ -1,4 +1,6 @@
 const PHASER_URLS = new Set([
+  '/js/vendor/phaser-3.70.0.esm.js',
+  '/js/vendor/phaser-3.60.0.esm.js',
   'https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js',
   'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js',
 ]);

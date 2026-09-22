@@ -13,12 +13,14 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from BackEnd.db import (
-    franchise_state_collection,
-    franchises_collection,
-    games_collection,
-    press_conference_sessions_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+franchise_state_collection = _store.franchise_state_collection
+franchises_collection = _store.franchises_collection
+games_collection = _store.games_collection
+press_conference_sessions_collection = _store.press_conference_sessions_collection
+teams_collection = _store.teams_collection
+
 from BackEnd.pgpc_context import build_franchise_context_for_pgpc
 from BackEnd.pgpc_player_slot import (
     answer_name_for_pgpc_answers,
@@ -49,7 +51,6 @@ def _user_team_from_franchise_doc(franchise_doc: dict[str, Any]) -> tuple[str | 
         state = franchise_state_collection.find_one({"_id": "state"}) or {}
         team_name = state.get("team")
         if team_name:
-            from BackEnd.db import teams_collection
 
             team_doc = teams_collection.find_one({"name": team_name})
             if team_doc:

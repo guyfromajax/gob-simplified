@@ -239,7 +239,8 @@ Two separate follow-ons remain open in
 - `_coaching_accumulator_for_player` remains dormant, so coaching quality does not yet differentiate
   offseason **level** targets.
 - Init recruit-set variety (mean attribute σ 15.7) differs from dynamic post-rollover generation
-  (σ 11.6), and `training_position` still lacks a live write path.
+  (σ 11.6). (`training_position` **now has** a live write path — Development Focus, from the
+  roster surfaces; see `09_Training_Systems/Training_System.md`.)
 
 ## Key Files
 

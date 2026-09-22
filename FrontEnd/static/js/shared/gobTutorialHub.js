@@ -40,7 +40,8 @@
   var ADVANCED_TOPICS = [
     { id: 'momentum', name: 'Momentum', href: '/tutorial-advanced-momentum.html', available: true },
     { id: 'presses-traps', name: 'Presses & Traps', href: '/tutorial-advanced-press-trap.html', available: true },
-    { id: 'practice-squad', name: 'Practice Squad', href: '/tutorial-advanced-practice-squads.html', available: true }
+    { id: 'practice-squad', name: 'Practice Squad', href: '/tutorial-advanced-practice-squads.html', available: true },
+    { id: 'training-by-position', name: 'Training by Position', href: '/tutorial-advanced-training-by-position.html', available: true }
   ];
   var ADVANCED_TOTAL = ADVANCED_TOPICS.length;
 

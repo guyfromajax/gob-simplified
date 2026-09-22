@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Tutorial Pick Opponent — Screen 4 of the FTE v3 funnel.
  *
@@ -164,14 +185,13 @@ ctaEl.addEventListener('click', async () => {
     // team_id IS the team name — the backend resolves via gm.<team>.name.
     // Every downstream screen forwards the query string verbatim, so setting it
     // once here carries it through Lineup -> Game Plan -> Tip-off.
-    const params = new URLSearchParams({
-      mode: 'tutorial',
-      home: userTeam,
-      away: selectedName,
-      my_team: 'home',
-      team_id: userTeam,
-      game_id: gameId,
-    });
+    const params = emptyParams();
+    params.set('mode', 'tutorial');
+    params.set('home', userTeam);
+    params.set('away', selectedName);
+    params.set('my_team', 'home');
+    params.set('team_id', userTeam);
+    params.set('game_id', gameId);
     window.location.href = '/set-lineup.html?' + params.toString();
   } catch (e) {
     console.error('[tutorial] advance failed:', e);

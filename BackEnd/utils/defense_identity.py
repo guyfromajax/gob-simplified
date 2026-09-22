@@ -20,6 +20,10 @@ from typing import Any, Dict, Optional, Tuple
 
 from bson import ObjectId
 
+from BackEnd.persistence import get_store
+_store = get_store()
+defenses_collection = _store.defenses_collection
+
 logger = logging.getLogger(__name__)
 
 # Non-catalog rows used in scouting templates / sim (stable, not Mongo `defense_id`).
@@ -181,7 +185,6 @@ def clear_defense_identity_cache() -> None:
 
 def _read_catalog_documents():
     """The one place the catalog is read. Raises if the database cannot be read."""
-    from BackEnd.db import defenses_collection
 
     return list(defenses_collection.find({}))
 
@@ -465,7 +468,6 @@ def resolve_to_defense_id(value: Any) -> Optional[str]:
     if len(raw) == 24:
         try:
             oid = ObjectId(raw)
-            from BackEnd.db import defenses_collection
 
             doc = defenses_collection.find_one({"_id": oid})
             if doc and isinstance(doc.get("defense_id"), str):

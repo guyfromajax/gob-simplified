@@ -6,14 +6,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
-from BackEnd.db import plays_collection, client
+
+from BackEnd.persistence import get_store
+_store = get_store()
+plays_collection = _store.plays_collection
+client = _store.client
+
 from BackEnd.utils.auth import require_admin_for_builder
 from bson import ObjectId
 from pathlib import Path
 
 router = APIRouter()
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+from BackEnd.runtime_paths import bundle_path
+
+STATIC_DIR = bundle_path("FrontEnd", "static")
 
 
 def get_staging_plays_collection():

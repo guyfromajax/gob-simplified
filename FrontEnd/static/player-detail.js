@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function () {
   const ATTRIBUTE_LAYOUT = [
     ['SC', 'ID', 'PS', 'RB', 'AG', 'IQ'],
@@ -210,7 +231,7 @@
   }
 
   function goBack() {
-    const params = new URLSearchParams(window.location.search);
+    const params = liveParams();
     // Same-origin guard: return_url is attacker-controllable via the query string.
     const returnUrl = typeof getSafeReturnUrl === 'function'
       ? getSafeReturnUrl(params.get('return_url'))
@@ -319,15 +340,13 @@
     return Math.max(...ratings);
   }
 
-  function getPlayerMomentum(player) {
-    const momentum = player?.attributes?.MO ?? player?.MO ?? player?.mo ?? player?.momentum;
-    return momentum === undefined || momentum === null || momentum === '' ? '--' : momentum;
-  }
-
   function renderPositionRatingsBlock(player, primaryPosition) {
     const ratings = getPositionRatings(player);
     if (!ratings) return '';
 
+    // The training position is NOT marked in this list. It was, and the badge broke the
+    // column's symmetry for the one row that carried it; the DEVELOPMENT block below
+    // states it plainly instead.
     const order = ['PG', 'SG', 'SF', 'PF', 'C'];
     const rows = order.map((position) => {
       const rawValue = ratings[position];
@@ -392,7 +411,7 @@
     const img = document.getElementById('pd-player-portrait');
     if (!img) return;
     const api = window.API_CONFIG;
-    const franchiseId = new URLSearchParams(window.location.search).get('franchise_id');
+    const franchiseId = liveParams().get('franchise_id');
     const url = api.getPlayerImageUrl(playerId, { size: 'modal' });
     const generic = api.getGenericHeadshotUrl({ size: 'modal' });
     img.onerror = () => {
@@ -465,7 +484,38 @@
     return `<p class="pd-scouting-text">${escaped}</p>`;
   }
 
-  function renderPlayerPage(player) {
+  /**
+ * DEVELOPMENT — read-only training position + Development Focus.
+ *
+ * Sits directly beneath the position-ratings list on purpose: the ratings are the evidence
+ * for the choice, so a coach reads the grades and the decision together. The roster screens
+ * are the only editors (GOB_DEVELOPMENT_FOCUS_PLAN.md phase 4).
+ *
+ * Renders for the USER'S OWN team only — the endpoint omits these fields entirely for an
+ * opponent, so an opponent's page shows nothing here rather than an empty block.
+ */
+function buildDevelopmentBlock(player) {
+  if (!player || !player.is_user_team_player) return '';
+  const api = window.GOBDevelopmentFocus;
+  if (!api) return '';
+  const position = api.positionOf(player);
+  const focus = api.focusLabel(player);
+  return `
+          <div class="pd-divider"></div>
+          <div class="pd-status-label">DEVELOPMENT</div>
+          <div class="pd-dev-grid">
+            <div class="pd-dev-row">
+              <span class="pd-dev-key">Position</span>
+              <span class="pd-dev-val">${position}</span>
+            </div>
+            <div class="pd-dev-row">
+              <span class="pd-dev-key">Focus</span>
+              <span class="pd-dev-val">${focus}</span>
+            </div>
+          </div>`;
+}
+
+function renderPlayerPage(player) {
     const content = document.getElementById('pd-content');
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const staticPrefix = isLocalhost ? '/static' : '';
@@ -499,7 +549,6 @@
     const positionAbbrev = getHighestPosition(player);
     const positionConfig = getPositionConfig(positionAbbrev);
     const rtValue = getPlayerOverall(player);
-    const momentumValue = getPlayerMomentum(player);
     const emotionEmoji = getEmotionEmoji(player);
     const portraitBackground = getPortraitBackground(player, staticPrefix);
     const teamPrimaryColor = player.primary_color || POSITION_CONFIG[positionAbbrev]?.color || '';
@@ -522,24 +571,13 @@
           <div class="pd-player-name">${fullName}</div>
           <div class="pd-pos-line">${yearJerseyLine}</div>
           <div class="pd-pos-line">${heightWeightLine}</div>
+          ${isRecruit ? '' : `<div class="pd-attitude-line" title="Attitude"><span class="pd-attitude-emoji">${emotionEmoji}</span></div>`}
           <div class="pd-overall">
             <div class="pd-overall-label">OVERALL</div>
             <div class="pd-overall-value">${formatRtDisplay(rtValue)}</div>
           </div>
           ${positionRatingsBlock}
-          ${isRecruit ? buildRecruitingBlock(player) : `
-          <div class="pd-divider"></div>
-          <div class="pd-status-label">STATUS</div>
-          <div class="pd-status-grid">
-            <div class="pd-status-cell">
-              <div class="pd-status-cell-label">ATTITUDE</div>
-              <div class="pd-status-emoji">${emotionEmoji}</div>
-            </div>
-            <div class="pd-status-cell">
-              <div class="pd-status-cell-label">MOMENTUM</div>
-              <div class="pd-status-value">${momentumValue}</div>
-            </div>
-          </div>`}
+          ${isRecruit ? buildRecruitingBlock(player) : buildDevelopmentBlock(player)}
         </aside>
 
         <div class="pd-right-column">
@@ -632,12 +670,11 @@
   }
 
   async function loadPlayerData() {
-    const params = new URLSearchParams(window.location.search);
+    const params = liveParams();
     const playerId = params.get('id');
     const recruitId = params.get('recruit_id');
     const mode = params.get('mode');
     const franchiseId = params.get('franchise_id');
-    const tournamentId = params.get('tournament_id');
     const gameId = params.get('game_id');
 
     // Recruit mode: un-signed recruits live in FRD, not the players collection.
@@ -652,10 +689,9 @@
     }
 
     try {
-      const qs = new URLSearchParams();
+      const qs = emptyParams();
       if (mode) qs.set('mode', mode);
       if (franchiseId) qs.set('franchise_id', franchiseId);
-      if (tournamentId) qs.set('tournament_id', tournamentId);
       if (gameId) qs.set('game_id', gameId);
 
       const apiUrl = API_CONFIG.buildUrl(`/player/${encodeURIComponent(playerId)}`);

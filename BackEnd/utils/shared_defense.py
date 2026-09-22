@@ -12,29 +12,29 @@ from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS
 # ==================== ZONE DEFENSE LOGIC ====================
 
 ZONE_23_NORMAL = {
-    "PG": ["key", "midLane", "topLane", "upper midCorner", "upper wing", "upper midWing"],
+    "PG": ["key", "topLane", "midLane", "upper midCorner", "upper wing", "upper midWing"],
     "SG": ["key", "midLane", "topLane", "lower midCorner", "lower wing", "lower midWing"],
-    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost", "lower apex", "lower bird", "lower midBaseline"],
-    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost", "upper apex", "upper bird", "upper midBaseline"],
-    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
+    "SF": ["lower apex", "lower midCorner", "lower corner", "lower midBaseline", "lower bird", "lower lowPost", "lower midPost"],
+    "PF": ["upper midPost", "upper lowPost", "upper bird", "upper midBaseline", "upper corner", "upper midCorner", "upper apex"],
+    "C": ["upper lowPost", "basketSpot", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # Lower shift (ball on lower wing, lower midCorner, or lower corner)
 ZONE_23_LOWER_SHIFT = {
     "PG": ["lower midWing", "lower highPost", "upper midCorner", "upper wing", "upper midWing", "key"],
-    "SG": ["lower corner", "lower midCorner", "lower wing", "lower midPost", "lower highPost", "lower apex", "lower bird", "lower midBaseline"],
-    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost", "lower apex", "lower bird", "lower midBaseline"],
-    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost", "upper apex", "upper bird", "upper midBaseline"],
-    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
+    "SG": ["lower wing", "lower midCorner", "lower corner", "lower midBaseline", "lower apex", "lower bird", "lower midPost", "lower highPost"],
+    "SF": ["lower apex", "lower midCorner", "lower corner", "lower midBaseline", "lower bird", "lower lowPost", "lower midPost"],
+    "PF": ["upper midPost", "upper lowPost", "upper bird", "upper midBaseline", "upper corner", "upper midCorner", "upper apex"],
+    "C": ["upper lowPost", "basketSpot", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # Upper shift (ball on upper wing, upper midCorner, or upper corner)
 ZONE_23_UPPER_SHIFT = {
     "SG": ["upper midWing", "upper highPost", "lower midCorner", "lower wing", "lower midWing", "key"],  # Removed midLane to mirror Lower PG
-    "PG": ["upper corner", "upper midCorner", "upper wing", "upper midPost", "upper highPost", "upper apex", "upper bird", "upper midBaseline"],  # Added upper corner, upper midPost, upper apex, upper bird, upper midBaseline to mirror Lower SG
-    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost", "lower apex", "lower bird", "lower midBaseline"],
-    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost", "upper apex", "upper bird", "upper midBaseline"],
-    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
+    "PG": ["upper wing", "upper highPost", "upper midPost", "upper bird", "upper apex", "upper midBaseline", "upper corner", "upper midCorner"],  # Added upper corner, upper midPost, upper apex, upper bird, upper midBaseline to mirror Lower SG
+    "SF": ["lower apex", "lower midCorner", "lower corner", "lower midBaseline", "lower bird", "lower lowPost", "lower midPost"],
+    "PF": ["upper midPost", "upper lowPost", "upper bird", "upper midBaseline", "upper corner", "upper midCorner", "upper apex"],
+    "C": ["upper lowPost", "basketSpot", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # 3-2 Zone Defense: Zone definitions (using spot names from HCO_STRING_SPOTS)
@@ -52,7 +52,7 @@ ZONE_32_LOWER_SHIFT = {
     "PG": ["key", "upper midWing", "upper highPost", "midLane", "lower highPost", "lower midWing"],
     "SG": ["upper wing", "upper midWing", "upper highPost", "upper midPost", "upper bird", "upper midCorner"],
     "SF": ["lower wing", "lower midWing", "lower highPost", "lower midPost", "lower bird", "lower midCorner"],
-    "PF": ["basketSpot", "midLane", "upper midPost", "upper bird", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost", "basketSpot", "midLane", "lower corner"],
+    "PF": ["midLane", "lower corner", "upper midBaseline", "basketSpot", "upper bird", "upper lowPost", "upper corner", "upper midCorner", "upper midPost"],
     "C": ["basketSpot", "midLane", "lower midPost", "lower bird", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost"],
 }
 
@@ -62,7 +62,7 @@ ZONE_32_UPPER_SHIFT = {
     "SG": ["upper wing", "upper midWing", "upper highPost", "upper midPost", "upper bird", "upper midCorner"],
     "SF": ["lower wing", "lower midWing", "lower highPost", "lower midPost", "lower bird", "lower midCorner"],
     "PF": ["basketSpot", "midLane", "upper midPost", "upper bird", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost"],
-    "C": ["basketSpot", "midLane", "lower midPost", "lower bird", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "basketSpot", "midLane", "upper corner"],
+    "C": ["lower midPost", "lower midCorner", "lower corner", "lower lowPost", "lower bird", "basketSpot", "lower midBaseline", "upper corner", "midLane"],
 }
 
 # 1-3-1 Zone Defense: Zone definitions (using spot names from HCO_STRING_SPOTS)
@@ -72,7 +72,7 @@ ZONE_131_NORMAL = {
     "SG": ["upper apex", "upper wing", "upper midCorner", "upper bird"],
     "SF": ["lower apex", "lower wing", "lower midCorner", "lower bird"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["basketSpot", "upper corner", "upper midBaseline", "upper lowPost", "basketSpot", "lower lowPost", "lower midBaseline", "lower corner", "lower midCorner", "lower bird", "lower midPost", "midLane", "basketSpot"],
+    "C": ["lower midPost", "lower midCorner", "lower corner", "lower midBaseline", "upper midBaseline", "lower lowPost", "lower bird", "upper lowPost", "basketSpot", "upper corner", "midLane"],
 }
 
 # Lower shift (ball on lower wing, lower midWing, lower midCorner)
@@ -81,7 +81,7 @@ ZONE_131_LOWER_SHIFT = {
     "SG": ["upper midWing", "upper wing", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost", "upper midPost", "upper highPost"],
     "SF": ["lower midWing", "lower wing", "lower midCorner"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["basketSpot", "lower lowPost", "lower midBaseline", "lower corner"],
+    "C": ["lower lowPost", "lower corner", "lower midBaseline", "basketSpot"],
 }
 
 # Lower corner shift (ball on lower corner)
@@ -90,7 +90,7 @@ ZONE_131_LOWER_CORNER_SHIFT = {
     "SG": ["key", "upper midWing", "upper wing", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost", "upper midPost", "upper highPost"],
     "SF": ["lower midWing", "lower wing", "lower midCorner"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["lower corner"],
+    "C": ["lower bird", "lower corner", "lower midBaseline", "basketSpot", "lower lowPost"],
 }
 
 # Upper shift (ball on upper wing, upper midWing, upper midCorner)
@@ -99,7 +99,7 @@ ZONE_131_UPPER_SHIFT = {
     "SG": ["upper midWing", "upper wing", "upper midCorner"],
     "SF": ["lower midWing", "lower wing", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "lower midPost", "lower highPost"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["basketSpot", "upper lowPost", "upper midBaseline", "upper corner"],
+    "C": ["upper lowPost", "basketSpot", "upper midBaseline", "upper corner"],
 }
 
 # Upper corner shift (ball on upper corner)
@@ -108,8 +108,112 @@ ZONE_131_UPPER_CORNER_SHIFT = {
     "SG": ["upper midWing", "upper wing", "upper midCorner"],
     "SF": ["key", "lower midWing", "lower wing", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "lower midPost", "lower highPost"],
     "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
-    "C": ["upper corner"],
+    "C": ["upper bird", "upper lowPost", "basketSpot", "upper midBaseline", "upper corner"],
 }
+
+
+# ==================== Zone sink (empty-zone rung) ====================
+# Anchors are the poles of inaccessibility of the eleven shift tables above. Zones
+# are static data, so they are computed ONCE here at import - 55 rings - and never
+# per step. See BackEnd/utils/zone_sink.py.
+def _warm_zone_sink_anchors():
+    from BackEnd.utils import zone_sink
+
+    return zone_sink.warm_anchor_cache([
+        {p: _get_zone_coords(s, flip) for p, s in table.items()}
+        for table in (ZONE_23_NORMAL, ZONE_23_LOWER_SHIFT, ZONE_23_UPPER_SHIFT,
+                      ZONE_32_NORMAL, ZONE_32_LOWER_SHIFT, ZONE_32_UPPER_SHIFT,
+                      ZONE_131_NORMAL, ZONE_131_LOWER_SHIFT, ZONE_131_LOWER_CORNER_SHIFT,
+                      ZONE_131_UPPER_SHIFT, ZONE_131_UPPER_CORNER_SHIFT)
+        for flip in (False, True)   # both court orientations
+    ])
+
+
+ZONE_SINK_IQ_LAPSE_ERROR = 0.60   # how far off a lapsed defender is pulled
+ZONE_SINK_IQ_MAX_LAPSE = 0.45     # lapse chance at IQ 0, before the team scale
+ZONE_SINK_IQ_TEAM_SPAN = 0.40     # how much team defensive_efficiency moves it
+
+_ZONE_SINK_IQ = {"key": None, "err": {}}
+
+
+def _zone_sink_iq_enabled():
+    """``GOB_ZONE_SINK_IQ`` - **default ON**. Separate from ``GOB_ZONE_SINK`` so the
+    sink's geometry stays measurable on its own: ``GOB_ZONE_SINK_IQ=0`` leaves the
+    sink running with every defender perfectly calibrated."""
+    import os
+    return os.environ.get("GOB_ZONE_SINK_IQ", "1") == "1"
+
+
+def zone_sink_begin_possession(game, def_lineup):
+    """Roll each zone defender's calibration error for THIS possession.
+
+    Called once per placement build from ``position_zone_defenders``. The rolls are
+    cached against a possession key - (quarter, clock, both team ids) - so the
+    several builds a turn makes all reuse one roll per defender. That is what keeps
+    this at ~5 draws a possession instead of ~5 per build or ~5 per step.
+
+    A defender either has his attention for that trip down the floor or he does not:
+    one Bernoulli per defender, lapse chance falling with IQ and with the unit's
+    ``defensive_efficiency``. A lapse pulls him TOO FAR toward the ball and costs
+    him his help toward the rim (see ``zone_sink.sink_position``); a defender who
+    does not lapse is perfectly calibrated.
+    """
+    # Gated on the SINK as well as on IQ: with the sink off the error is never
+    # consumed, so rolling would burn draws and move the stream for nothing.
+    from BackEnd.utils import zone_sink as _zs
+    if not (_zs.enabled() and _zone_sink_iq_enabled()):
+        _ZONE_SINK_IQ["key"], _ZONE_SINK_IQ["err"] = None, {}
+        return
+    gs = getattr(game, "game_state", None) or {}
+    key = (gs.get("quarter"), gs.get("time_remaining"),
+           getattr(getattr(game, "offense_team", None), "team_id", None),
+           getattr(getattr(game, "defense_team", None), "team_id", None))
+    if _ZONE_SINK_IQ["key"] == key:
+        return                                   # already rolled for this possession
+    team_attrs = getattr(getattr(game, "defense_team", None), "team_attributes", None) or {}
+    try:
+        def_eff = float(team_attrs.get("defensive_efficiency") or 0.0)
+    except (TypeError, ValueError):
+        def_eff = 0.0
+    # 0 def-eff leaves the lapse chance untouched; a disciplined unit lapses less.
+    team_scale = max(0.0, 1.0 - (def_eff / 100.0) * ZONE_SINK_IQ_TEAM_SPAN)
+
+    err = {}
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        player = (def_lineup or {}).get(pos)
+        attrs = getattr(player, "attributes", None) or {}
+        try:
+            iq = float(attrs.get("IQ", 50) or 50)
+        except (TypeError, ValueError):
+            iq = 50.0
+        lapse_chance = ZONE_SINK_IQ_MAX_LAPSE * max(0.0, 1.0 - iq / 100.0) * team_scale
+        err[pos] = ZONE_SINK_IQ_LAPSE_ERROR if random.random() < lapse_chance else 0.0
+    _ZONE_SINK_IQ["key"], _ZONE_SINK_IQ["err"] = key, err
+
+
+def _zone_sink_iq_error(defender_pos):
+    """Directional calibration error for the empty-zone sink.
+
+    A low-IQ defender is pulled TOO FAR toward the ball and gives up his help toward
+    the rim; a high-IQ defender holds the correct balance. It is an error in
+    calibration, not in magnitude, which is why it is applied to the weights rather
+    than to the travel distance.
+
+    Rolled **once per defender per zone possession** by
+    ``zone_sink_begin_possession`` (~5 rolls a possession, ~282 a game, ~0.4% on a
+    ~69,000-draw base), NOT per step - per-step rolls would be ~11,200 a game.
+
+    Returns 0.0 and draws nothing when ``GOB_ZONE_SINK_IQ`` is off, so the sink's
+    geometry is measurable on its own.
+
+    KNOWN LIMIT, not papered over: the resolution-side callers of
+    ``assign_all_zone_defenders`` in ``phase_resolution.py`` do not go through
+    ``position_zone_defenders``, so if one of them runs before that possession's
+    first placement build it sees error 0.0 while the render sees the rolled value.
+    Three of those four call sites discard the coordinates and keep only the
+    guard map, so the exposure is the legacy fallback at ``phase_resolution.py:5485``.
+    """
+    return _ZONE_SINK_IQ["err"].get(defender_pos, 0.0)
 
 
 # ==================== HCT (Half Court Trap) Zone Defense ====================
@@ -717,6 +821,74 @@ def _map_deep_location_to_zone_location(ball_spot):
     return deep_location_map.get(ball_spot, ball_spot)
 
 
+# ── Zone weak-side help shade (GOB_ZONE_HELP_SHADE, default OFF) ──────────────────────
+# A zone defender WITH a man in his area is placed by the "key" branch of
+# calculate_defender_coords, which has no basket shade at all: the only basket shade in
+# the codebase lives in `_apply_defender_posture`, and the zone path never calls it.
+# Measured (reports/zone-help-shade-2026-09-22.md): on the weak side he sits 11.14 from
+# his man and 14.02 from the rim, sagging toward neither.
+#
+# This adds the MISSING shade and nothing else. It reuses HELP_BASKET_SHADE for the
+# magnitude and the SINK's own strong/weak ramp for the weighting, so there is no new
+# constant. Scaling by (1 - strongness) scopes it to the weak side, which is where the
+# complaint is: the strong-side defender should pressure his area, not sag off it.
+# Continuous by construction, so a man drifting across the middle never teleports.
+#
+# NOTE, deliberately NOT done: he is not clamped into his own polygon. He is already
+# outside it on 58.9% of placements today, and those are the ones ALREADY nearest the
+# rim (11.66 vs 16.29) - introducing a clamp would push exactly the right defenders
+# back out, and would move 58.9% of placements with zero shade applied.
+ZONE_HELP_SHADE_FLAG = "GOB_ZONE_HELP_SHADE"
+
+
+def zone_help_shade_enabled():
+    import os  # local, matching _zone_sink_iq_enabled above - this module has no top-level os
+    return os.environ.get(ZONE_HELP_SHADE_FLAG, "0") == "1"
+
+
+_ZONE_SHADE_COUNTS = {"considered": 0, "shaded": 0, "no_shade_middle": 0}
+
+
+def zone_help_shade_counters():
+    return dict(_ZONE_SHADE_COUNTS)
+
+
+def reset_zone_help_shade_counters():
+    for k in _ZONE_SHADE_COUNTS:
+        _ZONE_SHADE_COUNTS[k] = 0
+
+
+def _apply_zone_help_shade(coords, man_coords, ball_coords, is_away_offense):
+    """Sag a weak-side zone defender toward the rim he is defending.
+
+    ``coords``/``man_coords``/``ball_coords`` are all in the caller's (zone) frame, and
+    the defended rim is taken in that same frame.
+    """
+    if not zone_help_shade_enabled():
+        return coords
+    try:
+        from BackEnd.utils import zone_sink as _zs
+        _ZONE_SHADE_COUNTS["considered"] += 1
+        bx, by = float(ball_coords["x"]), float(ball_coords["y"])
+        mx, my = float(man_coords["x"]), float(man_coords["y"])
+        rim_x = (100.0 - float(HOME_RIM_COORDS["x"])) if is_away_offense else float(HOME_RIM_COORDS["x"])
+        rim_y = float(HOME_RIM_COORDS["y"])
+        # The sink's measure, unchanged: 1 on the defender's own side, 0 a full
+        # court-width away, then pushed toward 1 as the ball nears the middle.
+        strongness = 1.0 - min(1.0, abs(by - my) / _zs.SIDE_SPAN)
+        strongness += (1.0 - strongness) * _zs.ball_centrality(by)
+        weakness = max(0.0, 1.0 - strongness)
+        if weakness <= 1e-9:
+            _ZONE_SHADE_COUNTS["no_shade_middle"] += 1
+            return coords
+        _ZONE_SHADE_COUNTS["shaded"] += 1
+        k = HELP_BASKET_SHADE * weakness
+        return {"x": float(coords["x"]) + k * (rim_x - mx),
+                "y": float(coords["y"]) + k * (rim_y - my)}
+    except Exception:
+        return coords
+
+
 def assign_zone_defender_coords(
     defender_pos,
     zone_boundaries,
@@ -724,7 +896,8 @@ def assign_zone_defender_coords(
     ball_handler_coords,
     ball_spot,
     aggression_level,
-    is_away_offense
+    is_away_offense,
+    placed_defenders=None,
 ):
     """
     Assign defensive coordinates for a zone defender based on priorities and zone logic.
@@ -827,6 +1000,7 @@ def assign_zone_defender_coords(
             ball_handler_coords,
             is_ball_handler=False
         )
+        result = _apply_zone_help_shade(result, target_coords, ball_handler_coords, is_away_offense)
         # get_defender_coords returns in same orientation as input (away if away offense)
         # Convert to HOME orientation for consistency with zone defense
         if is_away_offense:
@@ -848,6 +1022,8 @@ def assign_zone_defender_coords(
             ball_handler_coords,
             is_ball_handler=False
         )
+        result = _apply_zone_help_shade(
+            result, closest_to_basket["coords"], ball_handler_coords, is_away_offense)
         # get_defender_coords returns in same orientation as input (away if away offense)
         # Convert to HOME orientation for consistency with zone defense
         if is_away_offense:
@@ -855,7 +1031,46 @@ def assign_zone_defender_coords(
         else:
             return result
     else:
-        # No players in zone - position at spot in zone closest to ball handler
+        # No players in zone. Two behaviours, selected by GOB_ZONE_SINK (default OFF):
+        #
+        #   ON  - zone_sink.sink_position: anchor (the zone's pole of inaccessibility)
+        #         plus a pull toward the ball and a pull toward the rim, clamped to
+        #         stay inside this defender's own polygon. Continuous, and it reads
+        #         how far the ball is and which side it is on.
+        #   OFF - the legacy menu pick below: snap to whichever LISTED SPOT is
+        #         nearest the ball, which gave each defender 2-6 discrete positions.
+        #
+        # Both run in the ZONE frame (boundaries and ball_handler_coords are already
+        # flipped together when the away team is on offense), so the rim passed in is
+        # the defended rim flipped to match, and the result is unflipped once below.
+        from BackEnd.utils import zone_sink as _zone_sink
+
+        if _zone_sink.enabled():
+            _rim = (float(HOME_RIM_COORDS["x"]), float(HOME_RIM_COORDS["y"]))
+            if is_away_offense:
+                _rim = (100.0 - _rim[0], _rim[1])
+            # GOB_ZONE_SINK_ESCAPE only: the separation guardrail needs the defenders
+            # already placed this step. `assignments` is filled in a fixed order
+            # (PG,SG,SF,PF,C), so each defender separates from those before him and
+            # those after him separate from him — deterministic, and no pass is needed.
+            # They are stored in HOME orientation; the sink works in the zone frame, so
+            # they are flipped back for away offense (the flip is an involution).
+            _others = None
+            if _zone_sink.escape_enabled():
+                _others = []
+                for _c in (placed_defenders or {}).values():
+                    if isinstance(_c, dict) and "x" in _c and "y" in _c:
+                        _p = get_away_player_coords(_c) if is_away_offense else _c
+                        _others.append((float(_p["x"]), float(_p["y"])))
+            sunk = _zone_sink.sink_position(
+                defender_zone_coords_list,
+                (float(ball_handler_coords["x"]), float(ball_handler_coords["y"])),
+                _rim,
+                iq_error=_zone_sink_iq_error(defender_pos),
+                others=_others,
+            )
+            return get_away_player_coords(sunk) if is_away_offense else sunk
+
         # ✅ Zone coords are in same orientation as ball_handler_coords (both flipped if away offense)
         # _find_closest_spot_in_zone_to_point assumes zones are in home orientation, so it flips target
         # But our zones are now in away orientation if away offense, so pass False (don't flip target)
@@ -1126,6 +1341,21 @@ def assign_all_zone_defenders(
                 overlap_guarded_by[assigned_player_id] = def_pos
     
     # Second pass: Assign coordinates for each defender
+    # Who has the ball. HOISTED out of the per-defender loop below, where it used to be
+    # recomputed identically on every iteration from `offensive_players` - which this
+    # function never mutates, so this is the same value, computed once.
+    #
+    # Hoisted rather than merely defaulted, because it is also READ by the ball-handler
+    # assignment block AFTER the loop. When `zone_boundaries` was missing all five slots,
+    # every iteration hit the `continue` below, the name was never bound, and that later
+    # read raised `UnboundLocalError` - a crash, mid-game. Seed 8093 hit it with
+    # GOB_BOXOUT_CONTEST=1. See reports/zone-crash-and-arrival-cap-2026-09-20.md.
+    ball_handler_id = None
+    for p in offensive_players:
+        if p.get("is_ball_handler"):
+            ball_handler_id = p.get("player_id")
+            break
+
     for defender_pos in ["PG", "SG", "SF", "PF", "C"]:
         if defender_pos not in zone_boundaries:
             continue
@@ -1179,12 +1409,7 @@ def assign_all_zone_defenders(
         # If not in overlap, use standard priority logic (excluding overlap players already assigned)
         players_to_consider = offensive_players.copy()
         
-        # Find ball handler player_id
-        ball_handler_id = None
-        for p in offensive_players:
-            if p.get("is_ball_handler"):
-                ball_handler_id = p.get("player_id")
-                break
+        # (ball_handler_id is resolved once, above the loop)
         
         # If this defender is involved in an overlap but not guarding the overlap player,
         # exclude ALL overlap players from their consideration (except ball handler if not already guarded)
@@ -1210,7 +1435,8 @@ def assign_all_zone_defenders(
             ball_handler_coords,
             ball_spot,
             aggression_level,
-            is_away_offense
+            is_away_offense,
+            placed_defenders=assignments,
         )
         if coords:
             assignments[defender_pos] = coords
@@ -1988,3 +2214,8 @@ def get_defender_coords(
             result, offensive_coords, ball_handler_coords, is_ball_handler, spot, posture,
             is_away_offense)
     return result
+
+
+# Zone sink anchors: computed once, at import, for both court orientations.
+# Defined here rather than beside the tables because it needs _get_zone_coords.
+ZONE_SINK_ANCHOR_COUNT = _warm_zone_sink_anchors()

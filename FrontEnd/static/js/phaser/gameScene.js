@@ -19,6 +19,18 @@ import { showSecondaryAnnouncement, getSecondaryColorForTeam } from './utils/ann
 import { resolveTeamsSlotLookupKey } from './utils/loadGameStats.js';
 import { getGameMode } from '../shared/getGameMode.js';
 
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
   (typeof process !== 'undefined' && process.env.DEBUG_SIM_PAYLOAD) ||
@@ -115,9 +127,9 @@ function isDebugPlaycall() {
   if (typeof window === 'undefined') return false;
   try {
     if (typeof window.isDebugPlaycallSearch === 'function') {
-      return window.isDebugPlaycallSearch(window.location.search);
+      return window.isDebugPlaycallSearch(liveParams());
     }
-    const v = (new URLSearchParams(window.location.search).get('debug_pc') || '').trim().toLowerCase();
+    const v = (franchiseCtx().get('debug_pc') || '').trim().toLowerCase();
     return v === '1' || v === 'true' || v === 'yes';
   } catch (e) {
     return false;
@@ -507,7 +519,7 @@ function resolveTeamRowForScoreboard(simData, side) {
   let urlAway = null;
   try {
     if (typeof window !== 'undefined') {
-      const sp = new URLSearchParams(window.location.search);
+      const sp = liveParams();
       urlHome = sp.get('home_id');
       urlAway = sp.get('away_id');
     }
@@ -550,7 +562,7 @@ function resolveTeamRowForScoreboard(simData, side) {
   let nameKey = null;
   try {
     if (typeof window !== 'undefined') {
-      const sp = new URLSearchParams(window.location.search);
+      const sp = liveParams();
       nameKey = side === 'home' ? sp.get('home') : sp.get('away');
     }
   } catch (e) {
@@ -575,7 +587,7 @@ function resolveTeamRowForScoreboard(simData, side) {
 /** Append `&debug_scoreboard=1` to the court URL to log rank/record resolution and DOM-bound strings. */
 function isCourtDebugScoreboard() {
   try {
-    return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug_scoreboard') === '1';
+    return typeof window !== 'undefined' && franchiseCtx() && franchiseCtx().get('debug_scoreboard') === '1';
   } catch (e) {
     return false;
   }
@@ -862,7 +874,6 @@ export function createGameScene(Phaser) {
     }
 
     init(data) {
-        this.tournamentId = data.tournamentId;
         this.franchiseId = data.franchiseId;
         this.animate = data.animate;
         this.mode = data.mode;
@@ -901,7 +912,6 @@ export function createGameScene(Phaser) {
           const teams = gameStore.getTeams();
           console.log("🧠 Game initialized with:", {
             rosters: gameStore.getRosters(),
-            tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
             homeTeam: teams.home,
             awayTeam: teams.away,
@@ -1015,7 +1025,7 @@ export function createGameScene(Phaser) {
       
       // ✅ DEFENSE MATCHUPS: Store trigger info for after simData loads
       // We'll show the popup after simData is fetched but before animation starts
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = liveParams();
       const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
       const activeResume = urlParams.get('active_resume') === 'true' || this.resumeActive;
       const timeoutTraceId = urlParams.get('timeout_trace_id');
@@ -1143,9 +1153,6 @@ export function createGameScene(Phaser) {
       if (this.mode) {
         payload.mode = this.mode;
       }
-      if (this.tournamentId) {
-        payload.tournament_id = this.tournamentId;
-      }
       if (this.franchiseId) {
         payload.franchise_id = this.franchiseId;
       }
@@ -1173,11 +1180,10 @@ export function createGameScene(Phaser) {
         });
       }
       if (resumeFromTimeout && urlParams.get('resume_from_anchor') !== 'true') {
-        const futureParams = new URLSearchParams(window.location.search);
+        const futureParams = liveParams();
         futureParams.set('resume_from_timeout', 'false');
-        if (typeof history !== 'undefined' && history.replaceState) {
-          history.replaceState(null, '', `${window.location.pathname}?${futureParams.toString()}`);
-        }
+        // In-place: this request still resumes; later refreshes must not. Do not navigate.
+        franchiseCtx().commitParams(futureParams);
         console.warn('[RESUME-ANCHOR-CLIENT] converted timeout-return URL for future refreshes', {
           game_id: this.gameId,
           quarter: this.quarter,
@@ -1318,7 +1324,7 @@ export function createGameScene(Phaser) {
       const acceptedResumeAnchorRestore =
         payload.resume_from_anchor === true && payload.consume_resume_anchor === true;
       if (typeof window !== 'undefined' && typeof history !== 'undefined' && history.replaceState) {
-        const liveEntryParams = new URLSearchParams(window.location.search);
+        const liveEntryParams = liveParams();
         const quarterBreakFrom = liveEntryParams.get('quarter_break_from');
         const hadLiveQuarterMarker =
           quarterBreakFrom === 'play_quarter' || quarterBreakFrom === 'sim_quarter';
@@ -1328,7 +1334,8 @@ export function createGameScene(Phaser) {
         if (hadLiveQuarterMarker || hadLineupCheckpoint) {
           if (hadLiveQuarterMarker) liveEntryParams.delete('quarter_break_from');
           if (hadLineupCheckpoint) liveEntryParams.delete('lineup_checkpoint');
-          history.replaceState(null, '', `${window.location.pathname}?${liveEntryParams.toString()}`);
+          // In-place: consume one-load markers on the current court URL.
+          franchiseCtx().commitParams(liveEntryParams);
           console.warn('[COURT BOOT MODE] consumed live quarter entry marker after successful quarter start', {
             game_id: this.gameId,
             quarter: this.quarter,
@@ -1352,13 +1359,14 @@ export function createGameScene(Phaser) {
         this._skipFirstRestoredSipSetup = false;
       }
       if ((payload.resume_from_anchor || payload.consume_resume_anchor) && typeof window !== 'undefined' && typeof history !== 'undefined' && history.replaceState) {
-        const consumedParams = new URLSearchParams(window.location.search);
+        const consumedParams = liveParams();
         consumedParams.delete('resume_from_anchor');
         consumedParams.delete('consume_resume_anchor');
         consumedParams.delete('active_resume');
         consumedParams.delete('anchor_type');
         consumedParams.set('resume_from_timeout', 'false');
-        history.replaceState(null, '', `${window.location.pathname}?${consumedParams.toString()}`);
+        // In-place: consume resume-anchor flags after a successful restore.
+        franchiseCtx().commitParams(consumedParams);
         console.warn('[RESUME-ANCHOR-CLIENT] consumed anchor URL state after successful resume', {
           game_id: this.gameId,
           quarter: this.quarter,
@@ -1440,7 +1448,7 @@ export function createGameScene(Phaser) {
       let urlHomeDisplay = null;
       let urlAwayDisplay = null;
       try {
-        const spChrome = new URLSearchParams(window.location.search);
+        const spChrome = liveParams();
         urlHomeDisplay = spChrome.get('home_display');
         urlAwayDisplay = spChrome.get('away_display');
       } catch (e) { /* ignore */ }
@@ -2879,8 +2887,7 @@ export function createGameScene(Phaser) {
           import('./utils/foulOutPopup.js').then(({ showFoulOutPopup }) => {
             // Get game context from scene
             const mode = this.mode || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mode') : null) || 'single';
-            const urlParams = new URLSearchParams(window.location.search);
-            const tournamentId = urlParams.get('tournament_id') || null;
+            const urlParams = liveParams();
             const franchiseId = urlParams.get('franchise_id') || null;
             
             // Get team information from gameStore or URL
@@ -2897,7 +2904,6 @@ export function createGameScene(Phaser) {
               mode: mode,
               quarter: liveQuarter,
               clock: liveClock, // ✅ Pass current clock time to preserve it
-              tournamentId: tournamentId,
               franchiseId: franchiseId,
               homeTeam: homeTeam,
               awayTeam: awayTeam,
@@ -3114,15 +3120,13 @@ export function createGameScene(Phaser) {
         if (this.finalized) return this.finalScore;
         const finalScore = await finalizeGame({
           simData,
-          tournamentId: this.tournamentId,
           franchiseId: this.franchiseId,
           game: this.game,
         });
         this.finalScore = finalScore;
         this.finalized = true;
         if (window.GOB_Analytics) {
-          if (this.tournamentId) window.GOB_Analytics.tournamentGameCompleted();
-          else if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
+          if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
           else window.GOB_Analytics.singleGameCompleted();
         }
         // Show game completion popup (absolute path for Netlify/module resolution)
@@ -3130,8 +3134,7 @@ export function createGameScene(Phaser) {
         const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
           showGameCompletionPopup({
             gameId: this.gameId || simData.game_id,
-            mode: getGameMode({ scene: this, tournamentId: this.tournamentId, franchiseId: this.franchiseId }),
-            tournamentId: this.tournamentId,
+            mode: getGameMode({ scene: this, franchiseId: this.franchiseId }),
             franchiseId: this.franchiseId,
             teamId: this.teamId,
             userTeamSide: this.userTeamSide,
@@ -3322,7 +3325,7 @@ export function createGameScene(Phaser) {
             const helper = window.TimeoutNavigationHelper;
             let params;
             if (!helper) {
-              const fallback = new URLSearchParams(window.location.search);
+              const fallback = liveParams();
               fallback.set('game_id', this.gameId);
               fallback.set('quarter', nextQ);
               fallback.set('period', `Q${nextQ}`);
@@ -3330,7 +3333,7 @@ export function createGameScene(Phaser) {
               params = fallback;
             } else {
               const teams = gameStore.getTeams();
-              const sourceParams = new URLSearchParams(window.location.search);
+              const sourceParams = liveParams();
               params = helper.buildGameNavigationParams({
                 sourceParams: sourceParams,
                 targetQuarter: nextQ,
@@ -3342,7 +3345,6 @@ export function createGameScene(Phaser) {
                   home: teams.home,
                   away: teams.away,
                   mode: this.mode,
-                  tournament_id: this.tournamentId,
                   franchise_id: this.franchiseId,
                   team_id: this.teamId
                 }
@@ -3408,7 +3410,7 @@ export function createGameScene(Phaser) {
           
           // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
           const nextQ = this.quarter + 1;
-          const urlParams = new URLSearchParams(window.location.search);
+          const urlParams = liveParams();
           
           // ✅ REMOVED: Quarter navigation debug logging (cluttering console)
           
@@ -3556,7 +3558,7 @@ export function createGameScene(Phaser) {
           console.error('❌ /api/simulate-turn failed:', errorData);
           if (response.status === 404 && errorData.detail && errorData.detail.includes('not found')) {
             if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
-              const urlParams = new URLSearchParams(window.location.search);
+              const urlParams = liveParams();
               window.ErrorHandler.showMissingTruthError({
                 pointerType: 'game_id',
                 pointerValue: urlParams.get('game_id') || 'unknown',
@@ -4507,7 +4509,6 @@ export function createGameScene(Phaser) {
           }
           
           console.log('🔍 [GAMESCENE] Calling finalizeGame with:', {
-            tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
             game_id: updatedSimData.game_id || updatedSimData._id,
             hasFinalGameDocument: !!updatedSimData.final_game_document
@@ -4515,15 +4516,13 @@ export function createGameScene(Phaser) {
           
           const finalScore = await finalizeGame({
             simData: updatedSimData,
-            tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
             game: this.game,
           });
           this.finalScore = finalScore;
           this.finalized = true;
           if (window.GOB_Analytics) {
-            if (this.tournamentId) window.GOB_Analytics.tournamentGameCompleted();
-            else if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
+            if (this.franchiseId) window.GOB_Analytics.franchiseGameCompleted();
             else window.GOB_Analytics.singleGameCompleted();
           }
           // Show game completion popup (absolute path for Netlify/module resolution)
@@ -4531,8 +4530,7 @@ export function createGameScene(Phaser) {
           const { showGameCompletionPopup } = await import(`${base}/js/phaser/utils/gameCompletionPopup.js`);
           showGameCompletionPopup({
             gameId: gameId,
-            mode: getGameMode({ scene: this, tournamentId: this.tournamentId, franchiseId: this.franchiseId }),
-            tournamentId: this.tournamentId,
+            mode: getGameMode({ scene: this, franchiseId: this.franchiseId }),
             franchiseId: this.franchiseId,
             teamId: this.teamId,
             userTeamSide: this.userTeamSide,
@@ -4555,7 +4553,7 @@ export function createGameScene(Phaser) {
         if (!helper) {
           console.error('❌ [GAMESCENE] TimeoutNavigationHelper not loaded!');
           // Fallback to manual params if helper not available
-          const params = new URLSearchParams(window.location.search);
+          const params = liveParams();
           params.set('game_id', this.gameId);
           params.set('quarter', nextQ);
           params.set('period', `Q${nextQ}`);
@@ -4567,7 +4565,7 @@ export function createGameScene(Phaser) {
         
         // Get teams from gameStore (same as Sim Quarter pattern)
         const teams = gameStore.getTeams();
-        const sourceParams = new URLSearchParams(window.location.search);
+        const sourceParams = liveParams();
         
         // Build params using helper (exactly like Sim Quarter does)
         const params = helper.buildGameNavigationParams({
@@ -4581,7 +4579,6 @@ export function createGameScene(Phaser) {
             home: teams.home,
             away: teams.away,
             mode: this.mode,
-            tournament_id: this.tournamentId,
             franchise_id: this.franchiseId,
             team_id: this.teamId
           }

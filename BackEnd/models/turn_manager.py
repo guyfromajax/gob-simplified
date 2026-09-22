@@ -8,7 +8,16 @@ from BackEnd.utils.team_attr_scale import core8_gameplay
 import json
 import logging
 import uuid
-from BackEnd.db import players_collection, teams_collection, plays_collection
+
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+teams_collection = _store.teams_collection
+plays_collection = _store.plays_collection
+games_collection = _store.games_collection
+tournaments_collection = _store.tournaments_collection
+franchises_collection = _store.franchises_collection
+
 from BackEnd.utils import plays_catalog
 from BackEnd.models.player import Player, player_to_dict
 
@@ -68,6 +77,7 @@ from BackEnd.engine.phase_resolution import (
     resolve_half_court_trap_logic
 )
 from typing import TYPE_CHECKING, Any, Dict, Optional
+from BackEnd.utils.lineup_position import lineup_position_lookup_enabled, lineup_slot
 if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
 
@@ -1615,6 +1625,44 @@ class TurnManager:
             chain_active=chain_active,
             final_shot_ran_this_chain=bool(game_state.get("final_shot_ran_this_chain")),
         )
+        dest_pass_decided = False
+        if (
+            result is None
+            and state == "HCO"
+            and time_remaining_sec is not None
+            and 0 < int(time_remaining_sec) <= 30
+            and (
+                game_state.get("flss_possession_pending")
+                or game_state.get("final_shot_ran_this_chain")
+            )
+        ):
+            dest_pass_decided = True
+            ran = bool(game_state.get("final_shot_ran_this_chain"))
+            if self._try_arm_final_shot_from_dest_pass(
+                game_state, suppress_sfx=ran
+            ):
+                activate_late_clock_eoq_chain(game_state)
+                begin_eoq_trace_sequence(self.game)
+                log_eoq_chain_event(
+                    self.game,
+                    "EOQ_DEST_PASS_FINAL_TURN",
+                    extra={
+                        "time_remaining_sec": time_remaining_sec,
+                        "final_shot_ran_this_chain": ran,
+                    },
+                )
+            else:
+                if not game_state.get("flss_possession_pending"):
+                    game_state["flss_possession_pending"] = True
+                begin_eoq_trace_sequence(self.game)
+                log_eoq_chain_event(
+                    self.game,
+                    "EOQ_DEST_PASS_FLSS",
+                    extra={
+                        "time_remaining_sec": time_remaining_sec,
+                        "final_shot_ran_this_chain": ran,
+                    },
+                )
         final_turn_eligible = (
             quarter is not None
             and time_remaining_sec is not None
@@ -1622,6 +1670,7 @@ class TurnManager:
             and state != "FAST_BREAK"
             and state in ("HCO", "HCT", "FCP")
             and result is None
+            and not dest_pass_decided
             and not game_state.get("flss_possession_pending")
             and first_gate_open
         )
@@ -1652,55 +1701,6 @@ class TurnManager:
                     begin_eoq_trace_sequence=begin_eoq_trace_sequence,
                     log_eoq_chain_event=log_eoq_chain_event,
                     activate_late_clock_eoq_chain=activate_late_clock_eoq_chain,
-                )
-
-        elif (
-            result is None
-            and game_state.get("final_shot_ran_this_chain")
-            and time_remaining_sec is not None
-            and int(time_remaining_sec) <= 30
-            and state != "FAST_BREAK"
-            and state in ("HCO", "HCT", "FCP")
-        ):
-            # After the first EOQ terminal shot, pick full Final Turn vs FLSS by runway.
-            # Final Turn execute flags are HCO-only; HCT/FCP with runway defer to a
-            # later HCO entry (or FLSS at ≤8). Runway-fail → flss_possession_pending.
-            if self._eoq_followup_can_run_final_turn():
-                if state == "HCO":
-                    game_state.pop("flss_possession_pending", None)
-                    game_state["final_turn_shot_this_turn"] = True
-                    game_state["final_shot_possession_active"] = True
-                    game_state["suppress_final_shot_sfx"] = True
-                    begin_eoq_trace_sequence(self.game)
-                    log_eoq_chain_event(
-                        self.game,
-                        "EOQ_FOLLOWUP_FINAL_TURN",
-                        extra={
-                            "time_remaining_sec": time_remaining_sec,
-                            "offensive_state": state,
-                        },
-                    )
-                else:
-                    begin_eoq_trace_sequence(self.game)
-                    log_eoq_chain_event(
-                        self.game,
-                        "EOQ_FOLLOWUP_DEFER_FINAL_TURN",
-                        extra={
-                            "time_remaining_sec": time_remaining_sec,
-                            "offensive_state": state,
-                            "reason": "final_shot_hco_only",
-                        },
-                    )
-            elif not game_state.get("flss_possession_pending"):
-                game_state["flss_possession_pending"] = True
-                begin_eoq_trace_sequence(self.game)
-                log_eoq_chain_event(
-                    self.game,
-                    "EOQ_FOLLOWUP_FLSS",
-                    extra={
-                        "time_remaining_sec": time_remaining_sec,
-                        "offensive_state": state,
-                    },
                 )
 
         clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
@@ -2629,6 +2629,15 @@ class TurnManager:
         off_lineup = self.game.offense_team.lineup
         def_lineup = self.game.defense_team.lineup
         ball_handler = self.game.game_state.get("last_ball_handler")
+        # last_ball_handler holds whoever LAST touched the ball, which after a possession
+        # flip or a substitution can be someone not on the current offense. Same guard and
+        # same reason as eoq_perfection.resolve_flss_shot_logic: keep it only if it is
+        # actually on the floor for this team. Without it the forced shot was taken by an
+        # off-floor player while `shooter_pos` fell back to the literal "PG" slot, so the
+        # skeleton animated the wrong man.
+        if (lineup_position_lookup_enabled() and ball_handler is not None
+                and not get_player_position(off_lineup, ball_handler)):
+            ball_handler = None
         if not ball_handler:
             ball_handler = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
 
@@ -2636,7 +2645,9 @@ class TurnManager:
             return self._build_shot_clock_violation_result(current_state)
 
         shooter = ball_handler
-        shooter_pos = get_player_position(off_lineup, shooter) or "PG"
+        shooter_pos = get_player_position(off_lineup, shooter)
+        if shooter_pos is None and not lineup_position_lookup_enabled():
+            shooter_pos = "PG"  # legacy last resort, kill switch only
         shooter_coords = getattr(shooter, "coords", {"x": 50, "y": 25}) or {"x": 50, "y": 25}
         shooter_spot = self._coords_to_nearest_spot(shooter_coords)
         defender = select_defender_closest_to_victim(shooter_coords, def_lineup, None) if def_lineup else None
@@ -2728,12 +2739,13 @@ class TurnManager:
         offense_call = None
         user_team_side = self.game.game_state.get("user_team_side")
         is_offense_user = (user_team_side == "home" and self.game.offense_team.is_home_team) or (user_team_side == "away" and not self.game.offense_team.is_home_team)
+        is_defense_user = (user_team_side == "home" and self.game.defense_team.is_home_team) or (user_team_side == "away" and not self.game.defense_team.is_home_team)
         
         logging.debug(f"🎮 [PLAYCALL CHECK] Checking for overrides in set_playcalls()")
         logging.debug(f"   - Offense team: {self.game.offense_team.name} (team_id: {self.game.offense_team.team_id}, object_id: {id(self.game.offense_team)}, is_home_team: {self.game.offense_team.is_home_team})")
         # logging.debug(f"   - Home team: {self.game.home_team.name} (team_id: {self.game.home_team.team_id}, object_id: {id(self.game.home_team)})")
         # logging.debug(f"   - Away team: {self.game.away_team.name} (team_id: {self.game.away_team.team_id}, object_id: {id(self.game.away_team)})")
-        logging.debug(f"   - user_team_side={user_team_side}, is_offense_user={is_offense_user}")
+        logging.debug(f"   - user_team_side={user_team_side}, is_offense_user={is_offense_user}, is_defense_user={is_defense_user}")
         logging.debug(f"   - game_object_id: {id(self.game)}")
         if is_offense_user:
             offense_call = self.game.offense_team.strategy_calls.get("offense_call")
@@ -2748,8 +2760,9 @@ class TurnManager:
         else:
             logging.debug(f"🎮 [PLAYCALL DEBUG] Offense team {self.game.offense_team.name} is NOT user team (user_team_side={user_team_side}), skipping offense_call check")
         
-        # Check if user team has defense_call set (regardless of current offense/defense)
-        # Defense override can be set when user is on offense (for next time they're on defense)
+        # Defense override may be set while the user is on offense (stash for their next
+        # defensive possession). Apply it only when the user team is actually on defense —
+        # never as this turn's call when the CPU is defending (Playcall_Center.md).
         defense_call = None
         user_team = None
         if user_team_side == "home":
@@ -2763,6 +2776,7 @@ class TurnManager:
             logging.debug(f"   - User team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
             logging.debug(f"   - defense_call value: {defense_call}, type: {type(defense_call)}")
             logging.debug(f"   - Full strategy_calls: {user_team.strategy_calls}")
+            logging.debug(f"   - is_defense_user={is_defense_user}")
             if defense_call:
                 logging.debug(f"🎮 [PLAYCALL CHECK] ✅ Found user defense call: '{defense_call}'")
             else:
@@ -2772,7 +2786,8 @@ class TurnManager:
         
         # Legacy support: Also check game_state for backward compatibility (will be removed)
         user_offense = self.game.game_state.get("user_offense_override") or offense_call
-        user_defense = self.game.game_state.get("user_defense_override") or defense_call
+        stored_user_defense = self.game.game_state.get("user_defense_override") or defense_call
+        user_defense = stored_user_defense if is_defense_user else None
         
         # If user provided an offense call, use the specific play name
         if user_offense:
@@ -2839,7 +2854,7 @@ class TurnManager:
                 self.game.game_state["user_defense_override"] = None  # Legacy clear
                 logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (defense_team={self.game.defense_team.name}, persistent until manually cleared)")
             else:
-                logging.info(f"🎮 [PLAYCALL DEBUG] No user_defense override found (user_defense={user_defense}), will use normal selection or check strategy_calls")
+                logging.info(f"🎮 [PLAYCALL DEBUG] No user_defense override for this turn (is_defense_user={is_defense_user}, stored={stored_user_defense}), using defending team's normal selection")
                 # No user defense override - choose defense normally
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
                 pick = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
@@ -2921,7 +2936,7 @@ class TurnManager:
                 "offense_override_cleared": offense_override_cleared  # ✅ SS&S: Flag for frontend button un-highlighting
             }
         
-        # If only defense call (user on offense, setting defense for next possession)
+        # User defense override applies only while the user team is on defense.
         if user_defense:
             chosen_defense = self._coerce_hco_defense_id(user_defense)
             # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
@@ -2981,41 +2996,23 @@ class TurnManager:
                 )
                 chosen_playcall = selected_play["name"]
         
-        # Defense setting - use override if set, otherwise choose normally
-        # NOTE: This must happen BEFORE offense attempt tracking so we know the correct defense
-        if chosen_defense is None:  # Not set by user override above
-            # ✅ SS&S: Check for defense_call in user_team.strategy_calls (regardless of current offense/defense)
-            # Defense override can be set when user is on offense (for next time they're on defense)
-            logging.info(f"🎮 [PLAYCALL DEBUG] chosen_defense is None, checking defense_call in user_team.strategy_calls")
-            user_team = self.game.home_team if self.game.home_team.is_user_team else (self.game.away_team if self.game.away_team.is_user_team else None)
-            if user_team:
-                defense_call = user_team.strategy_calls.get("defense_call")
-                logging.info(f"🎮 [PLAYCALL DEBUG] defense_call from user_team ({user_team.name}) strategy_calls: {defense_call}")
-                if defense_call:
-                    chosen_defense = self._coerce_hco_defense_id(defense_call)
-                    # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
-                    logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (persistent until manually cleared)")
-                else:
-                    logging.info(f"🎮 [PLAYCALL DEBUG] defense_call is None or empty, will use normal selection")
+        # Defense setting - use override if set above (user on defense), otherwise the
+        # defending team's normal process. NOTE: must happen BEFORE offense attempt tracking.
+        if chosen_defense is None:
+            defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
+            logging.info(f"🎮 [PLAYCALL DEBUG] Using normal defense selection (defense_setting={defense_setting}, is_defense_user={is_defense_user})")
+            pick = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+            logging.info(f"🎮 [PLAYCALL DEBUG] Normal selection chose: {pick}")
+            if pick == STRATEGY_DEFENSE_ZONE_SENTINEL:
+                chosen_defense = self._select_zone_defense_with_playbook_weights()
+                logging.info(f"🎮 [PLAYCALL DEBUG] Expanded zone sentinel to: {chosen_defense}")
+            elif pick == "man":
+                # CPU: expand bare "man" to a variant (Base/Deny/Loose) by the team's playbook % —
+                # symmetric to the zone-sentinel expansion (integrating_new_d_plays.md Phase 3).
+                chosen_defense = self._select_man_defense_with_playbook_weights()
+                logging.info(f"🎮 [PLAYCALL DEBUG] Expanded man to: {chosen_defense}")
             else:
-                logging.info(f"🎮 [PLAYCALL DEBUG] No user team found, skipping defense_call check")
-            
-            # If still no override, use normal process
-            if chosen_defense is None:
-                defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
-                logging.info(f"🎮 [PLAYCALL DEBUG] Using normal defense selection (defense_setting={defense_setting})")
-                pick = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
-                logging.info(f"🎮 [PLAYCALL DEBUG] Normal selection chose: {pick}")
-                if pick == STRATEGY_DEFENSE_ZONE_SENTINEL:
-                    chosen_defense = self._select_zone_defense_with_playbook_weights()
-                    logging.info(f"🎮 [PLAYCALL DEBUG] Expanded zone sentinel to: {chosen_defense}")
-                elif pick == "man":
-                    # CPU: expand bare "man" to a variant (Base/Deny/Loose) by the team's playbook % —
-                    # symmetric to the zone-sentinel expansion (integrating_new_d_plays.md Phase 3).
-                    chosen_defense = self._select_man_defense_with_playbook_weights()
-                    logging.info(f"🎮 [PLAYCALL DEBUG] Expanded man to: {chosen_defense}")
-                else:
-                    chosen_defense = pick
+                chosen_defense = pick
         
         # Record playcall attempt under new buckets
         try:
@@ -3124,7 +3121,6 @@ class TurnManager:
         is_offense_team = str(team_id) == str(getattr(offense_team, "team_id", None))
         is_defense_team = str(team_id) == str(getattr(defense_team, "team_id", None))
         logging.error(f"🔴🔴🔴 [DIAG] FALLING BACK TO DB - GameManager missing playbook_settings! offense_team={is_offense_team}, defense_team={is_defense_team}")
-        from BackEnd.db import games_collection, tournaments_collection, franchises_collection
         from bson import ObjectId
         
         # Get game document
@@ -3605,7 +3601,6 @@ class TurnManager:
         from BackEnd.utils.sim_random import sim_rng as random
         
         # Implement EV calculation
-        from BackEnd.db import plays_collection
         from BackEnd.engine.phase_resolution import get_hco_skeleton
         from BackEnd.utils.shared_defense import (
             _get_23_zone_boundaries,
@@ -3958,6 +3953,49 @@ class TurnManager:
             pass
         return result
 
+    def _maybe_add_sim_post_shot_clock(self, result):
+        """Full simulation only, ``GOB_SIM_CRASH_CLOCK`` (default OFF): add the derived post-shot
+        window to an HCO shot turn's ``time_elapsed``.
+
+        The played arm takes its whole HCO clock from the emitted steps (UESS §5 clock authority,
+        below), which include the ball-flight / rattle / bounce beats. A full simulation emits none,
+        so its legacy ``calc_skeleton_step_timing_contract`` estimate stops at the shot and never
+        burns the live-ball time after it. This adds that slice only — derived from the turn result
+        by ``sim_post_shot_window_seconds``, no build and no draw. Independent of
+        ``GOB_SIM_CRASH_APPLY``."""
+        from BackEnd.utils.shared import _sim_crash_clock_enabled, sim_post_shot_window_seconds
+
+        game_state = getattr(self.game, "game_state", None) or {}
+        if not game_state.get("_is_full_simulation") or not _sim_crash_clock_enabled():
+            return
+        if not isinstance(result, dict) or result.get("final_turn") or result.get("flss"):
+            return
+        # Any rendered output means the clock already came from it (or will): only a turn with no
+        # schema steps AND no legacy ``animations`` is a full-sim HCO turn. The played arm keeps
+        # ``animations`` even when its emitter returns None, so this leaves played untouched.
+        if result.get("animation_steps") or result.get("animations"):
+            return
+        shot_spot = result.get("shot_spot")
+        if not isinstance(shot_spot, dict):
+            shooter_id = str(result.get("shooter_id") or "")
+            for team in (self.game.home_team, self.game.away_team):
+                for player in (getattr(team, "lineup", None) or {}).values():
+                    if player is not None and str(getattr(player, "player_id", "")) == shooter_id:
+                        shot_spot = getattr(player, "coords", None)
+                        break
+        away_offense = str(result.get("offense_team_id") or "") == str(
+            getattr(getattr(self.game, "away_team", None), "team_id", "")
+        )
+        seconds = sim_post_shot_window_seconds(result, away_offense, shot_spot)
+        if not seconds:
+            return
+        before = int(result.get("time_elapsed") or 0)
+        result["time_elapsed"] = before + int(round(seconds))
+        logging.info(
+            "[SIM POST-SHOT CLOCK] %s: time_elapsed %d → %d (+%.2fs live-ball window)",
+            result.get("result_type"), before, result["time_elapsed"], seconds,
+        )
+
     def _emit_hco_animation_steps(self, result):
         """Single injection point for HCO-tagged turn results — both the normal
         ``resolve_half_court_offense`` path and the ``resolve_final_turn_shot``
@@ -3986,6 +4024,7 @@ class TurnManager:
             anim_steps = build_skeleton_animation_steps(result, self.game)
             if anim_steps is None:
                 self._assert_eoq_animation_steps(result, anim_steps=None, context="emit_none")
+                self._maybe_add_sim_post_shot_clock(result)
                 return
             result["animation_steps"] = anim_steps
             # HCO batted-OOB: append the schema ball trajectory (deflector
@@ -4398,6 +4437,46 @@ class TurnManager:
         offense["Fast_Break_Entries"] += 1
         defense["vs_Fast_Break"]["used"] += 1
 
+    def _try_arm_final_shot_from_dest_pass(self, game_state, *, suppress_sfx: bool) -> bool:
+        """Arm HCO Final Shot when dest travel + BH→shooter pass fits remaining clock.
+
+        Consumes sim_rng for alignment and the live Final Turn shooter pick. On fit,
+        stashes those picks so ``resolve_final_turn_shot`` does not roll them again.
+        """
+        from BackEnd.engine.final_turn_pacing import can_fit_final_shot_dest_and_pass
+        from BackEnd.engine.phase_resolution import pick_final_turn_shot_type_and_shooter
+
+        o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
+        shot_type, _shooter, shooter_pos = pick_final_turn_shot_type_and_shooter(
+            self.game, bh_pos
+        )
+        prior_turns = getattr(self.game, "turns", None) or []
+        prior_turn = prior_turns[-1] if prior_turns else None
+        if not can_fit_final_shot_dest_and_pass(
+            self.game,
+            o_destinations=o_dest,
+            bh_pos=bh_pos,
+            shooter_pos=shooter_pos,
+            prior_turn=prior_turn if isinstance(prior_turn, dict) else None,
+        ):
+            return False
+        game_state["_eoq_final_shot_gate"] = {
+            "shot_type": shot_type,
+            "shooter_pos": shooter_pos,
+            "o_destinations": o_dest,
+            "position_to_spot": position_to_spot,
+            "bh_pos": bh_pos,
+        }
+        game_state.pop("flss_possession_pending", None)
+        game_state.pop("flss_from_dreb", None)
+        game_state["final_turn_shot_this_turn"] = True
+        game_state["final_shot_possession_active"] = True
+        if suppress_sfx:
+            game_state["suppress_final_shot_sfx"] = True
+        else:
+            game_state.pop("suppress_final_shot_sfx", None)
+        return True
+
     def _enter_eoq_first_gate(
         self,
         game_state,
@@ -4465,16 +4544,20 @@ class TurnManager:
         )
 
     def _eoq_followup_can_run_final_turn(self) -> bool:
-        from BackEnd.engine.final_turn_pacing import can_run_final_turn_followup
+        from BackEnd.engine.final_turn_pacing import can_fit_final_shot_dest_and_pass
+        from BackEnd.engine.phase_resolution import pick_final_turn_shot_type_and_shooter
 
         prior_turns = getattr(self.game, "turns", None) or []
         prior_turn = prior_turns[-1] if prior_turns else None
         o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
-        return can_run_final_turn_followup(
+        _shot_type, _shooter, shooter_pos = pick_final_turn_shot_type_and_shooter(
+            self.game, bh_pos
+        )
+        return can_fit_final_shot_dest_and_pass(
             self.game,
             o_destinations=o_dest,
-            position_to_spot=position_to_spot,
             bh_pos=bh_pos,
+            shooter_pos=shooter_pos,
             prior_turn=prior_turn if isinstance(prior_turn, dict) else None,
         )
 
@@ -4484,9 +4567,15 @@ class TurnManager:
         from BackEnd.engine.phase_resolution import resolve_final_turn_shot_logic
 
         suppress_sfx = bool(self.game.game_state.pop("suppress_final_shot_sfx", False))
+        gate = self.game.game_state.pop("_eoq_final_shot_gate", None) or {}
 
         log_eoq_step(self.game, "FINAL_SHOT", "alignment_build", "START")
-        o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
+        if gate.get("o_destinations"):
+            o_dest = gate["o_destinations"]
+            position_to_spot = gate["position_to_spot"]
+            bh_pos = gate.get("bh_pos") or "PG"
+        else:
+            o_dest, position_to_spot, bh_pos = self._build_final_turn_offense_alignment()
         d_dest, zone_playcall = self._build_final_turn_defense_alignment()
         log_eoq_step(
             self.game,
@@ -4505,7 +4594,13 @@ class TurnManager:
         announce_zone_played_as_man(zone_playcall, "Final Turn")
         log_eoq_step(self.game, "FINAL_SHOT", "resolve_final_turn_shot_logic", "START", extra={"bh_pos": bh_pos})
         result = resolve_final_turn_shot_logic(
-            self.game, o_dest, d_dest, position_to_spot, bh_pos
+            self.game,
+            o_dest,
+            d_dest,
+            position_to_spot,
+            bh_pos,
+            shot_type=gate.get("shot_type"),
+            shooter_pos=gate.get("shooter_pos"),
         )
         if isinstance(result, dict) and result.get("route_flss"):
             from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step

@@ -288,7 +288,7 @@ The first 12 attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT) are dis
   - **>= 40:** 😐 (Straight face) - Neutral
   - **>= 20:** 😕 (Slight frown) - Negative
   - **< 20:** 😡 (Angry face) - Very negative
-- **Purpose:** Visual representation of player emotional state
+- **Purpose:** Visual representation of player emotional state. Franchise week-to-week value lives on FPD (training + EOG); franchise games seed from that value. Clamp 1–100. See `projects/Player_EM_Overview.md`.
 - **Implementation:** Value converted to emoji during display rendering
 
 #### MO (Momentum)

@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Walk-On Welcome modal — season-start reveal of the walk-ons who joined the
  * user's roster.
@@ -47,7 +68,7 @@
   }
 
   function franchiseId() {
-    return window.franchiseId || new URLSearchParams(window.location.search).get('franchise_id');
+    return window.franchiseId || liveParams().get('franchise_id');
   }
 
   function markSeen(fid) {

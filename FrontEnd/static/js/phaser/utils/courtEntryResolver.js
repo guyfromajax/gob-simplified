@@ -16,7 +16,7 @@ export const COURT_BOOT_MODES = Object.freeze({
 });
 
 /**
- * @param {URLSearchParams|Object} params
+ * @param {Object} params
  * @returns {string} one of COURT_BOOT_MODES
  */
 export function classifyCourtBootMode(params) {
@@ -57,7 +57,7 @@ export function classifyCourtBootMode(params) {
  * for the Resume Game modal.
  *
  * @param {string} bootMode
- * @param {URLSearchParams|Object} params
+ * @param {Object} params
  * @returns {boolean}
  */
 export function shouldProbeResumeStateForBoot(bootMode, params) {

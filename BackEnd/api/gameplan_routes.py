@@ -6,11 +6,22 @@ from pathlib import Path
 import logging
 from typing import Optional
 
-from BackEnd.db import db, games_collection, franchise_team_data_collection, players_collection, tournaments_collection, franchises_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+games_collection = _store.games_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+players_collection = _store.players_collection
+tournaments_collection = _store.tournaments_collection
+franchises_collection = _store.franchises_collection
+plays_collection = _store.plays_collection
+
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
-from BackEnd.api.tournament_routes import get_user_team_from_tournament
 from BackEnd.utils.franchise_geek_points import gm_team_matches_ref
-from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical as unified_resolve_team_id_to_canonical
+from BackEnd.utils.team_id_resolver import (
+    get_user_team_from_tournament,
+    resolve_team_id_to_canonical as unified_resolve_team_id_to_canonical,
+)
 from BackEnd.utils.defense_identity import (
     PLAYBOOK_MAN_KEY_TO_DEFENSE_ID,
     PLAYBOOK_ZONE_KEY_TO_DEFENSE_ID,
@@ -44,7 +55,9 @@ from datetime import datetime
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+from BackEnd.runtime_paths import bundle_path
+
+STATIC_DIR = bundle_path("FrontEnd", "static")
 
 
 def _franchise_playbook_snapshot_meaningful(pb: dict | None) -> bool:
@@ -470,7 +483,6 @@ def get_save_location_for_franchise_tournament(mode: str, game_id: str = None, f
             - doc_id: Document ID to save to
             - is_game_doc: True if saving to game doc, False if saving to master doc
     """
-    from BackEnd.db import games_collection, franchises_collection, tournaments_collection
     
     # If no game_id provided, always save to master
     if not game_id:
@@ -596,7 +608,6 @@ def populate_team_plays(mode="single"):
     import random
     
     try:
-        from BackEnd.db import plays_collection
         
         # Get all plays from universal collection
         all_plays = list(plays_collection.find({}))
@@ -684,7 +695,6 @@ def get_play_ids_by_names(play_names, plays_map=None):
                     logger.warning(f"⚠️ [POSITION FILTERS] Play '{play_name}' not found in plays_map")
         else:
             # ✅ PERFORMANCE: Batch query instead of N+1 individual queries
-            from BackEnd.db import plays_collection
             plays = list(plays_collection.find({"name": {"$in": play_names}}))
             plays_by_name = {play["name"]: play for play in plays}
             
@@ -709,7 +719,6 @@ def initialize_playbook_settings():
     Initialize simplified playbook_settings with alpha-friendly defaults.
     """
     try:
-        from BackEnd.db import plays_collection
         
         # Get all plays from universal collection
         all_plays = list(plays_collection.find({}))
@@ -2797,7 +2806,6 @@ def get_playbooks(
         # slot_assignments; merge universal plays so normalize_pc_order does not drop every slot.
         if load_from_game_doc:
             try:
-                from BackEnd.db import plays_collection
 
                 _univ_plays = list(
                     plays_collection.find({}, {"_id": 1, "name": 1, "play_id": 1})
@@ -3130,7 +3138,6 @@ def preview_playbook_shot_weights(request: PlaybookSettingsRequest):
     """
     try:
         incoming_playbook_settings = dict(request.playbook_settings or {})
-        from BackEnd.db import plays_collection
 
         universal_plays = list(plays_collection.find({}, {"_id": 1, "name": 1}))
         plays_by_id, plays_by_name = build_play_lookups_from_universal_plays(universal_plays)
@@ -3175,7 +3182,6 @@ def save_playbooks(request: PlaybookSettingsRequest):
     try:
         # Normalize incoming data to the simplified canonical structure.
         incoming_playbook_settings = dict(request.playbook_settings or {})
-        from BackEnd.db import plays_collection
 
         universal_plays = list(plays_collection.find({}, {"_id": 1, "name": 1}))
         plays_by_id, plays_by_name = build_play_lookups_from_universal_plays(universal_plays)
@@ -3191,7 +3197,6 @@ def save_playbooks(request: PlaybookSettingsRequest):
         playbook_meta["user_saved"] = True
         playbook_meta["schema_version"] = 2
         if request.mode == "franchise" and request.franchise_id and not request.game_id:
-            from BackEnd.db import franchises_collection
             franchise_doc = franchises_collection.find_one(
                 {"_id": ObjectId(request.franchise_id)},
                 {"week": 1}

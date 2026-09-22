@@ -39,6 +39,10 @@ logger = logging.getLogger(__name__)
 # Values track shot_threshold_scale (MIN / MID); update both when retuning scale.
 from BackEnd.constants.shot_threshold_scale import TUTORIAL_COMPUTER, TUTORIAL_USER
 
+from BackEnd.persistence import get_store
+_store = get_store()
+plays_collection = _store.plays_collection
+
 USER_SHOT_THRESHOLD = TUTORIAL_USER
 COMPUTER_SHOT_THRESHOLD = TUTORIAL_COMPUTER
 
@@ -131,7 +135,6 @@ def _load_tutorial_offense_plays() -> list[dict]:
     Returns a list of dicts in slot order, omitting any play whose name
     doesn't resolve. Each dict: {"name", "play_id", "play_type"}.
     """
-    from BackEnd.db import plays_collection
 
     docs = list(plays_collection.find(
         {"name": {"$in": TUTORIAL_USER_OFFENSE_PLAYCALLS}},

@@ -1,0 +1,1 @@
+Position lookup 2 done: reports/position-lookup-2-2026-09-19.md. 8 sites fixed; played games byte-identical; 1 sim seed moved; new reference ec4f5acfc_poslookup2. Played games now tag an on-ball defender (guard_ball). Open: FB foul announcements always use on-ball copy. Not merged.

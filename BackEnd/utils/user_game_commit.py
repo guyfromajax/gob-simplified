@@ -21,7 +21,10 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from pymongo import ReturnDocument
 
-from BackEnd.db import db, users_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+users_collection = _store.users_collection
 from BackEnd.utils.user_tracking import compute_lead_archetype, recompute_record_derived
 
 logger = logging.getLogger(__name__)

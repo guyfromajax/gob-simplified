@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 // Training Page JavaScript
 let TOTAL_POINTS = 24; // Will be updated from API for franchise mode
 
@@ -52,7 +73,7 @@ function trainingFormDraftStorageKey(urlParams) {
 }
 
 function saveTrainingFormDraft() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const key = trainingFormDraftStorageKey(urlParams);
   if (!key) return;
   const sliders = {};
@@ -75,7 +96,7 @@ function saveTrainingFormDraft() {
 }
 
 function clearTrainingFormDraftForCurrentContext() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const key = trainingFormDraftStorageKey(urlParams);
   if (!key) return;
   try {
@@ -94,7 +115,7 @@ function clearTutorialResumeContext() {
 }
 
 function currentTrainingReturnUrl() {
-  return window.location.pathname + window.location.search + (window.location.hash || '');
+  return window.location.pathname + currentSearch() + (window.location.hash || '');
 }
 
 function navigateToTrainingTutorial() {
@@ -121,6 +142,134 @@ function wireTrainingTutorialButton() {
   if (!btn) return;
   btn.addEventListener('click', navigateToTrainingTutorial);
 }
+
+/**
+ * Player Development: the 12 active players, their training position and focus.
+ *
+ * Data comes from `custom_focus_roster` on /franchise/training-points — the same rows the
+ * Player Maximizer modal uses, already RT-descending and already carrying both fields, so
+ * this section costs no extra request. Controls are the shared Development Focus module.
+ */
+const playerDevSection = document.getElementById('player-dev-section');
+const playerDevGrid = document.getElementById('player-dev-grid');
+
+function playerDevFranchiseId() {
+  return liveParams().get('franchise_id') || '';
+}
+
+function playerDevMaxRt(row) {
+  const ratings = (row && row.position_ratings) || {};
+  let best = null;
+  Object.keys(ratings).forEach(function (pos) {
+    const v = Number(ratings[pos]);
+    if (isFinite(v) && (best === null || v > best)) best = v;
+  });
+  return best;
+}
+
+function renderPlayerDevelopment() {
+  const dev = window.GOBDevelopmentFocus;
+  if (!playerDevSection || !playerDevGrid || !dev) return;
+  const rows = Array.isArray(customFocusRoster) ? customFocusRoster : [];
+  if (!rows.length) {
+    playerDevSection.hidden = true;
+    return;
+  }
+  playerDevSection.hidden = false;
+
+  playerDevGrid.innerHTML = rows.map(function (row) {
+    const player = {
+      _id: row.player_id,
+      player_id: row.player_id,
+      position_ratings: row.position_ratings || {},
+      training_position: row.training_position || null,
+      training_focus: row.training_focus || null,
+      resolved_training_position: row.resolved_training_position || null,
+      resolved_training_focus: row.resolved_training_focus || null,
+    };
+    const rt = playerDevMaxRt(row);
+    return '<div class="player-dev-card">' +
+      '<span class="player-dev-name" title="' + escapeTrainingAttr(row.name) + '">' +
+        escapeTrainingAttr(row.name) + '</span>' +
+      '<span class="player-dev-rt">' + (rt == null ? '--' : Math.round(rt)) + '</span>' +
+      '<span class="player-dev-controls">' +
+        dev.positionSelectHtml(player) + dev.focusSelectHtml(player) +
+      '</span>' +
+    '</div>';
+  }).join('');
+
+  dev.bind(playerDevGrid, playerDevFranchiseId, function (playerId, field, value) {
+    const key = field === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position';
+    rows.forEach(function (r) {
+      if (String(r.player_id) === String(playerId)) { r[field] = value; r[key] = value; }
+    });
+    renderPlayerDevelopmentTally();
+  });
+  renderPlayerDevelopmentTally();
+}
+
+/** Positions left, focuses right — how the squad is being coached, in one line. */
+function renderPlayerDevelopmentTally() {
+  const dev = window.GOBDevelopmentFocus;
+  const posEl = document.getElementById('player-dev-tally-positions');
+  const focEl = document.getElementById('player-dev-tally-focuses');
+  if (!dev || !posEl || !focEl) return;
+  const rows = Array.isArray(customFocusRoster) ? customFocusRoster : [];
+
+  const item = function (label, n) {
+    return '<span class="player-dev-tally-item' + (n ? '' : ' is-zero') + '">' +
+      escapeTrainingAttr(label) + ' <b>' + n + '</b></span>';
+  };
+
+  const byPos = {};
+  const byFocus = {};
+  rows.forEach(function (r) {
+    const p = dev.positionOf(r);
+    const f = dev.focusOf(r);
+    byPos[p] = (byPos[p] || 0) + 1;
+    byFocus[f] = (byFocus[f] || 0) + 1;
+  });
+
+  posEl.innerHTML = dev.POSITIONS.map(function (p) { return item(p, byPos[p] || 0); }).join('');
+  focEl.innerHTML = dev.FOCUSES.map(function (f) {
+    return item(f.label, byFocus[f.value] || 0);
+  }).join('');
+}
+
+function escapeTrainingAttr(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+/**
+ * "Training by Position" leaves the page, so the in-progress allocation is saved as a
+ * draft first and a resume context is set — the same pattern the Training Tutorial button
+ * uses. A coach who reads the chart comes back to the points he had already spent.
+ */
+function wirePlayerDevelopmentTutorialButton() {
+  const btn = document.getElementById('player-dev-tutorial-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    playSound('click-tiny.wav');
+    saveTrainingFormDraft();
+    const returnUrl = currentTrainingReturnUrl();
+    if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
+      window.GOBTutorialAlertResume.setTrainingPageContext(returnUrl);
+    } else {
+      try {
+        sessionStorage.setItem('gob_tut_alert_resume', JSON.stringify({
+          entrySource: 'training-page',
+          alertId: 'training',
+          lessonId: 'training',
+          returnUrl: returnUrl
+        }));
+      } catch (_e) {}
+    }
+    window.location.href = '/tutorial-advanced-training-by-position.html';
+  });
+}
+wirePlayerDevelopmentTutorialButton();
 
 /** Main PM radio value; modal assigns a concrete leaf here before submit */
 const CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
@@ -285,7 +434,7 @@ async function fetchFranchiseCommandCenterData(franchiseId) {
 }
 
 async function redirectIfTrainingAlreadyCommitted() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
   const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
@@ -294,7 +443,7 @@ async function redirectIfTrainingAlreadyCommitted() {
   try {
     const data = await fetchFranchiseCommandCenterData(franchiseId);
     if (!data || !data.training_completed) return false;
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('mode', 'franchise');
     params.set('franchise_id', franchiseId);
     if (teamId) params.set('team_id', teamId);
@@ -313,61 +462,78 @@ allSliders.forEach(slider => {
   slider.dataset.prev = '0';
 });
 
+/**
+ * Build the 6-pip stepper for one drill.
+ *
+ * The <input type="range"> stays the model. Everything that reads a drill value — the
+ * points counter, the draft save/restore, Auto-Train, collectTrainingData — still reads
+ * `slider.value`, so the swap is visual plus a click target and changes no contract. The
+ * input is clipped out of sight but stays focusable, so arrow keys still work.
+ */
 function ensureTrainingSliderVisual(slider) {
   const wrapper = slider?.closest('.slider-container');
   if (!wrapper) return null;
-  let shell = wrapper.querySelector('.training-slider-shell');
-  if (shell) return shell;
+  let row = wrapper.querySelector('.pipstep');
+  if (row) return row;
 
-  shell = document.createElement('div');
-  shell.className = 'training-slider-shell';
-  shell.setAttribute('aria-hidden', 'true');
-  shell.innerHTML = `
-    <div class="training-slider-track"></div>
-    <div class="training-slider-nodes">
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-      <span class="training-slider-node"></span>
-    </div>
-    <div class="training-slider-scale">
-      <span class="training-slider-scale-value">0</span>
-      <span class="training-slider-scale-value">1</span>
-      <span class="training-slider-scale-value">2</span>
-      <span class="training-slider-scale-value">3</span>
-      <span class="training-slider-scale-value">4</span>
-      <span class="training-slider-scale-value">5</span>
-    </div>
-  `;
-  wrapper.appendChild(shell);
-  return shell;
+  row = document.createElement('div');
+  row.className = 'pipstep';
+  for (let i = 0; i <= 5; i++) {
+    const pip = document.createElement('button');
+    pip.type = 'button';
+    pip.className = 'pipstep-pip';
+    pip.dataset.value = String(i);
+    pip.textContent = String(i);
+    // The range input carries the accessible name and value; the pips are a shortcut
+    // to it, so they stay out of the accessibility tree rather than repeating it.
+    pip.setAttribute('aria-hidden', 'true');
+    pip.tabIndex = -1;
+    pip.addEventListener('click', function () {
+      setSliderValueFromPip(slider, i);
+    });
+    row.appendChild(pip);
+  }
+  wrapper.appendChild(row);
+  return row;
+}
+
+/**
+ * A pip click routes through the input's own `input` handler, so over-allocation is
+ * refused by the one rule that already guards dragging and keyboard use.
+ */
+function setSliderValueFromPip(slider, value) {
+  if (slider.disabled) return;
+  const next = Math.max(0, Math.min(5, Number(value) || 0));
+  if (next === (parseInt(slider.value, 10) || 0)) return;
+  slider.value = String(next);
+  slider.dispatchEvent(new Event('input', { bubbles: true }));
+  slider.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function updateTrainingSliderVisual(slider, rawValue) {
-  const shell = ensureTrainingSliderVisual(slider);
-  if (!shell) return;
+  const row = ensureTrainingSliderVisual(slider);
+  if (!row) return;
   const value = Math.max(0, Math.min(5, Number(rawValue) || 0));
-  shell.querySelectorAll('.training-slider-node').forEach((node, index) => {
-    node.classList.toggle('is-selected', index === value);
+  const spent = calculateTotalPoints();
+  const headroom = TOTAL_POINTS - spent + value;   // what this drill alone could reach
+  row.querySelectorAll('.pipstep-pip').forEach((pip, index) => {
+    pip.classList.toggle('is-filled', index <= value);
+    pip.classList.toggle('is-current', index === value);
+    // Dimming what the budget cannot reach beats letting a click silently do nothing.
+    pip.disabled = index > headroom;
   });
 }
 
-function updateTrainingSliderValuePosition(slider) {
-  const wrapper = slider?.closest('.slider-container');
-  if (!wrapper) return;
-  const valueSpan = wrapper.querySelector('.slider-value');
-  if (!valueSpan) return;
-  const min = Number(slider.min || 0);
-  const max = Number(slider.max || 0);
-  const current = Number(slider.value || 0);
-  const range = max - min;
-  const percent = range > 0 ? (current - min) / range : 0;
-  const thumbOffset = percent * slider.offsetWidth;
-  valueSpan.style.left = `${thumbOffset}px`;
-  valueSpan.style.transform = 'translateX(-50%)';
+/** Repaint every stepper's reachable range after the budget moves. */
+function refreshAllTrainingSliderVisuals() {
+  allSliders.forEach(function (slider) {
+    updateTrainingSliderVisual(slider, slider.value);
+  });
 }
+
+/** No-op since the pip swap: there is no range thumb to position a bubble against.
+ *  Kept as a seam so the call sites (resize, restore, auto-train) stay one shape. */
+function updateTrainingSliderValuePosition(_slider) {}
 
 /**
  * Utility: set slider value and update display/cache
@@ -438,7 +604,7 @@ function resetCustomFocusCommitted() {
 
 function openCustomFocusModal() {
   if (!customFocusModal || !customFocusThead || !customFocusTbody) return;
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   if (urlParams.get('mode') !== 'franchise' || !urlParams.get('franchise_id')) {
     showMessageModal('Choose Attributes is available in franchise mode after roster data loads.');
     return;
@@ -634,6 +800,9 @@ function updatePointsRemaining() {
   }
 
   updateRequirementsBar();
+  // Spending on one drill shrinks every other drill's reachable range, so the disabled
+  // pips are repainted across the page, not just on the stepper that moved.
+  refreshAllTrainingSliderVisuals();
 
   return remaining;
 }
@@ -861,7 +1030,7 @@ function applyCoachingFocusArchetypeUi(value) {
 }
 
 function restoreTrainingFormDraft() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const key = trainingFormDraftStorageKey(urlParams);
   if (!key) return;
   let raw;
@@ -1000,7 +1169,7 @@ if (customFocusCancelBtn) {
 backBtn.addEventListener('click', function() {
   clearTutorialResumeContext();
   // Get URL parameters to determine where to navigate back
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const from = urlParams.get('from');
   
@@ -1017,13 +1186,6 @@ backBtn.addEventListener('click', function() {
         })
       : `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ''}`;
     window.location.href = finalUrl;
-  } else if (mode === 'tournament') {
-    // Use same pattern as franchise mode - tournament.html is the command center
-    const tournamentId = urlParams.get('tournament_id');
-    const teamId = urlParams.get('team_id');
-    const url = `/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
-    const finalUrl = teamId ? `${url}&team_id=${encodeURIComponent(teamId)}` : url;
-    window.location.href = finalUrl;
   } else if (from === 'game-plan') {
     window.location.href = '/game-plan.html?' + urlParams.toString();
   } else {
@@ -1036,7 +1198,7 @@ backBtn.addEventListener('click', function() {
  * Collect all training data for submission
  */
 function collectTrainingData() {
-  const pageParams = new URLSearchParams(window.location.search);
+  const pageParams = liveParams();
   const data = {
     // Player Drills
     player_drills: {
@@ -1192,10 +1354,9 @@ submitBtn.addEventListener('click', async function() {
   }
   
   // Get URL parameters for context
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
-  const tournamentId = urlParams.get('tournament_id');
   const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
   
   // Prepare payload based on mode
@@ -1211,16 +1372,6 @@ submitBtn.addEventListener('click', async function() {
     if (teamId) {
       payload.team_id = teamId;
     }
-  } else if (mode === 'tournament' && tournamentId) {
-    payload = {
-      tournament_id: tournamentId,
-      training_data: trainingData
-    };
-    // Only include team_id if it's not null/undefined
-    if (teamId) {
-      payload.team_id = teamId;
-    }
-    endpoint = '/tournament/run-training';
   } else {
     // Single game mode or default
     payload = {
@@ -1326,8 +1477,10 @@ submitBtn.addEventListener('click', async function() {
         const safeReturnUrl = typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(returnUrl) : returnUrl;
         if (safeReturnUrl) {
           const redirect = new URL(redirectUrl, window.location.origin);
-          redirect.searchParams.set('return_url', safeReturnUrl);
-          redirectUrl = `${redirect.pathname}${redirect.search}${redirect.hash || ''}`;
+          const bag = franchiseCtx().parseSearch(redirect.search);
+          bag.set('return_url', safeReturnUrl);
+          const qs = bag.toString();
+          redirectUrl = `${redirect.pathname}${qs ? '?' + qs : ''}${redirect.hash || ''}`;
         }
       }
       window.location.href = redirectUrl;
@@ -1339,9 +1492,6 @@ submitBtn.addEventListener('click', async function() {
             teamId: urlParams.get('team_id')
           })
         : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}`;
-    } else if (mode === 'tournament' && tournamentId) {
-      // Use same pattern as franchise mode - tournament.html is the command center
-      window.location.href = `/tournament.html?tournament_id=${tournamentId}`;
     } else {
       window.location.href = '/game-plan.html';
     }
@@ -1399,7 +1549,7 @@ async function resumeCpuTraining(franchiseId) {
  * Fetch training points from API for franchise mode
  */
 async function initializeTrainingPoints() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
   const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
@@ -1416,6 +1566,9 @@ async function initializeTrainingPoints() {
         prefetchTrainingNewswire(franchiseId);
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
+          // Same 12 rows, already RT-descending, already carrying training_position /
+          // training_focus through training_position_projection — no second fetch.
+          renderPlayerDevelopment();
         }
         if (Array.isArray(data.player_maximizer_ranking_attrs)) {
           customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
@@ -1497,7 +1650,7 @@ function syncPlaybookModeToggleUi() {
 }
 
 function wireCustomTrainingPlaybook() {
-  const pageParams = new URLSearchParams(window.location.search);
+  const pageParams = liveParams();
   if (pageParams.get('mode') !== 'franchise') {
     const wrap = document.querySelector('.playbook-mode-selection');
     if (wrap) wrap.style.display = 'none';
@@ -1529,8 +1682,8 @@ function wireCustomTrainingPlaybook() {
           })
         );
       } catch (_e) {}
-      const p = new URLSearchParams(window.location.search);
-      const q = new URLSearchParams();
+      const p = liveParams();
+      const q = emptyParams();
       q.set('mode', p.get('mode') || 'franchise');
       if (p.get('franchise_id')) q.set('franchise_id', p.get('franchise_id'));
       const tid = p.get('team_id') || p.get('user_team_id');
@@ -1735,11 +1888,16 @@ function buildFocusTooltipHtml(value, f) {
     '<div class="tt-desc">' + f.desc + '</div>' + modes;
 }
 
-/* --- Attribute code chips on single-attribute drills --- */
+/* --- Attribute code chips on single-attribute drills ---
+   The chip hangs off the drill's NAME, which is the .label-text on a drill that sits
+   inside a titled group and the .drill-title on a solo drill. Requiring .label-text alone
+   silently dropped the chip from every General drill once they became solo rows. */
 function injectAttributeChip(slider, d) {
   if (!d || !d.code) return;
   const label = slider.closest('.slider-label');
-  const lt = label && label.querySelector('.label-text');
+  const group = slider.closest('.drill-group');
+  const lt = (label && label.querySelector('.label-text'))
+    || (group && group.classList.contains('drill-group--solo') && group.querySelector('.drill-title'));
   if (!lt || lt.querySelector('.attr-chip')) return;
   const chip = document.createElement('span');
   chip.className = 'attr-chip';
@@ -1787,7 +1945,6 @@ const reqPointsMeterEl = document.getElementById('req-points-meter');
 const reqFocusChip = document.getElementById('req-focus');
 const reqFocusValueEl = document.getElementById('req-focus-value');
 const reqFocusNudgeBtn = document.getElementById('req-focus-nudge');
-const reqReadoutEl = document.getElementById('req-readout');
 
 function friendlyFocusName(radio) {
   const v = radio.value;
@@ -1837,11 +1994,9 @@ function updateRequirementsBar() {
   if (reqFocusChip) reqFocusChip.classList.toggle('is-nudge', nudge);
   if (reqFocusNudgeBtn) reqFocusNudgeBtn.hidden = !nudge;
 
-  const readyCount = (pointsComplete ? 1 : 0) + (focusComplete ? 1 : 0);
-  if (reqReadoutEl) {
-    reqReadoutEl.textContent = readyCount === 2 ? 'Ready to submit' : (readyCount + ' of 2 ready');
-    reqReadoutEl.classList.toggle('is-ready', readyCount === 2);
-  }
+  // No "n of 2 ready" tally: the two chips already show their own state, and Submit
+  // stays disabled until both are met, which says the same thing in the place a coach
+  // is actually looking when he wants to submit.
 }
 
 function scrollToCoachingFocus() {

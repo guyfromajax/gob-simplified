@@ -1,5 +1,26 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 // Parse URL parameters
-const urlParams = new URLSearchParams(window.location.search);
+const urlParams = liveParams();
 
 function playSound(filename) {
   try {
@@ -39,7 +60,6 @@ const myTeamSide = urlParams.get('my_team');
 const userTeamIdParam = urlParams.get('user_team_id');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', urlParams.get('franchise_id')) : urlParams.get('franchise_id');
 const weekParam = urlParams.get('week');
-const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
 const modeParam = urlParams.get('mode');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 const periodLabel = urlParams.get('period') || `Q${quarter}`;
@@ -54,7 +74,7 @@ const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
 
 // ✅ PHASE 1.1: Fail loudly if game_id is required but missing
 // For single mode, game_id is required for ALL quarters (Q1 must be created by init-game)
-// For tournament/franchise mode, game_id is optional (may not exist yet)
+// For franchise mode, game_id is optional (may not exist yet)
 const isGameIdRequired = (modeParam === 'single') || (quarter > 1) || resumeFromTimeout;
 if (isGameIdRequired && !gameId) {
   const errorMsg = `game_id is required but missing from URL. Mode: ${modeParam}, Quarter: ${quarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
@@ -76,8 +96,7 @@ if (isGameIdRequired && !gameId) {
           my_team: myTeamSide || 'home',
           mode: modeParam || 'single',
           quarter: quarter,
-          franchise_id: franchiseId || undefined,
-          tournament_id: tournamentId || undefined
+          franchise_id: franchiseId || undefined
         },
         redirectLabel: 'Return to Lineup'
       }
@@ -93,7 +112,6 @@ if (isGameIdRequired && !gameId) {
       if (homeDisplayParam) lineupUrl += `&home_display=${encodeURIComponent(homeDisplayParam)}`;
       if (awayDisplayParam) lineupUrl += `&away_display=${encodeURIComponent(awayDisplayParam)}`;
       if (franchiseId) lineupUrl += `&franchise_id=${encodeURIComponent(franchiseId)}`;
-      if (tournamentId) lineupUrl += `&tournament_id=${encodeURIComponent(tournamentId)}`;
       window.location.href = lineupUrl;
     }
   }
@@ -235,7 +253,7 @@ if (modeParam === 'tutorial') {
       // Forward the query string VERBATIM. It carries the chosen five as
       // home_pg / home_sg / … — rebuilding it here would drop the lineup and leave
       // the pre-game card empty.
-      const fwd = new URLSearchParams(window.location.search);
+      const fwd = liveParams();
       window.location.href = '/tutorial-situation.html?' + fwd.toString();
     });
     actions.appendChild(cta);
@@ -264,7 +282,7 @@ const TOAST_POST_LAND_BUFFER_MS = 100;
 
 /** True when game-plan was opened from FCC / TCC (not from set-lineup). */
 function isGamePlanFromCommandCenter() {
-  const p = new URLSearchParams(window.location.search);
+  const p = liveParams();
   const from = p.get('from') || 'lineup';
   return (
     from === 'command_center' ||
@@ -471,9 +489,10 @@ const recoverTutorialGameId = async () => {
       gameId = recovered;
       // Repair the URL in place so every later read — including the save on
       // PLAY NOW and anything that forwards the query string — sees it.
-      const u = new URL(window.location.href);
-      u.searchParams.set('game_id', recovered);
-      window.history.replaceState({}, '', u.toString());
+      const bag = liveParams();
+      bag.set('game_id', recovered);
+      // In-place: repair game_id on the current game-plan URL. Do not navigate.
+      franchiseCtx().commitParams(bag);
       console.warn('[tutorial] recovered game_id from tutorial_state:', recovered);
     }
     return recovered;
@@ -531,15 +550,12 @@ async function loadSettings() {
     let mode = modeParam || 'single';
     
     // ✅ SS&S: Always load from database (single source of truth for all modes)
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('mode', mode);
     params.set('team_id', teamId);
     
     if (mode === 'franchise' && franchiseId) {
       params.set('franchise_id', franchiseId);
-      if (gameId) params.set('game_id', gameId);
-    } else if (mode === 'tournament' && tournamentId) {
-      params.set('tournament_id', tournamentId);
       if (gameId) params.set('game_id', gameId);
     } else if ((mode === 'single' || mode === 'tutorial') && gameId) {
       // Tutorial games are stored in games_collection like single mode; the
@@ -583,16 +599,16 @@ async function loadSettings() {
         if (res.status === 404 && errorDetail.includes('not found')) {
           // Document not found - show missing truth error
           if (window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
-            const pointerType = mode === 'single' ? 'game_id' : (mode === 'franchise' ? 'franchise_id' : 'tournament_id');
-            const pointerValue = mode === 'single' ? gameId : (mode === 'franchise' ? franchiseId : tournamentId);
+            const pointerType = mode === 'franchise' ? 'franchise_id' : 'game_id';
+            const pointerValue = mode === 'franchise' ? franchiseId : gameId;
             window.ErrorHandler.showMissingTruthError({
               pointerType,
               pointerValue: pointerValue || 'unknown',
               message: errorDetail,
               mode: mode,
               recoveryOptions: {
-                redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
-                redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
+                redirectTo: mode === 'franchise' ? 'franchise-select' : 'mode-select',
+                redirectLabel: mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Mode Select'
               }
             });
           }
@@ -666,8 +682,6 @@ async function saveSettingsQuietly() {
     
     if (mode === 'franchise' && franchiseId) {
       payload.franchise_id = franchiseId;
-    } else if (mode === 'tournament' && tournamentId) {
-      payload.tournament_id = tournamentId;
     }
     
     // ✅ PHASE 1.3: Log backend write
@@ -756,9 +770,9 @@ function executeNavigateToCourt() {
   // ✅ TASK 0: Commented out save logic - nav-only button
   // await saveSettingsQuietly();
   
-  // ✅ CRITICAL FIX: Read URL params directly from window.location.search
+  // ✅ CRITICAL FIX: Read URL params directly from currentSearch()
   // Don't rely on module-level urlParams which might be stale
-  const currentUrlParams = new URLSearchParams(window.location.search);
+  const currentUrlParams = liveParams();
   const currentParamsObj = Object.fromEntries(currentUrlParams.entries());
   console.log('🚀 [GAME-PLAN] Current URL params:', currentParamsObj);
   console.error('🚀🚀🚀 [GAME-PLAN] executeNavigateToCourt() - game_id:', currentUrlParams.get('game_id'), 'resume_from_timeout:', currentUrlParams.get('resume_from_timeout'));
@@ -861,9 +875,9 @@ function executeNavigateBack() {
     return;
   }
   
-  // ✅ CRITICAL FIX: Read URL params directly from window.location.search
+  // ✅ CRITICAL FIX: Read URL params directly from currentSearch()
   // Don't rely on module-level urlParams which might be stale
-  const currentUrlParams = new URLSearchParams(window.location.search);
+  const currentUrlParams = liveParams();
   
   const currentGameId = helper.getGameId(currentUrlParams);
   const resumeFromTimeout = helper.getResumeFromTimeout(currentUrlParams);
@@ -905,16 +919,9 @@ function executeNavigateToCommandCenter() {
   // ✅ TASK 0: Commented out save logic - nav-only button
   // await saveSettingsQuietly();
   
-  // Return to command center (tournament or franchise)
   const mode = modeParam || 'single';
   
-  if (mode === 'tournament' && tournamentId) {
-    // Include team_id in URL for tournament command center
-    const teamIdParam = teamId || userTeamIdParam || teamName;
-    const url = `/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
-    const finalUrl = teamIdParam ? `${url}&team_id=${encodeURIComponent(teamIdParam)}` : url;
-    window.location.href = finalUrl;
-  } else if (mode === 'franchise' && franchiseId) {
+  if (mode === 'franchise' && franchiseId) {
     const teamIdParam = teamId || userTeamIdParam || teamName;
     const finalUrl = typeof resolveFranchiseLockerRoomUrl === 'function'
       ? resolveFranchiseLockerRoomUrl({
@@ -1067,7 +1074,7 @@ async function init() {
   await loadSettings();
   
   // Check where user came from (command_center vs lineup)
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const from = urlParams.get('from') || 'lineup';  // Default to lineup for backwards compatibility
   
   // Button event listeners

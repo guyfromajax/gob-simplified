@@ -3,6 +3,17 @@ name: Run Tests
 on: [push, pull_request]
 
 jobs:
+  migration-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+      - name: Check desktop-migration ratchets
+        run: python scripts/ci/check_migration_gates.py
+
   test:
     runs-on: ubuntu-latest
     steps:

@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Load and display accumulated game statistics for resumed games
  * Used when loading Q4 after simming Q1-Q3
@@ -170,7 +191,7 @@ function setScoreboardHeaderDefaults(homeTeam, awayTeam) {
   let homeChrome = homeTeam;
   let awayChrome = awayTeam;
   try {
-    const sp = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const sp = typeof window !== 'undefined' ? liveParams() : emptyParams();
     homeChrome = sp.get('home_display') || homeTeam;
     awayChrome = sp.get('away_display') || awayTeam;
   } catch (e) { /* ignore */ }
@@ -298,7 +319,7 @@ export function displayAccumulatedHeaderState(gameData, homeTeam, awayTeam) {
   let urlAwayId = null;
   try {
     if (typeof window !== 'undefined') {
-      const p = new URLSearchParams(window.location.search);
+      const p = liveParams();
       urlHomeId = p.get('home_id');
       urlAwayId = p.get('away_id');
     }
@@ -568,7 +589,7 @@ export function displayTeamBoxScore(gameData, homeTeam, awayTeam) {
   let urlAwayId = null;
   try {
     if (typeof window !== 'undefined') {
-      const p = new URLSearchParams(window.location.search);
+      const p = liveParams();
       urlHomeId = p.get('home_id');
       urlAwayId = p.get('away_id');
     }
@@ -627,7 +648,7 @@ export function displayTeamBoxScore(gameData, homeTeam, awayTeam) {
  * Call this on page load if game_id exists
  */
 export async function initializeGameStats() {
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const gameId = urlParams.get('game_id');
   const homeTeam = urlParams.get('home');
   const awayTeam = urlParams.get('away');

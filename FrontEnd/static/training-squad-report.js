@@ -1,7 +1,28 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function () {
   'use strict';
 
-  var urlParams = new URLSearchParams(window.location.search);
+  var urlParams = liveParams();
   var franchiseId = urlParams.get('franchise_id');
   var teamId = urlParams.get('team_id');
   // Default to the changes view, mirroring the training report.
@@ -11,7 +32,7 @@
     if (typeof resolveFranchiseLockerRoomUrl === 'function') {
       return resolveFranchiseLockerRoomUrl({ params: urlParams, franchiseId: franchiseId, teamId: teamId });
     }
-    var p = new URLSearchParams();
+    var p = emptyParams();
     p.set('mode', 'franchise');
     if (franchiseId) p.set('franchise_id', franchiseId);
     if (teamId) p.set('team_id', teamId);

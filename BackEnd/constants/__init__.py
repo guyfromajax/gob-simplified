@@ -716,3 +716,21 @@ TEAM_ATTR_RANGES = {
     # never called) was deleted in this pass.
     "rebound_modifier": (0.0, 1.0),
 }
+
+# Rebound RACE term (GOB_REBOUND_RACE): the distance discount is applied to TIME to the
+# ball rather than distance to it -- final_score *= 1 / (1 + time_to_ball /
+# REBOUND_RACE_TIME_SCALE), where time_to_ball = distance / the player's own movement
+# rate. A UNIT CONVERSION, not a retune: the value is set so the league-average
+# time_to_ball lands on the same term value the league-average arrival distance lands on
+# under REBOUND_DISTANCE_SCALE. Derivation and the measured averages are in
+# reports/rebound-race-2026-09-19.md.
+#
+# Derived, not chosen: REBOUND_RACE_TIME_SCALE = T_bar * REBOUND_DISTANCE_SCALE / D_bar,
+# where D_bar = 10.7069 grid units is the league-average arrival distance to the bounce
+# and T_bar = 0.7752 game-seconds the league-average time_to_ball, both measured over
+# 6,555 candidate evaluations (n=8 seeds per arm, SEED_DEFENSES=1, arrival flag on).
+# Both terms then evaluate to 0.427651 at the league average, so the average player's
+# distance discount is unchanged and only the SPREAD between players moves. Implied mean
+# travel rate D_bar/T_bar = 13.81 grid units per game-second.
+
+REBOUND_RACE_TIME_SCALE = 0.5792

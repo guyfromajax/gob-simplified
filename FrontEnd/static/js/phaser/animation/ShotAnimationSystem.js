@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * ShotAnimationSystem - Universal Shot Animation Handler
  * 
@@ -14,7 +35,7 @@
  * - No floating balls or teleports
  */
 
-import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
+import * as Phaser from "/js/vendor/phaser-3.70.0.esm.js";
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
@@ -2385,7 +2406,7 @@ export class ShotAnimationSystem {
    */
   _applyDebugVariantOverride(turnData) {
     if (typeof window === 'undefined' || !window.location?.search) return;
-    const params = new URLSearchParams(window.location.search);
+    const params = liveParams();
     const forced = params.get('debug_shot_variant');
     if (!forced) return;
 

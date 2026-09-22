@@ -109,6 +109,8 @@ So both **user and CPU** franchise teams enter the first summarize with full FTD
 
 After `_initialize_game_stats`, the handler sets scores to zero and calls `summarize_game_state(gm, exclude_animations=True)`, then attaches `game_id`, `mode`, `user_team_side`, etc.
 
+**Player EM at game init:** `_initialize_game_stats` still re-rolls **CH** and zeros **MO** for every new game. **Franchise** games pass `preserve_emotion=True` so FPD EM walks into the game document (timeout/resume still restores from the game save). Single / tournament still re-roll EM 1–100. See `projects/Player_EM_Overview.md`.
+
 **`franchise_id`:** written to **`summary["franchise_id"]` whenever the request includes `franchise_id`** (not gated on `mode`). The court’s **`GET /api/game`** path uses this field to re-merge **FTD rank + franchise `results` W–L** onto team rows; omitting it on older saves broke scoreboard metadata until re-init.
 
 **Scoreboard metadata (franchise):**

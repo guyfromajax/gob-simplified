@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>Redirecting…</title>
+  <script src="/js/shared/franchiseContext.js"></script>
   <script>
     // This tutorial page moved to /tutorial-scouting.html (consistent tutorial- naming).
     // Redirect stub preserves any query string + hash for bookmarks/old links.
-    location.replace('/tutorial-scouting.html' + location.search + location.hash);
+    var qs = window.FranchiseContext.toSearchParams().toString();
+    location.replace("/tutorial-scouting.html" + (qs ? "?" + qs : "") + location.hash);
   </script>
   <meta http-equiv="refresh" content="0; url=/tutorial-scouting.html">
   <link rel="stylesheet" href="/css/fonts.css">

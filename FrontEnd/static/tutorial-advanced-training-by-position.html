@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="stylesheet" href="/fonts/app-fonts.css">
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Training by Position — Advanced Topics | Geeked Out Basketball</title>
+<link rel="stylesheet" href="/css/auth-bar.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/gob-tutorial.css">
+  <link rel="stylesheet" href="/css/gob-advanced.css">
+  <link rel="stylesheet" href="/css/fonts.css">
+</head>
+<body class="gob-tut has-auth-bar has-footer" data-gob-nav="players">
+
+  <div class="gob-shell">
+
+    <header class="gob-head">
+      <button class="gob-back" data-gob-back type="button"><span class="chev">‹</span> Back</button>
+      <span class="spacer"></span>
+    </header>
+
+    <!-- LESSON HERO -->
+    <section class="lesson-hero" data-screen-label="Training by Position — hero">
+      <nav class="crumb" aria-label="Breadcrumb">
+        <a href="/tutorial.html">Tutorials</a>
+        <span class="sep">›</span>
+        <a href="/tutorial.html#advanced-topics">Advanced Topics</a>
+        <span class="sep">›</span>
+        <span class="here">Training by Position</span>
+      </nav>
+      <div class="meta">
+        <span class="depth advanced">Advanced Topic</span>
+      </div>
+      <h1>TRAINING BY POSITION</h1>
+      <p class="intro">Players train differently based on position and development focus.</p>
+    </section>
+
+    <!-- THE GRID — rendered from /js/generated/trainingMatrix.js, which is written
+         from BackEnd/constants/training_shape.py. Nothing here is typed by hand. -->
+    <section class="lsec" id="fit-grid">
+      <div class="panel" style="padding:22px 20px;">
+
+        <div class="fitgrid-controls">
+          <div class="fg-modes" role="tablist" aria-label="Matrix orientation">
+            <button type="button" class="fg-mode" role="tab" aria-selected="false"
+                    data-fg-mode="position">By Position</button>
+            <button type="button" class="fg-mode is-on" role="tab" aria-selected="true"
+                    data-fg-mode="focus">By Focus</button>
+          </div>
+          <div class="fg-picks" id="fg-picks" role="tablist" aria-label="Selection"></div>
+        </div>
+
+        <p class="fg-caption" id="fg-caption"></p>
+
+        <div class="fitgrid-wrap">
+          <table class="fitgrid" id="fitgrid">
+            <thead id="fitgrid-head"></thead>
+            <tbody id="fitgrid-body"></tbody>
+          </table>
+        </div>
+
+        <div class="fitgrid-legend" id="fitgrid-legend"></div>
+      </div>
+    </section>
+
+    <!-- HANDOFF -->
+    <section class="handoff panel">
+      <div class="h-l">
+        <div class="lbl">You're all caught up</div>
+        <div class="nx">More advanced topics coming soon</div>
+      </div>
+      <div class="h-actions">
+        <a class="gob-btn gob-btn--action gob-btn--lg" href="/tutorial.html#advanced-topics">All topics</a>
+        <a class="gob-btn gob-btn--ghost gob-btn--lg" href="/tutorial-advanced-momentum.html">Revisit: Momentum</a>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="gob-bottomnav" aria-label="Tutorial sections">
+    <div class="navwrap" id="bottomnav"></div>
+  </nav>
+
+  <!-- TOAST -->
+  <div class="gob-toast" id="toast" role="status" aria-live="polite">
+    <span class="ti">✓</span>
+    <span><span class="tt"></span><br><span class="ts"></span></span>
+  </div>
+
+  <!-- global auth-bar + footer (injected by authBarInit) -->
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/archetypeBadge.js"></script>
+  <script src="/js/shared/authBarInit.js"></script>
+  <!-- tutorial nav + progress behavior -->
+  <script src="/js/shared/gobTutorialNav.js"></script>
+  <script src="/js/generated/trainingMatrix.js"></script>
+  <script src="/js/shared/trainingMatrixGrid.js"></script>
+  <script>
+    if (window.GOB && window.GOB.markSeen) window.GOB.markSeen('training-by-position');
+  </script>
+</body>
+</html>

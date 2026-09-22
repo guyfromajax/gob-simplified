@@ -380,6 +380,132 @@ class ShotManager:
             }
         return None
 
+    def _crash_coords(self, roles, shooter, is_home_team_shooting, min_x=None, max_x=None, pid=None):
+        """Where one crasher is sent on a shot attempt.
+
+        ``GOB_CRASH_SHOT_AWARE`` off: the legacy flat box - randint(85,92)/(8,15) by x
+        and randint(20,30) by y, independent of everything about the shot.
+
+        On: Model A, sampled from the rebound distribution FOR THAT SHOT. The model is
+        handed only the shot origin and the rim side; it is structurally incapable of
+        reading the bounce, which is already in scope here (``bounce_spot`` is computed
+        at :2465, before the HCO authoring at :2550). See
+        ``BackEnd/utils/crash_destination.py`` and ``tests/test_crash_destination.py``.
+
+        Two ``randint`` draws either way, so the flag is draw-neutral.
+        """
+        from BackEnd.utils import crash_destination as CDEST
+
+        if pid is not None:
+            cached = (getattr(self, "_crash_prepared", None) or {}).get(pid)
+            if cached is not None:
+                return dict(cached)
+
+        if CDEST.enabled():
+            rim_x = 91.0 if is_home_team_shooting else 9.0
+            origin = self._shooter_grid_for_bounce(roles, shooter) or {"x": rim_x, "y": 25.0}
+            coords = CDEST.crash_destination(
+                shooter_x=origin["x"], shooter_y=origin["y"], rim_x=rim_x,
+            )
+            if min_x is not None and max_x is not None:
+                coords["x"] = max(min_x, min(max_x, coords["x"]))
+            return coords
+
+        if is_home_team_shooting:
+            rebounder_x = random.randint(85, 92)
+        else:
+            rebounder_x = random.randint(8, 15)
+        if min_x is not None and max_x is not None:
+            rebounder_x = max(min_x, min(max_x, rebounder_x))
+        return {"x": rebounder_x, "y": random.randint(20, 30)}
+
+    def _prepare_crash_arrival(self, roles, shooter, off_team, off_players, def_players,
+                               result, bounce_spot, shot_spot):
+        """Author crash destinations BEFORE the rebounder is selected, and return the
+        arrival coords selection should score from.
+
+        ``GOB_REBOUND_FROM_ARRIVAL`` off: returns None and draws nothing, so the flag is
+        inert and the legacy order (select, then author) stands.
+
+        On: the destinations for both pools are drawn here, in the SAME ORDER the later
+        authoring loops walk, and cached by player id so those loops reuse them instead
+        of drawing again. The crash draws therefore move ahead of selection's draws -
+        that is the reorder, and it re-phases the stream by design.
+
+        THE WINDOW IS AN APPROXIMATION, AND KNOWINGLY SO. ``sim_post_shot_window_seconds``
+        wants ``uses_shot_arc``, which ``select_and_stamp_shot_micro`` does not set until
+        :2742 - after selection. Moving that call earlier would re-phase shot
+        micro-movement as well, a far larger change than this pass. So the window is
+        derived here from what IS known at this point (the result type, the bounce, any
+        shot variant already stamped) with ``uses_shot_arc`` absent, and the resulting
+        error is measured in reports/rebound-arrival-2026-09-19.md rather than assumed
+        away. It affects HOW FAR a crasher gets, never WHERE he was aiming.
+        """
+        from BackEnd.utils import rebound_arrival as RA
+        from BackEnd.utils import boxout_contest as BOXOUT
+
+        if not RA.enabled():
+            return None
+        from BackEnd.utils.shared import sim_post_shot_window_seconds
+
+        is_home = off_team.team_id == self.game.home_team.team_id
+        prepared = getattr(self, "_crash_prepared", None)
+        if prepared is None:
+            prepared = self._crash_prepared = {}
+        players_by_id = {}
+        for player in list(off_players) + list(def_players):
+            if player is None:
+                continue
+            pid = getattr(player, "player_id", None)
+            if pid is None:
+                continue
+            players_by_id[pid] = player
+            prepared[pid] = self._crash_coords(roles, shooter, is_home)
+
+        # Box-out contest (GOB_BOXOUT_CONTEST, default OFF). Resolves HERE, from the two
+        # players' shot-moment coords, their just-authored destinations and their ST -
+        # and NOTHING else. `result` and `bounce_spot` are in scope on the lines below
+        # and are deliberately NOT passed: a box-out that knew where the ball was going
+        # would be the same clairvoyance `crash_destination` exists to refuse. The loser's
+        # destination is pushed back away from the rim, which is a visible change to where
+        # he stands, not a scoring bonus. See BackEnd/utils/boxout_contest.py.
+        self._boxout_log = []
+        if BOXOUT.enabled():
+            rim_x = 91.0 if is_home else 9.0
+            for defender, crasher, gap in BOXOUT.find_boxout_pairs(def_players, off_players):
+                outcome = BOXOUT.resolve_boxout(defender, crasher)
+                loser = outcome["loser"]
+                lid = getattr(loser, "player_id", None)
+                before = prepared.get(lid)
+                origin = BOXOUT._xy(loser)
+                if not isinstance(before, dict) or origin is None:
+                    continue
+                after = BOXOUT.push_back(before, origin, rim_x)
+                prepared[lid] = after
+                self._boxout_log.append({
+                    "defender_id": getattr(defender, "player_id", None),
+                    "crasher_id": getattr(crasher, "player_id", None),
+                    "gap": round(gap, 3),
+                    "def_st": (getattr(defender, "attributes", None) or {}).get("ST", 0),
+                    "off_st": (getattr(crasher, "attributes", None) or {}).get("ST", 0),
+                    "def_score": outcome["def_score"], "off_score": outcome["off_score"],
+                    "defender_wins": outcome["defender_wins"],
+                    "loser_id": lid, "before": dict(before), "after": dict(after),
+                })
+
+        probe = dict(result or {})
+        probe.setdefault("result_type", "MISS")
+        if isinstance(bounce_spot, dict):
+            probe["ball_bounce_x"] = bounce_spot.get("x")
+            probe["ball_bounce_y"] = bounce_spot.get("y")
+        away_offense = off_team.team_id == self.game.away_team.team_id
+        try:
+            seconds = sim_post_shot_window_seconds(probe, away_offense, shot_spot)
+        except Exception:  # noqa: BLE001
+            seconds = None
+        self._crash_window_seconds = seconds
+        return RA.arrival_coords(prepared, players_by_id, seconds)
+
     def _compute_miss_bounce_spot(self, roles, shooter, off_team):
         """Grid coord where a missed shot's ball rests for schema ``[bounce]``."""
         foul_block_spot_used = getattr(self, "_foul_block_spot", None)
@@ -671,6 +797,9 @@ class ShotManager:
         time_elapsed = 0
         events = []
         result = {}
+
+        self._crash_prepared = {}
+        self._crash_window_seconds = None
 
         shooter = roles["shooter"]
         passer = roles.get("passer")  # Can be None if no passer found
@@ -2053,12 +2182,8 @@ class ShotManager:
                 # their step.end.coords stays at the skeleton's shot spot).
                 if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
                     continue
-                if is_home_team_shooting:
-                    rebounder_x = random.randint(85, 92)
-                else:
-                    rebounder_x = random.randint(8, 15)
-                rebounder_x = max(min_x, min(max_x, rebounder_x))
-                rebounder_coords = {"x": rebounder_x, "y": random.randint(20, 30)}
+                rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting, min_x, max_x)
+                rebounder_x = rebounder_coords["x"]
                 offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
             result["offense_rebounder_coords"] = offense_rebounder_coords
 
@@ -2072,12 +2197,8 @@ class ShotManager:
                 rebounder_player = def_team.lineup.get(pos)
                 if rebounder_player is None:
                     continue
-                if is_home_team_shooting:
-                    rebounder_x = random.randint(85, 92)
-                else:
-                    rebounder_x = random.randint(8, 15)
-                rebounder_x = max(min_x, min(max_x, rebounder_x))
-                rebounder_coords = {"x": rebounder_x, "y": random.randint(20, 30)}
+                rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting, min_x, max_x)
+                rebounder_x = rebounder_coords["x"]
                 defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
             result["defense_rebounder_coords"] = defense_rebounder_coords
 
@@ -2156,10 +2277,8 @@ class ShotManager:
                         continue
                     if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
                         continue
-                    if is_home_team_shooting:
-                        rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                    else:
-                        rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                    rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting,
+                            pid=getattr(rebounder_player, "player_id", None))
                     offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                 result["offense_rebounder_coords"] = offense_rebounder_coords
 
@@ -2168,10 +2287,8 @@ class ShotManager:
                     rebounder_player = def_team.lineup.get(pos)
                     if rebounder_player is None:
                         continue
-                    if is_home_team_shooting:
-                        rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                    else:
-                        rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                    rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting,
+                            pid=getattr(rebounder_player, "player_id", None))
                     defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                 result["defense_rebounder_coords"] = defense_rebounder_coords
 
@@ -2356,6 +2473,15 @@ class ShotManager:
                         shooter_id = getattr(shooter, "player_id", None)
                         exclude_player_ids = set()
                         penalize_player_ids = {shooter_id} if shooter_id else set()
+                        # GOB_REBOUND_FROM_ARRIVAL, fast-break miss. Same reorder as the
+                        # HCO branch below: destinations first, then score from arrival.
+                        _arrival = self._prepare_crash_arrival(
+                            roles, shooter, off_team,
+                            [p for p in o_rebounder_lineup.values()
+                             if p is not None and getattr(p, "player_id", None) != shooter_id],
+                            [p for p in d_rebounder_lineup.values() if p is not None],
+                            result, bounce_spot, roles.get("shot_spot"),
+                        )
                         rebounder, rebound_team, stat = select_rebounder_by_score(
                             off_team,
                             def_team,
@@ -2367,6 +2493,7 @@ class ShotManager:
                             max_distance_from_bounce=FAST_BREAK_REBOUND_GEO_DISTANCE,
                             fallback_off_lineup=off_lineup,
                             fallback_def_lineup=def_lineup,
+                            arrival_coords=_arrival,
                         )
 
                         result["ball_bounce_x"] = bounce_spot["x"]
@@ -2440,20 +2567,16 @@ class ShotManager:
                             continue
                         if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
                             continue
-                        if is_home_team_shooting:
-                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                        else:
-                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting,
+                            pid=getattr(rebounder_player, "player_id", None))
                         offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                     result["offense_rebounder_coords"] = offense_rebounder_coords
 
                     defense_rebounder_coords = {}
                     for pos, rebounder_player in d_rebounder_lineup.items():
                         if rebounder_player:
-                            if is_home_team_shooting:
-                                rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                            else:
-                                rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                            rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting,
+                            pid=getattr(rebounder_player, "player_id", None))
                             defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                     result["defense_rebounder_coords"] = defense_rebounder_coords
                 else:
@@ -2480,6 +2603,20 @@ class ShotManager:
                         exclude_player_ids = set()  # Don't exclude shooter anymore
                         penalize_player_ids = {shooter_id} if shooter_id else set()  # Penalize shooter by 20% distance
                     
+                        # GOB_REBOUND_FROM_ARRIVAL: author the crash destinations FIRST
+                        # and score candidates from where each crasher actually gets to.
+                        # Same pools, same order the authoring loops below walk, so the
+                        # destinations are drawn once and reused. Returns None (and draws
+                        # nothing) with the flag off.
+                        _shooter_id_excl = getattr(shooter, "player_id", None)
+                        _arrival = self._prepare_crash_arrival(
+                            roles, shooter, off_team,
+                            [p for p in (off_team.lineup.get(pos) for pos in offense_rebounders)
+                             if p is not None and getattr(p, "player_id", None) != _shooter_id_excl],
+                            [p for p in (def_team.lineup.get(pos) for pos in defense_rebounders)
+                             if p is not None],
+                            result, bounce_spot, roles.get("shot_spot"),
+                        )
                         rebounder, rebound_team, stat = select_rebounder_by_score(
                             off_team,
                             def_team,
@@ -2491,6 +2628,7 @@ class ShotManager:
                             fallback_off_lineup=off_lineup,
                             fallback_def_lineup=def_lineup,
                             fallback_start_distance=20,
+                            arrival_coords=_arrival,
                         )
                     
                         # Store bounce spot for frontend animation
@@ -2546,10 +2684,8 @@ class ShotManager:
                             continue
                         if getattr(rebounder_player, "player_id", None) == shooter_id_excl:
                             continue
-                        if is_home_team_shooting:
-                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                        else:
-                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting,
+                            pid=getattr(rebounder_player, "player_id", None))
                         offense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                     result["offense_rebounder_coords"] = offense_rebounder_coords
 
@@ -2561,10 +2697,8 @@ class ShotManager:
                         rebounder_player = def_team.lineup.get(pos)
                         if rebounder_player is None:
                             continue
-                        if is_home_team_shooting:
-                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
-                        else:
-                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        rebounder_coords = self._crash_coords(roles, shooter, is_home_team_shooting,
+                            pid=getattr(rebounder_player, "player_id", None))
                         defense_rebounder_coords[rebounder_player.player_id] = rebounder_coords
                     result["defense_rebounder_coords"] = defense_rebounder_coords
                 

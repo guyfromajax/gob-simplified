@@ -19,18 +19,20 @@ user decision.
 CPU reference auto-training is already shipped and tested. The old random-CPU allocation defect
 and its projected ~15 RT user advantage are resolved; do not reopen them from older project notes.
 
-### Training-position control — open
+### Training-position control — user write path SHIPPED, CPU policy still open
 
-`training_position` exists, persists, defaults to `position_intent`, and is carried through
-rollover, but it has no user write surface or CPU season-start assignment policy. The future UI
-should show the projected RT/conversion cost. CPU rules still need product agreement; the prior
-proposal was to prefer adjacent positions for persistent depth-chart needs, respect height, and
-avoid converting seniors.
+The user write surface exists: **Development Focus** (`GOB_DEVELOPMENT_FOCUS_PLAN.md`) puts
+`training_position` and `training_focus` on the FCC roster tab and the roster page, switchable
+any week, saving to FPD. It does **not** show a projected RT/conversion cost — still open.
 
-### Mid-season switch penalty — blocked by training-position control
+CPU season-start assignment policy is unchanged and still needs product agreement; every CPU
+player sits on `standard`. The prior proposal was to prefer adjacent positions for persistent
+depth-chart needs, respect height, and avoid converting seniors.
 
-Measure and decide the switch penalty only after the live write path and a real per-player focus
-policy exist. The prior Monte Carlo could not express this decision.
+### Mid-season switch penalty — unblocked, not yet measured
+
+The live write path and a real per-player focus policy now exist, so the switch penalty can be
+measured and decided. Today a switch is free and applies to future training only.
 
 ## Validation still owed
 

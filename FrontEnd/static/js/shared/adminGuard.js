@@ -23,19 +23,26 @@
   if (!token) return; // Auth guard will have redirected to login
   console.log("[adminGuard] token present, fetching /api/auth/me");
 
-  function getApiBase() {
-    if (window.API_BASE_URL) return window.API_BASE_URL;
-    var h = window.location.hostname;
-    if (h === "www.geekedoutbasketball.com" || h === "geekedoutbasketball.com") return "https://api.geekedoutbasketball.com";
-    if (h === "staging.geekedoutbasketball.com") return "https://api-staging.geekedoutbasketball.com";
-    if (h.indexOf("netlify.app") !== -1 && h.indexOf("staging") !== -1) return "https://gob-simplified-staging.up.railway.app";
-    return "http://localhost:8000";
-  }
   function redirectToModeSelect() {
     window.location.replace("/mode-select.html");
   }
-  var url = getApiBase() + "/api/auth/me";
-  fetch(url, { headers: { "Authorization": "Bearer " + token } })
+  // Auth is always-remote. Resolve through the routing table, not a local copy
+  // of the hostname sniff. adminGuard loads before api-config on builder pages,
+  // so pull it in if needed (same host/path as API_CONFIG.getBaseUrl()).
+  function withApiConfig(done) {
+    if (window.API_CONFIG) {
+      done(window.API_CONFIG);
+      return;
+    }
+    var script = document.createElement("script");
+    script.src = "/js/config/api-config.js";
+    script.onload = function () { done(window.API_CONFIG); };
+    script.onerror = function () { redirectToModeSelect(); };
+    document.head.appendChild(script);
+  }
+  withApiConfig(function (api) {
+    var url = api.buildUrl("/api/auth/me", { category: "auth" });
+    fetch(url, { headers: { "Authorization": "Bearer " + token } })
     .then(function (r) {
       if (!r.ok) return null;
       return r.json();
@@ -53,4 +60,5 @@
       console.log("[adminGuard] fetch error", err);
       redirectToModeSelect();
     });
+  });
 })();

@@ -20,11 +20,14 @@ import re
 from typing import Optional
 from bson import ObjectId
 
+from BackEnd.persistence import get_store
+_store = get_store()
+teams_collection = _store.teams_collection
+
 logger = logging.getLogger(__name__)
 
 # Try to import database collections (optional, for database lookups)
 try:
-    from BackEnd.db import teams_collection
     HAS_DB = True
 except ImportError:
     HAS_DB = False
@@ -139,6 +142,26 @@ def _is_objectid_string(team_id: str) -> bool:
         return False
 
 
+def get_user_team_from_tournament(tournament_doc: dict) -> tuple:
+    """Read user-team identifiers from a standalone tournament document.
+
+    Extracted from the retired ``tournament_routes`` module (WS-0 Phase 2B) so
+    remaining shared callers do not keep that router alive. Franchise
+    tournament weeks do not use this helper; they use
+    ``get_user_team_from_franchise``.
+    """
+    tournament_doc = tournament_doc or {}
+    user_team_id = tournament_doc.get("user_team_id")
+    user_team_object_id = tournament_doc.get("user_team_object_id")
+    if user_team_id and user_team_object_id:
+        return (user_team_id, user_team_object_id)
+    if user_team_id and not user_team_object_id and HAS_DB and teams_collection is not None:
+        team_doc = teams_collection.find_one({"name": user_team_id})
+        if team_doc:
+            return (user_team_id, str(team_doc["_id"]))
+    return (None, None)
+
+
 def _resolve_from_franchise_tournament_document(
     team_identifier: str,
     mode: str,
@@ -157,7 +180,6 @@ def _resolve_from_franchise_tournament_document(
             from BackEnd.api.franchise_routes import get_user_team_from_franchise
             user_team_id, user_team_object_id = get_user_team_from_franchise(doc)
         elif mode == "tournament":
-            from BackEnd.api.tournament_routes import get_user_team_from_tournament
             user_team_id, user_team_object_id = get_user_team_from_tournament(doc)
         else:
             return None

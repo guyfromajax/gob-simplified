@@ -1,7 +1,28 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function () {
   'use strict';
 
-  var params = new URLSearchParams(window.location.search);
+  var params = liveParams();
   var franchiseId = params.get('franchise_id');
   var teamId = params.get('team_id');
   var TIER_ORDER = ['1', '2', '3', '4', '5'];
@@ -14,14 +35,14 @@
   };
 
   function q() {
-    var p = new URLSearchParams();
+    var p = emptyParams();
     if (franchiseId) p.set('franchise_id', franchiseId);
     if (teamId) p.set('team_id', teamId);
     return p.toString();
   }
 
   function currentReturnUrl() {
-    return encodeURIComponent(window.location.pathname + window.location.search);
+    return encodeURIComponent(window.location.pathname + currentSearch());
   }
 
   function boxScoreUrl(gameId) {

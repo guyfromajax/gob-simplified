@@ -48,11 +48,9 @@
 113. Bring logic to screens
 114. Better individual player defense stat tracking
 116. User account -- link X & Facebook?
-127. Get Aggressive / Get Conservative settings and Playcall Center buttons
 128. Add a badass design appraoch to New Stories
 131. Centralized Turn Transition Helper / System
 139. Mod system for uploading custom leagues
-140. Better logic and impact to player EM
 142. Logic and impact for play scores
 143. Nail player plumbing for Mod Teams
 144. Nail mod team balance, league-wide
@@ -61,16 +59,12 @@
 200. PvP live
 
 ##Continuous Evolution (base is built)
-1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
-2. Advanced Topics tutorials
-5. Players as Characters
+1. Advanced Topics tutorials
+2. Players as Characters
 
 
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
-2. Still missing EOQ perfection
-2a. Fast Break animation is still sloppy and inconsistent with defenders in particular not moving on shot steps or freezing before the shot step then teleporting
-2b. Still reading fouled 3 pt attempts as 2 pt shots in some instances
 2c. some HCO turnovers are still mismatched on BE and FE as to who the ball handler is. Note teh BE logic + turnover animation jiggle are synced, but sometimes a different player is holding teh ball.
     _(Possibly related, untraced: the ~4% interception stale-victim fallback in `06_Gameplay_Systems/Dynamic_HCO_System.md` §4, and the step-0 owner bootstrap disagreement in `projects/UESS Audits/HCO_UESS_Audit.md`.)_
 2d. Sometimes the deleting franchise gets stuck in an infinite loop
@@ -4276,3 +4270,114 @@ Why it went rather than being brought in line with the attribute-tile work:
 
 Residual risk accepted: an external bookmark or link would now 404. If that surfaces,
 the fix is a 301 to `/team-roster-view.html` rather than restoring the page.
+
+---
+
+## Test-suite hygiene — 124 pre-existing develop reds [CODE-CLEANUP]
+
+Tracked 2026-09-19 on `ws1/sqlite-adapter` after merging develop (`f4ccca2de`).
+Same 124 fail on Mongo and SQLite. `test_zone_credit_shell` was the 125th and
+has already been re-derived on develop. **Do not fix these here** — that is its
+own workstream. The suite now *tracks* them so a new red is a failure.
+
+| bucket | count | suite action | what it is |
+|---|---:|---|---|
+| stale | 55 | xfail, strict=False | Product moved; the test still pins the old constant, status, or copy |
+| broken-harness | 56 | xfail, strict=False | TypeError / ImportError / AttributeError / StopIteration / DID NOT RAISE |
+| env | 13 | skip | 5 `node --loader` + 6 screenshot ESM (`ERR_MODULE_NOT_FOUND`) + 2 mongomock `$replaceAll` |
+
+Dropping `--maxfail=2` also surfaced 6 UESS seam guards
+(`test_unrendered_and_ball_seam`, `test_sa1_within_step_pass`) whose
+`caplog` is empty in a full run and populated when they run alone. They are
+**not** on this list — they are not stably red. Do not xfail an XPASS.
+
+Node ids and reasons live in `tests/known_failures.py`. An xfail that starts
+passing is an XPASS — that is free signal, leave it visible.
+
+`--maxfail=2` was removed from `pytest.ini` on this branch. That cap is why the
+pile was invisible (a plain `pytest tests/` reported "2 failed"). Do not put it
+back.
+
+Largest clusters: `test_possession_changes` (9, StopIteration),
+`test_simulate_quarter_endpoint` (8, request/DummyGM signatures),
+`test_training_execution_v2_thresholds` (8, retuned buckets),
+`test_motion_should_shoot` (6, mixed stale + missing symbols),
+`test_screenshot_tool` (6, skipped ESM), `test_shot_system_regressions` (5, arity).
+
+Zero of the 124 need Atlas or a network. The earlier `reports/test-triage-2026-09-19.md`
+count of 129/130 included `zone_credit` and used a looser environmental bucket.
+
+**Do not fix piecemeal.** Work the groups, not the 124 lines.
+
+---
+
+## [RNG LEAK] EOG player EM (`eog_em_delta`) — pre-existing on develop
+
+Logged 2026-09-20 on `ws2/engine-loopback`. **Do not fix in this PR.** Converting
+the draw to `sim_rng` changes the EOG stream and needs its own change plus a
+deliberate re-baseline.
+
+`BackEnd/utils/player_em.py` `eog_em_delta` takes a caller-supplied `rng` and
+calls `rng.randint`. `apply_franchise_eog_player_em` defaults that argument
+with `import random as rng` ("EOG uses the global stream, same as team-attr
+EOG"). The live franchise path therefore draws player EM off the process-global
+`random` module, not `sim_rng`.
+
+Present on `develop` (`gob-simplified` `BackEnd/utils/player_em.py`) with the
+same default. Not introduced by WS-2.
+
+## [RNG LEAK] EOG team-attr bands (`eog_attr_rules._roll`) — pre-existing on develop
+
+Logged 2026-09-20 on `ws2/engine-loopback`. **Do not fix in this PR.** Same
+reason as the EM leak: `sim_rng` conversion changes the draw stream.
+
+`BackEnd/eog_attr_rules.py` `_roll` calls `rng.randint`. Every public band
+helper (`shot_threshold_change`, `discipline_change`, `fight_change`,
+`rebound_modifier_change`, the efficiency / opp-modifier helpers) defaults
+`rng=random` (the module). The live apply in `franchise_routes.py` (~2064)
+calls those helpers with no `rng`, so EOG team-attr deltas also consume the
+global stream.
+
+Present on `develop` (`gob-simplified` `BackEnd/eog_attr_rules.py`, same
+`rng=random` defaults). Not introduced by WS-2.
+
+## [DESKTOP] Phase-b FTD growth (momentum / rank / leans / news) — polish backlog
+
+Logged 2026-09-21 on `ws2/persist-maps-week-projection`. **Do not fix in this PR.**
+Growth is bounded per season because `finish_season` resets FTD, so this is
+polish, not a scaling risk.
+
+After memoize + `g_week` + inclusion projection, a full loopback season is
+49.8 min player-wait (week 5 **128 s**, week 26 **142 s**). The old phase-b
+31 s → 240 s curve was the 63 `games.find_one({week, franchise_id, $or})`
+residual-scanning every franchise game; `g_week` flattened that to ~2.8 s at
+both week 5 and week 26. What still grows (7.8 s → 34.6 s) is FTD-sized:
+
+- **FTD momentum cache.** One `find({franchise_id})` with dotted
+  `team_attributes.*` plus `players`. Inclusion projection does not push down
+  dotted paths, so SQLite decodes all 128 full FTD docs (55.3 MB / 432 KB per
+  team at week 26) to return 0.05 MB. `json_extract` supports dotted paths —
+  likely cheap.
+- **Rank/prestige.** 128 `update_one`s rewriting the whole ~432 KB FTD doc
+  each week.
+- **Recruiting leans.** 0.48 s → 8.98 s over weeks 20–26.
+- **News.** Growing franchise / story blob.
+
+Measured against a true week-26 FTD (snapshot before `finish_season` reset it
+to 2 MB). Persist-maps re-runs at 46896, not 40773 — see the 21 Sept exact-diff
+baseline note in the desktop work plan. `remote=0` on all 239 lsof samples.
+
+## [TEST] Three new pytest reds on develop — not from the sidecar PR
+
+Logged 2026-09-21 while verifying `desktop/catalog-sidecar`. **Do not treat
+these as sidecar or persist-maps failures.** They fail on current `develop`
+(`c79520ae3`) with no sidecar checkout:
+
+- `BackEnd/tests/test_eog_and_training_rule_updates.py::TestEOGAndTrainingRuleUpdates::test_pre_training_decay_ranges_match_doc` — `(-1, 0) != (-2, 0)`
+- `BackEnd/tests/test_team_builder_court_persist.py::TestCustomNameJoinMap::test_custom_name_joins_without_ftd_identity_fields` — `KeyError: 'Concord'`
+- `BackEnd/tests/test_team_builder_court_persist.py::TestCustomNameJoinMap::test_without_overlay_custom_name_absent` — `None != '507f1f77bcf86cd799439011'`
+
+Full suite on the sidecar worktree: 3114 passed / 3 failed / 20 skipped / 112
+xfailed. The same three fail when pointed at `gob-simplified` develop. They
+are new reds on the default pytest run — the reason `--maxfail` came out —
+and need a develop-side triage, not a desktop adapter change.

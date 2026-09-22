@@ -1,10 +1,30 @@
-const reportParams = new URLSearchParams(window.location.search);
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
+const reportParams = liveParams();
 
 const reportState = {
   mode: reportParams.get('mode') || 'single',
   teamId: reportParams.get('team_id') || reportParams.get('user_team_id') || '',
   franchiseId: reportParams.get('franchise_id') || '',
-  tournamentId: reportParams.get('tournament_id') || '',
   gameId: reportParams.get('game_id') || '',
   homeTeam: reportParams.get('home') || '',
   awayTeam: reportParams.get('away') || '',
@@ -134,11 +154,10 @@ function renderList(containerId, rows) {
 }
 
 function getPlaybookUrl() {
-  const params = new URLSearchParams();
+  const params = emptyParams();
   params.set('mode', reportState.mode);
   if (reportState.teamId) params.set('team_id', reportState.teamId);
   if (reportState.franchiseId) params.set('franchise_id', reportState.franchiseId);
-  if (reportState.tournamentId) params.set('tournament_id', reportState.tournamentId);
   if (reportState.gameId) params.set('game_id', reportState.gameId);
   return `${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`;
 }
@@ -326,11 +345,10 @@ function configureButtons() {
   }
 
   editBtn.addEventListener('click', () => {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('mode', reportState.mode);
     if (reportState.teamId) params.set('team_id', reportState.teamId);
     if (reportState.franchiseId) params.set('franchise_id', reportState.franchiseId);
-    if (reportState.tournamentId) params.set('tournament_id', reportState.tournamentId);
     params.set('return_url', getCurrentRelativeUrl());
     window.location.href = `/playbooks.html?${params.toString()}`;
   });

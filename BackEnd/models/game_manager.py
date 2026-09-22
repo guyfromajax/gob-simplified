@@ -22,6 +22,12 @@ from BackEnd.utils.transition_registry import TurnType
 import logging
 import uuid
 
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+games_collection = _store.games_collection
+
+
 
 class GameManager:
     _POST_MAKE_BIP_CLOCK_RUN_THRESHOLD_SECONDS = 60
@@ -120,7 +126,6 @@ class GameManager:
                     )
 
         if bulk_operations:
-            from BackEnd.db import players_collection
             players_collection.bulk_write(bulk_operations, ordered=False)
     
     def setup_opening_tip(self):
@@ -1442,7 +1447,6 @@ class GameManager:
         if self.game_id:
             try:
                 from BackEnd.utils.shared import summarize_game_state
-                from BackEnd.db import games_collection
                 # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log before save (Hypothesis 2)
                 logging.debug(
                     "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout saving: game_id=%s, type=%s",
@@ -2408,6 +2412,9 @@ class GameManager:
         """Get box score with all players (lineup + bench) to match team totals."""
         import logging
         from BackEnd.utils.shared import derive_pts_from_shooting_stats
+        from BackEnd.utils.lineup_position import (
+            lineup_position_lookup_enabled, lineup_slot, warn_position_unresolved,
+        )
 
         box_score = {}
         for team in [self.home_team, self.away_team]:
@@ -2428,8 +2435,17 @@ class GameManager:
             lineup_player_ids = {p.player_id for p in team.lineup.values() if p}
             for player in team.players.values():
                 if player.player_id not in lineup_player_ids:
-                    # Use player's position attribute or default to bench
-                    pos = getattr(player, "position", None) or getattr(player, "pos", None) or "BENCH"
+                    # "BENCH" is DERIVED, not guessed: this loop only runs for players the
+                    # lineup-id set above already excluded, and the identity lookup confirms
+                    # it. The old read was `getattr(player, "position", None) or
+                    # getattr(player, "pos", None) or "BENCH"` - Player carries neither
+                    # attribute, so it always landed on "BENCH" without ever establishing
+                    # that the player was off the floor.
+                    slot = lineup_slot(team.lineup, player) if lineup_position_lookup_enabled() else None
+                    if slot is not None:
+                        # Would mean the id-set exclusion above disagreed with the lineup dict.
+                        warn_position_unresolved("BOXSCORE:bench player on the floor", player)
+                    pos = slot or "BENCH"
                     # Handle multiple bench players with same position by appending player_id
                     if pos in team_box:
                         pos = f"{pos}_{player.player_id[:8]}"

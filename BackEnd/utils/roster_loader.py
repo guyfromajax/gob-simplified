@@ -2,15 +2,17 @@ import json
 from pathlib import Path
 from typing import Tuple, List, Dict
 
-from BackEnd.db import (
-    players_collection,
-    teams_collection,
-    franchises_collection,
-    franchise_players_data_collection,
-    franchise_team_data_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+players_collection = _store.players_collection
+teams_collection = _store.teams_collection
+franchises_collection = _store.franchises_collection
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
 from pymongo.errors import PyMongoError
 from bson import ObjectId
+
+from BackEnd.constants.training_shape import training_position_projection
 
 
 
@@ -67,8 +69,13 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                         # entry_tier + potential_factor feed the Potential Rating display
                         # projection (§Phase 4). A narrow projection here silently dropped
                         # them before — see the Mongo-projection audit note in the dev docs.
+                        # training_position / training_focus feed the Development Focus
+                        # columns (GOB_DEVELOPMENT_FOCUS_PLAN.md phase 4). Same trap as the
+                        # note above: omit them here and the roster silently shows every
+                        # player as Standard, because the read-side resolver defaults.
                         {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1,
-                         "entry_tier": 1, "potential_factor": 1}
+                         "entry_tier": 1, "potential_factor": 1,
+                         "training_position": 1, "training_focus": 1}
                     ))
                     franchise_query_time = (time.time() - franchise_query_start) * 1000
                     # logger.warning(f"⏱️ [DB TIMING] franchise_players_data find (franchise_id={franchise_id}): {franchise_query_time:.2f}ms, found {len(fpd_docs)} FPD docs")
@@ -114,6 +121,9 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                             # /roster payload can compute the projected ceiling (§Phase 4).
                             base_player["entry_tier"] = franchise_player_data.get("entry_tier")
                             base_player["potential_factor"] = franchise_player_data.get("potential_factor")
+                            # Development Focus: raw values plus the resolved pair, so the UI
+                            # shows what training will actually use for a legacy player.
+                            base_player.update(training_position_projection(franchise_player_data))
                             if meta.get("height") is not None:
                                 base_player["height"] = meta.get("height")
                             if meta.get("weight") is not None:
@@ -190,16 +200,17 @@ def _team_file_path(team_name: str) -> Path:
 
     snake = path_slug_for_display_name(team_name)
     filename = f"{snake}.json"
-    current = Path(__file__).resolve()
+    from BackEnd.runtime_paths import bundle_path, bundle_root
 
-    for parent in current.parents:
+    bundled = bundle_path("teams", filename)
+    if bundled.exists():
+        return bundled
+    current = bundle_root()
+    for parent in [current, *current.parents]:
         candidate = parent / "teams" / filename
         if candidate.exists():
             return candidate
-
-    # Preserve the old behaviour (which effectively pointed one level up) so
-    # that callers still receive a sensible path even if the file is missing.
-    return current.parents[1] / "teams" / filename
+    return bundled
 
 
 def _load_from_file(team_name: str) -> Tuple[Dict | None, List[Dict]]:

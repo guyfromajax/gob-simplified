@@ -23,15 +23,20 @@ from collections import defaultdict
 from urllib.parse import urlencode
 from BackEnd.main import run_simulation, simulate_quarter
 
-from BackEnd.db import (
-    db,
-    franchise_state_collection,
-    franchise_team_data_collection,
-    franchise_players_data_collection,
-    franchise_recruits_data_collection,
-    games_collection,
-    press_conference_sessions_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+franchise_state_collection = _store.franchise_state_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_recruits_data_collection = _store.franchise_recruits_data_collection
+games_collection = _store.games_collection
+press_conference_sessions_collection = _store.press_conference_sessions_collection
+eog_band_log_collection = _store.eog_band_log_collection
+tournaments_collection = _store.tournaments_collection
+teams_collection = _store.teams_collection
+players_collection = _store.players_collection
+
 
 from BackEnd.constants.multi_franchise import MAX_FRANCHISES_PER_USER
 
@@ -130,7 +135,9 @@ from BackEnd.utils.franchise_rank_prestige import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+from BackEnd.runtime_paths import bundle_path, bundle_root
+
+STATIC_DIR = bundle_path("FrontEnd", "static")
 RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
 # DEPRECATED — superseded by RECRUITING_LEAN_EVENTS_FIELD ("recruiting_lean_events").
 # This field CANNOT represent a drop: every reader re-intersects it against the
@@ -1528,7 +1535,7 @@ def _eog_band_git_sha() -> str:
             import subprocess
             sha = subprocess.check_output(
                 ["git", "rev-parse", "--short", "HEAD"],
-                cwd=os.path.dirname(os.path.abspath(__file__)),
+                cwd=str(bundle_root()),
                 stderr=subprocess.DEVNULL,
             ).decode().strip()
         except Exception:
@@ -1568,7 +1575,6 @@ def _emit_eog_band_record(record: dict) -> None:
         return
     try:
         if mode == "mongo":
-            from BackEnd.db import eog_band_log_collection
             doc = dict(record)
             doc["created_at"] = datetime.utcnow()      # TTL anchor
             doc["git_sha"] = _eog_band_git_sha()
@@ -1612,7 +1618,6 @@ def flush_eog_band_buffer() -> int:
             if not _EOG_BAND_BUFFER:
                 return 0
             batch, _EOG_BAND_BUFFER[:] = list(_EOG_BAND_BUFFER), []
-        from BackEnd.db import eog_band_log_collection
         eog_band_log_collection.insert_many(batch, ordered=False)
         return len(batch)
     except Exception:
@@ -1635,10 +1640,57 @@ def _finalize_team_attributes_for_game(
     week: int | None = None,
 ) -> None:
     """
-    Run update_team_attributes_after_game once for this game and persist
+    Apply player EM EOG to FPD (all franchise weeks, including postseason freeze),
+    then run update_team_attributes_after_game once and persist
     team_attribute_changes on the game doc so the box score can display them.
     game_id: string or ObjectId (game doc _id).
     """
+    tx = getattr(_store, "transaction", None)
+    if callable(tx):
+        with tx():
+            return _finalize_team_attributes_for_game_impl(
+                game_id,
+                franchise_id,
+                home_team_id,
+                away_team_id,
+                winner_id,
+                loser_id,
+                winner_score,
+                loser_score,
+                week=week,
+            )
+    return _finalize_team_attributes_for_game_impl(
+        game_id,
+        franchise_id,
+        home_team_id,
+        away_team_id,
+        winner_id,
+        loser_id,
+        winner_score,
+        loser_score,
+        week=week,
+    )
+
+
+def _finalize_team_attributes_for_game_impl(
+    game_id,
+    franchise_id: ObjectId,
+    home_team_id: str,
+    away_team_id: str,
+    winner_id: str,
+    loser_id: str,
+    winner_score: int,
+    loser_score: int,
+    week: int | None = None,
+) -> None:
+    try:
+        from BackEnd.utils.player_em import apply_franchise_eog_player_em
+        apply_franchise_eog_player_em(game_id, franchise_id)
+    except Exception as e:
+        logger.error(
+            "[PLAYER-EM-EOG-FAILURE] game_id=%s week=%s exc_type=%s exc=%s",
+            str(game_id), str(week), type(e).__name__, e,
+        )
     try:
         gid = game_id
         game_id_str = str(game_id) if not isinstance(game_id, str) else game_id
@@ -8461,7 +8513,8 @@ def _complete_week_finish_cpu_and_persist(
         _sub = {"games_write": 0.0, "finalize_game": 0.0, "records": 0.0,
                 "team_attrs": 0.0, "momentum": 0.0}
         stat_updater.reset_finalize_subtiming()  # [FINALIZE-SUBTIMING] split finalize_game internals
-        for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+        with stat_updater.franchise_team_maps_scope():
+          for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
             if job_idx in sim_err:
                 logger.error(
                     "❌ [COMPLETE-WEEK] Parallel full-sim core failed; random fallback + bracket sync. franchise_id=%s week=%s idx=%s",
@@ -9557,6 +9610,98 @@ def delete_franchise_by_id(franchise_id: str, user: dict = Depends(get_current_u
     _cascade_delete_franchise(oid)
     return {"deleted": True, "already_gone": False, "count": 1,
             "franchise_id": str(oid)}
+
+
+class DevelopmentFocusUpdateRequest(BaseModel):
+    """One player's Development Focus settings. Both fields optional; at least one required."""
+
+    franchise_id: str
+    player_id: str
+    training_position: str | None = None
+    training_focus: str | None = None
+
+
+@router.post("/franchise/player/development-focus")
+def set_player_development_focus(
+    body: DevelopmentFocusUpdateRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Set a player's training position / Development Focus on his FPD document.
+
+    FPD is authoritative for both fields (GOB_DEVELOPMENT_FOCUS_PLAN.md): training reads
+    them from here, and every UI surface writes here.
+
+    Guards, in order:
+      * the franchise must belong to the caller (403 otherwise);
+      * the player must be on the caller's OWN team — a coach cannot set development for an
+        opponent's roster, which is the same rule the UI applies by only rendering the
+        controls for his team;
+      * values are validated against POSITIONS / TRAINING_FOCUSES and REJECTED when unknown,
+        never silently coerced, so junk cannot reach the database. (The read-side resolver
+        still degrades a bad legacy value to ``standard`` so a stored surprise can never
+        stop a week of training from resolving.)
+
+    Changing a focus affects FUTURE training only; nothing already developed is recomputed.
+    """
+    from BackEnd.constants.training_shape import POSITIONS, TRAINING_FOCUSES
+
+    if body.training_position is None and body.training_focus is None:
+        raise HTTPException(status_code=400, detail="training_position or training_focus is required")
+
+    updates: dict[str, Any] = {}
+    if body.training_position is not None:
+        pos = str(body.training_position).strip()
+        if pos not in POSITIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid training_position {body.training_position!r}; expected one of {', '.join(POSITIONS)}",
+            )
+        updates["training_position"] = pos
+    if body.training_focus is not None:
+        foc = str(body.training_focus).strip().lower()
+        if foc not in TRAINING_FOCUSES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid training_focus {body.training_focus!r}; expected one of {', '.join(TRAINING_FOCUSES)}",
+            )
+        updates["training_focus"] = foc
+
+    try:
+        oid = ObjectId(body.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise_id")
+    franchise = db.franchises.find_one(
+        {"_id": oid}, {"user_id": 1, "user_team_id": 1, "user_team_object_id": 1})
+    if not franchise:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    if str(franchise.get("user_id") or "") != str(user["user_id"]):
+        raise HTTPException(status_code=403, detail="Access denied to this franchise")
+
+    fpd = franchise_players_data_collection.find_one(
+        {"franchise_id": str(body.franchise_id), "player_id": str(body.player_id)},
+        {"meta": 1},
+    )
+    if not fpd:
+        raise HTTPException(status_code=404, detail="Player not found in this franchise")
+
+    # user_team_id is the team NAME; user_team_object_id is the id. FPD meta carries both
+    # (meta.team / meta.team_id), so compare like with like — an earlier revision compared
+    # meta.team_id against the name and rejected every write with 403.
+    user_team_name, user_team_object_id = get_user_team_from_franchise(franchise)
+    meta = fpd.get("meta") or {}
+    player_team_object_id = str(meta.get("team_id") or "")
+    player_team_name = str(meta.get("team") or "")
+    on_user_team = (
+        (user_team_object_id and player_team_object_id == str(user_team_object_id))
+        or (user_team_name and player_team_name == str(user_team_name))
+    )
+    if not on_user_team:
+        raise HTTPException(status_code=403, detail="Player is not on your team")
+
+    updates["updated_at"] = datetime.utcnow()
+    franchise_players_data_collection.update_one({"_id": fpd["_id"]}, {"$set": updates})
+    updates.pop("updated_at", None)
+    return {"updated": True, "player_id": str(body.player_id), **updates}
 
 
 @router.get("/franchise/command-center/data")
@@ -15177,7 +15322,6 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
         actual_team_id = str(team_doc["_id"])
     
     # ✅ FTD: Load team data from FTD collection instead of franchise doc
-    from BackEnd.db import franchise_team_data_collection
     
     try:
         team_object_id = ObjectId(actual_team_id)
@@ -15660,7 +15804,6 @@ def get_scouting_report(franchise_id: str, team_name: str):
     team_id_field = team_doc.get("team_id")
     
     # ✅ FTD: Get team attributes from FTD collection instead of franchise doc
-    from BackEnd.db import franchise_team_data_collection
     ftd_doc = franchise_team_data_collection.find_one(
         {"franchise_id": fid, "team_id": team_object_id},
         {"team_attributes": 1}
@@ -16902,8 +17045,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
         
         # For tournament mode, determine round from backend state if not provided
         if mode == "tournament":
-            from BackEnd.db import tournaments_collection
-            from BackEnd.api.tournament_routes import get_user_team_from_tournament
+            from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
             doc_id_obj = ObjectId(doc_id)
             doc = tournaments_collection.find_one({"_id": doc_id_obj})
             if not doc:
@@ -17094,8 +17236,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             }
             
         else:  # tournament mode
-            from BackEnd.db import tournaments_collection, teams_collection
-            from BackEnd.api.tournament_routes import get_user_team_from_tournament
+            from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
             doc_id_obj = ObjectId(doc_id)
             doc = tournaments_collection.find_one({"_id": doc_id_obj})
             if not doc:
@@ -17166,7 +17307,6 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 
                 if not has_all_attrs:
                     # Merge with core collection for backward compatibility
-                    from BackEnd.db import players_collection
                     # ✅ FIX: Player IDs are UUIDs (strings), not ObjectIds - use directly
                     core_player = players_collection.find_one({"_id": pid_str}, {"attributes": 1})
                     if core_player:
@@ -17844,7 +17984,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         _sub = {"games_write": 0.0, "finalize_game": 0.0, "records": 0.0,
                 "team_attrs": 0.0, "momentum": 0.0}
         stat_updater.reset_finalize_subtiming()
-        for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+        with stat_updater.franchise_team_maps_scope():
+          for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
             g = week_games_meta[job_idx] if job_idx < len(week_games_meta) else None
             if job_idx in sim_err:
                 logger.error(

@@ -1,6 +1,27 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Pointer Validation Utility
- * Phase 2: Validate that pointers (game_id, franchise_id, tournament_id) point to existing documents
+ * Phase 2: Validate that pointers (game_id, franchise_id) point to existing documents
  * 
  * This utility provides functions to validate pointers before making API calls or navigating,
  * ensuring we fail loudly when pointers are invalid.
@@ -9,7 +30,7 @@
 /**
  * Validate a pointer by checking if it points to an existing document
  * 
- * @param {string} pointerType - Type of pointer ('game_id', 'franchise_id', 'tournament_id')
+ * @param {string} pointerType - Type of pointer ('game_id', 'franchise_id')
  * @param {string} pointerValue - Value of the pointer to validate
  * @returns {Promise<boolean>} - True if valid, throws error if invalid
  */
@@ -25,10 +46,9 @@ async function validatePointer(pointerType, pointerValue) {
       throw new Error('API configuration not available');
     }
 
-    const params = new URLSearchParams({
-      pointer_type: pointerType,
-      pointer_value: pointerValue
-    });
+    const params = emptyParams();
+    params.set('pointer_type', pointerType);
+    params.set('pointer_value', pointerValue);
 
     const response = await fetch(`${API_CONFIG.buildUrl('/api/validate-pointer')}?${params.toString()}`);
     
@@ -42,15 +62,15 @@ async function validatePointer(pointerType, pointerValue) {
       
       // ✅ Phase 4: Show missing truth error screen for 404 (document not found)
       if (response.status === 404 && window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
-        const mode = new URLSearchParams(window.location.search).get('mode') || 'single';
+        const mode = liveParams().get('mode') || 'single';
         window.ErrorHandler.showMissingTruthError({
           pointerType,
           pointerValue,
           message: errorMsg,
           mode,
           recoveryOptions: {
-            redirectTo: mode === 'single' ? 'mode-select' : (mode === 'franchise' ? 'franchise-select' : 'tournament-select'),
-            redirectLabel: mode === 'single' ? 'Go to Mode Select' : (mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Tournament Select')
+            redirectTo: mode === 'franchise' ? 'franchise-select' : 'mode-select',
+            redirectLabel: mode === 'franchise' ? 'Go to Franchise Select' : 'Go to Mode Select'
           }
         });
       }
@@ -78,17 +98,10 @@ async function validateFranchiseId(franchiseId) {
 }
 
 /**
- * Validate tournament_id
- */
-async function validateTournamentId(tournamentId) {
-  return validatePointer('tournament_id', tournamentId);
-}
-
-/**
  * Validate all pointers in URL params based on mode
  * 
- * @param {URLSearchParams} urlParams - URL parameters
- * @param {string} mode - Game mode ('single', 'franchise', 'tournament')
+ * @param {Object} urlParams - URL parameters
+ * @param {string} mode - Game mode ('single', 'franchise')
  * @returns {Promise<boolean>} - True if all required pointers are valid
  */
 async function validatePointersForMode(urlParams, mode) {
@@ -103,11 +116,6 @@ async function validatePointersForMode(urlParams, mode) {
     const franchiseId = urlParams.get('franchise_id');
     if (franchiseId) {
       validations.push(validateFranchiseId(franchiseId));
-    }
-  } else if (mode === 'tournament') {
-    const tournamentId = urlParams.get('tournament_id');
-    if (tournamentId) {
-      validations.push(validateTournamentId(tournamentId));
     }
   }
 
@@ -131,7 +139,6 @@ if (typeof window !== 'undefined') {
     validatePointer,
     validateGameId,
     validateFranchiseId,
-    validateTournamentId,
     validatePointersForMode
   };
 }

@@ -7,6 +7,7 @@ const { defineConfig, devices } = require('@playwright/test');
  */
 module.exports = defineConfig({
   testDir: './tests/e2e',
+  testIgnore: 'desktop-*.spec.js',
   /* Tests that start the game (click Play Quarter, wait for Phaser canvas) need extra time */
   timeout: 60 * 1000,
   /* Run tests in files in parallel */
@@ -40,8 +41,8 @@ module.exports = defineConfig({
   /* Run your local dev server before starting the tests. Uses .venv or venv if present. */
   webServer: {
     command: process.env.PYTHON_PATH
-      ? `${process.env.PYTHON_PATH} dev.py`
-      : "sh -c '(.venv/bin/python dev.py) || (venv/bin/python dev.py) || python3 dev.py'",
+      ? `${process.env.PYTHON_PATH} tests/e2e/helpers/seed_and_serve.py`
+      : "sh -c '(.venv/bin/python tests/e2e/helpers/seed_and_serve.py) || (venv/bin/python tests/e2e/helpers/seed_and_serve.py) || python3 tests/e2e/helpers/seed_and_serve.py'",
     url: 'http://localhost:8000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

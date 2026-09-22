@@ -32,8 +32,8 @@ Supporting files:
 
 ## Defensive Selection Flow
 
-1. Check for a user defense override in `strategy_calls["defense_call"]`.
-2. If no override, choose Man vs Zone from strategy settings.
+1. If the **user’s team is on defense** and has a Playcall Center override in `strategy_calls["defense_call"]` (or legacy `game_state["user_defense_override"]`), use that call. The override may be set while the user is on offense; it is only applied on user-defensive HCO turns and stays set until the user clears it. It is never applied as the CPU team’s defensive call.
+2. If no user-on-defense override, choose Man vs Zone from the **defending** team’s `strategy_settings["defense"]`.
 3. If Zone is selected, choose the specific zone from `playbook_settings["zone_defense"]`
    (`_select_zone_defense_with_playbook_weights`).
 4. If Man is selected, choose the specific man play (Base / Deny / Loose) from

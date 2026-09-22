@@ -12,6 +12,12 @@
  * This script is intentionally dependency-free and safe to include on every page.
  */
 (function () {
+  if (typeof window !== "undefined" && (
+    window.GOB_BUILD_PROFILE === "desktop"
+    || /(?:^|; )GOB_BUILD_PROFILE=desktop(?:;|$)/.test(document.cookie || "")
+  )) {
+    return;
+  }
   var CONFIG_URL = "/config/maintenance.json";
   var POLL_MS = 60 * 1000;
   var BANNER_ID = "maintenance-warning-banner";

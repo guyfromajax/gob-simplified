@@ -37,6 +37,7 @@ from BackEnd.engine.phase_resolution import (
 from BackEnd.utils.fb_geo_helpers import stamp_fb_miss_bounce_coords
 from BackEnd.utils.shared import apply_scoring, get_name_safe
 from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
+from BackEnd.engine.foul_announcement_language import stamp_fb_foul_on_ball
 
 
 def _rendered_starts_by_pos(
@@ -336,6 +337,10 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
         )
         if result_type in ("FOUL", "CHARGE"):
             turn_result["foul_team"] = game_state.get("foul_team")
+            stamp_fb_foul_on_ball(
+                turn_result, foul_team=game_state.get("foul_team"),
+                foul_player=foul_player, stopper=stopper,
+            )
             if foul_transition is not None:
                 if foul_transition.get("foul_player_id"):
                     turn_result["foul_player_id"] = foul_transition["foul_player_id"]

@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Custom Training Playbook — select offense/defense rows for CMD training distribution.
  * Persists selection to sessionStorage; Training Orders submit sends training_playbook_focus.
@@ -19,7 +40,7 @@
     } catch (e) {}
   }
 
-  const params = new URLSearchParams(window.location.search);
+  const params = liveParams();
   const mode = params.get('mode') || 'franchise';
   const franchiseId = params.get('franchise_id') || '';
   const teamId = params.get('team_id') || params.get('user_team_id') || '';
@@ -59,7 +80,7 @@
   }
 
   function trainingOrdersUrl() {
-    const q = new URLSearchParams();
+    const q = emptyParams();
     if (franchiseId) q.set('franchise_id', franchiseId);
     if (teamId) q.set('team_id', teamId);
     q.set('mode', mode);
@@ -352,9 +373,12 @@
         : '/api/playbooks',
       window.location.origin
     );
-    url.searchParams.set('mode', mode);
-    url.searchParams.set('team_id', teamId);
-    url.searchParams.set('franchise_id', franchiseId);
+    const bag = franchiseCtx().parseSearch(url.search);
+    bag.set('mode', mode);
+    bag.set('team_id', teamId);
+    bag.set('franchise_id', franchiseId);
+    const qs = bag.toString();
+    url.search = qs ? '?' + qs : '';
 
     const res = await fetch(url.toString());
     if (!res.ok) {

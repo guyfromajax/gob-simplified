@@ -21,11 +21,11 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 
-from BackEnd.db import (
-    franchises_collection,
-    tournaments_collection,
-    games_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+franchises_collection = _store.franchises_collection
+tournaments_collection = _store.tournaments_collection
+games_collection = _store.games_collection
 
 
 def verify_franchise_owned_by_user(franchise_id: str, user_id: str) -> dict:

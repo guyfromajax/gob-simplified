@@ -20,6 +20,7 @@ from BackEnd.constants import (
     OREB_REBOUND_SCORE_DISCOUNT,
     REBOUND_TEAM_CHEMISTRY_FACTOR,
     REBOUND_DISTANCE_SCALE,
+    REBOUND_RACE_TIME_SCALE,
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
@@ -31,6 +32,11 @@ from BackEnd.constants import (
     BURST_GRID_PER_GAME_SEC,
     CONTEST_EUCLIDEAN_RADIUS,
 )
+
+from BackEnd.persistence import get_store
+from BackEnd.utils.lineup_position import lineup_position_lookup_enabled, lineup_slot
+_store = get_store()
+games_collection = _store.games_collection
 
 # Legacy pace-rate fallbacks (Phase 4d). Used only when a caller doesn't
 # provide AG context (player= or off_lineup=) — preserves pre-Phase-4 timing
@@ -465,6 +471,29 @@ def calc_skeleton_step_timing_contract(
     behavior at unmigrated call sites — at AG=50 the AG-driven path produces
     identical timing to the legacy path, so migrating one caller at a time is
     safe.
+
+    ⚠️ THE WHOLE-SECOND ROUNDING AND THE 1s STEP FLOOR BELOW ARE LOAD-BEARING. DO NOT REMOVE THEM
+    ON THEIR OWN. Measured per HCO turn on the played arm, paired against its own emitted clock
+    (reports/clock-and-crash-scope-2026-09-17.md §A2, equiv-v3 n=40, SEED_DEFENSES=1):
+
+        this contract, rounded      9.43 s   ← what a full simulation burns
+        the same contract, unrounded 6.10 s   (rounding + the 1s floor add ~3.33 s)
+        played's emitted clock      11.14 s
+
+    The rounding inflates this estimate by ~3.33 s/turn, and a full simulation is separately
+    missing ~5.18 s/turn that played burns: entry orchestration (~3.15 — walk-up / handoff /
+    kickout, which only the emitter builds), post-shot sub-steps (~1.03 — now supplied on sim by
+    GOB_SIM_CRASH_CLOCK) and per-step model differences (~1.0 — placement coords vs skeleton spots,
+    archetype rates, the emitter's 0.5s floor, ball-flight time).
+
+    So the rounding is currently STANDING IN for the missing entry time, and the two very nearly
+    cancel. Dropping the rounding by itself takes sim from ~9.4 s to ~6.1 s per half-court turn
+    against played's ~11.1 and makes the arm gap sharply WORSE. Entry orchestration must not be
+    added to the sim clock without removing the rounding in the SAME change, and vice versa.
+
+    The gate set is NOT the explanation for the rest: played gates its HCO skeleton steps on the
+    shooter, the drive driver or the slowest offensive mover, never on defenders, and re-timing
+    this contract on played's gate set moves it by only −0.13 s/turn (§A2 (b)).
     """
     if not steps:
         one_step = FALLBACK_STEP_SECONDS
@@ -1667,7 +1696,15 @@ def _rebound_distance(player, bounce_spot):
     return ((px - bx) ** 2 + (py - by) ** 2) ** 0.5
 
 
-def _rebound_entries(lineup, team, bounce_spot, exclude_player_ids):
+def _rebound_entries(lineup, team, bounce_spot, exclude_player_ids, arrival_coords=None):
+    """Rebound candidates with their distance to the bounce.
+
+    ``arrival_coords`` (``{player_id: {x, y}}``) overrides a player's live coords for
+    the distance term only. That is how GOB_REBOUND_FROM_ARRIVAL scores a crasher from
+    where he actually GETS TO rather than where he stood when the shot went up. It is
+    an override, not a mutation: ``player.coords`` is left alone, so nothing else in
+    the turn sees a moved player.
+    """
     entries = []
     excluded = {str(pid) for pid in (exclude_player_ids or set()) if pid is not None}
     for player in (lineup or {}).values():
@@ -1676,15 +1713,44 @@ def _rebound_entries(lineup, team, bounce_spot, exclude_player_ids):
         pid = getattr(player, "player_id", None)
         if pid is not None and str(pid) in excluded:
             continue
+        at = (arrival_coords or {}).get(str(pid)) if pid is not None else None
+        dist = (_distance_between(at, bounce_spot) if at
+                else _rebound_distance(player, bounce_spot))
         entries.append(
             {
                 "player": player,
                 "team": team,
                 "stat": None,
-                "distance": _rebound_distance(player, bounce_spot),
+                "distance": dist,
+                "scored_from": dict(at) if at else None,
+                "time_to_ball": _time_to_ball(player, dist),
             }
         )
     return entries
+
+
+def _rebound_race_enabled():
+    from BackEnd.utils.rebound_arrival import race_enabled
+    return race_enabled()
+
+
+def _time_to_ball(player, distance):
+    """Game-seconds for this player to cover ``distance`` at his own movement rate.
+
+    The race term. Two players the same distance from the ball are not equally likely
+    to reach it first; this is the quantity that separates them.
+    """
+    from BackEnd.utils.rebound_arrival import travel_rate
+
+    rate = travel_rate(player)
+    return float(distance) / rate if rate > 0 else float(distance)
+
+
+def _distance_between(a, b):
+    try:
+        return math.hypot(float(a["x"]) - float(b["x"]), float(a["y"]) - float(b["y"]))
+    except (TypeError, KeyError, ValueError):
+        return 0.0
 
 
 def _entries_with_stat(off_entries, def_entries):
@@ -1739,6 +1805,7 @@ def select_rebounder_by_score(
     fallback_def_lineup=None,
     fallback_start_distance=20,
     fallback_step=5,
+    arrival_coords=None,
 ):
     """Select the rebound winner from all eligible players by final rebound value.
 
@@ -1750,8 +1817,10 @@ def select_rebounder_by_score(
     exclude_player_ids = exclude_player_ids or set()
     penalized = {str(pid) for pid in (penalize_player_ids or set()) if pid is not None}
 
-    off_entries = _rebound_entries(off_lineup, off_team, bounce_spot, exclude_player_ids)
-    def_entries = _rebound_entries(def_lineup, def_team, bounce_spot, exclude_player_ids)
+    off_entries = _rebound_entries(off_lineup, off_team, bounce_spot, exclude_player_ids,
+                                   arrival_coords)
+    def_entries = _rebound_entries(def_lineup, def_team, bounce_spot, exclude_player_ids,
+                                   arrival_coords)
     entries = _entries_with_stat(off_entries, def_entries)
 
     if max_distance_from_bounce is not None:
@@ -1762,8 +1831,10 @@ def select_rebounder_by_score(
         fallback_off = fallback_off_lineup if fallback_off_lineup is not None else off_lineup
         fallback_def = fallback_def_lineup if fallback_def_lineup is not None else def_lineup
         fallback_entries = _entries_with_stat(
-            _rebound_entries(fallback_off, off_team, bounce_spot, exclude_player_ids),
-            _rebound_entries(fallback_def, def_team, bounce_spot, exclude_player_ids),
+            _rebound_entries(fallback_off, off_team, bounce_spot, exclude_player_ids,
+                             arrival_coords),
+            _rebound_entries(fallback_def, def_team, bounce_spot, exclude_player_ids,
+                             arrival_coords),
         )
         radius = float(fallback_start_distance)
         while radius <= 150:
@@ -1787,7 +1858,15 @@ def select_rebounder_by_score(
         value = calculate_rebound_score(player) + _team_rebound_bonus(team)
         # Smooth distance discount — closer to bounce → stronger score; replaces
         # the former blunt upper-/lower-half multiplier.
-        value *= 1.0 / (1.0 + float(entry["distance"]) / distance_scale)
+        if _rebound_race_enabled():
+            # RACE: score on TIME to the ball, not distance to it. Same curve shape, so
+            # the only change is which quantity feeds it. REBOUND_RACE_TIME_SCALE is a
+            # unit conversion, not a retune - it is set so the league-average
+            # time_to_ball lands on the same term value the league-average arrival
+            # distance lands on today. See reports/rebound-race-2026-09-19.md.
+            value *= 1.0 / (1.0 + float(entry.get("time_to_ball", 0.0)) / REBOUND_RACE_TIME_SCALE)
+        else:
+            value *= 1.0 / (1.0 + float(entry["distance"]) / distance_scale)
         # Offensive rebounders are discounted — defense's box-out / positioning edge on a
         # miss (otherwise offense and defense were scored equally). See OREB_REBOUND_SCORE_DISCOUNT.
         if off_team_id is not None and getattr(team, "team_id", None) == off_team_id:
@@ -2559,7 +2638,15 @@ def summarize_game_state(
                     "name": getattr(player_obj, "name", None) or f"{getattr(player_obj, 'first_name', '')} {getattr(player_obj, 'last_name', '')}".strip(),
                     "team": team_key,
                     "team_id": team_obj.team_id,
-                    "pos": getattr(player_obj, "position", None) or getattr(player_obj, "pos", None),
+                    # Same contract as the lineup loop above and as gameScene.js:1669
+                    # ("Only include players in current lineup"): the slot when this player
+                    # is on the floor, else None. The old read was
+                    # `getattr(player_obj, "position", None) or getattr(player_obj, "pos", None)`,
+                    # neither of which Player carries, so it was always None by accident.
+                    "pos": (lineup_slot(team_obj.lineup, player_obj)
+                            if lineup_position_lookup_enabled()
+                            else (getattr(player_obj, "position", None)
+                                  or getattr(player_obj, "pos", None))),
                     "jersey": player_obj.jersey,
                     "height": getattr(player_obj, "height", None),  # Integer inches; used by v2 player sprite (height-linked headshot radius)
                     "photo": getattr(player_obj, "photo", None),  # Player headshot image
@@ -2712,7 +2799,6 @@ def summarize_game_state(
     # This ensures settings are available in both frontend response AND DB save
     if hasattr(game, 'game_id') and game.game_id:
         try:
-            from BackEnd.db import games_collection
             from bson import ObjectId
             from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical
             
@@ -3693,6 +3779,165 @@ def apply_coords_from_animations_list(game: Any, animations: Optional[List[Any]]
                     break
 
 
+def _sim_crash_apply_enabled() -> bool:
+    """``GOB_SIM_CRASH_APPLY`` (default ON): on a full simulation, move the post-shot overlay players
+    toward the crash / get-back / release destinations the turn already carries, the way the played
+    arm's emitted sub-steps do. Set it to 0 for the pre-fix behaviour, which leaves them where the
+    possession left them — 13.3 grid units from where played puts them, and the reason over-the-back
+    was in play 25.9 times a game on sim against played's 39.0
+    (reports/crash-parity-2026-09-17.md)."""
+    import os
+    return os.environ.get("GOB_SIM_CRASH_APPLY", "1").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _sim_crash_clock_enabled() -> bool:
+    """``GOB_SIM_CRASH_CLOCK`` (default ON): add the derived post-shot window to a sim HCO shot turn's
+    ``time_elapsed`` — the live-ball time after the shot leaves the hand, which the legacy
+    ``calc_skeleton_step_timing_contract`` estimate never burned. Independent of
+    ``GOB_SIM_CRASH_APPLY``; set either to 0 alone.
+
+    Worth ~4 possessions a game: it moved the sim/played arm gap from +11.39 to +1.80 pts/team
+    (SEED_DEFENSES=1) on its own, and the two flags are NOT additive — both on lands at +3.61
+    (reports/flags-on-2026-09-17.md)."""
+    import os
+    return os.environ.get("GOB_SIM_CRASH_CLOCK", "1").strip().lower() in ("1", "true", "yes", "on")
+
+
+def sim_post_shot_window_seconds(turn_result: Dict[str, Any], away_offense: bool,
+                                 shot_spot: Optional[Dict[str, Any]]) -> Optional[float]:
+    """Game-seconds the ball is live after the shot leaves the shooter's hands, derived from the turn
+    result alone: ball flight (``_variant_flight_end`` / arc rate) + RATTLE hops (+ the make settle) +
+    the miss/block bounce step.
+
+    The played arm gets this from its emitted sub-steps; a full simulation emits none, so it is
+    recomputed here from fields the resolver already wrote (``shot_variant``, the rattle start /
+    progression, ``uses_shot_arc``, ``ball_bounce_x/y``). Pure arithmetic over existing data: the
+    emitter helpers it calls take no RNG (`_build_post_shot_sub_steps` measures 0 sim_rng draws), and
+    nothing here builds placement or animations. Returns None when the turn is not a shot attempt.
+
+    NOT the same number played burns: played's window also carries its shoot-step duration (an emitter
+    construct) and its clock-pinned beats (the make hold freezes players). Measured ratio of this
+    derived window to played's emitted one, equiv-v3 n=40, SEED_DEFENSES=1
+    (reports/crash-parity-2026-09-17.md):
+
+        HCO MISS   0.80   (1.84 s vs 2.28 s)
+        HCO MAKE   0.57   (0.93 s vs 1.55 s)  ← the systematically wrong one
+        HCO BLOCK  1.62   (1.21 s vs 0.76 s)
+
+    Overall position accuracy of the crash write that consumes this window, against played's actual
+    post-shot coords: 2.17 units mean (0.81 on MISS, 3.66 on MAKE, 3.08 on BLOCK; 13.31 with the
+    write disabled). Anyone tightening this derivation should start with MAKE — and should expect it
+    to move the sim clock too, because GOB_SIM_CRASH_CLOCK adds this same number to time_elapsed.
+    """
+    result_type = str((turn_result or {}).get("result_type") or "").upper()
+    if result_type not in ("MAKE", "MISS", "BLOCK") or not isinstance(shot_spot, dict):
+        return None
+    if shot_spot.get("x") is None or shot_spot.get("y") is None:
+        return None
+    from BackEnd.constants import (
+        BOUNCE_STEP_GAME_SECONDS,
+        RATTLE_HOP_GAME_SECONDS,
+        RATTLE_MAKE_SETTLE_GAME_SECONDS,
+    )
+    from BackEnd.engine.skeleton_step_emitter import (
+        _RATTLE_VARIANTS,
+        _rattle_hop_targets,
+        _variant_flight_end,
+    )
+    from BackEnd.utils.shot_ball_arc import shot_ball_flight_grid_rate
+
+    variant = None if turn_result.get("foul_block_contact") else turn_result.get("shot_variant")
+    variant_upper = str(variant or "").upper()
+    flight_end = _variant_flight_end(variant, result_type, away_offense, turn_result)
+    rate = shot_ball_flight_grid_rate(
+        uses_arc=(result_type != "BLOCK" and bool(turn_result.get("uses_shot_arc")))
+    )
+    dx = float(flight_end["x"]) - float(shot_spot["x"])
+    dy = float(flight_end["y"]) - float(shot_spot["y"])
+    seconds = max(0.05, math.sqrt(dx * dx + dy * dy) / float(rate))
+    if variant_upper in _RATTLE_VARIANTS:
+        seconds += len(_rattle_hop_targets(variant_upper, away_offense, turn_result)) * float(RATTLE_HOP_GAME_SECONDS)
+        if result_type == "MAKE":
+            seconds += float(RATTLE_MAKE_SETTLE_GAME_SECONDS)
+    if (result_type in ("MISS", "BLOCK") and variant_upper != "AIRBALL"
+            and turn_result.get("ball_bounce_x") is not None):
+        seconds += float(BOUNCE_STEP_GAME_SECONDS)
+    return seconds
+
+
+def apply_sim_crash_destinations(game: Any, turn_result: Dict[str, Any],
+                                 positions: Dict[str, Dict[str, float]]) -> int:
+    """Full simulation only: advance each post-shot overlay player toward his destination, into
+    ``positions`` (the map ``sync_lineup_coords_from_turn`` is about to write to ``Player.coords``).
+
+    The played arm reaches the same positions through the emitter's [shoot] / [ball_flight] / [rattle]
+    / [bounce] sub-steps, each interrupting the player toward the same destination at the same
+    archetype rate; the sequence collapses to ONE interruption over the post-shot window. A turn that
+    produced ``animation_steps`` (fast break, HCT, FCP on both arms) already carries those positions
+    and is skipped, so this only fills the HCO family, where a full simulation emits nothing.
+
+    Reads only what the turn already carries; no placement build, no animation build, no RNG draw.
+    Role exclusivity is the caller's ``canonicalize_post_shot_overlays`` — not reimplemented here.
+    Returns the number of players moved.
+    """
+    game_state = getattr(game, "game_state", None) or {}
+    if not game_state.get("_is_full_simulation") or not _sim_crash_apply_enabled():
+        return 0
+    # Rendered output of ANY kind means this turn already carries post-shot positions: schema steps
+    # (fast break / HCT / FCP, which emit on both arms) or the legacy ``animations`` list. A full
+    # simulation produces neither for the HCO family. Both are checked because the played arm still
+    # carries ``animations`` on the rare turn whose emitter returns None, and that turn must not move.
+    if turn_result.get("animation_steps") or turn_result.get("animations"):
+        return 0
+    from BackEnd.engine.skeleton_step_emitter import _OVERLAY_ARCHETYPES, _interpolate_step_end
+    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+
+    maps = [(key, arch, turn_result.get(key)) for key, arch in _OVERLAY_ARCHETYPES]
+    if not any(isinstance(m, dict) and m for _k, _a, m in maps):
+        return 0
+    shooter_id = _norm_player_id(turn_result.get("shooter_id"))
+    shot_spot = turn_result.get("shot_spot")
+    if not isinstance(shot_spot, dict) and shooter_id and shooter_id in positions:
+        shot_spot = positions[shooter_id]
+    away_offense = str(turn_result.get("offense_team_id") or "") == str(
+        getattr(getattr(game, "away_team", None), "team_id", "")
+    )
+    seconds = sim_post_shot_window_seconds(turn_result, away_offense, shot_spot)
+    if not seconds:
+        return 0
+    by_id = {}
+    for team in (game.home_team, game.away_team):
+        for player in (getattr(team, "lineup", None) or {}).values():
+            if player is not None and getattr(player, "player_id", None) is not None:
+                by_id[_norm_player_id(player.player_id)] = player
+    moved = 0
+    for _key, archetype, overlay in maps:
+        if not isinstance(overlay, dict):
+            continue
+        for pid, dest in overlay.items():
+            ns = _norm_player_id(pid)
+            player = by_id.get(ns)
+            start = positions.get(ns)
+            if player is None or not start or not isinstance(dest, dict):
+                continue
+            if dest.get("x") is None or dest.get("y") is None:
+                continue
+            rate = _ag_grid_per_game_sec(player, archetype)
+            end, _dur = _interpolate_step_end(
+                {"x": float(start["x"]), "y": float(start["y"])},
+                {"x": float(dest["x"]), "y": float(dest["y"])},
+                rate, seconds,
+            )
+            positions[ns] = {"x": float(end["x"]), "y": float(end["y"])}
+            moved += 1
+    if moved:
+        logging.info(
+            "[SIM CRASH] %s/%s: advanced %d overlay players over a %.2fs post-shot window",
+            turn_result.get("current_turn"), turn_result.get("result_type"), moved, seconds,
+        )
+    return moved
+
+
 def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None:
     """
     After a turn is finalized, align all ten active players' ``Player.coords`` with the
@@ -3832,6 +4077,13 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
     # longer override schema end.coords below — DREB/legacy callers still
     # read the overlay maps directly.)
     canonicalize_post_shot_overlays(turn_result)
+
+    # Full-sim crash parity (flag-gated, default OFF): the played arm renders the post-shot crash /
+    # get-back / release motion through its emitted sub-steps; a full simulation emits none for the
+    # HCO family, so the same destinations are applied here by arithmetic. Runs AFTER canonicalize so
+    # the shooter / get-back / release exclusions are already applied, and writes into `positions`,
+    # which the loop below assigns to Player.coords.
+    apply_sim_crash_destinations(game, turn_result, positions)
 
     # Overlay maps DELIBERATELY DO NOT override `animation_steps[-1].end.coords`
     # anymore. UESS §9.5: non-gate movers freeze at their interrupted coord,

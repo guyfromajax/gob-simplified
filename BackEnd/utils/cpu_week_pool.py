@@ -43,6 +43,11 @@ from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 
+from BackEnd.persistence import get_store
+_store = get_store()
+_FPD = _store.franchise_players_data_collection
+_FRD = _store.franchise_recruits_data_collection
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_POOL_WORKERS = 8
@@ -74,12 +79,18 @@ def _pool_span(label: str, workers: int, jobs: int):
         _live_pools[label] = _live_pools.get(label, 0) + workers
         total = sum(_live_pools.values())
     if others:
-        logger.warning(
+        from BackEnd.loopback_env import is_loopback
+
+        message = (
             "[POOL-OVERLAP] %s starting %s workers while %s already live — %s workers "
             "requested across %s pools on %s cpus. They will contend; consider serializing "
-            "them or lowering the worker count.",
-            label, workers, others, total, len(_live_pools), os.cpu_count(),
+            "them or lowering the worker count."
         )
+        args = (label, workers, others, total, len(_live_pools), os.cpu_count())
+        if is_loopback():
+            logger.error(message, *args)
+        else:
+            logger.warning(message, *args)
 
     t0 = time.time()
     cpu0 = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -101,20 +112,24 @@ def _pool_span(label: str, workers: int, jobs: int):
 
 
 def pool_worker_count(env_var: str = "FRANCHISE_CPU_SIM_POOL_WORKERS") -> int:
-    """Worker count from FRANCHISE_CPU_SIM_POOL_WORKERS (default 8).
+    """Worker count from FRANCHISE_CPU_SIM_POOL_WORKERS.
 
-    Default leaves headroom on the 32-vCPU Railway service so live user-game
-    requests never contend with a background week.
-
-    ``env_var`` lets a second pooled path size itself separately — see
-    ``ps_pool_worker_count`` — so the two can be de-conflicted from the
-    environment without a deploy.
+    Hosted default is 8 (Railway 32 vCPU). Desktop sizes from cores minus a
+    live-game reserve, bounded by RAM and a conservative cap. An explicit
+    env value always wins so the number stays tunable.
     """
-    try:
-        n = int(os.environ.get(env_var, DEFAULT_POOL_WORKERS))
-        return max(1, n)
-    except (TypeError, ValueError):
-        return DEFAULT_POOL_WORKERS
+    raw = os.environ.get(env_var)
+    if raw is not None and str(raw).strip() != "":
+        try:
+            return max(1, int(raw))
+        except (TypeError, ValueError):
+            pass
+    from BackEnd.loopback_env import is_loopback
+    from BackEnd.pool_policy import desktop_worker_count
+
+    if is_loopback():
+        return desktop_worker_count()
+    return DEFAULT_POOL_WORKERS
 
 
 def ps_pool_worker_count() -> int:
@@ -421,8 +436,6 @@ def _ps_sim_worker(task: tuple) -> tuple:
     if collect_guard:
         sim_random.install_global_draw_guard()
         sim_random.reset_global_draw_guard()
-    from BackEnd.db import (franchise_players_data_collection as _FPD,
-                            franchise_recruits_data_collection as _FRD)
     from BackEnd.practice_squad.sim import run_ps_full_simulation
 
     fpd_ids: list[str] = []

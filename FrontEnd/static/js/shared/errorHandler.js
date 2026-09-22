@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Error Handler Utility for State & Persistence Errors
  * Phase 1.1 & Phase 4: Provides explicit error screens with recovery flows and telemetry
@@ -34,9 +55,9 @@ function logErrorTelemetry(errorType, errorDetails) {
 /**
  * Show error screen for missing required pointer
  * @param {Object} options - Error configuration
- * @param {string} options.missingPointer - The missing pointer (game_id, franchise_id, tournament_id)
+ * @param {string} options.missingPointer - The missing pointer (game_id, franchise_id)
  * @param {string} options.message - Detailed error message
- * @param {string} options.mode - Current game mode (single, franchise, tournament)
+ * @param {string} options.mode - Current game mode (single, franchise)
  * @param {Object} options.recoveryOptions - Recovery flow options
  * @param {string} options.recoveryOptions.redirectTo - Where to redirect (lineup, mode-select, franchise-select, etc.)
  * @param {Object} options.recoveryOptions.redirectParams - Parameters for redirect URL
@@ -73,9 +94,6 @@ function showMissingPointerError({
       break;
     case 'franchise-select':
       recoveryUrl = '/franchise-select-team.html';
-      break;
-    case 'tournament-select':
-      recoveryUrl = '/tournament-select.html';
       break;
     case 'homepage':
       recoveryUrl = '/homepage.html';
@@ -176,7 +194,7 @@ function showMissingPointerError({
  * Build lineup URL from params
  */
 function buildLineupUrl(params) {
-  const urlParams = new URLSearchParams();
+  const urlParams = emptyParams();
   
   if (params.home) urlParams.set('home', params.home);
   if (params.away) urlParams.set('away', params.away);
@@ -187,7 +205,6 @@ function buildLineupUrl(params) {
   if (params.quarter) urlParams.set('quarter', params.quarter);
   if (params.period) urlParams.set('period', params.period);
   if (params.franchise_id) urlParams.set('franchise_id', params.franchise_id);
-  if (params.tournament_id) urlParams.set('tournament_id', params.tournament_id);
   if (params.week) urlParams.set('week', params.week);
   if (params.team_id) urlParams.set('team_id', params.team_id);
   
@@ -198,10 +215,10 @@ function buildLineupUrl(params) {
  * Show error screen for missing truth (document not found)
  * Phase 4: Error screen for when pointer exists but document doesn't
  * @param {Object} options - Error configuration
- * @param {string} options.pointerType - The pointer type (game_id, franchise_id, tournament_id)
+ * @param {string} options.pointerType - The pointer type (game_id, franchise_id)
  * @param {string} options.pointerValue - The pointer value that was invalid
  * @param {string} options.message - Detailed error message
- * @param {string} options.mode - Current game mode (single, franchise, tournament)
+ * @param {string} options.mode - Current game mode (single, franchise)
  * @param {Object} options.recoveryOptions - Recovery flow options
  */
 function showMissingTruthError({
@@ -238,9 +255,6 @@ function showMissingTruthError({
       break;
     case 'franchise-select':
       recoveryUrl = '/franchise-select-team.html';
-      break;
-    case 'tournament-select':
-      recoveryUrl = '/tournament-select.html';
       break;
     case 'homepage':
       recoveryUrl = '/homepage.html';

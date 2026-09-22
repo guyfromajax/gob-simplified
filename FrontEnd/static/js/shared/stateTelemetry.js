@@ -35,10 +35,6 @@ const STATE_CONTRACT = {
     sources: ['url'], // Only URL is allowed
     description: 'Franchise identifier - must come from URL params only'
   },
-  tournament_id: {
-    sources: ['url'], // Only URL is allowed
-    description: 'Tournament identifier - must come from URL params only'
-  },
   playbook_settings: {
     sources: ['backend', 'gameStore'], // Backend is source of truth, gameStore is cache
     description: 'Playbook settings - backend is source of truth, gameStore is cache'

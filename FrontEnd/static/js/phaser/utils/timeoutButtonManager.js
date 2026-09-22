@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Timeout Button Manager
  * Modular timeout button functionality with feature flag
@@ -561,7 +582,7 @@ async function handleTimeoutButtonClick(executeOnly = false) {
     // Execute the timeout
     // Get game ID and team info from scene
     const gameId = scene.gameId || scene.simData?.game_id;
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = liveParams();
     const myTeamSide = scene.userTeamSide || urlParams.get('my_team');
     
     if (!myTeamSide) {
@@ -698,7 +719,7 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
         existingPopup.remove();
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = liveParams();
     const myTeamSide = scene.userTeamSide || urlParams.get('my_team');
     const homeTeamId = scene.simData?.home_team_id;
     const awayTeamId = scene.simData?.away_team_id;
@@ -875,7 +896,7 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
                        (scene.simData?.user_team_side === 'home' ? 'home' : 'away');
     
     // Fallback: Get from URL params if scene doesn't have it
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = liveParams();
     // ✅ SINGLE GAME FIX: Ensure game_id is available for lineup URL (NG/stats load).
     // In Single Game, scene.gameId can be unset if gameStore wasn't set; court URL still has game_id.
     const gameIdToUse = gameId || urlParams.get('game_id') || null;
@@ -888,7 +909,6 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     const userTeamIdParam = urlParams.get('user_team_id'); // Keep for backward compatibility
     const franchiseId = urlParams.get('franchise_id');
     const weekParam = urlParams.get('week');
-    const tournamentId = urlParams.get('tournament_id');
     const modeParam = urlParams.get('mode') || 'single';
     
     const currentQuarter = scene.simData?.quarter || scene.quarter || 1;
@@ -983,7 +1003,6 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
             user_team_id: userTeamIdParam, // Keep for backward compatibility
             franchise_id: franchiseId,
             week: weekParam,
-            tournament_id: tournamentId,
             mode: modeParam,
             timeout_trace_id: timeoutResult?.timeout_trace_id || undefined,
             home_score: homeScore ?? undefined,

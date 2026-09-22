@@ -21,7 +21,10 @@ from typing import Any, Mapping, MutableMapping, Optional
 
 from bson import ObjectId
 
-from BackEnd.db import franchises_collection, teams_collection
+from BackEnd.persistence import get_store
+_store = get_store()
+franchises_collection = _store.franchises_collection
+teams_collection = _store.teams_collection
 
 # Franchise-doc field holding the per-save Team Builder overlay.
 TEAM_BUILDER_FIELD = "team_builder"

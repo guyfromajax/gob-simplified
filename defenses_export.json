@@ -1,0 +1,1196 @@
+[
+ {
+  "_id": {
+   "$oid": "6920a9031ed9435840bc6d72"
+  },
+  "cloaking": 0,
+  "defense_id": "1-3-1-zone",
+  "defense_type": "Zone",
+  "description": "1-3-1 zone defense with one guard up top, three players in the middle, and one player in the paint",
+  "effectiveness": 0.0,
+  "game_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "momentum": 0,
+  "name": "1-3-1 Zone",
+  "season_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "shift_triggers": {
+   "lower_corner_shift": [
+    "lower corner"
+   ],
+   "lower_shift": [
+    "lower wing",
+    "lower midWing",
+    "lower midCorner"
+   ],
+   "upper_corner_shift": [
+    "upper corner"
+   ],
+   "upper_shift": [
+    "upper wing",
+    "upper midWing",
+    "upper midCorner"
+   ]
+  },
+  "zone_definitions": {
+   "lower_corner_shift": {
+    "C": [
+     "lower lowPost",
+     "lower midBaseline",
+     "lower corner"
+    ],
+    "PF": [
+     "midLane",
+     "lower lowPost",
+     "lower midPost",
+     "lower highPost",
+     "topLane",
+     "upper highPost",
+     "upper midPost",
+     "upper lowPost"
+    ],
+    "PG": [
+     "key",
+     "lower midWing",
+     "lower wing",
+     "lower apex",
+     "lower highPost",
+     "lower midPost",
+     "midLane",
+     "topLane"
+    ],
+    "SF": [
+     "lower midWing",
+     "lower wing",
+     "lower midCorner"
+    ],
+    "SG": [
+     "key",
+     "upper midWing",
+     "upper wing",
+     "upper midCorner",
+     "upper corner",
+     "upper midBaseline",
+     "upper lowPost",
+     "upper midPost",
+     "upper highPost"
+    ]
+   },
+   "lower_shift": {
+    "C": [
+     "basketSpot",
+     "lower lowPost",
+     "lower midBaseline",
+     "lower corner"
+    ],
+    "PF": [
+     "midLane",
+     "lower lowPost",
+     "lower midPost",
+     "lower highPost",
+     "topLane",
+     "upper highPost",
+     "upper midPost",
+     "upper lowPost"
+    ],
+    "PG": [
+     "key",
+     "lower midWing",
+     "lower wing",
+     "lower apex",
+     "lower highPost",
+     "topLane"
+    ],
+    "SF": [
+     "lower midWing",
+     "lower wing",
+     "lower midCorner"
+    ],
+    "SG": [
+     "upper midWing",
+     "upper wing",
+     "upper midCorner",
+     "upper corner",
+     "upper midBaseline",
+     "upper lowPost",
+     "upper midPost",
+     "upper highPost"
+    ]
+   },
+   "normal": {
+    "C": [
+     "basketSpot",
+     "upper corner",
+     "upper midBaseline",
+     "upper lowPost",
+     "basketSpot",
+     "lower lowPost",
+     "lower midBaseline",
+     "lower corner",
+     "lower midCorner",
+     "lower bird",
+     "lower midPost",
+     "midLane",
+     "basketSpot"
+    ],
+    "PF": [
+     "midLane",
+     "lower lowPost",
+     "lower midPost",
+     "lower highPost",
+     "topLane",
+     "upper highPost",
+     "upper midPost",
+     "upper lowPost"
+    ],
+    "PG": [
+     "key",
+     "lower midWing",
+     "lower wing",
+     "lower apex",
+     "lower highPost",
+     "topLane",
+     "upper highPost",
+     "upper apex",
+     "upper wing",
+     "upper midWing"
+    ],
+    "SF": [
+     "lower apex",
+     "lower wing",
+     "lower midCorner",
+     "lower bird"
+    ],
+    "SG": [
+     "upper apex",
+     "upper wing",
+     "upper midCorner",
+     "upper bird"
+    ]
+   },
+   "upper_corner_shift": {
+    "C": [
+     "upper lowPost",
+     "upper midBaseline",
+     "upper corner"
+    ],
+    "PF": [
+     "midLane",
+     "lower lowPost",
+     "lower midPost",
+     "lower highPost",
+     "topLane",
+     "upper highPost",
+     "upper midPost",
+     "upper lowPost"
+    ],
+    "PG": [
+     "key",
+     "upper midWing",
+     "upper wing",
+     "upper apex",
+     "upper highPost",
+     "upper midPost",
+     "midLane",
+     "topLane"
+    ],
+    "SF": [
+     "key",
+     "lower midWing",
+     "lower wing",
+     "lower midCorner",
+     "lower corner",
+     "lower midBaseline",
+     "lower lowPost",
+     "lower midPost",
+     "lower highPost"
+    ],
+    "SG": [
+     "upper midWing",
+     "upper wing",
+     "upper midCorner"
+    ]
+   },
+   "upper_shift": {
+    "C": [
+     "basketSpot",
+     "upper lowPost",
+     "upper midBaseline",
+     "upper corner"
+    ],
+    "PF": [
+     "midLane",
+     "lower lowPost",
+     "lower midPost",
+     "lower highPost",
+     "topLane",
+     "upper highPost",
+     "upper midPost",
+     "upper lowPost"
+    ],
+    "PG": [
+     "key",
+     "upper midWing",
+     "upper wing",
+     "upper apex",
+     "upper highPost",
+     "topLane"
+    ],
+    "SF": [
+     "lower midWing",
+     "lower wing",
+     "lower midCorner",
+     "lower corner",
+     "lower midBaseline",
+     "lower lowPost",
+     "lower midPost",
+     "lower highPost"
+    ],
+    "SG": [
+     "upper midWing",
+     "upper wing",
+     "upper midCorner"
+    ]
+   }
+  }
+ },
+ {
+  "_id": {
+   "$oid": "6946bad3653078351e7d6315"
+  },
+  "cloaking": 0,
+  "defense_id": "2-3-zone",
+  "defense_type": "Zone",
+  "description": "Standard 2-3 zone defense with two guards up top and three players in the paint",
+  "effectiveness": 0.0,
+  "game_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "momentum": 0,
+  "name": "2-3 Zone",
+  "season_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "shift_triggers": {
+   "lower_shift": [
+    "lower wing",
+    "lower midCorner",
+    "lower corner"
+   ],
+   "upper_shift": [
+    "upper wing",
+    "upper midCorner",
+    "upper corner"
+   ]
+  },
+  "zone_definitions": {
+   "lower_shift": {
+    "C": [
+     "upper lowPost",
+     "lower lowPost",
+     "lower midPost",
+     "midLane",
+     "upper midPost"
+    ],
+    "PF": [
+     "upper midCorner",
+     "upper corner",
+     "upper lowPost",
+     "upper midPost",
+     "upper apex",
+     "upper bird",
+     "upper midBaseline"
+    ],
+    "PG": [
+     "lower midWing",
+     "lower highPost",
+     "upper midCorner",
+     "upper wing",
+     "upper midWing",
+     "key"
+    ],
+    "SF": [
+     "lower midCorner",
+     "lower corner",
+     "lower lowPost",
+     "lower midPost",
+     "lower apex",
+     "lower bird",
+     "lower midBaseline"
+    ],
+    "SG": [
+     "lower corner",
+     "lower midCorner",
+     "lower wing",
+     "lower midPost",
+     "lower highPost",
+     "lower apex",
+     "lower bird",
+     "lower midBaseline"
+    ]
+   },
+   "normal": {
+    "C": [
+     "upper lowPost",
+     "lower lowPost",
+     "lower midPost",
+     "midLane",
+     "upper midPost"
+    ],
+    "PF": [
+     "upper midCorner",
+     "upper corner",
+     "upper lowPost",
+     "upper midPost",
+     "upper apex",
+     "upper bird",
+     "upper midBaseline"
+    ],
+    "PG": [
+     "key",
+     "midLane",
+     "topLane",
+     "upper midCorner",
+     "upper wing",
+     "upper midWing"
+    ],
+    "SF": [
+     "lower midCorner",
+     "lower corner",
+     "lower lowPost",
+     "lower midPost",
+     "lower apex",
+     "lower bird",
+     "lower midBaseline"
+    ],
+    "SG": [
+     "key",
+     "midLane",
+     "topLane",
+     "lower midCorner",
+     "lower wing",
+     "lower midWing"
+    ]
+   },
+   "upper_shift": {
+    "C": [
+     "upper lowPost",
+     "lower lowPost",
+     "lower midPost",
+     "midLane",
+     "upper midPost"
+    ],
+    "PF": [
+     "upper midCorner",
+     "upper corner",
+     "upper lowPost",
+     "upper midPost",
+     "upper apex",
+     "upper bird",
+     "upper midBaseline"
+    ],
+    "PG": [
+     "upper corner",
+     "upper midCorner",
+     "upper wing",
+     "upper midPost",
+     "upper highPost",
+     "upper apex",
+     "upper bird",
+     "upper midBaseline"
+    ],
+    "SF": [
+     "lower midCorner",
+     "lower corner",
+     "lower lowPost",
+     "lower midPost",
+     "lower apex",
+     "lower bird",
+     "lower midBaseline"
+    ],
+    "SG": [
+     "upper midWing",
+     "upper highPost",
+     "lower midCorner",
+     "lower wing",
+     "lower midWing",
+     "key"
+    ]
+   }
+  }
+ },
+ {
+  "_id": {
+   "$oid": "691fafb7ecb7845ebb094233"
+  },
+  "cloaking": 0,
+  "defense_id": "3-2-zone",
+  "defense_type": "Zone",
+  "description": "3-2 zone defense with three guards up top and two players in the paint",
+  "effectiveness": 0.0,
+  "game_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "momentum": 0,
+  "name": "3-2 Zone",
+  "season_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "shift_triggers": {
+   "lower_shift": [
+    "lower corner"
+   ],
+   "upper_shift": [
+    "upper corner"
+   ]
+  },
+  "zone_definitions": {
+   "lower_shift": {
+    "C": [
+     "basketSpot",
+     "midLane",
+     "lower midPost",
+     "lower bird",
+     "lower midCorner",
+     "lower corner",
+     "lower midBaseline",
+     "lower lowPost"
+    ],
+    "PF": [
+     "basketSpot",
+     "midLane",
+     "upper midPost",
+     "upper bird",
+     "upper midCorner",
+     "upper corner",
+     "upper midBaseline",
+     "upper lowPost",
+     "basketSpot",
+     "midLane",
+     "lower corner"
+    ],
+    "PG": [
+     "key",
+     "upper midWing",
+     "upper highPost",
+     "midLane",
+     "lower highPost",
+     "lower midWing"
+    ],
+    "SF": [
+     "lower wing",
+     "lower midWing",
+     "lower highPost",
+     "lower midPost",
+     "lower bird",
+     "lower midCorner"
+    ],
+    "SG": [
+     "upper wing",
+     "upper midWing",
+     "upper highPost",
+     "upper midPost",
+     "upper bird",
+     "upper midCorner"
+    ]
+   },
+   "normal": {
+    "C": [
+     "basketSpot",
+     "midLane",
+     "lower midPost",
+     "lower bird",
+     "lower midCorner",
+     "lower corner",
+     "lower midBaseline",
+     "lower lowPost"
+    ],
+    "PF": [
+     "basketSpot",
+     "midLane",
+     "upper midPost",
+     "upper bird",
+     "upper midCorner",
+     "upper corner",
+     "upper midBaseline",
+     "upper lowPost"
+    ],
+    "PG": [
+     "key",
+     "upper midWing",
+     "upper highPost",
+     "midLane",
+     "lower highPost",
+     "lower midWing"
+    ],
+    "SF": [
+     "lower wing",
+     "lower midWing",
+     "lower highPost",
+     "lower midPost",
+     "lower bird",
+     "lower midCorner"
+    ],
+    "SG": [
+     "upper wing",
+     "upper midWing",
+     "upper highPost",
+     "upper midPost",
+     "upper bird",
+     "upper midCorner"
+    ]
+   },
+   "upper_shift": {
+    "C": [
+     "basketSpot",
+     "midLane",
+     "lower midPost",
+     "lower bird",
+     "lower midCorner",
+     "lower corner",
+     "lower midBaseline",
+     "lower lowPost",
+     "basketSpot",
+     "midLane",
+     "upper corner"
+    ],
+    "PF": [
+     "basketSpot",
+     "midLane",
+     "upper midPost",
+     "upper bird",
+     "upper midCorner",
+     "upper corner",
+     "upper midBaseline",
+     "upper lowPost"
+    ],
+    "PG": [
+     "key",
+     "upper midWing",
+     "upper highPost",
+     "midLane",
+     "lower highPost",
+     "lower midWing"
+    ],
+    "SF": [
+     "lower wing",
+     "lower midWing",
+     "lower highPost",
+     "lower midPost",
+     "lower bird",
+     "lower midCorner"
+    ],
+    "SG": [
+     "upper wing",
+     "upper midWing",
+     "upper highPost",
+     "upper midPost",
+     "upper bird",
+     "upper midCorner"
+    ]
+   }
+  }
+ },
+ {
+  "_id": {
+   "$oid": "6946c02e67e0c86089ead921"
+  },
+  "cloaking": 0,
+  "defense_id": "base-man",
+  "defense_type": "Man",
+  "description": "Standard man defense",
+  "effectiveness": 0,
+  "game_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "momentum": 0,
+  "name": "Base Man",
+  "season_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "shift_triggers": null,
+  "zone_definitions": null
+ },
+ {
+  "_id": {
+   "$oid": "6a5d3a0fd48d59a9f9a255ed"
+  },
+  "cloaking": 0,
+  "defense_id": "man-loose",
+  "defense_type": "Man",
+  "description": "Loose/sagging man defense \u2014 extra cushion, help toward the ball line.",
+  "effectiveness": 0,
+  "game_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "momentum": 0,
+  "name": "Loose Man",
+  "season_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "shift_triggers": null,
+  "zone_definitions": null
+ },
+ {
+  "_id": {
+   "$oid": "6a5d3a0fd48d59a9f9a255ec"
+  },
+  "cloaking": 0,
+  "defense_id": "man-tight",
+  "defense_type": "Man",
+  "description": "Tight/deny man defense \u2014 pressures on-ball and denies passing lanes.",
+  "effectiveness": 0,
+  "game_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "momentum": 0,
+  "name": "Deny Man",
+  "season_stats": {
+   "success": 0,
+   "used": 0,
+   "vs_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_motion_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_outside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_attack": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_inside": {
+    "attempts": 0,
+    "success": 0
+   },
+   "vs_set_outside": {
+    "attempts": 0,
+    "success": 0
+   }
+  },
+  "shift_triggers": null,
+  "zone_definitions": null
+ }
+]

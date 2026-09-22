@@ -15,12 +15,12 @@ from typing import Any
 
 from bson import ObjectId
 
-from BackEnd.db import (
-    around_the_league_collection,
-    franchises_collection,
-    teams_collection,
-    users_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+around_the_league_collection = _store.around_the_league_collection
+franchises_collection = _store.franchises_collection
+teams_collection = _store.teams_collection
+users_collection = _store.users_collection
 from BackEnd.utils.community_highlights import (
     _display_username_for_highlight,
     _ftd_team_display,

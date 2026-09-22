@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Background music controller.
  *
@@ -43,7 +64,7 @@ function debugEnabled() {
   if (typeof window === "undefined") return false;
   if (window.DEBUG_MUSIC === true) return true;
   try {
-    const value = new URLSearchParams(window.location.search).get("debug_music");
+    const value = liveParams().get("debug_music");
     return ["1", "true", "yes"].includes(String(value || "").toLowerCase());
   } catch (_err) {
     return false;

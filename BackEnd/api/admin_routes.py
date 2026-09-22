@@ -12,19 +12,22 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from BackEnd.db import (
-    db,
-    tournaments_collection,
-    franchises_collection,
-    franchise_team_data_collection,
-    franchise_players_data_collection,
-    franchise_recruits_data_collection,
-)
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+tournaments_collection = _store.tournaments_collection
+franchises_collection = _store.franchises_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_recruits_data_collection = _store.franchise_recruits_data_collection
+
 from BackEnd.utils.auth import get_admin_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+from BackEnd.runtime_paths import bundle_path
+
+STATIC_DIR = bundle_path("FrontEnd", "static")
 
 
 class ResetUserStateRequest(BaseModel):

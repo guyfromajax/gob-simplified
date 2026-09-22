@@ -1,11 +1,31 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Shows a foul out popup when a player reaches 5 fouls
  * @param {Object} options
  * @param {Object} options.player - Player object with player_id, name, photo, team
  * @param {string} options.gameId - The game ID
- * @param {string} options.mode - Game mode: 'single', 'tournament', or 'franchise'
+ * @param {string} options.mode - Game mode: 'single' or 'franchise'
  * @param {string} options.quarter - Current quarter
- * @param {string} [options.tournamentId] - Tournament ID (for tournament mode)
  * @param {string} [options.franchiseId] - Franchise ID (for franchise mode)
  * @param {string} [options.homeTeam] - Home team name
  * @param {string} [options.awayTeam] - Away team name
@@ -15,7 +35,7 @@
  * @param {string} [options.userTeamId] - User's team ID
  * @param {string} [options.foulOutPlayerId] - Fouling-out player's id from turn (single source of truth for image; same as shooting-foul uses turnData.foul_player_id)
  */
-export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId, foulOutPlayerId: foulOutPlayerIdFromTurn }) {
+export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId, foulOutPlayerId: foulOutPlayerIdFromTurn }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
   if (existingPopup) {
@@ -24,7 +44,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
 
   // ✅ SS&S: Use unified navigation helper for consistent parameter building
   // Fallback: try to get team info and CURRENT LINEUP from current URL if not provided
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   if (!homeTeam) homeTeam = urlParams.get('home');
   if (!awayTeam) awayTeam = urlParams.get('away');
   if (!homeId) homeId = urlParams.get('home_id');
@@ -116,7 +136,6 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, t
       my_team: myTeamSide,
       user_team_id: userTeamId,
       mode: mode,
-      tournament_id: tournamentId,
       franchise_id: franchiseId,
       home_score: homeScore ?? undefined,
       away_score: awayScore ?? undefined

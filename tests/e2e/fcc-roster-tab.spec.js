@@ -190,10 +190,11 @@ test.describe('FCC Recruiting tab', () => {
       <style>body{margin:0;background:#0b0d14}.tab-content{display:block!important}
              #franchise-container{width:${width || 1500}px}</style>
       <div id="franchise-container"><div id="tournament-tabs">${RECRUITS_TAB}</div></div>`);
+    await page.addScriptTag({ content: read('js/shared/franchiseContext.js') });
     await page.addScriptTag({ content: read('js/shared/rtBucket.js') });
     await page.addScriptTag({ content: read('js/shared/attrTiles.js') });
     await page.addScriptTag({ content: read('js/shared/playerYear.js') });
-    // Production script order: common.js supplies getBestPosition/formatHeight.
+    // Production script order: door, then common.js (getBestPosition/formatHeight).
     await page.addScriptTag({ content: read('common.js') });
     await page.addScriptTag({ content: read('recruiting-common.js') });
     await page.addScriptTag({ content: read('recruiting-spine.js') });

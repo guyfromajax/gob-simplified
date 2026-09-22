@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function () {
   const MOTION_FOCUS_OPTIONS = [
     { value: "balanced", label: "Balanced" },
@@ -184,11 +205,10 @@
   }
 
   function buildPlayDetailsUrl(context, play) {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set("mode", context.mode);
     params.set("team_id", context.teamId);
     if (context.franchiseId) params.set("franchise_id", context.franchiseId);
-    if (context.tournamentId) params.set("tournament_id", context.tournamentId);
     if (context.gameId) params.set("game_id", context.gameId);
     if (play.id) params.set("play_id", play.id);
     params.set("play_name", play.name);
@@ -206,11 +226,10 @@
   }
 
   function buildPlaybookReportUrl(context) {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set("mode", context.mode);
     params.set("team_id", context.teamId);
     if (context.franchiseId) params.set("franchise_id", context.franchiseId);
-    if (context.tournamentId) params.set("tournament_id", context.tournamentId);
     if (context.gameId) params.set("game_id", context.gameId);
     if (context.from) params.set("from", context.from);
 
@@ -264,13 +283,12 @@
 
   class PlaybooksPage {
     constructor() {
-      this.params = new URLSearchParams(window.location.search);
+      this.params = liveParams();
       this.context = {
         params: this.params,
         mode: this.params.get("mode") || "single",
         teamId: this.params.get("team_id") || "",
         franchiseId: this.params.get("franchise_id") || "",
-        tournamentId: this.params.get("tournament_id") || "",
         gameId: this.params.get("game_id") || "",
         from: this.params.get("from") || "",
         isGameplayContext: Boolean(this.params.get("game_id") || ""),
@@ -363,7 +381,6 @@
         this.context.mode || "single",
         this.context.teamId || "",
         this.context.franchiseId || "",
-        this.context.tournamentId || "",
         this.context.gameId || "",
       ].join(":");
     }
@@ -374,7 +391,6 @@
         this.context.mode || "single",
         this.context.teamId || "",
         this.context.franchiseId || "",
-        this.context.tournamentId || "",
         this.context.gameId || "",
       ].join(":");
     }
@@ -502,11 +518,10 @@
     }
 
     async loadData() {
-      const params = new URLSearchParams();
+      const params = emptyParams();
       params.set("mode", this.context.mode);
       params.set("team_id", this.context.teamId);
       if (this.context.franchiseId) params.set("franchise_id", this.context.franchiseId);
-      if (this.context.tournamentId) params.set("tournament_id", this.context.tournamentId);
       if (this.context.gameId) params.set("game_id", this.context.gameId);
 
       const response = await fetch(`${API_CONFIG.buildUrl("/api/playbooks")}?${params.toString()}`);
@@ -1299,7 +1314,6 @@
         mode: this.context.mode,
         team_id: this.context.teamId,
         franchise_id: this.context.franchiseId || null,
-        tournament_id: this.context.tournamentId || null,
         game_id: this.context.gameId || null,
         playbook_settings: {
           motion: toPercentMap(this.state.motion),

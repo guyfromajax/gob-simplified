@@ -37,9 +37,10 @@ training_position → position_intent → highest current position rating → SF
 The backend training-player producer carries `training_position`, `position_intent`, and
 `resolved_training_position`. Browser pricing consumes the server-resolved field; user budget
 validation, execution floors, CPU grouping/reference focus, Team Builder floor validation, and
-offseason development call the same canonical resolver. There is currently no product/UI write
-path that lets a user change `training_position`; generation supplies `position_intent`, and
+offseason development call the same canonical resolver. Generation supplies `position_intent`;
 rollover defaults a missing `training_position` to that intent and then carries it forward.
+A coach **can** change `training_position` from the roster surfaces — see **Development Focus**
+below. `position_intent` (the natural fit) is never rewritten by that change.
 
 Player Maximizer **Positional Focus is intentionally separate**: it selects its fixed attribute
 triple from the player's highest current RT, not from `training_position`.
@@ -199,9 +200,60 @@ While training runs, `PageLoadOverlay` uses its separate `newswire` variant to r
 
 ### Position fit and class taper
 
-Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO 91%, JR 95%, SR 100% (JR/SR raised from 80/71 on 2026-08-14 — flat decay was making upperclassmen regress in-season; the bump flips JR/SR net positive without touching FR/SO or decay). The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`.
+Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO 91%, JR 95%, SR 100% (JR/SR raised from 80/71 on 2026-08-14 — flat decay was making upperclassmen regress in-season; the bump flips JR/SR net positive without touching FR/SO or decay). The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`. Since Development Focus, `position_fit` is the profile lookup `TRAINING_FOCUS_PERCENTAGES[position][focus][attr]` — **one** multiplier, not a fit term times a focus term. `standard` aliases `TRAINING_GAIN_PERCENTAGES[position]`, so a player on the default focus trains exactly as before.
 
 This moved the fractional component off the budget so the user always sees and spends whole points while retaining the original cross-position granularity. Shape floors and `resolve_training_position()` are unchanged.
+
+**Player-facing surface:** the percentages are published to coaches as a read-only chart at `FrontEnd/static/tutorial-advanced-training-by-position.html` (Tutorials → Advanced Topics → Training by Position; hub id `training-by-position`). The page **reads all 30 profiles from a generated asset** — nothing on it is typed by hand:
+
+| | |
+|---|---|
+| Generator | `scripts/generate_training_matrix_asset.py` |
+| Asset | `FrontEnd/static/js/generated/trainingMatrix.js` (a `<script src>`, not a fetch, so the desktop build needs no special case) |
+| Renderer | `FrontEnd/static/js/shared/trainingMatrixGrid.js` — **By Position** (one position, six focuses) / **By Focus** (one focus, five positions), landing on By Focus → Standard |
+| Drift guard | `tests/test_training_matrix_asset.py` fails if the asset does not match `training_shape.py` |
+
+**After any retune of `TRAINING_FOCUS_PERCENTAGES` or `TRAINING_GAIN_PERCENTAGES`, run `python scripts/generate_training_matrix_asset.py` and commit the asset.** The guard test will fail until you do — it replaces the old "must be mirrored by hand" warning, which was a warning rather than a guard and was exactly how the page would have gone stale. Class-year taper is deliberately omitted from that page.
+
+### Development Focus
+
+Per-player training profile, selected by **position × focus**. Replaces the position-only
+lookup. FPD is authoritative; changing either value affects **future** training only.
+
+| | |
+|---|---|
+| Positions | PG SG SF PF C |
+| Focuses | `standard` `offensive` `defensive` `athletic` `fundamentals` `rebounding` |
+| Profiles | 30 (5 × 6), each totalling **808** across the 12 attributes |
+| Locked at 100% in every profile | FT, IQ, ND |
+| Stored on FPD | `training_position`, `training_focus` |
+| Resolvers | `resolve_training_position()`, `resolve_training_focus()` — a missing or unknown stored value degrades to the default rather than raising mid-week |
+| Multiplier | `training_attr_gain_multiplier(position, attr, focus)`; `player_attr_gain_multiplier(player, attr)` resolves both off the player |
+
+**Where a coach sets it.** The **training page only** — the Player Development grid under
+Coaching Focus, where the setting sits beside the points it governs. Each dropdown saves on
+change through `POST /franchise/player/development-focus`, which validates against
+`POSITIONS` / `TRAINING_FOCUSES` and **rejects** an unknown value rather than coercing it.
+
+Every other surface is **read-only**: the FCC roster tab and the roster page show **POS**
+(third column, where it has always sat, showing the training position and nothing else)
+and **DEV FOCUS** (trailing the attribute tiles — the evidence, then the coaching call);
+player detail shows both under the position ratings.
+Rosters are for scanning and comparing; a live control in a twelve-tile-wide row invites a
+stray click that writes with no undo. Those surfaces carry **no link** to the editor yet —
+deliberate, pending testing of the one-editor flow.
+
+**User's own team only.** `/roster/{team}` returns `is_user_team` and attaches the four
+development keys only for that team, so another team's roster cannot render a control the
+write route would reject. Ownership is `_player_on_user_team` (`api.py`): the franchise doc
+holds `user_team_id` (team **name**) and `user_team_object_id` (**id**), FPD `meta` mirrors
+both as `meta.team` / `meta.team_id` — compare like with like. Practice-squad rows are
+outside the editor; that payload does not carry the two fields.
+
+**Player Maximizer** resolves its positional-focus triple from the same
+`resolve_training_position`, so the two features cannot disagree about a converted player.
+
+Full design, phases and settled decisions: `_documentation_master/projects/GOB_DEVELOPMENT_FOCUS_PLAN.md`.
 
 ### Coaching Focus Selection
 
@@ -250,7 +302,7 @@ The training execution system applies pre-training conditions, allocates trainin
 #### Community Engagement (`culture-builder-community`)
 
 - **Franchise only** (no training in Single Game / Tournament).
-- **Immediate training effect:** small EM bump for all players (see `training_execution_v2.py`).
+- **Immediate training effect:** each player **EM** `+random.randint(2, 5)` (clamped 1–100 with the breaks EM roll; not shown on the report changes grid). See **Player EM** below.
 - **Next franchise game (home crowd roll):** sets **`pending_community_engagement`** on that team’s **FTD** (`franchise_team_data`). When a franchise game is started (`/api/init-game` or new-game `simulate-quarter` path), the engine reads pending flags for **both** teams, resolves a single band shift for the **home crowd weight table** (see `Home_Crowd_System.md`), then clears both teams’ flags.
 - **User home:** shift crowd weights **up** one chemistry band vs the user’s current `team_chemistry` for the home team in that game; if already in **21–25**, use the **Upper Bonus Range** row from `Home_Crowd_System.md` instead.
 - **User away:** shift **down** one band vs the **home opponent’s** `team_chemistry`; if opponent chemistry is in **7–10**, no downward effect.
@@ -418,30 +470,40 @@ Input is `technical_drills.rebounding + scrimmages`, summed and applied **once**
 2. **Install training (play/defense effectiveness only):** Authoritarian **Execution** and **Teamwork** use one session roll of the same `[1.5, 1.6, 1.7, 1.8]` values on integer **effectiveness** (Command) increments only, via `_scale_install_training_effectiveness_points`—not on momentum/cloaking (install does not allocate to those).
 
 **Authoritarian (all four sub-options implemented):**
-- **Discipline:** Amplifies BH, `fight`, `discipline` (drill / team-attribute mechanism *#1*). Also adds flat `discipline += random.randint(1, 2)` once per training session (shared with Rebounding and Execution only — not Teamwork).
-- **Rebounding:** Amplifies RB, `rebound_modifier` (mechanism *#1*). Receives the shared flat `discipline += random.randint(1, 2)` once per session.
-- **Teamwork:** Amplifies PS, IQ (mechanism *#1*). Also amplifies install **effectiveness** gains on **motion** plays and **zone** defenses only (mechanism *#2*). Man and set plays receive base install gains only under this focus. Adds flat **`team_chemistry += random.randint(0, 1)`** once per session (clamped). Does **not** add the shared Authoritarian **discipline** flat.
-- **Execution:** Amplifies install **effectiveness** gains on **set plays** and **Man** only (mechanism *#2*). Motion and zone defenses receive base install gains only under this focus. Receives the shared flat `discipline += random.randint(1, 2)` once per session.
+- **Discipline:** Amplifies BH, `fight`, `discipline` (drill / team-attribute mechanism *#1*). Also adds flat `discipline += random.randint(1, 2)` once per training session (shared with Rebounding and Execution only — not Teamwork). Player EM `+random.randint(-5, 0)`.
+- **Rebounding:** Amplifies RB, `rebound_modifier` (mechanism *#1*). Receives the shared flat `discipline += random.randint(1, 2)` once per session. No focus EM.
+- **Teamwork:** Amplifies PS, IQ (mechanism *#1*). Also amplifies install **effectiveness** gains on **motion** plays and **zone** defenses only (mechanism *#2*). Man and set plays receive base install gains only under this focus. Adds flat **`team_chemistry += random.randint(0, 1)`** once per session (clamped). Does **not** add the shared Authoritarian **discipline** flat. No focus EM.
+- **Execution:** Amplifies install **effectiveness** gains on **set plays** and **Man** only (mechanism *#2*). Motion and zone defenses receive base install gains only under this focus. Receives the shared flat `discipline += random.randint(1, 2)` once per session. Player EM `+random.randint(-3, 0)`.
 
 **Systems Coach:**
 - Offense / Defense: Drill gains to `offensive_efficiency` / `defensive_efficiency` use mechanism *#1* above. Install: multiplies offense or defense **play point pool** by the same `[1.5, 1.6, 1.7, 1.8]` band before `_apply_offense_play_training` / `_apply_defense_training` when `systems-coach-offense` or `systems-coach-defense` is selected.
 - Fast Breaks: Amplifies `fb_efficiency` and `fb_opp_modifier` drill gains (mechanism *#1*).
 - Presses/Traps: Amplifies `pt_efficiency` and `pt_opp_modifier` drill gains (mechanism *#1*).
+- Any Systems Coach leaf also applies Player EM `+random.randint(-2, 0)`.
 
 **Player Maximizer:**
 - Top 3 Attributes: Amplifies gains to player's top 3 attributes (excluding CH, EM, MO, NG)
 - Attributes 4-6: Amplifies gains to player's 4th–6th highest attributes among the same set as Top 3 (excluding CH, EM, MO, NG)
 - **Positional Focus** (`player-maximizer-positional-focus`): Primary position from highest **RT** (ties PG→SG→SF→PF→C); fixed triple per primary—PG: PS/BH/IQ; SG: SH/OD/AG; SF: SC/ST/AG; PF: RB/ID/ST; C: SC/ID/ST. Same focus multiplier on drill gains to those attrs.
 - **Custom:** User picks **three** distinct attributes per player (same ranking set as Top 3 / 4–6). Franchise UI sends `coaching_focus_custom_by_player` with `{ player_id: [attrA, attrB, attrC] }` for every roster player. Roster rows include `attrs` and `position_ratings`; list order **highest RT** descending.
+- Any Player Maximizer leaf also applies Player EM `+random.randint(0, 2)`.
 
 **Culture Builder:**
-- Inspire: **Flat block:** each player gets **EM** `+random.randint(2, 5)` and **MO** `+random.randint(1, 2)` (caps apply); no focus multiplier on those. **team_chemistry** training gains use `random.choice([1.5, 1.6, 1.7, 1.8])` under Inspire.
-- Community Engagement: Improves EM, affects crowd factors (carried to next game)
-- **Team Building** (`culture-builder-teamwork`): **Team chemistry** `+random.randint(1, 3)` once per session (clamped like other team attrs). UI label only; API `value` unchanged. Does **not** add the shared Culture Builder **`fight`** flat (that applies only to Inspire, Confidence, and Community Engagement).
-- **Build Confidence:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use the standard focus multiplier `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coefficient). No flat EM/MO block; no Inspire-style team chemistry mult.
+- Inspire: **Flat block:** each player gets **MO** `+random.randint(1, 2)` (MO scale clamp); **EM** uses the shared Player EM focus band `+random.randint(2, 5)` (additive with breaks, then clamp 1–100). No focus multiplier on those. **team_chemistry** training gains use `random.choice([1.5, 1.6, 1.7, 1.8])` under Inspire.
+- Community Engagement: **EM** `+random.randint(2, 5)` (shared Player EM helper); crowd band shift via `pending_community_engagement` (next home game).
+- **Team Building** (`culture-builder-teamwork`): **Team chemistry** `+random.randint(1, 3)` once per session (clamped like other team attrs). UI label only; API `value` unchanged. Does **not** add the shared Culture Builder **`fight`** flat (that applies only to Inspire, Confidence, and Community Engagement). No focus EM.
+- **Build Confidence:** **CH** (conditioning, film study) and **FT** (free throws) drill gains use the standard focus multiplier `random.choice([1.5, 1.6, 1.7, 1.8])` (after CH’s 0.5 drill coefficient). Focus EM `+random.randint(0, 2)`. No Inspire-style team chemistry mult.
 - **Inspire**, **Confidence**, and **Community Engagement** also add flat **`fight += random.randint(1, 2)`** once per training session (Culture Builder shared block; Team Building excluded).
 - **Culture Builder**, except **Confidence**, also adds flat **`discipline += random.randint(-2, -1)`** once per training session.
 - **Authoritarian**, except **Rebounding**, also adds flat **`fight += random.randint(-2, -1)`** once per training session.
+
+#### Player EM (Emotion)
+
+Canonical rules: `_documentation_master/projects/Player_EM_Overview.md` and `BackEnd/utils/player_em.py`.
+
+Weeks 1–26 (user and CPU auto-train): each player gets **two independent rolls** (coaching-focus band + breaks band), then clamp **1–100**. Missing breaks = 0 (`randint(-5, -3)`). The training-report **changes grid does not show EM**. Inspire still ticks MO separately.
+
+Breaks EM bands: 0 → `(-5, -3)`; 1 → `(-2, 0)`; 2 → `(0, 2)`; >2 → `(2, 5)`.
 
 #### Breaks Effect
 
@@ -855,7 +917,8 @@ Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shap
 **FPD / Franchise Player Data:**
 - `attributes.anchor_{attr}` and `attributes.{attr}` - Updated player attribute values
 - `position_ratings` - Recalculated position ratings after training
-- `training_position`, `position_intent` - Persisted position identity used by the canonical resolver
+- `training_position`, `position_intent` - Persisted position identity used by the canonical resolver. `training_position` is coach-editable; `position_intent` is the natural fit and is not rewritten by that edit
+- `training_focus` - One of the six Development Focus values; defaults to `standard`. Backfilled additively onto existing FPDs by `scripts/backfill_development_focus.py`
 - `training_gain_remainders.{attr}` - Fractional positive-gain carry stored beside, never inside, `attributes`; read and written only by franchise training and carried across season rollover through `PLAYER_DEV_CARRY_FIELDS`. It is never stored on universal/core `players`.
 - `attributes.NG` - Updated NG value when conditioning or scrimmages apply energy reduction
 - `meta.height` and `meta.weight` (integer inches / pounds) — carried on the FPD; **career HT/WT growth is applied at offseason rollover** (`develop_one_offseason`), not at training camp. If `meta` omitted height/weight (legacy or lazy FPD row), `run_franchise_training` backfills missing values from the universal `players` document before training runs; `finalize_game` lazy FPD inserts also copy height/weight/year/jersey from `players` into `meta`.
@@ -885,13 +948,16 @@ Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shap
 - `FrontEnd/static/training-report.html` - Training report display page
 - `FrontEnd/static/training-report.css` - Report page styling
 - `FrontEnd/static/training-report.js` - Report data loading and rendering
-- `FrontEnd/static/franchise-command-center.js` - Schedule rendering with training report links
+- `FrontEnd/static/franchise-command-center.js` - Schedule rendering with training report links; roster-tab Development Focus columns
+- `FrontEnd/static/js/shared/developmentFocus.js` - The one implementation of the Development Focus controls (FCC roster tab, roster page, player detail)
+- `FrontEnd/static/team-roster-view.js` - Roster page Development Focus columns (user's own team only)
 
 **Backend:**
 - `BackEnd/models/training_execution_v2.py` - Core training execution logic (gains, remainder, floor clamp)
-- `BackEnd/constants/training_shape.py` - Camp weeks/flat budgets/gain scale, position-fit divisors, class gain taper, P6 floors, `training_points_spent`
+- `BackEnd/constants/training_shape.py` - Camp weeks/flat budgets/gain scale, position-fit divisors, class gain taper, P6 floors, `training_points_spent`, the 30 Development Focus profiles
+- `scripts/backfill_development_focus.py` - Additive, idempotent FPD backfill for `training_position` / `training_focus`
 - `BackEnd/models/training_notes.py` - Structured training-notes generation for report sections
-- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/cpu-train`) and CPU auto-training/idempotency; also `GET /franchise/training-report`, `GET /franchise/schedule`, and `GET /franchise/league-news`.
+- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/cpu-train`, `player/development-focus`) and CPU auto-training/idempotency; also `GET /franchise/training-report`, `GET /franchise/schedule`, and `GET /franchise/league-news`.
 - `BackEnd/utils/franchise_league_news.py` - Consolidated, pre-ranked training newswire payload
 - `BackEnd/utils/franchise_training_state.py` - Split-phase completion helpers for FCC and cuts
 - `BackEnd/utils/franchise_coaching_focus_counts.py` - FTD `coaching_focus` archetype counters (user team)

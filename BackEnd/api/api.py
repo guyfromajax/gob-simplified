@@ -6,9 +6,12 @@ import copy
 import logging
 # ✅ PERFORMANCE: Removed debug print statements - use logger instead
 
+from BackEnd.loopback_env import is_loopback
+from BackEnd.runtime_paths import bundle_path
+
 # Sentry - init before FastAPI (captures unhandled exceptions)
 _sentry_dsn = os.getenv("SENTRY_DSN")
-if _sentry_dsn:
+if _sentry_dsn and not is_loopback():
     import sentry_sdk
     sentry_sdk.init(
         dsn=_sentry_dsn,
@@ -44,6 +47,24 @@ def _persisted_strategy_settings(team) -> dict:
     if isinstance(base, dict) and base:
         return base
     return getattr(team, "strategy_settings", {}) or {}
+
+
+def _player_on_user_team(franchise_doc, player_meta) -> bool:
+    """Is this FPD player on the franchise owner's OWN team?
+
+    Development Focus renders and saves for the user's team alone. The franchise document
+    stores BOTH identifiers — ``user_team_id`` is the team NAME and ``user_team_object_id``
+    is the id — and FPD ``meta`` mirrors them as ``team`` / ``team_id``. Either pairing is
+    accepted; comparing across the two (name vs id) matches nothing, which is exactly how
+    an earlier revision hid the development block from every player.
+    """
+    fr = franchise_doc or {}
+    meta = player_meta or {}
+    team_name = str(fr.get("user_team_id") or "")
+    team_oid = str(fr.get("user_team_object_id") or "")
+    if team_oid and str(meta.get("team_id") or "") == team_oid:
+        return True
+    return bool(team_name) and str(meta.get("team") or "") == team_name
 
 
 def _saved_player_pts_by_side(saved: dict | None) -> tuple[int, int]:
@@ -114,7 +135,8 @@ _startup_error = None
 try:
     from fastapi import Depends, FastAPI, HTTPException, Query, Response
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+    from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, FileResponse
+    from pathlib import Path
     from fastapi.templating import Jinja2Templates
     from fastapi import Request
     from BackEnd.constants import POSITION_LIST
@@ -124,16 +146,28 @@ try:
     from BackEnd.main import run_simulation, simulate_quarter
     from BackEnd.models.game_manager import GameManager
     # ✅ PERFORMANCE: Removed debug print statements
-    from BackEnd.db import (
-        players_collection,
-        teams_collection,
-        games_collection,
-        tournaments_collection,
-        franchises_collection,
-        franchise_players_data_collection,
-        franchise_team_data_collection,
-        franchise_recruits_data_collection,
-    )
+    from BackEnd.persistence import get_store
+    _store = get_store()
+    players_collection = _store.players_collection
+    teams_collection = _store.teams_collection
+    games_collection = _store.games_collection
+    tournaments_collection = _store.tournaments_collection
+    franchises_collection = _store.franchises_collection
+    franchise_players_data_collection = _store.franchise_players_data_collection
+    franchise_team_data_collection = _store.franchise_team_data_collection
+    franchise_recruits_data_collection = _store.franchise_recruits_data_collection
+    ensure_users_username_index = _store.ensure_users_username_index
+    ensure_alpha_access_requests_email_index = _store.ensure_alpha_access_requests_email_index
+    ensure_ftd_index = _store.ensure_ftd_index
+    ensure_fpd_index = _store.ensure_fpd_index
+    ensure_frd_index = _store.ensure_frd_index
+    ensure_games_franchise_index = _store.ensure_games_franchise_index
+    ensure_franchises_user_id_index = _store.ensure_franchises_user_id_index
+    ensure_eog_band_log_index = _store.ensure_eog_band_log_index
+    ensure_tutorial_game_ttl_index = _store.ensure_tutorial_game_ttl_index
+    client = _store.client
+    DB_NAME = _store.DB_NAME
+    TUTORIAL_GAME_TTL_DAYS = _store.TUTORIAL_GAME_TTL_DAYS
     from BackEnd.utils.roster_loader import load_roster
     from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
     from BackEnd.utils.game_summary_builder import build_game_summary
@@ -457,24 +491,27 @@ try:
     limiter = None
     SIM_RATE_LIMIT = "30/minute"
     SIM_TURN_RATE_LIMIT = "300/minute"
-    try:
-        from slowapi.errors import RateLimitExceeded
-        from BackEnd.utils.rate_limiter import (
-            limiter as _limiter,
-            rate_limit_exceeded_handler,
-            SIM_RATE_LIMIT as _SIM_RATE_LIMIT,
-            SIM_TURN_RATE_LIMIT as _SIM_TURN_RATE_LIMIT,
-        )
-        limiter = _limiter
-        SIM_RATE_LIMIT = _SIM_RATE_LIMIT
-        SIM_TURN_RATE_LIMIT = _SIM_TURN_RATE_LIMIT
-        app.state.limiter = limiter
-        app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-        print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
-    except Exception as e:
-        print(f"⚠️ [RATE LIMIT] Failed to enable rate limiting: {e}", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+    if is_loopback():
+        print("🖥️ [LOOPBACK] rate limiting omitted", file=sys.stderr, flush=True)
+    else:
+        try:
+            from slowapi.errors import RateLimitExceeded
+            from BackEnd.utils.rate_limiter import (
+                limiter as _limiter,
+                rate_limit_exceeded_handler,
+                SIM_RATE_LIMIT as _SIM_RATE_LIMIT,
+                SIM_TURN_RATE_LIMIT as _SIM_TURN_RATE_LIMIT,
+            )
+            limiter = _limiter
+            SIM_RATE_LIMIT = _SIM_RATE_LIMIT
+            SIM_TURN_RATE_LIMIT = _SIM_TURN_RATE_LIMIT
+            app.state.limiter = limiter
+            app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+            print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
+        except Exception as e:
+            print(f"⚠️ [RATE LIMIT] Failed to enable rate limiting: {e}", file=sys.stderr, flush=True)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
     
     def _no_limit(f):
         """No-op when rate limiter is disabled."""
@@ -487,28 +524,35 @@ try:
     app.include_router(franchise_router)
     app.include_router(player_image_router)
     app.include_router(press_conference_router)
-    app.include_router(community_highlights_router)
     app.include_router(gameplan_router)
     app.include_router(play_router)
     app.include_router(skeleton_router)
     app.include_router(pointer_validation_router)
-    app.include_router(auth_router)
-    app.include_router(leaderboard_router)
-    app.include_router(admin_router)
-    app.include_router(feedback_router)
-    app.include_router(alpha_feedback_router)
-    app.include_router(email_router)
-    app.include_router(billing_router)
+    if is_loopback():
+        print("🖥️ [LOOPBACK] omitting always-remote routers (auth/billing/email/admin/community)",
+              file=sys.stderr, flush=True)
+        from BackEnd.loopback_app import configure_loopback
+        configure_loopback(app)
+    else:
+        app.include_router(community_highlights_router)
+        app.include_router(auth_router)
+        app.include_router(leaderboard_router)
+        app.include_router(admin_router)
+        app.include_router(feedback_router)
+        app.include_router(alpha_feedback_router)
+        app.include_router(email_router)
+        app.include_router(billing_router)
 
     # One line at startup naming the billing posture (enabled? which Stripe mode?).
     # Cheap, and it makes "is prod still on test keys?" answerable from the logs
     # rather than from someone's memory of what they set in Railway.
-    try:
-        from BackEnd.services.stripe_client import log_configuration_at_boot
-        log_configuration_at_boot()
-    except Exception as _billing_log_exc:
-        print(f"⚠️ [BILLING] could not log configuration: {_billing_log_exc}",
-              file=sys.stderr, flush=True)
+    if not is_loopback():
+        try:
+            from BackEnd.services.stripe_client import log_configuration_at_boot
+            log_configuration_at_boot()
+        except Exception as _billing_log_exc:
+            print(f"⚠️ [BILLING] could not log configuration: {_billing_log_exc}",
+                  file=sys.stderr, flush=True)
 
     @app.get("/debug/server-state")
     def debug_server_state():
@@ -520,19 +564,22 @@ try:
             "ongoing_games_count": len(ongoing_games),
         }
     
-    templates = Jinja2Templates(directory="FrontEnd/static")
+    templates = Jinja2Templates(directory=str(bundle_path("FrontEnd", "static")))
     
-    # Conditionally mount static files (only in development)
-    # In production, Netlify serves static files
+    # Conditionally mount static files (local development and test).
+    # In production/staging, Netlify serves static files. Test must mount too
+    # so mongomock Playwright can load /static/*.html.
     environment = os.getenv("ENVIRONMENT", "development")
-    if environment == "development":
+    if environment in ("development", "test"):
         @app.middleware("http")
         async def local_static_html_redirect(request: Request, call_next):
             """
-            Local dev convenience: frontend uses root static paths
-            (e.g. /set-lineup.html, /mode-select.css, /js/..., /images/...),
-            while FastAPI serves static files at /static/*.
-            Redirect those requests to /static/* in development only.
+            Local/dev convenience: frontend uses root static paths
+            (e.g. /set-lineup.html, /js/..., /fonts/...), while FastAPI also
+            mounts the same tree at /static/*. Serve the file at the root URL
+            when it exists — do not 307. Browser ESM imports (Phaser, shared
+            modules) do not follow redirects, so a /js → /static/js bounce
+            leaves the module graph dead and the court canvas never mounts.
             """
             path = request.url.path or ""
             method = (request.method or "").upper()
@@ -541,12 +588,28 @@ try:
             if path.startswith("/static/") or path.startswith("/api/") or path.startswith("/health"):
                 return await call_next(request)
 
+            static_root = Path(bundle_path("FrontEnd", "static")).resolve()
+
+            def _file_at(url_path: str):
+                rel = url_path.lstrip("/")
+                candidate = (static_root / rel).resolve()
+                try:
+                    candidate.relative_to(static_root)
+                except ValueError:
+                    return None
+                if candidate.is_file():
+                    return FileResponse(candidate)
+                return None
+
             static_page_aliases = {
                 "/privacy": "/privacy.html",
                 "/terms": "/terms.html",
             }
             aliased_path = static_page_aliases.get(path)
             if aliased_path:
+                served = _file_at(aliased_path)
+                if served is not None:
+                    return served
                 query = request.url.query
                 target = f"/static{aliased_path}"
                 if query:
@@ -558,6 +621,8 @@ try:
                 "/images/",
                 "/sounds/",
                 "/styles/",
+                "/fonts/",
+                "/css/",
             )
             static_exts = (
                 ".html",
@@ -578,11 +643,15 @@ try:
                 ".woff",
                 ".woff2",
                 ".ttf",
+                ".otf",
             )
             if (
                 path.startswith(static_dirs)
                 or path.endswith(static_exts)
             ):
+                served = _file_at(path)
+                if served is not None:
+                    return served
                 query = request.url.query
                 target = f"/static{path}"
                 if query:
@@ -591,7 +660,7 @@ try:
             return await call_next(request)
 
         app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
-        print("✅ Static files mounted (development mode)")
+        print("✅ Static files mounted (development/test mode)")
     
     # ✅ PERFORMANCE: Removed debug print statements
     
@@ -653,17 +722,6 @@ try:
 
         # Ensure indexes exist (idempotent; safe on every deploy)
         try:
-            from BackEnd.db import (
-                ensure_users_username_index,
-                ensure_alpha_access_requests_email_index,
-                ensure_ftd_index,
-                ensure_fpd_index,
-                ensure_frd_index,
-                ensure_games_franchise_index,
-                ensure_franchises_user_id_index,
-                ensure_eog_band_log_index,
-                ensure_tutorial_game_ttl_index,
-            )
             ensure_users_username_index()
             ensure_alpha_access_requests_email_index()
             ensure_ftd_index()
@@ -683,7 +741,7 @@ try:
         # Check MongoDB connection status (non-blocking, don't crash if it fails)
         # MongoDB connections are lazy - this just verifies the client exists
         try:
-            from BackEnd.db import client, DB_NAME
+            _ = (client, DB_NAME)
             # ✅ PERFORMANCE: Removed verbose startup debug prints
             
             # NOTE: We don't test actual DB connection here to avoid blocking startup
@@ -813,7 +871,6 @@ try:
     # Helper functions for tournament/franchise mode
     def load_player_attributes_from_doc(mode: str, doc_id: str, player_id: str):
         """Load player attributes (EM, CH, MO) from tournament/franchise doc."""
-        from BackEnd.db import franchises_collection
         
         if mode == "tournament":
             try:
@@ -850,7 +907,6 @@ try:
     
     def load_plays_from_doc(mode: str, doc_id: str, team_id: str):
         """Load plays data from tournament/franchise doc."""
-        from BackEnd.db import franchises_collection
         
         if mode == "tournament":
             try:
@@ -881,7 +937,6 @@ try:
     
     def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_name: str):
         """Load team_attributes from tournament/franchise doc, fallback to core teams doc."""
-        from BackEnd.db import franchises_collection
         
         # Resolve team_id from team_name if not provided
         if not team_id and team_name:
@@ -909,7 +964,6 @@ try:
         elif mode == "franchise":
             try:
                 # ✅ FTD: Load team_attributes from franchise_team_data collection instead of franchise doc
-                from BackEnd.db import franchise_team_data_collection
                 # (module-level ObjectId — a local import here shadowed it for the whole
                 # function, breaking the tournament lookup at L814)
                 
@@ -1003,7 +1057,6 @@ try:
             dict with keys: team_attributes, strategy_settings, playbook_settings, plays, scouting_data
             or None if not found
         """
-        from BackEnd.db import franchise_team_data_collection, teams_collection
         from bson import ObjectId
         
         try:
@@ -1093,9 +1146,8 @@ try:
         
         ✅ PHASE 5.7: For franchise/tournament mode, tries game doc first, then falls back to master doc.
         """
-        from BackEnd.db import franchises_collection
         from BackEnd.api.franchise_routes import get_user_team_from_franchise
-        from BackEnd.api.tournament_routes import get_user_team_from_tournament
+        from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
         
         # Resolve team_id from team_name if not provided
         if not team_id and team_name:
@@ -1158,7 +1210,6 @@ try:
         # If settings not loaded from game doc, load from master doc (FTD for franchise, extract for tournament)
         if strategy_settings is None and playbook_settings is None:
             from BackEnd.utils.team_settings_manager import extract_team_settings
-            from BackEnd.db import franchise_team_data_collection
             
             if mode == "franchise":
                 # ✅ FTD: Load strategy_settings and playbook_settings from FTD
@@ -1272,7 +1323,6 @@ try:
     
     def load_game_from_nested_structure(mode: str, doc_id: str, game_id: str, round_key: str = None, week: int = None):
         """Load game data from tournament/franchise nested structure."""
-        from BackEnd.db import franchises_collection
         
         game_data = None
         
@@ -1299,7 +1349,6 @@ try:
     
     def save_game_to_nested_structure(mode: str, doc_id: str, game_id: str, game_data: dict, round_key: str = None, week: int = None):
         """Save game data to tournament/franchise nested structure."""
-        from BackEnd.db import franchises_collection
         
         if mode == "tournament":
             try:
@@ -1488,7 +1537,6 @@ try:
         Returns:
             dict: Consistent timeout response format with saved data from DB
         """
-        from BackEnd.db import games_collection
         
         # ✅ DIAGNOSTIC: Log GameManager state before saving during timeout
         debug_prefix = "USER" if timeout_reason == "USER" else "COMPUTER"
@@ -3096,7 +3144,6 @@ try:
         Reads the persisted saved doc first (the screen renders before resume
         applies state), falling back to live GameManager state.
         """
-        from BackEnd.db import games_collection
         from bson import ObjectId
 
         next_is_ft = False
@@ -3139,7 +3186,6 @@ try:
         Falls back to DB if game is not in memory.
         Returns format compatible with /api/playbooks for frontend consistency.
         """
-        from BackEnd.db import games_collection
         from bson import ObjectId
         
         # ✅ SS&S: GameManager is single source of truth during gameplay
@@ -6751,7 +6797,6 @@ try:
                     resolve_mongo_team_id_string,
                 )
                 from BackEnd.utils.franchise_standings import calculate_franchise_standings
-                from BackEnd.db import franchise_team_data_collection
 
                 fr = franchises_collection.find_one(
                     {"_id": ObjectId(franchise_id)},
@@ -6969,11 +7014,23 @@ try:
         # Training Camp is complete. Display gate only — the player keeps its
         # archetype ("Walk On") in the data regardless.
         show_walk_on = False
+        # Development Focus renders for the user's OWN team only. This endpoint serves every
+        # team, so the answer travels with the payload rather than being guessed in the view.
+        is_user_team = False
         if franchise_id:
             try:
                 from BackEnd.utils.franchise_training_state import franchise_training_fully_complete_for_week
-                franchise_doc = franchises_collection.find_one({"_id": ObjectId(franchise_id)}, {"week": 1, "training_status": 1})
+                franchise_doc = franchises_collection.find_one(
+                    {"_id": ObjectId(franchise_id)},
+                    {"week": 1, "training_status": 1, "user_team_id": 1, "user_team_object_id": 1},
+                )
                 franchise_week = franchise_doc.get("week") if franchise_doc else None
+                # `team`, not `team_doc`: team_doc is None for an unmatched lookup, and this
+                # check must not be the thing that throws past franchise_week/show_walk_on.
+                is_user_team = bool(franchise_doc) and (
+                    str(team.get("_id") or "") == str(franchise_doc.get("user_team_object_id") or "")
+                    or str(team.get("name") or "") == str(franchise_doc.get("user_team_id") or "")
+                )
                 try:
                     _wk = int(franchise_week or 1)
                 except (TypeError, ValueError):
@@ -7032,6 +7089,15 @@ try:
                 # preseason, drops once Training Camp completes, and never returns
                 # once they advance past Freshman (the archetype stays in the data).
                 "walk_on": bool(p.get("walk_on")) and show_walk_on and str(p.get("year") or "").strip().lower() == "freshman",
+                # Development Focus (GOB_DEVELOPMENT_FOCUS_PLAN.md phase 4). The user's own
+                # franchise roster only: another team's roster carries no development keys at
+                # all, so no view can render a control the write route would reject.
+                **({
+                    "training_position": p.get("training_position"),
+                    "training_focus": p.get("training_focus"),
+                    "resolved_training_position": p.get("resolved_training_position"),
+                    "resolved_training_focus": p.get("resolved_training_focus"),
+                } if is_user_team else {}),
             })
             
             # ✅ DEBUG: Log final attributes for first player (or Kevin Nelson)
@@ -7259,6 +7325,7 @@ try:
             "practice_squad_recruits": practice_squad_recruits,
             "practice_squad_recruiting_done": practice_squad_recruiting_done,
             "projected_starting_five": projected_starting_five,
+            "is_user_team": is_user_team,
         }
 
         # Record + conference/national rank for the roster page's identity lockup.
@@ -7580,9 +7647,9 @@ try:
         else:
             logging.debug(f"⚠️ [INIT-GAME] No user_team_side provided - override checking will not work!")
         
-        # Initialize game stats (this randomizes EM, CH, MO for all players)
+        # Initialize game stats (CH re-roll, MO=0; franchise keeps FPD EM, others re-roll EM)
         stats_start = time.time()
-        _initialize_game_stats(gm, game_id=None)  # None = new game, will randomize
+        _initialize_game_stats(gm, game_id=None)  # None = new game
         stats_time = (time.time() - stats_start) * 1000
         # logging.warning(f"⏱️ [PERF] /api/init-game - Game stats initialized: {stats_time:.2f}ms")
         gm_time = (time.time() - gm_start) * 1000
@@ -7693,8 +7760,7 @@ try:
             )
         elif mode == "tournament" and tournament_id:
             # ✅ PHASE 5.7: Copy master settings from tournament doc to game doc as baseline
-            from BackEnd.api.tournament_routes import get_user_team_from_tournament
-            from BackEnd.db import tournaments_collection
+            from BackEnd.utils.team_id_resolver import get_user_team_from_tournament
             
             try:
                 tournament_doc = tournaments_collection.find_one(
@@ -7765,7 +7831,6 @@ try:
             # Local import: api.py only pulls in `datetime` (line 182); timezone and
             # timedelta are not in scope here and would NameError at runtime.
             from datetime import timedelta, timezone as _tz
-            from BackEnd.db import TUTORIAL_GAME_TTL_DAYS
             summary["tutorial_expires_at"] = datetime.now(_tz.utc) + timedelta(
                 days=TUTORIAL_GAME_TTL_DAYS
             )
@@ -7906,7 +7971,8 @@ try:
             if mode == "franchise" and franchise_id:
                 fpd_doc = franchise_players_data_collection.find_one(
                     {"franchise_id": str(franchise_id), "player_id": str(player_id)},
-                    {"attributes": 1, "position_ratings": 1, "meta": 1, "season": 1, "career": 1},
+                    {"attributes": 1, "position_ratings": 1, "meta": 1, "season": 1, "career": 1,
+                     "training_position": 1, "training_focus": 1},
                 )
                 if fpd_doc:
                     if isinstance(fpd_doc.get("attributes"), dict):
@@ -7921,6 +7987,18 @@ try:
                         player["season"] = fpd_doc["season"]
                     if isinstance(fpd_doc.get("career"), dict):
                         player["career"] = fpd_doc["career"]
+                    # Development Focus, read-only on the player page and shown for the
+                    # user's OWN team only (GOB_DEVELOPMENT_FOCUS_PLAN.md phase 4). The
+                    # franchise doc decides whose team it is; an opponent's player simply
+                    # carries no development block.
+                    _fr = franchises_collection.find_one(
+                        {"_id": ObjectId(str(franchise_id))},
+                        {"user_team_id": 1, "user_team_object_id": 1},
+                    ) if ObjectId.is_valid(str(franchise_id)) else None
+                    if _player_on_user_team(_fr, fpd_doc.get("meta")):
+                        from BackEnd.constants.training_shape import training_position_projection
+                        player.update(training_position_projection(fpd_doc))
+                        player["is_user_team_player"] = True
 
             # Debug logging removed - was cluttering logs
             # logging.debug(f"✅ Player found: {player.get('first_name')} {player.get('last_name')}")
@@ -7965,21 +8043,6 @@ try:
             "team": team_doc.get("name", team_id) if team_doc else team_id,
             "players": players_data,
         }
-    
-    
-    @app.get("/tournament/active")
-    def get_active_tournament(user_team_id: Optional[str] = "BENTLEY-TRUMAN"):
-        # Fetch the most recently created active tournament or create one.
-        doc = tournaments_collection.find_one({"completed": False}, sort=[("created_at", -1)])
-        if not doc:
-            manager = TournamentManager(user_team_id=user_team_id, tournaments_collection=tournaments_collection)
-            doc = manager.create_tournament()
-        else:
-            doc["_id"] = str(doc["_id"])
-        # ✅ SS&S: Serialize all ObjectIds in nested structures (consistent with /tournament/state)
-        from bson import ObjectId
-        from fastapi.encoders import jsonable_encoder
-        return jsonable_encoder(doc, custom_encoder={ObjectId: str})
     
     
     class SimQuarterDiagnosticRequest(BaseModel):

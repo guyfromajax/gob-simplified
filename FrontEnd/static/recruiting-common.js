@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 (function (global) {
   'use strict';
 
@@ -75,7 +96,7 @@
   }
 
   function getQueryContext() {
-    var params = new URLSearchParams(global.location.search);
+    var params = liveParams();
     return {
       franchiseId: params.get('franchise_id'),
       teamId: params.get('team_id'),
@@ -104,12 +125,12 @@
    */
   function buildRecruitDetailUrl(recruitId, franchiseId) {
     if (!recruitId || !franchiseId) return '';
-    var params = new URLSearchParams();
+    var params = emptyParams();
     params.set('recruit_id', String(recruitId));
     params.set('franchise_id', String(franchiseId));
     params.set('return_url', global.getCurrentRelativeUrl
       ? global.getCurrentRelativeUrl()
-      : global.location.pathname + global.location.search + (global.location.hash || ''));
+      : global.location.pathname + currentSearch() + (global.location.hash || ''));
     return '/player-detail.html?' + params.toString();
   }
 
@@ -132,7 +153,7 @@
         teamId: context.teamId
       });
     }
-    var params = new URLSearchParams();
+    var params = emptyParams();
     params.set('mode', 'franchise');
     if (context.franchiseId) params.set('franchise_id', context.franchiseId);
     if (context.teamId) params.set('team_id', context.teamId);
@@ -140,7 +161,7 @@
   }
 
   function buildRecruitingUrl(page, context, extraParams) {
-    var params = new URLSearchParams();
+    var params = emptyParams();
     if (context.franchiseId) params.set('franchise_id', context.franchiseId);
     if (context.teamId) params.set('team_id', context.teamId);
     if (context.from) params.set('from', context.from);

@@ -218,6 +218,8 @@ def training_report_display_movement(old_value: Any, new_value: Any) -> int:
 PLAYER_MAXIMIZER_RANKING_ATTRS = tuple(a for a in TRAINABLE_PLAYER_ATTRS if a != "CH")
 
 # Primary position from max RT → three focus attrs (Player Maximizer / Positional Focus)
+from BackEnd.constants.training_shape import resolve_training_position
+
 POSITIONAL_FOCUS_ATTRS_BY_PRIMARY: Dict[str, Tuple[str, str, str]] = {
     "PG": ("PS", "BH", "IQ"),
     "SG": ("SH", "OD", "AG"),
@@ -249,8 +251,17 @@ def primary_position_from_position_ratings(ratings: Optional[dict]) -> str:
 
 
 def positional_focus_attrs_for_player(player: dict) -> Tuple[str, str, str]:
-    ratings = player.get("position_ratings") or {}
-    pos = primary_position_from_position_ratings(ratings)
+    """The three attrs Player Maximizer / Positional Focus amplifies.
+
+    Uses the player's TRAINING position (coach's choice, then natural fit, then best RT) so
+    this and Development Focus cannot disagree about where a player is being coached: a
+    guard converted to PF should have Maximizer amplify PF attributes, not the guard
+    attributes his ratings still favour. Falls back to the RT-argmax for a player carrying
+    no training position at all.
+    """
+    pos = resolve_training_position(player)
+    if pos not in POSITIONAL_FOCUS_ATTRS_BY_PRIMARY:
+        pos = primary_position_from_position_ratings(player.get("position_ratings") or {})
     return POSITIONAL_FOCUS_ATTRS_BY_PRIMARY.get(pos, POSITIONAL_FOCUS_ATTRS_BY_PRIMARY["PG"])
 
 
@@ -745,30 +756,21 @@ def apply_training_points(
                     for team_attr, mult in multiplier_list:
                         team_attr_contributions[team_attr] += allocation_data * mult
     
-    # Handle special focus effects that apply to all players
+    # Handle special focus effects that apply to all players.
+    # Player EM for every coaching-focus leaf + breaks is applied later via
+    # apply_training_em (two independent rolls, then clamp 1–100).
     if sub_option == "culture-builder-inspire":
-        # EM/morale lift + MO tick; CH/FT amplification is culture-builder-confidence
+        # Inspire still ticks MO here; CH/FT amplification is culture-builder-confidence.
         for player in players:
             attrs = player.get("attributes", {})
-            em_improvement = random.randint(2, 5)
             mo_improvement = random.randint(1, 2)
-            attrs["EM"] = min(100, attrs.get("EM", 0) + em_improvement)
             # MO is bounded to its defined scale [MO_MIN, MO_MAX] (single source
             # of truth in BackEnd/constants/momentum.py).
             attrs["MO"] = max(MO_MIN, min(MO_MAX, attrs.get("MO", 0) + mo_improvement))
-            # Update anchors
-            attrs["anchor_EM"] = attrs["EM"]
             attrs["anchor_MO"] = attrs["MO"]
     
-    if sub_option == "culture-builder-community":
-        # Improve EM for all players
-        for player in players:
-            attrs = player.get("attributes", {})
-            # Home crowd band shift is applied at franchise game start via FTD
-            # ``pending_community_engagement`` + Home_Crowd_System.md / Training_System.md
-            em_improvement = random.randint(1, 2)
-            attrs["EM"] = min(100, attrs.get("EM", 0) + em_improvement)
-            attrs["anchor_EM"] = attrs["EM"]
+    # Community Engagement crowd shift remains FTD pending_community_engagement
+    # (Home_Crowd_System.md). Its EM band is in apply_training_em, not here.
 
     if sub_option == "culture-builder-teamwork":
         # API value `culture-builder-teamwork` = UI **Team Building** (not Authoritarian Teamwork).
@@ -863,10 +865,12 @@ def apply_training_points(
     
     # Apply breaks effect (multiplies all positive increments, adds Team Chemistry at 4-5 points)
     # This is applied after multiplier contributions so breaks can multiply those gains too
-    if "breaks" in normalized_allocations:
-        breaks_points = normalized_allocations["breaks"]
-        if breaks_points is not None and breaks_points > 0:
-            _apply_breaks_effect(players, team, breaks_points, player_baselines, team_baseline)
+    try:
+        breaks_points = int(normalized_allocations.get("breaks") or 0)
+    except (TypeError, ValueError):
+        breaks_points = 0
+    if breaks_points > 0:
+        _apply_breaks_effect(players, team, breaks_points, player_baselines, team_baseline)
 
     # Apply NG reductions from scrimmages and conditioning
     # Track which players had reductions for training report notes
@@ -920,6 +924,11 @@ def apply_training_points(
                 team[attr_name] = max(lower, min(upper, team[attr_name]))
             else:
                 team[attr_name] = max(lower, team[attr_name])
+
+    # Player EM: focus roll + breaks roll per player, then clamp 1–100.
+    # Kept off TRAINABLE_PLAYER_ATTRS so the training-report changes grid omits it.
+    from BackEnd.utils.player_em import apply_training_em
+    apply_training_em(players, sub_option, breaks_points, rng=random)
     
     # Calculate changes for training report
     player_changes = {}

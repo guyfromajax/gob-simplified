@@ -6,17 +6,27 @@
 (function () {
   'use strict';
 
-  function getApiBaseUrl() {
-    if (window.API_BASE_URL) return window.API_BASE_URL;
-    var hostname = window.location.hostname;
-    if (hostname === 'www.geekedoutbasketball.com' || hostname === 'geekedoutbasketball.com') return 'https://api.geekedoutbasketball.com';
-    if (hostname === 'staging.geekedoutbasketball.com') return 'https://api-staging.geekedoutbasketball.com';
-    if (hostname.includes('.railway.app') || hostname.includes('.netlify.app')) {
-      return hostname.includes('staging') || hostname.includes('test')
-        ? 'https://gob-simplified-staging.up.railway.app'
-        : 'https://gob-simplified-gob-backend-prod.up.railway.app';
+  function isDesktopProfile() {
+    if (window.GOB_BUILD_PROFILE === 'desktop') return true;
+    return /(?:^|; )GOB_BUILD_PROFILE=desktop(?:;|$)/.test(document.cookie || '');
+  }
+  if (isDesktopProfile()) {
+    return;
+  }
+
+  // Web only (desktop returns above). Sentry DSN lives on the hosted
+  // /app-config; force the auth cell so this never follows a local franchise
+  // onto loopback. Desktop loadAppConfig talks to loopback instead.
+  function withApiConfig(done) {
+    if (window.API_CONFIG) {
+      done(window.API_CONFIG);
+      return;
     }
-    return 'http://localhost:8000';
+    var script = document.createElement('script');
+    script.src = '/js/config/api-config.js';
+    script.onload = function () { done(window.API_CONFIG); };
+    script.onerror = function () { /* same as fetch catch: skip Sentry */ };
+    document.head.appendChild(script);
   }
 
   function setUserContext() {
@@ -46,11 +56,14 @@
     document.head.appendChild(script);
   }
 
-  fetch(getApiBaseUrl() + '/app-config')
-    .then(function (r) { return r.json(); })
-    .then(function (config) {
-      if (config && config.sentryDsn) initSentry(config.sentryDsn);
-    })
-    .catch(function () {});
+  withApiConfig(function (api) {
+    if (!api) return;
+    fetch(api.buildUrl('/app-config', { category: 'auth' }))
+      .then(function (r) { return r.json(); })
+      .then(function (config) {
+        if (config && config.sentryDsn) initSentry(config.sentryDsn);
+      })
+      .catch(function () {});
+  });
 
 })();

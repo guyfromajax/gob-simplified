@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 const logoGrid = document.getElementById('logo-grid');
 const awayBox = document.getElementById('away-box');
 const homeBox = document.getElementById('home-box');
@@ -134,11 +155,10 @@ playBtn.addEventListener('click', () => {
     sessionStorage.removeItem('myTeam');
   }
 
-  const params = new URLSearchParams({
-    home: homeTeam,
-    away: awayTeam,
-    mode: 'single'
-  });
+  const params = emptyParams();
+  params.set('home', homeTeam);
+  params.set('away', awayTeam);
+  params.set('mode', 'single');
 
   if (homeCheck.checked || awayCheck.checked) {
     const mySide = homeCheck.checked ? 'home' : 'away';

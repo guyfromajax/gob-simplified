@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="stylesheet" href="/fonts/app-fonts.css">
+  <!-- Google Tag Manager (production only) -->
+  <script src="/js/shared/gtm-loader.js"></script>
+  <!-- End Google Tag Manager -->
+  <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team Training - GOB</title>
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
+<link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/training.css">
+  <link rel="stylesheet" href="/css/training-newswire.css">
+  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/development-focus.css">
+</head>
+<body class="training-page">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+  <div class="training-container resource-page-container fcc-brand-page-shell training-resource-shell">
+    <!-- Header -->
+    <header class="training-header">
+      <div class="training-header-left">
+        <button id="back-btn" class="back-button" type="button">Back</button>
+        <button id="training-tutorial-btn" type="button" class="gob-btn gob-btn--ghost training-tutorial-btn">Training Tutorial</button>
+      </div>
+      <div class="header-center">
+        <h1 class="page-title">Team Training</h1>
+        <!-- The two submit requirements, in the one place a coach already looks. Replaces
+             the full-width "Before you submit" bar; the ids are unchanged so the same
+             updateRequirementsBar() drives it. -->
+        <div class="req-pill" id="requirements-bar" aria-label="Before you submit">
+          <span class="req-pill-seg req-chip req-chip--points" id="req-points">
+            <span class="req-chip-check" aria-hidden="true"></span>
+            <span class="req-pill-label">Points</span>
+            <span class="req-chip-value"><span id="req-points-used">0</span>/<span id="req-points-total">24</span></span>
+            <span class="req-meter"><span class="req-meter-fill" id="req-points-meter"></span></span>
+            <span class="points-display"><span id="points-remaining">24</span> left</span>
+          </span>
+          <span class="req-pill-div" aria-hidden="true"></span>
+          <span class="req-pill-seg req-chip req-chip--focus" id="req-focus">
+            <span class="req-chip-check" aria-hidden="true"></span>
+            <span class="req-pill-label">Focus</span>
+            <span class="req-chip-value" id="req-focus-value">Not selected</span>
+            <button type="button" class="req-focus-nudge" id="req-focus-nudge" hidden>Choose one &rarr;</button>
+          </span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="auto-train-btn" class="auto-train-button">Auto-Train</button>
+        <div class="submit-stack">
+          <button id="submit-btn" class="submit-button" disabled>Submit Training</button>
+          <button id="recruiting-invites-btn" class="recruiting-invites-button" type="button" style="display:none;">Recruiting Invites</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Three equal columns: Player Drills · Scheme Installs · General -->
+    <div class="main-content-grid">
+      <div class="content-section player-drills-section">
+        <h2 class="section-header">Player Drills</h2>
+        <div class="section-container">
+          <div class="drill-stack">
+            <div class="drill-group">
+              <h3 class="drill-title">Offense Drills</h3>
+              <label class="slider-label">
+                <span class="label-text">Inside Offense</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="offense-inside" data-category="player-drills">
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Outside Offense</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="offense-outside" data-category="player-drills">
+                </div>
+              </label>
+            </div>
+
+            <div class="drill-group">
+              <h3 class="drill-title">Defense Drills</h3>
+              <label class="slider-label">
+                <span class="label-text">Inside Defense</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="defense-inside" data-category="player-drills">
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Outside Defense</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="defense-outside" data-category="player-drills">
+                </div>
+              </label>
+            </div>
+
+            <div class="drill-group">
+              <h3 class="drill-title">Technical Drills</h3>
+              <label class="slider-label">
+                <span class="label-text">Passing</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-passing" data-category="player-drills">
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Ball Handling</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-ball-handling" data-category="player-drills">
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Rebounding</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-rebounding" data-category="player-drills">
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-section scheme-installs-section">
+        <h2 class="section-header">Scheme Installs</h2>
+        <div class="section-container">
+          <div class="drill-stack">
+            <div class="drill-group">
+              <h3 class="drill-title">Core</h3>
+              <label class="slider-label">
+                <span class="label-text">Offense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-offense-install" data-category="team-drills">
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">Defense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-defense-install" data-category="team-drills">
+                </div>
+              </label>
+            </div>
+
+            <div class="drill-group">
+              <h3 class="drill-title">Fast Breaks</h3>
+              <label class="slider-label">
+                <span class="label-text">FB Offense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="fast-break-offense-install" data-category="team-drills">
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">FB Defense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="fast-break-defense-install" data-category="team-drills">
+                </div>
+              </label>
+            </div>
+
+            <div class="drill-group">
+              <h3 class="drill-title">Press / Trap</h3>
+              <label class="slider-label">
+                <span class="label-text">P/T Offense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="press-offense-install" data-category="team-drills">
+                </div>
+              </label>
+              <label class="slider-label">
+                <span class="label-text">P/T Defense Install</span>
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="press-defense-install" data-category="team-drills">
+                </div>
+              </label>
+            </div>
+
+          </div>
+
+          <!-- Playbook mode sits under the install rows it governs. -->
+          <div class="playbook-mode-selection">
+            <p id="custom-playbook-banner" class="custom-playbook-banner" hidden>
+              Custom playbook is configured for this session (CMD gains only on selected plays).
+            </p>
+            <div class="playbook-mode-toggle" role="group" aria-label="Playbook training mode">
+              <button type="button" id="playbook-mode-current-btn" class="playbook-mode-btn is-selected" aria-pressed="true">
+                Current Playbooks
+              </button>
+              <button type="button" id="playbook-mode-custom-btn" class="playbook-mode-btn is-ghost" aria-pressed="false">
+                Custom Playbook
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-section general-section">
+        <h2 class="section-header">Full Team Sessions</h2>
+        <div class="section-container">
+          <div class="drill-stack">
+            <div class="drill-group drill-group--solo">
+              <h3 class="drill-title">Strength Training</h3>
+              <label class="slider-label">
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-strength" data-category="player-drills">
+                </div>
+              </label>
+            </div>
+            <div class="drill-group drill-group--solo">
+              <h3 class="drill-title">Agility Training</h3>
+              <label class="slider-label">
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-agility" data-category="player-drills">
+                </div>
+              </label>
+            </div>
+            <div class="drill-group drill-group--solo">
+              <h3 class="drill-title">Conditioning</h3>
+              <label class="slider-label">
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-conditioning" data-category="general">
+                </div>
+              </label>
+            </div>
+            <div class="drill-group drill-group--solo">
+              <h3 class="drill-title">Free Throws</h3>
+              <label class="slider-label">
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-free-throws" data-category="general">
+                </div>
+              </label>
+            </div>
+            <div class="drill-group drill-group--solo">
+              <h3 class="drill-title">Film Study</h3>
+              <label class="slider-label">
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-film-study" data-category="general">
+                </div>
+              </label>
+            </div>
+            <div class="drill-group drill-group--solo">
+              <h3 class="drill-title">Breaks</h3>
+              <label class="slider-label">
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-breaks" data-category="general">
+                </div>
+              </label>
+            </div>
+            <div class="drill-group drill-group--solo">
+              <h3 class="drill-title">Scrimmages</h3>
+              <label class="slider-label">
+                <div class="slider-container">
+                  <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-scrimmages" data-category="team-drills">
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coaching Style / Focus Section -->
+    <div class="coaching-section">
+      <h2 class="coaching-title">Coaching Style / Focus</h2>
+      <p class="coaching-subtitle">Sets what you emphasize across drills, scrimmages and locker-room talks.</p>
+      <div class="archetypes-grid">
+        <!-- Authoritarian -->
+        <div class="archetype-block" data-archetype="authoritarian">
+          <div class="archetype-header">
+            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="archetype-name">Authoritarian</span>
+          </div>
+          <div class="archetype-options">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="authoritarian-discipline" class="archetype-radio">
+              <span>Discipline</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="authoritarian-rebounding" class="archetype-radio">
+              <span>Rebounding</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="authoritarian-execution" class="archetype-radio">
+              <span>Execution</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="authoritarian-teamwork" class="archetype-radio">
+              <span>Teamwork</span>
+      </label>
+    </div>
+        </div>
+
+        <!-- Systems Coach -->
+        <div class="archetype-block" data-archetype="systems-coach">
+          <div class="archetype-header">
+            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="archetype-name">Systems Coach</span>
+          </div>
+          <div class="archetype-options">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="systems-coach-offense" class="archetype-radio">
+              <span>Offense</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="systems-coach-defense" class="archetype-radio">
+              <span>Defense</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="systems-coach-fast-breaks" class="archetype-radio">
+              <span>Fast Breaks</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="systems-coach-press-trap" class="archetype-radio">
+              <span>Press / Trap</span>
+      </label>
+    </div>
+  </div>
+
+        <!-- Player Maximizer -->
+        <div class="archetype-block" data-archetype="player-maximizer">
+          <div class="archetype-header">
+            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="archetype-name">Player Maximizer</span>
+          </div>
+          <div class="archetype-options">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-choose-attributes" class="archetype-radio">
+              <span>Choose Attributes</span>
+            </label>
+            <!-- Auto-Train: leaf values not shown in main UI -->
+            <input type="radio" name="coaching-focus" value="player-maximizer-top-3" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
+            <input type="radio" name="coaching-focus" value="player-maximizer-attributes-4-6" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
+            <input type="radio" name="coaching-focus" value="player-maximizer-positional-focus" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
+          </div>
+  </div>
+
+        <!-- Culture Builder -->
+        <div class="archetype-block" data-archetype="culture-builder">
+          <div class="archetype-header">
+            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="archetype-name">Culture Builder</span>
+          </div>
+          <div class="archetype-options">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="culture-builder-inspire" class="archetype-radio">
+              <span>Inspire</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="culture-builder-confidence" class="archetype-radio">
+              <span>Confidence</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="culture-builder-community" class="archetype-radio">
+              <span>Community Engagement</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="culture-builder-teamwork" class="archetype-radio">
+              <span>Team Building</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Player Development: per-player training position + focus, for the 12 active
+         players. Read and written through the shared Development Focus module, the same
+         one the roster surfaces use, so the six values cannot drift between screens. -->
+    <section class="player-dev-section" id="player-dev-section" hidden>
+      <div class="player-dev-head">
+        <h2 class="coaching-title player-dev-title">Player Development</h2>
+        <button type="button" class="gob-btn gob-btn--ghost player-dev-tutorial-btn" id="player-dev-tutorial-btn">
+          Training by Position &#8599;
+        </button>
+      </div>
+      <div class="player-dev-tally">
+        <div class="player-dev-tally-group player-dev-tally--positions" id="player-dev-tally-positions"></div>
+        <div class="player-dev-tally-group player-dev-tally--focuses" id="player-dev-tally-focuses"></div>
+      </div>
+      <div class="player-dev-grid" id="player-dev-grid"></div>
+    </section>
+  </div>
+
+  <!-- Player Maximizer: Choose Attributes modal -->
+  <div id="custom-focus-modal" class="custom-focus-modal" style="display: none;" aria-hidden="true">
+    <div class="custom-focus-modal-content">
+      <h2 class="custom-focus-modal-title">Custom Focus Attributes</h2>
+      <div class="pm-modal-mode-row" role="radiogroup" aria-label="Focus mode">
+        <label class="pm-modal-mode-option">
+          <input type="radio" name="pm-modal-mode" value="top-3" class="archetype-radio">
+          <span>Top 3</span>
+        </label>
+        <label class="pm-modal-mode-option">
+          <input type="radio" name="pm-modal-mode" value="attributes-4-6" class="archetype-radio">
+          <span>Attributes 4–6</span>
+        </label>
+        <label class="pm-modal-mode-option">
+          <input type="radio" name="pm-modal-mode" value="positional" class="archetype-radio">
+          <span>Positional Focus</span>
+        </label>
+        <label class="pm-modal-mode-option">
+          <input type="radio" name="pm-modal-mode" value="custom" class="archetype-radio">
+          <span>Custom</span>
+        </label>
+      </div>
+      <p id="pm-modal-custom-hint" class="pm-modal-custom-hint" hidden>Pick three attributes per player.</p>
+      <div class="custom-focus-table-wrap">
+        <table class="custom-focus-table" id="custom-focus-table">
+          <thead id="custom-focus-thead"></thead>
+          <tbody id="custom-focus-tbody"></tbody>
+        </table>
+      </div>
+      <div class="custom-focus-modal-actions">
+        <button type="button" id="custom-focus-assign-btn" class="custom-focus-assign-btn" disabled>Assign Focus Attributes</button>
+        <button type="button" id="custom-focus-cancel-btn" class="custom-focus-cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auto-Train confirmation modal -->
+  <div id="auto-train-modal" class="gob-modal-overlay">
+    <div class="gob-modal-backdrop"></div>
+    <div class="gob-modal-box">
+      <div class="gob-modal-accent"></div>
+      <div class="gob-modal-body">
+        <div class="gob-modal-title" id="auto-train-modal-title">Training Lock In</div>
+        <div class="gob-modal-subtitle" id="auto-train-modal-focus">Focus: Attributes 4–6 (Player Maximizer)</div>
+      </div>
+      <div class="gob-modal-actions">
+        <button id="auto-train-modal-close" class="gob-modal-btn-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/shared/developmentFocus.js"></script>
+  <script>
+  /* PREVIEW ONLY — no network, no auth. Renders the real controls against fake data so
+     the layout can be judged. Delete this file once the layout is signed off. */
+  var TOTAL = 24;
+  var sliders = Array.prototype.slice.call(document.querySelectorAll('.slider'));
+  function spent() { return sliders.reduce(function (n, s) { return n + (parseInt(s.value,10)||0); }, 0); }
+  function paint() {
+    sliders.forEach(function (s) {
+      var wrap = s.closest('.slider-container');
+      var row = wrap.querySelector('.pipstep');
+      if (!row) {
+        row = document.createElement('div'); row.className = 'pipstep';
+        for (var i = 0; i <= 5; i++) {
+          var b = document.createElement('button');
+          b.type = 'button'; b.className = 'pipstep-pip'; b.dataset.value = String(i);
+          b.textContent = String(i); b.setAttribute('aria-hidden','true'); b.tabIndex = -1;
+          (function (v) { b.addEventListener('click', function () { s.value = String(v); paint(); }); })(i);
+          row.appendChild(b);
+        }
+        wrap.appendChild(row);
+      }
+      var val = parseInt(s.value, 10) || 0;
+      var head = TOTAL - spent() + val;
+      row.querySelectorAll('.pipstep-pip').forEach(function (pip, i) {
+        pip.classList.toggle('is-filled', i <= val);
+        pip.classList.toggle('is-current', i === val);
+        pip.disabled = i > head;
+      });
+    });
+    var used = spent();
+    document.getElementById('req-points-used').textContent = used;
+    document.getElementById('points-remaining').textContent = TOTAL - used;
+    document.getElementById('req-points-meter').style.width = (used / TOTAL * 100) + '%';
+    document.getElementById('req-points').classList.toggle('is-complete', used === TOTAL);
+  }
+  paint();
+
+  var NAMES = ['Marcus Fain','DeAndre Cobb','Tyrell Vance','Jonah Brick','Ivan Petrov',
+               'Cole Hartley','Sam Okafor','Luis Madrigal','Bryce Whitten','Nate Solberg',
+               'Omar Haddad','Finn Gallagher'];
+  var POS = ['PG','SG','SF','PF','C'];
+  var FOC = ['standard','offensive','defensive','athletic','fundamentals','rebounding'];
+  var roster = NAMES.map(function (n, i) {
+    return { player_id: 'p' + i, name: n,
+             position_ratings: { PG: 70 - i, SG: 66 - i, SF: 62, PF: 58, C: 54 },
+             resolved_training_position: POS[i % 5],
+             resolved_training_focus: FOC[i % 6] };
+  });
+  var dev = window.GOBDevelopmentFocus;
+  document.getElementById('player-dev-section').hidden = false;
+  document.getElementById('player-dev-grid').innerHTML = roster.map(function (r, i) {
+    return '<div class="player-dev-card">' +
+      '<span class="player-dev-name">' + r.name + '</span>' +
+      '<span class="player-dev-rt">' + (70 - i) + '</span>' +
+      '<span class="player-dev-controls">' + dev.positionSelectHtml(r) + dev.focusSelectHtml(r) + '</span>' +
+    '</div>';
+  }).join('');
+  function tally() {
+    var bp = {}, bf = {};
+    roster.forEach(function (r) {
+      var p = dev.positionOf(r), f = dev.focusOf(r);
+      bp[p] = (bp[p]||0)+1; bf[f] = (bf[f]||0)+1;
+    });
+    var item = function (l, n) {
+      return '<span class="player-dev-tally-item' + (n ? '' : ' is-zero') + '">' + l + ' <b>' + n + '</b></span>';
+    };
+    document.getElementById('player-dev-tally-positions').innerHTML =
+      dev.POSITIONS.map(function (p) { return item(p, bp[p]||0); }).join('');
+    document.getElementById('player-dev-tally-focuses').innerHTML =
+      dev.FOCUSES.map(function (f) { return item(f.label, bf[f.value]||0); }).join('');
+  }
+  tally();
+  document.getElementById('player-dev-grid').addEventListener('change', function (e) {
+    var sel = e.target.closest('.devfocus-select');
+    if (!sel) return;
+    var row = roster.filter(function (r) { return r.player_id === sel.dataset.playerId; })[0];
+    if (!row) return;
+    row[sel.dataset.devfocusField === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position'] = sel.value;
+    tally();
+  });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+Rebound-from-arrival Stage 1 done. See reports/rebound-arrival-2026-09-19.md + reports/rebound-arrival-trace-2026-09-19.md (feature/animation-reward worktree). Position now decides rebounds (75% winner change); AG does not (82-87% of crashers fully arrive). Played/sim OREB split opened (+5.50 vs +3.06). Flag OFF. Awaiting Jamie.

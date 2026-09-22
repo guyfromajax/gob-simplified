@@ -297,3 +297,14 @@ th.c-rt, td.c-rt { white-space: nowrap; }
   letter-spacing: .06em;
   text-transform: uppercase;
 }
+
+
+/* ---- Development Focus (roster tables) ----------------------------------
+   Two columns of live controls sitting inside a dense, scannable table. They stay
+   quiet at rest — border only on hover/focus — so twelve dropdowns do not read as
+   twelve buttons competing with the attribute tiles. */
+.roster-table th.c-devpos,
+.roster-table th.c-devfocus { white-space: nowrap; }
+.roster-table td.c-devpos,
+.roster-table td.c-devfocus { white-space: nowrap; }
+.roster-table td.c-devpos { padding-right: 4px; }

@@ -78,6 +78,7 @@ input[type="reset"] {
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-xs);
+  min-width: 0;          /* lets the pill ellipsise rather than widen the header */
 }
 
 .header-actions {
@@ -190,10 +191,15 @@ input[type="reset"] {
 .main-content-grid {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Player Drills · Scheme Installs · General. align-items:stretch (the default) plus
+     the flex:1 container below is what makes all three end on the same line. */
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--spacing-lg);
   margin-bottom: var(--spacing-md);
 }
+
+/* Narrow-width collapse lives with the other body.training-page responsive rules, which
+   outrank anything written at plain-class specificity here. */
 
 .content-section {
   display: flex;
@@ -211,13 +217,13 @@ input[type="reset"] {
   flex-direction: column;
 }
 
-.player-drills-section .section-container,
-.team-drills-section .section-container {
-  min-height: 500px;
-}
-
-.general-section .section-container {
-  min-height: 200px;
+/* No fixed floor. Each column is as tall as its own content, and the grid stretches all
+   three to match the tallest — so the page never reserves height nothing is using.
+   (`body.training-page .section-container` already zeroes min-height; this is the same
+   intent stated where the column rules live.) */
+.main-content-grid .section-container {
+  min-height: 0;
+  flex: 1;
 }
 
 .section-header {
@@ -333,18 +339,20 @@ input[type="reset"] {
   cursor: pointer;
 }
 
-/* General Section */
+/* General is now the third column, not a full-width strip under the other two. */
 .general-section {
-  grid-column: 1 / -1;
   margin-bottom: var(--spacing-md);
 }
 
-.general-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+/* One vertical run of drill groups per column. */
+.drill-stack {
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-md);
-  flex: 1;
 }
+
+/* A drill whose group title IS its label (Scrimmages, and every General row). */
+.drill-group--solo .slider-label { gap: 0; }
 
 /* Coaching Section */
 .coaching-section {
@@ -757,12 +765,16 @@ body.training-page #points-remaining {
   color: currentColor;
 }
 
+/* Back over Training Tutorial. Stacking them keeps the left cluster narrow, so the
+   requirements pill in the centre column has the width it needs to stay on one line. */
 body.training-page .training-header-left {
   justify-self: start;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  /* Each sizes to its own content: Back is a bare text link, Training Tutorial is a
+     ghost button — stretching would give the link a button-width hit area. */
+  align-items: flex-start;
+  gap: 10px;
 }
 
 body.training-page .training-tutorial-btn {
@@ -853,13 +865,20 @@ body.training-page .custom-focus-assign-btn:hover:not(:disabled) {
 }
 
 body.training-page .main-content-grid,
-body.training-page .general-section,
 body.training-page .coaching-section {
   grid-column: 1 / -1;
 }
 
+/* General is the THIRD COLUMN now, not a full-width strip: it must not span, and the
+   column count has to be declared at this specificity or the base rule is overridden. */
 body.training-page .main-content-grid {
+  grid-template-columns: repeat(3, 1fr);
   gap: 18px;
+  margin-bottom: 0;
+}
+
+body.training-page .general-section {
+  grid-column: auto;
   margin-bottom: 0;
 }
 
@@ -968,7 +987,9 @@ body.training-page .slider-container {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 74px;
+  /* Sized by the pip row. The old 74px floor fitted the range track, the node row and
+     the 0-5 scale beneath it; none of those exist now. */
+  min-height: 0;
 }
 
 body.training-page .slider {
@@ -1146,14 +1167,16 @@ body.training-page .playbook-mode-btn.is-ghost:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
+/* Pulled up under the install rows it governs. The old 22/20px stack pushed it toward
+   the bottom of a column that is now shorter than the other two. */
 body.training-page .playbook-mode-selection {
-  margin-top: 22px;
-  padding-top: 20px;
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 body.training-page .archetypes-grid {
@@ -1566,15 +1589,6 @@ body.training-page .req-focus-nudge:hover {
   color: #ffffff;
 }
 
-body.training-page .req-readout {
-  flex: 0 0 auto;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 18px;
-  letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.66);
-  white-space: nowrap;
-}
-body.training-page .req-readout.is-ready { color: #6cd07f; }
 
 /* Flash when the nudge scrolls to the coaching section */
 @keyframes coachingFlash {
@@ -1587,11 +1601,13 @@ body.training-page .coaching-section.coaching-flash {
   animation: coachingFlash 1.5s ease-out;
 }
 
-/* --- Feature 5: equal-height Player / Team drill panels --- */
+/* --- Equal-height panels across all three columns --- */
 body.training-page .player-drills-section,
-body.training-page .team-drills-section { height: 100%; }
+body.training-page .scheme-installs-section,
+body.training-page .general-section { height: 100%; }
 body.training-page .player-drills-section .section-container,
-body.training-page .team-drills-section .section-container { flex: 1 1 auto; }
+body.training-page .scheme-installs-section .section-container,
+body.training-page .general-section .section-container { flex: 1 1 auto; }
 
 /* --- Feature 1: Coaching Focus premium card treatment --- */
 body.training-page .coaching-subtitle {
@@ -1819,7 +1835,7 @@ body.training-page .has-tooltip { cursor: help; }
   }
 
   body.training-page .training-header-left {
-    justify-content: center;
+    align-items: center;
   }
 
   body.training-page .header-actions {
@@ -1838,4 +1854,294 @@ body.training-page .has-tooltip { cursor: help; }
   body.training-page .scrimmages-group {
     width: 100%;
   }
+}
+
+/* ==========================================================================
+   Phase 5 — pill, pip steppers, Player Development
+   ========================================================================== */
+
+/* --- The requirements pill (replaces the full-width "Before you submit" bar) ---
+   Same ids, same state classes; only the arrangement changed. It rides in the sticky
+   header under the title, so the two things blocking Submit are always on screen. */
+body.training-page .req-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  /* One line. Wrapping turned the pill into two stacked lozenges taller than the title. */
+  flex-wrap: nowrap;
+  justify-content: center;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%),
+    linear-gradient(180deg, rgba(42, 48, 58, 0.97), rgba(30, 35, 44, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+body.training-page .req-pill-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  min-width: 0;
+}
+
+body.training-page .req-pill-div {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+body.training-page .req-pill-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+/* Inside the pill the value sits inline and the meter is a short inline rule, rather
+   than the stacked chip body the old bar used. */
+body.training-page .req-pill .req-chip-value {
+  font-size: 16px;
+  white-space: nowrap;
+}
+body.training-page .req-pill .req-meter {
+  margin-top: 0;
+  width: 46px;
+  flex: 0 0 auto;
+}
+/* "N left" is the same fact as the x/y readout beside it, so it is not drawn — but the
+   element stays, because updatePointsRemaining() writes to it and a screen reader still
+   gets the plain-language count. */
+body.training-page .req-pill .points-display {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+body.training-page .req-pill .req-focus-nudge { margin-left: 2px; }
+
+/* The focus value can be long ("Community Engagement · Culture Builder"). */
+body.training-page .req-chip--focus .req-chip-value {
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- 6-pip stepper -------------------------------------------------------
+   The <input type="range"> is still the model: every read, the draft save/restore,
+   Auto-Train and the points counter go through it untouched. It is clipped out of
+   sight but NOT removed from the tab order, so arrow keys still work and the pips are
+   the visual plus a click target. */
+body.training-page .slider-container .slider {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+body.training-page .slider-container {
+  position: relative;
+  gap: 10px;
+}
+
+body.training-page .pipstep {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+body.training-page .pipstep-pip {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.38);
+  font: 700 10px/1 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+body.training-page .pipstep-pip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.8);
+}
+/* Filled through the current value, so the row reads as a level, not as six buttons. */
+body.training-page .pipstep-pip.is-filled {
+  background: rgba(247, 148, 32, 0.28);
+  border-color: rgba(247, 148, 32, 0.5);
+  color: #ffffff;
+}
+body.training-page .pipstep-pip.is-current {
+  background: #f79420;
+  border-color: #f79420;
+  color: #10131a;
+}
+/* The zero pip is a reset, not a level — it never reads as "filled". */
+body.training-page .pipstep-pip[data-value="0"].is-filled {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.38);
+}
+body.training-page .pipstep-pip[data-value="0"].is-current {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.72);
+}
+/* A pip that would overspend the budget. Still clickable-looking is worse than dimmed. */
+body.training-page .pipstep-pip:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+/* The range keeps the focus ring, drawn on the pip row it controls. */
+body.training-page .slider-container .slider:focus-visible ~ .pipstep {
+  outline: 2px solid #f79420;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+/* Every drill row reads the same way, whichever column it is in: name on the left, pips
+   hard right. The General column's solo drills already did this; the labelled rows in
+   Player Drills and Scheme Installs stacked their label above the pips instead. */
+body.training-page .slider-label {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+body.training-page .slider-label .label-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+body.training-page .slider-container {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+/* A solo drill puts its title and its pips on one line — the group IS the row. */
+body.training-page .drill-group--solo {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+body.training-page .drill-group--solo .drill-title { margin-bottom: 0; }
+body.training-page .drill-group--solo .slider-label { flex: 0 0 auto; }
+
+/* --- Player Development --------------------------------------------------- */
+body.training-page .player-dev-section {
+  grid-column: 1 / -1;
+  margin-top: var(--spacing-lg);
+}
+body.training-page .player-dev-section[hidden] { display: none; }
+
+body.training-page .player-dev-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+body.training-page .player-dev-title { margin-bottom: 0; text-align: left; }
+
+/* Positions read left, focuses read right — two tallies, one line, no legend needed. */
+body.training-page .player-dev-tally {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin: 10px 0 12px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+body.training-page .player-dev-tally-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+body.training-page .player-dev-tally--focuses { justify-content: flex-end; }
+body.training-page .player-dev-tally-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font: 600 11px/1 'Inter', sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+body.training-page .player-dev-tally-item b {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+body.training-page .player-dev-tally-item.is-zero { opacity: 0.4; }
+
+/* 4 rows × 3 columns, filled COLUMN-first so the best players run down column one. */
+body.training-page .player-dev-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(4, auto);
+  grid-auto-flow: column;
+  gap: 10px;
+}
+@media (max-width: 1100px) {
+  body.training-page .player-dev-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-auto-flow: row;
+  }
+}
+
+body.training-page .player-dev-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+body.training-page .player-dev-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 13px/1.2 'Inter', sans-serif;
+  color: #ffffff;
+}
+body.training-page .player-dev-rt {
+  font: 500 11px/1 'Inter', sans-serif;
+  color: rgba(255, 255, 255, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+body.training-page .player-dev-card .devfocus-select { max-width: 116px; }
+body.training-page .player-dev-card .devfocus-select--pos { width: 58px; }
+body.training-page .player-dev-empty {
+  padding: 18px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font: 500 13px/1.4 'Inter', sans-serif;
 }

@@ -16,14 +16,24 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 if os.environ.get("PYTHONHASHSEED") != "0":
     raise SystemExit("run with PYTHONHASHSEED=0")
 
-from BackEnd.db import players_collection, teams_collection, plays_collection
-from tests.roster_fixtures import seed_universal_rosters, seed_universal_plays
+from BackEnd.db import (
+    players_collection, teams_collection, plays_collection, defenses_collection,
+)
+from tests.roster_fixtures import (
+    seed_universal_rosters, seed_universal_plays, seed_universal_defenses,
+)
 
 if os.environ.get("SEED_PLAYS", "1") == "1":
     seed_universal_rosters(teams_collection, players_collection)
     seed_universal_plays(plays_collection)
 else:
     seed_universal_rosters(teams_collection, players_collection)
+
+# SEED_DEFENSES=1 seeds the six real defenses (defenses_export.json). Default 0 keeps the
+# Phase 6 footing (b2982fce1), where the catalogue was empty and every zone call played man.
+SEED_DEFENSES = os.environ.get("SEED_DEFENSES", "0") == "1"
+if SEED_DEFENSES:
+    seed_universal_defenses(defenses_collection)
 
 from BackEnd.utils import sim_random, training_random
 from BackEnd.models.game_manager import GameManager
@@ -115,6 +125,80 @@ def _uninstall_played_arm():
             setattr(AN.Animator, meth, _PATCHED[meth])
 
 
+class PlayedState(dict):
+    """game_state that refuses ``_is_full_simulation``: the production turn-by-turn footing.
+    ARM=played only clears the flag inside GATED_METHODS; ARM=played_full never sets it."""
+    def __setitem__(self, k, v):
+        if k == "_is_full_simulation":
+            return
+        dict.__setitem__(self, k, v)
+
+    def setdefault(self, k, *a):
+        if k == "_is_full_simulation":
+            return None
+        return dict.setdefault(self, k, *a)
+
+    def update(self, *a, **kw):
+        src = dict(*a, **kw)
+        src.pop("_is_full_simulation", None)
+        dict.update(self, src)
+
+
+# ── ALIGN_RNG=1: arm-gated regions draw from a SIDE stream (harness only) ─────────────────
+# Each region below draws sim_rng only when animation is live (a `_is_full_simulation`
+# early return, or data that only exists when it is live). Running them on a side stream on
+# BOTH arms leaves the main sim_rng stream arm-independent, so the two arms' main streams
+# agree until a genuine behavioural difference. The sim arm draws nothing inside them, so
+# the wrap is a no-op there. Production draw behaviour is untouched; the ALIGNED played arm
+# is a diagnostic footing, not the production one.
+ALIGN_RNG = os.environ.get("ALIGN_RNG", "0") == "1"
+ALIGN_REGIONS = (
+    ("BackEnd.models.animator", "Animator.capture_fast_break_animation"),
+    ("BackEnd.models.animator", "Animator.capture_free_throw_animation"),
+    ("BackEnd.models.animator", "Animator.capture_halfcourt_animation"),
+    ("BackEnd.models.animator", "Animator.skeleton_to_animations"),
+    ("BackEnd.engine.skeleton_step_emitter", "build_skeleton_animation_steps"),
+    ("BackEnd.engine.step_state", "_diagnose"),
+    ("BackEnd.engine.ft_step_emitter", "build_ft_animation_steps"),
+    ("BackEnd.engine.triangle_step_emitter", "build_triangle_animation_steps"),
+    ("BackEnd.engine.phase_resolution", "get_fcp_skeleton"),
+    ("BackEnd.engine.phase_resolution", "get_hct_skeleton"),
+)
+SIDE = {"state": None, "depth": 0, "draws": 0, "calls": {}}
+
+
+def _install_align_regions():
+    import importlib
+    for mod_name, attr in ALIGN_REGIONS:
+        owner = importlib.import_module(mod_name)
+        name = attr
+        if "." in attr:
+            cls, name = attr.split(".")
+            owner = getattr(owner, cls)
+        orig = getattr(owner, name)
+
+        def make(orig=orig, label=attr):
+            def wrapped(*a, **k):
+                if SIDE["depth"]:
+                    return orig(*a, **k)
+                rng = sim_random.sim_rng
+                main = rng.getstate()
+                rng.setstate(SIDE["state"])
+                SIDE["depth"] = 1
+                box = getattr(rng, "_equiv_draws", None)
+                before = box[0] if box else 0
+                try:
+                    return orig(*a, **k)
+                finally:
+                    SIDE["draws"] += (box[0] if box else 0) - before
+                    SIDE["calls"][label] = SIDE["calls"].get(label, 0) + 1
+                    SIDE["state"] = rng.getstate()
+                    rng.setstate(main)
+                    SIDE["depth"] = 0
+            return wrapped
+        setattr(owner, name, make())
+
+
 def ft_invariant(turns, window=3):
     awards = strict = windowed = 0
     for i, t in enumerate(turns):
@@ -128,6 +212,102 @@ def ft_invariant(turns, window=3):
         if "FREE_THROW" in nxts:
             windowed += 1
     return awards, strict, windowed
+
+
+# ── Defense census (observation only: no RNG, return values passed through) ──────────────
+# One record per HCO possession, opened by turn_manager's per-possession announce call.
+# Placement calls are tagged to the open possession only while its call is still live.
+import hashlib
+import logging as _logging
+
+_ZONE_SHELL = {"2-3-zone": "2-3", "3-2-zone": "3-2", "1-3-1-zone": "1-3-1"}
+DCENSUS = {"poss": [], "final_turn": [], "untagged_placements": 0, "sub_log_lines": 0}
+
+
+class _SubLogCounter(_logging.Handler):
+    def emit(self, record):
+        if "[DEFENSE-IDENTITY SUBSTITUTION]" in record.getMessage():
+            DCENSUS["sub_log_lines"] += 1
+
+
+def _install_defense_census():
+    from BackEnd.models import turn_manager as TM
+    from BackEnd.engine import defender_placement as DP
+    from BackEnd.engine import phase_resolution as PR
+    from BackEnd.utils import defense_identity as DI
+
+    DI.logger.addHandler(_SubLogCounter(level=_logging.WARNING))
+    _announce = TM.announce_zone_played_as_man
+
+    def announce(raw_call, context):
+        short = _announce(raw_call, context)
+        rec = {"call": raw_call, "substituted": short is not None, "paths": set(),
+               "posture": None}
+        if context == "HCO possession":
+            DCENSUS["poss"].append(rec)
+        else:
+            DCENSUS["final_turn"].append(rec)
+        return short
+
+    TM.announce_zone_played_as_man = announce
+
+    def tag(name):
+        orig = getattr(DP, name)
+
+        def wrapped(game, *a, **k):
+            cur = DCENSUS["poss"][-1] if DCENSUS["poss"] else None
+            live = (game.game_state or {}).get("defense_playcall")
+            if cur is not None and cur["call"] == live:
+                cur["paths"].add("zone" if name == "position_zone_defenders" else "man")
+            else:
+                DCENSUS["untagged_placements"] += 1
+            return orig(game, *a, **k)
+        setattr(DP, name, wrapped)
+
+    tag("position_zone_defenders")
+    tag("position_standard_defenders")
+    _roll = PR._roll_defense_posture
+
+    def roll(game, rng=None):
+        posture = _roll(game, rng)
+        if DCENSUS["poss"]:
+            DCENSUS["poss"][-1]["posture"] = posture
+        return posture
+
+    PR._roll_defense_posture = roll
+
+
+def defense_census_summary():
+    from collections import Counter
+    from BackEnd.utils import defense_identity as DI
+
+    poss = DCENSUS["poss"]
+    calls = Counter(p["call"] for p in poss)
+    zone = [p for p in poss if p["call"] in _ZONE_SHELL]
+    return {
+        "catalog_status_end": DI.defense_catalog_status(),
+        "hco_possessions": len(poss),
+        "calls": dict(calls),
+        "zone_calls": len(zone),
+        "zone_calls_by_shell": dict(Counter(_ZONE_SHELL[p["call"]] for p in zone)),
+        "zone_calls_zone_path": sum(1 for p in zone if "zone" in p["paths"]),
+        "zone_calls_man_path_only": sum(1 for p in zone if p["paths"] == {"man"}),
+        "zone_calls_no_placement": sum(1 for p in zone if not p["paths"]),
+        "man_calls_zone_path": sum(1 for p in poss
+                                   if p["call"] not in _ZONE_SHELL and "zone" in p["paths"]),
+        "postures": dict(Counter(str(p["posture"]) for p in poss)),
+        "substitutions_hco": sum(1 for p in poss if p["substituted"]),
+        "substitutions_final_turn": sum(1 for p in DCENSUS["final_turn"] if p["substituted"]),
+        "final_turn_announces": len(DCENSUS["final_turn"]),
+        "substitution_log_lines": DCENSUS["sub_log_lines"],
+        "untagged_placements": DCENSUS["untagged_placements"],
+    }
+
+
+def turns_fingerprint(turns, score):
+    rows = [(str(t.get("result_type") or ""), str(t.get("next_turn") or "")) for t in turns]
+    blob = json.dumps({"rows": rows, "score": score}, sort_keys=True)
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
 def run_arm(played: bool):
@@ -157,19 +337,28 @@ def run_arm(played: bool):
                 sim_random.sim_rng.random = _rnd_c
                 sim_random.sim_rng._equiv_draws = _box
             sim_random.sim_rng._equiv_draws[0] = 0
+            SIDE.update({"state": _stdlib.Random(seed ^ 0x51DE).getstate(), "depth": 0,
+                         "draws": 0, "calls": {}})
+            DCENSUS.update({"poss": [], "final_turn": [], "untagged_placements": 0,
+                            "sub_log_lines": 0})
             gm = GameManager("Lancaster", "Bentley-Truman")
+            if ARM == "played_full":
+                gm.game_state = PlayedState(gm.game_state)
             d = {"defense": 2, "tempo": 2, "aggression": 2, "fast_break": 2,
                  "hc_trap": 5, "fc_press": 5}
             gm.home_team.strategy_settings = d.copy()
             gm.away_team.strategy_settings = d.copy()
             gid = "%024x" % (0xE0000 + (seed - 8000))
             err = None
+            import time as _time
+            _t0 = _time.perf_counter()
             for _q in range(4):
                 try:
                     simulate_quarter(gm, game_id=gid)
                 except Exception as e:  # noqa: BLE001
                     err = "%s: %s" % (type(e).__name__, e)
                     break
+            wall_s = _time.perf_counter() - _t0
             turns = gm.turns or []
             score = dict(gm.score or {})
             poss = sum(1 for t in turns if t.get("possession_flips"))
@@ -181,7 +370,12 @@ def run_arm(played: bool):
                 "points_per_team": sum(score.values()) / 2.0,
                 "possessions": poss,
                 "draws": draws[0] if draws else None,
+                "arm": ARM, "align_rng": ALIGN_RNG, "wall_s": round(wall_s, 3),
+                "side_draws": SIDE["draws"], "side_calls": dict(SIDE["calls"]),
                 "ft_awards": aw, "ft_strict": st, "ft_windowed": wi,
+                "fp": turns_fingerprint(turns, score),
+                "defenses_seeded": SEED_DEFENSES,
+                "defense": defense_census_summary(),
             })
     finally:
         if played:
@@ -201,6 +395,9 @@ def published_ci95(vals):
 
 if __name__ == "__main__":
     label = "%s_%s" % (COND, ARM)
+    _install_defense_census()
+    if ALIGN_RNG:
+        _install_align_regions()
     rows = run_arm(ARM == "played")
     json.dump({"rows": {label: rows}}, open(OUT, "w"), indent=1)
     pts = [r["points_per_team"] for r in rows if r.get("err") is None]

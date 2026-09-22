@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 // Returns { data, status }. status is the HTTP status, or 0 when the request never
 // got a response. Callers that need to tell "this franchise is gone" (404) apart
 // from "the network hiccuped" (0) use this; fetchJSON keeps the old null contract
@@ -127,9 +148,7 @@ async function recoverCpuSimsBeforeFccRender(topData) {
 }
 
 let franchiseId = null;
-const _urlFidEarly = (typeof URLSearchParams !== 'undefined')
-  ? new URLSearchParams(window.location.search).get('franchise_id')
-  : null;
+const _urlFidEarly = franchiseCtx() ? franchiseCtx().get('franchise_id') : null;
 const userTeamName = (_urlFidEarly && window.FranchiseLS)
   ? (window.FranchiseLS.get(_urlFidEarly, 'user_team') || '')
   : '';
@@ -334,7 +353,7 @@ function invalidateHomeWeekSensitiveCaches() {
 }
 
 function buildPlayerDetailUrl(playerId) {
-  const qs = new URLSearchParams();
+  const qs = emptyParams();
   qs.set('id', playerId);
   if (franchiseId) qs.set('mode', 'franchise');
   if (franchiseId) qs.set('franchise_id', franchiseId);
@@ -1010,7 +1029,7 @@ async function fetchRosterWithStatsForTeam(teamId) {
 
 async function ensureHomeScheduleData() {
   if (userScheduleDataCache || !franchiseId) return userScheduleDataCache;
-  const params = new URLSearchParams();
+  const params = emptyParams();
   params.set('franchise_id', franchiseId);
   params.set('user_team_only', '1');
   userScheduleDataCache = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?${params.toString()}`);
@@ -1441,7 +1460,7 @@ const RECRUITING_DROP_KINDS = new Set(['dropped_you']);
 const RECRUITING_GAIN_KINDS = new Set(['gained_you', 'moved_up']);
 
 function buildRecruitingUrl() {
-  const params = new URLSearchParams();
+  const params = emptyParams();
   if (franchiseId) params.set('franchise_id', franchiseId);
   if (userTeamId) params.set('team_id', userTeamId);
   params.set('from', 'fcc');
@@ -1678,7 +1697,7 @@ function renderHomeNewsCard() {
 }
 
 function buildStandaloneNewsUrl(storyId) {
-  const q = new URLSearchParams();
+  const q = emptyParams();
   if (franchiseId) q.set('franchise_id', franchiseId);
   if (userTeamId) q.set('team_id', userTeamId);
   if (storyId) q.set('story', storyId);
@@ -1754,7 +1773,7 @@ function bindStandingsRegionButtons() {
 
 function buildResourceUrl(page, extraParams) {
   if (!franchiseId || !userTeamId) return '#';
-  const params = new URLSearchParams();
+  const params = emptyParams();
   params.set('franchise_id', franchiseId);
   params.set('team_id', userTeamId);
   params.set('return_url', getCurrentRelativeUrl());
@@ -1803,7 +1822,7 @@ async function maybeRefreshPlaybooksButtonState() {
 function bindResourcesLinks() {
   const q = () => {
     if (!franchiseId || !userTeamId) return '';
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('franchise_id', franchiseId);
     params.set('team_id', userTeamId);
     params.set('return_url', getCurrentRelativeUrl());
@@ -1950,7 +1969,7 @@ async function ensureFccTeamStatsSummary() {
 
 async function ensureFccPlaybooksSummary() {
   if (fccPlaybooksSummaryCache || !franchiseId || !userTeamId) return fccPlaybooksSummaryCache;
-  const params = new URLSearchParams();
+  const params = emptyParams();
   params.set('mode', 'franchise');
   params.set('team_id', userTeamId);
   params.set('franchise_id', franchiseId);
@@ -2279,7 +2298,7 @@ async function renderFccPlaybooksSummary() {
     editBtn.dataset.bound = '1';
     editBtn.addEventListener('click', () => {
       if (!franchiseId || !userTeamId) return;
-      const params = new URLSearchParams();
+      const params = emptyParams();
       params.set('mode', 'franchise');
       params.set('team_id', userTeamId);
       params.set('franchise_id', franchiseId);
@@ -2293,7 +2312,7 @@ async function renderFccPlaybooksSummary() {
     playcallEditLink.dataset.bound = '1';
     playcallEditLink.addEventListener('click', () => {
       if (!franchiseId || !userTeamId) return;
-      const params = new URLSearchParams();
+      const params = emptyParams();
       params.set('mode', 'franchise');
       params.set('team_id', userTeamId);
       params.set('franchise_id', franchiseId);
@@ -2339,7 +2358,7 @@ function renderFccRecruits() {
   const useSignedRecruits = Number(document.body.dataset.fccWeek || 1) >= 36;
   if (heading) heading.textContent = useSignedRecruits ? 'Signed Recruits' : 'Recruits Leaning Your Way';
   if (fullListLink) {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('franchise_id', franchiseId);
     params.set('team_id', userTeamId);
     params.set('from', 'fcc');
@@ -2348,7 +2367,7 @@ function renderFccRecruits() {
   }
   const psLink = document.getElementById('fcc-ps-season-link');
   if (psLink) {
-    const psParams = new URLSearchParams();
+    const psParams = emptyParams();
     psParams.set('franchise_id', franchiseId);
     psParams.set('team_id', userTeamId);
     psLink.href = `/practice-squad-standings.html?${psParams.toString()}`;
@@ -2510,7 +2529,7 @@ async function initializeTeamColorCache() {
   try {
     const fid =
       (typeof franchiseId !== 'undefined' && franchiseId) ||
-      new URLSearchParams(window.location.search || '').get('franchise_id') ||
+      liveParams().get('franchise_id') ||
       '';
     const teamsUrl = fid
       ? `${API_CONFIG.buildUrl('/teams')}?franchise_id=${encodeURIComponent(fid)}`
@@ -3032,11 +3051,41 @@ function fccRosterRowHtml(p, opts) {
       name: p.name, jersey: p.jersey, href: href, flags: fccRosterFlagsHtml(p),
     }) + '</td>' +
     '<td class="c-rt">' + fccRtLockupHtml(p.rt, p.potential_rt_ratcheted) + '</td>' +
-    '<td>' + fccPosChipHtml(p.pos) + '</td>' +
+    fccPositionCellHtml(p) +
     '<td>' + escapeHomeHtml(p.year == null ? '--' : p.year) + '</td>' +
     '<td>' + escapeHomeHtml(p.height == null ? '--' : p.height) + '</td>' +
     '<td>' + escapeHomeHtml(p.weight == null ? '--' : p.weight) + '</td>' +
-    '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>';
+    '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>' +
+    fccFocusCellHtml(p);
+}
+
+/** Development Focus cells. The roster tab is the user's own team, so they always render
+ *  here; the guard is the shared module's absence (script not loaded) rather than a flag. */
+/**
+ * POS and DEV FOCUS — READ-ONLY here. Editing lives on the training page's Player
+ * Development grid and nowhere else, so the setting sits beside the points it governs.
+ *
+ * There is no separate derived-position column: POS shows the TRAINING position, the one
+ * that governs how he develops. A second column repeating the natural best position read
+ * as duplicated data, because for most players it is.
+ *
+ * Practice-squad rows fall back to the chip: that payload carries neither field, so a
+ * training position there would be an invented default shown as if it were his setting.
+ */
+function fccPositionCellHtml(p) {
+  const api = window.GOBDevelopmentFocus;
+  if (!api || FCC_ROSTER_STATE.scope === 'practice') {
+    return '<td class="c-devpos">' + fccPosChipHtml(p.pos) + '</td>';
+  }
+  return '<td class="c-devpos">' + api.positionTextHtml(p) + '</td>';
+}
+
+/** DEV FOCUS trails the attribute tiles: the evidence first, then what he is coached
+ *  toward. Empty on the practice scope, which carries neither field. */
+function fccFocusCellHtml(p) {
+  const api = window.GOBDevelopmentFocus;
+  if (!api || FCC_ROSTER_STATE.scope === 'practice') return '<td class="c-devfocus"></td>';
+  return '<td class="c-devfocus">' + api.focusTextHtml(p) + '</td>';
 }
 
 /** Grouped 2-row attribute header + its per-attribute sort controls. */
@@ -3089,6 +3138,11 @@ function fccNormalizePracticePlayer(p) {
     attributes: p.attributes || {},
     rt: best.rating != null ? best.rating : null,
     potential_rt_ratcheted: p.potential_rt_ratcheted != null ? p.potential_rt_ratcheted : null,
+    position_ratings: p.position_ratings || {},
+    training_position: p.training_position || null,
+    training_focus: p.training_focus || null,
+    resolved_training_position: p.resolved_training_position || null,
+    resolved_training_focus: p.resolved_training_focus || null,
   };
 }
 
@@ -3128,9 +3182,9 @@ function renderFccRosterBody() {
     const rows = fccPracticeSquadPlayers().map(fccNormalizePracticePlayer);
     tbody.innerHTML = rows.length
       ? rows.map((p) => '<tr>' + fccRosterRowHtml(p, { link: false }) + '</tr>').join('')
-      : '<tr><td colspan="7" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No practice-squad players.</td></tr>';
+      : '<tr><td colspan="8" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No practice-squad players.</td></tr>';
     updateFccRosterCounts();
-    if (typeof initAttributeTooltips !== 'undefined') {
+      if (typeof initAttributeTooltips !== 'undefined') {
       initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
     }
   } else {
@@ -3169,6 +3223,13 @@ function renderTeam(data) {
         has_playing_time_promise: !!p.has_playing_time_promise,
         is_graduating: !!p.is_graduating,
         walk_on: !!p.walk_on,
+        // Development Focus. Carried explicitly: this mapper cherry-picks fields, so an
+        // omission here reaches the control as a blank rather than as his real setting.
+        position_ratings: p.position_ratings || {},
+        training_position: p.training_position || null,
+        training_focus: p.training_focus || null,
+        resolved_training_position: p.resolved_training_position || null,
+        resolved_training_focus: p.resolved_training_focus || null,
       };
       return player;
     } catch (error) {
@@ -3420,6 +3481,20 @@ function sortRosterTable(columnName, direction) {
     } else if (dataKey === 'weight') {
       val1 = parseInt(a.weight) || 0;
       val2 = parseInt(b.weight) || 0;
+    } else if (dataKey === 'pos' || dataKey === 'Focus') {
+      // Sort on what the column DISPLAYS. POS previously fell through to the attribute
+      // branch, read a non-existent anchor_pos and scored every row 0, so clicking it did
+      // nothing; it now ranks PG→C on the same value the cell shows. Focus sorts on the
+      // RESOLVED value for the same reason — the raw field is null for anyone unchanged.
+      const api = window.GOBDevelopmentFocus;
+      if (!api) return 0;
+      const isPos = dataKey === 'pos';
+      const order = isPos ? api.POSITIONS : api.FOCUSES.map((f) => f.value);
+      const shown = (p) => (isPos
+        ? (FCC_ROSTER_STATE.scope === 'practice' ? (p.pos || '') : api.positionOf(p))
+        : api.focusOf(p));
+      val1 = order.indexOf(shown(a));
+      val2 = order.indexOf(shown(b));
     } else {
       // Attribute columns
       const attrsA = a.attributes || {};
@@ -3445,6 +3520,8 @@ rosterTableDataForSorting.forEach((p) => {
     tr.innerHTML = fccRosterRowHtml(p);
     tbody.appendChild(tr);
   });
+
+  // The rows are new DOM nodes, so the previous listeners went with the old ones.
 
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
@@ -3657,7 +3734,7 @@ async function init() {
   }
   
   // ✅ SS&S: Check URL params first for team_id (ObjectId) - allows seamless navigation
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   const urlTeamId = urlParams.get('team_id');
   if (urlTeamId) {
     userTeamId = urlTeamId;
@@ -4031,7 +4108,7 @@ function fccHasCompetingModal(topData) {
 
 function buildFccBoxScoreUrlForMoment(moment) {
   if (!moment || !moment.game_id || !franchiseId) return '';
-  const params = new URLSearchParams();
+  const params = emptyParams();
   params.set('mode', 'franchise');
   params.set('franchise_id', franchiseId);
   params.set('game_id', moment.game_id);
@@ -4126,7 +4203,7 @@ function showNewSeasonConfirmModal() {
 // the Green Action Button's 'cut-players' mode so both land on the same screen
 // with the same return path.
 function buildAssignPracticeSquadUrl() {
-  const params = new URLSearchParams();
+  const params = emptyParams();
   params.set('franchise_id', franchiseId);
   params.set('team_id', userTeamId);
   params.set('from', 'fcc');
@@ -4395,7 +4472,7 @@ function updateRecruitingButton(data) {
   // The Recruiting Hub (recruiting.html) now owns invites / signing / results.
   let href = null;
   if (showButton) {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('franchise_id', franchiseId);
     if (userTeamId) params.set('team_id', userTeamId);
     params.set('from', 'fcc');
@@ -4485,7 +4562,7 @@ playNowBtn.addEventListener('click', async () => {
       return;
     }
     const sessionType = topData?.session_type || 'in-season';
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('franchise_id', franchiseId);
     params.set('mode', 'franchise');
     params.set('session_type', sessionType);
@@ -4525,7 +4602,7 @@ playNowBtn.addEventListener('click', async () => {
     // The hub owns both /run-week-35-recruiting and the reveal that follows it, so the
     // press is handed over rather than duplicated here. No cut offer: the orders are
     // already allocated against the current roster.
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('franchise_id', franchiseId);
     params.set('team_id', userTeamId);
     params.set('from', 'fcc');
@@ -4541,7 +4618,7 @@ playNowBtn.addEventListener('click', async () => {
   }
 
   if (mode === 'week35-recruiting') {
-    const params = new URLSearchParams();
+    const params = emptyParams();
     params.set('franchise_id', franchiseId);
     params.set('team_id', userTeamId);
     params.set('from', 'fcc');
@@ -4691,7 +4768,7 @@ playNowBtn.addEventListener('click', async () => {
   }
   
   // Otherwise, play the game
-  console.log('Play Now click search:', window.location.search);
+  console.log('Play Now click search:', currentSearch());
   const originalText = playNowBtn.textContent;
   playNowBtn.disabled = true;
   playNowBtn.textContent = 'Loading...';
@@ -4763,7 +4840,7 @@ function navigateToGamePlan() {
     alert('Franchise or user team not loaded');
     return;
   }
-  const params = new URLSearchParams();
+  const params = emptyParams();
   params.set('mode', 'franchise');
   params.set('franchise_id', franchiseId);
   params.set('team_id', userTeamId);
@@ -4790,7 +4867,7 @@ function wireFccNavButtons() {
         alert('Franchise or user team not loaded');
         return;
       }
-      const params = new URLSearchParams();
+      const params = emptyParams();
       params.set('mode', 'franchise');
       params.set('franchise_id', franchiseId);
       params.set('team_id', userTeamId);
@@ -4804,7 +4881,7 @@ function wireFccNavButtons() {
 window.addEventListener('DOMContentLoaded', () => {
   wireFccNavButtons();
   // ✅ PHASE 2.4: Removed localStorage fallback - franchise_id must come from URL
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = liveParams();
   franchiseId = urlParams.get('franchise_id');
   if (!franchiseId) {
     console.error('❌ [FCC] franchise_id is required but missing from URL. Redirecting to franchise select.');
@@ -4884,13 +4961,12 @@ function renderFccInbox(topData) {
   if (w != null && w !== '' && franchiseId && tid) {
     const weekNum = Number(w);
     if (Number.isFinite(weekNum) && weekNum >= 1) {
-      const reportParams = new URLSearchParams({
-        mode: 'franchise',
-        franchise_id: String(franchiseId),
-        team_id: String(tid),
-        week: String(weekNum),
-        from: 'inbox',
-      });
+      const reportParams = emptyParams();
+      reportParams.set('mode', 'franchise');
+      reportParams.set('franchise_id', String(franchiseId));
+      reportParams.set('team_id', String(tid));
+      reportParams.set('week', String(weekNum));
+      reportParams.set('from', 'inbox');
       const href = `/training-report.html?${reportParams.toString()}`;
       const p = document.createElement('p');
       p.className = 'fcc-inbox-message';
@@ -4908,11 +4984,10 @@ function renderFccInbox(topData) {
   inboxItems.forEach((item) => {
     if (!item) return;
     if (item.type === 'training_squad_report') {
-      const tsParams = new URLSearchParams({
-        franchise_id: String(franchiseId || ''),
-        team_id: String(tid || ''),
-        from: 'inbox',
-      });
+      const tsParams = emptyParams();
+      tsParams.set('franchise_id', String(franchiseId || ''));
+      tsParams.set('team_id', String(tid || ''));
+      tsParams.set('from', 'inbox');
       const p = document.createElement('p');
       p.className = 'fcc-inbox-message';
       p.appendChild(document.createTextNode(`Week #${Number(item.week)} Practice Squad Development report `));

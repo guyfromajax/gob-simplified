@@ -1,4 +1,7 @@
 const { test, expect } = require('@playwright/test');
+const { stubAuth } = require('./helpers/auth');
+const { courtUrl, waitForCanonicalRosters } = require('./helpers/rosters');
+const { stubPlayerImage } = require('./helpers/playerImage');
 
 /**
  * Frontend Layout Refactor Tests
@@ -7,6 +10,11 @@ const { test, expect } = require('@playwright/test');
  * across different viewport sizes, preventing the "court covers playcall"
  * bug that occurred on large screens (e.g., iMac).
  */
+
+test.beforeEach(async ({ page, request }) => {
+  await stubAuth(page);
+  await waitForCanonicalRosters(request);
+});
 
 // Viewport sizes to test (matching exit criteria from refactor plan)
 const VIEWPORTS = [
@@ -28,29 +36,29 @@ const VIEWPORTS = [
  * 5. Wait for canvas with longer timeout
  */
 async function startGame(page) {
-  const playButton = page.locator('.play-button');
+  const playButton = page.getByRole('button', { name: 'Play Quarter' });
+  const canvas = page.locator('#phaser-container canvas');
   await expect(playButton).toBeVisible({ timeout: 15000 });
-  await page.waitForTimeout(3000); // Give bootGame.js time to attach handler and load
+  await page.waitForTimeout(1000); // Give bootGame.js time to attach handler and load
 
   await playButton.click();
 
   try {
-    await page.waitForSelector('#phaser-container canvas', { timeout: 5000, state: 'attached' });
+    await canvas.waitFor({ state: 'attached', timeout: 20000 });
     return;
   } catch (e) {
     const buttonCount = await playButton.count();
     if (buttonCount > 0) {
-      await page.waitForTimeout(2000);
       await playButton.click();
     }
     // Wait for canvas: use 'attached' (canvas may not be "visible" in headless due to size/rendering)
-    await page.waitForSelector('#phaser-container canvas', { timeout: 45000, state: 'attached' });
+    await canvas.waitFor({ state: 'attached', timeout: 45000 });
   }
 }
 
 test.describe('Court Layout - Basic Structure', () => {
   test('court view loads with all major components (pre-game)', async ({ page }) => {
-    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await page.goto(courtUrl());
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -59,11 +67,11 @@ test.describe('Court Layout - Basic Structure', () => {
     await expect(page.locator('#playcall-center')).toBeVisible();
     await expect(page.locator('.player-stats-panel.away')).toBeVisible();
     await expect(page.locator('.player-stats-panel.home')).toBeVisible();
-    await expect(page.locator('.play-button')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play Quarter' })).toBeVisible();
   });
 
   test('court view shows canvas after Play Quarter (requires backend rosters)', async ({ page }) => {
-    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await page.goto(courtUrl());
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -78,7 +86,7 @@ test.describe('Court Layout - Viewport Stability', () => {
   for (const viewport of VIEWPORTS) {
     test(`layout stable at ${viewport.name} (${viewport.width}×${viewport.height})`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+      await page.goto(courtUrl());
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
       await startGame(page);
@@ -102,11 +110,11 @@ test.describe('Court Layout - Viewport Stability', () => {
       expect(scoreboardBox.y).toBeGreaterThanOrEqual(0);
       expect(scoreboardBox.y).toBeLessThan(150); // Should be near top (accounting for ~100px height)
       
-      // Assert: Court is below scoreboard
-      expect(courtBox.y).toBeGreaterThan(scoreboardBox.y + scoreboardBox.height);
+      // Assert: Court is below scoreboard (flush grid edges share a pixel, so >=)
+      expect(courtBox.y).toBeGreaterThanOrEqual(scoreboardBox.y + scoreboardBox.height);
       
       // Assert: Playcall center is below court (CRITICAL - this is the bug we're preventing)
-      expect(playcallBox.y).toBeGreaterThan(courtBox.y + courtBox.height);
+      expect(playcallBox.y).toBeGreaterThanOrEqual(courtBox.y + courtBox.height);
       
       // Assert: Playcall center is visible (not covered by court)
       const playcallBottom = playcallBox.y + playcallBox.height;
@@ -124,7 +132,7 @@ test.describe('Court Layout - No Overlapping Elements', () => {
     // 1536 CSS px reproduces the compact-desktop/device-scale viewport where
     // expanding the score tracks previously pushed the home logo off-screen.
     await page.setViewportSize({ width: 1536, height: 960 });
-    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await page.goto(courtUrl());
     await page.waitForLoadState('networkidle');
 
     await page.locator('#away-score').evaluate((node) => { node.textContent = '123'; });
@@ -160,7 +168,7 @@ test.describe('Court Layout - No Overlapping Elements', () => {
   test('playcall center never overlaps court on large screens', async ({ page }) => {
     // Test the exact viewport where bug occurred
     await page.setViewportSize({ width: 3840, height: 2160 });
-    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await page.goto(courtUrl());
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     await startGame(page);
@@ -171,9 +179,10 @@ test.describe('Court Layout - No Overlapping Elements', () => {
     const courtBox = await courtContainer.boundingBox();
     const playcallBox = await playcallCenter.boundingBox();
     
-    // Critical assertion: Playcall must be below court (not overlapping)
+    // Critical assertion: Playcall must be below court (not overlapping).
+    // CSS grid tracks share an edge, so flush (gap === 0) is not coverage.
     const courtBottom = courtBox.y + courtBox.height;
-    expect(playcallBox.y).toBeGreaterThan(courtBottom);
+    expect(playcallBox.y).toBeGreaterThanOrEqual(courtBottom);
     
     // Verify there's at least some gap (even if small)
     const gap = playcallBox.y - courtBottom;
@@ -182,7 +191,7 @@ test.describe('Court Layout - No Overlapping Elements', () => {
   
   test('stats panels are positioned correctly', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await page.goto(courtUrl());
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     
@@ -208,7 +217,7 @@ test.describe('Court Layout - Responsive Behavior', () => {
   test('layout adapts correctly when viewport resizes', async ({ page }) => {
     // Start at standard desktop
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await page.goto(courtUrl());
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     
@@ -229,7 +238,9 @@ test.describe('Court Layout - Responsive Behavior', () => {
     // Verify it's still below court
     const courtContainer = page.locator('#phaser-container');
     const courtBox = await courtContainer.boundingBox();
-    expect(resizedPlaycallBox.y).toBeGreaterThan(courtBox.y + courtBox.height);
+    // Flush edges (y === courtBottom) are not overlap; the sibling overlap spec
+    // already treats gap >= 0 as a pass.
+    expect(resizedPlaycallBox.y).toBeGreaterThanOrEqual(courtBox.y + courtBox.height);
   });
 });
 
@@ -237,7 +248,7 @@ test.describe('Court Layout - Grid Constraints', () => {
   test('playcall center respects grid-level height constraints', async ({ page }) => {
     // Test at tall viewport to verify clamp() constraint works
     await page.setViewportSize({ width: 1920, height: 2000 }); // Very tall
-    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await page.goto(courtUrl());
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
     
@@ -255,14 +266,15 @@ test.describe('Court Layout - Grid Constraints', () => {
 
 test.describe('Regression - No infinite hang', () => {
   test('court page loads and shows Play button within 25s (no hang)', async ({ page }) => {
-    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
-    await expect(page.locator('.play-button')).toBeVisible({ timeout: 25000 });
+    await page.goto(courtUrl());
+    await expect(page.getByRole('button', { name: 'Play Quarter' })).toBeVisible({ timeout: 25000 });
   });
 });
 
 test.describe('Foul Out Popup - Player image URL', () => {
   test('popup image src uses correct path (static prefix on localhost)', async ({ page }) => {
-    await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
+    await stubPlayerImage(page);
+    await page.goto(courtUrl());
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
 

@@ -1,3 +1,24 @@
+function franchiseCtx() {
+  return typeof window !== 'undefined' ? window.FranchiseContext : null;
+}
+function liveParams() {
+  return franchiseCtx().toSearchParams();
+}
+function emptyParams() {
+  return franchiseCtx().createParams();
+}
+function currentSearch() {
+  const s = liveParams().toString();
+  return s ? '?' + s : '';
+}
+function cloneParams(params) {
+  const out = emptyParams();
+  if (params && typeof params.forEach === 'function') {
+    params.forEach((value, key) => out.set(key, value));
+  }
+  return out;
+}
+
 /**
  * Tutorial Tip-off — Screen 7 of the FTE v3 funnel.
  *
@@ -76,7 +97,7 @@ function gotoBroadcast(userTeam, opponent, gameId) {
   // Start from the INCOMING query string, don't rebuild it. It carries the five the
   // user set as home_pg / home_sg / … — the court needs those to seed the lineup.
   // Rebuilding here is what emptied the pre-game card once already.
-  const params = new URLSearchParams(window.location.search);
+  const params = liveParams();
   params.set('mode', 'tutorial');
   params.set('home', userTeam);
   params.set('away', opponent);
@@ -142,7 +163,7 @@ async function main() {
 
   // FTE v3: the user PICKED their opponent at step 4. Fall back to the v2
   // derivation only if the param is somehow absent (a hand-typed URL).
-  const opponent = new URLSearchParams(window.location.search).get('away')
+  const opponent = liveParams().get('away')
     || deriveOpponent(teamPick);
   paintMoment(teamPick, opponent);
 
@@ -161,7 +182,7 @@ async function main() {
       // survives a refresh, a hand-typed URL, or any upstream screen that drops
       // the param. Falling back to it is what stops a lost query string from
       // dead-ending the funnel one click from the payoff.
-      let gameId = new URLSearchParams(window.location.search).get('game_id');
+      let gameId = liveParams().get('game_id');
       if (!gameId) {
         gameId = ((me && me.tutorial_state) || {}).game_id || null;
       }

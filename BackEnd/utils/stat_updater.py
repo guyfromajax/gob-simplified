@@ -1,4 +1,6 @@
-from typing import Any, Dict
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Dict, Iterator
 import logging
 import time
 
@@ -27,14 +29,16 @@ from bson import ObjectId
 from pymongo import ReturnDocument, UpdateOne
 
 from BackEnd.constants import BOX_SCORE_KEYS
-from BackEnd.db import (
-    db,
-    players_collection,
-    tournaments_collection,
-    games_collection,
-    teams_collection,
-    franchise_players_data_collection,
-)
+
+from BackEnd.persistence import get_store
+_store = get_store()
+db = _store.db
+players_collection = _store.players_collection
+tournaments_collection = _store.tournaments_collection
+games_collection = _store.games_collection
+teams_collection = _store.teams_collection
+franchise_players_data_collection = _store.franchise_players_data_collection
+franchise_team_data_collection = _store.franchise_team_data_collection
 from BackEnd.utils.game_id_utils import franchise_matchup_claim_key
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.team_play_utils import iter_team_plays
@@ -97,6 +101,31 @@ def _pct_block(totals: Dict[str, Any]) -> Dict[str, float]:
     return {"FG%": fg_pct, "3PT%": fg3_pct, "FT%": ft_pct, "TS%": ts_pct, "eFG%": efg_pct}
 
 
+# Identity maps only (FTD.team_id + catalog names + overlay). Persist mutates
+# FTD season_stats, not those keys, so one build per CPU persist batch is safe.
+_FTD_MAPS_CACHE: ContextVar[dict[str, tuple[Dict[str, str], Dict[str, str]]] | None] = ContextVar(
+    "ftd_maps_cache", default=None
+)
+
+
+@contextmanager
+def franchise_team_maps_scope() -> Iterator[None]:
+    """Reuse team maps for one finalize or one CPU-week persist loop.
+
+    Nested scopes share the outer cache so a week-level wrap plus per-game
+    finalize does not rebuild.
+    """
+    existing = _FTD_MAPS_CACHE.get()
+    if existing is not None:
+        yield
+        return
+    token = _FTD_MAPS_CACHE.set({})
+    try:
+        yield
+    finally:
+        _FTD_MAPS_CACHE.reset(token)
+
+
 def _build_franchise_team_maps_from_ftd(
     franchise_id: str | ObjectId,
 ) -> tuple[Dict[str, str], Dict[str, str]]:
@@ -109,7 +138,21 @@ def _build_franchise_team_maps_from_ftd(
     is added from ``franchises.team_builder`` (one franchise-document read) —
     not from FTD, which does not store identity.
     """
-    from BackEnd.db import franchise_team_data_collection, teams_collection
+    cache = _FTD_MAPS_CACHE.get()
+    key = str(franchise_id)
+    if cache is not None and key in cache:
+        return cache[key]
+    team_name_to_id, team_id_to_object_id = _build_franchise_team_maps_from_ftd_uncached(
+        franchise_id
+    )
+    if cache is not None:
+        cache[key] = (team_name_to_id, team_id_to_object_id)
+    return team_name_to_id, team_id_to_object_id
+
+
+def _build_franchise_team_maps_from_ftd_uncached(
+    franchise_id: str | ObjectId,
+) -> tuple[Dict[str, str], Dict[str, str]]:
     from BackEnd.utils.franchise_team_display import get_team_builder_overlay
 
     doc_id = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
@@ -882,7 +925,6 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
     logger.info(f"🔍 [UPDATE_PLAY_STATS] Processing {len(teams_obj)} teams, mode={mode}, doc_id={doc_id}")
     logger.info(f"🔍 [UPDATE_PLAY_STATS] Teams keys: {list(teams_obj.keys())}")
     
-    from BackEnd.db import tournaments_collection
 
     # ✅ FTD: For franchise mode, build team_name -> ObjectId and team_id (canonical) -> ObjectId maps from FTD.
     # Game document uses team_id strings (e.g. "LITTLE_YORK") or names as keys; we map to ObjectId for FTD updates.
@@ -1004,7 +1046,6 @@ def _update_offensive_play_season_stats(game: Dict[str, Any], mode: str, doc_id:
     if mode == "franchise" and ftd_updates:
         try:
             doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
-            from BackEnd.db import franchise_team_data_collection
             
             for team_object_id_str, team_updates in ftd_updates.items():
                 team_object_id = ObjectId(team_object_id_str)
@@ -1133,7 +1174,6 @@ def _update_defensive_playcall_season_stats(game: Dict[str, Any], mode: str = No
             if mode == "franchise" and doc_id:
                 # ✅ FTD: Update FTD collection instead of teams_collection
                 try:
-                    from BackEnd.db import franchise_team_data_collection
                     doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
                     
                     # Resolve team_id_key to ObjectId (map stores ObjectId strings)
@@ -1156,7 +1196,6 @@ def _update_defensive_playcall_season_stats(game: Dict[str, Any], mode: str = No
             elif mode == "tournament" and doc_id:
                 # Tournament mode: update tournament document
                 try:
-                    from BackEnd.db import tournaments_collection
                     doc_obj_id = ObjectId(doc_id) if isinstance(doc_id, str) else doc_id
                     base_path = f"teams.{team_id_key}.scouting_data.defense"
                     
@@ -1274,6 +1313,40 @@ def finalize_game(
     """
     if mode in (None, "scrimmage"):
         # Explicitly skip aggregation for scrimmages and unspecified modes.
+        return
+    tx = getattr(_store, "transaction", None)
+    if mode == "franchise" and callable(tx):
+        with franchise_team_maps_scope(), tx():
+            return _finalize_game_impl(
+                game_id,
+                mode=mode,
+                tournament_id=tournament_id,
+                franchise_id=franchise_id,
+            )
+    if mode == "franchise":
+        with franchise_team_maps_scope():
+            return _finalize_game_impl(
+                game_id,
+                mode=mode,
+                tournament_id=tournament_id,
+                franchise_id=franchise_id,
+            )
+    return _finalize_game_impl(
+        game_id,
+        mode=mode,
+        tournament_id=tournament_id,
+        franchise_id=franchise_id,
+    )
+
+
+def _finalize_game_impl(
+    game_id: str,
+    *,
+    mode: str | None = None,
+    tournament_id: str | None = None,
+    franchise_id: str | None = None,
+) -> None:
+    if mode in (None, "scrimmage"):
         return
     if mode == "tournament" and tournament_id:
         import logging

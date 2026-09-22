@@ -628,6 +628,16 @@ def position_hct_zone_defenders(game, offensive_animations, def_lineup, skeleton
             def_action = "guard_offball"
 
             if zone_polygon and len(zone_polygon) >= 3:
+                # GOB_ZONE_SINK_ESCAPE: the sink's separation guardrail needs the
+                # defenders already placed at THIS step. `step_coords` holds them in the
+                # CURRENT orientation; the contract for `placed_defenders` is HOME, so
+                # they are unflipped here. The existing collision pass below only splits
+                # EXACT (x, y) ties, so it does not subsume a minimum separation.
+                _placed = {
+                    k: (get_away_player_coords(v) if is_away_offense else v)
+                    for k, v in step_coords.items()
+                    if isinstance(v, dict) and "x" in v and "y" in v
+                }
                 coords = assign_zone_defender_coords(
                     def_pos,
                     zone_boundaries,
@@ -636,6 +646,7 @@ def position_hct_zone_defenders(game, offensive_animations, def_lineup, skeleton
                     ball_spot,
                     aggression,
                     is_away_offense,
+                    placed_defenders=_placed,
                 )
                 if coords:
                     # assign_zone_defender_coords returns HOME orientation; flip
@@ -720,10 +731,16 @@ def position_zone_defenders(game, offensive_animations, def_lineup, skeleton_ste
         _get_32_zone_boundaries,
         _get_131_zone_boundaries,
         assign_all_zone_defenders,
+        zone_sink_begin_possession,
         _point_in_zone
     )
     from BackEnd.utils.shared import get_away_player_coords
-    
+
+    # One zone-sink IQ roll per defender per POSSESSION, not per build and not per
+    # step. Cached against a possession key inside, so the several builds a turn
+    # makes reuse the same roll. No-op unless GOB_ZONE_SINK_IQ is on.
+    zone_sink_begin_possession(game, def_lineup)
+
     defensive_animations = []
     
     # Determine court orientation
@@ -1300,5 +1317,36 @@ def defender_grid_from_animations(anims, def_lineup, num_steps):
             c = (mv[i] or {}).get("coords") if i < len(mv) else None
             if isinstance(c, dict) and "x" in c and "y" in c:
                 row[dpos] = {"x": float(c["x"]), "y": float(c["y"])}
+        grid[i] = row
+    return grid
+
+
+def offense_grid_from_animations(anims, off_lineup, steps):
+    """Extract ``{step_idx: {off_pos: {x, y}}}`` for the offense from the same ``animations`` list.
+
+    Not ``defender_grid_from_animations``: an offensive player's ``movement`` only gains an entry on
+    steps where he has a ``pos_action``, so ``movement[i]`` is not step ``i``. Each entry carries its
+    step's ``timestamp``; a player's position at step ``i`` is his last entry at or before that
+    timestamp, which is where ``apply_coords_from_animations_list`` would leave him on a skeleton
+    ending at ``i``. Players with no entry by step ``i`` are omitted.
+    """
+    move_by_pid = {a.get("playerId"): (a.get("movement") or [])
+                   for a in (anims or []) if a.get("playerId")}
+    step_ts = [float((step or {}).get("timestamp", 0) or 0) for step in (steps or [])]
+    grid = {}
+    for i, ts in enumerate(step_ts):
+        row = {}
+        for pos, player in (off_lineup or {}).items():
+            pid = getattr(player, "player_id", None) if player is not None else None
+            if not pid:
+                continue
+            last = None
+            for entry in move_by_pid.get(pid) or []:
+                c = (entry or {}).get("coords")
+                if float((entry or {}).get("timestamp", 0) or 0) <= ts and isinstance(c, dict) \
+                        and "x" in c and "y" in c:
+                    last = c
+            if last is not None:
+                row[pos] = {"x": float(last["x"]), "y": float(last["y"])}
         grid[i] = row
     return grid

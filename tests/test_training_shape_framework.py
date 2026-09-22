@@ -14,6 +14,8 @@ from BackEnd.constants.training_shape import (
     CAMP_WEEKS,
     CORE_12,
     POSITIONS,
+    TRAINING_FOCUS_PERCENTAGES,
+    TRAINING_FOCUSES,
     TRAINING_GAIN_PERCENTAGES,
     TRAINING_GAIN_INVARIANT_EXCEPTIONS,
     TRAINING_GAIN_UNIVERSALS,
@@ -45,6 +47,36 @@ def test_cross_position_gain_orderings_are_locked():
         if strength[i] > strength[i + 1]
     }
     assert violations == set(TRAINING_GAIN_INVARIANT_EXCEPTIONS["strength_ordering"])
+
+
+# ── Development Focus: the three invariants above stay STRICT for `standard` (they read the
+# position-only table, which IS the standard column). Focus profiles are deliberately allowed
+# to break the wall and ordering rules — Rebounding lifts PG/SG rebounding from 25 to 75, and
+# reallocating within a fixed budget reorders ST/RB across positions. What must hold for every
+# focus profile is the budget, the universals, and the authored value range.
+
+def test_focus_profiles_keep_the_budget_and_the_universals():
+    for pos in POSITIONS:
+        for focus in TRAINING_FOCUSES:
+            profile = TRAINING_FOCUS_PERCENTAGES[pos][focus]
+            assert sum(profile.values()) == 808, f"{pos}/{focus}"
+            for attr in TRAINING_GAIN_UNIVERSALS:
+                assert profile[attr] == 100, f"{pos}/{focus}/{attr}"
+
+
+def test_focus_profiles_stay_inside_the_authored_range():
+    """25 is the floor and 100 the ceiling everywhere; focus redistributes, it never exceeds."""
+    for pos in POSITIONS:
+        for focus in TRAINING_FOCUSES:
+            for attr, value in TRAINING_FOCUS_PERCENTAGES[pos][focus].items():
+                assert 25 <= value <= 100, f"{pos}/{focus}/{attr} = {value}"
+
+
+def test_standard_column_is_the_position_only_table():
+    """The strict invariants read TRAINING_GAIN_PERCENTAGES; this is what ties them to the
+    matrix the game actually uses for a standard-focus player."""
+    for pos in POSITIONS:
+        assert TRAINING_FOCUS_PERCENTAGES[pos]["standard"] == TRAINING_GAIN_PERCENTAGES[pos]
 
 
 def test_every_selectable_training_target_totals_the_same():
