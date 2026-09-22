@@ -174,6 +174,38 @@ python scripts/export_catalog_sidecar.py \
 | WS-3 FranchiseContext | Done and merged (PRs #589–#592; Gate B 0/0) |
 | Catalog sidecar | Done (PR #596) |
 | WS-4 shell | In review (`desktop/electron-shell`); base league on `desktop/base-league` |
+
+### Pre-beta production hash checklist (Jamie)
+
+This process has no production identity. Before the January beta, run **both** exports from a checkout that contains the scripts, with production credentials in the *process* (not `.env.local`). `--output` is always a scratch path — never overwrite the committed files.
+
+**1. Catalog sidecar** (plays / defenses / FCP / HCT). Compare `version=` to `c4dcc375ce01f3b7fd89cf29b8d0db949f6bcf4da4a22763e1ebca072998be8c`.
+
+```
+GOB_DB_ACCESS=read \
+ENVIRONMENT=production \
+MONGO_DB_NAME=gob \
+MONGO_URI='mongodb+srv://…/gob' \
+python scripts/export_catalog_sidecar.py \
+  --target gob \
+  --output /tmp/catalog-prod.sqlite \
+  --json-output /tmp/catalog-prod.json
+```
+
+**2. Base league** (128 teams / 1536 players). Compare `version=` to `35e43c9a2970cb105fef35505fbc9536d856392ca0bf88e53758856d54a1a63c`.
+
+```
+GOB_DB_ACCESS=read \
+ENVIRONMENT=production \
+MONGO_DB_NAME=gob \
+MONGO_URI='mongodb+srv://…/gob' \
+python scripts/export_base_league.py \
+  --target gob \
+  --output /tmp/base-league-prod.sqlite \
+  --json-output /tmp/base-league-prod.json
+```
+
+Equal on both → staging == production; the committed `catalog.sqlite` and `base_league.sqlite` stay. Differ on either → that production export ships before the January beta. **Either way both checks are a pre-beta gate.**
 | WS-6 pipeline / Demo variant | Not started |
 | WS-7 asset payload | Not started |
 | WS-8 local object store + portraits | Not started |
