@@ -1,6 +1,6 @@
 /* Team Builder — Identity, Gate, Roster, Review, Establish (chaptered SPA).
    Prototype .vbar stripped. Typography via /css/fonts.css + Inter. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('/fonts/app-fonts.css');
 
 :root {
   --bg: #0b0d14;

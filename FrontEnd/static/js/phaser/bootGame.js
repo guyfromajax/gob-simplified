@@ -1,4 +1,4 @@
-import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
+import * as Phaser from '/js/vendor/phaser-3.60.0.esm.js';
 import { createGameScene } from './gameScene.js?v=uess-turn-preload-1';
 import { setCourtOffsets } from './utils/gridToPixels.js';
 import { on, emit } from './utils/eventBus.js';

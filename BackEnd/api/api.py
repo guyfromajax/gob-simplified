@@ -602,6 +602,8 @@ try:
                 "/images/",
                 "/sounds/",
                 "/styles/",
+                "/fonts/",
+                "/css/",
             )
             static_exts = (
                 ".html",
@@ -622,6 +624,7 @@ try:
                 ".woff",
                 ".woff2",
                 ".ttf",
+                ".otf",
             )
             if (
                 path.startswith(static_dirs)

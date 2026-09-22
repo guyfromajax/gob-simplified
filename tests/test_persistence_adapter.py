@@ -23,6 +23,7 @@ from BackEnd.persistence.sqlite_collection import (
     RemoteUnavailable,
     SqliteCollection,
 )
+from BackEnd.persistence.sqlite_query import SqliteUnsupportedOperator
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -400,6 +401,64 @@ def test_sqlite_collection_round_trip_queries(tmp_path: Path):
     created = coll.find_one({"slug": "p3"})
     assert created["team"] == "Lancaster"
     assert created["rt"] == 5
+
+
+def test_sqlite_roster_name_normalization_aggregate(tmp_path: Path):
+    """Set Lineup looks up /roster/{teamName} via $addFields+$replaceAll+$toLower."""
+    store = SqliteStore(_sqlite_env(tmp_path))
+    coll = store.teams_collection
+    coll.insert_one({"_id": "t1", "name": "Four-Corners", "team_id": "FOUR_CORNERS"})
+    coll.insert_one({"_id": "t2", "name": "Lancaster", "team_id": "LANCASTER"})
+    pipeline = [
+        {
+            "$addFields": {
+                "normalized_name": {
+                    "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
+                }
+            }
+        },
+        {"$match": {"normalized_name": "four corners"}},
+        {"$limit": 1},
+    ]
+    hit = list(coll.aggregate(pipeline))
+    assert len(hit) == 1
+    assert hit[0]["team_id"] == "FOUR_CORNERS"
+    assert hit[0]["normalized_name"] == "four corners"
+    lanc = list(coll.aggregate([
+        {
+            "$addFields": {
+                "normalized_name": {
+                    "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
+                }
+            }
+        },
+        {"$match": {"normalized_name": "lancaster"}},
+        {"$limit": 1},
+    ]))
+    assert lanc[0]["name"] == "Lancaster"
+
+
+def test_sqlite_unsupported_operators_raise(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    coll = store.players_collection
+    coll.insert_one({"_id": "p1", "team": "Lancaster", "rt": 10})
+    with pytest.raises(SqliteUnsupportedOperator, match="Unsupported aggregate stage"):
+        list(coll.aggregate([{"$lookup": {"from": "x"}}]))
+    with pytest.raises(SqliteUnsupportedOperator, match="Unsupported expression operator"):
+        list(coll.aggregate([{"$project": {"v": {"$concat": ["$team", "x"]}}}]))
+    with pytest.raises(SqliteUnsupportedOperator, match="Unsupported query operator"):
+        list(coll.aggregate([{"$match": {"rt": {"$mod": [2, 0]}}}]))
+    with pytest.raises(SqliteUnsupportedOperator, match="Unsupported update operator"):
+        coll.update_one({"_id": "p1"}, {"$rename": {"rt": "rating"}})
+
+
+def test_sqlite_type_operator_matches_resume_anchor_objects(tmp_path: Path):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    games = store.games_collection
+    games.insert_one({"_id": "g1", "franchise_id": "f1", "is_final": False, "resume_anchor": {"snapshot": {}}})
+    games.insert_one({"_id": "g2", "franchise_id": "f1", "is_final": False, "resume_anchor": "stale"})
+    hits = list(games.find({"resume_anchor": {"$type": "object"}, "is_final": {"$ne": True}}))
+    assert {doc["_id"] for doc in hits} == {"g1"}
 
 
 def test_sqlite_generated_columns_and_real_indexes(tmp_path: Path):

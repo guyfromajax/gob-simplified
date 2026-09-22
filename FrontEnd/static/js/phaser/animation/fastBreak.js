@@ -1,4 +1,4 @@
-import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
+import * as Phaser from "/js/vendor/phaser-3.70.0.esm.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { tweenPlayerTo, runPass, cancelBallTweenAndClearOwner, getBallDuration } from "./ballTween.js";

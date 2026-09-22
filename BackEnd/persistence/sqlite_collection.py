@@ -19,9 +19,12 @@ from pymongo.results import (
 )
 
 from BackEnd.persistence.sqlite_query import (
+    SqliteUnsupportedOperator,
     apply_update,
     match_query,
     project_doc,
+    resolve_value,
+    set_path,
     sort_docs,
 )
 from BackEnd.persistence.sqlite_schema import (
@@ -250,7 +253,7 @@ class SqliteCollection:
         with self._lock:
             self._conn.commit()
 
-    def find(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None):
+    def find(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None, **kwargs):
         projected = inclusion_projection_fields(projection) if filter_fully_compiled(filter) else None
         matched = [
             copy.deepcopy(doc)
@@ -258,7 +261,14 @@ class SqliteCollection:
         ]
         if projection and not projected:
             matched = [project_doc(doc, projection) for doc in matched]
-        return SqliteCursor(matched)
+        cursor = SqliteCursor(matched)
+        if kwargs.get("sort") is not None:
+            cursor.sort(kwargs["sort"])
+        if kwargs.get("skip"):
+            cursor.skip(kwargs["skip"])
+        if kwargs.get("limit") is not None:
+            cursor.limit(kwargs["limit"])
+        return cursor
 
     def find_one(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None):
         projected = inclusion_projection_fields(projection) if filter_fully_compiled(filter) else None
@@ -517,18 +527,28 @@ class SqliteCollection:
         docs = [copy.deepcopy(doc) for _row_id, doc in self._rows()]
         for stage in pipeline or []:
             if not isinstance(stage, dict) or len(stage) != 1:
-                continue
+                raise SqliteUnsupportedOperator(
+                    f"Aggregate stage must be a single-operator document, got {stage!r}"
+                )
             op, spec = next(iter(stage.items()))
             if op == "$match":
                 docs = [doc for doc in docs if match_query(doc, spec)]
             elif op == "$project":
                 docs = [project_doc(doc, spec) for doc in docs]
+            elif op == "$addFields":
+                if not isinstance(spec, dict):
+                    raise SqliteUnsupportedOperator("$addFields requires an object of field expressions")
+                for doc in docs:
+                    for field, expr in spec.items():
+                        set_path(doc, field, resolve_value(doc, expr))
             elif op == "$limit":
                 docs = docs[: int(spec)]
             elif op == "$skip":
                 docs = docs[int(spec) :]
             elif op == "$sort":
                 docs = sort_docs(docs, list(spec.items()))
+            else:
+                raise SqliteUnsupportedOperator(f"Unsupported aggregate stage {op!r}")
         return docs
 
     def __repr__(self) -> str:

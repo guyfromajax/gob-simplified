@@ -575,7 +575,7 @@
         escapeHtml(cardSrc) +
         '" alt="' +
         escapeHtml(team.name) +
-        '" loading="lazy" decoding="async" data-fallback="' +
+        '" decoding="async" data-fallback="' +
         escapeHtml(fullSrc) +
         '">' +
         '  <div class="team-card-caption">' +

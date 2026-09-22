@@ -397,7 +397,7 @@ function cloneParams(params) {
           escapeHtml(art.src) +
           '" alt="' +
           escapeHtml(team.name) +
-          '" loading="lazy" decoding="async" data-fallback="' +
+          '" decoding="async" data-fallback="' +
           escapeHtml(art.fallback) +
           '"></div>' +
           '<div class="pg-b"><div class="pg-nm">' +

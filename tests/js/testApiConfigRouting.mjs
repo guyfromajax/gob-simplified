@@ -32,7 +32,7 @@ const HOST_CASES = [
 const ENDPOINTS = [
   ['/api/auth/me', 'auth'],
   ['/api/auth/login', 'auth'],
-  ['/app-config', 'auth'],
+  ['/app-config', 'api'],
   ['/api/billing/status', 'billing'],
   ['/api/email/send', 'email'],
   ['/api/admin/users', 'admin'],

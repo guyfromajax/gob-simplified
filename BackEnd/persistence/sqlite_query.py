@@ -8,6 +8,10 @@ from typing import Any
 from bson import ObjectId
 
 
+class SqliteUnsupportedOperator(ValueError):
+    """SqliteStore does not implement this operator. Never swallow — empty looks like no data."""
+
+
 def oid_key(value: Any) -> str | None:
     if isinstance(value, ObjectId):
         return str(value)
@@ -144,7 +148,39 @@ def eval_expr(doc: dict[str, Any], op: str, args: Any) -> Any:
         else:
             pred, then, els = args[0], args[1], args[2]
         return resolve_value(doc, then) if resolve_value(doc, pred) else resolve_value(doc, els)
-    return None
+    if op == "$toLower":
+        value = resolve_value(doc, args)
+        return "" if value is None else str(value).lower()
+    if op == "$replaceAll":
+        if not isinstance(args, dict):
+            raise SqliteUnsupportedOperator("$replaceAll requires {input, find, replacement}")
+        source = resolve_value(doc, args.get("input"))
+        find = resolve_value(doc, args.get("find"))
+        replacement = resolve_value(doc, args.get("replacement"))
+        if source is None:
+            return None
+        return str(source).replace("" if find is None else str(find), "" if replacement is None else str(replacement))
+    raise SqliteUnsupportedOperator(f"Unsupported expression operator {op!r}")
+
+
+def _value_has_bson_type(value: Any, wanted: Any) -> bool:
+    if wanted in ("object", 3, "3"):
+        return isinstance(value, dict)
+    if wanted in ("string", 2, "2"):
+        return isinstance(value, str)
+    if wanted in ("int", "long", "double", "number", 1, 16, 18, "1", "16", "18"):
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if wanted in ("bool", 8, "8"):
+        return isinstance(value, bool)
+    if wanted in ("array", 4, "4"):
+        return isinstance(value, list)
+    if wanted in ("null", 10, "10"):
+        return value is None
+    if wanted in ("objectId", 7, "7"):
+        return isinstance(value, ObjectId) or (
+            isinstance(value, dict) and set(value.keys()) == {"$oid"}
+        )
+    raise SqliteUnsupportedOperator(f"Unsupported $type {wanted!r}")
 
 
 def match_query(doc: dict[str, Any], query: dict[str, Any] | None) -> bool:
@@ -167,6 +203,8 @@ def match_query(doc: dict[str, Any], query: dict[str, Any] | None) -> bool:
             if any(match_query(doc, part) for part in condition):
                 return False
             continue
+        if str(key).startswith("$"):
+            raise SqliteUnsupportedOperator(f"Unsupported query operator {key!r}")
         if not _match_field(doc, key, condition):
             return False
     return True
@@ -207,9 +245,12 @@ def _match_field(doc: dict[str, Any], path: str, condition: Any) -> bool:
             elif op == "$not":
                 if _match_field(doc, path, expected):
                     return False
-            else:
-                if not values_equal(actual, expected):
+            elif op == "$type":
+                wanted = expected if isinstance(expected, (list, tuple)) else [expected]
+                if not any(_value_has_bson_type(actual, item) for item in wanted):
                     return False
+            else:
+                raise SqliteUnsupportedOperator(f"Unsupported query operator {op!r}")
         return True
     actual = get_path(doc, path) if has_path(doc, path) else None
     return values_equal(actual, condition)
@@ -264,6 +305,8 @@ def apply_update(doc: dict[str, Any], update: dict[str, Any], *, inserting: bool
                 if not isinstance(current, list):
                     continue
                 set_path(doc, path, [item for item in current if not values_equal(item, value)])
+        else:
+            raise SqliteUnsupportedOperator(f"Unsupported update operator {op!r}")
     return doc
 
 

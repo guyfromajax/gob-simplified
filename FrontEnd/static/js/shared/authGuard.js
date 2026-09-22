@@ -42,7 +42,7 @@ function cloneParams(params) {
         var fontLink = document.createElement("link");
         fontLink.id = "gob-bebas-neue-font";
         fontLink.rel = "stylesheet";
-        fontLink.href = "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap";
+        fontLink.href = "/fonts/app-fonts.css";
         head.appendChild(fontLink);
       }
 
