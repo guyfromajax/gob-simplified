@@ -1,9 +1,9 @@
 """The man weak-side help shade must ship in the state Jamie approved (2026-09-22).
 
-``GOB_MAN_HELP_SHADE`` is **OFF**: the man off-ball basket shade is still the flat
-``HELP_BASKET_SHADE``. Turning it on scales that one term by how weak-side the man is, on
-the same ramp the shipped zone help shade uses, so the strong side is untouched and the far
-weak side doubles.
+``GOB_MAN_HELP_SHADE`` is **ON**: the man off-ball basket shade is scaled by how weak-side
+the man is, on the same ramp the shipped zone help shade uses, so the strong side is
+untouched and the far weak side doubles. ``GOB_MAN_HELP_SHADE=0`` is the rollback and
+reproduces ``equiv_v3_reference_32db56c77_helpshade.json``.
 
 This is a shipped-defaults guard. If someone flips it, they should have to edit this file
 and say why. It also pins the things that make the change defensible:
@@ -37,7 +37,7 @@ BASE = {"x": 0.0, "y": 0.0}       # the aggression base; the help branch discard
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    """No flag set - so the helper returns its shipped default."""
+    """No flag set - so the helper returns its shipped default (ON since 2026-09-22)."""
     monkeypatch.delenv(SD.MAN_HELP_SHADE_FLAG, raising=False)
 
 
@@ -51,26 +51,29 @@ def place(man, ball, posture="normal", away=False, spot="lower wing"):
     return SD._apply_defender_posture(dict(BASE), man, ball, False, spot, posture, away)
 
 
-def test_shade_defaults_off(clean_env):
-    assert SD.man_help_shade_enabled() is False, (
-        "GOB_MAN_HELP_SHADE must default OFF. The flat HELP_BASKET_SHADE is still the "
-        "shipped behaviour; this is built, measured and not yet flipped."
+def test_shade_defaults_on(clean_env):
+    assert SD.man_help_shade_enabled() is True, (
+        "GOB_MAN_HELP_SHADE must default ON. The weak-side off-ball helper sagging toward "
+        "the basket, scaled by how weak-side he is, is the shipped behaviour."
     )
 
 
-def test_flag_turns_it_on(clean_env, monkeypatch):
-    monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "1")
-    assert SD.man_help_shade_enabled() is True
+def test_shade_kill_switch(clean_env, monkeypatch):
+    """The rollback path to equiv_v3_reference_32db56c77_helpshade.json."""
+    monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "0")
+    assert SD.man_help_shade_enabled() is False
 
 
-def test_flag_off_is_a_no_op_at_the_function(clean_env):
+def test_flag_off_is_a_no_op_at_the_function(clean_env, monkeypatch):
     """OFF must return the constant itself, not a recomputed value that happens to match."""
+    monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "0")
     assert SD._man_help_basket_shade(WEAK_MAN["y"], BALL["y"]) == SD.HELP_BASKET_SHADE
     assert SD._man_help_basket_shade(STRONG_MAN["y"], BALL["y"]) == SD.HELP_BASKET_SHADE
 
 
 def test_off_and_on_agree_on_the_strong_side(clean_env, no_jitter, monkeypatch):
     """Weakness is 0 for a man on the ball's own side, so ON must not move him at all."""
+    monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "0")
     off = place(STRONG_MAN, BALL, spot="upper wing")
     monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "1")
     on = place(STRONG_MAN, BALL, spot="upper wing")
@@ -80,6 +83,7 @@ def test_off_and_on_agree_on_the_strong_side(clean_env, no_jitter, monkeypatch):
 def test_weak_side_moves_toward_the_defended_rim(clean_env, no_jitter, monkeypatch):
     from BackEnd.constants import HOME_RIM_COORDS
     rim = (float(HOME_RIM_COORDS["x"]), float(HOME_RIM_COORDS["y"]))
+    monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "0")
     off = place(WEAK_MAN, BALL)
     monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "1")
     on = place(WEAK_MAN, BALL)
@@ -95,6 +99,7 @@ def test_away_offense_uses_the_mirrored_rim(clean_env, no_jitter, monkeypatch):
     rim = (float(AWAY_RIM_COORDS["x"]), float(AWAY_RIM_COORDS["y"]))
     man = {"x": 32.0, "y": 8.0}
     ball = {"x": 32.0, "y": 44.0}
+    monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "0")
     off = place(man, ball, away=True)
     monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "1")
     on = place(man, ball, away=True)
@@ -149,6 +154,7 @@ def test_one_ramp_serves_both_shades(clean_env, monkeypatch):
 def test_deny_is_untouched(clean_env, no_jitter, monkeypatch):
     """Deny already sits POSTURE_DENY_DISTANCE off the man and in the passing lane 99.7%
     of the time. The shade must not reach it."""
+    monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "0")
     off = place(WEAK_MAN, BALL, posture="tight")
     monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "1")
     assert place(WEAK_MAN, BALL, posture="tight") == off
@@ -162,6 +168,7 @@ def test_inside_man_lock_is_untouched(clean_env, no_jitter, monkeypatch):
 
 def test_on_ball_cushion_is_untouched(clean_env, no_jitter, monkeypatch):
     """The shade is an OFF-ball term. The ball handler's defender must not move."""
+    monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "0")
     off = SD._apply_defender_posture(dict(BASE), WEAK_MAN, BALL, True, "lower wing",
                                      "normal", False)
     monkeypatch.setenv(SD.MAN_HELP_SHADE_FLAG, "1")
