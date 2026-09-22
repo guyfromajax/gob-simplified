@@ -21,12 +21,16 @@ These Playwright tests verify the Grid-based layout refactor works correctly acr
 
 ## Running Tests
 
-**Do not reuse a bare `dev.py` on :8000.** Playwright's `reuseExistingServer` (on when not in CI) will attach to whatever is already listening. A leftover `python dev.py` has empty mongomock: `/roster/Lancaster` 404s, Phaser never draws a canvas, and the court-layout `startGame()` specs time out. Kill that process first so Playwright can start `tests/e2e/helpers/seed_and_serve.py`.
+Playwright always starts its own `tests/e2e/helpers/seed_and_serve.py` (`reuseExistingServer: false`). A leftover process on :8000 is a **loud fail** (port in use), not a silent attach to empty mongomock. That leftover-reuse path produced fake court-layout failures three times (catalog sidecar, bare `dev.py`, bisect without `CI=1`).
+
+If something is already listening:
 
 ```bash
 lsof -iTCP:8000 -sTCP:LISTEN
 # then: kill <pid>
 ```
+
+To reuse a server you have already seeded, set `PW_REUSE_SERVER=1`. Do not use that for a full-suite baseline.
 
 ### Run all tests
 ```bash
@@ -69,7 +73,7 @@ Tests run at these viewport sizes (matching refactor plan exit criteria):
 
 Tests are configured in `playwright.config.js`:
 - Base URL: `http://localhost:8000` (or `BASE_URL` env var)
-- **webServer**: Playwright auto-starts `tests/e2e/helpers/seed_and_serve.py` (same `.venv` / `PYTHON_PATH` fallback as before) and waits for port 8000. If a server is already running on 8000, it is reused (`reuseExistingServer: true` when not in CI) — see the `:8000` gotcha under **Running Tests**.
+- **webServer**: Playwright auto-starts `tests/e2e/helpers/seed_and_serve.py` (same `.venv` / `PYTHON_PATH` fallback as before) and waits for port 8000. `reuseExistingServer` is **off** unless `PW_REUSE_SERVER=1` — see **Running Tests**.
 - Court-layout specs stub auth via `helpers/auth.js` and wait for seeded rosters via `helpers/rosters.js`.
 - Screenshots on failure
 - Trace collection on retry

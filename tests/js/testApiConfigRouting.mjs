@@ -223,6 +223,18 @@ function main() {
     );
   }
 
+  // Second classic-script evaluation must be a no-op (sentryInit inject + page tag).
+  {
+    const first = loadApiConfig({ hostname: 'localhost' });
+    vm.runInNewContext(SRC, {
+      window: first.window,
+      console: { log: () => {}, error: () => {}, warn: () => {} },
+      document: undefined,
+    }, { filename: 'api-config.js#reload' });
+    assertEqual(first.window.API_CONFIG, first.api, 'reload keeps the same API_CONFIG object');
+    assertEqual(first.api.getBaseUrl(), 'http://localhost:8000', 'reload leaves routing intact');
+  }
+
   // Stragglers no longer hardcode API hosts
   const admin = fs.readFileSync(
     path.join(ROOT, 'FrontEnd/static/js/shared/adminGuard.js'),
