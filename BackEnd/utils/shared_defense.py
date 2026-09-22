@@ -852,6 +852,21 @@ def zone_help_shade_enabled():
     return os.environ.get(ZONE_HELP_SHADE_FLAG, "1") == "1"
 
 
+def help_side_weakness(man_y, ball_y):
+    """How WEAK-SIDE a man is, on the zone sink's own ramp: 0.0 strong side, 1.0 far weak side.
+
+    Extracted from ``_apply_zone_help_shade`` so the man help shade reads the SAME ramp
+    instead of a second copy of it. The measure, unchanged: 1 on the ball's own side, 0 a
+    full ``zone_sink.SIDE_SPAN`` away, then pushed back toward 1 as the ball nears the
+    middle of the floor (with the ball central there is no weak side). Continuous
+    everywhere, so a man drifting across the middle never teleports.
+    """
+    from BackEnd.utils import zone_sink as _zs
+    strongness = 1.0 - min(1.0, abs(float(ball_y) - float(man_y)) / _zs.SIDE_SPAN)
+    strongness += (1.0 - strongness) * _zs.ball_centrality(float(ball_y))
+    return max(0.0, 1.0 - strongness)
+
+
 _ZONE_SHADE_COUNTS = {"considered": 0, "shaded": 0, "no_shade_middle": 0}
 
 
@@ -873,17 +888,12 @@ def _apply_zone_help_shade(coords, man_coords, ball_coords, is_away_offense):
     if not zone_help_shade_enabled():
         return coords
     try:
-        from BackEnd.utils import zone_sink as _zs
         _ZONE_SHADE_COUNTS["considered"] += 1
         bx, by = float(ball_coords["x"]), float(ball_coords["y"])
         mx, my = float(man_coords["x"]), float(man_coords["y"])
         rim_x = (100.0 - float(HOME_RIM_COORDS["x"])) if is_away_offense else float(HOME_RIM_COORDS["x"])
         rim_y = float(HOME_RIM_COORDS["y"])
-        # The sink's measure, unchanged: 1 on the defender's own side, 0 a full
-        # court-width away, then pushed toward 1 as the ball nears the middle.
-        strongness = 1.0 - min(1.0, abs(by - my) / _zs.SIDE_SPAN)
-        strongness += (1.0 - strongness) * _zs.ball_centrality(by)
-        weakness = max(0.0, 1.0 - strongness)
+        weakness = help_side_weakness(my, by)
         if weakness <= 1e-9:
             _ZONE_SHADE_COUNTS["no_shade_middle"] += 1
             return coords
@@ -2038,6 +2048,71 @@ _POSTURE_INSIDE_SPOTS = frozenset({
 })
 
 
+# ── Man weak-side help shade (GOB_MAN_HELP_SHADE; default ON since 2026-09-22) ──────────────
+# Man off-ball help has exactly one rim-ward term, HELP_BASKET_SHADE, and it is FLAT: it reads
+# neither posture nor ball side. That is why Loose buys +3.79 gap toward the BALL and -0.34
+# toward the rim - the helper floats, guarding neither his man nor the basket
+# (reports/man-posture-fixture-2026-09-22.md §3).
+#
+# This scales that one term by how weak-side the man is, on the SAME ramp the shipped zone help
+# shade uses (help_side_weakness -> zone_sink.SIDE_SPAN + ball_centrality):
+#
+#     effective shade = HELP_BASKET_SHADE * (1 + weakness)
+#
+# so the strong side and a central ball are UNCHANGED (weakness 0 -> 0.20) and the far weak side
+# doubles (-> 0.40). That shape, not a flat bump, is what the counterfactual priced: flat 0.40
+# fixes the weak side (rim 13.20 -> 10.25) but drags the strong side with it (15.25 -> 11.65,
+# gap 6.29 -> 9.56), while the weak-scaled form fixes the weak side (-> 10.52) and leaves the
+# strong side alone (-> 14.86).
+#
+# NOT touched, deliberately: deny/tight (correct at 2.09 off the man, 99.7% in the passing lane),
+# the inside-man lock, and the on-ball cushion. No clamp - the shade is a sag toward the rim, and
+# the defenders it moves furthest are the ones with nothing to guard on their side.
+MAN_HELP_SHADE_FLAG = "GOB_MAN_HELP_SHADE"
+
+
+def man_help_shade_enabled():
+    """``GOB_MAN_HELP_SHADE`` - **default ON** since 2026-09-22.
+
+    Kill switch: ``GOB_MAN_HELP_SHADE=0`` restores the flat ``HELP_BASKET_SHADE`` and
+    reproduces ``equiv_v3_reference_32db56c77_helpshade.json`` - verified 40/40 on
+    fingerprint AND draws in all four cells at the flip.
+    """
+    import os  # local, matching zone_help_shade_enabled above - this module has no top-level os
+    return os.environ.get(MAN_HELP_SHADE_FLAG, "1") == "1"
+
+
+_MAN_SHADE_COUNTS = {"considered": 0, "shaded": 0, "no_shade_middle": 0}
+
+
+def man_help_shade_counters():
+    return dict(_MAN_SHADE_COUNTS)
+
+
+def reset_man_help_shade_counters():
+    for k in _MAN_SHADE_COUNTS:
+        _MAN_SHADE_COUNTS[k] = 0
+
+
+def _man_help_basket_shade(man_y, ball_y):
+    """The fraction of man->basket the off-ball help spot is shaded by.
+
+    Flag off -> ``HELP_BASKET_SHADE`` exactly, so nothing moves. Flag on -> that same
+    constant scaled by ``help_side_weakness``. Both terms are read by name at call time,
+    so retuning ``HELP_BASKET_SHADE`` or ``zone_sink.SIDE_SPAN`` moves this too rather
+    than leaving a stale duplicate behind.
+    """
+    if not man_help_shade_enabled():
+        return HELP_BASKET_SHADE
+    _MAN_SHADE_COUNTS["considered"] += 1
+    weakness = help_side_weakness(man_y, ball_y)
+    if weakness <= 1e-9:
+        _MAN_SHADE_COUNTS["no_shade_middle"] += 1
+        return HELP_BASKET_SHADE
+    _MAN_SHADE_COUNTS["shaded"] += 1
+    return HELP_BASKET_SHADE * (1.0 + weakness)
+
+
 def _posture_nudge(px, py, tx, ty, amt):
     """Move point (px,py) `amt` grid toward (tx,ty). Negative amt moves away."""
     dx, dy = tx - px, ty - py
@@ -2078,8 +2153,9 @@ def _apply_defender_posture(def_coords, off_coords, ball_coords, is_ball_handler
 
     # normal / loose HELP
     sag = HELP_SAG.get(posture, 0.30) * (1.0 + random.uniform(-HELP_SAG_JITTER, HELP_SAG_JITTER))
-    hx = ox + sag * (bx - ox) + HELP_BASKET_SHADE * (bkx - ox)   # ideal help spot (between ball & man, + shade)
-    hy = oy + sag * (by - oy) + HELP_BASKET_SHADE * (bky - oy)
+    shade = _man_help_basket_shade(oy, by)   # flat HELP_BASKET_SHADE unless GOB_MAN_HELP_SHADE
+    hx = ox + sag * (bx - ox) + shade * (bkx - ox)   # ideal help spot (between ball & man, + shade)
+    hy = oy + sag * (by - oy) + shade * (bky - oy)
     off_x, off_y = abs(ox - bkx), abs(oy - bky)                  # man's basket-offset per axis
     m = max(off_x, off_y) or 1.0
     wx = max(HELP_ANCHOR_FLOOR, off_x / m)
