@@ -842,8 +842,14 @@ ZONE_HELP_SHADE_FLAG = "GOB_ZONE_HELP_SHADE"
 
 
 def zone_help_shade_enabled():
+    """``GOB_ZONE_HELP_SHADE`` - **default ON** since 2026-09-22.
+
+    Kill switch: ``GOB_ZONE_HELP_SHADE=0`` restores the unshaded placement and
+    reproduces ``equiv_v3_reference_5ea94694f_sinkescape.json`` - verified 40/40 on
+    fingerprint AND draws in all four cells at the flip.
+    """
     import os  # local, matching _zone_sink_iq_enabled above - this module has no top-level os
-    return os.environ.get(ZONE_HELP_SHADE_FLAG, "0") == "1"
+    return os.environ.get(ZONE_HELP_SHADE_FLAG, "1") == "1"
 
 
 _ZONE_SHADE_COUNTS = {"considered": 0, "shaded": 0, "no_shade_middle": 0}
