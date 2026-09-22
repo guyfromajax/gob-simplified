@@ -4381,3 +4381,29 @@ Full suite on the sidecar worktree: 3114 passed / 3 failed / 20 skipped / 112
 xfailed. The same three fail when pointed at `gob-simplified` develop. They
 are new reds on the default pytest run — the reason `--maxfail` came out —
 and need a develop-side triage, not a desktop adapter change.
+
+## [TEST] Current develop Playwright baseline is 382/13 — not 392/3
+
+Logged 2026-09-22 while comparing `desktop/electron-shell` to `origin/develop`
+(`e9fd11fda`). Same clean setup: free :8000, `seed_and_serve`. **Do not treat
+these as desktop-shell failures.** They fail on current develop with no
+desktop checkout.
+
+395 tests, 7 workers, 382 passed / 13 failed:
+
+- 8 `court-layout` Play Quarter / canvas specs — `bootGame` alerts that
+  single-mode needs a `game_id` from `/api/init-game`, then the sim fetch
+  400s. Canvas never attaches. Pre-game court specs pass.
+- `fcc-invite-step` week 36 still offers the season transition —
+  received `view-recruiting-results`, expected `new-season`
+- `fcc-roster-tab` column order / sort keys — FCC HTML now has a trailing
+  **DEV FOCUS** column (`c-devfocus`); tests still expect 7 headers
+  without it
+- `homepage-v3-auth` homepage-v3.html redirects to homepage.html
+- `season-advance` confirm modal dismissed before the request, not after
+
+The old 392/3 gate is days stale. Develop has moved.
+
+`invite-board-layout` "stacked row" is **not** in this list. It passed on
+develop only because `/js` 307'd the invite-seed Sammy ESM import; the
+modal is product-correct and now loads when `/js` is served in place.
