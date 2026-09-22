@@ -1,0 +1,1 @@
+# Off-ball: forwarding ball_spot fixes neither #1 nor #3. #1 = zone sink polygon clamp + reach cap (missing branch + constants). #3 = HELP_SAG/HELP_ANCHOR_FLOOR constants (tuning pass). Man loose absent from fixture. Reference 5cc98ee3e_freeze still 40/40 after develop merge. See offball-zone-empty-2026-09-21.png.

@@ -1,0 +1,1 @@
+# Zone sink escape FLIPPED ON by default (5ea94694f). New reference equiv_v3_reference_5ea94694f_sinkescape.json; 5cc98ee3e_freeze superseded (GOB_ZONE_SINK_ESCAPE=0). Kill switch 40/40, double re-baseline 40/40 x2, SD=0 byte-identical, suite 3160/0/0. Ready to merge.

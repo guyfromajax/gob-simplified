@@ -1,0 +1,1 @@
+# Zone help shade built (GOB_ZONE_HELP_SHADE default 0). Weak-side zone defender 13.83 -> 11.74 from rim; strong side barely touched; middle untouched. Flag off 40/40, suite 3166/0/0. Played-arm freeze-miss +0.70 resolves (still in band). Outcomes flat at n=120. Ready for Railway eye test.
