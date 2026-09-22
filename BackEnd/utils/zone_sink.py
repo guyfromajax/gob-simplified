@@ -264,10 +264,15 @@ _ESCAPE_COUNTS = {
 
 
 def escape_enabled() -> bool:
-    """``GOB_ZONE_SINK_ESCAPE`` — **default OFF**. When on, an empty-area zone defender
-    may leave his own polygon, but only to the extent the movement takes him CLOSER TO
-    THE RIM. Movement that is not rim-ward is still clamped into the zone."""
-    return os.environ.get(FLAG_ESCAPE, "0") == "1"
+    """``GOB_ZONE_SINK_ESCAPE`` — **default ON** since 2026-09-22. An empty-area zone
+    defender may leave his own polygon, but only to the extent the movement takes him
+    CLOSER TO THE RIM. Movement that is not rim-ward is still clamped into the zone.
+
+    Kill switch: ``GOB_ZONE_SINK_ESCAPE=0`` restores the clamped-in-zone behaviour and
+    reproduces ``equiv_v3_reference_5cc98ee3e_freeze.json`` — verified 40/40 on
+    fingerprint AND draws in all four cells at the flip.
+    """
+    return os.environ.get(FLAG_ESCAPE, "1") == "1"
 
 
 def escape_counters() -> Dict[str, int]:
