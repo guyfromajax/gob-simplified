@@ -127,6 +127,21 @@
   font: 500 11px/1.3 'Inter', sans-serif;
   color: rgba(255, 255, 255, .55);
 }
+/* Names what the accent means, so the mark never has to be decoded to be understood. */
+.pdg-hc-develops {
+  display: block;
+  margin-top: 7px;
+  font: 500 11px/1.35 'Inter', sans-serif;
+  color: rgba(255, 255, 255, .5);
+}
+.pdg-hc-develops b {
+  display: inline-block;
+  margin-left: 3px;
+  font: 700 11px/1 'Inter', sans-serif;
+  letter-spacing: .06em;
+  color: #F79420;
+}
+
 .pdg-hc-attrs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -146,6 +161,10 @@
   letter-spacing: .06em;
   color: rgba(255, 255, 255, .42);
 }
+/* One accent, on the CODE only. The value stays white: colour on a rating already means
+   "how good is he" product-wide (blue 10+, green 7-9), and reusing those hues for training
+   efficiency would make the same colour mean two things on the same attribute. */
+.pdg-hc-attr.is-develops b { color: #F79420; }
 .pdg-hc-attr i {
   font: 700 12px/1 'Inter', sans-serif;
   font-style: normal;

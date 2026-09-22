@@ -114,6 +114,14 @@ window.GOB_TRAINING_MATRIX = {
       "label": "Poor Fit"
     }
   ],
+  "develops": {
+    "min": 70,
+    "locked": [
+      "ND",
+      "IQ",
+      "FT"
+    ]
+  },
   "matrix": {
     "PG": {
       "standard": {

@@ -54,17 +54,75 @@
     return isFinite(n) ? n : null;
   }
 
+  /**
+   * Which attributes this player's position + focus actually develops.
+   *
+   * Read from the generated matrix asset (window.GOB_TRAINING_MATRIX), the same source the
+   * Training by Position tutorial renders, so the card and the chart cannot disagree. The
+   * threshold and the always-100 attributes are published by that asset rather than
+   * decided here — see DEVELOPS_MIN in scripts/generate_training_matrix_asset.py.
+   *
+   * Empty list when the asset is absent; the card then simply carries no accent.
+   */
+  function developsFor(player) {
+    var data = window.GOB_TRAINING_MATRIX;
+    var dev = window.GOBDevelopmentFocus;
+    if (!data || !data.develops || !dev) return [];
+    var byPos = data.matrix[dev.positionOf(player)] || {};
+    var focus = dev.focusOf(player);
+    var profile = byPos[focus];
+    if (!profile) return [];
+    var locked = data.develops.locked || [];
+    var usable = ATTR_ORDER.filter(function (c) { return locked.indexOf(c) === -1; });
+
+    // A focus other than Standard is a CHOICE, so the useful answer is what that choice
+    // buys: the attributes it raises above the Standard profile for the same position.
+    //
+    // An absolute threshold was tried first and is wrong here. For a PG it marked the same
+    // four codes on Standard, Defensive AND Fundamentals, because those four clear the bar
+    // in all three — so switching focus changed nothing on screen, which is the opposite of
+    // what this card is for. Defensive really moves ID 25->55 and OD 70->100; that is the
+    // fact worth showing.
+    if (focus !== 'standard' && byPos.standard) {
+      return usable.filter(function (c) { return Number(profile[c]) > Number(byPos.standard[c]); });
+    }
+    // Standard has no baseline to differ from, so it names where his points land best.
+    return usable.filter(function (c) { return Number(profile[c]) >= data.develops.min; });
+  }
+
+  /** "adds" for a chosen focus, "develops" for Standard — the two say different things. */
+  function developsVerb(player) {
+    var dev = window.GOBDevelopmentFocus;
+    return (dev && dev.focusOf(player) !== 'standard') ? 'adds' : 'develops';
+  }
+
   function hoverCardHtml(player) {
+    var develops = developsFor(player);
     var rows = ATTR_ORDER.map(function (code) {
       var v = attrValue(player.attributes, code);
-      return '<span class="pdg-hc-attr"><b>' + esc(code) + '</b>' +
+      // The accent is on the CODE, never the value. Values are ratings, and colour on a
+      // rating already means "how good is he" everywhere else in the product — blue #4A90D9
+      // for 10+, green for 7-9. Tinting them here would put the product's own value palette
+      // on a quantity that is not a value.
+      var on = develops.indexOf(code) !== -1 ? ' is-develops' : '';
+      return '<span class="pdg-hc-attr' + on + '"><b>' + esc(code) + '</b>' +
         '<i>' + (v == null ? '--' : v) + '</i></span>';
     }).join('');
+
+    var dev = window.GOBDevelopmentFocus;
+    var summary = '';
+    if (develops.length && dev) {
+      // Named outright, so the accent never has to be decoded to be understood.
+      summary = '<span class="pdg-hc-develops">' +
+        esc(dev.positionOf(player)) + ' &middot; ' + esc(dev.focusLabel(player)) + ' ' +
+        developsVerb(player) + ' <b>' + develops.map(esc).join('</b> <b>') + '</b></span>';
+    }
+
     return '<span class="pdg-hc-head">' + esc(player.name) + '</span>' +
       '<span class="pdg-hc-vitals">' +
         esc(player.year || '--') + ' &middot; ' + esc(formatHeight(player.height)) +
         ' &middot; ' + esc(player.weight == null ? '--' : player.weight) + ' lb' +
-      '</span>' +
+      '</span>' + summary +
       '<span class="pdg-hc-attrs">' + rows + '</span>';
   }
 
@@ -231,6 +289,7 @@
     rtAtTrainingPosition: rtAtTrainingPosition,
     formatHeight: formatHeight,
     attrValue: attrValue,
+    developsFor: developsFor,
     hideHoverCard: hideHoverCard,
   };
 })();

@@ -240,7 +240,17 @@ through the postseason.
 
 In both, the row shows the player's **RT at his training position**, repainted when that
 position changes, and hovering his name gives year, height, weight and the core 12
-attributes. Row order is best-position RT descending and is **fixed while editing** — it
+attributes — plus what his current profile develops:
+
+| | |
+|---|---|
+| A chosen focus | names the attributes it **raises above Standard** for that position (`Defensive adds ID OD`) |
+| Standard | has no baseline to differ from, so it names where his points land best, at `DEVELOPS_MIN` (70%) or above |
+| Never named | FT / IQ / ND — 100% in every profile, so they would mark every player on every focus. Derived by the generator, not hardcoded |
+| Marked on | the attribute **code** only, in the training accent. **Never the value:** colour on a rating already means "how good is he" product-wide (`attrTiles.js`: blue `#4A90D9` for 10+, green 7–9), and the tutorial's band palette is the same blue — reusing it here would make one colour mean two things on the same attribute |
+
+An absolute threshold was tried first and rejected: it marked the same four codes on a PG's
+Standard, Defensive **and** Fundamentals, so changing focus changed nothing on screen. Row order is best-position RT descending and is **fixed while editing** — it
 never re-sorts under a change. Team-wide position and focus counts sit **above** the roster. Each dropdown saves on
 change through `POST /franchise/player/development-focus`, which validates against
 `POSITIONS` / `TRAINING_FOCUSES` and **rejects** an unknown value rather than coercing it.

@@ -255,3 +255,84 @@ def test_a_shared_report_link_still_has_its_back_button():
     assert "_reportFromRaw === 'news' || _reportFromRaw === 'inbox'" in REPORT_JS
     assert "tab: 'press-tab'" in REPORT_JS
     assert "tutorials-tab" not in REPORT_JS
+
+
+# ── what the focus develops, in the hover card ──────────────────────────────
+
+DEVELOPS_HARNESS = """
+'use strict';
+global.window = {}; global.CSS = { escape: (s) => s };
+require(__DEVFOCUS__); require(__MATRIX__); require(__GRID__);
+const g = global.window.GOBPlayerDevelopmentGrid;
+const mk = (p, f) => ({ id: 'x', name: 'T', position_ratings: { [p]: 70 },
+  resolved_training_position: p, resolved_training_focus: f, attributes: {} });
+const FOCUSES = ['standard','offensive','defensive','athletic','fundamentals','rebounding'];
+const out = { PG: {}, C: {}, SG: {} };
+Object.keys(out).forEach((pos) => FOCUSES.forEach((f) => { out[pos][f] = g.developsFor(mk(pos, f)); }));
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+def _develops() -> dict:
+    script = (textwrap.dedent(DEVELOPS_HARNESS)
+              .replace("__GRID__", json.dumps(str(GRID)))
+              .replace("__DEVFOCUS__", json.dumps(str(S / "js" / "shared" / "developmentFocus.js")))
+              .replace("__MATRIX__", json.dumps(str(S / "js" / "generated" / "trainingMatrix.js"))))
+    return json.loads(subprocess.check_output(["node", "-e", script], text=True, timeout=30))
+
+
+@pytestmark_node
+def test_each_focus_names_something_different():
+    """The flaw in the first rule. An absolute threshold marked the same four codes on a
+    PG's Standard, Defensive AND Fundamentals, so changing focus changed nothing on screen.
+    A chosen focus now reports what it RAISES above Standard for that position."""
+    pg = _develops()["PG"]
+    assert pg["offensive"] == ["SC", "SH"]
+    assert pg["defensive"] == ["ID", "OD"]
+    assert pg["rebounding"] == ["RB", "ST"]
+    assert pg["athletic"] == ["ST", "AG"]
+    assert len({tuple(v) for k, v in pg.items() if k != "standard"}) == 5, \
+        "five chosen focuses, five distinct answers"
+
+
+@pytestmark_node
+def test_standard_names_where_his_points_land_best():
+    """Standard has no baseline to differ from, so it falls back to the published threshold."""
+    assert _develops()["PG"]["standard"] == ["PS", "BH", "OD", "AG"]
+
+
+@pytestmark_node
+def test_every_profile_names_at_least_one_and_at_most_four():
+    """Enough to be a statement, few enough to read without decoding."""
+    d = _develops()
+    for pos, focuses in d.items():
+        for focus, attrs in focuses.items():
+            assert 1 <= len(attrs) <= 4, f"{pos}/{focus} -> {attrs}"
+
+
+@pytestmark_node
+def test_the_always_100_attributes_are_never_named():
+    """FT/IQ/ND are 100% in every profile, so naming them would put the same three codes on
+    every player on every focus. The asset derives them rather than hardcoding."""
+    d = _develops()
+    for focuses in d.values():
+        for attrs in focuses.values():
+            assert not ({"FT", "IQ", "ND"} & set(attrs))
+
+
+def test_the_accent_is_on_the_code_and_never_the_value():
+    """Colour on a rating already means 'how good is he' product-wide — blue #4A90D9 for
+    10+, green for 7-9 (attrTiles.js). Tinting the values here would make one colour mean
+    two things on the same attribute, one click apart."""
+    css = (S / "css" / "player-development-grid.css").read_text()
+    assert ".pdg-hc-attr.is-develops b { color: #F79420; }" in css
+    assert ".pdg-hc-attr.is-develops i" not in css
+    block = css[css.index(".pdg-hc-attr i {"):]
+    assert "color: #fff" in block[:block.index("}")]
+
+
+def test_the_threshold_is_published_not_hardcoded_in_the_view():
+    assert "data.develops.min" in GRID_JS
+    gen = (ROOT / "scripts" / "generate_training_matrix_asset.py").read_text()
+    assert "DEVELOPS_MIN = 70" in gen
+    assert "def _locked_attrs" in gen
