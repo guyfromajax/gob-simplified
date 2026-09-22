@@ -3426,6 +3426,9 @@ async function initGame() {
   } else {
     console.error('Play Quarter button not found!');
   }
+  if (typeof window !== 'undefined') {
+    window.__GOB_BOOTGAME_BOUND = true;
+  }
   
   // ✅ FIX: Only auto-start direct timeout resumes. Cold browser returns use the
   // explicit active-resume modal and must wait for the user's Resume click.
