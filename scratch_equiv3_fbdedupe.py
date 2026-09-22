@@ -35,7 +35,40 @@ SEED_DEFENSES = os.environ.get("SEED_DEFENSES", "0") == "1"
 if SEED_DEFENSES:
     seed_universal_defenses(defenses_collection)
 
+# ── EQUIV_MAN_POSTURE — man posture via the team's PLAYBOOK, not an engine hook ─────────
+# unset  → today's behaviour. Teams are built with `playbook_settings = {}`
+#          (team_manager.py:445), so turn_manager._select_man_defense_with_playbook_weights
+#          (:3407-3424) finds no man % and falls back to base `man` → posture "normal".
+# normal / loose / deny → 100% on the matching playbook man row. That dict is the SAME one a
+#          user's saved playbook writes (playbooks.js:1323 → gameplan_routes.py:145-147) and
+#          the one the CPU writes for itself in franchise play
+#          (cpu_playbook_customization.py:402-404). The engine is untouched.
+# EQUIV_POSTURE_CENSUS=1 adds the read-only off-ball geometry census (scratch_posture_census).
+# Default OFF so a reference-reproduction run walks exactly the code the reference was cut on.
+POSTURE_CENSUS = os.environ.get("EQUIV_POSTURE_CENSUS", "0") == "1"
+MAN_POSTURE = os.environ.get("EQUIV_MAN_POSTURE", "").strip().lower()
+_MAN_POSTURE_PB_KEY = {"normal": "man_normal", "loose": "man_loose", "deny": "man_tight"}
+if MAN_POSTURE and MAN_POSTURE not in _MAN_POSTURE_PB_KEY:
+    raise SystemExit("EQUIV_MAN_POSTURE must be one of %s (got %r)"
+                     % (sorted(_MAN_POSTURE_PB_KEY), MAN_POSTURE))
+
+
+def apply_man_posture_playbook(gm):
+    """Put the man_defense % on BOTH teams, through the GameManager team attribute that
+    turn_manager._load_playbook_settings (:3097-3114) treats as the single source of truth
+    during gameplay. Unset → not called, so `playbook_settings` stays {} and nothing moves."""
+    if not MAN_POSTURE:
+        return
+    key = _MAN_POSTURE_PB_KEY[MAN_POSTURE]
+    for team in (gm.home_team, gm.away_team):
+        pb = dict(getattr(team, "playbook_settings", None) or {})
+        man = {"man_normal": 0, "man_tight": 0, "man_loose": 0}
+        man[key] = 100
+        pb["man_defense"] = man
+        team.playbook_settings = pb
+
 from BackEnd.utils import sim_random, training_random
+import scratch_posture_census as _pcensus
 from BackEnd.models.game_manager import GameManager
 from BackEnd.main import simulate_quarter
 
@@ -348,6 +381,9 @@ def run_arm(played: bool):
                  "hc_trap": 5, "fc_press": 5}
             gm.home_team.strategy_settings = d.copy()
             gm.away_team.strategy_settings = d.copy()
+            apply_man_posture_playbook(gm)
+            if POSTURE_CENSUS:
+                _pcensus.reset(seed)
             gid = "%024x" % (0xE0000 + (seed - 8000))
             err = None
             import time as _time
@@ -376,6 +412,7 @@ def run_arm(played: bool):
                 "fp": turns_fingerprint(turns, score),
                 "defenses_seeded": SEED_DEFENSES,
                 "defense": defense_census_summary(),
+                "posture_census": _pcensus.summary() if POSTURE_CENSUS else None,
             })
     finally:
         if played:
@@ -396,6 +433,8 @@ def published_ci95(vals):
 if __name__ == "__main__":
     label = "%s_%s" % (COND, ARM)
     _install_defense_census()
+    if POSTURE_CENSUS:
+        _pcensus.install()
     if ALIGN_RNG:
         _install_align_regions()
     rows = run_arm(ARM == "played")
