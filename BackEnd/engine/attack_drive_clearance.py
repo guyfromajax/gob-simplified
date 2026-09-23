@@ -508,11 +508,44 @@ DRIVE_NEUTRAL_BAND = 100.0
 
 # S2c help-cutoff tuning. On a Tier-A blow-by a HELP defender may rotate to cut off the drive. HCO
 # drives are half-court (standard AG rate, like HCT — not FB's outlet sprint), so the corridor + slack
-# stay tight. Aggression gates whether a given help defender even attempts the rotation (mirrors FB's
-# stop_attempt_prob → loose/aggressive defenses sit deeper in help lanes and cut off more). Tunable (S2f).
+# stay tight. Tunable (S2f).
 HCO_CUTOFF_PATH_CORRIDOR = 11.0          # help defender must be within 11 grid of the drive line to rotate
 HCO_CUTOFF_DEFENDER_TIME_SLACK = 1.0     # no arrival-time credit (a clean blow-by outruns late help)
+
+# Per-candidate gate on whether a help defender even ATTEMPTS the rotation, by the defending team's
+# aggression call. What this actually does, stated plainly: a PASSIVE defense never attempts a help
+# rotation on a blow-by (0.0), a normal one attempts with half its candidates (0.5), and only an
+# aggressive one always attempts (1.0). The comment this replaces claimed the opposite — that loose
+# and aggressive defenses "sit deeper in help lanes and cut off more" — which was never what the
+# numbers said; `passive` is the lowest entry, not the highest.
+#
+# GOB_HCO_CUTOFF_NO_GATE (default OFF) removes the gate entirely: every aggression setting attempts
+# the rotation. Whether it SUCCEEDS is unchanged — the candidate still has to be inside
+# HCO_CUTOFF_PATH_CORRIDOR, still has to win the arrival race at its own AG rate with
+# HCO_CUTOFF_DEFENDER_TIME_SLACK, and still has to win the contest roll. Only the attempt gate goes.
+# The constant is kept, not deleted, so the rollback is exact.
 HCO_CUTOFF_STOP_ATTEMPT_PROB = {"passive": 0.0, "normal": 0.5, "aggressive": 1.0}
+HCO_CUTOFF_NO_GATE_FLAG = "GOB_HCO_CUTOFF_NO_GATE"
+
+
+def cutoff_gate_removed() -> bool:
+    """``GOB_HCO_CUTOFF_NO_GATE`` - **default OFF**. ON → stop_attempt_prob 1.0 for every
+    aggression setting, so the attempt gate never turns a help defender away."""
+    import os
+    return os.environ.get(HCO_CUTOFF_NO_GATE_FLAG, "0") == "1"
+
+
+def hco_cutoff_stop_attempt_prob(aggression) -> float:
+    """The per-candidate attempt probability. Reads ``HCO_CUTOFF_STOP_ATTEMPT_PROB`` by name at
+    call time, so a retune of that table moves this rather than leaving a stale copy.
+
+    Note on draws: ``best_cutoff_on_drive`` rolls once per candidate whenever this is not None,
+    and 1.0 is not None — so removing the gate changes which candidates are admitted WITHOUT
+    changing how many rolls are consumed. The draw count per drive is the same either way.
+    """
+    if cutoff_gate_removed():
+        return 1.0
+    return HCO_CUTOFF_STOP_ATTEMPT_PROB.get(aggression, 0.5)
 
 
 def _resolve_hco_help_cutoff(
@@ -533,7 +566,7 @@ def _resolve_hco_help_cutoff(
     if not race_coords:
         return None, "A", 1.0, None, None
     bh_rate = _ag_grid_per_game_sec(driver, "standard")
-    stop_prob = HCO_CUTOFF_STOP_ATTEMPT_PROB.get(aggression, 0.5)
+    stop_prob = hco_cutoff_stop_attempt_prob(aggression)
     cutoff_pos, meet = best_cutoff_on_drive(
         bh_start, drive_end, bh_rate, race_coords, def_lineup,
         get_defender_rate=lambda d: _ag_grid_per_game_sec(d, "standard"),
@@ -1160,7 +1193,11 @@ def build_attack_drive_sequence(
     # → `best_cutoff_on_drive` + `resolve_cutoff_contest`). A successful cutoff DEMOTES the blow-by: the
     # cutoff defender becomes the contact/guard defender (`bh_defender_pos`) and the drive re-resolves to
     # B/C (or a foul/charge/TO) — the downstream S2d/S2b/S2e machinery then consumes the demoted tier with
-    # NO special-casing. Loose/aggressive postures sit deeper in help lanes → more cutoffs, organically.
+    # NO special-casing. How often a rotation is even ATTEMPTED is set by the defending team's aggression
+    # call via `hco_cutoff_stop_attempt_prob` — passive 0.0 (never), normal 0.5, aggressive 1.0 — unless
+    # GOB_HCO_CUTOFF_NO_GATE removes that gate. (This comment used to claim the opposite, that
+    # loose/aggressive postures "sit deeper in help lanes and cut off more": posture does not enter this
+    # path at all, and `passive` is the lowest entry in the table, not the highest.)
     # Tier B/C (primary already stopped him) and flag-off skip this. See Dynamic_MM_Brief §S2c.
     if _three_tier and drive_tier == "A" and driver and bh_defender_pos and _help_race_coords:
         _cut_pos, _cut_tier, _cut_frac, _cut_contact, _cut_meet = _resolve_hco_help_cutoff(
