@@ -17,6 +17,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 HTML = (ROOT / "FrontEnd" / "static" / "training.html").read_text()
 JS = (ROOT / "FrontEnd" / "static" / "training.js").read_text()
 CSS = (ROOT / "FrontEnd" / "static" / "training.css").read_text()
+# The grid's own look moved to a shared sheet when the FCC Training tab became the second
+# host; the training page keeps only its section chrome.
+CSS_GRID = (ROOT / "FrontEnd" / "static" / "css" / "player-development-grid.css").read_text()
 
 # The twenty drills the backend is fed, exactly as collectTrainingData names them.
 DRILL_IDS = [
@@ -252,8 +255,9 @@ def test_the_pill_sits_under_the_page_title():
 
 def test_player_development_reuses_the_shared_module():
     assert "/js/shared/developmentFocus.js" in HTML
+    assert "/js/shared/playerDevelopmentGrid.js" in HTML
     assert "/css/development-focus.css" in HTML
-    assert "window.GOBDevelopmentFocus" in JS
+    assert "GOBPlayerDevelopmentGrid" in JS
     assert "development-focus" not in re.sub(r"//[^\n]*", "", JS), \
         "the training page must not save through its own route"
 
@@ -267,7 +271,7 @@ def test_it_costs_no_extra_request():
 
 
 def test_the_grid_is_four_rows_of_three_filled_column_first():
-    block = CSS[CSS.index("body.training-page .player-dev-grid {"):]
+    block = CSS_GRID[CSS_GRID.index(".pdg-grid {"):]
     block = block[:block.index("}")]
     assert "repeat(3, 1fr)" in block
     assert "repeat(4, auto)" in block
@@ -275,10 +279,10 @@ def test_the_grid_is_four_rows_of_three_filled_column_first():
 
 
 def test_positions_tally_left_focuses_tally_right():
-    pos = HTML.index('player-dev-tally-positions')
-    foc = HTML.index('player-dev-tally-focuses')
+    pos = HTML.index('pdg-tally-positions')
+    foc = HTML.index('pdg-tally-focuses')
     assert pos < foc
-    assert "player-dev-tally--focuses { justify-content: flex-end; }" in CSS
+    assert ".pdg-tally-focuses { justify-content: flex-end; }" in CSS_GRID
 
 
 def test_leaving_for_the_chart_saves_the_draft_first():
@@ -291,5 +295,7 @@ def test_leaving_for_the_chart_saves_the_draft_first():
 
 
 def test_tally_recounts_after_a_save():
-    saved = JS[JS.index("dev.bind(playerDevGrid"):]
-    assert "renderPlayerDevelopmentTally();" in saved[:900]
+    """Counting lives with the grid now; a save repaints both tallies."""
+    grid = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "playerDevelopmentGrid.js").read_text()
+    saved = grid[grid.index("dev.bind(grid,"):]
+    assert "paintTallies(host, rows);" in saved[:1400]

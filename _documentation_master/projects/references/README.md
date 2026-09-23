@@ -18,12 +18,28 @@ Animator methods at Pattern A.
 
 | file | tree | what it baselines |
 |---|---|---|
-| **`equiv_v3_reference_5ea94694f_sinkescape.json`** | `5ea94694f` (2026-09-22) | **CURRENT, both arms, both footings.** Zone sink escape ON by default: an empty-area zone defender may leave his own polygon to the extent the movement takes him **closer to the rim**; movement that is not rim-ward is still clamped. Guardrails `RIM_FLOOR` 4.0 and `MIN_SEPARATION` 2.0, both derived from measured geometry. No reach constant or sink weight changed. **`SEED_DEFENSES=0` is byte-identical to the superseded file** (40/40 fp and draws, both arms) — zone does not exist there, so the escape cannot fire. At `SEED_DEFENSES=1`, 36/40 sim and 37/40 played seeds differ. See `reports/zone-sink-escape-flip-2026-09-22.md`. |
+| **`equiv_v3_reference_1f4af0ede_loosesag_nogate.json`** | `1f4af0ede` (2026-09-23) | **CURRENT, both arms, both footings.** Two flips in one state. **(1) Loose sag axis** — the man off-ball HELP sag target is blended toward the defended rim by `HELP_BASKET_PULL` {normal **0.0**, loose 0.25}, so Loose protects the rim instead of drifting ball-ward (weak-side defender→rim 12.07 → 9.46, ball-crowding 50.3% → 26.2%). **(2) Drive help-cutoff gate removed** — every aggression setting now attempts a rotation on a tier-A blow-by (`stop_attempt_prob` 1.0); demote rate 52% → 74%. **Only the gate moves this file**: the axis is invisible here because this footing runs base man, where the pull is 0.0. Every seed differs in all four cells. The loose footing has its own baseline below. See `reports/loose-sag-and-gate-flip-2026-09-23.md`. |
+
+## Posture-footing baselines
+
+Not part of the supersession chain above. A change that only fires at a non-default **posture**
+is invisible to the ordinary reference, because that reference runs the unset posture (base
+man). These files run `EQUIV_MAN_POSTURE=<posture>` instead and are the thing such a change is
+measured against.
+
+| file | tree | footing | what it baselines |
+|---|---|---|---|
+| **`equiv_v3_loose_baseline_1f4af0ede_loosesag.json`** | `1f4af0ede` (2026-09-23) | `EQUIV_MAN_POSTURE=loose`, `SEED_DEFENSES=1`, both arms, n=40 | **CURRENT loose baseline.** Both flags ON. Double re-baselined (80/80 twice). Future loose work measures against this. |
+| `equiv_v3_loose_baseline_ef00985ce.json` | `ef00985ce` (2026-09-23) | as above | **SUPERSEDED** by `1f4af0ede`, reproduced by **`GOB_MAN_LOOSE_SAG_AXIS=0 GOB_HCO_CUTOFF_NO_GATE=0`**. Both flags OFF; every seed differs from the current one. |
 
 ## Superseded — kept deliberately
 
 | file | tree | superseded by | reproduced today by |
 |---|---|---|---|
+| `equiv_v3_reference_09f1b0ca9_boxout.json` | `09f1b0ca9` | `1f4af0ede` | **`GOB_MAN_LOOSE_SAG_AXIS=0 GOB_HCO_CUTOFF_NO_GATE=0`** — **both are needed by convention**, though `GOB_HCO_CUTOFF_NO_GATE=0` alone is what restores the fingerprints: the axis is invisible at this footing. Verified 160/160 three ways at `1f4af0ede` before the re-cut (both off; axis-only-on; gate-only-on). It baselines the two-directional box-out contest. |
+| `equiv_v3_reference_f2a060488_manhelpshade.json` | `f2a060488` | `09f1b0ca9` | **`GOB_BOXOUT_CONTEST=0`** — verified 40/40 on fingerprint AND draws in all four cells at `09f1b0ca9`, before the re-cut, with every box-out counter at zero. It baselines the **man** weak-side help shade: a man off-ball help defender sags toward the rim he is defending, scaled by how weak-side he is. |
+| `equiv_v3_reference_32db56c77_helpshade.json` | `32db56c77` | `f2a060488` | **`GOB_MAN_HELP_SHADE=0`** — verified 40/40 on fingerprint AND draws in all four cells at `f2a060488`, before the re-cut, with every man-shade counter at zero. It baselines the **zone** weak-side help shade: a zone defender with a man in his area sags toward the rim, scaled by how weak-side he is. |
+| `equiv_v3_reference_5ea94694f_sinkescape.json` | `5ea94694f` | `32db56c77` | **`GOB_ZONE_HELP_SHADE=0`** — verified 40/40 on fingerprint AND draws in all four cells at `32db56c77`, before the re-cut. It baselines the zone sink escape: an empty-area zone defender may leave his polygon to the extent the movement is rim-ward, guardrails `RIM_FLOOR` 4.0 and `MIN_SEPARATION` 2.0. |
 | `equiv_v3_reference_5cc98ee3e_freeze.json` | `5cc98ee3e` | `5ea94694f` | **`GOB_ZONE_SINK_ESCAPE=0`** — verified 40/40 on fingerprint AND draws in all four cells at `5ea94694f`, before the re-cut, with every escape counter at zero. |
 | `equiv_v3_reference_70f7dd021_b1a.json` | `70f7dd021` | `5cc98ee3e` | **`GOB_PLACEMENT_FREEZE=0 GOB_PLACEMENT_SINGLE_BUILD=0`** — verified 40/40 on fingerprint AND draws in all four cells at `5cc98ee3e`, before the re-cut. `GOB_PLACEMENT_FREEZE=0` alone is sufficient: Stage 3 is inert unless the freeze is on. |
 | `equiv_v3_reference_ec4f5acfc_poslookup2.json` | `ec4f5acfc` | `70f7dd021` | **`GOB_SIM_BUILD_ANIM_FOR_EMITTER=0`** — verified 40/40 on all four cells at `70f7dd021`. `GOB_SIM_HCO_COORD_WRITE` and `GOB_SIM_CRASH_APPLY` are kept as this switch's partners: they are what write the sim arm's HCO coords when B1-A is off. |

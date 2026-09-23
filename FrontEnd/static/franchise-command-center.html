@@ -27,6 +27,7 @@
   <script src="/js/shared/rtBucket.js"></script>
   <link rel="stylesheet" href="/css/fonts.css">
   <link rel="stylesheet" href="/css/development-focus.css">
+  <link rel="stylesheet" href="/css/player-development-grid.css">
 </head>
 <body>
   <!-- Page load overlay: hides stale/incomplete FCC until data and UI are ready (not shown on tab switch) -->
@@ -83,10 +84,12 @@
         <button data-tab="schedule-tab">Schedule</button>
         <button id="stats-nav-btn" data-tab="fcc-team-stats-summary-tab">Team Stats</button>
         <button data-tab="awards-tab">Leaders</button>
-        <button data-tab="press-tab">News</button>
+        <!-- Training takes the slot News used to hold; News moves to the end, where the
+             Inbox was. The Inbox is retired — everything it published now runs in News. -->
+        <button data-tab="training-tab">Training</button>
         <!-- Same slot, renamed. Carries .inbox-badge when the wire needs attention. -->
         <button data-tab="recruits-tab">Recruiting</button>
-        <button data-tab="tutorials-tab">Inbox</button>
+        <button data-tab="press-tab">News</button>
       </div>
       <div id="home-tab" class="tab-content active">
         <div class="fcc-home-grid">
@@ -509,12 +512,23 @@
           <a id="leaders-full-link" class="fcc-standings-full-link" href="#">See all leaders here</a>
         </div>
       </div>
-      <div id="tutorials-tab" class="tab-content fcc-inbox-tab">
-        <section class="fcc-data-card fcc-inbox-card">
-          <div class="fcc-data-card-body fcc-inbox-card-body">
-            <div id="fcc-inbox-body" class="fcc-inbox-body" aria-live="polite">
-              <p class="fcc-inbox-empty">Loading…</p>
+      <!-- Training: the second and only other place development is editable. Same grid,
+           same hover card and same summaries as the training page, from the one shared
+           module — and reachable in any week, which the training page is not. -->
+      <div id="training-tab" class="tab-content">
+        <div class="fcc-training-head">
+          <h2 class="fcc-training-title">Player Development</h2>
+          <button type="button" class="gob-btn gob-btn--ghost" id="fcc-training-tutorial-btn">
+            Training by Position &#8599;
+          </button>
+        </div>
+        <section class="fcc-data-card" id="fcc-training-dev">
+          <div class="fcc-data-card-body">
+            <div class="pdg-tally">
+              <div class="pdg-tally-group pdg-tally-positions"></div>
+              <div class="pdg-tally-group pdg-tally-focuses"></div>
             </div>
+            <div class="pdg-grid"></div>
           </div>
         </section>
       </div>
@@ -558,6 +572,8 @@
   <script src="/js/shared/bigNewsModals.js"></script>
   <script src="/js/shared/tierEmblem.js"></script>
   <script src="/js/shared/developmentFocus.js"></script>
+  <script src="/js/generated/trainingMatrix.js"></script>
+  <script src="/js/shared/playerDevelopmentGrid.js"></script>
   <script src="/franchise-command-center.js"></script>
 </body>
 </html>

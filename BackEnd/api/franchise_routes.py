@@ -16272,6 +16272,11 @@ def _build_custom_focus_roster_for_franchise(
                 "attrs": attr_vals,
                 "position_ratings": position_ratings,
                 "year": meta.get("year"),
+                # Height/weight feed the Player Development hover card. The row already
+                # carried year, all 12 attributes and every position rating; these two were
+                # the only fields the card needed that were not here.
+                "height": meta.get("height"),
+                "weight": meta.get("weight"),
                 **training_position_projection(fpd),
                 "_sort_max_rt": _max_position_rating_from_fpd(fpd),
             }

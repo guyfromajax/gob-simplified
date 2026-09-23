@@ -124,7 +124,7 @@ While training runs, `PageLoadOverlay` uses its separate `newswire` variant to r
   - [Breaks Effect](#breaks-effect)
   - [NG Reduction from Scrimmages and Conditioning](#ng-reduction-from-scrimmages-and-conditioning)
 - [Training Report Page](#training-report-page)
-  - [FCC Inbox](#fcc-inbox-training-report-shortcut), [Page Layout](#page-layout), [Recruiting summary](#recruiting-summary-franchise-only), [Training Focus Display Format](#training-focus-display-format), [Schedule Integration](#schedule-integration)
+  - [FCC News](#fcc-news-training-report-shortcut), [Page Layout](#page-layout), [Recruiting summary](#recruiting-summary-franchise-only), [Training Focus Display Format](#training-focus-display-format), [Schedule Integration](#schedule-integration)
 - [Data Flow](#data-flow)
 - [Team ID Resolution](#team-id-resolution)
 - [Computer Team Training (Franchise Mode Only)](#computer-team-training-franchise-mode-only)
@@ -230,8 +230,28 @@ lookup. FPD is authoritative; changing either value affects **future** training 
 | Resolvers | `resolve_training_position()`, `resolve_training_focus()` — a missing or unknown stored value degrades to the default rather than raising mid-week |
 | Multiplier | `training_attr_gain_multiplier(position, attr, focus)`; `player_attr_gain_multiplier(player, attr)` resolves both off the player |
 
-**Where a coach sets it.** The **training page only** — the Player Development grid under
-Coaching Focus, where the setting sits beside the points it governs. Each dropdown saves on
+**Where a coach sets it.** Two places, and only two: the **training page** (Player
+Development grid under Coaching Focus, where the setting sits beside the points it governs)
+and the **FCC Training tab**. Both render from one module, `js/shared/playerDevelopmentGrid.js`
+— same grid, same hover card, same summaries — so learning one teaches the other. The
+Training tab reads the roster the FCC already holds rather than `/franchise/training-points`,
+so unlike the training page it stays reachable after the week's training is submitted and
+through the postseason.
+
+In both, the row shows the player's **RT at his training position**, repainted when that
+position changes, and hovering his name gives year, height, weight and the core 12
+attributes — plus what his current profile develops:
+
+| | |
+|---|---|
+| A chosen focus | names the attributes it **raises above Standard** for that position (`Defensive adds ID OD`) |
+| Standard | has no baseline to differ from, so it names where his points land best, at `DEVELOPS_MIN` (70%) or above |
+| Never named | FT / IQ / ND — 100% in every profile, so they would mark every player on every focus. Derived by the generator, not hardcoded |
+| Marked on | the attribute **code** only, in the training accent. **Never the value:** colour on a rating already means "how good is he" product-wide (`attrTiles.js`: blue `#4A90D9` for 10+, green 7–9), and the tutorial's band palette is the same blue — reusing it here would make one colour mean two things on the same attribute |
+
+An absolute threshold was tried first and rejected: it marked the same four codes on a PG's
+Standard, Defensive **and** Fundamentals, so changing focus changed nothing on screen. Row order is best-position RT descending and is **fixed while editing** — it
+never re-sorts under a change. Team-wide position and focus counts sit **above** the roster. Each dropdown saves on
 change through `POST /franchise/player/development-focus`, which validates against
 `POSITIONS` / `TRAINING_FOCUSES` and **rejects** an unknown value rather than coercing it.
 
@@ -554,14 +574,14 @@ The training report automatically generates notes when players have NG reduction
 
 **Location:** `FrontEnd/static/training-report.html`
 
-After training is submitted, users are automatically redirected to the training report page which displays detailed information about attribute changes. The report can also be opened from the **Inbox** tab on the Franchise Command Center (see below) and via other FCC links (e.g. schedule) where applicable.
+After training is submitted, users are automatically redirected to the training report page which displays detailed information about attribute changes. The report can also be opened from the **News** tab on the Franchise Command Center (see below) and via other FCC links (e.g. schedule) where applicable.
 
-#### FCC Inbox (training report shortcut)
+#### FCC News (training report shortcut)
 
-- **Tab:** Franchise Command Center → **Inbox** (`tutorials-tab` in the FCC HTML).
-- **Message:** When the franchise has a stored latest training report (`latest_training.week` on the franchise document), the API exposes `last_training_report_week` on `GET /franchise/command-center/data`. The Inbox shows: `Week {N} training report` with **`here`** as a link to `training-report.html` with `from=inbox`.
-- **Single active link:** The Inbox only surfaces the **most recent** training report week. When the user runs training for a new week, `latest_training` updates and the Inbox copy and link target week update; older weeks are not listed in the Inbox.
-- **Training report behavior when `from=inbox`:** The header control is labeled **Back** and returns to `franchise-command-center.html` with `tab=tutorials-tab` (Inbox). There is no **Go To Locker Room** action on this entry path.
+- **Tab:** Franchise Command Center → **News** (`press-tab`). The Inbox tab is retired; its three item types now interleave into the News week cards — see `04_Franchise_Mode_Systems/FCC.md`.
+- **Message:** When the franchise has a stored latest training report (`latest_training.week` on the franchise document), the API exposes `last_training_report_week` on `GET /franchise/command-center/data`. News shows: `Week {N} training report` with **`view`** as a link to `training-report.html` with `from=news`.
+- **Single active link:** Only the **most recent** training report week is surfaced. When the user runs training for a new week, `latest_training` updates and the copy and link target week update; older weeks are not listed.
+- **Training report behavior when `from=news`:** The header control is labeled **Back** and returns to `franchise-command-center.html` with `tab=press-tab` (News). There is no **Go To Locker Room** action on this entry path. `from=inbox` is still accepted and treated identically, so links shared before the Inbox was retired keep their Back button.
 - **Training report behavior when `from=training` (or omitted for legacy URLs):** After `POST /franchise/run-training`, redirects include `from=training`. The header control is **Go To Locker Room** and uses the existing locker-room / command-center navigation (same as before). This is the only path that shows that action button.
 
 #### Page Layout
@@ -570,7 +590,7 @@ After training is submitted, users are automatically redirected to the training 
 - Page title: "TRAINING REPORT"
 - **Row 1 (meta):** Week number, Upcoming Opponent (from schedule), Training Focus (formatted as "Focus (Archetype)", e.g., "Inspire (Culture Builder)"). Franchise-only recruit **detail** (name / RT line) is **not** in this row; it sits under the recruit strip title in the Notes header (see below).
 - **Top-right header control** (behavior depends on `from` query parameter):
-  - **`from=inbox` (franchise):** **Back** → Franchise Command Center, Inbox tab
+  - **`from=news` (franchise; `from=inbox` accepted as a legacy alias):** **Back** → Franchise Command Center, News tab
   - **Otherwise (e.g. `from=training` or absent):** Orange **Go To Locker Room** → Franchise or Tournament Command Center (existing behavior)
 
 #### Attribute-change arrows (legend)
@@ -918,7 +938,7 @@ Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shap
 - `attributes.anchor_{attr}` and `attributes.{attr}` - Updated player attribute values
 - `position_ratings` - Recalculated position ratings after training
 - `training_position`, `position_intent` - Persisted position identity used by the canonical resolver. `training_position` is coach-editable; `position_intent` is the natural fit and is not rewritten by that edit
-- `training_focus` - One of the six Development Focus values; defaults to `standard`. Backfilled additively onto existing FPDs by `scripts/backfill_development_focus.py`
+- `training_focus` - One of the six Development Focus values; defaults to `standard`. Backfilled additively onto existing FPDs by `scripts/backfill_development_focus.py` (**gob-staging** and **gob / production, 93,411 docs, 2026-09-22**). Neither field is required for correctness — the resolvers fall back to `position_intent` → best rating → `standard` — so a doc created outside those paths still trains correctly
 - `training_gain_remainders.{attr}` - Fractional positive-gain carry stored beside, never inside, `attributes`; read and written only by franchise training and carried across season rollover through `PLAYER_DEV_CARRY_FIELDS`. It is never stored on universal/core `players`.
 - `attributes.NG` - Updated NG value when conditioning or scrimmages apply energy reduction
 - `meta.height` and `meta.weight` (integer inches / pounds) — carried on the FPD; **career HT/WT growth is applied at offseason rollover** (`develop_one_offseason`), not at training camp. If `meta` omitted height/weight (legacy or lazy FPD row), `run_franchise_training` backfills missing values from the universal `players` document before training runs; `finalize_game` lazy FPD inserts also copy height/weight/year/jersey from `players` into `meta`.
@@ -932,7 +952,7 @@ Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shap
 - `training_status.cpu_training_camp_cuts_applied` - Season-scoped guard indicating that final-camp-week CPU cuts have run. `finish_season` resets it to `false` so CPU teams assign roster overflow to their training squads again during the next season's camp.
 
 **FCC API (`GET /franchise/command-center/data`):**
-- `last_training_report_week` - Integer week for the current **latest** user training report (`latest_training.week`), used to render the Inbox message and link; omitted or null when no report exists yet
+- `last_training_report_week` - Integer week for the current **latest** user training report (`latest_training.week`), used to render the News dispatch and link; omitted or null when no report exists yet
 
 **Computer Team Updates (Franchise Mode Only):**
 - CPU auto-training updates FPD player attributes, position ratings, and gain remainders plus FTD team attributes, plays, scouting data, coaching-focus counters, and training reports.

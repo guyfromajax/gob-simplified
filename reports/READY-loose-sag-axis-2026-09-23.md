@@ -1,0 +1,1 @@
+READY loose-sag-axis reviewed 2026-09-23T13:47:06Z — measurement only, nothing built. Axis beats the HELP_SAG tune; crossover BASKET_PULL 0.15, recommended 0.25. Jamie's design decision. Note: reference cannot see this change; acceptance must come from the posture fixture + n=120 outcomes.

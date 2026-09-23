@@ -1,0 +1,1 @@
+READY loose-sag-axis + cutoff-gate reviewed 2026-09-23T15:29:35Z — PASS, both flags OFF, nothing merged. Axis matched the priced geometry; gate lifts help-arrival 52%->74%. KEY: the two are NOT additive (axis removes the blow-bys the gate feeds on). Jamie eye-tests, then decides which to flip.

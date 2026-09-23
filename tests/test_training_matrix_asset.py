@@ -69,9 +69,10 @@ def test_no_attribute_is_quietly_dropped_from_the_page():
 
 
 def test_the_attribute_order_is_the_reading_order_not_the_dict_order():
-    """Offense, defense, body, mind — a scouting report, not insertion order."""
-    assert [c for c, _ in ATTR_ROWS][:4] == ["SC", "SH", "PS", "BH"]
-    assert [c for c, _ in ATTR_ROWS][-3:] == ["FT", "IQ", "ND"]
+    """Standard display order, shared by By Position and By Focus."""
+    assert [c for c, _ in ATTR_ROWS] == [
+        "SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT",
+    ]
 
 
 # ── bands ───────────────────────────────────────────────────────────────────

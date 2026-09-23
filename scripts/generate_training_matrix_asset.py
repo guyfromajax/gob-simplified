@@ -35,21 +35,20 @@ from BackEnd.constants.training_shape import (  # noqa: E402
 
 ASSET = ROOT / "FrontEnd" / "static" / "js" / "generated" / "trainingMatrix.js"
 
-# Row order is the tutorial's, not the dict's: offense, defense, body, mind. It reads as
-# a scouting report rather than as whatever order the constants happen to be written in.
+# Row order is the tutorial's, not the dict's. Same sequence on By Position and By Focus.
 ATTR_ROWS = [
     ("SC", "Scoring"),
     ("SH", "Shooting"),
-    ("PS", "Passing"),
-    ("BH", "Ball Handling"),
     ("ID", "Inside Defense"),
     ("OD", "Outside Defense"),
+    ("PS", "Passing"),
+    ("BH", "Ball Handling"),
     ("RB", "Rebounding"),
     ("ST", "Strength"),
     ("AG", "Agility"),
-    ("FT", "Free Throws"),
-    ("IQ", "Basketball IQ"),
     ("ND", "Endurance"),
+    ("IQ", "Basketball IQ"),
+    ("FT", "Free Throws"),
 ]
 
 FOCUS_LABELS = {
@@ -71,6 +70,35 @@ BANDS = [
 ]
 
 
+# Which attributes a profile is said to DEVELOP, for the hover card on the two editors.
+#
+# 70 rather than the published `full` band (80): at 80 a PG on Rebounding shows only BH,
+# hiding the two attributes that focus actually buys him. At 70 every one of the 30
+# profiles names between 2 and 4 attributes — enough to be a statement, few enough to read
+# without decoding. Verified across the whole matrix, not picked by eye.
+DEVELOPS_MIN = 70
+
+
+def _locked_attrs() -> list[str]:
+    """Attributes identical in all 30 profiles — FT/IQ/ND today.
+
+    They are never what a focus develops, because they are 100% no matter what a coach
+    picks, so marking them would put the same three codes on every player on every focus.
+    Derived, not hardcoded: if a retune ever lets one of them vary, it stops being excluded
+    on the next regeneration.
+    """
+    varies = set()
+    for pos in POSITIONS:
+        for attr, _ in ATTR_ROWS:
+            values = {TRAINING_FOCUS_PERCENTAGES[pos][f][attr] for f in TRAINING_FOCUSES}
+            if len(values) > 1:
+                varies.add(attr)
+    all_attrs = {a for a, _ in ATTR_ROWS}
+    return [a for a, _ in ATTR_ROWS if a not in varies and
+            all(TRAINING_FOCUS_PERCENTAGES[p][f][a] == 100
+                for p in POSITIONS for f in TRAINING_FOCUSES)]
+
+
 def build_payload() -> dict:
     matrix = {
         pos: {
@@ -84,6 +112,7 @@ def build_payload() -> dict:
         "focuses": [{"value": f, "label": FOCUS_LABELS[f]} for f in TRAINING_FOCUSES],
         "attributes": [{"code": c, "name": n} for c, n in ATTR_ROWS],
         "bands": BANDS,
+        "develops": {"min": DEVELOPS_MIN, "locked": _locked_attrs()},
         "matrix": matrix,
     }
 

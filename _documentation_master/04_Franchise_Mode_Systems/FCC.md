@@ -201,9 +201,12 @@ The current live tab bar contains:
 9. `Schedule`
 10. `Team Stats`
 11. `Leaders`
-12. `News` (tab id is still `press-tab`)
+12. `Training` (tab id `training-tab`)
 13. `Recruits`
-14. `Inbox`
+14. `News` (tab id is still `press-tab`)
+
+The `Inbox` tab is **retired**. Everything it published now runs inside `News`; `Training`
+took the slot `News` used to hold, and `News` moved to the end where the Inbox was.
 
 Important clarification:
 
@@ -787,60 +790,56 @@ Footer link:
 
 ---
 
-## Inbox Tab
+## Training Tab
 
-The `Inbox` tab is now a live hybrid of:
+Second — and only other — place a coach can edit Development Focus. Same grid, same hover
+card and the same team-wide summaries as the training page, from the one shared module
+`js/shared/playerDevelopmentGrid.js` (styles: `css/player-development-grid.css`).
 
-1. persisted season inbox items
-2. synthetic training-report shortcut
+| | |
+|---|---|
+| Source | the roster the FCC already holds (`userRosterDataCache`) |
+| Why not `/franchise/training-points` | it 400s after week 26 and is the training page's own dependency; using it here would rebuild the gap this tab exists to close |
+| Reachability | any week, including after the week's training is submitted and through the postseason — unlike the training page, which redirects to the report once training is in |
+| Order | best-position RT descending, and **fixed while editing** — re-sorting would pull a row out from under the coach the instant he used it |
+| Displayed RT | the rating at his **training** position, repainted on a position change |
+| Hover card | year, height, weight and the core 12 attributes |
+| Summaries | **above** the roster: a summary belongs before the detail it summarises, and twelve rows would push it below the fold |
 
-### Persisted season inbox
+A **Training by Position** button sits in the tab header, right-justified, matching the
+training page's. It sets a tutorial resume context so the chart's footer returns here. The
+training page's version also saves the in-progress point allocation first; this one has
+nothing to protect, because every change on this tab is already saved.
 
-Source:
-
-- `topData.season_inbox`
-
-Current supported live type:
-
-- `game_result`
-
-Format:
-
-- `Week #7: Morristown defeated Lancaster 68-61 box score`
-- `Week #8: Morristown lost to Little York 59-64 box score`
-
-Behavior:
-
-- newest items appear first
-- items persist for the full season
-- reset when next season initializes
-
-### Training report link
-
-Source:
-
-- `topData.last_training_report_week`
-
-Format:
-
-- `Week 3 training report here.`
-
-Link target:
-
-- `training-report.html?...&from=inbox`
-
-Important system note:
-
-- the training item is still synthesized from franchise state
-- the game-result items are persisted in `season_inbox`
-- FCC renders the synthesized training-report item at the top of the Inbox
-- persisted `season_inbox` game-result items render underneath it in newest-first order
-
-If neither source produces items:
-
-- FCC renders `Inbox is empty.`
+Writes go through `POST /franchise/player/development-focus`, the same route every other
+surface uses. See `09_Training_Systems/Training_System.md` for the profile matrix itself.
 
 ---
+
+## News Tab — your team's dispatches
+
+The retired Inbox's contents are **interleaved into the News tab's existing week cards**,
+above that week's league headlines and styled apart (`.fcc-news-mine`), so one week reads
+as one story rather than two lists in two places.
+
+Builder: `fccTeamDispatches(topData)` in `franchise-command-center.js`, which returns
+`{ week, html }` entries for `renderNewsTab` to bucket by week.
+
+Three item types, all preserved from the Inbox:
+
+| Type | Source | Link |
+|---|---|---|
+| Training report | `topData.last_training_report_week` (most recent week only) | `training-report.html?...&from=news` |
+| Practice Squad development report | `season_inbox` item `type: 'training_squad_report'` | `training-squad-report.html?...&from=news` |
+| Game result | `season_inbox` item `type: 'game_result'` | `item.box_score_url` |
+
+**No migration was needed.** `season_inbox` still lives on the franchise document and is
+read unchanged — only the presentation moved. Franchises that already have items show them
+in News immediately; nothing was backfilled and nothing was lost.
+
+**Legacy links keep working.** Report links already shared or bookmarked carry `from=inbox`.
+`training-report.js` accepts `inbox` and `news` as the same thing, and its **Back** button
+now returns to `tab=press-tab` (News) instead of the tab that no longer exists.
 
 ## Recruiting Surface Outside The Recruits Tab
 

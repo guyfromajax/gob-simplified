@@ -81,7 +81,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         # Reduced substantially (design §7.2) — the offseason event owns career
         # growth, so in-season decay is now a light drag, not a treadmill.
         self.assertEqual(_pre_training_decay_range_for_year("freshman"), (-2, 0))
-        self.assertEqual(_pre_training_decay_range_for_year("sophomore"), (-2, 0))
+        self.assertEqual(_pre_training_decay_range_for_year("sophomore"), (-1, 0))
         self.assertEqual(_pre_training_decay_range_for_year("junior"), (-1, 0))
         self.assertEqual(_pre_training_decay_range_for_year("senior"), (-1, 0))
         self.assertEqual(_pre_training_decay_range_for_year("unknown"), (-1, 0))

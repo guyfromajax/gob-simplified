@@ -17,8 +17,9 @@ async function waitForCanonicalRosters(request) {
   if (missing.length) {
     throw new Error(
       `Canonical roster(s) missing: ${missing.join('; ')}. ` +
-        'Playwright reused a bare `dev.py` on :8000 (empty mongomock). ' +
-        'Kill that server and let webServer start tests/e2e/helpers/seed_and_serve.py.'
+        'webServer did not seed these rosters. Kill whatever is on :8000 ' +
+        'and let Playwright start tests/e2e/helpers/seed_and_serve.py ' +
+        '(reuseExistingServer is off unless PW_REUSE_SERVER=1).'
     );
   }
 }

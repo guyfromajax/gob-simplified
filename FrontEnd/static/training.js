@@ -146,99 +146,56 @@ function wireTrainingTutorialButton() {
 /**
  * Player Development: the 12 active players, their training position and focus.
  *
- * Data comes from `custom_focus_roster` on /franchise/training-points — the same rows the
- * Player Maximizer modal uses, already RT-descending and already carrying both fields, so
- * this section costs no extra request. Controls are the shared Development Focus module.
+ * Rendering lives in js/shared/playerDevelopmentGrid.js, shared with the FCC's Training
+ * tab — the only other place these are editable. This function's whole job is adapting
+ * `custom_focus_roster` (already RT-descending, already carrying both fields, year, all 12
+ * attributes, height/weight and every position rating) into that module's shape.
  */
 const playerDevSection = document.getElementById('player-dev-section');
-const playerDevGrid = document.getElementById('player-dev-grid');
 
 function playerDevFranchiseId() {
   return liveParams().get('franchise_id') || '';
 }
 
-function playerDevMaxRt(row) {
-  const ratings = (row && row.position_ratings) || {};
-  let best = null;
-  Object.keys(ratings).forEach(function (pos) {
-    const v = Number(ratings[pos]);
-    if (isFinite(v) && (best === null || v > best)) best = v;
-  });
-  return best;
-}
-
-function renderPlayerDevelopment() {
-  const dev = window.GOBDevelopmentFocus;
-  if (!playerDevSection || !playerDevGrid || !dev) return;
-  const rows = Array.isArray(customFocusRoster) ? customFocusRoster : [];
-  if (!rows.length) {
-    playerDevSection.hidden = true;
-    return;
-  }
-  playerDevSection.hidden = false;
-
-  playerDevGrid.innerHTML = rows.map(function (row) {
-    const player = {
+function playerDevRows() {
+  return (Array.isArray(customFocusRoster) ? customFocusRoster : []).map(function (row) {
+    return {
+      id: row.player_id,
       _id: row.player_id,
       player_id: row.player_id,
+      name: row.name,
+      year: row.year,
+      height: row.height,
+      weight: row.weight,
+      attributes: row.attrs || {},
       position_ratings: row.position_ratings || {},
       training_position: row.training_position || null,
       training_focus: row.training_focus || null,
       resolved_training_position: row.resolved_training_position || null,
       resolved_training_focus: row.resolved_training_focus || null,
     };
-    const rt = playerDevMaxRt(row);
-    return '<div class="player-dev-card">' +
-      '<span class="player-dev-name" title="' + escapeTrainingAttr(row.name) + '">' +
-        escapeTrainingAttr(row.name) + '</span>' +
-      '<span class="player-dev-rt">' + (rt == null ? '--' : Math.round(rt)) + '</span>' +
-      '<span class="player-dev-controls">' +
-        dev.positionSelectHtml(player) + dev.focusSelectHtml(player) +
-      '</span>' +
-    '</div>';
-  }).join('');
-
-  dev.bind(playerDevGrid, playerDevFranchiseId, function (playerId, field, value) {
-    const key = field === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position';
-    rows.forEach(function (r) {
-      if (String(r.player_id) === String(playerId)) { r[field] = value; r[key] = value; }
-    });
-    renderPlayerDevelopmentTally();
   });
-  renderPlayerDevelopmentTally();
 }
 
-/** Positions left, focuses right — how the squad is being coached, in one line. */
-function renderPlayerDevelopmentTally() {
-  const dev = window.GOBDevelopmentFocus;
-  const posEl = document.getElementById('player-dev-tally-positions');
-  const focEl = document.getElementById('player-dev-tally-focuses');
-  if (!dev || !posEl || !focEl) return;
-  const rows = Array.isArray(customFocusRoster) ? customFocusRoster : [];
-
-  const item = function (label, n) {
-    return '<span class="player-dev-tally-item' + (n ? '' : ' is-zero') + '">' +
-      escapeTrainingAttr(label) + ' <b>' + n + '</b></span>';
-  };
-
-  const byPos = {};
-  const byFocus = {};
-  rows.forEach(function (r) {
-    const p = dev.positionOf(r);
-    const f = dev.focusOf(r);
-    byPos[p] = (byPos[p] || 0) + 1;
-    byFocus[f] = (byFocus[f] || 0) + 1;
-  });
-
-  posEl.innerHTML = dev.POSITIONS.map(function (p) { return item(p, byPos[p] || 0); }).join('');
-  focEl.innerHTML = dev.FOCUSES.map(function (f) {
-    return item(f.label, byFocus[f.value] || 0);
-  }).join('');
-}
-
-function escapeTrainingAttr(value) {
-  return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
-    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+function renderPlayerDevelopment() {
+  const grid = window.GOBPlayerDevelopmentGrid;
+  if (!playerDevSection || !grid) return;
+  const rows = playerDevRows();
+  if (!rows.length) {
+    playerDevSection.hidden = true;
+    return;
+  }
+  playerDevSection.hidden = false;
+  grid.render(playerDevSection, rows, {
+    getFranchiseId: playerDevFranchiseId,
+    // Write back to the source array so a later re-render keeps the change.
+    onSaved: function (playerId, field, value) {
+      const key = field === 'training_focus'
+        ? 'resolved_training_focus' : 'resolved_training_position';
+      (customFocusRoster || []).forEach(function (r) {
+        if (String(r.player_id) === String(playerId)) { r[field] = value; r[key] = value; }
+      });
+    },
   });
 }
 

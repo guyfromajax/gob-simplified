@@ -86,10 +86,29 @@ Each phase is independently shippable.
 - `resolve_training_focus(player)` mirroring `resolve_training_position`, defaulting to `standard`.
 - **Gate:** `standard` output is byte-identical to today for all 5 positions × 12 attrs.
 
-### Phase 2 — Data model + backfill — **SHIPPED**
+### Phase 2 — Data model + backfill — **SHIPPED (staging + production)**
 - FPD reads/writes for both fields; validation against the six stored values (reject, don't coerce silently).
 - Backfill script in `scripts/` (repo already has `backfill_*.py` precedent), **idempotent, additive-only, never deletes or replaces existing docs**.
 - Creation paths default both fields: franchise init, recruit signing, walk-ons, transfers, season rollover.
+
+**Production migration — 2026-09-22.** `scripts/backfill_development_focus.py --db gob --apply`.
+93,411 FPD docs updated; 60 already carried a `training_position` (the field predates this
+project) and took only `training_focus`. Position resolved from: intent 21,060 · ratings
+66,803 · ratings-tie 5,488. Zero skipped. Verified by an independent re-query: `total_docs`
+matching `MISSING_FILTER` is 0 and `scanned_all_docs` still 93,411.
+
+**Production is pre-recalibration, and this froze that.** The derived position mix came out
+PG 17.9% · SG 19.6% · SF 11.7% · PF 15.8% · **C 34.9%**, against staging's 18.7% C — prod
+still has the old height-weighted RT formula, without the attribute recalibration and the
+height −2 shift. `training_position` is persisted and this backfill is idempotent, so if the
+recalibration later ships to prod, **32,590 players stay pinned to C** and will not
+re-derive. Decision taken knowingly (2026-09-22). If that recal happens, pair it with a
+re-derive pass over players whose focus is still `standard` and whose position was never
+coach-set — a deliberate conversion must never be overwritten.
+
+Note the backfill was never required for correctness: `resolve_training_position` /
+`resolve_training_focus` already fall back to `position_intent` → best rating → `standard`,
+which is exactly what was written. It makes stored state explicit, nothing more.
 
 ### Phase 3 — Execution wiring — **SHIPPED**
 - Focus flows through camp + in-season.

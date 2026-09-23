@@ -5,6 +5,8 @@
   },
   "gate_b": {
     "description": "WS-3: FrontEnd/static lines matching URLSearchParams, location.search, or .searchParams. Count may fall, never rise.",
-    "files": {}
+    "files": {
+      "FrontEnd/static/franchise-command-center.js": 1
+    }
   }
 }

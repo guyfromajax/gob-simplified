@@ -15,7 +15,7 @@ published staging→production; production is the last published snapshot.
 Production read (Jamie). Scratch paths only — never the committed sidecar::
 
   GOB_DB_ACCESS=read ENVIRONMENT=production MONGO_DB_NAME=gob \\
-    MONGO_URI='mongodb+srv://…/gob' \\
+    MONGO_URI='mongodb+srv://…/dbname' \\
     python scripts/export_catalog_sidecar.py --target gob \\
       --output /tmp/catalog-prod.sqlite --json-output /tmp/catalog-prod.json
 

@@ -160,25 +160,46 @@
         var value = select.value;
         var previous = select.dataset.devfocusPrev || '';
         select.disabled = true;
-        save(getFranchiseId(), playerId, field, value)
-          .then(function (result) {
+        save(getFranchiseId(), playerId, field, value).then(
+          // SUCCESS. Nothing in here may reject the chain: the rejection handler below
+          // reverts the control, so a throw after a SAVED change would put the old value
+          // back on screen while the database held the new one. A missing `toastTimer`
+          // declaration did exactly that — every first change looked like it failed, and
+          // picking a different value second left the control showing neither.
+          function (result) {
             select.dataset.devfocusPrev = value;
-            if (typeof onSaved === 'function') onSaved(playerId, field, value, result);
-            toast(field === 'training_focus'
-              ? 'Development focus updated'
-              : 'Training position updated');
-          })
-          .catch(function (err) {
-            // Put the control back where it was: a silent revert would look like the
-            // save worked, which is the one outcome a coach must not be told.
+            runSafely(function () {
+              if (typeof onSaved === 'function') onSaved(playerId, field, value, result);
+            });
+            runSafely(function () {
+              toast(field === 'training_focus'
+                ? 'Development focus updated'
+                : 'Training position updated');
+            });
+          },
+          // FAILURE. Passed as .then's SECOND argument, not .catch, so it cannot see
+          // anything thrown by the success handler above it — only a genuine rejection
+          // from save() can revert the control. That is structural, not a convention.
+          function (err) {
             if (previous) select.value = previous;
-            toast(err.message || 'Could not save', true);
-          })
-          .finally(function () { select.disabled = false; });
+            runSafely(function () { toast((err && err.message) || 'Could not save', true); });
+          }
+        ).finally(function () { select.disabled = false; });
       });
       select.dataset.devfocusPrev = select.value;
     });
   }
+
+  /** Run a side effect that must never decide whether the save succeeded. */
+  function runSafely(fn) {
+    try {
+      fn();
+    } catch (err) {
+      console.error('[Development Focus] post-save step failed:', err);
+    }
+  }
+
+  var toastTimer = null;
 
   function toast(message, isError) {
     var el = document.getElementById('devfocus-toast');

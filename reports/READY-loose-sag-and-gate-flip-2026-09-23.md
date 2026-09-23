@@ -1,0 +1,1 @@
+READY loose-sag + gate flip reviewed 2026-09-23T17:00:07Z — PASS. Three kill-switch proofs, both re-baselines held (160/160 and 80/80 x2). New reference equiv_v3_reference_1f4af0ede_loosesag_nogate.json; new loose baseline ..._1f4af0ede_loosesag.json. Rollback: GOB_HCO_CUTOFF_NO_GATE=0 restores fingerprints; GOB_MAN_LOOSE_SAG_AXIS=0 rolls back against the loose baseline.

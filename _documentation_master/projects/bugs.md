@@ -4381,3 +4381,32 @@ Full suite on the sidecar worktree: 3114 passed / 3 failed / 20 skipped / 112
 xfailed. The same three fail when pointed at `gob-simplified` develop. They
 are new reds on the default pytest run — the reason `--maxfail` came out —
 and need a develop-side triage, not a desktop adapter change.
+
+## [TEST] Current develop Playwright baseline is 384/11 — not 392/3 or 382/13
+
+Logged 2026-09-22 on `aa41bf96b` (develop tip, “added tutorial tab to FCC”)
+with `CI=1` so Playwright starts its own `seed_and_serve` and does **not**
+reuse :8000. 395 tests, 1 worker, **384 passed / 11 failed**.
+
+The earlier 382/13 (`e9fd11fda`, 7 workers) included **8 fake `court-layout`
+reds** from a leftover/unseeded :8000. Isolated and under `CI=1`, those 12
+specs are green on #588, on `e9fd11fda`, and on current develop. Do not treat
+court-layout as a develop regression.
+
+The 11 real reds:
+
+- `fcc-invite-step` week 36 still offers the season transition —
+  received `view-recruiting-results`, expected `new-season`
+- `fcc-recruiting-layout` tab badge — Recruiting tab text is null after
+  `aa41bf96b` added a Tutorial tab
+- `fcc-roster-tab` column order / sort keys — FCC HTML now has a trailing
+  **DEV FOCUS** column (`c-devfocus`); tests still expect 7 headers
+  without it
+- `homepage-v3-auth` homepage-v3.html redirects to homepage.html
+- `invite-board-layout` stacked row — Sammy seed modal now loads (FileResponse
+  `/js`) and sits on `.pool-add`. Product-correct; test needs to dismiss it.
+- `invite-board` seed-notice (4) — same Sammy backdrop intercepts
+  `#board-seed-dismiss` / reorder / save
+- `season-advance` confirm modal dismissed before the request, not after
+
+The old 392/3 gate is days stale. 382/13 was poisoned by server reuse.
