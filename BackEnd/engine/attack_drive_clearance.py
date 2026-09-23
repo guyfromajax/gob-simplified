@@ -519,7 +519,7 @@ HCO_CUTOFF_DEFENDER_TIME_SLACK = 1.0     # no arrival-time credit (a clean blow-
 # and aggressive defenses "sit deeper in help lanes and cut off more" — which was never what the
 # numbers said; `passive` is the lowest entry, not the highest.
 #
-# GOB_HCO_CUTOFF_NO_GATE (default OFF) removes the gate entirely: every aggression setting attempts
+# GOB_HCO_CUTOFF_NO_GATE (default ON since 2026-09-23) removes the gate entirely: every aggression setting attempts
 # the rotation. Whether it SUCCEEDS is unchanged — the candidate still has to be inside
 # HCO_CUTOFF_PATH_CORRIDOR, still has to win the arrival race at its own AG rate with
 # HCO_CUTOFF_DEFENDER_TIME_SLACK, and still has to win the contest roll. Only the attempt gate goes.
@@ -529,10 +529,15 @@ HCO_CUTOFF_NO_GATE_FLAG = "GOB_HCO_CUTOFF_NO_GATE"
 
 
 def cutoff_gate_removed() -> bool:
-    """``GOB_HCO_CUTOFF_NO_GATE`` - **default OFF**. ON → stop_attempt_prob 1.0 for every
-    aggression setting, so the attempt gate never turns a help defender away."""
+    """``GOB_HCO_CUTOFF_NO_GATE`` - **default ON** since 2026-09-23. stop_attempt_prob is 1.0
+    for every aggression setting, so the attempt gate never turns a help defender away.
+
+    Kill switch: ``GOB_HCO_CUTOFF_NO_GATE=0`` restores the aggression gate and, together with
+    ``GOB_MAN_LOOSE_SAG_AXIS=0``, reproduces ``equiv_v3_reference_09f1b0ca9_boxout.json``.
+    This is the flag that actually moves that reference; the axis is invisible to it.
+    """
     import os
-    return os.environ.get(HCO_CUTOFF_NO_GATE_FLAG, "0") == "1"
+    return os.environ.get(HCO_CUTOFF_NO_GATE_FLAG, "1") == "1"
 
 
 def hco_cutoff_stop_attempt_prob(aggression) -> float:
