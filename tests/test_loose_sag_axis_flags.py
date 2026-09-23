@@ -1,4 +1,4 @@
-"""The loose sag axis ships behind ``GOB_MAN_LOOSE_SAG_AXIS``, **default OFF** (2026-09-23).
+"""The loose sag axis ships behind ``GOB_MAN_LOOSE_SAG_AXIS``, **default ON** (2026-09-23).
 
 `HELP_SAG` moves the off-ball helper a fraction of the way from his man toward a TARGET, and
 that target is the ball — so "loose" means drifting ball-ward, away from the man *and* away
@@ -13,6 +13,14 @@ This is a shipped-defaults guard. It also pins the properties the build rests on
   * deny and the inside-man lock return before this branch and must stay untouched;
   * no clamp;
   * it is independent of ``GOB_MAN_HELP_SHADE`` — the shade is a separate second term.
+
+Note on the kill switch: ``GOB_MAN_LOOSE_SAG_AXIS=0`` does NOT on its own restore the main
+equiv-v3 reference, because that reference runs base man where the pull is 0.0 either way. What
+it restores is ``equiv_v3_loose_baseline_ef00985ce.json``, the loose footing.
+
+Because the default is now ON, every paired before/after test below sets the flag to "0"
+explicitly for its "before" state. An unset flag is no longer the off state, and without that
+they would silently compare ON against ON.
 """
 
 import inspect
@@ -29,7 +37,7 @@ BASE = {"x": 0.0, "y": 0.0}
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    """No flag set - so the helper returns its shipped default (OFF)."""
+    """No flag set - so the helper returns its shipped default (ON since 2026-09-23)."""
     monkeypatch.delenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, raising=False)
 
 
@@ -42,27 +50,31 @@ def place(man, ball, posture="loose", away=False, spot="lower wing"):
     return SD._apply_defender_posture(dict(BASE), man, ball, False, spot, posture, away)
 
 
-def test_axis_defaults_off(clean_env):
-    assert SD.loose_sag_axis_enabled() is False, (
-        "GOB_MAN_LOOSE_SAG_AXIS must default OFF. This is built and measured, not flipped."
+def test_axis_defaults_on(clean_env):
+    assert SD.loose_sag_axis_enabled() is True, (
+        "GOB_MAN_LOOSE_SAG_AXIS must default ON. The loose helper sagging toward a target "
+        "blended a quarter of the way to the rim is the shipped behaviour."
     )
 
 
 def test_axis_kill_switch(clean_env, monkeypatch):
+    """The rollback path to equiv_v3_loose_baseline_ef00985ce.json."""
     monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "0")
     assert SD.loose_sag_axis_enabled() is False
     monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "1")
     assert SD.loose_sag_axis_enabled() is True
 
 
-def test_flag_off_targets_the_ball_exactly(clean_env):
+def test_flag_off_targets_the_ball_exactly(clean_env, monkeypatch):
     """OFF must return the ball itself, not a recomputed value that happens to match."""
+    monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "0")
     assert SD._help_sag_target((68.0, 44.0), (91.0, 25.0), "loose") == (68.0, 44.0)
     assert SD._help_sag_target((68.0, 44.0), (91.0, 25.0), "normal") == (68.0, 44.0)
 
 
 def test_normal_is_byte_identical_with_the_flag_on(clean_env, no_jitter, monkeypatch):
     """The whole reason the equiv-v3 reference cannot see this change."""
+    monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "0")
     off = place(WEAK_MAN, BALL, posture="normal")
     monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "1")
     assert place(WEAK_MAN, BALL, posture="normal") == off
@@ -71,6 +83,7 @@ def test_normal_is_byte_identical_with_the_flag_on(clean_env, no_jitter, monkeyp
 
 def test_normal_is_unchanged_at_any_pull_value(clean_env, no_jitter, monkeypatch):
     """Not just at the shipped 0.25 - normal must be pinned at 0.0 whatever loose is set to."""
+    monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "0")
     off = place(WEAK_MAN, BALL, posture="normal")
     monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "1")
     for loose_pull in (0.25, 0.5, 1.0):
@@ -81,6 +94,7 @@ def test_normal_is_unchanged_at_any_pull_value(clean_env, no_jitter, monkeypatch
 def test_loose_moves_toward_the_defended_rim(clean_env, no_jitter, monkeypatch):
     from BackEnd.constants import HOME_RIM_COORDS
     rim = (float(HOME_RIM_COORDS["x"]), float(HOME_RIM_COORDS["y"]))
+    monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "0")
     off = place(WEAK_MAN, BALL)
     monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "1")
     on = place(WEAK_MAN, BALL)
@@ -91,6 +105,7 @@ def test_away_offense_uses_the_mirrored_rim(clean_env, no_jitter, monkeypatch):
     from BackEnd.constants import AWAY_RIM_COORDS
     rim = (float(AWAY_RIM_COORDS["x"]), float(AWAY_RIM_COORDS["y"]))
     man, ball = {"x": 32.0, "y": 8.0}, {"x": 32.0, "y": 44.0}
+    monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "0")
     off = place(man, ball, away=True)
     monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "1")
     on = place(man, ball, away=True)
@@ -118,6 +133,7 @@ def test_pull_1_targets_the_rim_exactly(clean_env, monkeypatch):
 
 
 def test_deny_is_untouched(clean_env, no_jitter, monkeypatch):
+    monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "0")
     off = place(WEAK_MAN, BALL, posture="tight")
     monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "1")
     assert place(WEAK_MAN, BALL, posture="tight") == off
@@ -129,6 +145,7 @@ def test_inside_man_lock_is_untouched(clean_env, no_jitter, monkeypatch):
 
 
 def test_on_ball_cushion_is_untouched(clean_env, no_jitter, monkeypatch):
+    monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "0")
     off = SD._apply_defender_posture(dict(BASE), WEAK_MAN, BALL, True, "lower wing", "loose", False)
     monkeypatch.setenv(SD.MAN_LOOSE_SAG_AXIS_FLAG, "1")
     on = SD._apply_defender_posture(dict(BASE), WEAK_MAN, BALL, True, "lower wing", "loose", False)
