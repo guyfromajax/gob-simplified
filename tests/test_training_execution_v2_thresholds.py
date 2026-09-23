@@ -63,7 +63,7 @@ def test_pre_training_decay_ranges_by_year():
     # The offseason-ownership decision (§7.2) explicitly retired the heavy decay
     # treadmill below; weekly decay is now light drag because rollover owns growth.
     assert training._pre_training_decay_range_for_year("freshman") == (-2, 0)
-    assert training._pre_training_decay_range_for_year("sophomore") == (-2, 0)
+    assert training._pre_training_decay_range_for_year("sophomore") == (-1, 0)
     assert training._pre_training_decay_range_for_year("junior") == (-1, 0)
     assert training._pre_training_decay_range_for_year("senior") == (-1, 0)
 

@@ -93,7 +93,6 @@ XFAIL: dict[str, str] = {
     "tests/test_tournament_player_stats.py::test_apply_stats_idempotent": "stale: idempotent apply count 0 vs 10",
     "tests/test_tournament_run_training_stub.py::test_run_training_returns_404": "stale: training stub copy/status moved",
     "tests/test_tournament_state_applied_games.py::test_tournament_state_casts_applied_games_to_strings": "stale: applied_games cast path returns 404 vs 200",
-    "tests/test_training_execution_v2_thresholds.py::test_pre_training_decay_ranges_by_year": "stale: decay range (-1,0) vs (-2,0)",
     "tests/test_training_execution_v2_thresholds.py::test_rebound_modifier_uses_half_point_accrual_from_rebounding_and_scrimmages": "stale: rebound-modifier bucket pairing retuned",
     "tests/test_training_execution_v2_thresholds.py::test_fight_and_discipline_share_training_bucket_randint_pairs": "stale: fight/discipline buckets retuned",
     "tests/test_training_execution_v2_thresholds.py::test_standard_and_chemistry_training_bucket_ranges": "stale: standard/chemistry buckets retuned",
