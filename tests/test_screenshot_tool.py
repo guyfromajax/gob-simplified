@@ -289,10 +289,17 @@ def test_retired_capture_runtime_cannot_be_reintroduced_silently():
         "html2canvas",
         "preserveDrawingBuffer",
     )
+    vendor_root = (ROOT / "FrontEnd" / "static" / "js" / "vendor").resolve()
     matches = []
     for shipped_root in shipped_roots:
         for path in shipped_root.rglob("*"):
             if not path.is_file():
+                continue
+            try:
+                resolved = path.resolve()
+            except OSError:
+                continue
+            if resolved.is_relative_to(vendor_root):
                 continue
             try:
                 text = path.read_text()

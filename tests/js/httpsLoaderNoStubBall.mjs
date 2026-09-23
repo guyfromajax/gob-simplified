@@ -1,22 +1,44 @@
-export async function resolve(specifier, context, defaultResolve) {
-  if (specifier.startsWith('https://')) {
-    return { url: specifier, format: 'module', shortCircuit: true };
-  }
-  return defaultResolve(specifier, context, defaultResolve);
-}
+import path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 
-export async function load(url, context, defaultLoad) {
-  if (url.startsWith('https://')) {
-    return {
-      format: 'module',
-      source: `export const Math = {
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+
+const PHASER_MATH_STUB = `export const Math = {
   Distance: { Between: (x1, y1, x2, y2) => globalThis.Math.hypot(x2 - x1, y2 - y1) },
   Between: (min, max) => min,
   Clamp: (value, min, max) => {
     if (min > max) [min, max] = [max, min];
     return globalThis.Math.max(min, globalThis.Math.min(max, value));
   }
-};`,
+};`;
+
+function isVendoredPhaser(url) {
+  return (
+    url.startsWith('file:') &&
+    /\/FrontEnd\/static\/js\/vendor\/phaser-\d+\.\d+\.\d+\.esm\.js$/.test(
+      fileURLToPath(url)
+    )
+  );
+}
+
+export async function resolve(specifier, context, defaultResolve) {
+  if (specifier.startsWith('https://')) {
+    return { url: specifier, format: 'module', shortCircuit: true };
+  }
+  if (specifier.startsWith('/js/vendor/')) {
+    const disk = path.join(ROOT, 'FrontEnd/static', specifier.slice(1));
+    return { url: pathToFileURL(disk).href, format: 'module', shortCircuit: true };
+  }
+  return defaultResolve(specifier, context, defaultResolve);
+}
+
+export async function load(url, context, defaultLoad) {
+  // jsDelivr Phaser used to land here. Vendored Phaser is resolved to disk above,
+  // but the browser bundle still cannot execute in Node (HTMLVideoElement).
+  if (url.startsWith('https://') || isVendoredPhaser(url)) {
+    return {
+      format: 'module',
+      source: PHASER_MATH_STUB,
       shortCircuit: true
     };
   }

@@ -142,8 +142,8 @@ class TestCustomNameJoinMap(unittest.TestCase):
             def find(self, *a, **k):
                 return list(team_rows)
 
-        with mock.patch("BackEnd.db.franchise_team_data_collection", FakeFtd()), mock.patch(
-            "BackEnd.db.teams_collection", FakeTeams()
+        with mock.patch.object(su, "franchise_team_data_collection", FakeFtd()), mock.patch.object(
+            su, "teams_collection", FakeTeams()
         ), mock.patch.object(
             ftdisp,
             "get_team_builder_overlay",
@@ -181,8 +181,8 @@ class TestCustomNameJoinMap(unittest.TestCase):
             def find(self, *a, **k):
                 return [{"_id": replaced, "name": "Concord", "team_id": "concord"}]
 
-        with mock.patch("BackEnd.db.franchise_team_data_collection", FakeFtd()), mock.patch(
-            "BackEnd.db.teams_collection", FakeTeams()
+        with mock.patch.object(su, "franchise_team_data_collection", FakeFtd()), mock.patch.object(
+            su, "teams_collection", FakeTeams()
         ), mock.patch.object(ftdisp, "get_team_builder_overlay", return_value=None):
             name_to_id, _ = su._build_franchise_team_maps_from_ftd(fid)
 

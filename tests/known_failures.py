@@ -93,7 +93,6 @@ XFAIL: dict[str, str] = {
     "tests/test_tournament_player_stats.py::test_apply_stats_idempotent": "stale: idempotent apply count 0 vs 10",
     "tests/test_tournament_run_training_stub.py::test_run_training_returns_404": "stale: training stub copy/status moved",
     "tests/test_tournament_state_applied_games.py::test_tournament_state_casts_applied_games_to_strings": "stale: applied_games cast path returns 404 vs 200",
-    "tests/test_training_execution_v2_thresholds.py::test_pre_training_decay_ranges_by_year": "stale: decay range (-1,0) vs (-2,0)",
     "tests/test_training_execution_v2_thresholds.py::test_rebound_modifier_uses_half_point_accrual_from_rebounding_and_scrimmages": "stale: rebound-modifier bucket pairing retuned",
     "tests/test_training_execution_v2_thresholds.py::test_fight_and_discipline_share_training_bucket_randint_pairs": "stale: fight/discipline buckets retuned",
     "tests/test_training_execution_v2_thresholds.py::test_standard_and_chemistry_training_bucket_ranges": "stale: standard/chemistry buckets retuned",
@@ -113,7 +112,6 @@ XFAIL: dict[str, str] = {
     "tests/test_weekly_recruiting_training_flow.py::test_fcc_current_week_invite_recruit_returns_assigned_visit_after_processing": "stale: invite recruit_id no longer assigned",
     "tests/test_weekly_recruiting_training_flow.py::test_fcc_current_week_invite_recruit_returns_top_remaining_order": "stale: remaining-order recruit_id drifted",
     # broken-harness
-    "tests/test_env_static_safety.py::test_repository_passes_environment_static_safety_scan": "broken-harness: scan reports leftover mongo-client violations",
     "tests/test_lineup_change_sprites.py::test_lineup_change_no_benched_players": "broken-harness: Player.__init__ arity changed",
     "tests/test_load_franchise_names.py::test_load_franchise_names_missing_file": "broken-harness: missing file no longer raises FileNotFoundError",
     "tests/test_load_franchise_names.py::test_load_franchise_names_invalid_json": "broken-harness: invalid JSON no longer raises ValueError",
