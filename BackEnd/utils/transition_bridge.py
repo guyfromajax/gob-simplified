@@ -31,6 +31,7 @@ from BackEnd.utils.animation_step_helpers import (
     pass_arrival_sfx,
     pass_release_sfx,
     stamp_idle_wander_on_still_players,
+    defender_movement_rate,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -337,9 +338,31 @@ def build_walk_up_step(
         destinations[pid] = dict(target)
         # End coord: gate players + fast-enough non-gate players → full target.
         # Slower non-gate players → interrupted at their natural rate within T.
+        #
+        # ORDERING, AND WHY IT IS SAFE: `t` was frozen at the `max(min_t, slowest_t)` above, and
+        # `natural_t` / `rates` were already consumed by the gate selection before that. The
+        # defender spread is applied HERE and nowhere earlier, so a widened defender rate cannot
+        # reach `natural_t`, cannot reach `_offense_arrival_times`, and therefore cannot change
+        # step duration. That is the whole design (reports/ag-spread-sweep-2026-09-24.md §5:
+        # widening the shared rate function instead costs +11.2% game length at s = 0.50).
         player_rate = rates.get(pid, 0.0)
-        if player_rate > 0 and pid in natural_t and natural_t[pid] > t:
-            final_end_coords[pid] = _interrupted_coord(sc, target, player_rate, t)
+        if player_rate > 0 and pid in natural_t:
+            arch_pid = bh_archetype if pid == bh_id else other_archetype
+            eff_rate = defender_movement_rate(
+                _player_lookup_by_id(off_lineup, def_lineup, pid),
+                arch_pid,
+                not _is_offense_player(pid, off_lineup),
+            )
+            if eff_rate == player_rate:
+                # flag off, or an offensive player: reuse the value computed above so the
+                # result is byte-identical rather than merely arithmetically equal.
+                eff_natural_t = natural_t[pid]
+            else:
+                eff_natural_t = _euclid(sc, target) / eff_rate if eff_rate > 0 else 0.0
+            if eff_rate > 0 and eff_natural_t > t:
+                final_end_coords[pid] = _interrupted_coord(sc, target, eff_rate, t)
+            else:
+                final_end_coords[pid] = dict(target)
         else:
             final_end_coords[pid] = dict(target)
         if pid == bh_id:

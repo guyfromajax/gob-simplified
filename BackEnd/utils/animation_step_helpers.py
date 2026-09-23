@@ -1190,6 +1190,83 @@ def rebase_animation_step_next_indices(
             nxt["next_step_index"] = int(nxt["next_step_index"]) + base_index
 
 
+def _is_defender_id(pid: Any, def_lineup: Dict[str, Any]) -> bool:
+    """True when ``pid`` is on the defending lineup. Membership, never a guess."""
+    target = str(pid)
+    for p in (def_lineup or {}).values():
+        if p is None:
+            continue
+        if str(getattr(p, "player_id", None)) == target:
+            return True
+    return False
+
+
+# ── Defender AG spread (GOB_DEFENDER_AG_SPREAD; default OFF) ────────────────────────────────
+# The shipped AG curve is nearly flat: rate = base x (0.90 + AG/100 x 0.2), so across the real
+# league a p90-AG defender is only 1.103x a p10-AG one, and the measured p10->p90 ENDPOINT gap is
+# 0.35 grid units (0.66 on `standard`). Defenders therefore all move alike
+# (reports/ag-spread-sweep-2026-09-24.md).
+#
+# This widens the PLAYER multiplier for DEFENDERS ONLY, keeping the midpoint at AG=50 so the
+# average player is unchanged:
+#
+#     scale(AG) = (1 - s) + (AG / 100) x 2s          s = DEFENDER_AG_SPREAD
+#
+# At s = 0.10 that is algebraically 0.90 + (AG/100) x 0.2 -- the shipped formula -- so the flag
+# off is byte-identical, not merely equivalent.
+#
+# WHY IT IS NOT IN `_ag_grid_per_game_sec`: that function feeds `natural_t`, which feeds the
+# step gate, which sets step duration T. Widening it there costs +11.2% game length at s = 0.50
+# (measured, same report), because 1/x is convex and the league mean AG sits below the 50 anchor.
+# This wrapper is called only AFTER T is frozen, so it cannot reach step duration.
+#
+# ONE SOURCE OF TRUTH: both the endpoint (transition_bridge's final_end_coords loop) and the
+# tween (`stamp_tween_durations` below) call this. If the endpoint used the wide rate and the
+# tween the narrow one, the rendered motion would stop matching the distance covered.
+DEFENDER_AG_SPREAD = 0.50
+DEFENDER_AG_SPREAD_FLAG = "GOB_DEFENDER_AG_SPREAD"
+
+
+def defender_ag_spread_enabled() -> bool:
+    """``GOB_DEFENDER_AG_SPREAD`` - **default OFF**. Built and measured, not flipped."""
+    import os
+    return os.environ.get(DEFENDER_AG_SPREAD_FLAG, "0") == "1"
+
+
+def defender_movement_rate(player: Any, archetype: PlayerArchetype,
+                           is_defender: bool = False) -> float:
+    """grid/game-sec for one player on one step, with the defender spread applied.
+
+    Flag off, or an offensive player, returns ``_ag_grid_per_game_sec`` itself -- the same
+    object call, so there is no second implementation to drift.
+
+    The archetype base is recovered as ``_ag_grid_per_game_sec(None, archetype)``: with no
+    player that resolves AG=50, whose scale is exactly 1.0, so it returns the archetype's own
+    rate. The clamp is applied to the STANDARD-equivalent rate and then scaled by the
+    archetype, which is precisely what ``ag_to_grid_per_game_sec`` +
+    ``_ag_grid_per_game_sec`` do together -- so the two agree at s = 0.10 by construction.
+    """
+    if not is_defender or not defender_ag_spread_enabled():
+        return _ag_grid_per_game_sec(player, archetype)
+    try:
+        from BackEnd.constants import STANDARD_GRID_PER_GAME_SEC
+    except Exception:
+        return _ag_grid_per_game_sec(player, archetype)
+    if player is None:
+        ag = 50.0
+    else:
+        attrs = getattr(player, "attributes", None) or {}
+        try:
+            ag = float(attrs.get("AG", 50)) if isinstance(attrs, dict) else 50.0
+        except (TypeError, ValueError):
+            ag = 50.0
+    s = DEFENDER_AG_SPREAD
+    std = STANDARD_GRID_PER_GAME_SEC * ((1.0 - s) + (ag / 100.0) * 2.0 * s)
+    std = max(0.5, min(std, 60.0))
+    base = _ag_grid_per_game_sec(None, archetype)
+    return base * (std / float(STANDARD_GRID_PER_GAME_SEC))
+
+
 def stamp_tween_durations(
     start: Dict[str, Any],
     end_coords: Dict[str, GridCoord],
@@ -1218,7 +1295,8 @@ def stamp_tween_durations(
             continue
         arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # Same wrapper the endpoint uses, so the tween always matches the distance covered.
+        rate = defender_movement_rate(player, arch, _is_defender_id(pid, def_lineup))
         if rate <= 0:
             continue
         durations[pid] = float(min(dist / rate, step_t))
