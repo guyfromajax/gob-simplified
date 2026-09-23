@@ -20,6 +20,17 @@ Animator methods at Pattern A.
 |---|---|---|
 | **`equiv_v3_reference_09f1b0ca9_boxout.json`** | `09f1b0ca9` (2026-09-23) | **CURRENT, both arms, both footings.** Box-out contest ON by default, **two-directional**: when a defensive crasher has an offensive crasher within `BOXOUT_PAIR_RADIUS` 8.0 the two contest the box-out — `(0.4·RB + 0.4·ST + 0.1·IQ + 0.1·CH) × rand(1,6)`, a tie to the defender — and the **loser's** crash destination is pushed back off the rim by `BOXOUT_PUSHBACK_FRACTION` 0.5 of his remaining travel. Either side can lose: the defender won **48.3%** of 8,792 contests. Nothing retuned. **Team-level rebounding does not move** — at n=120 seed-paired, OREB −0.36 ±1.27, DREB −0.53 ±1.49, OREB share −0.42 ±1.59, and no metric clears its CI — while per-player P(rebound \| winner) is **1.69×** P(rebound \| loser). **Both footings move and every seed differs in all four cells**: the box-out is scheme-independent, keying on crasher geometry rather than man vs zone, so SD=0 pairs at a similar rate to SD=1 (40.2% vs 35.8% of defenders). See `reports/boxout-flip-2026-09-23.md`. |
 
+## Posture-footing baselines
+
+Not part of the supersession chain above. A change that only fires at a non-default **posture**
+is invisible to the ordinary reference, because that reference runs the unset posture (base
+man). These files run `EQUIV_MAN_POSTURE=<posture>` instead and are the thing such a change is
+measured against.
+
+| file | tree | footing | what it baselines |
+|---|---|---|---|
+| `equiv_v3_loose_baseline_ef00985ce.json` | `ef00985ce` (2026-09-23) | `EQUIV_MAN_POSTURE=loose`, `SEED_DEFENSES=1`, both arms, n=40 | Both new flags OFF. Cut because `GOB_MAN_LOOSE_SAG_AXIS` is invisible to `equiv_v3_reference_09f1b0ca9_boxout.json` — `HELP_BASKET_PULL["normal"]` is 0.0, so base man is byte-identical either way. Double re-baselined (80/80 twice); `GOB_MAN_LOOSE_SAG_AXIS=1` moves **every** seed (0/80). See `reports/loose-sag-and-cutoff-gate-2026-09-23.md`. |
+
 ## Superseded — kept deliberately
 
 | file | tree | superseded by | reproduced today by |
