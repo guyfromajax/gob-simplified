@@ -1,0 +1,1 @@
+READY boxout-flip reviewed 2026-09-23T13:35:52Z — PASS, rebounding flat at n=120, kill switch 160/160, double re-baseline held. 3 suite failures inherited from develop (2 node module, 1 phaser guard) — not box-out.
