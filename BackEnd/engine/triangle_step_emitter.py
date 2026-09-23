@@ -39,6 +39,8 @@ from BackEnd.utils.animation_step_schema import (
 
 from BackEnd.engine.rim_runner_step_emitter import (
     _all_player_start_coords,
+    _is_defender_id,
+    defender_movement_rate,
     append_lane_pass_to_rr_resolution_steps,
     _build_burst_step,
     _build_hold_up_step,
@@ -981,8 +983,6 @@ def build_triangle_animation_steps(
         )
         if dr_steps:
             from BackEnd.utils.animation_step_helpers import (
-    _is_defender_id,
-    defender_movement_rate,
                 rebase_animation_step_next_indices,
             )
 
