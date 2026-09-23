@@ -2038,7 +2038,7 @@ POSTURE_DENY_DISTANCE = 2.0
 # Off-ball normal/loose = HELP: sit `sag` of the way from the man toward the ball, + a shade toward the
 # basket (fraction of man→basket), then anchor per dimension (see _apply_defender_posture).
 HELP_SAG = {"normal": 0.30, "loose": 0.55}
-# Off-ball HELP sag AXIS (GOB_MAN_LOOSE_SAG_AXIS; default OFF). `HELP_SAG` above is a fraction of
+# Off-ball HELP sag AXIS (GOB_MAN_LOOSE_SAG_AXIS; default ON since 2026-09-23). `HELP_SAG` above is a fraction of
 # the way from the man toward a TARGET; today that target is the ball, so "loose" means drifting
 # ball-ward, away from the man AND away from the basket. That is why Loose is strictly worse
 # defence: the weak-side helper ends up FURTHER from the rim than at normal (12.05 vs 10.67), and
@@ -2060,10 +2060,16 @@ MAN_LOOSE_SAG_AXIS_FLAG = "GOB_MAN_LOOSE_SAG_AXIS"
 
 
 def loose_sag_axis_enabled():
-    """``GOB_MAN_LOOSE_SAG_AXIS`` - **default OFF**. Set to "1" to blend the off-ball help sag
-    target toward the defended rim by ``HELP_BASKET_PULL[posture]``."""
+    """``GOB_MAN_LOOSE_SAG_AXIS`` - **default ON** since 2026-09-23.
+
+    Kill switch: ``GOB_MAN_LOOSE_SAG_AXIS=0`` restores the ball as the sag target. Note it does
+    NOT on its own restore ``equiv_v3_reference_09f1b0ca9_boxout.json`` - that reference runs
+    base man, where the pull is 0.0 and this flag changes nothing either way, so the rollback
+    there is ``GOB_HCO_CUTOFF_NO_GATE=0``. What this switch restores is
+    ``equiv_v3_loose_baseline_ef00985ce.json``, the loose footing, where it moves every seed.
+    """
     import os  # local, matching man_help_shade_enabled below - this module has no top-level os
-    return os.environ.get(MAN_LOOSE_SAG_AXIS_FLAG, "0") == "1"
+    return os.environ.get(MAN_LOOSE_SAG_AXIS_FLAG, "1") == "1"
 
 
 def _help_sag_target(ball_xy, rim_xy, posture):
