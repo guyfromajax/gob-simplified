@@ -40,6 +40,7 @@ from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
     _player_lookup_by_id,
+    defender_movement_rate,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -250,7 +251,7 @@ def _build_reset_hold_step(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -327,7 +328,7 @@ def _build_reset_pg_converge_step(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -403,7 +404,7 @@ def _build_reset_inbound_pass_step(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}

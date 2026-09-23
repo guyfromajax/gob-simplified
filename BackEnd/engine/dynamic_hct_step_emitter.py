@@ -41,6 +41,7 @@ from BackEnd.constants import (
 )
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
+    defender_movement_rate,
     _euclid,
     _player_lookup_by_id,
     drift_or_hold_coord,
@@ -342,7 +343,8 @@ def _build_loop_step(
                 )
             )
         else:
-            rate = _ag_grid_per_game_sec(player, move_arch)
+            # `pid not in off_ids` is the defender branch above (action "guard_offball").
+            rate = defender_movement_rate(player, move_arch, pid not in off_ids)
         ec = _interrupted_coord(sc, target, rate, t) if rate > 0 else dict(target)
 
         moved = (

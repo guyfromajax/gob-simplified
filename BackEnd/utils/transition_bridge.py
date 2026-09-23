@@ -591,7 +591,7 @@ def _build_handoff_hold_substep(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_state: BallState = {"owner_player_id": bh_id}
@@ -671,7 +671,7 @@ def _build_handoff_converge_substep(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_state: BallState = {"owner_player_id": bh_id}
@@ -847,7 +847,7 @@ def build_pass_step(
             archetype[pid] = continuing_archetype
             destinations[pid] = dict(target)
             player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-            rate_player = _ag_grid_per_game_sec(player, continuing_archetype)
+            rate_player = defender_movement_rate(player, continuing_archetype, not _is_offense_player(pid, off_lineup))
             end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate_player, t)
 
     ball_start: BallState = {
@@ -1079,7 +1079,7 @@ def _build_kickout_positioning_substep(
         archetype[pid] = "cruise"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "cruise")
+        rate = defender_movement_rate(player, "cruise", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_state: BallState = {"owner_player_id": bh_id}
@@ -1178,7 +1178,8 @@ def _build_inbound_passer_hold_step(
                 archetype[pid] = moving_archetype
                 destinations[pid] = dict(target)
                 player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-                rate = _ag_grid_per_game_sec(player, moving_archetype)
+                rate = defender_movement_rate(
+                    player, moving_archetype, not _is_offense_player(pid, off_lineup))
                 end_coords[pid] = (
                     _interrupted_coord(sc, target, rate, t) if rate > 0 else dict(target)
                 )
