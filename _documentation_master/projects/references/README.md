@@ -18,7 +18,7 @@ Animator methods at Pattern A.
 
 | file | tree | what it baselines |
 |---|---|---|
-| **`equiv_v3_reference_09f1b0ca9_boxout.json`** | `09f1b0ca9` (2026-09-23) | **CURRENT, both arms, both footings.** Box-out contest ON by default, **two-directional**: when a defensive crasher has an offensive crasher within `BOXOUT_PAIR_RADIUS` 8.0 the two contest the box-out — `(0.4·RB + 0.4·ST + 0.1·IQ + 0.1·CH) × rand(1,6)`, a tie to the defender — and the **loser's** crash destination is pushed back off the rim by `BOXOUT_PUSHBACK_FRACTION` 0.5 of his remaining travel. Either side can lose: the defender won **48.3%** of 8,792 contests. Nothing retuned. **Team-level rebounding does not move** — at n=120 seed-paired, OREB −0.36 ±1.27, DREB −0.53 ±1.49, OREB share −0.42 ±1.59, and no metric clears its CI — while per-player P(rebound \| winner) is **1.69×** P(rebound \| loser). **Both footings move and every seed differs in all four cells**: the box-out is scheme-independent, keying on crasher geometry rather than man vs zone, so SD=0 pairs at a similar rate to SD=1 (40.2% vs 35.8% of defenders). See `reports/boxout-flip-2026-09-23.md`. |
+| **`equiv_v3_reference_1f4af0ede_loosesag_nogate.json`** | `1f4af0ede` (2026-09-23) | **CURRENT, both arms, both footings.** Two flips in one state. **(1) Loose sag axis** — the man off-ball HELP sag target is blended toward the defended rim by `HELP_BASKET_PULL` {normal **0.0**, loose 0.25}, so Loose protects the rim instead of drifting ball-ward (weak-side defender→rim 12.07 → 9.46, ball-crowding 50.3% → 26.2%). **(2) Drive help-cutoff gate removed** — every aggression setting now attempts a rotation on a tier-A blow-by (`stop_attempt_prob` 1.0); demote rate 52% → 74%. **Only the gate moves this file**: the axis is invisible here because this footing runs base man, where the pull is 0.0. Every seed differs in all four cells. The loose footing has its own baseline below. See `reports/loose-sag-and-gate-flip-2026-09-23.md`. |
 
 ## Posture-footing baselines
 
@@ -29,12 +29,14 @@ measured against.
 
 | file | tree | footing | what it baselines |
 |---|---|---|---|
-| `equiv_v3_loose_baseline_ef00985ce.json` | `ef00985ce` (2026-09-23) | `EQUIV_MAN_POSTURE=loose`, `SEED_DEFENSES=1`, both arms, n=40 | Both new flags OFF. Cut because `GOB_MAN_LOOSE_SAG_AXIS` is invisible to `equiv_v3_reference_09f1b0ca9_boxout.json` — `HELP_BASKET_PULL["normal"]` is 0.0, so base man is byte-identical either way. Double re-baselined (80/80 twice); `GOB_MAN_LOOSE_SAG_AXIS=1` moves **every** seed (0/80). See `reports/loose-sag-and-cutoff-gate-2026-09-23.md`. |
+| **`equiv_v3_loose_baseline_1f4af0ede_loosesag.json`** | `1f4af0ede` (2026-09-23) | `EQUIV_MAN_POSTURE=loose`, `SEED_DEFENSES=1`, both arms, n=40 | **CURRENT loose baseline.** Both flags ON. Double re-baselined (80/80 twice). Future loose work measures against this. |
+| `equiv_v3_loose_baseline_ef00985ce.json` | `ef00985ce` (2026-09-23) | as above | **SUPERSEDED** by `1f4af0ede`, reproduced by **`GOB_MAN_LOOSE_SAG_AXIS=0 GOB_HCO_CUTOFF_NO_GATE=0`**. Both flags OFF; every seed differs from the current one. |
 
 ## Superseded — kept deliberately
 
 | file | tree | superseded by | reproduced today by |
 |---|---|---|---|
+| `equiv_v3_reference_09f1b0ca9_boxout.json` | `09f1b0ca9` | `1f4af0ede` | **`GOB_MAN_LOOSE_SAG_AXIS=0 GOB_HCO_CUTOFF_NO_GATE=0`** — **both are needed by convention**, though `GOB_HCO_CUTOFF_NO_GATE=0` alone is what restores the fingerprints: the axis is invisible at this footing. Verified 160/160 three ways at `1f4af0ede` before the re-cut (both off; axis-only-on; gate-only-on). It baselines the two-directional box-out contest. |
 | `equiv_v3_reference_f2a060488_manhelpshade.json` | `f2a060488` | `09f1b0ca9` | **`GOB_BOXOUT_CONTEST=0`** — verified 40/40 on fingerprint AND draws in all four cells at `09f1b0ca9`, before the re-cut, with every box-out counter at zero. It baselines the **man** weak-side help shade: a man off-ball help defender sags toward the rim he is defending, scaled by how weak-side he is. |
 | `equiv_v3_reference_32db56c77_helpshade.json` | `32db56c77` | `f2a060488` | **`GOB_MAN_HELP_SHADE=0`** — verified 40/40 on fingerprint AND draws in all four cells at `f2a060488`, before the re-cut, with every man-shade counter at zero. It baselines the **zone** weak-side help shade: a zone defender with a man in his area sags toward the rim, scaled by how weak-side he is. |
 | `equiv_v3_reference_5ea94694f_sinkescape.json` | `5ea94694f` | `32db56c77` | **`GOB_ZONE_HELP_SHADE=0`** — verified 40/40 on fingerprint AND draws in all four cells at `32db56c77`, before the re-cut. It baselines the zone sink escape: an empty-area zone defender may leave his polygon to the extent the movement is rim-ward, guardrails `RIM_FLOOR` 4.0 and `MIN_SEPARATION` 2.0. |
