@@ -2038,6 +2038,49 @@ POSTURE_DENY_DISTANCE = 2.0
 # Off-ball normal/loose = HELP: sit `sag` of the way from the man toward the ball, + a shade toward the
 # basket (fraction of man→basket), then anchor per dimension (see _apply_defender_posture).
 HELP_SAG = {"normal": 0.30, "loose": 0.55}
+# Off-ball HELP sag AXIS (GOB_MAN_LOOSE_SAG_AXIS; default OFF). `HELP_SAG` above is a fraction of
+# the way from the man toward a TARGET; today that target is the ball, so "loose" means drifting
+# ball-ward, away from the man AND away from the basket. That is why Loose is strictly worse
+# defence: the weak-side helper ends up FURTHER from the rim than at normal (12.05 vs 10.67), and
+# 52.4% of loose placements sit inside CONTEST_EUCLIDEAN_RADIUS of the ball, guarding neither their
+# man nor the rim (reports/loose-sag-axis-2026-09-23.md).
+#
+# This blends the target toward the rim, per posture:
+#
+#     sag_target = ball + HELP_BASKET_PULL[posture] * (rim - ball)
+#
+# NORMAL IS 0.0 AND MUST STAY 0.0: at 0.0 the target is the ball exactly, so base man is
+# byte-identical at any flag state, and the equiv-v3 reference (which runs base man) cannot see
+# this change at all. 0.25 at loose is the measured recommendation: it takes the weak-side helper
+# to 9.53 from the rim against base's 10.67, costs the strong side only +0.49 of gap against
+# today's loose while bringing him 2.26 nearer the rim, and drops ball-crowding to 25.8%.
+# Values >= 0.50 turn Loose into a zone. Tunable; 0.25 is Jamie's call, not a fitted number.
+HELP_BASKET_PULL = {"normal": 0.0, "loose": 0.25}
+MAN_LOOSE_SAG_AXIS_FLAG = "GOB_MAN_LOOSE_SAG_AXIS"
+
+
+def loose_sag_axis_enabled():
+    """``GOB_MAN_LOOSE_SAG_AXIS`` - **default OFF**. Set to "1" to blend the off-ball help sag
+    target toward the defended rim by ``HELP_BASKET_PULL[posture]``."""
+    import os  # local, matching man_help_shade_enabled below - this module has no top-level os
+    return os.environ.get(MAN_LOOSE_SAG_AXIS_FLAG, "0") == "1"
+
+
+def _help_sag_target(ball_xy, rim_xy, posture):
+    """The point the off-ball helper sags toward. Flag off -> the ball, exactly as before.
+
+    Both terms are read by name at call time, so retuning ``HELP_BASKET_PULL`` moves this
+    rather than leaving a stale copy behind. Returns the ball unchanged whenever the pull is
+    0.0, which is every posture with the flag off and ``normal`` at any flag state.
+    """
+    bx, by = ball_xy
+    if not loose_sag_axis_enabled():
+        return bx, by
+    pull = HELP_BASKET_PULL.get(posture, 0.0)
+    if not pull:
+        return bx, by
+    rx, ry = rim_xy
+    return bx + pull * (rx - bx), by + pull * (ry - by)
 HELP_SAG_JITTER = 0.10          # ±0–10% human jitter on the sag fraction (resolved once + frozen → UESS-safe)
 HELP_BASKET_SHADE = 0.20        # shade toward the basket, as a fraction of the man→basket distance
 HELP_ANCHOR_FLOOR = 0.30        # min follow in the man's basket-aligned dimension ("comes off it some")
@@ -2154,8 +2197,9 @@ def _apply_defender_posture(def_coords, off_coords, ball_coords, is_ball_handler
     # normal / loose HELP
     sag = HELP_SAG.get(posture, 0.30) * (1.0 + random.uniform(-HELP_SAG_JITTER, HELP_SAG_JITTER))
     shade = _man_help_basket_shade(oy, by)   # flat HELP_BASKET_SHADE unless GOB_MAN_HELP_SHADE
-    hx = ox + sag * (bx - ox) + shade * (bkx - ox)   # ideal help spot (between ball & man, + shade)
-    hy = oy + sag * (by - oy) + shade * (bky - oy)
+    tx, ty = _help_sag_target((bx, by), (bkx, bky), posture)  # the ball unless GOB_MAN_LOOSE_SAG_AXIS
+    hx = ox + sag * (tx - ox) + shade * (bkx - ox)   # ideal help spot (toward the target, + shade)
+    hy = oy + sag * (ty - oy) + shade * (bky - oy)
     off_x, off_y = abs(ox - bkx), abs(oy - bky)                  # man's basket-offset per axis
     m = max(off_x, off_y) or 1.0
     wx = max(HELP_ANCHOR_FLOOR, off_x / m)
