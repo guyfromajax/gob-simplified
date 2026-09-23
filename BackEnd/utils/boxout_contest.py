@@ -66,8 +66,13 @@ RIM_Y = 25.0
 
 
 def enabled() -> bool:
-    """``GOB_BOXOUT_CONTEST`` - **default OFF**. Stage 1 is measurement only."""
-    return os.environ.get("GOB_BOXOUT_CONTEST", "0") == "1"
+    """``GOB_BOXOUT_CONTEST`` - **default ON** since 2026-09-23.
+
+    Kill switch: ``GOB_BOXOUT_CONTEST=0`` removes the contest entirely and reproduces
+    ``equiv_v3_reference_f2a060488_manhelpshade.json`` - verified 40/40 on fingerprint
+    AND draws in all four cells at the flip, with every box-out counter at zero.
+    """
+    return os.environ.get("GOB_BOXOUT_CONTEST", "1") == "1"
 
 
 def _xy(player: Any) -> Optional[Tuple[float, float]]:

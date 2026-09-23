@@ -33,8 +33,12 @@ def _flag_on(monkeypatch):
     monkeypatch.setenv("GOB_BOXOUT_CONTEST", "1")
 
 
-def test_flag_defaults_off(monkeypatch):
+def test_flag_defaults_on(monkeypatch):
+    """Flipped 2026-09-23. The shipped-default guard lives in
+    tests/test_boxout_contest_flags.py; this keeps the module's own flag contract honest."""
     monkeypatch.delenv("GOB_BOXOUT_CONTEST", raising=False)
+    assert BO.enabled() is True
+    monkeypatch.setenv("GOB_BOXOUT_CONTEST", "0")
     assert BO.enabled() is False
     monkeypatch.setenv("GOB_BOXOUT_CONTEST", "1")
     assert BO.enabled() is True
