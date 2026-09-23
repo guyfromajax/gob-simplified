@@ -7,39 +7,38 @@ For each collection:
   3. Verify counts (and _id sets)
   4. Atomically rename over the live collection (dropTarget=True)
 
-Dry-run is the default. Writes require ``--execute --confirm-db gob``.
+Dry-run is the default. Writes require process-level ``GOB_DB_ACCESS=write``
+and ``--execute --confirm-db gob``.
 
-Uses the Mongo cluster from repo-root ``.env.local``. Does not modify
-gob-staging. Prefer running ``backup_gob_players_and_recruit_sets.py`` first.
+Staging is independently resolved from repo-root ``.env.local``. Does not
+modify gob-staging. Prefer running ``backup_gob_players_and_recruit_sets.py``
+first.
 
 Usage:
-    .venv/bin/python scripts/publish_players_recruit_sets_staging_to_gob.py
-    .venv/bin/python scripts/publish_players_recruit_sets_staging_to_gob.py \\
+    GOB_DB_ACCESS=read .venv/bin/python scripts/publish_players_recruit_sets_staging_to_gob.py
+    GOB_DB_ACCESS=write .venv/bin/python scripts/publish_players_recruit_sets_staging_to_gob.py \\
         --execute --confirm-db gob
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Any
 
-from dotenv import dotenv_values
-from pymongo import MongoClient
-
 ROOT = Path(__file__).resolve().parents[1]
-PRODUCTION_DB = "gob"
-STAGING_DB = "gob-staging"
+sys.path.insert(0, str(ROOT))
+
+from BackEnd.script_db import (  # noqa: E402
+    PRODUCTION_DB,
+    STAGING_DB,
+    ScriptDatabaseError,
+    connect_script_database,
+)
+
 COLLECTIONS = ("players", "recruit_sets")
-
-
-def _load_uri() -> str:
-    values = dotenv_values(ROOT / ".env.local")
-    uri = str(values.get("MONGO_URI") or "").strip()
-    if not uri:
-        raise SystemExit("Missing MONGO_URI in .env.local")
-    return uri
 
 
 def _ids(docs: list[dict[str, Any]]) -> set[Any]:
@@ -103,17 +102,30 @@ def main() -> int:
         )
         return 2
 
-    client = MongoClient(_load_uri(), serverSelectionTimeoutMS=30000)
+    pristine = dict(os.environ)
+    production = connect_script_database(
+        target=PRODUCTION_DB,
+        access="write" if args.execute else "read",
+        destructive=args.execute,
+        confirm_db=args.confirm_db,
+        pristine_env=pristine,
+        repo_root=ROOT,
+    )
+    staging = connect_script_database(
+        target=STAGING_DB,
+        access="read",
+        pristine_env=pristine,
+        repo_root=ROOT,
+        force_local_staging=True,
+    )
     try:
-        staging = client[STAGING_DB]
-        production = client[PRODUCTION_DB]
-        if production.name != PRODUCTION_DB or staging.name != STAGING_DB:
+        if production.database.name != PRODUCTION_DB or staging.database.name != STAGING_DB:
             raise SystemExit("Database name mismatch — aborting")
 
         print(f"=== publish {STAGING_DB} → {PRODUCTION_DB}: {', '.join(COLLECTIONS)} ===")
         for name in COLLECTIONS:
-            src_n = staging[name].count_documents({})
-            dst_n = production[name].count_documents({})
+            src_n = staging.database[name].count_documents({})
+            dst_n = production.database[name].count_documents({})
             print(f"  {name}: staging={src_n} gob={dst_n}")
             if src_n == 0:
                 print(f"Refusing empty source: {STAGING_DB}.{name}", file=sys.stderr)
@@ -125,13 +137,18 @@ def main() -> int:
             return 0
 
         for name in COLLECTIONS:
-            _publish_one(production, staging, name)
+            _publish_one(production.database, staging.database, name)
 
         print("Done.")
         return 0
     finally:
-        client.close()
+        production.close()
+        staging.close()
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        raise SystemExit(2)

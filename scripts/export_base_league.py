@@ -14,7 +14,7 @@ already run. Staging can hold unpublished roster or Team Builder work.
 Production read (Jamie). Scratch paths only — never the committed bundle::
 
   GOB_DB_ACCESS=read ENVIRONMENT=production MONGO_DB_NAME=gob \\
-    MONGO_URI='mongodb+srv://…/gob' \\
+    MONGO_URI='mongodb+srv://…/dbname' \\
     python scripts/export_base_league.py --target gob \\
       --output /tmp/base-league-prod.sqlite --json-output /tmp/base-league-prod.json
 

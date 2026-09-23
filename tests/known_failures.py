@@ -112,7 +112,6 @@ XFAIL: dict[str, str] = {
     "tests/test_weekly_recruiting_training_flow.py::test_fcc_current_week_invite_recruit_returns_assigned_visit_after_processing": "stale: invite recruit_id no longer assigned",
     "tests/test_weekly_recruiting_training_flow.py::test_fcc_current_week_invite_recruit_returns_top_remaining_order": "stale: remaining-order recruit_id drifted",
     # broken-harness
-    "tests/test_env_static_safety.py::test_repository_passes_environment_static_safety_scan": "broken-harness: scan reports leftover mongo-client violations",
     "tests/test_lineup_change_sprites.py::test_lineup_change_no_benched_players": "broken-harness: Player.__init__ arity changed",
     "tests/test_load_franchise_names.py::test_load_franchise_names_missing_file": "broken-harness: missing file no longer raises FileNotFoundError",
     "tests/test_load_franchise_names.py::test_load_franchise_names_invalid_json": "broken-harness: invalid JSON no longer raises ValueError",

@@ -4,34 +4,30 @@
 Summarizes field presence and value drift. Does not dump every mismatched doc —
 prints per-field mismatch counts (and a few example team names).
 
-Both databases are read on the same Mongo cluster via repo-root ``.env.local``
-(MONGO_URI). No writes.
+Production is read-only and requires process-level ``GOB_DB_ACCESS=read``.
+Staging resolves independently from repo-root ``.env.local``. No writes.
 
 Usage:
-    .venv/bin/python scripts/audit_teams_gob_vs_staging.py
+    GOB_DB_ACCESS=read .venv/bin/python scripts/audit_teams_gob_vs_staging.py
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from dotenv import dotenv_values
-from pymongo import MongoClient
-
 ROOT = Path(__file__).resolve().parents[1]
-PRODUCTION_DB = "gob"
-STAGING_DB = "gob-staging"
+sys.path.insert(0, str(ROOT))
 
-
-def _load_cluster_uri() -> str:
-    values = dotenv_values(ROOT / ".env.local")
-    uri = str(values.get("MONGO_URI") or "").strip()
-    if not uri:
-        raise SystemExit("Missing MONGO_URI in .env.local")
-    return uri
+from BackEnd.script_db import (  # noqa: E402
+    PRODUCTION_DB,
+    STAGING_DB,
+    ScriptDatabaseError,
+    connect_script_database,
+)
 
 
 def _norm(value: Any) -> Any:
@@ -55,11 +51,20 @@ def _team_key(doc: dict[str, Any]) -> str:
 
 
 def main() -> int:
-    uri = _load_cluster_uri()
-    client = MongoClient(uri, serverSelectionTimeoutMS=15000)
+    pristine = dict(os.environ)
+    production = connect_script_database(
+        target=PRODUCTION_DB, access="read", pristine_env=pristine, repo_root=ROOT
+    )
+    staging = connect_script_database(
+        target=STAGING_DB,
+        access="read",
+        pristine_env=pristine,
+        repo_root=ROOT,
+        force_local_staging=True,
+    )
     try:
-        prod_docs = list(client[PRODUCTION_DB]["teams"].find({}))
-        stg_docs = list(client[STAGING_DB]["teams"].find({}))
+        prod_docs = list(production.database["teams"].find({}))
+        stg_docs = list(staging.database["teams"].find({}))
 
         prod_by_id = {_team_key(d): d for d in prod_docs}
         stg_by_id = {_team_key(d): d for d in stg_docs}
@@ -182,8 +187,13 @@ def main() -> int:
 
         return 0
     finally:
-        client.close()
+        production.close()
+        staging.close()
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        raise SystemExit(2)

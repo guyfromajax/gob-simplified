@@ -9,38 +9,35 @@ Copies each source collection into a new collection named:
 If a same-day name already exists, a UTC time suffix is added (``_HHMMSS``)
 so prior backups are never overwritten.
 
-Read-only by default. Writes require ``--execute --confirm-db gob``.
+Read-only by default. Writes require process-level ``GOB_DB_ACCESS=write``
+and ``--execute --confirm-db gob``.
 
-Uses the Mongo cluster from repo-root ``.env.local`` (same cluster hosts ``gob``
-and ``gob-staging``). Does not touch gob-staging.
+Does not touch gob-staging.
 
 Usage:
-    .venv/bin/python scripts/backup_gob_players_and_recruit_sets.py
-    .venv/bin/python scripts/backup_gob_players_and_recruit_sets.py \\
+    GOB_DB_ACCESS=read .venv/bin/python scripts/backup_gob_players_and_recruit_sets.py
+    GOB_DB_ACCESS=write .venv/bin/python scripts/backup_gob_players_and_recruit_sets.py \\
         --execute --confirm-db gob
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dotenv import dotenv_values
-from pymongo import MongoClient
-
 ROOT = Path(__file__).resolve().parents[1]
-PRODUCTION_DB = "gob"
+sys.path.insert(0, str(ROOT))
+
+from BackEnd.script_db import (  # noqa: E402
+    PRODUCTION_DB,
+    ScriptDatabaseError,
+    connect_script_database,
+)
+
 SOURCES = ("players", "recruit_sets")
-
-
-def _load_uri() -> str:
-    values = dotenv_values(ROOT / ".env.local")
-    uri = str(values.get("MONGO_URI") or "").strip()
-    if not uri:
-        raise SystemExit("Missing MONGO_URI in .env.local")
-    return uri
 
 
 def _backup_name(source: str, stamp: str, existing: set[str]) -> str:
@@ -74,15 +71,22 @@ def main() -> int:
         )
         return 2
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
-    client = MongoClient(_load_uri(), serverSelectionTimeoutMS=20000)
+    connection = connect_script_database(
+        target=PRODUCTION_DB,
+        access="write" if args.execute else "read",
+        destructive=args.execute,
+        confirm_db=args.confirm_db,
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
     try:
-        db = client[PRODUCTION_DB]
+        db = connection.database
         if db.name != PRODUCTION_DB:
             raise SystemExit(f"Refusing: opened db {db.name!r}, expected {PRODUCTION_DB!r}")
 
         existing = set(db.list_collection_names())
         plan: list[tuple[str, str, int]] = []
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
         for source in SOURCES:
             if source not in existing:
                 print(f"Missing source collection: {PRODUCTION_DB}.{source}", file=sys.stderr)
@@ -118,8 +122,12 @@ def main() -> int:
         print("Done.")
         return 0
     finally:
-        client.close()
+        connection.close()
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        raise SystemExit(2)
