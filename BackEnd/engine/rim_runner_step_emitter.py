@@ -227,6 +227,8 @@ def _is_offense_player(pid: str, off_lineup: Dict[str, Any]) -> bool:
 # so drift resolved to `standard` (14 instead of 8). Aliased to the private
 # name so existing call sites in this file are unchanged.
 from BackEnd.utils.animation_step_helpers import (  # noqa: E402
+    _is_defender_id,
+    defender_movement_rate,
     ag_grid_per_game_sec as _ag_grid_per_game_sec,
 )
 from BackEnd.utils.animation_step_helpers import (  # noqa: E402
@@ -380,7 +382,7 @@ def _initialize_continuing_movement(
             else "sprint"
         )
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_movement_rate(player, arch, not _is_offense_player(pid, off_lineup))
         actions[pid] = (
             "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
         )
@@ -595,7 +597,8 @@ def _build_burst_step(
         archetype[pid] = arch
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # generic committer: called for both lineups, so use def_lineup membership.
+        rate = defender_movement_rate(player, arch, _is_defender_id(pid, def_lineup))
         end_coords[pid] = _interrupted_coord(
             all_start_coords[pid], target, rate, t
         )
@@ -1227,7 +1230,7 @@ def _build_shot_motion_step(
         d_start = step_start_coords[defender_id]
         contest = closeout_contest_coord(d_start, rr_coord_end)
         d_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
-        d_rate = _ag_grid_per_game_sec(d_player, "sprint")
+        d_rate = defender_movement_rate(d_player, "sprint", True)
         end_coords[defender_id] = _interrupted_coord(d_start, contest, d_rate, t)
 
     destinations[rr_id] = dict(rr_coord_end)
@@ -1646,7 +1649,7 @@ def _build_hold_up_step(
         )
         archetype[pid] = "standard"
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coord, drift_target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -1767,7 +1770,7 @@ def converge_outlet_denied_into_burst(
     step_t = float(end.get("time_elapsed") or 0.0)
     d_start = start_coords[defender_id]
     d_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
-    d_rate = _ag_grid_per_game_sec(d_player, "standard")
+    d_rate = defender_movement_rate(d_player, "standard", True)
     start.setdefault("action", {})[defender_id] = "guard_ball"
     start.setdefault("archetype", {})[defender_id] = "standard"
     start.setdefault("destination", {})[defender_id] = dict(target)
@@ -2056,7 +2059,7 @@ def carry_defense_to_basket(
                 filled += 1
 
             player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-            rate = _ag_grid_per_game_sec(player, arch)
+            rate = defender_movement_rate(player, arch, _is_defender_id(pid, def_lineup))
             new_end = _interrupted_coord(sc, target, rate, step_t)
             end_coords[pid] = dict(new_end)
             cur[pid] = dict(new_end)

@@ -37,6 +37,8 @@ from BackEnd.constants import (
     FB_PASS_MIN_GAME_SECONDS,
 )
 from BackEnd.utils.animation_step_helpers import (
+    _is_defender_id,
+    defender_movement_rate,
     _ag_grid_per_game_sec,
     _euclid,
     _player_lookup_by_id,
@@ -176,7 +178,9 @@ def build_fb_outlet_pass_step(
         if pid in (passer_id, receiver_id) or pid not in start_coords:
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        # mover_targets mixes both lineups; def_lineup membership is the test.
+        rate = (defender_movement_rate(player, arch, _is_defender_id(pid, def_lineup))
+                if player else 12.0)
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
         destinations[pid] = {"x": float(target["x"]), "y": float(target["y"])}
         actions[pid] = action

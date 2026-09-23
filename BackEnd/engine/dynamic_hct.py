@@ -75,7 +75,11 @@ from BackEnd.engine.cutoff_resolution import (
 from BackEnd.constants.hct_trap_play_types import STANDARD_DIAMOND
 from BackEnd.utils.team_attr_scale import core8_gameplay
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL, compute_hct_trap_formation
-from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec, drift_or_hold_coord
+from BackEnd.utils.animation_step_helpers import (
+    _ag_grid_per_game_sec,
+    defender_movement_rate,
+    drift_or_hold_coord,
+)
 from BackEnd.utils.transition_bridge import _interrupted_coord
 from BackEnd.engine.pass_contest import (
     BAT_OOB,
@@ -370,7 +374,7 @@ def _apply_fcp_engagement(
             _interrupted_coord(bh_start, bh_end, bh_rate, seconds)
         )
     if def_pg_end["x"] != def_pg_start["x"] or def_pg_end["y"] != def_pg_start["y"]:
-        pg_rate = _ag_grid_per_game_sec(pg_def, "standard")
+        pg_rate = defender_movement_rate(pg_def, "standard", True)
         def_coords["PG"] = _clamp_xy(
             _interrupted_coord(def_pg_start, def_pg_end, pg_rate, seconds)
         )
@@ -1924,7 +1928,7 @@ def _move_defense(
     for pos in POSITIONS:
         arch = _defender_move_archetype(pos, recovered)
         move_archetype[pos] = arch
-        rate = _ag_grid_per_game_sec(def_lineup.get(pos), arch)
+        rate = defender_movement_rate(def_lineup.get(pos), arch, True)
         if rate <= 0:
             def_coords[pos] = _clamp_xy(targets[pos])
             continue
@@ -2570,7 +2574,7 @@ def compute_dynamic_hct_turn(
     for pos in POSITIONS:
         arch = _defender_move_archetype(pos, set())
         conv_move_arch[pos] = arch
-        rate = _ag_grid_per_game_sec(def_lineup.get(pos), arch)
+        rate = defender_movement_rate(def_lineup.get(pos), arch, True)
         if rate <= 0:
             def_coords[pos] = _clamp_xy(dict(conv_targets[pos]))
             continue
@@ -2690,7 +2694,7 @@ def compute_dynamic_hct_turn(
         """Drive BH from current spot to the y-keyed ABA target; chase defender
         trails (cosmetic). Then §2 ABA read → HCO or FAST_BREAK."""
         nonlocal bh_xy
-        def_rate = _ag_grid_per_game_sec(chase_def, "standard")
+        def_rate = defender_movement_rate(chase_def, "standard", True)
         seconds = max(0.3, _euclid(bh_xy, aba_target) / bh_drive_rate)
         atk_snap_off, atk_snap_def = _snap_loop_coords()
         off_coords[bh_pos] = aba_target

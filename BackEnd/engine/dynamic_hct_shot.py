@@ -607,7 +607,7 @@ def _collapse_defenders_and_pick(
     contested)`` where the shot defender is the nearest defender ending within
     ``CONTEST_EUCLIDEAN_RADIUS`` grid spots of ``shot_spot`` (``None`` → uncontested).
     """
-    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+    from BackEnd.utils.animation_step_helpers import defender_movement_rate
     from BackEnd.utils.transition_bridge import _interrupted_coord
     from BackEnd.engine.dynamic_hct import (
         RIM_PROTECT_X_MIN,
@@ -634,7 +634,8 @@ def _collapse_defenders_and_pick(
             "x": _clampf(start["x"], band_x_lo, band_x_hi),
             "y": _clampf(start["y"], RIM_PROTECT_Y_MIN, RIM_PROTECT_Y_MAX),
         }
-        rate = _ag_grid_per_game_sec(player, "standard")
+        # `player` comes from `def_lineup.items()` above -- a defender by construction.
+        rate = defender_movement_rate(player, "standard", True)
         end = (
             _interrupted_coord(start, target, rate, t) if rate > 0 else dict(target)
         )
