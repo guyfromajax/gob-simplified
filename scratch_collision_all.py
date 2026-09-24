@@ -21,6 +21,10 @@ S = {
     "residual_by_class": collections.Counter(),
     "moved_by_class": collections.Counter(),
     "errors": 0,
+    # measurement 8 — the court is 100 x 50 and separate_defenders does NOT clamp to it
+    "oob_after": 0, "oob_before": 0, "oob_created": 0,
+    "oob_examples": [],
+    "tolerance": None,
 }
 
 
@@ -84,6 +88,31 @@ def _measure(before, animations, st, off_lineup, def_lineup, skeleton):
     shooters = shooter_positions(skeleton)
 
     after = _snap(animations)
+    S["tolerance"] = st.get("tolerance")
+
+    def _oob(c):
+        try:
+            return not (0.0 <= float(c.get("x")) <= 100.0 and 0.0 <= float(c.get("y")) <= 50.0)
+        except (TypeError, ValueError):
+            return False
+
+    for pid, rows in after.items():
+        prev = before.get(pid) or []
+        for i, c in enumerate(rows):
+            if not c:
+                continue
+            was = _oob(prev[i]) if i < len(prev) and prev[i] else False
+            now = _oob(c)
+            if was:
+                S["oob_before"] += 1
+            if now:
+                S["oob_after"] += 1
+                if not was:
+                    S["oob_created"] += 1
+                    if len(S["oob_examples"]) < 5:
+                        S["oob_examples"].append({"before": prev[i] if i < len(prev) else None,
+                                                  "after": c})
+
     for pid, rows in after.items():
         prev = before.get(pid) or []
         for i, c in enumerate(rows):

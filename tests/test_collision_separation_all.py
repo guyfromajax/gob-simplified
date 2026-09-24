@@ -237,3 +237,47 @@ def test_an_offensive_entry_is_written_at_most_once_per_pass(monkeypatch):
     assert moved <= CS.COLLISION_MAX_DISPLACEMENT + 1e-9, (
         "an offensive entry was displaced past the cap — it was written more than once")
     assert st["stats"]["pinned_already_written"] >= 1 if "stats" in st else True
+
+
+# ---------------------------------------------------------------------------
+# GOB_COLLISION_TOLERANCE — the sweep override. It must not change any default.
+# ---------------------------------------------------------------------------
+
+
+def test_tolerance_override_absent_resolves_to_the_shipped_constant(monkeypatch):
+    """The whole safety property: unset, the override IS the constant, so production is inert."""
+    monkeypatch.delenv(CS.COLLISION_TOLERANCE_ENV, raising=False)
+    assert CS.overlap_tolerance() == CS.COLLISION_OVERLAP_TOLERANCE == 0.5
+
+
+def test_tolerance_override_supplies_the_value(monkeypatch):
+    monkeypatch.setenv(CS.COLLISION_TOLERANCE_ENV, "1.0")
+    assert CS.overlap_tolerance() == 1.0
+    a, b = _P("a"), _P("b")
+    # full sprite clearance at 1.0 = exactly twice the 0.5 threshold
+    full = CS.separation_threshold(a, b)
+    monkeypatch.setenv(CS.COLLISION_TOLERANCE_ENV, "0.5")
+    assert full == pytest.approx(2.0 * CS.separation_threshold(a, b))
+
+
+def test_a_junk_override_falls_back_rather_than_changing_behaviour(monkeypatch):
+    """Unparseable or non-positive must never silently alter the shipped default."""
+    for junk in ("", "   ", "abc", "0", "-1", "None"):
+        monkeypatch.setenv(CS.COLLISION_TOLERANCE_ENV, junk)
+        assert CS.overlap_tolerance() == 0.5, junk
+
+
+def test_the_constant_itself_is_untouched():
+    assert CS.COLLISION_OVERLAP_TOLERANCE == 0.5
+
+
+def test_cap_binding_is_counted(monkeypatch):
+    """At higher tolerance the 2.0 displacement cap, not the tolerance, may become the limiter.
+    The sweep needs to see that, so pushes and capped pushes are counted."""
+    monkeypatch.setenv(CS.COLLISION_TOLERANCE_ENV, "1.0")
+    five = {p: _P(p) for p in ("PG", "SG", "SF", "PF", "C")}
+    coords = {p: {"x": 50.0 + i * 0.01, "y": 25.0} for i, p in enumerate(five)}
+    _out, s = CS.separate_defenders(coords, five)
+    assert s["pushes"] > 0
+    assert s["pushes_cap_bound"] > 0, "a 5-way pileup at full clearance must bind the 2.0 cap"
+    assert s["pushes_cap_bound"] <= s["pushes"]

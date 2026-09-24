@@ -55,6 +55,17 @@ COLLISION_SEPARATION_ALL_FLAG = "GOB_COLLISION_SEPARATION_ALL"
 #: NOT tuned here — Jamie tunes once at the end.
 COLLISION_OVERLAP_TOLERANCE = 0.5
 
+#: MEASUREMENT OVERRIDE for the tolerance sweep. Read at call time.
+#:
+#: This exists so a sweep needs no code edit per point. **Absent, empty or unparseable, it
+#: resolves to COLLISION_OVERLAP_TOLERANCE exactly**, so the shipped default is untouched and
+#: flags-on with the variable unset is byte-identical to flags-on at 0.5 — which is gated, not
+#: assumed (reports/collision-tolerance-sweep.md).
+#:
+#: It is NOT a tuning knob and NOT a shipped behaviour change: it is inert in production, where
+#: the variable is never set. The surface it measures is for Jamie's single tuning pass.
+COLLISION_TOLERANCE_ENV = "GOB_COLLISION_TOLERANCE"
+
 #: Relaxation passes. Pushing A off B can push A into C; this is capped rather than iterated to
 #: convergence so the pass is O(1) and cannot oscillate. Residual overlap is accepted and
 #: measured, not chased.
@@ -153,9 +164,23 @@ def defender_radius_grid(player: Any) -> float:
     return _head_radius_px(height) / PX_PER_GRID_X
 
 
+def overlap_tolerance() -> float:
+    """The tolerance in force. ``COLLISION_OVERLAP_TOLERANCE`` unless the sweep override says
+    otherwise; anything unset, empty, unparseable or non-positive falls back to the constant, so
+    the production default cannot be changed by accident."""
+    raw = os.environ.get(COLLISION_TOLERANCE_ENV)
+    if raw is None or not str(raw).strip():
+        return COLLISION_OVERLAP_TOLERANCE
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return COLLISION_OVERLAP_TOLERANCE
+    return value if value > 0.0 else COLLISION_OVERLAP_TOLERANCE
+
+
 def separation_threshold(player_a: Any, player_b: Any) -> float:
     """Centre distance below which this specific pair reads as overlapping."""
-    return COLLISION_OVERLAP_TOLERANCE * (
+    return overlap_tolerance() * (
         defender_radius_grid(player_a) + defender_radius_grid(player_b)
     )
 
@@ -205,6 +230,9 @@ def separate_defenders(
         "pairs_one_pinned": 0,
         "moved": {},
         "residual": [],
+        # how often COLLISION_MAX_DISPLACEMENT is the limiter rather than the tolerance
+        "pushes": 0,
+        "pushes_cap_bound": 0,
     }
     if not coords:
         return coords, stats
@@ -249,11 +277,14 @@ def separate_defenders(
                     # Midpoint preserved: each takes half.
                     shares = ((a, need / 2.0), (b, -need / 2.0))
                 for who, amount in shares:
+                    stats["pushes"] += 1
                     room = COLLISION_MAX_DISPLACEMENT - spent[who]
                     if room <= 0:
+                        stats["pushes_cap_bound"] += 1
                         continue
                     mag = abs(amount)
                     if mag > room:
+                        stats["pushes_cap_bound"] += 1
                         amount = room if amount > 0 else -room
                         mag = room
                     out[who]["x"] += ux * amount
@@ -298,7 +329,8 @@ def apply_separation_to_animations(animations, game, def_lineup, off_lineup=None
              "def_placements": 0, "all_placements": 0, "off_carried_not_writable": 0,
              "pinned_defender": 0, "pinned_shooter": 0, "pinned_ball": 0,
              "pinned_authored": 0, "pinned_not_writable": 0, "pinned_already_written": 0,
-             "moved_by_class": _c.Counter(), "residual_by_class": _c.Counter()}
+             "moved_by_class": _c.Counter(), "residual_by_class": _c.Counter(),
+             "pushes": 0, "pushes_cap_bound": 0, "tolerance": overlap_tolerance()}
     if not collision_separation_enabled() or not animations or not def_lineup:
         # ALL on with the base flag off: say so once, change nothing.
         if collision_separation_all_enabled() and not collision_separation_enabled():
@@ -620,7 +652,7 @@ def apply_separation_all(animations, game, def_lineup, off_lineup, skeleton, sta
 
         new, s = separate_defenders(coords, players, pinned=pinned)
         for k in ("pairs_overlapping", "pairs_separated", "pairs_one_pinned",
-                  "pairs_skipped_both_pinned"):
+                  "pairs_skipped_both_pinned", "pushes", "pushes_cap_bound"):
             stats[k] += s[k]
         for _who, moved in s["moved"].items():
             stats["moves"].append(round(moved, 4))
