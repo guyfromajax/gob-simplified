@@ -64,6 +64,7 @@ from BackEnd.engine.rim_runner_step_emitter import (
     _traversal_seconds,
     _ag_grid_per_game_sec,
 )
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 def _triangle_guarded(steps):
@@ -74,7 +75,8 @@ def _triangle_guarded(steps):
         from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
         enforce_step_start_continuity(steps, context="triangle")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps
 

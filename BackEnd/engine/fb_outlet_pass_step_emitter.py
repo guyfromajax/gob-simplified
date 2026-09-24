@@ -55,6 +55,7 @@ from BackEnd.utils.animation_step_schema import (
     StepStart,
 )
 from BackEnd.utils.shared import movement_rate  # STAGE 1: the one rate accessor
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 # (target_coord, movement archetype, per-player action)
 MoverTarget = Tuple[GridCoord, PlayerArchetype, PlayerAction]
@@ -230,6 +231,7 @@ def build_fb_outlet_pass_step(
             result={"current_turn": "FAST_BREAK"},
         )
     except Exception as e:
+        reraise_if_strict(e)
         logging.warning(
             "🐛 [FB_OUTLET_PASS_STEPSTATE] projection failed passer_id=%s "
             "receiver_id=%s: %s",
@@ -241,6 +243,7 @@ def build_fb_outlet_pass_step(
         from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
         enforce_step_start_continuity([step] if step else None, context="fb_outlet_pass")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return step

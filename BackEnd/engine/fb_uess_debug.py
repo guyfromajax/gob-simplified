@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 _reported_fb_uess_fallback_keys = set()
@@ -191,6 +192,7 @@ def _report_fb_uess_fallback_to_sentry(
                 level="error",
             )
     except Exception as exc:
+        reraise_if_strict(exc)
         logging.debug("[FB_UESS_SENTRY] report failed: %s", exc)
 
 

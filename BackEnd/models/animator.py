@@ -54,6 +54,7 @@ from BackEnd.engine.defender_placement import (  # noqa: F401
     _defender_lag_fraction,
     _subtle_defender_should_freeze,
 )
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 class Animator:
@@ -1283,7 +1284,8 @@ class Animator:
         try:
             anims = self._build_all_animations(
                 _copy.deepcopy(skeleton), off_lineup, def_lineup, add_defenders=True, is_fcp=is_fcp, is_hct=is_hct)
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             return {}, {}
         steps = skeleton.get("steps") or []
         defense = self.defender_grid_from_animations(anims, def_lineup, len(steps))

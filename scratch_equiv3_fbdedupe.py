@@ -252,9 +252,61 @@ def ft_invariant(turns, window=3):
 # Placement calls are tagged to the open possession only while its call is still live.
 import hashlib
 import logging as _logging
+import re as _re
+import traceback as _traceback
 
 _ZONE_SHELL = {"2-3-zone": "2-3", "3-2-zone": "3-2", "1-3-1-zone": "1-3-1"}
 DCENSUS = {"poss": [], "final_turn": [], "untagged_placements": 0, "sub_log_lines": 0}
+
+
+# ── Emitter-failure gate (2026-09-24) ──────────────────────────────────────────────────
+#
+# Every equiv-v3 cell used to run `... > /dev/null 2>&1`, which is why 70-101 emitter
+# warnings per game were invisible during the Stage 2 NameError
+# (reports/rebaseline-and-handler-audit.md). The handlers DO log; the harness threw the log
+# away. This catches those records in-process so the shell redirect cannot hide them.
+#
+# THE MATCHER IS DELIBERATELY NARROW. A healthy run emits ~730 stderr lines per cell,
+# including 45 containing "failed" and 43 at ERROR level -- among them
+# `ERROR ... [HCO ENTRY BUG] ... prior turn failed to stamp a final ball handler` and
+# `WARNING ... Final Turn anchor verification failed after emit`. Both are legitimate today.
+# Matching on "failed" or on ERROR level would fire on every clean run, and a gate that
+# cries wolf gets switched off. So this matches only:
+#   * "EMITTER EXCEPTION"  -- the RR / TRIANGLE / CR / AFTER_STEAL emitter handlers
+#   * "build_<something> [(...)] failed" -- turn_manager's and phase_resolution's emit
+#     wrappers, e.g. "build_skeleton_animation_steps (HCO) failed". The `build_` prefix is
+#     what keeps the two legitimate lines above out.
+#   * a formatted traceback, which is what `logging.exception` and strict mode produce.
+# Verified against a clean 6-cell corpus: 0 hits.
+EMITTER_FAILURE_RE = _re.compile(
+    r"EMITTER EXCEPTION"
+    r"|build_[A-Za-z_]+(?:\s*\([^)]*\))?\s+failed"
+    r"|Traceback \(most recent call last\)"
+)
+
+EMITTER_FAILURES = []
+
+
+class _EmitterFailureGate(_logging.Handler):
+    """Collect emitter-failure log records. Never raises, never swallows anything else."""
+
+    def emit(self, record):
+        try:
+            msg = record.getMessage()
+            if record.exc_info:
+                msg = msg + "\n" + "".join(_traceback.format_exception(*record.exc_info))
+            if EMITTER_FAILURE_RE.search(msg):
+                EMITTER_FAILURES.append("%s:%s" % (record.levelname, msg[:4000]))
+        except Exception:
+            pass
+
+
+def emitter_failures():
+    """The gate's hits so far, for a caller that wants them in its own payload."""
+    return list(EMITTER_FAILURES)
+
+
+_logging.getLogger().addHandler(_EmitterFailureGate(level=_logging.WARNING))
 
 
 class _SubLogCounter(_logging.Handler):
@@ -439,6 +491,17 @@ if __name__ == "__main__":
         _install_align_regions()
     rows = run_arm(ARM == "played")
     json.dump({"rows": {label: rows}}, open(OUT, "w"), indent=1)
+    # Fail the cell if an emitter blew up. The payload is written first so a failing cell is
+    # still inspectable; the non-zero exit is what the runner and verifier key on.
+    if EMITTER_FAILURES:
+        _fail_log = OUT + ".emitterfail.log"
+        with open(_fail_log, "w") as _fh:
+            _fh.write("\n\n".join(EMITTER_FAILURES))
+        print("EMITTER FAILURE: %d record(s) -> %s" % (len(EMITTER_FAILURES), _fail_log),
+              file=sys.stderr)
+        for _m in EMITTER_FAILURES[:3]:
+            print("  " + _m.splitlines()[0][:200], file=sys.stderr)
+        sys.exit(3)
     pts = [r["points_per_team"] for r in rows if r.get("err") is None]
     mean, ci = published_ci95(pts)
     if mean is None:

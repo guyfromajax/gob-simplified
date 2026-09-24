@@ -63,6 +63,7 @@ from BackEnd.utils.animation_step_helpers import (
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_helpers import defender_aware_rate  # STAGE 2: per-player defender test
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 FB_ANNOUNCE_HOLD_MS: float = float(ANNOUNCEMENT_FREEZE_HOLD_MS)
@@ -600,7 +601,8 @@ def _guard_step_start_continuity(steps, context: str) -> None:
         )
 
         enforce_step_start_continuity(steps, context=context)
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
 
 

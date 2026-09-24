@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.utils.animation_step_schema import GridCoord, PlayerAction, PlayerArchetype
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 # --- Universal foul-contact rattle -----------------------------------------
@@ -52,7 +53,8 @@ def stamp_foul_contact_rattle(
                 "cycles": int(cycles),
                 "foul_rattle_mult": float(mult),
             }
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         pass
 
 
@@ -153,7 +155,8 @@ def stamp_idle_wander_on_still_players(
         return 0
     try:
         from BackEnd.engine.motion_step_decision import SUBTLE_IDLE_STYLE_AMPLITUDE_GRID
-    except Exception:  # pragma: no cover - amplitude table is advisory
+    except Exception as e:  # pragma: no cover - amplitude table is advisory
+        reraise_if_strict(e)
         SUBTLE_IDLE_STYLE_AMPLITUDE_GRID = {}
 
     excluded = {str(p) for p in (exclude or ()) if p is not None}
@@ -316,7 +319,8 @@ def stamp_arrival_settle(
         return 0
     try:
         from BackEnd.engine.motion_step_decision import SUBTLE_IDLE_STYLE_AMPLITUDE_GRID
-    except Exception:  # pragma: no cover - amplitude table is advisory
+    except Exception as e:  # pragma: no cover - amplitude table is advisory
+        reraise_if_strict(e)
         SUBTLE_IDLE_STYLE_AMPLITUDE_GRID = {}
     import math
 
@@ -895,7 +899,8 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
     """
     try:
         from BackEnd.utils.shared import movement_rate
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         return 14.0
     return movement_rate(player, archetype, apply_spread=False)
 
@@ -1326,7 +1331,8 @@ def defender_movement_rate(player: Any, archetype: PlayerArchetype,
     """
     try:
         from BackEnd.utils.shared import movement_rate
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         return _ag_grid_per_game_sec(player, archetype)
     return movement_rate(player, archetype, apply_spread=bool(is_defender))
 

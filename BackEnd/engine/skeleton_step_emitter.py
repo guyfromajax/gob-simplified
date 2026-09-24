@@ -67,6 +67,7 @@ from BackEnd.utils.animation_step_schema import (
     PlayerArchetype,
 )
 from BackEnd.utils.animation_step_helpers import defender_aware_rate  # STAGE 2: per-player defender test
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 # HCO drive-start VO (SFX_System.md): an announcer "he's driving!" cue fired the instant a
@@ -1614,6 +1615,7 @@ def build_skeleton_animation_steps(
                 for_emitter=True,   # this IS the emitter
             )
         except Exception as _anim_err:
+            reraise_if_strict(_anim_err)
             import logging as _anim_log
             _anim_log.warning(
                 "skeleton_step_emitter: internal animator build failed: %s",
@@ -1649,7 +1651,8 @@ def build_skeleton_animation_steps(
                 animations, _def_lineup or {}, skeleton_steps, game)
         else:
             setattr(game, "_hco_render_animations", animations)
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         pass
 
     # Walk one step per skeleton step. Phase 3 of HCO UESS migration: step T

@@ -78,6 +78,7 @@ from BackEnd.utils.animation_step_schema import (
     StepStart,
 )
 from BackEnd.utils.shared import movement_rate  # STAGE 1: the one rate accessor
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 # --- Vocabulary helpers ----------------------------------------------------
@@ -2195,8 +2196,9 @@ def _finalize_rr_steps(
         from BackEnd.utils.shared import canonicalize_post_shot_overlays
 
         canonicalize_post_shot_overlays(turn_result)
-    except Exception:
+    except Exception as e:
         # Canonicalize is best-effort; failure shouldn't block the steps emit.
+        reraise_if_strict(e)
         pass
 
     # Variant-aware post-shot sub-steps (audit remediation item 4). Brings
@@ -2232,7 +2234,8 @@ def _finalize_rr_steps(
             _build_post_shot_sub_steps(
                 steps, turn_result, off_lineup, def_lineup, away_offense,
             )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("FB post-shot sub-steps failed")
     _warn_if_post_shot_sfx_missing(turn_result, steps)
 
@@ -2255,7 +2258,8 @@ def _finalize_rr_steps(
             def_lineup=def_team_l,
             is_away_offense=_away_off,
         )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("carry_defense_to_basket failed — steps left unchanged")
 
     # UESS §8.1 guard, LAST so it sees every builder's output. Modelled on the
@@ -2263,7 +2267,8 @@ def _finalize_rr_steps(
     # Expected to be a no-op; it logs whenever it is not.
     try:
         enforce_step_start_continuity(steps, context="rim_runner/triangle")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
 
     return steps

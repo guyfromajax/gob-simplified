@@ -59,6 +59,7 @@ from BackEnd.utils.animation_step_schema import (
 )
 from BackEnd.utils.shared import get_player_position
 from BackEnd.utils.transition_bridge import build_walk_up_step
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 _FT_HOME_CFG = {
     "shooterSpot": {"x": 74, "y": 25},
@@ -921,7 +922,8 @@ def build_ft_animation_steps(
         from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
         enforce_step_start_continuity(steps, context="ft")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         import logging
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps

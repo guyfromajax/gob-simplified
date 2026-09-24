@@ -64,6 +64,7 @@ from BackEnd.utils.animation_step_schema import (
 )
 from BackEnd.utils.shared import movement_rate  # STAGE 1: the one rate accessor
 from BackEnd.utils.animation_step_helpers import _is_defender_id  # STAGE 2
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 # --- Vocabulary helpers ----------------------------------------------------
@@ -859,7 +860,8 @@ def _guard_step_start_continuity(steps, context: str) -> None:
         )
 
         enforce_step_start_continuity(steps, context=context)
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
 
 
@@ -1666,7 +1668,8 @@ def build_covert_release_animation_steps(
             _build_post_shot_sub_steps(
                 steps, turn_result, off_lineup, def_lineup, is_away_offense,
             )
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             import logging
             logging.exception("CR FB post-shot sub-steps failed")
     elif result_type != "DEFENSIVE_STOP":

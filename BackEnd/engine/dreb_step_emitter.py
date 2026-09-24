@@ -51,6 +51,7 @@ from BackEnd.utils.animation_step_schema import (
     NextStep,
 )
 from BackEnd.utils.shared import calc_ag_segment_seconds
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 _OFFENSE_POSITIONS = ["PG", "SG", "SF", "PF", "C"]
@@ -286,7 +287,8 @@ def build_dreb_animation_steps(
         from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
         enforce_step_start_continuity(out, context="dreb")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         import logging
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return out

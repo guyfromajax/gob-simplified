@@ -71,6 +71,7 @@ from BackEnd.utils.transition_bridge import (
     build_pass_step,
     build_walk_up_step,
 )
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 _OFFENSE_POSITIONS = ("PG", "SG", "SF", "PF", "C")
@@ -101,7 +102,8 @@ def _project_pressure_step(
             turn_type=turn_type,
             result=turn_result,
         )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         return step
 
 
@@ -1688,7 +1690,8 @@ def build_dynamic_hct_animation_steps(
         from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
         enforce_step_start_continuity(steps, context="dynamic_hct")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         import logging
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps

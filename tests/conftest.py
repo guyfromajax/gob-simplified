@@ -9,6 +9,19 @@ os.environ.setdefault("GOB_DB_MODE", "mongomock")
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("MONGO_DB_NAME", "gob-test")
 
+# GOB_STRICT_EXCEPTIONS — ON for the whole suite (2026-09-24).
+#
+# The animation path carries 86 `except Exception` handlers. They keep the sim alive when an
+# emitter fails on a rare turn, which is legitimate, but they also caught a Stage 2 NameError
+# 70-101 times per game and let the turn continue with no animation_steps
+# (reports/rebaseline-and-handler-audit.md). Every one now calls `reraise_if_strict(e)` first,
+# which re-raises NameError / AttributeError / TypeError / UnboundLocalError when this is set.
+#
+# Default is OFF, so production is untouched; under test a typo'd name fails loudly instead of
+# silently emitting a turn with no animation. `setdefault` so a test that needs the production
+# behaviour can still export "0" for itself.
+os.environ.setdefault("GOB_STRICT_EXCEPTIONS", "1")
+
 # Ensure the project root is on sys.path so 'import BackEnd' succeeds
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

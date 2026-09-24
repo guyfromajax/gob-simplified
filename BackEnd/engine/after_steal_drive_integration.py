@@ -43,6 +43,7 @@ from BackEnd.utils.free_throw_rules import (
 )
 from BackEnd.utils.shot_split_tracker import record_shot_split
 from BackEnd.engine.foul_announcement_language import stamp_fb_foul_on_ball
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 def _safe_id(p: Any) -> Optional[str]:
@@ -436,7 +437,8 @@ def _resolve_shot_attempt(
         shot_variant_extras = roll_shot_variant_extras(
             shot_variant, shooter_y=shooter_location["y"]
         )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         shot_variant = None
         shot_variant_extras = {}
 
@@ -1152,7 +1154,8 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         if not shot["has_and_one"]:
             try:
                 pressure_type = game.turn_manager.determine_defensive_pressure_type()
-            except Exception:
+            except Exception as e:
+                reraise_if_strict(e)
                 pressure_type = "HCO"
             game_state["offensive_state"] = pressure_type or "HCO"
     else:

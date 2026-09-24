@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from BackEnd.utils.animation_step_schema import AnimationStep
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 def build_dynamic_fcp_animation_steps(
@@ -29,7 +30,8 @@ def build_dynamic_fcp_animation_steps(
         from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
         enforce_step_start_continuity(steps, context="dynamic_fcp")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         import logging
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps

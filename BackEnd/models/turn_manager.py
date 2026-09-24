@@ -10,6 +10,7 @@ import logging
 import uuid
 
 from BackEnd.persistence import get_store
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 _store = get_store()
 players_collection = _store.players_collection
 teams_collection = _store.teams_collection
@@ -915,6 +916,7 @@ class TurnManager:
                                 _prior_fbc, _s0pos, _gap,
                             )
         except Exception as e:
+            reraise_if_strict(e)
             import logging
             logging.warning("build_sip_animation_steps failed: %s", e)
 
@@ -1431,6 +1433,7 @@ class TurnManager:
                     handoff_receiver = str(quick_foul_receiver_id) if quick_foul_receiver_id else pg_id
                     self._stamp_inbound_hco_handoff(payload, sf_id, handoff_receiver)
         except Exception as e:
+            reraise_if_strict(e)
             import logging
             logging.warning("build_bip_animation_steps failed: %s", e)
 
@@ -1824,6 +1827,7 @@ class TurnManager:
                     if anim_steps:
                         result["animation_steps"] = anim_steps
                 except Exception as e:
+                    reraise_if_strict(e)
                     logging.warning("build_ft_animation_steps failed: %s", e)
         elif state == "FAST_BREAK":
             self.logger.log("fb:start")
@@ -1905,6 +1909,7 @@ class TurnManager:
                         if projected_steps:
                             result["animation_steps"] = projected_steps
                     except Exception as e:
+                        reraise_if_strict(e)
                         logging.warning(
                             "build_fast_break_step_states failed: %s",
                             e,
@@ -1923,6 +1928,7 @@ class TurnManager:
                         ),
                     )
                 except Exception as e:
+                    reraise_if_strict(e)
                     logging.debug("[FB_UESS] summary log failed: %s", e)
         elif state == "FCP":
             self.logger.log("fcp:start")
@@ -2320,6 +2326,7 @@ class TurnManager:
 
             finalize_dead_ball_fumble_for_turn(result, self.game)
         except Exception as e:
+            reraise_if_strict(e)
             logging.warning("finalize_dead_ball_fumble_for_turn failed: %s", e)
         # ✅ REMOVED: possession_team_id is now set BEFORE update_clock_and_possession (line 373)
         # This ensures it represents the team on offense DURING the turn, not after any flips
@@ -2914,6 +2921,7 @@ class TurnManager:
                     self.game.offense_team.scouting_data["offense"]["last_play_by_category"][category_key] = chosen_playcall
             except Exception as e:
                 # Silently handle errors to avoid disrupting gameplay
+                reraise_if_strict(e)
                 logging.warning(f"⚠️ [PLAYCALL TRACKING] Error tracking override offense stats: {e}")
             
             # ✅ FIX: Set offense_play_type in game_state BEFORE returning (needed for resolve_half_court_offense_logic)
@@ -3056,7 +3064,8 @@ class TurnManager:
                 # Track last play run for this category (for tooltips)
                 category_key = f"{play_type_label.lower()}_{focus_label}"
                 self.game.offense_team.scouting_data["offense"]["last_play_by_category"][category_key] = chosen_playcall
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             pass
 
         # Persist play type/focus to game_state for later success attribution
@@ -3230,6 +3239,7 @@ class TurnManager:
                     logging.debug(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found in DB for defense team: team_id={resolved_def_team_id}")
                 return playbook_settings
         except Exception as e:
+            reraise_if_strict(e)
             logging.warning(f"⚠️ Error loading playbook settings: {e}")
             return None
         
@@ -3930,6 +3940,7 @@ class TurnManager:
                         game_stats[combo_key]["ev_scores"].append(ev)
         except Exception as e:
             # Silently handle errors to avoid disrupting gameplay
+            reraise_if_strict(e)
             pass
     
     def resolve_half_court_offense(self):
@@ -3941,7 +3952,8 @@ class TurnManager:
             from BackEnd.engine.phase_resolution import _track_hco_pass_lanes, _track_hco_pass_census
             _track_hco_pass_lanes(result, self.game)
             _track_hco_pass_census(result, self.game)
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             pass
         self._emit_hco_animation_steps(result)
         # StepState (Stage 0, additive): compute + stamp the per-step state (defense grid). No
@@ -3949,7 +3961,8 @@ class TurnManager:
         try:
             from BackEnd.engine.step_state import build_step_states
             build_step_states(result, self.game)
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             pass
         return result
 
@@ -4049,7 +4062,8 @@ class TurnManager:
                     append_hco_loose_ball_trajectory,
                 )
                 append_hco_loose_ball_trajectory(anim_steps, result, _off_l, _def_l)
-            except Exception:
+            except Exception as e:
+                reraise_if_strict(e)
                 logging.exception(
                     "append_hco_bat_oob_trajectory failed — falling back to the "
                     "frontend imperative ball-send"
@@ -4105,6 +4119,7 @@ class TurnManager:
                 log_eoq_turn(self.game, role, result, phase="POST_EMIT")
             self._assert_eoq_animation_steps(result, anim_steps=anim_steps, context="emit_ok")
         except Exception as e:
+            reraise_if_strict(e)
             logging.warning(
                 "build_skeleton_animation_steps (HCO) failed: %s", e
             )
@@ -4198,7 +4213,8 @@ class TurnManager:
                         step0_ball_pos,
                         gap,
                     )
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             pass
 
     def _emit_pressure_animation_steps(self, result: dict, turn_type: str) -> None:
@@ -4256,6 +4272,7 @@ class TurnManager:
                     )
                     return
             except Exception as e:
+                reraise_if_strict(e)
                 logging.warning(
                     "build_dynamic_%s_animation_steps failed: %s",
                     normalized.lower(),
@@ -4280,6 +4297,7 @@ class TurnManager:
                 if projected_steps:
                     result["animation_steps"] = projected_steps
             except Exception as e:
+                reraise_if_strict(e)
                 logging.warning(
                     "build_pressure_step_states (%s) failed: %s",
                     normalized,
@@ -4366,6 +4384,7 @@ class TurnManager:
             else:
                 return False, None
         except Exception as exc:
+            reraise_if_strict(exc)
             logging.warning("EOQ non-HCO preview failed for %s: %s", state, exc)
             return False, None
         finally:
@@ -5244,6 +5263,7 @@ class TurnManager:
                             _pfbc, _pos, _gap,
                         )
         except Exception as e:
+            reraise_if_strict(e)
             logging.warning("build_oreb_animation_steps failed: %s", e)
         return result
 
@@ -5353,7 +5373,8 @@ class TurnManager:
             if entry_shot_clock <= 0 and rebounder is not None:
                 try:
                     rebounder.record_stat("OREB", -1)
-                except Exception:
+                except Exception as e:
+                    reraise_if_strict(e)
                     pass
             self.game.update_team_stats()
             sc_violation = self._build_shot_clock_violation_result("OREB")
