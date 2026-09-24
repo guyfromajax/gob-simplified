@@ -428,6 +428,7 @@ def build_all_animations(game, skeleton, off_lineup, def_lineup, add_defenders=T
             apply_separation_to_animations(
                 animations, game, def_lineup,
                 off_lineup=getattr(getattr(game, "offense_team", None), "lineup", None),
+                skeleton=skeleton,
             )
         except Exception as e:
             reraise_if_strict(e)
