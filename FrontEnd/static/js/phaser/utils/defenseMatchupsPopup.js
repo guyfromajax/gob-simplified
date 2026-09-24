@@ -29,7 +29,7 @@ function cloneParams(params) {
  */
 
 import { playDefenseMatchupModalCourtSfx } from "./gameSfx.js";
-import { showPreGameExperience } from "./preGameExperience.js";
+import { showPreGameExperience, clearOpaqueSimBridgeCover } from "./preGameExperience.js";
 import {
   POSITIONS,
   buildPlayerTileHtml,
@@ -98,7 +98,7 @@ function ensureInGameStyles() {
   style.id = "defense-matchups-popup-styles";
   style.textContent = `
     .defense-matchups-popup {
-      position: fixed; inset: 0; z-index: 10002;
+      position: fixed; inset: 0; z-index: 10003;
       background: rgba(0, 0, 0, 0.75);
       display: flex; align-items: center; justify-content: center;
       padding: 22px; font-family: Inter, system-ui, sans-serif;
@@ -388,9 +388,11 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
  * @param {{ isQ1Start?: boolean }} [options]
  */
 export async function showDefenseMatchupsPopup(gameId, scene, options = {}) {
+  const releaseStartCover = () => clearOpaqueSimBridgeCover();
   if (typeof window !== "undefined") {
     const urlMode = liveParams().get("mode");
     if (urlMode === "tutorial") {
+      releaseStartCover();
       return;
     }
   }
@@ -400,19 +402,20 @@ export async function showDefenseMatchupsPopup(gameId, scene, options = {}) {
     gameId &&
     sessionStorage.getItem(SESSION_STORAGE_KEY_PREFIX + gameId) === "1";
   if (dontShowAgainThisGame || persisted) {
+    releaseStartCover();
     return;
   }
 
   const existingPopup = document.querySelector(".defense-matchups-popup");
   if (existingPopup) existingPopup.remove();
-  const existingPregame = document.querySelector(".pgxp-root");
-  if (existingPregame) existingPregame.remove();
+  document.querySelectorAll(".pgxp-root:not(.pgxp-bridge)").forEach((n) => n.remove());
 
   return new Promise((resolve) => {
     try {
       const API_CONFIG = window.API_CONFIG;
       if (!API_CONFIG) {
         console.error("❌ DEFENSE MATCHUPS: API_CONFIG not available");
+        releaseStartCover();
         resolve();
         return;
       }
@@ -437,14 +440,17 @@ export async function showDefenseMatchupsPopup(gameId, scene, options = {}) {
             return;
           }
 
+          if (q1) clearOpaqueSimBridgeCover();
           showInGameMatchupsModal(gameId, scene, normalized, resolve);
         })
         .catch((error) => {
           console.error("❌ DEFENSE MATCHUPS: Failed to show popup:", error);
+          releaseStartCover();
           resolve();
         });
     } catch (error) {
       console.error("❌ DEFENSE MATCHUPS: Failed to show popup:", error);
+      releaseStartCover();
       resolve();
     }
   });

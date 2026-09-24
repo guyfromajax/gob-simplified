@@ -441,6 +441,30 @@ console.log("🏀 Court launch params:", {
 const GameScene = createGameScene(Phaser);
 let game;
 let isSimulating = false;
+let courtStartMode = null;
+let courtStartScheduled = false;
+
+function consumeCourtStartParam() {
+  const params = liveParams();
+  const raw = params.get('court_start');
+  if (raw !== 'play' && raw !== 'sim') return null;
+  params.delete('court_start');
+  try {
+    franchiseCtx().commitParams(params);
+  } catch (err) {
+    console.warn('[court_start] could not strip param', err);
+  }
+  return raw;
+}
+
+function abortAutoStartCover() {
+  clearOpaqueSimBridgeCover();
+  const pre = document.querySelector('.pre-game-container:not(#resume-game-container)');
+  if (pre) pre.classList.remove('hidden');
+  if (typeof window.__GOB_RELEASE_COURT_START_HOLD__ === 'function') {
+    window.__GOB_RELEASE_COURT_START_HOLD__();
+  }
+}
 
 /** Pause FE TB leak detector during full_sim / presentation (staging measurement). */
 function setTbLeakDetectorBulkSimPaused(paused) {
@@ -2426,11 +2450,13 @@ async function showPopup(score) {
 }
 
 async function handleButtonClick(animate, options = {}) {
+  showOpaqueSimBridgeCover();
   try {
     await ensureFreshGameForPreAnchorQ1Refresh();
   } catch (error) {
     console.error('❌ [PRE-ANCHOR-Q1-REFRESH] Failed to create fresh game before Play Quarter:', error);
     alert(`Could not restart the pre-anchor game cleanly: ${error.message || error}`);
+    abortAutoStartCover();
     return;
   }
 
@@ -2439,6 +2465,7 @@ async function handleButtonClick(animate, options = {}) {
     await validateGameIdIfPresent();
   } catch (error) {
     // Validation failed - error already shown, don't proceed
+    abortAutoStartCover();
     return;
   }
   if (isSimulating) {
@@ -2496,6 +2523,7 @@ async function handleButtonClick(animate, options = {}) {
   } catch (err) {
     console.error('Error starting game:', err);
     console.error('Error details:', err.message, err.stack);
+    abortAutoStartCover();
   } finally {
     // ✅ FIX: Only reset isSimulating flag - buttons are already removed and game is complete
     // The pre-game container was removed at line 415, and completion popup handles navigation
@@ -2853,12 +2881,14 @@ async function handleSimQuarter() {
 async function handleSimFullGame() {
   if (typeof window.playSound === 'function') window.playSound('positive-plop.wav');
   if (isSimulating) return;
+  showOpaqueSimBridgeCover();
 
   try {
     await ensureFreshGameForPreAnchorQ1Refresh();
   } catch (error) {
     console.error('❌ [PRE-ANCHOR-Q1-REFRESH] Failed to create fresh game before Sim Full Game:', error);
     alert(`Could not restart the pre-anchor game cleanly: ${error.message || error}`);
+    abortAutoStartCover();
     return;
   }
   
@@ -2910,6 +2940,17 @@ async function handleSimFullGame() {
 
   maybeFireFranchiseStartCpuSimsOncePerWeek();
 
+  // Q2+ Sim Rest: mount PREPPING SIM before the settings/roster awaits. The
+  // opaque bridge from init (or above) is replaced in this same turn.
+  let resolveSimDone;
+  const simDonePromise = new Promise((r) => { resolveSimDone = r; });
+  let preppingCoverPromise = Promise.resolve();
+  if (!isSimFullGame) {
+    preppingCoverPromise = showPreppingSimCover(simDonePromise).catch((e) => {
+      console.warn('⚠️ [SIM-PRES] Prepping Sim cover skipped:', e);
+    });
+  }
+
   // Load game plan and playbook settings before simulating
   await loadGamePlanSettings();
   await loadPlaybookSettings();
@@ -2935,8 +2976,6 @@ async function handleSimFullGame() {
   // `quarter` gets reassigned to the final quarter after the loop. Sim Full Game = 1
   // (whole game); Sim Rest of Game = the current quarter (join at Q2+, no replay).
   const broadcastStartQuarter = Math.max(1, quarter);
-  let resolveSimDone;
-  const simDonePromise = new Promise((r) => { resolveSimDone = r; });
   let act1CoverPromise = Promise.resolve();
   let act1Launched = false;
   const launchAct1Cover = (gid) => {
@@ -2967,14 +3006,10 @@ async function handleSimFullGame() {
     })();
   };
 
-  // Sim Rest of Game (Q2+): show the "Prepping Sim" cover immediately (reuses the Tip
-  // Off veil), holding until the sim finishes — hides the "Simulating Qn" overlays.
-  // Sim Full Game uses the Act 1 cover instead.
-  let preppingCoverPromise = Promise.resolve();
+  // Sim Rest of Game (Q2+): the PREPPING SIM cover is already up (mounted before
+  // the settings/roster awaits). Start the same pregame bed the pre-game
+  // experience uses. Sim Full Game uses the Act 1 cover instead.
   if (!isSimFullGame) {
-    preppingCoverPromise = showPreppingSimCover(simDonePromise).catch((e) => {
-      console.warn('⚠️ [SIM-PRES] Prepping Sim cover skipped:', e);
-    });
     // Play the SAME pregame bed the pre-game experience uses (varies by week/game
     // conditions), looping through the Prepping Sim cover + Act 2; faded out when Act 2
     // ends (simGamePresentation.finish). Async so it never delays the sim; the game is
@@ -3209,7 +3244,9 @@ async function handleSimFullGame() {
     const simFullBtn = document.querySelector('.sim-full-game-button');
     const sim4Btn = document.querySelector('.sim-to-fourth-button');
     [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = false; });
+    if (typeof resolveSimDone === 'function') resolveSimDone();
     clearOpaqueSimBridgeCover();
+    document.querySelectorAll('.pgxp-root').forEach((n) => n.remove());
   } finally {
     isSimulating = false;
     setTbLeakDetectorBulkSimPaused(false);
@@ -3217,6 +3254,13 @@ async function handleSimFullGame() {
 }
 
 async function initGame() {
+  courtStartMode = consumeCourtStartParam();
+  if (courtStartMode) {
+    showOpaqueSimBridgeCover();
+    if (typeof window.__GOB_REVEAL_COURT_START_BRIDGE__ === 'function') {
+      window.__GOB_REVEAL_COURT_START_BRIDGE__();
+    }
+  }
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
@@ -3302,7 +3346,7 @@ async function initGame() {
   const resumeGameButton = document.getElementById('resume-game-button');
   const resumeGameSubtitle = document.getElementById('resume-game-subtitle');
   if (preGameContainer) {
-    if (resumeFromTimeout || activeResume) {
+    if (courtStartMode || resumeFromTimeout || activeResume) {
       preGameContainer.classList.add('hidden');
     } else {
       preGameContainer.classList.remove('hidden');
@@ -3433,7 +3477,7 @@ async function initGame() {
   // ✅ FIX: Only auto-start direct timeout resumes. Cold browser returns use the
   // explicit active-resume modal and must wait for the user's Resume click.
   // Quarter breaks now show pre-game buttons for user to choose Play/Sim Quarter/Sim Full Game
-  if (resumeFromTimeout && !activeResume && gameId && homeTeam && awayTeam) {
+  if (!courtStartMode && resumeFromTimeout && !activeResume && gameId && homeTeam && awayTeam) {
     console.log(`⏸️ AUTO-START: Timeout resume - auto-starting game`);
     // Auto-start the game (same as clicking "Play Quarter" button)
     handleButtonClick(true);
@@ -3489,6 +3533,24 @@ async function initGame() {
       console.warn('[bootGame] tutorial auto sim-full-game failed:', e);
     }
   }
+  if (courtStartMode) {
+    let tutorialOwnsStart = false;
+    try {
+      tutorialOwnsStart = franchiseCtx().get('sim_full_game') === '1'
+        && mode === 'tutorial'
+        && Math.max(0, quarter) < 2;
+    } catch (e) {
+      tutorialOwnsStart = false;
+    }
+    if (!tutorialOwnsStart) {
+      courtStartScheduled = true;
+      setTimeout(() => {
+        if (isSimulating) return;
+        if (courtStartMode === 'sim') handleSimFullGame();
+        else handleButtonClick(true);
+      }, 0);
+    }
+  }
   if (sim4Btn) {
     // Keep Sim Quarter logic dormant for possible future reintroduction, but hide it from the UI for now.
     sim4Btn.style.display = 'none';
@@ -3505,6 +3567,7 @@ async function initGame() {
 initGame()
   .catch(error => {
     console.error('Error initializing game:', error);
+    if (courtStartMode && !courtStartScheduled && !isSimulating) abortAutoStartCover();
   })
   .finally(() => {
     try {

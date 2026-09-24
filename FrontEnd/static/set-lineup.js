@@ -1987,26 +1987,19 @@ function bindRosterTableEvents() {
 }
 
 function updatePlayButton() {
-  const playBtn = document.getElementById('play-now');
+  const startBtns = ['play-now', 'sim-now']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
   const gameplanBtn = document.getElementById('gameplan-optional');
   
   const filled = ['PG','SG','SF','PF','C'].every(pos => lineup[pos]);
   const ftShooterPresent = !ftLockActive || Object.values(lineup).some(isFtLockedPlayer);
   const lineupIsValid = filled && ftShooterPresent;
-  
-  if (lineupIsValid) {
-    // Enable play button when lineup is complete
-    if (playBtn) {
-      playBtn.classList.remove('disabled');
-      playBtn.style.cursor = 'pointer';
-    }
-  } else {
-    // Disable play button when lineup is incomplete
-    if (playBtn) {
-      playBtn.classList.add('disabled');
-      playBtn.style.cursor = 'not-allowed';
-    }
-  }
+
+  startBtns.forEach((btn) => {
+    btn.classList.toggle('disabled', !lineupIsValid);
+    btn.style.cursor = lineupIsValid ? 'pointer' : 'not-allowed';
+  });
   
   // Game Plan button is ALWAYS enabled (user can go to Game Plan anytime)
   if (gameplanBtn) {
@@ -2198,6 +2191,7 @@ async function setHeader() {
   const timeValueEl = document.getElementById('time-value');
   const scoreboardEl = document.getElementById('context-scoreboard');
   const playBtn = document.getElementById('play-now');
+  const simBtn = document.getElementById('sim-now');
   if (!quarterValueEl || !timeValueEl) return;
 
   // Score dict keys = core URL names; chrome labels = display (overlay when present).
@@ -2310,7 +2304,12 @@ async function setHeader() {
   timeValueEl.textContent = isPregame ? '--:--' : formattedClock;
 
   if (playBtn) {
-    playBtn.textContent = isPregame ? 'Play Game' : 'Return to Game';
+    if (isPregame) playBtn.textContent = 'Play Game';
+    else if (isQuarterBreak) playBtn.textContent = 'Play Quarter';
+    else playBtn.textContent = 'Return to Game';
+  }
+  if (simBtn) {
+    simBtn.textContent = isPregame ? 'Sim Game' : 'Sim Rest Of Game';
   }
 }
 
@@ -2489,15 +2488,19 @@ async function init() {
   const validationPassed = await validatePointersOnLoad();
   if (!validationPassed) {
     // Validation failed - error screen already shown, disable functionality
-    const btn = document.getElementById('play-now');
-    if (btn) btn.classList.add('disabled');
+    ['play-now', 'sim-now'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.classList.add('disabled');
+    });
     return;
   }
 
   if (!resolveTeam()) {
     alert("Can't determine your team for this game. Please return and relaunch.");
-    const btn = document.getElementById('play-now');
-    if (btn) btn.classList.add('disabled');
+    ['play-now', 'sim-now'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.classList.add('disabled');
+    });
     return;
   }
 
@@ -2595,6 +2598,8 @@ async function init() {
   if (modeParam === 'tutorial') {
     const playBtnEl = document.getElementById('play-now');
     if (playBtnEl) playBtnEl.textContent = 'Continue';
+    const simBtnEl = document.getElementById('sim-now');
+    if (simBtnEl) simBtnEl.hidden = true;
 
     // Only fill EMPTY slots. A user who set a five, navigated back to Game Plan
     // and returned must not have their choices silently overwritten by autoset.
@@ -2676,10 +2681,9 @@ async function init() {
     }).catch((e) => console.warn('[tutorial] could not init lineup tutorial chrome:', e));
   }
 
-  const btn = document.getElementById('play-now');
-  if (btn) {
-    btn.addEventListener('click', async () => {
-      if (btn.classList.contains('disabled')) return;
+  async function beginFromLineup(courtStart) {
+    const btn = document.getElementById(courtStart === 'sim' ? 'sim-now' : 'play-now');
+    if (!btn || btn.classList.contains('disabled')) return;
       if (ftLockActive && !Object.values(lineup).some(isFtLockedPlayer)) {
         showToast('Free throw shooter must stay in the lineup');
         updatePlayButton();
@@ -2856,6 +2860,7 @@ async function init() {
         return;
       }
 
+      params.set('court_start', courtStart);
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
       playSound('confirm-1-lowervol.wav');
@@ -2890,8 +2895,12 @@ async function init() {
 
       // Non-tutorial: navigate directly.
       navigate();
-    });
   }
+
+  const playNowBtn = document.getElementById('play-now');
+  const simNowBtn = document.getElementById('sim-now');
+  if (playNowBtn) playNowBtn.addEventListener('click', () => beginFromLineup('play'));
+  if (simNowBtn) simNowBtn.addEventListener('click', () => beginFromLineup('sim'));
   // Game Plan, Playbooks, Box Score wired in wireLineupNavButtons()
   } finally {
     if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();

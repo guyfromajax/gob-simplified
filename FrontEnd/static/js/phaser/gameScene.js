@@ -18,6 +18,7 @@ import { syncSpriteAttributesFromPlayerEnergy } from './utils/syncPlayerSpriteAt
 import { showSecondaryAnnouncement, getSecondaryColorForTeam } from './utils/announcements.js';
 import { resolveTeamsSlotLookupKey } from './utils/loadGameStats.js';
 import { getGameMode } from '../shared/getGameMode.js';
+import { clearOpaqueSimBridgeCover } from './utils/preGameExperience.js';
 
 function franchiseCtx() {
   return typeof window !== 'undefined' ? window.FranchiseContext : null;
@@ -3262,6 +3263,7 @@ export function createGameScene(Phaser) {
           }
 
           if (typeof window !== 'undefined') {
+            clearOpaqueSimBridgeCover();
             const defenseTransitionWasActive = !!window.__GOB_DEFENSE_MATCHUPS_TRANSITION_OVERLAY__;
             window.__GOB_DEFENSE_MATCHUPS_TRANSITION_OVERLAY__ = false;
             if (shouldGateCourtEntryVisuals || window.__GOB_COURT_ENTRY_VISUAL_GATE__) {
