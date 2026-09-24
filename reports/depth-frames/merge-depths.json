@@ -1,0 +1,222 @@
+{
+  "spriteWidthGrid": 5.2482,
+  "pinnedBand": 2.5,
+  "teammateGapGrid": 1.100000000000012,
+  "defenderOnManGapGrid": 1.2000000000000028,
+  "flagOff": {
+    "o_C": {
+      "playerId": "o_C",
+      "teamId": "OFFENCE",
+      "depth": 1,
+      "x": 1056.94,
+      "y": 276.48
+    },
+    "o_PF": {
+      "playerId": "o_PF",
+      "teamId": "OFFENCE",
+      "depth": 1,
+      "x": 1056.94,
+      "y": 259.58399999999995
+    },
+    "o_SG": {
+      "playerId": "o_SG",
+      "teamId": "OFFENCE",
+      "depth": 1,
+      "x": 860.3,
+      "y": 552.96
+    },
+    "d_SG": {
+      "playerId": "d_SG",
+      "teamId": "DEFENCE",
+      "depth": 1,
+      "x": 860.3,
+      "y": 534.528
+    },
+    "o_PG": {
+      "playerId": "o_PG",
+      "teamId": "OFFENCE",
+      "depth": 1,
+      "x": 786.5600000000001,
+      "y": 61.44
+    },
+    "d_PG": {
+      "playerId": "d_PG",
+      "teamId": "DEFENCE",
+      "depth": 1,
+      "x": 786.5600000000001,
+      "y": 79.87200000000004
+    },
+    "o_SF": {
+      "playerId": "o_SF",
+      "teamId": "OFFENCE",
+      "depth": 1,
+      "x": 958.62,
+      "y": 645.12
+    },
+    "d_SF": {
+      "playerId": "d_SF",
+      "teamId": "DEFENCE",
+      "depth": 1,
+      "x": 491.6,
+      "y": 384
+    },
+    "d_PF": {
+      "playerId": "d_PF",
+      "teamId": "DEFENCE",
+      "depth": 1,
+      "x": 368.7,
+      "y": 307.20000000000005
+    },
+    "d_C": {
+      "playerId": "d_C",
+      "teamId": "DEFENCE",
+      "depth": 1,
+      "x": 245.8,
+      "y": 460.79999999999995
+    }
+  },
+  "tieBreak": {
+    "o_C": {
+      "playerId": "o_C",
+      "teamId": "OFFENCE",
+      "depth": 283,
+      "x": 1056.94,
+      "y": 276.48
+    },
+    "o_PF": {
+      "playerId": "o_PF",
+      "teamId": "OFFENCE",
+      "depth": 271.9999999999999,
+      "x": 1056.94,
+      "y": 259.58399999999995
+    },
+    "o_SG": {
+      "playerId": "o_SG",
+      "teamId": "OFFENCE",
+      "depth": 463.00000000000006,
+      "x": 860.3,
+      "y": 552.96
+    },
+    "d_SG": {
+      "playerId": "d_SG",
+      "teamId": "DEFENCE",
+      "depth": 448.00000000000006,
+      "x": 860.3,
+      "y": 534.528
+    },
+    "o_PG": {
+      "playerId": "o_PG",
+      "teamId": "OFFENCE",
+      "depth": 148,
+      "x": 786.5600000000001,
+      "y": 61.44
+    },
+    "d_PG": {
+      "playerId": "d_PG",
+      "teamId": "DEFENCE",
+      "depth": 152.00000000000003,
+      "x": 786.5600000000001,
+      "y": 79.87200000000004
+    },
+    "o_SF": {
+      "playerId": "o_SF",
+      "teamId": "OFFENCE",
+      "depth": 523,
+      "x": 958.62,
+      "y": 645.12
+    },
+    "d_SF": {
+      "playerId": "d_SF",
+      "teamId": "DEFENCE",
+      "depth": 350,
+      "x": 491.6,
+      "y": 384
+    },
+    "d_PF": {
+      "playerId": "d_PF",
+      "teamId": "DEFENCE",
+      "depth": 300,
+      "x": 368.7,
+      "y": 307.20000000000005
+    },
+    "d_C": {
+      "playerId": "d_C",
+      "teamId": "DEFENCE",
+      "depth": 400,
+      "x": 245.8,
+      "y": 460.79999999999995
+    }
+  },
+  "hardPromotion": {
+    "o_C": {
+      "playerId": "o_C",
+      "teamId": "OFFENCE",
+      "depth": 283,
+      "x": 1056.94,
+      "y": 276.48
+    },
+    "o_PF": {
+      "playerId": "o_PF",
+      "teamId": "OFFENCE",
+      "depth": 271.9999999999999,
+      "x": 1056.94,
+      "y": 259.58399999999995
+    },
+    "o_SG": {
+      "playerId": "o_SG",
+      "teamId": "OFFENCE",
+      "depth": 463.00000000000006,
+      "x": 860.3,
+      "y": 552.96
+    },
+    "d_SG": {
+      "playerId": "d_SG",
+      "teamId": "DEFENCE",
+      "depth": 448.00000000000006,
+      "x": 860.3,
+      "y": 534.528
+    },
+    "o_PG": {
+      "playerId": "o_PG",
+      "teamId": "OFFENCE",
+      "depth": 652,
+      "x": 786.5600000000001,
+      "y": 61.44
+    },
+    "d_PG": {
+      "playerId": "d_PG",
+      "teamId": "DEFENCE",
+      "depth": 152.00000000000003,
+      "x": 786.5600000000001,
+      "y": 79.87200000000004
+    },
+    "o_SF": {
+      "playerId": "o_SF",
+      "teamId": "OFFENCE",
+      "depth": 523,
+      "x": 958.62,
+      "y": 645.12
+    },
+    "d_SF": {
+      "playerId": "d_SF",
+      "teamId": "DEFENCE",
+      "depth": 350,
+      "x": 491.6,
+      "y": 384
+    },
+    "d_PF": {
+      "playerId": "d_PF",
+      "teamId": "DEFENCE",
+      "depth": 300,
+      "x": 368.7,
+      "y": 307.20000000000005
+    },
+    "d_C": {
+      "playerId": "d_C",
+      "teamId": "DEFENCE",
+      "depth": 400,
+      "x": 245.8,
+      "y": 460.79999999999995
+    }
+  }
+}

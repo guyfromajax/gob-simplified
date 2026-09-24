@@ -2407,6 +2407,12 @@ class GameManager:
         self.game_state["current_playcall"] = ""
         self.game_state["defense_playcall"] = ""
         self.reset_frontcourt_state()
+        # A Stage B defensive SWITCH lasts the possession, never past it. This is the
+        # live-play boundary; the quarter-start assignment in main.simulate_quarter sets
+        # offense_team directly and never routes through here, so it clears separately —
+        # the same two-boundary split reset_frontcourt_state documents above.
+        from BackEnd.utils.man_defense_matchups import clear_matchup_override
+        clear_matchup_override(self.game_state)
 
     def get_box_score(self):
         """Get box score with all players (lineup + bench) to match team totals."""

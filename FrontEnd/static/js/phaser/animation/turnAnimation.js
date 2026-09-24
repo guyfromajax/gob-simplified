@@ -1,5 +1,7 @@
 import * as Phaser from "/js/vendor/phaser-3.70.0.esm.js";
 import { animateStep } from "./animateStep.js";
+import { resolveStepBallOwnerId } from "../utils/playerDepth.js";
+import { installDepthOrdering } from "../utils/applyPlayerDepths.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import {
   shootBall,
@@ -368,19 +370,13 @@ function delayMs(scene, ms) {
   return new Promise((resolve) => setTimeout(resolve, safe));
 }
 
+// Was defined here and never called. It is now the ONE definition, moved to
+// utils/playerDepth.js so the depth policy and this share a single source instead of carrying
+// two copies of the same hasBallAtStep-then-action-set rule (which matches
+// collision_separation.BALL_ACTIONS on the backend). Kept as a named export so any future
+// caller in this file finds it where it has always been.
 function getStepBallHandlerId(animations, stepIndex) {
-  if (!Array.isArray(animations)) return null;
-  for (const anim of animations) {
-    if (anim?.hasBallAtStep?.[stepIndex]) return anim.playerId;
-  }
-  for (const anim of animations) {
-    const step = anim?.movement?.[stepIndex];
-    const action = step?.action;
-    if (action === "handle_ball" || action === "receive" || action === "pass" || action === "shoot" || action === "drive") {
-      return anim.playerId;
-    }
-  }
-  return null;
+  return resolveStepBallOwnerId(animations, stepIndex);
 }
 
 
@@ -4681,6 +4677,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       scene.passInFlight = false;
       console.log('🏀 [PASS ANIMATION] Cleared passInFlight after skipping updateBallOwnership');
     }
+
+    // ── Depth ordering context (GOB: USE_DEPTH_ORDERING, default OFF) ──────────────────
+    // The ordering itself runs on the scene update loop — the only funnel every animation
+    // path passes through. This just keeps it told which step is on screen. It computes no
+    // game state: `animations` is the backend payload and `stepIndex` is the loop's own
+    // counter. Inert with the flag off (the handler returns before reading this).
+    installDepthOrdering(scene, playerSprites);
+    scene.__depthContext = {
+      animations: turnData?.animations,
+      stepIndex,
+      offenseTeamId: scene.offenseTeamId ?? turnData?.possession_team_id,
+    };
 
     // Update active player displays in scoreboard
     if (!scene.skipToEnd) {

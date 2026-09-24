@@ -25,6 +25,26 @@ DEFAULT_MATCHUPS = {
 USER_MATCHUPS_KEY = "man_defense_matchups"
 COMPUTER_MATCHUPS_KEY = "man_defense_matchups_computer"
 
+#: PER-POSSESSION OVERRIDE LAYER (spatial screens Stage B, GOB_SCREEN_CONTEST).
+#:
+#: A defensive SWITCH changes who guards whom for the rest of the possession. The stored
+#: maps must NOT be mutated to express that: ``man_defense_matchups`` is the USER'S
+#: setting, entered through the Defense Matchups popup and persisted with the game
+#: (shared.py:3294) — writing a switch into it would silently rewrite what the user chose
+#: and survive into the next possession, the next quarter and the save file.
+#:
+#: So a switch writes HERE instead, and the two accessors below layer it over the stored
+#: map on read. Every consumer in the engine goes through those two functions — there is
+#: no site that reads the raw key for placement — so the override reaches all of them
+#: without a single call-site change, and cannot be half-applied by one that was missed.
+#: Proved by measurement, not inspection: see reports/spatial-screens-phase2.md.
+#:
+#: Cleared at every possession boundary (``GameManager.switch_possession`` and the
+#: quarter-start assignment in ``main.simulate_quarter``, the two boundaries
+#: ``reset_frontcourt_state`` documents) and wherever the map itself resets
+#: (``reset_matchups_to_defaults``), so a switch can never outlive its possession.
+OVERRIDE_KEY = "man_defense_matchups_override"
+
 POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
 
@@ -48,6 +68,7 @@ def reset_matchups_to_defaults(game_state: Dict) -> None:
     """
     game_state[USER_MATCHUPS_KEY] = get_default_matchups()
     game_state[COMPUTER_MATCHUPS_KEY] = get_default_matchups()
+    clear_matchup_override(game_state)
 
 
 def validate_man_defense_matchups(matchups: Dict[str, str]) -> Tuple[bool, Optional[str]]:
@@ -103,14 +124,58 @@ def validate_man_defense_matchups(matchups: Dict[str, str]) -> Tuple[bool, Optio
     return True, None
 
 
+def set_matchup_override(game_state: Dict, matchups: Dict[str, str]) -> None:
+    """Install the per-possession override (see ``OVERRIDE_KEY``). A copy is stored, so a
+    later edit to the caller's dict cannot reach back into game state."""
+    if game_state is None:
+        return
+    game_state[OVERRIDE_KEY] = dict(matchups or {})
+
+
+def get_matchup_override(game_state: Dict) -> Dict[str, str]:
+    return dict((game_state or {}).get(OVERRIDE_KEY) or {})
+
+
+def clear_matchup_override(game_state: Dict) -> None:
+    """Possession boundary, or the stored map resetting. Idempotent."""
+    if game_state is None:
+        return
+    game_state.pop(OVERRIDE_KEY, None)
+
+
+def _with_override(game_state: Dict, base: Dict[str, str]) -> Dict[str, str]:
+    """Layer the override over a stored map WITHOUT mutating either.
+
+    The override is a whole-map replacement for the defensive positions it names, and a
+    switch names both sides of the swap, so the result stays the 1-to-1 mapping
+    ``validate_man_defense_matchups`` requires. An override that would break 1-to-1 is
+    DISCARDED rather than applied: a half-applied switch would leave an offensive player
+    guarded twice and another guarded by nobody.
+    """
+    override = (game_state or {}).get(OVERRIDE_KEY)
+    if not override:
+        return base
+    merged = dict(base)
+    merged.update(override)
+    values = list(merged.values())
+    if len(values) != len(set(values)):
+        return base
+    return merged
+
+
 def get_matchups_for_defending_team(game_state: Dict, defending_team_is_user: bool) -> Dict[str, str]:
     """
     Returns the matchup dict to use based on who is on defense.
     User team on defense → man_defense_matchups; computer on defense → man_defense_matchups_computer (default if missing).
+
+    The per-possession override (``OVERRIDE_KEY``) is layered on here, which is why every
+    engine consumer sees a Stage B switch without changing its own call.
     """
     if defending_team_is_user:
-        return game_state.get(USER_MATCHUPS_KEY, {}) or get_default_matchups()
-    return game_state.get(COMPUTER_MATCHUPS_KEY) or get_default_matchups()
+        base = game_state.get(USER_MATCHUPS_KEY, {}) or get_default_matchups()
+    else:
+        base = game_state.get(COMPUTER_MATCHUPS_KEY) or get_default_matchups()
+    return _with_override(game_state, base)
 
 
 def get_defender_position_for_man_defense(
@@ -141,7 +206,9 @@ def get_defender_position_for_man_defense(
         return offensive_pos if offensive_pos in POSITIONS else random_defender_fallback_position()
     
     if defending_team_is_user is None:
-        matchups = game_state.get(USER_MATCHUPS_KEY, {})
+        # Backward-compat branch: callers that do not say who is defending. It read the
+        # raw key, which would have made this the ONE site the override could not reach.
+        matchups = _with_override(game_state, game_state.get(USER_MATCHUPS_KEY, {}))
     else:
         matchups = get_matchups_for_defending_team(game_state, defending_team_is_user)
     

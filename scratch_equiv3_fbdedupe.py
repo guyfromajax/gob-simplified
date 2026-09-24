@@ -46,6 +46,9 @@ if SEED_DEFENSES:
 # EQUIV_POSTURE_CENSUS=1 adds the read-only off-ball geometry census (scratch_posture_census).
 # Default OFF so a reference-reproduction run walks exactly the code the reference was cut on.
 POSTURE_CENSUS = os.environ.get("EQUIV_POSTURE_CENSUS", "0") == "1"
+# SCREEN_CENSUS=1 adds the read-only screen/receiver/defender census (scratch_screen_census).
+SCREEN_CENSUS = os.environ.get("SCREEN_CENSUS", "0") == "1"
+MATCHUP_SITE_PROBE = os.environ.get("MATCHUP_SITE_PROBE", "0") == "1"
 MAN_POSTURE = os.environ.get("EQUIV_MAN_POSTURE", "").strip().lower()
 _MAN_POSTURE_PB_KEY = {"normal": "man_normal", "loose": "man_loose", "deny": "man_tight"}
 if MAN_POSTURE and MAN_POSTURE not in _MAN_POSTURE_PB_KEY:
@@ -69,6 +72,7 @@ def apply_man_posture_playbook(gm):
 
 from BackEnd.utils import sim_random, training_random
 import scratch_posture_census as _pcensus
+import scratch_screen_census as _scensus
 from BackEnd.models.game_manager import GameManager
 from BackEnd.main import simulate_quarter
 
@@ -465,6 +469,8 @@ def run_arm(played: bool):
                 "defenses_seeded": SEED_DEFENSES,
                 "defense": defense_census_summary(),
                 "posture_census": _pcensus.summary() if POSTURE_CENSUS else None,
+                "screen_census": _scensus.summary() if SCREEN_CENSUS else None,
+                "matchup_sites": _scensus.matchup_sites() if MATCHUP_SITE_PROBE else None,
             })
     finally:
         if played:
@@ -487,6 +493,10 @@ if __name__ == "__main__":
     _install_defense_census()
     if POSTURE_CENSUS:
         _pcensus.install()
+    if SCREEN_CENSUS:
+        _scensus.install()
+    if MATCHUP_SITE_PROBE:
+        _scensus.install_matchup_probe()
     if ALIGN_RNG:
         _install_align_regions()
     rows = run_arm(ARM == "played")
