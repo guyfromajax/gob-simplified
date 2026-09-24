@@ -26,6 +26,7 @@ from BackEnd.constants import (
     require_hco_spot,
 )
 from BackEnd.utils.shared import get_away_player_coords
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS
 
 
 def _require_step_coords(step):
@@ -384,7 +385,32 @@ def build_all_animations(game, skeleton, off_lineup, def_lineup, add_defenders=T
                     steps
                 )
                 animations.extend(defensive_anims)
-    
+
+    # ── Collision Phase 1 (GOB_COLLISION_SEPARATION, default OFF) ──────────────────────
+    # Defender-defender partial-overlap separation. This is the ONE hook for all four
+    # placement paths above (FCP, HCT, zone, standard): each builds its defenders with the
+    # DEFENDER as the outer loop and the step as the inner one, so "every defender at step
+    # i" only exists here, once the per-defender movement lists are assembled.
+    #
+    # IT MUST RUN HERE, BEFORE THE RETURN. The freeze stamp reads these same coords back out
+    # through `defender_grid_from_animations`, so separating now means the frozen row records
+    # the post-separation coordinate. A pass bolted on after the stamp would be a second
+    # write to a row declared write-once and would break the screen==game guarantee.
+    #
+    # Only entries whose playerId is on the DEFENDING lineup are written; offensive entries
+    # are read (to find each defender's man) and never modified.
+    if add_defenders and def_lineup:
+        try:
+            from BackEnd.utils.collision_separation import apply_separation_to_animations
+            apply_separation_to_animations(
+                animations, game, def_lineup,
+                off_lineup=getattr(getattr(game, "offense_team", None), "lineup", None),
+            )
+        except Exception as e:
+            reraise_if_strict(e)
+            import logging as _sep_log
+            _sep_log.warning("collision separation failed: %s", e)
+
     return animations, zone_assignments
 
 
