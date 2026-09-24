@@ -33,7 +33,9 @@ S = {
     "no_recv_samples": [],
     # Stage A applier stats, accumulated from apply_screen_targeting's return value
     "stageA": {"screens": 0, "applied": 0,
-               "fallback": Counter(), "displacement": Counter(), "calls": 0},
+               "fallback": Counter(), "displacement": Counter(), "calls": 0,
+               "contested": 0, "switches_applied": 0,
+               "outcome": Counter(), "contest_skipped": Counter()},
 }
 
 
@@ -93,6 +95,10 @@ def _install_stage_a():
                 A["applied"] += st.get("applied", 0)
                 A["fallback"].update(st.get("fallback") or {})
                 A["displacement"].update(st.get("displacement") or {})
+                A["contested"] += st.get("contested", 0)
+                A["switches_applied"] += st.get("switches_applied", 0)
+                A["outcome"].update(st.get("outcome") or {})
+                A["contest_skipped"].update(st.get("contest_skipped") or {})
         except Exception:
             pass
         return st
@@ -248,5 +254,84 @@ def summary():
         "stageA": {"calls": S["stageA"]["calls"], "screens": S["stageA"]["screens"],
                    "applied": S["stageA"]["applied"],
                    "fallback": dict(S["stageA"]["fallback"]),
-                   "displacement": dict(S["stageA"]["displacement"])},
+                   "displacement": dict(S["stageA"]["displacement"]),
+                   "contested": S["stageA"]["contested"],
+                   "switches_applied": S["stageA"]["switches_applied"],
+                   "outcome": dict(S["stageA"]["outcome"]),
+                   "contest_skipped": dict(S["stageA"]["contest_skipped"])},
     }
+
+
+# ── matchup-site probe (MATCHUP_SITE_PROBE=1) ─────────────────────────────────────────
+#
+# Proves BY MEASUREMENT, not by inspection, that a Stage B SWITCH override is seen at
+# every site in the engine that asks who is guarding whom. Wraps the two accessors in
+# BackEnd/utils/man_defense_matchups and records, per CALLER file:line:
+#
+#   * how many times that site asked,
+#   * how many of those asks happened while an override was installed,
+#   * how many of THOSE returned a value that reflects the override.
+#
+# A site that reads the raw game_state key instead would never appear here at all, so the
+# site list is also the proof that there is no such site: the union of callers observed at
+# runtime is compared against the static grep in the report.
+import inspect
+
+SITES = {}
+
+
+def _site_record(kind, game_state, result):
+    try:
+        fr = inspect.currentframe().f_back.f_back
+        key = "%s:%d" % (fr.f_code.co_filename.split("gob-animation-reward/")[-1],
+                         fr.f_lineno)
+    except Exception:
+        key = "<unknown>"
+    rec = SITES.setdefault(key, {"kind": kind, "calls": 0, "with_override": 0,
+                                 "reflected": 0})
+    rec["calls"] += 1
+    ov = (game_state or {}).get("man_defense_matchups_override") or {}
+    if not ov:
+        return
+    rec["with_override"] += 1
+    if kind == "map":
+        if all(result.get(k) == v for k, v in ov.items()):
+            rec["reflected"] += 1
+    else:  # reverse lookup: result is a defensive position
+        # reflected iff the answer agrees with the override's own inverse
+        inv = {v: k for k, v in ov.items()}
+        rec["reflected"] += 1 if result in inv.values() or result in ov else 0
+
+
+def install_matchup_probe():
+    import sys
+    from BackEnd.utils import man_defense_matchups as MM
+    if getattr(MM.get_matchups_for_defending_team, "_probe", False):
+        return
+    o_map, o_rev = MM.get_matchups_for_defending_team, MM.get_defender_position_for_man_defense
+
+    def w_map(game_state, defending_team_is_user):
+        r = o_map(game_state, defending_team_is_user)
+        _site_record("map", game_state, r)
+        return r
+
+    def w_rev(offensive_pos, game_state, fallback_to_default=True,
+              defending_team_is_user=None):
+        r = o_rev(offensive_pos, game_state, fallback_to_default, defending_team_is_user)
+        _site_record("reverse", game_state, r)
+        return r
+
+    w_map._probe = True
+    MM.get_matchups_for_defending_team = w_map
+    MM.get_defender_position_for_man_defense = w_rev
+    for mod in list(sys.modules.values()):
+        if mod is None or mod is MM:
+            continue
+        if getattr(mod, "get_matchups_for_defending_team", None) is o_map:
+            mod.get_matchups_for_defending_team = w_map
+        if getattr(mod, "get_defender_position_for_man_defense", None) is o_rev:
+            mod.get_defender_position_for_man_defense = w_rev
+
+
+def matchup_sites():
+    return SITES

@@ -703,6 +703,11 @@ def simulate_quarter(
     # possession already "established" — no 10-second rule, and the first
     # backcourt pass an instant over-and-back.
     gm.reset_frontcourt_state()
+    # The OTHER possession boundary (see GameManager.switch_possession): a quarter start
+    # assigns offense_team directly, so a Stage B switch from the last possession of the
+    # previous quarter would otherwise survive into this one.
+    from BackEnd.utils.man_defense_matchups import clear_matchup_override
+    clear_matchup_override(gm.game_state)
     if start_with_inbound and starting_possession:
         # Use specified starting possession (for sim buttons)
         if starting_possession == "home":

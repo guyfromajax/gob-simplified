@@ -65,6 +65,10 @@ from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.utils.collision_separation import separation_threshold
+from BackEnd.utils.screen_contest import (
+    FIGHT_THROUGH, GO_AROUND, SWITCH, resolve_screen_contest, screen_contest_enabled,
+    warn_if_contest_without_targeting,
+)
 
 #: The flag. Unset or anything other than "1" means OFF. Read at CALL time, not captured at
 #: import: an import-time constant cannot be monkeypatched, and this is not a hot path.
@@ -187,6 +191,11 @@ def _new_stats() -> Dict[str, Any]:
         "applied": 0,
         "fallback": Counter(),      # why today's OFFSET_SPOTS placement was kept
         "displacement": Counter(),  # how far the screener moved, 0.5 grid buckets
+        # Stage B (GOB_SCREEN_CONTEST)
+        "contested": 0,
+        "outcome": Counter(),
+        "contest_skipped": Counter(),
+        "switches_applied": 0,
     }
 
 
@@ -202,6 +211,12 @@ def apply_screen_targeting(animations, game, skeleton, off_lineup, def_lineup,
     dict order. Inert and allocation-free when the flag is off.
     """
     if not screen_targeting_enabled():
+        # GOB_SCREEN_CONTEST=1 without GOB_SCREEN_TARGETING=1: say so ONCE and do nothing.
+        # Stage B contests the screen Stage A places; half-applying it would score a
+        # screen that is not where the contest assumes, and move the draws for no
+        # modelled reason.
+        if screen_contest_enabled():
+            warn_if_contest_without_targeting()
         return {"enabled": False, "screens": 0, "applied": 0}
 
     from BackEnd.engine.defender_placement import (
@@ -230,6 +245,11 @@ def apply_screen_targeting(animations, game, skeleton, off_lineup, def_lineup,
     for step_idx, step in enumerate(steps):
         pos_actions = step.get("pos_actions") or {}
         timestamp = step.get("timestamp", 0)
+        # Re-read per step so a Stage B SWITCH earlier in this possession is visible to
+        # every later screen. With GOB_SCREEN_CONTEST off no override is ever written, so
+        # this returns the same map every step and Stage A's behaviour is unchanged.
+        matchups = get_matchups_for_defending_team(game_state, defending_is_user) or {}
+        guard_of = {off: dfn for dfn, off in matchups.items()}
         for screener_pos in sorted(pos_actions, key=str):
             if _action(pos_actions.get(screener_pos)) != SCREEN_ACTION:
                 continue
@@ -286,8 +306,21 @@ def apply_screen_targeting(animations, game, skeleton, off_lineup, def_lineup,
             stats["applied"] += 1
             stats["displacement"][round(round(moved / 0.5) * 0.5, 2)] += 1
 
+            # ── Stage B: contest the screen that was just placed ──────────────────────
+            # Only reachable from inside this branch, so the draw cannot happen for a
+            # screen that was never placed — the flag gates the DRAW, not just its effect.
+            if screen_contest_enabled():
+                _contest_one(stats, game, game_state, step_idx, dgrid, anim_by_pid,
+                             screener_pos=screener_pos, receiver_pos=receiver_pos,
+                             guard_pos=guard_pos, screener=screener, defender=defender,
+                             zone=zone, matchups=matchups, guard_of=guard_of,
+                             off_lineup=off_lineup, def_lineup=def_lineup,
+                             screen_coord=target)
+
     stats["fallback"] = dict(stats["fallback"])
     stats["displacement"] = dict(stats["displacement"])
+    stats["outcome"] = dict(stats["outcome"])
+    stats["contest_skipped"] = dict(stats["contest_skipped"])
     return stats
 
 
@@ -329,3 +362,99 @@ def _resync_start_end(anim) -> None:
         return
     anim["start"] = movement[0]["coords"]
     anim["end"] = movement[-1]["coords"]
+
+
+# ── Stage B (GOB_SCREEN_CONTEST) ──────────────────────────────────────────────────────
+
+
+def _contest_one(stats, game, game_state, step_idx, dgrid, anim_by_pid, *,
+                 screener_pos, receiver_pos, guard_pos, screener, defender,
+                 zone, matchups, guard_of, off_lineup, def_lineup, screen_coord):
+    """Resolve one placed screen. See ``screen_contest`` for the model.
+
+    ZONE IS SKIPPED, DELIBERATELY. A switch is a man concept — it swaps two *assignments*,
+    and in a zone there are none to swap; the guard map is rebuilt per step from who
+    happens to stand in which area. Contesting in zone would roll dice whose SWITCH branch
+    has nowhere to write. Counted, not silently dropped.
+    """
+    if zone:
+        stats["contest_skipped"]["zone"] += 1
+        return
+    screener_guard_pos = guard_of.get(screener_pos)
+    if not screener_guard_pos:
+        stats["contest_skipped"]["screener_has_no_guard"] += 1
+        return
+    screener_defender = (def_lineup or {}).get(screener_guard_pos)
+    if defender is None or screener_defender is None:
+        stats["contest_skipped"]["defender_missing_from_lineup"] += 1
+        return
+
+    result = resolve_screen_contest(defender, screener, screener_defender)
+    stats["contested"] += 1
+    stats["outcome"][result["outcome"]] += 1
+
+    if result["outcome"] == FIGHT_THROUGH:
+        return                      # he stays with his man; nothing moves, nothing swaps
+
+    if result["outcome"] == GO_AROUND:
+        _detour(dgrid, anim_by_pid, def_lineup, step_idx, guard_pos, screen_coord,
+                screener, defender)
+        return
+
+    # SWITCH — the two defenders trade assignments for the rest of the possession.
+    # The stored map is NOT mutated; this writes the override layer, which
+    # get_matchups_for_defending_team lays over the stored map on every read.
+    #
+    # `matchups` is re-read here rather than reused from the caller: a possession can
+    # contain more than one screen, and a second switch must compose with the first
+    # instead of overwriting it from a map captured before either happened.
+    from BackEnd.utils.man_defense_matchups import set_matchup_override
+    current = dict(_current_matchups(game, game_state))
+    current[guard_pos], current[screener_guard_pos] = screener_pos, receiver_pos
+    set_matchup_override(game_state, current)
+    stats["switches_applied"] += 1
+
+
+def _current_matchups(game, game_state):
+    from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
+    try:
+        defending_is_user = game.defense_team.team_id == game.user_team.team_id
+    except Exception:
+        defending_is_user = False
+    return get_matchups_for_defending_team(game_state, defending_is_user) or {}
+
+
+def _detour(dgrid, anim_by_pid, def_lineup, step_idx, guard_pos, screen_coord,
+            screener, defender):
+    """GO AROUND: the beaten defender takes the long way and arrives a body-width late.
+
+    He is pushed one contact-distance further from the screen, directly away from it —
+    the same derived ``separation_threshold`` Stage A uses for the stand-off, so this
+    introduces no constant of its own. He is never teleported to the far side: going
+    around is arriving late, not arriving somewhere else.
+    """
+    coord = (dgrid.get(step_idx) or {}).get(guard_pos)
+    if not coord:
+        return
+    vx = float(coord["x"]) - float(screen_coord["x"])
+    vy = float(coord["y"]) - float(screen_coord["y"])
+    length = math.hypot(vx, vy)
+    if length < 1e-6:
+        return
+    lag = separation_threshold(screener, defender)
+    new_coord = {
+        "x": max(0.0, min(COURT_MAX_X, float(coord["x"]) + vx / length * lag)),
+        "y": max(0.0, min(COURT_MAX_Y, float(coord["y"]) + vy / length * lag)),
+    }
+    pid = getattr((def_lineup or {}).get(guard_pos), "player_id", None)
+    anim = anim_by_pid.get(pid) if pid else None
+    if not anim:
+        return
+    movement = anim.get("movement") or []
+    if step_idx >= len(movement):
+        return
+    # Defender movement lists ARE step-indexed (one entry per step, unlike the offence) —
+    # that is the contract defender_grid_from_animations relies on.
+    movement[step_idx]["coords"] = new_coord
+    dgrid.setdefault(step_idx, {})[guard_pos] = new_coord
+    _resync_start_end(anim)
