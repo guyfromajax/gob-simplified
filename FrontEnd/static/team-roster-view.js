@@ -465,23 +465,14 @@ function getBestPosition(positionRatings) {
   return { pos: bestPos || '--', rating: bestRating !== -Infinity ? bestRating : null };
 }
 
-function getRawAttrValue(attrs, attr) {
-  const rawVal = attrs[`anchor_${attr}`] ?? attrs[attr];
-  if (rawVal == null || rawVal === '') return null;
-  const num = Number(rawVal);
-  return Number.isNaN(num) ? null : num;
-}
-
 function formatAttrForDisplay(attrs, attr) {
-  const rawVal = getRawAttrValue(attrs, attr);
-  if (rawVal == null) return '--';
-  return Math.floor(rawVal / 10);
+  const d = window.GOB_AttributeDisplay.displayAttr(window.GOB_AttributeDisplay.rawAttr(attrs, attr));
+  return d == null ? '--' : d;
 }
 
 function getAttrSortValue(attrs, attr) {
-  const rawVal = getRawAttrValue(attrs, attr);
-  if (rawVal == null) return -Infinity;
-  return Math.floor(rawVal / 10);
+  const d = window.GOB_AttributeDisplay.displayAttr(window.GOB_AttributeDisplay.rawAttr(attrs, attr));
+  return d == null ? -Infinity : d;
 }
 
 function renderStartingFive() {

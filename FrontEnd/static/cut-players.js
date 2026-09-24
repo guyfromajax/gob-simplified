@@ -123,9 +123,8 @@ function cloneParams(params) {
   }
 
   function formatAttr(attrs, key) {
-    var rawVal = (attrs || {})['anchor_' + key];
-    if (rawVal == null) rawVal = (attrs || {})[key] || 0;
-    return Math.floor(Number(rawVal || 0) / 10);
+    var d = window.GOB_AttributeDisplay.displayAttr(window.GOB_AttributeDisplay.rawAttr(attrs, key));
+    return d == null ? 0 : d;
   }
 
   function formatNames(names) {

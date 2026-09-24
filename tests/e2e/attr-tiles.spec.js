@@ -15,6 +15,7 @@ const path = require('path');
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
 const TILES_JS = read('js/shared/attrTiles.js');
+const DISPLAY_JS = read('js/utils/attributeDisplay.js');
 const TOOLTIP_JS = read('js/shared/attributeTooltips.js');
 const TILES_CSS = read('css/attr-tiles.css');
 
@@ -32,6 +33,7 @@ async function mount(page, attrs) {
   await page.setContent(`<style>${TILES_CSS}</style><body style="margin:0;background:#0b0d14">
     <table><thead><tr><th class="attr-tiles-head">Attributes</th></tr></thead>
     <tbody><tr id="row"></tr></tbody></table></body>`);
+  await page.addScriptTag({ content: DISPLAY_JS });
   await page.addScriptTag({ content: TILES_JS });
   await page.addScriptTag({ content: TOOLTIP_JS });
   await page.evaluate((a) => {
@@ -120,7 +122,7 @@ test.describe('hover copy', () => {
 });
 
 test.describe('tiers', () => {
-  test('10+ is the brand blue, 7-9 green, <=3 red, rest neutral', async ({ page }) => {
+  test('9+ is elite blue, 7-8 high, 5-6 mid, 0-4 low', async ({ page }) => {
     await mount(page, rawAttrs([10, 16, 3, 1, 7, 9, 5, 6, 4, 2, 8, 5]));
     const m = await page.evaluate(() =>
       [...document.querySelectorAll('.attr-tile')].map((t) => ({
@@ -129,27 +131,32 @@ test.describe('tiers', () => {
         color: getComputedStyle(t.querySelector('s')).color,
       })));
     const BLUE = 'rgb(74, 144, 217)';
+    const YELLOW = 'rgb(255, 215, 0)';
     for (const t of m) {
-      if (t.v >= 10) { expect(t.cls, `${t.v}`).toContain('is-elite'); expect(t.color).toBe(BLUE); }
+      if (t.v >= 9) { expect(t.cls, `${t.v}`).toContain('is-elite'); expect(t.color).toBe(BLUE); }
       else if (t.v >= 7) { expect(t.cls, `${t.v}`).toContain('is-hi'); expect(t.color).not.toBe(BLUE); }
-      else if (t.v <= 3) { expect(t.cls, `${t.v}`).toContain('is-lo'); expect(t.color).not.toBe(BLUE); }
-      else { expect(t.cls, `${t.v}`).not.toMatch(/is-(elite|hi|lo)/); }
+      else if (t.v >= 5) { expect(t.cls, `${t.v}`).toContain('is-mid'); expect(t.color).toBe(YELLOW); }
+      else { expect(t.cls, `${t.v}`).toContain('is-lo'); expect(t.color).not.toBe(BLUE); }
     }
   });
 
-  test('the 9/10 boundary is exact', async ({ page }) => {
+  test('tier class follows the displayed value', async ({ page }) => {
     await mount(page, {});
     const m = await page.evaluate(() => ({
-      nine: window.GOB_AttrTiles.tierClass(9),
-      ten: window.GOB_AttrTiles.tierClass(10),
-      three: window.GOB_AttrTiles.tierClass(3),
+      zero: window.GOB_AttrTiles.tierClass(0),
       four: window.GOB_AttrTiles.tierClass(4),
+      five: window.GOB_AttrTiles.tierClass(5),
       six: window.GOB_AttrTiles.tierClass(6),
       seven: window.GOB_AttrTiles.tierClass(7),
+      eight: window.GOB_AttrTiles.tierClass(8),
+      nine: window.GOB_AttrTiles.tierClass(9),
+      ten: window.GOB_AttrTiles.tierClass(10),
+      twelve: window.GOB_AttrTiles.tierClass(12),
     }));
     expect(m).toEqual({
-      nine: 'is-hi', ten: 'is-elite', three: 'is-lo',
-      four: '', six: '', seven: 'is-hi',
+      zero: 'is-lo', four: 'is-lo', five: 'is-mid', six: 'is-mid',
+      seven: 'is-hi', eight: 'is-hi', nine: 'is-elite', ten: 'is-elite',
+      twelve: 'is-elite',
     });
   });
 });
@@ -177,6 +184,8 @@ test.describe('the four in-scope surfaces all use the shared builder', () => {
       const html = read(page);
       expect(html, page).toContain('/js/shared/attrTiles.js');
       expect(html, page).toContain('/css/attr-tiles.css');
+      expect(html, page).toContain('/js/utils/attributeDisplay.js');
+      expect(html.indexOf('/js/utils/attributeDisplay.js'), page).toBeLessThan(html.indexOf('/js/shared/attrTiles.js'));
     }
   });
 

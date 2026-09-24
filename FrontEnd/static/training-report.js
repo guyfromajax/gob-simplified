@@ -945,7 +945,13 @@ function renderPlayersTable() {
     if (currentView === 'attributes') {
       // Show current attribute values with tooltips
       attributeList.forEach(attr => {
-        const value = player.attributes[attr] || (attr === 'NG' ? 1.0 : attr === 'EM' ? 50 : attr === 'MO' ? 0 : 0);
+        let value;
+        if (attr === 'NG' || attr === 'EM' || attr === 'MO') {
+          value = player.attributes[attr] || (attr === 'NG' ? 1.0 : attr === 'EM' ? 50 : 0);
+        } else {
+          value = window.GOB_AttributeDisplay.rawAttr(player.attributes, attr);
+          if (value == null) value = 0;
+        }
         const changes = reportData.player_changes[player.name] || {};
         const change = changes[attr] || 0;
         const displayMovements = reportData.player_attribute_display_movements?.[player.name] || {};
@@ -1038,15 +1044,8 @@ function createAttributeCell(attr, value, change, displayMovement = 0) {
     td.style.padding = 'var(--spacing-xs)';
     attachChangeTooltip();
   } else {
-    // Team-page parity: raw 0–100 → single-digit display via floor(/10).
-    const raw =
-      typeof value === 'number'
-        ? value
-        : typeof value === 'string'
-          ? parseFloat(value)
-          : 0;
-    const displayValue = Number.isFinite(raw) ? Math.floor(raw / 10) : 0;
-    td.textContent = String(displayValue);
+    const displayValue = window.GOB_AttributeDisplay.displayAttr(value);
+    td.textContent = String(displayValue == null ? 0 : displayValue);
     if (displayMovement > 0) {
       td.classList.add('attribute-display-increase');
     } else if (displayMovement < 0) {

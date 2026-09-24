@@ -70,6 +70,7 @@ HARNESS = """
 'use strict';
 global.window = {};
 global.CSS = { escape: (s) => s };
+require(__DISPLAY__);
 require(__DEVFOCUS__);
 require(__GRID__);
 const g = global.window.GOBPlayerDevelopmentGrid;
@@ -92,6 +93,7 @@ process.stdout.write(JSON.stringify({
 def _run(pos: str) -> dict:
     script = (textwrap.dedent(HARNESS)
               .replace("__GRID__", json.dumps(str(GRID)))
+              .replace("__DISPLAY__", json.dumps(str(S / "js" / "utils" / "attributeDisplay.js")))
               .replace("__DEVFOCUS__", json.dumps(str(S / "js" / "shared" / "developmentFocus.js")))
               .replace("__POS__", json.dumps(pos)))
     return json.loads(subprocess.check_output(["node", "-e", script], text=True, timeout=30))
@@ -321,8 +323,8 @@ def test_the_always_100_attributes_are_never_named():
 
 
 def test_the_accent_is_on_the_code_and_never_the_value():
-    """Colour on a rating already means 'how good is he' product-wide — blue #4A90D9 for
-    10+, green for 7-9 (attrTiles.js). Tinting the values here would make one colour mean
+    """Colour on a rating already means how good he is — red / yellow / green / blue by the
+    displayed tier (attrTiles.js). Tinting the values here would make one colour mean
     two things on the same attribute, one click apart."""
     css = (S / "css" / "player-development-grid.css").read_text()
     assert ".pdg-hc-attr.is-develops b { color: #F79420; }" in css

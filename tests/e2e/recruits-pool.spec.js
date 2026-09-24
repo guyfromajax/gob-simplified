@@ -21,6 +21,7 @@ const CSS = read('recruiting-spine.css') + read('css/attr-tiles.css');
 const SCRIPTS = [
   'js/shared/franchiseContext.js',
   'common.js',
+  'js/utils/attributeDisplay.js',
   'js/shared/attrTiles.js', 'js/shared/rtBucket.js',
   'js/shared/playerYear.js',
   'recruiting-common.js',
@@ -321,10 +322,9 @@ test.describe('filters compose', () => {
 });
 
 test.describe('attribute tiles', () => {
-  test('10+ renders in the brand RT display blue', async ({ page }) => {
+  test('9+ renders in the brand blue, and nothing below 9 does', async ({ page }) => {
     await mountPool(page);
     const m = await page.evaluate(() => {
-      // Force a known spread onto the first row's chips and re-read the classes.
       const chips = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child .attr-tile')];
       return chips.map((c) => ({
         v: Number(c.querySelector('s').textContent),
@@ -334,7 +334,7 @@ test.describe('attribute tiles', () => {
     });
     const blue = 'rgb(74, 144, 217)';
     for (const chip of m) {
-      if (chip.v >= 10) {
+      if (chip.v >= 9) {
         expect(chip.cls, `value ${chip.v}`).toContain('is-elite');
         expect(chip.color, `value ${chip.v}`).toBe(blue);
       } else {
@@ -344,21 +344,22 @@ test.describe('attribute tiles', () => {
     }
   });
 
-  test('the tier boundaries hold at 9/10', async ({ page }) => {
+  test('tier class paints 9 elite, 8 high, 6 mid, 4 low', async ({ page }) => {
     await mountPool(page);
     const m = await page.evaluate(() => {
       const chip = document.querySelector('#hub-pool tbody tr.rec:first-child .attr-tile');
       const s = chip.querySelector('s');
       const read = (v) => {
         s.textContent = String(v);
-        chip.className = 'attr-tile ' + (v >= 10 ? 'is-elite' : v >= 7 ? 'is-hi' : v <= 3 ? 'is-lo' : '');
+        chip.className = 'attr-tile ' + window.GOB_AttrTiles.tierClass(v);
         return getComputedStyle(s).color;
       };
-      return { nine: read(9), ten: read(10), sixteen: read(16) };
+      return { nine: read(9), eight: read(8), six: read(6), four: read(4) };
     });
-    expect(m.ten).toBe('rgb(74, 144, 217)');
-    expect(m.sixteen).toBe('rgb(74, 144, 217)');
-    expect(m.nine).not.toBe('rgb(74, 144, 217)');
+    expect(m.nine).toBe('rgb(74, 144, 217)');
+    expect(m.eight).not.toBe('rgb(74, 144, 217)');
+    expect(m.six).toBe('rgb(255, 215, 0)');
+    expect(m.four).not.toBe('rgb(74, 144, 217)');
   });
 });
 

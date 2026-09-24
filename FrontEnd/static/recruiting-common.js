@@ -172,8 +172,9 @@ function cloneParams(params) {
     return '/' + page + '?' + params.toString();
   }
 
-  function formatAttrValue(value) {
-    return Math.floor((Number(value) || 0) / 10);
+  function formatAttrValue(attrs, key) {
+    var d = window.GOB_AttributeDisplay.displayAttr(window.GOB_AttributeDisplay.rawAttr(attrs, key));
+    return d == null ? 0 : d;
   }
 
   function getLeanDisplay(lean, teamNameMap) {
@@ -204,7 +205,7 @@ function cloneParams(params) {
       var attrs = recruit.attributes || {};
       var normalizedAttrs = {};
       ATTR_KEYS.forEach(function (key) {
-        normalizedAttrs[key] = formatAttrValue(attrs[key]);
+        normalizedAttrs[key] = formatAttrValue(attrs, key);
       });
       return {
         recruitId: recruit.recruit_id,

@@ -1371,8 +1371,13 @@ function comparePlayersForSort(a, b, columnName, direction) {
   } else if (['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'].includes(columnName)) {
     const attrsA = a.attributes || {};
     const attrsB = b.attributes || {};
-    val1 = Math.floor((attrsA[`anchor_${columnName}`] ?? attrsA[columnName] ?? 0) / 10);
-    val2 = Math.floor((attrsB[`anchor_${columnName}`] ?? attrsB[columnName] ?? 0) / 10);
+    const ad = window.GOB_AttributeDisplay;
+    const shown = (attrs, key) => {
+      const d = ad.displayAttr(ad.rawAttr(attrs, key));
+      return d == null ? 0 : d;
+    };
+    val1 = shown(attrsA, columnName);
+    val2 = shown(attrsB, columnName);
   } else if (columnName === 'PTS') {
     val1 = Number(statsA.PTS) || 0;
     val2 = Number(statsB.PTS) || 0;
@@ -1617,21 +1622,26 @@ function renderRosterAttributes() {
 
   function appendAttrTail(tr, p) {
     const attrs = p.attributes || {};
+    const ad = window.GOB_AttributeDisplay;
+    const shown = (key) => {
+      const d = ad.displayAttr(ad.rawAttr(attrs, key));
+      return d == null ? 0 : d;
+    };
     const vals = [
       formatHeight(p.height),
       p.weight != null && p.weight !== '' ? p.weight : '--',
-      Math.floor((attrs.anchor_SC ?? attrs.SC ?? 0) / 10),
-      Math.floor((attrs.anchor_SH ?? attrs.SH ?? 0) / 10),
-      Math.floor((attrs.anchor_ID ?? attrs.ID ?? 0) / 10),
-      Math.floor((attrs.anchor_OD ?? attrs.OD ?? 0) / 10),
-      Math.floor((attrs.anchor_PS ?? attrs.PS ?? 0) / 10),
-      Math.floor((attrs.anchor_BH ?? attrs.BH ?? 0) / 10),
-      Math.floor((attrs.anchor_RB ?? attrs.RB ?? 0) / 10),
-      Math.floor((attrs.anchor_ST ?? attrs.ST ?? 0) / 10),
-      Math.floor((attrs.anchor_AG ?? attrs.AG ?? 0) / 10),
-      Math.floor((attrs.anchor_ND ?? attrs.ND ?? 0) / 10),
-      Math.floor((attrs.anchor_IQ ?? attrs.IQ ?? 0) / 10),
-      Math.floor((attrs.anchor_FT ?? attrs.FT ?? 0) / 10),
+      shown('SC'),
+      shown('SH'),
+      shown('ID'),
+      shown('OD'),
+      shown('PS'),
+      shown('BH'),
+      shown('RB'),
+      shown('ST'),
+      shown('AG'),
+      shown('ND'),
+      shown('IQ'),
+      shown('FT'),
     ];
     vals.forEach((val) => {
       const td = document.createElement('td');
@@ -3393,15 +3403,16 @@ function createCardBack(player) {
     const value = document.createElement('span');
     value.className = 'attr-value';
     // Use anchor attribute (base value, not energy-scaled)
-    const rawVal = attrs[`anchor_${key}`] ?? attrs[key];
-    const displayVal = rawVal != null ? Math.floor(rawVal / 10) : '--';
-    value.textContent = displayVal;
-    
-    // Set gold bar fill percentage (0-10 scale, max at 100%)
-    if (displayVal !== '--' && typeof getAttrColor === 'function') {
+    const ad = window.GOB_AttributeDisplay;
+    const rawVal = ad.rawAttr(attrs, key);
+    const displayVal = ad.displayAttr(rawVal);
+    value.textContent = displayVal == null ? '--' : displayVal;
+
+    // Bar fill is the displayed value × 10, capped at 100% (a 16 still fills the bar).
+    if (displayVal != null && typeof getAttrColor === 'function') {
       const fillPercentage = Math.min(displayVal * 10, 100);
       pill.style.setProperty('--attr-fill', `${fillPercentage}%`);
-      pill.style.setProperty('--attr-bar-color', getAttrColor(Math.ceil(Number(rawVal) / 10)));
+      pill.style.setProperty('--attr-bar-color', getAttrColor(rawVal));
     }
     
     pill.appendChild(value);

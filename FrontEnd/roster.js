@@ -30,14 +30,16 @@ async function loadRoster() {
       data.players.forEach(p => {
         html += `<tr><td><a href="/static/player-detail.html?id=${p._id}">${p.name}</a></td>`;
         headers.forEach(attr => {
-          let value = p.attributes[attr];
-  
+          let value;
           if (attr === "NG") {
-            value = (value ?? 0).toFixed(2);  // show 2 decimal places
+            value = (p.attributes[attr] ?? 0).toFixed(2);
           } else {
-            value = Math.floor((value ?? 0) / 10);  // Convert to 0-12 scale
+            const shown = window.GOB_AttributeDisplay.displayAttr(
+              window.GOB_AttributeDisplay.rawAttr(p.attributes, attr)
+            );
+            value = shown == null ? 0 : shown;
           }
-  
+
           html += `<td>${value}</td>`;
         });
         html += `</tr>`;
@@ -138,7 +140,10 @@ function createPlayerCard(player) {
     if (attr === "NG") {
       return (attrs[attr] ?? 0).toFixed(2);
     }
-    return Math.floor((attrs[attr] ?? 0) / 10);
+    const shown = window.GOB_AttributeDisplay.displayAttr(
+      window.GOB_AttributeDisplay.rawAttr(attrs, attr)
+    );
+    return shown == null ? 0 : shown;
   };
   
   // Create the card inner structure
@@ -230,15 +235,20 @@ function createPlayerCard(player) {
       attrRow.className = 'attr-row';
       
       const value = formatAttr(attr);
-      const rawAttr = Number(attrs[attr] ?? 0);
+      const api = window.GOB_AttributeDisplay;
+      const rawNumber = attr === 'NG'
+        ? Number(attrs.NG ?? 0)
+        : Number(api.rawAttr(attrs, attr) ?? 0);
       const percentage = attr === 'NG' ?
-        Math.min(100, Math.max(0, rawAttr * 10)) :
-        Math.min(100, Math.max(0, rawAttr * 8.33));
+        Math.min(100, Math.max(0, rawNumber * 10)) :
+        Math.min(100, Math.max(0, rawNumber * 8.33));
 
       attrRow.style.setProperty('--attr-fill', `${percentage}%`);
       if (typeof getAttrColor === 'function') {
-        const bucket = attr === 'NG' ? Math.ceil(rawAttr * 10) : Math.ceil(rawAttr / 10);
-        attrRow.style.setProperty('--attr-bar-color', getAttrColor(bucket));
+        // NG is a coefficient, not a raw attribute. ceil(ng * 10) is its existing
+        // bucket; multiplying back by 10 lets getAttrColor floor-divide to that bucket.
+        const colorRaw = attr === 'NG' ? Math.ceil(rawNumber * 10) * 10 : rawNumber;
+        attrRow.style.setProperty('--attr-bar-color', getAttrColor(colorRaw));
       }
       
       const label = document.createElement('span');
