@@ -448,13 +448,18 @@ function consumeCourtStartParam() {
   const params = liveParams();
   const raw = params.get('court_start');
   if (raw !== 'play' && raw !== 'sim') return null;
+  let mode = raw;
+  if (mode === 'sim' && params.get('resume_from_timeout') === 'true') {
+    console.warn('[court_start] mid-quarter sim is not supported; starting play instead');
+    mode = 'play';
+  }
   params.delete('court_start');
   try {
     franchiseCtx().commitParams(params);
   } catch (err) {
     console.warn('[court_start] could not strip param', err);
   }
-  return raw;
+  return mode;
 }
 
 function abortAutoStartCover() {

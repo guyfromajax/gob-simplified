@@ -1996,7 +1996,16 @@ function updatePlayButton() {
   const ftShooterPresent = !ftLockActive || Object.values(lineup).some(isFtLockedPlayer);
   const lineupIsValid = filled && ftShooterPresent;
 
+  const midQuarterResume = urlParams.get('resume_from_timeout') === 'true';
   startBtns.forEach((btn) => {
+    if (btn.id === 'sim-now' && midQuarterResume) {
+      btn.hidden = true;
+      btn.disabled = true;
+      btn.tabIndex = -1;
+      btn.setAttribute('aria-hidden', 'true');
+      btn.classList.add('disabled');
+      return;
+    }
     btn.classList.toggle('disabled', !lineupIsValid);
     btn.style.cursor = lineupIsValid ? 'pointer' : 'not-allowed';
   });
@@ -2309,7 +2318,19 @@ async function setHeader() {
     else playBtn.textContent = 'Return to Game';
   }
   if (simBtn) {
-    simBtn.textContent = isPregame ? 'Sim Game' : 'Sim Rest Of Game';
+    if (resumeFromTimeout) {
+      simBtn.hidden = true;
+      simBtn.disabled = true;
+      simBtn.tabIndex = -1;
+      simBtn.setAttribute('aria-hidden', 'true');
+      simBtn.classList.add('disabled');
+    } else {
+      simBtn.hidden = false;
+      simBtn.disabled = false;
+      simBtn.tabIndex = 0;
+      simBtn.removeAttribute('aria-hidden');
+      simBtn.textContent = isPregame ? 'Sim Game' : 'Sim Rest Of Game';
+    }
   }
 }
 
@@ -2682,8 +2703,10 @@ async function init() {
   }
 
   async function beginFromLineup(courtStart) {
+    const liveNow = liveParams();
+    if (courtStart === 'sim' && liveNow.get('resume_from_timeout') === 'true') return;
     const btn = document.getElementById(courtStart === 'sim' ? 'sim-now' : 'play-now');
-    if (!btn || btn.classList.contains('disabled')) return;
+    if (!btn || btn.hidden || btn.disabled || btn.classList.contains('disabled')) return;
       if (ftLockActive && !Object.values(lineup).some(isFtLockedPlayer)) {
         showToast('Free throw shooter must stay in the lineup');
         updatePlayButton();

@@ -101,7 +101,16 @@ test('set lineup offers Play and Sim with the locked labels', async ({ page }) =
 
   await page.goto('/static/set-lineup.html?home=Lancaster&away=Four-Corners&my_team=home&mode=single&game_id=g-to&quarter=2&resume_from_timeout=true');
   await expect(page.locator('#play-now')).toHaveText('Return to Game', { timeout: 15000 });
-  await expect(page.locator('#sim-now')).toHaveText('Sim Rest Of Game');
+  await expect(page.locator('#sim-now')).toBeHidden();
+  const tookFocus = await page.locator('#sim-now').evaluate((btn) => {
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    btn.focus();
+    return document.activeElement === btn;
+  });
+  expect(tookFocus).toBe(false);
+  await page.waitForTimeout(400);
+  expect(page.url()).toContain('set-lineup.html');
+  expect(page.url()).not.toContain('court_start');
 });
 
 test('fallback pre-game modal covers the court and the scoreboard', async ({ page }) => {
