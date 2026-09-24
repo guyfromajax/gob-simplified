@@ -180,7 +180,7 @@ export function getPlayerTweenTargets(scene, playerSprite, jerseyNo = null) {
 const DEFAULT_BALL_SPEED = 450;
 const MAX_BALL_DURATION = 1000; // ms - cap for very long passes
 const MIN_BALL_DURATION = 50; // ms - minimum duration
-const BALL_DEPTH = 1000; // Depth for ball sprite
+import { BALL_DEPTH } from "./ballDepth.js";
 
 /**
  * Get current ball speed (can be changed dynamically)
