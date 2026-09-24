@@ -2437,6 +2437,12 @@ function renderFccRecruits() {
   );
 }
 
+function fccShownAttr(attrs, key) {
+  const ad = window.GOB_AttributeDisplay;
+  const d = ad.displayAttr(ad.rawAttr(attrs, key));
+  return d == null ? 0 : d;
+}
+
 function initFccRecruits(topData) {
   if (typeof RecruitingCommon === 'undefined') return;
   document.body.dataset.fccWeek = String(Number(topData?.week || 1));
@@ -2474,18 +2480,18 @@ function initFccRecruits(topData) {
       // path, which is why that table always worked and this one never did.
       rawAttrs: attrs,
       attrs: {
-        SC: Math.floor((Number(attrs.SC) || 0) / 10),
-        SH: Math.floor((Number(attrs.SH) || 0) / 10),
-        ID: Math.floor((Number(attrs.ID) || 0) / 10),
-        OD: Math.floor((Number(attrs.OD) || 0) / 10),
-        PS: Math.floor((Number(attrs.PS) || 0) / 10),
-        BH: Math.floor((Number(attrs.BH) || 0) / 10),
-        RB: Math.floor((Number(attrs.RB) || 0) / 10),
-        AG: Math.floor((Number(attrs.AG) || 0) / 10),
-        ST: Math.floor((Number(attrs.ST) || 0) / 10),
-        ND: Math.floor((Number(attrs.ND) || 0) / 10),
-        IQ: Math.floor((Number(attrs.IQ) || 0) / 10),
-        FT: Math.floor((Number(attrs.FT) || 0) / 10)
+        SC: fccShownAttr(attrs, 'SC'),
+        SH: fccShownAttr(attrs, 'SH'),
+        ID: fccShownAttr(attrs, 'ID'),
+        OD: fccShownAttr(attrs, 'OD'),
+        PS: fccShownAttr(attrs, 'PS'),
+        BH: fccShownAttr(attrs, 'BH'),
+        RB: fccShownAttr(attrs, 'RB'),
+        AG: fccShownAttr(attrs, 'AG'),
+        ST: fccShownAttr(attrs, 'ST'),
+        ND: fccShownAttr(attrs, 'ND'),
+        IQ: fccShownAttr(attrs, 'IQ'),
+        FT: fccShownAttr(attrs, 'FT')
       },
       raw: player
     };
@@ -2768,13 +2774,10 @@ function renderRecruits(data) {
     const tr = document.createElement('tr');
     const a = r.attributes;
     
-    // Format attributes: 0-9 displays 0, 10-19 displays 1, 20-29 displays 2, etc.
-    const formatAttr = (attr) => {
-      const value = attr ?? 0;
-      return Math.floor(value / 10);
-    };
+    // First digit of the raw attribute. Missing sorts and prints as 0, same as before.
+    const formatAttr = (key) => fccShownAttr(a, key);
     
-    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr(a.SC)}</td><td>${formatAttr(a.SH)}</td><td>${formatAttr(a.ID)}</td><td>${formatAttr(a.OD)}</td><td>${formatAttr(a.PS)}</td><td>${formatAttr(a.BH)}</td><td>${formatAttr(a.RB)}</td><td>${formatAttr(a.AG)}</td><td>${formatAttr(a.ST)}</td><td>${formatAttr(a.ND)}</td><td>${formatAttr(a.IQ)}</td><td>${formatAttr(a.FT)}</td><td>${formatRtDisplay(r.rt)}</td>`;
+    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr('SC')}</td><td>${formatAttr('SH')}</td><td>${formatAttr('ID')}</td><td>${formatAttr('OD')}</td><td>${formatAttr('PS')}</td><td>${formatAttr('BH')}</td><td>${formatAttr('RB')}</td><td>${formatAttr('AG')}</td><td>${formatAttr('ST')}</td><td>${formatAttr('ND')}</td><td>${formatAttr('IQ')}</td><td>${formatAttr('FT')}</td><td>${formatRtDisplay(r.rt)}</td>`;
     tbody.appendChild(tr);
   });
   
@@ -3509,10 +3512,8 @@ function sortRosterTable(columnName, direction) {
       // Attribute columns
       const attrsA = a.attributes || {};
       const attrsB = b.attributes || {};
-      const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
-      const rawValB = attrsB[`anchor_${dataKey}`] ?? attrsB[dataKey] ?? 0;
-      val1 = Math.floor(rawValA / 10);
-      val2 = Math.floor(rawValB / 10);
+      val1 = fccShownAttr(attrsA, dataKey);
+      val2 = fccShownAttr(attrsB, dataKey);
     }
     
     if (direction === 'desc') {

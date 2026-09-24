@@ -91,13 +91,9 @@ function cloneParams(params) {
     return Math.floor(raw / 12) + "'" + (raw % 12) + '"';
   }
 
-  // Roster page shows attributes on the 0-10 scale and prefers the anchor value.
   function formatAttr(attrs, key) {
-    var raw = (attrs || {})['anchor_' + key];
-    if (raw == null || raw === '') raw = (attrs || {})[key];
-    if (raw == null || raw === '') return '--';
-    var num = Number(raw);
-    return Number.isNaN(num) ? '--' : Math.floor(num / 10);
+    var d = window.GOB_AttributeDisplay.displayAttr(window.GOB_AttributeDisplay.rawAttr(attrs, key));
+    return d == null ? '--' : d;
   }
 
   /** Current/potential as letter grades — the pair the roster and pool already show. */

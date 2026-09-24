@@ -68,7 +68,6 @@
   var SIGN = { TOTAL: 50, PROMISE_W: 18 };
 
   function boardActive() { return state.phase === 'invite'; }
-  function attrClass(v) { return v >= 65 ? 'attr-hi' : v >= 40 ? 'attr-mid' : v >= 20 ? 'attr-lo' : 'attr-zero'; }
   function regionOf(rec) { var v = rec && rec.homeRegion ? String(rec.homeRegion).trim().toUpperCase() : ''; return v ? v.charAt(0) : ''; }
   // Recruit | Pos | RT | Yr | Ht | Rgn | Attributes | Lean | Watch — attributes are a
   // single cell of chips now, not 12 columns. +1 for the add column in the invite phase.

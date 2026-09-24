@@ -1196,18 +1196,20 @@ function resolveFranchiseLockerRoomUrl(options = {}) {
   return buildFranchiseLockerRoomUrl(franchiseId, teamId, extraParams);
 }
 
-// Canonical attribute bar color scale — see Styleguide.md ### Attribute Bar Scale
-// Do not add a fifth color tier. All values 81+ including 100+ return light blue.
+// Attribute bar colors. Pass the RAW attribute. The tier is the displayed
+// first digit (GOB_AttributeDisplay): 0–4 red, 5–6 yellow, 7–8 green, 9+ blue.
+// Do not add a fifth color. Do not pre-bucket the argument — a displayed 8
+// passed in here would be floored again.
 /**
- * @param {number} scaledValue Bucket from Math.ceil(rawAttribute / 10) for anchor storage on a 0–100+ raw scale (e.g. raw 81 → 9 → light blue). Values above 10 (raw > 100) still map to light blue.
- * @returns {string} Hex fill color for attribute / position-rating bars.
+ * @param {number} raw Raw attribute (anchor scale, uncapped). Not a 0–10 bucket.
+ * @returns {string} Hex fill color for attribute bars.
  */
-function getAttrColor(scaledValue) {
-  const s = Number(scaledValue);
-  if (!Number.isFinite(s)) return '#ff6d6d';
-  if (s >= 9) return '#4A90D9';
-  if (s >= 7) return '#34EC27';
-  if (s >= 5) return '#FFD700';
+function getAttrColor(raw) {
+  const ad = typeof window !== 'undefined' ? window.GOB_AttributeDisplay : null;
+  const tier = ad ? ad.attrTier(ad.displayAttr(raw)) : null;
+  if (tier === 'elite') return '#4A90D9';
+  if (tier === 'high') return '#34EC27';
+  if (tier === 'mid') return '#FFD700';
   return '#ff6d6d';
 }
 

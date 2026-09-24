@@ -145,7 +145,7 @@
 .pdg-hc-attrs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 4px 6px;
+  gap: 4px 18px;
   margin-top: 9px;
   padding-top: 9px;
   border-top: 1px solid rgba(255, 255, 255, .1);
@@ -153,7 +153,7 @@
 .pdg-hc-attr {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 4px;
 }
 .pdg-hc-attr b {
@@ -162,8 +162,8 @@
   color: rgba(255, 255, 255, .42);
 }
 /* One accent, on the CODE only. The value stays white: colour on a rating already means
-   "how good is he" product-wide (blue 10+, green 7-9), and reusing those hues for training
-   efficiency would make the same colour mean two things on the same attribute. */
+   how good he is (red / yellow / green / blue by displayed tier), and reusing those hues
+   for training efficiency would make the same colour mean two things on the same attribute. */
 .pdg-hc-attr.is-develops b { color: #F79420; }
 .pdg-hc-attr i {
   font: 700 12px/1 'Inter', sans-serif;

@@ -27,6 +27,7 @@ async function mount(page, opts = {}) {
   await page.addScriptTag({ content: read('js/shared/franchiseContext.js') });
   await page.addScriptTag({ content: read('js/shared/playerYear.js') });
   await page.addScriptTag({ content: read('js/shared/rtBucket.js') });
+  await page.addScriptTag({ content: read('js/utils/attributeDisplay.js') });
   await page.addScriptTag({ content: read('js/shared/attrTiles.js') });
   await page.addScriptTag({ content: read('js/shared/attributeTooltips.js') });
   await page.addScriptTag({ content: read('js/shared/scoutingReport.js') });

@@ -9,10 +9,11 @@
  *
  * Everything else that displays attributes is deliberately untouched.
  *
- * Display rules (product-wide):
- *   - Values render on the 0-10 scale, preferring the `anchor_<KEY>` value.
- *   - Tier colours: 10+ brand blue (#4A90D9), 7-9 green, <=3 red, otherwise neutral.
- *   - Hover shows the full attribute name and the 10-scale value, e.g. "Rebounding: 6".
+ * Display rules (product-wide, via GOB_AttributeDisplay):
+ *   - Values render as the first digit of the raw attribute (floor of raw/10),
+ *     preferring anchor_<KEY>. Uncapped: 105 → 10, 160 → 16. 0 is valid.
+ *   - Tier colours follow the displayed value: 0–4 low, 5–6 mid, 7–8 high, 9+ elite.
+ *   - Hover shows the full attribute name and that displayed value, e.g. "Rebounding: 6".
  *
  * The tooltip is delivered via `data-tooltip`, which the shared attributeTooltips.js
  * honours verbatim — so a surface only needs to call initAttributeTooltips() over the
@@ -66,22 +67,19 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  /** 0-10 display value, anchor-aware. Returns null when the attribute is absent. */
+  /** Displayed attribute, anchor-aware. Null when the attribute is absent. */
   function tileValue(attrs, key) {
-    var raw = (attrs || {})['anchor_' + key];
-    if (raw == null || raw === '') raw = (attrs || {})[key];
-    if (raw == null || raw === '') return null;
-    var num = Number(raw);
-    if (isNaN(num)) return null;
-    return Math.floor(num / 10);
+    var ad = global.GOB_AttributeDisplay;
+    return ad.displayAttr(ad.rawAttr(attrs, key));
   }
 
-  /** Tier class. 10+ takes the brand RT display blue. */
+  /** Tier class from the displayed value. 9+ is elite blue. */
   function tierClass(value) {
-    if (value == null) return '';
-    if (value >= 10) return 'is-elite';
-    if (value >= 7) return 'is-hi';
-    if (value <= 3) return 'is-lo';
+    var tier = global.GOB_AttributeDisplay.attrTier(value);
+    if (tier === 'elite') return 'is-elite';
+    if (tier === 'high') return 'is-hi';
+    if (tier === 'mid') return 'is-mid';
+    if (tier === 'low') return 'is-lo';
     return '';
   }
 

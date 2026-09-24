@@ -646,8 +646,9 @@ function renderCustomFocusTable() {
     customFocusRankingAttrs.forEach(function (code) {
       const td = document.createElement('td');
       td.className = 'custom-focus-cell' + (clickable ? '' : ' is-readonly');
-      const val = row.attrs && typeof row.attrs[code] === 'number' ? row.attrs[code] : '';
-      td.textContent = val === '' ? '—' : String(val);
+      const raw = window.GOB_AttributeDisplay.rawAttr(row.attrs, code);
+      const shown = window.GOB_AttributeDisplay.displayAttr(raw);
+      td.textContent = shown == null ? '—' : String(shown);
       if (picks.indexOf(code) !== -1) td.classList.add('selected');
       if (clickable) {
         td.addEventListener('click', function () {
