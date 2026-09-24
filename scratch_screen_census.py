@@ -28,13 +28,14 @@ S = {
     "dist_screener_to_recv_def": Counter(),   # 0.5 buckets
     "dist_screener_to_recv": Counter(),
     "on_path": Counter(),
+    "screen_rolepair": Counter(),   # (screener_pos, receiver_pos) for every derived screen
     "dist_screener_to_own_def": Counter(),   # staleness of the screener's OWN defender         # is today's screener coord between def and recv dest
     "samples": [],
     "no_recv_samples": [],
     # Stage A applier stats, accumulated from apply_screen_targeting's return value
     "stageA": {"screens": 0, "applied": 0,
                "fallback": Counter(), "displacement": Counter(), "calls": 0,
-               "contested": 0, "switches_applied": 0,
+               "contested": 0, "switches_applied": 0, "cap_refused": 0,
                "outcome": Counter(), "contest_skipped": Counter()},
 }
 
@@ -97,6 +98,7 @@ def _install_stage_a():
                 A["displacement"].update(st.get("displacement") or {})
                 A["contested"] += st.get("contested", 0)
                 A["switches_applied"] += st.get("switches_applied", 0)
+                A["cap_refused"] += st.get("cap_refused", 0)
                 A["outcome"].update(st.get("outcome") or {})
                 A["contest_skipped"].update(st.get("contest_skipped") or {})
         except Exception:
@@ -162,6 +164,8 @@ def _measure(game, skeleton, off_lineup, def_lineup, out):
             else:
                 recv, how = None, "none_same_location"
             S["receiver"][how] += 1
+            if recv is not None:
+                S["screen_rolepair"]["|".join(sorted(("O-" + spos, "O-" + recv)))] += 1
             if recv is None:
                 if len(S["no_recv_samples"]) < 120:
                     S["no_recv_samples"].append({
@@ -248,6 +252,7 @@ def summary():
         "dist_screener_to_recv_def": dict(S["dist_screener_to_recv_def"]),
         "dist_screener_to_recv": dict(S["dist_screener_to_recv"]),
         "on_path": top(S["on_path"], 20),
+        "screen_rolepair": dict(S["screen_rolepair"]),
         "dist_screener_to_own_def": dict(S["dist_screener_to_own_def"]),
         "samples": S["samples"][:25],
         "no_recv_samples": S["no_recv_samples"][:40],
@@ -257,6 +262,7 @@ def summary():
                    "displacement": dict(S["stageA"]["displacement"]),
                    "contested": S["stageA"]["contested"],
                    "switches_applied": S["stageA"]["switches_applied"],
+                   "cap_refused": S["stageA"]["cap_refused"],
                    "outcome": dict(S["stageA"]["outcome"]),
                    "contest_skipped": dict(S["stageA"]["contest_skipped"])},
     }

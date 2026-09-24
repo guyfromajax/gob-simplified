@@ -74,6 +74,20 @@ from BackEnd.utils.screen_contest import (
 #: import: an import-time constant cannot be monkeypatched, and this is not a hot path.
 SCREEN_TARGETING_FLAG = "GOB_SCREEN_TARGETING"
 
+#: Stage A's proximity cap, its OWN flag, default OFF and NOT folded into Stage A.
+#:
+#: Stage A aims the screener at the receiver's DEFENDER. In sag and help defences that
+#: defender is nowhere near the receiver, so the "screen" is dragged away from the play:
+#: measured, screener -> receiver reaches p90 17.0 grid uncapped. A screen 17 units from
+#: the man you are screening for is not a screen.
+#:
+#: With this on, a targeted point further than ``proximity_cap_distance()`` from the
+#: receiver is REFUSED and that screen keeps today's OFFSET_SPOTS placement, counted. It
+#: is not clamped onto the line: a clamped point is neither on the defender (so it screens
+#: nobody) nor near the receiver (so it is not his screen) — it would be a third position
+#: that is not a screen at all, and inventing one is worse than declining.
+SCREEN_PROXIMITY_CAP_FLAG = "GOB_SCREEN_PROXIMITY_CAP"
+
 #: Court bounds, in grid units. The 100x50 playing grid itself (``gridToPixels.js``), not a
 #: chosen margin — a screen point outside it is off the floor.
 COURT_MAX_X = 100.0
@@ -86,6 +100,20 @@ SCREEN_ACTION = "screen"
 
 def screen_targeting_enabled() -> bool:
     return os.environ.get(SCREEN_TARGETING_FLAG, "") == "1"
+
+
+def screen_proximity_cap_enabled() -> bool:
+    return os.environ.get(SCREEN_PROXIMITY_CAP_FLAG, "") == "1"
+
+
+def proximity_cap_distance() -> float:
+    """The house's EXISTING "close enough to contest" spatial gate, resolved at call time
+    and never inlined: ``pass_contest.PASS_LANE_DIST`` = 8.0, which ``boxout_contest``
+    already reused as ``BOXOUT_PAIR_RADIUS`` after deriving the same number independently
+    from the pooled median shot-moment distance. No new tuning number is introduced here,
+    and this one is not tuned."""
+    from BackEnd.engine.pass_contest import PASS_LANE_DIST
+    return float(PASS_LANE_DIST)
 
 
 def _loc(action_info: Dict[str, Any]) -> Optional[str]:
@@ -191,6 +219,10 @@ def _new_stats() -> Dict[str, Any]:
         "applied": 0,
         "fallback": Counter(),      # why today's OFFSET_SPOTS placement was kept
         "displacement": Counter(),  # how far the screener moved, 0.5 grid buckets
+        # proximity cap (GOB_SCREEN_PROXIMITY_CAP)
+        "cap_enabled": screen_proximity_cap_enabled(),
+        "cap_refused": 0,
+        "cap_gap": Counter(),       # target -> receiver gap, every screen the cap judged
         # Stage B (GOB_SCREEN_CONTEST)
         "contested": 0,
         "outcome": Counter(),
@@ -232,6 +264,10 @@ def apply_screen_targeting(animations, game, skeleton, off_lineup, def_lineup,
 
     anim_by_pid = {a.get("playerId"): a for a in (animations or []) if a.get("playerId")}
     dgrid = defender_grid_from_animations(animations, def_lineup, len(steps))
+    # Only the cap needs the offence's own positions, so it is only built when the cap is on.
+    cap_on = screen_proximity_cap_enabled()
+    ogrid = offense_grid_from_animations(animations, off_lineup, steps) if cap_on else {}
+    cap_distance = proximity_cap_distance() if cap_on else 0.0
 
     game_state = getattr(game, "game_state", {}) or {}
     zone = bool(is_zone_defense(game_state.get("defense_playcall", "man")))
@@ -298,6 +334,24 @@ def apply_screen_targeting(animations, game, skeleton, off_lineup, def_lineup,
                 stats["fallback"]["defender_already_at_destination"] += 1
                 continue
 
+            # ── Proximity cap (GOB_SCREEN_PROXIMITY_CAP, default OFF) ─────────────────
+            # Refuse a "screen" that would land further than the house's contest radius
+            # from the man it is supposedly for. Falls back to today's placement and is
+            # counted, exactly like every other Stage A fallback. Unreachable with
+            # targeting off, because the function has already returned by then.
+            if cap_on:
+                receiver_coord = (ogrid.get(step_idx) or {}).get(receiver_pos)
+                if receiver_coord is None:
+                    stats["fallback"]["cap_receiver_has_no_coord"] += 1
+                    continue
+                gap = math.hypot(float(target["x"]) - float(receiver_coord["x"]),
+                                 float(target["y"]) - float(receiver_coord["y"]))
+                stats["cap_gap"][round(round(gap / 0.5) * 0.5, 2)] += 1
+                if gap > cap_distance:
+                    stats["fallback"]["cap_too_far_from_receiver"] += 1
+                    stats["cap_refused"] += 1
+                    continue
+
             before = entry["coords"]
             moved = math.hypot(float(target["x"]) - float(before["x"]),
                                float(target["y"]) - float(before["y"]))
@@ -321,6 +375,7 @@ def apply_screen_targeting(animations, game, skeleton, off_lineup, def_lineup,
     stats["displacement"] = dict(stats["displacement"])
     stats["outcome"] = dict(stats["outcome"])
     stats["contest_skipped"] = dict(stats["contest_skipped"])
+    stats["cap_gap"] = dict(stats["cap_gap"])
     return stats
 
 
