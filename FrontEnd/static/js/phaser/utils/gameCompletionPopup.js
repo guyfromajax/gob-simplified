@@ -466,7 +466,7 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
     : `
       <section class="gc-section gc-actions-section">
         <div class="button-container">
-          <a href="${boxScoreUrl}" class="completion-button box-score-button">Box Score</a>
+          <a href="${boxScoreUrl}" class="completion-button box-score-button" data-gob-replace>Box Score</a>
           ${lockerActionHtml}
         </div>
       </section>
@@ -1012,7 +1012,9 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
         }
       }
       if (okToNavigate) {
-        window.location.assign(lockerRoomUrl);
+        if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+        else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+        else window.location.replace(lockerRoomUrl);
       }
     });
   }
@@ -1031,7 +1033,9 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
       } catch (err) {
         console.warn('[gameCompletionPopup] delete-completed-single failed:', err);
       }
-      window.location.href = lockerRoomUrl;
+      if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+      else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+      else window.location.replace(lockerRoomUrl);
     });
   }
 
@@ -1086,7 +1090,8 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
         }
       }
 
-      window.location.href = '/mode-select.html';
+      if (window.GOBNav) window.GOBNav.replace('/mode-select.html');
+      else window.location.replace('/mode-select.html');
     });
   }
 }

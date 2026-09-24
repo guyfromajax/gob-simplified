@@ -28,9 +28,12 @@ def test_lesson_and_hub_back_actions_have_distinct_routes():
     ]
 
     assert 'if (!isTutorialHub())' in go_back
-    assert "location.href = HUB" in go_back
+    assert "window.GOBNav.back(HUB)" in go_back
+    assert "location.href = HUB" not in go_back
+    assert "history.length" not in go_back
     assert "var origin = consumeOrigin()" in go_back
-    assert "location.href = origin" in go_back
+    assert "window.GOBNav.back(same)" in go_back
+    assert "location.replace(origin)" in go_back
 
 
 def test_hub_exit_consumes_saved_origin():

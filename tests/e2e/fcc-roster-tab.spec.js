@@ -32,6 +32,7 @@ async function mount(page) {
     <style>body{margin:0;background:#0b0d14}.tab-content{display:block!important}</style>
     <div id="franchise-container"><div id="tournament-tabs">${ROSTER_TAB}</div></div>`);
   await page.addScriptTag({ content: read('js/shared/rtBucket.js') });
+  await page.addScriptTag({ content: read('js/utils/attributeDisplay.js') });
   await page.addScriptTag({ content: read('js/shared/attrTiles.js') });
   await page.evaluate(() => {
     const A = ['SC','SH','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
@@ -192,6 +193,7 @@ test.describe('FCC Recruiting tab', () => {
       <div id="franchise-container"><div id="tournament-tabs">${RECRUITS_TAB}</div></div>`);
     await page.addScriptTag({ content: read('js/shared/franchiseContext.js') });
     await page.addScriptTag({ content: read('js/shared/rtBucket.js') });
+    await page.addScriptTag({ content: read('js/utils/attributeDisplay.js') });
     await page.addScriptTag({ content: read('js/shared/attrTiles.js') });
     await page.addScriptTag({ content: read('js/shared/playerYear.js') });
     // Production script order: door, then common.js (getBestPosition/formatHeight).

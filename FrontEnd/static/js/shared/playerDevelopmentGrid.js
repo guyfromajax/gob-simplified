@@ -45,12 +45,11 @@
     return Math.floor(n / 12) + "'" + (n % 12) + '"';
   }
 
-  /** Attributes may be stored raw or under anchor_ keys; prefer the anchor. */
+  /** Raw attribute, preferring anchor_. The hover card displays the first digit. */
   function attrValue(attributes, code) {
-    var a = attributes || {};
-    var v = a['anchor_' + code];
-    if (v == null) v = a[code];
-    var n = Number(v);
+    var raw = window.GOB_AttributeDisplay.rawAttr(attributes, code);
+    if (raw == null || raw === '') return null;
+    var n = Number(raw);
     return isFinite(n) ? n : null;
   }
 
@@ -99,14 +98,14 @@
   function hoverCardHtml(player) {
     var develops = developsFor(player);
     var rows = ATTR_ORDER.map(function (code) {
-      var v = attrValue(player.attributes, code);
+      var raw = attrValue(player.attributes, code);
+      var shown = window.GOB_AttributeDisplay.displayAttr(raw);
       // The accent is on the CODE, never the value. Values are ratings, and colour on a
-      // rating already means "how good is he" everywhere else in the product — blue #4A90D9
-      // for 10+, green for 7-9. Tinting them here would put the product's own value palette
+      // rating already means how good he is. Tinting them here would put that palette
       // on a quantity that is not a value.
       var on = develops.indexOf(code) !== -1 ? ' is-develops' : '';
       return '<span class="pdg-hc-attr' + on + '"><b>' + esc(code) + '</b>' +
-        '<i>' + (v == null ? '--' : v) + '</i></span>';
+        '<i>' + (shown == null ? '--' : shown) + '</i></span>';
     }).join('');
 
     var dev = window.GOBDevelopmentFocus;
@@ -204,7 +203,7 @@
     var rt = rtAtTrainingPosition(player);
     return '<div class="pdg-card" data-pdg-player="' + esc(player.id) + '">' +
       '<span class="pdg-name" tabindex="0">' + esc(player.name) + '</span>' +
-      '<span class="pdg-rt" data-pdg-rt>' + (rt == null ? '--' : rt) + '</span>' +
+      '<span class="pdg-rt" data-pdg-rt>' + (rt == null ? '--' : formatRtDisplay(rt)) + '</span>' +
       '<span class="pdg-controls">' +
         dev.positionSelectHtml(player) + dev.focusSelectHtml(player) +
       '</span>' +
@@ -267,7 +266,7 @@
           var cell = grid.querySelector('[data-pdg-player="' + CSS.escape(String(playerId)) + '"] [data-pdg-rt]');
           if (cell) {
             var rt = rtAtTrainingPosition(row);
-            cell.textContent = rt == null ? '--' : rt;
+            cell.textContent = rt == null ? '--' : formatRtDisplay(rt);
           }
         }
       }

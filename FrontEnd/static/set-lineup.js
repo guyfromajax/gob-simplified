@@ -121,6 +121,23 @@ function playSound(filename) {
   } catch (e) {}
 }
 
+function stripStaleQuarterBreakFrom() {
+  try {
+    const params = liveParams();
+    if (!params.has('quarter_break_from')) return;
+    params.delete('quarter_break_from');
+    if (franchiseCtx() && typeof franchiseCtx().commitParams === 'function') {
+      franchiseCtx().commitParams(params);
+    } else {
+      const next = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      history.replaceState(history.state, '', next);
+    }
+  } catch (err) {
+    console.warn('[set-lineup] could not strip quarter_break_from', err);
+  }
+}
+stripStaleQuarterBreakFrom();
+
 async function redirectIfFranchiseGameplayAlreadyCommitted() {
   if (modeParam !== 'franchise' || !franchiseId || !weekParam) return false;
   try {
@@ -137,7 +154,10 @@ async function redirectIfFranchiseGameplayAlreadyCommitted() {
     const currentWeek = Number(data.week || 1);
     const pageWeek = Number(weekParam || 0);
     if (pageWeek && currentWeek > pageWeek) {
-      window.location.replace(`/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`);
+      const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+      if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(fccUrl, { tab: 'home-tab' });
+      else if (window.GOBNav) window.GOBNav.replace(fccUrl);
+      else window.location.replace(fccUrl);
       return true;
     }
   } catch (error) {
@@ -152,7 +172,6 @@ function buildPlayerDetailUrl(playerId) {
   if (modeParam) qs.set('mode', modeParam);
   if (franchiseId) qs.set('franchise_id', franchiseId);
   if (gameId) qs.set('game_id', gameId);
-  qs.set('return_url', window.location.pathname + currentSearch());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -247,18 +266,32 @@ function isGameplayLineupContext() {
   return Boolean(gameId);
 }
 
+function playerDetailPeekUrl(playerId) {
+  const dest = new URL(buildPlayerDetailUrl(playerId), window.location.origin);
+  dest.searchParams.set(
+    'return_url',
+    window.location.pathname + window.location.search + window.location.hash
+  );
+  return dest.pathname + dest.search + dest.hash;
+}
+
 function applyPlayerDetailLinkBehavior(linkEl, playerId) {
-  if (!linkEl) return;
+  if (!linkEl || !playerId) return;
   if (isGameplayLineupContext()) {
-    linkEl.removeAttribute('href');
-    linkEl.style.cursor = 'default';
+    linkEl.href = buildPlayerDetailUrl(playerId);
     linkEl.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
       e.preventDefault();
       e.stopPropagation();
+      const next = playerDetailPeekUrl(playerId);
+      if (window.GOBNav) window.GOBNav.go(next);
+      else window.location.assign(next);
     });
     return;
   }
   linkEl.href = buildPlayerDetailUrl(playerId);
+  linkEl.setAttribute('data-return', '');
+  linkEl.setAttribute('data-gob-replace', '');
 }
 
 // ✅ PHASE 2: Validate pointers on page load (if present)
@@ -431,6 +464,7 @@ let roster = [];
 /** Team chemistry from /roster (franchise/tournament FTD); single-game default 15. */
 let rosterTeamChemistry = 15;
 const lineup = {};
+let lineupDirty = false;
 /** @type {string|null} Selected Rim Runner player id (single-select); null = use backend default */
 let rimRunnerPlayerId = null;
 const playerMap = {};
@@ -1274,8 +1308,9 @@ function appendSharedLeadingCells(tr, {
   nameTd.className = 'player-name-cell';
   const wrap = document.createElement('div');
   wrap.className = 'player-name-wrap';
-  const nameText = document.createElement('span');
+  const nameText = document.createElement(isGameplayLineupContext() ? 'a' : 'span');
   nameText.className = 'player-name-link';
+  if (isGameplayLineupContext()) applyPlayerDetailLinkBehavior(nameText, playerId);
   nameText.textContent = typeof formatNameWithJersey === 'function'
     ? formatNameWithJersey(player.jersey, player.name)
     : (player.name || '—');
@@ -1371,8 +1406,13 @@ function comparePlayersForSort(a, b, columnName, direction) {
   } else if (['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'].includes(columnName)) {
     const attrsA = a.attributes || {};
     const attrsB = b.attributes || {};
-    val1 = Math.floor((attrsA[`anchor_${columnName}`] ?? attrsA[columnName] ?? 0) / 10);
-    val2 = Math.floor((attrsB[`anchor_${columnName}`] ?? attrsB[columnName] ?? 0) / 10);
+    const ad = window.GOB_AttributeDisplay;
+    const shown = (attrs, key) => {
+      const d = ad.displayAttr(ad.rawAttr(attrs, key));
+      return d == null ? 0 : d;
+    };
+    val1 = shown(attrsA, columnName);
+    val2 = shown(attrsB, columnName);
   } else if (columnName === 'PTS') {
     val1 = Number(statsA.PTS) || 0;
     val2 = Number(statsB.PTS) || 0;
@@ -1617,21 +1657,26 @@ function renderRosterAttributes() {
 
   function appendAttrTail(tr, p) {
     const attrs = p.attributes || {};
+    const ad = window.GOB_AttributeDisplay;
+    const shown = (key) => {
+      const d = ad.displayAttr(ad.rawAttr(attrs, key));
+      return d == null ? 0 : d;
+    };
     const vals = [
       formatHeight(p.height),
       p.weight != null && p.weight !== '' ? p.weight : '--',
-      Math.floor((attrs.anchor_SC ?? attrs.SC ?? 0) / 10),
-      Math.floor((attrs.anchor_SH ?? attrs.SH ?? 0) / 10),
-      Math.floor((attrs.anchor_ID ?? attrs.ID ?? 0) / 10),
-      Math.floor((attrs.anchor_OD ?? attrs.OD ?? 0) / 10),
-      Math.floor((attrs.anchor_PS ?? attrs.PS ?? 0) / 10),
-      Math.floor((attrs.anchor_BH ?? attrs.BH ?? 0) / 10),
-      Math.floor((attrs.anchor_RB ?? attrs.RB ?? 0) / 10),
-      Math.floor((attrs.anchor_ST ?? attrs.ST ?? 0) / 10),
-      Math.floor((attrs.anchor_AG ?? attrs.AG ?? 0) / 10),
-      Math.floor((attrs.anchor_ND ?? attrs.ND ?? 0) / 10),
-      Math.floor((attrs.anchor_IQ ?? attrs.IQ ?? 0) / 10),
-      Math.floor((attrs.anchor_FT ?? attrs.FT ?? 0) / 10),
+      shown('SC'),
+      shown('SH'),
+      shown('ID'),
+      shown('OD'),
+      shown('PS'),
+      shown('BH'),
+      shown('RB'),
+      shown('ST'),
+      shown('AG'),
+      shown('ND'),
+      shown('IQ'),
+      shown('FT'),
     ];
     vals.forEach((val) => {
       const td = document.createElement('td');
@@ -1872,6 +1917,7 @@ function clearLineupSlot(pos) {
     return;
   }
   delete lineup[pos];
+  lineupDirty = true;
   if (removedId != null && rimRunnerPlayerId != null && String(rimRunnerPlayerId) === String(removedId)) {
     rimRunnerPlayerId = null;
   }
@@ -1977,26 +2023,28 @@ function bindRosterTableEvents() {
 }
 
 function updatePlayButton() {
-  const playBtn = document.getElementById('play-now');
+  const startBtns = ['play-now', 'sim-now']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
   const gameplanBtn = document.getElementById('gameplan-optional');
   
   const filled = ['PG','SG','SF','PF','C'].every(pos => lineup[pos]);
   const ftShooterPresent = !ftLockActive || Object.values(lineup).some(isFtLockedPlayer);
   const lineupIsValid = filled && ftShooterPresent;
-  
-  if (lineupIsValid) {
-    // Enable play button when lineup is complete
-    if (playBtn) {
-      playBtn.classList.remove('disabled');
-      playBtn.style.cursor = 'pointer';
+
+  const midQuarterResume = urlParams.get('resume_from_timeout') === 'true';
+  startBtns.forEach((btn) => {
+    if (btn.id === 'sim-now' && midQuarterResume) {
+      btn.hidden = true;
+      btn.disabled = true;
+      btn.tabIndex = -1;
+      btn.setAttribute('aria-hidden', 'true');
+      btn.classList.add('disabled');
+      return;
     }
-  } else {
-    // Disable play button when lineup is incomplete
-    if (playBtn) {
-      playBtn.classList.add('disabled');
-      playBtn.style.cursor = 'not-allowed';
-    }
-  }
+    btn.classList.toggle('disabled', !lineupIsValid);
+    btn.style.cursor = lineupIsValid ? 'pointer' : 'not-allowed';
+  });
   
   // Game Plan button is ALWAYS enabled (user can go to Game Plan anytime)
   if (gameplanBtn) {
@@ -2188,6 +2236,7 @@ async function setHeader() {
   const timeValueEl = document.getElementById('time-value');
   const scoreboardEl = document.getElementById('context-scoreboard');
   const playBtn = document.getElementById('play-now');
+  const simBtn = document.getElementById('sim-now');
   if (!quarterValueEl || !timeValueEl) return;
 
   // Score dict keys = core URL names; chrome labels = display (overlay when present).
@@ -2300,7 +2349,24 @@ async function setHeader() {
   timeValueEl.textContent = isPregame ? '--:--' : formattedClock;
 
   if (playBtn) {
-    playBtn.textContent = isPregame ? 'Play Game' : 'Return to Game';
+    if (isPregame) playBtn.textContent = 'Play Game';
+    else if (isQuarterBreak) playBtn.textContent = 'Play Quarter';
+    else playBtn.textContent = 'Return to Game';
+  }
+  if (simBtn) {
+    if (resumeFromTimeout) {
+      simBtn.hidden = true;
+      simBtn.disabled = true;
+      simBtn.tabIndex = -1;
+      simBtn.setAttribute('aria-hidden', 'true');
+      simBtn.classList.add('disabled');
+    } else {
+      simBtn.hidden = false;
+      simBtn.disabled = false;
+      simBtn.tabIndex = 0;
+      simBtn.removeAttribute('aria-hidden');
+      simBtn.textContent = isPregame ? 'Sim Game' : 'Sim Rest Of Game';
+    }
   }
 }
 
@@ -2430,7 +2496,8 @@ function wireLineupNavButtons() {
       });
       params.set('from', 'lineup');
       if (DEBUG) params.set('debug', '1');
-      window.location.href = `/game-plan.html?${params.toString()}`;
+      if (window.GOBNav) window.GOBNav.replace(`/game-plan.html?${params.toString()}`);
+      else window.location.replace(`/game-plan.html?${params.toString()}`);
     });
   }
   const playbooksBtn = document.getElementById('playbooks-button');
@@ -2467,7 +2534,9 @@ function wireLineupNavButtons() {
         params.set('pregame', '1');
       }
       params.set('from', 'lineup');
-      window.location.href = `/box-score.html?${params.toString()}`;
+      const boxUrl = `/box-score.html?${params.toString()}`;
+      if (window.GOBNav) window.GOBNav.go(boxUrl);
+      else window.location.assign(boxUrl);
     });
   }
 }
@@ -2479,15 +2548,19 @@ async function init() {
   const validationPassed = await validatePointersOnLoad();
   if (!validationPassed) {
     // Validation failed - error screen already shown, disable functionality
-    const btn = document.getElementById('play-now');
-    if (btn) btn.classList.add('disabled');
+    ['play-now', 'sim-now'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.classList.add('disabled');
+    });
     return;
   }
 
   if (!resolveTeam()) {
     alert("Can't determine your team for this game. Please return and relaunch.");
-    const btn = document.getElementById('play-now');
-    if (btn) btn.classList.add('disabled');
+    ['play-now', 'sim-now'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.classList.add('disabled');
+    });
     return;
   }
 
@@ -2498,6 +2571,11 @@ async function init() {
   
   // Restore lineup from URL
   restoreLineupFromUrl();
+  lineupDirty = false;
+  if (window.GOBNav) {
+    window.GOBNav.warnOnLeave(() => lineupDirty);
+    window.GOBNav.restoreScroll();
+  }
   
   // ✅ FOUL OUT: Remove ineligible players from lineup AFTER restoring from URL
   // This ensures fouled-out players are removed even if they were in the URL params
@@ -2585,6 +2663,8 @@ async function init() {
   if (modeParam === 'tutorial') {
     const playBtnEl = document.getElementById('play-now');
     if (playBtnEl) playBtnEl.textContent = 'Continue';
+    const simBtnEl = document.getElementById('sim-now');
+    if (simBtnEl) simBtnEl.hidden = true;
 
     // Only fill EMPTY slots. A user who set a five, navigated back to Game Plan
     // and returned must not have their choices silently overwritten by autoset.
@@ -2666,10 +2746,11 @@ async function init() {
     }).catch((e) => console.warn('[tutorial] could not init lineup tutorial chrome:', e));
   }
 
-  const btn = document.getElementById('play-now');
-  if (btn) {
-    btn.addEventListener('click', async () => {
-      if (btn.classList.contains('disabled')) return;
+  async function beginFromLineup(courtStart) {
+    const liveNow = liveParams();
+    if (courtStart === 'sim' && liveNow.get('resume_from_timeout') === 'true') return;
+    const btn = document.getElementById(courtStart === 'sim' ? 'sim-now' : 'play-now');
+    if (!btn || btn.hidden || btn.disabled || btn.classList.contains('disabled')) return;
       if (ftLockActive && !Object.values(lineup).some(isFtLockedPlayer)) {
         showToast('Free throw shooter must stay in the lineup');
         updatePlayButton();
@@ -2841,15 +2922,25 @@ async function init() {
         }
         playSound('confirm-1-lowervol.wav');
         setTimeout(() => {
-          window.location.href = '/game-plan.html?' + nextParams.toString();
+          const planUrl = '/game-plan.html?' + nextParams.toString();
+          if (window.GOBNav) window.GOBNav.replace(planUrl);
+          else window.location.replace(planUrl);
         }, 200);
         return;
       }
 
+      params.set('court_start', courtStart);
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
       playSound('confirm-1-lowervol.wav');
-      const navigate = () => setTimeout(() => { window.location.href = finalUrl; }, 200);
+      const navigate = () => setTimeout(() => {
+        if (window.GOBNav) {
+          window.GOBNav.allowNextLeave();
+          window.GOBNav.replace(finalUrl);
+        } else {
+          window.location.replace(finalUrl);
+        }
+      }, 200);
 
       // FTE v2 tutorial: insert a feedback modal between Return To Game and
       // the actual navigation. Algorithm picks a Talent / skill-based /
@@ -2880,11 +2971,19 @@ async function init() {
 
       // Non-tutorial: navigate directly.
       navigate();
-    });
   }
+
+  const playNowBtn = document.getElementById('play-now');
+  const simNowBtn = document.getElementById('sim-now');
+  if (playNowBtn) playNowBtn.addEventListener('click', () => beginFromLineup('play'));
+  if (simNowBtn) simNowBtn.addEventListener('click', () => beginFromLineup('sim'));
   // Game Plan, Playbooks, Box Score wired in wireLineupNavButtons()
   } finally {
-    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+    let redirected = false;
+    if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+      try { redirected = await window.GOBNav.guardClosedFranchiseGame(); } catch (e) { redirected = false; }
+    }
+    if (!redirected && window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
   }
 }
 
@@ -3393,15 +3492,16 @@ function createCardBack(player) {
     const value = document.createElement('span');
     value.className = 'attr-value';
     // Use anchor attribute (base value, not energy-scaled)
-    const rawVal = attrs[`anchor_${key}`] ?? attrs[key];
-    const displayVal = rawVal != null ? Math.floor(rawVal / 10) : '--';
-    value.textContent = displayVal;
-    
-    // Set gold bar fill percentage (0-10 scale, max at 100%)
-    if (displayVal !== '--' && typeof getAttrColor === 'function') {
+    const ad = window.GOB_AttributeDisplay;
+    const rawVal = ad.rawAttr(attrs, key);
+    const displayVal = ad.displayAttr(rawVal);
+    value.textContent = displayVal == null ? '--' : displayVal;
+
+    // Bar fill is the displayed value × 10, capped at 100% (a 16 still fills the bar).
+    if (displayVal != null && typeof getAttrColor === 'function') {
       const fillPercentage = Math.min(displayVal * 10, 100);
       pill.style.setProperty('--attr-fill', `${fillPercentage}%`);
-      pill.style.setProperty('--attr-bar-color', getAttrColor(Math.ceil(Number(rawVal) / 10)));
+      pill.style.setProperty('--attr-bar-color', getAttrColor(rawVal));
     }
     
     pill.appendChild(value);
@@ -3476,6 +3576,7 @@ function assignToSlot(pos, playerId) {
   
   // Update lineup data
   lineup[pos] = playerId;
+  lineupDirty = true;
   updateAllSlotDisplays();
   return true;
 }
@@ -3559,10 +3660,16 @@ function dndLog(label, data) {
   while (list.childNodes.length > 20) list.removeChild(list.firstChild);
 }
 
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) {
-    window.location.reload();
+window.addEventListener('pageshow', async (event) => {
+  stripStaleQuarterBreakFrom();
+  if (!event.persisted) return;
+  if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  let redirected = false;
+  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+    try { redirected = await window.GOBNav.guardClosedFranchiseGame(); } catch (e) { redirected = false; }
   }
+  if (redirected) return;
+  window.location.reload();
 });
 
 document.addEventListener('DOMContentLoaded', async () => {

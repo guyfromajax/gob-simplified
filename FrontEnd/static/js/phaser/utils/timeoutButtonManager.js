@@ -1039,8 +1039,10 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
         // Continue navigation even if fetch fails
     }
     
-    // Navigate to lineup screen
-    window.location.href = `/set-lineup.html?${params.toString()}`;
+    // Replace, so a timeout does not push a second court/lineup history entry.
+    const lineupUrl = `/set-lineup.html?${params.toString()}`;
+    if (window.GOBNav) window.GOBNav.replace(lineupUrl);
+    else window.location.replace(lineupUrl);
 }
 
 // Progress bar functions removed - no longer needed

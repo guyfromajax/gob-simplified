@@ -3,6 +3,7 @@
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -125,6 +126,7 @@
   const backBtn = document.getElementById('back-btn');
   if (backBtn && franchiseId && teamId) {
     backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
+    backBtn.setAttribute('data-gob-up', backBtn.href);
   }
 
   let resourceCache = null;
@@ -137,7 +139,8 @@
 
   function buildTeamLink(t) {
     const a = document.createElement('a');
-    a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_url=${encodeURIComponent(getCurrentRelativeUrl())}`;
+    a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(t.team_id)}&team_name=${encodeURIComponent(t.name)}&return_tab=standings-tab`;
+    a.setAttribute('data-return', '');
     const rank = Number(t?.natl_rank);
     const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
     a.textContent = `${rankPrefix}${t.name}`;

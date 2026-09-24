@@ -51,15 +51,41 @@ function initCommandCenterTabs(options) {
     var bag = liveParams();
     bag.set('tab', tabName);
     var qs = bag.toString();
-    // Keep pushState (back button between tabs). commitParams would replaceState.
-    window.history.pushState({}, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    // Tabs are sub-navigation. replaceState keeps FCC as one history entry
+    // so a later section rail can reuse the same tab switch.
+    var next = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+    window.history.replaceState(window.history.state, '', next);
+    if (window.GOBNav && typeof window.GOBNav.syncCurrent === 'function') {
+      window.GOBNav.syncCurrent();
+    }
   }
+
+  function showTabFromUrl() {
+    var bag = liveParams();
+    var tabName = bag.get('tab') || defaultTab;
+    var known = Array.prototype.some.call(tabButtons, function (b) {
+      return b.dataset.tab === tabName;
+    });
+    if (!known) tabName = defaultTab;
+    setActive(tabName);
+    onTabShow(tabName);
+    if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
+      window.GOBNav.restoreScroll();
+    }
+  }
+
+  window.addEventListener('popstate', function () {
+    showTabFromUrl();
+  });
 
   var hasMatchingTab = Array.prototype.some.call(tabButtons, function (b) {
     return b.dataset.tab === activeTab;
   });
   if (!hasMatchingTab) activeTab = defaultTab;
 
+  // The visible tab has to be in the URL before a drill-down click captures
+  // return_url. Otherwise in-app Back replaces onto Coach's Office.
+  updateUrl(activeTab);
   setActive(activeTab);
   onTabShow(activeTab);
 

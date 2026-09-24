@@ -150,6 +150,15 @@ function resolveUserTeamSideForPhaseBPulse(urlParams) {
 }
 
 // Initialize on page load
+async function releaseClosedGameCover() {
+  let redirected = false;
+  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+    try { redirected = await window.GOBNav.guardClosedFranchiseGame(); } catch (e) { redirected = false; }
+  }
+  if (!redirected && window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  return redirected;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = liveParams();
   const gameId = urlParams.get('game_id');
@@ -174,6 +183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('⚠️ No gameId in URL params');
     if (!homeTeamName || !awayTeamName) {
       console.error('❌ No game_id provided and team names missing');
+      await releaseClosedGameCover();
       return;
     }
     try {
@@ -185,6 +195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } finally {
       // ✅ Always setup locker room button, even if data loading fails
       setupLockerRoomButton();
+      await releaseClosedGameCover();
     }
     return;
   }
@@ -198,6 +209,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } finally {
     // ✅ Always setup locker room button, even if data loading fails
     setupLockerRoomButton();
+    await releaseClosedGameCover();
   }
 });
 
@@ -2188,7 +2200,9 @@ function setupLockerRoomButton() {
       e.preventDefault();
       e.stopPropagation();
       playSound('x-back.mp3');
-      window.location.href = backUrl;
+      if (from === 'lineup' && window.GOBNav) window.GOBNav.back(backUrl);
+      else if (window.GOBNav) window.GOBNav.replace(backUrl);
+      else window.location.replace(backUrl);
     });
     return;
   }
@@ -2202,7 +2216,10 @@ function setupLockerRoomButton() {
       e.preventDefault();
       e.stopPropagation();
       playSound('x-back.mp3');
-      window.location.href = safeReturnUrl;
+      if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(safeReturnUrl)) {
+        window.GOBNav.exitFlow(safeReturnUrl, { tab: 'home-tab' });
+      } else if (window.GOBNav) window.GOBNav.replace(safeReturnUrl);
+      else window.location.replace(safeReturnUrl);
     });
     return;
   }
@@ -2215,7 +2232,8 @@ function setupLockerRoomButton() {
         e.preventDefault();
         e.stopPropagation();
         playSound('x-back.mp3');
-        window.location.href = lineupUrl;
+        if (window.GOBNav) window.GOBNav.back(lineupUrl);
+        else window.location.replace(lineupUrl);
       });
       return;
     }
@@ -2368,7 +2386,10 @@ function setupLockerRoomButton() {
       }
     }
     console.log('🚪 [BOX-SCORE] Navigating to locker room:', lockerRoomUrl);
-    window.location.href = lockerRoomUrl;
+    if (window.GOBNav && window.GOBNav.exitFlow) {
+      window.GOBNav.exitFlow(lockerRoomUrl, navMode === 'franchise' ? { tab: 'home-tab' } : undefined);
+    } else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+    else window.location.replace(lockerRoomUrl);
   });
 }
 
@@ -2547,3 +2568,9 @@ function closeSpecialStatsPopup() {
     popup.remove();
   }
 }
+
+window.addEventListener('pageshow', async (event) => {
+  if (!event.persisted) return;
+  if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  await releaseClosedGameCover();
+});

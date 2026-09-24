@@ -153,7 +153,12 @@ function cloneParams(params) {
 
   document.addEventListener('DOMContentLoaded', function () {
     var back = document.getElementById('back-btn');
-    if (back) back.addEventListener('click', function () { window.location.href = buildFccUrl(); });
+    if (back) back.addEventListener('click', function (e) {
+      e.preventDefault();
+      var url = buildFccUrl();
+      if (window.GOBNav) window.GOBNav.back(url);
+      else window.location.replace(url);
+    });
     if (!franchiseId) {
       document.getElementById('tsr-reports').innerHTML = '<p class="tsr-empty">Missing franchise.</p>';
       return;

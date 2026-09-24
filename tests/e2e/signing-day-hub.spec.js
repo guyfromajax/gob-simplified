@@ -21,6 +21,7 @@ const CSS = read('recruiting-spine.css') + read('recruiting-signing.css') + read
 const SCRIPTS = [
   'js/shared/franchiseContext.js',
   'common.js',
+  'js/utils/attributeDisplay.js',
   'js/shared/attrTiles.js', 'js/shared/rtBucket.js',
   'js/shared/playerYear.js',
   'recruiting-common.js',

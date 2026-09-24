@@ -56,6 +56,7 @@ let customFocusRankingAttrs = [];
 let customFocusDraft = {};
 /** @type {Record<string, string[]>} committed picks after Assign */
 let customFocusCommitted = {};
+let trainingDirty = false;
 
 /** Session keys for Custom Training Playbook → training-playbooks.html */
 const STORAGE_PLAYBOOK_FOCUS = 'gob_training_playbook_focus';
@@ -92,6 +93,7 @@ function saveTrainingFormDraft() {
   };
   try {
     sessionStorage.setItem(key, JSON.stringify(payload));
+    trainingDirty = false;
   } catch (_e) {}
 }
 
@@ -406,7 +408,12 @@ async function redirectIfTrainingAlreadyCommitted() {
     if (teamId) params.set('team_id', teamId);
     params.set('week', String(Number(data.week || 1)));
     params.set('from', 'training');
-    window.location.replace(`/training-report.html?${params.toString()}`);
+    const returnUrl = urlParams.get('return_url');
+    const safeReturnUrl = typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(returnUrl) : null;
+    if (safeReturnUrl) params.set('return_url', safeReturnUrl);
+    const reportUrl = `/training-report.html?${params.toString()}`;
+    if (window.GOBNav) window.GOBNav.replace(reportUrl);
+    else window.location.replace(reportUrl);
     return true;
   } catch (error) {
     console.warn('⚠️ [TRAINING] Unable to verify committed training state:', error);
@@ -646,8 +653,9 @@ function renderCustomFocusTable() {
     customFocusRankingAttrs.forEach(function (code) {
       const td = document.createElement('td');
       td.className = 'custom-focus-cell' + (clickable ? '' : ' is-readonly');
-      const val = row.attrs && typeof row.attrs[code] === 'number' ? row.attrs[code] : '';
-      td.textContent = val === '' ? '—' : String(val);
+      const raw = window.GOB_AttributeDisplay.rawAttr(row.attrs, code);
+      const shown = window.GOB_AttributeDisplay.displayAttr(raw);
+      td.textContent = shown == null ? '—' : String(shown);
       if (picks.indexOf(code) !== -1) td.classList.add('selected');
       if (clickable) {
         td.addEventListener('click', function () {
@@ -795,6 +803,7 @@ allSliders.forEach(slider => {
     
     // Store current value as previous
     this.dataset.prev = this.value;
+    trainingDirty = true;
     
     // Update points remaining
     updatePointsRemaining();
@@ -1031,6 +1040,7 @@ function restoreTrainingFormDraft() {
       applyCoachingFocusArchetypeUi(radioVal);
     }
   }
+  trainingDirty = false;
 }
 
 /**
@@ -1040,6 +1050,7 @@ function restoreTrainingFormDraft() {
 coachingRadios.forEach(radio => {
   radio.addEventListener('change', function() {
     if (!this.checked) return;
+    trainingDirty = true;
     
     // SFX per coaching style — skip when Auto-Train triggered this change (avoid double sound with chaotic-choice)
     const value = this.value;
@@ -1142,12 +1153,17 @@ backBtn.addEventListener('click', function() {
           teamId: teamId
         })
       : `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ''}`;
-    window.location.href = finalUrl;
+    if (window.GOBNav) window.GOBNav.back(finalUrl);
+    else window.location.replace(finalUrl);
   } else if (from === 'game-plan') {
-    window.location.href = '/game-plan.html?' + urlParams.toString();
+    const planUrl = '/game-plan.html?' + urlParams.toString();
+    if (window.GOBNav) window.GOBNav.replace(planUrl);
+    else window.location.replace(planUrl);
   } else {
     // ✅ PHASE 2: Preserve URL params in fallback (includes game_id if present)
-    window.location.href = '/game-plan.html?' + urlParams.toString();
+    const planUrl = '/game-plan.html?' + urlParams.toString();
+    if (window.GOBNav) window.GOBNav.replace(planUrl);
+    else window.location.replace(planUrl);
   }
 });
 
@@ -1440,17 +1456,42 @@ submitBtn.addEventListener('click', async function() {
           redirectUrl = `${redirect.pathname}${qs ? '?' + qs : ''}${redirect.hash || ''}`;
         }
       }
-      window.location.href = redirectUrl;
+      trainingDirty = false;
+      if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(redirectUrl)) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.exitFlow(redirectUrl);
+      } else if (window.GOBNav) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.replace(redirectUrl);
+      } else {
+        window.location.replace(redirectUrl);
+      }
     } else if (mode === 'franchise' && franchiseId) {
-      window.location.href = (typeof resolveFranchiseLockerRoomUrl === 'function')
+      trainingDirty = false;
+      const lockerUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
         ? resolveFranchiseLockerRoomUrl({
             params: urlParams,
             franchiseId: franchiseId,
             teamId: urlParams.get('team_id')
           })
         : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}`;
+      if (window.GOBNav && window.GOBNav.exitFlow) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.exitFlow(lockerUrl);
+      } else if (window.GOBNav) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.replace(lockerUrl);
+      } else {
+        window.location.replace(lockerUrl);
+      }
     } else {
-      window.location.href = '/game-plan.html';
+      trainingDirty = false;
+      if (window.GOBNav) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.replace('/game-plan.html');
+      } else {
+        window.location.replace('/game-plan.html');
+      }
     }
     
   } catch (error) {
@@ -1498,7 +1539,17 @@ async function resumeCpuTraining(franchiseId) {
   }
 
   if (result && result.redirect) {
-    window.location.href = result.redirect.replace(/^\/static\//, '/');
+    trainingDirty = false;
+    const next = result.redirect.replace(/^\/static\//, '/');
+    if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(next)) {
+      window.GOBNav.allowNextLeave();
+      window.GOBNav.exitFlow(next);
+    } else if (window.GOBNav) {
+      window.GOBNav.allowNextLeave();
+      window.GOBNav.replace(next);
+    } else {
+      window.location.replace(next);
+    }
   }
 }
 
@@ -1577,7 +1628,9 @@ async function initializeTrainingPoints() {
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) {
     window.location.reload();
+    return;
   }
+  redirectIfTrainingAlreadyCommitted();
 });
 
 function syncPlaybookModeToggleUi() {
@@ -1997,11 +2050,13 @@ updateRequirementsBar();
 
 // Initialize training points on page load
 (async function initTrainingPage() {
+  if (window.GOBNav) window.GOBNav.warnOnLeave(function () { return trainingDirty; });
   const redirected = await redirectIfTrainingAlreadyCommitted();
   if (redirected) return;
   wireTrainingTutorialButton();
   await initializeTrainingPoints();
   wireCustomTrainingPlaybook();
+  if (window.GOBNav) window.GOBNav.restoreScroll();
 })();
 
 // Debug: Verify scrimmages element exists on page load

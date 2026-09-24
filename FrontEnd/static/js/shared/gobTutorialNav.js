@@ -72,13 +72,26 @@
   function goBack() {
     playSound('x-back.mp3');
     if (!isTutorialHub()) {
-      location.href = HUB;
+      if (window.GOBNav) window.GOBNav.back(HUB);
+      else location.replace(HUB);
       return;
     }
     var origin = consumeOrigin();
-    if (origin) { location.href = origin; return; }
-    if (window.history.length > 1) { window.history.back(); return; }
-    location.href = '/homepage.html';
+    if (origin) {
+      try {
+        var parsed = new URL(origin, location.origin);
+        if (parsed.origin === location.origin) {
+          var same = parsed.pathname + parsed.search + parsed.hash;
+          if (window.GOBNav) window.GOBNav.back(same);
+          else location.replace(same);
+          return;
+        }
+      } catch (e) {}
+      location.replace(origin);
+      return;
+    }
+    if (window.GOBNav) window.GOBNav.back('/homepage.html');
+    else location.replace('/homepage.html');
   }
 
   /* ---- icon library (shared) ---- */

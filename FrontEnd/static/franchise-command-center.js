@@ -357,7 +357,6 @@ function buildPlayerDetailUrl(playerId) {
   qs.set('id', playerId);
   if (franchiseId) qs.set('mode', 'franchise');
   if (franchiseId) qs.set('franchise_id', franchiseId);
-  qs.set('return_url', getCurrentRelativeUrl());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -735,14 +734,14 @@ function standingsTeamLabel(t) {
 }
 
 function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
-  const returnUrl = encodeURIComponent(getCurrentRelativeUrl());
-  return `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId)}&team_name=${encodeURIComponent(teamName)}&return_tab=${returnTab}&return_url=${returnUrl}`;
+  return `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId)}&team_name=${encodeURIComponent(teamName)}&return_tab=${returnTab}`;
 }
 
 function buildTeamLink(t) {
   const teamLink = document.createElement('a');
   const label = standingsTeamLabel(t);
   teamLink.href = buildFranchiseTeamPageUrl(t.team_id, label, 'standings-tab');
+  teamLink.setAttribute('data-return', '');
   const rank = Number(t?.natl_rank);
   const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
   teamLink.textContent = `${rankPrefix}${label}`;
@@ -1492,7 +1491,8 @@ async function openRecruitingSurface() {
     // Never block navigation on the read marker.
     console.warn('[WIRE] could not persist seen state:', err);
   }
-  window.location.href = url;
+  if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(url);
+  else window.location.assign(url);
 }
 
 function wireRowClassFor(kind) {
@@ -2372,8 +2372,8 @@ function renderFccRecruits() {
     params.set('franchise_id', franchiseId);
     params.set('team_id', userTeamId);
     params.set('from', 'fcc');
-    params.set('return_url', getCurrentRelativeUrl());
     fullListLink.href = `/recruiting.html?${params.toString()}`;
+    fullListLink.setAttribute('data-return', '');
   }
   const psLink = document.getElementById('fcc-ps-season-link');
   if (psLink) {
@@ -2437,6 +2437,12 @@ function renderFccRecruits() {
   );
 }
 
+function fccShownAttr(attrs, key) {
+  const ad = window.GOB_AttributeDisplay;
+  const d = ad.displayAttr(ad.rawAttr(attrs, key));
+  return d == null ? 0 : d;
+}
+
 function initFccRecruits(topData) {
   if (typeof RecruitingCommon === 'undefined') return;
   document.body.dataset.fccWeek = String(Number(topData?.week || 1));
@@ -2474,18 +2480,18 @@ function initFccRecruits(topData) {
       // path, which is why that table always worked and this one never did.
       rawAttrs: attrs,
       attrs: {
-        SC: Math.floor((Number(attrs.SC) || 0) / 10),
-        SH: Math.floor((Number(attrs.SH) || 0) / 10),
-        ID: Math.floor((Number(attrs.ID) || 0) / 10),
-        OD: Math.floor((Number(attrs.OD) || 0) / 10),
-        PS: Math.floor((Number(attrs.PS) || 0) / 10),
-        BH: Math.floor((Number(attrs.BH) || 0) / 10),
-        RB: Math.floor((Number(attrs.RB) || 0) / 10),
-        AG: Math.floor((Number(attrs.AG) || 0) / 10),
-        ST: Math.floor((Number(attrs.ST) || 0) / 10),
-        ND: Math.floor((Number(attrs.ND) || 0) / 10),
-        IQ: Math.floor((Number(attrs.IQ) || 0) / 10),
-        FT: Math.floor((Number(attrs.FT) || 0) / 10)
+        SC: fccShownAttr(attrs, 'SC'),
+        SH: fccShownAttr(attrs, 'SH'),
+        ID: fccShownAttr(attrs, 'ID'),
+        OD: fccShownAttr(attrs, 'OD'),
+        PS: fccShownAttr(attrs, 'PS'),
+        BH: fccShownAttr(attrs, 'BH'),
+        RB: fccShownAttr(attrs, 'RB'),
+        AG: fccShownAttr(attrs, 'AG'),
+        ST: fccShownAttr(attrs, 'ST'),
+        ND: fccShownAttr(attrs, 'ND'),
+        IQ: fccShownAttr(attrs, 'IQ'),
+        FT: fccShownAttr(attrs, 'FT')
       },
       raw: player
     };
@@ -2768,13 +2774,10 @@ function renderRecruits(data) {
     const tr = document.createElement('tr');
     const a = r.attributes;
     
-    // Format attributes: 0-9 displays 0, 10-19 displays 1, 20-29 displays 2, etc.
-    const formatAttr = (attr) => {
-      const value = attr ?? 0;
-      return Math.floor(value / 10);
-    };
+    // First digit of the raw attribute. Missing sorts and prints as 0, same as before.
+    const formatAttr = (key) => fccShownAttr(a, key);
     
-    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr(a.SC)}</td><td>${formatAttr(a.SH)}</td><td>${formatAttr(a.ID)}</td><td>${formatAttr(a.OD)}</td><td>${formatAttr(a.PS)}</td><td>${formatAttr(a.BH)}</td><td>${formatAttr(a.RB)}</td><td>${formatAttr(a.AG)}</td><td>${formatAttr(a.ST)}</td><td>${formatAttr(a.ND)}</td><td>${formatAttr(a.IQ)}</td><td>${formatAttr(a.FT)}</td><td>${formatRtDisplay(r.rt)}</td>`;
+    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr('SC')}</td><td>${formatAttr('SH')}</td><td>${formatAttr('ID')}</td><td>${formatAttr('OD')}</td><td>${formatAttr('PS')}</td><td>${formatAttr('BH')}</td><td>${formatAttr('RB')}</td><td>${formatAttr('AG')}</td><td>${formatAttr('ST')}</td><td>${formatAttr('ND')}</td><td>${formatAttr('IQ')}</td><td>${formatAttr('FT')}</td><td>${formatRtDisplay(r.rt)}</td>`;
     tbody.appendChild(tr);
   });
   
@@ -2898,6 +2901,7 @@ function renderPracticeSquad(data) {
       } else {
         const nameLink = document.createElement('a');
         nameLink.href = buildPlayerDetailUrl(p._id);
+        nameLink.setAttribute('data-return', '');
         nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
         nameLink.style.color = 'inherit';
         nameLink.style.textDecoration = 'none';
@@ -2949,6 +2953,7 @@ function renderPracticeSquad(data) {
         } else {
           const nameLink = document.createElement('a');
           nameLink.href = buildPlayerDetailUrl(p._id);
+        nameLink.setAttribute('data-return', '');
           nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
           nameLink.style.color = 'inherit';
           nameLink.style.textDecoration = 'none';
@@ -3035,8 +3040,8 @@ function fccRtLockupHtml(rt, potentialRt) {
 /** Identity cell: jersey in a fixed box so numbers align, then the linked name. */
 function fccIdentityCellHtml(opts) {
   const o = opts || {};
-  const nameHtml = o.href
-    ? '<a href="' + escapeHomeHtml(o.href) + '">' + escapeHomeHtml(o.name || '--') + '</a>'
+    const nameHtml = o.href
+    ? '<a href="' + escapeHomeHtml(o.href) + '" data-return>' + escapeHomeHtml(o.name || '--') + '</a>'
     : escapeHomeHtml(o.name || '--');
   return '<div class="ident">' +
     '<span class="ident-jersey">' + escapeHomeHtml(o.jersey == null ? '' : o.jersey) + '</span>' +
@@ -3372,7 +3377,7 @@ function renderPlayerStatsTable() {
       const playerId = entry.raw?._id || entry.raw?.player_id;
       const playerCell = isPractice && entry.raw?.is_recruit
         ? playerName
-        : '<a href="' + buildPlayerDetailUrl(playerId) + '" style="color:inherit;text-decoration:none;">' + playerName + '</a>';
+        : '<a href="' + buildPlayerDetailUrl(playerId) + '" data-return style="color:inherit;text-decoration:none;">' + playerName + '</a>';
       tr.innerHTML =
         '<td>' + playerCell + '</td>' +
         '<td>' + (stats.PTS || 0) + '</td>' +
@@ -3509,10 +3514,8 @@ function sortRosterTable(columnName, direction) {
       // Attribute columns
       const attrsA = a.attributes || {};
       const attrsB = b.attributes || {};
-      const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
-      const rawValB = attrsB[`anchor_${dataKey}`] ?? attrsB[dataKey] ?? 0;
-      val1 = Math.floor(rawValA / 10);
-      val2 = Math.floor(rawValB / 10);
+      val1 = fccShownAttr(attrsA, dataKey);
+      val2 = fccShownAttr(attrsB, dataKey);
     }
     
     if (direction === 'desc') {
@@ -4255,7 +4258,8 @@ function showCutPlayersRequiredModal(cutCount) {
     const sfxReady = waitForConfirmSfx();
     close();
     await sfxReady;
-    window.location.href = buildAssignPracticeSquadUrl();
+    if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(buildAssignPracticeSquadUrl());
+    else window.location.assign(buildAssignPracticeSquadUrl());
   });
   document.body.appendChild(overlay);
   overlay.querySelector('#fcc-cut-required-close')?.focus();
@@ -4513,7 +4517,8 @@ function updateRecruitingButton(data) {
     recruitingBtn.onclick = null;
     if (showButton && href) {
       recruitingBtn.onclick = () => {
-        window.location.href = href;
+        if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(href);
+        else window.location.assign(href);
       };
     }
   }
@@ -4558,8 +4563,11 @@ playNowBtn.addEventListener('click', async () => {
   if (mode === 'finish-cpu-sims') {
     const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
     const recovered = await recoverCpuSimsBeforeFccRender(topData);
-    if (recovered && !fccCpuSimNeedsRecovery(recovered)) {
-      window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+      if (recovered && !fccCpuSimNeedsRecovery(recovered)) {
+      const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+      if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(fccUrl);
+      else if (window.GOBNav) window.GOBNav.replace(fccUrl);
+      else window.location.replace(fccUrl);
     } else {
       updatePlayButton(recovered || topData);
     }
@@ -4585,7 +4593,8 @@ playNowBtn.addEventListener('click', async () => {
         const { clearFranchiseMusicState } = await import('/js/musicController.js');
         clearFranchiseMusicState();
       } catch {}
-      window.location.href = trainingReturnUrl;
+      if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(trainingReturnUrl);
+      else window.location.assign(trainingReturnUrl);
     };
     if (window.GOBTutorialAlerts) {
       const blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining, trainingReturnUrl);
@@ -4623,7 +4632,8 @@ playNowBtn.addEventListener('click', async () => {
       const { clearFranchiseMusicState } = await import('/js/musicController.js');
       clearFranchiseMusicState();
     } catch {}
-    window.location.href = `/recruiting.html?${params.toString()}`;
+    if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(`/recruiting.html?${params.toString()}`);
+    else window.location.assign(`/recruiting.html?${params.toString()}`);
     return;
   }
 
@@ -4640,7 +4650,8 @@ playNowBtn.addEventListener('click', async () => {
         const { clearFranchiseMusicState } = await import('/js/musicController.js');
         clearFranchiseMusicState();
       } catch {}
-      window.location.href = recruitingUrl;
+      if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(recruitingUrl);
+      else window.location.assign(recruitingUrl);
     };
     await goRecruiting();
     return;
@@ -4648,7 +4659,8 @@ playNowBtn.addEventListener('click', async () => {
 
   if (mode === 'cut-players') {
     await confirmSfxReady;
-    window.location.href = buildAssignPracticeSquadUrl();
+    if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(buildAssignPracticeSquadUrl());
+    else window.location.assign(buildAssignPracticeSquadUrl());
     return;
   }
   
@@ -4706,7 +4718,10 @@ playNowBtn.addEventListener('click', async () => {
       closeModal();
 
       const goToNextSeasonFcc = () => {
-        window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+        const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+        if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(fccUrl, { tab: 'home-tab' });
+        else if (window.GOBNav) window.GOBNav.replace(fccUrl);
+        else window.location.replace(fccUrl);
       };
       const startFinishSeason = () => fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
         method: 'POST',
@@ -4824,7 +4839,8 @@ playNowBtn.addEventListener('click', async () => {
         const { clearFranchiseMusicState } = await import('/js/musicController.js');
         clearFranchiseMusicState();
       } catch {}
-      window.location.href = url;
+      if (window.GOBNav) window.GOBNav.go(url);
+      else window.location.assign(url);
     };
     if (window.GOBTutorialAlerts) {
       const blocked = await window.GOBTutorialAlerts.interceptPlayNextGame(franchiseId, url, navigateToLineup);
@@ -4856,7 +4872,8 @@ function navigateToGamePlan() {
   params.set('team_id', userTeamId);
   params.set('from', 'command_center');
   params.set('return_url', getCurrentRelativeUrl());
-  window.location.href = `/game-plan.html?${params.toString()}`;
+  if (window.GOBNav) window.GOBNav.go(`/game-plan.html?${params.toString()}`);
+  else window.location.assign(`/game-plan.html?${params.toString()}`);
 }
 
 // Legacy route buttons were removed from the FCC tab bar in favor of local placeholder tabs.
@@ -4954,6 +4971,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (tabName === 'training-tab') {
           renderFccTrainingTab();
+        }
+        if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
+          window.GOBNav.restoreScroll();
         }
       }
     });
@@ -6059,6 +6079,7 @@ async function renderScoutingTab() {
   if (teamPageLink) {
     if (opponent.id && franchiseId) {
       teamPageLink.href = buildFranchiseTeamPageUrl(opponent.id, opponentTeamName, 'coaches-tab');
+      teamPageLink.setAttribute('data-return', '');
     } else {
       // TODO: wire team page URL when opponent team id is unavailable in matchup context
       teamPageLink.href = '#';

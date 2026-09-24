@@ -46,6 +46,9 @@
 .attr-tile.is-elite s { color: #4A90D9; }
 .attr-tile.is-hi { background: rgba(52, 236, 39, 0.15); }
 .attr-tile.is-hi s { color: #9cf294; }
+/* Mid tier is new. Background alpha matches is-hi (0.15). Text is the styleguide yellow. */
+.attr-tile.is-mid { background: rgba(255, 215, 0, 0.15); }
+.attr-tile.is-mid s { color: #FFD700; }
 .attr-tile.is-lo { background: rgba(255, 109, 109, 0.12); }
 .attr-tile.is-lo s { color: #ffa8a8; }
 

@@ -33,6 +33,14 @@
   var MAX_BOARD = 20;
 
   var context = Common.getQueryContext();
+  function replaceNav(url) {
+    if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(String(url))) {
+      window.GOBNav.exitFlow(url);
+      return;
+    }
+    if (window.GOBNav) window.GOBNav.replace(url);
+    else window.location.replace(url);
+  }
   var state = {
     week: 1, phase: 'passive', userTeamId: null, userRegion: '',
     recruits: [], byId: {}, newLeanIds: new Set(),
@@ -68,7 +76,6 @@
   var SIGN = { TOTAL: 50, PROMISE_W: 18 };
 
   function boardActive() { return state.phase === 'invite'; }
-  function attrClass(v) { return v >= 65 ? 'attr-hi' : v >= 40 ? 'attr-mid' : v >= 20 ? 'attr-lo' : 'attr-zero'; }
   function regionOf(rec) { var v = rec && rec.homeRegion ? String(rec.homeRegion).trim().toUpperCase() : ''; return v ? v.charAt(0) : ''; }
   // Recruit | Pos | RT | Yr | Ht | Rgn | Attributes | Lean | Watch — attributes are a
   // single cell of chips now, not 12 columns. +1 for the add column in the invite phase.
@@ -819,7 +826,7 @@
       renderDock();
       var live = document.getElementById('dock-save');
       if (live) live.disabled = true;
-      window.location.href = Common.buildFccUrl(context);
+      replaceNav(Common.buildFccUrl(context));
     })
       .catch(function (err) {
         console.error(err);
@@ -1250,7 +1257,7 @@
     var go = overlay.querySelector('#ssum-go');
     go.addEventListener('click', function () {
       overlay.remove();
-      window.location.href = Common.buildFccUrl(context);
+      replaceNav(Common.buildFccUrl(context));
     });
     go.focus();
   }
@@ -1266,7 +1273,11 @@
    */
   function maybeAutoRun() {
     if (context.action !== 'run') return;
-    if (state.phase !== 'day' || state.week35Ran) return;
+    if (state.week35Ran) {
+      if (window.GOBNav) window.GOBNav.stripParam('action');
+      return;
+    }
+    if (state.phase !== 'day') return;
     if (!committedIds().length) return;
     runRecruiting();
   }
@@ -1279,6 +1290,7 @@
    * put "Orders Submitted" on screen after the decision could no longer be changed.
    */
   function runRecruiting() {
+    if (window.GOBNav) window.GOBNav.stripParam('action');
     var btn = document.getElementById('sign-submit');
     if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
     Common.fetchJSON(API_CONFIG.buildUrl('/franchise/run-week-35-recruiting'), {
@@ -1808,7 +1820,7 @@
     var host = document.getElementById('hub-reveal');
     if (host) host.remove();
     // The confirm modal now comes BEFORE the run, so Continue leaves for the FCC.
-    window.location.href = Common.buildFccUrl(context);
+    replaceNav(Common.buildFccUrl(context));
   }
 
   // How many masters to force-paint before the stage opens. The background warm on the
@@ -1856,7 +1868,7 @@
     };
     // Nothing to reveal: stamp it seen and go, rather than opening an empty screen.
     if (!revealCards().length) {
-      markRevealSeen(); window.location.href = Common.buildFccUrl(context); return;
+      markRevealSeen(); replaceNav(Common.buildFccUrl(context)); return;
     }
     revealMusic(true);
     // FCC?action=run installs this cover before recruiting data is requested, so the
@@ -2272,7 +2284,10 @@
   function init() {
     var root = document.getElementById('hub-root'), backBtn = document.getElementById('back-btn');
     if (!context.franchiseId || !context.teamId) { if (root) root.innerHTML = '<div class="hub-error">Missing franchise context.</div>'; return; }
-    if (backBtn) backBtn.href = Common.buildFccUrl(context);
+    if (backBtn) {
+      backBtn.href = Common.buildFccUrl(context);
+      backBtn.setAttribute('data-gob-up', backBtn.href);
+    }
     // The FCC's green run action is a handoff to the Signing Day Experience, not a
     // visit to the Recruiting Hub. Cover the page before the first request begins and
     // keep this same pulse screen alive until the reveal is ready to paint.
@@ -2335,6 +2350,7 @@
         if (!state.board.length) state.board = seedBoard();
         // Signing Day: restore the budget from saved entries; else auto-fill top leaners.
         state.week35Ran = !!data.week_35_recruiting_ran;
+        if (state.week35Ran && window.GOBNav) window.GOBNav.stripParam('action');
         if (state.phase === 'day') {
           // Restore what the player previously SAVED, and nothing else. There is no
           // load-time seed: an empty board loads at 0 of 50 with zero promises.
@@ -2369,4 +2385,14 @@
   }
 
   init();
+  window.addEventListener('pageshow', function () {
+    if (!context.franchiseId || typeof Common.fetchJSON !== 'function') return;
+    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-data') + '?franchise_id=' + encodeURIComponent(context.franchiseId))
+      .then(function (data) {
+        if (!data || !data.week_35_recruiting_ran) return;
+        state.week35Ran = true;
+        if (window.GOBNav) window.GOBNav.stripParam('action');
+      })
+      .catch(function () {});
+  });
 })();

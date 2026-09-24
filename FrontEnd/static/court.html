@@ -6,6 +6,7 @@
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
     <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
@@ -1225,21 +1226,25 @@
       background: linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,1)) !important;  /* Match Playcall gradient for seamless blend */
     }
 
-    /* Quarter start functional modal */
+    /* Quarter start functional modal.
+       Fallback paths (no court_start) cover the viewport opaquely so the
+       scoreboard and court cannot show around a partial backdrop.
+       z-index sits above court chrome and below the pgxp bridge (10002). */
     .pre-game-container {
-      position: absolute;
+      position: fixed;
       inset: 0;
-      z-index: 300;
+      z-index: 10001;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
+      background: #0b0d14;
     }
 
     .pre-game-backdrop {
       position: absolute;
       inset: 0;
-      background: rgba(0, 0, 0, 0.72);
+      background: #0b0d14;
     }
 
     .pre-game-modal-box {
@@ -6850,8 +6855,14 @@
     // after 5s so the user isn't permanently blocked.
     (function () {
       var dismissed = false;
+      var courtStart = new URLSearchParams(window.location.search).get('court_start');
+      // Captured once. bootGame strips court_start from the URL immediately,
+      // so a later read would miss it and the 5s timer would reveal the court.
+      var holdForBridge = courtStart === 'play' || courtStart === 'sim';
       function dismissOverlay(options) {
-        if (window.__GOB_COURT_ENTRY_VISUAL_GATE__ && !(options && options.force)) {
+        var bridgeReady = !!(options && options.bridgeReady);
+        if (holdForBridge && !bridgeReady) return;
+        if (window.__GOB_COURT_ENTRY_VISUAL_GATE__ && !(options && options.force) && !bridgeReady) {
           return;
         }
         if (dismissed) return;
@@ -6860,8 +6871,30 @@
           window.PageLoadOverlay.hide();
         }
       }
-      window.addEventListener('court-ready', dismissOverlay, { once: true });
-      setTimeout(function () { dismissOverlay({ force: true }); }, 5000);
+      window.__GOB_REVEAL_COURT_START_BRIDGE__ = function () {
+        dismissOverlay({ bridgeReady: true });
+      };
+      window.__GOB_RELEASE_COURT_START_HOLD__ = function () {
+        holdForBridge = false;
+        dismissed = false;
+        dismissOverlay({ force: true });
+      };
+      window.addEventListener('court-ready', function () {
+        var guard = (window.GOBNav && window.GOBNav.guardClosedFranchiseGame)
+          ? window.GOBNav.guardClosedFranchiseGame()
+          : Promise.resolve(false);
+        Promise.resolve(guard).then(function (redirected) {
+          if (!redirected) dismissOverlay();
+        });
+      }, { once: true });
+      setTimeout(function () {
+        var guard = (window.GOBNav && window.GOBNav.guardClosedFranchiseGame)
+          ? window.GOBNav.guardClosedFranchiseGame()
+          : Promise.resolve(false);
+        Promise.resolve(guard).then(function (redirected) {
+          if (!redirected) dismissOverlay({ force: true });
+        });
+      }, 5000);
     })();
   </script>
   <script>
@@ -7273,7 +7306,7 @@
     // Load bootGame.js with environment-aware path
     const bootGameScript = document.createElement('script');
     bootGameScript.type = 'module';
-    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js?v=sim-full-bridge-1`;
+    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js?v=court-start-bridge-1`;
     document.head.appendChild(bootGameScript);
   </script>
   <script>

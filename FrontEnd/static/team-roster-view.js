@@ -72,40 +72,22 @@ function yearSortValue(year) {
   return order[normalized] != null ? order[normalized] : (order[String(year).toUpperCase()] != null ? order[String(year).toUpperCase()] : 0);
 }
 
-function getRosterReturnStorageKey() {
-  return [
-    'roster_return_url',
-    mode || 'base',
-    franchiseId || '',
-    teamId || teamName || ''
-  ].join(':');
-}
-
 function resolveRosterReturnUrl() {
-  const storageKey = getRosterReturnStorageKey();
-  if (returnUrl) {
-    sessionStorage.setItem(storageKey, returnUrl);
-    return returnUrl;
-  }
-
-  const saved = sessionStorage.getItem(storageKey);
-  if (saved) return saved;
-
-  // Fallback for direct links that didn't include return_url.
-  try {
-    if (document.referrer) {
-      const ref = new URL(document.referrer);
-      if (ref.origin === window.location.origin && !ref.pathname.includes('player-detail.html')) {
-        const relativeRef = `${ref.pathname}${ref.search}`;
-        sessionStorage.setItem(storageKey, relativeRef);
-        return relativeRef;
-      }
+  let safe = null;
+  if (typeof getSafeReturnUrl === 'function') safe = getSafeReturnUrl(returnUrl);
+  else if (returnUrl && returnUrl.charAt(0) === '/') safe = returnUrl;
+  if (safe) {
+    if (returnTab && /franchise-command-center\.html/i.test(safe) && !/[?&]tab=/.test(safe)) {
+      safe += (safe.indexOf('?') === -1 ? '?' : '&') + 'tab=' + encodeURIComponent(returnTab);
     }
-  } catch (e) {
-    // Ignore referrer parse failures and continue to mode fallback.
+    return safe;
   }
-
-  return null;
+  if (mode === 'franchise' && franchiseId) {
+    let returnPath = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+    if (returnTab) returnPath += `&tab=${encodeURIComponent(returnTab)}`;
+    return returnPath;
+  }
+  return '/mode-select.html';
 }
 
 function buildPlayerDetailUrl(playerId) {
@@ -113,7 +95,6 @@ function buildPlayerDetailUrl(playerId) {
   qs.set('id', playerId);
   if (mode) qs.set('mode', mode);
   if (franchiseId) qs.set('franchise_id', franchiseId);
-  qs.set('return_url', window.location.pathname + currentSearch());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -138,29 +119,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // One table, one sort path.
   trBindToolbar();
   renderTrTable();
+  if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
+    window.GOBNav.restoreScroll();
+  }
 });
 
 function setupBackButton() {
   const backBtn = document.getElementById('back-button');
-  const resolvedReturnUrl = resolveRosterReturnUrl();
+  const parent = resolveRosterReturnUrl();
   backBtn.addEventListener('click', () => {
-    if (resolvedReturnUrl) {
-      window.location.href = resolvedReturnUrl;
-    } else {
-      // Build return URL
-      let returnPath = '';
-      if (mode === 'franchise' && franchiseId) {
-        returnPath = `/franchise-command-center.html?franchise_id=${franchiseId}`;
-        if (returnTab) {
-          returnPath += `&tab=${returnTab}`;
-        }
-      } else {
-        // Base mode (from mode-select) - return to mode-select
-        window.location.href = '/mode-select.html';
-        return;
-      }
-      window.location.href = returnPath;
-    }
+    if (window.GOBNav) window.GOBNav.back(parent);
+    else window.location.replace(parent);
   });
 }
 
@@ -465,23 +434,14 @@ function getBestPosition(positionRatings) {
   return { pos: bestPos || '--', rating: bestRating !== -Infinity ? bestRating : null };
 }
 
-function getRawAttrValue(attrs, attr) {
-  const rawVal = attrs[`anchor_${attr}`] ?? attrs[attr];
-  if (rawVal == null || rawVal === '') return null;
-  const num = Number(rawVal);
-  return Number.isNaN(num) ? null : num;
-}
-
 function formatAttrForDisplay(attrs, attr) {
-  const rawVal = getRawAttrValue(attrs, attr);
-  if (rawVal == null) return '--';
-  return Math.floor(rawVal / 10);
+  const d = window.GOB_AttributeDisplay.displayAttr(window.GOB_AttributeDisplay.rawAttr(attrs, attr));
+  return d == null ? '--' : d;
 }
 
 function getAttrSortValue(attrs, attr) {
-  const rawVal = getRawAttrValue(attrs, attr);
-  if (rawVal == null) return -Infinity;
-  return Math.floor(rawVal / 10);
+  const d = window.GOB_AttributeDisplay.displayAttr(window.GOB_AttributeDisplay.rawAttr(attrs, attr));
+  return d == null ? -Infinity : d;
 }
 
 function renderStartingFive() {
@@ -553,7 +513,7 @@ function trIdentityCellHtml(p, opts) {
   const o = opts || {};
   const nameHtml = o.link === false
     ? escapeTrHtml(p.name || '--')
-    : '<a href="' + escapeTrHtml(buildPlayerDetailUrl(p._id)) + '">' + escapeTrHtml(p.name || '--') + '</a>';
+    : '<a href="' + escapeTrHtml(buildPlayerDetailUrl(p._id)) + '" data-return>' + escapeTrHtml(p.name || '--') + '</a>';
   let flags = '';
   if (p.hasPlayingTimePromise) flags += '<span class="ident-flag"> (PTP)</span>';
   if (p.isGraduating) flags += '<span class="ident-flag"> (GR)</span>';

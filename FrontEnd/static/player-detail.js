@@ -87,18 +87,19 @@ function cloneParams(params) {
   }
 
   function renderAttributeRow(code, attributes) {
-    const rawValue = attributes[`anchor_${code}`] ?? attributes[code] ?? 0;
-    const scaledValue = Math.max(1, Math.floor(rawValue / 10));
-    const fillPercentage = Math.min(100, scaledValue * 10);
-    const colorBucket = Math.max(0, Math.ceil(Number(rawValue) / 10));
+    const ad = window.GOB_AttributeDisplay;
+    const rawValue = ad.rawAttr(attributes, code);
+    const scaledValue = ad.displayAttr(rawValue);
+    const shown = scaledValue == null ? 0 : scaledValue;
+    const fillPercentage = Math.min(100, shown * 10);
     const row = document.createElement('div');
     row.className = 'pd-attribute-row';
     row.innerHTML = `
       <span class="pd-attribute-label attribute-label" data-attr="${code}">${code}</span>
       <div class="pd-attribute-track">
-        <div class="pd-attribute-fill" data-width="${fillPercentage}" style="background:${getAttrColor(colorBucket)};"></div>
+        <div class="pd-attribute-fill" data-width="${fillPercentage}" style="background:${getAttrColor(rawValue)};"></div>
       </div>
-      <span class="pd-attribute-value">${scaledValue}</span>
+      <span class="pd-attribute-value">${shown}</span>
     `;
     return row;
   }
@@ -232,20 +233,16 @@ function cloneParams(params) {
 
   function goBack() {
     const params = liveParams();
-    // Same-origin guard: return_url is attacker-controllable via the query string.
     const returnUrl = typeof getSafeReturnUrl === 'function'
       ? getSafeReturnUrl(params.get('return_url'))
       : params.get('return_url');
-    if (returnUrl) {
-      window.location.href = returnUrl;
-      return;
+    let fallback = returnUrl || '/homepage.html';
+    const returnTab = params.get('return_tab');
+    if (returnTab && /franchise-command-center\.html/i.test(fallback) && !/[?&]tab=/.test(fallback)) {
+      fallback += (fallback.indexOf('?') === -1 ? '?' : '&') + 'tab=' + encodeURIComponent(returnTab);
     }
-
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      window.location.href = '/homepage.html';
-    }
+    if (window.GOBNav) window.GOBNav.back(fallback);
+    else window.location.replace(fallback);
   }
 
   function showError(message) {
@@ -647,6 +644,9 @@ function renderPlayerPage(player) {
       setTimeout(() => {
         initAttributeTooltips(document, ['.attribute-label']);
       }, 500);
+    }
+    if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
+      window.GOBNav.restoreScroll();
     }
   }
 

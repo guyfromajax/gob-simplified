@@ -128,9 +128,6 @@ function cloneParams(params) {
     var params = emptyParams();
     params.set('recruit_id', String(recruitId));
     params.set('franchise_id', String(franchiseId));
-    params.set('return_url', global.getCurrentRelativeUrl
-      ? global.getCurrentRelativeUrl()
-      : global.location.pathname + currentSearch() + (global.location.hash || ''));
     return '/player-detail.html?' + params.toString();
   }
 
@@ -142,7 +139,7 @@ function cloneParams(params) {
     var safeName = escapeHtml(name || '--');
     var href = buildRecruitDetailUrl(recruitId, franchiseId);
     if (!href) return safeName;
-    return '<a class="recruit-name-link" href="' + escapeHtml(href) + '">' + safeName + '</a>';
+    return '<a class="recruit-name-link" data-return href="' + escapeHtml(href) + '">' + safeName + '</a>';
   }
 
   function buildFccUrl(context) {
@@ -172,8 +169,9 @@ function cloneParams(params) {
     return '/' + page + '?' + params.toString();
   }
 
-  function formatAttrValue(value) {
-    return Math.floor((Number(value) || 0) / 10);
+  function formatAttrValue(attrs, key) {
+    var d = window.GOB_AttributeDisplay.displayAttr(window.GOB_AttributeDisplay.rawAttr(attrs, key));
+    return d == null ? 0 : d;
   }
 
   function getLeanDisplay(lean, teamNameMap) {
@@ -204,7 +202,7 @@ function cloneParams(params) {
       var attrs = recruit.attributes || {};
       var normalizedAttrs = {};
       ATTR_KEYS.forEach(function (key) {
-        normalizedAttrs[key] = formatAttrValue(attrs[key]);
+        normalizedAttrs[key] = formatAttrValue(attrs, key);
       });
       return {
         recruitId: recruit.recruit_id,

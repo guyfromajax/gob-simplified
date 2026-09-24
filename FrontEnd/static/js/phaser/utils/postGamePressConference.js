@@ -346,7 +346,11 @@ export async function launchPostGamePressConference(opts) {
           } catch (_) {}
         }
         overlay.remove();
-        if (lockerRoomUrl) window.location.href = lockerRoomUrl;
+        if (lockerRoomUrl) {
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+          else window.location.replace(lockerRoomUrl);
+        }
       });
     }
   }
@@ -366,7 +370,11 @@ export async function launchPostGamePressConference(opts) {
       if (d) {
         d.addEventListener('click', () => {
           overlay.remove();
-          if (lockerRoomUrl) window.location.href = lockerRoomUrl;
+          if (lockerRoomUrl) {
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+          else window.location.replace(lockerRoomUrl);
+        }
         });
       }
       return;
@@ -397,7 +405,11 @@ export async function launchPostGamePressConference(opts) {
       if (d) {
         d.addEventListener('click', () => {
           overlay.remove();
-          if (lockerRoomUrl) window.location.href = lockerRoomUrl;
+          if (lockerRoomUrl) {
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+          else window.location.replace(lockerRoomUrl);
+        }
         });
       }
       return;
@@ -418,7 +430,11 @@ export async function launchPostGamePressConference(opts) {
     if (d) {
       d.addEventListener('click', () => {
         overlay.remove();
-        if (lockerRoomUrl) window.location.href = lockerRoomUrl;
+        if (lockerRoomUrl) {
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+          else window.location.replace(lockerRoomUrl);
+        }
       });
     }
     return;

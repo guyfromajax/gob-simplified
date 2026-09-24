@@ -164,6 +164,7 @@ function cloneParams(params) {
 
     if (backBtn && franchiseId && teamId) {
       backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
+      backBtn.setAttribute('data-gob-up', backBtn.href);
     }
 
     const topData = await fetchJSON(

@@ -830,6 +830,12 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   text-overflow: ellipsis;
 }
 
+a.player-name-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 /*
  * RT color buckets — canonical scale lives in /css/rt-buckets.css.
  * That stylesheet is loaded on this page in set-lineup.html, so both

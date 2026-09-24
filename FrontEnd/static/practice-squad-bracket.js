@@ -47,13 +47,15 @@ function cloneParams(params) {
 
   function boxScoreUrl(gameId) {
     return '/box-score.html?game_id=' + encodeURIComponent(gameId)
-      + '&mode=practice_squad&' + q()
-      + '&return_url=' + currentReturnUrl();
+      + '&mode=practice_squad&' + q();
   }
 
   function init() {
     var back = document.getElementById('back-btn');
-    if (back) back.href = '/practice-squad-standings.html?' + q();
+    if (back) {
+      back.href = '/practice-squad-standings.html?' + q();
+      back.setAttribute('data-gob-up', back.href);
+    }
     if (!franchiseId || typeof renderBracketShared !== 'function') return;
 
     fetch(API_CONFIG.buildUrl('/franchise/practice-squad/brackets') + '?franchise_id=' + encodeURIComponent(franchiseId), {
@@ -96,7 +98,7 @@ function cloneParams(params) {
             + ' ' + (data.championship.home_score != null ? data.championship.home_score : '')
             + ', ' + (nameMap[data.championship.away_team_id] || '')
             + ' ' + (data.championship.away_score != null ? data.championship.away_score : '')
-            + ' <a href="' + boxScoreUrl(data.championship.game_id) + '">Box Score</a></p>';
+            + ' <a data-return href="' + boxScoreUrl(data.championship.game_id) + '">Box Score</a></p>';
           root.appendChild(ch);
         }
       })
