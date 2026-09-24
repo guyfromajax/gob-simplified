@@ -3660,16 +3660,13 @@ function dndLog(label, data) {
   while (list.childNodes.length > 20) list.removeChild(list.firstChild);
 }
 
-window.addEventListener('pageshow', async (event) => {
+window.addEventListener('pageshow', (event) => {
   stripStaleQuarterBreakFrom();
   if (!event.persisted) return;
-  if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
-  let redirected = false;
+  if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
   if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
-    try { redirected = await window.GOBNav.guardClosedFranchiseGame(); } catch (e) { redirected = false; }
+    window.GOBNav.guardClosedFranchiseGame();
   }
-  if (redirected) return;
-  window.location.reload();
 });
 
 document.addEventListener('DOMContentLoaded', async () => {

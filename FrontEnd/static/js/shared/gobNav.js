@@ -16,6 +16,10 @@
   var SCROLL_KEY = 'gob_nav_scroll';
   var EXIT_KEY = 'gob_nav_exit';
   var FLOW_TAB_KEY = 'gob_nav_flow_tab';
+  var FLOW_START_KEY = 'gob_nav_flow_start';
+  var IDX_KEY = 'gob_nav_idx';
+  var PENDING_IDX_KEY = 'gob_nav_pending_idx';
+  var RELOAD_KEY = 'gob_nav_reload_return';
   var MAX_STACK = 40;
 
   function install(win) {
@@ -252,19 +256,157 @@
       return readFlowTab() || 'home-tab';
     }
 
+    function stateObj() {
+      var state = win.history && win.history.state;
+      return state && typeof state === 'object' ? state : {};
+    }
+
+    function readIdx() {
+      var stored = readJson(IDX_KEY);
+      if (typeof stored === 'number') return stored;
+      var state = stateObj();
+      if (typeof state.gobIdx === 'number') return state.gobIdx;
+      return null;
+    }
+
+    function writeIdx(idx) {
+      writeJson(IDX_KEY, idx);
+    }
+
+    function stampIdx(idx) {
+      var copy = {};
+      var current = stateObj();
+      for (var key in current) {
+        if (Object.prototype.hasOwnProperty.call(current, key)) copy[key] = current[key];
+      }
+      copy.gobIdx = idx;
+      var url = (win.location.pathname || '') + (win.location.search || '') + (win.location.hash || '');
+      if (win.history && win.history.replaceState) win.history.replaceState(copy, '', url);
+      writeIdx(idx);
+    }
+
+    function ensureIdx() {
+      var pending = readJson(PENDING_IDX_KEY);
+      if (typeof pending === 'number') {
+        removeKey(PENDING_IDX_KEY);
+        stampIdx(pending);
+        return pending;
+      }
+      var existing = stateObj();
+      if (typeof existing.gobIdx === 'number') {
+        writeIdx(existing.gobIdx);
+        return existing.gobIdx;
+      }
+      var stored = readJson(IDX_KEY);
+      if (typeof stored === 'number') {
+        stampIdx(stored);
+        return stored;
+      }
+      stampIdx(0);
+      return 0;
+    }
+
+    function pushIdx() {
+      var current = readIdx();
+      if (typeof current !== 'number') current = ensureIdx();
+      var next = current + 1;
+      writeJson(PENDING_IDX_KEY, next);
+      writeIdx(next);
+      return next;
+    }
+
+    function replaceIdx() {
+      var current = readIdx();
+      if (typeof current !== 'number') current = ensureIdx();
+      writeJson(PENDING_IDX_KEY, current);
+      writeIdx(current);
+      return current;
+    }
+
+    function syncIdxFromState() {
+      var state = stateObj();
+      if (typeof state.gobIdx === 'number') writeIdx(state.gobIdx);
+    }
+
+    function isPeekDestination(url) {
+      return /\/(game-plan|playbooks|playbook-report|team-roster-view|player-detail|standings|schedule|rankings|news|leaders|stats|team-stats|brackets|coaching-archetypes|alpha-feedback)\.html$/i.test(pathOf(url));
+    }
+
+    function rememberFlowStart(idx) {
+      if (typeof idx === 'number') writeJson(FLOW_START_KEY, { idx: idx });
+    }
+
+    function readFlowStart() {
+      var start = readJson(FLOW_START_KEY);
+      if (!start || typeof start.idx !== 'number') return null;
+      return start;
+    }
+
+    function showReturnCover() {
+      var overlay = win.PageLoadOverlay;
+      if (overlay && typeof overlay.show === 'function') {
+        overlay.show();
+        return;
+      }
+      var doc = win.document;
+      if (!doc || typeof doc.getElementById !== 'function') return;
+      var el = doc.getElementById('page-load-overlay');
+      if (el && el.style) el.style.display = 'flex';
+    }
+
+    function reloadTargetIdx() {
+      var mark = readJson(RELOAD_KEY);
+      if (typeof mark === 'number') return mark;
+      if (mark && typeof mark.idx === 'number') return mark.idx;
+      return null;
+    }
+
+    function armReloadOnReturn(idx) {
+      if (typeof idx === 'number') writeJson(RELOAD_KEY, { idx: idx });
+    }
+
+    function reloadIfStale(event) {
+      if (!event || !event.persisted) return false;
+      var exit = readJson(EXIT_KEY);
+      var here = stateObj().gobIdx;
+      if (typeof here !== 'number') here = readIdx();
+      var exitHere = !!(exit && exit.fresh && isFcc());
+      var marked = reloadTargetIdx() !== null && here === reloadTargetIdx();
+      if (!exitHere && !marked) return false;
+      if (!exitHere) removeKey(FLOW_START_KEY);
+      if (exitHere) applyExitTab(exit.tab || 'home-tab');
+      removeKey(RELOAD_KEY);
+      showReturnCover();
+      // Replace, rather than reload, so the browser drops every entry in front
+      // of this one. Forward must not walk back into the finished flow.
+      win.location.replace(currentUrl());
+      return true;
+    }
+
     function go(url) {
       saveScroll();
-      if (isFcc()) rememberFlowTab(currentFccTab());
+      if (isFcc()) {
+        var startIdx = readIdx();
+        if (typeof startIdx !== 'number') startIdx = ensureIdx();
+        if (!isPeekDestination(url)) {
+          rememberFlowTab(currentFccTab());
+          rememberFlowStart(startIdx);
+          armReloadOnReturn(startIdx);
+        }
+      }
+      pushIdx();
       noteHere();
       assign(url);
     }
 
     function replace(url) {
       saveScroll();
+      replaceIdx();
       var stack = readStack();
       var dest = entry(url);
       var here = entry(currentUrl()).url;
       if (stack.length && stack[stack.length - 1].url === here) stack[stack.length - 1] = dest;
+      else if (stack.length && stack[stack.length - 1].path === entry(currentUrl()).path) stack[stack.length - 1] = dest;
       else stack.push(dest);
       writeStack(stack);
       replaceUrl(dest.url);
@@ -272,9 +414,11 @@
 
     function back(fallbackUrl) {
       var parent = mergeReturnTab(fallbackUrl || returnUrlFromQuery() || defaultFallback());
+      var idx = readIdx();
       var prev = previousEntry();
       var ref = referrerEntry();
-      if ((prev && isParent(prev, parent)) || (ref && isParent(ref, parent))) {
+      if ((typeof idx === 'number' && idx > 0) || (prev && isParent(prev, parent)) || (ref && isParent(ref, parent))) {
+        if (typeof idx === 'number' && idx > 0) writeIdx(idx - 1);
         popHere();
         saveScroll();
         win.history.back();
@@ -283,18 +427,29 @@
       replace(parent);
     }
 
-    // Collapse a finished one-way flow onto the Locker Room entry that launched
-    // it. This does not start a CPU week; the landing page is an ordinary load.
+    // Collapse a finished one-way flow onto the history entry that launched it.
+    // gobIdx is stamped on history.state: a push is +1, a replace keeps the index.
+    // This does not start a CPU week; the landing page is an ordinary load.
     function exitFlow(hubUrl, options) {
       options = options || {};
       var locker = isFccPath(hubUrl);
       var tab = locker ? resolveExitTab(hubUrl, options) : '';
       var hub = locker ? forceTab(hubUrl, tab) : hubUrl;
-      var prev = previousEntry();
-      if (prev && prev.path === entry(hub).path) {
+      var start = readFlowStart();
+      var current = readIdx();
+      if (start && typeof current === 'number' && current !== start.idx) {
         if (locker) writeJson(EXIT_KEY, { tab: tab, fresh: true });
-        popHere();
-        win.history.back();
+        removeKey(FLOW_START_KEY);
+        writeIdx(start.idx);
+        win.history.go(start.idx - current);
+        return;
+      }
+      if (start && typeof current === 'number' && current === start.idx) {
+        if (locker) writeJson(EXIT_KEY, { tab: tab, fresh: true });
+        removeKey(FLOW_START_KEY);
+        removeKey(RELOAD_KEY);
+        showReturnCover();
+        win.location.reload();
         return;
       }
       if (entry(hub).url === entry(currentUrl()).url) {
@@ -414,25 +569,45 @@
       var parsed = parseUrl(href);
       if (!parsed || parsed.origin !== win.location.origin) return;
       if (link.target && link.target !== '_self') return;
+      if (isFcc() && !isPeekDestination(href)) {
+        var startIdx = readIdx();
+        if (typeof startIdx !== 'number') startIdx = ensureIdx();
+        rememberFlowTab(currentFccTab());
+        rememberFlowStart(startIdx);
+        armReloadOnReturn(startIdx);
+      }
+      pushIdx();
       saveScroll();
       noteHere();
     }
 
-    function onPopState() {
+    function onPageHide() {
+      var exit = readJson(EXIT_KEY);
+      var here = stateObj().gobIdx;
+      if (exit && exit.fresh && isFcc()) showReturnCover();
+      if (reloadTargetIdx() !== null && here === reloadTargetIdx()) showReturnCover();
+    }
+
+    function onPopState(event) {
+      var idx = event && event.state && typeof event.state.gobIdx === 'number' ? event.state.gobIdx : null;
+      if (idx === null) {
+        var state = stateObj();
+        if (typeof state.gobIdx === 'number') idx = state.gobIdx;
+      }
+      if (typeof idx === 'number') writeIdx(idx);
       truncateToHere();
     }
 
     function onPageShow(event) {
-      if (consumeExitLanding(event)) return;
       if (event && event.persisted) {
         resetBusyButtons();
-        if (isFcc()) {
-          win.location.reload();
-          return;
-        }
-        truncateToHere();
+        syncIdxFromState();
+        if (reloadIfStale(event)) return;
+        restoreScroll();
         return;
       }
+      ensureIdx();
+      if (consumeExitLanding(event)) return;
       noteHere();
     }
 
@@ -495,8 +670,10 @@
     if (win.addEventListener) {
       win.addEventListener('popstate', onPopState);
       win.addEventListener('pageshow', onPageShow);
+      win.addEventListener('pagehide', onPageHide);
       win.addEventListener('beforeunload', onBeforeUnload);
     }
+    ensureIdx();
     if (!isFcc()) rememberFlowTabFromReferrer();
     if (!consumeExitLanding(null)) noteHere();
 
@@ -505,6 +682,7 @@
       replace: replace,
       back: back,
       exitFlow: exitFlow,
+      reloadIfStale: reloadIfStale,
       restoreScroll: restoreScroll,
       syncCurrent: syncCurrent,
       stripParam: stripParam,

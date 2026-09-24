@@ -6794,9 +6794,7 @@
     const awayDisplay = urlParams.get('away_display') || awayTeam;
 
     window.addEventListener('pageshow', (event) => {
-      if (event.persisted) {
-        window.location.reload();
-      }
+      if (event.persisted && window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
     });
 
     const redirected = await redirectIfFranchiseGameplayAlreadyCommitted(urlParams);

@@ -23,8 +23,10 @@ function fakeWindow(start, seed) {
       scrollRestoration: 'auto',
       state: null,
       back() { win.navigations.push(['back']); },
-      replaceState(_s, _t, url) {
+      go(delta) { win.navigations.push(['go', delta]); },
+      replaceState(state, _t, url) {
         win.navigations.push(['replaceState', url]);
+        win.history.state = state;
         if (typeof url === 'string') {
           const q = url.indexOf('?');
           win.location.pathname = q === -1 ? url : url.slice(0, q);
@@ -148,11 +150,11 @@ test('closed-game guard reads command center only after the game is final', asyn
   assert.match(win.navigations.at(-1)[1], /franchise-command-center\.html/);
 });
 
-test('fcc bfcache restore reloads and does not call phase-b', () => {
+test('fcc bfcache peek return does not reload or call phase-b', () => {
   const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1' });
   win.fetch = () => { throw new Error('phase-b must not be fetched from pageshow'); };
   win.listeners.pageshow({ persisted: true });
-  assert.deepEqual(win.navigations.at(-1), ['reload']);
+  assert.equal(win.navigations.some((row) => row[0] === 'reload' || row[0] === 'replace'), false);
 });
 
 test('a repeat drill-down keeps the locker room that launched it', () => {
@@ -200,7 +202,7 @@ test('exitFlow backs into the locker room that launched the flow', () => {
   win.navigations.length = 0;
   win.fetch = () => { throw new Error('exitFlow must not fetch'); };
   win.GOBNav.exitFlow('/franchise-command-center.html?franchise_id=f1', { tab: 'home-tab' });
-  assert.deepEqual(win.navigations.at(-1), ['back']);
+  assert.deepEqual(win.navigations.at(-1), ['go', -1]);
   const landing = JSON.parse(win.sessionStorage.getItem('gob_nav_exit'));
   assert.equal(landing.tab, 'home-tab');
   assert.equal(landing.fresh, true);
@@ -214,7 +216,7 @@ test('exitFlow keeps the tab the flow started from', () => {
   win.listeners.pageshow({ persisted: false });
   win.navigations.length = 0;
   win.GOBNav.exitFlow('/franchise-command-center.html?franchise_id=f1');
-  assert.deepEqual(win.navigations.at(-1), ['back']);
+  assert.deepEqual(win.navigations.at(-1), ['go', -1]);
   const landing = JSON.parse(win.sessionStorage.getItem('gob_nav_exit'));
   assert.equal(landing.tab, 'training-tab');
 });
@@ -233,7 +235,7 @@ test('locker room load applies a pending exit tab', () => {
     { pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=game-plan-tab' },
     { gob_nav_exit: JSON.stringify({ tab: 'home-tab', fresh: true }) }
   );
-  const replaced = win.navigations.find((row) => row[0] === 'replaceState');
+  const replaced = win.navigations.find((row) => row[0] === 'replaceState' && /home-tab/.test(row[1]));
   assert.ok(replaced);
   assert.match(replaced[1], /tab=home-tab/);
   assert.equal(win.sessionStorage.getItem('gob_nav_exit'), null);
@@ -245,6 +247,124 @@ test('bfcache locker room with a pending exit reloads instead of showing stale d
   win.fetch = () => { throw new Error('exit landing must not fetch phase-b'); };
   win.navigations.length = 0;
   win.listeners.pageshow({ persisted: true });
-  assert.equal(win.navigations.at(-1)[0], 'reload');
+  assert.equal(win.navigations.at(-1)[0], 'replace');
+  assert.match(win.navigations.at(-1)[1], /home-tab/);
   assert.ok(win.navigations.some((row) => row[0] === 'replaceState' && /home-tab/.test(row[1])));
+});
+
+test('push advances gobIdx and replace keeps it', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1' });
+  assert.equal(win.history.state.gobIdx, 0);
+  win.GOBNav.go('/set-lineup.html?franchise_id=f1&game_id=g1');
+  win.location.pathname = '/set-lineup.html';
+  win.location.search = '?franchise_id=f1&game_id=g1';
+  win.listeners.pageshow({ persisted: false });
+  assert.equal(win.history.state.gobIdx, 1);
+  win.GOBNav.replace('/court.html?franchise_id=f1&game_id=g1');
+  win.location.pathname = '/court.html';
+  win.location.search = '?franchise_id=f1&game_id=g1';
+  win.listeners.pageshow({ persisted: false });
+  assert.equal(win.history.state.gobIdx, 1);
+});
+
+test('exitFlow jumps to the recorded locker-room index after a quarter break, a timeout, and a peek', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=game-plan-tab' });
+  win.GOBNav.go('/set-lineup.html?franchise_id=f1&game_id=g1');
+  win.location.pathname = '/set-lineup.html';
+  win.location.search = '?franchise_id=f1&game_id=g1';
+  win.listeners.pageshow({ persisted: false });
+
+  win.GOBNav.replace('/court.html?franchise_id=f1&game_id=g1&court_start=play');
+  win.location.pathname = '/court.html';
+  win.location.search = '?franchise_id=f1&game_id=g1&court_start=play';
+  win.listeners.pageshow({ persisted: false });
+
+  win.history.replaceState(win.history.state, '', '/court.html?franchise_id=f1&game_id=g1');
+  assert.equal(win.history.state.gobIdx, 1);
+
+  win.GOBNav.replace('/set-lineup.html?franchise_id=f1&game_id=g1&quarter_break_from=1');
+  win.location.pathname = '/set-lineup.html';
+  win.location.search = '?franchise_id=f1&game_id=g1&quarter_break_from=1';
+  win.listeners.pageshow({ persisted: false });
+
+  win.GOBNav.replace('/set-lineup.html?franchise_id=f1&game_id=g1&timeout=1');
+  win.location.pathname = '/set-lineup.html';
+  win.location.search = '?franchise_id=f1&game_id=g1&timeout=1';
+  win.listeners.pageshow({ persisted: false });
+
+  win.GOBNav.go('/player-detail.html?player_id=p1');
+  win.location.pathname = '/player-detail.html';
+  win.location.search = '?player_id=p1';
+  win.listeners.pageshow({ persisted: false });
+  assert.equal(win.history.state.gobIdx, 2);
+
+  win.navigations.length = 0;
+  win.GOBNav.back('/set-lineup.html?franchise_id=f1&game_id=g1&timeout=1');
+  assert.deepEqual(win.navigations.at(-1), ['back']);
+  win.history.state = { gobIdx: 1 };
+  win.listeners.popstate({ state: { gobIdx: 1 } });
+
+  win.fetch = () => { throw new Error('exitFlow must not fetch'); };
+  win.GOBNav.exitFlow('/franchise-command-center.html?franchise_id=f1', { tab: 'home-tab' });
+  assert.deepEqual(win.navigations.at(-1), ['go', -1]);
+  const landing = JSON.parse(win.sessionStorage.getItem('gob_nav_exit'));
+  assert.equal(landing.tab, 'home-tab');
+  assert.equal(landing.fresh, true);
+  assert.equal(win.navigations.some((row) => row[0] === 'replace'), false);
+});
+
+test('a lineup peek return does not reload while a game flow is open', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1' });
+  win.GOBNav.go('/set-lineup.html?franchise_id=f1&game_id=g1');
+  win.location.pathname = '/set-lineup.html';
+  win.location.search = '?franchise_id=f1&game_id=g1';
+  win.listeners.pageshow({ persisted: false });
+  win.GOBNav.go('/player-detail.html?player_id=p1');
+  win.location.pathname = '/set-lineup.html';
+  win.location.search = '?franchise_id=f1&game_id=g1';
+  win.history.state = { gobIdx: 1 };
+  win.fetch = () => { throw new Error('peek return must not fetch'); };
+  win.navigations.length = 0;
+  win.listeners.pageshow({ persisted: true });
+  assert.equal(win.navigations.some((row) => row[0] === 'reload' || row[0] === 'replace'), false);
+});
+
+test('returning to the flow start replaces the page and does not call phase-b', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=training-tab' });
+  win.GOBNav.go('/training.html?franchise_id=f1');
+  win.location.pathname = '/franchise-command-center.html';
+  win.location.search = '?franchise_id=f1&tab=training-tab';
+  win.history.state = { gobIdx: 0 };
+  win.fetch = () => { throw new Error('phase-b must not be fetched from pageshow'); };
+  win.navigations.length = 0;
+  win.listeners.pageshow({ persisted: true });
+  assert.equal(win.navigations.at(-1)[0], 'replace');
+  assert.equal(win.sessionStorage.getItem('gob_nav_flow_start'), null);
+});
+
+test('pagehide covers the flow start and leaves a peek snapshot alone', () => {
+  const flow = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=training-tab' });
+  let flowShown = 0;
+  flow.PageLoadOverlay = { show() { flowShown += 1; } };
+  flow.GOBNav.go('/training.html?franchise_id=f1');
+  flow.listeners.pagehide();
+  assert.equal(flowShown, 1);
+
+  const peek = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=standings-tab' });
+  let peekShown = 0;
+  peek.PageLoadOverlay = { show() { peekShown += 1; } };
+  peek.GOBNav.go('/team-roster-view.html?team_id=t1');
+  peek.listeners.pagehide();
+  assert.equal(peekShown, 0);
+
+  const lineup = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1' });
+  lineup.GOBNav.go('/set-lineup.html?franchise_id=f1&game_id=g1');
+  lineup.location.pathname = '/set-lineup.html';
+  lineup.location.search = '?franchise_id=f1&game_id=g1';
+  lineup.listeners.pageshow({ persisted: false });
+  let lineupShown = 0;
+  lineup.PageLoadOverlay = { show() { lineupShown += 1; } };
+  lineup.GOBNav.go('/player-detail.html?player_id=p1');
+  lineup.listeners.pagehide();
+  assert.equal(lineupShown, 0);
 });

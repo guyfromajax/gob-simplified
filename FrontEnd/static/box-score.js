@@ -2569,8 +2569,10 @@ function closeSpecialStatsPopup() {
   }
 }
 
-window.addEventListener('pageshow', async (event) => {
+window.addEventListener('pageshow', (event) => {
   if (!event.persisted) return;
-  if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
-  await releaseClosedGameCover();
+  if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
+  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+    window.GOBNav.guardClosedFranchiseGame();
+  }
 });

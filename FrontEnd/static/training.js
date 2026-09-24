@@ -1627,7 +1627,7 @@ async function initializeTrainingPoints() {
 
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) {
-    window.location.reload();
+    if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
     return;
   }
   redirectIfTrainingAlreadyCommitted();
