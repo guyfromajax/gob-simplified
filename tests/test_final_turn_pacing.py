@@ -16,6 +16,24 @@ from BackEnd.engine.final_turn_pacing import (
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
 
+#: Mirror of ``TeamManager.__init__``'s fresh-game initialisation (team_manager.py:435-444).
+#: Eight keys, all None. ``aggression_call`` is deliberately ABSENT: it is not part of the
+#: canonical init, it is written per turn by ``turn_manager.py:3580-3586``, and every reader
+#: uses ``.get("aggression_call", "normal")`` — so omitting it reproduces a real fresh game.
+def _fresh_strategy_calls():
+    return {
+        "offense_call": None,
+        "defense_call": None,
+        "aggression_override": None,
+        "tempo_override": None,
+        "press_override": None,
+        "trap_override": None,
+        "press_trap_override": None,
+        "aggression_roll": None,
+    }
+
+
+
 def _lineup(prefix):
     return {
         pos: SimpleNamespace(
@@ -27,8 +45,10 @@ def _lineup(prefix):
 
 
 def _game(*, time_remaining, prior_turn=None):
-    home = SimpleNamespace(team_id="home", lineup=_lineup("home"))
-    away = SimpleNamespace(team_id="away", lineup=_lineup("away"))
+    home = SimpleNamespace(team_id="home", lineup=_lineup("home"),
+                           strategy_calls=_fresh_strategy_calls())
+    away = SimpleNamespace(team_id="away", lineup=_lineup("away"),
+                           strategy_calls=_fresh_strategy_calls())
     return SimpleNamespace(
         quarter=2,
         game_state={"time_remaining": time_remaining, "shot_clock_remaining": 14},

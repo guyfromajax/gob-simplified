@@ -10,6 +10,24 @@ from BackEnd.models.turn_manager import TurnManager
 from BackEnd.utils.sim_random import sim_rng
 
 
+#: Mirror of ``TeamManager.__init__``'s fresh-game initialisation (team_manager.py:435-444).
+#: Eight keys, all None. ``aggression_call`` is deliberately ABSENT: it is not part of the
+#: canonical init, it is written per turn by ``turn_manager.py:3580-3586``, and every reader
+#: uses ``.get("aggression_call", "normal")`` — so omitting it reproduces a real fresh game.
+def _fresh_strategy_calls():
+    return {
+        "offense_call": None,
+        "defense_call": None,
+        "aggression_override": None,
+        "tempo_override": None,
+        "press_override": None,
+        "trap_override": None,
+        "press_trap_override": None,
+        "aggression_roll": None,
+    }
+
+
+
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
 
@@ -36,10 +54,12 @@ def _alignment_manager(*, away_offense):
     home = SimpleNamespace(
         team_id="home",
         lineup={pos: SimpleNamespace(player_id=f"home_{pos}") for pos in POSITIONS},
+        strategy_calls=_fresh_strategy_calls(),
     )
     away = SimpleNamespace(
         team_id="away",
         lineup={pos: SimpleNamespace(player_id=f"away_{pos}") for pos in POSITIONS},
+        strategy_calls=_fresh_strategy_calls(),
     )
     game = SimpleNamespace(
         home_team=home,
@@ -151,8 +171,10 @@ def test_final_turn_attack_shot_unwraps_attack_drive_steps(monkeypatch):
         pos: SimpleNamespace(player_id=f"away_{pos}", attributes={})
         for pos in POSITIONS
     }
-    home = SimpleNamespace(team_id="home", lineup=lineup)
-    away = SimpleNamespace(team_id="away", lineup=defense_lineup)
+    home = SimpleNamespace(team_id="home", lineup=lineup,
+                           strategy_calls=_fresh_strategy_calls())
+    away = SimpleNamespace(team_id="away", lineup=defense_lineup,
+                           strategy_calls=_fresh_strategy_calls())
     captured = {}
 
     game = SimpleNamespace(
@@ -233,8 +255,10 @@ def test_final_turn_outside_step0_floor_stamps_hold(monkeypatch):
         pos: SimpleNamespace(player_id=f"away_{pos}", attributes={})
         for pos in POSITIONS
     }
-    home = SimpleNamespace(team_id="home", lineup=lineup)
-    away = SimpleNamespace(team_id="away", lineup=defense_lineup)
+    home = SimpleNamespace(team_id="home", lineup=lineup,
+                           strategy_calls=_fresh_strategy_calls())
+    away = SimpleNamespace(team_id="away", lineup=defense_lineup,
+                           strategy_calls=_fresh_strategy_calls())
     game = SimpleNamespace(
         quarter=2,
         game_state={
@@ -311,8 +335,10 @@ def test_final_turn_attack_step0_floor_stamps_hold(monkeypatch):
         pos: SimpleNamespace(player_id=f"away_{pos}", attributes={})
         for pos in POSITIONS
     }
-    home = SimpleNamespace(team_id="home", lineup=lineup)
-    away = SimpleNamespace(team_id="away", lineup=defense_lineup)
+    home = SimpleNamespace(team_id="home", lineup=lineup,
+                           strategy_calls=_fresh_strategy_calls())
+    away = SimpleNamespace(team_id="away", lineup=defense_lineup,
+                           strategy_calls=_fresh_strategy_calls())
     game = SimpleNamespace(
         quarter=2,
         game_state={"defense_playcall": "man", "time_remaining": 29},
