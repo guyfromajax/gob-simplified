@@ -3252,6 +3252,37 @@ try:
             "source": "none"
         }
     
+    def _quarter_replay_block_response(saved_quarter, requested_quarter, game_id, body):
+        """409 when the request would simulate a quarter the saved game has already passed.
+
+        Timeout, foul-out, and cold/anchor resumes are exempt: those requests
+        carry resume_from_timeout or resume_from_anchor and continue the saved
+        quarter instead of replaying an earlier one. One comparison, no I/O.
+        """
+        if getattr(body, "resume_from_timeout", False) or getattr(body, "resume_from_anchor", False):
+            return None
+        try:
+            saved_q = int(saved_quarter)
+            requested_q = int(requested_quarter)
+        except (TypeError, ValueError):
+            return None
+        if saved_q <= requested_q:
+            return None
+        logging.warning(
+            "[QUARTER-REPLAY-BLOCKED] game_id=%s saved_quarter=%s requested_quarter=%s",
+            game_id,
+            saved_q,
+            requested_q,
+        )
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": "QUARTER_ALREADY_PLAYED",
+                "saved_quarter": saved_q,
+                "requested_quarter": requested_q,
+            },
+        )
+
     @app.options("/api/simulate-quarter")
     async def simulate_quarter_options():
         """
@@ -3393,12 +3424,22 @@ try:
                 )
             # Check if this is a "new game" scenario: user wants Q1 but saved game is Q2+
             # In this case, remove from memory and reload from DB (which will run new game detection)
-            if gm is not None and body.quarter == 1 and gm.quarter > 1:
+            # Q1 against an in-memory game that is already past Q1 must be decided
+            # from the persisted document (loaded below), not by starting a new game.
+            if (
+                gm is not None
+                and body.quarter == 1
+                and gm.quarter > 1
+                and not body.resume_from_timeout
+                and not body.resume_from_anchor
+            ):
                 logging.warning(
-                    f"🆕 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='New game scenario (Q1 requested but game in memory at Q{gm.quarter})'"
+                    "[ONGOING_GAMES] Q1 requested while memory is at Q%s; reloading saved game_id=%s",
+                    gm.quarter,
+                    game_id,
                 )
                 _drop_cached_game()
-                gm = None  # Force reload from DB where new game detection will run
+                gm = None
                 sim_quarter_load_source = None
             
             # ✅ SS&S: Ensure user_team_side is set in in-memory game if missing
@@ -3674,6 +3715,11 @@ try:
                 else:
                     # ✅ PERFORMANCE: Removed debug logging
                     pass
+
+            if gm is not None:
+                blocked = _quarter_replay_block_response(gm.quarter, body.quarter, game_id, body)
+                if blocked is not None:
+                    return blocked
             
             if gm is None:
                 logging.warning(
@@ -3718,6 +3764,11 @@ try:
                             )
                         else:
                             logging.warning("⚠️ [RESUME-ANCHOR-RESTORE] resume_anchor missing snapshot game_id=%s", game_id)
+                    blocked = _quarter_replay_block_response(
+                        saved.get("quarter", 1), body.quarter, game_id, body
+                    )
+                    if blocked is not None:
+                        return blocked
                     try:
                         # ✅ UNIFIED STRUCTURE: Get team IDs from top level (unified structure)
                         home_team_id = saved.get("home_team_id")
@@ -3978,9 +4029,9 @@ try:
                             # We only treat as timeout resume when the client sent resume_from_timeout=true (see earlier block).
                             # Otherwise "Play Quarter" after "Sim quarter" would incorrectly restore FREE_THROW state and cause instant EOG.
                             
-                            # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
-                            # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
-                            is_new_game = (body.quarter == 1 and saved_quarter > 1) and not body.resume_from_timeout
+                            # A saved game already past Q1 is rejected above. Never start a
+                            # fresh game over that document.
+                            is_new_game = False
                             should_restore_stats = not is_new_game or body.resume_from_timeout
                             # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log restore path so we can confirm Hypothesis 1
                             logging.debug(

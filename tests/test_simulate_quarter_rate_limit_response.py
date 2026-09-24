@@ -1,3 +1,5 @@
+import json
+
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -48,5 +50,11 @@ def test_simulate_quarter_early_return_is_response(monkeypatch):
     )
     response = api.simulate_quarter_endpoint(_make_request(), body)
 
+    # A quarter the saved game has already passed is a Response (not an exception
+    # the rate limiter would mishandle), and the body is the replay refusal.
     assert isinstance(response, Response)
-    assert response.status_code == 200
+    assert response.status_code == 409
+    payload = json.loads(response.body)
+    assert payload["error"] == "QUARTER_ALREADY_PLAYED"
+    assert payload["saved_quarter"] == 3
+    assert payload["requested_quarter"] == 2

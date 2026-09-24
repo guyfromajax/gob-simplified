@@ -442,6 +442,55 @@ const GameScene = createGameScene(Phaser);
 let game;
 let isSimulating = false;
 let courtStartMode = null;
+
+async function recoverFromQuarterAlreadyPlayed(gameId) {
+  const court = document.getElementById('phaser-container');
+  if (court) court.style.display = 'none';
+  const preGame = document.getElementById('pre-game-container');
+  if (preGame) preGame.style.display = 'none';
+  let state = null;
+  if (gameId && typeof API_CONFIG !== 'undefined') {
+    try {
+      const res = await fetch(API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(gameId)}/resume-state`), {
+        headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
+      });
+      if (res.ok) state = await res.json();
+    } catch (err) {
+      console.warn('[QUARTER-REPLAY] resume-state failed', err);
+    }
+  }
+  const go = (url) => {
+    if (window.GOBNav && typeof window.GOBNav.replace === 'function') window.GOBNav.replace(url);
+    else window.location.replace(url);
+  };
+  const params = new URLSearchParams(window.location.search);
+  if (state && (state.status === 'stoppage_anchor' || state.status === 'timeout_resume')) {
+    if (gameId) params.set('game_id', gameId);
+    if (state.quarter) params.set('quarter', String(state.quarter));
+    params.set('resume_from_anchor', 'true');
+    params.set('resume_from_timeout', 'true');
+    go(`${window.location.pathname}?${params.toString()}`);
+    return;
+  }
+  if (state && state.status === 'quarter_break' && state.quarter) {
+    params.set('quarter', String(state.quarter));
+    if (gameId) params.set('game_id', gameId);
+    params.delete('court_start');
+    go(`/set-lineup.html?${params.toString()}`);
+    return;
+  }
+  const franchiseId = params.get('franchise_id');
+  go(franchiseId
+    ? `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`
+    : '/mode-select.html');
+}
+
+function quarterAlreadyPlayedBody(status, data) {
+  return status === 409 && data && data.error === 'QUARTER_ALREADY_PLAYED';
+}
+
+window.recoverFromQuarterAlreadyPlayed = recoverFromQuarterAlreadyPlayed;
+window.quarterAlreadyPlayedBody = quarterAlreadyPlayedBody;
 let courtStartScheduled = false;
 
 function consumeCourtStartParam() {
@@ -2767,6 +2816,10 @@ async function handleSimQuarter() {
         }
       }
       console.error(`❌ Q${nextQuarter} simulation failed:`, errorDetail);
+      if (quarterAlreadyPlayedBody(res.status, errorData)) {
+        await recoverFromQuarterAlreadyPlayed(gameId);
+        return;
+      }
       
       // ✅ Phase 4: Show missing truth error screen for 404 (game not found)
       if (res.status === 404 && errorDetail.includes('not found') && window.ErrorHandler && window.ErrorHandler.showMissingTruthError) {
@@ -3133,11 +3186,11 @@ async function handleSimFullGame() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        // ✅ FIX: Extract actual error message from backend for better debugging
         let errorDetail = `HTTP ${res.status}: ${res.statusText}`;
+        let errorData = {};
         try {
-          const errorData = await res.json();
-          errorDetail = errorData.detail || errorData.message || errorDetail;
+          errorData = await res.json();
+          errorDetail = errorData.detail || errorData.message || errorData.error || errorDetail;
         } catch (e) {
           try {
             errorDetail = await res.text();
@@ -3146,6 +3199,10 @@ async function handleSimFullGame() {
           }
         }
         console.error(`❌ Q${currentQ} simulation failed:`, errorDetail);
+        if (quarterAlreadyPlayedBody(res.status, errorData)) {
+          await recoverFromQuarterAlreadyPlayed(gId);
+          return;
+        }
         throw new Error(`Q${currentQ} simulation failed: ${errorDetail}`);
       }
       lastSummary = await res.json();

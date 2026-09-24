@@ -1306,8 +1306,9 @@ export function createGameScene(Phaser) {
 
       if (!res.ok) {
         let errorMessage;
+        let errData = null;
         try {
-          const errData = await res.clone().json();
+          errData = await res.clone().json();
           errorMessage = errData.detail || errData.message || errData.error || JSON.stringify(errData);
         } catch {
           try {
@@ -1315,6 +1316,13 @@ export function createGameScene(Phaser) {
           } catch {
             errorMessage = res.statusText;
           }
+        }
+        if (errData && errData.error === 'QUARTER_ALREADY_PLAYED') {
+          console.error('❌ Quarter already played:', errData);
+          if (typeof window.recoverFromQuarterAlreadyPlayed === 'function') {
+            await window.recoverFromQuarterAlreadyPlayed(this.gameId);
+          }
+          return;
         }
         console.error("❌ Failed to fetch sim data:", errorMessage);
         appendToTextScroll(`❌ ${errorMessage}`);
