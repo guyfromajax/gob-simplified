@@ -121,6 +121,23 @@ function playSound(filename) {
   } catch (e) {}
 }
 
+function stripStaleQuarterBreakFrom() {
+  try {
+    const params = liveParams();
+    if (!params.has('quarter_break_from')) return;
+    params.delete('quarter_break_from');
+    if (franchiseCtx() && typeof franchiseCtx().commitParams === 'function') {
+      franchiseCtx().commitParams(params);
+    } else {
+      const next = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      history.replaceState(history.state, '', next);
+    }
+  } catch (err) {
+    console.warn('[set-lineup] could not strip quarter_break_from', err);
+  }
+}
+stripStaleQuarterBreakFrom();
+
 async function redirectIfFranchiseGameplayAlreadyCommitted() {
   if (modeParam !== 'franchise' || !franchiseId || !weekParam) return false;
   try {
@@ -137,7 +154,9 @@ async function redirectIfFranchiseGameplayAlreadyCommitted() {
     const currentWeek = Number(data.week || 1);
     const pageWeek = Number(weekParam || 0);
     if (pageWeek && currentWeek > pageWeek) {
-      window.location.replace(`/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`);
+      const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+      if (window.GOBNav) window.GOBNav.replace(fccUrl);
+      else window.location.replace(fccUrl);
       return true;
     }
   } catch (error) {
@@ -152,7 +171,6 @@ function buildPlayerDetailUrl(playerId) {
   if (modeParam) qs.set('mode', modeParam);
   if (franchiseId) qs.set('franchise_id', franchiseId);
   if (gameId) qs.set('game_id', gameId);
-  qs.set('return_url', window.location.pathname + currentSearch());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -259,6 +277,8 @@ function applyPlayerDetailLinkBehavior(linkEl, playerId) {
     return;
   }
   linkEl.href = buildPlayerDetailUrl(playerId);
+  linkEl.setAttribute('data-return', '');
+  linkEl.setAttribute('data-gob-replace', '');
 }
 
 // ✅ PHASE 2: Validate pointers on page load (if present)
@@ -431,6 +451,7 @@ let roster = [];
 /** Team chemistry from /roster (franchise/tournament FTD); single-game default 15. */
 let rosterTeamChemistry = 15;
 const lineup = {};
+let lineupDirty = false;
 /** @type {string|null} Selected Rim Runner player id (single-select); null = use backend default */
 let rimRunnerPlayerId = null;
 const playerMap = {};
@@ -1882,6 +1903,7 @@ function clearLineupSlot(pos) {
     return;
   }
   delete lineup[pos];
+  lineupDirty = true;
   if (removedId != null && rimRunnerPlayerId != null && String(rimRunnerPlayerId) === String(removedId)) {
     rimRunnerPlayerId = null;
   }
@@ -2460,7 +2482,8 @@ function wireLineupNavButtons() {
       });
       params.set('from', 'lineup');
       if (DEBUG) params.set('debug', '1');
-      window.location.href = `/game-plan.html?${params.toString()}`;
+      if (window.GOBNav) window.GOBNav.replace(`/game-plan.html?${params.toString()}`);
+      else window.location.replace(`/game-plan.html?${params.toString()}`);
     });
   }
   const playbooksBtn = document.getElementById('playbooks-button');
@@ -2497,7 +2520,9 @@ function wireLineupNavButtons() {
         params.set('pregame', '1');
       }
       params.set('from', 'lineup');
-      window.location.href = `/box-score.html?${params.toString()}`;
+      const boxUrl = `/box-score.html?${params.toString()}`;
+      if (window.GOBNav) window.GOBNav.replace(boxUrl);
+      else window.location.replace(boxUrl);
     });
   }
 }
@@ -2532,6 +2557,11 @@ async function init() {
   
   // Restore lineup from URL
   restoreLineupFromUrl();
+  lineupDirty = false;
+  if (window.GOBNav) {
+    window.GOBNav.warnOnLeave(() => lineupDirty);
+    window.GOBNav.restoreScroll();
+  }
   
   // ✅ FOUL OUT: Remove ineligible players from lineup AFTER restoring from URL
   // This ensures fouled-out players are removed even if they were in the URL params
@@ -2878,7 +2908,9 @@ async function init() {
         }
         playSound('confirm-1-lowervol.wav');
         setTimeout(() => {
-          window.location.href = '/game-plan.html?' + nextParams.toString();
+          const planUrl = '/game-plan.html?' + nextParams.toString();
+          if (window.GOBNav) window.GOBNav.replace(planUrl);
+          else window.location.replace(planUrl);
         }, 200);
         return;
       }
@@ -2887,7 +2919,14 @@ async function init() {
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
       playSound('confirm-1-lowervol.wav');
-      const navigate = () => setTimeout(() => { window.location.href = finalUrl; }, 200);
+      const navigate = () => setTimeout(() => {
+        if (window.GOBNav) {
+          window.GOBNav.allowNextLeave();
+          window.GOBNav.replace(finalUrl);
+        } else {
+          window.location.replace(finalUrl);
+        }
+      }, 200);
 
       // FTE v2 tutorial: insert a feedback modal between Return To Game and
       // the actual navigation. Algorithm picks a Talent / skill-based /
@@ -3519,6 +3558,7 @@ function assignToSlot(pos, playerId) {
   
   // Update lineup data
   lineup[pos] = playerId;
+  lineupDirty = true;
   updateAllSlotDisplays();
   return true;
 }
@@ -3603,6 +3643,9 @@ function dndLog(label, data) {
 }
 
 window.addEventListener('pageshow', (event) => {
+  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+    window.GOBNav.guardClosedFranchiseGame();
+  }
   if (event.persisted) {
     window.location.reload();
   }

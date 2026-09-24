@@ -727,7 +727,8 @@
         }, 320);
         const opts = options || {};
         if (action === 'primary' && opts.lockerRoomUrl) {
-          window.location.href = opts.lockerRoomUrl;
+          if (window.GOBNav) window.GOBNav.replace(opts.lockerRoomUrl);
+          else window.location.replace(opts.lockerRoomUrl);
           return;
         }
         if (action === 'boxscore') {

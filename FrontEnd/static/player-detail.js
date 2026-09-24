@@ -233,20 +233,12 @@ function cloneParams(params) {
 
   function goBack() {
     const params = liveParams();
-    // Same-origin guard: return_url is attacker-controllable via the query string.
     const returnUrl = typeof getSafeReturnUrl === 'function'
       ? getSafeReturnUrl(params.get('return_url'))
       : params.get('return_url');
-    if (returnUrl) {
-      window.location.href = returnUrl;
-      return;
-    }
-
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      window.location.href = '/homepage.html';
-    }
+    const fallback = returnUrl || '/homepage.html';
+    if (window.GOBNav) window.GOBNav.back(fallback);
+    else window.location.replace(fallback);
   }
 
   function showError(message) {
@@ -648,6 +640,9 @@ function renderPlayerPage(player) {
       setTimeout(() => {
         initAttributeTooltips(document, ['.attribute-label']);
       }, 500);
+    }
+    if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
+      window.GOBNav.restoreScroll();
     }
   }
 

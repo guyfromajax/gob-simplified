@@ -357,7 +357,6 @@ function buildPlayerDetailUrl(playerId) {
   qs.set('id', playerId);
   if (franchiseId) qs.set('mode', 'franchise');
   if (franchiseId) qs.set('franchise_id', franchiseId);
-  qs.set('return_url', getCurrentRelativeUrl());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -735,14 +734,14 @@ function standingsTeamLabel(t) {
 }
 
 function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
-  const returnUrl = encodeURIComponent(getCurrentRelativeUrl());
-  return `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId)}&team_name=${encodeURIComponent(teamName)}&return_tab=${returnTab}&return_url=${returnUrl}`;
+  return `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId)}&team_name=${encodeURIComponent(teamName)}&return_tab=${returnTab}`;
 }
 
 function buildTeamLink(t) {
   const teamLink = document.createElement('a');
   const label = standingsTeamLabel(t);
   teamLink.href = buildFranchiseTeamPageUrl(t.team_id, label, 'standings-tab');
+  teamLink.setAttribute('data-return', '');
   const rank = Number(t?.natl_rank);
   const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
   teamLink.textContent = `${rankPrefix}${label}`;
@@ -2372,8 +2371,8 @@ function renderFccRecruits() {
     params.set('franchise_id', franchiseId);
     params.set('team_id', userTeamId);
     params.set('from', 'fcc');
-    params.set('return_url', getCurrentRelativeUrl());
     fullListLink.href = `/recruiting.html?${params.toString()}`;
+    fullListLink.setAttribute('data-return', '');
   }
   const psLink = document.getElementById('fcc-ps-season-link');
   if (psLink) {
@@ -2901,6 +2900,7 @@ function renderPracticeSquad(data) {
       } else {
         const nameLink = document.createElement('a');
         nameLink.href = buildPlayerDetailUrl(p._id);
+        nameLink.setAttribute('data-return', '');
         nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
         nameLink.style.color = 'inherit';
         nameLink.style.textDecoration = 'none';
@@ -2952,6 +2952,7 @@ function renderPracticeSquad(data) {
         } else {
           const nameLink = document.createElement('a');
           nameLink.href = buildPlayerDetailUrl(p._id);
+        nameLink.setAttribute('data-return', '');
           nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
           nameLink.style.color = 'inherit';
           nameLink.style.textDecoration = 'none';
@@ -3038,8 +3039,8 @@ function fccRtLockupHtml(rt, potentialRt) {
 /** Identity cell: jersey in a fixed box so numbers align, then the linked name. */
 function fccIdentityCellHtml(opts) {
   const o = opts || {};
-  const nameHtml = o.href
-    ? '<a href="' + escapeHomeHtml(o.href) + '">' + escapeHomeHtml(o.name || '--') + '</a>'
+    const nameHtml = o.href
+    ? '<a href="' + escapeHomeHtml(o.href) + '" data-return>' + escapeHomeHtml(o.name || '--') + '</a>'
     : escapeHomeHtml(o.name || '--');
   return '<div class="ident">' +
     '<span class="ident-jersey">' + escapeHomeHtml(o.jersey == null ? '' : o.jersey) + '</span>' +
@@ -3375,7 +3376,7 @@ function renderPlayerStatsTable() {
       const playerId = entry.raw?._id || entry.raw?.player_id;
       const playerCell = isPractice && entry.raw?.is_recruit
         ? playerName
-        : '<a href="' + buildPlayerDetailUrl(playerId) + '" style="color:inherit;text-decoration:none;">' + playerName + '</a>';
+        : '<a href="' + buildPlayerDetailUrl(playerId) + '" data-return style="color:inherit;text-decoration:none;">' + playerName + '</a>';
       tr.innerHTML =
         '<td>' + playerCell + '</td>' +
         '<td>' + (stats.PTS || 0) + '</td>' +
@@ -4559,8 +4560,10 @@ playNowBtn.addEventListener('click', async () => {
   if (mode === 'finish-cpu-sims') {
     const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
     const recovered = await recoverCpuSimsBeforeFccRender(topData);
-    if (recovered && !fccCpuSimNeedsRecovery(recovered)) {
-      window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+      if (recovered && !fccCpuSimNeedsRecovery(recovered)) {
+      const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+      if (window.GOBNav) window.GOBNav.replace(fccUrl);
+      else window.location.replace(fccUrl);
     } else {
       updatePlayButton(recovered || topData);
     }
@@ -4707,7 +4710,9 @@ playNowBtn.addEventListener('click', async () => {
       closeModal();
 
       const goToNextSeasonFcc = () => {
-        window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+        const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+        if (window.GOBNav) window.GOBNav.replace(fccUrl);
+        else window.location.replace(fccUrl);
       };
       const startFinishSeason = () => fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
         method: 'POST',
@@ -4825,7 +4830,8 @@ playNowBtn.addEventListener('click', async () => {
         const { clearFranchiseMusicState } = await import('/js/musicController.js');
         clearFranchiseMusicState();
       } catch {}
-      window.location.href = url;
+      if (window.GOBNav) window.GOBNav.go(url);
+      else window.location.assign(url);
     };
     if (window.GOBTutorialAlerts) {
       const blocked = await window.GOBTutorialAlerts.interceptPlayNextGame(franchiseId, url, navigateToLineup);
@@ -4857,7 +4863,8 @@ function navigateToGamePlan() {
   params.set('team_id', userTeamId);
   params.set('from', 'command_center');
   params.set('return_url', getCurrentRelativeUrl());
-  window.location.href = `/game-plan.html?${params.toString()}`;
+  if (window.GOBNav) window.GOBNav.go(`/game-plan.html?${params.toString()}`);
+  else window.location.assign(`/game-plan.html?${params.toString()}`);
 }
 
 // Legacy route buttons were removed from the FCC tab bar in favor of local placeholder tabs.
@@ -4955,6 +4962,9 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (tabName === 'training-tab') {
           renderFccTrainingTab();
+        }
+        if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
+          window.GOBNav.restoreScroll();
         }
       }
     });
@@ -6060,6 +6070,7 @@ async function renderScoutingTab() {
   if (teamPageLink) {
     if (opponent.id && franchiseId) {
       teamPageLink.href = buildFranchiseTeamPageUrl(opponent.id, opponentTeamName, 'coaches-tab');
+      teamPageLink.setAttribute('data-return', '');
     } else {
       // TODO: wire team page URL when opponent team id is unavailable in matchup context
       teamPageLink.href = '#';

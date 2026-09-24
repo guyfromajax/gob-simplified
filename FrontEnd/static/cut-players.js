@@ -184,7 +184,8 @@ function cloneParams(params) {
       var attrs = player.attributes || {};
       var nameTd = document.createElement('td');
       var link = document.createElement('a');
-      link.href = '/player-detail.html?id=' + encodeURIComponent(player._id) + '&mode=franchise&franchise_id=' + encodeURIComponent(franchiseId || '') + '&return_url=' + encodeURIComponent(getCurrentRelativeUrl());
+      link.href = '/player-detail.html?id=' + encodeURIComponent(player._id) + '&mode=franchise&franchise_id=' + encodeURIComponent(franchiseId || '');
+      link.setAttribute('data-return', '');
       link.textContent = player.name;
       link.className = 'cut-player-name-link';
       nameTd.appendChild(link);
@@ -255,7 +256,9 @@ function cloneParams(params) {
 
   function navigateBack() {
     allowLeave = true;
-    window.location.href = buildFccUrl();
+    var url = buildFccUrl();
+    if (window.GOBNav) window.GOBNav.back(url);
+    else window.location.replace(url);
   }
 
   function attemptLeave() {
@@ -276,7 +279,9 @@ function cloneParams(params) {
 
   function goNext() {
     allowLeave = true;
-    window.location.href = nextUrl || buildFccUrl();
+    var url = nextUrl || buildFccUrl();
+    if (window.GOBNav) window.GOBNav.replace(url);
+    else window.location.replace(url);
   }
 
   function submitCuts() {
@@ -320,7 +325,8 @@ function cloneParams(params) {
               .then(function () {
                 playSound('confirm-1-lowervol.wav');
                 allowLeave = true;
-                window.location.href = buildFccUrl();
+                if (window.GOBNav) window.GOBNav.replace(buildFccUrl());
+                else window.location.replace(buildFccUrl());
               })
               .catch(function (err) {
                 console.error(err);
@@ -404,6 +410,10 @@ function cloneParams(params) {
     ]).then(function (results) {
       var topData = results[0] || {};
       var roster = results[1] || {};
+      if (isCutMode && topData.week_35_recruiting_ran) {
+        navigateBack();
+        return;
+      }
       cutCount = Number(topData.cut_count || 0);
       // Week-35 cut mode: cut from active roster AND training squad. Assignment mode: active only.
       var pool = (roster.players || []).slice();
@@ -478,6 +488,8 @@ function cloneParams(params) {
       e.preventDefault();
       e.returnValue = '';
     });
+  });
+  window.addEventListener('pageshow', function () {
     loadData();
   });
 })();

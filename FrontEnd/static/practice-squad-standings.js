@@ -200,11 +200,14 @@ function cloneParams(params) {
     if (back) {
       if (franchiseId && typeof resolveFranchiseLockerRoomUrl === 'function') {
         back.href = resolveFranchiseLockerRoomUrl({ params: params, franchiseId: franchiseId, teamId: teamId });
+        back.setAttribute('data-gob-up', back.href);
         back.textContent = 'Back to Locker Room';
       } else if (franchiseId) {
         back.href = '/franchise-command-center.html?' + q();
+        back.setAttribute('data-gob-up', back.href);
       } else {
         back.href = '/mode-select.html';
+        back.setAttribute('data-gob-up', back.href);
       }
     }
 

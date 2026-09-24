@@ -3368,7 +3368,8 @@ export function createGameScene(Phaser) {
             const button = popup.querySelector('.locker-room-button');
             button.addEventListener('click', () => {
               if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
-              window.location.href = `/set-lineup.html?${params.toString()}`;
+              if (window.GOBNav) window.GOBNav.replace(`/set-lineup.html?${params.toString()}`);
+              else window.location.replace(`/set-lineup.html?${params.toString()}`);
             });
 
             return;
@@ -3442,7 +3443,8 @@ export function createGameScene(Phaser) {
           // ✅ PHASE 1.2: Removed automatic localStorage write - only save for explicit "Resume Last Game" feature
           DEBUG_FLOW && console.log('➡️ Advancing to lineup', { nextQ, gameId: this.gameId });
           DEBUG_FLOW && console.log('skipToEnd at navigation:', this.skipToEnd);
-          window.location.href = `/set-lineup.html?${params.toString()}`;
+          if (window.GOBNav) window.GOBNav.replace(`/set-lineup.html?${params.toString()}`);
+              else window.location.replace(`/set-lineup.html?${params.toString()}`);
         }
       }
     }
@@ -4561,7 +4563,8 @@ export function createGameScene(Phaser) {
           params.set('period', `Q${nextQ}`);
           params.set('resume_from_timeout', 'false');
           const finalUrl = `/set-lineup.html?${params.toString()}`;
-          window.location.href = finalUrl;
+          if (window.GOBNav) window.GOBNav.replace(finalUrl);
+          else window.location.replace(finalUrl);
           return;
         }
         
@@ -4613,7 +4616,8 @@ export function createGameScene(Phaser) {
           if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
           const finalUrl = `/set-lineup.html?${params.toString()}`;
           console.log('🔍 [DEBUG QTR BREAK] gameScene.js - Navigating to set-lineup:', finalUrl);
-          window.location.href = finalUrl;
+          if (window.GOBNav) window.GOBNav.replace(finalUrl);
+          else window.location.replace(finalUrl);
         });
         return;
       }

@@ -42,6 +42,7 @@ function cloneParams(params) {
 
   if (backBtn && franchiseId && teamId) {
     backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
+    backBtn.setAttribute('data-gob-up', backBtn.href);
   }
   if (footerSchedule && franchiseId && teamId) {
     footerSchedule.href = `/schedule.html${resourceQuery()}`;

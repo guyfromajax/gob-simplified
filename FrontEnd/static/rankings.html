@@ -3,6 +3,7 @@
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -240,6 +241,7 @@
   const backBtn = document.getElementById('back-btn');
   if (backBtn && franchiseId && teamId) {
     backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
+    backBtn.setAttribute('data-gob-up', backBtn.href);
   }
 
   let showAll = false;
@@ -254,7 +256,8 @@
 
   function buildTeamLink(r) {
     const a = document.createElement('a');
-    a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(r.team_id)}&team_name=${encodeURIComponent(r.team_name)}&return_url=${encodeURIComponent(getCurrentRelativeUrl())}`;
+    a.href = `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(r.team_id)}&team_name=${encodeURIComponent(r.team_name)}&return_tab=rankings-tab`;
+    a.setAttribute('data-return', '');
     a.textContent = r.team_name;
     a.style.color = '#4a90e2';
     a.style.textDecoration = 'none';

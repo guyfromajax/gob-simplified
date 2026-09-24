@@ -128,9 +128,6 @@ function cloneParams(params) {
     var params = emptyParams();
     params.set('recruit_id', String(recruitId));
     params.set('franchise_id', String(franchiseId));
-    params.set('return_url', global.getCurrentRelativeUrl
-      ? global.getCurrentRelativeUrl()
-      : global.location.pathname + currentSearch() + (global.location.hash || ''));
     return '/player-detail.html?' + params.toString();
   }
 
@@ -142,7 +139,7 @@ function cloneParams(params) {
     var safeName = escapeHtml(name || '--');
     var href = buildRecruitDetailUrl(recruitId, franchiseId);
     if (!href) return safeName;
-    return '<a class="recruit-name-link" href="' + escapeHtml(href) + '">' + safeName + '</a>';
+    return '<a class="recruit-name-link" data-return href="' + escapeHtml(href) + '">' + safeName + '</a>';
   }
 
   function buildFccUrl(context) {

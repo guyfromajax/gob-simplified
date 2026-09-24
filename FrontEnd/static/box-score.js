@@ -2188,7 +2188,8 @@ function setupLockerRoomButton() {
       e.preventDefault();
       e.stopPropagation();
       playSound('x-back.mp3');
-      window.location.href = backUrl;
+      if (window.GOBNav) window.GOBNav.replace(backUrl);
+      else window.location.replace(backUrl);
     });
     return;
   }
@@ -2202,7 +2203,8 @@ function setupLockerRoomButton() {
       e.preventDefault();
       e.stopPropagation();
       playSound('x-back.mp3');
-      window.location.href = safeReturnUrl;
+      if (window.GOBNav) window.GOBNav.replace(safeReturnUrl);
+      else window.location.replace(safeReturnUrl);
     });
     return;
   }
@@ -2215,7 +2217,8 @@ function setupLockerRoomButton() {
         e.preventDefault();
         e.stopPropagation();
         playSound('x-back.mp3');
-        window.location.href = lineupUrl;
+        if (window.GOBNav) window.GOBNav.replace(lineupUrl);
+        else window.location.replace(lineupUrl);
       });
       return;
     }
@@ -2368,7 +2371,8 @@ function setupLockerRoomButton() {
       }
     }
     console.log('🚪 [BOX-SCORE] Navigating to locker room:', lockerRoomUrl);
-    window.location.href = lockerRoomUrl;
+    if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+    else window.location.replace(lockerRoomUrl);
   });
 }
 
@@ -2547,3 +2551,9 @@ function closeSpecialStatsPopup() {
     popup.remove();
   }
 }
+
+window.addEventListener('pageshow', () => {
+  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+    window.GOBNav.guardClosedFranchiseGame();
+  }
+});

@@ -4,6 +4,7 @@
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/gtm-loader.js"></script>
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -129,11 +130,10 @@
       var back = document.getElementById('alb-back');
       if (!back) return;
       back.addEventListener('click', function (e) {
-        if (window.history.length > 1) { e.preventDefault(); window.history.back(); return; }
-        try {
-          var ref = document.referrer;
-          if (ref && new URL(ref).origin === window.location.origin) { e.preventDefault(); window.location.href = ref; }
-        } catch (_) {}
+        e.preventDefault();
+        var fallback = back.getAttribute('href') || '/mode-select.html';
+        if (window.GOBNav) window.GOBNav.back(fallback);
+        else window.location.replace(fallback);
       });
     })();
 

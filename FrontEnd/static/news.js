@@ -287,7 +287,10 @@ function cloneParams(params) {
   function init() {
     var container = document.getElementById('news-container');
     var backBtn = document.getElementById('back-btn');
-    if (backBtn) backBtn.href = buildBackToFccUrl();
+    if (backBtn) {
+      backBtn.href = buildBackToFccUrl();
+      backBtn.setAttribute('data-gob-up', backBtn.href);
+    }
 
     if (!franchiseId) {
       renderEmpty(container, 'Missing franchise context.');

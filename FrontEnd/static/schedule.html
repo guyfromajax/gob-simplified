@@ -3,6 +3,7 @@
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -227,6 +228,7 @@
 
   if (backBtn && franchiseId && teamId) {
     backBtn.href = resolveFranchiseLockerRoomUrl({ params, franchiseId, teamId });
+    backBtn.setAttribute('data-gob-up', backBtn.href);
   }
 
   function escapeHtml(value) {
@@ -258,8 +260,8 @@
     return c % 2 === 0 ? c - 1 : c + 1;
   }
 
-  function buildTeamLink(teamId, displayName, rawName, returnUrl) {
-    return `<a href="/team-roster-view.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId || rawName)}&team_name=${encodeURIComponent(rawName)}&return_url=${encodeURIComponent(returnUrl)}">${escapeHtml(displayName)}</a>`;
+  function buildTeamLink(teamId, displayName, rawName) {
+    return `<a data-return href="/team-roster-view.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId || rawName)}&team_name=${encodeURIComponent(rawName)}&return_tab=schedule-tab">${escapeHtml(displayName)}</a>`;
   }
 
   function sortGamesForWeek(games, userConference) {
@@ -301,8 +303,8 @@
     const homeRaw = game.home_name || homeDisplay;
     const awayConf = getConferenceShortLabel(game.away_conference);
     const homeConf = getConferenceShortLabel(game.home_conference);
-    const awayLink = buildTeamLink(game.away_team_id, awayDisplay, awayRaw, returnUrl);
-    const homeLink = buildTeamLink(game.home_team_id, homeDisplay, homeRaw, returnUrl);
+    const awayLink = buildTeamLink(game.away_team_id, awayDisplay, awayRaw);
+    const homeLink = buildTeamLink(game.home_team_id, homeDisplay, homeRaw);
     const hasAwayConference = Number.isFinite(Number(game.away_conference));
     const hasHomeConference = Number.isFinite(Number(game.home_conference));
     const contextMarkup = game.tournament_context
@@ -330,7 +332,7 @@
     }
 
     const boxScore = (game.game_id && isComplete)
-      ? ` <a class="schedule-box-link" href="/box-score.html?game_id=${encodeURIComponent(game.game_id)}&mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}&return_url=${encodeURIComponent(returnUrl)}">Box Score</a>`
+      ? ` <a class="schedule-box-link" data-return href="/box-score.html?game_id=${encodeURIComponent(game.game_id)}&mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}">Box Score</a>`
       : '';
 
     return `<div class="schedule-game-row">${contextMarkup}${awayMarkup} at ${homeMarkup}${boxScore}</div>`;

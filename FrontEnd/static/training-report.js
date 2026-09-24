@@ -433,7 +433,8 @@ function setupLockerRoomButton() {
         const lockerRoomUrl = (typeof buildFranchiseLockerRoomUrl === 'function')
           ? buildFranchiseLockerRoomUrl(franchiseId, teamId, { tab: 'press-tab' })
           : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tab=press-tab`;
-        window.location.href = lockerRoomUrl;
+        if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+        else window.location.replace(lockerRoomUrl);
         return;
       }
       const lockerRoomUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
@@ -443,7 +444,8 @@ function setupLockerRoomButton() {
             extraParams: { tut_alert: 'training_return' }
           })
         : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tut_alert=training_return`;
-      window.location.href = lockerRoomUrl;
+      if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+      else window.location.replace(lockerRoomUrl);
     }
   });
 }

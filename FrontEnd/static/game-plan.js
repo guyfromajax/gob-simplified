@@ -112,7 +112,8 @@ if (isGameIdRequired && !gameId) {
       if (homeDisplayParam) lineupUrl += `&home_display=${encodeURIComponent(homeDisplayParam)}`;
       if (awayDisplayParam) lineupUrl += `&away_display=${encodeURIComponent(awayDisplayParam)}`;
       if (franchiseId) lineupUrl += `&franchise_id=${encodeURIComponent(franchiseId)}`;
-      window.location.href = lineupUrl;
+      if (window.GOBNav) window.GOBNav.replace(lineupUrl);
+      else window.location.replace(lineupUrl);
     }
   }
 }
@@ -850,7 +851,12 @@ function executeNavigateToCourt() {
   if (DEBUG) {
     console.debug('🔀 Redirecting to court.html (bypassing game plan)', { home: homeTeam, away: awayTeam, gameId: currentGameId });
   }
-  window.location.href = finalUrl;
+  if (window.GOBNav) {
+    window.GOBNav.allowNextLeave();
+    window.GOBNav.replace(finalUrl);
+  } else {
+    window.location.replace(finalUrl);
+  }
 }
 
 function navigateBack() {
@@ -901,7 +907,13 @@ function executeNavigateBack() {
   
   console.log('[executeNavigateBack] Passing lineup params:', { pgId, sgId, sfId, pfId, cId, myTeamSide });
   
-  window.location.href = `/set-lineup.html?${params.toString()}`;
+  const lineupUrl = `/set-lineup.html?${params.toString()}`;
+  if (window.GOBNav) {
+    window.GOBNav.allowNextLeave();
+    window.GOBNav.replace(lineupUrl);
+  } else {
+    window.location.replace(lineupUrl);
+  }
 }
 
 function navigateToCommandCenter() {
@@ -930,10 +942,19 @@ function executeNavigateToCommandCenter() {
           teamId: teamIdParam
         })
       : buildFranchiseLockerRoomUrl(franchiseId, teamIdParam);
-    window.location.href = finalUrl;
+    if (window.GOBNav) {
+      window.GOBNav.allowNextLeave();
+      window.GOBNav.replace(finalUrl);
+    } else {
+      window.location.replace(finalUrl);
+    }
   } else {
-    // ✅ PHASE 2: Navigate to mode-select instead of homepage (more appropriate)
-    window.location.href = '/mode-select.html';
+    if (window.GOBNav) {
+      window.GOBNav.allowNextLeave();
+      window.GOBNav.replace('/mode-select.html');
+    } else {
+      window.location.replace('/mode-select.html');
+    }
   }
 }
 
@@ -1069,6 +1090,7 @@ function showUnsavedChangesWarning(onContinue) {
 }
 
 async function init() {
+  if (window.GOBNav) window.GOBNav.warnOnLeave(function () { return hasUnsavedChanges; });
   setHeader();
   setupSliders();
   await loadSettings();

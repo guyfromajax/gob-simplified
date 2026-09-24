@@ -658,7 +658,8 @@ function redirectResumeAnchorToSetLineup(resumeState) {
     timeout_next_play_type: resumeState.timeout_next_play_type || null,
     game_id: targetGameId,
   });
-  window.location.href = `/set-lineup.html?${params.toString()}`;
+  if (window.GOBNav) window.GOBNav.replace(`/set-lineup.html?${params.toString()}`);
+  else window.location.replace(`/set-lineup.html?${params.toString()}`);
   return true;
 }
 
@@ -2845,7 +2846,8 @@ async function handleSimQuarter() {
       });
       params.set('quarter_break_from', 'sim_quarter');
       console.log(`🎮 Redirecting to set-lineup for ${periodLabel} after simming Q${nextQuarter}`);
-      window.location.href = `/set-lineup.html?${params.toString()}`;
+      if (window.GOBNav) window.GOBNav.replace(`/set-lineup.html?${params.toString()}`);
+  else window.location.replace(`/set-lineup.html?${params.toString()}`);
     } else {
       // Fallback: Build params manually if helper not available
       const params = emptyParams();
@@ -2865,7 +2867,8 @@ async function handleSimQuarter() {
       params.set('game_id', gameId);
       params.set('quarter_break_from', 'sim_quarter'); // fallback path
       console.log(`🎮 Redirecting to set-lineup for ${periodLabel} after simming Q${nextQuarter}`);
-      window.location.href = `/set-lineup.html?${params.toString()}`;
+      if (window.GOBNav) window.GOBNav.replace(`/set-lineup.html?${params.toString()}`);
+  else window.location.replace(`/set-lineup.html?${params.toString()}`);
     }
   } catch (err) {
     console.error('Error simming quarter:', err);
@@ -3259,6 +3262,7 @@ async function handleSimFullGame() {
 }
 
 async function initGame() {
+  if (window.GOBNav && await window.GOBNav.guardClosedFranchiseGame()) return;
   courtStartMode = consumeCourtStartParam();
   if (courtStartMode) {
     showOpaqueSimBridgeCover();
@@ -3580,6 +3584,11 @@ initGame()
     } catch (e) {}
   });
 updateOffsets();
+window.addEventListener('pageshow', () => {
+  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+    window.GOBNav.guardClosedFranchiseGame();
+  }
+});
 // console.log('🚨 BOOTGAME: Initialization complete!');
 
 // new Phaser.Game(config);
