@@ -84,6 +84,60 @@ test('browser back is not used when there is no matching parent', () => {
   assert.equal(win.navigations.at(-1)[0], 'replace');
 });
 
+test('a pushed lineup peek comes back with history.back', () => {
+  const lineup = '/set-lineup.html?franchise_id=f1&game_id=g1&quarter=2';
+  const win = fakeWindow({ pathname: '/set-lineup.html', search: '?franchise_id=f1&game_id=g1&quarter=2' });
+  win.GOBNav.go('/player-detail.html?id=p1&return_url=' + encodeURIComponent(lineup));
+  win.location.pathname = '/player-detail.html';
+  win.location.search = '?id=p1&return_url=' + encodeURIComponent(lineup);
+  win.listeners.pageshow({ persisted: false });
+  win.navigations.length = 0;
+  win.GOBNav.back(lineup);
+  assert.deepEqual(win.navigations.at(-1), ['back']);
+});
+
+test('closed-game guard uses one resume-state read while the game is live', async () => {
+  const win = fakeWindow({ pathname: '/set-lineup.html', search: '?franchise_id=f1&game_id=g1' });
+  const urls = [];
+  win.API_CONFIG = {
+    buildUrl(path) { return 'http://localhost:8000' + path; },
+    getAuthHeaders() { return {}; },
+  };
+  win.fetch = (url) => {
+    urls.push(String(url));
+    return Promise.resolve({ ok: true, json: async () => ({ status: 'quarter_break' }) });
+  };
+  const redirected = await win.GOBNav.guardClosedFranchiseGame();
+  assert.equal(redirected, false);
+  assert.deepEqual(urls, ['http://localhost:8000/api/game/g1/resume-state']);
+});
+
+test('closed-game guard reads command center only after the game is final', async () => {
+  const win = fakeWindow({ pathname: '/court.html', search: '?franchise_id=f1&game_id=g1' });
+  const urls = [];
+  win.API_CONFIG = {
+    buildUrl(path) { return 'http://localhost:8000' + path; },
+    getAuthHeaders() { return {}; },
+  };
+  win.fetch = (url) => {
+    urls.push(String(url));
+    if (String(url).includes('resume-state')) {
+      return Promise.resolve({ ok: true, json: async () => ({ status: 'final' }) });
+    }
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ week: 4, last_game_summary: { game_id: 'g1', week: 3 } }),
+    });
+  };
+  const redirected = await win.GOBNav.guardClosedFranchiseGame();
+  assert.equal(redirected, true);
+  assert.equal(urls.length, 2);
+  assert.match(urls[0], /resume-state/);
+  assert.match(urls[1], /command-center\/data/);
+  assert.equal(win.navigations.at(-1)[0], 'replace');
+  assert.match(win.navigations.at(-1)[1], /franchise-command-center\.html/);
+});
+
 test('fcc bfcache restore reloads and does not call phase-b', () => {
   const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1' });
   win.fetch = () => { throw new Error('phase-b must not be fetched from pageshow'); };

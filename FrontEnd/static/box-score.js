@@ -2188,7 +2188,8 @@ function setupLockerRoomButton() {
       e.preventDefault();
       e.stopPropagation();
       playSound('x-back.mp3');
-      if (window.GOBNav) window.GOBNav.replace(backUrl);
+      if (from === 'lineup' && window.GOBNav) window.GOBNav.back(backUrl);
+      else if (window.GOBNav) window.GOBNav.replace(backUrl);
       else window.location.replace(backUrl);
     });
     return;
@@ -2217,7 +2218,7 @@ function setupLockerRoomButton() {
         e.preventDefault();
         e.stopPropagation();
         playSound('x-back.mp3');
-        if (window.GOBNav) window.GOBNav.replace(lineupUrl);
+        if (window.GOBNav) window.GOBNav.back(lineupUrl);
         else window.location.replace(lineupUrl);
       });
       return;

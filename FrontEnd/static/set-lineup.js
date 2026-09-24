@@ -265,14 +265,26 @@ function isGameplayLineupContext() {
   return Boolean(gameId);
 }
 
+function playerDetailPeekUrl(playerId) {
+  const dest = new URL(buildPlayerDetailUrl(playerId), window.location.origin);
+  dest.searchParams.set(
+    'return_url',
+    window.location.pathname + window.location.search + window.location.hash
+  );
+  return dest.pathname + dest.search + dest.hash;
+}
+
 function applyPlayerDetailLinkBehavior(linkEl, playerId) {
-  if (!linkEl) return;
+  if (!linkEl || !playerId) return;
   if (isGameplayLineupContext()) {
-    linkEl.removeAttribute('href');
-    linkEl.style.cursor = 'default';
+    linkEl.href = buildPlayerDetailUrl(playerId);
     linkEl.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
       e.preventDefault();
       e.stopPropagation();
+      const next = playerDetailPeekUrl(playerId);
+      if (window.GOBNav) window.GOBNav.go(next);
+      else window.location.assign(next);
     });
     return;
   }
@@ -1295,8 +1307,9 @@ function appendSharedLeadingCells(tr, {
   nameTd.className = 'player-name-cell';
   const wrap = document.createElement('div');
   wrap.className = 'player-name-wrap';
-  const nameText = document.createElement('span');
+  const nameText = document.createElement(isGameplayLineupContext() ? 'a' : 'span');
   nameText.className = 'player-name-link';
+  if (isGameplayLineupContext()) applyPlayerDetailLinkBehavior(nameText, playerId);
   nameText.textContent = typeof formatNameWithJersey === 'function'
     ? formatNameWithJersey(player.jersey, player.name)
     : (player.name || '—');
@@ -2521,8 +2534,8 @@ function wireLineupNavButtons() {
       }
       params.set('from', 'lineup');
       const boxUrl = `/box-score.html?${params.toString()}`;
-      if (window.GOBNav) window.GOBNav.replace(boxUrl);
-      else window.location.replace(boxUrl);
+      if (window.GOBNav) window.GOBNav.go(boxUrl);
+      else window.location.assign(boxUrl);
     });
   }
 }
@@ -3643,6 +3656,7 @@ function dndLog(label, data) {
 }
 
 window.addEventListener('pageshow', (event) => {
+  stripStaleQuarterBreakFrom();
   if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
     window.GOBNav.guardClosedFranchiseGame();
   }

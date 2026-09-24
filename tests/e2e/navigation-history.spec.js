@@ -18,6 +18,19 @@ test('cold in-app back stays inside the app', async ({ page }) => {
   expect(backs).toBe(0);
 });
 
+test('in-progress lineup peeks push and flow steps replace', async ({ request }) => {
+  const lineup = await (await request.get('/set-lineup.js')).text();
+  const box = await (await request.get('/box-score.js')).text();
+  const nav = await (await request.get('/js/shared/gobNav.js')).text();
+  expect(lineup).toContain('window.GOBNav.go(next)');
+  expect(lineup).toContain('window.GOBNav.go(boxUrl)');
+  expect(lineup).toContain("window.GOBNav.replace(`/game-plan.html?");
+  expect(box).toContain('window.GOBNav.back(backUrl)');
+  expect(box).toContain('window.GOBNav.back(lineupUrl)');
+  expect(nav).toContain("'/api/game/' + encodeURIComponent(gameId) + '/resume-state'");
+  expect(nav).not.toContain('encodeURIComponent(gameId));');
+});
+
 test('section tab clicks do not add history entries', async ({ page }) => {
   await stubAuth(page);
   await page.goto('/coaching-archetypes.html');

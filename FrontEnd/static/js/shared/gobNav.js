@@ -322,24 +322,26 @@
         return Promise.resolve(false);
       }
       var headers = typeof api.getAuthHeaders === 'function' ? api.getAuthHeaders() : {};
-      var gameUrl = api.buildUrl('/api/game/' + encodeURIComponent(gameId));
-      var fccUrl = api.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId);
-      return Promise.all([
-        win.fetch(gameUrl, { headers: headers }).then(function (res) { return res.ok ? res.json() : null; }),
-        win.fetch(fccUrl, { headers: headers }).then(function (res) { return res.ok ? res.json() : null; }),
-      ]).then(function (pair) {
-        var game = pair[0];
-        var fcc = pair[1];
-        if (!game || !fcc || game.is_final !== true) return false;
-        var last = fcc.last_game_summary || null;
-        var weekMoved = !!(
-          last
-          && String(last.game_id) === String(gameId)
-          && Number(last.week) < Number(fcc.week)
-        );
-        if (!weekMoved) return false;
-        replace('/franchise-command-center.html?franchise_id=' + encodeURIComponent(franchiseId));
-        return true;
+      var resumeUrl = api.buildUrl('/api/game/' + encodeURIComponent(gameId) + '/resume-state');
+      return win.fetch(resumeUrl, { headers: headers }).then(function (res) {
+        return res.ok ? res.json() : null;
+      }).then(function (resume) {
+        if (!resume || resume.status !== 'final') return false;
+        var fccUrl = api.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId);
+        return win.fetch(fccUrl, { headers: headers }).then(function (res) {
+          return res.ok ? res.json() : null;
+        }).then(function (fcc) {
+          if (!fcc) return false;
+          var last = fcc.last_game_summary || null;
+          var weekMoved = !!(
+            last
+            && String(last.game_id) === String(gameId)
+            && Number(last.week) < Number(fcc.week)
+          );
+          if (!weekMoved) return false;
+          replace('/franchise-command-center.html?franchise_id=' + encodeURIComponent(franchiseId));
+          return true;
+        });
       }).catch(function () { return false; });
     }
 
