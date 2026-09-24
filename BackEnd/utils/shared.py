@@ -3992,7 +3992,7 @@ def apply_sim_crash_destinations(game: Any, turn_result: Dict[str, Any],
     if turn_result.get("animation_steps") or turn_result.get("animations"):
         return 0
     from BackEnd.engine.skeleton_step_emitter import _OVERLAY_ARCHETYPES, _interpolate_step_end
-    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+    from BackEnd.utils.animation_step_helpers import defender_aware_rate
 
     maps = [(key, arch, turn_result.get(key)) for key, arch in _OVERLAY_ARCHETYPES]
     if not any(isinstance(m, dict) and m for _k, _a, m in maps):
@@ -4012,6 +4012,12 @@ def apply_sim_crash_destinations(game: Any, turn_result: Dict[str, Any],
         for player in (getattr(team, "lineup", None) or {}).values():
             if player is not None and getattr(player, "player_id", None) is not None:
                 by_id[_norm_player_id(player.player_id)] = player
+    # STAGE 2: this is the SIM arm's counterpart of the played arm's `_interpolate_step_end`
+    # callers (see the docstring above — both interrupt the same players toward the same
+    # destinations at the same archetype rate). If the defender spread reached one arm and
+    # not the other the two would diverge, so the same per-player test is applied here.
+    # This function has no `def_lineup` parameter; the defending lineup comes off `game`.
+    _crash_def_lineup = getattr(getattr(game, "defense_team", None), "lineup", None) or {}
     moved = 0
     for _key, archetype, overlay in maps:
         if not isinstance(overlay, dict):
@@ -4024,7 +4030,7 @@ def apply_sim_crash_destinations(game: Any, turn_result: Dict[str, Any],
                 continue
             if dest.get("x") is None or dest.get("y") is None:
                 continue
-            rate = _ag_grid_per_game_sec(player, archetype)
+            rate = defender_aware_rate(player, archetype, pid, _crash_def_lineup)
             end, _dur = _interpolate_step_end(
                 {"x": float(start["x"]), "y": float(start["y"])},
                 {"x": float(dest["x"]), "y": float(dest["y"])},

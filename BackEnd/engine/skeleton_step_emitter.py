@@ -66,6 +66,7 @@ from BackEnd.utils.animation_step_schema import (
     PlayerAction,
     PlayerArchetype,
 )
+from BackEnd.utils.animation_step_helpers import defender_aware_rate  # STAGE 2: per-player defender test
 
 
 # HCO drive-start VO (SFX_System.md): an announcer "he's driving!" cue fired the instant a
@@ -860,7 +861,7 @@ def _build_step_end_coords_with_interrupts(
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
         arch = archetype.get(pid, "standard")
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         ec, _ = _interpolate_step_end(sc, dest, rate, step_t)
         final[pid] = ec
     return final
@@ -1177,7 +1178,7 @@ def append_hco_bat_oob_trajectory(
         if arch not in ("standard", "sprint", "burst", "cruise", "drift"):
             arch = "standard"
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         moved_end, _dur = _interpolate_step_end(sc, tgt, rate, contact_t)
         actions[pid] = "cut" if pid in off_ids else "guard_offball"
         archetype[pid] = arch
@@ -1396,8 +1397,8 @@ def append_hco_loose_ball_trajectory(
         arch = prior_arch.get(pid)
         if arch not in ("standard", "sprint", "burst", "cruise", "drift"):
             arch = "standard"
-        rate = _ag_grid_per_game_sec(
-            _player_lookup_by_id(off_lineup, def_lineup, pid), arch)
+        rate = defender_aware_rate(
+            _player_lookup_by_id(off_lineup, def_lineup, pid), arch, pid, def_lineup)
         moved_end, _dur = _interpolate_step_end(sc, tgt, rate, contact_t)
         actions[pid] = "cut" if pid in off_ids else "guard_offball"
         archetype[pid] = arch
@@ -1471,9 +1472,8 @@ def append_hco_loose_ball_trajectory(
                 dests[pid] = dict(sc)
                 ends[pid] = dict(sc)
                 continue
-            rate = _ag_grid_per_game_sec(
-                _player_lookup_by_id(off_lineup, def_lineup, pid),
-                LOOSE_BALL_CONVERGE_ARCHETYPE)
+            rate = defender_aware_rate(
+                _player_lookup_by_id(off_lineup, def_lineup, pid), LOOSE_BALL_CONVERGE_ARCHETYPE, pid, def_lineup)
             moved_end, _dur = _interpolate_step_end(sc, bounce, rate, t)
             acts[pid] = "cut" if pid in off_ids else "guard_offball"
             archs[pid] = LOOSE_BALL_CONVERGE_ARCHETYPE
@@ -2993,7 +2993,7 @@ def _apply_overlay_motion_to_shoot_step(
         if sc is None:
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         ec, dur = _interpolate_step_end(sc, dest_coord, rate, step_t)
         end_coords[pid] = ec
         destinations[pid] = dict(dest_coord)
@@ -3054,7 +3054,7 @@ def _build_ball_motion_sub_step(
             archetype[pid] = "stationary"
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         ec, dur = _interpolate_step_end(sc, dest_coord, rate, step_t)
         end_coords[pid] = ec
         destinations[pid] = dict(dest_coord)

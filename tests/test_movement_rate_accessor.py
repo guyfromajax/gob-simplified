@@ -206,9 +206,14 @@ def test_the_private_stampers_route_through_the_accessor(monkeypatch):
                   if isinstance(n, ast.FunctionDef) and n.name == "_stamp_tween_durations")
         body = ast.unparse(fn)
         assert "movement_rate(" in body, "%s._stamp_tween_durations bypasses the accessor" % mod.__name__
-        assert "apply_spread=False" in body, (
-            "%s._stamp_tween_durations must stay on the RAW rate in Stage 1 — wiring the "
-            "spread in is a later stage and would not be byte-identical" % mod.__name__
+        # STAGE 2 (2026-09-24) SUPERSEDES THE STAGE 1 PIN HERE. Stage 1 asserted
+        # `apply_spread=False` with the message "wiring the spread in is a later stage".
+        # This IS that stage: the flip was the whole point of routing these through the
+        # accessor. What must hold now is that the spread is applied PER PLAYER, by
+        # def_lineup membership, so the offence is untouched.
+        assert "apply_spread=_is_defender_id(pid, def_lineup)" in body, (
+            "%s._stamp_tween_durations must apply the spread per player via def_lineup "
+            "membership — a blanket apply_spread=True would widen the OFFENCE" % mod.__name__
         )
 
 
@@ -351,9 +356,15 @@ def test_the_combined_helper_callers_are_all_still_there():
     assert n == 13, "expected 13 combined-helper call sites, found %d" % n
 
 
-def test_the_combined_helper_still_takes_a_raw_rate():
-    """Wiring the defender spread into these 13 callers is a LATER stage. If someone does it
-    here, Stage 1 stops being byte-identical and this test says so."""
+def test_the_combined_helper_rate_is_per_player_not_per_call():
+    """STAGE 2 SUPERSEDES THE STAGE 1 PIN. Stage 1 asserted these 13 callers stayed on a raw
+    rate. Stage 2 wires the spread in — but it must be decided PER PLAYER.
+
+    All 13 callers are MIXED (each resolves the player with `_player_lookup_by_id(off_lineup,
+    def_lineup, pid)`; several branch `"cut" if pid in off_ids else "guard_offball"` in the
+    same loop). A blanket `apply_spread=True` would widen the OFFENCE, which is out of scope.
+    So every caller must go through `defender_aware_rate`, which tests def_lineup membership.
+    """
     for f in _py_files():
         tree = ast.parse(open(f).read())
         for node in ast.walk(tree):
@@ -364,9 +375,9 @@ def test_the_combined_helper_still_takes_a_raw_rate():
                 continue
             if len(node.args) > 2:
                 arg = ast.unparse(node.args[2])
-                assert "defender_movement_rate" not in arg and "apply_spread=True" not in arg, (
-                    "%s:%d wires the spread into the combined helper — that is a later stage"
-                    % (os.path.basename(f), node.lineno)
+                assert "apply_spread=True" not in arg, (
+                    "%s:%d applies the spread unconditionally — these call sites are MIXED, so "
+                    "that would widen the offence" % (os.path.basename(f), node.lineno)
                 )
 
 

@@ -681,6 +681,37 @@ def _motion_end_toward_dest(
     return {"x": float(x), "y": float(y)}, float(step_t)
 
 
+# ── Per-player defender rate for the combined helper (Stage 2, 2026-09-24) ─────────────
+#
+# `_motion_end_toward_dest` (re-exported as `_interpolate_step_end`) produces the ENDPOINT
+# and the DURATION together, and has 13 callers. EVERY ONE IS MIXED: each resolves the
+# player with `_player_lookup_by_id(off_lineup, def_lineup, pid)` and several branch
+# `"cut" if pid in off_ids else "guard_offball"` inside the same loop.
+#
+# `GOB_DEFENDER_AG_SPREAD` is a DEFENDER spread. Setting `apply_spread=True` for a whole
+# call site would widen the OFFENCE too, which is out of scope and a large behaviour
+# change. So the decision is made PER PLAYER, keyed on `pid`, by this one function.
+#
+# WHY IT LIVES HERE AND NOT INSIDE THE HELPER: the helper takes an already-computed
+# `rate`, five of the thirteen callers reference `rate` again after the call, and one
+# (`shared.apply_sim_crash_destinations`) has no `def_lineup` in scope at all — it reaches
+# the lineup through `game.defense_team`. Hoisting the rate computation into the helper
+# would therefore mean thirteen signature changes and a special case, for no behavioural
+# gain. Instead every caller goes through THIS function, and a test asserts that each of
+# the thirteen does — so a new caller that forgets fails the suite.
+
+
+def defender_aware_rate(player: Any, archetype: PlayerArchetype, pid: Any,
+                        def_lineup: Dict[str, Any]) -> float:
+    """grid/game-sec for ONE player, with the defender spread applied only if he is one.
+
+    Membership of ``def_lineup`` is the test — never an action label, never a variable
+    name. With ``GOB_DEFENDER_AG_SPREAD`` off this is exactly the raw archetype rate, which
+    is why flag-off stays byte-identical.
+    """
+    return defender_movement_rate(player, archetype, _is_defender_id(pid, def_lineup))
+
+
 # ── Interrupted-coord core (Stage 1, 2026-09-24) ───────────────────────────────────────
 #
 # There were FOUR definitions of ``_interrupted_coord`` and TWO distinct arithmetic
@@ -830,7 +861,7 @@ def stamp_rebound_capture_player_motion(
             actions[pid] = "cut"
             archetypes[pid] = "sprint"
             player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-            rate = _ag_grid_per_game_sec(player, "sprint")
+            rate = defender_aware_rate(player, 'sprint', pid, def_lineup)
             ec, dur = _motion_end_toward_dest(start, bounce_coords, rate, step_t)
             end_coords[pid] = ec
             if dur > 0:
@@ -839,7 +870,7 @@ def stamp_rebound_capture_player_motion(
         if pid in attemptor_set:
             dest = sample_rebound_collapse_target(bounce_coords)
             player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-            rate = _ag_grid_per_game_sec(player, attemptor_archetype)
+            rate = defender_aware_rate(player, attemptor_archetype, pid, def_lineup)
             ec, dur = _motion_end_toward_dest(start, dest, rate, step_t)
             end_coords[pid] = ec
             destinations[pid] = dest

@@ -29,6 +29,7 @@ from BackEnd.utils.fb_geo_helpers import (
     steal_meet_x_ahead_valid,
 )
 from BackEnd.utils.shared import calculate_charge, get_away_player_coords
+from BackEnd.utils.animation_step_helpers import defender_aware_rate  # STAGE 2: per-player defender test
 
 GridCoordDict = Dict[str, float]
 
@@ -159,7 +160,7 @@ def _reachable_defender_ends(
         pid = _player_id(defender)
         if not pid or pid not in clamped:
             continue
-        rate = _ag_grid_per_game_sec(defender, archetypes.get(pid, "sprint"))
+        rate = defender_aware_rate(defender, archetypes.get(pid, 'sprint'), pid, def_lineup)
         new_end, _ = _motion_end_toward_dest(
             def_starts[pos], clamped[pid], rate, float(time_budget)
         )

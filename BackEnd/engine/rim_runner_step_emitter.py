@@ -308,10 +308,10 @@ def _stamp_tween_durations(
             continue
         arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        # STAGE 1: routed through the one accessor. Still the RAW rate (apply_spread=False)
-        # so this is byte-identical today; the endpoints on this path use the wrapper, and
-        # closing that split is a LATER stage. See reports/rate-unify-stage1.md.
-        rate = movement_rate(player, arch, apply_spread=False)
+        # STAGE 2: the endpoints on this path already use the wrapper; this closes the
+        # split so the rendered duration matches the simulated distance. Defenders only —
+        # def_lineup membership is the test, so the offence is untouched.
+        rate = movement_rate(player, arch, apply_spread=_is_defender_id(pid, def_lineup))
         if rate <= 0:
             continue
         durations[pid] = float(min(dist / rate, step_t))

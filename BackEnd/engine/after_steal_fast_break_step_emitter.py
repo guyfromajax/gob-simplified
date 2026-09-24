@@ -62,6 +62,7 @@ from BackEnd.utils.animation_step_helpers import (
     floor_step_t_to_traversal,
     stamp_tween_durations,
 )
+from BackEnd.utils.animation_step_helpers import defender_aware_rate  # STAGE 2: per-player defender test
 
 
 FB_ANNOUNCE_HOLD_MS: float = float(ANNOUNCEMENT_FREEZE_HOLD_MS)
@@ -129,7 +130,7 @@ def _apply_drive_step_motion(
     for pid, sc in start_coords.items():
         arch = archetypes.get(pid, "sprint")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         if pid == gate_player_id:
             target = gate_target
         else:
