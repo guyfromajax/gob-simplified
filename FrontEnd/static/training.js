@@ -1457,7 +1457,10 @@ submitBtn.addEventListener('click', async function() {
         }
       }
       trainingDirty = false;
-      if (window.GOBNav) {
+      if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(redirectUrl)) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.exitFlow(redirectUrl);
+      } else if (window.GOBNav) {
         window.GOBNav.allowNextLeave();
         window.GOBNav.replace(redirectUrl);
       } else {
@@ -1472,7 +1475,10 @@ submitBtn.addEventListener('click', async function() {
             teamId: urlParams.get('team_id')
           })
         : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}`;
-      if (window.GOBNav) {
+      if (window.GOBNav && window.GOBNav.exitFlow) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.exitFlow(lockerUrl);
+      } else if (window.GOBNav) {
         window.GOBNav.allowNextLeave();
         window.GOBNav.replace(lockerUrl);
       } else {
@@ -1535,7 +1541,10 @@ async function resumeCpuTraining(franchiseId) {
   if (result && result.redirect) {
     trainingDirty = false;
     const next = result.redirect.replace(/^\/static\//, '/');
-    if (window.GOBNav) {
+    if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(next)) {
+      window.GOBNav.allowNextLeave();
+      window.GOBNav.exitFlow(next);
+    } else if (window.GOBNav) {
       window.GOBNav.allowNextLeave();
       window.GOBNav.replace(next);
     } else {

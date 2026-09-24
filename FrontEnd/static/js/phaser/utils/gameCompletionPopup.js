@@ -466,7 +466,7 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
     : `
       <section class="gc-section gc-actions-section">
         <div class="button-container">
-          <a href="${boxScoreUrl}" class="completion-button box-score-button">Box Score</a>
+          <a href="${boxScoreUrl}" class="completion-button box-score-button" data-gob-replace>Box Score</a>
           ${lockerActionHtml}
         </div>
       </section>
@@ -1012,7 +1012,8 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
         }
       }
       if (okToNavigate) {
-        if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+        if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+        else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
         else window.location.replace(lockerRoomUrl);
       }
     });
@@ -1032,7 +1033,8 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
       } catch (err) {
         console.warn('[gameCompletionPopup] delete-completed-single failed:', err);
       }
-      if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+      if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+      else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
       else window.location.replace(lockerRoomUrl);
     });
   }

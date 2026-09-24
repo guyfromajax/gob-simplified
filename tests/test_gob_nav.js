@@ -2,8 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { install } = require('../FrontEnd/static/js/shared/gobNav.js');
 
-function fakeWindow(start) {
+function fakeWindow(start, seed) {
   const store = new Map();
+  if (seed) Object.keys(seed).forEach((key) => store.set(key, seed[key]));
   const listeners = {};
   const win = {
     scrollY: 0,
@@ -22,13 +23,22 @@ function fakeWindow(start) {
       scrollRestoration: 'auto',
       state: null,
       back() { win.navigations.push(['back']); },
-      replaceState(_s, _t, url) { win.navigations.push(['replaceState', url]); },
+      replaceState(_s, _t, url) {
+        win.navigations.push(['replaceState', url]);
+        if (typeof url === 'string') {
+          const q = url.indexOf('?');
+          win.location.pathname = q === -1 ? url : url.slice(0, q);
+          win.location.search = q === -1 ? '' : url.slice(q);
+        }
+      },
     },
     sessionStorage: {
       getItem(k) { return store.has(k) ? store.get(k) : null; },
       setItem(k, v) { store.set(k, v); },
+      removeItem(k) { store.delete(k); },
     },
     document: {
+      referrer: '',
       addEventListener(type, fn, capture) { listeners['document:' + type] = fn; },
       querySelector() { return null; },
       querySelectorAll() { return []; },
@@ -143,4 +153,98 @@ test('fcc bfcache restore reloads and does not call phase-b', () => {
   win.fetch = () => { throw new Error('phase-b must not be fetched from pageshow'); };
   win.listeners.pageshow({ persisted: true });
   assert.deepEqual(win.navigations.at(-1), ['reload']);
+});
+
+test('a repeat drill-down keeps the locker room that launched it', () => {
+  const team = '/team-roster-view.html?team_id=t1';
+  const fcc = '/franchise-command-center.html?franchise_id=f1&tab=standings-tab';
+  const win = fakeWindow({ pathname: '/team-roster-view.html', search: '?team_id=t1' });
+  win.GOBNav.go(fcc);
+  win.location.pathname = '/franchise-command-center.html';
+  win.location.search = '?franchise_id=f1&tab=standings-tab';
+  win.listeners.pageshow({ persisted: false });
+  win.GOBNav.go(team);
+  win.location.pathname = '/team-roster-view.html';
+  win.location.search = '?team_id=t1';
+  win.listeners.pageshow({ persisted: false });
+  win.navigations.length = 0;
+  win.GOBNav.back(fcc);
+  assert.deepEqual(win.navigations.at(-1), ['back']);
+});
+
+test('in-app back uses the browser referrer when the stack lost the locker room', () => {
+  const win = fakeWindow({ pathname: '/team-roster-view.html', search: '?team_id=t1&return_tab=standings-tab' });
+  win.document.referrer = 'http://localhost:8000/franchise-command-center.html?franchise_id=f1&tab=standings-tab';
+  win.navigations.length = 0;
+  win.GOBNav.back('/franchise-command-center.html?franchise_id=f1');
+  assert.deepEqual(win.navigations.at(-1), ['back']);
+});
+
+test('replace fallback keeps return_tab when return_url has no tab', () => {
+  const win = fakeWindow({ pathname: '/team-roster-view.html', search: '?team_id=t1&return_tab=roster-tab' });
+  win.GOBNav.back('/franchise-command-center.html?franchise_id=f1');
+  const last = win.navigations.at(-1);
+  assert.equal(last[0], 'replace');
+  assert.match(last[1], /tab=roster-tab/);
+});
+
+test('exitFlow backs into the locker room that launched the flow', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=game-plan-tab' });
+  win.GOBNav.go('/set-lineup.html?franchise_id=f1&game_id=g1');
+  win.location.pathname = '/set-lineup.html';
+  win.location.search = '?franchise_id=f1&game_id=g1';
+  win.listeners.pageshow({ persisted: false });
+  win.GOBNav.replace('/court.html?franchise_id=f1&game_id=g1');
+  win.location.pathname = '/court.html';
+  win.location.search = '?franchise_id=f1&game_id=g1';
+  win.navigations.length = 0;
+  win.fetch = () => { throw new Error('exitFlow must not fetch'); };
+  win.GOBNav.exitFlow('/franchise-command-center.html?franchise_id=f1', { tab: 'home-tab' });
+  assert.deepEqual(win.navigations.at(-1), ['back']);
+  const landing = JSON.parse(win.sessionStorage.getItem('gob_nav_exit'));
+  assert.equal(landing.tab, 'home-tab');
+  assert.equal(landing.fresh, true);
+});
+
+test('exitFlow keeps the tab the flow started from', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=training-tab' });
+  win.GOBNav.go('/training.html?franchise_id=f1');
+  win.location.pathname = '/training.html';
+  win.location.search = '?franchise_id=f1';
+  win.listeners.pageshow({ persisted: false });
+  win.navigations.length = 0;
+  win.GOBNav.exitFlow('/franchise-command-center.html?franchise_id=f1');
+  assert.deepEqual(win.navigations.at(-1), ['back']);
+  const landing = JSON.parse(win.sessionStorage.getItem('gob_nav_exit'));
+  assert.equal(landing.tab, 'training-tab');
+});
+
+test('exitFlow replaces when the locker room is not the previous entry', () => {
+  const win = fakeWindow({ pathname: '/court.html', search: '?franchise_id=f1' });
+  win.fetch = () => { throw new Error('exitFlow must not fetch'); };
+  win.GOBNav.exitFlow('/franchise-command-center.html?franchise_id=f1', { tab: 'home-tab' });
+  const last = win.navigations.at(-1);
+  assert.equal(last[0], 'replace');
+  assert.match(last[1], /tab=home-tab/);
+});
+
+test('locker room load applies a pending exit tab', () => {
+  const win = fakeWindow(
+    { pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=game-plan-tab' },
+    { gob_nav_exit: JSON.stringify({ tab: 'home-tab', fresh: true }) }
+  );
+  const replaced = win.navigations.find((row) => row[0] === 'replaceState');
+  assert.ok(replaced);
+  assert.match(replaced[1], /tab=home-tab/);
+  assert.equal(win.sessionStorage.getItem('gob_nav_exit'), null);
+});
+
+test('bfcache locker room with a pending exit reloads instead of showing stale data', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=game-plan-tab' });
+  win.sessionStorage.setItem('gob_nav_exit', JSON.stringify({ tab: 'home-tab', fresh: true }));
+  win.fetch = () => { throw new Error('exit landing must not fetch phase-b'); };
+  win.navigations.length = 0;
+  win.listeners.pageshow({ persisted: true });
+  assert.equal(win.navigations.at(-1)[0], 'reload');
+  assert.ok(win.navigations.some((row) => row[0] === 'replaceState' && /home-tab/.test(row[1])));
 });

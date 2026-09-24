@@ -83,6 +83,9 @@ function initCommandCenterTabs(options) {
   });
   if (!hasMatchingTab) activeTab = defaultTab;
 
+  // The visible tab has to be in the URL before a drill-down click captures
+  // return_url. Otherwise in-app Back replaces onto Coach's Office.
+  updateUrl(activeTab);
   setActive(activeTab);
   onTabShow(activeTab);
 

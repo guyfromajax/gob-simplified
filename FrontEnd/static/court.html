@@ -6879,8 +6879,22 @@
         dismissed = false;
         dismissOverlay({ force: true });
       };
-      window.addEventListener('court-ready', function () { dismissOverlay(); }, { once: true });
-      setTimeout(function () { dismissOverlay({ force: true }); }, 5000);
+      window.addEventListener('court-ready', function () {
+        var guard = (window.GOBNav && window.GOBNav.guardClosedFranchiseGame)
+          ? window.GOBNav.guardClosedFranchiseGame()
+          : Promise.resolve(false);
+        Promise.resolve(guard).then(function (redirected) {
+          if (!redirected) dismissOverlay();
+        });
+      }, { once: true });
+      setTimeout(function () {
+        var guard = (window.GOBNav && window.GOBNav.guardClosedFranchiseGame)
+          ? window.GOBNav.guardClosedFranchiseGame()
+          : Promise.resolve(false);
+        Promise.resolve(guard).then(function (redirected) {
+          if (!redirected) dismissOverlay({ force: true });
+        });
+      }, 5000);
     })();
   </script>
   <script>

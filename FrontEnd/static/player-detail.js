@@ -236,7 +236,11 @@ function cloneParams(params) {
     const returnUrl = typeof getSafeReturnUrl === 'function'
       ? getSafeReturnUrl(params.get('return_url'))
       : params.get('return_url');
-    const fallback = returnUrl || '/homepage.html';
+    let fallback = returnUrl || '/homepage.html';
+    const returnTab = params.get('return_tab');
+    if (returnTab && /franchise-command-center\.html/i.test(fallback) && !/[?&]tab=/.test(fallback)) {
+      fallback += (fallback.indexOf('?') === -1 ? '?' : '&') + 'tab=' + encodeURIComponent(returnTab);
+    }
     if (window.GOBNav) window.GOBNav.back(fallback);
     else window.location.replace(fallback);
   }

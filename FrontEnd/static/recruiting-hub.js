@@ -34,6 +34,10 @@
 
   var context = Common.getQueryContext();
   function replaceNav(url) {
+    if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(String(url))) {
+      window.GOBNav.exitFlow(url);
+      return;
+    }
     if (window.GOBNav) window.GOBNav.replace(url);
     else window.location.replace(url);
   }

@@ -1491,7 +1491,8 @@ async function openRecruitingSurface() {
     // Never block navigation on the read marker.
     console.warn('[WIRE] could not persist seen state:', err);
   }
-  window.location.href = url;
+  if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(url);
+  else window.location.assign(url);
 }
 
 function wireRowClassFor(kind) {
@@ -4257,7 +4258,8 @@ function showCutPlayersRequiredModal(cutCount) {
     const sfxReady = waitForConfirmSfx();
     close();
     await sfxReady;
-    window.location.href = buildAssignPracticeSquadUrl();
+    if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(buildAssignPracticeSquadUrl());
+    else window.location.assign(buildAssignPracticeSquadUrl());
   });
   document.body.appendChild(overlay);
   overlay.querySelector('#fcc-cut-required-close')?.focus();
@@ -4515,7 +4517,8 @@ function updateRecruitingButton(data) {
     recruitingBtn.onclick = null;
     if (showButton && href) {
       recruitingBtn.onclick = () => {
-        window.location.href = href;
+        if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(href);
+        else window.location.assign(href);
       };
     }
   }
@@ -4562,7 +4565,8 @@ playNowBtn.addEventListener('click', async () => {
     const recovered = await recoverCpuSimsBeforeFccRender(topData);
       if (recovered && !fccCpuSimNeedsRecovery(recovered)) {
       const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
-      if (window.GOBNav) window.GOBNav.replace(fccUrl);
+      if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(fccUrl);
+      else if (window.GOBNav) window.GOBNav.replace(fccUrl);
       else window.location.replace(fccUrl);
     } else {
       updatePlayButton(recovered || topData);
@@ -4589,7 +4593,8 @@ playNowBtn.addEventListener('click', async () => {
         const { clearFranchiseMusicState } = await import('/js/musicController.js');
         clearFranchiseMusicState();
       } catch {}
-      window.location.href = trainingReturnUrl;
+      if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(trainingReturnUrl);
+      else window.location.assign(trainingReturnUrl);
     };
     if (window.GOBTutorialAlerts) {
       const blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining, trainingReturnUrl);
@@ -4627,7 +4632,8 @@ playNowBtn.addEventListener('click', async () => {
       const { clearFranchiseMusicState } = await import('/js/musicController.js');
       clearFranchiseMusicState();
     } catch {}
-    window.location.href = `/recruiting.html?${params.toString()}`;
+    if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(`/recruiting.html?${params.toString()}`);
+    else window.location.assign(`/recruiting.html?${params.toString()}`);
     return;
   }
 
@@ -4644,7 +4650,8 @@ playNowBtn.addEventListener('click', async () => {
         const { clearFranchiseMusicState } = await import('/js/musicController.js');
         clearFranchiseMusicState();
       } catch {}
-      window.location.href = recruitingUrl;
+      if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(recruitingUrl);
+      else window.location.assign(recruitingUrl);
     };
     await goRecruiting();
     return;
@@ -4652,7 +4659,8 @@ playNowBtn.addEventListener('click', async () => {
 
   if (mode === 'cut-players') {
     await confirmSfxReady;
-    window.location.href = buildAssignPracticeSquadUrl();
+    if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(buildAssignPracticeSquadUrl());
+    else window.location.assign(buildAssignPracticeSquadUrl());
     return;
   }
   
@@ -4711,7 +4719,8 @@ playNowBtn.addEventListener('click', async () => {
 
       const goToNextSeasonFcc = () => {
         const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
-        if (window.GOBNav) window.GOBNav.replace(fccUrl);
+        if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(fccUrl, { tab: 'home-tab' });
+        else if (window.GOBNav) window.GOBNav.replace(fccUrl);
         else window.location.replace(fccUrl);
       };
       const startFinishSeason = () => fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {

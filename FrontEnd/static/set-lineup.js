@@ -155,7 +155,8 @@ async function redirectIfFranchiseGameplayAlreadyCommitted() {
     const pageWeek = Number(weekParam || 0);
     if (pageWeek && currentWeek > pageWeek) {
       const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
-      if (window.GOBNav) window.GOBNav.replace(fccUrl);
+      if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(fccUrl, { tab: 'home-tab' });
+      else if (window.GOBNav) window.GOBNav.replace(fccUrl);
       else window.location.replace(fccUrl);
       return true;
     }
@@ -2978,7 +2979,11 @@ async function init() {
   if (simNowBtn) simNowBtn.addEventListener('click', () => beginFromLineup('sim'));
   // Game Plan, Playbooks, Box Score wired in wireLineupNavButtons()
   } finally {
-    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+    let redirected = false;
+    if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+      try { redirected = await window.GOBNav.guardClosedFranchiseGame(); } catch (e) { redirected = false; }
+    }
+    if (!redirected && window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
   }
 }
 
@@ -3655,14 +3660,16 @@ function dndLog(label, data) {
   while (list.childNodes.length > 20) list.removeChild(list.firstChild);
 }
 
-window.addEventListener('pageshow', (event) => {
+window.addEventListener('pageshow', async (event) => {
   stripStaleQuarterBreakFrom();
+  if (!event.persisted) return;
+  if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  let redirected = false;
   if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
-    window.GOBNav.guardClosedFranchiseGame();
+    try { redirected = await window.GOBNav.guardClosedFranchiseGame(); } catch (e) { redirected = false; }
   }
-  if (event.persisted) {
-    window.location.reload();
-  }
+  if (redirected) return;
+  window.location.reload();
 });
 
 document.addEventListener('DOMContentLoaded', async () => {

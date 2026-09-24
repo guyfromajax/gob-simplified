@@ -73,11 +73,14 @@ function yearSortValue(year) {
 }
 
 function resolveRosterReturnUrl() {
-  if (typeof getSafeReturnUrl === 'function') {
-    const safe = getSafeReturnUrl(returnUrl);
-    if (safe) return safe;
-  } else if (returnUrl && returnUrl.charAt(0) === '/') {
-    return returnUrl;
+  let safe = null;
+  if (typeof getSafeReturnUrl === 'function') safe = getSafeReturnUrl(returnUrl);
+  else if (returnUrl && returnUrl.charAt(0) === '/') safe = returnUrl;
+  if (safe) {
+    if (returnTab && /franchise-command-center\.html/i.test(safe) && !/[?&]tab=/.test(safe)) {
+      safe += (safe.indexOf('?') === -1 ? '?' : '&') + 'tab=' + encodeURIComponent(returnTab);
+    }
+    return safe;
   }
   if (mode === 'franchise' && franchiseId) {
     let returnPath = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;

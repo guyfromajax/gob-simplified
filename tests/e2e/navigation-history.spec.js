@@ -28,7 +28,16 @@ test('in-progress lineup peeks push and flow steps replace', async ({ request })
   expect(box).toContain('window.GOBNav.back(backUrl)');
   expect(box).toContain('window.GOBNav.back(lineupUrl)');
   expect(nav).toContain("'/api/game/' + encodeURIComponent(gameId) + '/resume-state'");
+  expect(nav).toContain('function exitFlow(');
   expect(nav).not.toContain('encodeURIComponent(gameId));');
+  const timeout = await (await request.get('/js/phaser/utils/timeoutButtonManager.js')).text();
+  const foul = await (await request.get('/js/phaser/utils/foulOutPopup.js')).text();
+  const popup = await (await request.get('/js/phaser/utils/gameCompletionPopup.js')).text();
+  expect(timeout).toContain('window.GOBNav.replace(lineupUrl)');
+  expect(timeout).not.toContain('window.location.href = `/set-lineup.html');
+  expect(foul).toContain('data-gob-replace');
+  expect(popup).toContain('data-gob-replace');
+  expect(popup).toContain("window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' })");
 });
 
 test('section tab clicks do not add history entries', async ({ page }) => {

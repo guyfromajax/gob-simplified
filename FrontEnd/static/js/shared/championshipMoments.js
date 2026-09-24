@@ -727,13 +727,15 @@
         }, 320);
         const opts = options || {};
         if (action === 'primary' && opts.lockerRoomUrl) {
-          if (window.GOBNav) window.GOBNav.replace(opts.lockerRoomUrl);
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(opts.lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(opts.lockerRoomUrl);
           else window.location.replace(opts.lockerRoomUrl);
           return;
         }
         if (action === 'boxscore') {
           if (resolvedBoxScoreUrl) {
-            window.location.href = resolvedBoxScoreUrl;
+            if (window.GOBNav) window.GOBNav.replace(resolvedBoxScoreUrl);
+            else window.location.replace(resolvedBoxScoreUrl);
             return;
           }
         }

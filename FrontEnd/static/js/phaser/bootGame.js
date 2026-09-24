@@ -3584,10 +3584,15 @@ initGame()
     } catch (e) {}
   });
 updateOffsets();
-window.addEventListener('pageshow', () => {
-  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
-    window.GOBNav.guardClosedFranchiseGame();
-  }
+window.addEventListener('pageshow', function (event) {
+  if (!event.persisted) return;
+  if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  var guard = (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function')
+    ? window.GOBNav.guardClosedFranchiseGame()
+    : Promise.resolve(false);
+  Promise.resolve(guard).then(function (redirected) {
+    if (!redirected && window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  });
 });
 // console.log('🚨 BOOTGAME: Initialization complete!');
 

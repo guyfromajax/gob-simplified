@@ -189,7 +189,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
         <div class="foul-out-player-name">${safeDisplayName}</div>
       </div>
       <div class="foul-out-button-container">
-        <a href="${lineupUrl}" class="foul-out-button sub-players-button">Sub Players</a>
+        <a href="${lineupUrl}" class="foul-out-button sub-players-button" data-gob-replace>Sub Players</a>
       </div>
     </div>
   `;

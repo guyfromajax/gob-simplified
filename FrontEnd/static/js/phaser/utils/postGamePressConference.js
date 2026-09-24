@@ -347,7 +347,8 @@ export async function launchPostGamePressConference(opts) {
         }
         overlay.remove();
         if (lockerRoomUrl) {
-          if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
           else window.location.replace(lockerRoomUrl);
         }
       });
@@ -370,7 +371,8 @@ export async function launchPostGamePressConference(opts) {
         d.addEventListener('click', () => {
           overlay.remove();
           if (lockerRoomUrl) {
-          if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
           else window.location.replace(lockerRoomUrl);
         }
         });
@@ -404,7 +406,8 @@ export async function launchPostGamePressConference(opts) {
         d.addEventListener('click', () => {
           overlay.remove();
           if (lockerRoomUrl) {
-          if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
           else window.location.replace(lockerRoomUrl);
         }
         });
@@ -428,7 +431,8 @@ export async function launchPostGamePressConference(opts) {
       d.addEventListener('click', () => {
         overlay.remove();
         if (lockerRoomUrl) {
-          if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
           else window.location.replace(lockerRoomUrl);
         }
       });
