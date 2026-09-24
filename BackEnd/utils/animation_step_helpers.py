@@ -1292,9 +1292,24 @@ DEFENDER_AG_SPREAD_FLAG = "GOB_DEFENDER_AG_SPREAD"
 
 
 def defender_ag_spread_enabled() -> bool:
-    """``GOB_DEFENDER_AG_SPREAD`` - **default OFF**. Built and measured, not flipped."""
+    """``GOB_DEFENDER_AG_SPREAD`` - **default ON** since 2026-09-24.
+
+    Defenders' player multiplier is widened to ``(1 - s) + (AG/100) * 2s`` at ``s = 0.50``,
+    keeping AG=50 fixed. Offence is untouched: the spread is applied per player, by
+    ``def_lineup`` membership (``defender_aware_rate``), never by an action label.
+
+    Kill switch: ``GOB_DEFENDER_AG_SPREAD=0`` disables the spread entirely and reproduces
+    ``equiv_v3_reference_1f4af0ede_loosesag_nogate.json`` - verified 160/160 on fingerprint
+    AND draws in all four cells at the flip, plus 80/80 on
+    ``equiv_v3_loose_baseline_1f4af0ede_loosesag.json``. Unlike the loose-sag flip this
+    rollback IS symmetric: flag-off was proved byte-identical in Stage 2, so setting 0
+    restores the OLD reference exactly rather than merely a related footing.
+
+    The new default is captured by ``equiv_v3_reference_<sha>_agspread.json``; see
+    reports/ag-spread-default-flip.md.
+    """
     import os
-    return os.environ.get(DEFENDER_AG_SPREAD_FLAG, "0") == "1"
+    return os.environ.get(DEFENDER_AG_SPREAD_FLAG, "1") == "1"
 
 
 def defender_movement_rate(player: Any, archetype: PlayerArchetype,

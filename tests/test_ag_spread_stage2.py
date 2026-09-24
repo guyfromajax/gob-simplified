@@ -85,8 +85,11 @@ def test_membership_is_the_test_not_the_action_label(monkeypatch):
 
 
 def test_flag_off_is_identical_for_defenders_and_offence(monkeypatch):
-    """The flag governs ALL of Stage 2. Off, every player gets the raw archetype rate."""
-    monkeypatch.delenv(ASH.DEFENDER_AG_SPREAD_FLAG, raising=False)
+    """The flag governs ALL of Stage 2. Off, every player gets the raw archetype rate.
+
+    Sets the flag to "0" explicitly since the 2026-09-24 default flip — an unset flag now
+    means ON, so `delenv` would no longer express "off". The assertion is unchanged."""
+    monkeypatch.setenv(ASH.DEFENDER_AG_SPREAD_FLAG, "0")
     lineup = {"PG": _P("D1", 10), "C": _P("D2", 90)}
     for pid, ag in (("D1", 10), ("D2", 90), ("O1", 10), ("O2", 90)):
         p = _P(pid, ag)
@@ -393,3 +396,42 @@ def test_the_id_passed_is_the_id_the_player_was_looked_up_with():
         "the id passed does not name the player whose rate is being computed. This is the "
         "unbound-`pid` bug:\n  " + "\n  ".join(bad)
     )
+
+
+def test_the_default_is_on_and_pinned_in_source():
+    """FLIP GUARD (2026-09-24). Two independent assertions so the default cannot drift back:
+
+      * behaviourally — an unset flag enables the spread;
+      * in source — the ``os.environ.get`` default literal is "1".
+
+    The second matters because a future edit could keep the helper's name and signature while
+    changing the literal, and only the source check would notice.
+    """
+    import os as _os
+    import inspect as _inspect
+    saved = _os.environ.pop(ASH.DEFENDER_AG_SPREAD_FLAG, None)
+    try:
+        assert ASH.defender_ag_spread_enabled() is True, \
+            "GOB_DEFENDER_AG_SPREAD must default ON since the 2026-09-24 flip"
+    finally:
+        if saved is not None:
+            _os.environ[ASH.DEFENDER_AG_SPREAD_FLAG] = saved
+    src = _inspect.getsource(ASH.defender_ag_spread_enabled)
+    assert 'os.environ.get(DEFENDER_AG_SPREAD_FLAG, "1") == "1"' in src, (
+        "the default literal in defender_ag_spread_enabled is no longer \"1\" — if that is "
+        "deliberate, it is a default flip and needs its own reference run"
+    )
+
+
+def test_the_kill_switch_still_fully_disables(monkeypatch):
+    """Rollback must be total, not partial: with "0" set, a defender's rate is exactly the
+    raw archetype rate at every archetype and AG, including through the per-player accessor."""
+    monkeypatch.setenv(ASH.DEFENDER_AG_SPREAD_FLAG, "0")
+    lineup = {"PG": _P("D1", 0), "C": _P("D2", 144)}
+    for pid, ag in (("D1", 0), ("D2", 144)):
+        p = _P(pid, ag)
+        for arch in ("standard", "sprint", "cruise", "drift", "burst", "shot_motion"):
+            assert ASH.defender_aware_rate(p, arch, pid, lineup) == \
+                ASH._ag_grid_per_game_sec(p, arch)
+            assert ASH.defender_movement_rate(p, arch, True) == \
+                ASH._ag_grid_per_game_sec(p, arch)

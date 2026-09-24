@@ -1,4 +1,9 @@
-"""The defender AG spread ships behind ``GOB_DEFENDER_AG_SPREAD``, **default OFF** (2026-09-24).
+"""The defender AG spread ships behind ``GOB_DEFENDER_AG_SPREAD``, **default ON** (2026-09-24).
+
+Flipped on 2026-09-24. ``GOB_DEFENDER_AG_SPREAD=0`` is the rollback and reproduces
+``equiv_v3_reference_1f4af0ede_loosesag_nogate.json`` (160/160, fp AND draws) plus
+``equiv_v3_loose_baseline_1f4af0ede_loosesag.json`` (80/80). Because an unset flag now means
+ON, any test that intends the spread OFF must use the ``spread_off`` fixture and say so.
 
 The shipped AG curve is nearly flat — across the real league a p90-AG defender is only 1.103×
 a p10-AG one — so defenders all move alike. This widens the player multiplier for **defenders
@@ -40,8 +45,15 @@ ARCHES = ("standard", "sprint", "cruise", "drift", "burst", "shot_motion", "comp
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    """No flag set - so the helper returns its shipped default (OFF)."""
+    """No flag set - so the helper returns its shipped default (ON since 2026-09-24)."""
     monkeypatch.delenv(ASH.DEFENDER_AG_SPREAD_FLAG, raising=False)
+
+
+@pytest.fixture
+def spread_off(monkeypatch):
+    """Explicitly DISABLED. Since the 2026-09-24 flip an unset flag means ON, so a test that
+    intends the spread off must say so rather than relying on the default."""
+    monkeypatch.setenv(ASH.DEFENDER_AG_SPREAD_FLAG, "0")
 
 
 @pytest.fixture
@@ -49,9 +61,13 @@ def spread_on(monkeypatch):
     monkeypatch.setenv(ASH.DEFENDER_AG_SPREAD_FLAG, "1")
 
 
-def test_spread_defaults_off(clean_env):
-    assert ASH.defender_ag_spread_enabled() is False, (
-        "GOB_DEFENDER_AG_SPREAD must default OFF. This is built and measured, not flipped."
+def test_spread_defaults_on(clean_env):
+    """FLIPPED 2026-09-24. Was `test_spread_defaults_off`; the assertion is inverted because
+    the default itself moved, which is the whole content of the flip. Kept (not deleted) so a
+    future change cannot silently flip it back without editing this line and saying why."""
+    assert ASH.defender_ag_spread_enabled() is True, (
+        "GOB_DEFENDER_AG_SPREAD must default ON. The defender spread at s=0.50 is the shipped "
+        "behaviour; reports/ag-spread-default-flip.md."
     )
 
 
@@ -62,8 +78,11 @@ def test_spread_kill_switch(clean_env, monkeypatch):
     assert ASH.defender_ag_spread_enabled() is True
 
 
-def test_flag_off_is_the_shipped_function_itself(clean_env):
-    """OFF must return `_ag_grid_per_game_sec`'s own value for defenders too."""
+def test_flag_off_is_the_shipped_function_itself(spread_off):
+    """OFF must return `_ag_grid_per_game_sec`'s own value for defenders too.
+
+    Takes `spread_off` rather than `clean_env` since the 2026-09-24 flip: unset now means ON,
+    so this test has to ask for the off state explicitly. The assertion is unchanged."""
     for arch in ARCHES:
         for ag in (0, 24, 39, 50, 73, 100, 144):
             assert ASH.defender_movement_rate(_P(ag), arch, True) == \
