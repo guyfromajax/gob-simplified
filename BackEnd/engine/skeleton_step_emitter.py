@@ -2925,38 +2925,14 @@ def _compute_pass_meet_point(
     return {"x": float(meet_x), "y": float(meet_y)}
 
 
-def _interpolate_step_end(
-    start_coord: GridCoord,
-    dest_coord: GridCoord,
-    rate: float,
-    step_t: float,
-) -> Tuple[GridCoord, float]:
-    """Compute the interrupted end coord + tween duration for a player moving
-    toward ``dest_coord`` at ``rate`` grid/game-sec over a step of duration
-    ``step_t`` game-sec.
+# STAGE 1 (2026-09-24): `_interpolate_step_end` and `_motion_end_toward_dest` were
+# byte-identical (verified over 200k random inputs). One implementation now lives in
+# animation_step_helpers; this name is re-exported because seven callers import it
+# from here. Both still take a RAW rate — wiring the defender spread in is a LATER
+# stage, not this one. See reports/rate-unify-stage1.md.
+from BackEnd.utils.animation_step_helpers import _motion_end_toward_dest
 
-    Returns ``(end_coord, tween_duration_game_seconds)``.
-
-    - If ``natural_t = dist / rate <= step_t``: player reaches dest. Tween
-      duration = natural_t (player idles for the remainder of step_t at their
-      destination).
-    - If ``natural_t > step_t``: player is interrupted at
-      ``start + rate × step_t`` along start→dest. Tween duration = step_t.
-    - Degenerate inputs (dist ~ 0, rate ≤ 0, step_t ≤ 0): no tween, end = start.
-
-    Enforces UESS §9.5 — non-gate movers freeze at interrupted coord, never
-    snap to destination.
-    """
-    dist = _euclid(start_coord, dest_coord)
-    if dist < 1e-6 or rate <= 0 or step_t <= 0:
-        return dict(start_coord), 0.0
-    natural_t = dist / rate
-    if natural_t <= step_t:
-        return dict(dest_coord), float(natural_t)
-    frac = (rate * step_t) / dist
-    x = start_coord["x"] + (dest_coord["x"] - start_coord["x"]) * frac
-    y = start_coord["y"] + (dest_coord["y"] - start_coord["y"]) * frac
-    return {"x": float(x), "y": float(y)}, float(step_t)
+_interpolate_step_end = _motion_end_toward_dest
 
 
 # Per-overlay-map archetype assignment. Rebounders move at standard pace

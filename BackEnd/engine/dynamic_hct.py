@@ -2626,6 +2626,12 @@ def compute_dynamic_hct_turn(
             bh_pos,
             seconds,
             exclude=exclude,
+            # STAGE 1: these two are INJECTED into fcp_offball_attack (1,989 calls/8 games)
+            # and are invisible to any name-based scan of that module. Both names below are
+            # now the canonical ones: `_ag_grid_per_game_sec` delegates to
+            # shared.movement_rate, and `_interrupted_coord` is the STRICT wrapper (this
+            # module imports it from transition_bridge = variant A). Verified by trace, not
+            # grep. See reports/rate-unify-stage1.md.
             ag_grid_fn=_ag_grid_per_game_sec,
             interrupted_fn=_interrupted_coord,
         )

@@ -62,6 +62,7 @@ from BackEnd.utils.animation_step_schema import (
     StepEnd,
     StepStart,
 )
+from BackEnd.utils.shared import movement_rate  # STAGE 1: the one rate accessor
 
 
 # --- Vocabulary helpers ----------------------------------------------------
@@ -490,7 +491,10 @@ def _build_outlet_pass_step(
     for pid, target, arch in targets:
         start = all_start_coords[pid]
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        # BUG: canonical is the archetype base (burst off by -20.0). STAGE 2.
+        rate = movement_rate(player, arch, apply_spread=False, fallback_rate=12.0)
+        # BUG: no max(0.0, ...) floor — a negative t moves the player AWAY from the
+        # target instead of holding him at start. Preserved exactly. STAGE 2.
         max_traversal = rate * t
         dist = _euclid(start, target)
         if dist <= max_traversal or dist == 0.0:
@@ -901,7 +905,10 @@ def _stamp_tween_durations(
             continue
         arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # STAGE 1: routed through the one accessor. Still the RAW rate (apply_spread=False)
+        # so this is byte-identical today; the endpoints on this path use the wrapper, and
+        # closing that split is a LATER stage. See reports/rate-unify-stage1.md.
+        rate = movement_rate(player, arch, apply_spread=False)
         if rate <= 0:
             continue
         durations[pid] = float(min(dist / rate, step_t))
@@ -1064,7 +1071,10 @@ def _build_outcome_step(
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
         arch = archetype.get(pid, "standard")
-        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        # BUG: canonical is the archetype base (burst off by -20.0). STAGE 2.
+        rate = movement_rate(player, arch, apply_spread=False, fallback_rate=12.0)
+        # BUG: no max(0.0, ...) floor — a negative t moves the player AWAY from the
+        # target instead of holding him at start. Preserved exactly. STAGE 2.
         max_traversal = rate * t
         if dist > max_traversal:
             ratio = max_traversal / dist
@@ -1304,7 +1314,8 @@ def _build_step_back_step(
         dy = end["y"] - start["y"]
         dist = (dx * dx + dy * dy) ** 0.5
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "sprint") if player else 12.0
+        # BUG: canonical is the archetype base (burst off by -20.0). STAGE 2.
+        rate = movement_rate(player, "sprint", apply_spread=False, fallback_rate=12.0)
         traversal = dist / rate if rate > 0 else 0.0
         if traversal > t:
             t = traversal
@@ -1715,7 +1726,10 @@ def _clamp_step_end_coords_to_archetype(
         if dist == 0.0:
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        # BUG: canonical is the archetype base (burst off by -20.0). STAGE 2.
+        rate = movement_rate(player, arch, apply_spread=False, fallback_rate=12.0)
+        # BUG: no max(0.0, ...) floor — a negative t moves the player AWAY from the
+        # target instead of holding him at start. Preserved exactly. STAGE 2.
         max_traversal = rate * t
         if dist > max_traversal:
             ratio = max_traversal / dist

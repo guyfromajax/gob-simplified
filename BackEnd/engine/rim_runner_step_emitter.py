@@ -77,6 +77,7 @@ from BackEnd.utils.animation_step_schema import (
     StepEnd,
     StepStart,
 )
+from BackEnd.utils.shared import movement_rate  # STAGE 1: the one rate accessor
 
 
 # --- Vocabulary helpers ----------------------------------------------------
@@ -242,30 +243,13 @@ def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:
     return _euclid(start, end) / rate
 
 
-def _interrupted_coord(
-    start: Optional[GridCoord],
-    target: Optional[GridCoord],
-    rate: float,
-    t: float,
-) -> GridCoord:
-    """Schema interrupted-coord math: position along start→target at
-    ``rate × t``; clamped to ``target`` if the player can complete the
-    traversal in ``t`` seconds."""
-    if start is None and target is None:
-        return {"x": 50.0, "y": 25.0}
-    if start is None:
-        return {"x": float(target["x"]), "y": float(target["y"])}
-    if target is None:
-        return {"x": float(start["x"]), "y": float(start["y"])}
-    dist = _euclid(start, target)
-    max_traversal = max(0.0, rate * t)
-    if dist <= max_traversal or dist == 0.0:
-        return {"x": float(target["x"]), "y": float(target["y"])}
-    ratio = max_traversal / dist
-    return {
-        "x": float(start["x"] + (target["x"] - start["x"]) * ratio),
-        "y": float(start["y"] + (target["y"] - start["y"]) * ratio),
-    }
+# STAGE 1 (2026-09-24): the four `_interrupted_coord` definitions collapsed to one core
+# in animation_step_helpers. This module reached VARIANT B, so it binds the lenient wrapper;
+# the name is kept because other modules import it from here BY VALUE.
+# See reports/movement-rate-inventory.md and reports/rate-unify-stage1.md.
+from BackEnd.utils.animation_step_helpers import _interrupted_coord_lenient
+
+_interrupted_coord = _interrupted_coord_lenient
 
 
 def _attacking_basket(is_away_offense: bool) -> GridCoord:
@@ -324,7 +308,10 @@ def _stamp_tween_durations(
             continue
         arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # STAGE 1: routed through the one accessor. Still the RAW rate (apply_spread=False)
+        # so this is byte-identical today; the endpoints on this path use the wrapper, and
+        # closing that split is a LATER stage. See reports/rate-unify-stage1.md.
+        rate = movement_rate(player, arch, apply_spread=False)
         if rate <= 0:
             continue
         durations[pid] = float(min(dist / rate, step_t))

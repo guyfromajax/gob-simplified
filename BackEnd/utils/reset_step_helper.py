@@ -96,18 +96,13 @@ def _pick_pg_target(bh_coord: GridCoord, is_away_offense: bool) -> GridCoord:
     return {"x": x, "y": y}
 
 
-def _interrupted_coord(
-    start: GridCoord, target: GridCoord, rate: float, t: float
-) -> GridCoord:
-    dist = _euclid(start, target)
-    max_traversal = max(0.0, rate * t)
-    if dist <= max_traversal or dist < 1e-9:
-        return {"x": float(target["x"]), "y": float(target["y"])}
-    ratio = max_traversal / dist
-    return {
-        "x": float(start["x"] + (target["x"] - start["x"]) * ratio),
-        "y": float(start["y"] + (target["y"] - start["y"]) * ratio),
-    }
+# STAGE 1 (2026-09-24): the four `_interrupted_coord` definitions collapsed to one core
+# in animation_step_helpers. This module reached VARIANT A, so it binds the strict wrapper;
+# the name is kept because other modules import it from here BY VALUE.
+# See reports/movement-rate-inventory.md and reports/rate-unify-stage1.md.
+from BackEnd.utils.animation_step_helpers import _interrupted_coord_strict
+
+_interrupted_coord = _interrupted_coord_strict
 
 
 def _is_offense_player(pid: str, off_lineup: Dict[str, Any]) -> bool:

@@ -681,6 +681,68 @@ def _motion_end_toward_dest(
     return {"x": float(x), "y": float(y)}, float(step_t)
 
 
+# ── Interrupted-coord core (Stage 1, 2026-09-24) ───────────────────────────────────────
+#
+# There were FOUR definitions of ``_interrupted_coord`` and TWO distinct arithmetic
+# variants (reports/movement-rate-inventory.md Q2). They are identical for every real
+# input and differ ONLY on degenerate ones. Stage 1 collapses them to one core plus two
+# thin, explicitly named wrappers — it does NOT normalise either policy, because choosing
+# one would be a behaviour change.
+#
+#   strict  = old transition_bridge / reset_step_helper  — no None guard, zero test < 1e-9
+#   lenient = old rim_runner / fb_outlet_pass            — None guards, zero test == 0.0
+#
+# All four old definitions called an arithmetically identical ``_euclid``
+# (``(dx*dx + dy*dy) ** 0.5``), including rim_runner's private copy, so routing every one
+# through this module's ``_euclid`` is byte-identical.
+
+
+def _interrupted_coord_core(
+    start: GridCoord, target: GridCoord, rate: float, t: float, *, lenient: bool
+) -> GridCoord:
+    """Where the player ends up after moving from ``start`` toward ``target``
+    at ``rate`` (grid/game-sec) for ``t`` game-seconds. Clamps at target.
+
+    ``lenient`` selects the degenerate-distance test only: the lenient variant treats
+    exactly zero as arrival, the strict one treats anything under 1e-9 as arrival. The
+    difference is bounded by 1e-9 grid units and is preserved rather than unified.
+    """
+    dist = _euclid(start, target)
+    max_traversal = max(0.0, rate * t)
+    zero = (dist == 0.0) if lenient else (dist < 1e-9)
+    if dist <= max_traversal or zero:
+        return {"x": float(target["x"]), "y": float(target["y"])}
+    ratio = max_traversal / dist
+    return {
+        "x": float(start["x"] + (target["x"] - start["x"]) * ratio),
+        "y": float(start["y"] + (target["y"] - start["y"]) * ratio),
+    }
+
+
+def _interrupted_coord_strict(
+    start: GridCoord, target: GridCoord, rate: float, t: float
+) -> GridCoord:
+    """Variant A — 22 call sites. NO None guard: a None coord raises TypeError, which is
+    today's behaviour on the transition_bridge / reset_step_helper paths and is left alone.
+    """
+    return _interrupted_coord_core(start, target, rate, t, lenient=False)
+
+
+def _interrupted_coord_lenient(
+    start: Optional[GridCoord], target: Optional[GridCoord], rate: float, t: float
+) -> GridCoord:
+    """Variant B — 10 call sites (rim runner / FB outlet pass)."""
+    if start is None and target is None:
+        # STAGE 2: see reports/movement-rate-inventory.md
+        # Silently teleports the player to centre court instead of failing.
+        return {"x": 50.0, "y": 25.0}
+    if start is None:
+        return {"x": float(target["x"]), "y": float(target["y"])}
+    if target is None:
+        return {"x": float(start["x"]), "y": float(start["y"])}
+    return _interrupted_coord_core(start, target, rate, t, lenient=True)
+
+
 def floor_step_t_to_traversal(
     step_t: float,
     start_coord: Optional[GridCoord],
@@ -793,47 +855,18 @@ def stamp_rebound_capture_player_motion(
 
 
 def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
-    """grid/game-sec rate for a player at a given archetype. Each archetype
-    has an absolute rate at AG=50 (see ``CRUISE_GRID_PER_GAME_SEC`` etc.);
-    other AG values scale proportionally via the AG curve anchored at
-    AG=50 → 14. ``archetype="standard"`` is the unscaled base rate.
+    """grid/game-sec rate for a player at a given archetype.
+
+    STAGE 1 (2026-09-24): the body moved to ``shared.movement_rate`` /
+    ``shared._archetype_rate`` — one implementation for all 117 rate sites. This stays as
+    the name the engine imports. The ``except -> 14.0`` fallback is preserved exactly: it
+    fires only if the import itself fails.
     """
     try:
-        from BackEnd.utils.shared import ag_to_grid_per_game_sec
-        from BackEnd.constants import (
-            BURST_GRID_PER_GAME_SEC,
-            CRUISE_GRID_PER_GAME_SEC,
-            DRIFT_GRID_PER_GAME_SEC,
-            STANDARD_GRID_PER_GAME_SEC,
-            SHOT_MOTION_GRID_PER_GAME_SEC,
-            SPRINT_GRID_PER_GAME_SEC,
-        )
+        from BackEnd.utils.shared import movement_rate
     except Exception:
         return 14.0
-
-    if player is None:
-        ag = 50
-    else:
-        attrs = getattr(player, "attributes", None) or {}
-        ag = attrs.get("AG", 50) if isinstance(attrs, dict) else 50
-    # AG scale factor: at AG=50 → 1.0; scales other AG values proportionally.
-    ag_scale = float(ag_to_grid_per_game_sec(ag)) / float(STANDARD_GRID_PER_GAME_SEC)
-
-    if archetype == "standard":
-        return STANDARD_GRID_PER_GAME_SEC * ag_scale
-    if archetype in ("shot_motion", "compressed_hco"):
-        return SHOT_MOTION_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "sprint":
-        return SPRINT_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "burst":
-        return BURST_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "cruise":
-        return CRUISE_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "drift":
-        return DRIFT_GRID_PER_GAME_SEC * ag_scale
-    # Unknown / fallback → base rate. The canonical name is "standard"; any
-    # unrecognized archetype string defensively resolves here.
-    return STANDARD_GRID_PER_GAME_SEC * ag_scale
+    return movement_rate(player, archetype, apply_spread=False)
 
 
 #: Public alias — **the** archetype rate function. Step emitters must import
@@ -1237,34 +1270,19 @@ def defender_movement_rate(player: Any, archetype: PlayerArchetype,
                            is_defender: bool = False) -> float:
     """grid/game-sec for one player on one step, with the defender spread applied.
 
-    Flag off, or an offensive player, returns ``_ag_grid_per_game_sec`` itself -- the same
-    object call, so there is no second implementation to drift.
+    STAGE 1 (2026-09-24): delegates to ``shared.movement_rate``. ``is_defender`` IS
+    ``apply_spread`` — flag off, or an offensive player, returns the raw archetype rate, so
+    there is still exactly one implementation and nothing to drift.
 
-    The archetype base is recovered as ``_ag_grid_per_game_sec(None, archetype)``: with no
-    player that resolves AG=50, whose scale is exactly 1.0, so it returns the archetype's own
-    rate. The clamp is applied to the STANDARD-equivalent rate and then scaled by the
-    archetype, which is precisely what ``ag_to_grid_per_game_sec`` +
-    ``_ag_grid_per_game_sec`` do together -- so the two agree at s = 0.10 by construction.
+    The constant and the flag stay in THIS module (``DEFENDER_AG_SPREAD``,
+    ``defender_ag_spread_enabled``) and the core reads them through it at call time, so
+    monkeypatching them here still reaches the arithmetic.
     """
-    if not is_defender or not defender_ag_spread_enabled():
-        return _ag_grid_per_game_sec(player, archetype)
     try:
-        from BackEnd.constants import STANDARD_GRID_PER_GAME_SEC
+        from BackEnd.utils.shared import movement_rate
     except Exception:
         return _ag_grid_per_game_sec(player, archetype)
-    if player is None:
-        ag = 50.0
-    else:
-        attrs = getattr(player, "attributes", None) or {}
-        try:
-            ag = float(attrs.get("AG", 50)) if isinstance(attrs, dict) else 50.0
-        except (TypeError, ValueError):
-            ag = 50.0
-    s = DEFENDER_AG_SPREAD
-    std = STANDARD_GRID_PER_GAME_SEC * ((1.0 - s) + (ag / 100.0) * 2.0 * s)
-    std = max(0.5, min(std, 60.0))
-    base = _ag_grid_per_game_sec(None, archetype)
-    return base * (std / float(STANDARD_GRID_PER_GAME_SEC))
+    return movement_rate(player, archetype, apply_spread=bool(is_defender))
 
 
 def stamp_tween_durations(
