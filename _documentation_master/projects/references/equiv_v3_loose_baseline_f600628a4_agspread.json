@@ -1,0 +1,596 @@
+{
+ "sha": "f600628a4",
+ "note": "LOOSE-FOOTING baseline at the NEW DEFAULT (2026-09-24): GOB_DEFENDER_AG_SPREAD ON at s = 0.50, on top of the loose-sag axis and cutoff-gate defaults. Supersedes equiv_v3_loose_baseline_1f4af0ede_loosesag.json, which was cut with the spread OFF. Reproduce the superseded loose baseline with GOB_DEFENDER_AG_SPREAD=0 -- verified 80/80 on fingerprint AND draws at the flip. SEED_DEFENSES=1 only. See reports/ag-spread-default-flip.md.",
+ "footing": "Lancaster vs Bentley-Truman, sliders 2 / traps 5, SEED_PLAYS=1, PYTHONHASHSEED=0, one game per process, ALIGN_RNG=0, game_id 0xE0000+(seed-8000), seeds 8000-8039 (n=40), CI = 1.96 x SEM. sim arm = _is_full_simulation True throughout; played arm = False only inside the four gated Animator methods at Pattern A. SEED_DEFENSES=1 seeds the six real defenses from defenses_export.json; SEED_DEFENSES=0 leaves the catalogue empty, so every zone call plays man.",
+ "flags": {
+  "GOB_MAN_LOOSE_SAG_AXIS": "on (flipped 2026-09-23); pull normal 0.0 / loose 0.25",
+  "GOB_HCO_CUTOFF_NO_GATE": "on (flipped 2026-09-23); stop_attempt_prob 1.0",
+  "GOB_MAN_HELP_SHADE": "on",
+  "GOB_ZONE_HELP_SHADE": "on",
+  "GOB_ZONE_SINK_ESCAPE": "on",
+  "GOB_BOXOUT_CONTEST": "on",
+  "GOB_PLACEMENT_FREEZE": "on",
+  "GOB_PLACEMENT_SINGLE_BUILD": "on",
+  "GOB_REBOUND_FROM_ARRIVAL": "on",
+  "GOB_REBOUND_RACE": "off",
+  "GOB_DEFENDER_AG_SPREAD": "on (flipped 2026-09-24, f600628a4); s = 0.50, defenders only"
+ },
+ "cells": {
+  "SEED_DEFENSES=1": {
+   "sim": {
+    "per_seed": {
+     "8000": {
+      "fp": "9a6e1149aaa88a93",
+      "draws": 71687,
+      "points_per_team": 90.0,
+      "turns": 428,
+      "possessions": 32
+     },
+     "8001": {
+      "fp": "161b0a95d383de9c",
+      "draws": 74680,
+      "points_per_team": 63.5,
+      "turns": 372,
+      "possessions": 38
+     },
+     "8002": {
+      "fp": "ff7eff1dbecffb0a",
+      "draws": 81129,
+      "points_per_team": 62.0,
+      "turns": 362,
+      "possessions": 45
+     },
+     "8003": {
+      "fp": "e27ff67287eda72d",
+      "draws": 78562,
+      "points_per_team": 79.5,
+      "turns": 418,
+      "possessions": 35
+     },
+     "8004": {
+      "fp": "43c635f2ff49ff5a",
+      "draws": 70843,
+      "points_per_team": 73.5,
+      "turns": 402,
+      "possessions": 39
+     },
+     "8005": {
+      "fp": "50fe339736cdd385",
+      "draws": 75422,
+      "points_per_team": 85.0,
+      "turns": 443,
+      "possessions": 31
+     },
+     "8006": {
+      "fp": "83d7c3c8d7b18b28",
+      "draws": 75665,
+      "points_per_team": 70.5,
+      "turns": 442,
+      "possessions": 49
+     },
+     "8007": {
+      "fp": "f24555c06d0201e6",
+      "draws": 77291,
+      "points_per_team": 71.0,
+      "turns": 398,
+      "possessions": 38
+     },
+     "8008": {
+      "fp": "8a0003dc349b305b",
+      "draws": 78715,
+      "points_per_team": 77.5,
+      "turns": 430,
+      "possessions": 36
+     },
+     "8009": {
+      "fp": "c8d2fe2c77ea0cc8",
+      "draws": 78629,
+      "points_per_team": 69.5,
+      "turns": 416,
+      "possessions": 44
+     },
+     "8010": {
+      "fp": "aca5921060de733f",
+      "draws": 75192,
+      "points_per_team": 63.0,
+      "turns": 381,
+      "possessions": 44
+     },
+     "8011": {
+      "fp": "119ba82143558d47",
+      "draws": 79635,
+      "points_per_team": 61.5,
+      "turns": 396,
+      "possessions": 46
+     },
+     "8012": {
+      "fp": "335d72d846300aa2",
+      "draws": 77001,
+      "points_per_team": 65.5,
+      "turns": 398,
+      "possessions": 35
+     },
+     "8013": {
+      "fp": "195498aea312e687",
+      "draws": 77613,
+      "points_per_team": 68.0,
+      "turns": 429,
+      "possessions": 54
+     },
+     "8014": {
+      "fp": "bce0436ae849215b",
+      "draws": 70429,
+      "points_per_team": 66.0,
+      "turns": 386,
+      "possessions": 35
+     },
+     "8015": {
+      "fp": "4ec0193ac909bcc0",
+      "draws": 78090,
+      "points_per_team": 90.5,
+      "turns": 450,
+      "possessions": 29
+     },
+     "8016": {
+      "fp": "44c55d21b567821c",
+      "draws": 76968,
+      "points_per_team": 95.0,
+      "turns": 458,
+      "possessions": 29
+     },
+     "8017": {
+      "fp": "132931adcaa2f7ab",
+      "draws": 76613,
+      "points_per_team": 67.5,
+      "turns": 388,
+      "possessions": 43
+     },
+     "8018": {
+      "fp": "b77129917b0980e7",
+      "draws": 77363,
+      "points_per_team": 77.0,
+      "turns": 399,
+      "possessions": 37
+     },
+     "8019": {
+      "fp": "709d5c9b8fc98f5f",
+      "draws": 75957,
+      "points_per_team": 78.0,
+      "turns": 435,
+      "possessions": 38
+     },
+     "8020": {
+      "fp": "c66a12388ed54c45",
+      "draws": 77400,
+      "points_per_team": 76.5,
+      "turns": 430,
+      "possessions": 44
+     },
+     "8021": {
+      "fp": "20d0775deeab137d",
+      "draws": 81601,
+      "points_per_team": 67.0,
+      "turns": 400,
+      "possessions": 39
+     },
+     "8022": {
+      "fp": "572c4ee1762161d0",
+      "draws": 80532,
+      "points_per_team": 85.0,
+      "turns": 415,
+      "possessions": 39
+     },
+     "8023": {
+      "fp": "573f3f3d5286bd5d",
+      "draws": 74061,
+      "points_per_team": 75.5,
+      "turns": 436,
+      "possessions": 40
+     },
+     "8024": {
+      "fp": "dd97e85b4fb9c975",
+      "draws": 74766,
+      "points_per_team": 56.0,
+      "turns": 380,
+      "possessions": 38
+     },
+     "8025": {
+      "fp": "6bb213b95521e2da",
+      "draws": 75780,
+      "points_per_team": 83.5,
+      "turns": 384,
+      "possessions": 31
+     },
+     "8026": {
+      "fp": "b5c3cc74dd027631",
+      "draws": 78308,
+      "points_per_team": 87.5,
+      "turns": 424,
+      "possessions": 34
+     },
+     "8027": {
+      "fp": "65fd9eed82ecfa2c",
+      "draws": 80152,
+      "points_per_team": 67.5,
+      "turns": 416,
+      "possessions": 39
+     },
+     "8028": {
+      "fp": "62000d9c58312afa",
+      "draws": 76525,
+      "points_per_team": 78.0,
+      "turns": 376,
+      "possessions": 26
+     },
+     "8029": {
+      "fp": "eeba37da25b52da6",
+      "draws": 77202,
+      "points_per_team": 64.0,
+      "turns": 431,
+      "possessions": 46
+     },
+     "8030": {
+      "fp": "d250fb9d3d1733c4",
+      "draws": 81659,
+      "points_per_team": 65.5,
+      "turns": 390,
+      "possessions": 44
+     },
+     "8031": {
+      "fp": "68dae8774c04a00d",
+      "draws": 74936,
+      "points_per_team": 87.0,
+      "turns": 459,
+      "possessions": 32
+     },
+     "8032": {
+      "fp": "2f6389a108a2ae53",
+      "draws": 78809,
+      "points_per_team": 78.0,
+      "turns": 393,
+      "possessions": 44
+     },
+     "8033": {
+      "fp": "3ee3e7d406bb98b1",
+      "draws": 76031,
+      "points_per_team": 85.0,
+      "turns": 416,
+      "possessions": 31
+     },
+     "8034": {
+      "fp": "b6f6c602d3b8b3da",
+      "draws": 77487,
+      "points_per_team": 75.5,
+      "turns": 432,
+      "possessions": 36
+     },
+     "8035": {
+      "fp": "2ca14b9b6ea3c351",
+      "draws": 76832,
+      "points_per_team": 65.5,
+      "turns": 385,
+      "possessions": 42
+     },
+     "8036": {
+      "fp": "a348a3eb78c2f932",
+      "draws": 70770,
+      "points_per_team": 77.5,
+      "turns": 424,
+      "possessions": 41
+     },
+     "8037": {
+      "fp": "e02a3cbb36eba449",
+      "draws": 79350,
+      "points_per_team": 75.0,
+      "turns": 420,
+      "possessions": 36
+     },
+     "8038": {
+      "fp": "60815d8f6966985e",
+      "draws": 78169,
+      "points_per_team": 77.0,
+      "turns": 456,
+      "possessions": 46
+     },
+     "8039": {
+      "fp": "2261f1b42d4a9437",
+      "draws": 72366,
+      "points_per_team": 78.5,
+      "turns": 402,
+      "possessions": 37
+     }
+    }
+   },
+   "played": {
+    "per_seed": {
+     "8000": {
+      "fp": "02908f07c8fad3a1",
+      "draws": 74155,
+      "points_per_team": 93.0,
+      "turns": 443,
+      "possessions": 28
+     },
+     "8001": {
+      "fp": "ea58646562d95163",
+      "draws": 71796,
+      "points_per_team": 69.5,
+      "turns": 384,
+      "possessions": 42
+     },
+     "8002": {
+      "fp": "5999364045b57d4d",
+      "draws": 78577,
+      "points_per_team": 72.0,
+      "turns": 399,
+      "possessions": 39
+     },
+     "8003": {
+      "fp": "9434470577f8cb86",
+      "draws": 81969,
+      "points_per_team": 72.5,
+      "turns": 410,
+      "possessions": 44
+     },
+     "8004": {
+      "fp": "08a7dd9299c52f76",
+      "draws": 74944,
+      "points_per_team": 75.5,
+      "turns": 409,
+      "possessions": 36
+     },
+     "8005": {
+      "fp": "dd502622d6e2e7e5",
+      "draws": 76996,
+      "points_per_team": 83.5,
+      "turns": 427,
+      "possessions": 33
+     },
+     "8006": {
+      "fp": "eaf01e891de5fb6c",
+      "draws": 74211,
+      "points_per_team": 54.0,
+      "turns": 410,
+      "possessions": 61
+     },
+     "8007": {
+      "fp": "85783c5d3635d9ae",
+      "draws": 73999,
+      "points_per_team": 77.5,
+      "turns": 418,
+      "possessions": 39
+     },
+     "8008": {
+      "fp": "b0a25bac3028887d",
+      "draws": 77432,
+      "points_per_team": 77.0,
+      "turns": 413,
+      "possessions": 41
+     },
+     "8009": {
+      "fp": "d6412b294fde46b3",
+      "draws": 74551,
+      "points_per_team": 69.5,
+      "turns": 395,
+      "possessions": 43
+     },
+     "8010": {
+      "fp": "2113b0483eb54c32",
+      "draws": 77350,
+      "points_per_team": 54.0,
+      "turns": 377,
+      "possessions": 45
+     },
+     "8011": {
+      "fp": "3840cb57a784fdf0",
+      "draws": 76978,
+      "points_per_team": 87.5,
+      "turns": 453,
+      "possessions": 34
+     },
+     "8012": {
+      "fp": "da0e7e6771ad4ad8",
+      "draws": 76295,
+      "points_per_team": 74.5,
+      "turns": 408,
+      "possessions": 37
+     },
+     "8013": {
+      "fp": "493777c7281bff53",
+      "draws": 74726,
+      "points_per_team": 68.0,
+      "turns": 418,
+      "possessions": 43
+     },
+     "8014": {
+      "fp": "bd8b4df141dbc177",
+      "draws": 73782,
+      "points_per_team": 79.5,
+      "turns": 416,
+      "possessions": 36
+     },
+     "8015": {
+      "fp": "778c2e7d415e6dcd",
+      "draws": 74370,
+      "points_per_team": 86.0,
+      "turns": 436,
+      "possessions": 30
+     },
+     "8016": {
+      "fp": "596bae62ba4a856b",
+      "draws": 77665,
+      "points_per_team": 73.5,
+      "turns": 388,
+      "possessions": 32
+     },
+     "8017": {
+      "fp": "d95bc776dd6f8d6b",
+      "draws": 78222,
+      "points_per_team": 63.0,
+      "turns": 381,
+      "possessions": 40
+     },
+     "8018": {
+      "fp": "7b02cea24b5327a0",
+      "draws": 71933,
+      "points_per_team": 74.5,
+      "turns": 400,
+      "possessions": 37
+     },
+     "8019": {
+      "fp": "832704433dad6561",
+      "draws": 75227,
+      "points_per_team": 88.0,
+      "turns": 410,
+      "possessions": 27
+     },
+     "8020": {
+      "fp": "cacbe10aefa79eba",
+      "draws": 74917,
+      "points_per_team": 82.0,
+      "turns": 414,
+      "possessions": 32
+     },
+     "8021": {
+      "fp": "ebbc344200cfcc3b",
+      "draws": 76887,
+      "points_per_team": 67.5,
+      "turns": 436,
+      "possessions": 34
+     },
+     "8022": {
+      "fp": "39bc9786ae69e0e0",
+      "draws": 82806,
+      "points_per_team": 96.5,
+      "turns": 432,
+      "possessions": 25
+     },
+     "8023": {
+      "fp": "fbb3e6c1d18401b9",
+      "draws": 74126,
+      "points_per_team": 84.0,
+      "turns": 448,
+      "possessions": 39
+     },
+     "8024": {
+      "fp": "2db40cf11e1fca13",
+      "draws": 77365,
+      "points_per_team": 51.5,
+      "turns": 407,
+      "possessions": 54
+     },
+     "8025": {
+      "fp": "820d44298bcd360e",
+      "draws": 71471,
+      "points_per_team": 72.5,
+      "turns": 376,
+      "possessions": 34
+     },
+     "8026": {
+      "fp": "06cded5a0c67b599",
+      "draws": 73284,
+      "points_per_team": 80.5,
+      "turns": 405,
+      "possessions": 37
+     },
+     "8027": {
+      "fp": "9a1aee15a4f245c0",
+      "draws": 71335,
+      "points_per_team": 77.0,
+      "turns": 428,
+      "possessions": 39
+     },
+     "8028": {
+      "fp": "75735a5c10e2e228",
+      "draws": 72260,
+      "points_per_team": 79.5,
+      "turns": 390,
+      "possessions": 33
+     },
+     "8029": {
+      "fp": "73b8ef2c398f54db",
+      "draws": 74917,
+      "points_per_team": 52.5,
+      "turns": 399,
+      "possessions": 47
+     },
+     "8030": {
+      "fp": "f8847a4d09bad60f",
+      "draws": 77123,
+      "points_per_team": 71.5,
+      "turns": 379,
+      "possessions": 31
+     },
+     "8031": {
+      "fp": "f2fcce4841615d8b",
+      "draws": 72366,
+      "points_per_team": 72.0,
+      "turns": 385,
+      "possessions": 43
+     },
+     "8032": {
+      "fp": "b27e543e59963bfb",
+      "draws": 74321,
+      "points_per_team": 80.5,
+      "turns": 432,
+      "possessions": 39
+     },
+     "8033": {
+      "fp": "2d3780b9f5752003",
+      "draws": 73077,
+      "points_per_team": 83.0,
+      "turns": 382,
+      "possessions": 42
+     },
+     "8034": {
+      "fp": "058bbf94ed962e41",
+      "draws": 78004,
+      "points_per_team": 75.0,
+      "turns": 413,
+      "possessions": 36
+     },
+     "8035": {
+      "fp": "c8978ff771186b05",
+      "draws": 75324,
+      "points_per_team": 73.5,
+      "turns": 442,
+      "possessions": 36
+     },
+     "8036": {
+      "fp": "a920398d55a2cfe3",
+      "draws": 75088,
+      "points_per_team": 68.0,
+      "turns": 415,
+      "possessions": 46
+     },
+     "8037": {
+      "fp": "161d8f384c048c2f",
+      "draws": 76974,
+      "points_per_team": 81.0,
+      "turns": 443,
+      "possessions": 41
+     },
+     "8038": {
+      "fp": "3f8781fed0ac7ea4",
+      "draws": 74378,
+      "points_per_team": 74.0,
+      "turns": 425,
+      "possessions": 45
+     },
+     "8039": {
+      "fp": "e1e08ded4662f77d",
+      "draws": 71937,
+      "points_per_team": 78.0,
+      "turns": 391,
+      "possessions": 32
+     }
+    }
+   },
+   "arm_gap_sim_minus_played": {
+    "mean": -0.338,
+    "ci95": 2.834,
+    "n": 40,
+    "note": "paired per-seed difference, not quadrature"
+   }
+  }
+ }
+}
