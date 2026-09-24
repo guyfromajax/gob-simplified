@@ -386,6 +386,29 @@ def build_all_animations(game, skeleton, off_lineup, def_lineup, add_defenders=T
                 )
                 animations.extend(defensive_anims)
 
+    # ── Spatial screens Stage A (GOB_SCREEN_TARGETING, default OFF) ───────────────────
+    # Aim each screener at the receiver's DEFENDER instead of at OFFSET_SPOTS[location].
+    #
+    # IT MUST RUN HERE, not at the `OFFSET_SPOTS` line above. That line is inside the
+    # OFFENSE loop, which completes before any defender is placed, so the receiver's
+    # defender has no coordinate yet. Running after placement also keeps the dependency
+    # one-way: defenders are placed against the offence, and this reads the placed
+    # defenders. Feeding the screen point back into placement would make the two recursive.
+    #
+    # AND BEFORE the separation pass below, which reads offensive coordinates to decide
+    # which defenders are pinned on deliberate coverage — it must see the final offence.
+    #
+    # Writes only offensive screeners. Moves no defender. Consumes no RNG.
+    if add_defenders and def_lineup:
+        try:
+            from BackEnd.utils.screen_targeting import apply_screen_targeting
+            apply_screen_targeting(animations, game, skeleton, off_lineup, def_lineup,
+                                   zone_assignments=zone_assignments)
+        except Exception as e:
+            reraise_if_strict(e)
+            import logging as _scr_log
+            _scr_log.warning("screen targeting failed: %s", e)
+
     # ── Collision Phase 1 (GOB_COLLISION_SEPARATION, default OFF) ──────────────────────
     # Defender-defender partial-overlap separation. This is the ONE hook for all four
     # placement paths above (FCP, HCT, zone, standard): each builds its defenders with the

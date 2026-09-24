@@ -1,0 +1,331 @@
+"""Spatial screens, Stage A: aim the screener at the receiver's DEFENDER.
+
+WHAT IS WRONG TODAY
+-------------------
+``defender_placement.build_all_animations`` sends a screener to
+``OFFSET_SPOTS[location]`` — a fixed per-spot nudge off the *receiver's own named
+spot*. It is a cosmetic anti-overlap table (``constants/__init__.py:600``, comment:
+"Offset positions for collision handling"), and it knows nothing about any defender.
+
+Measured over 6 games at production footing (3,162 screen ``pos_action``s,
+``reports/spatial-screens-phase2.md``):
+
+  * screener → receiver            p50 **4.0** grid  (p25 3.0, p90 4.0 — a fixed nudge)
+  * screener → receiver's DEFENDER p50 **8.5** grid  (p25 6.0, p90 13.0)
+
+So the screener is planted beside the man he is screening *for*, roughly two sprite
+widths from the man he is supposed to be screening. Nothing is in anybody's way.
+
+WHAT STAGE A DOES
+-----------------
+Put the screener on the segment from the receiver's defender toward where the receiver
+is heading, one contact-distance in front of the defender — i.e. in the defender's path,
+body-to-body, which is what setting a screen is.
+
+NOT CLAIRVOYANT. Everything read is known when placement runs: the receiver's *authored*
+next destination in the skeleton (the play's intent, which the screener is running too),
+and the defender's coordinate at this step. It never reads the step's outcome — not the
+shot, not the contest, not who ends up with the ball. The play call is knowledge the
+screener has; the outcome is not.
+
+NO NEW TUNING CONSTANT. The stand-off is ``collision_separation.separation_threshold``,
+the Phase 1 per-pair contact distance already derived from the frontend's
+``headRadiusForHeight`` sprite geometry. Two median players → 2.62 grid.
+
+NO RNG. Pure geometry, no draw, on either side of the flag.
+
+WHY IT IS A POST-PASS AND NOT AN EDIT AT defender_placement.py:223
+------------------------------------------------------------------
+Line 223 sits in the OFFENSE loop, which runs to completion before any defender is
+placed — so at that line the receiver's defender does not have a coordinate yet. It
+cannot: defenders are placed *against* the offence.
+
+Running afterwards also keeps the dependency one-way. Defender placement reads the
+offence; this reads the placed defenders. If the screen point fed back into defender
+placement the two would be mutually recursive.
+
+It must run BEFORE ``collision_separation``: that pass reads offensive coordinates to
+decide which defenders are pinned on deliberate coverage, so it has to see the final
+offence. And both must run before ``build_all_animations`` returns, because the freeze
+stamp reads these coordinates back out — see the Phase 1 comment at the hook.
+
+CONSEQUENCE, MEASURED NOT ASSUMED: the screener's OWN defender was placed against the
+screener's pre-screen coordinate and is not re-placed. That is what Stage B's SWITCH /
+FIGHT THROUGH / GO AROUND is for. The distribution is reported rather than papered over.
+
+``GOB_SCREEN_TARGETING`` gates it, default OFF.
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import os
+from collections import Counter
+from typing import Any, Dict, List, Optional, Tuple
+
+from BackEnd.utils.collision_separation import separation_threshold
+
+#: The flag. Unset or anything other than "1" means OFF. Read at CALL time, not captured at
+#: import: an import-time constant cannot be monkeypatched, and this is not a hot path.
+SCREEN_TARGETING_FLAG = "GOB_SCREEN_TARGETING"
+
+#: Court bounds, in grid units. The 100x50 playing grid itself (``gridToPixels.js``), not a
+#: chosen margin — a screen point outside it is off the floor.
+COURT_MAX_X = 100.0
+COURT_MAX_Y = 50.0
+
+#: pos_action action label for a screen. Both spellings appear; ``ACTIONS["SCREEN"]`` is
+#: itself the literal "screen" (constants/__init__.py:118).
+SCREEN_ACTION = "screen"
+
+
+def screen_targeting_enabled() -> bool:
+    return os.environ.get(SCREEN_TARGETING_FLAG, "") == "1"
+
+
+def _loc(action_info: Dict[str, Any]) -> Optional[str]:
+    """Authored spot name. HCO/FCP author it under "location", HCT under "spot"."""
+    if not isinstance(action_info, dict):
+        return None
+    return action_info.get("location") or action_info.get("spot") or None
+
+
+def _action(action_info: Dict[str, Any]) -> str:
+    if not isinstance(action_info, dict):
+        return ""
+    return (action_info.get("action") or "").lower().strip()
+
+
+def derive_receiver(pos_actions: Dict[str, Any], screener_pos: str) -> Tuple[Optional[str], str]:
+    """Who is this screen FOR?
+
+    The playbook says so explicitly — ``{"type": "screen", "by": X, "for": Y}`` — but those
+    events do NOT survive to the executed skeleton (audit:
+    ``reports/overlap-and-screens-audit-2026-09-24.md``). What does survive is that the
+    screener is authored to the receiver's OWN named spot, so the receiver is the other
+    offensive position standing on the same ``location`` at this step.
+
+    Measured: unique match on **87.3%** of screens (2,760 / 3,162). Ambiguity never
+    occurred in 6 games but is handled anyway, by lineup-slot order, so the answer can
+    never depend on dict iteration order.
+    """
+    loc = _loc(pos_actions.get(screener_pos))
+    if not loc:
+        return None, "no_location_on_screener"
+    same = [p for p in sorted(pos_actions, key=str)
+            if p != screener_pos and _loc(pos_actions.get(p)) == loc]
+    if not same:
+        return None, "none_same_location"
+    if len(same) > 1:
+        return same[0], "ambiguous_same_location"
+    return same[0], "unique_same_location"
+
+
+def receiver_next_location(steps: List[Dict[str, Any]], step_idx: int,
+                           receiver_pos: str, screen_loc: str) -> Optional[str]:
+    """Where the receiver is heading: his next AUTHORED spot after this step that differs
+    from the screen spot. Play intent, not outcome — see the module docstring."""
+    for later in steps[step_idx + 1:]:
+        info = (later.get("pos_actions") or {}).get(receiver_pos)
+        if not info:
+            continue
+        nxt = _loc(info)
+        if nxt and nxt != screen_loc:
+            return nxt
+    return None
+
+
+def resolve_receiver_guard(receiver_pos: str, step_idx: int, *, zone: bool,
+                           guard_of: Dict[str, str], zone_assignments: Dict[Any, Any],
+                           off_lineup: Dict[str, Any]) -> Optional[str]:
+    """The defensive position guarding the receiver at this step, or None.
+
+    Man reads the matchup map (100% resolved, 1,348 / 1,348). Zone reads
+    ``zone_defender_assignments_by_step`` — the guard map the zone placement actually
+    wrote — and legitimately resolves nothing when the receiver stands in an area no
+    defender was assigned to. Measured: zone resolves **51.8%** (731 / 1,412). The man
+    matchup dict is NOT a substitute in zone; nobody is playing man.
+    """
+    if not zone:
+        return guard_of.get(receiver_pos)
+    rpid = getattr((off_lineup or {}).get(receiver_pos), "player_id", None)
+    if not rpid:
+        return None
+    row = (zone_assignments or {}).get(step_idx)
+    if row is None:
+        row = (zone_assignments or {}).get(str(step_idx)) or {}
+    for dpos in sorted(row, key=str):          # sorted: never dict order
+        opid = row.get(dpos)
+        if opid and str(opid) == str(rpid):
+            return dpos
+    return None
+
+
+def screen_point(defender_coord: Dict[str, float], receiver_dest: Dict[str, float],
+                 screener: Any, defender: Any) -> Optional[Dict[str, float]]:
+    """One contact-distance in front of the defender, along defender → receiver's
+    destination. Returns None when the defender is already standing on that destination
+    (no path, so no path to block) — the caller then falls back to today's placement.
+    """
+    vx = float(receiver_dest["x"]) - float(defender_coord["x"])
+    vy = float(receiver_dest["y"]) - float(defender_coord["y"])
+    length = math.hypot(vx, vy)
+    if length < 1e-6:
+        return None
+    standoff = separation_threshold(screener, defender)
+    return {
+        "x": max(0.0, min(COURT_MAX_X, float(defender_coord["x"]) + vx / length * standoff)),
+        "y": max(0.0, min(COURT_MAX_Y, float(defender_coord["y"]) + vy / length * standoff)),
+    }
+
+
+def _new_stats() -> Dict[str, Any]:
+    return {
+        "enabled": True,
+        "screens": 0,
+        "applied": 0,
+        "fallback": Counter(),      # why today's OFFSET_SPOTS placement was kept
+        "displacement": Counter(),  # how far the screener moved, 0.5 grid buckets
+    }
+
+
+def apply_screen_targeting(animations, game, skeleton, off_lineup, def_lineup,
+                           zone_assignments=None):
+    """Retarget every resolvable screener in ``animations``, in place. Returns stats.
+
+    Writes ONLY offensive screeners' coordinates. Defensive entries are read and never
+    modified — Stage A moves no defender (Stage B does not move one either; it changes
+    who guards whom). Consumes no RNG.
+
+    Iteration is by step index then by sorted position, so the result cannot depend on
+    dict order. Inert and allocation-free when the flag is off.
+    """
+    if not screen_targeting_enabled():
+        return {"enabled": False, "screens": 0, "applied": 0}
+
+    from BackEnd.engine.defender_placement import (
+        defender_grid_from_animations, offense_grid_from_animations)
+    from BackEnd.utils.defense_utils import is_zone_defense
+    from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
+    from BackEnd.constants import HCO_STRING_SPOTS
+
+    stats = _new_stats()
+    steps = (skeleton or {}).get("steps") or []
+    if not steps or not off_lineup or not def_lineup:
+        return stats
+
+    anim_by_pid = {a.get("playerId"): a for a in (animations or []) if a.get("playerId")}
+    dgrid = defender_grid_from_animations(animations, def_lineup, len(steps))
+
+    game_state = getattr(game, "game_state", {}) or {}
+    zone = bool(is_zone_defense(game_state.get("defense_playcall", "man")))
+    try:
+        defending_is_user = game.defense_team.team_id == game.user_team.team_id
+    except Exception:
+        defending_is_user = False
+    matchups = get_matchups_for_defending_team(game_state, defending_is_user) or {}
+    guard_of = {off: dfn for dfn, off in matchups.items()}      # {off_pos: def_pos}
+
+    for step_idx, step in enumerate(steps):
+        pos_actions = step.get("pos_actions") or {}
+        timestamp = step.get("timestamp", 0)
+        for screener_pos in sorted(pos_actions, key=str):
+            if _action(pos_actions.get(screener_pos)) != SCREEN_ACTION:
+                continue
+            stats["screens"] += 1
+
+            screen_loc = _loc(pos_actions.get(screener_pos))
+            receiver_pos, why = derive_receiver(pos_actions, screener_pos)
+            if not receiver_pos:
+                stats["fallback"][why] += 1
+                continue
+
+            guard_pos = resolve_receiver_guard(
+                receiver_pos, step_idx, zone=zone, guard_of=guard_of,
+                zone_assignments=zone_assignments, off_lineup=off_lineup)
+            if not guard_pos:
+                stats["fallback"]["no_guard_" + ("zone" if zone else "man")] += 1
+                continue
+            defender_coord = (dgrid.get(step_idx) or {}).get(guard_pos)
+            if not defender_coord:
+                stats["fallback"]["guard_has_no_coord"] += 1
+                continue
+
+            dest_loc = receiver_next_location(steps, step_idx, receiver_pos, screen_loc)
+            if not dest_loc:
+                stats["fallback"]["receiver_not_heading_anywhere"] += 1
+                continue
+            dest_coord = HCO_STRING_SPOTS.get(dest_loc)
+            if not dest_coord:
+                stats["fallback"]["dest_spot_unknown"] += 1
+                continue
+            # The defender grid is in PLAYED orientation; the authored spot table is in home
+            # orientation. Flip the destination to match before taking the direction.
+            if _is_away_offense(game):
+                from BackEnd.utils.shared import get_away_player_coords
+                dest_coord = get_away_player_coords(dest_coord)
+
+            screener = (off_lineup or {}).get(screener_pos)
+            defender = (def_lineup or {}).get(guard_pos)
+            entry = _movement_entry(anim_by_pid, screener, timestamp)
+            if entry is None:
+                stats["fallback"]["screener_has_no_movement_entry"] += 1
+                continue
+
+            target = screen_point(defender_coord, dest_coord, screener, defender)
+            if target is None:
+                stats["fallback"]["defender_already_at_destination"] += 1
+                continue
+
+            before = entry["coords"]
+            moved = math.hypot(float(target["x"]) - float(before["x"]),
+                               float(target["y"]) - float(before["y"]))
+            entry["coords"] = target
+            _resync_start_end(anim_by_pid.get(getattr(screener, "player_id", None)))
+            stats["applied"] += 1
+            stats["displacement"][round(round(moved / 0.5) * 0.5, 2)] += 1
+
+    stats["fallback"] = dict(stats["fallback"])
+    stats["displacement"] = dict(stats["displacement"])
+    return stats
+
+
+def _is_away_offense(game) -> bool:
+    try:
+        return game.offense_team.team_id == game.away_team.team_id
+    except Exception:
+        return False
+
+
+def _movement_entry(anim_by_pid, player, timestamp):
+    """The screener's movement entry for THIS step.
+
+    An offensive player's ``movement`` only gains an entry on steps where he has a
+    ``pos_action``, so ``movement[step_idx]`` is not step ``step_idx`` — the same trap
+    ``offense_grid_from_animations`` documents. Match on the entry's own timestamp.
+    """
+    pid = getattr(player, "player_id", None)
+    anim = anim_by_pid.get(pid) if pid else None
+    if not anim:
+        return None
+    for entry in anim.get("movement") or []:
+        if entry.get("timestamp") == timestamp:
+            coords = entry.get("coords")
+            if isinstance(coords, dict) and coords.get("x") is not None:
+                return entry
+            return None
+    return None
+
+
+def _resync_start_end(anim) -> None:
+    """``start``/``end`` are the first/last movement coords, captured during the build. If
+    the retargeted step was the first or last, they must follow — otherwise the entry
+    disagrees with its own movement list."""
+    if not anim:
+        return
+    movement = anim.get("movement") or []
+    if not movement:
+        return
+    anim["start"] = movement[0]["coords"]
+    anim["end"] = movement[-1]["coords"]
