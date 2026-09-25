@@ -1,8 +1,8 @@
 /**
- * Speaker cap on the existing scoreboard. Absolute overlay only — it does not
- * add a grid column or change #scoreboard / #phaser-container size.
+ * Sound control in the playcall game-controls group, next to Pause and Timeout.
+ * The scoreboard is not touched. The popover is mounted on document.body so an
+ * ancestor with overflow:hidden cannot clip it. Opening it does not pause.
  * Mute all is the master channel. Music and SFX sliders follow uiSfx.
- * Opening the popover does not pause the game.
  */
 import { getAudioState, setChannelLevel, setChannelMuted, subscribeAudio } from './uiSfx.js';
 
@@ -14,39 +14,54 @@ function ensureStyle() {
   const style = document.createElement('style');
   style.id = 'court-audio-style';
   style.textContent = [
-    '#scoreboard .sb-snd{position:absolute;right:0;top:0;bottom:0;z-index:1002;display:flex;align-items:center;padding:0 8px;border-left:1px solid rgba(255,255,255,.08);pointer-events:auto}',
-    '#scoreboard .sb-snd button{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:rgba(255,255,255,.38);background:transparent;border:0;padding:0;cursor:pointer}',
-    '#scoreboard .sb-snd button svg{width:17px;height:17px}',
-    '#scoreboard .sb-snd button:hover,#scoreboard .sb-snd button.open{color:#fff;background:rgba(255,255,255,.08)}',
-    '#scoreboard .sb-snd button.is-muted{color:rgba(255,255,255,.60)}',
-    '#scoreboard .snd-pop{position:absolute;right:-6px;top:calc(100% + 8px);width:250px;padding:12px 14px;border-radius:12px;background:rgba(20,24,34,.98);box-shadow:0 16px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:10px;z-index:1003;color:rgba(255,255,255,.87);font-family:Inter,sans-serif}',
-    '#scoreboard .snd-pop::before{content:"";position:absolute;right:16px;top:-5px;width:10px;height:10px;transform:rotate(45deg);background:rgba(20,24,34,.98)}',
-    '#scoreboard .snd-m{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)}',
-    '#scoreboard .snd-r{display:grid;grid-template-columns:48px minmax(0,1fr) 26px;align-items:center;gap:10px;font-size:12px;font-weight:600}',
-    '#scoreboard .snd-r span:last-child{text-align:right;color:rgba(255,255,255,.60)}',
-    '#scoreboard .tgl{width:36px;height:20px;border-radius:10px;background:rgba(255,255,255,.12);position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);border:0;padding:0;cursor:pointer}',
-    '#scoreboard .tgl::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:999px;background:#c9ccd3;transition:transform 140ms}',
-    '#scoreboard .tgl.on{background:#27408E}',
-    '#scoreboard .tgl.on::after{transform:translateX(16px);background:#fff}',
-    '#scoreboard .slider{position:relative;height:18px;display:flex;align-items:center;cursor:pointer}',
-    '#scoreboard .slider::before{content:"";position:absolute;left:0;right:0;height:4px;border-radius:2px;background:rgba(255,255,255,.10)}',
-    '#scoreboard .slider i{position:absolute;left:0;height:4px;border-radius:2px;background:rgba(255,255,255,.72)}',
-    '#scoreboard .slider b{position:absolute;width:14px;height:14px;margin-left:-7px;border-radius:999px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}',
+    '#playcall-center .pcc-game .pcc-zone-body{min-height:0}',
+    '#playcall-center .pcc-game #pause-btn.pcc-pause,#playcall-center .pcc-game #timeout-btn.pcc-timeout,#playcall-center .pcc-game #sound-btn.pcc-sound{min-height:0;flex:1 1 0}',
+    '#playcall-center .pcc-game #sound-btn.pcc-sound{position:static;margin:0;width:100%;padding:0 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.16);border-radius:9px;color:#fff;font-family:"Bebas Neue",sans-serif;font-size:15px;letter-spacing:0.08em;cursor:pointer;display:inline-flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;transition:background 0.14s,border-color 0.14s;box-shadow:none}',
+    '.gob-snd-pop[hidden]{display:none !important}',
+    '#playcall-center .pcc-game #sound-btn.pcc-sound:hover:not(:disabled),#playcall-center .pcc-game #sound-btn.pcc-sound.open{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.24)}',
+    '#playcall-center .pcc-game #sound-btn.pcc-sound:disabled{opacity:0.5;cursor:not-allowed}',
+    '#sound-btn .pcc-sound-icon,#sound-btn .pcc-sound-label{pointer-events:none}',
+    '#sound-btn .pcc-sound-icon{display:grid;width:18px;height:18px;flex:0 0 auto}',
+    '#sound-btn .pcc-sound-icon svg{width:18px;height:18px}',
+    '.gob-snd-pop{position:fixed;z-index:10050;width:250px;padding:12px 14px;border-radius:12px;background:rgba(20,24,34,.98);box-shadow:0 16px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:10px;color:rgba(255,255,255,.87);font-family:Inter,sans-serif}',
+    '.gob-snd-pop::after{content:"";position:absolute;left:var(--caret,50%);bottom:-5px;width:10px;height:10px;transform:translateX(-50%) rotate(45deg);background:rgba(20,24,34,.98)}',
+    '.gob-snd-pop .snd-m{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.08)}',
+    '.gob-snd-pop .snd-r{display:grid;grid-template-columns:48px minmax(0,1fr) 26px;align-items:center;gap:10px;font-size:12px;font-weight:600}',
+    '.gob-snd-pop .snd-r span:last-child{text-align:right;color:rgba(255,255,255,.60)}',
+    '.gob-snd-pop .tgl{width:36px;height:20px;border-radius:10px;background:rgba(255,255,255,.12);position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);border:0;padding:0;cursor:pointer}',
+    '.gob-snd-pop .tgl::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:999px;background:#c9ccd3;transition:transform 140ms}',
+    '.gob-snd-pop .tgl.on{background:#27408E}',
+    '.gob-snd-pop .tgl.on::after{transform:translateX(16px);background:#fff}',
+    '.gob-snd-pop .slider{position:relative;height:18px;display:flex;align-items:center;cursor:pointer}',
+    '.gob-snd-pop .slider::before{content:"";position:absolute;left:0;right:0;height:4px;border-radius:2px;background:rgba(255,255,255,.10)}',
+    '.gob-snd-pop .slider i{position:absolute;left:0;height:4px;border-radius:2px;background:rgba(255,255,255,.72)}',
+    '.gob-snd-pop .slider b{position:absolute;width:14px;height:14px;margin-left:-7px;border-radius:999px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}',
   ].join('');
   document.head.appendChild(style);
 }
 
-function paint(root, state) {
+function controlsAreShown() {
+  const pause = document.getElementById('pause-btn');
+  const timeout = document.getElementById('timeout-btn');
+  const shown = (el) => {
+    if (!el || el.hidden) return false;
+    const cs = getComputedStyle(el);
+    return cs.display !== 'none' && cs.visibility !== 'hidden';
+  };
+  return shown(pause) || shown(timeout);
+}
+
+function paint(btn, pop, state) {
   const master = state.master || { muted: false, level: 100 };
-  const btn = root.querySelector('button');
+  const icon = btn.querySelector('.pcc-sound-icon');
   btn.classList.toggle('is-muted', !!master.muted);
-  btn.innerHTML = master.muted ? SPEAKER_OFF : SPEAKER;
+  if (icon) icon.innerHTML = master.muted ? SPEAKER_OFF : SPEAKER;
   btn.title = master.muted ? 'Sound (muted)' : 'Sound';
-  const tgl = root.querySelector('.tgl');
+  const tgl = pop.querySelector('.tgl');
   tgl.classList.toggle('on', !!master.muted);
   tgl.setAttribute('aria-checked', master.muted ? 'true' : 'false');
   ['music', 'sfx'].forEach((id) => {
-    const row = root.querySelector('[data-aud="' + id + '"]');
+    const row = pop.querySelector('[data-aud="' + id + '"]');
     const slot = state[id] || { level: 100 };
     const slider = row.querySelector('.slider');
     slider.setAttribute('aria-valuenow', String(slot.level));
@@ -56,6 +71,15 @@ function paint(root, state) {
   });
 }
 
+function mirror(method, channel, value) {
+  const api = window.GOBUiSfx;
+  const local = method === 'setChannelLevel' ? setChannelLevel : setChannelMuted;
+  local(channel, value);
+  // Localhost serves Phaser from /static and this module from /js, so the
+  // playback subscribers and this file can be two copies of uiSfx. Write both.
+  if (api && api[method] && api[method] !== local) api[method](channel, value);
+}
+
 function levelFromPointer(slider, event) {
   const rect = slider.getBoundingClientRect();
   const width = rect.width || 1;
@@ -63,42 +87,81 @@ function levelFromPointer(slider, event) {
   return Math.round((x / width) * 100);
 }
 
-export function mountCourtAudio(scoreboard) {
-  if (!scoreboard || scoreboard.querySelector('.sb-snd')) return;
+function placePopover(btn, pop) {
+  const rect = btn.getBoundingClientRect();
+  const width = pop.offsetWidth || 250;
+  const height = pop.offsetHeight || 0;
+  const gap = 8;
+  let left = rect.left + (rect.width - width) / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+  let top = rect.top - height - gap;
+  if (top < 8) top = 8;
+  pop.style.left = Math.round(left) + 'px';
+  pop.style.top = Math.round(top) + 'px';
+  const caret = rect.left + rect.width / 2 - left;
+  pop.style.setProperty('--caret', Math.round(caret) + 'px');
+}
+
+export function mountCourtAudio(root) {
+  const host = root && root.querySelector
+    ? (root.classList && root.classList.contains('pcc-zone-body')
+      ? root
+      : root.querySelector('.pcc-game .pcc-zone-body'))
+    : null;
+  const zone = host || document.querySelector('#playcall-center .pcc-game .pcc-zone-body');
+  if (!zone || zone.querySelector('#sound-btn')) return;
   ensureStyle();
-  const cap = document.createElement('div');
-  cap.className = 'sb-snd';
-  cap.innerHTML = ''
-    + '<button type="button" title="Sound" aria-label="Sound" aria-expanded="false">' + SPEAKER + '</button>'
-    + '<div class="snd-pop" hidden>'
-    + '  <div class="snd-m"><span>Mute all</span><button type="button" class="tgl" role="switch" aria-checked="false" aria-label="Mute all"></button></div>'
-    + '  <div class="snd-r" data-aud="music"><span>Music</span><div class="slider" data-channel="music" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Music"><i></i><b></b></div><span data-val>100</span></div>'
-    + '  <div class="snd-r" data-aud="sfx"><span>SFX</span><div class="slider" data-channel="sfx" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="SFX"><i></i><b></b></div><span data-val>100</span></div>'
-    + '</div>';
-  scoreboard.appendChild(cap);
-  const pop = cap.querySelector('.snd-pop');
-  const btn = cap.querySelector('button');
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'sound-btn';
+  btn.className = 'pcc-sound';
+  btn.setAttribute('aria-label', 'Sound');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.innerHTML = '<span class="pcc-sound-icon" aria-hidden="true">' + SPEAKER + '</span><span class="pcc-sound-label">SOUND</span>';
+  zone.appendChild(btn);
+
+  const pop = document.createElement('div');
+  pop.className = 'gob-snd-pop';
+  pop.hidden = true;
+  pop.innerHTML = ''
+    + '<div class="snd-m"><span>Mute all</span><button type="button" class="tgl" role="switch" aria-checked="false" aria-label="Mute all"></button></div>'
+    + '<div class="snd-r" data-aud="music"><span>Music</span><div class="slider" data-channel="music" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="Music"><i></i><b></b></div><span data-val>100</span></div>'
+    + '<div class="snd-r" data-aud="sfx"><span>SFX</span><div class="slider" data-channel="sfx" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="SFX"><i></i><b></b></div><span data-val>100</span></div>';
+  document.body.appendChild(pop);
+
   const setOpen = (next) => {
+    if (next && (btn.hidden || !controlsAreShown())) return;
     pop.hidden = !next;
     btn.classList.toggle('open', next);
     btn.setAttribute('aria-expanded', next ? 'true' : 'false');
+    if (next) placePopover(btn, pop);
   };
+
+  const syncVisibility = () => {
+    const show = controlsAreShown();
+    btn.hidden = !show;
+    if (!show) setOpen(false);
+  };
+  syncVisibility();
+
   btn.addEventListener('click', (event) => {
+    event.preventDefault();
     event.stopPropagation();
     setOpen(pop.hidden);
   });
-  cap.querySelector('.tgl').addEventListener('click', (event) => {
+  pop.querySelector('.tgl').addEventListener('click', (event) => {
+    event.preventDefault();
     event.stopPropagation();
-    const muted = !getAudioState().master.muted;
-    setChannelMuted('master', muted);
+    mirror('setChannelMuted', 'master', !getAudioState().master.muted);
   });
-  cap.addEventListener('pointerdown', (event) => {
+  pop.addEventListener('pointerdown', (event) => {
     const slider = event.target.closest && event.target.closest('.slider');
     if (!slider) return;
     event.preventDefault();
     event.stopPropagation();
     const channel = slider.getAttribute('data-channel');
-    const move = (ev) => setChannelLevel(channel, levelFromPointer(slider, ev));
+    const move = (ev) => mirror('setChannelLevel', channel, levelFromPointer(slider, ev));
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
@@ -107,7 +170,7 @@ export function mountCourtAudio(scoreboard) {
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   });
-  cap.addEventListener('keydown', (event) => {
+  pop.addEventListener('keydown', (event) => {
     const slider = event.target.closest && event.target.closest('.slider');
     if (!slider) {
       if (event.key === 'Escape') setOpen(false);
@@ -124,21 +187,30 @@ export function mountCourtAudio(scoreboard) {
     else if (event.key === 'Escape') setOpen(false);
     if (next == null) return;
     event.preventDefault();
-    setChannelLevel(channel, next);
+    mirror('setChannelLevel', channel, next);
   });
   document.addEventListener('click', (event) => {
-    if (!cap.contains(event.target)) setOpen(false);
+    if (btn.contains(event.target) || pop.contains(event.target)) return;
+    setOpen(false);
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') setOpen(false);
   });
-  subscribeAudio((state) => paint(cap, state));
-  paint(cap, getAudioState());
+  window.addEventListener('resize', () => {
+    syncVisibility();
+    if (!pop.hidden) placePopover(btn, pop);
+  });
+  const watch = document.getElementById('playcall-center') || document.body;
+  if (typeof MutationObserver === 'function') {
+    const observer = new MutationObserver(syncVisibility);
+    observer.observe(watch, { attributes: true, attributeFilter: ['style', 'class', 'hidden'], subtree: true });
+  }
+  subscribeAudio((state) => paint(btn, pop, state));
+  paint(btn, pop, getAudioState());
 }
 
 export function mountCourtAudioWhenReady() {
-  const scoreboard = document.getElementById('scoreboard');
-  if (scoreboard) mountCourtAudio(scoreboard);
+  mountCourtAudio(document.getElementById('playcall-center'));
 }
 
 if (typeof window !== 'undefined') {

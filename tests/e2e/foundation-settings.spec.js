@@ -83,35 +83,129 @@ test('offline profile hides Account and shows the offline note', async ({ page }
   await expect(page.locator('[data-conn-label]')).toHaveText('Offline');
 });
 
-test('court speaker mutes and shows the slashed icon', async ({ page }) => {
+const COURT_RECTS = {
+  '1280x720': {
+    scoreboard: { x: 0, y: 0, w: 1280, h: 120 },
+    phaser: { x: 280, y: 120, w: 720, h: 456 },
+  },
+  '1920x1080': {
+    scoreboard: { x: 0, y: 0, w: 1920, h: 120 },
+    phaser: { x: 280, y: 120, w: 1360, h: 744 },
+  },
+};
+
+function roundRect(box) {
+  return {
+    x: Math.round(box.x),
+    y: Math.round(box.y),
+    w: Math.round(box.width),
+    h: Math.round(box.height),
+  };
+}
+
+async function revealCourt(page) {
+  await page.evaluate(() => {
+    document.querySelectorAll('.pre-game-container, #page-load-overlay, .pgxp-root').forEach((el) => {
+      el.style.display = 'none';
+    });
+  });
+}
+
+async function mouseClick(page, locator) {
+  const box = await locator.boundingBox();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.click(x, y);
+  return { x, y };
+}
+
+test('court sound control sits with pause and timeout', async ({ page }) => {
   await stubAuth(page);
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
-  const cap = page.locator('#scoreboard .sb-snd');
-  await expect(cap).toBeVisible();
-  // The pregame modal covers the viewport until the quarter starts. Hide it
-  // so the scoreboard control can be clicked; measure size around the click
-  // only, after the modal is already out of the way.
-  await page.evaluate(() => {
-    document.querySelectorAll('.pre-game-container').forEach((el) => el.classList.add('hidden'));
+  const sound = page.locator('#sound-btn');
+  await expect(sound).toBeVisible();
+  await expect(page.locator('#scoreboard .sb-snd')).toHaveCount(0);
+  await revealCourt(page);
+
+  const hit = await page.evaluate(() => {
+    const btn = document.getElementById('sound-btn');
+    const box = btn.getBoundingClientRect();
+    const el = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return el && el.id;
   });
-  const before = await page.evaluate(() => ({
-    scoreboard: document.getElementById('scoreboard').getBoundingClientRect().height,
+  expect(hit).toBe('sound-btn');
+
+  const rects = await page.evaluate(() => ({
+    scoreboard: document.getElementById('scoreboard').getBoundingClientRect().toJSON(),
     phaser: document.getElementById('phaser-container').getBoundingClientRect().toJSON(),
   }));
-  await cap.locator('button').first().click();
-  await expect(page.locator('#scoreboard .snd-pop')).toBeVisible();
-  await page.locator('#scoreboard .tgl').click();
-  await expect(cap.locator('button').first()).toHaveClass(/is-muted/);
-  const muted = await page.evaluate(() => window.GOBUiSfx.getAudioState().master.muted);
-  expect(muted).toBe(true);
-  const after = await page.evaluate(() => ({
-    scoreboard: document.getElementById('scoreboard').getBoundingClientRect().height,
+  expect(roundRect(rects.scoreboard)).toEqual(COURT_RECTS['1280x720'].scoreboard);
+  expect(roundRect(rects.phaser)).toEqual(COURT_RECTS['1280x720'].phaser);
+
+  const beforePause = await page.locator('.pcc-pause-text').innerText();
+  expect(beforePause).toBe('PAUSE');
+  await mouseClick(page, sound);
+  const pop = page.locator('.gob-snd-pop');
+  await expect(pop).toBeVisible();
+  await expect(page.locator('#pause-btn')).not.toHaveClass(/paused/);
+  await expect(page.locator('.pcc-pause-text')).toHaveText('PAUSE');
+
+  const stacked = await page.evaluate(() => {
+    const btn = document.getElementById('sound-btn').getBoundingClientRect();
+    const panel = document.querySelector('.gob-snd-pop').getBoundingClientRect();
+    return { panelBottom: panel.bottom, buttonTop: btn.top, panelTop: panel.top };
+  });
+  expect(stacked.panelBottom).toBeLessThanOrEqual(stacked.buttonTop + 1);
+  expect(stacked.panelTop).toBeGreaterThanOrEqual(0);
+
+  await mouseClick(page, pop.locator('.tgl'));
+  await expect(sound).toHaveClass(/is-muted/);
+  const music = pop.locator('.slider[data-channel="music"]');
+  const track = await music.boundingBox();
+  await page.mouse.move(track.x + track.width - 2, track.y + track.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(track.x, track.y + track.height / 2, { steps: 12 });
+  await page.mouse.up();
+  const dragged = await page.evaluate(() => window.GOBUiSfx.getAudioState().music.level);
+  expect(dragged).toBe(0);
+  await pop.locator('.slider[data-channel="sfx"]').focus();
+  await page.keyboard.press('ArrowLeft');
+  const stepped = await page.evaluate(() => window.GOBUiSfx.getAudioState().sfx.level);
+  expect(stepped).toBe(95);
+
+  await page.reload();
+  await expect(sound).toBeVisible();
+  await revealCourt(page);
+  await expect(sound).toHaveClass(/is-muted/);
+  const kept = await page.evaluate(() => ({
+    muted: window.GOBUiSfx.getAudioState().master.muted,
+    music: window.GOBUiSfx.getAudioState().music.level,
+  }));
+  expect(kept.muted).toBe(true);
+  expect(kept.music).toBe(0);
+
+  await mouseClick(page, sound);
+  await expect(pop).toBeVisible();
+  await page.screenshot({ path: 'reports/court-sound/popover-1280x720.png' });
+
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await expect(pop).toBeVisible();
+  const wide = await page.evaluate(() => ({
+    scoreboard: document.getElementById('scoreboard').getBoundingClientRect().toJSON(),
     phaser: document.getElementById('phaser-container').getBoundingClientRect().toJSON(),
   }));
-  expect(after.scoreboard).toBe(before.scoreboard);
-  expect(after.phaser.width).toBe(before.phaser.width);
-  expect(after.phaser.height).toBe(before.phaser.height);
+  expect(roundRect(wide.scoreboard)).toEqual(COURT_RECTS['1920x1080'].scoreboard);
+  expect(roundRect(wide.phaser)).toEqual(COURT_RECTS['1920x1080'].phaser);
+  await page.screenshot({ path: 'reports/court-sound/popover-1920x1080.png' });
+
+  await page.keyboard.press('Escape');
+  await expect(pop).toBeHidden();
+  await mouseClick(page, sound);
+  await expect(pop).toBeVisible();
+  await mouseClick(page, sound);
+  await expect(pop).toBeHidden();
 });
 
 test('a mode-select click still asks for its original file', async ({ page }) => {
