@@ -14,13 +14,16 @@ function ensureStyle() {
   const style = document.createElement('style');
   style.id = 'court-audio-style';
   style.textContent = [
-    '#playcall-center .pcc-game .pcc-zone-body{min-height:0}',
-    '#playcall-center .pcc-game #pause-btn.pcc-pause,#playcall-center .pcc-game #timeout-btn.pcc-timeout,#playcall-center .pcc-game #sound-btn.pcc-sound{min-height:0;flex:1 1 0}',
-    '#playcall-center .pcc-game #sound-btn.pcc-sound{position:static;margin:0;width:100%;padding:0 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.16);border-radius:9px;color:#fff;font-family:"Bebas Neue",sans-serif;font-size:15px;letter-spacing:0.08em;cursor:pointer;display:inline-flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;transition:background 0.14s,border-color 0.14s;box-shadow:none}',
+    '#playcall-center .pcc-game .pcc-control-row,#playcall-center .pcc-game .pcc-timeout-row{display:flex;flex:1 1 0%;min-height:48px;width:100%;min-width:0;box-sizing:border-box}',
+    '#playcall-center .pcc-game .pcc-control-row{flex-direction:row;align-items:stretch;gap:6px}',
+    '@media (min-width:1920px){#playcall-center .pcc-game .pcc-control-row{gap:8px}}',
+    '#playcall-center .pcc-game .pcc-control-row #pause-btn.pcc-pause,#playcall-center .pcc-game .pcc-timeout-row #timeout-btn.pcc-timeout{width:auto;flex:1 1 auto;min-width:0;min-height:0;height:100%;box-sizing:border-box}',
+    '#playcall-center .pcc-game .pcc-timeout-row #timeout-btn.pcc-timeout{width:100%}',
+    '#playcall-center .pcc-game #sound-btn.pcc-sound{position:static;margin:0;flex:0 0 auto;align-self:stretch;box-sizing:border-box;height:100%;aspect-ratio:1;width:auto;min-width:0;min-height:0;padding:0;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.16);border-radius:9px;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background 0.14s,border-color 0.14s;box-shadow:none}',
     '.gob-snd-pop[hidden]{display:none !important}',
     '#playcall-center .pcc-game #sound-btn.pcc-sound:hover:not(:disabled),#playcall-center .pcc-game #sound-btn.pcc-sound.open{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.24)}',
     '#playcall-center .pcc-game #sound-btn.pcc-sound:disabled{opacity:0.5;cursor:not-allowed}',
-    '#sound-btn .pcc-sound-icon,#sound-btn .pcc-sound-label{pointer-events:none}',
+    '#sound-btn .pcc-sound-icon{pointer-events:none}',
     '#sound-btn .pcc-sound-icon{display:grid;width:18px;height:18px;flex:0 0 auto}',
     '#sound-btn .pcc-sound-icon svg{width:18px;height:18px}',
     '.gob-snd-pop{position:fixed;z-index:10050;width:250px;padding:12px 14px;border-radius:12px;background:rgba(20,24,34,.98);box-shadow:0 16px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:10px;color:rgba(255,255,255,.87);font-family:Inter,sans-serif}',
@@ -56,7 +59,8 @@ function paint(btn, pop, state) {
   const icon = btn.querySelector('.pcc-sound-icon');
   btn.classList.toggle('is-muted', !!master.muted);
   if (icon) icon.innerHTML = master.muted ? SPEAKER_OFF : SPEAKER;
-  btn.title = master.muted ? 'Sound (muted)' : 'Sound';
+  btn.title = 'Sound';
+  btn.setAttribute('aria-label', master.muted ? 'Sound (muted)' : 'Sound');
   const tgl = pop.querySelector('.tgl');
   tgl.classList.toggle('on', !!master.muted);
   tgl.setAttribute('aria-checked', master.muted ? 'true' : 'false');
@@ -92,7 +96,7 @@ function placePopover(btn, pop) {
   const width = pop.offsetWidth || 250;
   const height = pop.offsetHeight || 0;
   const gap = 8;
-  let left = rect.left + (rect.width - width) / 2;
+  let left = rect.right - width;
   left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
   let top = rect.top - height - gap;
   if (top < 8) top = 8;
@@ -116,10 +120,24 @@ export function mountCourtAudio(root) {
   btn.type = 'button';
   btn.id = 'sound-btn';
   btn.className = 'pcc-sound';
+  btn.title = 'Sound';
   btn.setAttribute('aria-label', 'Sound');
   btn.setAttribute('aria-expanded', 'false');
-  btn.innerHTML = '<span class="pcc-sound-icon" aria-hidden="true">' + SPEAKER + '</span><span class="pcc-sound-label">SOUND</span>';
-  zone.appendChild(btn);
+  btn.innerHTML = '<span class="pcc-sound-icon" aria-hidden="true">' + SPEAKER + '</span>';
+  const row = document.createElement('div');
+  row.className = 'pcc-control-row';
+  const pause = zone.querySelector('#pause-btn');
+  const timeout = zone.querySelector('#timeout-btn');
+  if (pause) pause.before(row);
+  else zone.appendChild(row);
+  if (pause) row.appendChild(pause);
+  row.appendChild(btn);
+  if (timeout) {
+    const timeoutRow = document.createElement('div');
+    timeoutRow.className = 'pcc-timeout-row';
+    timeout.before(timeoutRow);
+    timeoutRow.appendChild(timeout);
+  }
 
   const pop = document.createElement('div');
   pop.className = 'gob-snd-pop';
@@ -196,10 +214,28 @@ export function mountCourtAudio(root) {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') setOpen(false);
   });
+  const sizeSound = () => {
+    const row = btn.parentElement;
+    if (!row) return;
+    const h = Math.round(row.getBoundingClientRect().height);
+    if (!h) return;
+    const px = h + 'px';
+    if (btn.style.width === px) return;
+    btn.style.width = px;
+  };
+  sizeSound();
   window.addEventListener('resize', () => {
     syncVisibility();
+    sizeSound();
     if (!pop.hidden) placePopover(btn, pop);
   });
+  if (typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(() => {
+      sizeSound();
+      if (!pop.hidden) placePopover(btn, pop);
+    });
+    ro.observe(row);
+  }
   const watch = document.getElementById('playcall-center') || document.body;
   if (typeof MutationObserver === 'function') {
     const observer = new MutationObserver(syncVisibility);

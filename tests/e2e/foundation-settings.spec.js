@@ -87,10 +87,18 @@ const COURT_RECTS = {
   '1280x720': {
     scoreboard: { x: 0, y: 0, w: 1280, h: 120 },
     phaser: { x: 280, y: 120, w: 720, h: 456 },
+    playcall: { x: 280, y: 576, w: 720, h: 144 },
+    pauseH: 48,
+    timeoutH: 48,
+    gap: 6,
   },
   '1920x1080': {
     scoreboard: { x: 0, y: 0, w: 1920, h: 120 },
     phaser: { x: 280, y: 120, w: 1360, h: 744 },
+    playcall: { x: 280, y: 864, w: 1360, h: 216 },
+    pauseH: 75,
+    timeoutH: 75,
+    gap: 8,
   },
 };
 
@@ -139,9 +147,14 @@ test('court sound control sits with pause and timeout', async ({ page }) => {
   const rects = await page.evaluate(() => ({
     scoreboard: document.getElementById('scoreboard').getBoundingClientRect().toJSON(),
     phaser: document.getElementById('phaser-container').getBoundingClientRect().toJSON(),
+    playcall: document.getElementById('playcall-center').getBoundingClientRect().toJSON(),
   }));
   expect(roundRect(rects.scoreboard)).toEqual(COURT_RECTS['1280x720'].scoreboard);
   expect(roundRect(rects.phaser)).toEqual(COURT_RECTS['1280x720'].phaser);
+  expect(roundRect(rects.playcall)).toEqual(COURT_RECTS['1280x720'].playcall);
+  await expect(sound).not.toContainText('SOUND');
+  await expect(sound).toHaveAttribute('title', 'Sound');
+  await expect(sound).toHaveAttribute('aria-label', 'Sound');
 
   const beforePause = await page.locator('.pcc-pause-text').innerText();
   expect(beforePause).toBe('PAUSE');
@@ -154,13 +167,34 @@ test('court sound control sits with pause and timeout', async ({ page }) => {
   const stacked = await page.evaluate(() => {
     const btn = document.getElementById('sound-btn').getBoundingClientRect();
     const panel = document.querySelector('.gob-snd-pop').getBoundingClientRect();
-    return { panelBottom: panel.bottom, buttonTop: btn.top, panelTop: panel.top };
+    const pause = document.getElementById('pause-btn').getBoundingClientRect();
+    const timeout = document.getElementById('timeout-btn').getBoundingClientRect();
+    return {
+      panelBottom: panel.bottom,
+      panelRight: panel.right,
+      buttonTop: btn.top,
+      buttonRight: btn.right,
+      panelTop: panel.top,
+      soundW: btn.width,
+      soundH: btn.height,
+      pauseH: pause.height,
+      timeoutH: timeout.height,
+      gap: btn.left - pause.right,
+    };
   });
   expect(stacked.panelBottom).toBeLessThanOrEqual(stacked.buttonTop + 1);
   expect(stacked.panelTop).toBeGreaterThanOrEqual(0);
+  expect(Math.abs(stacked.panelRight - stacked.buttonRight)).toBeLessThanOrEqual(1);
+  expect(Math.round(stacked.pauseH)).toBe(COURT_RECTS['1280x720'].pauseH);
+  expect(Math.round(stacked.timeoutH)).toBe(COURT_RECTS['1280x720'].timeoutH);
+  expect(Math.round(stacked.soundW)).toBe(COURT_RECTS['1280x720'].pauseH);
+  expect(Math.round(stacked.soundH)).toBe(COURT_RECTS['1280x720'].pauseH);
+  expect(Math.round(stacked.gap)).toBe(COURT_RECTS['1280x720'].gap);
 
   await mouseClick(page, pop.locator('.tgl'));
   await expect(sound).toHaveClass(/is-muted/);
+  await expect(sound).toHaveAttribute('aria-label', 'Sound (muted)');
+  await expect(sound).toHaveAttribute('title', 'Sound');
   const music = pop.locator('.slider[data-channel="music"]');
   const track = await music.boundingBox();
   await page.mouse.move(track.x + track.width - 2, track.y + track.height / 2);
@@ -178,6 +212,8 @@ test('court sound control sits with pause and timeout', async ({ page }) => {
   await expect(sound).toBeVisible();
   await revealCourt(page);
   await expect(sound).toHaveClass(/is-muted/);
+  await expect(sound).toHaveAttribute('aria-label', 'Sound (muted)');
+  await expect(sound).toHaveAttribute('title', 'Sound');
   const kept = await page.evaluate(() => ({
     muted: window.GOBUiSfx.getAudioState().master.muted,
     music: window.GOBUiSfx.getAudioState().music.level,
@@ -195,9 +231,23 @@ test('court sound control sits with pause and timeout', async ({ page }) => {
   const wide = await page.evaluate(() => ({
     scoreboard: document.getElementById('scoreboard').getBoundingClientRect().toJSON(),
     phaser: document.getElementById('phaser-container').getBoundingClientRect().toJSON(),
+    playcall: document.getElementById('playcall-center').getBoundingClientRect().toJSON(),
+    pauseH: document.getElementById('pause-btn').getBoundingClientRect().height,
+    timeoutH: document.getElementById('timeout-btn').getBoundingClientRect().height,
+    sound: document.getElementById('sound-btn').getBoundingClientRect().toJSON(),
+    pauseRight: document.getElementById('pause-btn').getBoundingClientRect().right,
+    panelRight: document.querySelector('.gob-snd-pop').getBoundingClientRect().right,
+    soundRight: document.getElementById('sound-btn').getBoundingClientRect().right,
   }));
   expect(roundRect(wide.scoreboard)).toEqual(COURT_RECTS['1920x1080'].scoreboard);
   expect(roundRect(wide.phaser)).toEqual(COURT_RECTS['1920x1080'].phaser);
+  expect(roundRect(wide.playcall)).toEqual(COURT_RECTS['1920x1080'].playcall);
+  expect(Math.round(wide.pauseH)).toBe(COURT_RECTS['1920x1080'].pauseH);
+  expect(Math.round(wide.timeoutH)).toBe(COURT_RECTS['1920x1080'].timeoutH);
+  expect(Math.round(wide.sound.width)).toBe(COURT_RECTS['1920x1080'].pauseH);
+  expect(Math.round(wide.sound.height)).toBe(COURT_RECTS['1920x1080'].pauseH);
+  expect(Math.round(wide.sound.x - wide.pauseRight)).toBe(COURT_RECTS['1920x1080'].gap);
+  expect(Math.abs(wide.panelRight - wide.soundRight)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: 'reports/court-sound/popover-1920x1080.png' });
 
   await page.keyboard.press('Escape');
