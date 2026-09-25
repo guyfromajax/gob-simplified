@@ -213,6 +213,22 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
       const activeRail = page.locator('.rail [data-gob-section].on');
       await expect(activeRail).toHaveCount(1);
       await expect(activeRail).toHaveAttribute('data-gob-section', sectionFor[row[0]]);
+      if (row[0] === 'team' && row[2] === 'Roster') {
+        const stabMetrics = await page.evaluate(() => {
+          const read = (el) => {
+            const cs = getComputedStyle(el);
+            return { fontFamily: cs.fontFamily, height: cs.height, clipPath: cs.clipPath };
+          };
+          const tabs = Array.from(document.querySelectorAll('#gob-subtabs > .stab'));
+          const button = tabs.find((el) => el.tagName === 'BUTTON' && !el.classList.contains('on'));
+          const link = tabs.find((el) => el.tagName === 'A');
+          return { button: read(button), link: read(link) };
+        });
+        expect(stabMetrics.button).toEqual(stabMetrics.link);
+        expect(stabMetrics.button.height).toBe('40px');
+        expect(stabMetrics.button.fontFamily).toMatch(/Bebas/);
+        expect(stabMetrics.button.clipPath).toContain('polygon');
+      }
       await page.screenshot({ path: path.join(OUT, row[0] + '-' + size[2] + '.png') });
     }
     await mouseClick(page, '[data-gob-section="prep"]');

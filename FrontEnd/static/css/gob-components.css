@@ -366,7 +366,8 @@
 .gob .pg-title h1{font:var(--fw-bold) var(--fs-32)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-4);color:var(--text-100)}
 .gob .pg-title .crumb{font-size:var(--fs-12);color:var(--text-60)}
 .gob .subtabs{display:flex;gap:var(--space-6)}
-.gob .stab{position:relative;display:grid;place-items:center;height:40px;min-width:118px;padding:0 var(--space-20);clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);background:var(--white-6);color:var(--white-55)!important;font:var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-4);transition:background var(--dur-hover),color var(--dur-hover)}
+/* .pg-head button and .pg-head * outrank a bare .stab (font, background, padding). */
+.gob .pg-head .stab{position:relative;display:grid;place-items:center;height:40px;min-width:118px;padding:0 var(--space-20);clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);background:var(--white-6);color:var(--white-55)!important;font:var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-4);text-align:center;transition:background var(--dur-hover),color var(--dur-hover)}
 .gob .stab:hover,.gob .stab.is-hover{background:var(--white-11);color:var(--white-90)!important}
 .gob .stab.on{background:var(--white-9);color:var(--white)!important}
 .gob .stab.on::before{content:'';position:absolute;left:10px;right:0;top:0;height:2px;background:var(--white-70)}
