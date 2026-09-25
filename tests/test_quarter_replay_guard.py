@@ -305,6 +305,23 @@ def test_q1_request_when_saved_game_is_past_q1_is_blocked(monkeypatch):
     assert saved["marker"] == "untouched"
 
 
+def test_resume_flag_without_anchor_or_timeout_state_blocks_stale_quarter(monkeypatch):
+    for extra in ({"resume_from_timeout": True}, {"resume_from_anchor": True}):
+        called = {"count": 0, "quarter": None}
+        saved = _saved_game(3)
+        monkeypatch.setattr(api, "ongoing_games", {GAME_ID: _DummyGM(quarter=3)})
+        _patch_common(monkeypatch, called)
+        _install_saved_game(monkeypatch, saved)
+        res = _post(1, **extra)
+        assert res.status_code == 409, (extra, res.text)
+        body = res.json()
+        assert body["error"] == "QUARTER_ALREADY_PLAYED"
+        assert body["saved_quarter"] == 3
+        assert body["requested_quarter"] == 1
+        assert called["count"] == 0
+        assert saved["marker"] == "untouched"
+
+
 def test_cpu_week_and_practice_squad_do_not_use_this_endpoint():
     franchise = (ROOT / "BackEnd/api/franchise_routes.py").read_text()
     practice = (ROOT / "BackEnd/practice_squad/sim.py").read_text()

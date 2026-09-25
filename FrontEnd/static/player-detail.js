@@ -238,7 +238,7 @@ function cloneParams(params) {
       : params.get('return_url');
     let fallback = returnUrl || '/homepage.html';
     const returnTab = params.get('return_tab');
-    if (returnTab && /franchise-command-center\.html/i.test(fallback) && !/[?&]tab=/.test(fallback)) {
+    if (returnTab && window.GOBNav && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(fallback) && !/[?&]tab=/.test(fallback)) {
       fallback += (fallback.indexOf('?') === -1 ? '?' : '&') + 'tab=' + encodeURIComponent(returnTab);
     }
     if (window.GOBNav) window.GOBNav.back(fallback);

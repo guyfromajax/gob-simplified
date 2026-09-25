@@ -3252,15 +3252,14 @@ try:
             "source": "none"
         }
     
-    def _quarter_replay_block_response(saved_quarter, requested_quarter, game_id, body):
+    def _quarter_replay_block_response(saved_quarter, requested_quarter, game_id, _body):
         """409 when the request would simulate a quarter the saved game has already passed.
 
-        Timeout, foul-out, and cold/anchor resumes are exempt: those requests
-        carry resume_from_timeout or resume_from_anchor and continue the saved
-        quarter instead of replaying an earlier one. One comparison, no I/O.
+        Call this only after resume handling has rewritten the request quarter
+        to the saved or anchor quarter. A real resume then compares equal and
+        is allowed. A stale request that only carries a resume flag, with
+        nothing to rewrite, is checked the same way. One comparison, no I/O.
         """
-        if getattr(body, "resume_from_timeout", False) or getattr(body, "resume_from_anchor", False):
-            return None
         try:
             saved_q = int(saved_quarter)
             requested_q = int(requested_quarter)

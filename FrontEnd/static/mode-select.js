@@ -32,10 +32,15 @@ const MODE_SELECT_MUSIC_FADE_MS = 600;
 let modeSelectMusic = null;
 let modeSelectMusicIsFading = false;
 
+function leaveModeSelect(url) {
+  if (window.GOBNav && typeof window.GOBNav.go === 'function') window.GOBNav.go(url);
+  else window.location.href = url;
+}
+
 function navigateFromModeSelect(url) {
   if (modeSelectMusicIsFading) return;
   if (!modeSelectMusic || modeSelectMusic.paused) {
-    window.location.href = url;
+    leaveModeSelect(url);
     return;
   }
 
@@ -51,7 +56,7 @@ function navigateFromModeSelect(url) {
       return;
     }
     modeSelectMusic.pause();
-    window.location.href = url;
+    leaveModeSelect(url);
   }
 
   window.requestAnimationFrame(fadeFrame);

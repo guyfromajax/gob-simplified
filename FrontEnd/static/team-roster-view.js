@@ -77,7 +77,7 @@ function resolveRosterReturnUrl() {
   if (typeof getSafeReturnUrl === 'function') safe = getSafeReturnUrl(returnUrl);
   else if (returnUrl && returnUrl.charAt(0) === '/') safe = returnUrl;
   if (safe) {
-    if (returnTab && /franchise-command-center\.html/i.test(safe) && !/[?&]tab=/.test(safe)) {
+    if (returnTab && window.GOBNav && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(safe) && !/[?&]tab=/.test(safe)) {
       safe += (safe.indexOf('?') === -1 ? '?' : '&') + 'tab=' + encodeURIComponent(returnTab);
     }
     return safe;

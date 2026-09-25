@@ -459,9 +459,8 @@ async function recoverFromQuarterAlreadyPlayed(gameId) {
       console.warn('[QUARTER-REPLAY] resume-state failed', err);
     }
   }
-  const go = (url) => {
+  const replace = (url) => {
     if (window.GOBNav && typeof window.GOBNav.replace === 'function') window.GOBNav.replace(url);
-    else window.location.replace(url);
   };
   const params = new URLSearchParams(window.location.search);
   if (state && (state.status === 'stoppage_anchor' || state.status === 'timeout_resume')) {
@@ -469,20 +468,25 @@ async function recoverFromQuarterAlreadyPlayed(gameId) {
     if (state.quarter) params.set('quarter', String(state.quarter));
     params.set('resume_from_anchor', 'true');
     params.set('resume_from_timeout', 'true');
-    go(`${window.location.pathname}?${params.toString()}`);
+    replace(`${window.location.pathname}?${params.toString()}`);
     return;
   }
   if (state && state.status === 'quarter_break' && state.quarter) {
     params.set('quarter', String(state.quarter));
     if (gameId) params.set('game_id', gameId);
     params.delete('court_start');
-    go(`/set-lineup.html?${params.toString()}`);
+    replace(`/set-lineup.html?${params.toString()}`);
     return;
   }
-  const franchiseId = params.get('franchise_id');
-  go(franchiseId
-    ? `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`
-    : '/mode-select.html');
+  const franchiseIdParam = params.get('franchise_id');
+  if (franchiseIdParam && window.GOBNav && typeof window.GOBNav.exitFlow === 'function') {
+    window.GOBNav.exitFlow(
+      `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseIdParam)}`,
+      { tab: 'home-tab' }
+    );
+    return;
+  }
+  replace('/mode-select.html');
 }
 
 function quarterAlreadyPlayedBody(status, data) {

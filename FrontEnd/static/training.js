@@ -1699,7 +1699,9 @@ function wireCustomTrainingPlaybook() {
       const tid = p.get('team_id') || p.get('user_team_id');
       if (tid) q.set('team_id', tid);
       if (p.get('session_type')) q.set('session_type', p.get('session_type'));
-      window.location.href = `/training-playbooks.html?${q.toString()}`;
+      const playbooksUrl = `/training-playbooks.html?${q.toString()}`;
+      if (window.GOBNav && typeof window.GOBNav.go === 'function') window.GOBNav.go(playbooksUrl);
+      else window.location.href = playbooksUrl;
     });
   }
   syncPlaybookModeToggleUi();
