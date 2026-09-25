@@ -341,7 +341,9 @@ function cloneParams(params) {
   function wireNav() {
     document.getElementById('tp-back').addEventListener('click', (e) => {
       e.preventDefault();
-      window.location.href = trainingOrdersUrl();
+      const ordersUrl = trainingOrdersUrl();
+      if (window.GOBNav && typeof window.GOBNav.back === 'function') window.GOBNav.back(ordersUrl);
+      else window.location.href = ordersUrl;
     });
     document.getElementById('tp-cancel').addEventListener('click', () => {
       window.location.href = trainingOrdersUrl();

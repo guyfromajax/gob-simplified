@@ -6774,7 +6774,10 @@
         const data = await response.json();
         const currentWeek = Number(data.week || 1);
         if (currentWeek > pageWeek) {
-          window.location.replace(`/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`);
+          const hub = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+          if (window.GOBNav && typeof window.GOBNav.exitFlow === 'function') {
+            window.GOBNav.exitFlow(hub, { tab: 'home-tab' });
+          }
           return true;
         }
       } catch (err) {

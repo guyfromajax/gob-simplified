@@ -113,7 +113,8 @@ async function fulfillJson(route, body, status) {
   });
 }
 
-async function installApi(page, ccData) {
+async function installApi(page, ccData, options) {
+  options = options || {};
   const seen = [];
   page.__apiSeen = seen;
   await page.route('**/*', async (route) => {
@@ -225,14 +226,26 @@ async function installApi(page, ccData) {
       });
       return;
     }
+    if (path === '/api/playbooks') {
+      await fulfillJson(route, { motion: [], set_plays: [], man_defense_rows: [], zone_defense_rows: [] });
+      return;
+    }
     if (path.includes('/resume-state')) {
-      await fulfillJson(route, { status: 'quarter_break' });
+      await fulfillJson(route, options.resumeState || { status: 'quarter_break' });
       return;
     }
     if (path === '/api/simulate-quarter' && method === 'POST') {
       let body = {};
       try { body = request.postDataJSON() || {}; } catch (e) { body = {}; }
       seen.push('simulate-quarter full_sim=' + !!body.full_sim);
+      if (options.quarterAlreadyPlayed) {
+        await fulfillJson(route, {
+          error: 'QUARTER_ALREADY_PLAYED',
+          saved_quarter: 2,
+          requested_quarter: body.quarter || 1,
+        }, 409);
+        return;
+      }
       await fulfillJson(route, quarterSim(body));
       return;
     }
@@ -446,6 +459,81 @@ test('a corrupted exit index still lands on the locker room', async ({ page }) =
   await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
   await expect(page).not.toHaveURL(/mode-select\.html/);
   await expect(page).toHaveURL(/tab=home-tab/);
+});
+
+test('custom playbooks adds one step and Back removes it, then training still returns with one Back', async ({ page }) => {
+  await installApi(page, commandCenter({ training_completed: false, week: 1 }));
+  await openLockerRoom(page);
+  await expect(page.locator('#play-now')).toHaveText('Run Training');
+  await page.locator('#play-now').click();
+  await expect(page).toHaveURL(/training\.html/, { timeout: 20000 });
+  await page.locator('#playbook-mode-custom-btn').click();
+  await expect(page).toHaveURL(/training-playbooks\.html/, { timeout: 20000 });
+  await page.locator('#tp-back').click();
+  await expect(page).toHaveURL(/training\.html/, { timeout: 20000 });
+  await expect(page).not.toHaveURL(/training-playbooks\.html/);
+  await page.waitForFunction(() => {
+    const el = document.getElementById('points-remaining');
+    return el && String(el.textContent || '').replace(/\s/g, '').includes('0');
+  }, null, { timeout: 15000 });
+  await page.locator('input[name="coaching-focus"][value="authoritarian-discipline"]').check({ force: true });
+  await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
+  await page.locator('#submit-btn').click();
+  await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
+  await page.locator('#locker-room-btn').click();
+  await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
+  await backToModeSelect(page);
+});
+
+test('Enter Franchise gives the locker room its own step, and one Back returns to mode-select', async ({ page }) => {
+  await installApi(page, commandCenter({ training_completed: true, week: 1 }));
+  await page.goto('/mode-select.html');
+  const modeIdx = await page.evaluate(() => {
+    const state = history.state;
+    return state && typeof state.gobIdx === 'number' ? state.gobIdx : null;
+  });
+  await page.locator('[data-action="enter-franchise"]').first().click();
+  await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
+  const lockerIdx = await page.evaluate(() => {
+    const state = history.state;
+    return state && typeof state.gobIdx === 'number' ? state.gobIdx : null;
+  });
+  expect(modeIdx).toBe(0);
+  expect(lockerIdx).toBe(1);
+  await backToModeSelect(page);
+});
+
+test('a replayed quarter 409 leaves the court unpainted and returns to the lineup', async ({ page }) => {
+  test.setTimeout(120000);
+  const dialogs = [];
+  page.on('dialog', (dialog) => dialogs.push(dialog.message()));
+  await page.addInitScript(() => {
+    const mark = () => {
+      if (document.querySelector('#phaser-container canvas')) {
+        try { sessionStorage.setItem('e2e_phaser_canvas', '1'); } catch (e) {}
+      }
+    };
+    try { sessionStorage.removeItem('e2e_phaser_canvas'); } catch (e) {}
+    new MutationObserver(mark).observe(document.documentElement, { childList: true, subtree: true });
+    mark();
+  });
+  await installApi(page, commandCenter({ training_completed: true, week: 1 }), {
+    quarterAlreadyPlayed: true,
+    resumeState: { status: 'quarter_break', quarter: 2 },
+  });
+  await openLockerRoom(page);
+  await expect(page.locator('#play-now')).toHaveText('Play Next Game');
+  await page.locator('#play-now').click();
+  await expect(page).toHaveURL(/set-lineup\.html/, { timeout: 20000 });
+  await page.locator('#autoset-lineup').click();
+  await expect(page.locator('#sim-now')).not.toHaveClass(/disabled/, { timeout: 15000 });
+  await page.locator('#sim-now').click();
+  await expect(page).toHaveURL(/set-lineup\.html/, { timeout: 20000 });
+  await expect(page).toHaveURL(/quarter=2/);
+  await expect(page).not.toHaveURL(/court\.html/);
+  expect(dialogs, dialogs.join('\n')).toEqual([]);
+  const painted = await page.evaluate(() => sessionStorage.getItem('e2e_phaser_canvas') === '1');
+  expect(painted).toBe(false);
 });
 
 test('recruiting and cut-players exits return to the locker room they started from', async ({ page }) => {
