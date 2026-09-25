@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GOB · Team → Roster · section page with sub-tabs. Only .main scrolls; .pg-head and table header are sticky</title>
+<!-- Team → Roster · section page with sub-tabs. Only .main scrolls; .pg-head and table header are sticky — static reference. Sample data is illustrative. -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+</head>
+<body class="gob-preview">
+<div class="gob gob-1280">
+<div class="app">
+  <header class="top " >
+    <a class="top-id"><span class="logo" style="--tc:#A3243B;width:32px;height:32px;font-size:20px">L</span><span class="top-name">Lawrence Lions</span></a>
+    <div class="top-div">
+    </div>
+    <div class="top-stats">
+      <div class="ts">
+        <b>16–5</b><span>Record</span>
+      </div>
+      <div class="ts">
+        <b>#14</b><span>National</span>
+      </div>
+      <div class="ts ">
+        <div class="ts">
+          <b>Week 22</b><span>Regular Season</span>
+        </div>
+      </div>
+    </div>
+    <div class="top-sp">
+    </div>
+    <div class="adv-wrap">
+      <button class="advance " >PLAY NEXT GAME</button>
+    </div>
+  </header>
+  <nav class="rail">
+    <a class="rail-i   " title="Office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h17M5 10v10M19 10v10M8 10V6.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6.5V10"/><path d="M9 14h6"/></svg><span>Office</span></a><a class="rail-i  on " title="Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="2.7"/><circle cx="16" cy="9" r="2.3"/><path d="M3.5 19c0-2.9 2.2-5 5-5 1.8 0 3.3.9 4.2 2.3"/><path d="M13.5 19c.3-2.3 1.9-3.7 3.9-3.7 1.8 0 3.4 1.3 3.6 3.7"/></svg><span>Team</span></a><a class="rail-i   " title="Prep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h12a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"/><path d="M9 3h6v3H9z"/><path d="M8.5 12l2 2 4-4.5M8.5 17.5h7"/></svg><span>Prep</span></a><a class="rail-i   " title="League"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/><path d="M9 5v15"/></svg><span>League</span></a><a class="rail-i   " title="Recruiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.1"/><path d="M3.8 20c0-3.3 2.6-5.6 5.7-5.6 1.4 0 2.7.5 3.7 1.3"/><path d="M17.5 13.5v6M14.5 16.5h6"/></svg><span>Recruiting</span><em class="">3</em></a><a class="rail-i   " title="News"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a1.5 1.5 0 0 0 1.5 1.5H6A2 2 0 0 1 4 18.5Z"/><path d="M17 9h3v10a1.5 1.5 0 0 1-3 0"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/></svg><span>News</span></a>
+    <div class="rail-sp">
+    </div>
+    <div class="rail-div">
+    </div>
+    <a class="rail-i util  " title="Tutorials"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17.2v.1"/></svg><span>Tutorials</span></a><a class="rail-i util  " title="Feedback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4 3.5v-3.5h-.5a2 2 0 0 1-2-2Z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/></svg><span>Feedback</span></a><a class="rail-i util  " title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg><span>Settings</span></a>
+    <div class="rail-div q">
+    </div>
+    <a class="rail-i exit  " title="Exit Franchise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 16l-4-4 4-4M6 12h9"/></svg><span>Exit Franchise</span></a>
+  </nav>
+  <main class="main scroll">
+    <div class="pg-head">
+      <div class="pg-title">
+        <h1>Team</h1><span class="crumb">Lawrence Lions · 12 players · 5 starters</span>
+      </div>
+      <div class="subtabs">
+        <a class="stab on">Roster</a><a class="stab ">Stats</a><a class="stab ">Development</a><a class="stab ">Practice Squad</a><a class="stab ">History</a>
+      </div>
+    </div>
+    <table class="rtab">
+      <thead>
+        <tr>
+          <th class="l">Player</th><th>Pos</th><th>Class</th><th>Ht</th><th>RT</th><th>Energy</th><th>PTS</th><th>REB</th><th>AST</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="st-sep">
+          <td colspan="9">Starters</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">DP</span><span class="nm">Devin Park</span></a></td><td class="dim">PG</td><td class="dim">Jr</td><td class="dim">6'1</td><td><b class="tdig t-blue ">9</b></td><td><span class="en"><i><b style="width:86%;background:var(--green)"></b></i><span>86</span></span></td><td>11.4</td><td>3.2</td><td>6.1</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">JC</span><span class="nm">Jalen Carter</span></a></td><td class="dim">SG</td><td class="dim">Sr</td><td class="dim">6'4</td><td><b class="tdig t-blue ">10</b></td><td><span class="en"><i><b style="width:78%;background:var(--green)"></b></i><span>78</span></span></td><td>19.8</td><td>5.9</td><td>3.4</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">LO</span><span class="nm">Luis Ortega</span></a></td><td class="dim">SF</td><td class="dim">So</td><td class="dim">6'6</td><td><b class="tdig t-green ">7</b></td><td><span class="en"><i><b style="width:91%;background:var(--green)"></b></i><span>91</span></span></td><td>8.7</td><td>4.8</td><td>1.9</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">MR</span><span class="nm">Marcus Ruiz</span></a></td><td class="dim">PF</td><td class="dim">Jr</td><td class="dim">6'8</td><td><b class="tdig t-blue ">9</b></td><td><span class="en"><i><b style="width:52%;background:var(--yellow)"></b></i><span>52</span></span></td><td>14.2</td><td>9.6</td><td>1.7</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">AW</span><span class="nm">Andre Whitfield</span></a></td><td class="dim">C</td><td class="dim">Sr</td><td class="dim">6'10</td><td><b class="tdig t-green ">8</b></td><td><span class="en"><i><b style="width:81%;background:var(--green)"></b></i><span>81</span></span></td><td>9.9</td><td>8.1</td><td>0.9</td>
+        </tr>
+        <tr class="st-sep">
+          <td colspan="9">Bench</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">TH</span><span class="nm">Tre Holloway</span></a></td><td class="dim">SG</td><td class="dim">So</td><td class="dim">6'3</td><td><b class="tdig t-yellow ">6</b></td><td><span class="en"><i><b style="width:95%;background:var(--green)"></b></i><span>95</span></span></td><td>6.1</td><td>1.8</td><td>1.2</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">NL</span><span class="nm">Nate Lindqvist</span></a></td><td class="dim">PF</td><td class="dim">Sr</td><td class="dim">6'7</td><td><b class="tdig t-yellow ">6</b></td><td><span class="en"><i><b style="width:88%;background:var(--green)"></b></i><span>88</span></span></td><td>4.9</td><td>3.9</td><td>0.8</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">IM</span><span class="nm">Isaiah Monroe</span></a></td><td class="dim">PG</td><td class="dim">Fr</td><td class="dim">5'11</td><td><b class="tdig t-yellow ">5</b></td><td><span class="en"><i><b style="width:97%;background:var(--green)"></b></i><span>97</span></span></td><td>3.8</td><td>1.1</td><td>2.4</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">KA</span><span class="nm">Kobe Anders</span></a></td><td class="dim">SF</td><td class="dim">Jr</td><td class="dim">6'5</td><td><b class="tdig t-yellow ">6</b></td><td><span class="en"><i><b style="width:34%;background:var(--red)"></b></i><span>34</span></span></td><td>4.2</td><td>2.6</td><td>0.7</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">SK</span><span class="nm">Silas Kerr</span></a></td><td class="dim">C</td><td class="dim">So</td><td class="dim">6'9</td><td><b class="tdig t-yellow ">5</b></td><td><span class="en"><i><b style="width:90%;background:var(--green)"></b></i><span>90</span></span></td><td>2.9</td><td>3.3</td><td>0.3</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">RT</span><span class="nm">Reggie Tate</span></a></td><td class="dim">SG</td><td class="dim">Fr</td><td class="dim">6'2</td><td><b class="tdig t-red ">4</b></td><td><span class="en"><i><b style="width:99%;background:var(--green)"></b></i><span>99</span></span></td><td>1.7</td><td>0.6</td><td>0.5</td>
+        </tr>
+        <tr>
+          <td class="l"><a class="pl"><span class="av" style="width:26px;height:26px;font-size:9px">OP</span><span class="nm">Owen Pruitt</span></a></td><td class="dim">PF</td><td class="dim">Fr</td><td class="dim">6'7</td><td><b class="tdig t-red ">4</b></td><td><span class="en"><i><b style="width:99%;background:var(--green)"></b></i><span>99</span></span></td><td>1.1</td><td>1.4</td><td>0.2</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="height:18px">
+    </div>
+  </main>
+</div>
+</div>
+</body>
+</html>
