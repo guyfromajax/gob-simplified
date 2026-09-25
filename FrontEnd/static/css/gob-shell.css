@@ -221,6 +221,7 @@ html.gob-shell.gob-1280 .rail-face {
   border-right: 1px solid var(--line);
   box-sizing: border-box;
   overflow: hidden;
+  clip-path: inset(0);
   transition: width var(--dur-rail) var(--ease-out);
   transition-delay: 120ms;
 }
@@ -244,23 +245,38 @@ html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i {
   transition-delay: 400ms, 0s;
 }
 
-html.gob-shell.gob-1280 .rail-i span {
+/* Collapsed labels have a zero box inside the face, so a glyph cannot
+   paint past the 64px edge. max-width snaps open immediately on hover
+   (still invisible) and snaps shut only after the collapse fade. Opacity
+   is the fade, on the same clock as the face width. */
+html.gob-shell.gob-1280 .rail-i > .rail-l {
   display: inline;
   position: absolute;
   left: calc(var(--space-14) + 22px + var(--space-12));
   top: 50%;
   transform: translateY(-50%);
-  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
   white-space: nowrap;
+  opacity: 0;
   pointer-events: none;
-  transition: opacity var(--dur-rail) var(--ease-out);
-  transition-delay: 120ms;
+  transition-property: max-width, opacity;
+  transition-duration: 0s, var(--dur-rail);
+  transition-timing-function: linear, var(--ease-out);
+  transition-delay: calc(120ms + var(--dur-rail)), 120ms;
 }
 
-html.gob-shell.gob-1280 .rail:hover .rail-i span,
-html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i span {
+html.gob-shell.gob-1280 .rail:hover .rail-i > .rail-l,
+html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i > .rail-l {
+  max-width: 148px;
   opacity: 1;
-  transition-delay: 400ms;
+  transition-duration: 0s, var(--dur-rail);
+  transition-delay: 0s, 400ms;
+}
+
+html.gob-shell.gob-1280 .rail-i > .inbox-badge {
+  display: block;
+  opacity: 1;
 }
 
 html.gob-shell.gob-1920 .rail-face {
@@ -314,8 +330,20 @@ html.gob-shell .pg-head .stab.is-locked,
 html.gob-shell .pg-head .stab.is-locked:hover,
 html.gob-shell .pg-head .stab.is-locked:focus,
 html.gob-shell .pg-head .stab.is-locked:focus-visible {
-  color: var(--text-38) !important;
+  display: grid;
+  place-items: center;
+  height: 40px;
+  min-width: 118px;
+  padding: 0 var(--space-20);
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
   background: var(--white-6);
+  color: var(--text-38) !important;
+  font-family: var(--font-display) !important;
+  font-weight: var(--fw-bold) !important;
+  font-size: var(--fs-16) !important;
+  line-height: var(--lh-1) !important;
+  letter-spacing: var(--tracking-4) !important;
+  text-align: center;
   cursor: not-allowed;
   box-shadow: none;
 }

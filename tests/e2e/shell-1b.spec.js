@@ -161,6 +161,8 @@ test('top bar logo, name, and national rank at both sizes', async ({ page }) => 
     expect(metrics.label).toBe('Lancaster');
     expect(metrics.visibleText).toBe('');
     expect(metrics.rank).toBe('National Rank');
+    await page.mouse.move(size[0] / 2, size[1] / 2);
+    await page.waitForTimeout(400);
     await page.screenshot({ path: path.join(OUT, 'top-bar-' + size[2] + '.png') });
   }
 });
@@ -198,6 +200,24 @@ test('rail expansion is one monotonic width and does not move main', async ({ pa
   await page.waitForTimeout(400);
   const collapsed = await page.locator('.rail-face').evaluate((el) => el.getBoundingClientRect().width);
   expect(collapsed).toBeLessThan(80);
+  const labels = await page.evaluate(() => {
+    const face = document.querySelector('.rail-face');
+    const railRight = face.getBoundingClientRect().right;
+    return Array.from(document.querySelectorAll('.rail-l')).map((el) => {
+      const box = el.getBoundingClientRect();
+      return {
+        text: el.textContent,
+        opacity: getComputedStyle(el).opacity,
+        right: box.right,
+        railRight,
+      };
+    });
+  });
+  expect(labels.length).toBeGreaterThan(6);
+  for (const label of labels) {
+    expect(Number(label.opacity), label.text).toBe(0);
+    expect(label.right, label.text).toBeLessThanOrEqual(label.railRight + 0.5);
+  }
 
   await page.locator('[data-gob-section="office"]').focus();
   await page.keyboard.press('Tab');
@@ -256,8 +276,20 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   const cursor = await locked.evaluate((el) => getComputedStyle(el).cursor);
   expect(cursor).toBe('not-allowed');
   expect(color).toContain('0.38');
+  const stabType = await page.evaluate(() => {
+    const read = (el) => {
+      const cs = getComputedStyle(el);
+      return { fontFamily: cs.fontFamily, fontSize: cs.fontSize, height: cs.height };
+    };
+    const lockedEl = document.querySelector('#gob-subtabs .stab.is-locked');
+    const enabled = Array.from(document.querySelectorAll('#gob-subtabs .stab')).find((el) => !el.classList.contains('is-locked'));
+    return { locked: read(lockedEl), enabled: read(enabled) };
+  });
+  expect(stabType.locked).toEqual(stabType.enabled);
   await mouseClick(page, locked);
   expect(await page.evaluate(() => window.__shellNav.length)).toBe(0);
+  await page.mouse.move(640, 400);
+  await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(OUT, 'tournament-locked-1280.png') });
 
   async function expectGo(label, needle) {

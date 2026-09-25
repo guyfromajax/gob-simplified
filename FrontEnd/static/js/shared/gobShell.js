@@ -271,7 +271,7 @@
     btn.className = 'rail-i';
     btn.dataset.gobSection = section.id;
     btn.title = section.label;
-    btn.innerHTML = ICONS[section.icon] + '<span>' + section.label + '</span>';
+    btn.innerHTML = ICONS[section.icon] + '<span class="rail-l">' + section.label + '</span>';
     if (section.id === 'recruiting') btn.id = 'gob-rail-recruiting';
     btn.addEventListener('click', function () {
       if (section.go === 'recruiting') {
@@ -300,7 +300,7 @@
     btn.className = 'rail-i ' + className;
     btn.title = title;
     if (id) btn.id = id;
-    btn.innerHTML = ICONS[icon] + '<span>' + title + '</span>';
+    btn.innerHTML = ICONS[icon] + '<span class="rail-l">' + title + '</span>';
     return btn;
   }
 
@@ -468,7 +468,7 @@
     tutorials.className = 'rail-i util';
     tutorials.href = '/tutorial.html';
     tutorials.title = 'Tutorials';
-    tutorials.innerHTML = ICONS.tutorials + '<span>Tutorials</span>';
+    tutorials.innerHTML = ICONS.tutorials + '<span class="rail-l">Tutorials</span>';
     tutorials.addEventListener('click', function () { playClick(); });
     face.appendChild(tutorials);
 
