@@ -22,12 +22,7 @@ function cloneParams(params) {
 // Training Report Page JavaScript
 
 function playSound(filename) {
-  try {
-    const base = (typeof window.API_CONFIG !== 'undefined' && window.API_CONFIG.buildStaticPath) ? window.API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
-    const a = new Audio(base + encodeURIComponent(filename));
-    a.volume = 0.7;
-    a.play().catch(() => {});
-  } catch (e) {}
+  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
 }
 
 const urlParams = liveParams();

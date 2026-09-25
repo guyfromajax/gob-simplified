@@ -391,7 +391,7 @@ function cloneParams(params) {
       '    <a href="/signup.html" class="auth-link">Sign Up</a>',
       '  </div>',
       '  <div id="auth-logged-in" class="auth-status" style="display: none;">',
-      '    <button type="button" id="auth-settings-btn" class="auth-settings-btn" aria-label="Account settings" title="Account settings">',
+      '    <button type="button" id="auth-settings-btn" class="auth-settings-btn" aria-label="Settings" title="Settings" aria-expanded="false">',
       '      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>',
       '    </button>',
       '    <button type="button" id="logout-btn" class="auth-logout-btn">Log Out</button>',
@@ -426,8 +426,9 @@ function cloneParams(params) {
       settingsBtn.type = 'button';
       settingsBtn.id = 'auth-settings-btn';
       settingsBtn.className = 'auth-settings-btn';
-      settingsBtn.setAttribute('aria-label', 'Account settings');
-      settingsBtn.setAttribute('title', 'Account settings');
+      settingsBtn.setAttribute('aria-label', 'Settings');
+      settingsBtn.setAttribute('title', 'Settings');
+      settingsBtn.setAttribute('aria-expanded', 'false');
       settingsBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>';
       var logoutBtn = document.getElementById('logout-btn');
       if (logoutBtn) loggedIn.insertBefore(settingsBtn, logoutBtn);
@@ -438,11 +439,7 @@ function cloneParams(params) {
   }
 
   function playNavSound(filename) {
-    try {
-      var a = new Audio('/sounds/' + encodeURIComponent(filename));
-      a.volume = 0.7;
-      a.play().catch(function () {});
-    } catch (e) {}
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
   }
 
   function injectAuthBar() {
@@ -802,7 +799,9 @@ function cloneParams(params) {
     var closeBtn = document.getElementById('account-settings-close');
     if (settingsBtn && !settingsBtn.dataset.bound) {
       settingsBtn.dataset.bound = '1';
-      settingsBtn.addEventListener('click', openAccountSettingsModal);
+      settingsBtn.addEventListener('click', function () {
+        import('/js/shared/gobSettings.js').then(function (mod) { mod.toggle(); }).catch(function () {});
+      });
     }
     if (closeBtn && !closeBtn.dataset.bound) {
       closeBtn.dataset.bound = '1';
@@ -1079,11 +1078,7 @@ function cloneParams(params) {
     }
 
     function playSound(filename) {
-      try {
-        var a = new Audio('/sounds/' + encodeURIComponent(filename));
-        a.volume = 0.7;
-        a.play().catch(function () {});
-      } catch (e) {}
+      import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
     }
     function openModal() {
       playSound('click-tiny.wav');

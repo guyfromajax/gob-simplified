@@ -49,14 +49,7 @@ function cloneParams(params) {
   const NOSLACK_COPY = "No room — the slack is locked. Unlock a play to make space.";
 
   function playSound(filename) {
-    try {
-      const base = (typeof API_CONFIG !== "undefined" && API_CONFIG.buildStaticPath)
-        ? API_CONFIG.buildStaticPath("/sounds/")
-        : "/sounds/";
-      const audio = new Audio(base + encodeURIComponent(filename));
-      audio.volume = 0.7;
-      audio.play().catch(() => {});
-    } catch (error) {}
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
   }
 
   function parseInteger(value, fallback = 0) {

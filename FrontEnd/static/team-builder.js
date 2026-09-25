@@ -110,15 +110,7 @@ function cloneParams(params) {
 
   /** Same confirm SFX as the FCC green Advance (play-now) button. */
   function playAdvanceSound() {
-    try {
-      var base =
-        typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath
-          ? API_CONFIG.buildStaticPath('/sounds/')
-          : '/sounds/';
-      var a = new Audio(base + encodeURIComponent('confirm-1-lowervol.wav'));
-      a.volume = 0.7;
-      a.play().catch(function () {});
-    } catch (_) {}
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx('confirm-1-lowervol.wav', 0.7); }).catch(function () {});
   }
 
   function teamAbbr(team) {

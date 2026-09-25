@@ -1,3 +1,5 @@
+import { channelGain, getAudioState, setChannelMuted, subscribeAudio } from "./shared/uiSfx.js";
+
 function franchiseCtx() {
   return typeof window !== 'undefined' ? window.FranchiseContext : null;
 }
@@ -47,7 +49,7 @@ const TIMEOUT_LOOP_TRACK = "Timeout_Loop.wav";
 const DEFAULT_VOLUME = 0.4;
 const STATE_KEY = "franchise_music_state";
 const TIMEOUT_STATE_KEY = "timeout_loop_music_state";
-const SCOUTING_AMBIENCE_KEY = "gob_scouting_ambience_enabled";
+// Legacy key gob_scouting_ambience_enabled is migrated by uiSfx (LEGACY_AMBIENCE_KEY).
 
 let franchiseAudio = null;
 let gameplayAudio = null;
@@ -102,16 +104,35 @@ function writeState(audio) {
   }
 }
 
-function buildAudio(filename) {
+function applyChannelVolume(audio) {
+  if (!audio) return;
+  const channel = audio.dataset.audioChannel === "ambience" ? "ambience" : "music";
+  const base = Number(audio.dataset.audioBase);
+  const baseVolume = Number.isFinite(base) ? base : DEFAULT_VOLUME;
+  audio.volume = Math.max(0, Math.min(1, baseVolume * channelGain(getAudioState(), channel)));
+}
+
+function buildAudio(filename, channel) {
   const audio = new Audio();
   audio.src = `${soundsBasePath()}${encodeURIComponent(filename)}`;
   audio.preload = "none";
   audio.loop = true;
-  audio.volume = DEFAULT_VOLUME;
   audio.dataset.musicTrack = filename;
   audio.dataset.musicKilled = "0";
+  audio.dataset.audioChannel = channel === "ambience" ? "ambience" : "music";
+  audio.dataset.audioBase = String(DEFAULT_VOLUME);
+  applyChannelVolume(audio);
   return audio;
 }
+
+subscribeAudio(() => {
+  applyChannelVolume(franchiseAudio);
+  applyChannelVolume(gameplayAudio);
+  applyChannelVolume(timeoutAudio);
+  if (franchiseAudio && channelGain(getAudioState(), "ambience") === 0 && !franchiseAudio.paused) {
+    franchiseAudio.pause();
+  }
+});
 
 function attachFranchiseStatePersistence(audio) {
   // timeupdate fires every ~250ms during playback; cheap source of fresh
@@ -138,21 +159,11 @@ function playAudio(audio, label) {
 // by this flag.
 
 export function isScoutingAmbienceEnabled() {
-  try {
-    const raw = localStorage.getItem(SCOUTING_AMBIENCE_KEY);
-    if (raw == null) return true; // default on
-    return raw !== "false";
-  } catch (_err) {
-    return true;
-  }
+  return channelGain(getAudioState(), "ambience") > 0;
 }
 
 export function setScoutingAmbienceEnabled(enabled) {
-  try {
-    localStorage.setItem(SCOUTING_AMBIENCE_KEY, enabled ? "true" : "false");
-  } catch (_err) {
-    /* ignore */
-  }
+  setChannelMuted("ambience", !enabled);
   debugLog("ambience_set", { enabled });
 }
 
@@ -236,7 +247,7 @@ export function playFccTrack() {
   }
   const state = readState();
   if (state) {
-    franchiseAudio = buildAudio(state.track);
+    franchiseAudio = buildAudio(state.track, "ambience");
     attachFranchiseStatePersistence(franchiseAudio);
     franchiseAudio.currentTime = state.currentTime || 0;
     debugLog("fcc_resume", { file: state.track, t: state.currentTime });
@@ -244,7 +255,7 @@ export function playFccTrack() {
     return;
   }
   const pick = FCC_TRACKS[Math.floor(Math.random() * FCC_TRACKS.length)];
-  franchiseAudio = buildAudio(pick);
+  franchiseAudio = buildAudio(pick, "ambience");
   attachFranchiseStatePersistence(franchiseAudio);
   franchiseAudio.currentTime = 0;
   writeState(franchiseAudio);
@@ -269,7 +280,7 @@ export function resumeFranchiseTrack() {
     debugLog("resume_no_state");
     return;
   }
-  franchiseAudio = buildAudio(state.track);
+  franchiseAudio = buildAudio(state.track, "ambience");
   attachFranchiseStatePersistence(franchiseAudio);
   franchiseAudio.currentTime = state.currentTime || 0;
   debugLog("resume", { file: state.track, t: state.currentTime });
@@ -311,7 +322,7 @@ export function playGameplayTrack(filename = GAMEPLAY_DEFAULT_TRACK) {
     debugLog("gameplay_already_loaded", { current: gameplayAudio.dataset.musicTrack });
     return;
   }
-  gameplayAudio = buildAudio(filename);
+  gameplayAudio = buildAudio(filename, "music");
   gameplayAudio.currentTime = 0;
   playAudio(gameplayAudio, "gameplay_start");
 }
@@ -340,7 +351,7 @@ export function evaluateGameplayTrack(ctx = {}) {
   if (gameplayAudio) {
     gameplayAudio.pause();
   }
-  gameplayAudio = buildAudio(desired);
+  gameplayAudio = buildAudio(desired, "music");
   gameplayAudio.currentTime = 0;
   debugLog("gameplay_track_set", { file: desired, autoplay: !wasPaused, ctx });
   if (!wasPaused) {
@@ -409,14 +420,14 @@ export function startTimeoutLoop() {
   }
   const state = readTimeoutState();
   if (state) {
-    timeoutAudio = buildAudio(TIMEOUT_LOOP_TRACK);
+    timeoutAudio = buildAudio(TIMEOUT_LOOP_TRACK, "music");
     attachTimeoutStatePersistence(timeoutAudio);
     timeoutAudio.currentTime = state.currentTime || 0;
     debugLog("timeout_resume", { t: state.currentTime });
     playAudio(timeoutAudio, "timeout_resume");
     return;
   }
-  timeoutAudio = buildAudio(TIMEOUT_LOOP_TRACK);
+  timeoutAudio = buildAudio(TIMEOUT_LOOP_TRACK, "music");
   attachTimeoutStatePersistence(timeoutAudio);
   timeoutAudio.currentTime = 0;
   writeTimeoutState(timeoutAudio);
@@ -435,7 +446,7 @@ export function resumeTimeoutLoop() {
     debugLog("timeout_resume_no_state");
     return;
   }
-  timeoutAudio = buildAudio(TIMEOUT_LOOP_TRACK);
+  timeoutAudio = buildAudio(TIMEOUT_LOOP_TRACK, "music");
   attachTimeoutStatePersistence(timeoutAudio);
   timeoutAudio.currentTime = state.currentTime || 0;
   debugLog("timeout_resume", { t: state.currentTime });

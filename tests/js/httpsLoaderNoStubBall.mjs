@@ -1,3 +1,4 @@
+import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
@@ -39,6 +40,15 @@ export async function load(url, context, defaultLoad) {
     return {
       format: 'module',
       source: PHASER_MATH_STUB,
+      shortCircuit: true
+    };
+  }
+  // uiSfx.js lives outside the phaser package (which is "type": "module").
+  // Node would otherwise parse it as CommonJS and drop its named exports.
+  if (url.includes('/FrontEnd/static/js/shared/uiSfx.js')) {
+    return {
+      format: 'module',
+      source: await readFile(fileURLToPath(url), 'utf8'),
       shortCircuit: true
     };
   }

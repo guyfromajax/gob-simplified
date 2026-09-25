@@ -1,0 +1,375 @@
+/* GOB design tokens, scoped to .gob so legacy page :root blocks are untouched.
+   Display face: /css/fonts.css (Bebas Neue Pro OTFs in /fonts/).
+   Body face: /fonts/app-fonts.css (self-hosted Inter). No Google Fonts. */
+.gob{
+/* ── Brand ─────────────────────────────────────────────── */
+--navy:#27408E;          /* structure: active rail item, selected rows, switch on */
+--navy-hi:#4A6ED2;       /* edge/halo tint for navy selections only */
+--orange:#F79420;        /* saves / non-advancing actions, gated-task tag */
+--green:#34EC27;         /* the ONE Advance action per screen + positive data */
+--red:#ff6d6d;
+--yellow:#FFD700;
+--blue:#4A90D9;
+--white:#ffffff;
+--black:#000000;
+
+/* ── Rating tiers (canonical, game-wide — never remap) ─────
+   Player digit 0–16:  0–4 red · 5–6 yellow · 7–8 green · 9+ blue
+   Team RT letter:     D/F red · C yellow · B green · A blue          */
+--tier-red:var(--red);
+--tier-yellow:var(--yellow);
+--tier-green:var(--green);
+--tier-blue:var(--blue);
+
+/* ── Deltas, results, badge ─────────────────────────────── */
+--delta-up:var(--green);
+--delta-down:var(--red);
+--delta-flat:var(--text-60);
+--badge:var(--orange);   /* amber count badge on the rail */
+--badge-ink:#1a1206;
+
+/* ── Base + surface elevations (blue-black, never grey) ─── */
+--bg:#0b0d14;                     /* page base; also ink on green */
+--bg-chrome:#0d1018;              /* top bar + rail */
+--bg-page:rgba(14,16,24,.96);     /* main content area */
+--bg-page-solid:#0e1018;          /* sticky page header fill */
+--surface-1:#10131c;
+--surface-2:#141824;
+--surface-3:#1a1f2d;              /* avatars, portrait wells */
+--surface-panel:#131722;          /* settings panel */
+--surface-popover:rgba(20,24,34,.98);
+--surface-scoreboard:rgba(12,14,20,.94);
+--surface-th-top:#1a1e2a;         /* table header gradient */
+--surface-th-bottom:#151923;
+--surface-tier-top:#171722;       /* tournament next-game card */
+--surface-tier-bottom:#10121a;
+--scrim:rgba(5,6,10,.62);
+--placeholder-a:#0f1219;          /* gameplay mock stripes only */
+--placeholder-b:#11141c;
+--slider-knob-muted:#8a8d96;
+--switch-knob-off:#c9ccd3;
+
+/* ── Text (four white opacities) ────────────────────────── */
+--text-100:#ffffff;               /* display */
+--text-87:rgba(255,255,255,.87);  /* primary */
+--text-60:rgba(255,255,255,.60);  /* secondary */
+--text-38:rgba(255,255,255,.38);  /* disabled / tertiary */
+
+/* ── Lines ──────────────────────────────────────────────── */
+--line:rgba(255,255,255,.08);
+--line-strong:rgba(255,255,255,.14);
+
+/* ── White + black alpha ramp (tints, fills, highlights) ── */
+--white-1p2:rgba(255,255,255,.012);
+--white-1p8:rgba(255,255,255,.018);
+--white-2:rgba(255,255,255,.02);
+--white-2p2:rgba(255,255,255,.022);
+--white-3:rgba(255,255,255,.03);
+--white-3p5:rgba(255,255,255,.035);
+--white-4:rgba(255,255,255,.04);
+--white-4p5:rgba(255,255,255,.045);
+--white-5:rgba(255,255,255,.05);
+--white-6:rgba(255,255,255,.06);
+--white-6p5:rgba(255,255,255,.065);
+--white-7:rgba(255,255,255,.07);
+--white-9:rgba(255,255,255,.09);
+--white-10:rgba(255,255,255,.1);
+--white-11:rgba(255,255,255,.11);
+--white-12:rgba(255,255,255,.12);
+--white-18:rgba(255,255,255,.18);
+--white-20:rgba(255,255,255,.2);
+--white-22:rgba(255,255,255,.22);
+--white-25:rgba(255,255,255,.25);
+--white-28:rgba(255,255,255,.28);
+--white-30:rgba(255,255,255,.3);
+--white-35:rgba(255,255,255,.35);
+--white-40:rgba(255,255,255,.4);
+--white-45:rgba(255,255,255,.45);
+--white-50:rgba(255,255,255,.5);
+--white-55:rgba(255,255,255,.55);
+--white-62:rgba(255,255,255,.62);
+--white-70:rgba(255,255,255,.7);
+--white-72:rgba(255,255,255,.72);
+--white-75:rgba(255,255,255,.75);
+--white-90:rgba(255,255,255,.9);
+--black-18:rgba(0,0,0,.18);
+--black-25:rgba(0,0,0,.25);
+--black-35:rgba(0,0,0,.35);
+--black-45:rgba(0,0,0,.45);
+--black-50:rgba(0,0,0,.5);
+
+/* ── Data-driven accents (set per team / per tournament tier) ──
+   Team: from the team record. Tier metals: from emblem.js TIER_TOKENS
+   conference #C79A5B/#EAC488 · region #B9C1CD/#F0F4FA · national #D4A848/#F0C560 */
+--team-primary:#A3243B;
+--tier-metal:#C79A5B;
+--tier-metal-hi:#EAC488;
+
+/* ── Type ───────────────────────────────────────────────── */
+--font-display:'Bebas Neue Pro','Bebas Neue',sans-serif;  /* headings, big numbers, buttons */
+--font-body:'Inter',sans-serif;                            /* body, data, labels */
+--fw-regular:400;
+--fw-medium:500;
+--fw-semibold:600;
+--fw-bold:700;
+--lh-body:1.35;
+--lh-1:1;
+--lh-9:.9;
+--lh-85:.85;
+--lh-95:.95;
+--lh-94:.94;
+--lh-1p25:1.25;
+--tracking-1:.01em;
+--tracking-2:.02em;
+--tracking-3:.03em;
+--tracking-4:.04em;
+--tracking-5:.05em;
+--tracking-6:.06em;
+--tracking-7:.07em;
+--tracking-8:.08em;
+--tracking-10:.1em;
+--tracking-12:.12em;
+--tracking-26:.26em;
+--tracking-btn:1.6px;
+--tracking-btn-sm:1.4px;
+--tracking-1px:1px;
+/* Type roles (1280 size → 1920 size). Use with the tokens above:
+   score        Bebas 700 · fs-48 → 56.5 · lh .9 · tracking-1      result card score
+   display-lg   Bebas 700 · fs-40 → 47   · lh .85–.9               tournament round, points remaining
+   display-md   Bebas 700 · fs-32 → 38   · lh .9                   opponent name, stat-line numbers, page title
+   display-sm   Bebas 700 · fs-28 → 33   · lh .9                   what-moved values, tier team names
+   heading-col  Bebas 700 · fs-20 → 23.5 · lh 1 · tracking-7       column headers (01 This week)
+   heading-card Bebas 700 · fs-16 → 19   · lh 1 · tracking-8 · text-60   card titles
+   button       Bebas 700 · fs-18 → 21   · lh 1 · tracking-btn     Advance
+   tab          Bebas 700 · fs-16 → 19   · lh 1 · tracking-4       sub-tabs
+   body-strong  Inter 600 · fs-14 → 16.5 · lh 1.35                 to-do labels, headlines
+   body         Inter 400–500 · fs-13 → 15.5 · lh 1.35             default, names in lists
+   meta         Inter 500 · fs-11/12 → 13/14 · text-60             metadata, links
+   micro-label  Inter 700 · fs-10 → 12 · UPPERCASE · tracking-8/10 · text-60/38   eyebrows, sub-heads
+   numerals everywhere: font-variant-numeric: tabular-nums (set on .gob)           */
+
+/* ── Spacing ────────────────────────────────────────────────
+   --space-*  fixed, never scales (chrome, controls)
+   --dsp-*    density spacing, scales 1280 → 1920 (cards, rows)            */
+--space-1:1px;
+--space-2:2px;
+--space-3:3px;
+--space-4:4px;
+--space-5:5px;
+--space-6:6px;
+--space-7:7px;
+--space-8:8px;
+--space-9:9px;
+--space-10:10px;
+--space-12:12px;
+--space-14:14px;
+--space-16:16px;
+--space-18:18px;
+--space-20:20px;
+--space-22:22px;
+--space-24:24px;
+
+/* ── Radii ──────────────────────────────────────────────── */
+--radius-2:2px;
+--radius-3:3px;
+--radius-4:4px;
+--radius-5:5px;
+--radius-6:6px;
+--radius-7:7px;
+--radius-8:8px;
+--radius-9:9px;
+--radius-10:10px;
+--radius-12:12px;
+--radius-14:14px;
+--radius-round:50%;
+--radius-logo:24%;
+/* semantic: chip/tag 4–6 · row/cell/button 10 · card 14 · shell 24 */
+--radius-card:14px;
+--radius-shell:24px;
+
+/* ── Shadows / elevation ────────────────────────────────── */
+--shadow-card:inset 0 1px 0 var(--white-5),0 8px 24px var(--black-18);
+--shadow-logo:inset 0 0 0 1px var(--white-22),0 2px 6px var(--black-35);
+--shadow-advance:inset 0 1px 0 var(--white-35),0 4px 18px color-mix(in srgb,var(--green) 18%,transparent);
+--shadow-tier:inset 0 1px 0 color-mix(in srgb,var(--tier-metal-hi) 25%,transparent),0 0 0 1px color-mix(in srgb,var(--tier-metal) 12%,transparent),0 18px 50px color-mix(in srgb,var(--tier-metal) 12%,transparent);
+--shadow-panel:24px 0 60px var(--black-45),inset 1px 0 0 var(--white-4);
+--shadow-popover:0 16px 40px var(--black-50),inset 0 0 0 1px var(--white-12);
+--shadow-scoreboard:0 10px 30px var(--black-45),inset 0 0 0 1px var(--white-10);
+
+/* ── Z layers ───────────────────────────────────────────── */
+--z-raised:1;        /* content above page banding */
+--z-sticky:2;        /* sticky table header */
+--z-sticky-head:3;   /* sticky page title + sub-tabs */
+--z-popover:4;       /* gameplay sound popover */
+--z-scrim:5;
+--z-panel:6;         /* settings panel */
+
+/* ── Motion ─────────────────────────────────────────────── */
+--dur-press:80ms;
+--dur-hover:120ms;
+--dur-toggle:140ms;
+--dur-tab:160ms;
+--dur-rail:180ms;
+--dur-panel:220ms;
+--dur-arrive-card:380ms;
+--dur-arrive-item:300ms;
+--dur-pop:280ms;
+--dur-count:600ms;
+--dur-pulse:1.6s;
+--delay-arrive-items:320ms;
+--delay-chips:920ms;
+--delay-chips-calm:560ms;
+--delay-rail-expand:400ms;
+--stagger:60ms;
+--stagger-chip:40ms;
+--ease-out:cubic-bezier(.2,.8,.2,1);
+--ease-pop:cubic-bezier(.3,1.7,.5,1);
+
+/* ── Density (1280 default) ─────────────────────────────── */
+--fs-10:10px;
+--fs-11:11px;
+--fs-12:12px;
+--fs-13:13px;
+--fs-14:14px;
+--fs-15:15px;
+--fs-16:16px;
+--fs-17:17px;
+--fs-18:18px;
+--fs-20:20px;
+--fs-22:22px;
+--fs-24:24px;
+--fs-28:28px;
+--fs-32:32px;
+--fs-34:34px;
+--fs-36:36px;
+--fs-40:40px;
+--fs-48:48px;
+--dsp-4:4px;
+--dsp-6:6px;
+--dsp-8:8px;
+--dsp-10:10px;
+--dsp-12:12px;
+--dsp-14:14px;
+--dsp-16:16px;
+--dsp-20:20px;
+--dsp-24:24px;
+--dsz-4:4px;
+--dsz-6:6px;
+--dsz-18:18px;
+--dsz-20:20px;
+--dsz-22:22px;
+--dsz-24:24px;
+--dsz-26:26px;
+--dsz-28:28px;
+--dsz-30:30px;
+--dsz-34:34px;
+--dsz-40:40px;
+--dsz-44:44px;
+--dsz-50:50px;
+--dsz-52:52px;
+--dsz-60:60px;
+--dsz-64:64px;
+--dsz-118:118px;
+--top-h:56px;
+--rail-w:64px;
+--page-pad:18px;
+--col-gap:16px;
+}
+.gob.gob-1280{
+--fs-10:10px;
+--fs-11:11px;
+--fs-12:12px;
+--fs-13:13px;
+--fs-14:14px;
+--fs-15:15px;
+--fs-16:16px;
+--fs-17:17px;
+--fs-18:18px;
+--fs-20:20px;
+--fs-22:22px;
+--fs-24:24px;
+--fs-28:28px;
+--fs-32:32px;
+--fs-34:34px;
+--fs-36:36px;
+--fs-40:40px;
+--fs-48:48px;
+--dsp-4:4px;
+--dsp-6:6px;
+--dsp-8:8px;
+--dsp-10:10px;
+--dsp-12:12px;
+--dsp-14:14px;
+--dsp-16:16px;
+--dsp-20:20px;
+--dsp-24:24px;
+--dsz-4:4px;
+--dsz-6:6px;
+--dsz-18:18px;
+--dsz-20:20px;
+--dsz-22:22px;
+--dsz-24:24px;
+--dsz-26:26px;
+--dsz-28:28px;
+--dsz-30:30px;
+--dsz-34:34px;
+--dsz-40:40px;
+--dsz-44:44px;
+--dsz-50:50px;
+--dsz-52:52px;
+--dsz-60:60px;
+--dsz-64:64px;
+--dsz-118:118px;
+--top-h:56px;
+--rail-w:64px;
+--page-pad:18px;
+--col-gap:16px;}
+.gob.gob-1920{
+--fs-10:12px;
+--fs-11:13px;
+--fs-12:14px;
+--fs-13:15.5px;
+--fs-14:16.5px;
+--fs-15:17.5px;
+--fs-16:19px;
+--fs-17:20px;
+--fs-18:21px;
+--fs-20:23.5px;
+--fs-22:26px;
+--fs-24:28.5px;
+--fs-28:33px;
+--fs-32:38px;
+--fs-34:40px;
+--fs-36:42.5px;
+--fs-40:47px;
+--fs-48:56.5px;
+--dsp-4:4.5px;
+--dsp-6:7px;
+--dsp-8:9.5px;
+--dsp-10:12px;
+--dsp-12:14px;
+--dsp-14:16.5px;
+--dsp-16:19px;
+--dsp-20:23.5px;
+--dsp-24:28.5px;
+--dsz-4:4.5px;
+--dsz-6:7px;
+--dsz-18:21px;
+--dsz-20:23.5px;
+--dsz-22:26px;
+--dsz-24:28.5px;
+--dsz-26:30.5px;
+--dsz-28:33px;
+--dsz-30:35.5px;
+--dsz-34:40px;
+--dsz-40:47px;
+--dsz-44:52px;
+--dsz-50:59px;
+--dsz-52:61.5px;
+--dsz-60:71px;
+--dsz-64:75.5px;
+--dsz-118:139px;
+--top-h:64px;
+--rail-w:200px;
+--page-pad:28px;
+--col-gap:24px;}

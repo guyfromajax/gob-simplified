@@ -87,12 +87,7 @@ function cloneParams(params) {
   }
 
   function playSound(filename) {
-    try {
-      var base = (global.API_CONFIG && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
-      var audio = new Audio(base + encodeURIComponent(filename));
-      audio.volume = 0.7;
-      audio.play().catch(function () {});
-    } catch (e) {}
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
   }
 
   function getQueryContext() {

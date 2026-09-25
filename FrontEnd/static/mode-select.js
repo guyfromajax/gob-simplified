@@ -20,11 +20,7 @@ function cloneParams(params) {
 }
 
 function playSound(filename) {
-  try {
-    var a = new Audio('/sounds/' + encodeURIComponent(filename));
-    a.volume = 0.7;
-    a.play().catch(function () {});
-  } catch (e) {}
+  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
 }
 
 const MODE_SELECT_MUSIC_VOLUME = 0.4;
@@ -1734,6 +1730,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     modeSelectMusic = new Audio('/sounds/Championship_Gridlock.mp4');
     modeSelectMusic.loop = true;
     modeSelectMusic.volume = MODE_SELECT_MUSIC_VOLUME;
+    import('/js/shared/uiSfx.js').then(function (m) {
+      var apply = function () {
+        if (modeSelectMusic) modeSelectMusic.volume = m.outputVolume(MODE_SELECT_MUSIC_VOLUME, 'music');
+      };
+      apply();
+      m.subscribeAudio(apply);
+    }).catch(function () {});
     modeSelectMusic.play().catch(function () {});
   } catch (e) {}
 

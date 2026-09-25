@@ -211,11 +211,7 @@
   }
 
   function playClick() {
-    try {
-      var a = new Audio('/sounds/' + encodeURIComponent('click-beep.wav'));
-      a.volume = 0.7;
-      a.play().catch(function () {});
-    } catch (_) { /* ignore */ }
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx('click-beep.wav', 0.7); }).catch(function () {});
   }
 
   async function fetchTeams() {
