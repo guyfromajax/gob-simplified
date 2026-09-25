@@ -2216,7 +2216,7 @@ function setupLockerRoomButton() {
       e.preventDefault();
       e.stopPropagation();
       playSound('x-back.mp3');
-      if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(safeReturnUrl)) {
+      if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(safeReturnUrl)) {
         window.GOBNav.exitFlow(safeReturnUrl, { tab: 'home-tab' });
       } else if (window.GOBNav) window.GOBNav.replace(safeReturnUrl);
       else window.location.replace(safeReturnUrl);

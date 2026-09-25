@@ -368,3 +368,91 @@ test('pagehide covers the flow start and leaves a peek snapshot alone', () => {
   lineup.listeners.pagehide();
   assert.equal(lineupShown, 0);
 });
+
+test('isHubUrl matches the locker room pathname and ignores the query string', () => {
+  const win = fakeWindow({ pathname: '/training.html', search: '?franchise_id=f1' });
+  const report = '/training-report.html?return_url=' + encodeURIComponent('/franchise-command-center.html?franchise_id=f1&tab=training-tab');
+  assert.equal(win.GOBNav.isHubUrl(report), false);
+  assert.equal(win.GOBNav.isHubUrl('/franchise-command-center.html?franchise_id=f1'), true);
+  assert.equal(win.GOBNav.isHubUrl('http://localhost:8000/franchise-command-center.html?return_url=/franchise-command-center.html'), true);
+});
+
+function clickAnchor(win, href, options) {
+  options = options || {};
+  const link = {
+    getAttribute(name) {
+      if (name === 'href') return href;
+      if (name === 'data-gob-up') return options['data-gob-up'] || null;
+      return null;
+    },
+    hasAttribute(name) { return Object.prototype.hasOwnProperty.call(options, name); },
+    setAttribute() {},
+    target: '',
+  };
+  const event = {
+    defaultPrevented: !!options.defaultPrevented,
+    target: { closest(sel) { return sel === 'a[href]' ? link : null; } },
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    button: 0,
+    preventDefault() { event.defaultPrevented = true; },
+  };
+  win.listeners.click(event);
+  return event;
+}
+
+test('a prevented anchor click does not advance the index', () => {
+  const win = fakeWindow({ pathname: '/court.html', search: '?franchise_id=f1&game_id=g1' });
+  const before = win.history.state.gobIdx;
+  clickAnchor(win, '/franchise-command-center.html?franchise_id=f1', { defaultPrevented: true });
+  assert.equal(win.history.state.gobIdx, before);
+  assert.equal(win.sessionStorage.getItem('gob_nav_pending_idx'), null);
+  assert.equal(win.sessionStorage.getItem('gob_nav_idx'), String(before));
+});
+
+test('a same-origin anchor click records the next index once', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1' });
+  clickAnchor(win, '/team-roster-view.html?team_id=t1');
+  assert.equal(win.sessionStorage.getItem('gob_nav_pending_idx'), '1');
+  assert.equal(win.history.state.gobIdx, 0);
+});
+
+test('exitFlow uses the stamped entry index when sessionStorage is ahead', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=game-plan-tab' });
+  win.GOBNav.go('/set-lineup.html?franchise_id=f1&game_id=g1');
+  win.location.pathname = '/set-lineup.html';
+  win.location.search = '?franchise_id=f1&game_id=g1';
+  win.listeners.pageshow({ persisted: false });
+  win.sessionStorage.setItem('gob_nav_idx', '9');
+  assert.equal(win.history.state.gobIdx, 1);
+  win.navigations.length = 0;
+  win.GOBNav.exitFlow('/franchise-command-center.html?franchise_id=f1', { tab: 'home-tab' });
+  assert.deepEqual(win.navigations.at(-1), ['go', -1]);
+  const landing = JSON.parse(win.sessionStorage.getItem('gob_nav_exit'));
+  assert.equal(landing.tab, 'home-tab');
+  assert.match(landing.url, /franchise-command-center\.html/);
+  assert.match(landing.url, /tab=home-tab/);
+});
+
+test('a missed exit replaces mode-select with the locker room', () => {
+  const hub = '/franchise-command-center.html?franchise_id=f1&tab=home-tab';
+  const win = fakeWindow(
+    { pathname: '/mode-select.html', search: '' },
+    { gob_nav_exit: JSON.stringify({ url: hub, tab: 'home-tab', fresh: true }) }
+  );
+  const replaced = win.navigations.find((row) => row[0] === 'replace');
+  assert.ok(replaced);
+  assert.equal(replaced[1], hub);
+});
+
+test('a short jump still replaces an in-game page with the locker room', () => {
+  const hub = '/franchise-command-center.html?franchise_id=f1&tab=training-tab';
+  const win = fakeWindow({ pathname: '/court.html', search: '?franchise_id=f1&game_id=g1' });
+  win.sessionStorage.setItem('gob_nav_exit', JSON.stringify({ url: hub, tab: 'training-tab', fresh: true }));
+  win.navigations.length = 0;
+  win.listeners.pageshow({ persisted: true });
+  assert.equal(win.navigations[0][0], 'replace');
+  assert.equal(win.navigations[0][1], hub);
+});

@@ -280,7 +280,7 @@ function cloneParams(params) {
   function goNext() {
     allowLeave = true;
     var url = nextUrl || buildFccUrl();
-    if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(url)) {
+    if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(url)) {
       window.GOBNav.exitFlow(url);
     } else if (window.GOBNav) window.GOBNav.replace(url);
     else window.location.replace(url);

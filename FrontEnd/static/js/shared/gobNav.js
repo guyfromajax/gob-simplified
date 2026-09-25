@@ -97,6 +97,10 @@
       return /\/franchise-command-center\.html$/i.test(pathOf(url || ''));
     }
 
+    function isHubUrl(url) {
+      return isFccPath(url);
+    }
+
     function entry(url) {
       var parsed = parseUrl(url);
       var path = parsed ? parsed.pathname : pathOf(url);
@@ -261,11 +265,14 @@
       return state && typeof state === 'object' ? state : {};
     }
 
+    // The current entry's history.state.gobIdx is the index. sessionStorage is
+    // only a fallback before this entry has been stamped, so a click that never
+    // navigated cannot leave a tally that later jumps past the Locker Room.
     function readIdx() {
-      var stored = readJson(IDX_KEY);
-      if (typeof stored === 'number') return stored;
       var state = stateObj();
       if (typeof state.gobIdx === 'number') return state.gobIdx;
+      var stored = readJson(IDX_KEY);
+      if (typeof stored === 'number') return stored;
       return null;
     }
 
@@ -418,6 +425,8 @@
       var prev = previousEntry();
       var ref = referrerEntry();
       if ((typeof idx === 'number' && idx > 0) || (prev && isParent(prev, parent)) || (ref && isParent(ref, parent))) {
+        // idx is this entry's history.state.gobIdx when stamped. The decremented
+        // value is only a fallback for a destination that has not been stamped yet.
         if (typeof idx === 'number' && idx > 0) writeIdx(idx - 1);
         popHere();
         saveScroll();
@@ -430,6 +439,31 @@
     // Collapse a finished one-way flow onto the history entry that launched it.
     // gobIdx is stamped on history.state: a push is +1, a replace keeps the index.
     // This does not start a CPU week; the landing page is an ordinary load.
+    function writeExitMarker(hub, tab) {
+      writeJson(EXIT_KEY, { url: hub, tab: tab, fresh: true });
+    }
+
+    function hubUrlFromExit(landing) {
+      if (landing && landing.url) return landing.url;
+      var tab = (landing && landing.tab) || 'home-tab';
+      var params = new URLSearchParams(win.location.search || '');
+      var franchiseId = params.get('franchise_id');
+      if (!franchiseId) return '';
+      return forceTab('/franchise-command-center.html?franchise_id=' + encodeURIComponent(franchiseId), tab);
+    }
+
+    // A history.go that misses the Locker Room (mode-select, or a game page the
+    // jump fell short of) must not stick. The marker is written before the jump.
+    function recoverMissedExit() {
+      var landing = readJson(EXIT_KEY);
+      if (!landing || !landing.fresh || isFcc()) return false;
+      var dest = hubUrlFromExit(landing);
+      if (!dest || isFccPath(dest) === false) return false;
+      showReturnCover();
+      win.location.replace(dest);
+      return true;
+    }
+
     function exitFlow(hubUrl, options) {
       options = options || {};
       var locker = isFccPath(hubUrl);
@@ -438,14 +472,14 @@
       var start = readFlowStart();
       var current = readIdx();
       if (start && typeof current === 'number' && current !== start.idx) {
-        if (locker) writeJson(EXIT_KEY, { tab: tab, fresh: true });
+        if (locker) writeExitMarker(hub, tab);
         removeKey(FLOW_START_KEY);
         writeIdx(start.idx);
         win.history.go(start.idx - current);
         return;
       }
       if (start && typeof current === 'number' && current === start.idx) {
-        if (locker) writeJson(EXIT_KEY, { tab: tab, fresh: true });
+        if (locker) writeExitMarker(hub, tab);
         removeKey(FLOW_START_KEY);
         removeKey(RELOAD_KEY);
         showReturnCover();
@@ -548,6 +582,9 @@
     }
 
     function onClick(event) {
+      // Bubble phase, after the page's own handler. A click that called
+      // preventDefault (exitFlow, replace, back, or go) must not also push.
+      if (!event || event.defaultPrevented) return;
       var target = event.target;
       if (!target || !target.closest) return;
       var link = target.closest('a[href]');
@@ -599,6 +636,7 @@
     }
 
     function onPageShow(event) {
+      if (recoverMissedExit()) return;
       if (event && event.persisted) {
         resetBusyButtons();
         syncIdxFromState();
@@ -664,24 +702,25 @@
     }
 
     if (win.history) win.history.scrollRestoration = 'manual';
-    if (win.document && win.document.addEventListener) {
-      win.document.addEventListener('click', onClick, true);
-    }
     if (win.addEventListener) {
+      win.addEventListener('click', onClick, false);
       win.addEventListener('popstate', onPopState);
       win.addEventListener('pageshow', onPageShow);
       win.addEventListener('pagehide', onPageHide);
       win.addEventListener('beforeunload', onBeforeUnload);
     }
-    ensureIdx();
-    if (!isFcc()) rememberFlowTabFromReferrer();
-    if (!consumeExitLanding(null)) noteHere();
+    if (!recoverMissedExit()) {
+      ensureIdx();
+      if (!isFcc()) rememberFlowTabFromReferrer();
+      if (!consumeExitLanding(null)) noteHere();
+    }
 
     return {
       go: go,
       replace: replace,
       back: back,
       exitFlow: exitFlow,
+      isHubUrl: isHubUrl,
       reloadIfStale: reloadIfStale,
       restoreScroll: restoreScroll,
       syncCurrent: syncCurrent,

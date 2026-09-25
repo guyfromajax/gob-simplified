@@ -34,7 +34,7 @@
 
   var context = Common.getQueryContext();
   function replaceNav(url) {
-    if (window.GOBNav && window.GOBNav.exitFlow && /franchise-command-center\.html/i.test(String(url))) {
+    if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(String(url))) {
       window.GOBNav.exitFlow(url);
       return;
     }
