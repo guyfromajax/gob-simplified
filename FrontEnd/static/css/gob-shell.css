@@ -347,3 +347,94 @@ html.gob-shell .pg-head .stab.is-locked:focus-visible {
   cursor: not-allowed;
   box-shadow: none;
 }
+
+/* Focus mode: top bar only. Settings sits at the right. The panel anchors at left 0. */
+html.gob-shell.gob-focus .app {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html.gob-shell.gob-focus .main {
+  grid-column: 1 / -1;
+}
+
+html.gob-shell.gob-focus .rail,
+html.gob-shell.gob-focus .adv-wrap,
+html.gob-shell.gob-focus .pg-head {
+  display: none !important;
+}
+
+html.gob-shell #gob-focus-settings {
+  display: none;
+}
+
+html.gob-shell.gob-focus #gob-focus-settings {
+  display: grid;
+  place-items: center;
+  width: var(--top-h);
+  height: var(--top-h);
+  flex: 0 0 auto;
+  color: var(--text-60);
+  background: transparent;
+}
+
+html.gob-shell.gob-focus #gob-focus-settings svg {
+  width: 22px;
+  height: 22px;
+}
+
+html.gob-shell.gob-pending .rail,
+html.gob-shell.gob-pending .adv-wrap {
+  visibility: hidden;
+}
+
+/* Locker-room backs are replaced by the rail. Up-a-level backs stay (data-gob-keep-back). */
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .rankings-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .schedule-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .hub-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .team-stats-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .team-roster-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .standings-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .ps-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .news-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .leaders-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .brackets-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .recruiting-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .playbooks-page-header-wrap,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .game-plan-page-header-wrap,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .stats-topbar-back,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .back-to-locker-room {
+  display: none !important;
+}
+
+/* One vertical scroll: nested page lists grow, and .main (or focus .main) scrolls. */
+html.gob-shell .fcc-home-list-scroll,
+html.gob-shell .pool-scroll,
+html.gob-shell .spool-rows,
+html.gob-shell .rail-list,
+html.gob-shell .idock-list,
+html.gob-shell .signtable,
+html.gob-shell #tr-scroll,
+html.gob-shell .pd-right-column,
+html.gob-shell #franchise-container .fcc-home-card--recruiting .fcc-home-card-body,
+html.gob-shell #franchise-container .fcc-home-card--recruiting .fcc-home-list-scroll {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+html.gob-shell .main thead th {
+  position: sticky;
+  top: var(--dsz-118);
+  z-index: 2;
+  background: var(--bg-page-solid);
+}
+
+html.gob-shell .main .stats-table-wrap thead th,
+html.gob-shell .main .gob-data-grid-scroll thead th,
+html.gob-shell .main #tr-scroll thead th {
+  top: 0;
+}
+
+html.gob-shell.gob-focus .main thead th {
+  top: 0;
+}

@@ -52,13 +52,15 @@ The gear that opened the panel gets `.open` and `aria-expanded="true"` while it 
 
 ## 5. Shell
 
-Mounted only by `gobShell.js` on `franchise-command-center.html`. Standalone pages keep their current header until Shell 2.
+`gobShell.js` mounts the shell. The Office and every browse page in the table below get the full shell. Flow pages get focus mode. The live court never mounts it.
 
 Grid: `.app` is `grid-template-rows: var(--top-h) minmax(0, 1fr)` and `grid-template-columns: var(--rail-w) minmax(0, 1fr)`. `.top` spans both columns. `.rail` is column 1. `.main` is column 2 and the only scroller (`overflow-y: auto`). `html` and `body` do not scroll.
 
 Top bar, left to right: team logo (existing `#team-logo`, height `calc(var(--top-h) * 0.72)`, width auto, no crop) whose alt, `title`, and link `aria-label` are the team name. The name is not painted as visible text. The control opens Team › Roster. Then a divider, Record, National Rank, Week. Record text comes from `#fcc-record-label` (standings W-L for the user's team). National Rank comes from `#fcc-rank-label` / `data.rank`, shown as `#N` or `NR`, with the label "National Rank". Week comes from `data.week`. There is no Team RT. There is no alpha badge, product logo, or social link. The build label stays in Settings.
 
-Right side: the ghost Edit Recruit Invites button (`#fcc-edit-recruiting`, same show/hide as today) then Advance (`#play-now` with class `advance`). Advance keeps `updatePlayButton`: same labels, `dataset.mode`, and routes. A blocking task replaces the label; it does not disable the button or add a hint.
+Right side, browse pages: the ghost Edit Recruit Invites button (`#fcc-edit-recruiting`, same show/hide as today) then Advance (`#play-now` with class `advance`). Advance is `gobAdvance.js`. The Office passes its existing helpers into it. Labels, `dataset.mode`, routes, and gating are the same as the Office. A blocking task replaces the label; it does not disable the button or add a hint. Loading text is `STARTING…`. A second click while that class `is-loading` is set is ignored. Focus mode has no Advance. The page keeps its own green button.
+
+On a browse page that does not already paint `#fcc-record-label`, Record comes from `team_record.wins` and `team_record.losses` on the command-center payload. National Rank still comes from `data.rank`. Week still comes from `data.week`. The Office keeps painting Record from the standings label.
 
 Tier weeks: when `GOBTierEmblem.tierForWeek(data.week)` returns a tier and `TIER_TOKENS` has `metal` and `metalHi`, `.top` gets `is-tier` and those two custom properties. The existing `#fcc-header-emblem` is the emblem. If the tier is not available, the bar stays plain.
 
@@ -68,11 +70,17 @@ Rail order: Office, Team, Prep, League, Recruiting, News, then the utility group
 
 Recruiting carries the existing `.inbox-badge` when `recruitingIsPrompted` is true. That is a presence dot, not a count. Do not pulse it unless a field already says the recruiting task gates Advance. Turning Advance into the recruiting task is the gating; it is not a pulse signal.
 
-Sub-tabs sit in `.pg-head` (sticky title plus `.subtabs`). Office and Recruiting have no sub-tab row. Recruiting is a rail item that leaves the page: it calls the existing `openRecruitingSurface` (`GOBNav.go` to the recruiting URL the app already builds). Link sub-tabs look the same as in-page sub-tabs and call `GOBNav.go` with the href the page already built. There is no Players | Team toggle.
+Sub-tabs sit in `.pg-head` (sticky title plus `.subtabs`). Office and Recruiting have no sub-tab row. Recruiting is a rail item that leaves the page: it calls the existing `openRecruitingSurface` (`GOBNav.go` to the recruiting URL the app already builds). On the Office, link sub-tabs call `GOBNav.go` with the href the page already built. On a standalone browse page, every sub-tab uses `GOBNav.replace`: an Office tab goes to `franchise-command-center.html?tab=<id>`, and a link sub-tab goes to that standalone page. Rail section clicks on a standalone page `GOBNav.go` to that section's first Office tab (or to recruiting). There is no Players | Team toggle.
 
-On a shell page, the settings host is positioned at `left: var(--rail-w)` and `top: var(--top-h)` so the scrim covers `.main` only. The top bar and the rail stay usable. Pages that still use the auth bar keep the host anchored under `#auth-bar`.
+Focus mode (`html.gob-focus`): the top bar only — logo, Record, National Rank, Week, and the Settings gear at the right (`#gob-focus-settings`). No rail. No Advance. The settings host anchors at `left: 0` and `top: var(--top-h)`. The page's own primary action and its exit or back control stay, including `exitFlow` back to the locker room.
 
-Scroll rule: only `.main` scrolls. Do not add a second page-level scroller. Leave scroll inside an existing table or card; list it, do not refactor it, when the task says so.
+Player and team pages highlight the section in `return_tab` or `return_url`. If those are absent, the user's own team is Team and a different `team_id` from `user_team_id` is League. No sub-tab is active. A back control that goes up a level (player to team, bracket to standings) stays. A back control that only returned to the locker room is hidden, because the rail replaces it.
+
+Box score is browse when `return_url` is set, and focus when `from` is `lineup` or `game-plan` or neither param is set (the end-of-game open). Recruiting is focus for `action=run`, for weeks 20–26 before this week's invite board is submitted, and for week 35 before orders are submitted. Other hub views are browse.
+
+On a full shell page, the settings host is positioned at `left: var(--rail-w)` and `top: var(--top-h)` so the scrim covers `.main` only. The top bar and the rail stay usable. Focus mode anchors that host at `left: 0`. Pages that still use the auth bar keep the host anchored under `#auth-bar`.
+
+Scroll rule: only `.main` scrolls, on the Office, on browse pages, and in focus mode. Nested vertical scroll areas are removed (`overflow: visible`, no max-height). A table that is wider than `.main` at 1280 may scroll horizontally. `tests/e2e/helpers/oneVerticalScroll.js` (`assertOneVerticalScroll`) fails when any other element has `overflow-y` `auto` or `scroll` and `scrollHeight > clientHeight + 1`. Dialogs and the settings host are not page scrollers. A horizontal scroller whose extra height is only the scrollbar (24px or less, and wider than its box) is reported, not failed. Sticky `thead th` sits under `.pg-head` (`top: var(--dsz-118)`); in focus mode and inside a horizontal table wrap, `top` is 0.
 
 Rail and sub-tab clicks play `click-tiny.wav` through `playSfx`. Advance does not switch to that sound.
 
@@ -82,7 +90,7 @@ Rail and sub-tab clicks play `click-tiny.wav` through `playSfx`. Advance does no
 
 - `go(url)` leaves the page. From the franchise command center it records the flow start (unless the destination is a peek), stamps the next index for the following load, and assigns.
 - `pushSection(url)` is the same-page section push. It saves `.main` scroll, increments `gobIdx` on the new history entry immediately, and does not write the pending-index key (the document is not reloading).
-- `replace(url)` keeps the current index and replaces the page. Sub-tabs do not call it. They use `history.replaceState` through `CommandCenterTabs.show(tab, 'replace')` so the franchise page stays one entry.
+- `replace(url)` keeps the current index and replaces the page. In-page sub-tabs on the Office do not call it. They use `history.replaceState` through `CommandCenterTabs.show(tab, 'replace')` so the franchise page stays one entry. Sub-tabs on a standalone browse page do call `GOBNav.replace`, including the return to an Office tab.
 - Rail section clicks call `CommandCenterTabs.show(tab, 'push')`, except Recruiting, which leaves the page with `GOBNav.go`. Sub-tabs call `show(tab, 'replace')`.
 - Browser Back and Forward restore the section, the sub-tab, and the scroll position from `popstate` (`showTabFromUrl` plus `GOBNav.restoreScroll`). Scroll is stored per URL on `.main` when `html.gob-shell` is present, otherwise on the active tab panel.
 - In-app flows (Play Game, Run Training, and the other Advance routes) still return to the locker-room entry via `exitFlow`. That collapse is separate from the section stack.
@@ -130,9 +138,33 @@ A page or brief is done only when this file is updated if the shell, the section
 2. One Advance. Blocking work changes its label. No spinner. No second green button.
 3. Tokens from `gob-tokens.css` only. `.gob` plus `bindGobDensity`. Self-hosted fonts.
 4. Two levels of navigation. Rail pushes. Sub-tabs replace. Flows still `exitFlow` back to the locker room.
-5. Only `.main` scrolls on a shell page.
-6. Live gameplay does not mount the shell.
+5. Only `.main` scrolls. Run `assertOneVerticalScroll` on a new franchise page at 1280 and 1920.
+6. Live gameplay does not mount the shell. Flow pages use focus mode. Browse pages use the full shell.
 7. Sounds go through `playSfx` or the court bus. Advance keeps its confirm sound.
-8. Settings opens from the shell gear on a shell page and from the auth-bar gear everywhere else.
+8. Settings opens from the rail gear on a full shell page, from the top-bar gear in focus mode, and from the auth-bar gear everywhere else.
 9. Attribute digits and RT letters are unchanged.
 10. This document matches what shipped.
+
+## 9. Browse and focus pages
+
+| Page | Mode | Section | Sub-tab |
+|---|---|---|---|
+| franchise-command-center.html | browse | per tab | per tab |
+| recruiting.html | browse, or focus while that week's invites, Signing Day orders, or `action=run` are the task | Recruiting | none |
+| rankings.html | browse | League | Rankings |
+| schedule.html | browse | League | Schedule |
+| practice-squad-standings.html | browse | League | Practice Squad |
+| practice-squad-bracket.html | browse | League | Practice Squad |
+| brackets.html | browse | League | Tournament |
+| awards.html | browse | News | Awards |
+| news.html | browse | News | News |
+| leaders.html | browse | League | none |
+| standings.html | browse | League | Standings |
+| team-stats.html | browse | League | Team Stats |
+| stats.html | browse | League | none |
+| player-detail.html | browse | return context; else Team or League | none |
+| team-roster-view.html | browse | return context; else Team or League | none |
+| box-score.html | browse when `return_url` is set; otherwise focus | League when browse | none |
+| set-lineup.html, training.html, training-report.html, training-squad-report.html, training-playbooks.html, cut-players.html, game-plan.html, playbooks.html, playbook-report.html | focus | — | — |
+
+The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` reuses a response the page already requested. Otherwise it fetches that URL once.

@@ -53,6 +53,49 @@ function cloneParams(params) {
         styleLink.href = "/css/button-font.css";
         head.appendChild(styleLink);
       }
+
+      var shellPages = {
+        "/recruiting.html": 1,
+        "/rankings.html": 1,
+        "/schedule.html": 1,
+        "/practice-squad-standings.html": 1,
+        "/practice-squad-bracket.html": 1,
+        "/brackets.html": 1,
+        "/awards.html": 1,
+        "/news.html": 1,
+        "/leaders.html": 1,
+        "/standings.html": 1,
+        "/team-stats.html": 1,
+        "/stats.html": 1,
+        "/player-detail.html": 1,
+        "/team-roster-view.html": 1,
+        "/set-lineup.html": 1,
+        "/training.html": 1,
+        "/training-report.html": 1,
+        "/training-squad-report.html": 1,
+        "/training-playbooks.html": 1,
+        "/cut-players.html": 1,
+        "/game-plan.html": 1,
+        "/playbooks.html": 1,
+        "/playbook-report.html": 1,
+        "/box-score.html": 1
+      };
+      if (shellPages[window.location.pathname]) {
+        ["/css/gob-tokens.css", "/css/gob-components.css", "/css/gob-shell.css"].forEach(function (href) {
+          if (document.querySelector('link[href="' + href + '"]')) return;
+          var link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = href;
+          head.appendChild(link);
+        });
+        ["/js/shared/gobAdvance.js", "/js/shared/gobShell.js"].forEach(function (src) {
+          if (document.querySelector('script[src="' + src + '"]')) return;
+          var script = document.createElement("script");
+          script.src = src;
+          script.async = false;
+          head.appendChild(script);
+        });
+      }
     } catch (e) {
       // ignore
     }

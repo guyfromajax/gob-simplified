@@ -512,6 +512,7 @@ function populateTop(data) {
     rankLabelEl.textContent = `National Rank: ${data.rank || '--'}`;
   }
   updateTopRecordLabel();
+  window.__gobCommandCenterData = data;
   if (window.GOBShell && typeof window.GOBShell.syncTop === 'function') window.GOBShell.syncTop(data);
   console.log('Team logo URL:', logoSrc);
 
@@ -4328,122 +4329,32 @@ function fccEosSimOverlayCopy(week) {
   return EOS_SIM_OVERLAY_BY_WEEK[n] || 'Simming Tournament Games';
 }
 
-function updatePlayButton(data) {
-  const playNowBtn = document.getElementById('play-now');
-  if (!playNowBtn || !data) return;
-  playNowBtn.classList.remove('is-loading');
-
-  const eosTournamentActive = data.eos_tournament_active || false;
-  const eosTournament = data.eos_tournament;
-  const week = Number(data.week || 1);
-  playNowBtn.dataset.week = String(week);
-  const trainingDisabledForEos = !!data.training_disabled_for_eos;
-  const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || week >= 27;
-  const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
-  const offerSimRest = data.offer_sim_rest != null ? !!data.offer_sim_rest : null;
-  const regionQualified = !!data.region_qualified;
-  const hasEosGameThisWeek = !!data.has_eos_game_this_week;
-  
-  if (fccCpuSimNeedsRecovery(data)) {
-    playNowBtn.textContent = 'Finish Computer Games';
-    playNowBtn.dataset.mode = 'finish-cpu-sims';
-    return;
-  }
-
-  // Fallback: infer eliminated from bracket when API doesn't return user_eliminated/offer_sim_rest
-  let userTeamEliminated = false;
-  if (eosTournamentActive && eosTournament && userTeamId && userEliminated == null) {
-    const bracket = eosTournament.bracket || {};
-    const allMatchups = [...(bracket.round1 || []), ...(bracket.round2 || []), ...(bracket.final || [])];
-    const userInMatchup = allMatchups.some(m =>
-      String(m.home_team) === String(userTeamId) || String(m.away_team) === String(userTeamId)
-    );
-    userTeamEliminated = !userInMatchup && week >= 27;
-  }
-  
-  const eliminated = userEliminated != null ? userEliminated : userTeamEliminated;
-  const showSimRest = offerSimRest != null ? offerSimRest : (eliminated && eosTournamentActive && !eosTournament?.completed);
-  const tournamentComplete = eosTournament?.completed || false;
-  const cutRequired = !!data.cut_required;
-  
-  const wire = data.recruiting_wire || {};
-  // Weeks 20-26 open with recruiting. Invites are the FIRST step of the week — the
-  // green button runs Recruit Invites -> Training -> Play Game — because invites are
-  // assigned during run-training, so a board sent afterwards misses its own week.
-  //
-  // Done = the board was SUBMITTED this week (board_saved_week), not merely built:
-  // has_saved_board never clears once set, so it can only gate week 20. Deliberately
-  // AFTER the cut gate — an illegal roster outranks an unsent board.
-  //
-  // UI ORDER ONLY. /run-training still 400s in week 20 with no board at all, and still
-  // accepts weeks 21-26 without a fresh one; nothing here can lock a save out of a week.
-  const inviteWindow = week >= INVITE_FIRST_WEEK && week <= INVITE_LAST_WEEK;
-  const invitesPending = inviteWindow && Number(wire.board_saved_week || 0) !== week;
-
-  if (cutRequired) {
-    playNowBtn.textContent = 'Assign Practice Squad';
-    playNowBtn.dataset.mode = 'cut-players';
-  } else if (invitesPending) {
-    // Set on the first week (there is nothing to review yet), Review after — the board
-    // persists, so weeks 21-26 are confirming a standing list rather than building one.
-    playNowBtn.textContent = week === INVITE_FIRST_WEEK ? 'Set Recruit Invites' : 'Review Recruit Invites';
-    playNowBtn.dataset.mode = 'recruit-invites';
-  } else if (week === 35 && wire.week_35_orders_submitted) {
-    // Orders are saved but NOT run. The green press runs the day; the ghost button
-    // below it (see updateEditRecruitingButton) goes back to edit. The cut offer does
-    // not repeat here — it belongs on the way IN, before points were committed against
-    // a roster size.
-    playNowBtn.textContent = 'Run Recruiting Day';
-    playNowBtn.dataset.mode = 'week35-run';
-  } else if (week === 35) {
-    playNowBtn.textContent = 'Run Signing Day';
-    playNowBtn.dataset.mode = 'week35-recruiting';
-  } else if (week === 36 && !wire.week_36_results_seen) {
-    // Signing Day has run and the league list is the payoff — it comes BEFORE the
-    // rollover, which is irreversible. The hub stamps the view server-side (season-
-    // stamped), so the next load falls through to Go To Next Season below.
-    playNowBtn.textContent = 'View Recruiting Results';
-    playNowBtn.dataset.mode = 'view-recruiting-results';
-  } else if (week === 36) {
-    playNowBtn.textContent = 'Go To Next Season';
-    playNowBtn.dataset.mode = 'new-season';
-  } else if (tournamentComplete && week >= 37) {
-    playNowBtn.textContent = 'Go To Next Season';
-    playNowBtn.dataset.mode = 'new-season';
-  } else if (showSimRest && eosTournamentActive) {
-    playNowBtn.textContent = EOS_SIM_CTA_BY_WEEK[week] || 'Sim Next Round';
-    playNowBtn.dataset.mode = 'sim-rest-tournament';
-  } else if (
-    trainingDisabledForPostseason
-    && !eliminated
-    && regionQualified
-    && week >= 27
-    && week <= 29
-    && !hasEosGameThisWeek
-  ) {
-    playNowBtn.textContent = EOS_SIM_CTA_BY_WEEK[week] || 'Sim Next Round';
-    playNowBtn.dataset.mode = 'sim-rest-tournament';
-  } else if (trainingDisabledForPostseason && !eliminated) {
-    playNowBtn.textContent = EOS_PLAY_CTA_BY_WEEK[week] || 'Play Next Game';
-    playNowBtn.dataset.mode = 'play';
-  } else if (trainingDisabledForEos || eliminated) {
-    playNowBtn.textContent = 'Go To Next Season';
-    playNowBtn.dataset.mode = 'new-season';
-  } else {
-    const trainingCompleted = data.training_completed || false;
-    const sessionType = data.session_type || 'in-season';
-    if (!trainingCompleted) {
-      const cpuResumeRequired = !!data.cpu_training_resume?.required;
-      playNowBtn.textContent = cpuResumeRequired
-        ? 'Resume Training'
-        : (sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training');
-      playNowBtn.dataset.mode = 'training';
-    } else {
-      playNowBtn.textContent = 'Play Next Game';
-      playNowBtn.dataset.mode = 'play';
-    }
-  }
+function advanceEnv() {
+  return {
+    franchiseId: franchiseId,
+    userTeamId: userTeamId,
+    userTeamName: userTeamNameForLeaders,
+    topData: commandCenterTopDataCache,
+    fetchJSON: fetchJSON,
+    fccCpuSimNeedsRecovery: fccCpuSimNeedsRecovery,
+    recoverCpuSimsBeforeFccRender: recoverCpuSimsBeforeFccRender,
+    emptyParams: emptyParams,
+    getCurrentRelativeUrl: getCurrentRelativeUrl,
+    openRecruitingSurface: openRecruitingSurface,
+    buildAssignPracticeSquadUrl: buildAssignPracticeSquadUrl,
+    fccEosSimOverlayCopy: fccEosSimOverlayCopy,
+    showNewSeasonConfirmModal: showNewSeasonConfirmModal,
+    flashSeasonAdvanceScreen: flashSeasonAdvanceScreen,
+    showSeasonAdvanceOverlay: showSeasonAdvanceOverlay,
+    normalizeHexColor: normalizeHexColor,
+    nextSeasonNumber: nextSeasonNumber,
+  };
 }
+
+function updatePlayButton(data) {
+  if (window.GOBAdvance) window.GOBAdvance.updatePlayButton(data, advanceEnv());
+}
+
 
 /**
  * The ghost button under #play-now — the way BACK into recruiting.
@@ -4459,22 +4370,9 @@ function updatePlayButton(data) {
  * preserved by the sessionStorage draft, and re-submitting simply overwrites.
  */
 function updateEditRecruitingButton(data) {
-  const btn = document.getElementById('fcc-edit-recruiting');
-  if (!btn) return;
-  const week = Number(data?.week || 1);
-  const wire = data?.recruiting_wire || {};
-  const inviteWindow = week >= INVITE_FIRST_WEEK && week <= INVITE_LAST_WEEK;
-  const label = inviteWindow && Number(wire.board_saved_week || 0) === week ? 'Edit Recruit Invites'
-    : week === SIGNING_DAY_WEEK && wire.week_35_orders_submitted ? 'Edit Recruiting Orders'
-      : null;
-  btn.style.display = label ? 'block' : 'none';
-  if (!label) return;
-  btn.textContent = label;
-  if (!btn.dataset.wireBound) {
-    btn.dataset.wireBound = '1';
-    btn.addEventListener('click', () => { void openRecruitingSurface(); });
-  }
+  if (window.GOBAdvance) window.GOBAdvance.updateEditRecruitingButton(data, advanceEnv());
 }
+
 
 function updateRecruitingButton(data) {
   const week = Number(data?.week || 1);
@@ -4578,326 +4476,8 @@ function waitForConfirmSfx() {
 
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
-playNowBtn.addEventListener('click', async () => {
-  if (playNowBtn.classList.contains('is-loading')) return;
-  const advanceLabel = playNowBtn.textContent;
-  playNowBtn.classList.add('is-loading');
-  playNowBtn.textContent = 'STARTING…';
-  const settleAdvance = () => {
-    playNowBtn.classList.remove('is-loading');
-    if (playNowBtn.textContent === 'STARTING…') playNowBtn.textContent = advanceLabel;
-  };
-  playSound('confirm-1-lowervol.wav');
-  const confirmSfxReady = waitForConfirmSfx();
-  const mode = playNowBtn.dataset.mode || 'play';
+if (window.GOBAdvance && playNowBtn) window.GOBAdvance.bind(playNowBtn, advanceEnv);
 
-  if (mode === 'finish-cpu-sims') {
-    const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
-    const recovered = await recoverCpuSimsBeforeFccRender(topData);
-      if (recovered && !fccCpuSimNeedsRecovery(recovered)) {
-      const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
-      if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(fccUrl);
-      else if (window.GOBNav) window.GOBNav.replace(fccUrl);
-      else window.location.replace(fccUrl);
-    } else {
-      updatePlayButton(recovered || topData);
-    }
-    return;
-  }
-  
-  if (mode === 'training') {
-    const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
-    if (topData?.training_disabled_for_eos || topData?.training_disabled_for_postseason) {
-      settleAdvance();
-      return;
-    }
-    const sessionType = topData?.session_type || 'in-season';
-    const params = emptyParams();
-    params.set('franchise_id', franchiseId);
-    params.set('mode', 'franchise');
-    params.set('session_type', sessionType);
-    params.set('return_url', getCurrentRelativeUrl());
-    if (userTeamId) params.set('team_id', userTeamId);
-    const trainingReturnUrl = `/training.html?${params.toString()}`;
-    const navigateToTraining = async () => {
-      await confirmSfxReady;
-      try {
-        const { clearFranchiseMusicState } = await import('/js/musicController.js');
-        clearFranchiseMusicState();
-      } catch {}
-      if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(trainingReturnUrl);
-      else window.location.assign(trainingReturnUrl);
-    };
-    if (window.GOBTutorialAlerts) {
-      const blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining, trainingReturnUrl);
-      if (blocked) {
-        settleAdvance();
-        return;
-      }
-    } else {
-      await navigateToTraining();
-    }
-    return;
-  }
-
-  if (mode === 'recruit-invites') {
-    await openRecruitingSurface();
-    return;
-  }
-
-  if (mode === 'view-recruiting-results') {
-    // Week 36: the hub's results phase renders the league signing list (user's
-    // conference first). Same handoff the invite modes use.
-    await openRecruitingSurface();
-    return;
-  }
-
-  if (mode === 'week35-run') {
-    // The hub owns both /run-week-35-recruiting and the reveal that follows it, so the
-    // press is handed over rather than duplicated here. No cut offer: the orders are
-    // already allocated against the current roster.
-    const params = emptyParams();
-    params.set('franchise_id', franchiseId);
-    params.set('team_id', userTeamId);
-    params.set('from', 'fcc');
-    params.set('action', 'run');
-    params.set('return_url', getCurrentRelativeUrl());
-    await confirmSfxReady;
-    try {
-      const { clearFranchiseMusicState } = await import('/js/musicController.js');
-      clearFranchiseMusicState();
-    } catch {}
-    if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(`/recruiting.html?${params.toString()}`);
-    else window.location.assign(`/recruiting.html?${params.toString()}`);
-    return;
-  }
-
-  if (mode === 'week35-recruiting') {
-    const params = emptyParams();
-    params.set('franchise_id', franchiseId);
-    params.set('team_id', userTeamId);
-    params.set('from', 'fcc');
-    params.set('return_url', getCurrentRelativeUrl());
-    const recruitingUrl = `/recruiting.html?${params.toString()}`;
-    const goRecruiting = async () => {
-      await confirmSfxReady;
-      try {
-        const { clearFranchiseMusicState } = await import('/js/musicController.js');
-        clearFranchiseMusicState();
-      } catch {}
-      if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(recruitingUrl);
-      else window.location.assign(recruitingUrl);
-    };
-    await goRecruiting();
-    return;
-  }
-
-  if (mode === 'cut-players') {
-    await confirmSfxReady;
-    if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(buildAssignPracticeSquadUrl());
-    else window.location.assign(buildAssignPracticeSquadUrl());
-    return;
-  }
-  
-  // ✅ EOS TOURNAMENT: Handle sim rest of tournament
-  if (mode === 'sim-rest-tournament') {
-    const originalText = advanceLabel;
-    playNowBtn.disabled = true;
-    const week = Number(playNowBtn.dataset.week || commandCenterTopDataCache?.week || 0);
-    if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-      window.PageLoadOverlay.show({
-        variant: 'pulse',
-        title: fccEosSimOverlayCopy(week),
-        showBanner: false,
-      });
-    }
-
-    try {
-      const res = await fetch(API_CONFIG.buildUrl('/franchise/sim-rest-of-tournament'), {
-      method: 'POST',
-      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ franchise_id: franchiseId })
-      });
-      if (!res.ok) throw new Error('Simulation failed');
-      await confirmSfxReady;
-      location.reload();
-    } catch (err) {
-      console.error(err);
-      if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
-      alert('Unable to simulate tournament');
-      playNowBtn.disabled = false;
-      playNowBtn.textContent = originalText;
-      settleAdvance();
-    }
-    return;
-  }
-  
-  // End-of-season franchise rollover: keep the same franchise instance and build the next season from franchise data
-  if (mode === 'new-season') {
-    settleAdvance();
-    const modal = showNewSeasonConfirmModal();
-    const closeModal = () => {
-      if (typeof modal.closeGobModal === 'function') modal.closeGobModal();
-      else modal.remove();
-    };
-    modal.querySelector('#fcc-new-season-cancel')?.addEventListener('click', () => {
-      closeModal();
-    });
-    modal.querySelector('#fcc-new-season-proceed')?.addEventListener('click', async () => {
-      // Same confirm SFX as the FCC green advance button + a brief full-screen flash.
-      playSound('confirm-1-lowervol.wav');
-      flashSeasonAdvanceScreen();
-      const originalText = playNowBtn.textContent;
-      playNowBtn.disabled = true;
-      playNowBtn.textContent = 'Starting...';
-      // Take the modal down BEFORE the request: the old order left the dialog and a
-      // live button on screen for the whole rollover.
-      closeModal();
-
-      const goToNextSeasonFcc = () => {
-        const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
-        if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(fccUrl, { tab: 'home-tab' });
-        else if (window.GOBNav) window.GOBNav.replace(fccUrl);
-        else window.location.replace(fccUrl);
-      };
-      const startFinishSeason = () => fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
-        method: 'POST',
-        headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ franchise_id: franchiseId }),
-      }).then((res) => {
-        if (!res.ok) throw new Error('Finish season failed');
-        return res.json();
-      });
-      const failAdvance = (err, overlay) => {
-        console.error(err);
-        if (overlay) overlay.remove();
-        if (window.SeniorTribute && window.SeniorTribute.teardown) window.SeniorTribute.teardown();
-        alert('Unable to start new season');
-        playNowBtn.disabled = false;
-        playNowBtn.textContent = originalText;
-      };
-
-      let tribute = null;
-      try {
-        tribute = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/senior-tribute')}?franchise_id=${encodeURIComponent(franchiseId)}`);
-      } catch (err) {
-        console.warn('[TRIBUTE] snapshot failed; using load cover', err);
-      }
-      const seniors = (tribute && tribute.players) || [];
-
-      // No graduating seniors — current season-transition load cover.
-      if (!seniors.length || !window.SeniorTribute) {
-        const advanceOverlay = showSeasonAdvanceOverlay(nextSeasonNumber());
-        try {
-          await startFinishSeason();
-          goToNextSeasonFcc();
-        } catch (err) {
-          failAdvance(err, advanceOverlay);
-        }
-        return;
-      }
-
-      // Sequence A: snapshot is already in hand. Start rollover behind the tribute.
-      let finishState = 'pending';
-      const finishPromise = startFinishSeason()
-        .then(() => { finishState = 'ok'; })
-        .catch((err) => { finishState = 'err'; throw err; });
-
-      window.SeniorTribute.start({
-        players: seniors,
-        season: tribute.season || commandCenterTopDataCache?.current_season || 1,
-        // Atmosphere only (one soft radial on the tribute host).
-        teamColor: normalizeHexColor(commandCenterTopDataCache?.primary_color) || undefined,
-        onAdvance: async () => {
-          let overlay = null;
-          if (finishState === 'pending') {
-            overlay = showSeasonAdvanceOverlay(nextSeasonNumber());
-            // The cover (z 4000) sits below the tribute (z 10010), so it would open
-            // invisibly behind it. Remove the tribute so this screen matches the
-            // no-seniors path exactly. failAdvance already tears it down on error.
-            window.SeniorTribute.teardown();
-          }
-          try {
-            await finishPromise;
-            goToNextSeasonFcc();
-          } catch (err) {
-            failAdvance(err, overlay);
-          }
-        },
-      });
-    });
-    return;
-  }
-  
-  // Otherwise, play the game
-  console.log('Play Now click search:', currentSearch());
-  const originalText = advanceLabel;
-  playNowBtn.disabled = true;
-  if (!franchiseId) {
-    alert('Franchise not loaded');
-    playNowBtn.disabled = false;
-    playNowBtn.textContent = originalText;
-    settleAdvance();
-    return;
-  }
-  try {
-    const res = await fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
-      method: 'POST',
-      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ franchise_id: franchiseId })
-    });
-    if (!res.ok) throw new Error('Simulation failed');
-    const { home, away, week, home_id, away_id, home_display, away_display } = await res.json();
-    if (!home || !away) throw new Error('Matchup not found');
-    try {
-      if (franchiseId && window.FranchiseLS) {
-        window.FranchiseLS.setWeek(franchiseId, week);
-      }
-    } catch {}
-    // Prefer ObjectId for side (display names must not drive identity). Core names stay on home/away.
-    let resolvedSide = '';
-    if (userTeamId && home_id != null && away_id != null) {
-      if (String(userTeamId) === String(home_id)) resolvedSide = 'home';
-      else if (String(userTeamId) === String(away_id)) resolvedSide = 'away';
-    }
-    if (!resolvedSide) {
-      resolvedSide = (userTeamNameForLeaders === home ? 'home' : (userTeamNameForLeaders === away ? 'away' : ''));
-    }
-    let url = `/set-lineup.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
-    if (home_display) url += `&home_display=${encodeURIComponent(home_display)}`;
-    if (away_display) url += `&away_display=${encodeURIComponent(away_display)}`;
-    // ✅ SS&S: Use ObjectId for consistent navigation
-    if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}&user_team_id=${encodeURIComponent(userTeamId)}`;
-    if (resolvedSide) url += `&my_team=${resolvedSide}`;
-    console.log('Navigating to', url);
-    const navigateToLineup = async () => {
-      await confirmSfxReady;
-      try {
-        const { clearFranchiseMusicState } = await import('/js/musicController.js');
-        clearFranchiseMusicState();
-      } catch {}
-      if (window.GOBNav) window.GOBNav.go(url);
-      else window.location.assign(url);
-    };
-    if (window.GOBTutorialAlerts) {
-      const blocked = await window.GOBTutorialAlerts.interceptPlayNextGame(franchiseId, url, navigateToLineup);
-      if (blocked) {
-        playNowBtn.disabled = false;
-        playNowBtn.textContent = originalText;
-        settleAdvance();
-        return;
-      }
-    } else {
-      await navigateToLineup();
-    }
-  } catch (err) {
-    console.error(err);
-    alert('Unable to play next game');
-    playNowBtn.disabled = false;
-    playNowBtn.textContent = originalText;
-    settleAdvance();
-  }
-});
 
 function navigateToGamePlan() {
   playSound('click-tiny.wav');

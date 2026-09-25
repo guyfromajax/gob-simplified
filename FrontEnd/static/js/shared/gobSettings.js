@@ -67,7 +67,8 @@ function placeHost() {
   if (!host) return;
   if (shellPage()) {
     const root = getComputedStyle(document.documentElement);
-    host.style.left = root.getPropertyValue('--rail-w').trim();
+    const focus = document.documentElement.classList.contains('gob-focus');
+    host.style.left = focus ? '0px' : root.getPropertyValue('--rail-w').trim();
     host.style.top = root.getPropertyValue('--top-h').trim();
     host.style.right = '0';
     host.style.bottom = '0';
@@ -82,7 +83,7 @@ function placeHost() {
 }
 
 function markGears(isOpen) {
-  ['auth-settings-btn', 'gob-rail-settings'].forEach((id) => {
+  ['auth-settings-btn', 'gob-rail-settings', 'gob-focus-settings'].forEach((id) => {
     const gear = document.getElementById(id);
     if (!gear) return;
     gear.setAttribute('aria-expanded', isOpen ? 'true' : 'false');

@@ -5,6 +5,8 @@
  */
 (function () {
   'use strict';
+  if (window.__gobShellStarted) return;
+  window.__gobShellStarted = true;
 
   var ICONS = {
     office: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h17M5 10v10M19 10v10M8 10V6.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6.5V10"/><path d="M9 14h6"/></svg>',
@@ -70,6 +72,34 @@
   var titleEl = null;
   var paintedSection = '';
   var currentWeek = 0;
+  var pageMode = null;
+
+  var PAGES = {
+    '/recruiting.html': { kind: 'browse', section: 'recruiting', sub: '', file: 'recruiting' },
+    '/rankings.html': { kind: 'browse', section: 'league', sub: 'rankings' },
+    '/schedule.html': { kind: 'browse', section: 'league', sub: 'schedule' },
+    '/practice-squad-standings.html': { kind: 'browse', section: 'league', sub: 'practice' },
+    '/practice-squad-bracket.html': { kind: 'browse', section: 'league', sub: 'practice', keepBack: true },
+    '/brackets.html': { kind: 'browse', section: 'league', sub: 'brackets' },
+    '/awards.html': { kind: 'browse', section: 'news', sub: 'awards' },
+    '/news.html': { kind: 'browse', section: 'news', sub: 'press-tab' },
+    '/leaders.html': { kind: 'browse', section: 'league', sub: '' },
+    '/standings.html': { kind: 'browse', section: 'league', sub: 'standings-tab' },
+    '/team-stats.html': { kind: 'browse', section: 'league', sub: 'fcc-team-stats-summary-tab' },
+    '/stats.html': { kind: 'browse', section: 'league', sub: '' },
+    '/player-detail.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
+    '/team-roster-view.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
+    '/set-lineup.html': { kind: 'focus' },
+    '/training.html': { kind: 'focus' },
+    '/training-report.html': { kind: 'focus' },
+    '/training-squad-report.html': { kind: 'focus' },
+    '/training-playbooks.html': { kind: 'focus' },
+    '/cut-players.html': { kind: 'focus' },
+    '/game-plan.html': { kind: 'focus' },
+    '/playbooks.html': { kind: 'focus' },
+    '/playbook-report.html': { kind: 'focus' },
+    '/box-score.html': { kind: 'flow-or-browse' }
+  };
 
   function sectionById(id) {
     for (var i = 0; i < SECTIONS.length; i++) {
@@ -169,11 +199,47 @@
     return opens;
   }
 
+  function fallbackHref(kind) {
+    var file = {
+      rankings: 'rankings.html',
+      brackets: 'brackets.html',
+      awards: 'awards.html',
+      practice: 'practice-squad-standings.html',
+      schedule: 'schedule.html',
+      recruiting: 'recruiting.html'
+    }[kind];
+    if (!file) return '';
+    var q = new URLSearchParams(window.location.search);
+    var p = new URLSearchParams();
+    ['franchise_id', 'team_id', 'mode'].forEach(function (key) {
+      if (q.get(key)) p.set(key, q.get(key));
+    });
+    if (kind === 'recruiting') p.set('from', 'fcc');
+    var search = p.toString();
+    return '/' + file + (search ? '?' + search : '');
+  }
+
+  function fccHref(tab) {
+    var q = new URLSearchParams(window.location.search);
+    var p = new URLSearchParams();
+    if (q.get('franchise_id')) p.set('franchise_id', q.get('franchise_id'));
+    var teamId = q.get('team_id') || q.get('user_team_id');
+    if (teamId) p.set('team_id', teamId);
+    if (tab) p.set('tab', tab);
+    return '/franchise-command-center.html?' + p.toString();
+  }
+
   function goLink(kind) {
-    var href = linkHref(kind);
+    var href = linkHref(kind) || (pageMode ? fallbackHref(kind) : '');
     if (!href) return;
     playClick();
-    if (window.GOBNav && typeof window.GOBNav.go === 'function') window.GOBNav.go(href);
+    var nav = window.GOBNav;
+    if (pageMode) {
+      if (nav && typeof nav.replace === 'function') nav.replace(href);
+      else window.location.replace(href);
+      return;
+    }
+    if (nav && typeof nav.go === 'function') nav.go(href);
     else window.location.assign(href);
   }
 
@@ -217,6 +283,7 @@
         el.dataset.link = item.link;
         el.addEventListener('click', function (event) {
           event.preventDefault();
+          if (pageMode && pageMode.sub === item.link) return;
           goLink(item.link);
         });
       } else {
@@ -225,6 +292,14 @@
         el.className = 'stab';
         el.dataset.tab = item.id;
         el.addEventListener('click', function () {
+          if (pageMode) {
+            if (pageMode.sub === item.id) return;
+            playClick();
+            var href = fccHref(item.id);
+            if (window.GOBNav && window.GOBNav.replace) window.GOBNav.replace(href);
+            else window.location.replace(href);
+            return;
+          }
           if (currentTab() === item.id) return;
           playClick();
           openTab(item.id, 'replace');
@@ -243,7 +318,7 @@
         el.classList.remove('on');
         return;
       }
-      el.classList.toggle('on', el.dataset.tab === tab);
+      el.classList.toggle('on', el.dataset.tab === tab || (!!el.dataset.link && el.dataset.link === tab));
     });
   }
 
@@ -274,6 +349,23 @@
     btn.innerHTML = ICONS[section.icon] + '<span class="rail-l">' + section.label + '</span>';
     if (section.id === 'recruiting') btn.id = 'gob-rail-recruiting';
     btn.addEventListener('click', function () {
+      if (pageMode) {
+        if (pageMode.section === section.id) return;
+        playClick();
+        var nav = window.GOBNav;
+        if (section.go === 'recruiting') {
+          var rec = fallbackHref('recruiting');
+          if (nav && nav.go) nav.go(rec);
+          else window.location.assign(rec);
+          return;
+        }
+        var destPage = section.tabs.filter(function (item) { return !item.link; })[0];
+        if (!destPage) return;
+        var pageHref = fccHref(destPage.id);
+        if (nav && nav.go) nav.go(pageHref);
+        else window.location.assign(pageHref);
+        return;
+      }
       if (section.go === 'recruiting') {
         playClick();
         if (typeof window.openRecruitingSurface === 'function') {
@@ -304,7 +396,7 @@
     return btn;
   }
 
-  function paintRecord() {
+  function paintRecord(data) {
     var source = document.getElementById('fcc-record-label');
     var valueEl = document.getElementById('gob-record-value');
     var wrap = document.getElementById('gob-record-stat');
@@ -312,6 +404,9 @@
     var text = source ? String(source.textContent || '') : '';
     var cut = text.indexOf(':');
     var value = (cut === -1 ? text : text.slice(cut + 1)).trim();
+    if (!value && data && data.team_record && data.team_record.wins != null && data.team_record.losses != null) {
+      value = String(data.team_record.wins) + '-' + String(data.team_record.losses);
+    }
     if (!value) {
       wrap.hidden = true;
       return;
@@ -320,13 +415,18 @@
     valueEl.textContent = value;
   }
 
-  function paintRank() {
+  function paintRank(data) {
     var source = document.getElementById('fcc-rank-label');
     var valueEl = document.getElementById('gob-rank-value');
     var wrap = document.getElementById('gob-rank-stat');
     if (!valueEl || !wrap) return;
     var text = source ? String(source.textContent || '') : '';
     var match = text.match(/(\d+)/);
+    if (!match && data && data.rank != null && data.rank !== '' && data.rank !== '--') {
+      wrap.hidden = false;
+      valueEl.textContent = '#' + data.rank;
+      return;
+    }
     wrap.hidden = false;
     valueEl.textContent = match ? ('#' + match[1]) : 'NR';
   }
@@ -375,7 +475,8 @@
 
   function refreshTournamentLock() {
     if (paintedSection !== 'league') return;
-    renderSubtabs(sectionById('league'), currentTab());
+    var tab = pageMode ? (pageMode.sub || '') : currentTab();
+    renderSubtabs(sectionById('league'), tab);
   }
 
   function weekFromLabel() {
@@ -385,8 +486,8 @@
   }
 
   function syncTop(data) {
-    paintRecord();
-    paintRank();
+    paintRecord(data);
+    paintRank(data);
     var week = data && data.week != null ? Number(data.week) : weekFromLabel();
     paintWeek(week);
   }
@@ -579,12 +680,347 @@
   window.GOBShell = {
     sync: sync,
     syncTop: syncTop,
-    syncRecord: paintRecord
+    syncRecord: paintRecord,
+    noteCommandCenter: noteCommandCenter
   };
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount);
+    document.addEventListener('DOMContentLoaded', boot);
   } else {
-    mount();
+    boot();
+  }
+
+  function sectionFromReturn() {
+    var q = new URLSearchParams(window.location.search);
+    var tab = q.get('return_tab') || '';
+    if (TAB_SECTION[tab]) return TAB_SECTION[tab];
+    var ret = q.get('return_url') || '';
+    if (/standings|rankings|schedule\.html|leaders|brackets|practice-squad/.test(ret)) return 'league';
+    if (/recruiting\.html/.test(ret)) return 'recruiting';
+    if (/news\.html|awards\.html/.test(ret)) return 'news';
+    if (/training|game-plan|playbook|scout/.test(ret)) return 'prep';
+    var viewed = q.get('team_id') || '';
+    var owner = q.get('user_team_id') || '';
+    if (owner && viewed && owner !== viewed) return 'league';
+    return 'team';
+  }
+
+  function resolvePage() {
+    var path = window.location.pathname || '';
+    var spec = PAGES[path];
+    if (!spec) return null;
+    var q = new URLSearchParams(window.location.search);
+    if (path === '/box-score.html') {
+      if (q.get('return_url')) return { kind: 'browse', section: 'league', sub: '', keepBack: true };
+      return { kind: 'focus' };
+    }
+    if (path === '/recruiting.html' && q.get('action') === 'run') return { kind: 'focus', file: 'recruiting' };
+    var out = {
+      kind: spec.kind,
+      section: spec.section,
+      sub: spec.sub || '',
+      file: spec.file || '',
+      keepBack: !!spec.keepBack
+    };
+    if (out.section === 'context') out.section = sectionFromReturn();
+    return out;
+  }
+
+  function syncPage() {
+    if (!pageMode) return;
+    var section = sectionById(pageMode.section || 'office');
+    document.querySelectorAll('.rail [data-gob-section]').forEach(function (el) {
+      el.classList.toggle('on', el.getAttribute('data-gob-section') === section.id);
+    });
+    if (titleEl) titleEl.textContent = section.title;
+    paintedSection = '';
+    renderSubtabs(section, pageMode.sub || '');
+    paintedSection = section.id;
+  }
+
+  function paintEmblem(data) {
+    var slot = document.getElementById('fcc-header-emblem');
+    var api = window.GOBTierEmblem;
+    if (!slot || !api || !data || typeof api.tierForWeek !== 'function') return;
+    var tier = api.tierForWeek(data.week);
+    if (!tier) { slot.innerHTML = ''; return; }
+    if (typeof api.injectCss === 'function') api.injectCss();
+    var sz = api.EMBLEM_SIZING && api.EMBLEM_SIZING.fccFranchiseHeader;
+    if (!sz || typeof api.renderLockup !== 'function') return;
+    var value = null;
+    if (tier === 'conference' && (data.user_conference === 0 || data.user_conference)) value = String(data.user_conference);
+    if (tier === 'region') {
+      if (data.user_region) value = String(data.user_region).toUpperCase();
+      else {
+        var c = Number(data.user_conference);
+        if (c >= 1 && c <= 16) value = String.fromCharCode(65 + Math.floor((c - 1) / 2));
+      }
+    }
+    slot.innerHTML = api.renderLockup({
+      tier: tier,
+      value: value,
+      size: sz.emblem,
+      l1: sz.labelL1,
+      l2: sz.labelL2,
+      variant: 'stack'
+    });
+  }
+
+  function paintIdentity(data) {
+    if (!data) return;
+    var name = data.team || '';
+    var logo = document.getElementById('team-logo');
+    var topId = document.getElementById('gob-top-id');
+    if (name && topId && !topId.getAttribute('aria-label')) topId.setAttribute('aria-label', name);
+    if (logo && name) {
+      if (!logo.alt) logo.alt = name;
+      if (!logo.title) logo.title = name;
+      if (!logo.getAttribute('src') && typeof getTeamAssetPath === 'function') {
+        logo.src = getTeamAssetPath(name, 'banner_primary');
+      }
+    }
+    paintEmblem(data);
+  }
+
+  function noteCommandCenter(data) {
+    paintIdentity(data);
+    if (pageMode && pageMode.file === 'recruiting' && window.GOBAdvance && window.GOBAdvance.ordersAreFocus(data)) {
+      document.documentElement.classList.add('gob-focus');
+    }
+    document.documentElement.classList.remove('gob-pending');
+  }
+
+  function ensureExit() {
+    if (document.getElementById('exit-franchise')) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'exit-franchise';
+    btn.hidden = true;
+    btn.addEventListener('click', function () {
+      import('/js/shared/uiSfx.js').then(function (m) { m.playSfx('x-back.mp3', 0.7); }).catch(function () {});
+      import('/js/musicController.js').then(function (m) {
+        if (m.clearFranchiseMusicState) m.clearFranchiseMusicState();
+      }).catch(function () {});
+      window.location.href = '/mode-select.html';
+    });
+    document.body.appendChild(btn);
+  }
+
+  function focusGear() {
+    var gear = document.createElement('button');
+    gear.type = 'button';
+    gear.className = 'rail-i util';
+    gear.id = 'gob-focus-settings';
+    gear.title = 'Settings';
+    gear.setAttribute('aria-expanded', 'false');
+    gear.setAttribute('aria-label', 'Settings');
+    gear.innerHTML = ICONS.settings;
+    gear.addEventListener('click', function () {
+      playClick();
+      import('/js/shared/gobSettings.js').then(function () {
+        if (window.GOBSettings && window.GOBSettings.toggle) window.GOBSettings.toggle();
+      }).catch(function () {});
+    });
+    return gear;
+  }
+
+  function buildTop(withAdvance) {
+    var top = document.createElement('header');
+    top.className = 'top';
+    var topId = document.createElement('a');
+    topId.className = 'top-id';
+    topId.href = '#';
+    topId.id = 'gob-top-id';
+    var logo = document.getElementById('team-logo');
+    if (!logo) {
+      logo = document.createElement('img');
+      logo.id = 'team-logo';
+      logo.alt = '';
+    }
+    topId.appendChild(logo);
+    topId.addEventListener('click', function (event) {
+      event.preventDefault();
+      if (!pageMode) return;
+      if (pageMode.section === 'team' && pageMode.sub === 'roster-tab') return;
+      playClick();
+      var href = fccHref('roster-tab');
+      var nav = window.GOBNav;
+      if (pageMode.section === 'team') {
+        if (nav && nav.replace) nav.replace(href);
+        else window.location.replace(href);
+      } else if (nav && nav.go) nav.go(href);
+      else window.location.assign(href);
+    });
+    var divider = document.createElement('div');
+    divider.className = 'top-div';
+    var stats = document.createElement('div');
+    stats.className = 'top-stats';
+    stats.innerHTML = [
+      '<div class="ts" id="gob-record-stat" hidden><b id="gob-record-value"></b><span>Record</span></div>',
+      '<div class="ts" id="gob-rank-stat" hidden><b id="gob-rank-value"></b><span>National Rank</span></div>',
+      '<div class="ts" id="gob-week-stat" hidden><b id="gob-week-value"></b><span id="gob-week-phase" hidden></span><span id="fcc-header-emblem"></span></div>'
+    ].join('');
+    var spacer = document.createElement('div');
+    spacer.className = 'top-sp';
+    top.appendChild(topId);
+    top.appendChild(divider);
+    top.appendChild(stats);
+    top.appendChild(spacer);
+    if (withAdvance) {
+      var adv = document.createElement('div');
+      adv.className = 'adv-wrap';
+      var ghost = document.getElementById('fcc-edit-recruiting');
+      if (!ghost) {
+        ghost = document.createElement('button');
+        ghost.type = 'button';
+        ghost.id = 'fcc-edit-recruiting';
+        ghost.style.display = 'none';
+      }
+      var play = document.getElementById('play-now');
+      if (!play) {
+        play = document.createElement('button');
+        play.type = 'button';
+        play.id = 'play-now';
+        play.disabled = true;
+      }
+      play.classList.add('advance');
+      adv.appendChild(ghost);
+      adv.appendChild(play);
+      top.appendChild(adv);
+    }
+    top.appendChild(focusGear());
+    return top;
+  }
+
+  function adoptMain(main) {
+    var app = main.parentNode;
+    var nodes = Array.prototype.slice.call(document.body.childNodes);
+    nodes.forEach(function (node) {
+      if (node === app) return;
+      if (node.nodeType === 1 && node.tagName === 'SCRIPT') return;
+      main.appendChild(node);
+    });
+  }
+
+  function finishShell() {
+    import('/js/shared/gobDensity.js').then(function (m) {
+      m.bindGobDensity(document.documentElement);
+    }).catch(function () {});
+    import('/js/shared/gobSettings.js').catch(function () {});
+    import('/js/shared/tierEmblem.js').catch(function () {});
+    if (window.GOBAdvance && window.GOBAdvance.load) window.GOBAdvance.load();
+  }
+
+  function mountBrowse(spec) {
+    if (document.querySelector('html.gob-shell .app')) return;
+    pageMode = spec;
+    document.documentElement.classList.add('gob', 'gob-shell');
+    if (spec.keepBack) document.documentElement.setAttribute('data-gob-keep-back', '1');
+    if (spec.file === 'recruiting') document.documentElement.classList.add('gob-pending');
+    ensureExit();
+    var app = document.createElement('div');
+    app.className = 'app';
+    var rail = document.createElement('nav');
+    rail.className = 'rail';
+    rail.setAttribute('aria-label', 'Franchise');
+    var face = document.createElement('div');
+    face.className = 'rail-face';
+    SECTIONS.forEach(function (section) { face.appendChild(railButton(section)); });
+    var spring = document.createElement('div');
+    spring.className = 'rail-sp';
+    face.appendChild(spring);
+    var div = document.createElement('div');
+    div.className = 'rail-div';
+    face.appendChild(div);
+    var tutorials = document.createElement('a');
+    tutorials.className = 'rail-i util';
+    tutorials.href = '/tutorial.html';
+    tutorials.title = 'Tutorials';
+    tutorials.innerHTML = ICONS.tutorials + '<span class="rail-l">Tutorials</span>';
+    tutorials.addEventListener('click', function () { playClick(); });
+    face.appendChild(tutorials);
+    var feedback = utilButton('util', 'Feedback', 'feedback', 'gob-rail-feedback');
+    feedback.addEventListener('click', function () {
+      var existing = document.getElementById('feedback-btn');
+      if (!existing) return;
+      playClick();
+      existing.click();
+    });
+    if (window.GOB_BUILD_PROFILE === 'desktop' || !document.getElementById('feedback-btn')) feedback.hidden = true;
+    face.appendChild(feedback);
+    var settings = utilButton('util', 'Settings', 'settings', 'gob-rail-settings');
+    settings.setAttribute('aria-expanded', 'false');
+    settings.addEventListener('click', function () {
+      playClick();
+      import('/js/shared/gobSettings.js').then(function () {
+        if (window.GOBSettings && window.GOBSettings.toggle) window.GOBSettings.toggle();
+      }).catch(function () {});
+    });
+    face.appendChild(settings);
+    var quiet = document.createElement('div');
+    quiet.className = 'rail-div q';
+    face.appendChild(quiet);
+    var exitBtn = utilButton('exit', 'Exit Franchise', 'exit', 'gob-rail-exit');
+    exitBtn.addEventListener('click', function () {
+      var existing = document.getElementById('exit-franchise');
+      if (existing) existing.click();
+    });
+    face.appendChild(exitBtn);
+    rail.appendChild(face);
+    var main = document.createElement('div');
+    main.className = 'main scroll';
+    main.id = 'gob-main';
+    var head = document.createElement('div');
+    head.className = 'pg-head';
+    var titleRow = document.createElement('div');
+    titleRow.className = 'pg-title';
+    titleEl = document.createElement('h1');
+    titleRow.appendChild(titleEl);
+    subtabHost = document.createElement('div');
+    subtabHost.className = 'subtabs';
+    subtabHost.id = 'gob-subtabs';
+    head.appendChild(titleRow);
+    head.appendChild(subtabHost);
+    main.appendChild(head);
+    app.appendChild(buildTop(true));
+    app.appendChild(rail);
+    app.appendChild(main);
+    document.body.insertBefore(app, document.body.firstChild);
+    adoptMain(main);
+    syncPage();
+    syncTop(null);
+    var play = document.getElementById('play-now');
+    if (play && window.GOBAdvance) window.GOBAdvance.bind(play, function () {
+      return window.GOBAdvance.browseEnv(window.__gobCommandCenterData || null);
+    });
+    finishShell();
+  }
+
+  function mountFocus(spec) {
+    if (document.querySelector('html.gob-shell .app')) return;
+    pageMode = spec || { kind: 'focus' };
+    document.documentElement.classList.add('gob', 'gob-shell', 'gob-focus');
+    var app = document.createElement('div');
+    app.className = 'app';
+    var main = document.createElement('div');
+    main.className = 'main scroll';
+    main.id = 'gob-main';
+    app.appendChild(buildTop(false));
+    app.appendChild(main);
+    document.body.insertBefore(app, document.body.firstChild);
+    adoptMain(main);
+    syncTop(null);
+    finishShell();
+  }
+
+  function boot() {
+    if (document.getElementById('franchise-container')) {
+      mount();
+      return;
+    }
+    var spec = resolvePage();
+    if (!spec) return;
+    if (spec.kind === 'focus') mountFocus(spec);
+    else mountBrowse(spec);
   }
 })();
