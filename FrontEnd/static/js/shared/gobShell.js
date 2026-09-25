@@ -1,6 +1,6 @@
 /**
  * Franchise shell for franchise-command-center.html.
- * Rail section clicks push a history entry. Sub-tabs and the Stats toggle replace.
+ * Rail section clicks push a history entry. Sub-tabs replace. Recruiting leaves via GOBNav.go.
  * Does not run on the tournament command center or the live-game court.
  */
 (function () {
@@ -23,24 +23,26 @@
     { id: 'office', label: 'Office', title: "Coach's Office", icon: 'office', tabs: [{ id: 'home-tab' }] },
     { id: 'team', label: 'Team', title: 'Team', icon: 'team', tabs: [
       { id: 'roster-tab', label: 'Roster' },
-      { id: 'player-stats-tab', label: 'Stats' },
-      { id: 'team-stats-tab', label: 'Development' },
-      { id: 'practice-squad', label: 'Practice Squad', link: 'practice' }
+      { id: 'player-stats-tab', label: 'Player Stats' },
+      { id: 'team-stats-tab', label: 'Team Attributes' },
+      { id: 'schedule-tab', label: 'Schedule' }
     ]},
     { id: 'prep', label: 'Prep', title: 'Prep', icon: 'prep', tabs: [
       { id: 'training-tab', label: 'Training' },
       { id: 'game-plan-tab', label: 'Game Plan' },
       { id: 'playbooks-tab', label: 'Playbooks' },
-      { id: 'coaches-tab', label: 'Scouting' }
+      { id: 'coaches-tab', label: 'Scouting Report' }
     ]},
     { id: 'league', label: 'League', title: 'League', icon: 'league', tabs: [
       { id: 'standings-tab', label: 'Standings' },
-      { id: 'schedule-tab', label: 'Schedule & Results' },
+      { id: 'schedule-page', label: 'Schedule', link: 'schedule' },
       { id: 'rankings', label: 'Rankings', link: 'rankings' },
       { id: 'awards-tab', label: 'Leaders' },
-      { id: 'brackets', label: 'Brackets', link: 'brackets' }
+      { id: 'fcc-team-stats-summary-tab', label: 'Team Stats' },
+      { id: 'practice-squad', label: 'Practice Squad', link: 'practice' },
+      { id: 'brackets', label: 'Tournament', link: 'brackets', lock: 'tournament' }
     ]},
-    { id: 'recruiting', label: 'Recruiting', title: 'Recruiting', icon: 'recruiting', tabs: [{ id: 'recruits-tab' }] },
+    { id: 'recruiting', label: 'Recruiting', title: 'Recruiting', icon: 'recruiting', go: 'recruiting', tabs: [] },
     { id: 'news', label: 'News', title: 'News', icon: 'news', tabs: [
       { id: 'press-tab', label: 'News' },
       { id: 'awards-page', label: 'Awards', link: 'awards' }
@@ -51,24 +53,23 @@
     'home-tab': 'office',
     'roster-tab': 'team',
     'player-stats-tab': 'team',
-    'fcc-team-stats-summary-tab': 'team',
     'team-stats-tab': 'team',
+    'schedule-tab': 'team',
     'training-tab': 'prep',
     'game-plan-tab': 'prep',
     'playbooks-tab': 'prep',
     'coaches-tab': 'prep',
     'standings-tab': 'league',
-    'schedule-tab': 'league',
+    'fcc-team-stats-summary-tab': 'league',
     'awards-tab': 'league',
-    'recruits-tab': 'recruiting',
     'press-tab': 'news'
   };
 
   var sectionEls = {};
   var subtabHost = null;
   var titleEl = null;
-  var toggleEl = null;
   var paintedSection = '';
+  var currentWeek = 0;
 
   function sectionById(id) {
     for (var i = 0; i < SECTIONS.length; i++) {
@@ -87,6 +88,7 @@
 
   function currentTab() {
     var urlTab = tabFromUrl();
+    if (urlTab === 'recruits-tab') return 'home-tab';
     var actives = document.querySelectorAll('#tournament-tabs > .tab-content.active');
     var i;
     if (urlTab) {
@@ -94,7 +96,11 @@
         if (actives[i].id === urlTab) return urlTab;
       }
     }
-    if (actives.length) return actives[actives.length - 1].id;
+    if (actives.length) {
+      var id = actives[actives.length - 1].id;
+      if (id === 'recruits-tab') return 'home-tab';
+      return id;
+    }
     if (urlTab && TAB_SECTION[urlTab]) return urlTab;
     return 'home-tab';
   }
@@ -138,7 +144,29 @@
     }
     if (kind === 'awards') return resourceHref('awards.html');
     if (kind === 'practice') return hrefOf(document.getElementById('fcc-ps-season-link'));
+    if (kind === 'schedule') {
+      return hrefOf(document.getElementById('schedule-full-link'))
+        || hrefOf(document.getElementById('resources-schedule'))
+        || hrefOf(document.getElementById('tournament-schedule-link'));
+    }
+    if (kind === 'recruiting') return hrefOf(document.getElementById('resources-recruits'));
     return '';
+  }
+
+  function firstTournamentWeek() {
+    var api = window.GOBTierEmblem;
+    if (!api || typeof api.tierForWeek !== 'function') return 0;
+    var w;
+    for (w = 1; w <= 40; w++) {
+      if (api.tierForWeek(w)) return w;
+    }
+    return 0;
+  }
+
+  function tournamentLockWeek() {
+    var opens = firstTournamentWeek();
+    if (!opens || !currentWeek || currentWeek >= opens) return 0;
+    return opens;
   }
 
   function goLink(kind) {
@@ -156,7 +184,6 @@
   function renderSubtabs(section, tab) {
     if (!subtabHost) return;
     var tabs = labeledTabs(section);
-    if (toggleEl && toggleEl.parentNode) toggleEl.parentNode.removeChild(toggleEl);
     subtabHost.innerHTML = '';
     if (!tabs.length) {
       subtabHost.hidden = true;
@@ -165,7 +192,25 @@
     subtabHost.hidden = false;
     tabs.forEach(function (item) {
       var el;
-      if (item.link) {
+      var lockedWeek = item.lock === 'tournament' ? tournamentLockWeek() : 0;
+      if (lockedWeek) {
+        el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'stab is-locked';
+        el.setAttribute('aria-disabled', 'true');
+        el.tabIndex = -1;
+        el.title = 'Opens Week ' + lockedWeek;
+        el.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        el.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        });
+      } else if (item.link) {
         el = document.createElement('a');
         el.href = '#';
         el.className = 'stab';
@@ -187,25 +232,19 @@
       }
       el.textContent = item.label;
       subtabHost.appendChild(el);
-      if (item.id === 'player-stats-tab' && toggleEl) subtabHost.appendChild(toggleEl);
     });
     markSubtabs(tab);
   }
 
   function markSubtabs(tab) {
     if (!subtabHost) return;
-    var statsOn = tab === 'player-stats-tab' || tab === 'fcc-team-stats-summary-tab';
     subtabHost.querySelectorAll('.stab').forEach(function (el) {
-      var on = el.dataset.tab === tab || (statsOn && el.dataset.tab === 'player-stats-tab');
-      el.classList.toggle('on', !!on);
+      if (el.classList.contains('is-locked')) {
+        el.classList.remove('on');
+        return;
+      }
+      el.classList.toggle('on', el.dataset.tab === tab);
     });
-    if (toggleEl) {
-      var showToggle = statsOn;
-      toggleEl.hidden = !showToggle;
-      toggleEl.querySelectorAll('button').forEach(function (btn) {
-        btn.classList.toggle('on', btn.dataset.tab === tab);
-      });
-    }
   }
 
   function sync(tab) {
@@ -235,6 +274,15 @@
     btn.innerHTML = ICONS[section.icon] + '<span>' + section.label + '</span>';
     if (section.id === 'recruiting') btn.id = 'gob-rail-recruiting';
     btn.addEventListener('click', function () {
+      if (section.go === 'recruiting') {
+        playClick();
+        if (typeof window.openRecruitingSurface === 'function') {
+          window.openRecruitingSurface();
+          return;
+        }
+        goLink('recruiting');
+        return;
+      }
       var tab = currentTab();
       if ((TAB_SECTION[tab] || 'office') === section.id) return;
       var dest = section.tabs.filter(function (item) { return !item.link; })[0];
@@ -290,6 +338,7 @@
     var top = document.querySelector('html.gob-shell .top');
     if (!valueEl || !wrap) return;
     var n = Number(week);
+    currentWeek = n || 0;
     if (!n) {
       wrap.hidden = true;
       if (top) {
@@ -297,6 +346,7 @@
         top.style.removeProperty('--tier-metal');
         top.style.removeProperty('--tier-metal-hi');
       }
+      refreshTournamentLock();
       return;
     }
     wrap.hidden = false;
@@ -320,6 +370,12 @@
       top.style.removeProperty('--tier-metal');
       top.style.removeProperty('--tier-metal-hi');
     }
+    refreshTournamentLock();
+  }
+
+  function refreshTournamentLock() {
+    if (paintedSection !== 'league') return;
+    renderSubtabs(sectionById('league'), currentTab());
   }
 
   function weekFromLabel() {
@@ -350,11 +406,7 @@
     topId.href = '#';
     topId.id = 'gob-top-id';
     var logo = document.getElementById('team-logo');
-    var name = document.createElement('span');
-    name.className = 'top-name';
-    name.id = 'gob-top-name';
     if (logo) topId.appendChild(logo);
-    topId.appendChild(name);
     topId.addEventListener('click', function (event) {
       event.preventDefault();
       var tab = currentTab();
@@ -371,7 +423,7 @@
     stats.className = 'top-stats';
     stats.innerHTML = [
       '<div class="ts" id="gob-record-stat" hidden><b id="gob-record-value"></b><span>Record</span></div>',
-      '<div class="ts" id="gob-rank-stat" hidden><b id="gob-rank-value"></b><span>National</span></div>',
+      '<div class="ts" id="gob-rank-stat" hidden><b id="gob-rank-value"></b><span>National Rank</span></div>',
       '<div class="ts" id="gob-week-stat" hidden><b id="gob-week-value"></b><span id="gob-week-phase" hidden></span></div>'
     ].join('');
 
@@ -462,22 +514,6 @@
     titleRow.className = 'pg-title';
     titleEl = document.createElement('h1');
     titleRow.appendChild(titleEl);
-    toggleEl = document.createElement('div');
-    toggleEl.className = 'stats-toggle';
-    toggleEl.id = 'gob-stats-toggle';
-    toggleEl.hidden = true;
-    [['player-stats-tab', 'Players'], ['fcc-team-stats-summary-tab', 'Team']].forEach(function (pair) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.dataset.tab = pair[0];
-      btn.textContent = pair[1];
-      btn.addEventListener('click', function () {
-        if (currentTab() === pair[0]) return;
-        playClick();
-        openTab(pair[0], 'replace');
-      });
-      toggleEl.appendChild(btn);
-    });
     subtabHost = document.createElement('div');
     subtabHost.className = 'subtabs';
     subtabHost.id = 'gob-subtabs';
@@ -494,10 +530,20 @@
 
     window.addEventListener('gob-tab-shown', function (event) {
       var tab = event.detail && event.detail.tab;
+      if (tab === 'recruits-tab') {
+        setTimeout(function () { openTab('home-tab', 'replace'); }, 0);
+        return;
+      }
       sync(tab || currentTab());
     });
     window.addEventListener('popstate', function () {
-      setTimeout(function () { sync(currentTab()); }, 0);
+      setTimeout(function () {
+        if (tabFromUrl() === 'recruits-tab') {
+          openTab('home-tab', 'replace');
+          return;
+        }
+        sync(currentTab());
+      }, 0);
     });
     var tabsRoot = document.getElementById('tournament-tabs');
     if (tabsRoot && typeof MutationObserver === 'function') {
@@ -507,7 +553,11 @@
         attributeFilter: ['class']
       });
     }
-    sync(currentTab());
+    if (tabFromUrl() === 'recruits-tab' || (document.getElementById('recruits-tab') && document.getElementById('recruits-tab').classList.contains('active'))) {
+      setTimeout(function () { openTab('home-tab', 'replace'); }, 0);
+    } else {
+      sync(currentTab());
+    }
     syncTop(null);
 
     ['fcc-record-label', 'fcc-rank-label', 'fcc-season-label'].forEach(function (id) {

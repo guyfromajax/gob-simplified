@@ -253,6 +253,56 @@
     });
     return { watch: watch, leans: leans, unranked: unranked };
   }
+  var filtersTouched = false;
+  function filterStorageKey() {
+    return 'gob-hub-filters:' + (context.franchiseId || '');
+  }
+  function noteFilterChange() {
+    filtersTouched = true;
+    try {
+      sessionStorage.setItem(filterStorageKey(), JSON.stringify({
+        touched: true,
+        view: state.view,
+        region: state.region,
+        pos: state.pos,
+        year: state.year,
+        search: state.search
+      }));
+    } catch (err) {}
+  }
+  function applyLandingFilters() {
+    if (filtersTouched) return;
+    var back = false;
+    try {
+      var nav = performance.getEntriesByType('navigation')[0];
+      back = !!(nav && nav.type === 'back_forward');
+    } catch (err) {}
+    if (back) {
+      try {
+        var raw = sessionStorage.getItem(filterStorageKey());
+        if (raw) {
+          var saved = JSON.parse(raw);
+          if (saved && saved.touched) {
+            state.view = saved.view || 'all';
+            state.region = saved.region || 'all';
+            state.pos = saved.pos || 'all';
+            state.year = saved.year || 'all';
+            state.search = typeof saved.search === 'string' ? saved.search : '';
+            filtersTouched = true;
+            return;
+          }
+        }
+      } catch (err2) {}
+    } else {
+      try { sessionStorage.removeItem(filterStorageKey()); } catch (err3) {}
+    }
+    var counts = viewCounts();
+    if (counts.leans > 0) state.view = 'leans';
+    else if (state.userRegion) {
+      state.view = 'all';
+      state.region = state.userRegion;
+    }
+  }
   function viewBtn(value, label, count, iconSvg) {
     return '<button class="pool-view' + (state.view === value ? ' is-on' : '') + '" data-view="' + value + '" type="button">' +
       (iconSvg || '') + label + '<span class="n">' + count + '</span></button>';
@@ -295,19 +345,20 @@
   }
   function bindPool(host) {
     var search = host.querySelector('#pool-search');
-    if (search) search.addEventListener('input', function () { state.search = this.value; renderPoolBodyOnly(); updateCount(); });
+    if (search) search.addEventListener('input', function () { state.search = this.value; noteFilterChange(); renderPoolBodyOnly(); updateCount(); });
     var region = host.querySelector('#pool-region');
-    if (region) region.addEventListener('change', function () { state.region = this.value; renderPool(); });
+    if (region) region.addEventListener('change', function () { state.region = this.value; noteFilterChange(); renderPool(); });
     host.querySelectorAll('.pool-seg button[data-pos]').forEach(function (b) {
-      b.addEventListener('click', function () { state.pos = this.dataset.pos; renderPool(); });
+      b.addEventListener('click', function () { state.pos = this.dataset.pos; noteFilterChange(); renderPool(); });
     });
     host.querySelectorAll('.pool-seg button[data-year]').forEach(function (b) {
-      b.addEventListener('click', function () { state.year = this.dataset.year; renderPool(); });
+      b.addEventListener('click', function () { state.year = this.dataset.year; noteFilterChange(); renderPool(); });
     });
     host.querySelectorAll('.pool-view[data-view]').forEach(function (b) {
       // Views are mutually exclusive; clicking the active one clears it.
       b.addEventListener('click', function () {
         state.view = state.view === this.dataset.view ? 'all' : this.dataset.view;
+        noteFilterChange();
         renderPool();
       });
     });
@@ -2364,6 +2415,7 @@
         // LAST, so it lays over the server copy, the watchlist seed and the restored
         // week-35 entries alike — an unsubmitted edit is newer than all three.
         restoreDraft();
+        applyLandingFilters();
         var canAutoRun = context.action === 'run' && state.phase === 'day' &&
           !state.week35Ran && committedIds().length > 0;
         if (!canAutoRun) {

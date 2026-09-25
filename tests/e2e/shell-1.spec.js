@@ -14,15 +14,15 @@ const TABS = [
   ['roster-tab', 'team'],
   ['player-stats-tab', 'team'],
   ['team-stats-tab', 'team'],
+  ['schedule-tab', 'team'],
   ['game-plan-tab', 'prep'],
   ['playbooks-tab', 'prep'],
   ['coaches-tab', 'prep'],
   ['standings-tab', 'league'],
-  ['schedule-tab', 'league'],
-  ['fcc-team-stats-summary-tab', 'team'],
+  ['fcc-team-stats-summary-tab', 'league'],
   ['awards-tab', 'league'],
   ['training-tab', 'prep'],
-  ['recruits-tab', 'recruiting'],
+  ['recruits-tab', 'office', 'home-tab'],
   ['press-tab', 'news'],
 ];
 
@@ -161,7 +161,9 @@ test('office before and after at both sizes', async ({ page }) => {
       const overlay = document.getElementById('page-load-overlay');
       return !overlay || getComputedStyle(overlay).display === 'none';
     });
-    await expect(page.locator('#gob-top-name')).toHaveText('Lancaster');
+    await expect(page.locator('#gob-top-id')).toHaveAttribute('aria-label', 'Lancaster');
+    await expect(page.locator('#team-logo')).toHaveAttribute('alt', 'Lancaster');
+    await expect(page.locator('#gob-top-name')).toHaveCount(0);
     const appBox = await page.locator('html.gob-shell .app').boundingBox();
     expect(appBox.x).toBeLessThan(2);
     expect(appBox.y).toBeLessThan(2);
@@ -185,26 +187,26 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
   const shots = [
     ['office', 'home-tab', null],
     ['team', 'roster-tab', 'Roster'],
-    ['team-stats', 'player-stats-tab', 'Stats'],
-    ['team-development', 'team-stats-tab', 'Development'],
+    ['team-player-stats', 'player-stats-tab', 'Player Stats'],
+    ['team-attributes', 'team-stats-tab', 'Team Attributes'],
+    ['team-schedule', 'schedule-tab', 'Schedule'],
     ['prep', 'training-tab', 'Training'],
     ['prep-plan', 'game-plan-tab', 'Game Plan'],
     ['prep-playbooks', 'playbooks-tab', 'Playbooks'],
-    ['prep-scouting', 'coaches-tab', 'Scouting'],
+    ['prep-scouting', 'coaches-tab', 'Scouting Report'],
     ['league', 'standings-tab', 'Standings'],
-    ['league-schedule', 'schedule-tab', 'Schedule & Results'],
     ['league-leaders', 'awards-tab', 'Leaders'],
-    ['recruiting', 'recruits-tab', null],
+    ['league-team-stats', 'fcc-team-stats-summary-tab', 'Team Stats'],
     ['news', 'press-tab', 'News'],
   ];
   for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
     await page.setViewportSize({ width: size[0], height: size[1] });
     await openFcc(page, cc());
     const sectionFor = {
-      office: 'office', team: 'team', 'team-stats': 'team', 'team-development': 'team',
+      office: 'office', team: 'team', 'team-player-stats': 'team', 'team-attributes': 'team', 'team-schedule': 'team',
       prep: 'prep', 'prep-plan': 'prep', 'prep-playbooks': 'prep', 'prep-scouting': 'prep',
-      league: 'league', 'league-schedule': 'league', 'league-leaders': 'league',
-      recruiting: 'recruiting', news: 'news',
+      league: 'league', 'league-leaders': 'league', 'league-team-stats': 'league',
+      news: 'news',
     };
     for (const row of shots) {
       await mouseClick(page, '[data-gob-section="' + sectionFor[row[0]] + '"]');
@@ -213,14 +215,14 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
       const activeRail = page.locator('.rail [data-gob-section].on');
       await expect(activeRail).toHaveCount(1);
       await expect(activeRail).toHaveAttribute('data-gob-section', sectionFor[row[0]]);
-      if (row[0] === 'team' && row[2] === 'Roster') {
+      if (row[0] === 'league' && row[2] === 'Standings') {
         const stabMetrics = await page.evaluate(() => {
           const read = (el) => {
             const cs = getComputedStyle(el);
             return { fontFamily: cs.fontFamily, height: cs.height, clipPath: cs.clipPath };
           };
           const tabs = Array.from(document.querySelectorAll('#gob-subtabs > .stab'));
-          const button = tabs.find((el) => el.tagName === 'BUTTON' && !el.classList.contains('on'));
+          const button = tabs.find((el) => el.tagName === 'BUTTON' && !el.classList.contains('on') && !el.classList.contains('is-locked'));
           const link = tabs.find((el) => el.tagName === 'A');
           return { button: read(button), link: read(link) };
         });
@@ -233,11 +235,9 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
     }
     await mouseClick(page, '[data-gob-section="prep"]');
     await expect(page.locator('#gob-subtabs .stab', { hasText: /^Lineup$/ })).toHaveCount(0);
+    await expect(page.locator('#gob-stats-toggle')).toHaveCount(0);
     await mouseClick(page, '[data-gob-section="team"]');
-    await mouseClick(page, stab(page, 'Stats'));
-    await mouseClick(page, page.locator('#gob-stats-toggle button').filter({ hasText: /^Team$/ }));
-    await expect(page.locator('#fcc-team-stats-summary-tab.tab-content.active')).toBeVisible();
-    await page.screenshot({ path: path.join(OUT, 'team-stats-team-' + size[2] + '.png') });
+    await expect(page.locator('#gob-subtabs .stab', { hasText: /^Players$/ })).toHaveCount(0);
   }
 });
 
@@ -278,7 +278,7 @@ test('back restores the section as it was left, including scroll', async ({ page
   await page.setViewportSize({ width: 1280, height: 720 });
   await openFcc(page, cc());
   await mouseClick(page, '[data-gob-section="team"]');
-  await mouseClick(page, stab(page, 'Stats'));
+  await mouseClick(page, stab(page, 'Player Stats'));
   await expect(page.locator('#player-stats-tab.tab-content.active')).toBeVisible();
   const scrolled = await page.evaluate(() => {
     const panel = document.getElementById('player-stats-tab');
@@ -303,7 +303,8 @@ test('old tab query opens the new section', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   for (const pair of TABS) {
     await openFcc(page, cc(), '?franchise_id=' + FID + '&team_id=' + TID + '&tab=' + pair[0]);
-    await expect(page.locator('#' + pair[0] + '.tab-content.active')).toBeVisible();
+    const activeId = pair[2] || pair[0];
+    await expect(page.locator('#' + activeId + '.tab-content.active')).toBeVisible();
     await expect(page.locator('[data-gob-section="' + pair[1] + '"]')).toHaveClass(/on/);
   }
 });

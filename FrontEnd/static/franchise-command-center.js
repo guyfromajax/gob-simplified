@@ -477,8 +477,13 @@ function resolveFccTeamBanner(data) {
 function populateTop(data) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
-  const shellName = document.getElementById('gob-top-name');
-  if (shellName) shellName.textContent = formattedTeam;
+  const logoEl = document.getElementById('team-logo');
+  if (logoEl) {
+    logoEl.alt = formattedTeam;
+    logoEl.title = formattedTeam;
+  }
+  const topId = document.getElementById('gob-top-id');
+  if (topId) topId.setAttribute('aria-label', formattedTeam);
   // Hydrate from franchise payload — FranchiseLS is cache only.
   const visual =
     typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function'

@@ -56,7 +56,7 @@ Mounted only by `gobShell.js` on `franchise-command-center.html`. Standalone pag
 
 Grid: `.app` is `grid-template-rows: var(--top-h) minmax(0, 1fr)` and `grid-template-columns: var(--rail-w) minmax(0, 1fr)`. `.top` spans both columns. `.rail` is column 1. `.main` is column 2 and the only scroller (`overflow-y: auto`). `html` and `body` do not scroll.
 
-Top bar, left to right: team logo and name (existing team field and `#team-logo`; the control opens Team › Roster), divider, Record, National rank, Week. Record text comes from `#fcc-record-label` (standings W-L for the user's team). National rank comes from `#fcc-rank-label` / `data.rank`, shown as `#N` or `NR`. Week comes from `data.week`. There is no Team RT. There is no alpha badge, product logo, or social link. The build label stays in Settings.
+Top bar, left to right: team logo (existing `#team-logo`, height `calc(var(--top-h) * 0.72)`, width auto, no crop) whose alt, `title`, and link `aria-label` are the team name. The name is not painted as visible text. The control opens Team › Roster. Then a divider, Record, National Rank, Week. Record text comes from `#fcc-record-label` (standings W-L for the user's team). National Rank comes from `#fcc-rank-label` / `data.rank`, shown as `#N` or `NR`, with the label "National Rank". Week comes from `data.week`. There is no Team RT. There is no alpha badge, product logo, or social link. The build label stays in Settings.
 
 Right side: the ghost Edit Recruit Invites button (`#fcc-edit-recruiting`, same show/hide as today) then Advance (`#play-now` with class `advance`). Advance keeps `updatePlayButton`: same labels, `dataset.mode`, and routes. A blocking task replaces the label; it does not disable the button or add a hint.
 
@@ -64,11 +64,11 @@ Tier weeks: when `GOBTierEmblem.tierForWeek(data.week)` returns a tier and `TIER
 
 Rail order: Office, Team, Prep, League, Recruiting, News, then the utility group: Tutorials (`/tutorial.html`), Feedback, Settings, a quieter divider, Exit Franchise. Exit calls the existing `#exit-franchise` handler (same sound, same `/mode-select.html` destination). Feedback is the existing `#feedback-btn` modal and is omitted when `window.GOB_BUILD_PROFILE === 'desktop'`. Settings calls `GOBSettings.toggle()`.
 
-`.gob-1280`: the grid column stays `--rail-w`. Labels are hidden. `title` tooltips remain. Hover or keyboard focus expands an overlay face to the labeled rail width after 400ms. The overlay must not change `.main`'s rectangle. `.gob-1920`: the rail is `--rail-w` with labels visible.
+`.gob-1280`: the grid column stays `--rail-w`. Labels are hidden. `title` tooltips remain. Hover or keyboard focus (`:focus-visible`) waits 400ms, then the overlay face widens from `--rail-w` to 200px in one `--dur-rail` (180ms) `--ease-out` transition. Labels fade in on that same timing. They do not change the face width. Collapse is one motion as well: 120ms after the pointer leaves (or focus clears), the face narrows with `--dur-rail`. The overlay must not change `.main`'s rectangle. `prefers-reduced-motion` makes the change instant. `.gob-1920`: the rail is `--rail-w` with labels visible.
 
 Recruiting carries the existing `.inbox-badge` when `recruitingIsPrompted` is true. That is a presence dot, not a count. Do not pulse it unless a field already says the recruiting task gates Advance. Turning Advance into the recruiting task is the gating; it is not a pulse signal.
 
-Sub-tabs sit in `.pg-head` (sticky title plus `.subtabs`). Office and Recruiting have no sub-tab row. Link sub-tabs look the same as in-page sub-tabs and call `GOBNav.go` with the href the page already built. The Stats sub-tab has a Players | Team toggle (`player-stats-tab` and `fcc-team-stats-summary-tab`) that uses replace.
+Sub-tabs sit in `.pg-head` (sticky title plus `.subtabs`). Office and Recruiting have no sub-tab row. Recruiting is a rail item that leaves the page: it calls the existing `openRecruitingSurface` (`GOBNav.go` to the recruiting URL the app already builds). Link sub-tabs look the same as in-page sub-tabs and call `GOBNav.go` with the href the page already built. There is no Players | Team toggle.
 
 On a shell page, the settings host is positioned at `left: var(--rail-w)` and `top: var(--top-h)` so the scrim covers `.main` only. The top bar and the rail stay usable. Pages that still use the auth bar keep the host anchored under `#auth-bar`.
 
@@ -83,12 +83,12 @@ Rail and sub-tab clicks play `click-tiny.wav` through `playSfx`. Advance does no
 - `go(url)` leaves the page. From the franchise command center it records the flow start (unless the destination is a peek), stamps the next index for the following load, and assigns.
 - `pushSection(url)` is the same-page section push. It saves `.main` scroll, increments `gobIdx` on the new history entry immediately, and does not write the pending-index key (the document is not reloading).
 - `replace(url)` keeps the current index and replaces the page. Sub-tabs do not call it. They use `history.replaceState` through `CommandCenterTabs.show(tab, 'replace')` so the franchise page stays one entry.
-- Rail section clicks call `CommandCenterTabs.show(tab, 'push')`. Sub-tabs and the Stats toggle call `show(tab, 'replace')`.
+- Rail section clicks call `CommandCenterTabs.show(tab, 'push')`, except Recruiting, which leaves the page with `GOBNav.go`. Sub-tabs call `show(tab, 'replace')`.
 - Browser Back and Forward restore the section, the sub-tab, and the scroll position from `popstate` (`showTabFromUrl` plus `GOBNav.restoreScroll`). Scroll is stored per URL on `.main` when `html.gob-shell` is present, otherwise on the active tab panel.
 - In-app flows (Play Game, Run Training, and the other Advance routes) still return to the locker-room entry via `exitFlow`. That collapse is separate from the section stack.
 - `exitFlow` jumps back to the locker-room index that launched the flow. In-app Back uses `history.back()` only when the previous entry is that parent.
 
-Old `?tab=` values still open the matching section and sub-tab. Each tab's `onTabShow` lazy-load still runs.
+Old `?tab=` values still open the matching section and sub-tab. `schedule-tab` is Team › Schedule. `fcc-team-stats-summary-tab` is League › Team Stats. `recruits-tab` opens Office (`home-tab`). Each tab's `onTabShow` lazy-load still runs.
 
 The shared tab module also serves any other command center that calls `initCommandCenterTabs`. Button clicks there stay on `replace`. Do not make those clicks push.
 
@@ -98,23 +98,27 @@ The shared tab module also serves any other command center that calls `initComma
 |---|---|---|
 | Office | (none) | `home-tab` |
 | Team | Roster | `roster-tab` |
-| Team | Stats | `player-stats-tab`, with Players \| Team toggle to `fcc-team-stats-summary-tab` |
-| Team | Development | `team-stats-tab` (Team Measures) |
-| Team | Practice Squad | existing `#fcc-ps-season-link` (`practice-squad-standings.html`, `franchise_id` and `team_id`) |
+| Team | Player Stats | `player-stats-tab` |
+| Team | Team Attributes | `team-stats-tab` (Team Measures) |
+| Team | Schedule | `schedule-tab` (the user team's schedule) |
 | Prep | Training | `training-tab` |
 | Prep | Game Plan | `game-plan-tab` |
 | Prep | Playbooks | `playbooks-tab` |
-| Prep | Scouting | `coaches-tab` |
+| Prep | Scouting Report | `coaches-tab` |
 | League | Standings | `standings-tab` |
-| League | Schedule & Results | `schedule-tab` |
+| League | Schedule | existing `#schedule-full-link` (`schedule.html` with `franchise_id`, `team_id`, `return_url`) |
 | League | Rankings | existing rankings href (`/rankings.html` plus the resource query) |
 | League | Leaders | `awards-tab` |
-| League | Brackets | existing `brackets.html` href, or the same resource query already on the rankings link |
-| Recruiting | (none) | `recruits-tab` |
+| League | Team Stats | `fcc-team-stats-summary-tab` |
+| League | Practice Squad | existing `#fcc-ps-season-link` (`practice-squad-standings.html`, `franchise_id` and `team_id`) |
+| League | Tournament | existing `brackets.html` href, or the same resource query already on the rankings link. Before the first week `GOBTierEmblem.tierForWeek` returns a tier, the control is disabled: same shape, `--text-38`, `not-allowed`, not focusable, title `Opens Week N`. |
+| Recruiting | (none) | `recruiting.html` via `openRecruitingSurface` / `GOBNav.go` (`franchise_id`, `team_id`, `from=fcc`, `return_url`). An old `?tab=recruits-tab` deep link opens `home-tab`. |
 | News | News | `press-tab` |
 | News | Awards | `awards.html` with the resource query already on the rankings link. There is no dedicated awards anchor on the page |
 
 History is not a section.
+
+A fresh Recruiting Hub arrival (not a back/forward restore of filters the user already changed) opens "Leans to me" when `viewCounts().leans` is greater than 0. Otherwise it opens region = `team_region` (the existing "your region" value) and view = all. Filter changes after that stick for the rest of the visit, including a back/forward restore.
 
 To add a section: add one rail item, one entry in the shell section list, and the `?tab=` ids that belong to it. Default the rail click to the first in-page sub-tab and push. To add a sub-tab: add it under that section. In-page sub-tabs replace. Links use an href the page already builds and `GOBNav.go`. Then update this table.
 

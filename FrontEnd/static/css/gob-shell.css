@@ -104,20 +104,18 @@ html.gob-shell .top-stats {
 }
 
 html.gob-shell a.top-id {
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
+  height: 100%;
 }
 
 html.gob-shell #team-logo {
-  width: var(--dsz-30);
-  height: var(--dsz-30);
+  height: calc(var(--top-h) * 0.72);
+  width: auto;
+  max-width: none;
   object-fit: contain;
   flex: none;
-}
-
-html.gob-shell #gob-top-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 html.gob-shell #fcc-header-emblem {
@@ -204,7 +202,10 @@ html.gob-shell .rail-div.q {
   flex-shrink: 0;
 }
 
-/* 1280: the grid column stays --rail-w. The face overlays .main. */
+/* 1280: the grid column stays --rail-w. The face overlays .main.
+   One motion: after 400ms the face width runs 64 → 200 in --dur-rail.
+   Collapse waits 120ms, then the same single width transition.
+   Labels only fade; they are out of flow so they cannot widen the face early. */
 html.gob-shell.gob-1280 .rail {
   padding: 0;
 }
@@ -220,7 +221,8 @@ html.gob-shell.gob-1280 .rail-face {
   border-right: 1px solid var(--line);
   box-sizing: border-box;
   overflow: hidden;
-  transition: width var(--dur-hover) var(--ease-out);
+  transition: width var(--dur-rail) var(--ease-out);
+  transition-delay: 120ms;
 }
 
 html.gob-shell.gob-1280 .rail:hover .rail-face,
@@ -229,15 +231,36 @@ html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-face {
   transition-delay: 400ms;
 }
 
+html.gob-shell.gob-1280 .rail-i {
+  justify-content: flex-start;
+  padding-left: calc((var(--rail-w) - 22px) / 2 - var(--space-10));
+  transition: padding-left var(--dur-rail) var(--ease-out), color var(--dur-hover);
+  transition-delay: 120ms, 0s;
+}
+
 html.gob-shell.gob-1280 .rail:hover .rail-i,
 html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i {
-  justify-content: flex-start;
-  padding: 0 var(--space-14);
+  padding-left: var(--space-14);
+  transition-delay: 400ms, 0s;
+}
+
+html.gob-shell.gob-1280 .rail-i span {
+  display: inline;
+  position: absolute;
+  left: calc(var(--space-14) + 22px + var(--space-12));
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity var(--dur-rail) var(--ease-out);
+  transition-delay: 120ms;
 }
 
 html.gob-shell.gob-1280 .rail:hover .rail-i span,
 html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i span {
-  display: inline;
+  opacity: 1;
+  transition-delay: 400ms;
 }
 
 html.gob-shell.gob-1920 .rail-face {
@@ -285,4 +308,14 @@ html.gob-shell .stats-toggle button.on {
 html.gob-shell .pg-head .subtabs:empty,
 html.gob-shell .pg-head .subtabs[hidden] {
   display: none;
+}
+
+html.gob-shell .pg-head .stab.is-locked,
+html.gob-shell .pg-head .stab.is-locked:hover,
+html.gob-shell .pg-head .stab.is-locked:focus,
+html.gob-shell .pg-head .stab.is-locked:focus-visible {
+  color: var(--text-38) !important;
+  background: var(--white-6);
+  cursor: not-allowed;
+  box-shadow: none;
 }
