@@ -171,11 +171,20 @@ html.gob-shell button.rail-i.on {
   color: var(--text-100);
 }
 
-html.gob-shell .rail {
+html.gob-shell .app > nav.rail {
   position: relative;
+  top: 0;
   z-index: 30;
   min-height: 0;
   overflow: visible;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  max-height: none;
+  background: var(--bg-chrome);
 }
 
 html.gob-shell .main {
@@ -408,7 +417,6 @@ html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .back-to-locker-room {
 
 /* One vertical scroll: nested page lists grow, and .main (or focus .main) scrolls. */
 html.gob-shell .fcc-home-list-scroll,
-html.gob-shell .pool-scroll,
 html.gob-shell .spool-rows,
 html.gob-shell .rail-list,
 html.gob-shell .idock-list,
@@ -437,4 +445,67 @@ html.gob-shell .main #tr-scroll thead th {
 
 html.gob-shell.gob-focus .main thead th {
   top: 0;
+}
+
+/* Page shells sized themselves with 100vw, which ignores the rail and runs
+   past .main. Under the shell, content width is .main minus page padding.
+   Wide tables keep their min-width and scroll inside their own wrap. */
+html.gob-shell .main .resource-page-container,
+html.gob-shell .main .fcc-brand-page-shell,
+html.gob-shell .main #franchise-container,
+html.gob-shell .main .team-roster-shell,
+html.gob-shell .main .training-resource-shell,
+html.gob-shell .main .playbooks-resource-shell,
+html.gob-shell .main .pd-shell,
+html.gob-shell .main .doc,
+html.gob-shell .main .spine,
+html.gob-shell .main .hub-root {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box;
+}
+
+html.gob-shell .main .scroll-x,
+html.gob-shell .main .stats-table-wrap,
+html.gob-shell .main .gob-data-grid-scroll,
+html.gob-shell .main .fcc-data-card,
+html.gob-shell .main .fcc-data-card-body,
+html.gob-shell .main .recruiting-section,
+html.gob-shell .main .pool-scroll {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+html.gob-shell .main .scroll-x,
+html.gob-shell .main .stats-table-wrap,
+html.gob-shell .main .gob-data-grid-scroll,
+html.gob-shell .main .pool-scroll {
+  overflow-x: auto;
+  height: auto;
+  max-height: none;
+}
+
+/* Focus lineup: the 80px banner strip is the team banner. Hide it only
+   while both the image and the name fallback are still hidden. */
+html.gob-focus .set-lineup-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+html.gob-focus .set-lineup-shell:has(.lineup-banner-strip:has(#team-banner[hidden]):has(#team-banner-fallback[hidden]))::before,
+html.gob-focus .set-lineup-shell:has(.lineup-banner-strip:has(#team-banner[hidden]):has(#team-banner-fallback[hidden]))::after {
+  top: 0;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+}
+
+html.gob-focus .lineup-banner-strip:has(#team-banner[hidden]):has(#team-banner-fallback[hidden]) {
+  display: none;
 }

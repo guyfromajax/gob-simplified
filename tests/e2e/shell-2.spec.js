@@ -67,7 +67,99 @@ async function fulfillJson(route, body) {
   });
 }
 
-async function installApi(page, data) {
+function midSeason() {
+  const opp = 'bbbbbbbbbbbbbbbbbbbbbbbb';
+  const rankings = [];
+  for (let i = 0; i < 128; i += 1) {
+    const name = i === 0 ? 'Lancaster' : ('Program ' + (i + 1));
+    rankings.push({
+      rank: i + 1,
+      team_id: i === 0 ? TID : opp.slice(0, 23) + String(i % 10),
+      name: name,
+      team_name: name,
+      display_name: name,
+      PF: 80,
+      PA: 70,
+      differential: 10,
+      W: 10 - (i % 4),
+      L: i % 4,
+      conference: (i % 16) + 1,
+      region: 'ABCDEFGH'[i % 8],
+      last_week: 'W vs Program 2',
+      last_week_result: 'W',
+      next: 'vs Program 3',
+      primary_color: '#c4a35a',
+    });
+  }
+  const standings = rankings.slice(0, 8).map(function (row) {
+    return Object.assign({}, row, { conference: 1, region: 'A' });
+  });
+  const schedule = [];
+  for (let w = 0; w < 12; w += 1) {
+    schedule.push([{
+      away_team_id: TID,
+      home_team_id: opp,
+      away_conference: 1,
+      home_conference: 1,
+      away_score: w < 11 ? 72 : null,
+      home_score: w < 11 ? 66 : null,
+    }]);
+  }
+  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const years = ['Freshman', 'Sophomore', 'Junior', 'Senior'];
+  const recruits = [];
+  for (let i = 0; i < 48; i += 1) {
+    const pos = positions[i % 5];
+    const ratings = { PG: 40, SG: 40, SF: 40, PF: 40, C: 40 };
+    ratings[pos] = 70 + (i % 20);
+    recruits.push({
+      recruit_id: 'r' + i,
+      name: 'Recruit ' + (i + 1),
+      'Home Region': 'ABCDEFGH'[i % 8],
+      archetype: 'Scorer',
+      height: 72 + (i % 10),
+      weight: 170 + i,
+      year: years[i % 4],
+      position_ratings: ratings,
+      potential_rt_ratcheted: 82,
+      Lean: {},
+      attributes: { SC: 70, SH: 60, ID: 55, OD: 50, PS: 48, BH: 52, RB: 40, AG: 60, ST: 58, ND: 44, IQ: 62, FT: 66 },
+    });
+  }
+  const players = [];
+  for (let i = 0; i < 12; i += 1) {
+    const pos = positions[i % 5];
+    const ratings = { PG: 50, SG: 50, SF: 50, PF: 50, C: 50 };
+    ratings[pos] = 78;
+    players.push({
+      id: 'p' + i,
+      player_id: 'p' + i,
+      name: 'Player ' + (i + 1),
+      jersey: String(i + 1),
+      position: pos,
+      position_ratings: ratings,
+      attributes: {},
+    });
+  }
+  const news = [8, 9, 10, 11, 12].map(function (week) {
+    return {
+      story_id: 'story-' + week,
+      week: week,
+      headline: 'Week ' + week + ' — Lancaster stays in the regional race',
+      body: 'Lancaster won its week ' + week + ' game.',
+    };
+  });
+  const data = cc({
+    week: 12,
+    rank: 8,
+    rankings: rankings,
+    standings: standings,
+    team_record: { wins: 9, losses: 2 },
+  });
+  return { data: data, standings: standings, schedule: schedule, recruits: recruits, players: players, news: news, opp: opp };
+}
+
+async function installApi(page, data, rich) {
   await page.route('**/*', async (route) => {
     const request = route.request();
     let pathname = '';
@@ -104,8 +196,52 @@ async function installApi(page, data) {
     }
     if (pathname.startsWith('/franchise/standings')) {
       await fulfillJson(route, {
-        standings: [{ team_id: TID, name: 'Lancaster', W: 16, L: 5, conference: 1, region: 'A' }],
+        standings: (rich && rich.standings) || [{ team_id: TID, name: 'Lancaster', W: 16, L: 5, conference: 1, region: 'A' }],
       });
+      return;
+    }
+    if (rich && pathname.startsWith('/franchise/recruiting-data')) {
+      await fulfillJson(route, {
+        week: data.week,
+        team_id: TID,
+        team: 'Lancaster',
+        team_region: 'A',
+        season: 1,
+        recruits: rich.recruits,
+        recruiting_wire: data.recruiting_wire,
+        roster_capacity: { used: 12, max: 15 },
+        competition_counts: {},
+      });
+      return;
+    }
+    if (rich && pathname.startsWith('/franchise/schedule/national')) {
+      const names = {};
+      names[TID] = 'Lancaster';
+      names[rich.opp] = 'Four Corners';
+      await fulfillJson(route, {
+        schedule: rich.schedule,
+        tournament_schedule: {},
+        team_name_map: names,
+        team_display_name_map: names,
+      });
+      return;
+    }
+    if (rich && pathname.startsWith('/franchise/news')) {
+      await fulfillJson(route, { news: rich.news });
+      return;
+    }
+    if (rich && pathname.startsWith('/roster/')) {
+      await fulfillJson(route, {
+        players: rich.players,
+        conference: 1,
+        region: 'A',
+        team_chemistry: 18,
+        name: 'Lancaster',
+      });
+      return;
+    }
+    if (rich && pathname.indexOf('/api/game/') === 0) {
+      await fulfillJson(route, { score: { Lancaster: 0, 'Four Corners': 0 }, clock: '8:00' });
       return;
     }
     await fulfillJson(route, {});
@@ -123,9 +259,52 @@ function stab(page, label) {
   return page.locator('#gob-subtabs .stab').filter({ hasText: new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$') });
 }
 
-async function openPage(page, file, data, extra) {
+async function assertNoHorizontalOverflow(page) {
+  const offenders = await page.evaluate(() => {
+    const out = [];
+    function check(el, name) {
+      if (!el) return;
+      if (el.scrollWidth > el.clientWidth + 1) out.push(name + ' ' + el.scrollWidth + '>' + el.clientWidth);
+    }
+    check(document.querySelector('html.gob-shell .main'), '.main');
+    check(document.scrollingElement, 'scrollingElement');
+    return out;
+  });
+  expect(offenders, offenders.join('; ')).toEqual([]);
+}
+
+async function wideTables(page) {
+  return page.evaluate(() => {
+    const main = document.querySelector('html.gob-shell .main');
+    if (!main) return [];
+    return Array.from(main.querySelectorAll('table')).filter(function (table) {
+      return table.scrollWidth > main.clientWidth + 1;
+    }).map(function (table) {
+      return {
+        id: table.id || String(table.className).slice(0, 80),
+        table: table.scrollWidth,
+        main: main.clientWidth,
+      };
+    });
+  });
+}
+
+async function railIconTops(page) {
+  return page.evaluate(() => {
+    const rail = document.querySelector('html.gob-shell .app > nav.rail');
+    const face = rail && rail.querySelector('.rail-face');
+    if (!face) return [];
+    const box = face.getBoundingClientRect();
+    return Array.from(face.querySelectorAll(':scope > .rail-i')).map(function (el) {
+      const b = el.getBoundingClientRect();
+      return Math.round(b.top - box.top);
+    });
+  });
+}
+
+async function openPage(page, file, data, extra, rich) {
   await stubAuth(page);
-  await installApi(page, data);
+  await installApi(page, data, rich);
   const q = 'franchise_id=' + FID + '&team_id=' + TID + (extra || '');
   await page.goto('/' + file + '?' + q);
   await page.waitForSelector('html.gob-shell .app');
@@ -137,19 +316,28 @@ test.beforeAll(() => {
 
 test('browse and focus pages, screenshots, and one vertical scroll', async ({ page }) => {
   const loads = [];
+  const wideLog = [];
+  const season = midSeason();
   const pages = BROWSE.concat(FOCUS).concat(['box-score.html']);
   for (const file of pages) {
-    const extra = file === 'box-score.html' ? '&return_url=' + encodeURIComponent('/schedule.html') : '';
-    await openPage(page, file, cc(), extra);
+    let extra = '';
+    if (file === 'box-score.html') extra = '&return_url=' + encodeURIComponent('/schedule.html');
+    if (file === 'set-lineup.html') {
+      extra = '&home=Lancaster&away=Four%20Corners&home_display=Lancaster&away_display=Four%20Corners&my_team=home&game_id=g-mid&week=12';
+    }
+    await openPage(page, file, season.data, extra, season);
     const focus = FOCUS.indexOf(file) !== -1;
     if (focus) {
       await expect(page.locator('html.gob-focus')).toHaveCount(1);
-      await expect(page.locator('.rail')).toHaveCount(0);
+      await expect(page.locator('nav.rail')).toHaveCount(0);
       await expect(page.locator('#play-now.advance')).toHaveCount(0);
       await expect(page.locator('#gob-focus-settings')).toBeVisible();
     } else {
-      await expect(page.locator('.rail')).toHaveCount(1);
+      await expect(page.locator('nav.rail')).toHaveCount(1);
       await expect(page.locator('#play-now.advance')).toHaveCount(1);
+    }
+    if (file === 'set-lineup.html') {
+      await page.waitForSelector('#team-banner:not([hidden]), #team-banner-fallback:not([hidden])');
     }
     const meta = await page.evaluate(() => ({
       ms: window.__gobAdvanceLoadMs,
@@ -158,16 +346,55 @@ test('browse and focus pages, screenshots, and one vertical scroll', async ({ pa
     loads.push(file + ' ' + (meta.reused ? 'reused' : 'fetched') + ' ' + Math.round(meta.ms || 0) + 'ms');
     for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
       await page.setViewportSize({ width: size[0], height: size[1] });
-      await page.waitForTimeout(150);
+      await page.waitForTimeout(200);
       await assertOneVerticalScroll(page);
-      const name = file.replace('.html', '') + (extra ? '-browse' : '') + '-' + size[2] + '.png';
+      await assertNoHorizontalOverflow(page);
+      const wide = await wideTables(page);
+      wide.forEach(function (row) {
+        wideLog.push(file + ' ' + size[2] + ' ' + row.id + ' table=' + row.table + ' main=' + row.main);
+      });
+      const browseShot = file === 'box-score.html';
+      const name = file.replace('.html', '') + (browseShot ? '-browse' : '') + '-' + size[2] + '.png';
       await page.screenshot({ path: path.join(OUT, name) });
     }
   }
-  await openPage(page, 'box-score.html', cc(), '&from=lineup');
+  await openPage(page, 'box-score.html', season.data, '&from=lineup', season);
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
-  await page.screenshot({ path: path.join(OUT, 'box-score-flow-1280.png') });
+  for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    await page.waitForTimeout(200);
+    await assertOneVerticalScroll(page);
+    await assertNoHorizontalOverflow(page);
+    await page.screenshot({ path: path.join(OUT, 'box-score-flow-' + size[2] + '.png') });
+  }
   fs.writeFileSync(path.join(OUT, 'load-times.txt'), loads.join('\n') + '\n');
+  fs.writeFileSync(path.join(OUT, 'wide-tables.txt'), (wideLog.length ? wideLog.join('\n') : 'none') + '\n');
+});
+
+test('tournament stays locked on standalone league pages at week 1', async ({ page }) => {
+  for (const file of ['rankings.html', 'schedule.html']) {
+    await openPage(page, file, cc());
+    const tab = stab(page, 'Tournament');
+    await expect(tab).toHaveClass(/is-locked/);
+    await expect(tab).toHaveAttribute('aria-disabled', 'true');
+    await expect(tab).toHaveAttribute('title', /Opens Week \d+/);
+  }
+});
+
+test('rail icon positions match across shell pages', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const files = ['franchise-command-center.html', 'rankings.html', 'recruiting.html', 'player-detail.html'];
+  const tops = [];
+  for (const file of files) {
+    await openPage(page, file, cc());
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const rects = await railIconTops(page);
+    expect(rects.length).toBeGreaterThan(3);
+    tops.push(rects);
+  }
+  for (let i = 1; i < tops.length; i += 1) {
+    expect(tops[i]).toEqual(tops[0]);
+  }
 });
 
 test('advance label matches the office on three weeks', async ({ page }) => {

@@ -907,7 +907,9 @@
       m.bindGobDensity(document.documentElement);
     }).catch(function () {});
     import('/js/shared/gobSettings.js').catch(function () {});
-    import('/js/shared/tierEmblem.js').catch(function () {});
+    import('/js/shared/tierEmblem.js').then(function () {
+      refreshTournamentLock();
+    }).catch(function () {});
     if (window.GOBAdvance && window.GOBAdvance.load) window.GOBAdvance.load();
   }
 
