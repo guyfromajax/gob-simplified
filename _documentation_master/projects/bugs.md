@@ -13,24 +13,14 @@
 2. Steam submission for review
 
 
-##Brand/Product
-1. UI Design upgrade, what is this game's personality?
-2. UX upgrade -- particularly around tabs and scrolling and back buttons (relative to browser back button), load screens
-
-
 ##Features
 1. PvP sim -- playtest post-launch / immediate parallel task
 2. College and Pro setup
 3. Team Mod System
-6. Replace Kobe look alike image and add more walk on images
-7. Auto train button on FCC
-8. Position & Archetype assignmnents for players
-9. Depth charts
 
 
 ##Animation
-1. Evolve animation from annoying to rewarding
-2. **POST-LAUNCH — §8.1 for the ball.** Emitters author a ball position
+1. **POST-LAUNCH — §8.1 for the ball.** Emitters author a ball position
    on every step. The 2026-09-14 continuity carry is a mitigation that
    reads a neighbour; the remaining 30/28 unplaced steps are what is
    left of a missing rule, not what is left of a bug. See bugs.md
@@ -45,7 +35,6 @@
 ##Full Product Perfection
 1. Training Camp News Report
 108. Message board
-113. Bring logic to screens
 114. Better individual player defense stat tracking
 116. User account -- link X & Facebook?
 128. Add a badass design appraoch to New Stories
@@ -4364,49 +4353,5 @@ both week 5 and week 26. What still grows (7.8 s → 34.6 s) is FTD-sized:
 - **News.** Growing franchise / story blob.
 
 Measured against a true week-26 FTD (snapshot before `finish_season` reset it
-to 2 MB). Persist-maps re-runs at 46896, not 40773 — see the 21 Sept exact-diff
-baseline note in the desktop work plan. `remote=0` on all 239 lsof samples.
-
-## [TEST] Three new pytest reds on develop — not from the sidecar PR
-
-Logged 2026-09-21 while verifying `desktop/catalog-sidecar`. **Do not treat
-these as sidecar or persist-maps failures.** They fail on current `develop`
-(`c79520ae3`) with no sidecar checkout:
-
-- `BackEnd/tests/test_eog_and_training_rule_updates.py::TestEOGAndTrainingRuleUpdates::test_pre_training_decay_ranges_match_doc` — `(-1, 0) != (-2, 0)`
-- `BackEnd/tests/test_team_builder_court_persist.py::TestCustomNameJoinMap::test_custom_name_joins_without_ftd_identity_fields` — `KeyError: 'Concord'`
-- `BackEnd/tests/test_team_builder_court_persist.py::TestCustomNameJoinMap::test_without_overlay_custom_name_absent` — `None != '507f1f77bcf86cd799439011'`
-
-Full suite on the sidecar worktree: 3114 passed / 3 failed / 20 skipped / 112
-xfailed. The same three fail when pointed at `gob-simplified` develop. They
-are new reds on the default pytest run — the reason `--maxfail` came out —
-and need a develop-side triage, not a desktop adapter change.
-
-## [TEST] Current develop Playwright baseline is 384/11 — not 392/3 or 382/13
-
-Logged 2026-09-22 on `aa41bf96b` (develop tip, “added tutorial tab to FCC”)
-with `CI=1` so Playwright starts its own `seed_and_serve` and does **not**
-reuse :8000. 395 tests, 1 worker, **384 passed / 11 failed**.
-
-The earlier 382/13 (`e9fd11fda`, 7 workers) included **8 fake `court-layout`
-reds** from a leftover/unseeded :8000. Isolated and under `CI=1`, those 12
-specs are green on #588, on `e9fd11fda`, and on current develop. Do not treat
-court-layout as a develop regression.
-
-The 11 real reds:
-
-- `fcc-invite-step` week 36 still offers the season transition —
-  received `view-recruiting-results`, expected `new-season`
-- `fcc-recruiting-layout` tab badge — Recruiting tab text is null after
-  `aa41bf96b` added a Tutorial tab
-- `fcc-roster-tab` column order / sort keys — FCC HTML now has a trailing
-  **DEV FOCUS** column (`c-devfocus`); tests still expect 7 headers
-  without it
-- `homepage-v3-auth` homepage-v3.html redirects to homepage.html
-- `invite-board-layout` stacked row — Sammy seed modal now loads (FileResponse
-  `/js`) and sits on `.pool-add`. Product-correct; test needs to dismiss it.
-- `invite-board` seed-notice (4) — same Sammy backdrop intercepts
-  `#board-seed-dismiss` / reorder / save
-- `season-advance` confirm modal dismissed before the request, not after
-
-The old 392/3 gate is days stale. 382/13 was poisoned by server reuse.
+to 2 MB). 40773 identical across mongo / sqlite / loopback after the three
+fixes. `remote=0` on all 239 lsof samples.
