@@ -162,6 +162,21 @@ test('office before and after at both sizes', async ({ page }) => {
       return !overlay || getComputedStyle(overlay).display === 'none';
     });
     await expect(page.locator('#gob-top-name')).toHaveText('Lancaster');
+    const appBox = await page.locator('html.gob-shell .app').boundingBox();
+    expect(appBox.x).toBeLessThan(2);
+    expect(appBox.y).toBeLessThan(2);
+    expect(appBox.width).toBeGreaterThan(size[0] - 4);
+    expect(appBox.height).toBeGreaterThan(size[1] - 4);
+    const frame = await page.locator('#franchise-container').evaluate((el) => getComputedStyle(el, '::before').content);
+    expect(frame).toBe('none');
+    const cardPad = await page.locator('.fcc-home-card').first().evaluate((el) => getComputedStyle(el).paddingLeft);
+    expect(cardPad).toBe('16px');
+    const exit = page.locator('#gob-rail-exit');
+    await expect(exit).toBeVisible();
+    await expect(exit).toHaveText(/Exit Franchise/);
+    const exitBox = await exit.boundingBox();
+    expect(exitBox.height).toBeGreaterThanOrEqual(36);
+    expect(exitBox.y + exitBox.height).toBeLessThanOrEqual(size[1]);
     await page.screenshot({ path: path.join(OUT, 'office-after-' + size[2] + '.png') });
   }
 });
@@ -195,8 +210,13 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
       await mouseClick(page, '[data-gob-section="' + sectionFor[row[0]] + '"]');
       if (row[2]) await mouseClick(page, stab(page, row[2]));
       await expect(page.locator('#' + row[1] + '.tab-content.active')).toBeVisible();
+      const activeRail = page.locator('.rail [data-gob-section].on');
+      await expect(activeRail).toHaveCount(1);
+      await expect(activeRail).toHaveAttribute('data-gob-section', sectionFor[row[0]]);
       await page.screenshot({ path: path.join(OUT, row[0] + '-' + size[2] + '.png') });
     }
+    await mouseClick(page, '[data-gob-section="prep"]');
+    await expect(page.locator('#gob-subtabs .stab', { hasText: /^Lineup$/ })).toHaveCount(0);
     await mouseClick(page, '[data-gob-section="team"]');
     await mouseClick(page, stab(page, 'Stats'));
     await mouseClick(page, page.locator('#gob-stats-toggle button').filter({ hasText: /^Team$/ }));
@@ -314,6 +334,30 @@ test('settings anchors beside the rail and closes three ways', async ({ page }) 
   await expect(page.locator('#gob-settings-host')).toBeVisible();
   await mouseClick(page, '#gob-rail-settings');
   await expect(page.locator('#gob-settings-host')).toBeHidden();
+});
+
+test('rail active state follows deep links and back, and exit calls the existing control', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openFcc(page, cc(), '?franchise_id=' + FID + '&team_id=' + TID + '&tab=roster-tab');
+  await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'team');
+  await mouseClick(page, '[data-gob-section="prep"]');
+  await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'prep');
+  await page.goBack();
+  await expect(page.locator('#roster-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'team');
+  await page.goForward();
+  await expect(page.locator('#training-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'prep');
+  await page.evaluate(() => {
+    const exit = document.getElementById('exit-franchise');
+    exit.addEventListener('click', (event) => {
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      window.__railExit = (window.__railExit || 0) + 1;
+    }, true);
+  });
+  await mouseClick(page, '#gob-rail-exit');
+  expect(await page.evaluate(() => window.__railExit)).toBe(1);
 });
 
 test('shared tab clicks still replace and stay visible without the shell', async ({ page }) => {

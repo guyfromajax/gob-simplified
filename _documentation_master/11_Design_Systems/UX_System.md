@@ -102,7 +102,6 @@ The shared tab module also serves any other command center that calls `initComma
 | Team | Development | `team-stats-tab` (Team Measures) |
 | Team | Practice Squad | existing `#fcc-ps-season-link` (`practice-squad-standings.html`, `franchise_id` and `team_id`) |
 | Prep | Training | `training-tab` |
-| Prep | Lineup | only an existing `set-lineup.html` href. The Advance play route builds that URL after its request; do not invent one |
 | Prep | Game Plan | `game-plan-tab` |
 | Prep | Playbooks | `playbooks-tab` |
 | Prep | Scouting | `coaches-tab` |

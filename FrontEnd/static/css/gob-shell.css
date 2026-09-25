@@ -2,22 +2,40 @@
    Token values stay in gob-tokens.css. This file only places the shell
    and stops the old page chrome from scrolling beside .main. */
 
+/* html.gob-shell also matches the tutorial page's .gob-shell card
+   (gob-tutorial.css). Reset that wrapper so the franchise shell is flush. */
 html.gob-shell {
   width: 100%;
+  max-width: none;
   height: 100vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--bg);
   overflow: hidden;
 }
 
-html.gob-shell body {
-  margin: 0;
+html.gob-shell::before,
+html.gob-shell::after {
+  content: none;
+  display: none;
+}
+
+html.gob-shell body,
+html.gob-shell body.has-auth-bar {
+  margin: 0 !important;
   height: 100%;
   overflow: hidden;
   padding: 0 !important;
+  background: var(--bg);
 }
 
 html.gob-shell .app {
   width: 100%;
   height: 100vh;
+  max-height: 100vh;
 }
 
 html.gob-shell .main {
@@ -42,6 +60,7 @@ html.gob-shell #franchise-container .tab-buttons {
 }
 
 html.gob-shell #franchise-container {
+  position: static;
   width: 100%;
   max-width: none;
   margin: 0;
@@ -50,6 +69,16 @@ html.gob-shell #franchise-container {
   max-height: none;
   overflow: visible;
   padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.gob-shell #franchise-container::before,
+html.gob-shell #franchise-container::after {
+  content: none;
+  display: none;
 }
 
 html.gob-shell #franchise-container #tournament-tabs {
@@ -139,6 +168,11 @@ html.gob-shell button.rail-i {
   font: inherit;
 }
 
+html.gob-shell button.rail-i.on {
+  background: var(--navy);
+  color: var(--text-100);
+}
+
 html.gob-shell .rail {
   position: relative;
   z-index: 30;
@@ -155,7 +189,19 @@ html.gob-shell .rail-face {
   flex-direction: column;
   gap: var(--space-2);
   min-height: 0;
-  flex: 1;
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
+}
+
+html.gob-shell .rail-sp {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+html.gob-shell .rail-i.exit,
+html.gob-shell .rail-div.q {
+  flex-shrink: 0;
 }
 
 /* 1280: the grid column stays --rail-w. The face overlays .main. */

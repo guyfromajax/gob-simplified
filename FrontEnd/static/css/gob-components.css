@@ -8,14 +8,20 @@
    component dimensions (widths/heights/offsets) and are listed in components.md.
    Density: the root element carries .gob-1280 or .gob-1920 (see layout.md).
    ========================================================================== */
-.gob,.gob *{box-sizing:border-box;margin:0;padding:0}
+.gob,.gob *{box-sizing:border-box}
+/* Margin and padding reset stays on shell chrome. Resetting #franchise-container
+   wiped the existing card padding and clipped Bebas titles at the left edge. */
+.gob .top,.gob .top *,
+.gob .rail,.gob .rail *,
+.gob .pg-head,.gob .pg-head *,
+.gob .gob-settings-host,.gob .gob-settings-host *{margin:0;padding:0}
 .gob{position:relative;overflow:hidden;background:var(--bg);color:var(--text-87);font-family:var(--font-body);font-size:var(--fs-13);line-height:var(--lh-body);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
 .gob.gob-1280.gob-frame{width:1280px;height:720px}
 .gob.gob-1920.gob-frame{width:1920px;height:1080px}
-.gob a{color:inherit;text-decoration:none;cursor:pointer}
-.gob a:hover{color:var(--text-100)}
-.gob button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:left}
-.gob b{font-weight:inherit}
+.gob .top a,.gob .rail a,.gob .pg-head a,.gob .gob-settings-host a{color:inherit;text-decoration:none;cursor:pointer}
+.gob .top a:hover,.gob .rail a:hover,.gob .pg-head a:hover,.gob .gob-settings-host a:hover{color:var(--text-100)}
+.gob .top button,.gob .rail button,.gob .pg-head button,.gob .gob-settings-host button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:left}
+.gob .top b,.gob .rail b,.gob .pg-head b,.gob .gob-settings-host b{font-weight:inherit}
 /* links */
 .gob .nm{color:var(--text-100);font-weight:var(--fw-semibold);text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:text-decoration-color var(--dur-hover)}
 .gob .nm:hover,.gob .nm.is-hover{text-decoration-color:var(--text-60)}
@@ -47,7 +53,7 @@
 .gob .lk-l2{font:var(--fw-regular) var(--fs-11)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-26);color:var(--tier-metal-hi);margin-top:var(--space-3)}
 /* rail */
 .gob .rail{display:flex;flex-direction:column;gap:var(--space-4);padding:var(--space-12) var(--space-10);background:var(--bg-chrome);border-right:1px solid var(--line)}
-.gob .rail-i{position:relative;display:flex;align-items:center;gap:var(--space-12);height:44px;border-radius:var(--radius-10);color:var(--text-60);font:var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-6);transition:background var(--dur-hover),color var(--dur-hover)}
+.gob .rail-i{position:relative;display:flex;align-items:center;gap:var(--space-12);height:44px;border-radius:var(--radius-10);color:var(--text-60);font:var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-6);transition:color var(--dur-hover)}
 .gob.gob-1280 .rail-i{justify-content:center}
 .gob.gob-1280 .rail-i span{display:none}
 .gob.gob-1920 .rail-i{padding:0 var(--space-14)}

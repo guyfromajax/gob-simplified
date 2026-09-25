@@ -29,7 +29,6 @@
     ]},
     { id: 'prep', label: 'Prep', title: 'Prep', icon: 'prep', tabs: [
       { id: 'training-tab', label: 'Training' },
-      { id: 'lineup', label: 'Lineup', link: 'lineup' },
       { id: 'game-plan-tab', label: 'Game Plan' },
       { id: 'playbooks-tab', label: 'Playbooks' },
       { id: 'coaches-tab', label: 'Scouting' }
@@ -78,9 +77,26 @@
     return SECTIONS[0];
   }
 
+  function tabFromUrl() {
+    try {
+      return new URLSearchParams(window.location.search).get('tab') || '';
+    } catch (err) {
+      return '';
+    }
+  }
+
   function currentTab() {
-    var active = document.querySelector('#tournament-tabs > .tab-content.active');
-    return active ? active.id : 'home-tab';
+    var urlTab = tabFromUrl();
+    var actives = document.querySelectorAll('#tournament-tabs > .tab-content.active');
+    var i;
+    if (urlTab) {
+      for (i = 0; i < actives.length; i++) {
+        if (actives[i].id === urlTab) return urlTab;
+      }
+    }
+    if (actives.length) return actives[actives.length - 1].id;
+    if (urlTab && TAB_SECTION[urlTab]) return urlTab;
+    return 'home-tab';
   }
 
   function playClick() {
@@ -122,10 +138,6 @@
     }
     if (kind === 'awards') return resourceHref('awards.html');
     if (kind === 'practice') return hrefOf(document.getElementById('fcc-ps-season-link'));
-    if (kind === 'lineup') {
-      var line = document.querySelector('a[href*="set-lineup.html"]');
-      return hrefOf(line);
-    }
     return '';
   }
 
@@ -199,6 +211,9 @@
   function sync(tab) {
     var sectionId = TAB_SECTION[tab] || 'office';
     var section = sectionById(sectionId);
+    document.querySelectorAll('.rail [data-gob-section]').forEach(function (el) {
+      el.classList.toggle('on', el.getAttribute('data-gob-section') === sectionId);
+    });
     Object.keys(sectionEls).forEach(function (id) {
       if (sectionEls[id]) sectionEls[id].classList.toggle('on', id === sectionId);
     });
@@ -479,8 +494,19 @@
 
     window.addEventListener('gob-tab-shown', function (event) {
       var tab = event.detail && event.detail.tab;
-      if (tab) sync(tab);
+      sync(tab || currentTab());
     });
+    window.addEventListener('popstate', function () {
+      setTimeout(function () { sync(currentTab()); }, 0);
+    });
+    var tabsRoot = document.getElementById('tournament-tabs');
+    if (tabsRoot && typeof MutationObserver === 'function') {
+      new MutationObserver(function () { sync(currentTab()); }).observe(tabsRoot, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class']
+      });
+    }
     sync(currentTab());
     syncTop(null);
 

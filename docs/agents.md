@@ -4,6 +4,8 @@ We are developing a game called Geeked-Out Basketball (GOB for short). Simply pu
 
 MACRO OBJECTIVE: We're building a game engine that is simple, stable, and scalable (SS&S). Use the SS&S lens in every project you undertake, every file you build, and every solution you develop. That is the most important component to building this game engine.
 
+Shell, navigation, and settings construction: `_documentation_master/11_Design_Systems/UX_System.md`.
+
 This file documents key game engine agents, roles, and architectural logic used by the Geeked Out Basketball simulation engine. It exists to help Codex, collaborators, and future developers reason about the system consistently.
 
 ## Product scope (Franchise-first)
