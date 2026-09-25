@@ -27,24 +27,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 
 # ---------------------------------------------------------------------------
-# DB safety guard — block-list of databases the test suite must NEVER touch.
+# DB safety guard — see tests/db_guard.py. ONE module, shared by every pytest tree, so the
+# two conftests cannot drift (BackEnd/tests/conftest.py's docstring warns about exactly that:
+# "a guard that covers some directories reads as protection everywhere, which is worse than no
+# guard at all").
 #
-# Several existing tests (notably tests/test_franchise_complete_week.py) call
-# ``db.games.delete_many({})`` / ``db.teams.delete_many({})`` /
-# ``db.franchises.delete_many({})`` at setup with no internal guard. If the
-# active environment (.env.local / .env / system env) points at a real DB,
-# those calls wipe production data. This has happened twice — see
-# memory/feedback_no_pytest.md and Tournament_Execution_System.md.
-#
-# This guard runs once at pytest session start (before test collection and
-# before any fixture). It imports the project ``db`` and aborts the entire
-# session with a non-zero exit code if ``db.name`` is on the block-list.
-# Tests literally cannot run against ``gob`` or ``gob-staging``.
-#
-# To run tests locally, use explicit GOB_DB_MODE=mongomock (the default established
-# above) or a separately configured throwaway DB whose name is not blocked.
+# It is now an ALLOW-LIST. The block-list that used to live here permitted every name it had
+# not been told about, which is the wrong default for a guard whose failure mode is silent
+# data loss. An in-memory store is allowed whatever it is called; a real connection is allowed
+# only if its name is a recognised disposable one, or GOB_ALLOW_DESTRUCTIVE_TESTS=1 is set.
 # ---------------------------------------------------------------------------
-_BLOCKED_DB_NAMES = frozenset({"gob", "gob-staging"})
 
 
 def pytest_collection_modifyitems(config, items):
@@ -54,22 +46,9 @@ def pytest_collection_modifyitems(config, items):
 
 
 def pytest_configure(config):
-    try:
-        from BackEnd.db import db
-    except Exception:
-        # If we can't even import the db module, let the regular test run surface that.
-        return
-    name = getattr(db, "name", None)
-    if name in _BLOCKED_DB_NAMES:
-        pytest.exit(
-            f"\n❌ Refusing to run pytest: connected DB is {name!r}, which is on "
-            f"the safety block-list {set(_BLOCKED_DB_NAMES)}.\n\n"
-            f"The test suite contains destructive delete_many({{}}) calls that "
-            f"have wiped this database before. Point .env.local (or your active "
-            f"MONGO_URI) at a throwaway DB whose name is NOT on the block-list "
-            f"before running tests.\n",
-            returncode=2,
-        )
+    from tests.db_guard import enforce
+
+    enforce(pytest, "tests/")
 
 
 from BackEnd.models.game_manager import GameManager
