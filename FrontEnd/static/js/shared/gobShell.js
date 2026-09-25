@@ -902,9 +902,40 @@
     });
   }
 
+  function syncStickTop() {
+    var root = document.documentElement;
+    var head = document.querySelector('html.gob-shell .pg-head');
+    var top = 0;
+    if (head && !root.classList.contains('gob-focus')) top = head.getBoundingClientRect().height;
+    root.style.setProperty('--gob-stick-top', top + 'px');
+    var row = 0;
+    var first = document.querySelector('html.gob-shell .main thead tr:first-child th');
+    var second = document.querySelector('html.gob-shell .main thead tr + tr th');
+    if (first && second) row = first.getBoundingClientRect().height;
+    root.style.setProperty('--gob-stick-row', row + 'px');
+  }
+
+  function watchStickTop() {
+    syncStickTop();
+    if (window.__gobStickWatch) return;
+    window.__gobStickWatch = true;
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', syncStickTop);
+      return;
+    }
+    var observer = new ResizeObserver(syncStickTop);
+    var head = document.querySelector('html.gob-shell .pg-head');
+    var main = document.querySelector('html.gob-shell .main');
+    if (head) observer.observe(head);
+    if (main) observer.observe(main);
+    window.addEventListener('resize', syncStickTop);
+  }
+
   function finishShell() {
+    watchStickTop();
     import('/js/shared/gobDensity.js').then(function (m) {
       m.bindGobDensity(document.documentElement);
+      syncStickTop();
     }).catch(function () {});
     import('/js/shared/gobSettings.js').catch(function () {});
     import('/js/shared/tierEmblem.js').then(function () {

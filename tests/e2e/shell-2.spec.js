@@ -74,6 +74,7 @@ function midSeason() {
     const name = i === 0 ? 'Lancaster' : ('Program ' + (i + 1));
     rankings.push({
       rank: i + 1,
+      natl_rank: i + 1,
       team_id: i === 0 ? TID : opp.slice(0, 23) + String(i % 10),
       name: name,
       team_name: name,
@@ -115,7 +116,7 @@ function midSeason() {
     recruits.push({
       recruit_id: 'r' + i,
       name: 'Recruit ' + (i + 1),
-      'Home Region': 'ABCDEFGH'[i % 8],
+      'Home Region': 'A',
       archetype: 'Scorer',
       height: 72 + (i % 10),
       weight: 170 + i,
@@ -127,7 +128,7 @@ function midSeason() {
     });
   }
   const players = [];
-  for (let i = 0; i < 12; i += 1) {
+  for (let i = 0; i < 24; i += 1) {
     const pos = positions[i % 5];
     const ratings = { PG: 50, SG: 50, SF: 50, PF: 50, C: 50 };
     ratings[pos] = 78;
@@ -289,6 +290,33 @@ async function wideTables(page) {
   });
 }
 
+async function stickyGeometry(page, headerSel, rowSel) {
+  return page.evaluate(({ headerSel, rowSel }) => {
+    const head = document.querySelector('html.gob-shell .pg-head');
+    const headers = Array.from(document.querySelectorAll(headerSel));
+    const rows = Array.from(document.querySelectorAll(rowSel));
+    const headBox = head.getBoundingClientRect();
+    let stackTop = Infinity;
+    let stackBottom = -Infinity;
+    headers.forEach((el) => {
+      const b = el.getBoundingClientRect();
+      if (b.height < 1) return;
+      stackTop = Math.min(stackTop, b.top);
+      stackBottom = Math.max(stackBottom, b.bottom);
+    });
+    const rowBox = rows[0].getBoundingClientRect();
+    const gapRows = rows.filter((el) => {
+      const b = el.getBoundingClientRect();
+      return stackTop - headBox.bottom > 1 && b.bottom > headBox.bottom + 1 && b.top < stackTop - 1;
+    }).length;
+    return {
+      headerToRow: Math.abs(stackBottom - rowBox.top),
+      headToHeader: Math.abs(stackTop - headBox.bottom),
+      gapRows: gapRows,
+    };
+  }, { headerSel, rowSel });
+}
+
 async function railIconTops(page) {
   return page.evaluate(() => {
     const rail = document.querySelector('html.gob-shell .app > nav.rail');
@@ -378,6 +406,49 @@ test('tournament stays locked on standalone league pages at week 1', async ({ pa
     await expect(tab).toHaveClass(/is-locked/);
     await expect(tab).toHaveAttribute('aria-disabled', 'true');
     await expect(tab).toHaveAttribute('title', /Opens Week \d+/);
+  }
+});
+
+test('sticky table headers sit on the first row, then pin under the page head', async ({ page }) => {
+  const season = midSeason();
+  const cases = [
+    ['rankings.html', '#rankings-table thead th', '#rankings-table tbody tr'],
+    ['recruiting.html', 'table.pool thead th', 'table.pool tbody tr'],
+    ['team-roster-view.html', '#roster-table thead th', '#roster-table tbody tr'],
+  ];
+  for (const size of [[1280, 720], [1920, 1080]]) {
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    for (const item of cases) {
+      await openPage(page, item[0], season.data, '', season);
+      await page.setViewportSize({ width: size[0], height: size[1] });
+      await page.waitForSelector(item[2]);
+      await page.waitForFunction(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gob-stick-top')) > 20);
+      await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
+      const atTop = await stickyGeometry(page, item[1], item[2]);
+      expect(atTop.headerToRow, item[0] + ' ' + size[0] + ' scroll 0').toBeLessThanOrEqual(1);
+      await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 600; });
+      const stuck = await stickyGeometry(page, item[1], item[2]);
+      expect(stuck.headToHeader, item[0] + ' ' + size[0] + ' scrolled').toBeLessThanOrEqual(1);
+      expect(stuck.gapRows, item[0] + ' ' + size[0] + ' gap').toEqual(0);
+    }
+    await openPage(page, 'schedule.html', season.data, '', season);
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    await page.waitForSelector('.schedule-game-row');
+    expect(await page.locator('.main thead').count()).toBe(0);
+    const scheduleGap = await page.evaluate(() => {
+      const main = document.querySelector('html.gob-shell .main');
+      function gap() {
+        const card = document.querySelector('.schedule-week-card');
+        const title = card.querySelector('.schedule-week-title').getBoundingClientRect();
+        const row = card.querySelector('.schedule-game-row').getBoundingClientRect();
+        return Math.abs(title.bottom - row.top);
+      }
+      main.scrollTop = 0;
+      const atTop = gap();
+      main.scrollTop = 600;
+      return { atTop: atTop, scrolled: gap() };
+    });
+    expect(Math.abs(scheduleGap.atTop - scheduleGap.scrolled), 'schedule ' + size[0]).toBeLessThanOrEqual(1);
   }
 });
 

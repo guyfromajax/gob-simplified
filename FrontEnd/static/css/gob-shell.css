@@ -430,21 +430,82 @@ html.gob-shell #franchise-container .fcc-home-card--recruiting .fcc-home-list-sc
   overflow: visible !important;
 }
 
+/* Sticky headers pin to .main, directly under .pg-head. --gob-stick-top is
+   the measured head height (the head is height:auto, shorter than --dsz-118).
+   Focus has no .pg-head inside .main, so the offset stays 0 (under the top bar).
+   Ancestors that used overflow:hidden/auto/clip were the sticky containing
+   block, so a large top pushed the header down into the rows. */
+html.gob-shell {
+  --gob-stick-top: 0px;
+  --gob-stick-row: 0px;
+}
+
+html.gob-shell .main .fcc-brand-page-shell,
+html.gob-shell .main .fcc-data-card,
+html.gob-shell .main .scroll-x,
+html.gob-shell .main .pool-scroll,
+html.gob-shell .main .spine,
+html.gob-shell .main .doc {
+  overflow: visible !important;
+}
+
+html.gob-shell .main .pool-scroll,
+html.gob-shell .main .spine,
+html.gob-shell .main #tr-scroll,
+html.gob-shell .main .team-roster-shell {
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+  max-width: 100%;
+}
+
 html.gob-shell .main thead th {
   position: sticky;
-  top: var(--dsz-118);
-  z-index: 2;
+  top: var(--gob-stick-top);
+  z-index: var(--z-sticky);
   background: var(--bg-page-solid);
 }
 
-html.gob-shell .main .stats-table-wrap thead th,
-html.gob-shell .main .gob-data-grid-scroll thead th,
-html.gob-shell .main #tr-scroll thead th {
-  top: 0;
+html.gob-shell .main thead tr + tr th {
+  top: calc(var(--gob-stick-top) + var(--gob-stick-row));
 }
 
-html.gob-shell.gob-focus .main thead th {
-  top: 0;
+html.gob-shell .main #roster-table thead th,
+html.gob-shell .main #roster-table thead th.c-ident {
+  z-index: var(--z-sticky);
+}
+
+html.gob-shell .main #roster-table thead tr:first-child th {
+  top: var(--gob-stick-top);
+}
+
+html.gob-shell .main #roster-table thead tr.tr-colrow th {
+  top: calc(var(--gob-stick-top) + var(--gob-stick-row));
+}
+
+/* Wide grids keep a horizontal wrap. That wrap is their sticky box, so the
+   header stays at the top of the wrap instead of jumping by the page-head offset. */
+html.gob-shell .main .fcc-team-stats-card .scroll-x,
+html.gob-shell .main .team-stats-page-card .scroll-x,
+html.gob-shell .main .stats-table-wrap,
+html.gob-shell .main .gob-data-grid-scroll {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  max-width: 100%;
+  min-width: 0;
+}
+
+html.gob-shell .main table.pool,
+html.gob-shell .main .rankings-results-table,
+html.gob-shell .main #roster-table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+html.gob-shell .main .team-stats-page-card thead th,
+html.gob-shell .main .fcc-team-stats-card thead th,
+html.gob-shell .main .stats-table-wrap thead th,
+html.gob-shell .main .gob-data-grid-scroll thead th {
+  top: 0 !important;
 }
 
 /* Page shells sized themselves with 100vw, which ignores the rail and runs
@@ -481,10 +542,9 @@ html.gob-shell .main .pool-scroll {
 }
 
 html.gob-shell .main .scroll-x,
+html.gob-shell .main .pool-scroll,
 html.gob-shell .main .stats-table-wrap,
-html.gob-shell .main .gob-data-grid-scroll,
-html.gob-shell .main .pool-scroll {
-  overflow-x: auto;
+html.gob-shell .main .gob-data-grid-scroll {
   height: auto;
   max-height: none;
 }
