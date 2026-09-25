@@ -1,5 +1,7 @@
 # Style Guide
 
+How to build the shell, navigation, and settings is in [UX_System.md](UX_System.md). This document is the look.
+
 ## Purpose
 This document defines the core visual and interaction standards for Geeked-Out Basketball. It is intended to establish one shared design language across command centers and, over time, the full product.
 

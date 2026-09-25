@@ -344,8 +344,9 @@ test('training submit lands on the report, then one Back reaches mode-select', a
   await page.locator('#submit-btn').click();
   await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
   expect(new URL(page.url()).pathname).toBe('/training-report.html');
+  await page.waitForFunction(() => window.GOBNav);
   await page.locator('#locker-room-btn').click();
-  await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
   await backToModeSelect(page);
 });
 
@@ -419,15 +420,18 @@ test('end-of-game box score exit returns to the locker room', async ({ page }) =
 test('standings team page returns instantly with in-app Back and browser Back', async ({ page }) => {
   await installApi(page, commandCenter({ training_completed: true, week: 1 }));
   await openLockerRoom(page);
-  await page.locator('[data-tab="standings-tab"]').click();
+  await page.waitForFunction(() => window.CommandCenterTabs && typeof window.CommandCenterTabs.show === 'function');
+  await page.evaluate(() => window.CommandCenterTabs.show('standings-tab', 'replace'));
   const teamLink = page.locator('#standings-by-region a').first();
   await expect(teamLink).toBeVisible({ timeout: 20000 });
   await page.evaluate(() => { window.__standingsMark = 'alive'; });
   await teamLink.click();
   await expect(page).toHaveURL(/team-roster-view\.html/, { timeout: 20000 });
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.GOBNav && history.state && history.state.gobIdx > 0);
   await page.locator('#back-button').click();
-  await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 15000 });
-  await expect(page).toHaveURL(/tab=standings-tab/);
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 15000 }).toBe('/franchise-command-center.html');
+  expect(new URL(page.url()).searchParams.get('tab')).toBe('standings-tab');
   const afterInApp = await page.evaluate(() => {
     const nav = performance.getEntriesByType('navigation')[0];
     return { mark: window.__standingsMark || null, type: nav ? nav.type : '' };
@@ -437,8 +441,8 @@ test('standings team page returns instantly with in-app Back and browser Back', 
   await page.locator('#standings-by-region a').first().click();
   await expect(page).toHaveURL(/team-roster-view\.html/, { timeout: 20000 });
   await page.goBack({ waitUntil: 'commit' });
-  await expect(page).toHaveURL(/tab=standings-tab/, { timeout: 15000 });
-  await expect(page).toHaveURL(/franchise-command-center\.html/);
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 15000 }).toBe('/franchise-command-center.html');
+  expect(new URL(page.url()).searchParams.get('tab')).toBe('standings-tab');
   const afterBrowser = await page.evaluate(() => {
     const nav = performance.getEntriesByType('navigation')[0];
     return { mark: window.__standingsMark || null, type: nav ? nav.type : '' };
@@ -467,6 +471,7 @@ test('custom playbooks adds one step and Back removes it, then training still re
   await expect(page.locator('#play-now')).toHaveText('Run Training');
   await page.locator('#play-now').click();
   await expect(page).toHaveURL(/training\.html/, { timeout: 20000 });
+  await page.waitForLoadState('load');
   await page.locator('#playbook-mode-custom-btn').click();
   await expect(page).toHaveURL(/training-playbooks\.html/, { timeout: 20000 });
   await page.locator('#tp-back').click();
@@ -480,8 +485,9 @@ test('custom playbooks adds one step and Back removes it, then training still re
   await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
   await page.locator('#submit-btn').click();
   await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
+  await page.waitForFunction(() => window.GOBNav);
   await page.locator('#locker-room-btn').click();
-  await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
   await backToModeSelect(page);
 });
 
@@ -494,10 +500,11 @@ test('Enter Franchise gives the locker room its own step, and one Back returns t
   });
   await page.locator('[data-action="enter-franchise"]').first().click();
   await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
-  const lockerIdx = await page.evaluate(() => {
+  await page.waitForFunction(() => {
     const state = history.state;
-    return state && typeof state.gobIdx === 'number' ? state.gobIdx : null;
+    return state && typeof state.gobIdx === 'number';
   });
+  const lockerIdx = await page.evaluate(() => history.state.gobIdx);
   expect(modeIdx).toBe(0);
   expect(lockerIdx).toBe(1);
   await backToModeSelect(page);

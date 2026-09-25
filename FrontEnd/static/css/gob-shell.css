@@ -1,0 +1,242 @@
+/* Franchise shell layout for franchise-command-center.html only.
+   Token values stay in gob-tokens.css. This file only places the shell
+   and stops the old page chrome from scrolling beside .main. */
+
+html.gob-shell {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+html.gob-shell body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 0 !important;
+}
+
+html.gob-shell .app {
+  width: 100%;
+  height: 100vh;
+}
+
+html.gob-shell .main {
+  min-width: 0;
+}
+
+html.gob-shell .pg-head {
+  height: auto;
+}
+
+/* The handoff stripe sits on .main. The office already paints its own
+   panel, so a second stripe would change the existing cards. */
+html.gob-shell .main::after {
+  content: none;
+}
+
+html.gob-shell #auth-bar,
+html.gob-shell #alpha-badge,
+html.gob-shell #tournament-top,
+html.gob-shell #franchise-container .tab-buttons {
+  display: none !important;
+}
+
+html.gob-shell #franchise-container {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+html.gob-shell #franchise-container #tournament-tabs {
+  display: block;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  padding: 0;
+}
+
+html.gob-shell #franchise-container #tournament-tabs > .tab-content.active {
+  overflow: visible;
+  height: auto;
+  max-height: none;
+}
+
+html.gob-shell .top {
+  min-width: 0;
+}
+
+html.gob-shell .top-stats {
+  min-width: 0;
+}
+
+html.gob-shell a.top-id {
+  min-width: 0;
+}
+
+html.gob-shell #team-logo {
+  width: var(--dsz-30);
+  height: var(--dsz-30);
+  object-fit: contain;
+  flex: none;
+}
+
+html.gob-shell #gob-top-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.gob-shell #fcc-header-emblem {
+  max-height: calc(var(--top-h) - var(--space-12));
+  display: flex;
+  align-items: center;
+}
+
+html.gob-shell #fcc-header-emblem:empty {
+  display: none;
+}
+
+html.gob-shell #fcc-edit-recruiting {
+  min-height: var(--dsz-40);
+  padding: 0 var(--space-16);
+  border: 1px solid var(--white-28);
+  border-radius: var(--radius-10);
+  background: transparent;
+  color: var(--text-87);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-14);
+  letter-spacing: var(--tracking-2);
+}
+
+html.gob-shell #fcc-edit-recruiting:hover {
+  color: var(--text-100);
+  background: var(--white-6);
+}
+
+html.gob-shell #play-now.advance:disabled {
+  opacity: 1;
+}
+
+html.gob-shell button.rail-i,
+html.gob-shell button.stab {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+}
+
+html.gob-shell button.rail-i {
+  background: transparent;
+  color: inherit;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+}
+
+html.gob-shell .rail {
+  position: relative;
+  z-index: 30;
+  min-height: 0;
+  overflow: visible;
+}
+
+html.gob-shell .main {
+  z-index: 1;
+}
+
+html.gob-shell .rail-face {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  flex: 1;
+}
+
+/* 1280: the grid column stays --rail-w. The face overlays .main. */
+html.gob-shell.gob-1280 .rail {
+  padding: 0;
+}
+
+html.gob-shell.gob-1280 .rail-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--rail-w);
+  padding: var(--space-12) var(--space-10);
+  background: var(--bg-chrome);
+  border-right: 1px solid var(--line);
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: width var(--dur-hover) var(--ease-out);
+}
+
+html.gob-shell.gob-1280 .rail:hover .rail-face,
+html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-face {
+  width: 200px;
+  transition-delay: 400ms;
+}
+
+html.gob-shell.gob-1280 .rail:hover .rail-i,
+html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i {
+  justify-content: flex-start;
+  padding: 0 var(--space-14);
+}
+
+html.gob-shell.gob-1280 .rail:hover .rail-i span,
+html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i span {
+  display: inline;
+}
+
+html.gob-shell.gob-1920 .rail-face {
+  width: 100%;
+}
+
+html.gob-shell .rail-i .inbox-badge {
+  animation: none;
+  top: 6px;
+  right: 8px;
+}
+
+html.gob-shell .subtabs {
+  flex-wrap: wrap;
+}
+
+html.gob-shell .stats-toggle {
+  display: inline-flex;
+  margin-left: 0;
+  border-radius: var(--radius-8);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+html.gob-shell .stats-toggle[hidden] {
+  display: none;
+}
+
+html.gob-shell .stats-toggle button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-60);
+  cursor: pointer;
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-6);
+  padding: var(--space-8) var(--space-12);
+}
+
+html.gob-shell .stats-toggle button.on {
+  background: var(--white-10);
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .subtabs:empty,
+html.gob-shell .pg-head .subtabs[hidden] {
+  display: none;
+}

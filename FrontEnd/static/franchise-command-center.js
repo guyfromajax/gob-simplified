@@ -477,6 +477,8 @@ function resolveFccTeamBanner(data) {
 function populateTop(data) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
+  const shellName = document.getElementById('gob-top-name');
+  if (shellName) shellName.textContent = formattedTeam;
   // Hydrate from franchise payload — FranchiseLS is cache only.
   const visual =
     typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function'
@@ -505,6 +507,7 @@ function populateTop(data) {
     rankLabelEl.textContent = `National Rank: ${data.rank || '--'}`;
   }
   updateTopRecordLabel();
+  if (window.GOBShell && typeof window.GOBShell.syncTop === 'function') window.GOBShell.syncTop(data);
   console.log('Team logo URL:', logoSrc);
 
   const abbr = teamMap[formattedTeam];
@@ -595,6 +598,7 @@ function updateTopRecordLabel() {
     losses = Number(teamEntry?.L || 0);
   }
   recordLabelEl.textContent = `Record: ${wins}-${losses}`;
+  if (window.GOBShell && typeof window.GOBShell.syncRecord === 'function') window.GOBShell.syncRecord();
 }
 
 function normalizeHexColor(value) {
@@ -1653,15 +1657,15 @@ function renderRecruitingTabBadge() {
 
   // Tab badge — prompted only. Hovering does not clear it; only opening the surface
   // does, via the mark-seen PATCH.
+  const prompted = api.recruitingIsPrompted({
+    week,
+    counts: wire.counts || {},
+    boardSavedWeek: Number(wire.board_saved_week || 0),
+    hasSavedBoard: !!wire.has_saved_board,
+  });
   const tabBtn = document.querySelector('#franchise-container [data-tab="recruits-tab"]')
     || document.querySelector('[data-tab="recruits-tab"]');
   if (tabBtn) {
-    const prompted = api.recruitingIsPrompted({
-      week,
-      counts: wire.counts || {},
-      boardSavedWeek: Number(wire.board_saved_week || 0),
-      hasSavedBoard: !!wire.has_saved_board,
-    });
     let badge = tabBtn.querySelector('.inbox-badge');
     if (prompted && !badge) {
       badge = document.createElement('span');
@@ -1671,6 +1675,17 @@ function renderRecruitingTabBadge() {
       badge.remove();
     }
     if (getComputedStyle(tabBtn).position === 'static') tabBtn.style.position = 'relative';
+  }
+  const railItem = document.getElementById('gob-rail-recruiting');
+  if (railItem) {
+    let railBadge = railItem.querySelector('.inbox-badge');
+    if (prompted && !railBadge) {
+      railBadge = document.createElement('span');
+      railBadge.className = 'inbox-badge';
+      railItem.appendChild(railBadge);
+    } else if (!prompted && railBadge) {
+      railBadge.remove();
+    }
   }
 }
 
@@ -1864,6 +1879,13 @@ function bindResourcesLinks() {
   if (rRankings) rRankings.href = `/rankings.html${q()}`;
   const homeRankingsFullLink = document.getElementById('home-rankings-full-link');
   if (homeRankingsFullLink) homeRankingsFullLink.href = `/rankings.html${q()}`;
+  const psLink = document.getElementById('fcc-ps-season-link');
+  if (psLink && franchiseId && userTeamId) {
+    const psParams = emptyParams();
+    psParams.set('franchise_id', franchiseId);
+    psParams.set('team_id', userTeamId);
+    psLink.href = `/practice-squad-standings.html?${psParams.toString()}`;
+  }
   const rRecruits = document.getElementById('resources-recruits');
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
   const rAwards = document.getElementById('resources-awards');
@@ -4303,7 +4325,8 @@ function fccEosSimOverlayCopy(week) {
 
 function updatePlayButton(data) {
   const playNowBtn = document.getElementById('play-now');
-  if (!data) return;
+  if (!playNowBtn || !data) return;
+  playNowBtn.classList.remove('is-loading');
 
   const eosTournamentActive = data.eos_tournament_active || false;
   const eosTournament = data.eos_tournament;
@@ -4551,6 +4574,14 @@ function waitForConfirmSfx() {
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
 playNowBtn.addEventListener('click', async () => {
+  if (playNowBtn.classList.contains('is-loading')) return;
+  const advanceLabel = playNowBtn.textContent;
+  playNowBtn.classList.add('is-loading');
+  playNowBtn.textContent = 'STARTING…';
+  const settleAdvance = () => {
+    playNowBtn.classList.remove('is-loading');
+    if (playNowBtn.textContent === 'STARTING…') playNowBtn.textContent = advanceLabel;
+  };
   playSound('confirm-1-lowervol.wav');
   const confirmSfxReady = waitForConfirmSfx();
   const mode = playNowBtn.dataset.mode || 'play';
@@ -4572,6 +4603,7 @@ playNowBtn.addEventListener('click', async () => {
   if (mode === 'training') {
     const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
     if (topData?.training_disabled_for_eos || topData?.training_disabled_for_postseason) {
+      settleAdvance();
       return;
     }
     const sessionType = topData?.session_type || 'in-season';
@@ -4593,7 +4625,10 @@ playNowBtn.addEventListener('click', async () => {
     };
     if (window.GOBTutorialAlerts) {
       const blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining, trainingReturnUrl);
-      if (blocked) return;
+      if (blocked) {
+        settleAdvance();
+        return;
+      }
     } else {
       await navigateToTraining();
     }
@@ -4661,7 +4696,7 @@ playNowBtn.addEventListener('click', async () => {
   
   // ✅ EOS TOURNAMENT: Handle sim rest of tournament
   if (mode === 'sim-rest-tournament') {
-    const originalText = playNowBtn.textContent;
+    const originalText = advanceLabel;
     playNowBtn.disabled = true;
     const week = Number(playNowBtn.dataset.week || commandCenterTopDataCache?.week || 0);
     if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
@@ -4687,12 +4722,14 @@ playNowBtn.addEventListener('click', async () => {
       alert('Unable to simulate tournament');
       playNowBtn.disabled = false;
       playNowBtn.textContent = originalText;
+      settleAdvance();
     }
     return;
   }
   
   // End-of-season franchise rollover: keep the same franchise instance and build the next season from franchise data
   if (mode === 'new-season') {
+    settleAdvance();
     const modal = showNewSeasonConfirmModal();
     const closeModal = () => {
       if (typeof modal.closeGobModal === 'function') modal.closeGobModal();
@@ -4789,13 +4826,13 @@ playNowBtn.addEventListener('click', async () => {
   
   // Otherwise, play the game
   console.log('Play Now click search:', currentSearch());
-  const originalText = playNowBtn.textContent;
+  const originalText = advanceLabel;
   playNowBtn.disabled = true;
-  playNowBtn.textContent = 'Loading...';
   if (!franchiseId) {
     alert('Franchise not loaded');
     playNowBtn.disabled = false;
     playNowBtn.textContent = originalText;
+    settleAdvance();
     return;
   }
   try {
@@ -4842,6 +4879,7 @@ playNowBtn.addEventListener('click', async () => {
       if (blocked) {
         playNowBtn.disabled = false;
         playNowBtn.textContent = originalText;
+        settleAdvance();
         return;
       }
     } else {
@@ -4852,6 +4890,7 @@ playNowBtn.addEventListener('click', async () => {
     alert('Unable to play next game');
     playNowBtn.disabled = false;
     playNowBtn.textContent = originalText;
+    settleAdvance();
   }
 });
 

@@ -45,6 +45,34 @@ function initCommandCenterTabs(options) {
     tabContents.forEach(function (c) {
       c.classList.toggle('active', c.id === tabName);
     });
+    try {
+      window.dispatchEvent(new CustomEvent('gob-tab-shown', { detail: { tab: tabName } }));
+    } catch (err) { /* ignore */ }
+  }
+
+  function show(tabName, historyMode) {
+    var known = Array.prototype.some.call(tabButtons, function (b) {
+      return b.dataset.tab === tabName;
+    });
+    if (!known) tabName = defaultTab;
+    if (window.GOB_BUILD_PROFILE === 'desktop' && window.FranchiseContext && typeof window.FranchiseContext.set === 'function') {
+      window.FranchiseContext.set('tab', tabName);
+    }
+    if (historyMode === 'push' && window.GOBNav && typeof window.GOBNav.pushSection === 'function') {
+      var bag = liveParams();
+      bag.set('tab', tabName);
+      var qs = bag.toString();
+      var next = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+      window.GOBNav.pushSection(next);
+    } else {
+      updateUrl(tabName);
+    }
+    setActive(tabName);
+    if (historyMode === 'push') {
+      var main = document.querySelector('html.gob-shell .main');
+      if (main) main.scrollTop = 0;
+    }
+    onTabShow(tabName);
   }
 
   function updateUrl(tabName) {
@@ -104,11 +132,11 @@ function initCommandCenterTabs(options) {
       var tabName = btn.dataset.tab;
       if (!tabName) return;
       playSound('click-tiny.wav');
-      setActive(tabName);
-      updateUrl(tabName);
-      onTabShow(tabName);
+      show(tabName, 'replace');
     });
   });
+
+  if (window.CommandCenterTabs) window.CommandCenterTabs.show = show;
 }
 
 (function (global) {

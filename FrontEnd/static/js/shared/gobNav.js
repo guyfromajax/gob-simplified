@@ -112,6 +112,8 @@
 
     function scrollContainer() {
       if (!win.document || !win.document.querySelector) return null;
+      var main = win.document.querySelector('html.gob-shell .main');
+      if (main) return main;
       return win.document.querySelector('#franchise-container #tournament-tabs > .tab-content.active')
         || win.document.querySelector('[data-gob-scroll]');
     }
@@ -404,6 +406,24 @@
       pushIdx();
       noteHere();
       assign(url);
+    }
+
+    // Same-page section change. Stamps gobIdx on the new entry immediately.
+    // Does not write the pending-idx key: the document is not reloading.
+    function pushSection(url) {
+      saveScroll();
+      var current = readIdx();
+      if (typeof current !== 'number') current = ensureIdx();
+      var next = current + 1;
+      var copy = {};
+      var state = stateObj();
+      for (var key in state) {
+        if (Object.prototype.hasOwnProperty.call(state, key)) copy[key] = state[key];
+      }
+      copy.gobIdx = next;
+      writeIdx(next);
+      if (win.history && win.history.pushState) win.history.pushState(copy, '', url);
+      noteHere();
     }
 
     function replace(url) {
@@ -718,6 +738,7 @@
     return {
       go: go,
       replace: replace,
+      pushSection: pushSection,
       back: back,
       exitFlow: exitFlow,
       isHubUrl: isHubUrl,

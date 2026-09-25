@@ -33,6 +33,18 @@ function fakeWindow(start, seed) {
           win.location.search = q === -1 ? '' : url.slice(q);
         }
       },
+      pushState(state, _t, url) {
+        win.navigations.push(['pushState', url, state && state.gobIdx]);
+        win.history.state = state;
+        if (typeof url === 'string') {
+          const hash = url.indexOf('#');
+          const bare = hash === -1 ? url : url.slice(0, hash);
+          const q = bare.indexOf('?');
+          win.location.pathname = q === -1 ? bare : bare.slice(0, q);
+          win.location.search = q === -1 ? '' : bare.slice(q);
+          win.location.hash = hash === -1 ? '' : url.slice(hash);
+        }
+      },
     },
     sessionStorage: {
       getItem(k) { return store.has(k) ? store.get(k) : null; },
@@ -445,6 +457,18 @@ test('a missed exit replaces mode-select with the locker room', () => {
   const replaced = win.navigations.find((row) => row[0] === 'replace');
   assert.ok(replaced);
   assert.equal(replaced[1], hub);
+});
+
+test('pushSection stamps gobIdx on the new entry and does not arm a pending idx', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=home-tab' });
+  assert.equal(win.history.state.gobIdx, 0);
+  win.GOBNav.pushSection('/franchise-command-center.html?franchise_id=f1&tab=roster-tab');
+  assert.equal(win.history.state.gobIdx, 1);
+  assert.equal(win.location.search, '?franchise_id=f1&tab=roster-tab');
+  assert.equal(win.sessionStorage.getItem('gob_nav_pending_idx'), null);
+  win.GOBNav.pushSection('/franchise-command-center.html?franchise_id=f1&tab=standings-tab');
+  assert.equal(win.history.state.gobIdx, 2);
+  assert.equal(win.sessionStorage.getItem('gob_nav_pending_idx'), null);
 });
 
 test('a short jump still replaces an in-game page with the locker room', () => {

@@ -3,6 +3,7 @@
 **The one document to read first.** Covers why the computer-game simulation was slow, what
 changed across three phases, how it is verified, and how to finish the rollout. Written 2026-07-21,
 at develop HEAD `bb95978ee`. Detailed phase reports and commit hashes are at the bottom.
+Shell, navigation, and settings construction: `_documentation_master/11_Design_Systems/UX_System.md`.
 
 ---
 

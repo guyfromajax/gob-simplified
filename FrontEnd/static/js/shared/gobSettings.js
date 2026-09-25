@@ -59,6 +59,37 @@ function barHeight() {
   return Math.max(0, Math.round(rect.bottom));
 }
 
+function shellPage() {
+  return document.documentElement.classList.contains('gob-shell');
+}
+
+function placeHost() {
+  if (!host) return;
+  if (shellPage()) {
+    const root = getComputedStyle(document.documentElement);
+    host.style.left = root.getPropertyValue('--rail-w').trim();
+    host.style.top = root.getPropertyValue('--top-h').trim();
+    host.style.right = '0';
+    host.style.bottom = '0';
+    host.style.setProperty('--gob-bar-h', '0px');
+  } else {
+    host.style.left = '';
+    host.style.top = '';
+    host.style.right = '';
+    host.style.bottom = '';
+    host.style.setProperty('--gob-bar-h', barHeight() + 'px');
+  }
+}
+
+function markGears(isOpen) {
+  ['auth-settings-btn', 'gob-rail-settings'].forEach((id) => {
+    const gear = document.getElementById(id);
+    if (!gear) return;
+    gear.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    gear.classList.toggle('open', isOpen);
+  });
+}
+
 function isDesktop() {
   return typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop';
 }
@@ -278,7 +309,7 @@ export function isOpen() {
 export function openSettings() {
   if (!host) build();
   host.hidden = false;
-  host.style.setProperty('--gob-bar-h', barHeight() + 'px');
+  placeHost();
   open = true;
   loadIdentity();
   paintAudio(getAudioState());
@@ -286,8 +317,7 @@ export function openSettings() {
     onKey = onEscape;
     document.addEventListener('keydown', onKey);
   }
-  const gear = document.getElementById('auth-settings-btn');
-  if (gear) gear.setAttribute('aria-expanded', 'true');
+  markGears(true);
 }
 
 export function close() {
@@ -309,8 +339,7 @@ export function close() {
     document.removeEventListener('keydown', onKey);
     onKey = null;
   }
-  const gear = document.getElementById('auth-settings-btn');
-  if (gear) gear.setAttribute('aria-expanded', 'false');
+  markGears(false);
 }
 
 export function toggle() {
