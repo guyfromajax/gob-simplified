@@ -1081,19 +1081,27 @@
     return node;
   }
 
+  function mainPastFold() {
+    var main = document.querySelector('html.gob-shell .main') || document.querySelector('.main');
+    return !!(main && main.scrollHeight - main.clientHeight > 1);
+  }
+
   function fitStandings(root) {
     var card = root.querySelector('.office-st');
     if (!card || !card._rows || card._rows.length <= 3) return;
-    if (document.documentElement.classList.contains('gob-1920')) {
-      if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, card._rows, false);
-      return;
+    var rows = card._rows;
+    if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, rows, false);
+    if (!mainPastFold()) return;
+    var size = rows.length - 1;
+    while (size >= 5) {
+      paintStandingsRows(card, standingsWindow(rows, size), true);
+      if (!mainPastFold()) return;
+      size -= 1;
     }
-    var col = card.closest('.office-col');
-    if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, card._rows, false);
-    if (!columnPastFold(col)) return;
-    if (card._rows.length > 5) paintStandingsRows(card, standingsWindow(card._rows, 5), true);
-    if (columnPastFold(col) && card._rows.length > 3) {
-      paintStandingsRows(card, standingsWindow(card._rows, 3), true);
+    while (size >= 3 && mainPastFold()) {
+      paintStandingsRows(card, standingsWindow(rows, size), true);
+      if (!mainPastFold()) return;
+      size -= 1;
     }
   }
 
@@ -1101,14 +1109,6 @@
     var main = document.querySelector('html.gob-shell .main') || document.querySelector('.main');
     if (!main) return global.innerHeight;
     return main.getBoundingClientRect().top + main.clientHeight;
-  }
-
-  function columnPastFold(node) {
-    if (!node) return false;
-    var main = document.querySelector('html.gob-shell .main') || document.querySelector('.main');
-    if (main && main.scrollHeight - main.clientHeight > 1) return true;
-    if (node.scrollHeight - node.clientHeight > 1) return true;
-    return node.getBoundingClientRect().bottom > foldBottom() + 1;
   }
 
   function trimRecruiting(root) {

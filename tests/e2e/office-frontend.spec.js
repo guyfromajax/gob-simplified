@@ -548,27 +548,25 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
       fit[name][size[2]] = numbers;
       expect(Math.abs(numbers.left - numbers.pad), name + ' left pad').toBeLessThan(1.5);
       expect(Math.abs(numbers.right - numbers.pad), name + ' right pad').toBeLessThan(1.5);
+      expect(numbers.mainScroll, name + ' ' + size[2] + ' vertical').toBeLessThanOrEqual(1);
+      if (numbers.standings && numbers.standings.mode === 'window') {
+        expect(numbers.standings.shown, name + ' ' + size[2] + ' window').toBeLessThan(numbers.standings.total);
+        expect(numbers.standings.shown, name + ' ' + size[2] + ' window').toBeGreaterThanOrEqual(size[2] === '1280' ? 3 : 5);
+      } else if (numbers.standings) {
+        expect(numbers.standings.mode, name + ' ' + size[2] + ' full table').toBe('all');
+        expect(numbers.standings.shown, name + ' ' + size[2] + ' rows').toBe(numbers.standings.total);
+      }
       if (size[2] === '1280') {
-        expect(numbers.mainScroll, name + ' vertical').toBeLessThanOrEqual(1);
         expect(numbers.pageWide, name + ' horizontal').toBeLessThanOrEqual(1);
         numbers.clip.forEach(function (px, index) {
           expect(px, name + ' column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
         });
         await assertOneVerticalScroll(page);
       }
-      if (size[2] === '1440') {
-        expect(numbers.standings && numbers.standings.mode, name + ' 1440 full table').toBe('all');
-        expect(numbers.standings.shown, name + ' 1440 rows').toBe(numbers.standings.total);
-      }
-      if (size[2] === '1920') {
-        expect(numbers.standings && numbers.standings.mode, name + ' 1920 full table').toBe('all');
-        expect(numbers.standings.shown, name + ' 1920 rows').toBe(numbers.standings.total);
-        if (name !== 'tournament') {
-          expect(numbers.mainScroll, name + ' 1920 vertical').toBeLessThanOrEqual(1);
-          numbers.clip.forEach(function (px, index) {
-            expect(px, name + ' 1920 column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
-          });
-        }
+      if (size[2] === '1920' && numbers.standings && numbers.standings.mode === 'all') {
+        numbers.clip.forEach(function (px, index) {
+          expect(px, name + ' 1920 column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
+        });
       }
       expect(numbers.standings && numbers.standings.column, name + ' standings column').toBe(2);
       await page.screenshot({ path: path.join(V3B, name + '-' + size[2] + '.png') });
@@ -670,9 +668,9 @@ test('live mid-season digest', async ({ page }) => {
       await expect(page.locator('#office-root .pg-extra')).toContainText('20');
       await expect(page.locator('#office-root .pg-extra')).not.toContainText('1237');
     }
+    const numbers = await measure(page);
+    expect(numbers.mainScroll, 'live ' + size[2] + ' vertical').toBeLessThanOrEqual(1);
     if (size[2] === '1280') {
-      const numbers = await measure(page);
-      expect(numbers.mainScroll).toBeLessThanOrEqual(1);
       await assertOneVerticalScroll(page);
     }
     await page.screenshot({ path: path.join(V3B, 'live-' + size[2] + '.png') });
@@ -825,7 +823,8 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
     expect(await page.locator('#office-root .st-more').count()).toBe(0);
   } else {
     expect(mode).toBe('window');
-    expect([5, 3]).toContain(visible.length);
+    expect(visible.length).toBeGreaterThanOrEqual(3);
+    expect(visible.length).toBeLessThan(order.length);
     await expect(page.locator('#office-root .st-more')).toHaveAttribute('href', /tab=standings-tab/);
   }
   const rowMetrics = await page.evaluate(() => {
