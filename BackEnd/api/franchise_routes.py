@@ -11066,12 +11066,7 @@ def leaders(
     limit: int = 10,
     view_scope: str = "national",
 ):
-    from BackEnd.utils.leaders_snapshot import (
-        lines_for_request,
-        rank_lines,
-        read_snapshot,
-        snapshot_is_fresh,
-    )
+    from BackEnd.utils.leaders_snapshot import fresh_lines, lines_for_request, rank_lines
 
     try:
         oid = ObjectId(franchise_id)
@@ -11090,10 +11085,9 @@ def leaders(
         raise HTTPException(status_code=404, detail="Franchise not found")
     week = int(header.get("week") or 1)
     season = int(header.get("current_season") or 1)
-    stored = read_snapshot(str(franchise_id))
-    if snapshot_is_fresh(stored, week=week, season=season):
-        rows = list(stored.get("rows") or [])
-        team_games = dict(stored.get("team_games") or {})
+    cached = fresh_lines(str(franchise_id), week=week, season=season)
+    if cached is not None:
+        rows, team_games = cached
     else:
         results_doc = db.franchises.find_one({"_id": oid}, {"results": 1}) or {}
         rows, team_games, _source = lines_for_request(

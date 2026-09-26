@@ -10,7 +10,7 @@ from BackEnd.api.franchise_routes import get_leaders
 from BackEnd.db import db, franchise_players_data_collection
 from BackEnd.persistence import get_store
 from BackEnd.utils import leaders_snapshot
-from BackEnd.utils.leaders_snapshot import note_season_stats_written, read_snapshot
+from BackEnd.utils.leaders_snapshot import note_season_stats_written, read_meta, read_snapshot
 
 client = TestClient(app)
 
@@ -220,10 +220,11 @@ def test_missing_snapshot_uses_the_live_scan():
     assert board["PTS"][0]["value"] == ranked[0]["value"] == 7.5
     assert board["3PTM"][0]["value"] == 4
 
-    stored = get_store().leaders_snapshots_collection.find_one({"_id": str(fid)})
-    assert stored is not None
-    assert stored.get("stale") is False
-    assert stored.get("gen") == 0
+    stored = read_snapshot(str(fid))
+    meta = read_meta(str(fid))
+    assert stored is not None and meta is not None
+    assert meta.get("stale") is False
+    assert meta.get("built_gen") == stored.get("gen") == 0
 
 
 def _process_memory() -> dict:
@@ -255,14 +256,14 @@ def test_second_process_rebuild_does_not_let_the_writer_skip_the_next_mark():
 
     before = _board(fid, scope="season", view_scope="national")
     assert before["PTS"][0]["name"] == "Cal Beta"
-    assert read_snapshot(fid).get("stale") is False
+    assert read_meta(fid).get("stale") is False
 
     note_season_stats_written(fid)
     writer = _process_memory()
     _install_process_memory({})
     rebuilt = _board(fid, scope="season", view_scope="national")
     assert rebuilt["PTS"][0]["name"] == "Cal Beta"
-    assert read_snapshot(fid).get("stale") is False
+    assert read_meta(fid).get("stale") is False
 
     _install_process_memory(writer)
     franchise_players_data_collection.update_one(
@@ -282,7 +283,7 @@ def test_write_between_load_and_store_is_not_saved(monkeypatch):
     _board(fid, scope="season", view_scope="national")
     note_season_stats_written(fid)
     frozen = read_snapshot(fid)
-    assert frozen.get("stale") is True
+    assert read_meta(fid).get("stale") is True
     frozen_pts = next(row[7] for row in frozen["rows"] if row[0] == "ann")
 
     real_load = leaders_snapshot.load_lines
@@ -301,8 +302,38 @@ def test_write_between_load_and_store_is_not_saved(monkeypatch):
     assert during["PTS"][0]["name"] == "Cal Beta"
 
     held = read_snapshot(fid)
-    assert held.get("stale") is True
+    assert read_meta(fid).get("stale") is True
     assert next(row[7] for row in held["rows"] if row[0] == "ann") == frozen_pts
+
+    monkeypatch.undo()
+    after = _board(fid, scope="season", view_scope="national")
+    assert after["PTS"][0]["name"] == "Ann Alpha"
+    assert after["PTS"][0]["value"] == 100.0
+
+
+def test_lines_stored_when_meta_commit_misses_are_not_served(monkeypatch):
+    """Lines can land and the meta update can still miss. The next read rebuilds."""
+    fid = _seed_two_conferences()
+    _board(fid, scope="season", view_scope="national")
+    note_season_stats_written(fid)
+    real_commit = leaders_snapshot._commit_meta
+
+    def commit_after_another_game(franchise_id, gen, week, season, *, existed):
+        franchise_players_data_collection.update_one(
+            {"franchise_id": franchise_id, "player_id": "ann"},
+            {"$set": {"season.PTS": 1000}},
+        )
+        note_season_stats_written(franchise_id)
+        return real_commit(franchise_id, gen, week, season, existed=existed)
+
+    monkeypatch.setattr(leaders_snapshot, "_commit_meta", commit_after_another_game)
+    during = _board(fid, scope="season", view_scope="national")
+    assert during["PTS"][0]["name"] == "Cal Beta"
+    lines = read_snapshot(fid)
+    meta = read_meta(fid)
+    assert lines is not None
+    assert meta.get("stale") is True
+    assert int(lines.get("gen")) != int(meta.get("gen"))
 
     monkeypatch.undo()
     after = _board(fid, scope="season", view_scope="national")

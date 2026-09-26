@@ -13,9 +13,9 @@ saves that have never built one take that fallback and do not error.
 Stale, not browse_rev: a game finalizes player season totals before the
 franchise document's ``browse_rev`` moves (CPU games between heartbeats,
 the user game before phase A returns). ``note_season_stats_written`` bumps
-``gen`` and sets ``stale`` on the snapshot document. That state is shared
-by every process. A rebuild reads ``gen`` before it loads player lines and
-writes the new snapshot only if ``gen`` is still that value.
+``gen`` on a small meta document. The player lines live in a second
+document stamped with the generation they were built at. A rebuild writes
+the lines, then clears stale only if that generation is still current.
 """
 
 from __future__ import annotations
@@ -292,71 +292,121 @@ def snapshot_id(franchise_id: str) -> str:
     return str(franchise_id)
 
 
+def meta_id(franchise_id: str) -> str:
+    return f"meta:{franchise_id}"
+
+
 def read_snapshot(franchise_id: str) -> dict[str, Any] | None:
+    """The lines document. Freshness lives on the meta document."""
     doc = _collection().find_one({"_id": snapshot_id(franchise_id)})
     return doc if isinstance(doc, dict) else None
 
 
-def snapshot_is_fresh(doc: dict[str, Any] | None, *, week: int, season: int) -> bool:
-    if not doc or doc.get("stale"):
+def read_meta(franchise_id: str) -> dict[str, Any] | None:
+    doc = _collection().find_one({"_id": meta_id(franchise_id)})
+    return doc if isinstance(doc, dict) else None
+
+
+def _meta_matches_week(meta: dict[str, Any] | None, *, week: int, season: int) -> bool:
+    if not meta or meta.get("stale"):
         return False
     try:
-        return int(doc.get("week")) == int(week) and int(doc.get("season") or 1) == int(season)
+        return int(meta.get("week")) == int(week) and int(meta.get("season") or 1) == int(season)
     except (TypeError, ValueError):
         return False
 
 
-def _seen_gen(doc: dict[str, Any] | None) -> tuple[bool, int]:
-    """Whether a snapshot document exists, and the ``gen`` observed on it."""
+def _generation(doc: dict[str, Any] | None) -> int:
     if not doc:
-        return False, 0
+        return 0
     try:
-        return True, int(doc.get("gen") or 0)
+        return int(doc.get("gen") or 0)
     except (TypeError, ValueError):
-        return True, 0
+        return 0
+
+
+def fresh_lines(franchise_id: str, *, week: int, season: int) -> tuple[list[list[Any]], dict[str, int]] | None:
+    """Lines when meta is current and the lines document was built at that generation."""
+    meta = read_meta(franchise_id)
+    if not _meta_matches_week(meta, week=week, season=season):
+        return None
+    lines = read_snapshot(franchise_id)
+    if not lines:
+        return None
+    try:
+        built = int(meta.get("built_gen"))
+    except (TypeError, ValueError):
+        return None
+    if _generation(lines) != built:
+        return None
+    return list(lines.get("rows") or []), dict(lines.get("team_games") or {})
 
 
 def note_season_stats_written(franchise_id: str | None) -> None:
-    """Bump ``gen`` and mark the stored lines stale. No-op when no snapshot exists."""
+    """Bump meta ``gen`` and mark the lines stale. Creates the counter if needed."""
     if not franchise_id:
         return
     try:
         _collection().update_one(
-            {"_id": snapshot_id(franchise_id)},
-            {"$inc": {"gen": 1}, "$set": {"stale": True}},
+            {"_id": meta_id(franchise_id)},
+            {
+                "$inc": {"gen": 1},
+                "$set": {"stale": True, "franchise_id": str(franchise_id)},
+            },
+            upsert=True,
         )
     except Exception:
         logger.exception("[LEADERS] snapshot invalidate failed franchise_id=%s", franchise_id)
 
 
-def _gen_filter(doc_id: str, gen: int) -> dict[str, Any]:
-    """Match the generation read before the player scan.
-
-    A missing ``gen`` is generation 0, which is what a snapshot stored before
-    this field existed still has.
-    """
-    if gen == 0:
-        return {"_id": doc_id, "$or": [{"gen": 0}, {"gen": {"$exists": False}}]}
-    return {"_id": doc_id, "gen": gen}
-
-
-def _publish_snapshot(
-    doc: dict[str, Any],
-    *,
-    existed: bool,
-    gen: int,
-) -> bool:
-    """Store ``doc`` only when ``gen`` is still the value read before the scan."""
+def _write_lines(doc: dict[str, Any]) -> None:
     coll = _collection()
+    sqlite_coll = _as_sqlite(coll)
+    if sqlite_coll is not None:
+        sqlite_coll.upsert_owned(doc)
+    else:
+        coll.replace_one({"_id": doc["_id"]}, doc, upsert=True)
+
+
+def _commit_meta(franchise_id: str, gen: int, week: int, season: int, *, existed: bool) -> bool:
+    """Clear stale only while ``gen`` is still the value read before the scan."""
+    coll = _collection()
+    mid = meta_id(franchise_id)
+    fields = {
+        "franchise_id": str(franchise_id),
+        "stale": False,
+        "week": int(week),
+        "season": int(season or 1),
+        "built_gen": int(gen),
+    }
     if not existed:
         result = coll.update_one(
-            {"_id": doc["_id"]},
-            {"$setOnInsert": {key: value for key, value in doc.items() if key != "_id"}},
+            {"_id": mid},
+            {"$setOnInsert": {**fields, "gen": int(gen)}},
             upsert=True,
         )
         return getattr(result, "upserted_id", None) is not None
-    result = coll.replace_one(_gen_filter(doc["_id"], gen), doc, upsert=False)
+    result = coll.update_one(
+        {"_id": mid, "gen": int(gen)},
+        {"$set": fields},
+    )
     return getattr(result, "matched_count", 0) > 0
+
+
+def _publish(franchise_id: str, *, week: int, season: int, results: dict | None, rows: list[list[Any]], meta: dict[str, Any] | None) -> bool:
+    """Write lines stamped with the generation read before the scan, then clear stale if it still matches."""
+    existed = meta is not None
+    gen = _generation(meta) if existed else 0
+    _write_lines(
+        {
+            "_id": snapshot_id(franchise_id),
+            "franchise_id": str(franchise_id),
+            "gen": gen,
+            "team_games": team_games_from_results(results),
+            "rows": rows,
+        }
+    )
+    return _commit_meta(franchise_id, gen, week, season, existed=existed)
 
 
 def write_snapshot(
@@ -367,21 +417,11 @@ def write_snapshot(
     results: dict | None,
     rows: list[list[Any]] | None = None,
 ) -> bool:
-    """Rebuild lines and store them only if ``gen`` did not move during the load."""
-    existed, gen = _seen_gen(read_snapshot(franchise_id))
+    """Rebuild lines. Meta is cleared only if ``gen`` did not move during the load."""
+    meta = read_meta(franchise_id)
     if rows is None:
         rows = load_lines(franchise_id)
-    doc = {
-        "_id": snapshot_id(franchise_id),
-        "franchise_id": str(franchise_id),
-        "week": int(week),
-        "season": int(season or 1),
-        "stale": False,
-        "gen": 0 if not existed else gen,
-        "team_games": team_games_from_results(results),
-        "rows": rows,
-    }
-    return _publish_snapshot(doc, existed=existed, gen=gen)
+    return _publish(franchise_id, week=week, season=season, results=results, rows=rows, meta=meta)
 
 
 def refresh_leaders_snapshot(franchise_id: str, *, week: int, season: int, results: dict | None) -> None:
@@ -397,27 +437,15 @@ def lines_for_request(franchise_id: str, *, week: int, season: int, results: dic
 
     A miss stores a fresh snapshot so the next open of this week does not scan.
     """
-    current = read_snapshot(franchise_id)
-    if snapshot_is_fresh(current, week=week, season=season):
-        return list(current.get("rows") or []), dict(current.get("team_games") or {}), "snapshot"
-    existed, gen = _seen_gen(current)
+    cached = fresh_lines(franchise_id, week=week, season=season)
+    if cached is not None:
+        rows, team_games = cached
+        return rows, team_games, "snapshot"
+    meta = read_meta(franchise_id)
     rows = load_lines(franchise_id)
     team_games = team_games_from_results(results)
     try:
-        _publish_snapshot(
-            {
-                "_id": snapshot_id(franchise_id),
-                "franchise_id": str(franchise_id),
-                "week": int(week),
-                "season": int(season or 1),
-                "stale": False,
-                "gen": 0 if not existed else gen,
-                "team_games": team_games,
-                "rows": rows,
-            },
-            existed=existed,
-            gen=gen,
-        )
+        _publish(franchise_id, week=week, season=season, results=results, rows=rows, meta=meta)
     except Exception:
         logger.exception("[LEADERS] snapshot store failed franchise_id=%s", franchise_id)
     return rows, team_games, "live"
