@@ -304,7 +304,7 @@ A rate leader qualifies when attempts are at least the floor times the games tha
 | FG% | 5 | FGA |
 | 3PT% | 2 | 3PTA |
 | FT% | 2 | FTA |
-| DEF% | 8 | DEF_A |
+| DEF% | 6 | DEF_A |
 | SCR% | 5 | SCR_A |
 
 Season Leaders (FG% and DEF%), the league-news FG% and DEF% boards, and the community-highlights top defender use this rule. SCR%, 3PT%, and FT% are defined for any later consumer. Leaders does not show those three today.

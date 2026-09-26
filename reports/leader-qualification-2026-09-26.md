@@ -13,7 +13,7 @@ The five floors live in one dict, `LEADER_QUALIFICATION_FLOORS`, with `qualifies
 | FG% | 5 | FGA |
 | 3PT% | 2 | 3PTA |
 | FT% | 2 | FTA |
-| DEF% | 8 | DEF_A |
+| DEF% | 6 | DEF_A |
 | SCR% | 5 | SCR_A |
 
 Career scope was left on the old rule. Career FG% and DEF% still require the denominator to be at least 5 times that player's own GP, and GP greater than 0. Season scope (anything other than `career`) uses `qualifies` and the team's completed games.
@@ -88,7 +88,7 @@ The first open of a week is still a multi-second scan. A repeat open in that sam
 - `tests/test_leader_qualification.py`: 15 passed (each of the five stats at the floor, one below, and zero team games).
 - `tests/test_franchise_leaders_endpoint.py`: 2 passed. The new case is a team with 10 completed games. The player with GP 4 and 40 FGA (clears 5 × GP, misses 5 × team games) drops out of season FG% and DEF%. The teammate at exactly 50 FGA / 80 DEF_A stays. Career FG% still includes both. `GET /franchise/leaders` returns only the full-season player for FG%.
 - Same two files again with `GOB_PERSISTENCE=sqlite`: 17 passed.
-- `tests/test_franchise_league_news.py`: 2 passed (boards still have 10 rows; the fixture's 30 FGA and 24 DEF_A still clear 5×3 and 8×3).
+- `tests/test_franchise_league_news.py`: 2 passed (boards still have 10 rows; the fixture's 30 FGA and 24 DEF_A still clear 5×3 and 6×3).
 - `tests/test_office_digest.py`: 13 passed.
 - `tests/test_persistence_adapter.py`: 41 passed (with the files above, 73 passed in 15.46s).
 - Standings: `tests/test_roster_team_record.py` 9 passed. Office digest also calls `GET /franchise/standings`.
@@ -125,5 +125,7 @@ Full 128-team census. League totals ignore Lancaster, because that roster qualif
 | DEF% | 8 | 0 | 1 | 6 | 191 |
 
 DEF_A per team game, players with GP >= 10 (1,524 players, team games 14): 50th percentile 5.50, 75th 7.00, 90th 8.29, max 12.93.
+
+DEF% floor set to 6 (median 5 qualifiers per team, no team at 0 excluding the incomplete Lancaster save).
 
 STATUS: COMPLETE

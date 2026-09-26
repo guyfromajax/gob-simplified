@@ -18,7 +18,7 @@ LEADER_QUALIFICATION_FLOORS: dict[str, int] = {
     "FG%": 5,
     "3PT%": 2,
     "FT%": 2,
-    "DEF%": 8,
+    "DEF%": 6,
     "SCR%": 5,
 }
 
