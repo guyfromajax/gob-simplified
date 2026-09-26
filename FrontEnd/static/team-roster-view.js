@@ -202,7 +202,9 @@ async function loadRoster() {
       params.append('franchise_id', franchiseId);
       if (teamId) params.append('team_id', teamId);
     }
-    params.append('profile', '1');
+    if (new URLSearchParams(window.location.search).get('cc_profile') === '1') {
+      params.append('profile', '1');
+    }
     if (params.toString()) {
       url += `?${params.toString()}`;
     }

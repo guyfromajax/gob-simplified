@@ -43,51 +43,6 @@
     34: 'Simming National Finals',
   });
 
-  var ccInflight = null;
-  var ccBody = null;
-
-  function isCommandCenterUrl(url) {
-    return String(url || '').indexOf('/franchise/command-center/data') !== -1;
-  }
-
-  function jsonResponse(data) {
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-
-  function installFetchWatch() {
-    if (window.__gobCcFetchWatch || typeof window.fetch !== 'function') return;
-    window.__gobCcFetchWatch = true;
-    var orig = window.fetch;
-    window.fetch = function (input, init) {
-      var url = typeof input === 'string' ? input : (input && input.url) || '';
-      var method = (init && init.method) || (input && input.method) || 'GET';
-      if (!isCommandCenterUrl(url) || String(method).toUpperCase() !== 'GET') {
-        return orig.apply(this, arguments);
-      }
-      if (ccBody) return Promise.resolve(jsonResponse(ccBody));
-      if (ccInflight) {
-        return ccInflight.then(function (data) { return jsonResponse(data); });
-      }
-      var started = performance.now();
-      var pending = orig.apply(this, arguments);
-      ccInflight = pending.then(function (res) {
-        return res.clone().json();
-      }).then(function (data) {
-        ccBody = data;
-        if (data && !window.__gobCommandCenterData) {
-          window.__gobCommandCenterData = data;
-          window.__gobAdvanceLoadMs = performance.now() - started;
-          window.__gobAdvanceLoadReused = false;
-        }
-        return data;
-      }).catch(function () { return null; });
-      return pending;
-    };
-  }
-
   function playSound(filename) {
     import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
   }
@@ -662,7 +617,11 @@
   }
 
   function defaultFetchJSON(url) {
-    return fetch(url, { headers: window.API_CONFIG.getAuthHeaders() }).then(function (res) {
+    var headers = window.API_CONFIG.getAuthHeaders();
+    if (window.GOBStore && typeof window.GOBStore.get === 'function') {
+      return window.GOBStore.get(url, { headers: headers });
+    }
+    return fetch(url, { headers: headers }).then(function (res) {
       if (!res.ok) throw new Error('Request failed');
       return res.json();
     });
@@ -751,7 +710,6 @@
   }
 
   function load() {
-    installFetchWatch();
     if (window.__gobCommandCenterData) {
       window.__gobAdvanceLoadMs = 0;
       window.__gobAdvanceLoadReused = true;
@@ -765,14 +723,6 @@
           window.__gobAdvanceLoadReused = true;
           applyData(window.__gobCommandCenterData, true);
           resolve(window.__gobCommandCenterData);
-          return;
-        }
-        if (ccInflight) {
-          ccInflight.then(function (data) {
-            window.__gobAdvanceLoadReused = true;
-            applyData(data, true);
-            resolve(data);
-          });
           return;
         }
         var franchiseId = queryId('franchise_id');
@@ -800,8 +750,6 @@
     if (week === SIGNING_DAY_WEEK && !wire.week_35_orders_submitted) return true;
     return false;
   }
-
-  installFetchWatch();
 
   window.GOBAdvance = {
     updatePlayButton: updatePlayButton,

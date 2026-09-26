@@ -7367,6 +7367,18 @@ try:
                                 season_map[pid] = dict(season_raw)
                 except Exception:
                     season_map = {}
+            # Same season dict rosterLoader used to copy off GET /franchise/state.
+            # Computed here from the FPD rows already read for the starting five.
+            # No new stored field. /franchise/state is unchanged.
+            if franchise_id:
+                for player in players:
+                    pid = str(player.get("_id") or "")
+                    season = season_map.get(pid)
+                    if not isinstance(season, dict):
+                        season = {}
+                    existing_stats = player.get("stats") if isinstance(player.get("stats"), dict) else {}
+                    player["stats"] = dict(existing_stats)
+                    player["stats"]["season"] = dict(season)
             from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
 
             projected_starting_five = build_enriched_projected_starting_five(

@@ -49,6 +49,17 @@ function cloneParams(params) {
  * Public pages: homepage, login, signup (and root /)
  */
 (function () {
+  (function loadClientStore() {
+    try {
+      var head = document.head || document.documentElement;
+      if (!head || document.querySelector('script[src="/js/shared/gobStore.js"]')) return;
+      var script = document.createElement('script');
+      script.src = '/js/shared/gobStore.js';
+      script.async = false;
+      head.appendChild(script);
+    } catch (e) {}
+  })();
+
   (function loadGlobalButtonFont() {
     try {
       var head = document.head || document.getElementsByTagName("head")[0];

@@ -64,7 +64,7 @@ function cloneParams(params) {
     root.innerHTML = '<p class="fcc-tournament-empty-msg">Loading brackets…</p>';
     try {
       const topData = await fetchJSON(
-        `${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`
+        `${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${encodeURIComponent(franchiseId)}${new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : ''}`
       );
       const teamIdToNameMap = {};
       const teamIdMetaMap = {};

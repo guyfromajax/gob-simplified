@@ -329,7 +329,11 @@ async function ensureTeamBuilderVisualHydratedFromFranchise(franchiseId) {
       typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl
         ? API_CONFIG.buildUrl('/franchise/command-center/data')
         : '/franchise/command-center/data';
-    var url = base + '?franchise_id=' + encodeURIComponent(franchiseId) + '&profile=1';
+    var profile = '';
+    try {
+      if (new URLSearchParams(window.location.search).get('cc_profile') === '1') profile = '&profile=1';
+    } catch (e) {}
+    var url = base + '?franchise_id=' + encodeURIComponent(franchiseId) + profile;
     var headers =
       typeof API_CONFIG !== 'undefined' && API_CONFIG.getAuthHeaders
         ? API_CONFIG.getAuthHeaders()

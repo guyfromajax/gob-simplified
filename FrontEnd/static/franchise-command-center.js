@@ -49,9 +49,32 @@ async function fetchJSON(url) {
 }
 
 // Profiling stays available as ?cc_profile=1. The Office load itself does not request it.
+function fccProfileSuffix() {
+  try {
+    return new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : '';
+  } catch (error) {
+    return '';
+  }
+}
+
 function fccCommandCenterDataUrl(franchiseId) {
-  const profile = new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : '';
-  return `${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}${profile}`;
+  return `${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}${fccProfileSuffix()}`;
+}
+
+function fccTeamDataUrl() {
+  return `${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`;
+}
+
+function fccRosterUrl() {
+  return `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}${fccProfileSuffix()}`;
+}
+
+function fccPlaybooksUrl() {
+  const params = emptyParams();
+  params.set('mode', 'franchise');
+  params.set('franchise_id', franchiseId);
+  params.set('team_id', userTeamId);
+  return `${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`;
 }
 
 // A franchise_id that 404s is a franchise that no longer exists — almost always one
@@ -196,13 +219,6 @@ const FCC_DEFAULT_TOP = '#3551A5';
 const FCC_DEFAULT_DEEP = '#1C2D60';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 const recruitSortState = { key: 'rt', direction: 'desc' };
-const HOME_EMOJI_BUCKETS = [
-  { emoji: '😡', min: 0, maxExclusive: 20 },
-  { emoji: '😕', min: 20, maxExclusive: 40 },
-  { emoji: '😐', min: 40, maxExclusive: 60 },
-  { emoji: '😊', min: 60, maxExclusive: 80 },
-  { emoji: '😎', min: 80, maxExclusive: Infinity }
-];
 const GENERIC_GAMEPLAN_SCALE = {
   0: 'Never',
   1: 'Less',
@@ -1025,23 +1041,6 @@ function getLastCompletedUserGame() {
   return games[0] || null;
 }
 
-async function fetchRosterWithStatsForTeam(teamId) {
-  if (!franchiseId || !teamId) return [];
-  if (homeOpponentRosterCache.has(teamId)) return homeOpponentRosterCache.get(teamId);
-  const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}`;
-  const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${encodeURIComponent(franchiseId)}`;
-  try {
-    const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
-    const players = result?.players || [];
-    homeOpponentRosterCache.set(teamId, players);
-    persistFccSessionCache();
-    return players;
-  } catch (error) {
-    console.warn('Failed to load opponent roster for Home tab:', teamId, error);
-    return [];
-  }
-}
-
 async function ensureHomeScheduleData() {
   if (userScheduleDataCache || !franchiseId) return userScheduleDataCache;
   const params = emptyParams();
@@ -1050,17 +1049,6 @@ async function ensureHomeScheduleData() {
   userScheduleDataCache = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?${params.toString()}`);
   persistFccSessionCache();
   return userScheduleDataCache;
-}
-
-async function ensureHomeLastGameData(game) {
-  if (!game?.game_id) return null;
-  if (homeLastGameDataCache && homeLastGameDataCache.game_id === game.game_id) return homeLastGameDataCache.data;
-  const data = await fetchJSON(`${API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(game.game_id)}`)}`);
-  if (data) {
-    homeLastGameDataCache = { game_id: game.game_id, data };
-    persistFccSessionCache();
-  }
-  return data;
 }
 
 function createEmptyHomeState(message = 'N/A') {
@@ -1249,47 +1237,6 @@ function renderHomeMatchupCard(bodyId, summary, options = {}) {
         <div class="fcc-home-detail-line">Player of The Game: ${escapeHomeHtml(summary.potg?.name || 'N/A')}</div>
         <div class="fcc-home-detail-line fcc-home-potg-line">
           ${escapeHomeHtml(summary.potg ? `${summary.potg.stats.pts} PTS  ${summary.potg.stats.reb} REB  ${summary.potg.stats.ast} AST  ${summary.potg.stats.stl} STL  ${summary.potg.stats.blk} BLK  ${summary.potg.stats.defPct} DEF%` : 'N/A')}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderHomeLockerRoomCard() {
-  const body = document.getElementById('home-locker-room-body');
-  if (!body) return;
-  if (!teamData?.team_attributes || !userRosterPlayersCache.length) {
-    body.innerHTML = createEmptyHomeState('Loading...');
-    return;
-  }
-
-  const chemistry = Number(teamData.team_attributes.team_chemistry || 0);
-  const chemistryPercent = Math.max(0, Math.min(100, (chemistry / 25) * 100));
-  const attitudeCounts = HOME_EMOJI_BUCKETS.map((bucket) => {
-    const count = userRosterPlayersCache.filter((player) => {
-      const em = Number(player?.attributes?.EM || 0);
-      return em >= bucket.min && em < bucket.maxExclusive;
-    }).length;
-    return { ...bucket, count };
-  });
-
-  body.innerHTML = `
-    <div class="fcc-home-locker-room">
-      <div class="fcc-home-locker-label">Team Chemistry</div>
-      <div class="fcc-home-chemistry-bar">
-        <div class="fcc-home-chemistry-fill" style="width:${chemistryPercent}%"></div>
-        <div class="fcc-home-chemistry-text">${escapeHomeHtml(`${chemistry} / 25`)}</div>
-      </div>
-      <div class="fcc-home-locker-label">Player Attitudes</div>
-      <div class="fcc-home-attitude-scale">
-        <div class="fcc-home-attitude-emojis">
-          ${attitudeCounts.map((bucket) => `<span>${bucket.emoji}</span>`).join('')}
-        </div>
-        <div class="fcc-home-attitude-rail">
-          ${attitudeCounts.map(() => '<span class="fcc-home-attitude-tick"></span>').join('')}
-        </div>
-        <div class="fcc-home-attitude-counts">
-          ${attitudeCounts.map((bucket) => `<span>${bucket.count}</span>`).join('')}
         </div>
       </div>
     </div>
@@ -1803,9 +1750,7 @@ async function updatePlaybooksButtonState(topData) {
   const playbooksBtn = document.getElementById('playbooks-franchise');
   if (!playbooksBtn || !franchiseId || !userTeamId) return;
   const currentWeek = Number(topData?.week || 1);
-  const data = await fetchJSON(
-    `${API_CONFIG.buildUrl('/api/playbooks')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`
-  );
+  const data = await fetchJSON(fccPlaybooksUrl());
   const savedForWeek = Number(data?.playbook_meta?.saved_for_week || 0);
   playbooksWeekSavedCache = savedForWeek;
   const needsSave = savedForWeek !== currentWeek;
@@ -1994,11 +1939,7 @@ async function ensureFccTeamStatsSummary() {
 
 async function ensureFccPlaybooksSummary() {
   if (fccPlaybooksSummaryCache || !franchiseId || !userTeamId) return fccPlaybooksSummaryCache;
-  const params = emptyParams();
-  params.set('mode', 'franchise');
-  params.set('team_id', userTeamId);
-  params.set('franchise_id', franchiseId);
-  fccPlaybooksSummaryCache = await fetchJSON(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
+  fccPlaybooksSummaryCache = await fetchJSON(fccPlaybooksUrl());
   return fccPlaybooksSummaryCache;
 }
 
@@ -3831,19 +3772,18 @@ async function init() {
   persistFccSessionCache();
   emitDisplayContextUpdate();
   
-  // ✅ FIX: Use EXACT same source as Team tab - fetch team_chemistry from /franchise/team-data
-  // This ensures 100% consistency between header and Team tab
+  // One team-data read. loadTeamData reuses this body. Chemistry for the header
+  // comes from the same payload the Team tab renders.
   if (franchiseId && userTeamId) {
     try {
       const teamDataStartTime = performance.now();
-      const teamDataResponse = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
+      const teamPayload = await fetchJSON(fccTeamDataUrl());
       const teamDataEndTime = performance.now();
       console.log(`⏱️ [PERF] /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
-      if (teamDataResponse.ok) {
-        const teamData = await teamDataResponse.json();
-        // Override team_chemistry with value from team-data endpoint (same as Team tab uses)
-        if (teamData && teamData.team_attributes && teamData.team_attributes.team_chemistry !== undefined) {
-          topData.team_chemistry = teamData.team_attributes.team_chemistry;
+      if (teamPayload) {
+        fccTeamDataPayload = teamPayload;
+        if (teamPayload.team_attributes && teamPayload.team_attributes.team_chemistry !== undefined) {
+          topData.team_chemistry = teamPayload.team_attributes.team_chemistry;
           console.log('📊 [TEAM CHEMISTRY] Top bar value (from team-data):', topData.team_chemistry);
           persistFccSessionCache();
         }
@@ -3960,11 +3900,9 @@ async function init() {
     }
     try {
       const rosterStartTime = performance.now();
-      const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`;
-      const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${franchiseId}&profile=1`;
-      const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
+      const result = await RosterLoader.loadRosterWithStats(fccRosterUrl(), '');
       const rosterEndTime = performance.now();
-      console.log(`⏱️ [PERF] roster+state (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
+      console.log(`⏱️ [PERF] roster (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
       renderTeam(result);
     } catch (error) {
       console.error('Failed to load franchise roster:', error);
@@ -3972,8 +3910,8 @@ async function init() {
   }
   const standingsStartTime = performance.now();
   const standingsUrl = userTeamId
-    ? `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&scope=user_region&team_id=${encodeURIComponent(userTeamId)}&profile=1`
-    : `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&profile=1`;
+    ? `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&scope=user_region&team_id=${encodeURIComponent(userTeamId)}${fccProfileSuffix()}`
+    : `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}${fccProfileSuffix()}`;
   const standingsData = await fetchJSON(standingsUrl);
   const standingsEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
@@ -4737,6 +4675,7 @@ const TEAM_ATTR_NAMES = {
 };
 
 let teamData = null;
+let fccTeamDataPayload = null;
 
 async function loadTeamData() {
   if (!franchiseId || !userTeamId) return;
@@ -4761,34 +4700,22 @@ async function loadTeamData() {
       console.warn('Could not ensure team objects exist:', error);
     }
     
-    // ✅ SS&S: Use ObjectId directly - backend accepts team_id parameter
-    const teamDataStartTime = performance.now();
-    console.log('⏱️ [PERF] loadTeamData() calling /franchise/team-data START');
-    const response = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
-    const teamDataEndTime = performance.now();
-    console.log(`⏱️ [PERF] loadTeamData() /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
-    
-    if (!response.ok) {
-      console.error('Failed to load team data:', response.status, response.statusText);
+    // The Office init already loaded this body. Fetch only if that read did not run.
+    let data = fccTeamDataPayload;
+    if (!data) {
+      const teamDataStartTime = performance.now();
+      console.log('⏱️ [PERF] loadTeamData() calling /franchise/team-data START');
+      data = await fetchJSON(fccTeamDataUrl());
+      fccTeamDataPayload = data;
+      const teamDataEndTime = performance.now();
+      console.log(`⏱️ [PERF] loadTeamData() /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
+    }
+    if (!data) {
+      console.error('Failed to load team data');
       return;
     }
-    
-    const data = await response.json();
-    
-    // Also load players for top scorer lookup (wire by team_id per Data_Persistence_System / FCC)
-    let players = [];
-    try {
-      const rosterStartTime = performance.now();
-      const rosterResponse = await fetch(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`, { headers: API_CONFIG.getAuthHeaders() });
-      const rosterEndTime = performance.now();
-      console.log(`⏱️ [PERF] loadTeamData() /roster (team_id): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
-      if (rosterResponse.ok) {
-        const rosterData = await rosterResponse.json();
-        players = rosterData.players || [];
-      }
-    } catch (error) {
-      console.warn('Could not load players for team data:', error);
-    }
+
+    const players = userRosterPlayersCache.length ? userRosterPlayersCache.slice() : [];
     
     teamData = {
       team_attributes: data.team_attributes || {},

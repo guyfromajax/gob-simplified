@@ -218,6 +218,31 @@ Not on this rev: `GET /api/game/{id}`, `POST /api/simulate-quarter`, press-confe
 
 A new franchise write must fold or bump. A new browse GET must use the dependency.
 
+## Client store
+
+`js/shared/gobStore.js` is the only client cache for franchise browse reads. `authGuard.js` loads it on every page. The store caches server responses. It does not compute standings, ratings, season lines, or anything else the page renders.
+
+`GOBStore.get(url, init)` fetches a browse GET:
+
+- Two callers of the same URL in one document share one request.
+- A resolved entry in that document is reused. A new document does not keep the JavaScript heap, so it sends `If-None-Match` with the stored ETag.
+- `304` returns the stored body. `200` replaces the body and the ETag.
+- The body is also written to `sessionStorage` under `gob-store:<franchise_id>`, inside try/catch. Bodies larger than about 1.5 MB are kept in memory only. If `sessionStorage` throws, the request still completes.
+
+The ETag is `franchise:season:week:browse_rev:BUILD:signature`. The store remembers the newest season, week, revision, and build it has seen for that franchise. A greater season, a greater week in that season, a greater revision in that week, or a different `BUILD` drops every cached body for that franchise. A newer revision means any cached route may be stale, because every franchise write bumps the revision.
+
+`GOBStore.mutate(url, options)` is the write wrapper. `window.fetch` sends POST, PUT, PATCH, and DELETE on `/franchise/`, `/api/gameplan`, and `/api/playbooks` through it. After a successful response it clears that franchise's memory and `sessionStorage`. The next GET is a full read and picks up the new revision. A flow page that navigates away after a write does not have to do anything else.
+
+Cached routes are the browse GETs: command-center, standings, schedule (including national), leaders, team-stats, team-player-stats, team-data, news, recruiting-data, recruiting-results, practice-squad, awards, scouting-report, roster, player, recruit, teams, game plan, and playbooks.
+
+Never cached: `GET /api/game/{id}`, `POST /api/simulate-quarter`, `/api/auth`, and any URL with `profile=1`. `profile=1` is only added when the page URL has `cc_profile=1`.
+
+`ResourceCache` (the old season+week `sessionStorage` copy) always misses. Do not add a second cache in a page.
+
+A new browse view calls `GOBStore.get` or plain `fetch` (the store wraps `fetch` for the routes above). A new franchise write uses `fetch` or `GOBStore.mutate` so the franchise cache is cleared. Do not read `sessionStorage` for a browse body yourself.
+
+The Office does not call `GET /franchise/state`. Season counting stats for the user's roster are `players[].stats.season` on `GET /roster/{teamId}` in franchise mode, copied on read from `franchise_players_data.season`.
+
 ## 12. Office
 
 The home tab of `franchise-command-center.html` is the Office (`.office` inside `.main`). It has no page title and no sub-tab row. `js/shared/officeHome.js` paints it from `office_digest` only. Grouping and sorting attribute changes for display is allowed. A null field is omitted. The page does not substitute another payload, and it does not write "N/A".

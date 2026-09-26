@@ -398,9 +398,9 @@ function cloneParams(params) {
 
   function loadData() {
     Promise.all([
-      fetch(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId) + '&profile=1', { headers: API_CONFIG.getAuthHeaders() })
+      fetch(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId) + (new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : ''), { headers: API_CONFIG.getAuthHeaders() })
         .then(function (res) { return res.ok ? res.json() : null; }),
-      fetch(API_CONFIG.buildUrl('/roster/' + encodeURIComponent(teamId)) + '?franchise_id=' + encodeURIComponent(franchiseId) + '&profile=1', { headers: API_CONFIG.getAuthHeaders() })
+      fetch(API_CONFIG.buildUrl('/roster/' + encodeURIComponent(teamId)) + '?franchise_id=' + encodeURIComponent(franchiseId) + (new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : ''), { headers: API_CONFIG.getAuthHeaders() })
         .then(function (res) {
           if (!res.ok) throw new Error('Failed to load roster');
           return res.json();
