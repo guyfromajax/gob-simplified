@@ -407,12 +407,29 @@
     if (!value && data && data.team_record && data.team_record.wins != null && data.team_record.losses != null) {
       value = String(data.team_record.wins) + '-' + String(data.team_record.losses);
     }
+    if (!value) value = recordFromRankings(data);
     if (!value) {
       wrap.hidden = true;
       return;
     }
     wrap.hidden = false;
     valueEl.textContent = value;
+  }
+
+  function recordFromRankings(data) {
+    var rankings = data && data.rankings;
+    if (!rankings || !rankings.length) return '';
+    var teamId = String(data.user_team_object_id || data.user_team_id || data.team_id || '');
+    if (!teamId) return '';
+    var row = null;
+    for (var i = 0; i < rankings.length; i++) {
+      if (String(rankings[i].team_id || '') === teamId) {
+        row = rankings[i];
+        break;
+      }
+    }
+    if (!row || row.W == null || row.L == null) return '';
+    return String(row.W) + '-' + String(row.L);
   }
 
   function paintRank(data) {
@@ -681,6 +698,7 @@
     sync: sync,
     syncTop: syncTop,
     syncRecord: paintRecord,
+    classifyTables: classifyTables,
     noteCommandCenter: noteCommandCenter
   };
 
@@ -913,22 +931,132 @@
     var second = document.querySelector('html.gob-shell .main thead tr + tr th');
     if (first && second) row = first.getBoundingClientRect().height;
     root.style.setProperty('--gob-stick-row', row + 'px');
+    document.querySelectorAll('html.gob-shell .main table').forEach(function (table) {
+      var rowHead = table.querySelector('thead tr:first-child th');
+      var rowNext = table.querySelector('thead tr + tr th');
+      if (rowHead && rowNext) table.style.setProperty('--gob-stick-row', rowHead.getBoundingClientRect().height + 'px');
+    });
+    classifyTables();
+  }
+
+  function mainContentWidth(main) {
+    var cs = getComputedStyle(main);
+    return main.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  }
+
+  function hostForTable(table) {
+    var parent = table.parentElement;
+    if (parent && (parent.classList.contains('gob-table-wrap') || parent.classList.contains('gob-wide-wrap'))) return parent;
+    if (parent && parent.classList.contains('main')) return insertTableWrap(table);
+    if (parent && parent.children.length === 1 && parent.children[0] === table) return parent;
+    return insertTableWrap(table);
+  }
+
+  function insertTableWrap(table) {
+    var wrap = document.createElement('div');
+    wrap.className = 'gob-table-wrap';
+    table.parentNode.insertBefore(wrap, table);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  function intrinsicWidth(table) {
+    var prevWidth = table.style.width;
+    var prevMax = table.style.maxWidth;
+    table.style.width = 'max-content';
+    table.style.maxWidth = 'none';
+    var width = table.scrollWidth;
+    table.style.width = prevWidth;
+    table.style.maxWidth = prevMax;
+    return width;
+  }
+
+  function paintWideFade(wrap) {
+    var hiddenRight = wrap.scrollWidth - wrap.clientWidth - wrap.scrollLeft > 1;
+    var hiddenLeft = wrap.scrollLeft > 1;
+    wrap.classList.toggle('is-fade-right', hiddenRight);
+    wrap.classList.toggle('is-fade-left', hiddenLeft);
+  }
+
+  var classifying = false;
+  var stickObserver = null;
+
+  function classifyTables() {
+    if (classifying) return;
+    var main = document.querySelector('html.gob-shell .main');
+    if (!main) return;
+    classifying = true;
+    var wide = [];
+    try {
+      var limit = mainContentWidth(main);
+      Array.from(main.querySelectorAll('table')).forEach(function (table) {
+        if (table.closest('.gob-settings-host, [role="dialog"]')) return;
+        var wrap = hostForTable(table);
+        var already = wrap.classList.contains('gob-wide-wrap');
+        var sticksOut = !already && table.getBoundingClientRect().right > main.getBoundingClientRect().right + 1;
+        var width = intrinsicWidth(table);
+        var overflowInside = already && table.scrollWidth > wrap.clientWidth + 1;
+        var isWide = width > limit + 1 || sticksOut || overflowInside;
+        wrap.classList.toggle('gob-wide-wrap', isWide);
+        if (isWide) {
+          if (!wrap.__gobFade) {
+            wrap.__gobFade = true;
+            wrap.addEventListener('scroll', function () { paintWideFade(wrap); });
+          }
+          paintWideFade(wrap);
+          wrap.dataset.gobTableWidth = String(width);
+          wrap.dataset.gobWrapWidth = String(wrap.clientWidth);
+          wide.push({
+            id: table.id || String(table.className || '').slice(0, 80),
+            table: width,
+            wrap: wrap.clientWidth,
+            main: Math.round(limit)
+          });
+        } else {
+          wrap.classList.remove('is-fade-right', 'is-fade-left');
+          delete wrap.dataset.gobTableWidth;
+          delete wrap.dataset.gobWrapWidth;
+        }
+        if (stickObserver) {
+          stickObserver.observe(table);
+          stickObserver.observe(wrap);
+        }
+      });
+    } finally {
+      classifying = false;
+    }
+    window.__gobWideTables = wide;
   }
 
   function watchStickTop() {
     syncStickTop();
     if (window.__gobStickWatch) return;
     window.__gobStickWatch = true;
+    var queued = false;
+    function queueSync() {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () {
+        queued = false;
+        syncStickTop();
+      });
+    }
     if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', syncStickTop);
+      window.addEventListener('resize', queueSync);
       return;
     }
-    var observer = new ResizeObserver(syncStickTop);
+    var observer = new ResizeObserver(queueSync);
+    stickObserver = observer;
     var head = document.querySelector('html.gob-shell .pg-head');
     var main = document.querySelector('html.gob-shell .main');
     if (head) observer.observe(head);
-    if (main) observer.observe(main);
-    window.addEventListener('resize', syncStickTop);
+    if (main) {
+      observer.observe(main);
+      if (typeof MutationObserver !== 'undefined') {
+        new MutationObserver(queueSync).observe(main, { childList: true, subtree: true });
+      }
+    }
+    window.addEventListener('resize', queueSync);
   }
 
   function finishShell() {

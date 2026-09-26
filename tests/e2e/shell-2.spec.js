@@ -4,7 +4,7 @@ const path = require('path');
 const { stubAuth } = require('./helpers/auth');
 const { assertOneVerticalScroll } = require('./helpers/oneVerticalScroll');
 
-test.describe.configure({ timeout: 180000 });
+test.describe.configure({ timeout: 360000 });
 
 const FID = 'f-e2e-shell2';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
@@ -150,14 +150,58 @@ function midSeason() {
       body: 'Lancaster won its week ' + week + ' game.',
     };
   });
+  const teamStats = {
+    teams: rankings.map(function (row, i) {
+      return {
+        team: row.team_name,
+        team_id: row.team_id,
+        natl_rank: row.natl_rank,
+        stats: {
+          W: row.W, L: row.L, PF: 70 + (i % 20), PA: 64,
+          FGM: 28, FGA: 60, '3PTM': 8, '3PTA': 22, FTM: 12, FTA: 16,
+          DREB: 24, OREB: 10, TREB: 34, AST: 14, F: 16, TO: 11,
+          STL: 7, BLK: 3, DEF_A: 40, DEF_S: 22, SCR_A: 12, SCR_S: 6,
+        },
+      };
+    }),
+  };
+  const boxPlayers = [];
+  for (let side = 0; side < 2; side += 1) {
+    const teamKey = side === 0 ? 'home' : 'away';
+    const teamId = side === 0 ? TID : opp;
+    for (let i = 0; i < 12; i += 1) {
+      boxPlayers.push({
+        playerId: teamKey + '-p' + i,
+        _id: teamKey + '-p' + i,
+        name: (side === 0 ? 'Home ' : 'Away ') + (i + 1),
+        team: teamKey,
+        team_id: teamId,
+        jersey: i,
+        year: 'SR',
+        position: positions[i % 5],
+        stats: { PTS: 8 + i, MIN: 1200, FGM: 3, FGA: 7, '3PTM': 1, '3PTA': 3, FTM: 2, FTA: 2, DREB: 3, OREB: 1, AST: 2, STL: 1, BLK: 0, TO: 1, F: 2 },
+      });
+    }
+  }
   const data = cc({
     week: 12,
     rank: 8,
     rankings: rankings,
     standings: standings,
+    user_team_object_id: TID,
     team_record: { wins: 9, losses: 2 },
   });
-  return { data: data, standings: standings, schedule: schedule, recruits: recruits, players: players, news: news, opp: opp };
+  return {
+    data: data,
+    standings: standings,
+    schedule: schedule,
+    recruits: recruits,
+    players: players,
+    news: news,
+    opp: opp,
+    teamStats: teamStats,
+    boxPlayers: boxPlayers,
+  };
 }
 
 async function installApi(page, data, rich) {
@@ -231,6 +275,10 @@ async function installApi(page, data, rich) {
       await fulfillJson(route, { news: rich.news });
       return;
     }
+    if (rich && pathname.startsWith('/franchise/team-stats')) {
+      await fulfillJson(route, rich.teamStats);
+      return;
+    }
     if (rich && pathname.startsWith('/roster/')) {
       await fulfillJson(route, {
         players: rich.players,
@@ -238,11 +286,36 @@ async function installApi(page, data, rich) {
         region: 'A',
         team_chemistry: 18,
         name: 'Lancaster',
+        team_record: data.team_record || null,
       });
       return;
     }
-    if (rich && pathname.indexOf('/api/game/') === 0) {
-      await fulfillJson(route, { score: { Lancaster: 0, 'Four Corners': 0 }, clock: '8:00' });
+    if (rich && pathname.indexOf('/api/game/') === 0 && pathname.indexOf('resume-state') === -1) {
+      const homeBox = {};
+      const awayBox = {};
+      (rich.boxPlayers || []).forEach(function (player) {
+        const slot = Object.assign({ name: player.name, playerId: player.playerId }, player.stats);
+        if (player.team === 'away') awayBox[player.position + player.jersey] = slot;
+        else homeBox[player.position + player.jersey] = slot;
+      });
+      const teams = {};
+      teams[TID] = { name: 'Lancaster' };
+      teams[rich.opp] = { name: 'Four Corners' };
+      const boxScore = {};
+      boxScore[TID] = homeBox;
+      boxScore[rich.opp] = awayBox;
+      await fulfillJson(route, {
+        home_team_id: TID,
+        away_team_id: rich.opp,
+        teams: teams,
+        home_team: { name: 'Lancaster' },
+        away_team: { name: 'Four Corners' },
+        score: { Lancaster: 78, 'Four Corners': 71 },
+        clock: '0:00',
+        quarter: 4,
+        players: rich.boxPlayers || [],
+        box_score: boxScore,
+      });
       return;
     }
     await fulfillJson(route, {});
@@ -267,8 +340,30 @@ async function assertNoHorizontalOverflow(page) {
       if (!el) return;
       if (el.scrollWidth > el.clientWidth + 1) out.push(name + ' ' + el.scrollWidth + '>' + el.clientWidth);
     }
-    check(document.querySelector('html.gob-shell .main'), '.main');
+    const main = document.querySelector('html.gob-shell .main');
+    check(main, '.main');
     check(document.scrollingElement, 'scrollingElement');
+    if (!main) return out;
+    const limit = main.getBoundingClientRect().right + 1;
+    function visibleRight(el) {
+      let edge = el.getBoundingClientRect().right;
+      let node = el.parentElement;
+      while (node && node !== main) {
+        const ox = getComputedStyle(node).overflowX;
+        if (ox === 'auto' || ox === 'scroll' || ox === 'hidden' || ox === 'clip') {
+          edge = Math.min(edge, node.getBoundingClientRect().right);
+        }
+        node = node.parentElement;
+      }
+      return edge;
+    }
+    main.querySelectorAll('table, .fcc-data-card, .team-stats-page-card, .gob-wide-wrap').forEach(function (el) {
+      if (el.getBoundingClientRect().width < 1) return;
+      if (visibleRight(el) > limit) {
+        const id = el.id || String(el.className || '').slice(0, 60);
+        out.push(id + ' right ' + Math.round(visibleRight(el)) + '>' + Math.round(limit));
+      }
+    });
     return out;
   });
   expect(offenders, offenders.join('; ')).toEqual([]);
@@ -276,16 +371,9 @@ async function assertNoHorizontalOverflow(page) {
 
 async function wideTables(page) {
   return page.evaluate(() => {
-    const main = document.querySelector('html.gob-shell .main');
-    if (!main) return [];
-    return Array.from(main.querySelectorAll('table')).filter(function (table) {
-      return table.scrollWidth > main.clientWidth + 1;
-    }).map(function (table) {
-      return {
-        id: table.id || String(table.className).slice(0, 80),
-        table: table.scrollWidth,
-        main: main.clientWidth,
-      };
+    if (window.GOBShell && typeof window.GOBShell.classifyTables === 'function') window.GOBShell.classifyTables();
+    return (window.__gobWideTables || []).map(function (row) {
+      return row.id + ' table=' + row.table + ' wrap=' + row.wrap + ' main=' + row.main;
     });
   });
 }
@@ -349,7 +437,9 @@ test('browse and focus pages, screenshots, and one vertical scroll', async ({ pa
   const pages = BROWSE.concat(FOCUS).concat(['box-score.html']);
   for (const file of pages) {
     let extra = '';
-    if (file === 'box-score.html') extra = '&return_url=' + encodeURIComponent('/schedule.html');
+    if (file === 'box-score.html') {
+      extra = '&return_url=' + encodeURIComponent('/schedule.html') + '&game_id=g-box&home=Lancaster&away=Four%20Corners';
+    }
     if (file === 'set-lineup.html') {
       extra = '&home=Lancaster&away=Four%20Corners&home_display=Lancaster&away_display=Four%20Corners&my_team=home&game_id=g-mid&week=12';
     }
@@ -367,27 +457,43 @@ test('browse and focus pages, screenshots, and one vertical scroll', async ({ pa
     if (file === 'set-lineup.html') {
       await page.waitForSelector('#team-banner:not([hidden]), #team-banner-fallback:not([hidden])');
     }
+    if (file === 'team-stats.html') await page.waitForSelector('#teamstats-body tr');
+    if (file === 'box-score.html' && extra.indexOf('return_url') !== -1) {
+      await page.waitForSelector('#home-player-stats-body tr');
+      await page.waitForSelector('#away-player-stats-body tr', { state: 'attached' });
+    }
+    if (!focus) {
+      await page.waitForFunction(() => {
+        const el = document.getElementById('gob-record-value');
+        return !!(el && el.textContent.trim());
+      });
+      const record = (await page.locator('#gob-record-value').textContent()) || '';
+      expect(record.trim(), file + ' record').not.toEqual('');
+    }
     const meta = await page.evaluate(() => ({
       ms: window.__gobAdvanceLoadMs,
       reused: !!window.__gobAdvanceLoadReused,
     }));
     loads.push(file + ' ' + (meta.reused ? 'reused' : 'fetched') + ' ' + Math.round(meta.ms || 0) + 'ms');
-    for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
+    for (const size of [[1280, 720, '1280'], [1440, 900, '1440'], [1920, 1080, '1920']]) {
       await page.setViewportSize({ width: size[0], height: size[1] });
       await page.waitForTimeout(200);
       await assertOneVerticalScroll(page);
       await assertNoHorizontalOverflow(page);
       const wide = await wideTables(page);
       wide.forEach(function (row) {
-        wideLog.push(file + ' ' + size[2] + ' ' + row.id + ' table=' + row.table + ' main=' + row.main);
+        wideLog.push(file + ' ' + size[2] + ' ' + row);
       });
-      const browseShot = file === 'box-score.html';
-      const name = file.replace('.html', '') + (browseShot ? '-browse' : '') + '-' + size[2] + '.png';
-      await page.screenshot({ path: path.join(OUT, name) });
+      if (size[2] !== '1440') {
+        const browseShot = file === 'box-score.html';
+        const name = file.replace('.html', '') + (browseShot ? '-browse' : '') + '-' + size[2] + '.png';
+        await page.screenshot({ path: path.join(OUT, name) });
+      }
     }
   }
-  await openPage(page, 'box-score.html', season.data, '&from=lineup', season);
+  await openPage(page, 'box-score.html', season.data, '&from=lineup&game_id=g-box&home=Lancaster&away=Four%20Corners', season);
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await page.waitForSelector('#home-player-stats-body tr');
   for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
     await page.setViewportSize({ width: size[0], height: size[1] });
     await page.waitForTimeout(200);
@@ -409,27 +515,70 @@ test('tournament stays locked on standalone league pages at week 1', async ({ pa
   }
 });
 
+async function pinTable(page, tableSel) {
+  await page.evaluate((tableSel) => {
+    const main = document.querySelector('html.gob-shell .main');
+    const head = document.querySelector('html.gob-shell .pg-head');
+    const table = document.querySelector(tableSel);
+    main.scrollTop = 0;
+    const headBottom = head.getBoundingClientRect().bottom;
+    const tableBox = table.getBoundingClientRect();
+    const delta = tableBox.top - headBottom;
+    const room = Math.max(0, tableBox.bottom - headBottom - 80);
+    main.scrollTop = Math.min(Math.max(24, delta + 36), room);
+  }, tableSel);
+}
+
 test('sticky table headers sit on the first row, then pin under the page head', async ({ page }) => {
   const season = midSeason();
   const cases = [
-    ['rankings.html', '#rankings-table thead th', '#rankings-table tbody tr'],
-    ['recruiting.html', 'table.pool thead th', 'table.pool tbody tr'],
-    ['team-roster-view.html', '#roster-table thead th', '#roster-table tbody tr'],
+    ['rankings.html', '#rankings-table', '#rankings-table thead th', '#rankings-table tbody tr', ''],
+    ['recruiting.html', 'table.pool', 'table.pool thead th', 'table.pool tbody tr', ''],
+    ['team-roster-view.html', '#roster-table', '#roster-table thead th', '#roster-table tbody tr', ''],
+    ['box-score.html', '#quarter-scoring-table', '#quarter-scoring-table thead th', '#quarter-scoring-table tbody tr', '&return_url=' + encodeURIComponent('/schedule.html') + '&game_id=g-box&home=Lancaster&away=Four%20Corners'],
+    ['box-score.html', '#home-player-stats-table', '#home-player-stats-table thead th', '#home-player-stats-body tr', '&return_url=' + encodeURIComponent('/schedule.html') + '&game_id=g-box&home=Lancaster&away=Four%20Corners'],
   ];
-  for (const size of [[1280, 720], [1920, 1080]]) {
+  for (const size of [[1280, 720], [1440, 900], [1920, 1080]]) {
     await page.setViewportSize({ width: size[0], height: size[1] });
     for (const item of cases) {
-      await openPage(page, item[0], season.data, '', season);
+      await openPage(page, item[0], season.data, item[4], season);
       await page.setViewportSize({ width: size[0], height: size[1] });
-      await page.waitForSelector(item[2]);
+      await page.waitForSelector(item[3]);
       await page.waitForFunction(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gob-stick-top')) > 20);
+      const wide = await page.evaluate((tableSel) => {
+        const table = document.querySelector(tableSel);
+        return !!(table && table.closest('.gob-wide-wrap'));
+      }, item[1]);
+      if (wide) {
+        const contained = await page.evaluate((tableSel) => {
+          const main = document.querySelector('html.gob-shell .main');
+          const wrap = document.querySelector(tableSel).closest('.gob-wide-wrap');
+          const header = document.querySelector(tableSel + ' thead th');
+          return wrap.getBoundingClientRect().right <= main.getBoundingClientRect().right + 1
+            && getComputedStyle(header).position !== 'sticky';
+        }, item[1]);
+        expect(contained, item[0] + ' ' + item[1] + ' wide ' + size[0]).toBe(true);
+        continue;
+      }
       await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
-      const atTop = await stickyGeometry(page, item[1], item[2]);
-      expect(atTop.headerToRow, item[0] + ' ' + size[0] + ' scroll 0').toBeLessThanOrEqual(1);
-      await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 600; });
-      const stuck = await stickyGeometry(page, item[1], item[2]);
-      expect(stuck.headToHeader, item[0] + ' ' + size[0] + ' scrolled').toBeLessThanOrEqual(1);
-      expect(stuck.gapRows, item[0] + ' ' + size[0] + ' gap').toEqual(0);
+      const atTop = await stickyGeometry(page, item[2], item[3]);
+      expect(atTop.headerToRow, item[0] + ' ' + item[1] + ' ' + size[0] + ' scroll 0').toBeLessThanOrEqual(1);
+      await pinTable(page, item[1]);
+      const stuck = await stickyGeometry(page, item[2], item[3]);
+      expect(stuck.headToHeader, item[0] + ' ' + item[1] + ' ' + size[0] + ' scrolled').toBeLessThanOrEqual(1);
+      expect(stuck.gapRows, item[0] + ' ' + item[1] + ' ' + size[0] + ' gap').toEqual(0);
+      if (item[1] === '#quarter-scoring-table') {
+        const leftWithTable = await page.evaluate(() => {
+          const main = document.querySelector('html.gob-shell .main');
+          const head = document.querySelector('html.gob-shell .pg-head').getBoundingClientRect();
+          const table = document.querySelector('#quarter-scoring-table').getBoundingClientRect();
+          main.scrollTop += table.bottom - head.bottom + 12;
+          const header = document.querySelector('#quarter-scoring-table thead th').getBoundingClientRect();
+          const headAfter = document.querySelector('html.gob-shell .pg-head').getBoundingClientRect();
+          return header.bottom <= headAfter.bottom + 1;
+        });
+        expect(leftWithTable, 'quarter header leaves with its table ' + size[0]).toBe(true);
+      }
     }
     await openPage(page, 'schedule.html', season.data, '', season);
     await page.setViewportSize({ width: size[0], height: size[1] });
@@ -524,6 +673,96 @@ test('flow pages keep their own exit and the court has no shell', async ({ page 
   await page.waitForTimeout(400);
   await expect(page.locator('html.gob-shell')).toHaveCount(0);
   await expect(page.locator('.rail')).toHaveCount(0);
+});
+
+const OUT2 = path.join(__dirname, '../../reports/shell-2b');
+
+async function chromeRects(page) {
+  return page.evaluate(() => {
+    function box(sel) {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const b = el.getBoundingClientRect();
+      return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+    }
+    return { top: box('.top'), rail: box('nav.rail') };
+  });
+}
+
+test('record comes from rankings when team_record is absent', async ({ page }) => {
+  const season = midSeason();
+  const data = Object.assign({}, season.data, { team_record: null });
+  const rich = Object.assign({}, season, { data: data });
+  const files = BROWSE.concat(['box-score.html']);
+  for (const file of files) {
+    let extra = '';
+    if (file === 'box-score.html') {
+      extra = '&return_url=' + encodeURIComponent('/schedule.html') + '&game_id=g-box&home=Lancaster&away=Four%20Corners';
+    }
+    await openPage(page, file, data, extra, rich);
+    await page.waitForFunction(() => {
+      const el = document.getElementById('gob-record-value');
+      return !!(el && el.textContent.trim());
+    });
+    const record = ((await page.locator('#gob-record-value').textContent()) || '').trim();
+    expect(record, file).toBe('10-0');
+  }
+});
+
+test('top bar and rail stay put from Rankings to Schedule to Office', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openPage(page, 'rankings.html', cc());
+  await page.waitForSelector('#gob-subtabs .stab');
+  const names = await page.evaluate(() => ({
+    top: getComputedStyle(document.querySelector('.top')).viewTransitionName,
+    rail: getComputedStyle(document.querySelector('nav.rail')).viewTransitionName,
+    main: getComputedStyle(document.querySelector('.main')).viewTransitionName,
+  }));
+  expect(names.top).toBe('gob-chrome-top');
+  expect(names.rail).toBe('gob-chrome-rail');
+  expect(names.main).toBe('none');
+  const before = await chromeRects(page);
+  await mouseClick(page, stab(page, 'Schedule'));
+  await page.waitForURL(/schedule\.html/);
+  fs.mkdirSync(OUT2, { recursive: true });
+  await page.screenshot({ path: path.join(OUT2, 'transition-rankings-schedule.png') });
+  expect(await chromeRects(page)).toEqual(before);
+  await mouseClick(page, '.rail [data-gob-section="office"]');
+  await page.waitForURL(/franchise-command-center\.html/);
+  expect(await chromeRects(page)).toEqual(before);
+  await page.goBack();
+  await page.waitForURL(/schedule\.html/);
+  expect(await chromeRects(page)).toEqual(before);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await page.waitForSelector('nav.rail');
+  const reduced = await page.evaluate(() => getComputedStyle(document.querySelector('.top')).viewTransitionName);
+  expect(reduced).toBe('none');
+});
+
+test('box score and team stats screenshots at three sizes', async ({ page }) => {
+  fs.mkdirSync(OUT2, { recursive: true });
+  const season = midSeason();
+  const shots = [
+    ['box-score.html', '&return_url=' + encodeURIComponent('/schedule.html') + '&game_id=g-box&home=Lancaster&away=Four%20Corners', 'box-score-browse', '#home-player-stats-body tr'],
+    ['box-score.html', '&from=lineup&game_id=g-box&home=Lancaster&away=Four%20Corners', 'box-score-flow', '#home-player-stats-body tr'],
+    ['team-stats.html', '', 'team-stats', '#teamstats-body tr'],
+  ];
+  const wideLog = [];
+  for (const shot of shots) {
+    await openPage(page, shot[0], season.data, shot[1], season);
+    await page.waitForSelector(shot[3]);
+    for (const size of [[1280, 720, '1280'], [1440, 900, '1440'], [1920, 1080, '1920']]) {
+      await page.setViewportSize({ width: size[0], height: size[1] });
+      await page.waitForTimeout(250);
+      await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
+      await assertNoHorizontalOverflow(page);
+      const wide = await wideTables(page);
+      wide.forEach(function (row) { wideLog.push(shot[2] + ' ' + size[2] + ' ' + row); });
+      await page.screenshot({ path: path.join(OUT2, shot[2] + '-' + size[2] + '.png') });
+    }
+  }
+  fs.writeFileSync(path.join(OUT2, 'wide-tables.txt'), (wideLog.length ? wideLog.join('\n') : 'none') + '\n');
 });
 
 test('office home has one vertical scroller', async ({ page }) => {

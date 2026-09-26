@@ -103,6 +103,10 @@ html.gob-shell .top-stats {
   min-width: 0;
 }
 
+html.gob-shell .ts[hidden] {
+  display: none !important;
+}
+
 html.gob-shell a.top-id {
   display: inline-flex;
   align-items: center;
@@ -430,11 +434,13 @@ html.gob-shell #franchise-container .fcc-home-card--recruiting .fcc-home-list-sc
   overflow: visible !important;
 }
 
-/* Sticky headers pin to .main, directly under .pg-head. --gob-stick-top is
-   the measured head height (the head is height:auto, shorter than --dsz-118).
-   Focus has no .pg-head inside .main, so the offset stays 0 (under the top bar).
-   Ancestors that used overflow:hidden/auto/clip were the sticky containing
-   block, so a large top pushed the header down into the rows. */
+/* Fitting tables pin under .pg-head. --gob-stick-top is the measured head
+   height. Focus has no .pg-head in .main, so the offset stays 0.
+   Ancestors between thead and .main stay overflow:visible. A clipped card
+   (box score sections, .table-container) was the sticky box, so the page-head
+   offset landed inside the card and covered the first rows.
+   A table wider than .main gets .gob-wide-wrap at runtime: horizontal scroll
+   inside the card, edge fades, and a static header. */
 html.gob-shell {
   --gob-stick-top: 0px;
   --gob-stick-row: 0px;
@@ -445,17 +451,21 @@ html.gob-shell .main .fcc-data-card,
 html.gob-shell .main .scroll-x,
 html.gob-shell .main .pool-scroll,
 html.gob-shell .main .spine,
-html.gob-shell .main .doc {
-  overflow: visible !important;
-}
-
-html.gob-shell .main .pool-scroll,
-html.gob-shell .main .spine,
+html.gob-shell .main .doc,
+html.gob-shell .main .table-container,
+html.gob-shell .main .stats-section,
+html.gob-shell .main #quarter-scoring-section,
+html.gob-shell .main #potg-section,
+html.gob-shell .main .play-usage-scroll,
 html.gob-shell .main #tr-scroll,
-html.gob-shell .main .team-roster-shell {
-  overflow-x: clip !important;
-  overflow-y: visible !important;
+html.gob-shell .main .team-roster-shell,
+html.gob-shell .main .gob-table-wrap,
+html.gob-shell .main .stats-table-wrap,
+html.gob-shell .main .gob-data-grid-scroll {
+  overflow: visible !important;
+  max-height: none !important;
   max-width: 100%;
+  min-width: 0;
 }
 
 html.gob-shell .main thead th {
@@ -482,30 +492,37 @@ html.gob-shell .main #roster-table thead tr.tr-colrow th {
   top: calc(var(--gob-stick-top) + var(--gob-stick-row));
 }
 
-/* Wide grids keep a horizontal wrap. That wrap is their sticky box, so the
-   header stays at the top of the wrap instead of jumping by the page-head offset. */
-html.gob-shell .main .fcc-team-stats-card .scroll-x,
-html.gob-shell .main .team-stats-page-card .scroll-x,
-html.gob-shell .main .stats-table-wrap,
-html.gob-shell .main .gob-data-grid-scroll {
+html.gob-shell .main .gob-wide-wrap,
+html.gob-shell .main #quarter-scoring-section.gob-wide-wrap,
+html.gob-shell .main #potg-section.gob-wide-wrap,
+html.gob-shell .main #tr-scroll.gob-wide-wrap {
   overflow-x: auto !important;
-  overflow-y: hidden !important;
+  overflow-y: clip !important;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
+  contain: inline-size;
+  box-sizing: border-box;
 }
 
-html.gob-shell .main table.pool,
-html.gob-shell .main .rankings-results-table,
-html.gob-shell .main #roster-table {
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
+html.gob-shell .main .gob-wide-wrap thead th {
+  position: static !important;
+  top: auto !important;
 }
-html.gob-shell .main .team-stats-page-card thead th,
-html.gob-shell .main .fcc-team-stats-card thead th,
-html.gob-shell .main .stats-table-wrap thead th,
-html.gob-shell .main .gob-data-grid-scroll thead th {
-  top: 0 !important;
+
+html.gob-shell .main .gob-wide-wrap.is-fade-right {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+}
+
+html.gob-shell .main .gob-wide-wrap.is-fade-left:not(.is-fade-right) {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 36px);
+  mask-image: linear-gradient(to right, transparent, #000 36px);
+}
+
+html.gob-shell .main .gob-wide-wrap.is-fade-left.is-fade-right {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
 }
 
 /* Page shells sized themselves with 100vw, which ignores the rail and runs
@@ -568,4 +585,67 @@ html.gob-focus .set-lineup-shell:has(.lineup-banner-strip:has(#team-banner[hidde
 
 html.gob-focus .lineup-banner-strip:has(#team-banner[hidden]):has(#team-banner-fallback[hidden]) {
   display: none;
+}
+
+/* Same-origin page loads crossfade .main. The top bar and rail keep stable
+   names so they stay put. Reduced motion turns the navigation transition off. */
+@view-transition {
+  navigation: auto;
+}
+
+html.gob-shell .top {
+  view-transition-name: gob-chrome-top;
+}
+
+html.gob-shell .app > nav.rail {
+  view-transition-name: gob-chrome-rail;
+}
+
+::view-transition-old(gob-chrome-top),
+::view-transition-new(gob-chrome-top),
+::view-transition-old(gob-chrome-rail),
+::view-transition-new(gob-chrome-rail) {
+  animation: 150ms linear both gob-hold;
+  mix-blend-mode: normal;
+}
+
+@keyframes gob-hold {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
+::view-transition,
+::view-transition-group(*),
+::view-transition-image-pair(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  pointer-events: none;
+}
+
+::view-transition-old(root) {
+  animation: 150ms var(--ease-out) both gob-page-out;
+}
+
+::view-transition-new(root) {
+  animation: 150ms var(--ease-out) both gob-page-in;
+}
+
+@keyframes gob-page-out {
+  to { opacity: 0; }
+}
+
+@keyframes gob-page-in {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+
+  html.gob-shell .top,
+  html.gob-shell .app > nav.rail,
+  html.gob-shell .main {
+    view-transition-name: none;
+  }
 }

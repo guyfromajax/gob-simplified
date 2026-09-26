@@ -80,7 +80,13 @@ Box score is browse when `return_url` is set, and focus when `from` is `lineup` 
 
 On a full shell page, the settings host is positioned at `left: var(--rail-w)` and `top: var(--top-h)` so the scrim covers `.main` only. The top bar and the rail stay usable. Focus mode anchors that host at `left: 0`. Pages that still use the auth bar keep the host anchored under `#auth-bar`.
 
-Scroll rule: only `.main` scrolls, on the Office, on browse pages, and in focus mode. Nested vertical scroll areas are removed (`overflow: visible`, no max-height). A table that is wider than `.main` at 1280 may scroll horizontally. `tests/e2e/helpers/oneVerticalScroll.js` (`assertOneVerticalScroll`) fails when any other element has `overflow-y` `auto` or `scroll` and `scrollHeight > clientHeight + 1`. Dialogs and the settings host are not page scrollers. A horizontal scroller whose extra height is only the scrollbar (24px or less, and wider than its box) is reported, not failed. Sticky `thead th` sits under `.pg-head` (`top: var(--dsz-118)`); in focus mode and inside a horizontal table wrap, `top` is 0.
+Scroll rule: only `.main` scrolls, on the Office, on browse pages, and in focus mode. Nested vertical scroll areas are removed (`overflow: visible`, no max-height). `tests/e2e/helpers/oneVerticalScroll.js` (`assertOneVerticalScroll`) fails when any other element has `overflow-y` `auto` or `scroll` and `scrollHeight > clientHeight + 1`. Dialogs and the settings host are not page scrollers. A horizontal scroller whose extra height is only the scrollbar (24px or less, and wider than its box) is reported, not failed.
+
+Sticky versus wide tables: after each render and on resize, each table's content width is compared with `.main`'s content box. A table that fits gets a page-level sticky `thead` (`top: var(--gob-stick-top)`, the measured `.pg-head` height; `0` in focus). Ancestors between the header and `.main` stay `overflow: visible`, so the header pins on `.pg-head`'s bottom and scrolls away with its own table. A table wider than `.main` gets `.gob-wide-wrap`: `overflow-x: auto`, `overflow-y: clip`, the table stays inside its card, a right-edge fade shows while columns are hidden (and a left fade once scrolled), and that header is not sticky.
+
+Page transitions: browse shell pages and the Office use `@view-transition { navigation: auto; }`. `.top` and `nav.rail` have stable `view-transition-name`s so they stay put. The rest of the page crossfades in 150ms with `--ease-out`. Focus pages set `navigation: none` so a flow step is a normal load. `prefers-reduced-motion: reduce` also sets `navigation: none`. Browsers without the API navigate normally.
+
+The top bar Record reads `#fcc-record-label` on the Office, then `team_record.wins` / `team_record.losses` when that object is on the command-center payload, then the user's row in `rankings` (`W` and `L` for `user_team_object_id` / `user_team_id` / `team_id`). Those standings are already on `/franchise/command-center/data`.
 
 Rail and sub-tab clicks play `click-tiny.wav` through `playSfx`. Advance does not switch to that sound.
 
@@ -167,4 +173,4 @@ A page or brief is done only when this file is updated if the shell, the section
 | box-score.html | browse when `return_url` is set; otherwise focus | League when browse | none |
 | set-lineup.html, training.html, training-report.html, training-squad-report.html, training-playbooks.html, cut-players.html, game-plan.html, playbooks.html, playbook-report.html | focus | — | — |
 
-The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` reuses a response the page already requested. Otherwise it fetches that URL once.
+The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` reuses a response the page already requested. Otherwise it fetches that URL once. Record on a browse page uses that same payload: `team_record` when present, otherwise the user team's `W`-`L` in `rankings`.

@@ -15,6 +15,22 @@ function currentSearch() {
   const s = liveParams().toString();
   return s ? '?' + s : '';
 }
+function shellFocusNavigation(pathname, search) {
+  var path = pathname || '';
+  var q = new URLSearchParams(search || '');
+  if (path === '/box-score.html') return !q.get('return_url');
+  if (path === '/recruiting.html' && q.get('action') === 'run') return true;
+  return path === '/set-lineup.html'
+    || path === '/training.html'
+    || path === '/training-report.html'
+    || path === '/training-squad-report.html'
+    || path === '/training-playbooks.html'
+    || path === '/cut-players.html'
+    || path === '/game-plan.html'
+    || path === '/playbooks.html'
+    || path === '/playbook-report.html';
+}
+
 function cloneParams(params) {
   const out = emptyParams();
   if (params && typeof params.forEach === 'function') {
@@ -88,6 +104,11 @@ function cloneParams(params) {
           link.href = href;
           head.appendChild(link);
         });
+        if (shellFocusNavigation(window.location.pathname, window.location.search)) {
+          var vtOff = document.createElement("style");
+          vtOff.textContent = "@view-transition { navigation: none; }";
+          head.appendChild(vtOff);
+        }
         ["/js/shared/gobAdvance.js", "/js/shared/gobShell.js"].forEach(function (src) {
           if (document.querySelector('script[src="' + src + '"]')) return;
           var script = document.createElement("script");
