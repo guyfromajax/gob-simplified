@@ -15,17 +15,17 @@ var GROUPS = [
   { name: 'Shooting', shade: false, cols: [
     { key: 'FGM', label: 'FGM' },
     { key: 'FGA', label: 'FGA' },
-    { key: 'FG_PCT', label: 'FG%' }
+    { key: 'FG_PCT', label: 'FG%', decimal: true }
   ]},
   { name: '3PT', shade: true, cols: [
     { key: '3PTM', label: '3PTM' },
     { key: '3PTA', label: '3PTA' },
-    { key: 'TP_PCT', label: '3PT%' }
+    { key: 'TP_PCT', label: '3PT%', decimal: true }
   ]},
   { name: 'Free Throws', shade: false, cols: [
     { key: 'FTM', label: 'FTM' },
     { key: 'FTA', label: 'FTA' },
-    { key: 'FT_PCT', label: 'FT%' }
+    { key: 'FT_PCT', label: 'FT%', decimal: true }
   ]},
   { name: 'Rebounding', shade: true, cols: [
     { key: 'DREB', label: 'DREB' },
@@ -37,20 +37,27 @@ var GROUPS = [
     { key: 'F', label: 'F' },
     { key: 'TO', label: 'TO' },
     { key: 'SCR_A', label: 'SCRA' },
-    { key: 'SCR_PCT', label: 'SCR%' }
+    { key: 'SCR_PCT', label: 'SCR%', decimal: true }
   ]},
   { name: 'Defense', shade: true, cols: [
     { key: 'STL', label: 'STL' },
     { key: 'BLK', label: 'BLK' },
     { key: 'DEF_A', label: 'DEFA' },
-    { key: 'DEF_PCT', label: 'DEF%' }
+    { key: 'DEF_PCT', label: 'DEF%', decimal: true }
   ]}
 ];
 
 var LEAF = [];
 GROUPS.forEach(function (group) {
   group.cols.forEach(function (col) {
-    LEAF.push({ key: col.key, label: col.label, pin: !!col.pin, shade: group.shade, stat: group.name !== '' });
+    LEAF.push({
+      key: col.key,
+      label: col.label,
+      pin: !!col.pin,
+      shade: group.shade,
+      stat: group.name !== '',
+      decimal: !!col.decimal
+    });
   });
 });
 
@@ -71,8 +78,8 @@ function num(value) {
 export function mount(container, ctx) {
   var tables = window.GOBTables;
   var query = '';
-  var sortKey = '';
-  var sortDir = -1;
+  var sortKey = 'natl_rank';
+  var sortDir = 1;
   var teams = [];
   var signature = '';
   var loaded = false;
@@ -128,6 +135,7 @@ export function mount(container, ctx) {
     }
     var value = valueOf(row, col);
     if (value == null) return '';
+    if (col.decimal) return tables.esc(tables.formatOneDecimal(value));
     return tables.esc(value);
   }
 

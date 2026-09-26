@@ -11,6 +11,47 @@ from bson import ObjectId
 from pymongo.collection import Collection
 
 
+# Season keys the franchise team-stats table sums. A projection of just these
+# skips decoding the rest of each player document.
+SEASON_STAT_KEYS = (
+    "PTS", "REB", "AST", "STL", "BLK",
+    "FGM", "FGA", "3PTM", "3PTA", "FTM", "FTA",
+    "DREB", "OREB", "TREB",
+    "TO", "F",
+    "DEF_A", "DEF_S", "SCR_A", "SCR_S",
+)
+
+
+def fpd_season_projection() -> dict:
+    """Inclusion projection for the franchise player scan team stats actually reads."""
+    projection = {"player_id": 1, "meta.team_id": 1}
+    for key in SEASON_STAT_KEYS:
+        projection[f"season.{key}"] = 1
+    return projection
+
+
+def load_franchise_player_seasons(collection, franchise_id: str) -> list[dict]:
+    """Season lines only. SQLite extracts scalars so the player document is not decoded."""
+    from BackEnd.persistence.sqlite_collection import SqliteCollection
+
+    if isinstance(collection, SqliteCollection):
+        fields = ["player_id", "meta.team_id", *[f"season.{key}" for key in SEASON_STAT_KEYS]]
+        rows = collection.projected_tuples({"franchise_id": str(franchise_id)}, fields)
+        docs: list[dict] = []
+        for raw in rows:
+            season = {}
+            for key, value in zip(SEASON_STAT_KEYS, raw[2:]):
+                if value is not None:
+                    season[key] = value
+            docs.append({
+                "player_id": raw[0],
+                "meta": {"team_id": "" if raw[1] is None else str(raw[1])},
+                "season": season,
+            })
+        return docs
+    return list(collection.find({"franchise_id": str(franchise_id)}, fpd_season_projection()))
+
+
 def aggregate_team_stats_from_players(
     players: Dict[str, Dict[str, Any]],
     team_ids: Dict[str, Any],

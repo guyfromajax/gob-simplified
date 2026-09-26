@@ -50,22 +50,26 @@ function standings(week) {
   };
 }
 
-function leaders(week, limit, basis) {
+function leaders(week, limit) {
   const count = limit >= 50 ? 30 : 5;
-  const perGame = basis !== 'totals';
+  const totals = { '3PTM': 1, BLK: 1, STL: 1 };
+  const rates = { 'FG%': 1, 'DEF%': 1 };
   const body = {};
   ['PTS', '3PTM', 'AST', 'BLK', 'FG%', 'REB', 'STL', 'DEF%'].forEach(function (stat) {
     const rows = [];
     for (let i = 0; i < count; i += 1) {
       const mine = i === 2;
+      let value = 20 - i;
+      if (totals[stat]) value = 40 - i;
+      if (rates[stat]) value = i === 0 ? 75 : (70 - i);
       const row = {
-        player_id: stat + '-p' + i,
+        player_id: stat === 'AST' ? '' : (stat + '-p' + i),
         name: (week === 1 ? 'Alpha ' : 'Beta ') + stat + ' ' + (i + 1),
         team: mine ? 'Lancaster' : ('Club ' + (i + 1)),
         team_id: mine ? TID : ('bbbbbbbbbbbbbbbbbbbbbbb' + (i % 10)),
         position: 'G',
         year: 'JR',
-        value: perGame ? (20 - i) : (200 - i),
+        value: value,
       };
       if (stat === 'FG%') row.qualification_caption = 'min 5 FGA per team game';
       if (stat === 'DEF%') row.qualification_caption = 'min 6 DEF_A per team game';
@@ -144,6 +148,18 @@ async function installApi(page, state) {
       await route.continue();
       return;
     }
+    if (pathname.indexOf('/images/players/') !== -1) {
+      if (pathname.indexOf('3PTM') !== -1) {
+        await route.fulfill({ status: 404, body: '' });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'),
+      });
+      return;
+    }
     const api = pathname.startsWith('/api/')
       || pathname.startsWith('/franchise/')
       || pathname.startsWith('/roster/')
@@ -192,8 +208,9 @@ async function installApi(page, state) {
       return;
     }
     if (pathname.startsWith('/franchise/leaders')) {
+      if (search.has('basis')) throw new Error('leaders request sent basis');
       const limit = Number(search.get('limit') || '5');
-      await cached('leaders' + limit + (search.get('basis') || ''), leaders(liveWeek, limit, search.get('basis')));
+      await cached('leaders' + limit, leaders(liveWeek, limit));
       return;
     }
     if (pathname.startsWith('/franchise/team-stats')) {
@@ -333,8 +350,24 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     expect(await page.evaluate(() => history.state && history.state.gobIdx)).toBe(leagueIdx);
     await expect(page.locator('#leaders-view .gob-ldb')).toHaveCount(8);
     await expect(page.locator('#leaders-view .is-user').first()).toBeVisible();
-    await expect(page.locator('#leaders-view .cap').filter({ hasText: 'min 5 FGA per team game' })).toHaveCount(1);
-    await expect(page.locator('#leaders-view .cap').filter({ hasText: 'min 6 DEF_A per team game' })).toHaveCount(1);
+    await expect(page.locator('#gob-subtabs .pg-tools')).not.toContainText('Per game');
+    await expect(page.locator('#gob-subtabs .pg-tools')).not.toContainText('Totals');
+    const cards = page.locator('#leaders-view .gob-ldb');
+    await expect(cards.nth(0).locator('.card-h')).toContainText('PTS · per game');
+    await expect(cards.nth(1).locator('.card-h')).toContainText('3PTM · total');
+    await expect(cards.nth(4).locator('.card-h .meta')).toHaveCount(0);
+    await expect(cards.nth(7).locator('.card-h .meta')).toHaveCount(0);
+    await expect(cards.nth(0).locator('.ldb-v')).toContainText('20.0');
+    await expect(cards.nth(0).locator('.ldb-v')).toContainText('PPG');
+    await expect(cards.nth(1).locator('.ldb-v')).toHaveText('40');
+    await expect(cards.nth(4).locator('.ldb-v')).toContainText('75.0');
+    await expect(cards.nth(4).locator('.ldb-v')).toContainText('%');
+    await expect(page.locator('#leaders-view .cap')).toHaveCount(0);
+    await expect(cards.nth(0).locator('.av img')).toBeVisible();
+    await expect(cards.nth(1).locator('.av img')).toHaveCount(0);
+    await expect(cards.nth(1).locator('.av')).toContainText('A3');
+    await expect(cards.nth(2).locator('.av img')).toHaveCount(0);
+    await expect(cards.nth(2).locator('.av')).toContainText('AA');
     await expect(page.locator('#leaders-view .spinner, #leaders-view [class*="spinner"]')).toHaveCount(0);
     await clickStab(page, 'Rankings');
     const leadersSecond = await timedOpen(page, 'Leaders', '#leaders-view .gob-ldb');
@@ -358,6 +391,10 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     });
     expect(scrollable.wide).toBe(true);
     expect(scrollable.sticky).toBe('static');
+    await expect(page.locator('#team-stats-view thead th[data-sort="natl_rank"]')).toHaveClass(/asc/);
+    await expect(page.locator('#team-stats-view')).toContainText('75.0');
+    await expect(page.locator('#team-stats-view')).toContainText('46.7');
+    await expect(page.locator('#team-stats-view')).toContainText('50.0');
     await assertNoMainOverflow(page);
     await parkPointer(page);
     await assertCollapsedRail(page);
@@ -541,7 +578,7 @@ test('a week advance refreshes the three views', async ({ page }) => {
   await expect(page.locator('#team-stats-view tr.is-user')).toContainText('88');
 });
 
-test('leaders full list replaces in place and totals come from the api', async ({ page }) => {
+test('leaders full list replaces in place and per-game values keep a decimal', async ({ page }) => {
   const state = { week: 1 };
   await installApi(page, state);
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -552,8 +589,7 @@ test('leaders full list replaces in place and totals come from the api', async (
   await clickStab(page, 'Leaders');
   await page.waitForSelector('#leaders-view .full');
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
-  await mouseClick(page, page.locator('#gob-subtabs .pg-tools button', { hasText: 'Totals' }));
-  await expect(page.locator('#leaders-view .ldb-v').first()).toContainText('200');
+  await expect(page.locator('#leaders-view .ldb-v').first()).toContainText('20.0');
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
   await mouseClick(page, '#leaders-view .full');
   await page.waitForSelector('#leaders-view .gob-full tbody tr');

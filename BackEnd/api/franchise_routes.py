@@ -11246,10 +11246,17 @@ def team_stats(franchise_id: str, scope: str = "national"):
     # logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
-    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id)}))
+    from BackEnd.utils.team_stats_aggregator import load_franchise_player_seasons
+
+    fpd_docs = load_franchise_player_seasons(franchise_players_data_collection, str(franchise_id))
     players = {d["player_id"]: d for d in fpd_docs}
     franchise_results = franchise_doc.get("results", {})
-    team_list = _ftd_team_list_for_franchise(fid)
+    # One roster read supplies the team list. A second team_id-only scan was the same rows.
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": fid},
+        {"team_id": 1, "players": 1, "natl_rank": 1},
+    ))
+    team_list = {str(row["team_id"]): {} for row in ftd_docs if row.get("team_id")}
     if scope in {"conference", "region"}:
         user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
         if user_team_object_id and ObjectId.is_valid(user_team_object_id):
@@ -11267,8 +11274,6 @@ def team_stats(franchise_id: str, scope: str = "national"):
                     if scope == "region" and team_doc.get("region", "") == user_team_doc.get("region", ""):
                         filtered_team_list[team_id_str] = team_name
                 team_list = filtered_team_list
-    # Build team_id -> [player_id, ...] from FTD.players for aggregation (prefer over meta.team_id)
-    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "players": 1, "natl_rank": 1}))
     franchise_team_rosters = {}
     natl_rank_by_team_id = {}
     for ftd in ftd_docs:

@@ -1,7 +1,8 @@
 /**
  * League › Leaders. Category boards from GET /franchise/leaders.
- * Conference / National and Per game / Totals are query params. Full list
- * replaces this history entry and shows the top 50 of one category.
+ * Each category uses the API default (basis omitted): PTS/REB/AST per game,
+ * 3PTM/BLK/STL season totals, FG% and DEF% as percentages.
+ * Full list replaces this history entry and shows the top 50 of one category.
  */
 
 var CATS = ['PTS', '3PTM', 'AST', 'BLK', 'FG%', 'REB', 'STL', 'DEF%'];
@@ -15,16 +16,14 @@ var LABELS = {
   STL: 'Steals',
   'DEF%': 'DEF%'
 };
-var FALLBACK_CAPTION = {
-  'FG%': 'min 5 FGA per team game',
-  'DEF%': 'min 6 DEF_A per team game'
-};
+var PER_GAME = { PTS: 1, REB: 1, AST: 1 };
+var TOTALS = { '3PTM': 1, BLK: 1, STL: 1 };
+var UNITS = { PTS: 'PPG', REB: 'RPG', AST: 'APG' };
 
-function leadersUrl(franchiseId, viewScope, basis, limit) {
+function leadersUrl(franchiseId, viewScope, limit) {
   return window.GOBTables.apiBase('/franchise/leaders')
     + '?franchise_id=' + franchiseId
     + '&view_scope=' + viewScope
-    + '&basis=' + basis
     + '&limit=' + limit;
 }
 
@@ -41,8 +40,6 @@ export function mount(container, ctx) {
   var tables = window.GOBTables;
   var viewScope = tables.readKey('gob-view-leaders-scope', 'conference');
   if (viewScope !== 'national') viewScope = 'conference';
-  var basis = tables.readKey('gob-view-leaders-basis', 'per_game');
-  if (basis !== 'totals') basis = 'per_game';
   var query = '';
   var expanded = leaderParam();
   var board = null;
@@ -82,30 +79,13 @@ export function mount(container, ctx) {
     slot.innerHTML = tables.segment([
       { id: 'conference', label: 'Conference' },
       { id: 'national', label: 'National' }
-    ], viewScope) + tables.segment([
-      { id: 'per_game', label: 'Per game' },
-      { id: 'totals', label: 'Totals' }
-    ], basis) + tables.searchBox('Search players');
-    var toggles = slot.querySelectorAll('.stats-toggle');
-    toggles[0].querySelectorAll('button').forEach(function (button) {
+    ], viewScope) + tables.searchBox('Search players');
+    slot.querySelectorAll('.stats-toggle button').forEach(function (button) {
       button.addEventListener('click', function () {
         var next = button.getAttribute('data-value');
         if (!next || next === viewScope) return;
         viewScope = next;
         tables.writeKey('gob-view-leaders-scope', viewScope);
-        board = null;
-        full = null;
-        loaded = false;
-        tables.resetScroll();
-        load();
-      });
-    });
-    toggles[1].querySelectorAll('button').forEach(function (button) {
-      button.addEventListener('click', function () {
-        var next = button.getAttribute('data-value');
-        if (!next || next === basis) return;
-        basis = next;
-        tables.writeKey('gob-view-leaders-basis', basis);
         board = null;
         full = null;
         loaded = false;
@@ -143,15 +123,6 @@ export function mount(container, ctx) {
     return blob.indexOf(needle) !== -1;
   }
 
-  function captionFor(stat, rows) {
-    if (stat !== 'FG%' && stat !== 'DEF%') return '';
-    var i;
-    for (i = 0; i < rows.length; i++) {
-      if (rows[i] && rows[i].qualification_caption) return rows[i].qualification_caption;
-    }
-    return FALLBACK_CAPTION[stat] || '';
-  }
-
   function initials(name) {
     var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return '';
@@ -163,18 +134,33 @@ export function mount(container, ctx) {
     return String(name || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase();
   }
 
+  function headerMeta(stat) {
+    if (PER_GAME[stat]) return stat + ' · per game';
+    if (TOTALS[stat]) return stat + ' · total';
+    return '';
+  }
+
   function unit(stat) {
     if (stat === 'FG%' || stat === 'DEF%') return '%';
-    if (basis !== 'per_game') return '';
-    return { PTS: 'PPG', REB: 'RPG', AST: 'APG', STL: 'SPG', BLK: 'BPG', '3PTM': '3PM' }[stat] || '';
+    return UNITS[stat] || '';
   }
 
   function showValue(stat, value) {
-    if (basis === 'per_game' && stat !== 'FG%' && stat !== 'DEF%') {
-      var n = Number(value);
-      if (isFinite(n)) return n.toFixed(1);
+    var n = Number(value);
+    if (!isFinite(n)) return value == null ? '' : String(value);
+    if (TOTALS[stat]) return String(Math.round(n));
+    return tables.formatOneDecimal(n);
+  }
+
+  function portraitHtml(playerId, name) {
+    var letters = initials(name);
+    var url = '';
+    if (playerId && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function') {
+      url = window.API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' });
     }
-    return value;
+    if (!url) return tables.esc(letters);
+    return '<img alt="" src="' + tables.esc(url) + '" data-letters="' + tables.esc(letters)
+      + '" onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';}">';
   }
 
   function teamBits(row) {
@@ -183,21 +169,19 @@ export function mount(container, ctx) {
 
   function renderBoard() {
     var html = '<div class="gob-ldr">';
-    var basisText = basis === 'totals' ? 'totals' : 'per game';
     CATS.forEach(function (stat) {
       var rows = ((board && board[stat]) || []).filter(matches);
       if (query.trim() && !rows.length) return;
       var hero = rows[0];
-      var cap = captionFor(stat, (board && board[stat]) || []);
       var suffix = unit(stat);
+      var meta = headerMeta(stat);
       html += '<article class="gob-ldb"><header class="card-h"><h3>' + tables.esc(LABELS[stat] || stat)
-        + '</h3><span class="meta">' + tables.esc(stat) + ' · ' + basisText + '</span></header>';
-      if (cap) html += '<p class="cap">' + tables.esc(cap) + '</p>';
+        + '</h3>' + (meta ? '<span class="meta">' + tables.esc(meta) + '</span>' : '') + '</header>';
       if (hero) {
         var href = tables.rosterHref(franchiseId, hero.team_id, hero.team || '', 'leaders-view');
         var who = teamBits(hero);
         html += '<div class="ldb-top' + (mine(hero) ? ' me is-user' : '') + '">'
-          + '<span class="av">' + tables.esc(initials(hero.name)) + '</span>'
+          + '<span class="av">' + portraitHtml(hero.player_id, hero.name) + '</span>'
           + '<span class="ldb-id"><span class="nm">' + tables.esc(hero.name || '') + '</span>'
           + '<span>' + (hero.team_id
             ? '<a class="gob-team" data-return href="' + tables.esc(href) + '">' + tables.esc(who) + '</a>'
@@ -241,12 +225,9 @@ export function mount(container, ctx) {
         + '<td class="left">' + (row.team_id
           ? '<a class="gob-team" data-return href="' + tables.esc(href) + '">' + tables.esc(row.team || '') + '</a>'
           : tables.esc(row.team || '')) + '</td>'
-        + '<td>' + tables.esc(row.value) + '</td></tr>';
+        + '<td>' + tables.esc(showValue(stat, row.value)) + '</td></tr>';
     });
-    html += '</tbody></table>';
-    var cap = captionFor(stat, (full && full[stat]) || []);
-    if (cap) html += '<p class="cap">' + tables.esc(cap) + '</p>';
-    html += '</section>';
+    html += '</tbody></table></section>';
     container.innerHTML = html;
     var back = container.querySelector('.gob-board');
     if (back) back.addEventListener('click', function () { setLeader(''); });
@@ -288,7 +269,7 @@ export function mount(container, ctx) {
       return;
     }
     if (!loaded) tables.paintSkeleton(container);
-    store.get(leadersUrl(franchiseId, viewScope, basis, 5)).then(function (payload) {
+    store.get(leadersUrl(franchiseId, viewScope, 5)).then(function (payload) {
       applyBoard(payload || {});
       if (expanded) loadFull();
     }).catch(fail);
@@ -297,7 +278,7 @@ export function mount(container, ctx) {
   function loadFull() {
     var store = ctx && ctx.store;
     if (!store || typeof store.get !== 'function' || !franchiseId) return;
-    store.get(leadersUrl(franchiseId, viewScope, basis, 50)).then(function (payload) {
+    store.get(leadersUrl(franchiseId, viewScope, 50)).then(function (payload) {
       applyFull(payload || {});
     }).catch(fail);
   }
@@ -305,7 +286,7 @@ export function mount(container, ctx) {
   function revalidate() {
     var store = ctx && ctx.store;
     if (!loaded || !store || typeof store.revalidate !== 'function' || !franchiseId) return;
-    store.revalidate(leadersUrl(franchiseId, viewScope, basis, expanded ? 50 : 5)).then(function (payload) {
+    store.revalidate(leadersUrl(franchiseId, viewScope, expanded ? 50 : 5)).then(function (payload) {
       if (!payload) return;
       if (expanded) applyFull(payload);
       else applyBoard(payload);

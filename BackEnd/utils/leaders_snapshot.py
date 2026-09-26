@@ -20,6 +20,7 @@ the lines, then clears stale only if that generation is still current.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -44,6 +45,11 @@ STAT_KEYS: tuple[str, ...] = (
 
 PER_GAME_STATS = frozenset({"PTS", "REB", "AST"})
 RATE_STATS = frozenset({"FG%", "DEF%"})
+# Same order the roster chip walks when it picks the highest position rating.
+POSITION_ORDER = ("PG", "SG", "SF", "PF", "C")
+# Bump when the stored line's position (or any other slot) changes meaning.
+# Older snapshots stay readable only until this misses, then they rebuild.
+LINE_LAYOUT = 2
 
 
 def _collection():
@@ -74,6 +80,9 @@ def leader_projection() -> dict[str, int]:
         "meta.position": 1,
         "meta.year": 1,
         "meta.yr": 1,
+        "training_position": 1,
+        "resolved_training_position": 1,
+        "position_ratings": 1,
     }
     for scope in ("season", "career"):
         for key in STAT_KEYS:
@@ -89,6 +98,90 @@ def team_games_from_results(results: dict | None) -> dict[str, int]:
         str(team_id): team_games_from_record(row.get("W"), row.get("L"))
         for team_id, row in standings.items()
     }
+
+
+def _rating_number(raw: Any) -> float | None:
+    if isinstance(raw, bool) or raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ratings_dict(raw: Any) -> dict:
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw.strip()[:1] == "{":
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _best_position(ratings: dict | None) -> str:
+    """Highest position rating. Ties keep the earlier slot in POSITION_ORDER."""
+    best = ""
+    best_val = None
+    for pos in POSITION_ORDER:
+        number = _rating_number((ratings or {}).get(pos))
+        if number is None:
+            continue
+        if best_val is None or number > best_val:
+            best = pos
+            best_val = number
+    return best
+
+
+def _roster_position(
+    stored: Any,
+    ratings: Any,
+    training: Any,
+    resolved: Any,
+    *,
+    on_user_team: bool,
+) -> str:
+    """Position the roster page would show.
+
+    A stored ``meta.position`` wins, matching the roster's ``p.position ||``
+    chip. When that is empty, the user's own roster shows the training
+    position and every other roster shows the best position rating.
+    """
+    text = "" if stored is None else str(stored).strip()
+    if text and text != "--":
+        return text
+    if on_user_team:
+        for raw in (resolved, training):
+            pos = "" if raw is None else str(raw).strip()
+            if pos in POSITION_ORDER:
+                return pos
+    return _best_position(_ratings_dict(ratings))
+
+
+def _on_user_team(team_id: Any, team_name: Any, user_team_id: str, user_team_name: str) -> bool:
+    if user_team_id and str(team_id or "") == user_team_id:
+        return True
+    if user_team_name and str(team_name or "") == user_team_name:
+        return True
+    return False
+
+
+def _user_team(franchise_id: str) -> tuple[str, str]:
+    from bson import ObjectId
+
+    try:
+        key = ObjectId(franchise_id)
+    except Exception:
+        return "", ""
+    doc = _franchises().find_one(
+        {"_id": key},
+        {"user_team_object_id": 1, "user_team_id": 1},
+    ) or {}
+    return str(doc.get("user_team_object_id") or ""), str(doc.get("user_team_id") or "")
 
 
 def _display_year(raw: Any) -> str:
@@ -115,10 +208,12 @@ def _stat_block(raw: dict | None) -> list[int | float]:
     return values
 
 
-def lines_from_player_docs(docs) -> list[list[Any]]:
+def lines_from_player_docs(docs, user_team_id: str = "", user_team_name: str = "") -> list[list[Any]]:
     rows: list[list[Any]] = []
     for doc in docs:
         meta = doc.get("meta") or {}
+        team_id = str(meta.get("team_id") or "")
+        team_name = str(meta.get("team") or "")
         # Display matches the old response. Scope matching uses the raw team
         # name only, the same rule as the old ``meta.team`` filter.
         rows.append(
@@ -127,11 +222,17 @@ def lines_from_player_docs(docs) -> list[list[Any]]:
                 meta.get("first_name", ""),
                 meta.get("last_name", ""),
                 meta.get("team", meta.get("team_id", "")),
-                str(meta.get("team_id") or ""),
-                str(meta.get("team") or ""),
+                team_id,
+                team_name,
                 *_stat_block(doc.get("season")),
                 *_stat_block(doc.get("career")),
-                meta.get("position") or "",
+                _roster_position(
+                    meta.get("position"),
+                    doc.get("position_ratings"),
+                    doc.get("training_position"),
+                    doc.get("resolved_training_position"),
+                    on_user_team=_on_user_team(team_id, team_name, user_team_id, user_team_name),
+                ),
                 _display_year(meta.get("year") or meta.get("yr")),
             ]
         )
@@ -149,10 +250,11 @@ def _line_fields() -> list[str]:
     for scope in ("season", "career"):
         fields.extend(f"{scope}.{key}" for key in STAT_KEYS)
     fields.extend(["meta.position", "meta.year", "meta.yr"])
+    fields.extend(["training_position", "resolved_training_position", "position_ratings"])
     return fields
 
 
-def _lines_from_tuples(raw_rows: list[tuple]) -> list[list[Any]]:
+def _lines_from_tuples(raw_rows: list[tuple], user_team_id: str = "", user_team_name: str = "") -> list[list[Any]]:
     season_at = 5
     career_at = season_at + len(STAT_KEYS)
     tail_at = career_at + len(STAT_KEYS)
@@ -166,17 +268,28 @@ def _lines_from_tuples(raw_rows: list[tuple]) -> list[list[Any]]:
         position = raw[tail_at] if len(raw) > tail_at else ""
         year = raw[tail_at + 1] if len(raw) > tail_at + 1 else ""
         yr = raw[tail_at + 2] if len(raw) > tail_at + 2 else ""
+        training = raw[tail_at + 3] if len(raw) > tail_at + 3 else ""
+        resolved = raw[tail_at + 4] if len(raw) > tail_at + 4 else ""
+        ratings = raw[tail_at + 5] if len(raw) > tail_at + 5 else None
+        team_id_text = "" if team_id is None else str(team_id)
+        team_name = str(team or "")
         lines.append(
             [
                 raw[0],
                 raw[1] or "",
                 raw[2] or "",
                 display,
-                "" if team_id is None else str(team_id),
-                str(team or ""),
+                team_id_text,
+                team_name,
                 *season,
                 *career,
-                "" if position is None else str(position),
+                _roster_position(
+                    position,
+                    ratings,
+                    training,
+                    resolved,
+                    on_user_team=_on_user_team(team_id_text, team_name, user_team_id, user_team_name),
+                ),
                 _display_year(year or yr),
             ]
         )
@@ -193,6 +306,7 @@ def _as_sqlite(coll):
 def load_lines(franchise_id: str) -> list[list[Any]]:
     """Compact rows in the same order as an aggregate ``$match``."""
     coll = _players()
+    user_team_id, user_team_name = _user_team(franchise_id)
     sqlite_coll = _as_sqlite(coll)
     if sqlite_coll is not None:
         return _lines_from_tuples(
@@ -200,9 +314,11 @@ def load_lines(franchise_id: str) -> list[list[Any]]:
                 {"franchise_id": str(franchise_id)},
                 _line_fields(),
                 natural_order=True,
-            )
+            ),
+            user_team_id,
+            user_team_name,
         )
-    return lines_from_player_docs(load_player_docs(franchise_id))
+    return lines_from_player_docs(load_player_docs(franchise_id), user_team_id, user_team_name)
 
 
 def load_player_docs(franchise_id: str) -> list[dict[str, Any]]:
@@ -331,10 +447,8 @@ def rank_lines(
     chosen = ranked[:limit]
     results: list[dict[str, Any]] = []
     for value, _tiebreak, payload in chosen:
-        if per_game or stat == "FG%":
+        if per_game or stat in RATE_STATS:
             payload["value"] = round(float(value or 0), 1)
-        elif stat == "DEF%":
-            payload["value"] = int(round(float(value or 0)))
         else:
             number = float(value or 0)
             payload["value"] = int(number) if number.is_integer() else number
@@ -396,6 +510,10 @@ def fresh_lines(franchise_id: str, *, week: int, season: int) -> tuple[list[list
     rows = list(lines.get("rows") or [])
     # A line from before position/year were stored cannot match a live scan.
     if any(len(row) < line_width() for row in rows):
+        return None
+    # Position used to be meta.position only. A snapshot built before the
+    # roster resolution has to rebuild so both paths return the same letter.
+    if lines.get("layout") != LINE_LAYOUT:
         return None
     return rows, dict(lines.get("team_games") or {})
 
@@ -460,6 +578,7 @@ def _publish(franchise_id: str, *, week: int, season: int, results: dict | None,
             "_id": snapshot_id(franchise_id),
             "franchise_id": str(franchise_id),
             "gen": gen,
+            "layout": LINE_LAYOUT,
             "team_games": team_games_from_results(results),
             "rows": rows,
         }

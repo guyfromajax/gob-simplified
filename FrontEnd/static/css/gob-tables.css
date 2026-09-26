@@ -314,7 +314,16 @@ html.gob-shell.gob-1920 .gob-tgrid {
 .gob-ldb .av {
   width: 36px;
   height: 36px;
+  overflow: hidden;
   font-size: var(--fs-13);
+}
+
+.gob-ldb .av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  display: block;
 }
 
 .gob-ldb .ldb-id {

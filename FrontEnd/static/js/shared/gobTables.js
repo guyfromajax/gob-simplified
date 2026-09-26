@@ -76,6 +76,12 @@
     return (n < 0 ? '-' : '') + text;
   }
 
+  function formatOneDecimal(value) {
+    var n = Number(value);
+    if (!isFinite(n)) return '';
+    return n.toFixed(1);
+  }
+
   function segment(options, current) {
     var html = '<div class="stats-toggle" role="group">';
     options.forEach(function (opt) {
@@ -194,6 +200,7 @@
     nextCell: nextCell,
     diffCell: diffCell,
     formatPct: formatPct,
+    formatOneDecimal: formatOneDecimal,
     segment: segment,
     searchBox: searchBox,
     registerTools: registerTools,

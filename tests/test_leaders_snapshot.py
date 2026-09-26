@@ -191,6 +191,39 @@ def test_snapshot_matches_live_scan_for_every_category():
             assert [row["value"] for row in board[stat]] == [row["value"] for row in ranked]
 
 
+def test_roster_position_matches_on_snapshot_and_live_scan():
+    """User-team players use the training position; everyone else uses the best rating."""
+    fid = _seed_two_conferences()
+    franchise_players_data_collection.update_one(
+        {"franchise_id": fid, "player_id": "ann"},
+        {"$set": {
+            "meta.position": "",
+            "training_position": "SG",
+            "position_ratings": {"C": 99, "PG": 10},
+        }},
+    )
+    franchise_players_data_collection.update_one(
+        {"franchise_id": fid, "player_id": "cal"},
+        {"$set": {
+            "training_position": "PG",
+            "position_ratings": {"PG": 10, "C": 90},
+        }},
+    )
+    get_store().leaders_snapshots_collection.delete_many({})
+    live = _board(fid, scope="season", view_scope="national")
+    snap = _board(fid, scope="season", view_scope="national")
+    assert snap == live
+
+    def position(board, player_id):
+        return next(row["position"] for row in board["PTS"] if row["player_id"] == player_id)
+
+    assert position(live, "ann") == "SG"
+    assert position(live, "cal") == "C"
+    ranked = get_leaders(fid, scope="season", stat="PTS", limit=10)
+    assert [row["position"] for row in ranked] == [row["position"] for row in live["PTS"]]
+    assert [row["player_id"] for row in ranked] == [row["player_id"] for row in live["PTS"]]
+
+
 def test_basis_and_row_fields_match_on_snapshot_and_live_scan():
     fid = _seed_two_conferences()
     franchise_players_data_collection.update_one(
