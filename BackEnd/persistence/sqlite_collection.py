@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
+import os
 import sqlite3
 import threading
+import time
 from datetime import datetime
 from typing import Any
 
 from bson import ObjectId
+
+logger = logging.getLogger(__name__)
 from pymongo.results import (
     BulkWriteResult,
     DeleteResult,
@@ -189,6 +194,8 @@ class SqliteCollection:
         fully = filter_fully_compiled(filt)
         limit_sql = one and fully
         fields = inclusion_projection_fields(projection) if fully else None
+        log_query = os.environ.get("GOB_SQLITE_QUERY_LOG") == "1"
+        started = time.perf_counter() if log_query else 0.0
         with self._lock:
             if compiled is None:
                 where_sql = ""
@@ -225,6 +232,17 @@ class SqliteCollection:
                         matched.append((row_id, doc))
                         if one:
                             break
+        if log_query:
+            logger.warning(
+                "[SQLITE-QUERY] coll=%s ms=%.1f rows=%s fully=%s decoded=%s filter=%s proj=%s",
+                self.name,
+                (time.perf_counter() - started) * 1000,
+                len(matched),
+                fully,
+                not bool(fields),
+                filt,
+                list(projection) if isinstance(projection, dict) else None,
+            )
         return matched
 
     def _rows(self) -> list[tuple[str, dict[str, Any]]]:

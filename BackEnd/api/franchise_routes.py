@@ -883,6 +883,28 @@ def _clock_from_time_remaining(seconds: Any) -> str:
     return f"{total // 60}:{total % 60:02d}"
 
 
+def _cc_lap(name: str, started: float) -> float:
+    """Section timer for GET /franchise/command-center/data. Off unless GOB_CC_TIMING=1."""
+    if os.environ.get("GOB_CC_TIMING") == "1":
+        logger.warning("[CC-TIMING] %s %.1fms", name, (time.perf_counter() - started) * 1000)
+    return time.perf_counter()
+
+
+def _active_resume_game_query(franchise_id: str, week: int) -> dict[str, Any]:
+    """This week's non-final games that carry a resume anchor.
+
+    The previous filter was franchise-wide. ``is_final`` and ``resume_anchor``
+    did not compile, so SQLite decoded every game in the save and then kept
+    none. Week is indexed; the two JSON predicates compile beside it.
+    """
+    return {
+        "franchise_id": str(franchise_id),
+        "week": int(week),
+        "is_final": {"$ne": True},
+        "resume_anchor": {"$type": "object"},
+    }
+
+
 def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
     next_game = _find_user_next_game(franchise_doc, user_team_id_str)
     if not next_game:
@@ -1042,11 +1064,7 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     game_doc = None
     matched_candidates: list[dict[str, Any]] = []
     anchor_cursor = db.games.find(
-        {
-            "franchise_id": franchise_id,
-            "is_final": {"$ne": True},
-            "resume_anchor": {"$type": "object"},
-        },
+        _active_resume_game_query(franchise_id, int(next_game.get("week") or 0)),
         sort=[("_id", -1)],
         limit=12,
     )
@@ -9816,6 +9834,7 @@ def command_center_data(
 ):
     """FCC main data load. Add ?profile=1 to get profile_summary in the response."""
     def _build():
+        cc_t = time.perf_counter()
         last_completed_game_cache: dict[str, Any] = {"loaded": False, "value": None}
 
         def _cached_last_completed_game() -> Optional[dict[str, Any]]:
@@ -9943,6 +9962,7 @@ def command_center_data(
                     response["attribute_mode"] = franchise_doc.get("attribute_mode")
             except Exception:
                 logger.exception("[FCC] team display resolve failed franchise_id=%s", franchise_id)
+        cc_t = _cc_lap("franchise_team", cc_t)
         # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank
         if franchise_id and franchise_doc:
             try:
@@ -9971,7 +9991,11 @@ def command_center_data(
                         for team_id in team_ids
                     }
                     display_name_by_id = resolve_team_name_map(franchise_doc, team_ids)
-                    team_list = _ftd_team_list_for_franchise(franchise_id)
+                    team_list = {
+                        str(d["team_id"]): {}
+                        for d in ftd_rank_docs
+                        if d.get("team_id") is not None
+                    }
                     standings_data = calculate_franchise_standings(
                         franchise_doc.get("results", {}),
                         team_list,
@@ -10097,6 +10121,7 @@ def command_center_data(
             response["rankings"] = []
             response["next_game_summary"] = None
             response["last_game_summary"] = None
+        cc_t = _cc_lap("rankings_and_games", cc_t)
         response["username"] = state.get("username", "Coach")
         response["seed"] = state.get("seed", 1)
         response["training_completed"] = training_completed
@@ -10123,6 +10148,7 @@ def command_center_data(
         response["cut_count"] = int(cut_state.get("cut_count", 0) or 0)
         response["cut_required"] = bool(cut_state.get("cut_required", False))
         response["week_35_recruiting_ran"] = bool(franchise_doc.get("week_35_recruiting_ran", False)) if franchise_doc else False
+        cc_t = _cc_lap("cuts_and_flags", cc_t)
         response["active_game_resume"] = None
         if franchise_doc and team_id:
             try:
@@ -10130,6 +10156,7 @@ def command_center_data(
             except Exception as e:
                 logger.debug("active game resume lookup failed: %s", e)
                 response["active_game_resume"] = None
+        cc_t = _cc_lap("resume", cc_t)
         response["cpu_sim_resume"] = _cpu_sim_job_public_summary(franchise_doc, week) if franchise_doc else None
         if response.get("cpu_sim_resume"):
             _csr = response["cpu_sim_resume"]
@@ -10240,6 +10267,7 @@ def command_center_data(
             response["week_35_user_recruits"] = []
             response["current_week_invite_recruit"] = None
             response["new_lean_recruit_ids"] = []
+        cc_t = _cc_lap("recruits", cc_t)
         response["training_status"] = (
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}
@@ -10430,6 +10458,7 @@ def command_center_data(
             team_doc,
             _cached_last_completed_game(),
         )
+        _cc_lap("modals_digest", cc_t)
         return response
     if profile:
         from BackEnd.utils.profiling import run_profiled
@@ -11417,12 +11446,12 @@ def get_team_player_stats(
     except Exception:
         fid = franchise_id
 
-    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id) if isinstance(franchise_id, str) else str(fid)}))
-    franchise_players = {d["player_id"]: d for d in fpd_docs}
+    fid_str = str(franchise_id) if isinstance(franchise_id, str) else str(fid)
     team_id_str = str(team_id)
     results: list[dict] = []
 
-    # Prefer FTD.players (roster list) when present
+    # Prefer FTD.players (roster list) when present. Seek those player ids
+    # instead of decoding every player in the franchise for one roster.
     try:
         team_oid = ObjectId(team_id_str) if len(team_id_str) == 24 else None
     except Exception:
@@ -11433,6 +11462,12 @@ def get_team_player_stats(
             {"players": 1},
         )
         if ftd and ftd.get("players"):
+            player_ids = [str(pid) for pid in ftd["players"] if pid is not None]
+            fpd_docs = list(franchise_players_data_collection.find(
+                {"franchise_id": fid_str, "player_id": {"$in": player_ids}},
+                {"player_id": 1, "meta": 1, scope: 1},
+            )) if player_ids else []
+            franchise_players = {d["player_id"]: d for d in fpd_docs if d.get("player_id")}
             for pid in ftd["players"]:
                 pid_str = str(pid)
                 pdata = franchise_players.get(pid_str)
@@ -11455,6 +11490,9 @@ def get_team_player_stats(
                 start = max(page - 1, 0) * limit
                 results = results[start : start + limit]
             return results
+
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": fid_str}))
+    franchise_players = {d["player_id"]: d for d in fpd_docs}
 
     # Fallback: filter by meta.team_id (legacy / no FTD.players)
     for pid, pdata in franchise_players.items():

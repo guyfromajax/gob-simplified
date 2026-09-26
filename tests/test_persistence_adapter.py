@@ -483,6 +483,61 @@ def test_sqlite_unsupported_operators_raise(tmp_path: Path):
         coll.update_one({"_id": "p1"}, {"$rename": {"rt": "rating"}})
 
 
+def test_ne_and_type_agree_on_mongo_and_sqlite(tmp_path: Path):
+    docs = [
+        {"_id": "g1", "franchise_id": "f1", "week": 5, "is_final": False, "resume_anchor": {"snapshot": {}}},
+        {"_id": "g2", "franchise_id": "f1", "week": 5, "is_final": True, "resume_anchor": {"snapshot": {}}},
+        {"_id": "g3", "franchise_id": "f1", "week": 5, "is_final": False, "resume_anchor": "stale"},
+        {"_id": "g4", "franchise_id": "f1", "week": 4, "is_final": False, "resume_anchor": {"snapshot": {}}},
+        {"_id": "g5", "franchise_id": "f1", "week": 5, "resume_anchor": {"snapshot": {}}},
+    ]
+    query = {
+        "franchise_id": "f1",
+        "week": 5,
+        "is_final": {"$ne": True},
+        "resume_anchor": {"$type": "object"},
+    }
+
+    def ids(store):
+        store.games_collection.insert_many([dict(doc) for doc in docs])
+        return sorted(doc["_id"] for doc in store.games_collection.find(query))
+
+    mongo_ids = ids(MongoStore(_mongomock_env(tmp_path)))
+    sqlite_ids = ids(SqliteStore(_sqlite_env(tmp_path)))
+    assert mongo_ids == sqlite_ids == ["g1", "g5"]
+
+
+def test_resume_filter_does_not_decode_final_games(tmp_path: Path, monkeypatch):
+    from BackEnd.persistence import sqlite_collection as sc
+    from BackEnd.persistence.sqlite_schema import filter_fully_compiled
+
+    store = SqliteStore(_sqlite_env(tmp_path))
+    fat = "x" * 40000
+    store.games_collection.insert_many([
+        {"_id": "final", "franchise_id": "f1", "week": 5, "is_final": True, "blob": fat},
+        {"_id": "open", "franchise_id": "f1", "week": 5, "is_final": False, "resume_anchor": {"q": 2}, "blob": fat},
+        {"_id": "other", "franchise_id": "f1", "week": 4, "is_final": False, "resume_anchor": {"q": 1}, "blob": fat},
+    ])
+    query = {
+        "franchise_id": "f1",
+        "week": 5,
+        "is_final": {"$ne": True},
+        "resume_anchor": {"$type": "object"},
+    }
+    assert filter_fully_compiled(query) is True
+    decoded = []
+    orig = sc.decode_doc
+
+    def counting(raw):
+        decoded.append(1)
+        return orig(raw)
+
+    monkeypatch.setattr(sc, "decode_doc", counting)
+    hits = list(store.games_collection.find(query))
+    assert [doc["_id"] for doc in hits] == ["open"]
+    assert decoded == [1]
+
+
 def test_sqlite_type_operator_matches_resume_anchor_objects(tmp_path: Path):
     store = SqliteStore(_sqlite_env(tmp_path))
     games = store.games_collection
@@ -672,7 +727,10 @@ def test_sqlite_week_range_compiles_and_skips_decode(tmp_path: Path, monkeypatch
     assert filter_fully_compiled(open_high) is True
     assert sorted(doc["week"] for doc in games.find(open_high, {"week": 1})) == [10]
 
-    assert filter_fully_compiled({"franchise_id": "fid", "week": {"$ne": 10}}) is False
+    assert filter_fully_compiled({"franchise_id": "fid", "week": {"$ne": 10}}) is True
+    assert sorted(doc["_id"] for doc in games.find({"franchise_id": "fid", "week": {"$ne": 10}}, {"_id": 1})) == [
+        "g1", "g26", "g27", "g3", "gabc",
+    ]
     assert filter_fully_compiled({"team_id": {"$gte": "L", "$lt": "M"}}) is True
     team_sql, _team_params = compile_filter({"team_id": {"$gte": "L", "$lt": "M"}})
     assert "CAST(" not in team_sql
