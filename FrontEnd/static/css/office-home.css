@@ -9,12 +9,16 @@
   padding: 0;
 }
 .gob .office a { color: inherit; text-decoration: none; }
-.gob .office .rs-n,
 .gob .office .nx-name,
-.gob .office .td-l,
 .gob .office .wr-1 { min-width: 0; }
-.gob .office .rs-n,
 .gob .office .nx-name { overflow: hidden; text-overflow: ellipsis; }
+.gob .office .rs-n {
+  min-width: 0;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+  line-height: 1.05;
+}
 
 .gob .office-skel {
   min-height: 96px;
@@ -53,6 +57,12 @@
 .gob.gob-1280 .office-col { gap: 6px; }
 .gob.gob-1280 .office .card { padding-top: 8px; padding-bottom: 8px; }
 .gob.gob-1280 .office-res { gap: 6px; }
+.gob.gob-1280 .office .rs-pts { font-size: var(--fs-28); }
+.gob.gob-1280 .office .rs-dash { font-size: var(--fs-20); }
+.gob.gob-1280 .office .rs-n { font-size: var(--fs-16); }
+.gob .office .rs-team .logo { width: 34px; height: 34px; font-size: 18px; }
+.gob.gob-1280 .office .rs-team .logo { width: 28px; height: 28px; font-size: 15px; }
+.gob.gob-1280 .office .res-score { gap: 6px; }
 .gob.gob-1280 .potg { padding-top: 4px; }
 .gob.gob-1280 #office-root:not(.is-todos-open) .todo-list > .todo:nth-child(n + 5) { display: none; }
 .gob.gob-1920 .office-more { display: none; }
@@ -93,7 +103,7 @@ html.gob-shell.gob-office .office {
   height: 56px;
   min-height: 56px;
   flex: none;
-  overflow: hidden;
+  min-width: 0;
 }
 .gob.gob-1920 .week-strip {
   height: 64px;
@@ -112,16 +122,15 @@ html.gob-shell.gob-office .office {
   align-items: center;
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
 }
 .gob .wk-step {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
-  flex: 1 1 0;
+  flex: 0 1 auto;
+  min-width: max-content;
   height: 36px;
-  padding: 0 8px;
+  padding: 0 10px;
   border-radius: var(--radius-10);
   background: var(--white-3p5);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -142,11 +151,20 @@ html.gob-shell.gob-office .office {
 .gob .week-strip.is-tight .wk-step { padding: 0 4px; gap: 4px; }
 .gob .week-strip.is-tight .wk-step + .wk-step { margin-left: 8px; }
 .gob .week-strip.is-tight .wk-step + .wk-step::before { left: -8px; width: 8px; }
-.gob .week-strip.is-tight .td-l { font-size: var(--fs-11); }
+.gob .week-strip.is-tight .td-adv,
+.gob .week-strip.is-tight .td-gate {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  padding: 2px 4px;
+}
+.gob .week-strip.is-tighter .wk-step { padding: 0 2px; gap: 3px; }
+.gob .week-strip.is-tighter .wk-step + .wk-step { margin-left: 6px; }
+.gob .week-strip.is-tighter .wk-step + .wk-step::before { left: -6px; width: 6px; }
+.gob .week-strip.is-tighter .td-l { font-size: var(--fs-12); }
 .gob .wk-step .td-l {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
+  overflow: visible;
+  text-overflow: unset;
   white-space: nowrap;
 }
 .gob .wk-dot {
@@ -177,48 +195,55 @@ html.gob-shell.gob-office .office {
   margin: 0;
 }
 
-.gob .office-col { overflow: hidden; }
+.gob .office-col { overflow: visible; }
 .gob .office-col .office-wire {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
+  flex: 0 0 auto;
+  height: auto;
+  overflow: visible;
+}
+.gob .wr-empty {
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  color: var(--text-60);
 }
 
-.gob .mv-p .nm {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gob .attr-run {
-  display: flex;
+.gob .mv-p {
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 4px;
-  min-width: 0;
-  margin-left: auto;
+  justify-content: flex-start;
+  align-items: center;
 }
+.gob .mv-p .nm {
+  flex: 0 0 auto;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: nowrap;
+  font-size: var(--fs-16);
+}
+.gob .attr-run { display: contents; }
 .gob .attr-chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  height: 22px;
-  padding: 0 5px;
+  gap: 6px;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 32px;
+  padding: 6px 10px;
   border-radius: var(--radius-6);
   background: var(--white-5);
   box-shadow: inset 0 0 0 1px var(--line);
   white-space: nowrap;
+  font-size: var(--fs-22);
 }
 .gob .attr-chip .attr-code {
-  font: var(--fw-bold) 15px/1 var(--font-display);
+  font: var(--fw-bold) var(--fs-22)/1 var(--font-display);
   color: var(--text-100);
   letter-spacing: var(--tracking-2);
 }
-.gob .attr-chip .tdig { font-size: 12px; }
+.gob .attr-chip .tdig { font-size: var(--fs-16); }
 .gob .attr-chip .arr {
   font-style: normal;
-  font-size: 9px;
+  font-size: var(--fs-13);
   line-height: 1;
 }
 .gob .attr-chip .arr.up { color: var(--delta-up); }

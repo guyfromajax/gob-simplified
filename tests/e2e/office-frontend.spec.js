@@ -27,15 +27,15 @@ function resultBlock(overrides) {
     week: 21,
     home_team_id: TID,
     away_team_id: 'bbbbbbbbbbbbbbbbbbbbbbbb',
-    home_team_name: 'Lancaster',
-    away_team_name: 'Four Corners',
+    home_team_name: 'Amariabi International',
+    away_team_name: 'Long Island Methodist',
     home_score: 71,
     away_score: 64,
     user_is_home: true,
     site: 'home',
     neutral: null,
     opponent_team_id: 'bbbbbbbbbbbbbbbbbbbbbbbb',
-    opponent_team_name: 'Four Corners',
+    opponent_team_name: 'Long Island Methodist',
     opponent_rank: 9,
     round_name: null,
     user_won: true,
@@ -359,6 +359,46 @@ async function assertOfficeText(page) {
   return text;
 }
 
+async function assertLabelsFit(page) {
+  const clipped = await page.evaluate(() => {
+    return [...document.querySelectorAll('#office-root .rs-n, #office-root .wk-step .td-l')]
+      .filter((node) => node.scrollWidth > node.clientWidth + 1)
+      .map((node) => node.textContent.trim());
+  });
+  expect(clipped, 'ellipsis on team names or strip labels').toEqual([]);
+}
+
+async function assertChipSize(page) {
+  const sizes = await page.evaluate(() => {
+    const row = document.querySelector('#office-root .mv-p');
+    if (!row) return null;
+    const name = row.querySelector('.nm');
+    const code = row.querySelector('.attr-code');
+    if (!name || !code) return null;
+    return {
+      name: parseFloat(getComputedStyle(name).fontSize),
+      chip: parseFloat(getComputedStyle(code).fontSize),
+    };
+  });
+  if (!sizes) return;
+  expect(sizes.chip).toBeGreaterThanOrEqual(sizes.name);
+}
+
+async function assertWireFitsContent(page) {
+  const over = await page.evaluate(() => {
+    const wire = document.querySelector('#office-root .office-wire');
+    if (!wire) return 0;
+    const style = getComputedStyle(wire);
+    const pad = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const gap = parseFloat(style.rowGap || style.gap) || 0;
+    const kids = [...wire.children];
+    const content = kids.reduce((sum, el) => sum + el.getBoundingClientRect().height, 0);
+    const gaps = Math.max(0, kids.length - 1) * gap;
+    return wire.getBoundingClientRect().height - (content + pad + gaps);
+  });
+  expect(over, 'wire taller than its content').toBeLessThanOrEqual(2);
+}
+
 async function assertHeadersClear(page) {
   const overlap = await page.evaluate(() => {
     return [...document.querySelectorAll('#office-root .office-col')].map((col) => {
@@ -424,6 +464,9 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
       await openOffice(page, STATES[name]);
       await assertOfficeText(page);
       await assertHeadersClear(page);
+      await assertLabelsFit(page);
+      await assertChipSize(page);
+      await assertWireFitsContent(page);
       expect(await page.locator('#office-root .office-col').count()).toBe(3);
       expect(await page.locator('#office-root .week-strip').count()).toBe(1);
       expect(await page.locator('#gob-main h1')).toHaveText('');
@@ -443,6 +486,13 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
       if (name === 'first_week') {
         expect(await page.locator('#office-root .sp-card').count()).toBe(1);
         expect(await page.locator('#office-root').getByText('Set after camp').count()).toBe(2);
+        expect(await page.locator('#office-root .td-gate').count()).toBe(0);
+        expect(await page.locator('#office-root .td-adv').count()).toBe(1);
+        await expect(page.locator('#office-root .wr-empty')).toHaveText('Opens with the invite period');
+      }
+      if (name !== 'first_week') {
+        await expect(page.locator('#office-root .rs-n').first()).toContainText('Amariabi International');
+        await expect(page.locator('#office-root .rs-n').nth(1)).toContainText('Long Island Methodist');
       }
       if (name === 'regular') {
         expect(await page.locator('#office-root .mv-cell .chip').count()).toBe(0);
@@ -542,6 +592,11 @@ test('live mid-season digest', async ({ page }) => {
     await openOffice(page, data);
     await assertOfficeText(page);
     await assertHeadersClear(page);
+    await assertLabelsFit(page);
+    await assertWireFitsContent(page);
+    expect(await page.locator('#office-root .td-gate').count()).toBe(0);
+    expect(await page.locator('#office-root .td-adv').count()).toBe(1);
+    await expect(page.locator('#office-root .wr-empty')).toHaveText('No recruiting movement this week');
     await expect(page.locator('#office-root .nx-sub')).toContainText('7–7');
     await expect(page.locator('#office-root .nx-sub')).toContainText('A1');
     await expect(page.locator('[data-advance-mirror="1"] .td-l')).toHaveText(

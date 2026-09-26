@@ -226,22 +226,22 @@ The Office fills `.main` edge to edge inside the standard page padding (`--page-
 
 While the digest is absent the page shows a skeleton strip and three skeleton cards. There is no spinner.
 
-A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. The left end reads `Week N` from `next_game.week`, or from `result.week` when there is no next game. Each `todos[]` entry is one step, in order, joined left to right. Labels use the same copy as before. An `is_advance_action` step that is not done copies the top-bar Advance label. Three to six steps fit at 1280 without wrapping. More than six compress the labels. The strip does not scroll and does not wrap to a second row.
+A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. The left end reads `Week N` from `next_game.week`, or from `result.week` when there is no next game. Each `todos[]` entry is one step, in order, joined left to right. Labels use the same copy as before. An `is_advance_action` step that is not done copies the top-bar Advance label and shows only the ADVANCE tag. A gating step that is not the Advance action shows BLOCKS ADVANCE. Steps size to their labels. If the row is wider than the page, padding and tag size come down before the labels do. Labels are not truncated. The strip does not scroll and does not wrap to a second row.
 
 | Step | Rule |
 |---|---|
 | Done | Check mark, opacity 38%, still clickable. Opens `route`. |
 | Next | The first not-done required step. Neutral bright outline (`--text-100`). Green stays on the top-bar Advance only. If this step is `is_advance_action`, it shows ADVANCE and runs the same click as the top bar. |
-| Blocking | `gates_advance` draws an orange outline and BLOCKS ADVANCE. This wins over the next outline when both apply. |
+| Blocking | `gates_advance` on a step that is not `is_advance_action` draws an orange outline and BLOCKS ADVANCE. |
 | Upcoming | The remaining steps. |
 
 | State | Column 1 · Since last week | Column 2 · Next game | Column 3 · Recruiting |
 |---|---|---|---|
-| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot | Recruiting wire, full column height |
-| `first_week` | Season preview | Next game · Team snapshot | One-line wire (the digest status line) |
+| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot | Recruiting wire, sized to its events. No events: "No recruiting movement this week". |
+| `first_week` | Season preview | Next game · Team snapshot | One-line wire. The digest status when it is set, otherwise the empty-state line. |
 | `signing_day` | Result · What moved | Team snapshot (`next_game` is null) | Signing Day card. The wire is hidden. |
 
-The three columns are equal width. The wire shows as many events as the column height allows. "Recruiting →" opens the recruiting hub.
+The three columns are equal width. The wire card is as tall as its rows. "Recruiting →" opens the recruiting hub. Result team names wrap, and at the 1280 density the score is smaller so a long name is not cut off.
 
 | Component | Digest fields |
 |---|---|
@@ -254,7 +254,7 @@ The three columns are equal width. The wire shows as many events as the column h
 | Signing Day | `signing_day.points_remaining`, `points_total`, `promises_made`, `open_roster_spots`, `targets` |
 | Season preview | `season_preview` fields that are non-null. The opener is the next-game card. |
 
-Attribute changes are one row per `player_id`. The row is the player name, linked to the player page, then chips. A chip shows the attribute abbreviation in Bebas at `--text-100` (the largest text in the chip), the new first-digit value in the tier colour from `attributeDisplay.js`, and a small green ▲ or red ▼. The previous value is not shown. The chip `title` is the full name from `ATTRIBUTE_NAMES` (`BH` → "Ball Handling"). Players sort by total absolute movement, then name. Inside a row, increases come before decreases. At 1280 the card shows up to 5 players. At 1920 it shows up to 8. When the list is longer, "All changes →" opens the training report for `result.week` (or `next_game.week` when there is no result). Rank, conference, and record tiles omit the delta chip when the delta is 0 or null.
+Attribute changes are one row per `player_id`. The row is the player name, linked to the player page, then chips flowing left from the name and wrapping under it. A chip shows the attribute abbreviation in Bebas at `--fs-22` and `--text-100` (larger than the player name, the largest text in the chip), the new first-digit value in the tier colour from `attributeDisplay.js`, and a green ▲ or red ▼. Chips are not truncated. The previous value is not shown. The chip `title` is the full name from `ATTRIBUTE_NAMES` (`BH` → "Ball Handling"). Players sort by total absolute movement, then name. Inside a row, increases come before decreases. At 1280 the card shows up to 5 players. At 1920 it shows up to 8. When the list is longer, "All changes →" opens the training report for `result.week` (or `next_game.week` when there is no result). Rank, conference, and record tiles omit the delta chip when the delta is 0 or null.
 
 Attribute `from` / `to` are already the first-digit scale. Player RT on a signing target is the letter already on the digest. Attitude counts use the EM emoji buckets. A loss result uses the calm card (no wash, no count-up). A win counts the scores up once, on the first open after that result. `prefers-reduced-motion` shows the final state immediately.
 

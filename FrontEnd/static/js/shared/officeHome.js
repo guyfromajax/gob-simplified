@@ -188,9 +188,6 @@
   function monogram(name) {
     var mark = el('span', 'logo');
     mark.style.setProperty('--tc', '#3a4254');
-    mark.style.width = '34px';
-    mark.style.height = '34px';
-    mark.style.fontSize = '18px';
     mark.textContent = initials(name).charAt(0) || '';
     return mark;
   }
@@ -435,17 +432,15 @@
       if (todo.done) {
         classes += ' done';
         state = 'done';
+      } else if (todo.gates_advance && !todo.is_advance_action) {
+        classes += ' gated';
+        state = 'blocking';
+        if (index === nextIndex) classes += ' is-next';
+      } else if (index === nextIndex) {
+        classes += ' is-next';
+        state = 'next';
       } else {
-        if (index === nextIndex) {
-          classes += ' is-next';
-          state = 'next';
-        } else {
-          classes += ' is-upcoming';
-        }
-        if (todo.gates_advance) {
-          classes += ' gated';
-          state = 'blocking';
-        }
+        classes += ' is-upcoming';
       }
       var row = el('button', classes);
       row.type = 'button';
@@ -459,10 +454,9 @@
         ? advanceLabel()
         : (TODO_COPY[todo.label_key] || labelize(todo.label_key));
       row.appendChild(el('span', 'td-l', copy));
-      if (!todo.done && index === nextIndex && todo.is_advance_action) {
+      if (!todo.done && todo.is_advance_action) {
         row.appendChild(el('span', 'td-adv', 'ADVANCE'));
-      }
-      if (!todo.done && todo.gates_advance) {
+      } else if (!todo.done && todo.gates_advance) {
         row.appendChild(el('span', 'td-gate', 'BLOCKS ADVANCE'));
       }
       row.addEventListener('click', function () {
@@ -477,6 +471,15 @@
     });
     strip.appendChild(track);
     return strip;
+  }
+
+  function tightenStrip(strip) {
+    if (!strip) return;
+    strip.classList.remove('is-tight', 'is-tighter');
+    if (strip.scrollWidth <= strip.clientWidth + 1) return;
+    strip.classList.add('is-tight');
+    if (strip.scrollWidth <= strip.clientWidth + 1) return;
+    strip.classList.add('is-tighter');
   }
 
   function userSide(result) {
@@ -724,27 +727,31 @@
   }
 
   function wireCard(wire, oneLine, index) {
-    if (!wire) return null;
-    var events = Array.isArray(wire.events) ? wire.events : [];
-    if (!present(wire.status) && !events.length) return null;
+    var events = wire && Array.isArray(wire.events) ? wire.events : [];
     var node = card('office-wire', index);
     var head = el('div', 'card-h');
     head.appendChild(el('h3', '', 'Recruiting wire'));
-    if (!oneLine && present(wire.status)) head.appendChild(el('span', 'meta', wire.status));
     var open = el('a', 'lnk', 'Recruiting');
     var url = recruitingHref();
     open.href = url;
     bindGo(open, url);
     head.appendChild(open);
     node.appendChild(head);
-    if (oneLine) {
-      if (present(wire.status)) node.appendChild(el('p', 'wr-2', wire.status));
-      return node;
+    var rows = [];
+    if (!oneLine) {
+      events.forEach(function (event, eventIndex) {
+        var row = wireRow(event, eventIndex);
+        if (row) rows.push(row);
+      });
     }
-    events.forEach(function (event, eventIndex) {
-      var row = wireRow(event, eventIndex);
-      if (row) node.appendChild(row);
-    });
+    if (rows.length && wire && present(wire.status)) head.insertBefore(el('span', 'meta', wire.status), open);
+    rows.forEach(function (row) { node.appendChild(row); });
+    if (!rows.length) {
+      var line = (oneLine && wire && present(wire.status))
+        ? wire.status
+        : 'No recruiting movement this week';
+      node.appendChild(el('p', 'wr-empty', line));
+    }
     return node;
   }
 
@@ -1050,7 +1057,9 @@
     third.forEach(function (node) { if (node) col3.appendChild(node); });
     var grid = el('div', 'office-grid');
     grid.append(col1, col2, col3);
-    root.append(weekStrip(digest), grid);
+    var strip = weekStrip(digest);
+    root.append(strip, grid);
+    tightenStrip(strip);
     if (countScores) countUp(root);
   }
 
