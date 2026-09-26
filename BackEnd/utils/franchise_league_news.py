@@ -15,15 +15,15 @@ from BackEnd.utils.franchise_standings import calculate_franchise_standings
 from BackEnd.utils.franchise_team_display import resolve_team_name_map
 
 
-LEADER_SPECS: tuple[tuple[str, str, str | None, float | None], ...] = (
+LEADER_SPECS: tuple[tuple[str, str, str | None, str | None], ...] = (
     ("pts", "PTS", None, None),
     ("treb", "REB", None, None),
     ("ast", "AST", None, None),
-    ("def_pct", "DEF_S", "DEF_A", 6.0),
+    ("def_pct", "DEF_S", "DEF_A", "DEF%"),
     ("stl", "STL", None, None),
     ("blk", "BLK", None, None),
     ("tpm", "3PTM", None, None),
-    ("fg_pct", "FGM", "FGA", 7.0),
+    ("fg_pct", "FGM", "FGA", "FG%"),
 )
 
 PER_GAME_LEADER_BOARDS = frozenset({"pts", "treb", "ast"})
@@ -168,7 +168,11 @@ def _build_leaders(
     franchise_id: ObjectId,
     core_by_id: dict[str, dict[str, Any]],
     names: dict[str, str],
+    team_games: dict[str, int] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
+    from BackEnd.constants.leader_qualification import qualifies
+
+    team_games = team_games or {}
     players = list(
         franchise_players_data_collection.find(
             {"franchise_id": str(franchise_id)},
@@ -189,10 +193,13 @@ def _build_leaders(
             gp = _float(season.get("GP"))
             numerator_value = _float(season.get(numerator))
             denominator_value = _float(season.get(denominator)) if denominator else 0.0
+            team_id = str(meta.get("team_id") or "")
+            if team_id not in core_by_id:
+                team_id = core_name_to_id.get(str(meta.get("team") or "").strip().casefold(), "")
             if denominator:
-                if gp <= 0 or denominator_value <= 0:
+                if denominator_value <= 0 or team_id not in core_by_id:
                     continue
-                if qualifier is not None and denominator_value / gp < qualifier:
+                if qualifier and not qualifies(qualifier, denominator_value, team_games.get(team_id, 0)):
                     continue
                 value = numerator_value / denominator_value * 100.0
                 tiebreak = denominator_value
@@ -205,9 +212,6 @@ def _build_leaders(
                 value = numerator_value
                 tiebreak = 0.0
 
-            team_id = str(meta.get("team_id") or "")
-            if team_id not in core_by_id:
-                team_id = core_name_to_id.get(str(meta.get("team") or "").strip().casefold(), "")
             if team_id not in core_by_id:
                 continue
             core = core_by_id[team_id]
@@ -283,5 +287,9 @@ def build_franchise_league_news(franchise_doc: dict[str, Any]) -> dict[str, Any]
     current_games = schedule[current_week - 1] if current_week - 1 < len(schedule) else []
     payload["top10"] = _build_top10(core_by_id, ranks, names, standings, include_record=True)
     payload["key_games"] = _build_games(current_games, core_by_id, ranks, names)
-    payload["leaders"] = _build_leaders(franchise_id, core_by_id, names)
+    team_games = {
+        str(team_id): int((row or {}).get("W") or 0) + int((row or {}).get("L") or 0)
+        for team_id, row in standings.items()
+    }
+    payload["leaders"] = _build_leaders(franchise_id, core_by_id, names, team_games)
     return payload

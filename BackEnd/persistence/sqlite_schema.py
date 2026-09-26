@@ -307,6 +307,90 @@ def _compile_equality(field: str, value: Any) -> tuple[str, list[Any]] | None:
     return f"{expr} = ?", list(compiled)
 
 
+def _predicate_expr(field: str) -> str | None:
+    """SQL expression for a top-level field. Indexed fields use the g_* column."""
+    if field in COLUMN_FOR_FIELD:
+        return COLUMN_FOR_FIELD[field]
+    if not _FIELD_NAME.fullmatch(field):
+        return None
+    return _json_equality_expr(field)
+
+
+def _compile_ne(expr: str, expected: Any, *, text_column: bool) -> tuple[str, list[Any]] | None:
+    """``$ne`` including missing fields. Null stays residual (Mongo null rules)."""
+    if expected is None:
+        return None
+    if isinstance(expected, bool):
+        if text_column:
+            return None
+        bound: Any = 1 if expected else 0
+    elif isinstance(expected, (int, float)):
+        bound = str(expected) if text_column else expected
+    elif isinstance(expected, str):
+        bound = expected
+    elif isinstance(expected, ObjectId):
+        bound = str(expected)
+    else:
+        return None
+    return f"({expr} IS NULL OR {expr} != ?)", [bound]
+
+
+# Mongo $type names SQLite json_type() can decide. objectId stays residual:
+# it is stored as {"$oid": "..."} and json_type would call that an object.
+_JSON_TYPE_NAMES: dict[Any, tuple[str, ...]] = {
+    "object": ("object",),
+    3: ("object",),
+    "3": ("object",),
+    "string": ("text",),
+    2: ("text",),
+    "2": ("text",),
+    "array": ("array",),
+    4: ("array",),
+    "4": ("array",),
+    "null": ("null",),
+    10: ("null",),
+    "10": ("null",),
+    "bool": ("true", "false"),
+    8: ("true", "false"),
+    "8": ("true", "false"),
+    "number": ("integer", "real"),
+    "int": ("integer",),
+    "long": ("integer",),
+    "double": ("real",),
+    1: ("real",),
+    "1": ("real",),
+    16: ("integer",),
+    "16": ("integer",),
+    18: ("integer",),
+    "18": ("integer",),
+}
+
+
+def _compile_type(field: str, wanted: Any) -> tuple[str, list[Any]] | None:
+    names = _JSON_TYPE_NAMES.get(wanted)
+    if names is None or not _FIELD_NAME.fullmatch(field):
+        return None
+    path = f"$.{field}"
+    if len(names) == 1:
+        return "json_type(doc, ?) = ?", [path, names[0]]
+    placeholders = ",".join("?" * len(names))
+    return f"json_type(doc, ?) IN ({placeholders})", [path, *names]
+
+
+def compile_operator_predicate(field: str, value: Any) -> tuple[str, list[Any]] | None:
+    """SQL for a single ``$ne`` or ``$type`` on a top-level field, else None."""
+    if not isinstance(value, dict) or len(value) != 1:
+        return None
+    if "$ne" in value:
+        expr = _predicate_expr(field)
+        if expr is None:
+            return None
+        return _compile_ne(expr, value["$ne"], text_column=field in COLUMN_FOR_FIELD)
+    if "$type" in value:
+        return _compile_type(field, value["$type"])
+    return None
+
+
 def compile_or_clause(branches: Any) -> tuple[str, list[Any]] | None:
     """SQL for a ``$or`` of equality branches, or None to leave it residual.
 
@@ -377,6 +461,12 @@ def compile_filter(filt: dict[str, Any] | None) -> tuple[str, list[Any]] | None:
             clauses.append(clause)
             params.extend(clause_params)
             continue
+        compiled_op = compile_operator_predicate(key, value)
+        if compiled_op is not None:
+            clause, clause_params = compiled_op
+            clauses.append(clause)
+            params.extend(clause_params)
+            continue
         if key not in COLUMN_FOR_FIELD:
             continue
         column = COLUMN_FOR_FIELD[key]
@@ -403,6 +493,8 @@ def filter_fully_compiled(filt: dict[str, Any] | None) -> bool:
         if key == "$or":
             if compile_or_clause(value) is None:
                 return False
+            continue
+        if compile_operator_predicate(key, value) is not None:
             continue
         if key not in COLUMN_FOR_FIELD:
             return False

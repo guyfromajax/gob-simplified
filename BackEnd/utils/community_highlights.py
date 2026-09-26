@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 FEED_DOC_ID = "global_feed"
 REGULAR_SEASON_LAST_WEEK = 26
-TOP_DEFENDER_MIN_DEFA_SEASON = 156  # 26 games × 6 DEFA / game
 
 
 def _display_username_for_highlight(user_doc: dict | None) -> str:
@@ -372,9 +371,41 @@ def _user_conference_rs_champion(franchise_doc: dict, user_team_id_str: str) -> 
     return seed == 1
 
 
-def _top_defender_season_summary(franchise_id_str: str, user_team_id_str: str) -> dict[str, Any] | None:
-    from BackEnd.api.franchise_routes import get_team_player_stats
+def _regular_season_team_games(franchise_doc: dict[str, Any], team_id_str: str) -> int:
+    """Completed regular-season games (weeks 1–26) for one team. Wins + losses."""
+    from BackEnd.constants.leader_qualification import team_games_from_record
 
+    results = franchise_doc.get("results") or {}
+    filtered: dict[str, Any] = {}
+    for key, value in results.items():
+        try:
+            week = int(key)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= week <= REGULAR_SEASON_LAST_WEEK:
+            filtered[str(week)] = value
+    standings = calculate_franchise_standings(filtered, {str(team_id_str): {}})
+    row = standings.get(str(team_id_str)) or {}
+    return team_games_from_record(row.get("W"), row.get("L"))
+
+
+def _top_defender_season_summary(
+    franchise_id_str: str,
+    user_team_id_str: str,
+    franchise_doc: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    from BackEnd.api.franchise_routes import get_team_player_stats
+    from BackEnd.constants.leader_qualification import qualifies
+
+    if franchise_doc is None:
+        try:
+            franchise_doc = franchises_collection.find_one(
+                {"_id": ObjectId(franchise_id_str)},
+                {"results": 1},
+            ) or {}
+        except Exception:
+            franchise_doc = {}
+    team_games = _regular_season_team_games(franchise_doc, user_team_id_str)
     players = get_team_player_stats(franchise_id_str, user_team_id_str, scope="season", sort=None, limit=None)
     best_pct = -1.0
     best: dict[str, Any] | None = None
@@ -384,7 +415,7 @@ def _top_defender_season_summary(franchise_id_str: str, user_team_id_str: str) -
         if gp <= 0:
             continue
         def_a = int(st.get("DEF_A", 0) or 0)
-        if def_a < TOP_DEFENDER_MIN_DEFA_SEASON:
+        if not qualifies("DEF%", def_a, team_games):
             continue
         def_s = int(st.get("DEF_S", 0) or 0)
         pct = round((def_s / def_a) * 100) if def_a > 0 else 0
@@ -822,11 +853,11 @@ def flush_community_highlight_pending_after_week(
         leaders = _build_team_leader_summary(franchise_id, str(user_team_id_str))
         ts = leaders.get("top_scorer") or {}
         tr = leaders.get("top_rebounder") or {}
-        td = _top_defender_season_summary(franchise_id_str, str(user_team_id_str))
+        td = _top_defender_season_summary(franchise_id_str, str(user_team_id_str), fresh)
         def_part = ""
         if td:
             def_part = f" -- Top Defender: {td['name']}: {td['def_pct']}%"
-        elif TOP_DEFENDER_MIN_DEFA_SEASON:
+        else:
             def_part = " -- Top Defender: —"
         details_line = (
             f"Record: {rec} -- Top Scorer: {ts.get('name', '—')}: {ts.get('average', 0)} PPG"

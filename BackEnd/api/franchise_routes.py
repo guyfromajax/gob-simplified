@@ -883,6 +883,32 @@ def _clock_from_time_remaining(seconds: Any) -> str:
     return f"{total // 60}:{total % 60:02d}"
 
 
+def _cc_lap(name: str, started: float) -> float:
+    """Section timer for GET /franchise/command-center/data. Off unless GOB_CC_TIMING=1."""
+    if os.environ.get("GOB_CC_TIMING") == "1":
+        logger.warning("[CC-TIMING] %s %.1fms", name, (time.perf_counter() - started) * 1000)
+    return time.perf_counter()
+
+
+def _active_resume_game_query(franchise_id: str, week: int | None = None) -> dict[str, Any]:
+    """Non-final games that carry a resume anchor, optionally this week only.
+
+    Week is indexed. ``is_final`` and ``resume_anchor`` compile beside it, so
+    SQLite does not decode the rest of the season. Omit ``week`` for the
+    franchise-wide filter used when the week-scoped lookup returns nothing
+    (an in-progress doc can omit ``week``, or store a week other than
+    ``next_game.week``).
+    """
+    query: dict[str, Any] = {
+        "franchise_id": str(franchise_id),
+        "is_final": {"$ne": True},
+        "resume_anchor": {"$type": "object"},
+    }
+    if week is not None:
+        query["week"] = int(week)
+    return query
+
+
 def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
     next_game = _find_user_next_game(franchise_doc, user_team_id_str)
     if not next_game:
@@ -1041,30 +1067,44 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
 
     game_doc = None
     matched_candidates: list[dict[str, Any]] = []
-    anchor_cursor = db.games.find(
-        {
-            "franchise_id": franchise_id,
-            "is_final": {"$ne": True},
-            "resume_anchor": {"$type": "object"},
-        },
-        sort=[("_id", -1)],
-        limit=12,
-    )
-    anchor_candidate_count = 0
     rejected_candidates: list[dict[str, Any]] = []
-    for candidate in anchor_cursor:
-        anchor_candidate_count += 1
-        if _matches_current_user_game(candidate):
-            matched_candidates.append(candidate)
-            continue
-        if len(rejected_candidates) < 5:
-            rejected_candidates.append(
-                {
-                    "game_id": str(candidate.get("_id")),
-                    "pair": sorted(_candidate_pair(candidate)),
-                    "has_snapshot": bool(_anchor_snapshot(candidate)),
-                }
-            )
+
+    def _scan_resume_games(query: dict[str, Any]) -> int:
+        matched_candidates.clear()
+        rejected_candidates.clear()
+        count = 0
+        anchor_cursor = db.games.find(query, sort=[("_id", -1)], limit=12)
+        for candidate in anchor_cursor:
+            count += 1
+            if _matches_current_user_game(candidate):
+                matched_candidates.append(candidate)
+                continue
+            if len(rejected_candidates) < 5:
+                rejected_candidates.append(
+                    {
+                        "game_id": str(candidate.get("_id")),
+                        "pair": sorted(_candidate_pair(candidate)),
+                        "has_snapshot": bool(_anchor_snapshot(candidate)),
+                    }
+                )
+        return count
+
+    next_week = int(next_game.get("week") or 0)
+    anchor_candidate_count = _scan_resume_games(
+        _active_resume_game_query(franchise_id, next_week)
+    )
+    # init-game and quarter/timeout saves do not write ``week``. An EOS game
+    # can also be stored under a week other than ``next_game.week``. The
+    # unscoped filter runs only when the week seek returned no documents.
+    if anchor_candidate_count == 0:
+        logger.warning(
+            "🧭 [MODE-RESUME-LOOKUP] scoped_empty_fallback franchise_id=%s week=%s",
+            franchise_id,
+            next_week,
+        )
+        anchor_candidate_count = _scan_resume_games(
+            _active_resume_game_query(franchise_id, None)
+        )
 
     if matched_candidates:
         game_doc = max(matched_candidates, key=_candidate_sort_key)
@@ -9816,6 +9856,7 @@ def command_center_data(
 ):
     """FCC main data load. Add ?profile=1 to get profile_summary in the response."""
     def _build():
+        cc_t = time.perf_counter()
         last_completed_game_cache: dict[str, Any] = {"loaded": False, "value": None}
 
         def _cached_last_completed_game() -> Optional[dict[str, Any]]:
@@ -9943,6 +9984,7 @@ def command_center_data(
                     response["attribute_mode"] = franchise_doc.get("attribute_mode")
             except Exception:
                 logger.exception("[FCC] team display resolve failed franchise_id=%s", franchise_id)
+        cc_t = _cc_lap("franchise_team", cc_t)
         # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank
         if franchise_id and franchise_doc:
             try:
@@ -9971,7 +10013,11 @@ def command_center_data(
                         for team_id in team_ids
                     }
                     display_name_by_id = resolve_team_name_map(franchise_doc, team_ids)
-                    team_list = _ftd_team_list_for_franchise(franchise_id)
+                    team_list = {
+                        str(d["team_id"]): {}
+                        for d in ftd_rank_docs
+                        if d.get("team_id") is not None
+                    }
                     standings_data = calculate_franchise_standings(
                         franchise_doc.get("results", {}),
                         team_list,
@@ -10097,6 +10143,7 @@ def command_center_data(
             response["rankings"] = []
             response["next_game_summary"] = None
             response["last_game_summary"] = None
+        cc_t = _cc_lap("rankings_and_games", cc_t)
         response["username"] = state.get("username", "Coach")
         response["seed"] = state.get("seed", 1)
         response["training_completed"] = training_completed
@@ -10123,6 +10170,7 @@ def command_center_data(
         response["cut_count"] = int(cut_state.get("cut_count", 0) or 0)
         response["cut_required"] = bool(cut_state.get("cut_required", False))
         response["week_35_recruiting_ran"] = bool(franchise_doc.get("week_35_recruiting_ran", False)) if franchise_doc else False
+        cc_t = _cc_lap("cuts_and_flags", cc_t)
         response["active_game_resume"] = None
         if franchise_doc and team_id:
             try:
@@ -10130,6 +10178,7 @@ def command_center_data(
             except Exception as e:
                 logger.debug("active game resume lookup failed: %s", e)
                 response["active_game_resume"] = None
+        cc_t = _cc_lap("resume", cc_t)
         response["cpu_sim_resume"] = _cpu_sim_job_public_summary(franchise_doc, week) if franchise_doc else None
         if response.get("cpu_sim_resume"):
             _csr = response["cpu_sim_resume"]
@@ -10240,6 +10289,7 @@ def command_center_data(
             response["week_35_user_recruits"] = []
             response["current_week_invite_recruit"] = None
             response["new_lean_recruit_ids"] = []
+        cc_t = _cc_lap("recruits", cc_t)
         response["training_status"] = (
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}
@@ -10430,6 +10480,7 @@ def command_center_data(
             team_doc,
             _cached_last_completed_game(),
         )
+        _cc_lap("modals_digest", cc_t)
         return response
     if profile:
         from BackEnd.utils.profiling import run_profiled
@@ -10947,6 +10998,71 @@ def franchise_league_news(
     return build_franchise_league_news(franchise_doc)
 
 
+def _completed_team_games(franchise_id: str) -> dict[str, int]:
+    """Wins + losses per team from this franchise's completed results."""
+    from BackEnd.constants.leader_qualification import team_games_from_record
+    from BackEnd.utils.franchise_standings import calculate_franchise_standings
+
+    try:
+        oid = ObjectId(franchise_id)
+    except Exception:
+        return {}
+    doc = db.franchises.find_one({"_id": oid}, {"results": 1})
+    if not doc:
+        return {}
+    standings = calculate_franchise_standings(doc.get("results") or {}, {})
+    return {
+        str(team_id): team_games_from_record(row.get("W"), row.get("L"))
+        for team_id, row in standings.items()
+    }
+
+
+def _player_in_leader_scope(meta: dict, allowed_team_ids, allowed_team_names) -> bool:
+    if not allowed_team_ids and not allowed_team_names:
+        return True
+    team_id = str(meta.get("team_id") or "")
+    team_name = str(meta.get("team") or "")
+    if allowed_team_ids and team_id in allowed_team_ids:
+        return True
+    if allowed_team_names and team_name in allowed_team_names:
+        return True
+    return False
+
+
+def _season_percentage_leaders(
+    franchise_id: str,
+    stat: str,
+    limit: int,
+    allowed_team_ids,
+    allowed_team_names,
+) -> list[dict[str, Any]]:
+    """FG% / DEF% for season scope, qualified on team games rather than player GP."""
+    from BackEnd.constants.leader_qualification import qualifies
+
+    numerator_field = "FGM" if stat == "FG%" else "DEF_S"
+    denominator_field = "FGA" if stat == "FG%" else "DEF_A"
+    team_games = _completed_team_games(franchise_id)
+    players = franchise_players_data_collection.find(
+        {"franchise_id": str(franchise_id)},
+        {"player_id": 1, "meta": 1, "season": 1},
+    )
+    ranked: list[tuple[float, int, dict[str, Any]]] = []
+    for player in players:
+        meta = player.get("meta") or {}
+        if not _player_in_leader_scope(meta, allowed_team_ids, allowed_team_names):
+            continue
+        season = player.get("season") or {}
+        attempts = int(season.get(denominator_field) or 0)
+        games = team_games.get(str(meta.get("team_id") or ""), 0)
+        if not qualifies(stat, attempts, games):
+            continue
+        made = float(season.get(numerator_field) or 0)
+        value = (made / attempts) * 100.0 if attempts else 0.0
+        ranked.append((value, attempts, {"player_id": player.get("player_id"), "meta": meta, "value": value}))
+    ranked.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    return [row[2] for row in ranked[:limit]]
+
+
 def get_leaders(
     franchise_id: str,
     scope: str = "season",
@@ -10958,6 +11074,9 @@ def get_leaders(
     """Return the top players for a given stat within a franchise.
 
     ✅ FPD: Reads from franchise_players_data (season/career stats), not franchise.players.
+
+    Season FG% and DEF% qualify on team games (``qualifies``). Career FG% and
+    DEF% keep attempts >= 5 * the player's own GP.
     """
     start_time = time.time()
 
@@ -10973,95 +11092,104 @@ def get_leaders(
     elif stat == "TPA":
         stat_field = "3PTA"
 
-    # ✅ FPD: Aggregate from franchise_players_data (season/career live here)
-    aggregation_start = time.time()
-    pipeline = [{"$match": {"franchise_id": str(franchise_id)}}]
-    if allowed_team_ids or allowed_team_names:
-        team_filters = []
-        if allowed_team_ids:
-            team_filters.append({"meta.team_id": {"$in": list(allowed_team_ids)}})
-        if allowed_team_names:
-            team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
-        pipeline.append({"$match": {"$or": team_filters}})
-
     per_game_stats = {"PTS", "REB", "AST"}
-    if stat in {"FG%", "DEF%"}:
-        numerator_field = "FGM" if stat == "FG%" else "DEF_S"
-        denominator_field = "FGA" if stat == "FG%" else "DEF_A"
-        pipeline.extend([
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "gp": {"$ifNull": [f"${scope}.GP", 0]},
-                    "numerator": {"$ifNull": [f"${scope}.{numerator_field}", 0]},
-                    "denominator": {"$ifNull": [f"${scope}.{denominator_field}", 0]},
-                }
-            },
-            {
-                "$match": {
-                    "$expr": {
-                        "$and": [
-                            {"$gt": ["$gp", 0]},
-                            {"$gte": ["$denominator", {"$multiply": ["$gp", 5]}]},
-                        ]
-                    }
-                }
-            },
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "value": {
-                        "$cond": [
-                            {"$gt": ["$denominator", 0]},
-                            {"$multiply": [{"$divide": ["$numerator", "$denominator"]}, 100]},
-                            0,
-                        ]
-                    },
-                    "tiebreak_volume": "$denominator",
-                }
-            },
-            {"$sort": {"value": -1, "tiebreak_volume": -1}},
-            {"$limit": limit},
-        ])
-    elif stat in per_game_stats:
-        pipeline.extend([
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "gp": {"$ifNull": [f"${scope}.GP", 0]},
-                    "total": {"$ifNull": [f"${scope}.{stat_field}", 0]},
-                }
-            },
-            {"$match": {"gp": {"$gt": 0}}},
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "value": {"$divide": ["$total", "$gp"]},
-                    "tiebreak_total": "$total",
-                }
-            },
-            {"$sort": {"value": -1, "tiebreak_total": -1}},
-            {"$limit": limit},
-        ])
+    # Season rate leaders filter in Python after the team-games lookup.
+    # A $limit inside the aggregate would drop real qualifiers.
+    if stat in {"FG%", "DEF%"} and str(scope or "season") != "career":
+        agg = _season_percentage_leaders(
+            str(franchise_id), stat, limit, allowed_team_ids, allowed_team_names
+        )
+        aggregation_time = time.time() - start_time
     else:
-        pipeline.extend([
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "value": {"$ifNull": [f"${scope}.{stat_field}", 0]},
-                }
-            },
-            {"$sort": {"value": -1}},
-            {"$limit": limit},
-        ])
+        # ✅ FPD: Aggregate from franchise_players_data (season/career live here)
+        aggregation_start = time.time()
+        pipeline = [{"$match": {"franchise_id": str(franchise_id)}}]
+        if allowed_team_ids or allowed_team_names:
+            team_filters = []
+            if allowed_team_ids:
+                team_filters.append({"meta.team_id": {"$in": list(allowed_team_ids)}})
+            if allowed_team_names:
+                team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
+            pipeline.append({"$match": {"$or": team_filters}})
 
-    agg = list(franchise_players_data_collection.aggregate(pipeline))
-    aggregation_time = time.time() - aggregation_start
+        if stat in {"FG%", "DEF%"}:
+            # Career scope only. Season FG%/DEF% returned above.
+            numerator_field = "FGM" if stat == "FG%" else "DEF_S"
+            denominator_field = "FGA" if stat == "FG%" else "DEF_A"
+            pipeline.extend([
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "gp": {"$ifNull": [f"${scope}.GP", 0]},
+                        "numerator": {"$ifNull": [f"${scope}.{numerator_field}", 0]},
+                        "denominator": {"$ifNull": [f"${scope}.{denominator_field}", 0]},
+                    }
+                },
+                {
+                    "$match": {
+                        "$expr": {
+                            "$and": [
+                                {"$gt": ["$gp", 0]},
+                                {"$gte": ["$denominator", {"$multiply": ["$gp", 5]}]},
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "value": {
+                            "$cond": [
+                                {"$gt": ["$denominator", 0]},
+                                {"$multiply": [{"$divide": ["$numerator", "$denominator"]}, 100]},
+                                0,
+                            ]
+                        },
+                        "tiebreak_volume": "$denominator",
+                    }
+                },
+                {"$sort": {"value": -1, "tiebreak_volume": -1}},
+                {"$limit": limit},
+            ])
+        elif stat in per_game_stats:
+            pipeline.extend([
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "gp": {"$ifNull": [f"${scope}.GP", 0]},
+                        "total": {"$ifNull": [f"${scope}.{stat_field}", 0]},
+                    }
+                },
+                {"$match": {"gp": {"$gt": 0}}},
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "value": {"$divide": ["$total", "$gp"]},
+                        "tiebreak_total": "$total",
+                    }
+                },
+                {"$sort": {"value": -1, "tiebreak_total": -1}},
+                {"$limit": limit},
+            ])
+        else:
+            pipeline.extend([
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "value": {"$ifNull": [f"${scope}.{stat_field}", 0]},
+                    }
+                },
+                {"$sort": {"value": -1}},
+                {"$limit": limit},
+            ])
+
+        agg = list(franchise_players_data_collection.aggregate(pipeline))
+        aggregation_time = time.time() - aggregation_start
     # logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline (FPD): {aggregation_time:.3f}s")
     results: list[dict[str, Any]] = []
     for p in agg:
@@ -11417,12 +11545,12 @@ def get_team_player_stats(
     except Exception:
         fid = franchise_id
 
-    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id) if isinstance(franchise_id, str) else str(fid)}))
-    franchise_players = {d["player_id"]: d for d in fpd_docs}
+    fid_str = str(franchise_id) if isinstance(franchise_id, str) else str(fid)
     team_id_str = str(team_id)
     results: list[dict] = []
 
-    # Prefer FTD.players (roster list) when present
+    # Prefer FTD.players (roster list) when present. Seek those player ids
+    # instead of decoding every player in the franchise for one roster.
     try:
         team_oid = ObjectId(team_id_str) if len(team_id_str) == 24 else None
     except Exception:
@@ -11433,6 +11561,12 @@ def get_team_player_stats(
             {"players": 1},
         )
         if ftd and ftd.get("players"):
+            player_ids = [str(pid) for pid in ftd["players"] if pid is not None]
+            fpd_docs = list(franchise_players_data_collection.find(
+                {"franchise_id": fid_str, "player_id": {"$in": player_ids}},
+                {"player_id": 1, "meta": 1, scope: 1},
+            )) if player_ids else []
+            franchise_players = {d["player_id"]: d for d in fpd_docs if d.get("player_id")}
             for pid in ftd["players"]:
                 pid_str = str(pid)
                 pdata = franchise_players.get(pid_str)
@@ -11455,6 +11589,9 @@ def get_team_player_stats(
                 start = max(page - 1, 0) * limit
                 results = results[start : start + limit]
             return results
+
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": fid_str}))
+    franchise_players = {d["player_id"]: d for d in fpd_docs}
 
     # Fallback: filter by meta.team_id (legacy / no FTD.players)
     for pid, pdata in franchise_players.items():

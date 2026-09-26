@@ -295,7 +295,23 @@ Attribute `from` / `to` are already the first-digit scale. Player RT on a signin
 
 Tournament weeks keep the top-bar tier from `tierEmblem.js`. The next-game card takes the same metal tokens. `projected_starting_five`, `team_rt`, `seeds`, `stakes`, `date`, `neutral`, `stars`, and `filmed_grade` stay off the page because they are null. There is no Team RT row and no coach-stat block.
 
-## 13. Views
+## 13. Leader qualification
+
+A rate leader qualifies when attempts are at least the floor times the games that player's team has completed in the scope being read (attempts per team game). Team games are wins plus losses from `franchise.results`. There is no separate games-played rule. The floors live in `LEADER_QUALIFICATION_FLOORS` (`BackEnd/constants/leader_qualification.py`). `qualifies(stat, attempts, team_games)` is the only check.
+
+| Stat | Floor (attempts per team game) | Attempt field |
+| --- | --- | --- |
+| FG% | 5 | FGA |
+| 3PT% | 2 | 3PTA |
+| FT% | 2 | FTA |
+| DEF% | 6 | DEF_A |
+| SCR% | 5 | SCR_A |
+
+Season Leaders (FG% and DEF%), the league-news FG% and DEF% boards, and the community-highlights top defender use this rule. SCR%, 3PT%, and FT% are defined for any later consumer. Leaders does not show those three today.
+
+Career Leaders keep the older rule for FG% and DEF%: attempts at least 5 times that player's own games played. Zero team games never qualifies a season rate. Exactly the floor qualifies. One attempt below does not.
+
+## 14. Views
 
 A view is a section of the franchise app that lives at `franchise-command-center.html?tab=<view-id>`. That is the same URL rule as today's in-page tabs. Rail clicks still push. Sub-tabs still replace. Back restores the view and the scroll position `GOBNav` already stores. There is no second URL scheme.
 

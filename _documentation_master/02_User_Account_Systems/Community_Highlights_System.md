@@ -56,7 +56,7 @@ Phase B runs **`_apply_regular_season_rank_prestige_updates`** inside **`_comple
 - If the user finishes the regular season as **#1 seed in their conference** (conference regular-season champion):
   - **Announcement:** "`{user_name}`, coaching {user team name}, wins the Conference `{n}` regular season title."
   - **Details:** "Record: {user record} -- Top Scorer: {name}: {PPG} -- Top Rebounder: {name}: {RPG} -- Top Defender: {name}: {DEF%} or — if no qualifier."
-  - **Top Defender:** qualifies only with **≥ 156 DEFA** for the season (26 games × 6 DEFA per game).
+  - **Top Defender:** qualifies with the shared season rule (`qualifies("DEF%", DEF_A, team games)`): at least 6 defensive attempts per regular-season game the team has completed (weeks 1–26, wins + losses).
 
 - If the user wins a **conference**, **regional**, or **national** tournament final:
   - **Announcement:** e.g. wins the Conference `{n}` Tournament; wins the `{region}` Regional Tournament; wins the National Tournament (see `BackEnd/utils/community_highlights.py`).
