@@ -10,6 +10,7 @@ range comparisons on those columns, is applied in SQL.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
@@ -275,6 +276,67 @@ def _compile_comparison_value(column: str, value: dict[str, Any]) -> tuple[str, 
     return " AND ".join(parts), params
 
 
+_FIELD_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _json_equality_expr(field: str) -> str:
+    """Same COALESCE as the generated columns, for a field that has no g_* column."""
+    return (
+        f"COALESCE(json_extract(doc, '$.{field}.$oid'), json_extract(doc, '$.{field}'))"
+    )
+
+
+def _compile_equality(field: str, value: Any) -> tuple[str, list[Any]] | None:
+    """One equality predicate, or None when ``match_query`` must decide."""
+    if not _FIELD_NAME.fullmatch(field):
+        return None
+    if isinstance(value, dict):
+        return None
+    if isinstance(value, bool):
+        return None
+    if field in COLUMN_FOR_FIELD:
+        return compile_indexed_value(COLUMN_FOR_FIELD[field], value)
+    compiled = index_sql_values(value)
+    if compiled is None:
+        return None
+    expr = _json_equality_expr(field)
+    if not compiled:
+        return f"{expr} IS NULL", []
+    if len(compiled) != 1:
+        return None
+    return f"{expr} = ?", list(compiled)
+
+
+def compile_or_clause(branches: Any) -> tuple[str, list[Any]] | None:
+    """SQL for a ``$or`` of equality branches, or None to leave it residual.
+
+    Each branch is a conjunction of field equalities (string, number, ObjectId,
+    or null). A comparison, regex, or nested operator stays residual so the
+    indexed clauses around the ``$or`` can still be pushed.
+    """
+    if not isinstance(branches, list):
+        return None
+    if not branches:
+        return "0", []
+    parts: list[str] = []
+    params: list[Any] = []
+    for branch in branches:
+        if not isinstance(branch, dict) or not branch:
+            return None
+        if any(str(key).startswith("$") for key in branch):
+            return None
+        ands: list[str] = []
+        for field, value in branch.items():
+            compiled = _compile_equality(str(field), value)
+            if compiled is None:
+                return None
+            clause, clause_params = compiled
+            ands.append(clause)
+            params.extend(clause_params)
+        parts.append("(" + " AND ".join(ands) + ")" if len(ands) > 1 else ands[0])
+    return "(" + " OR ".join(parts) + ")", params
+
+
 def compile_filter(filt: dict[str, Any] | None) -> tuple[str, list[Any]] | None:
     """Push every compilable clause to SQL; leave the rest to ``match_query``.
 
@@ -307,6 +369,14 @@ def compile_filter(filt: dict[str, Any] | None) -> tuple[str, list[Any]] | None:
             clauses.append(f"id IN ({placeholders})")
             params.extend(ids)
             continue
+        if key == "$or":
+            compiled_or = compile_or_clause(value)
+            if compiled_or is None:
+                continue
+            clause, clause_params = compiled_or
+            clauses.append(clause)
+            params.extend(clause_params)
+            continue
         if key not in COLUMN_FOR_FIELD:
             continue
         column = COLUMN_FOR_FIELD[key]
@@ -328,6 +398,10 @@ def filter_fully_compiled(filt: dict[str, Any] | None) -> bool:
     for key, value in filt.items():
         if key == "_id":
             if isinstance(value, dict) and "$in" not in value:
+                return False
+            continue
+        if key == "$or":
+            if compile_or_clause(value) is None:
                 return False
             continue
         if key not in COLUMN_FOR_FIELD:

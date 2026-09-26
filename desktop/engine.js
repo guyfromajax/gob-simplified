@@ -1,5 +1,6 @@
 'use strict';
 
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
@@ -42,6 +43,45 @@ function resolvePython(repoRoot) {
   const venv = path.join(repoRoot, '.venv', 'bin', 'python');
   if (fs.existsSync(venv)) return venv;
   return null;
+}
+
+function normalizeBuildId(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.split(/\s+/)[0].slice(0, 12);
+}
+
+function readStamp(filePath) {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return '';
+    return normalizeBuildId(fs.readFileSync(filePath, 'utf8'));
+  } catch (_) {
+    return '';
+  }
+}
+
+function resolveBuildId(repoRoot) {
+  const fromEnv = normalizeBuildId(process.env.GOB_BUILD_ID);
+  if (fromEnv) return fromEnv;
+  const binary = resolveBinary(repoRoot);
+  const candidates = [];
+  if (binary) candidates.push(path.join(path.dirname(binary), 'BUILD_ID'));
+  if (repoRoot) candidates.push(path.join(repoRoot, 'BUILD_ID'));
+  for (const filePath of candidates) {
+    const stamped = readStamp(filePath);
+    if (stamped) return stamped;
+  }
+  if (!repoRoot) return 'unknown';
+  try {
+    const sha = execFileSync('git', ['rev-parse', '--short=12', 'HEAD'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return normalizeBuildId(sha) || 'unknown';
+  } catch (_) {
+    return 'unknown';
+  }
 }
 
 function resolveBinary(repoRoot) {
@@ -92,6 +132,7 @@ function startEngine({ repoRoot, userData, port, mode, logPath }) {
   const env = { ...process.env };
   env.GOB_LOOPBACK = '1';
   env.GOB_BUILD_PROFILE = 'desktop';
+  env.GOB_BUILD_ID = resolveBuildId(repoRoot);
   env.GOB_LOOPBACK_PORT = String(port);
   env.PORT = String(port);
   env.GOB_SQLITE_PATH = path.join(userData, 'local.sqlite');
@@ -173,6 +214,8 @@ module.exports = {
   portIsFree,
   resolvePython,
   resolveBinary,
+  resolveBuildId,
+  normalizeBuildId,
   assertStablePort,
   waitForReady,
   startEngine,

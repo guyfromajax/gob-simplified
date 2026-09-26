@@ -86,6 +86,18 @@ Only one GOB app can be open. A second double-click focuses the first window so 
 
 ---
 
+## Build id
+
+Browse responses carry an ETag that includes the running build. Settings shows the same string as `window.GOB_BUILD_LABEL`. A packaged app has no `.git` directory, so a missing id would stay `unknown` on every version and the Electron cache could keep an old page body after an update.
+
+`scripts/compile_loopback.sh` writes that id before it compiles:
+
+1. Use `GOB_BUILD_ID` if the pack script set it (a version, or `git rev-parse --short=12 HEAD`).
+2. Otherwise use the checkout's short git SHA.
+3. Write it to `dist/loopback/BUILD_ID` and pass `--include-data-files` so the file sits next to `gob-loopback`.
+
+The Electron shell reads that file (or `GOB_BUILD_ID`) in `desktop/engine.js` and puts the same 12-character value in the engine environment and in `window.GOB_BUILD_LABEL`. Do not ship a binary without this stamp.
+
 ## Optional: compiled engine
 
 After `scripts/compile_loopback.sh` has produced a Nuitka binary:

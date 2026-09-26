@@ -160,7 +160,14 @@ function cloneParams(params) {
     window.__gobAuthMeData = Object.assign({}, window.__gobAuthMeData || {}, patch);
   }
 
+  function desktopProfile() {
+    return typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop';
+  }
+
   function apiPatch(path, body) {
+    // Account routes stay remote. Offline desktop has no auth server; skip
+    // the call instead of failing it in the console.
+    if (desktopProfile()) return Promise.resolve(null);
     if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl || !API_CONFIG.getAuthHeaders) {
       return Promise.resolve(null);
     }
@@ -172,6 +179,7 @@ function cloneParams(params) {
   }
 
   function refreshMeFromServer() {
+    if (desktopProfile()) return Promise.resolve(meCache);
     if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl || !API_CONFIG.getAuthHeaders) {
       return Promise.resolve(meCache);
     }
