@@ -63,6 +63,7 @@
 --white-1p2:rgba(255,255,255,.012);
 --white-1p8:rgba(255,255,255,.018);
 --white-2:rgba(255,255,255,.02);
+--group-shade:rgba(255,255,255,.04); /* grouped columns; about twice --white-2 */
 --white-2p2:rgba(255,255,255,.022);
 --white-3:rgba(255,255,255,.03);
 --white-3p5:rgba(255,255,255,.035);
@@ -216,6 +217,7 @@
 --dur-pop:280ms;
 --dur-count:600ms;
 --dur-pulse:1.6s;
+--dur-skeleton:1.4s;
 --delay-arrive-items:320ms;
 --delay-chips:920ms;
 --delay-chips-calm:560ms;

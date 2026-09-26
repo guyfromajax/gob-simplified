@@ -36,11 +36,11 @@
       { id: 'coaches-tab', label: 'Scouting Report' }
     ]},
     { id: 'league', label: 'League', title: 'League', icon: 'league', tabs: [
-      { id: 'standings-tab', label: 'Standings' },
-      { id: 'schedule-page', label: 'Schedule', link: 'schedule' },
+      { id: 'standings-view', label: 'Standings' },
       { id: 'rankings-view', label: 'Rankings' },
-      { id: 'awards-tab', label: 'Leaders' },
-      { id: 'fcc-team-stats-summary-tab', label: 'Team Stats' },
+      { id: 'leaders-view', label: 'Leaders' },
+      { id: 'team-stats-view', label: 'Team Stats' },
+      { id: 'schedule-page', label: 'Schedule', link: 'schedule' },
       { id: 'practice-squad', label: 'Practice Squad', link: 'practice' },
       { id: 'brackets', label: 'Tournament', link: 'brackets', lock: 'tournament' }
     ]},
@@ -62,7 +62,10 @@
     'playbooks-tab': 'prep',
     'coaches-tab': 'prep',
     'standings-tab': 'league',
+    'standings-view': 'league',
     'rankings-view': 'league',
+    'leaders-view': 'league',
+    'team-stats-view': 'league',
     'fcc-team-stats-summary-tab': 'league',
     'awards-tab': 'league',
     'press-tab': 'news'
@@ -84,9 +87,9 @@
     '/brackets.html': { kind: 'browse', section: 'league', sub: 'brackets' },
     '/awards.html': { kind: 'browse', section: 'news', sub: 'awards' },
     '/news.html': { kind: 'browse', section: 'news', sub: 'press-tab' },
-    '/leaders.html': { kind: 'browse', section: 'league', sub: '' },
-    '/standings.html': { kind: 'browse', section: 'league', sub: 'standings-tab' },
-    '/team-stats.html': { kind: 'browse', section: 'league', sub: 'fcc-team-stats-summary-tab' },
+    '/leaders.html': { kind: 'browse', section: 'league', sub: 'leaders-view' },
+    '/standings.html': { kind: 'browse', section: 'league', sub: 'standings-view' },
+    '/team-stats.html': { kind: 'browse', section: 'league', sub: 'team-stats-view' },
     '/stats.html': { kind: 'browse', section: 'league', sub: '' },
     '/player-detail.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/team-roster-view.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
@@ -311,6 +314,7 @@
       subtabHost.appendChild(el);
     });
     markSubtabs(tab);
+    if (window.GOBTables && typeof window.GOBTables.placeTools === 'function') window.GOBTables.placeTools(subtabHost);
   }
 
   function markSubtabs(tab) {
@@ -340,6 +344,7 @@
       paintedSection = sectionId;
     } else {
       markSubtabs(tab);
+      if (window.GOBTables && typeof window.GOBTables.placeTools === 'function') window.GOBTables.placeTools(subtabHost);
     }
   }
 

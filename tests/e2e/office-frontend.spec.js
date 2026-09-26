@@ -877,7 +877,7 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
     expect(mode).toBe('window');
     expect(visible.length).toBeGreaterThanOrEqual(2);
     expect(visible.length).toBeLessThan(order.length);
-    await expect(page.locator('#office-root .st-more')).toHaveAttribute('href', /tab=standings-tab/);
+    await expect(page.locator('#office-root .st-more')).toHaveAttribute('href', /tab=standings-view/);
   }
   const rowMetrics = await page.evaluate(() => {
     const watch = document.querySelector('#office-root .ptw');
@@ -952,7 +952,7 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
     expect(mode1440).toBe('window');
     expect(count1440).toBeGreaterThanOrEqual(5);
     expect(count1440).toBeLessThan(8);
-    await expect(page.locator('#office-root .st-more')).toHaveAttribute('href', /tab=standings-tab/);
+    await expect(page.locator('#office-root .st-more')).toHaveAttribute('href', /tab=standings-view/);
   }
   const typeStep = await page.evaluate(() => {
     const title = document.querySelector('#office-root .office-mv h3');

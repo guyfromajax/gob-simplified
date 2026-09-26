@@ -197,9 +197,9 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
     ['prep-plan', 'game-plan-tab', 'Game Plan'],
     ['prep-playbooks', 'playbooks-tab', 'Playbooks'],
     ['prep-scouting', 'coaches-tab', 'Scouting Report'],
-    ['league', 'standings-tab', 'Standings'],
-    ['league-leaders', 'awards-tab', 'Leaders'],
-    ['league-team-stats', 'fcc-team-stats-summary-tab', 'Team Stats'],
+    ['league', 'standings-view', 'Standings'],
+    ['league-leaders', 'leaders-view', 'Leaders'],
+    ['league-team-stats', 'team-stats-view', 'Team Stats'],
     ['news', 'press-tab', 'News'],
   ];
   for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
@@ -292,7 +292,7 @@ test('back restores the section as it was left, including scroll', async ({ page
   });
   expect(scrolled.top, JSON.stringify(scrolled)).toBeGreaterThan(500);
   await mouseClick(page, '[data-gob-section="league"]');
-  await expect(page.locator('#standings-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#standings-view.tab-content.active')).toBeVisible();
   await page.goBack();
   await expect(page.locator('#player-stats-tab.tab-content.active')).toBeVisible();
   await expect(page.locator('[data-gob-section="team"]')).toHaveClass(/on/);

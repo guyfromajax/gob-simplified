@@ -91,3 +91,52 @@ def standings_display_sort_key(row: Mapping[str, Any]) -> tuple[int, int]:
         differential = int(row.get("differential", 0) or 0)
     return (-wins, -differential)
 
+
+def current_streaks(franchise_results: Dict[str, Any] | None) -> Dict[str, str]:
+    """Current W/L streak for each team, from completed results in week order.
+
+    A tie ends the streak. The text is ``W3`` or ``L1``. Teams with no
+    decided game are omitted. This does not affect standings order.
+    """
+    weeks: list[tuple[int, Any]] = []
+    for key, games in (franchise_results or {}).items():
+        try:
+            week_n = int(key)
+        except (TypeError, ValueError):
+            continue
+        weeks.append((week_n, games))
+    weeks.sort(key=lambda item: item[0])
+    running: Dict[str, tuple[str, int]] = {}
+    for _week, games in weeks:
+        if not isinstance(games, list):
+            continue
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            away_id = str(game.get("away_id") or "")
+            home_id = str(game.get("home_id") or "")
+            if not away_id or not home_id:
+                continue
+            try:
+                away_score = int(game.get("away_score") or 0)
+                home_score = int(game.get("home_score") or 0)
+            except (TypeError, ValueError):
+                continue
+            if away_score == home_score:
+                running[away_id] = ("", 0)
+                running[home_id] = ("", 0)
+                continue
+            if away_score > home_score:
+                outcomes = ((away_id, "W"), (home_id, "L"))
+            else:
+                outcomes = ((home_id, "W"), (away_id, "L"))
+            for team_id, outcome in outcomes:
+                prev = running.get(team_id)
+                count = prev[1] + 1 if prev and prev[0] == outcome else 1
+                running[team_id] = (outcome, count)
+    return {
+        team_id: outcome + str(count)
+        for team_id, (outcome, count) in running.items()
+        if outcome and count
+    }
+

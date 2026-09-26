@@ -119,11 +119,11 @@ The shared tab module also serves any other command center that calls `initComma
 | Prep | Game Plan | `game-plan-tab` |
 | Prep | Playbooks | `playbooks-tab` |
 | Prep | Scouting Report | `coaches-tab` |
-| League | Standings | `standings-tab` |
-| League | Schedule | existing `#schedule-full-link` (`schedule.html` with `franchise_id`, `team_id`, `return_url`) |
+| League | Standings | `standings-view` (in-page module view; `standings.html` redirects here and keeps `franchise_id`, `team_id`, and return params). `?tab=standings-tab` still opens the old panel. |
 | League | Rankings | `rankings-view` (in-page module view; `rankings.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
-| League | Leaders | `awards-tab` |
-| League | Team Stats | `fcc-team-stats-summary-tab` |
+| League | Leaders | `leaders-view` (in-page module view; `leaders.html` redirects here). `?tab=awards-tab` still opens the old panel. |
+| League | Team Stats | `team-stats-view` (in-page module view; `team-stats.html` redirects here). `?tab=fcc-team-stats-summary-tab` still opens the old panel. |
+| League | Schedule | existing `#schedule-full-link` (`schedule.html` with `franchise_id`, `team_id`, `return_url`) |
 | League | Practice Squad | existing `#fcc-ps-season-link` (`practice-squad-standings.html`, `franchise_id` and `team_id`) |
 | League | Tournament | existing `brackets.html` href, or the same resource query already on the rankings link. Before the first week `GOBTierEmblem.tierForWeek` returns a tier, the control is disabled: same shape, `--text-38`, `not-allowed`, not focusable, title `Opens Week N`. |
 | Recruiting | (none) | `recruiting.html` via `openRecruitingSurface` / `GOBNav.go` (`franchise_id`, `team_id`, `from=fcc`, `return_url`). An old `?tab=recruits-tab` deep link opens `home-tab`. |
@@ -164,9 +164,9 @@ A page or brief is done only when this file is updated if the shell, the section
 | brackets.html | browse | League | Tournament |
 | awards.html | browse | News | Awards |
 | news.html | browse | News | News |
-| leaders.html | browse | League | none |
-| standings.html | browse | League | Standings |
-| team-stats.html | browse | League | Team Stats |
+| leaders.html | browse | League | Leaders (`leaders-view`; the file redirects) |
+| standings.html | browse | League | Standings (`standings-view`; the file redirects) |
+| team-stats.html | browse | League | Team Stats (`team-stats-view`; the file redirects) |
 | stats.html | browse | League | none |
 | player-detail.html | browse | return context; else Team or League | none |
 | team-roster-view.html | browse | return context; else Team or League | none |
@@ -315,7 +315,7 @@ Career Leaders keep the older rule for FG% and DEF%: attempts at least 5 times t
 
 A view is a section of the franchise app that lives at `franchise-command-center.html?tab=<view-id>`. That is the same URL rule as today's in-page tabs. Rail clicks still push. Sub-tabs still replace. Back restores the view and the scroll position `GOBNav` already stores. There is no second URL scheme.
 
-In-page tabs (Standings, Roster, the Office) stay as panels already in the page. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant.
+In-page tabs (Roster, the Office) stay as panels already in the page. Standings, Rankings, Leaders, and Team Stats are module views. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant. The old Standings, Leaders, and Team Stats panels remain in the page so an old `?tab=` still resolves.
 
 ### Add a module view
 

@@ -104,16 +104,44 @@
     }
   }
 
+  function viewModule(file) {
+    return function (attempt) {
+      var href = '/js/shared/views/' + file;
+      if (attempt) href += '?retry=' + attempt;
+      return import(href);
+    };
+  }
+
   register({
     id: 'rankings-view',
     section: 'league',
     subtab: 'rankings-view',
     title: 'Rankings',
-    module: function (attempt) {
-      var href = '/js/shared/views/rankingsView.js';
-      if (attempt) href += '?retry=' + attempt;
-      return import(href);
-    }
+    module: viewModule('rankingsView.js')
+  });
+
+  register({
+    id: 'standings-view',
+    section: 'league',
+    subtab: 'standings-view',
+    title: 'Standings',
+    module: viewModule('standingsView.js')
+  });
+
+  register({
+    id: 'leaders-view',
+    section: 'league',
+    subtab: 'leaders-view',
+    title: 'Leaders',
+    module: viewModule('leadersView.js')
+  });
+
+  register({
+    id: 'team-stats-view',
+    section: 'league',
+    subtab: 'team-stats-view',
+    title: 'Team Stats',
+    module: viewModule('teamStatsView.js')
   });
 
   global.GOBViews = {
