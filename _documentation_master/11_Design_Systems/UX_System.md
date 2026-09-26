@@ -263,9 +263,9 @@ A week strip sits under the top of `.main`, above the columns. It is one row, ab
 
 | State | Column 1 · Since last week | Column 2 · This Week | Column 3 · Recruiting |
 |---|---|---|---|
-| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot | Recruiting wire, then the full conference standings. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
-| `first_week` | Season preview | Next game · Team snapshot | One-line wire, then the full conference standings. The digest status when it is set, otherwise the empty-state line. The column heading is the hub link. |
-| `signing_day` | Result · What moved | Team snapshot (`next_game` is null) | Signing Day card, then the full conference standings. The wire is hidden. The column heading still links to the hub. |
+| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot · Conference standings | Recruiting wire. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
+| `first_week` | Season preview | Next game · Team snapshot · Conference standings | One-line wire. The digest status when it is set, otherwise the empty-state line. The column heading is the hub link. |
+| `signing_day` | Result · What moved | Team snapshot · Conference standings (`next_game` is null) | Signing Day card. The wire is hidden. The column heading still links to the hub. |
 
 The three columns are equal width. The wire card is as tall as its rows. "Recruiting →" opens the recruiting hub. Result team names wrap, and at the 1280 density the score is smaller so a long name is not cut off.
 
@@ -274,10 +274,10 @@ The three columns are equal width. The wire card is as tall as its rows. "Recrui
 | Week strip | `todos[]` `label_key`, `done`, `required`, `gates_advance`, `is_advance_action`, `route`. No week label and no ADVANCE tag. |
 | Result | `result` scores, names, `opponent_rank`, `site`, `round_name`, `user_won`, `headline`, `leader`, `leader_role`, `box_score`. The user name is prefixed with `#` plus `what_moved.national_rank.now` when that rank is set. No team monograms. |
 | What moved | `what_moved.national_rank`, `conference_standing`, `record`, `streak`, `attribute_changes` |
-| Recruiting wire | Deduped `recruiting_wire.events` (`event_text`, `position`, `list_position`, `direction`). One row per `recruit_id`, or per name when the id is missing, keeping the latest event. At most 8 rows at the 1280 density and 12 at 1920. The list shrinks, oldest first, so the standings card below it stays on the page. It never drops below 3 events when any exist, and it never shows a half-cut row. The column heading opens the hub. Rail badge uses `pending_count` and `urgent`. |
+| Recruiting wire | Deduped `recruiting_wire.events` (`event_text`, `position`, `list_position`, `direction`). One row per `recruit_id`, or per name when the id is missing, keeping the latest event. At most 8 rows at the 1280 density and 12 at 1920, and only whole rows that sit above the fold. The column heading opens the hub. Rail badge uses `pending_count` and `urgent`. |
 | Next game | `next_game` opponent, `rank` as `21. Name` in upright Bebas, `record`, `Conference` plus the short label and `(place of size)` from `conference_position` and `conference_size`. The place is omitted when either is null. No week callout and no monogram. |
 | Team snapshot | `team_snapshot.chemistry` (red 0–8, yellow 9–16, green 17–25), five equal attitude columns, `moved_most`, `state` |
-| Conference standings | `conference_standings.rows` under the recruiting list in column 3. Every row, at every size. Header is `Conference` plus the short label plus `standings` (`Conference A2 standings`). The user row uses the navy selected-row treatment. |
+| Conference standings | `conference_standings.rows` under Team snapshot. Header is `Conference` plus the short label plus `standings` (`Conference A2 standings`). Show every row when the card fits above the fold. Otherwise show five rows centred on the user, or three if five still clip, plus "Full standings" in the card header to League › Standings. A row matches a players-to-watch row: the team name is `--fs-13` semibold, W-L is the display face at `--fs-22`, and the place is `--text-38` tabular. The user row uses the navy selected-row treatment, with padding inside the highlight. |
 | Signing Day | `signing_day.points_remaining`, `points_total`, `promises_made`, `open_roster_spots`, `targets` |
 | Season preview | `season_preview` fields that are non-null. The opener is the next-game card. |
 

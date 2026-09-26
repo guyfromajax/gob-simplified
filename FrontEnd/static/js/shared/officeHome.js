@@ -1007,20 +1007,42 @@
     return node;
   }
 
+  function standingsHref() {
+    var current = new URLSearchParams(global.location.search);
+    var params = { tab: 'standings-tab' };
+    if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
+    var teamId = current.get('team_id') || current.get('user_team_id');
+    if (teamId) params.team_id = teamId;
+    return href('/franchise-command-center.html', params);
+  }
+
+  function standingsWindow(rows, size) {
+    if (!rows || rows.length <= size) return rows || [];
+    var user = -1;
+    rows.forEach(function (row, index) {
+      if (user === -1 && row && row.is_user) user = index;
+    });
+    if (user < 0) user = 0;
+    var start = user - Math.floor((size - 1) / 2);
+    if (start < 0) start = 0;
+    if (start + size > rows.length) start = Math.max(0, rows.length - size);
+    return rows.slice(start, start + size);
+  }
+
   function standingsRow(row) {
     if (!row) return null;
     var line = el('div', 'st-r' + (row.is_user ? ' me' : ''));
     line.dataset.teamId = row.team_id || '';
-    line.appendChild(el('span', '', present(row.position) ? String(row.position) : ''));
+    line.appendChild(el('span', 'st-pos', present(row.position) ? String(row.position) : ''));
     line.appendChild(el('span', 'st-n', present(row.team_name) ? String(row.team_name) : ''));
     var record = '';
     if (present(row.wins) && present(row.losses)) record = row.wins + '-' + row.losses;
-    line.appendChild(el('span', '', record));
+    line.appendChild(el('span', 'st-wl', record));
     return line;
   }
 
-  function paintStandingsRows(node, rows) {
-    node.querySelectorAll('.st-r').forEach(function (child) { child.remove(); });
+  function paintStandingsRows(node, rows, truncated) {
+    node.querySelectorAll('.st-r, .st-more').forEach(function (child) { child.remove(); });
     var head = el('div', 'st-r st-hd');
     head.appendChild(el('span', '', '#'));
     head.appendChild(el('span', '', 'Team'));
@@ -1030,8 +1052,17 @@
       var line = standingsRow(row);
       if (line) node.appendChild(line);
     });
+    if (truncated) {
+      var moreUrl = standingsHref();
+      var more = el('a', 'lnk st-more', 'Full standings');
+      more.href = moreUrl;
+      bindGo(more, moreUrl);
+      var title = node.querySelector('.card-h');
+      if (title) title.appendChild(more);
+      else node.appendChild(more);
+    }
     node.dataset.standingsShown = String(rows.length);
-    node.dataset.standingsMode = 'all';
+    node.dataset.standingsMode = truncated ? 'window' : 'all';
   }
 
   function standingsCard(table, index) {
@@ -1046,8 +1077,20 @@
     node.dataset.standingsTotal = String(rows.length);
     if (present(table.region)) node.dataset.region = String(table.region);
     if (present(table.conference)) node.dataset.conference = String(table.conference);
-    paintStandingsRows(node, rows);
+    paintStandingsRows(node, rows, false);
     return node;
+  }
+
+  function fitStandings(root) {
+    var card = root.querySelector('.office-st');
+    if (!card || !card._rows || card._rows.length <= 3) return;
+    var col = card.closest('.office-col');
+    if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, card._rows, false);
+    if (!columnPastFold(col)) return;
+    if (card._rows.length > 5) paintStandingsRows(card, standingsWindow(card._rows, 5), true);
+    if (columnPastFold(col) && card._rows.length > 3) {
+      paintStandingsRows(card, standingsWindow(card._rows, 3), true);
+    }
   }
 
   function foldBottom() {
@@ -1058,6 +1101,8 @@
 
   function columnPastFold(node) {
     if (!node) return false;
+    var main = document.querySelector('html.gob-shell .main') || document.querySelector('.main');
+    if (main && main.scrollHeight - main.clientHeight > 1) return true;
     if (node.scrollHeight - node.clientHeight > 1) return true;
     return node.getBoundingClientRect().bottom > foldBottom() + 1;
   }
@@ -1065,15 +1110,13 @@
   function trimRecruiting(root) {
     var wire = root.querySelector('.office-wire');
     if (!wire) return;
-    var col = wire.closest('.office-col');
     var guard = 0;
     while (guard < 24) {
       var rows = wire.querySelectorAll(':scope > .wr');
-      if (rows.length <= 3) break;
+      if (!rows.length) break;
       var last = rows[rows.length - 1];
-      var past = columnPastFold(col) || last.getBoundingClientRect().bottom > foldBottom() + 0.5;
-      if (!past) break;
-      rows[0].remove();
+      if (last.getBoundingClientRect().bottom <= foldBottom() + 0.5) break;
+      last.remove();
       guard += 1;
     }
   }
@@ -1143,19 +1186,17 @@
       first = [previewCard(digest.season_preview, 1)];
       second = [
         nextCard(digest.next_game, digest, 2),
-        snapshotCard(digest.team_snapshot, 3)
+        snapshotCard(digest.team_snapshot, 3),
+        standingsCard(digest.conference_standings, 4)
       ];
-      third = [
-        wireCard(digest.recruiting_wire, true, 4),
-        standingsCard(digest.conference_standings, 5)
-      ];
+      third = [wireCard(digest.recruiting_wire, true, 5)];
     } else if (digest.state === 'signing_day') {
       first = [resultCard(digest.result, false, 1, userRank), whatMovedCard(digest.what_moved, digest, 2)];
-      second = [snapshotCard(digest.team_snapshot, 3)];
-      third = [
-        signingCard(digest.signing_day, 4),
-        standingsCard(digest.conference_standings, 5)
+      second = [
+        snapshotCard(digest.team_snapshot, 3),
+        standingsCard(digest.conference_standings, 4)
       ];
+      third = [signingCard(digest.signing_day, 5)];
     } else {
       first = [
         resultCard(digest.result, countScores, 1, userRank),
@@ -1163,12 +1204,10 @@
       ];
       second = [
         nextCard(digest.next_game, digest, 3),
-        snapshotCard(digest.team_snapshot, 4)
+        snapshotCard(digest.team_snapshot, 4),
+        standingsCard(digest.conference_standings, 5)
       ];
-      third = [
-        wireCard(digest.recruiting_wire, false, 5),
-        standingsCard(digest.conference_standings, 6)
-      ];
+      third = [wireCard(digest.recruiting_wire, false, 6)];
     }
     first.forEach(function (node) { if (node) col1.appendChild(node); });
     second.forEach(function (node) { if (node) col2.appendChild(node); });
@@ -1179,6 +1218,7 @@
     root.append(strip, grid);
     tightenStrip(strip);
     function settle() {
+      fitStandings(root);
       trimRecruiting(root);
     }
     settle();

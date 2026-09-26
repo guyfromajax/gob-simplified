@@ -11,6 +11,7 @@ const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/office-frontend');
 const V2 = path.join(__dirname, '../../reports/office-v2');
 const V3 = path.join(__dirname, '../../reports/office-v3');
+const V3B = path.join(__dirname, '../../reports/office-v3b');
 const FRAMES = path.join(__dirname, '../../_documentation_master/projects/design_handoff_office_shell/frames');
 
 const FRAME_SHOTS = [
@@ -475,6 +476,17 @@ function measure(page) {
       gaps: gaps,
       clip: clip,
       pad: pad,
+      standings: (function () {
+        const card = document.querySelector('#office-root .office-st');
+        if (!card) return null;
+        const cols = [...document.querySelectorAll('#office-root .office-col')];
+        return {
+          mode: card.dataset.standingsMode || '',
+          shown: Number(card.dataset.standingsShown) || 0,
+          total: Number(card.dataset.standingsTotal) || 0,
+          column: cols.findIndex((col) => col.contains(card)) + 1,
+        };
+      })(),
       left: Math.round((officeBox.left - mainBox.left) * 10) / 10,
       right: Math.round((mainBox.right - officeBox.right) * 10) / 10,
     };
@@ -485,6 +497,7 @@ test.beforeAll(() => {
   fs.mkdirSync(OUT, { recursive: true });
   fs.mkdirSync(V2, { recursive: true });
   fs.mkdirSync(V3, { recursive: true });
+  fs.mkdirSync(V3B, { recursive: true });
 });
 
 test('six states fit at 1280 and 1920', async ({ page }) => {
@@ -543,10 +556,24 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         });
         await assertOneVerticalScroll(page);
       }
-      await page.screenshot({ path: path.join(V3, name + '-' + size[2] + '.png') });
+      if (size[2] === '1440') {
+        expect(numbers.standings && numbers.standings.mode, name + ' 1440 full table').toBe('all');
+        expect(numbers.standings.shown, name + ' 1440 rows').toBe(numbers.standings.total);
+      }
+      if (size[2] === '1920') {
+        expect(numbers.mainScroll, name + ' 1920 vertical').toBeLessThanOrEqual(1);
+        numbers.clip.forEach(function (px, index) {
+          expect(px, name + ' 1920 column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
+        });
+        if (numbers.standings && numbers.standings.mode === 'all') {
+          expect(numbers.standings.shown, name + ' 1920 rows').toBe(numbers.standings.total);
+        }
+      }
+      expect(numbers.standings && numbers.standings.column, name + ' standings column').toBe(2);
+      await page.screenshot({ path: path.join(V3B, name + '-' + size[2] + '.png') });
     }
   }
-  fs.writeFileSync(path.join(V3, 'fit.json'), JSON.stringify(fit, null, 2));
+  fs.writeFileSync(path.join(V3B, 'fit.json'), JSON.stringify(fit, null, 2));
 });
 
 test('frames at their design sizes', async ({ page }) => {
@@ -647,7 +674,7 @@ test('live mid-season digest', async ({ page }) => {
       expect(numbers.mainScroll).toBeLessThanOrEqual(1);
       await assertOneVerticalScroll(page);
     }
-    await page.screenshot({ path: path.join(V3, 'live-' + size[2] + '.png') });
+    await page.screenshot({ path: path.join(V3B, 'live-' + size[2] + '.png') });
   }
 });
 
@@ -776,9 +803,9 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   const heading = page.locator('#office-root .office-col').nth(2).locator('.col-link');
   await expect(heading).toHaveAttribute('href', /recruiting\.html/);
   expect(await page.locator('#office-root .office-wire h3').count()).toBe(0);
-  const col3 = page.locator('#office-root .office-col').nth(2);
-  await expect(col3.locator('.office-st h3')).toHaveText('Conference A2 standings');
-  await expect(page.locator('#office-root .office-col').nth(1).locator('.office-st')).toHaveCount(0);
+  const col2 = page.locator('#office-root .office-col').nth(1);
+  await expect(col2.locator('.office-st h3')).toHaveText('Conference A2 standings');
+  await expect(page.locator('#office-root .office-col').nth(2).locator('.office-st')).toHaveCount(0);
   const shown = await page.locator('#office-root .office-st .st-r:not(.st-hd)').evaluateAll((nodes) => {
     return nodes.map((node) => ({
       me: node.classList.contains('me'),
@@ -789,9 +816,64 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   const mode = await page.locator('#office-root .office-st').getAttribute('data-standings-mode');
   const order = standingsBlock().rows.map((row) => row.team_name);
   const visible = shown.map((row) => row.name);
-  expect(mode).toBe('all');
-  expect(visible).toEqual(order);
   expect(shown.some((row) => row.me && row.name === 'Amariabi International')).toBe(true);
+  const start = order.indexOf(visible[0]);
+  expect(order.slice(start, start + visible.length)).toEqual(visible);
+  if (mode === 'all') {
+    expect(visible).toEqual(order);
+    expect(await page.locator('#office-root .st-more').count()).toBe(0);
+  } else {
+    expect(mode).toBe('window');
+    expect([5, 3]).toContain(visible.length);
+    await expect(page.locator('#office-root .st-more')).toHaveAttribute('href', /tab=standings-tab/);
+  }
+  const rowMetrics = await page.evaluate(() => {
+    const watch = document.querySelector('#office-root .ptw');
+    const row = document.querySelector('#office-root .office-st .st-r:not(.st-hd):not(.me)');
+    const watchStyle = getComputedStyle(watch);
+    const rowStyle = getComputedStyle(row);
+    const name = getComputedStyle(row.querySelector('.st-n'));
+    const watchName = getComputedStyle(watch.querySelector('.nm'));
+    const record = getComputedStyle(row.querySelector('.st-wl'));
+    const watchNum = getComputedStyle(watch.querySelector('b'));
+    const place = getComputedStyle(row.querySelector('.st-pos'));
+    const me = getComputedStyle(document.querySelector('#office-root .office-st .st-r.me'));
+    const px = (style, prop) => parseFloat(style[prop]);
+    return {
+      font: Math.abs(px(watchStyle, 'fontSize') - px(rowStyle, 'fontSize')),
+      lineMatch: watchStyle.lineHeight === rowStyle.lineHeight,
+      lineWatch: watchStyle.lineHeight,
+      lineRow: rowStyle.lineHeight,
+      padTop: Math.abs(px(watchStyle, 'paddingTop') - px(rowStyle, 'paddingTop')),
+      padBottom: Math.abs(px(watchStyle, 'paddingBottom') - px(rowStyle, 'paddingBottom')),
+      nameSize: Math.abs(px(name, 'fontSize') - px(watchName, 'fontSize')),
+      nameWeight: name.fontWeight === watchName.fontWeight,
+      nameTrack: name.letterSpacing,
+      recordFamily: record.fontFamily,
+      watchFamily: watchNum.fontFamily,
+      recordSize: Math.abs(px(record, 'fontSize') - px(watchNum, 'fontSize')),
+      placeTrack: place.letterSpacing,
+      mePadLeft: px(me, 'paddingLeft'),
+      mePadTop: px(me, 'paddingTop'),
+    };
+  });
+  expect(rowMetrics.font).toBeLessThanOrEqual(1);
+  expect(rowMetrics.lineMatch, rowMetrics.lineWatch + ' vs ' + rowMetrics.lineRow).toBe(true);
+  expect(rowMetrics.padTop).toBeLessThanOrEqual(1);
+  expect(rowMetrics.padBottom).toBeLessThanOrEqual(1);
+  expect(rowMetrics.nameSize).toBeLessThanOrEqual(1);
+  expect(rowMetrics.nameWeight).toBe(true);
+  expect(rowMetrics.nameTrack === 'normal' || rowMetrics.nameTrack === '0px').toBe(true);
+  expect(rowMetrics.placeTrack === 'normal' || rowMetrics.placeTrack === '0px').toBe(true);
+  expect(rowMetrics.recordFamily).toMatch(/Bebas/i);
+  expect(rowMetrics.watchFamily).toMatch(/Bebas/i);
+  expect(rowMetrics.recordSize).toBeLessThanOrEqual(1);
+  expect(rowMetrics.mePadLeft).toBeGreaterThanOrEqual(6);
+  expect(rowMetrics.mePadTop).toBeGreaterThanOrEqual(4);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openOffice(page, STATES.win);
+  await expect(page.locator('#office-root .office-st')).toHaveAttribute('data-standings-mode', 'all');
+  expect(await page.locator('#office-root .office-st .st-r:not(.st-hd)').count()).toBe(8);
   expect(await page.locator('#office-root .st-more').count()).toBe(0);
   const typeStep = await page.evaluate(() => {
     const title = document.querySelector('#office-root .office-mv h3');
@@ -869,9 +951,8 @@ test('recruiting keeps the latest event and whole rows', async ({ page }) => {
   expect(rows).not.toContain('id:r0');
   expect(rows).toContain('id:r1');
   await expect(page.locator('#office-root .office-wire')).toContainText('Latest for 1');
-  expect(rows.length).toBeGreaterThanOrEqual(3);
   expect(rows.length).toBeLessThanOrEqual(8);
-  expect(await page.locator('#office-root .office-st .st-r:not(.st-hd)').count()).toBe(8);
+  expect(rows.length).toBeGreaterThan(0);
   const cut = await page.evaluate(() => {
     const main = document.querySelector('html.gob-shell .main');
     const limit = main.getBoundingClientRect().bottom;
