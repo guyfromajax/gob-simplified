@@ -9,6 +9,7 @@ test.describe.configure({ timeout: 180000 });
 const FID = 'f-e2e-office';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/office-frontend');
+const V2 = path.join(__dirname, '../../reports/office-v2');
 const FRAMES = path.join(__dirname, '../../_documentation_master/projects/design_handoff_office_shell/frames');
 
 const FRAME_SHOTS = [
@@ -136,8 +137,9 @@ function digest(state, patch) {
       record: { wins: 16, losses: 5 },
       streak: 'W4',
       attribute_changes: [
-        { player_id: 'p-jalen', name: 'Jalen Carter', attribute: 'shooting', from: 6, to: 7 },
-        { player_id: 'p-marcus', name: 'Marcus Ruiz', attribute: 'endurance', from: 7, to: 6 },
+        { player_id: 'p-jalen', name: 'Jalen Carter', attribute: 'SH', from: 6, to: 7 },
+        { player_id: 'p-jalen', name: 'Jalen Carter', attribute: 'ND', from: 7, to: 6 },
+        { player_id: 'p-marcus', name: 'Marcus Ruiz', attribute: 'BH', from: 4, to: 5 },
       ],
     },
     team_snapshot: snapshotBlock(),
@@ -199,8 +201,8 @@ const STATES = {
   regular: commandCenter(digest('regular', {
     result: resultBlock({ user_won: null, home_score: 70, away_score: 70, headline: null, leader_role: null, leader: null }),
     what_moved: {
-      national_rank: { now: 20, prev: null, delta: null },
-      conference_standing: { now: 4, prev: null, delta: null },
+      national_rank: { now: 20, prev: 20, delta: 0 },
+      conference_standing: { now: 4, prev: 4, delta: 0 },
       record: { wins: 8, losses: 8 },
       streak: null,
       attribute_changes: [],
@@ -384,34 +386,46 @@ function measure(page) {
   return page.evaluate(() => {
     const main = document.querySelector('html.gob-shell .main');
     const mainBox = main.getBoundingClientRect();
+    const office = document.getElementById('office-root');
+    const officeBox = office.getBoundingClientRect();
+    const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--page-pad'));
     const gaps = [...document.querySelectorAll('#office-root .office-col')].map((col) => {
       const kids = [...col.children].filter((el) => el.getBoundingClientRect().height > 1);
       const last = kids[kids.length - 1] || col;
       return Math.round(mainBox.bottom - last.getBoundingClientRect().bottom);
+    });
+    const clip = [...document.querySelectorAll('#office-root .office-col')].map((col) => {
+      return Math.max(0, col.scrollHeight - col.clientHeight);
     });
     return {
       mainScroll: main.scrollHeight - main.clientHeight,
       mainWide: main.scrollWidth - main.clientWidth,
       pageWide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       gaps: gaps,
+      clip: clip,
+      pad: pad,
+      left: Math.round((officeBox.left - mainBox.left) * 10) / 10,
+      right: Math.round((mainBox.right - officeBox.right) * 10) / 10,
     };
   });
 }
 
 test.beforeAll(() => {
   fs.mkdirSync(OUT, { recursive: true });
+  fs.mkdirSync(V2, { recursive: true });
 });
 
 test('six states fit at 1280 and 1920', async ({ page }) => {
   const fit = {};
   for (const name of Object.keys(STATES)) {
     fit[name] = {};
-    for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
+    for (const size of [[1280, 720, '1280'], [1440, 900, '1440'], [1920, 1080, '1920']]) {
       await page.setViewportSize({ width: size[0], height: size[1] });
       await openOffice(page, STATES[name]);
       await assertOfficeText(page);
       await assertHeadersClear(page);
       expect(await page.locator('#office-root .office-col').count()).toBe(3);
+      expect(await page.locator('#office-root .week-strip').count()).toBe(1);
       expect(await page.locator('#gob-main h1')).toHaveText('');
       if (name === 'signing_day') {
         expect(await page.locator('#office-root .office-wire').count()).toBe(0);
@@ -430,17 +444,25 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         expect(await page.locator('#office-root .sp-card').count()).toBe(1);
         expect(await page.locator('#office-root').getByText('Set after camp').count()).toBe(2);
       }
+      if (name === 'regular') {
+        expect(await page.locator('#office-root .mv-cell .chip').count()).toBe(0);
+      }
       const numbers = await measure(page);
       fit[name][size[2]] = numbers;
+      expect(Math.abs(numbers.left - numbers.pad), name + ' left pad').toBeLessThan(1.5);
+      expect(Math.abs(numbers.right - numbers.pad), name + ' right pad').toBeLessThan(1.5);
       if (size[2] === '1280') {
         expect(numbers.mainScroll, name + ' vertical').toBeLessThanOrEqual(1);
         expect(numbers.pageWide, name + ' horizontal').toBeLessThanOrEqual(1);
+        numbers.clip.forEach(function (px, index) {
+          expect(px, name + ' column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
+        });
         await assertOneVerticalScroll(page);
       }
-      await page.screenshot({ path: path.join(OUT, name + '-' + size[2] + '.png') });
+      await page.screenshot({ path: path.join(V2, name + '-' + size[2] + '.png') });
     }
   }
-  fs.writeFileSync(path.join(OUT, 'fit.json'), JSON.stringify(fit, null, 2));
+  fs.writeFileSync(path.join(V2, 'fit.json'), JSON.stringify(fit, null, 2));
 });
 
 test('frames at their design sizes', async ({ page }) => {
@@ -515,7 +537,7 @@ test('live mid-season digest', async ({ page }) => {
     rank: dumped.rank,
     training_completed: dumped.training_completed !== false,
   });
-  for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
+  for (const size of [[1280, 720, '1280'], [1440, 900, '1440'], [1920, 1080, '1920']]) {
     await page.setViewportSize({ width: size[0], height: size[1] });
     await openOffice(page, data);
     await assertOfficeText(page);
@@ -534,7 +556,136 @@ test('live mid-season digest', async ({ page }) => {
       expect(numbers.mainScroll).toBeLessThanOrEqual(1);
       await assertOneVerticalScroll(page);
     }
-    await page.screenshot({ path: path.join(OUT, 'live-' + size[2] + '.png') });
+    await page.screenshot({ path: path.join(V2, 'live-' + size[2] + '.png') });
+  }
+});
+
+test('week strip states and clicks', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openOffice(page, STATES.win);
+  const steps = await page.locator('#office-root .wk-step').evaluateAll((nodes) => nodes.map((node) => ({
+    state: node.dataset.stepState,
+    next: node.classList.contains('is-next'),
+    text: node.innerText.replace(/\s+/g, ' ').trim(),
+  })));
+  expect(steps.map((step) => step.state)).toEqual(['done', 'blocking', 'upcoming', 'upcoming', 'upcoming']);
+  expect(steps[1].next).toBe(true);
+  expect(steps[1].text).toContain('BLOCKS ADVANCE');
+  expect(await page.locator('#office-root .wk-step.gated .td-adv').count()).toBe(0);
+  const doneOpacity = await page.locator('#office-root .wk-step.done').evaluate((node) => getComputedStyle(node).opacity);
+  expect(doneOpacity).toBe('0.38');
+  const strip = await page.locator('#office-root .week-strip').evaluate((node) => ({
+    h: node.getBoundingClientRect().height,
+    wide: node.scrollWidth - node.clientWidth,
+  }));
+  expect(strip.h).toBeGreaterThan(50);
+  expect(strip.h).toBeLessThan(60);
+  expect(strip.wide).toBeLessThanOrEqual(1);
+  await page.evaluate(() => {
+    window.__officeNav = [];
+    window.GOBNav.go = function (url) { window.__officeNav.push(String(url)); };
+  });
+  await mouseClick(page, '#office-root .wk-step.done');
+  await page.waitForFunction(() => window.__officeNav && window.__officeNav.length > 0);
+  expect(new URL((await page.evaluate(() => window.__officeNav[0])), 'http://local').pathname).toBe('/training.html');
+});
+
+test('attribute chips group, order, and cap', async ({ page }) => {
+  const changes = [
+    { player_id: 'p-zoe', name: 'Zoe Ng', attribute: 'SH', from: 1, to: 2 },
+    { player_id: 'p-amy', name: 'Amy Cole', attribute: 'BH', from: 3, to: 5 },
+    { player_id: 'p-amy', name: 'Amy Cole', attribute: 'ND', from: 8, to: 7 },
+    { player_id: 'p-bob', name: 'Bob Hale', attribute: 'SC', from: 4, to: 5 },
+    { player_id: 'p-cal', name: 'Cal Ives', attribute: 'ID', from: 2, to: 4 },
+    { player_id: 'p-dee', name: 'Dee Ortiz', attribute: 'OD', from: 5, to: 6 },
+    { player_id: 'p-eve', name: 'Eve Park', attribute: 'PS', from: 6, to: 8 },
+    { player_id: 'p-eve', name: 'Eve Park', attribute: 'AG', from: 4, to: 3 },
+  ];
+  const data = commandCenter(digest('win', {
+    what_moved: {
+      national_rank: { now: 18, prev: 18, delta: 0 },
+      conference_standing: { now: 3, prev: 3, delta: 0 },
+      record: { wins: 16, losses: 5 },
+      streak: null,
+      attribute_changes: changes,
+    },
+  }));
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openOffice(page, data);
+  await assertOfficeText(page);
+  expect(await page.locator('#office-root .mv-cell .chip').count()).toBe(0);
+  const rows = await page.locator('#office-root .mv-p').evaluateAll((nodes) => nodes.map((node) => ({
+    id: node.dataset.playerId,
+    chips: [...node.querySelectorAll('.attr-chip')].map((chip) => ({
+      code: chip.querySelector('.attr-code').textContent,
+      value: chip.querySelector('.tdig').textContent,
+      title: chip.getAttribute('title'),
+      dir: chip.querySelector('.arr').classList.contains('up') ? 'up' : 'down',
+      text: chip.textContent,
+    })),
+  })));
+  expect(rows.map((row) => row.id)).toEqual(['p-amy', 'p-eve', 'p-cal', 'p-bob', 'p-dee']);
+  expect(rows[0].chips.map((chip) => chip.code + chip.dir + chip.value)).toEqual(['BHup5', 'NDdown7']);
+  expect(rows[0].chips[0].title).toBe('Ball Handling');
+  expect(rows[0].chips[0].text).not.toContain('3');
+  expect(rows[1].chips.map((chip) => chip.dir)).toEqual(['up', 'down']);
+  await expect(page.locator('#office-root .office-mv .lnk')).toHaveText(/All changes/);
+  const href = await page.locator('#office-root .office-mv .lnk').getAttribute('href');
+  expect(href).toContain('/training-report.html');
+  expect(href).toContain('week=21');
+  const nameHref = await page.locator('#office-root .mv-p[data-player-id="p-amy"] .nm').getAttribute('href');
+  expect(nameHref).toContain('/player-detail.html');
+  expect(nameHref).toContain('id=p-amy');
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openOffice(page, data);
+  expect(await page.locator('#office-root .mv-p').count()).toBe(6);
+  expect(await page.locator('#office-root .office-mv .lnk').count()).toBe(0);
+});
+
+async function logoBox(page) {
+  return page.evaluate(() => {
+    const logo = document.getElementById('team-logo');
+    const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--top-h'));
+    const box = logo.getBoundingClientRect();
+    const natural = logo.naturalWidth / logo.naturalHeight;
+    return {
+      topH: topH,
+      logoH: box.height,
+      logoW: box.width,
+      natural: natural,
+      boxRatio: box.width / box.height,
+      alt: logo.alt,
+      title: logo.title,
+      label: document.getElementById('gob-top-id').getAttribute('aria-label'),
+    };
+  });
+}
+
+test('logo fills the top bar on office and standalone pages', async ({ page }) => {
+  const pages = [
+    '/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID,
+    '/rankings.html?franchise_id=' + FID + '&team_id=' + TID,
+    '/schedule.html?franchise_id=' + FID + '&team_id=' + TID,
+  ];
+  for (const size of [[1280, 720], [1920, 1080]]) {
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    for (const url of pages) {
+      await stubAuth(page);
+      await installApi(page, STATES.win);
+      await page.goto(url);
+      await page.waitForSelector('html.gob-shell #team-logo');
+      await page.waitForFunction(() => {
+        const logo = document.getElementById('team-logo');
+        return logo && logo.naturalWidth > 0;
+      });
+      const box = await logoBox(page);
+      expect(Math.abs(box.logoH - box.topH), url).toBeLessThanOrEqual(1);
+      expect(box.logoW).toBeGreaterThan(0);
+      expect(Math.abs(box.boxRatio - box.natural), url + ' aspect').toBeLessThan(0.08);
+      expect(box.alt).toBe('Lancaster');
+      expect(box.title).toBe('Lancaster');
+      expect(box.label).toBe('Lancaster');
+    }
   }
 });
 

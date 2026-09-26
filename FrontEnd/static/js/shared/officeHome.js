@@ -241,9 +241,9 @@
   function chip(delta, popIndex) {
     if (delta == null || delta === '') return null;
     var n = Number(delta);
-    if (!isFinite(n)) return null;
-    var kind = n > 0 ? 'up' : (n < 0 ? 'down' : 'flat');
-    var text = n > 0 ? '▲' + n : (n < 0 ? '▼' + Math.abs(n) : '0');
+    if (!isFinite(n) || n === 0) return null;
+    var kind = n > 0 ? 'up' : 'down';
+    var text = n > 0 ? '▲' + n : '▼' + Math.abs(n);
     var node = el('span', 'chip ' + kind + (popIndex != null ? ' ar-pop' : ''), text);
     if (popIndex != null) node.style.setProperty('--i', String(popIndex));
     return node;
@@ -337,65 +337,146 @@
     return '';
   }
 
-  function todosCard(todos) {
-    var list = Array.isArray(todos) ? todos : [];
-    var node = card('office-todo', 0);
-    var head = el('div', 'card-h');
-    head.appendChild(el('h3', '', 'To do'));
-    node.appendChild(head);
-    var wrap = el('div', 'todo-list');
+  function attrParts(raw) {
+    var names = global.ATTRIBUTE_NAMES || {};
+    var key = String(raw || '');
+    var upper = key.toUpperCase();
+    if (names[upper]) return { code: upper, title: names[upper] };
+    var codes = Object.keys(names);
+    for (var i = 0; i < codes.length; i++) {
+      if (String(names[codes[i]]).toLowerCase() === key.toLowerCase()) {
+        return { code: codes[i], title: names[codes[i]] };
+      }
+    }
+    return { code: upper.length <= 3 ? upper : upper.slice(0, 2), title: labelize(key) };
+  }
+
+  function playerCap() {
+    return document.documentElement.classList.contains('gob-1920') ? 8 : 5;
+  }
+
+  function groupAttributes(changes) {
+    var order = [];
+    var map = {};
+    (Array.isArray(changes) ? changes : []).forEach(function (change) {
+      if (!change || !present(change.from) || !present(change.to)) return;
+      var delta = Number(change.to) - Number(change.from);
+      if (!isFinite(delta) || delta === 0) return;
+      var id = present(change.player_id) ? String(change.player_id) : String(change.name || '');
+      if (!map[id]) {
+        map[id] = {
+          id: id,
+          name: present(change.name) ? String(change.name) : '',
+          chips: [],
+          total: 0
+        };
+        order.push(id);
+      }
+      var row = map[id];
+      if (present(change.name)) row.name = String(change.name);
+      row.total += Math.abs(delta);
+      row.chips.push({
+        attribute: change.attribute,
+        to: change.to,
+        delta: delta
+      });
+    });
+    var rows = order.map(function (id) { return map[id]; });
+    rows.forEach(function (row) {
+      row.chips.sort(function (a, b) {
+        var upA = a.delta > 0 ? 0 : 1;
+        var upB = b.delta > 0 ? 0 : 1;
+        return upA - upB;
+      });
+    });
+    rows.sort(function (a, b) {
+      if (b.total !== a.total) return b.total - a.total;
+      return a.name.localeCompare(b.name);
+    });
+    return rows;
+  }
+
+  function attrChip(change) {
+    var parts = attrParts(change.attribute);
+    var node = el('span', 'attr-chip');
+    node.title = parts.title;
+    node.appendChild(el('b', 'attr-code', parts.code));
+    node.appendChild(el('b', 'tdig ' + digitClass(change.to), String(change.to)));
+    node.appendChild(el('i', 'arr ' + (change.delta > 0 ? 'up' : 'down'), change.delta > 0 ? '▲' : '▼'));
+    return node;
+  }
+
+  function trainingReportHref(digest) {
+    var current = new URLSearchParams(global.location.search);
+    var params = { mode: 'franchise', from: 'office' };
+    if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
+    var teamId = current.get('team_id') || current.get('user_team_id');
+    if (teamId) params.team_id = teamId;
+    var week = digest && digest.result && digest.result.week;
+    if (!present(week) && digest && digest.next_game) week = digest.next_game.week;
+    if (present(week)) params.week = week;
+    return href('/training-report.html', params);
+  }
+
+  function weekStrip(digest) {
+    var list = Array.isArray(digest && digest.todos) ? digest.todos : [];
+    var nextIndex = -1;
+    list.forEach(function (todo, index) {
+      if (nextIndex === -1 && todo && !todo.done && todo.required !== false) nextIndex = index;
+    });
+    var strip = el('div', 'week-strip' + (list.length > 6 ? ' is-tight' : ''));
+    var label = weekAside(digest);
+    if (label) strip.appendChild(el('span', 'week-k', label));
+    var track = el('div', 'week-track');
     list.forEach(function (todo, index) {
       if (!todo) return;
-      var classes = 'todo ar-item';
-      if (todo.done) classes += ' done';
-      if (todo.gates_advance) classes += ' gated';
+      var classes = 'wk-step';
+      var state = 'upcoming';
+      if (todo.done) {
+        classes += ' done';
+        state = 'done';
+      } else {
+        if (index === nextIndex) {
+          classes += ' is-next';
+          state = 'next';
+        } else {
+          classes += ' is-upcoming';
+        }
+        if (todo.gates_advance) {
+          classes += ' gated';
+          state = 'blocking';
+        }
+      }
       var row = el('button', classes);
       row.type = 'button';
-      row.style.setProperty('--i', String(index));
       row.dataset.officeTodo = todo.id || '';
-      if (todo.is_advance_action) row.dataset.advanceMirror = '1';
-      var box = el('span', 'cbox');
-      if (todo.done) box.appendChild(checkMark());
-      row.appendChild(box);
-      var text = el('span', 'td-t');
-      var copy = todo.is_advance_action
+      row.dataset.stepState = state;
+      if (todo.is_advance_action && !todo.done) row.dataset.advanceMirror = '1';
+      var dot = el('span', 'wk-dot');
+      if (todo.done) dot.appendChild(checkMark());
+      row.appendChild(dot);
+      var copy = (todo.is_advance_action && !todo.done)
         ? advanceLabel()
         : (TODO_COPY[todo.label_key] || labelize(todo.label_key));
-      text.appendChild(el('span', 'td-l', copy));
-      if (todo.gates_advance || todo.is_advance_action) {
-        var tags = el('span', 'td-tags');
-        if (todo.gates_advance) tags.appendChild(el('span', 'td-gate', 'BLOCKS ADVANCE'));
-        if (todo.is_advance_action) tags.appendChild(el('span', 'td-adv', 'ADVANCE'));
-        text.appendChild(tags);
+      row.appendChild(el('span', 'td-l', copy));
+      if (!todo.done && index === nextIndex && todo.is_advance_action) {
+        row.appendChild(el('span', 'td-adv', 'ADVANCE'));
       }
-      row.appendChild(text);
-      var cue = el('span', 'td-c');
-      cue.appendChild(chevron());
-      row.appendChild(cue);
+      if (!todo.done && todo.gates_advance) {
+        row.appendChild(el('span', 'td-gate', 'BLOCKS ADVANCE'));
+      }
       row.addEventListener('click', function () {
-        if (todo.is_advance_action) {
+        if (!todo.done && todo.is_advance_action) {
           var play = document.getElementById('play-now');
           if (play) play.click();
           return;
         }
         if (present(todo.route)) go(franchiseHref(todo.route));
       });
-      wrap.appendChild(row);
+      track.appendChild(row);
     });
-    node.appendChild(wrap);
-    if (list.length > 4) {
-      var more = el('button', 'lnk more office-more', 'See all · ' + (list.length - 4) + ' more');
-      more.type = 'button';
-      more.addEventListener('click', function () {
-        clickTiny();
-        var root = document.getElementById('office-root');
-        if (!root) return;
-        var open = root.classList.toggle('is-todos-open');
-        more.textContent = open ? 'Show less' : ('See all · ' + (list.length - 4) + ' more');
-      });
-      node.appendChild(more);
-    }
-    return node;
+    strip.appendChild(track);
+    return strip;
   }
 
   function userSide(result) {
@@ -559,7 +640,7 @@
     return cell;
   }
 
-  function whatMovedCard(moved, index) {
+  function whatMovedCard(moved, digest, index) {
     if (!moved) return null;
     var node = card('office-mv', index);
     var head = el('div', 'card-h');
@@ -582,36 +663,39 @@
     });
     if (strip.childNodes.length) node.appendChild(strip);
 
-    var changes = Array.isArray(moved.attribute_changes) ? moved.attribute_changes : [];
-    if (changes.length) {
+    var rows = groupAttributes(moved.attribute_changes);
+    var cap = playerCap();
+    var shown = rows.slice(0, cap);
+    if (shown.length) {
       node.appendChild(el('div', 'sub-h', 'Attributes'));
       var list = el('div', 'mv-list');
-      changes.forEach(function (change, changeIndex) {
-        if (!change || !present(change.from) || !present(change.to)) return;
-        var url = playerHref(change.player_id);
-        var row = el(url ? 'a' : 'div', 'mv-p ar-item');
+      shown.forEach(function (player, changeIndex) {
+        var row = el('div', 'mv-p ar-item');
         row.style.setProperty('--i', String(changeIndex + 3));
+        row.dataset.playerId = player.id;
+        var url = playerHref(player.id);
+        var who = el(url ? 'a' : 'span', 'nm');
+        who.textContent = player.name;
         if (url) {
-          row.href = url;
-          bindGo(row, url);
+          who.href = url;
+          bindGo(who, url);
         }
-        var who = el('span', 'mv-pn');
-        if (present(change.name)) who.appendChild(el('span', 'nm', change.name));
-        if (present(change.attribute)) who.appendChild(el('span', '', labelize(change.attribute)));
         row.appendChild(who);
-        var ft = el('span', 'mv-ft');
-        ft.appendChild(el('b', 'tdig ' + digitClass(change.from), String(change.from)));
-        ft.appendChild(el('i', '', '→'));
-        ft.appendChild(el('b', 'tdig ' + digitClass(change.to), String(change.to)));
-        row.appendChild(ft);
-        var delta = Number(change.to) - Number(change.from);
-        if (isFinite(delta) && delta !== 0) {
-          var deltaChip = chip(delta, changeIndex + 3);
-          if (deltaChip) row.appendChild(deltaChip);
-        }
+        var run = el('span', 'attr-run');
+        player.chips.forEach(function (change) {
+          run.appendChild(attrChip(change));
+        });
+        row.appendChild(run);
         list.appendChild(row);
       });
-      if (list.childNodes.length) node.appendChild(list);
+      node.appendChild(list);
+      if (rows.length > cap) {
+        var moreUrl = trainingReportHref(digest);
+        var more = el('a', 'lnk', 'All changes');
+        more.href = moreUrl;
+        bindGo(more, moreUrl);
+        node.appendChild(more);
+      }
     }
     return node;
   }
@@ -910,13 +994,15 @@
     var root = el('div', 'office');
     root.id = 'office-root';
     root.setAttribute('aria-busy', 'true');
+    root.appendChild(el('div', 'week-strip office-skel'));
+    var grid = el('div', 'office-grid');
     ['01', '02', '03'].forEach(function (index, nth) {
-      var titles = ['This week', 'Since last week', 'Next game'];
+      var titles = ['Since last week', 'Next game', 'Recruiting'];
       var col = column(index, titles[nth], '');
       col.appendChild(el('div', 'card office-skel'));
-      col.appendChild(el('div', 'card office-skel'));
-      root.appendChild(col);
+      grid.appendChild(col);
     });
+    root.appendChild(grid);
     return root;
   }
 
@@ -937,29 +1023,34 @@
     root.setAttribute('aria-busy', 'false');
     root.replaceChildren();
 
-    var col1 = column('01', 'This week', weekAside(digest));
-    col1.appendChild(todosCard(digest.todos));
-    var col2 = column('02', 'Since last week', '');
-    var col3 = column('03', 'Next game', '');
+    var col1 = column('01', 'Since last week', '');
+    var col2 = column('02', 'Next game', '');
+    var col3 = column('03', 'Recruiting', '');
+    var first = [];
     var second = [];
     var third = [];
     if (digest.state === 'first_week') {
-      second = [previewCard(digest.season_preview, 1), wireCard(digest.recruiting_wire, true, 2)];
-      third = [nextCard(digest.next_game, digest, 3), snapshotCard(digest.team_snapshot, 4)];
+      first = [previewCard(digest.season_preview, 1)];
+      second = [nextCard(digest.next_game, digest, 2), snapshotCard(digest.team_snapshot, 3)];
+      third = [wireCard(digest.recruiting_wire, true, 4)];
     } else if (digest.state === 'signing_day') {
-      second = [resultCard(digest.result, false, 1)];
-      third = [signingCard(digest.signing_day, 2)];
+      first = [resultCard(digest.result, false, 1), whatMovedCard(digest.what_moved, digest, 2)];
+      second = [snapshotCard(digest.team_snapshot, 3)];
+      third = [signingCard(digest.signing_day, 4)];
     } else {
-      second = [
+      first = [
         resultCard(digest.result, countScores, 1),
-        whatMovedCard(digest.what_moved, 2),
-        wireCard(digest.recruiting_wire, false, 3)
+        whatMovedCard(digest.what_moved, digest, 2)
       ];
-      third = [nextCard(digest.next_game, digest, 4), snapshotCard(digest.team_snapshot, 5)];
+      second = [nextCard(digest.next_game, digest, 3), snapshotCard(digest.team_snapshot, 4)];
+      third = [wireCard(digest.recruiting_wire, false, 5)];
     }
+    first.forEach(function (node) { if (node) col1.appendChild(node); });
     second.forEach(function (node) { if (node) col2.appendChild(node); });
     third.forEach(function (node) { if (node) col3.appendChild(node); });
-    root.append(col1, col2, col3);
+    var grid = el('div', 'office-grid');
+    grid.append(col1, col2, col3);
+    root.append(weekStrip(digest), grid);
     if (countScores) countUp(root);
   }
 

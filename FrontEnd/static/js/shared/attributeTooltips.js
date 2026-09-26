@@ -201,6 +201,7 @@ function addTooltip(element, abbreviation) {
 }
 
 // Export for use in other scripts
+if (typeof window !== 'undefined') window.ATTRIBUTE_NAMES = ATTRIBUTE_NAMES;
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { initAttributeTooltips, addTooltip, ATTRIBUTE_NAMES };
 }

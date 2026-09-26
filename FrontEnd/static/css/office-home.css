@@ -61,12 +61,166 @@
 .gob.gob-1280 .office-av { display: none; }
 
 html.gob-shell.gob-office .pg-head { display: none; }
-html.gob-shell.gob-office .main { padding-top: var(--page-pad); }
+html.gob-shell.gob-office .main {
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--page-pad);
+}
+html.gob-shell.gob-office #franchise-container,
+html.gob-shell.gob-office #tournament-tabs,
 html.gob-shell.gob-office #home-tab.tab-content,
 html.gob-shell.gob-office #home-tab.tab-content.active {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
+html.gob-shell.gob-office .office {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.gob .week-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--dsp-12);
+  height: 56px;
+  min-height: 56px;
+  flex: none;
+  overflow: hidden;
+}
+.gob.gob-1920 .week-strip {
+  height: 64px;
+  min-height: 64px;
+}
+.gob .week-strip.office-skel { min-height: 56px; background: var(--white-4); box-shadow: none; }
+.gob .week-k {
+  flex: none;
+  font: var(--fw-bold) var(--fs-16)/1 var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-87);
+  white-space: nowrap;
+}
+.gob .week-track {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.gob .wk-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: var(--radius-10);
+  background: var(--white-3p5);
+  box-shadow: inset 0 0 0 1px var(--line);
+  position: relative;
+  white-space: nowrap;
+}
+.gob.gob-1920 .wk-step { height: 40px; }
+.gob .wk-step + .wk-step { margin-left: 12px; }
+.gob .wk-step + .wk-step::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  width: 12px;
+  top: 50%;
+  height: 1px;
+  background: var(--line-strong);
+}
+.gob .week-strip.is-tight .wk-step { padding: 0 4px; gap: 4px; }
+.gob .week-strip.is-tight .wk-step + .wk-step { margin-left: 8px; }
+.gob .week-strip.is-tight .wk-step + .wk-step::before { left: -8px; width: 8px; }
+.gob .week-strip.is-tight .td-l { font-size: var(--fs-11); }
+.gob .wk-step .td-l {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gob .wk-dot {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: var(--radius-round);
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1.5px var(--white-40);
+  color: var(--bg);
+}
+.gob .wk-dot svg { width: 10px; height: 10px; }
+.gob .wk-step.done { opacity: 0.38; }
+.gob .wk-step.done .wk-dot { background: var(--text-38); box-shadow: none; }
+.gob .wk-step.is-next {
+  box-shadow: inset 0 0 0 1.5px var(--text-100);
+  background: var(--white-7);
+}
+.gob .wk-step.gated {
+  box-shadow: inset 0 0 0 1.5px var(--orange);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+.gob .wk-step .td-adv,
+.gob .wk-step .td-gate {
+  flex: none;
+  align-self: center;
+  margin: 0;
+}
+
+.gob .office-col { overflow: hidden; }
+.gob .office-col .office-wire {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gob .mv-p .nm {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gob .attr-run {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+  margin-left: auto;
+}
+.gob .attr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: var(--radius-6);
+  background: var(--white-5);
+  box-shadow: inset 0 0 0 1px var(--line);
+  white-space: nowrap;
+}
+.gob .attr-chip .attr-code {
+  font: var(--fw-bold) 15px/1 var(--font-display);
+  color: var(--text-100);
+  letter-spacing: var(--tracking-2);
+}
+.gob .attr-chip .tdig { font-size: 12px; }
+.gob .attr-chip .arr {
+  font-style: normal;
+  font-size: 9px;
+  line-height: 1;
+}
+.gob .attr-chip .arr.up { color: var(--delta-up); }
+.gob .attr-chip .arr.down { color: var(--delta-down); }
+.gob .office-mv .lnk { align-self: flex-end; }

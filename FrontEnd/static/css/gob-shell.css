@@ -95,6 +95,23 @@ html.gob-shell #franchise-container #tournament-tabs > .tab-content.active {
   max-height: none;
 }
 
+html.gob-shell.gob-office .main {
+  display: flex;
+  flex-direction: column;
+}
+
+html.gob-shell.gob-office #franchise-container,
+html.gob-shell.gob-office #franchise-container #tournament-tabs,
+html.gob-shell.gob-office #franchise-container #tournament-tabs > #home-tab.tab-content.active {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  width: 100%;
+}
+
 html.gob-shell .top {
   min-width: 0;
 }
@@ -111,15 +128,27 @@ html.gob-shell a.top-id {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  height: 100%;
+  height: var(--top-h);
+  padding: 0 var(--dsp-12);
+  gap: 0;
+  box-sizing: border-box;
+}
+
+html.gob.gob-shell.gob-1280 a.top-id,
+html.gob.gob-shell.gob-1920 a.top-id {
+  padding: 0 var(--dsp-12);
+  min-width: 0;
+  height: var(--top-h);
+  gap: 0;
 }
 
 html.gob-shell #team-logo {
-  height: calc(var(--top-h) * 0.72);
+  height: var(--top-h);
   width: auto;
   max-width: none;
   object-fit: contain;
   flex: none;
+  display: block;
 }
 
 html.gob-shell #fcc-header-emblem {

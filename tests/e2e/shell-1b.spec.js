@@ -154,7 +154,7 @@ test('top bar logo, name, and national rank at both sizes', async ({ page }) => 
         rank: document.querySelector('#gob-rank-stat span').textContent,
       };
     });
-    expect(Math.abs(metrics.logoH - metrics.topH * 0.72)).toBeLessThan(1.5);
+    expect(Math.abs(metrics.logoH - metrics.topH)).toBeLessThan(1.5);
     expect(metrics.logoW).toBeGreaterThan(0);
     expect(metrics.alt).toBe('Lancaster');
     expect(metrics.title).toBe('Lancaster');

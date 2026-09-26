@@ -56,7 +56,7 @@ The gear that opened the panel gets `.open` and `aria-expanded="true"` while it 
 
 Grid: `.app` is `grid-template-rows: var(--top-h) minmax(0, 1fr)` and `grid-template-columns: var(--rail-w) minmax(0, 1fr)`. `.top` spans both columns. `.rail` is column 1. `.main` is column 2 and the only scroller (`overflow-y: auto`). `html` and `body` do not scroll.
 
-Top bar, left to right: team logo (existing `#team-logo`, height `calc(var(--top-h) * 0.72)`, width auto, no crop) whose alt, `title`, and link `aria-label` are the team name. The name is not painted as visible text. The control opens Team › Roster. Then a divider, Record, National Rank, Week. Record text comes from `#fcc-record-label` (standings W-L for the user's team). National Rank comes from `#fcc-rank-label` / `data.rank`, shown as `#N` or `NR`, with the label "National Rank". Week comes from `data.week`. There is no Team RT. There is no alpha badge, product logo, or social link. The build label stays in Settings.
+Top bar, left to right: team logo (existing `#team-logo`, height `var(--top-h)`, width auto, `object-fit: contain`, no crop) with `--dsp-12` of horizontal padding on each side before the divider. Its alt, `title`, and link `aria-label` are the team name. The name is not painted as visible text. The control opens Team › Roster. Then a divider, Record, National Rank, Week. Record text comes from `#fcc-record-label` (standings W-L for the user's team). National Rank comes from `#fcc-rank-label` / `data.rank`, shown as `#N` or `NR`, with the label "National Rank". Week comes from `data.week`. There is no Team RT. There is no alpha badge, product logo, or social link. The build label stays in Settings.
 
 Right side, browse pages: the ghost Edit Recruit Invites button (`#fcc-edit-recruiting`, same show/hide as today) then Advance (`#play-now` with class `advance`). Advance is `gobAdvance.js`. The Office passes its existing helpers into it. Labels, `dataset.mode`, routes, and gating are the same as the Office. A blocking task replaces the label; it does not disable the button or add a hint. Loading text is `STARTING…`. A second click while that class `is-loading` is set is ignored. Focus mode has no Advance. The page keeps its own green button.
 
@@ -220,21 +220,32 @@ A new franchise write must fold or bump. A new browse GET must use the dependenc
 
 ## 12. Office
 
-The home tab of `franchise-command-center.html` is the Office grid (`.office` inside `.main`). It has no page title and no sub-tab row. `js/shared/officeHome.js` paints it from `office_digest` only. A null field is omitted. The page does not substitute another payload, and it does not write "N/A".
+The home tab of `franchise-command-center.html` is the Office (`.office` inside `.main`). It has no page title and no sub-tab row. `js/shared/officeHome.js` paints it from `office_digest` only. Grouping and sorting attribute changes for display is allowed. A null field is omitted. The page does not substitute another payload, and it does not write "N/A".
 
-While the digest is absent the grid shows neutral skeleton cards. There is no spinner.
+The Office fills `.main` edge to edge inside the standard page padding (`--page-pad`). There is no 1664px cap. At a viewport of 2400px or wider the Office caps at 2200px and stays centred. The collapsed rail still overlays the page on hover. The Office does not reserve space for that overlay.
 
-| State | Column 2 | Column 3 |
-|---|---|---|
-| `win`, `loss`, `regular`, `tournament` | Result · What moved · Recruiting wire | Next game · Team snapshot |
-| `first_week` | Season preview · one-line Wire | Next game · Team snapshot |
-| `signing_day` | Result | Signing Day card. The wire is hidden. |
+While the digest is absent the page shows a skeleton strip and three skeleton cards. There is no spinner.
 
-Column 1 is always the to-do list. At the 1280 density the first four rows show, with "See all" when there are more. 1920 shows every row. A done row stays clickable. `gates_advance` draws BLOCKS ADVANCE. `is_advance_action` draws ADVANCE and runs the same click as the top-bar Advance button.
+A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. The left end reads `Week N` from `next_game.week`, or from `result.week` when there is no next game. Each `todos[]` entry is one step, in order, joined left to right. Labels use the same copy as before. An `is_advance_action` step that is not done copies the top-bar Advance label. Three to six steps fit at 1280 without wrapping. More than six compress the labels. The strip does not scroll and does not wrap to a second row.
+
+| Step | Rule |
+|---|---|
+| Done | Check mark, opacity 38%, still clickable. Opens `route`. |
+| Next | The first not-done required step. Neutral bright outline (`--text-100`). Green stays on the top-bar Advance only. If this step is `is_advance_action`, it shows ADVANCE and runs the same click as the top bar. |
+| Blocking | `gates_advance` draws an orange outline and BLOCKS ADVANCE. This wins over the next outline when both apply. |
+| Upcoming | The remaining steps. |
+
+| State | Column 1 · Since last week | Column 2 · Next game | Column 3 · Recruiting |
+|---|---|---|---|
+| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot | Recruiting wire, full column height |
+| `first_week` | Season preview | Next game · Team snapshot | One-line wire (the digest status line) |
+| `signing_day` | Result · What moved | Team snapshot (`next_game` is null) | Signing Day card. The wire is hidden. |
+
+The three columns are equal width. The wire shows as many events as the column height allows. "Recruiting →" opens the recruiting hub.
 
 | Component | Digest fields |
 |---|---|
-| To-do row | `todos[]` `label_key`, `done`, `gates_advance`, `is_advance_action`, `route` |
+| Week strip | `todos[]` `label_key`, `done`, `required`, `gates_advance`, `is_advance_action`, `route`. Week number from `next_game.week` or `result.week`. |
 | Result | `result` scores, names, `opponent_rank`, `site`, `round_name`, `user_won`, `headline`, `leader`, `leader_role`, `box_score` |
 | What moved | `what_moved.national_rank`, `conference_standing`, `record`, `streak`, `attribute_changes` |
 | Recruiting wire | `recruiting_wire.status`, `events` (`event_text`, `position`, `list_position`, `direction`). Rail badge uses `pending_count` and `urgent`. |
@@ -242,6 +253,8 @@ Column 1 is always the to-do list. At the 1280 density the first four rows show,
 | Team snapshot | `team_snapshot.chemistry`, `attitude.buckets`, `moved_most`, `state` |
 | Signing Day | `signing_day.points_remaining`, `points_total`, `promises_made`, `open_roster_spots`, `targets` |
 | Season preview | `season_preview` fields that are non-null. The opener is the next-game card. |
+
+Attribute changes are one row per `player_id`. The row is the player name, linked to the player page, then chips. A chip shows the attribute abbreviation in Bebas at `--text-100` (the largest text in the chip), the new first-digit value in the tier colour from `attributeDisplay.js`, and a small green ▲ or red ▼. The previous value is not shown. The chip `title` is the full name from `ATTRIBUTE_NAMES` (`BH` → "Ball Handling"). Players sort by total absolute movement, then name. Inside a row, increases come before decreases. At 1280 the card shows up to 5 players. At 1920 it shows up to 8. When the list is longer, "All changes →" opens the training report for `result.week` (or `next_game.week` when there is no result). Rank, conference, and record tiles omit the delta chip when the delta is 0 or null.
 
 Attribute `from` / `to` are already the first-digit scale. Player RT on a signing target is the letter already on the digest. Attitude counts use the EM emoji buckets. A loss result uses the calm card (no wash, no count-up). A win counts the scores up once, on the first open after that result. `prefers-reduced-motion` shows the final state immediately.
 

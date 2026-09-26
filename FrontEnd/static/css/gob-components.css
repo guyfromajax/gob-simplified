@@ -102,8 +102,8 @@
 @keyframes arItem{from{opacity:0;transform:translateY(6px)}}
 @keyframes arPop{from{opacity:0;transform:scale(.55)}}
 
-.gob .office{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.36fr) minmax(0,1.04fr);gap:var(--col-gap);height:100%}
-.gob.gob-1920 .office{grid-template-columns:minmax(0,.86fr) minmax(0,1.3fr) minmax(0,1.14fr)}
+.gob .office{display:flex;flex-direction:column;gap:var(--dsp-8);height:100%;min-height:0;width:100%;max-width:none;margin:0}
+.gob .office-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--col-gap);flex:1 1 auto;min-height:0;align-items:stretch}
 .gob .office-col{display:flex;flex-direction:column;gap:var(--dsp-12);min-height:0}
 .gob .office-h{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-12);padding:0 var(--space-2);height:var(--dsz-22)}
 .gob .office-h h2{font:var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-7);color:var(--text-87);display:flex;gap:var(--space-8);align-items:baseline}
@@ -462,8 +462,10 @@
 .gob.gob-1280 .office-snap .sn-g{gap:var(--space-4)}
 .gob.gob-1280 .office-next.tier{gap:var(--space-6)}.gob.gob-1280 .office-next.tier .tn-band{padding-bottom:var(--space-6)}.gob.gob-1280 .office-next.tier .tn-side{gap:var(--space-4)}
 
-/* ── max content width (viewports wider than 1920) ── */
-.gob .office{max-width:1664px;margin:0 auto}
+/* Office stays full width of .main until an ultra-wide viewport. */
+@media (min-width:2400px){
+  .gob .office{max-width:2200px;margin-inline:auto}
+}
 /* ── keyboard focus ── */
 .gob a:focus-visible,.gob button:focus-visible,.gob .slider:focus-visible,.gob .tgl:focus-visible{outline:2px solid var(--white);outline-offset:2px}
 .gob .advance:focus-visible{outline:2px solid var(--white);outline-offset:3px}
