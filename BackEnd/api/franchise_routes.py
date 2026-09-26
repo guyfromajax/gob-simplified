@@ -890,19 +890,23 @@ def _cc_lap(name: str, started: float) -> float:
     return time.perf_counter()
 
 
-def _active_resume_game_query(franchise_id: str, week: int) -> dict[str, Any]:
-    """This week's non-final games that carry a resume anchor.
+def _active_resume_game_query(franchise_id: str, week: int | None = None) -> dict[str, Any]:
+    """Non-final games that carry a resume anchor, optionally this week only.
 
-    The previous filter was franchise-wide. ``is_final`` and ``resume_anchor``
-    did not compile, so SQLite decoded every game in the save and then kept
-    none. Week is indexed; the two JSON predicates compile beside it.
+    Week is indexed. ``is_final`` and ``resume_anchor`` compile beside it, so
+    SQLite does not decode the rest of the season. Omit ``week`` for the
+    franchise-wide filter used when the week-scoped lookup returns nothing
+    (an in-progress doc can omit ``week``, or store a week other than
+    ``next_game.week``).
     """
-    return {
+    query: dict[str, Any] = {
         "franchise_id": str(franchise_id),
-        "week": int(week),
         "is_final": {"$ne": True},
         "resume_anchor": {"$type": "object"},
     }
+    if week is not None:
+        query["week"] = int(week)
+    return query
 
 
 def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
@@ -1063,26 +1067,44 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
 
     game_doc = None
     matched_candidates: list[dict[str, Any]] = []
-    anchor_cursor = db.games.find(
-        _active_resume_game_query(franchise_id, int(next_game.get("week") or 0)),
-        sort=[("_id", -1)],
-        limit=12,
-    )
-    anchor_candidate_count = 0
     rejected_candidates: list[dict[str, Any]] = []
-    for candidate in anchor_cursor:
-        anchor_candidate_count += 1
-        if _matches_current_user_game(candidate):
-            matched_candidates.append(candidate)
-            continue
-        if len(rejected_candidates) < 5:
-            rejected_candidates.append(
-                {
-                    "game_id": str(candidate.get("_id")),
-                    "pair": sorted(_candidate_pair(candidate)),
-                    "has_snapshot": bool(_anchor_snapshot(candidate)),
-                }
-            )
+
+    def _scan_resume_games(query: dict[str, Any]) -> int:
+        matched_candidates.clear()
+        rejected_candidates.clear()
+        count = 0
+        anchor_cursor = db.games.find(query, sort=[("_id", -1)], limit=12)
+        for candidate in anchor_cursor:
+            count += 1
+            if _matches_current_user_game(candidate):
+                matched_candidates.append(candidate)
+                continue
+            if len(rejected_candidates) < 5:
+                rejected_candidates.append(
+                    {
+                        "game_id": str(candidate.get("_id")),
+                        "pair": sorted(_candidate_pair(candidate)),
+                        "has_snapshot": bool(_anchor_snapshot(candidate)),
+                    }
+                )
+        return count
+
+    next_week = int(next_game.get("week") or 0)
+    anchor_candidate_count = _scan_resume_games(
+        _active_resume_game_query(franchise_id, next_week)
+    )
+    # init-game and quarter/timeout saves do not write ``week``. An EOS game
+    # can also be stored under a week other than ``next_game.week``. The
+    # unscoped filter runs only when the week seek returned no documents.
+    if anchor_candidate_count == 0:
+        logger.warning(
+            "🧭 [MODE-RESUME-LOOKUP] scoped_empty_fallback franchise_id=%s week=%s",
+            franchise_id,
+            next_week,
+        )
+        anchor_candidate_count = _scan_resume_games(
+            _active_resume_game_query(franchise_id, None)
+        )
 
     if matched_candidates:
         game_doc = max(matched_candidates, key=_candidate_sort_key)
