@@ -103,4 +103,32 @@ The per-game note is over the ~2 ms budget. Each call rewrites the whole 334 KB 
 
 Follow-up implementation commit: `da46d7006`
 
+## Follow-up 2
+
+`gen` and `stale` moved off the lines document. `leaders_snapshots` now has two documents per franchise:
+
+- `meta:<franchise_id>` holds `gen`, `stale`, `week`, `season`, and `built_gen`. That document is about 150 bytes.
+- `<franchise_id>` still holds the player lines, stamped with the `gen` they were built at.
+
+`note_season_stats_written` is `$inc gen` / `$set stale: true` on the meta document only, with upsert so the counter exists before the first build. It stays wrapped so `finalize_game` cannot fail on it. A rebuild reads `meta.gen`, loads lines, writes the lines document with that `gen`, then updates meta `{gen: g}` to `{stale: false, week, season, built_gen: g}`. If that update does not match, the live lines are returned and meta stays stale. A read is fresh only when meta is not stale, the week and season match, and `lines.gen == meta.built_gen`. No meta document means a live scan.
+
+The two-process test and the load-then-note test still pass. A new test writes the lines and then bumps `gen` before the meta update; the next read rebuilds and shows the new points.
+
+- mongomock: 79 passed
+- SQLite: 79 passed
+
+Same five suites, included in those 79.
+
+Re-measured on the week-15 SQLite copy, five runs:
+
+| | Runs | Median |
+| --- | --- | ---: |
+| Snapshot open | 29.73, 29.99, 30.67, 31.09, 30.80 ms | 30.7 ms |
+| Week-advance delta | 53.1, 59.3, 56.0, 49.8, 57.0 ms | 56.0 ms |
+| `note_season_stats_written` | 0.415, 0.167, 5.329, 0.223, 0.144 ms | **0.223 ms** |
+
+63 × the median note is **14.0 ms** added across a CPU week. The median is under 2 ms. One of the five samples was 5.3 ms; the other four were under 0.5 ms. The time is the meta document update itself (decode, `$inc`/`$set`, write of the 150-byte doc), not the lines.
+
+Follow-up 2 implementation commit: `90a5e54b7`
+
 STATUS: COMPLETE
