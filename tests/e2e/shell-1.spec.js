@@ -161,6 +161,9 @@ test('office before and after at both sizes', async ({ page }) => {
       const overlay = document.getElementById('page-load-overlay');
       return !overlay || getComputedStyle(overlay).display === 'none';
     });
+    await page.waitForFunction((wide) => {
+      return document.documentElement.classList.contains(wide ? 'gob-1920' : 'gob-1280');
+    }, size[2] === '1920');
     await expect(page.locator('#gob-top-id')).toHaveAttribute('aria-label', 'Lancaster');
     await expect(page.locator('#team-logo')).toHaveAttribute('alt', 'Lancaster');
     await expect(page.locator('#gob-top-name')).toHaveCount(0);
@@ -171,8 +174,8 @@ test('office before and after at both sizes', async ({ page }) => {
     expect(appBox.height).toBeGreaterThan(size[1] - 4);
     const frame = await page.locator('#franchise-container').evaluate((el) => getComputedStyle(el, '::before').content);
     expect(frame).toBe('none');
-    const cardPad = await page.locator('.fcc-home-card').first().evaluate((el) => getComputedStyle(el).paddingLeft);
-    expect(cardPad).toBe('16px');
+    const cardPad = await page.locator('.office .card').first().evaluate((el) => getComputedStyle(el).paddingLeft);
+    expect(cardPad).toBe(size[2] === '1920' ? '19px' : '14px');
     const exit = page.locator('#gob-rail-exit');
     await expect(exit).toBeVisible();
     await expect(exit).toHaveText(/Exit Franchise/);

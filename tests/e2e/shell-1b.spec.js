@@ -304,7 +304,7 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   const scheduleHref = await page.locator('#schedule-full-link').getAttribute('href');
   expect(scheduleUrl).toBe(scheduleHref);
   const rankingsUrl = await expectGo('Rankings', '/rankings.html');
-  const rankingsHref = await page.locator('#home-rankings-full-link').getAttribute('href');
+  const rankingsHref = scheduleHref.replace('/schedule.html', '/rankings.html');
   expect(rankingsUrl).toBe(rankingsHref);
   const psUrl = await expectGo('Practice Squad', '/practice-squad-standings.html');
   const psHref = await page.locator('#fcc-ps-season-link').getAttribute('href');

@@ -67,7 +67,7 @@ function cloneParams(params) {
   }
 
   function goToLockerRoom() {
-    var card = document.getElementById('home-locker-room-body');
+    var card = document.getElementById('office-root') || document.getElementById('home-locker-room-body');
     if (!card) return;
     var homeTab = document.querySelector('[data-tab="home-tab"]');
     var homePanel = document.getElementById('home-tab');

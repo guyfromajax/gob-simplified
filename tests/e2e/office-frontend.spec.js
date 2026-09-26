@@ -1,0 +1,550 @@
+const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
+const { stubAuth } = require('./helpers/auth');
+const { assertOneVerticalScroll } = require('./helpers/oneVerticalScroll');
+
+test.describe.configure({ timeout: 180000 });
+
+const FID = 'f-e2e-office';
+const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+const OUT = path.join(__dirname, '../../reports/office-frontend');
+const FRAMES = path.join(__dirname, '../../_documentation_master/projects/design_handoff_office_shell/frames');
+
+const FRAME_SHOTS = [
+  ['office-win-1280.html', 1280, 720],
+  ['office-win-1920.html', 1920, 1080],
+  ['office-loss-1280.html', 1280, 720],
+  ['office-first-week-1280.html', 1280, 720],
+  ['office-tournament-1280.html', 1280, 720],
+  ['office-tournament-1920.html', 1920, 1080],
+  ['office-signing-day-1280.html', 1280, 720],
+];
+
+function resultBlock(overrides) {
+  return Object.assign({
+    week: 21,
+    home_team_id: TID,
+    away_team_id: 'bbbbbbbbbbbbbbbbbbbbbbbb',
+    home_team_name: 'Lancaster',
+    away_team_name: 'Four Corners',
+    home_score: 71,
+    away_score: 64,
+    user_is_home: true,
+    site: 'home',
+    neutral: null,
+    opponent_team_id: 'bbbbbbbbbbbbbbbbbbbbbbbb',
+    opponent_team_name: 'Four Corners',
+    opponent_rank: 9,
+    round_name: null,
+    user_won: true,
+    leader_role: 'potg',
+    leader: {
+      player_id: 'p-jalen',
+      name: 'Jalen Carter',
+      stats: { pts: 24, reb: 6, ast: 4, fgm: 9, fga: 16, fg3m: 3, fg3a: 7, min: 2040 },
+    },
+    headline: 'Carter closes it late',
+    box_score: {
+      path: '/box-score.html',
+      params: { mode: 'franchise', franchise_id: FID, game_id: 'g1', home: 'Lancaster', away: 'Four Corners' },
+    },
+  }, overrides || {});
+}
+
+function nextBlock(overrides) {
+  return Object.assign({
+    week: 22,
+    date: null,
+    site: 'away',
+    neutral: null,
+    opponent_team_id: 'cccccccccccccccccccccccc',
+    opponent: 'Morristown',
+    rank: 40,
+    record: { wins: 11, losses: 8 },
+    conference: 1,
+    top_scorer: { name: 'Avery Cole', average: 18.4 },
+    top_rebounder: { name: 'Noah Peck', average: 9.1 },
+    projected_starting_five: null,
+    round_name: null,
+    seeds: null,
+    stakes: null,
+    team_rt: null,
+  }, overrides || {});
+}
+
+function wireBlock(overrides) {
+  return Object.assign({
+    status: 'Two leans moved',
+    events: [
+      {
+        recruit_id: 'r1',
+        recruit: 'Miles Hart',
+        position: 'SG',
+        stars: null,
+        filmed_grade: null,
+        event_type: 'gained',
+        event_text: 'Miles Hart moved you to #2',
+        list_position: 2,
+        direction: 'up',
+      },
+      {
+        recruit_id: 'r2',
+        recruit: 'Owen Blake',
+        position: 'PF',
+        stars: null,
+        filmed_grade: null,
+        event_type: 'lost',
+        event_text: 'Owen Blake dropped you to #4',
+        list_position: 4,
+        direction: 'down',
+      },
+    ],
+    pending_count: 1,
+    urgent: true,
+    unseen_count: 3,
+  }, overrides || {});
+}
+
+function snapshotBlock(overrides) {
+  return Object.assign({
+    state: 'ready',
+    chemistry: { value: 18, max: 25 },
+    attitude: {
+      player_count: 12,
+      buckets: [
+        { id: 'em_0_19', min: 0, max: 19, count: 1 },
+        { id: 'em_20_39', min: 20, max: 39, count: 2 },
+        { id: 'em_40_59', min: 40, max: 59, count: 4 },
+        { id: 'em_60_79', min: 60, max: 79, count: 3 },
+        { id: 'em_80_plus', min: 80, max: null, count: 2 },
+      ],
+    },
+    moved_most: [
+      { measure: 'fight', value: 1.4, delta: 0.3 },
+      { measure: 'discipline', value: 0.9, delta: -0.2 },
+    ],
+  }, overrides || {});
+}
+
+function digest(state, patch) {
+  const body = {
+    state: state,
+    what_moved: {
+      national_rank: { now: 18, prev: 22, delta: 4 },
+      conference_standing: { now: 3, prev: 5, delta: 2 },
+      record: { wins: 16, losses: 5 },
+      streak: 'W4',
+      attribute_changes: [
+        { player_id: 'p-jalen', name: 'Jalen Carter', attribute: 'shooting', from: 6, to: 7 },
+        { player_id: 'p-marcus', name: 'Marcus Ruiz', attribute: 'endurance', from: 7, to: 6 },
+      ],
+    },
+    team_snapshot: snapshotBlock(),
+    result: resultBlock(),
+    next_game: nextBlock(),
+    todos: [
+      { id: 'run_training', label_key: 'run_training', required: true, done: true, gates_advance: false, is_advance_action: false, route: '/training.html' },
+      { id: 'review_recruit_invites', label_key: 'review_recruit_invites', required: true, done: false, gates_advance: true, is_advance_action: false, route: '/recruiting.html' },
+      { id: 'play_next_game', label_key: 'play_next_game', required: true, done: false, gates_advance: false, is_advance_action: true, route: '/set-lineup.html' },
+      { id: 'resume_training', label_key: 'resume_training', required: true, done: false, gates_advance: false, is_advance_action: false, route: '/training.html' },
+      { id: 'run_training_camp', label_key: 'run_training_camp', required: true, done: false, gates_advance: false, is_advance_action: false, route: '/training.html' },
+    ],
+    recruiting_wire: wireBlock(),
+    signing_day: null,
+    season_preview: null,
+  };
+  return Object.assign(body, patch || {});
+}
+
+function commandCenter(office, flags) {
+  return Object.assign({
+    franchise_id: FID,
+    team_id: TID,
+    user_team_id: TID,
+    team: 'Lancaster',
+    week: 22,
+    rank: 18,
+    season: 1,
+    current_season: 1,
+    training_completed: true,
+    session_type: 'in-season',
+    cut_required: false,
+    recruiting_wire: { board_saved_week: 22, counts: {} },
+    user_conference: 1,
+    user_region: 'A',
+    office_digest: office,
+  }, flags || {});
+}
+
+const STATES = {
+  win: commandCenter(digest('win')),
+  loss: commandCenter(digest('loss', {
+    result: resultBlock({
+      user_won: false,
+      home_score: 58,
+      away_score: 71,
+      leader_role: 'team_leader',
+      leader: { player_id: 'p-jalen', name: 'Jalen Carter', stats: { pts: 19, reb: 4, ast: 3 } },
+      headline: null,
+    }),
+    what_moved: {
+      national_rank: { now: 24, prev: 18, delta: -6 },
+      conference_standing: { now: 6, prev: 3, delta: -3 },
+      record: { wins: 15, losses: 6 },
+      streak: 'L1',
+      attribute_changes: [],
+    },
+  })),
+  regular: commandCenter(digest('regular', {
+    result: resultBlock({ user_won: null, home_score: 70, away_score: 70, headline: null, leader_role: null, leader: null }),
+    what_moved: {
+      national_rank: { now: 20, prev: null, delta: null },
+      conference_standing: { now: 4, prev: null, delta: null },
+      record: { wins: 8, losses: 8 },
+      streak: null,
+      attribute_changes: [],
+    },
+  })),
+  first_week: commandCenter(digest('first_week', {
+    result: null,
+    what_moved: {
+      national_rank: { now: 40, prev: null, delta: null },
+      conference_standing: { now: null, prev: null, delta: null },
+      record: { wins: 0, losses: 0 },
+      streak: null,
+      attribute_changes: [],
+    },
+    team_snapshot: snapshotBlock({ state: 'set_after_camp', moved_most: [] }),
+    season_preview: {
+      preseason_rank: 40,
+      conference_projection: null,
+      team_rt: null,
+      national_rank: 40,
+      returning_starters: null,
+      top_returner: null,
+      newcomers: null,
+      opener: nextBlock({ week: 1 }),
+    },
+    next_game: nextBlock({ week: 1, site: 'home' }),
+    recruiting_wire: wireBlock({ status: 'Opens with the invite period', events: [], pending_count: 0, urgent: false }),
+    todos: [
+      { id: 'run_training_camp', label_key: 'run_training_camp', required: true, done: false, gates_advance: true, is_advance_action: true, route: '/training.html' },
+    ],
+  }), { week: 1, training_completed: false, session_type: 'preseason' }),
+  tournament: commandCenter(digest('tournament', {
+    result: resultBlock({ week: 30, round_name: 'Region Tourney First Round', headline: null }),
+    next_game: nextBlock({
+      week: 31,
+      site: 'home',
+      round_name: 'Region Tourney Championship',
+      seeds: null,
+      stakes: null,
+      team_rt: null,
+      date: null,
+      neutral: null,
+      projected_starting_five: null,
+    }),
+  }), { week: 31, eos_tournament_active: true, training_completed: true, training_disabled_for_postseason: true }),
+  signing_day: commandCenter(digest('signing_day', {
+    result: resultBlock({ week: 34, round_name: 'National Championship', user_won: true, headline: null }),
+    next_game: null,
+    recruiting_wire: wireBlock({ status: 'Signing Day', pending_count: 1, urgent: true }),
+    signing_day: {
+      points_remaining: 12,
+      points_total: 50,
+      promises_made: 1,
+      open_roster_spots: 3,
+      targets: [
+        { recruit_id: 'r1', name: 'Miles Hart', position: 'SG', stars: null, rt: 'A', lean_rank: 1, direction: 'up' },
+        { recruit_id: 'r2', name: 'Owen Blake', position: 'PF', stars: null, rt: 'B+', lean_rank: 2, direction: null },
+      ],
+    },
+    todos: [
+      { id: 'run_signing_day', label_key: 'run_signing_day', required: true, done: false, gates_advance: true, is_advance_action: true, route: '/recruiting.html' },
+    ],
+  }), { week: 35 }),
+};
+
+async function fulfillJson(route, body) {
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+}
+
+async function installApi(page, data) {
+  await page.unrouteAll({ behavior: 'ignoreErrors' }).catch(function () {});
+  await page.route('**/*', async (route) => {
+    const request = route.request();
+    let pathname = '';
+    try { pathname = new URL(request.url()).pathname; } catch (err) {
+      await route.continue();
+      return;
+    }
+    const api = pathname.startsWith('/api/')
+      || pathname.startsWith('/franchise/')
+      || pathname.startsWith('/roster/')
+      || pathname.startsWith('/player/')
+      || pathname.startsWith('/recruit/')
+      || pathname === '/teams'
+      || pathname === '/app-config';
+    if (!api) {
+      await route.continue();
+      return;
+    }
+    if (pathname === '/api/auth/me') {
+      await fulfillJson(route, { user_id: 'e2e-user', username: 'e2e', email: 'e2e@example.com' });
+      return;
+    }
+    if (pathname === '/app-config') {
+      await fulfillJson(route, { isAlpha: false, alphaDisclaimer: null, version: '1.0' });
+      return;
+    }
+    if (pathname === '/teams') {
+      await fulfillJson(route, [{ name: 'Lancaster', display_name: 'Lancaster', object_id: TID, _id: TID }]);
+      return;
+    }
+    if (pathname.startsWith('/franchise/command-center/data')) {
+      await fulfillJson(route, data);
+      return;
+    }
+    if (pathname.startsWith('/franchise/play-next-game')) {
+      await fulfillJson(route, {
+        home: 'Lancaster', away: 'Morristown', week: 22,
+        home_id: TID, away_id: 'cccccccccccccccccccccccc',
+        home_display: 'Lancaster', away_display: 'Morristown',
+      });
+      return;
+    }
+    if (pathname.startsWith('/franchise/standings')) {
+      var rec = data.office_digest && data.office_digest.what_moved && data.office_digest.what_moved.record;
+      await fulfillJson(route, {
+        standings: [{
+          team_id: TID,
+          name: 'Lancaster',
+          W: rec ? rec.wins : 0,
+          L: rec ? rec.losses : 0,
+          conference: 1,
+          region: 'A',
+        }],
+      });
+      return;
+    }
+    await fulfillJson(route, {});
+  });
+}
+
+async function openOffice(page, data) {
+  await stubAuth(page);
+  await installApi(page, data);
+  await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID);
+  await page.waitForFunction(() => {
+    const overlay = document.getElementById('page-load-overlay');
+    const root = document.getElementById('office-root');
+    return (!overlay || getComputedStyle(overlay).display === 'none')
+      && root && root.getAttribute('aria-busy') === 'false';
+  });
+  await page.waitForFunction(() => {
+    const root = document.documentElement;
+    return root.classList.contains('gob-1280') || root.classList.contains('gob-1920');
+  });
+  await page.waitForTimeout(900);
+}
+
+const OFFICE_BAD_TEXT = /\[object Object\]|\bNaN\b|\bnull\b|\bundefined\b|N\/A|\{["']?\w+["']?\s*:/;
+
+async function assertOfficeText(page) {
+  const text = await page.locator('#office-root').innerText();
+  expect(text).not.toMatch(OFFICE_BAD_TEXT);
+  return text;
+}
+
+async function assertHeadersClear(page) {
+  const overlap = await page.evaluate(() => {
+    return [...document.querySelectorAll('#office-root .office-col')].map((col) => {
+      const head = col.querySelector('.office-h');
+      const card = col.querySelector('.card');
+      if (!head || !card) return null;
+      const gap = card.getBoundingClientRect().top - head.getBoundingClientRect().bottom;
+      return Math.round(gap * 10) / 10;
+    });
+  });
+  overlap.forEach((gap, index) => {
+    expect(gap, 'column ' + (index + 1) + ' header clearance').not.toBeNull();
+    expect(gap, 'column ' + (index + 1) + ' header overlaps its card').toBeGreaterThanOrEqual(0);
+  });
+}
+
+async function mouseClick(page, selector) {
+  const loc = page.locator(selector).first();
+  const box = await loc.boundingBox();
+  if (!box) throw new Error('missing ' + selector);
+  await page.mouse.click(box.x + box.width / 2, box.y + Math.min(box.height / 2, 24));
+}
+
+function measure(page) {
+  return page.evaluate(() => {
+    const main = document.querySelector('html.gob-shell .main');
+    const mainBox = main.getBoundingClientRect();
+    const gaps = [...document.querySelectorAll('#office-root .office-col')].map((col) => {
+      const kids = [...col.children].filter((el) => el.getBoundingClientRect().height > 1);
+      const last = kids[kids.length - 1] || col;
+      return Math.round(mainBox.bottom - last.getBoundingClientRect().bottom);
+    });
+    return {
+      mainScroll: main.scrollHeight - main.clientHeight,
+      mainWide: main.scrollWidth - main.clientWidth,
+      pageWide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      gaps: gaps,
+    };
+  });
+}
+
+test.beforeAll(() => {
+  fs.mkdirSync(OUT, { recursive: true });
+});
+
+test('six states fit at 1280 and 1920', async ({ page }) => {
+  const fit = {};
+  for (const name of Object.keys(STATES)) {
+    fit[name] = {};
+    for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
+      await page.setViewportSize({ width: size[0], height: size[1] });
+      await openOffice(page, STATES[name]);
+      await assertOfficeText(page);
+      await assertHeadersClear(page);
+      expect(await page.locator('#office-root .office-col').count()).toBe(3);
+      expect(await page.locator('#gob-main h1')).toHaveText('');
+      if (name === 'signing_day') {
+        expect(await page.locator('#office-root .office-wire').count()).toBe(0);
+        expect(await page.locator('#office-root').getByText('stars', { exact: false }).count()).toBe(0);
+      }
+      if (name === 'loss') {
+        expect(await page.locator('#office-root .office-res.is-loss').count()).toBe(1);
+        expect(await page.locator('#office-root .res-hl').count()).toBe(0);
+      }
+      if (name === 'win') {
+        expect(await page.locator('#office-root .res-hl').count()).toBe(1);
+        expect(await page.locator('#office-root').getByText('Team RT').count()).toBe(0);
+        expect(await page.locator('#office-root .five').count()).toBe(0);
+      }
+      if (name === 'first_week') {
+        expect(await page.locator('#office-root .sp-card').count()).toBe(1);
+        expect(await page.locator('#office-root').getByText('Set after camp').count()).toBe(2);
+      }
+      const numbers = await measure(page);
+      fit[name][size[2]] = numbers;
+      if (size[2] === '1280') {
+        expect(numbers.mainScroll, name + ' vertical').toBeLessThanOrEqual(1);
+        expect(numbers.pageWide, name + ' horizontal').toBeLessThanOrEqual(1);
+        await assertOneVerticalScroll(page);
+      }
+      await page.screenshot({ path: path.join(OUT, name + '-' + size[2] + '.png') });
+    }
+  }
+  fs.writeFileSync(path.join(OUT, 'fit.json'), JSON.stringify(fit, null, 2));
+});
+
+test('frames at their design sizes', async ({ page }) => {
+  for (const row of FRAME_SHOTS) {
+    await page.setViewportSize({ width: row[1], height: row[2] });
+    await page.goto('file://' + path.join(FRAMES, row[0]));
+    await page.screenshot({ path: path.join(OUT, 'frame-' + row[0].replace('.html', '.png')) });
+  }
+});
+
+test('advance mirror matches the top bar', async ({ page }) => {
+  const cases = [
+    ['training', commandCenter(digest('win', {
+      todos: [
+        { id: 'run_training', label_key: 'run_training', required: true, done: false, gates_advance: true, is_advance_action: true, route: '/training.html' },
+        { id: 'play_next_game', label_key: 'play_next_game', required: true, done: false, gates_advance: false, is_advance_action: false, route: '/set-lineup.html' },
+      ],
+    }), { week: 10, training_completed: false }), '/training.html'],
+    ['game', commandCenter(digest('win'), { week: 12, training_completed: true }), '/set-lineup.html'],
+    ['cut', commandCenter(digest('regular', {
+      todos: [
+        { id: 'assign_practice_squad', label_key: 'assign_practice_squad', required: true, done: false, gates_advance: true, is_advance_action: true, route: '/cut-players.html' },
+      ],
+    }), { week: 8, cut_required: true, training_completed: true }), '/cut-players.html'],
+  ];
+  const log = [];
+  for (const row of cases) {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await openOffice(page, row[1]);
+    await page.evaluate(() => {
+      window.__officeNav = [];
+      const nav = window.GOBNav;
+      if (!nav || !nav.go) return;
+      const real = nav.go.bind(nav);
+      nav.go = function (url) {
+        window.__officeNav.push(String(url));
+        void real;
+      };
+    });
+    await expect(page.locator('#play-now')).toBeVisible();
+    await expect(page.locator('[data-advance-mirror="1"] .td-l')).toHaveText(
+      ((await page.locator('#play-now').textContent()) || '').trim()
+    );
+    const todoUrl = await captureNav(page, '[data-advance-mirror="1"]');
+    await openOffice(page, row[1]);
+    await page.evaluate(() => {
+      window.__officeNav = [];
+      const nav = window.GOBNav;
+      nav.go = function (url) { window.__officeNav.push(String(url)); };
+    });
+    const barUrl = await captureNav(page, '#play-now');
+    expect(new URL(todoUrl, 'http://local').pathname).toBe(row[2]);
+    expect(new URL(barUrl, 'http://local').pathname).toBe(new URL(todoUrl, 'http://local').pathname);
+    log.push(row[0] + ' ' + new URL(todoUrl, 'http://local').pathname);
+  }
+  fs.writeFileSync(path.join(OUT, 'advance.txt'), log.join('\n') + '\n');
+});
+
+async function captureNav(page, selector) {
+  await mouseClick(page, selector);
+  await page.waitForFunction(() => window.__officeNav && window.__officeNav.length > 0, null, { timeout: 8000 });
+  return page.evaluate(() => window.__officeNav[0]);
+}
+
+test('live mid-season digest', async ({ page }) => {
+  const file = path.join(OUT, 'live-digest.json');
+  test.skip(!fs.existsSync(file), 'no live digest dump');
+  const dumped = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const data = commandCenter(dumped.office_digest, {
+    week: dumped.week,
+    team: dumped.team || 'Lancaster',
+    rank: dumped.rank,
+    training_completed: dumped.training_completed !== false,
+  });
+  for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    await openOffice(page, data);
+    await assertOfficeText(page);
+    await assertHeadersClear(page);
+    await expect(page.locator('#office-root .nx-sub')).toContainText('7–7');
+    await expect(page.locator('#office-root .nx-sub')).toContainText('A1');
+    await expect(page.locator('[data-advance-mirror="1"] .td-l')).toHaveText(
+      ((await page.locator('#play-now').textContent()) || '').trim()
+    );
+    if (size[2] === '1920') {
+      await expect(page.locator('#office-root .pg-extra')).toContainText('20');
+      await expect(page.locator('#office-root .pg-extra')).not.toContainText('1237');
+    }
+    if (size[2] === '1280') {
+      const numbers = await measure(page);
+      expect(numbers.mainScroll).toBeLessThanOrEqual(1);
+      await assertOneVerticalScroll(page);
+    }
+    await page.screenshot({ path: path.join(OUT, 'live-' + size[2] + '.png') });
+  }
+});
+
+test('null wire fields stay out of the dom', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openOffice(page, STATES.win);
+  const html = await page.locator('#office-root').innerHTML();
+  expect(html).not.toContain('null');
+  expect(html).not.toContain('undefined');
+  expect(html).not.toContain('N/A');
+  expect(html).not.toContain('filmed');
+  expect(await page.locator('#gob-rail-recruiting em.office-rail-count.urgent')).toHaveText('1');
+});

@@ -1,0 +1,72 @@
+/* Office home. Component chrome lives in gob-components.css. */
+.gob .office button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+.gob .office a { color: inherit; text-decoration: none; }
+.gob .office .rs-n,
+.gob .office .nx-name,
+.gob .office .td-l,
+.gob .office .wr-1 { min-width: 0; }
+.gob .office .rs-n,
+.gob .office .nx-name { overflow: hidden; text-overflow: ellipsis; }
+
+.gob .office-skel {
+  min-height: 96px;
+  background: var(--white-4);
+  box-shadow: none;
+}
+.gob .potg .portrait { width: 46px; height: 46px; display: grid; place-items: center; }
+.gob.gob-1920 .potg .portrait { width: 76px; height: 76px; }
+.gob .office-initials {
+  font: var(--fw-bold) var(--fs-16)/1 var(--font-display);
+  color: var(--text-60);
+}
+.gob .office-snap .spread i { background: var(--white-55); }
+.gob .office-snap .spread i:nth-child(2) { background: var(--white-40); }
+.gob .office-snap .spread i:nth-child(3) { background: var(--white-28); }
+.gob .office-snap .spread i:nth-child(4) { background: var(--white-18); }
+.gob .office-snap .spread i:nth-child(5) { background: var(--white-12); }
+.gob .office-snap .spread i.is-low { background: var(--red); }
+
+.gob .office .office-h,
+.gob.gob-1280 .office .office-h {
+  height: auto;
+  align-items: baseline;
+}
+.gob .office .office-h { min-height: var(--dsz-22); }
+.gob.gob-1280 .office .office-h { min-height: 20px; }
+.gob .office .office-h h2,
+.gob .office .office-h span {
+  margin: 0;
+}
+.gob .office .office-h h2 {
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gob.gob-1280 .office-col { gap: 6px; }
+.gob.gob-1280 .office .card { padding-top: 8px; padding-bottom: 8px; }
+.gob.gob-1280 .office-res { gap: 6px; }
+.gob.gob-1280 .potg { padding-top: 4px; }
+.gob.gob-1280 #office-root:not(.is-todos-open) .todo-list > .todo:nth-child(n + 5) { display: none; }
+.gob.gob-1920 .office-more { display: none; }
+.gob.gob-1280 .td-m2,
+.gob.gob-1280 .pg-extra,
+.gob.gob-1280 .office-av { display: none; }
+
+html.gob-shell.gob-office .pg-head { display: none; }
+html.gob-shell.gob-office .main { padding-top: var(--page-pad); }
+html.gob-shell.gob-office #home-tab.tab-content,
+html.gob-shell.gob-office #home-tab.tab-content.active {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}

@@ -155,7 +155,8 @@
 
   function resourceHref(page) {
     var src = hrefOf(document.getElementById('home-rankings-full-link'))
-      || hrefOf(document.getElementById('resources-rankings'));
+      || hrefOf(document.getElementById('resources-rankings'))
+      || hrefOf(document.getElementById('schedule-full-link'));
     if (!src) return '';
     try {
       var u = new URL(src, window.location.origin);
@@ -331,7 +332,8 @@
     Object.keys(sectionEls).forEach(function (id) {
       if (sectionEls[id]) sectionEls[id].classList.toggle('on', id === sectionId);
     });
-    if (titleEl) titleEl.textContent = section.title;
+    if (titleEl) titleEl.textContent = sectionId === 'office' ? '' : section.title;
+    document.documentElement.classList.toggle('gob-office', sectionId === 'office');
     if (paintedSection !== sectionId) {
       renderSubtabs(section, tab);
       paintedSection = sectionId;
@@ -491,8 +493,13 @@
   }
 
   function refreshTournamentLock() {
-    if (paintedSection !== 'league') return;
+    if (paintedSection !== 'league' || !subtabHost) return;
     var tab = pageMode ? (pageMode.sub || '') : currentTab();
+    var wantLock = !!tournamentLockWeek();
+    var hasLock = !!subtabHost.querySelector('.stab.is-locked');
+    var on = subtabHost.querySelector('.stab.on');
+    var onKey = on ? (on.dataset.tab || on.dataset.link || '') : '';
+    if (wantLock === hasLock && onKey === tab && subtabHost.childElementCount) return;
     renderSubtabs(sectionById('league'), tab);
   }
 
