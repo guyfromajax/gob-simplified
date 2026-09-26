@@ -874,6 +874,22 @@ function createNotesHeroInitials(displayName, accentConfig, isMuted) {
   return fallback;
 }
 
+function displayMovementsForPlayer(player) {
+  const all = (reportData && reportData.player_attribute_display_movements) || {};
+  const id = player && (player.id != null ? String(player.id) : '');
+  return all[id] || all[player && player.name] || {};
+}
+
+function displayMovementValue(cell) {
+  if (cell && typeof cell === 'object') {
+    const from = Number(cell.from);
+    const to = Number(cell.to);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to === from) return 0;
+    return to > from ? 1 : -1;
+  }
+  return Number(cell) || 0;
+}
+
 function createPlayerNameCell(player) {
   const td = document.createElement('td');
   td.className = 'player-name-cell';
@@ -953,8 +969,8 @@ function renderPlayersTable() {
         }
         const changes = reportData.player_changes[player.name] || {};
         const change = changes[attr] || 0;
-        const displayMovements = reportData.player_attribute_display_movements?.[player.name] || {};
-        const displayMovement = Number(displayMovements[attr]) || 0;
+        const displayMovements = displayMovementsForPlayer(player);
+        const displayMovement = displayMovementValue(displayMovements[attr]);
         row.appendChild(createAttributeCell(attr, value, change, displayMovement));
       });
     } else {

@@ -168,3 +168,30 @@ A page or brief is done only when this file is updated if the shell, the section
 | set-lineup.html, training.html, training-report.html, training-squad-report.html, training-playbooks.html, cut-players.html, game-plan.html, playbooks.html, playbook-report.html | focus | — | — |
 
 The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` reuses a response the page already requested. Otherwise it fetches that URL once.
+
+## 10. Office data
+
+`GET /franchise/command-center/data` includes `office_digest`. The Office renders that block. It does not recompute ranks, streaks, to-dos, or attitude. The request does not send `profile=1` unless the page URL has `cc_profile=1`.
+
+`office_digest` fields:
+
+| Field | Source |
+|---|---|
+| `state` | `regular`, `first_week` (week ≤ 1), `tournament` (EOS active, weeks 27–34), `signing_day` (week 35), `win`, `loss` |
+| `what_moved.national_rank` | `{now, prev, delta}`. Delta is previous minus current (positive means the team climbed). `prev` comes from the week-advance snapshot. |
+| `what_moved.conference_standing` | Same shape. Place is wins, then national rank. |
+| `what_moved.record` | `{wins, losses}` from standings already on the response. |
+| `what_moved.streak` | `W4` or `L1`, from results. Null when the user has no decided game. |
+| `what_moved.attribute_changes` | `{player_id, name, attribute, from, to}`. `from` and `to` are the first-digit display scale (`value // 10`). Keyed by player id. Legacy name-keyed direction maps are omitted. |
+| `team_snapshot.state` | `set_after_camp` until a snapshot exists for a week before the current week. Otherwise `ready`. |
+| `team_snapshot.chemistry` | `{value, max: 25}` from stored team chemistry. |
+| `team_snapshot.attitude` | Counts in the EM buckets 0–19, 20–39, 40–59, 60–79, 80+. |
+| `team_snapshot.moved_most` | Up to two `{measure, value, delta}` rows. Delta is this week's stored measure minus the previous snapshot. Empty until a prior snapshot exists. |
+| `result` | Last completed user game, or null. Scores, site (`home` / `away`), `neutral` (always null; no stored neutral site), opponent rank, round name for weeks 27–34, POTG on a win or the user's highest-PTS player on a loss, box-score path and params. `headline` only when a `season_news` story stores this game's id. |
+| `next_game` | Opponent, rank, record, conference, site, week, top scorer, top rebounder. `date`, `neutral`, `projected_starting_five`, `seeds`, `stakes`, and `team_rt` are null. |
+| `todos` | `{id, label_key, required, done, gates_advance, is_advance_action, route}` from the same flags as `gobAdvance.js`. A blocking task is the Advance action. |
+| `recruiting_wire` | Status line, events (`recruit`, `position`, `stars` and `filmed_grade` always null, `event_type`, `event_text` from the stored lean-event sentence, `list_position`, `direction`), `pending_count`, `urgent`, `unseen_count`. |
+| `signing_day` | Week 35 only. Points remaining out of 50, playing-time promises, open roster spots, up to three targets. Otherwise null. |
+| `season_preview` | `first_week` only. Preseason rank is the current national rank. Conference projection, team RT, returning starters, and top returner are null. Newcomers only when `pending_walk_on_welcome` is stored. Opener is `next_game`. |
+
+The week-advance snapshot is the only new stored field: `franchises.office_week_snapshots.{season}.{completed_week}` with `national_rank_before`, `conference_position_before`, `team_measures`, and `team_measures_before` when a prior week exists. It is written in the same franchise `$set` as the week persist, before national rank is updated, and skipped when that week is already stored or rank/prestige for that week was already applied.
