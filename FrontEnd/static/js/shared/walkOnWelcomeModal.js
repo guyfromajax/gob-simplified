@@ -222,7 +222,7 @@ function cloneParams(params) {
         modalClass: 'is-wide',
         primaryClass: 'is-orange',
         onCta: function () {
-          var card = document.getElementById('home-locker-room-body');
+          var card = document.getElementById('office-root') || document.getElementById('home-locker-room-body');
           if (!card) return;
           var homeTab = document.querySelector('[data-tab="home-tab"]');
           if (homeTab && !document.getElementById('home-tab').classList.contains('active')) {

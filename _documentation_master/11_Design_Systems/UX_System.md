@@ -201,3 +201,32 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 | `season_preview` | `first_week` only. Preseason rank is the current national rank. Conference projection, team RT, returning starters, and top returner are null. Newcomers only when `pending_walk_on_welcome` is stored. Opener is `next_game`. |
 
 The week-advance snapshot is the only new stored field: `franchises.office_week_snapshots.{season}.{completed_week}` with `national_rank_before`, `conference_position_before`, `team_measures`, and `team_measures_before` when a prior week exists. It is written in the same franchise `$set` as the week persist, before national rank is updated, and skipped when that week is already stored or rank/prestige for that week was already applied.
+
+## 11. Office
+
+The home tab of `franchise-command-center.html` is the Office grid (`.office` inside `.main`). It has no page title and no sub-tab row. `js/shared/officeHome.js` paints it from `office_digest` only. A null field is omitted. The page does not substitute another payload, and it does not write "N/A".
+
+While the digest is absent the grid shows neutral skeleton cards. There is no spinner.
+
+| State | Column 2 | Column 3 |
+|---|---|---|
+| `win`, `loss`, `regular`, `tournament` | Result · What moved · Recruiting wire | Next game · Team snapshot |
+| `first_week` | Season preview · one-line Wire | Next game · Team snapshot |
+| `signing_day` | Result | Signing Day card. The wire is hidden. |
+
+Column 1 is always the to-do list. At the 1280 density the first four rows show, with "See all" when there are more. 1920 shows every row. A done row stays clickable. `gates_advance` draws BLOCKS ADVANCE. `is_advance_action` draws ADVANCE and runs the same click as the top-bar Advance button.
+
+| Component | Digest fields |
+|---|---|
+| To-do row | `todos[]` `label_key`, `done`, `gates_advance`, `is_advance_action`, `route` |
+| Result | `result` scores, names, `opponent_rank`, `site`, `round_name`, `user_won`, `headline`, `leader`, `leader_role`, `box_score` |
+| What moved | `what_moved.national_rank`, `conference_standing`, `record`, `streak`, `attribute_changes` |
+| Recruiting wire | `recruiting_wire.status`, `events` (`event_text`, `position`, `list_position`, `direction`). Rail badge uses `pending_count` and `urgent`. |
+| Next game | `next_game` opponent, `rank`, `record`, `conference`, `site`, `week`, `round_name`, `top_scorer`, `top_rebounder` |
+| Team snapshot | `team_snapshot.chemistry`, `attitude.buckets`, `moved_most`, `state` |
+| Signing Day | `signing_day.points_remaining`, `points_total`, `promises_made`, `open_roster_spots`, `targets` |
+| Season preview | `season_preview` fields that are non-null. The opener is the next-game card. |
+
+Attribute `from` / `to` are already the first-digit scale. Player RT on a signing target is the letter already on the digest. Attitude counts use the EM emoji buckets. A loss result uses the calm card (no wash, no count-up). A win counts the scores up once, on the first open after that result. `prefers-reduced-motion` shows the final state immediately.
+
+Tournament weeks keep the top-bar tier from `tierEmblem.js`. The next-game card takes the same metal tokens. `projected_starting_five`, `team_rt`, `seeds`, `stakes`, `date`, `neutral`, `stars`, and `filmed_grade` stay off the page because they are null. There is no Team RT row and no coach-stat block.

@@ -1688,17 +1688,6 @@ function renderRecruitingTabBadge() {
     }
     if (getComputedStyle(tabBtn).position === 'static') tabBtn.style.position = 'relative';
   }
-  const railItem = document.getElementById('gob-rail-recruiting');
-  if (railItem) {
-    let railBadge = railItem.querySelector('.inbox-badge');
-    if (prompted && !railBadge) {
-      railBadge = document.createElement('span');
-      railBadge.className = 'inbox-badge';
-      railItem.appendChild(railBadge);
-    } else if (!prompted && railBadge) {
-      railBadge.remove();
-    }
-  }
 }
 
 function renderHomeNewsCard() {
@@ -1779,18 +1768,10 @@ async function renderNewsTab() {
 }
 
 async function renderHomeTab() {
-  bindHomeTeamLeaderButtons();
-  renderHomeRankingsCard();
-  renderHomeLockerRoomCard();
-  renderHomeTeamStatsCard();
-  renderHomeRecruitingWire();
+  if (window.GOBOffice && typeof window.GOBOffice.render === 'function') {
+    window.GOBOffice.render(commandCenterTopDataCache && commandCenterTopDataCache.office_digest);
+  }
   renderRecruitingTabBadge();
-  renderHomeNewsCard();
-  renderHomeMatchupCard('home-next-game-body', commandCenterTopDataCache?.next_game_summary || null, {
-    emptyMessage: commandCenterTopDataCache?.next_game_is_bye ? 'Bye' : 'N/A'
-  });
-  renderHomeMatchupCard('home-last-game-body', commandCenterTopDataCache?.last_game_summary || null);
-  renderFccGameCardLockups();
 }
 
 async function loadHomeTabData() {
@@ -3820,15 +3801,7 @@ async function init() {
     bindResourcesLinks();
     if (standingsDataCache) renderStandings(standingsDataCache, 'A');
     if (userRosterPlayersCache.length) renderTeam(userRosterDataCache);
-    renderHomeRankingsCard();
-    renderHomeLockerRoomCard();
-    renderHomeTeamStatsCard();
-    renderHomeRecruitingWire();
-    renderRecruitingTabBadge();
-    renderHomeNewsCard();
-    if (userScheduleDataCache) {
-      void renderHomeTab();
-    }
+    void renderHomeTab();
     // Keep the full-page overlay visible until authoritative command-center
     // data returns. Cached rendering is only a behind-the-overlay warm paint;
     // showing it directly causes a stale-data flash on FCC entry.
