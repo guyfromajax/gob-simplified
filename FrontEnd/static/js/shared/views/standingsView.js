@@ -180,7 +180,7 @@ export function mount(container, ctx) {
       var yours = sameConference(card, userConference, userRegion);
       var title = String(card.region || '') + String(card.conference == null ? '' : card.conference) + ' CONFERENCE';
       html += '<section class="gob-tcard"><h2>' + tables.esc(title);
-      if (yours) html += ' <b>· Yours</b>';
+      if (yours) html += '<em>· Yours</em>';
       html += '</h2><table class="gob-tbl"><thead><tr>';
       COLS.forEach(function (col) {
         var on = sortKey === col.key;
@@ -205,6 +205,8 @@ export function mount(container, ctx) {
             cell = tables.esc(row._rank);
           } else if (col.key === 'streak') {
             cell = tables.esc(row.streak || '');
+          } else if (col.key === 'pct') {
+            cell = tables.esc(tables.formatPct(row.pct));
           } else if (row[col.key] == null || row[col.key] === '') {
             cell = '';
           } else {

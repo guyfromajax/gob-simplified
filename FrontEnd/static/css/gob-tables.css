@@ -50,14 +50,17 @@ html.gob-shell.gob-1920 .gob-tgrid {
 .gob-tcard h2 {
   margin: 0;
   padding: var(--space-12) var(--space-12) var(--space-8);
-  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
-  letter-spacing: var(--tracking-6);
-  color: var(--text-60);
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-87);
 }
 
-.gob-tcard h2 b {
-  color: var(--text-100);
-  font-weight: var(--fw-bold);
+.gob-tcard h2 em {
+  margin-left: var(--space-10);
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
 }
 
 .gob-tbl {
@@ -139,6 +142,16 @@ html.gob-shell.gob-1920 .gob-tgrid {
   background-image: linear-gradient(var(--white-12), var(--white-12));
 }
 
+.gob-tbl tr.gob-groups th {
+  height: var(--dsz-22);
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-10);
+  color: var(--text-38);
+  text-align: center;
+  background: var(--surface-th-top);
+  border-bottom: 1px solid var(--line);
+}
+
 .gob-tbl tr.gob-rep th {
   position: static;
   background: var(--surface-th-bottom);
@@ -166,15 +179,16 @@ html.gob-shell.gob-1920 .gob-tgrid {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-8);
 }
 
 .gob-diff i {
   position: relative;
-  width: 52px;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--white-6);
+  display: inline-block;
+  width: var(--dsz-40);
+  height: var(--dsz-6);
+  border-radius: var(--radius-2);
+  background: var(--white-4);
   flex: none;
 }
 
@@ -182,22 +196,38 @@ html.gob-shell.gob-1920 .gob-tgrid {
   content: "";
   position: absolute;
   left: 50%;
-  top: -2px;
-  bottom: -2px;
+  top: -3px;
+  bottom: -3px;
   width: 1px;
-  background: var(--text-38);
+  background: var(--white-25);
 }
 
-.gob-diff i b {
+.gob-diff i::after {
+  content: "";
   position: absolute;
   top: 0;
   bottom: 0;
-  background: var(--text-60);
-  border-radius: 3px;
+  left: 50%;
+  width: calc(var(--v, 0) * 50%);
+  border-radius: var(--radius-2);
+  background: var(--white-55);
 }
 
-.gob-diff i b.pos { left: 50%; }
-.gob-diff i b.neg { right: 50%; }
+.gob-diff i.neg::after {
+  left: auto;
+  right: 50%;
+  background: var(--white-25);
+}
+
+.gob-diff > span {
+  display: inline-block;
+  min-width: 4.2ch;
+  text-align: right;
+}
+
+.gob-diff.neg > span {
+  color: var(--text-60);
+}
 
 .gob-xs {
   overflow-x: auto;
@@ -249,6 +279,9 @@ html.gob-shell.gob-1920 .gob-tgrid {
 }
 
 .gob-ldb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
   min-width: 0;
   background: var(--surface-1);
   border: 1px solid var(--line);
@@ -256,83 +289,152 @@ html.gob-shell.gob-1920 .gob-tgrid {
   padding: var(--space-12);
 }
 
-.gob-ldb header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: var(--space-8);
-  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
-  letter-spacing: var(--tracking-6);
-  color: var(--text-60);
-}
-
-.gob-ldb .hero,
-.gob-ldb li,
-.gob-full tr {
-  display: grid;
-  grid-template-columns: 1.4rem minmax(0, 1fr) auto;
-  gap: 6px;
-  align-items: center;
-}
-
-.gob-ldb .hero {
-  padding: var(--space-8) 0;
-}
-
-.gob-ldb ol {
-  list-style: none;
+.gob-ldb .card-h h3 {
   margin: 0;
-  padding: 0;
-}
-
-.gob-ldb li {
-  padding: 4px 0;
-}
-
-.gob-ldb .nm {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-100);
-}
-
-.gob-ldb .sub {
-  display: block;
-  color: var(--text-38);
-  font: var(--fw-regular) var(--fs-12)/1.2 var(--font-body);
-  letter-spacing: 0;
-}
-
-.gob-ldb .val {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-100);
-}
-
-.gob-ldb .me,
-.gob-ldb .is-user,
-.gob-full tr.me td {
-  background: rgba(39, 64, 142, 0.34);
-  border-radius: 6px;
 }
 
 .gob-ldb .cap,
 .gob-full .cap {
-  margin: var(--space-8) 0 0;
+  margin: 0;
   color: var(--text-38);
-  font: var(--fw-regular) var(--fs-12)/1.3 var(--font-body);
+  font: var(--fw-regular) var(--fs-11)/1.3 var(--font-body);
+}
+
+.gob-ldb .ldb-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--dsp-10);
+  padding: var(--dsp-8) var(--dsp-10);
+  border-radius: var(--radius-10);
+  background: var(--white-3);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.gob-ldb .av {
+  width: 36px;
+  height: 36px;
+  font-size: var(--fs-13);
+}
+
+.gob-ldb .ldb-id {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.gob-ldb .ldb-id .nm {
+  font-size: var(--fs-14);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gob-ldb .ldb-id > span {
+  font-size: var(--fs-11);
+  color: var(--text-60);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gob-ldb .ldb-v {
+  font: var(--fw-bold) var(--fs-32)/0.9 var(--font-display);
+  color: var(--text-100);
+  white-space: nowrap;
+}
+
+.gob-ldb .ldb-v em {
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: var(--tracking-6);
+  color: var(--text-60);
+  margin-left: 3px;
+}
+
+.gob-ldb .ldb-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.gob-ldb .ldb-r {
+  display: grid;
+  grid-template-columns: var(--dsz-18) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--dsp-8);
+  height: var(--dsz-28);
+  padding: 0 var(--dsp-8);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-12);
+}
+
+.gob-ldb .ldb-r:first-child {
+  border-top: 0;
+}
+
+.gob-ldb .ldb-r > span:first-child {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  color: var(--text-38);
+}
+
+.gob-ldb .ldb-n {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.gob-ldb .ldb-n .nm {
+  font-weight: var(--fw-medium);
+  color: var(--text-87);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gob-ldb .ldb-n em {
+  font-style: normal;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-6);
+  color: var(--text-38);
+}
+
+.gob-ldb .ldb-r b {
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  color: var(--text-87);
+}
+
+.gob-ldb .ldb-top.me,
+.gob-ldb .ldb-r.me,
+.gob-ldb .ldb-top.is-user,
+.gob-ldb .ldb-r.is-user,
+.gob-full tr.me td {
+  background: #1c2a52;
+}
+
+.gob-ldb .ldb-r.me {
+  border-radius: 6px;
+  border-top-color: transparent;
+}
+
+.gob-ldb .ldb-top.me {
+  border-radius: var(--radius-10);
 }
 
 .gob-ldb .full,
 .gob-board {
-  margin-top: var(--space-8);
+  align-self: flex-end;
+  margin-top: var(--space-4);
   padding: 0;
   border: 0;
   background: none;
   color: var(--text-60);
   cursor: pointer;
-  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
-  letter-spacing: var(--tracking-6);
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
 }
 
 .gob-full {

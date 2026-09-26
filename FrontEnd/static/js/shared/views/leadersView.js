@@ -152,36 +152,71 @@ export function mount(container, ctx) {
     return FALLBACK_CAPTION[stat] || '';
   }
 
-  function person(row, rank) {
-    var name = row.name || '';
-    var meta = [row.position, row.year, row.team].filter(Boolean).join(' · ');
-    var href = tables.rosterHref(franchiseId, row.team_id, row.team || '', 'leaders-view');
-    return '<span class="rk">' + rank + '</span>'
-      + '<span class="nm"><span>' + tables.esc(name) + '</span>'
-      + (meta ? '<span class="sub">' + (row.team_id
-        ? '<a class="gob-team" data-return href="' + tables.esc(href) + '">' + tables.esc(meta) + '</a>'
-        : tables.esc(meta)) + '</span>' : '')
-      + '</span><span class="val">' + tables.esc(row.value) + '</span>';
+  function initials(name) {
+    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+  }
+
+  function abbr(name) {
+    return String(name || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase();
+  }
+
+  function unit(stat) {
+    if (stat === 'FG%' || stat === 'DEF%') return '%';
+    if (basis !== 'per_game') return '';
+    return { PTS: 'PPG', REB: 'RPG', AST: 'APG', STL: 'SPG', BLK: 'BPG', '3PTM': '3PM' }[stat] || '';
+  }
+
+  function showValue(stat, value) {
+    if (basis === 'per_game' && stat !== 'FG%' && stat !== 'DEF%') {
+      var n = Number(value);
+      if (isFinite(n)) return n.toFixed(1);
+    }
+    return value;
+  }
+
+  function teamBits(row) {
+    return [row.team, row.position, row.year].filter(Boolean).join(' · ');
   }
 
   function renderBoard() {
     var html = '<div class="gob-ldr">';
+    var basisText = basis === 'totals' ? 'totals' : 'per game';
     CATS.forEach(function (stat) {
       var rows = ((board && board[stat]) || []).filter(matches);
       if (query.trim() && !rows.length) return;
       var hero = rows[0];
-      html += '<article class="gob-ldb"><header><span>' + tables.esc(LABELS[stat] || stat) + '</span></header>';
-      if (hero) {
-        html += '<div class="hero' + (mine(hero) ? ' me is-user' : '') + '">' + person(hero, 1) + '</div><ol>';
-        rows.slice(1, 5).forEach(function (row, index) {
-          html += '<li class="' + (mine(row) ? 'me is-user' : '') + '">' + person(row, index + 2) + '</li>';
-        });
-        html += '</ol>';
-      }
-      html += '<button type="button" class="full" data-stat="' + tables.esc(stat) + '">Full list →</button>';
       var cap = captionFor(stat, (board && board[stat]) || []);
+      var suffix = unit(stat);
+      html += '<article class="gob-ldb"><header class="card-h"><h3>' + tables.esc(LABELS[stat] || stat)
+        + '</h3><span class="meta">' + tables.esc(stat) + ' · ' + basisText + '</span></header>';
       if (cap) html += '<p class="cap">' + tables.esc(cap) + '</p>';
-      html += '</article>';
+      if (hero) {
+        var href = tables.rosterHref(franchiseId, hero.team_id, hero.team || '', 'leaders-view');
+        var who = teamBits(hero);
+        html += '<div class="ldb-top' + (mine(hero) ? ' me is-user' : '') + '">'
+          + '<span class="av">' + tables.esc(initials(hero.name)) + '</span>'
+          + '<span class="ldb-id"><span class="nm">' + tables.esc(hero.name || '') + '</span>'
+          + '<span>' + (hero.team_id
+            ? '<a class="gob-team" data-return href="' + tables.esc(href) + '">' + tables.esc(who) + '</a>'
+            : tables.esc(who)) + '</span></span>'
+          + '<span class="ldb-v">' + tables.esc(showValue(stat, hero.value))
+          + (suffix ? '<em>' + tables.esc(suffix) + '</em>' : '') + '</span></div><div class="ldb-list">';
+        rows.slice(1, 5).forEach(function (row, index) {
+          var rowHref = tables.rosterHref(franchiseId, row.team_id, row.team || '', 'leaders-view');
+          var code = abbr(row.team);
+          html += '<div class="ldb-r' + (mine(row) ? ' me is-user' : '') + '"><span>' + (index + 2) + '</span>'
+            + '<span class="ldb-n"><span class="nm">' + tables.esc(row.name || '') + '</span>'
+            + (code ? '<em>' + (row.team_id
+              ? '<a class="gob-team" data-return href="' + tables.esc(rowHref) + '">' + tables.esc(code) + '</a>'
+              : tables.esc(code)) + '</em>' : '')
+            + '</span><b>' + tables.esc(showValue(stat, row.value)) + '</b></div>';
+        });
+        html += '</div>';
+      }
+      html += '<button type="button" class="full" data-stat="' + tables.esc(stat) + '">Full list →</button></article>';
     });
     html += '</div>';
     container.innerHTML = html;

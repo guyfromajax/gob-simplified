@@ -255,6 +255,27 @@ async function assertNoMainOverflow(page) {
   await assertOneVerticalScroll(page);
 }
 
+async function parkPointer(page) {
+  const box = await page.locator('html.gob-shell .main').boundingBox();
+  if (box) await page.mouse.move(box.x + Math.min(320, box.width / 2), box.y + 88);
+}
+
+async function assertCollapsedRail(page) {
+  if (page.viewportSize().width >= 1680) return;
+  await parkPointer(page);
+  const leaked = await page.evaluate(() => {
+    const face = document.querySelector('html.gob-shell .rail-face');
+    if (!face) return ['missing rail'];
+    const railRight = face.getBoundingClientRect().right;
+    return Array.from(document.querySelectorAll('.rail-l')).filter(function (el) {
+      const box = el.getBoundingClientRect();
+      const opacity = Number(getComputedStyle(el).opacity);
+      return opacity > 0.05 && box.width > 1 && box.right > railRight + 0.5;
+    }).map(function (el) { return el.textContent.trim(); });
+  });
+  expect(leaked).toEqual([]);
+}
+
 async function clickStab(page, label) {
   await page.evaluate(() => {
     const main = document.querySelector('html.gob-shell .main');
@@ -293,6 +314,9 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await expect(page.locator('#standings-view tr.is-user')).toContainText('Lancaster');
     await expect(page.locator('#standings-view tr.is-user')).toContainText('W3');
     await expect(page.locator('#standings-view .gob-next').first()).toContainText('W1');
+    await expect(page.locator('#standings-view tr.is-user')).toContainText('.833');
+    await parkPointer(page);
+    await assertCollapsedRail(page);
     await expect(page.locator('#standings-view')).not.toContainText(/Mon|Tue|Wed|Thu|Fri|Sat|Sun|\d{1,2}:\d{2}/);
     const labels = await page.locator('#gob-subtabs .stab').allTextContents();
     expect(labels.map(function (text) { return text.trim(); }).filter(Boolean)).toEqual([
@@ -315,6 +339,9 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await clickStab(page, 'Rankings');
     const leadersSecond = await timedOpen(page, 'Leaders', '#leaders-view .gob-ldb');
     await assertNoMainOverflow(page);
+    await parkPointer(page);
+    await assertCollapsedRail(page);
+    await expect(page.locator('#gob-subtabs .stab.on')).toHaveCount(1);
     await page.screenshot({ path: path.join(OUT, 'leaders-' + size[2] + '.png') });
 
     const statsFirst = await timedOpen(page, 'Team Stats', '#teamstats-body tr');
@@ -332,6 +359,9 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     expect(scrollable.wide).toBe(true);
     expect(scrollable.sticky).toBe('static');
     await assertNoMainOverflow(page);
+    await parkPointer(page);
+    await assertCollapsedRail(page);
+    await expect(page.locator('#gob-subtabs .stab.on')).toHaveCount(1);
     await page.screenshot({ path: path.join(OUT, 'team-stats-' + size[2] + '.png') });
     await page.evaluate(() => {
       const card = document.querySelector('#team-stats-view .gob-xs');
@@ -343,6 +373,9 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
 
     await clickStab(page, 'Standings');
     await page.waitForSelector('#standings-view .gob-tcard');
+    await parkPointer(page);
+    await assertCollapsedRail(page);
+    await expect(page.locator('#gob-subtabs .stab.on')).toHaveCount(1);
     await page.screenshot({ path: path.join(OUT, 'standings-' + size[2] + '.png') });
     await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
     await page.getByRole('button', { name: 'National', exact: true }).click();
@@ -351,6 +384,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
       const columns = await page.evaluate(() => getComputedStyle(document.querySelector('#standings-view .gob-tgrid')).gridTemplateColumns);
       expect(columns.split(' ').length).toBe(2);
     }
+    await parkPointer(page);
     await page.screenshot({ path: path.join(OUT, 'standings-national-' + size[2] + '.png') });
     await assertNoMainOverflow(page);
 
@@ -519,7 +553,7 @@ test('leaders full list replaces in place and totals come from the api', async (
   await page.waitForSelector('#leaders-view .full');
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
   await mouseClick(page, page.locator('#gob-subtabs .pg-tools button', { hasText: 'Totals' }));
-  await expect(page.locator('#leaders-view .hero .val').first()).toHaveText('200');
+  await expect(page.locator('#leaders-view .ldb-v').first()).toContainText('200');
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
   await mouseClick(page, '#leaders-view .full');
   await page.waitForSelector('#leaders-view .gob-full tbody tr');

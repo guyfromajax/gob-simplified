@@ -61,11 +61,19 @@
   function diffCell(value, maxAbs) {
     var n = Number(value);
     if (!isFinite(n)) n = 0;
-    var width = maxAbs > 0 ? Math.min(50, Math.abs(n) / maxAbs * 50) : 0;
-    var side = n < 0 ? 'neg' : 'pos';
+    var scale = maxAbs > 0 ? Math.min(1, Math.abs(n) / maxAbs) : 0;
+    var side = n < 0 ? ' neg' : '';
     var text = (n > 0 ? '+' : '') + n;
-    return '<span class="gob-diff"><i><b class="' + side + '" style="width:' + width + '%"></b></i><span>'
-      + esc(text) + '</span></span>';
+    return '<span class="gob-diff' + side + '"><i class="' + (n < 0 ? 'neg' : 'pos')
+      + '" style="--v:' + scale + '"></i><span>' + esc(text) + '</span></span>';
+  }
+
+  function formatPct(value) {
+    var n = Number(value);
+    if (!isFinite(n)) return '';
+    var text = Math.abs(n).toFixed(3);
+    if (text.charAt(0) === '0') text = text.slice(1);
+    return (n < 0 ? '-' : '') + text;
   }
 
   function segment(options, current) {
@@ -185,6 +193,7 @@
     teamLink: teamLink,
     nextCell: nextCell,
     diffCell: diffCell,
+    formatPct: formatPct,
     segment: segment,
     searchBox: searchBox,
     registerTools: registerTools,

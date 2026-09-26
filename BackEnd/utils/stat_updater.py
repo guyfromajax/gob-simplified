@@ -2261,6 +2261,9 @@ def _finalize_game_impl(
                 )
         if _fpd_ops:
             franchise_players_data_collection.bulk_write(_fpd_ops, ordered=False)
+            from BackEnd.utils.leaders_snapshot import note_season_stats_written
+
+            note_season_stats_written(str(fid))
         _ck = _fsub_mark("fpd_write", _ck)  # [FINALIZE-SUBTIMING] FPD load+init+bulk_write
 
         logger.info(f"🔍 [FINALIZE_GAME] Applied stats/meta to FPD for {len(processed_player_ids)} players")

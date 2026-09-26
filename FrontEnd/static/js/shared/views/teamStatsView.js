@@ -157,7 +157,7 @@ export function mount(container, ctx) {
     var html = '<section class="gob-tcard"><div class="gob-xs"><table class="gob-tbl"><thead>';
     html += '<tr class="gob-groups">';
     GROUPS.forEach(function (group) {
-      html += '<th class="left' + (group.shade ? ' gshade' : '') + '" colspan="' + group.cols.length + '">'
+      html += '<th class="gob-g' + (group.shade ? ' gshade' : '') + '" colspan="' + group.cols.length + '">'
         + tables.esc(group.name) + '</th>';
     });
     html += '</tr>' + headerRow(false) + '</thead><tbody id="teamstats-body">';

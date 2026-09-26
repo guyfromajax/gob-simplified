@@ -52,6 +52,7 @@ class PersistenceStore(Protocol):
     franchises_collection: Any
     franchise_team_data_collection: Any
     franchise_players_data_collection: Any
+    leaders_snapshots_collection: Any
     franchise_recruits_data_collection: Any
     plays_collection: Any
     defenses_collection: Any
