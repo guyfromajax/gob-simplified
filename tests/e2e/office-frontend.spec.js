@@ -359,6 +359,19 @@ async function assertOfficeText(page) {
   return text;
 }
 
+async function assertMonograms(page) {
+  const bad = await page.evaluate(() => {
+    return [...document.querySelectorAll('#office-root .logo')].filter((node) => {
+      const box = node.getBoundingClientRect();
+      return Math.abs(box.width - box.height) > 1 || box.width < 28 || box.height < 28;
+    }).map((node) => {
+      const box = node.getBoundingClientRect();
+      return node.textContent.trim() + ' ' + Math.round(box.width) + 'x' + Math.round(box.height);
+    });
+  });
+  expect(bad, 'monogram not square').toEqual([]);
+}
+
 async function assertLabelsFit(page) {
   const clipped = await page.evaluate(() => {
     return [...document.querySelectorAll('#office-root .rs-n, #office-root .wk-step .td-l')]
@@ -465,6 +478,7 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
       await assertOfficeText(page);
       await assertHeadersClear(page);
       await assertLabelsFit(page);
+      await assertMonograms(page);
       await assertChipSize(page);
       await assertWireFitsContent(page);
       expect(await page.locator('#office-root .office-col').count()).toBe(3);
@@ -593,6 +607,7 @@ test('live mid-season digest', async ({ page }) => {
     await assertOfficeText(page);
     await assertHeadersClear(page);
     await assertLabelsFit(page);
+    await assertMonograms(page);
     await assertWireFitsContent(page);
     expect(await page.locator('#office-root .td-gate').count()).toBe(0);
     expect(await page.locator('#office-root .td-adv').count()).toBe(1);
