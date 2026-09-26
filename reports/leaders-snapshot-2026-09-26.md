@@ -78,4 +78,29 @@ Also run: `test_leader_qualification`, `test_franchise_leaders_endpoint`, `test_
 - mongomock (`GOB_DB_MODE=mongomock`): 76 passed
 - SQLite (`GOB_PERSISTENCE=sqlite`, `GOB_DB_MODE=mongomock`): 76 passed
 
+## Follow-up
+
+The process-local sets (`_stale_marked`, `_local_gen`, `_built_gen`) are gone. A second process cannot see them, so process A could skip a later mark after process B had rebuilt.
+
+`note_season_stats_written` is one `update_one({"_id"}, {"$inc": {"gen": 1}, "$set": {"stale": true}})`. If the snapshot document does not exist, that matches nothing. The call is wrapped so `finalize_game` cannot fail on it. A rebuild reads `gen` before it loads player lines. It writes the new document, with `stale: false` and the same `gen`, only when a conditional replace still matches that `gen` (a missing `gen` counts as 0). If `gen` moved, the live lines are returned and nothing is stored. The fresh check is still week + season + not stale. `$inc` and the conditional replace already compile on the SQLite adapter; the route does not branch.
+
+Tests added: a second process (module memory saved, cleared, and restored) marks, rebuilds, and marks again, and the next read shows the new points; a `note` between load and store leaves the previous snapshot in place and the following read rebuilds. The earlier equivalence, staleness, and fallback tests still pass.
+
+- mongomock: 78 passed
+- SQLite: 78 passed
+
+Same five suites as above, included in those 78.
+
+Re-measured on the week-15 SQLite copy, five runs each:
+
+| | Runs | Median |
+| --- | --- | ---: |
+| Snapshot open | 30.80, 30.87, 29.89, 31.36, 29.82 ms | 30.8 ms |
+| Week-advance delta | 59.1, 75.7, 61.2, 62.9, 67.2 ms | 62.9 ms |
+| `note_season_stats_written` | 38.31, 38.62, 38.24, 38.59, 38.07 ms | **38.3 ms** |
+
+The per-game note is over the ~2 ms budget. Each call rewrites the whole 334 KB snapshot: the adapter decodes the document, applies `$inc` and `$set` in Python, and writes it back. That was not changed. At one note per game, 63 games is about 2.4 s on a CPU week.
+
+Follow-up implementation commit: `da46d7006`
+
 STATUS: COMPLETE
