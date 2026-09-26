@@ -9,6 +9,7 @@ test.describe.configure({ timeout: 180000 });
 const FID = 'f-e2e-office';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/office-frontend');
+const TWEAKS = path.join(__dirname, '../../reports/office-tweaks-4');
 const V2 = path.join(__dirname, '../../reports/office-v2');
 const V3 = path.join(__dirname, '../../reports/office-v3');
 const V3B = path.join(__dirname, '../../reports/office-v3b');
@@ -839,6 +840,27 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openOffice(page, STATES.win);
   await assertOfficeText(page);
+  const arrowColors = await page.evaluate(() => {
+    function rgb(node) { return getComputedStyle(node).color; }
+    const up = document.querySelector('#office-root .wr.up .wr-tag');
+    const down = document.querySelector('#office-root .wr.dn .wr-tag');
+    const chipUp = document.querySelector('#office-root .chip.up');
+    const chipDown = document.querySelector('#office-root .chip.down');
+    return {
+      up: rgb(up),
+      down: rgb(down),
+      chipUp: rgb(chipUp),
+      chipDown: rgb(chipDown),
+      upText: up.textContent,
+      downText: down.textContent,
+    };
+  });
+  expect(arrowColors.upText).toBe('▲');
+  expect(arrowColors.downText).toBe('▼');
+  expect(arrowColors.up).toBe(arrowColors.chipUp);
+  expect(arrowColors.down).toBe(arrowColors.chipDown);
+  fs.mkdirSync(TWEAKS, { recursive: true });
+  await page.screenshot({ path: path.join(TWEAKS, 'office-1280x720.png') });
   const rankStyle = await page.locator('#office-root .nx-rank').evaluate((node) => ({
     style: getComputedStyle(node).fontStyle,
     family: getComputedStyle(node).fontFamily,
@@ -988,6 +1010,36 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   expect(Math.max(...attitude.widths) - Math.min(...attitude.widths)).toBeLessThanOrEqual(1);
   attitude.centers.forEach((delta) => expect(delta).toBeLessThanOrEqual(1));
 
+  const scaleData = commandCenter(digest('win', {
+    team_snapshot: snapshotBlock({
+      attitude: {
+        player_count: 12,
+        buckets: [
+          { id: 'em_0_19', min: 0, max: 19, count: 0 },
+          { id: 'em_20_39', min: 20, max: 39, count: 2 },
+          { id: 'em_40_59', min: 40, max: 59, count: 5 },
+          { id: 'em_60_79', min: 60, max: 79, count: 7 },
+          { id: 'em_80_plus', min: 80, max: null, count: 2 },
+        ],
+      },
+    }),
+  }));
+  await openOffice(page, scaleData);
+  const bars = await page.locator('#office-root .att-col').evaluateAll((nodes) => {
+    return nodes.map((node) => ({
+      bucket: node.dataset.bucket,
+      count: node.querySelector('.att-n').textContent,
+      width: node.querySelector('.att-bar i').style.width,
+    }));
+  });
+  expect(bars).toEqual([
+    { bucket: 'em_0_19', count: '0', width: '0%' },
+    { bucket: 'em_20_39', count: '2', width: '40%' },
+    { bucket: 'em_40_59', count: '5', width: '100%' },
+    { bucket: 'em_60_79', count: '7', width: '100%' },
+    { bucket: 'em_80_plus', count: '2', width: '40%' },
+  ]);
+
   for (const band of [[5, 'red'], [13, 'yellow'], [20, 'green']]) {
     const data = commandCenter(digest('win', {
       team_snapshot: snapshotBlock({ chemistry: { value: band[0], max: 25 } }),
@@ -998,6 +1050,11 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
     expect(paint).toContain('gradient');
     expect(paint.toLowerCase()).not.toContain('74, 144, 217');
   }
+
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openOffice(page, STATES.win);
+  fs.mkdirSync(TWEAKS, { recursive: true });
+  await page.screenshot({ path: path.join(TWEAKS, 'office-1920x1080.png') });
 });
 
 test('recruiting keeps the latest event and whole rows', async ({ page }) => {

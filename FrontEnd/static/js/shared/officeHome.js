@@ -34,6 +34,8 @@
     pt_opp_modifier: 'P/T Offense'
   };
 
+  var ATTITUDE_BAR_MAX = 5;
+
   var EMOJI = {
     em_0_19: '😡',
     em_20_39: '😕',
@@ -908,12 +910,6 @@
     var buckets = Array.isArray(attitude.buckets) ? attitude.buckets : [];
     if (buckets.length) {
       node.appendChild(el('div', 'sub-h', 'Attitude'));
-      var total = Number(attitude.player_count);
-      if (!total) {
-        total = buckets.reduce(function (sum, bucket) {
-          return sum + (Number(bucket && bucket.count) || 0);
-        }, 0);
-      }
       var spread = el('div', 'att');
       buckets.forEach(function (bucket) {
         if (!bucket) return;
@@ -924,7 +920,7 @@
         col.appendChild(el('span', 'att-n', String(count)));
         var bar = el('span', 'att-bar');
         var share = el('i');
-        var width = total > 0 ? Math.max(0, Math.min(100, (count / total) * 100)) : 0;
+        var width = (Math.min(count, ATTITUDE_BAR_MAX) / ATTITUDE_BAR_MAX) * 100;
         share.style.width = width + '%';
         bar.appendChild(share);
         col.appendChild(bar);

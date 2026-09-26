@@ -195,7 +195,8 @@
 .gob .wr-2{font-size:var(--fs-12);color:var(--text-87)}
 .gob .wr.dn .wr-2{color:var(--text-87)}
 .gob .wr-tag{font:var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-4);color:var(--text-87)}
-.gob .wr.dn .wr-tag{color:var(--red)}
+.gob .wr.up .wr-tag{color:var(--delta-up)}
+.gob .wr.dn .wr-tag{color:var(--delta-down)}
 /* next */
 .gob .nx-top{display:flex;justify-content:space-between;gap:var(--space-10)}
 .gob .nx-m{display:flex;align-items:center;gap:var(--dsp-12)}
