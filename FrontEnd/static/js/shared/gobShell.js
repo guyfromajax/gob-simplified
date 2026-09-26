@@ -38,7 +38,7 @@
     { id: 'league', label: 'League', title: 'League', icon: 'league', tabs: [
       { id: 'standings-tab', label: 'Standings' },
       { id: 'schedule-page', label: 'Schedule', link: 'schedule' },
-      { id: 'rankings', label: 'Rankings', link: 'rankings' },
+      { id: 'rankings-view', label: 'Rankings' },
       { id: 'awards-tab', label: 'Leaders' },
       { id: 'fcc-team-stats-summary-tab', label: 'Team Stats' },
       { id: 'practice-squad', label: 'Practice Squad', link: 'practice' },
@@ -62,6 +62,7 @@
     'playbooks-tab': 'prep',
     'coaches-tab': 'prep',
     'standings-tab': 'league',
+    'rankings-view': 'league',
     'fcc-team-stats-summary-tab': 'league',
     'awards-tab': 'league',
     'press-tab': 'news'
@@ -699,6 +700,7 @@
       m.bindGobDensity(document.documentElement);
     }).catch(function () {});
     import('/js/shared/gobSettings.js').catch(function () {});
+    watchStickTop();
   }
 
   window.GOBShell = {

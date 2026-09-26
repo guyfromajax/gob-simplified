@@ -38,6 +38,16 @@ function initCommandCenterTabs(options) {
   var urlParams = liveParams();
   var activeTab = urlParams.get('tab') || defaultTab;
 
+  function isKnown(tabName) {
+    if (!tabName) return false;
+    var button = Array.prototype.some.call(tabButtons, function (b) {
+      return b.dataset.tab === tabName;
+    });
+    if (button) return true;
+    var panel = document.getElementById(tabName);
+    return !!(panel && panel.classList && panel.classList.contains('tab-content'));
+  }
+
   function setActive(tabName) {
     tabButtons.forEach(function (b) {
       b.classList.toggle('active', b.dataset.tab === tabName);
@@ -45,16 +55,16 @@ function initCommandCenterTabs(options) {
     tabContents.forEach(function (c) {
       c.classList.toggle('active', c.id === tabName);
     });
+    if (window.GOBViews && typeof window.GOBViews.has === 'function' && window.GOBViews.has(tabName)) {
+      window.GOBViews.show(tabName);
+    }
     try {
       window.dispatchEvent(new CustomEvent('gob-tab-shown', { detail: { tab: tabName } }));
     } catch (err) { /* ignore */ }
   }
 
   function show(tabName, historyMode) {
-    var known = Array.prototype.some.call(tabButtons, function (b) {
-      return b.dataset.tab === tabName;
-    });
-    if (!known) tabName = defaultTab;
+    if (!isKnown(tabName)) tabName = defaultTab;
     if (window.GOB_BUILD_PROFILE === 'desktop' && window.FranchiseContext && typeof window.FranchiseContext.set === 'function') {
       window.FranchiseContext.set('tab', tabName);
     }
@@ -91,10 +101,7 @@ function initCommandCenterTabs(options) {
   function showTabFromUrl() {
     var bag = liveParams();
     var tabName = bag.get('tab') || defaultTab;
-    var known = Array.prototype.some.call(tabButtons, function (b) {
-      return b.dataset.tab === tabName;
-    });
-    if (!known) tabName = defaultTab;
+    if (!isKnown(tabName)) tabName = defaultTab;
     setActive(tabName);
     onTabShow(tabName);
     if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
@@ -106,10 +113,7 @@ function initCommandCenterTabs(options) {
     showTabFromUrl();
   });
 
-  var hasMatchingTab = Array.prototype.some.call(tabButtons, function (b) {
-    return b.dataset.tab === activeTab;
-  });
-  if (!hasMatchingTab) activeTab = defaultTab;
+  if (!isKnown(activeTab)) activeTab = defaultTab;
 
   // The visible tab has to be in the URL before a drill-down click captures
   // return_url. Otherwise in-app Back replaces onto Coach's Office.

@@ -417,6 +417,27 @@
 
   install();
 
+  function revalidate(url, init) {
+    if (!nativeFetch) return Promise.reject(new Error('fetch unavailable'));
+    var nextInit = {};
+    if (init) {
+      Object.keys(init).forEach(function (name) { nextInit[name] = init[name]; });
+    }
+    nextInit.cache = 'no-store';
+    if (neverCache(url) || !isBrowseGet(url)) {
+      return get(url, nextInit).then(function (res) { return res.json(); });
+    }
+    var key = canonical(url);
+    return fetchRevalidate(url, key, nextInit).then(function (entry) {
+      if (entry && entry.passthrough) {
+        var err = new Error('Request failed');
+        err.status = entry.status;
+        throw err;
+      }
+      return entry ? entry.body : null;
+    });
+  }
+
   root.GOBStore = {
     get: function (url, init) {
       return get(url, init).then(function (res) {
@@ -428,6 +449,7 @@
         return res.json();
       });
     },
+    revalidate: revalidate,
     mutate: mutate,
     clearFranchise: dropFranchise
   };

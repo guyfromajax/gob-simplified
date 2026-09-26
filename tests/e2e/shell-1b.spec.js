@@ -303,9 +303,14 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   const scheduleUrl = await expectGo('Schedule', '/schedule.html');
   const scheduleHref = await page.locator('#schedule-full-link').getAttribute('href');
   expect(scheduleUrl).toBe(scheduleHref);
-  const rankingsUrl = await expectGo('Rankings', '/rankings.html');
-  const rankingsHref = scheduleHref.replace('/schedule.html', '/rankings.html');
-  expect(rankingsUrl).toBe(rankingsHref);
+  const navBeforeRankings = await page.evaluate(() => window.__shellNav.length);
+  const docBeforeRankings = await page.evaluate(() => window.__docStamp || (window.__docStamp = 'shell1b'));
+  await mouseClick(page, stab(page, 'Rankings'));
+  await expect(page.locator('#rankings-view.tab-content.active')).toBeVisible();
+  expect(page.url()).toContain('tab=rankings-view');
+  expect(page.url()).not.toContain('rankings.html');
+  expect(await page.evaluate(() => window.__shellNav.length)).toBe(navBeforeRankings);
+  expect(await page.evaluate(() => window.__docStamp)).toBe(docBeforeRankings);
   const psUrl = await expectGo('Practice Squad', '/practice-squad-standings.html');
   const psHref = await page.locator('#fcc-ps-season-link').getAttribute('href');
   expect(psUrl).toBe(psHref);

@@ -642,24 +642,27 @@ test('advance label matches the office on three weeks', async ({ page }) => {
   }
 });
 
-test('rankings sub-tab replace then back returns to League', async ({ page }) => {
+test('rankings sub-tab replaces in place and back leaves League', async ({ page }) => {
   await openPage(page, 'franchise-command-center.html', cc());
   await page.waitForSelector('#play-now.advance');
   await mouseClick(page, '.rail [data-gob-section="league"]');
   await expect(page.locator('#gob-subtabs .stab.on')).toHaveText('Standings');
-  await mouseClick(page, stab(page, 'Rankings'));
-  await page.waitForURL(/rankings\.html/);
-  await expect(page.locator('#gob-subtabs .stab.on')).toHaveText('Rankings');
-  await page.waitForSelector('#gob-subtabs .stab.is-locked');
   const mid = await page.evaluate(() => (history.state && history.state.gobIdx));
+  const navs = await page.evaluate(() => performance.getEntriesByType('navigation').length);
+  await mouseClick(page, stab(page, 'Rankings'));
+  await expect(page.locator('#rankings-view.tab-content.active')).toBeVisible();
+  await expect(page.locator('#gob-subtabs .stab.on')).toHaveText('Rankings');
+  expect(page.url()).toContain('tab=rankings-view');
+  expect(await page.evaluate(() => performance.getEntriesByType('navigation').length)).toBe(navs);
+  const afterRank = await page.evaluate(() => (history.state && history.state.gobIdx));
+  expect(afterRank).toBe(mid);
   await stab(page, 'Standings').click();
-  await page.waitForURL((url) => url.pathname === '/franchise-command-center.html', { timeout: 15000 });
+  await expect(page.locator('#standings-tab.tab-content.active')).toBeVisible();
   await expect(page.locator('#gob-subtabs .stab.on')).toHaveText('Standings');
   const after = await page.evaluate(() => (history.state && history.state.gobIdx));
   expect(after).toBe(mid);
   await page.goBack();
-  await page.waitForURL(/franchise-command-center\.html\?.*tab=standings-tab/);
-  await expect(page.locator('.rail [data-gob-section="league"].on')).toHaveCount(1);
+  await expect(page.locator('#home-tab.tab-content.active')).toBeVisible();
 });
 
 test('flow pages keep their own exit and the court has no shell', async ({ page }) => {

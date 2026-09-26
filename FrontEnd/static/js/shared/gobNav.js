@@ -667,6 +667,10 @@
       ensureIdx();
       if (consumeExitLanding(event)) return;
       noteHere();
+      var navEntry = win.performance && win.performance.getEntriesByType
+        ? win.performance.getEntriesByType('navigation')[0]
+        : null;
+      if (navEntry && navEntry.type === 'back_forward') restoreScroll();
     }
 
     function onBeforeUnload(event) {

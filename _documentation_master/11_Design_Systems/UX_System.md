@@ -121,7 +121,7 @@ The shared tab module also serves any other command center that calls `initComma
 | Prep | Scouting Report | `coaches-tab` |
 | League | Standings | `standings-tab` |
 | League | Schedule | existing `#schedule-full-link` (`schedule.html` with `franchise_id`, `team_id`, `return_url`) |
-| League | Rankings | existing rankings href (`/rankings.html` plus the resource query) |
+| League | Rankings | `rankings-view` (in-page module view; `rankings.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
 | League | Leaders | `awards-tab` |
 | League | Team Stats | `fcc-team-stats-summary-tab` |
 | League | Practice Squad | existing `#fcc-ps-season-link` (`practice-squad-standings.html`, `franchise_id` and `team_id`) |
@@ -157,7 +157,7 @@ A page or brief is done only when this file is updated if the shell, the section
 |---|---|---|---|
 | franchise-command-center.html | browse | per tab | per tab |
 | recruiting.html | browse, or focus while that week's invites, Signing Day orders, or `action=run` are the task | Recruiting | none |
-| rankings.html | browse | League | Rankings |
+| rankings.html | redirect to `franchise-command-center.html?tab=rankings-view` | League | Rankings |
 | schedule.html | browse | League | Schedule |
 | practice-squad-standings.html | browse | League | Practice Squad |
 | practice-squad-bracket.html | browse | League | Practice Squad |
@@ -294,3 +294,25 @@ Chemistry fill uses the red, yellow, and green tokens for 0–8, 9–16, and 17�
 Attribute `from` / `to` are already the first-digit scale. Player RT on a signing target is the letter already on the digest. Attitude counts use the EM emoji buckets. A loss result uses the calm card (no wash, no count-up). A win counts the scores up once, on the first open after that result. `prefers-reduced-motion` shows the final state immediately.
 
 Tournament weeks keep the top-bar tier from `tierEmblem.js`. The next-game card takes the same metal tokens. `projected_starting_five`, `team_rt`, `seeds`, `stakes`, `date`, `neutral`, `stars`, and `filmed_grade` stay off the page because they are null. There is no Team RT row and no coach-stat block.
+
+## 13. Views
+
+A view is a section of the franchise app that lives at `franchise-command-center.html?tab=<view-id>`. That is the same URL rule as today's in-page tabs. Rail clicks still push. Sub-tabs still replace. Back restores the view and the scroll position `GOBNav` already stores. There is no second URL scheme.
+
+In-page tabs (Standings, Roster, the Office) stay as panels already in the page. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant.
+
+### Add a module view
+
+1. Move the page's read onto a browse GET `GOBStore` already caches. No new endpoint.
+2. Add `js/shared/views/<name>View.js` that exports `mount(container, ctx)` and `unmount()`. `ctx` has `franchiseId`, `teamId`, `store` (`GOBStore`), and `nav` (`GOBNav`). `mount` returns `{ unmount, revalidate }`.
+3. Register it in `js/shared/gobViews.js`: `id`, `section`, `subtab`, `title`, and `module` (a function that returns `import(...)`).
+4. Add an empty `<div id="<view-id>" class="tab-content">` on `franchise-command-center.html`, and map the id in the shell section list so the sub-tab calls `CommandCenterTabs.show(id, 'replace')`.
+5. Leave the old HTML file as a redirect to `franchise-command-center.html?tab=<view-id>` that copies `franchise_id`, `team_id`, and any return params.
+6. Update the section map in this file.
+7. Cover it with tests: no document navigation, first-open skeleton, failed module, history, and a week-advance refresh.
+
+### Loading
+
+The first open paints a neutral skeleton in the shape of the view. No spinner. Data comes from `GOBStore.get`. The module stays in the panel after the user leaves. Opening it again shows that panel immediately and calls `GOBStore.revalidate`. The view re-renders only when the body changed. A 304 keeps the table on screen.
+
+An unknown module, or an import that fails, paints a quiet error card with Retry in that panel. The rest of the app stays up. Retry loads the module again. A `?tab=` that is neither a panel nor a registered view still falls back to the section default, as today's tabs do.

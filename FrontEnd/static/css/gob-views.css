@@ -1,0 +1,201 @@
+/* Module views. Skeleton is a still block in the view's shape. No spinner. */
+
+#rankings-view .gob-view-skel,
+.gob-view-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0 8px;
+}
+
+.gob-view-skel-bar,
+.gob-view-skel-row {
+  background: var(--white-4, rgba(255, 255, 255, 0.06));
+  border-radius: 8px;
+}
+
+.gob-view-skel-bar {
+  height: 36px;
+  width: 42%;
+}
+
+.gob-view-skel-row {
+  height: 28px;
+  width: 100%;
+}
+
+.gob-view-error {
+  margin: 12px 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.gob-view-error p {
+  margin: 0 0 12px;
+}
+
+.gob-view-retry {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+}
+
+#rankings-view .rankings-page-card {
+  margin-top: 0;
+}
+
+#rankings-view .rankings-page-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 0;
+}
+
+#rankings-view .rankings-page-title {
+  margin: 0 0 8px;
+}
+
+#rankings-view .rankings-toggle-wrap {
+  margin-bottom: 8px;
+}
+
+#rankings-view {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#rankings-view .rankings-page-card,
+#rankings-view .fcc-data-card-body {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#rankings-view .rankings-results-table {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#rankings-view .rankings-results-table th,
+#rankings-view .rankings-results-table td {
+  padding: 12px 10px 10px;
+  vertical-align: middle;
+  line-height: 1.35;
+}
+
+#rankings-view .rankings-results-table th {
+  position: sticky;
+  top: var(--gob-stick-top);
+  z-index: var(--z-sticky);
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+}
+
+#rankings-view .rankings-results-table th:nth-child(1),
+#rankings-view .rankings-results-table .team-cell {
+  width: 34%;
+  white-space: nowrap;
+}
+
+#rankings-view .rankings-results-table th:nth-child(2),
+#rankings-view .rankings-results-table .wl-cell {
+  width: 10%;
+  white-space: nowrap;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+#rankings-view .rankings-results-table th:nth-child(3),
+#rankings-view .rankings-results-table td:nth-child(3) {
+  width: 34%;
+}
+
+#rankings-view .rankings-results-table th:nth-child(4),
+#rankings-view .rankings-results-table td:nth-child(4) {
+  width: 22%;
+}
+
+#rankings-view .rankings-results-table tbody td {
+  padding: 9px 10px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  text-align: center;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+}
+
+#rankings-view .rankings-results-table tbody tr:nth-child(odd) td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+#rankings-view .rankings-results-table tbody tr.is-user td {
+  background: rgba(64, 101, 175, 0.28);
+}
+
+#rankings-view .rankings-results-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#rankings-view .rankings-results-table tbody tr.is-user:hover td {
+  background: rgba(64, 101, 175, 0.34);
+}
+
+#rankings-view .rankings-results-table th:first-child,
+#rankings-view .rankings-results-table td:first-child {
+  text-align: left;
+  padding-left: 16px;
+}
+
+#rankings-view .rankings-results-table td:nth-child(3),
+#rankings-view .rankings-results-table td:nth-child(4) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#rankings-view .rankings-results-table .team-cell a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+#rankings-view .rankings-results-table .team-cell a:hover {
+  text-decoration: underline;
+}
+
+#rankings-view .rankings-results-table .team-cell span:first-child {
+  display: inline-block;
+  min-width: 2.5rem;
+}
+
+#rankings-view .rankings-results-table .last-week-win {
+  color: #1f8f47;
+  font-weight: 700;
+}
+
+#rankings-view .rankings-results-table .last-week-loss {
+  color: #c0392b;
+  font-weight: 700;
+}
+
+#rankings-view .rankings-results-table .last-week-tie {
+  font-weight: 700;
+}
