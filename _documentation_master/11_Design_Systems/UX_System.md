@@ -263,9 +263,9 @@ A week strip sits under the top of `.main`, above the columns. It is one row, ab
 
 | State | Column 1 · Since last week | Column 2 · This Week | Column 3 · Recruiting |
 |---|---|---|---|
-| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot · Conference standings | Recruiting wire. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
-| `first_week` | Season preview | Next game · Team snapshot · Conference standings | One-line wire. The digest status when it is set, otherwise the empty-state line. The column heading is the hub link. |
-| `signing_day` | Result · What moved | Team snapshot · Conference standings (`next_game` is null) | Signing Day card. The wire is hidden. The column heading still links to the hub. |
+| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot | Recruiting wire, then the full conference standings. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
+| `first_week` | Season preview | Next game · Team snapshot | One-line wire, then the full conference standings. The digest status when it is set, otherwise the empty-state line. The column heading is the hub link. |
+| `signing_day` | Result · What moved | Team snapshot (`next_game` is null) | Signing Day card, then the full conference standings. The wire is hidden. The column heading still links to the hub. |
 
 The three columns are equal width. The wire card is as tall as its rows. "Recruiting →" opens the recruiting hub. Result team names wrap, and at the 1280 density the score is smaller so a long name is not cut off.
 
@@ -274,16 +274,18 @@ The three columns are equal width. The wire card is as tall as its rows. "Recrui
 | Week strip | `todos[]` `label_key`, `done`, `required`, `gates_advance`, `is_advance_action`, `route`. No week label and no ADVANCE tag. |
 | Result | `result` scores, names, `opponent_rank`, `site`, `round_name`, `user_won`, `headline`, `leader`, `leader_role`, `box_score`. The user name is prefixed with `#` plus `what_moved.national_rank.now` when that rank is set. No team monograms. |
 | What moved | `what_moved.national_rank`, `conference_standing`, `record`, `streak`, `attribute_changes` |
-| Recruiting wire | Deduped `recruiting_wire.events` (`event_text`, `position`, `list_position`, `direction`). One row per `recruit_id`, or per name when the id is missing, keeping the latest event. At most 8 rows at the 1280 density and 12 at 1920, and only whole rows that sit above the fold. The column heading opens the hub. Rail badge uses `pending_count` and `urgent`. |
+| Recruiting wire | Deduped `recruiting_wire.events` (`event_text`, `position`, `list_position`, `direction`). One row per `recruit_id`, or per name when the id is missing, keeping the latest event. At most 8 rows at the 1280 density and 12 at 1920. The list shrinks, oldest first, so the standings card below it stays on the page. It never drops below 3 events when any exist, and it never shows a half-cut row. The column heading opens the hub. Rail badge uses `pending_count` and `urgent`. |
 | Next game | `next_game` opponent, `rank` as `21. Name` in upright Bebas, `record`, `Conference` plus the short label and `(place of size)` from `conference_position` and `conference_size`. The place is omitted when either is null. No week callout and no monogram. |
 | Team snapshot | `team_snapshot.chemistry` (red 0–8, yellow 9–16, green 17–25), five equal attitude columns, `moved_most`, `state` |
-| Conference standings | `conference_standings.rows` under the snapshot. Header is the short label (`A2`). The user row uses the navy selected-row treatment. When every row fits above the fold, show them all. Otherwise show five rows centred on the user. If five still clip, show three centred on the user. "Full standings" goes to League › Standings. |
+| Conference standings | `conference_standings.rows` under the recruiting list in column 3. Every row, at every size. Header is `Conference` plus the short label plus `standings` (`Conference A2 standings`). The user row uses the navy selected-row treatment. |
 | Signing Day | `signing_day.points_remaining`, `points_total`, `promises_made`, `open_roster_spots`, `targets` |
 | Season preview | `season_preview` fields that are non-null. The opener is the next-game card. |
 
 Attribute changes are one row per `player_id`. The player name stays on the left and links to the player page. Chips are right-justified: the rightmost chip meets the card's right content edge, and the others sit to its left with a consistent gap. If they do not fit on one line they wrap, still right-aligned, under the name. A chip shows the attribute abbreviation in Bebas at `--fs-22` and `--text-100` (larger than the player name, the largest text in the chip), the new first-digit value in the tier colour from `attributeDisplay.js`, and a green ▲ or red ▼. Chips are not truncated. The previous value is not shown. The chip `title` is the full name from `ATTRIBUTE_NAMES` (`BH` → "Ball Handling"). Players sort by total absolute movement, then name. Inside a row, increases come before decreases. At 1280 the card shows up to 5 players. At 1920 it shows up to 8. When the list is longer, "All changes →" opens the training report for `result.week` (or `next_game.week` when there is no result). Rank, conference, and record tiles omit the delta chip when the delta is 0 or null.
 
-Chemistry fill uses the red, yellow, and green tokens for 0–8, 9–16, and 17–25. The track stays neutral. Attitude is five equal columns, 😡 😕 😐 😊 😎, each with the count and a short bar for that bucket's share of the roster. The bar colours run red, orange, neutral, green, bright green. The emoji, count, and bar are centred in the column.
+Card titles (What moved, Team snapshot, Signing Day, Conference standings) are one type step smaller than the shared card title, `--fs-15`, and stay larger than the body copy under them.
+
+Chemistry fill uses the red, yellow, and green tokens for 0–8, 9–16, and 17–25. The track stays neutral. The bar and the chemistry value keep the shared meter and snapshot sizes at both densities. Attitude is five equal columns, 😡 😕 😐 😊 😎, each with the count and a short bar for that bucket's share of the roster. The bar colours run red, orange, neutral, green, bright green. The emoji, count, and bar are centred in the column, at the same sizes at both densities.
 
 Attribute `from` / `to` are already the first-digit scale. Player RT on a signing target is the letter already on the digest. Attitude counts use the EM emoji buckets. A loss result uses the calm card (no wash, no count-up). A win counts the scores up once, on the first open after that result. `prefers-reduced-motion` shows the final state immediately.
 

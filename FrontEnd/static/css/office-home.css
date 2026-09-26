@@ -333,8 +333,12 @@ html.gob-shell.gob-office .office {
   background: var(--green);
   box-shadow: 0 0 6px color-mix(in srgb, var(--green) 45%, transparent);
 }
+html.gob-shell.gob-office #franchise-container .office .card-h h3 {
+  font-size: var(--fs-15);
+  letter-spacing: var(--tracking-8);
+  margin: 0;
+}
 .gob .office-st { gap: 0; }
-.gob .office-st .card-h h3 { letter-spacing: var(--tracking-4); }
 .gob .office-st .st-r {
   grid-template-columns: 1.6em minmax(0, 1fr) auto;
   gap: 6px;
@@ -346,21 +350,14 @@ html.gob-shell.gob-office .office {
   text-overflow: unset;
   white-space: nowrap;
 }
-.gob .office-st .st-more { align-self: flex-end; margin-top: 2px; }
 .gob .office .wk-step,
 .gob .office .week-strip.is-tight .wk-step,
 .gob .office .week-strip.is-tighter .wk-step {
   padding: 0 var(--dsp-8);
   gap: var(--dsp-8);
 }
-.gob.gob-1280 .office-st { padding: 0 8px; }
-.gob.gob-1280 .office-st .st-r { line-height: 11px; font-size: 11px; }
-.gob.gob-1280 .office .meter { height: 4px; }
-.gob.gob-1280 .office-snap .sn-v { font-size: var(--fs-16); }
-.gob.gob-1280 .office-st .card-h h3 { font-size: var(--fs-14); }
-.gob.gob-1280 .office-snap { gap: 2px; padding-top: 4px; padding-bottom: 2px; }
-.gob.gob-1280 .office-snap .msr { padding: 0; }
-.gob.gob-1280 .office-snap .sub-h { margin-top: 1px; }
+.gob.gob-1280 .office-st { gap: 0; }
+.gob.gob-1280 .office-st .st-r { line-height: 14px; font-size: var(--fs-12); }
 .gob.gob-1280 .office-next { gap: 2px; padding-top: 4px; padding-bottom: 2px; }
 .gob.gob-1280 .office-next .ptw { padding: 2px 0; }
 .gob.gob-1280 .office-next .nx-name { font-size: var(--fs-24); line-height: 1; }
@@ -369,5 +366,3 @@ html.gob-shell.gob-office .office {
 .gob.gob-1280 .office-next.tier .tn-round { font-size: 14px; line-height: 1; }
 .gob.gob-1280 .office-next.tier .tn-band { padding-bottom: 0; }
 .gob.gob-1280 .office-next.tier .tn-lock { max-height: 22px; overflow: hidden; }
-.gob.gob-1280 .att-emoji { font-size: 14px; }
-.gob.gob-1280 .att-col { gap: 1px; }

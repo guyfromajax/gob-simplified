@@ -776,6 +776,9 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   const heading = page.locator('#office-root .office-col').nth(2).locator('.col-link');
   await expect(heading).toHaveAttribute('href', /recruiting\.html/);
   expect(await page.locator('#office-root .office-wire h3').count()).toBe(0);
+  const col3 = page.locator('#office-root .office-col').nth(2);
+  await expect(col3.locator('.office-st h3')).toHaveText('Conference A2 standings');
+  await expect(page.locator('#office-root .office-col').nth(1).locator('.office-st')).toHaveCount(0);
   const shown = await page.locator('#office-root .office-st .st-r:not(.st-hd)').evaluateAll((nodes) => {
     return nodes.map((node) => ({
       me: node.classList.contains('me'),
@@ -786,15 +789,31 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   const mode = await page.locator('#office-root .office-st').getAttribute('data-standings-mode');
   const order = standingsBlock().rows.map((row) => row.team_name);
   const visible = shown.map((row) => row.name);
-  const start = order.indexOf(visible[0]);
-  expect(order.slice(start, start + visible.length)).toEqual(visible);
+  expect(mode).toBe('all');
+  expect(visible).toEqual(order);
   expect(shown.some((row) => row.me && row.name === 'Amariabi International')).toBe(true);
-  if (mode === 'window') {
-    expect(visible).toHaveLength(5);
-    await expect(page.locator('#office-root .st-more')).toHaveAttribute('href', /tab=standings-tab/);
-  } else {
-    expect(visible).toEqual(order);
-  }
+  expect(await page.locator('#office-root .st-more').count()).toBe(0);
+  const typeStep = await page.evaluate(() => {
+    const title = document.querySelector('#office-root .office-mv h3');
+    const body = document.querySelector('#office-root .sn-l');
+    const heading = document.querySelector('#office-root .office-h h2');
+    const emoji = document.querySelector('#office-root .att-emoji');
+    const meter = document.querySelector('#office-root .meter.chem');
+    const step = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--fs-15'));
+    return {
+      title: parseFloat(getComputedStyle(title).fontSize),
+      step: step,
+      body: parseFloat(getComputedStyle(body).fontSize),
+      heading: parseFloat(getComputedStyle(heading).fontSize),
+      emoji: parseFloat(getComputedStyle(emoji).fontSize),
+      meter: meter.getBoundingClientRect().height,
+    };
+  });
+  expect(typeStep.title).toBeCloseTo(typeStep.step, 0);
+  expect(typeStep.title).toBeGreaterThan(typeStep.body);
+  expect(typeStep.title).toBeLessThan(typeStep.heading);
+  expect(typeStep.emoji).toBe(16);
+  expect(typeStep.meter).toBeGreaterThanOrEqual(6);
   const attitude = await page.locator('#office-root .att-col').evaluateAll((nodes) => {
     const widths = nodes.map((node) => node.getBoundingClientRect().width);
     const centers = nodes.map((node) => {
@@ -850,7 +869,9 @@ test('recruiting keeps the latest event and whole rows', async ({ page }) => {
   expect(rows).not.toContain('id:r0');
   expect(rows).toContain('id:r1');
   await expect(page.locator('#office-root .office-wire')).toContainText('Latest for 1');
+  expect(rows.length).toBeGreaterThanOrEqual(3);
   expect(rows.length).toBeLessThanOrEqual(8);
+  expect(await page.locator('#office-root .office-st .st-r:not(.st-hd)').count()).toBe(8);
   const cut = await page.evaluate(() => {
     const main = document.querySelector('html.gob-shell .main');
     const limit = main.getBoundingClientRect().bottom;
