@@ -1046,7 +1046,7 @@
     var head = el('div', 'st-r st-hd');
     head.appendChild(el('span', '', '#'));
     head.appendChild(el('span', '', 'Team'));
-    head.appendChild(el('span', '', 'W-L'));
+    head.appendChild(el('span', 'st-wl', 'W-L'));
     node.appendChild(head);
     rows.forEach(function (row) {
       var line = standingsRow(row);
@@ -1084,6 +1084,10 @@
   function fitStandings(root) {
     var card = root.querySelector('.office-st');
     if (!card || !card._rows || card._rows.length <= 3) return;
+    if (document.documentElement.classList.contains('gob-1920')) {
+      if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, card._rows, false);
+      return;
+    }
     var col = card.closest('.office-col');
     if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, card._rows, false);
     if (!columnPastFold(col)) return;

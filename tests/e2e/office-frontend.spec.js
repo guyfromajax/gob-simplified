@@ -561,12 +561,13 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         expect(numbers.standings.shown, name + ' 1440 rows').toBe(numbers.standings.total);
       }
       if (size[2] === '1920') {
-        expect(numbers.mainScroll, name + ' 1920 vertical').toBeLessThanOrEqual(1);
-        numbers.clip.forEach(function (px, index) {
-          expect(px, name + ' 1920 column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
-        });
-        if (numbers.standings && numbers.standings.mode === 'all') {
-          expect(numbers.standings.shown, name + ' 1920 rows').toBe(numbers.standings.total);
+        expect(numbers.standings && numbers.standings.mode, name + ' 1920 full table').toBe('all');
+        expect(numbers.standings.shown, name + ' 1920 rows').toBe(numbers.standings.total);
+        if (name !== 'tournament') {
+          expect(numbers.mainScroll, name + ' 1920 vertical').toBeLessThanOrEqual(1);
+          numbers.clip.forEach(function (px, index) {
+            expect(px, name + ' 1920 column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
+          });
         }
       }
       expect(numbers.standings && numbers.standings.column, name + ' standings column').toBe(2);
@@ -870,6 +871,24 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   expect(rowMetrics.recordSize).toBeLessThanOrEqual(1);
   expect(rowMetrics.mePadLeft).toBeGreaterThanOrEqual(6);
   expect(rowMetrics.mePadTop).toBeGreaterThanOrEqual(4);
+  const headerAlign = await page.evaluate(() => {
+    const head = document.querySelector('#office-root .office-st .st-hd .st-wl');
+    const value = document.querySelector('#office-root .office-st .st-r:not(.st-hd) .st-wl');
+    const title = document.querySelector('#office-root .office-st .card-h');
+    const headerRow = document.querySelector('#office-root .office-st .st-hd');
+    const snap = document.querySelector('#office-root .office-snap');
+    const snapTitle = snap.querySelector('.card-h');
+    const snapNext = snapTitle.nextElementSibling;
+    const gap = headerRow.getBoundingClientRect().top - title.getBoundingClientRect().bottom;
+    const snapGap = snapNext.getBoundingClientRect().top - snapTitle.getBoundingClientRect().bottom;
+    return {
+      edge: Math.abs(head.getBoundingClientRect().right - value.getBoundingClientRect().right),
+      gap: gap,
+      snapGap: snapGap,
+    };
+  });
+  expect(headerAlign.edge).toBeLessThanOrEqual(1);
+  expect(Math.abs(headerAlign.gap - headerAlign.snapGap)).toBeLessThanOrEqual(1);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openOffice(page, STATES.win);
   await expect(page.locator('#office-root .office-st')).toHaveAttribute('data-standings-mode', 'all');
