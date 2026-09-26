@@ -1168,6 +1168,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
             }
             
             franchise_team_data_collection.insert_one(ftd_entry)
+            bump_browse_rev(doc_id)
             logger.info(f"✅ [ENSURE-TEAM-OBJECTS] Created FTD entry for team {team_id}")
             
             # Return the team data in expected format
@@ -1204,6 +1205,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                     {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                     {"$set": ftd_update}
                 )
+                bump_browse_rev(doc_id)
                 # Update local copy
                 for key, value in ftd_update.items():
                     ftd_doc[key] = value
@@ -2528,6 +2530,7 @@ def get_playbooks(
                         {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                         {"$set": {"playbook_settings": existing_playbook_settings}}
                     )
+                    bump_browse_rev(doc_id)
                     team_obj["playbook_settings"] = existing_playbook_settings
                 else:
                     # Else branch: updating game or tournament doc (both use "teams")
@@ -2574,6 +2577,7 @@ def get_playbooks(
                     {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                     {"$set": {"plays": populated_plays}}
                 )
+                bump_browse_rev(doc_id)
                 team_obj["plays"] = populated_plays
             else:
                 # Else branch: updating game or tournament doc (both use "teams")

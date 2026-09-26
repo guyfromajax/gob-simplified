@@ -4541,7 +4541,7 @@ def select_team(
         try:
             db.franchises.update_one(
                 {"_id": manager.franchise_id},
-                {"$set": {"home_slot": home_slot}},
+                fold_browse_rev({"$set": {"home_slot": home_slot}}),
             )
         except Exception:
             logger.exception(
@@ -5304,7 +5304,7 @@ def team_builder_apply(
     # Mode metadata — eligibility is mode-only; soft-budget echo fields retired.
     db.franchises.update_one(
         {"_id": franchise_id},
-        {
+        fold_browse_rev({
             "$set": {
                 "home_slot": home_slot,
                 TEAM_BUILDER_FIELD: overlay,
@@ -5319,7 +5319,7 @@ def team_builder_apply(
                 "hasEverExceededBudget": "",
                 "roster_shape_at_creation": "",
             },
-        },
+        }),
     )
 
     # Rewrite FPD meta.team for the replaced slot so leaders / baked identity match.
@@ -5371,6 +5371,9 @@ def team_builder_apply(
         delete_draft_for_slot(db, user_id=str(user.get("user_id") or ""))
     except Exception:
         logger.exception("[TEAM-BUILDER] wizard walk-on draft cleanup failed")
+
+    # FPD meta.team rewrites and portrait stamps land after the franchise $set.
+    bump_browse_rev(franchise_id)
 
     eligible = bool(online_eligible)
     return {
@@ -5842,7 +5845,7 @@ def _release_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> Non
     path = _cpu_sim_claim_path(week)
     db.franchises.update_one(
         {"_id": franchise_id, f"{path}.owner": owner, f"{path}.active": True},
-        {"$set": {f"{path}.active": False, f"{path}.released_at": _utc_now_iso()}},
+        fold_browse_rev({"$set": {f"{path}.active": False, f"{path}.released_at": _utc_now_iso()}}),
     )
 
 
@@ -6050,7 +6053,7 @@ def _persist_cpu_sim_job(franchise_id: ObjectId, week: int, local_job: dict) -> 
     merged_job = _compute_cpu_sim_job_rollup(merged_job)
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": {_cpu_sim_job_path(week): merged_job}},
+        fold_browse_rev({"$set": {_cpu_sim_job_path(week): merged_job}}),
     )
     return merged_job
 
@@ -7957,7 +7960,7 @@ def _eos_heal_phase_from_games(
         patch["results"] = fresh.get("results") or {}
     if slots_total or adv_steps:
         patch[bracket_field] = fresh.get(bracket_field) or ({} if bracket_field != "national_tournament" else {})
-    db.franchises.update_one({"_id": franchise_id}, {"$set": patch})
+    db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": patch}))
     out["did_work"] = True
     out["results_rows_added"] = rows_total
     out["bracket_slots_synced"] = slots_total
@@ -9436,7 +9439,10 @@ def _ensure_home_slots_for_user(user_id: str) -> list[dict]:
         if not free:
             break
         slot = free.pop(0)
-        db.franchises.update_one({"_id": doc["_id"]}, {"$set": {"home_slot": slot}})
+        db.franchises.update_one(
+            {"_id": doc["_id"]},
+            fold_browse_rev({"$set": {"home_slot": slot}}),
+        )
         doc["home_slot"] = slot
         used.add(slot)
 
@@ -14223,7 +14229,7 @@ def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str
     awards = _compute_all_american_teams(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {AWARDS_FIELD: awards}},
+        fold_browse_rev({"$set": {AWARDS_FIELD: awards}}),
     )
     franchise_doc[AWARDS_FIELD] = awards
     return awards

@@ -13,7 +13,7 @@ from bson import ObjectId
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from BackEnd.api import franchise_routes, gameplan_routes
+from BackEnd.api import franchise_routes, gameplan_routes, player_image_routes
 from BackEnd.api.api import app
 from BackEnd.db import (
     db,
@@ -66,6 +66,18 @@ REQUIRED_WRITERS = frozenset(
         "seen-week-36-results",
         "seen-recruiting-wire",
         "seen-walk-on-welcome",
+        "dismiss-championship-moment",
+        "team-builder-apply",
+        "week-35-awards",
+        "get-playbooks-backfill",
+        "franchise-list-home-slot",
+        "select-team",
+        "eos-heal",
+        "cpu-sim-job-persist",
+        "cpu-sim-claim-release",
+        "player-image-ensure",
+        "player-image-warm",
+        "ensure-team-objects",
     }
 )
 
@@ -525,6 +537,190 @@ def _setup_sim_rest() -> tuple[str, dict]:
     return fid, {"teams": [team]}
 
 
+def _perform_dismiss(fid: str, _ctx: dict) -> None:
+    _post(
+        "/franchise/championship-moments/dismiss",
+        {"franchise_id": fid, "moment_id": "m1"},
+    )
+
+
+def _perform_team_builder(fid: str, ctx: dict) -> None:
+    from BackEnd.models.franchise_manager import FranchiseManager as RealManager
+
+    class _Manager(RealManager):
+        def initialize_season(self, **_kwargs):
+            self.franchise_id = ObjectId(fid)
+
+    with patch.object(franchise_routes, "FranchiseManager", _Manager), patch(
+        "BackEnd.utils.team_builder_roster.replace_slot_roster",
+        return_value={"player_ids": []},
+    ), patch.object(
+        franchise_routes,
+        "_warm_team_builder_roster_masters",
+        return_value={"painted": 0, "r2_configured": False},
+    ):
+        _post(
+            "/franchise/team-builder/apply",
+            {
+                "replaced_object_id": str(ctx["teams"][0]),
+                "home_slot": 1,
+                "name": "Query College",
+                "abbreviation": "QXQ",
+                "mascot": "Owls",
+                "primary_color": "#112233",
+                "secondary_color": "#445566",
+                "roster_mode": "edit",
+                "attribute_mode": "capped",
+            },
+        )
+
+
+def _perform_awards(fid: str, _ctx: dict) -> None:
+    with patch.object(
+        franchise_routes,
+        "_compute_all_american_teams",
+        return_value={"all_american_teams": {"first_team": [], "second_team": [], "third_team": []}},
+    ):
+        res = client.get("/franchise/awards", params={"franchise_id": fid})
+    assert res.status_code == 200, res.text
+
+
+def _perform_playbooks_backfill(fid: str, ctx: dict) -> None:
+    res = client.get(
+        "/api/playbooks",
+        params={"mode": "franchise", "team_id": str(ctx["teams"][0]), "franchise_id": fid},
+    )
+    assert res.status_code == 200, res.text
+
+
+def _perform_list(_fid: str, _ctx: dict) -> None:
+    res = client.get("/franchise/list")
+    assert res.status_code == 200, res.text
+
+
+def _perform_select(fid: str, _ctx: dict) -> None:
+    from BackEnd.models.franchise_manager import FranchiseManager as RealManager
+
+    class _Manager(RealManager):
+        def initialize_season(self, **_kwargs):
+            self.franchise_id = ObjectId(fid)
+
+    with patch.object(franchise_routes, "FranchiseManager", _Manager):
+        _post("/franchise/select-team", {"team_name": "A", "home_slot": 2})
+
+
+def _perform_eos_heal(fid: str, _ctx: dict) -> None:
+    def _rows(_fid_s, fresh, _week):
+        fresh["results"] = {"healed": []}
+        return 1
+
+    with patch.object(
+        franchise_routes,
+        "_eos_sync_missing_result_rows_from_games_for_week",
+        side_effect=_rows,
+    ), patch.object(
+        franchise_routes, "_eos_sync_bracket_slots_from_games_for_week", return_value=0
+    ), patch.object(
+        franchise_routes, "_eos_advance_all_conference_brackets_until_idle", return_value=0
+    ), patch.object(
+        franchise_routes, "_eos_advance_national_bracket_until_idle", return_value=0
+    ):
+        _post("/franchise/complete-week/phase-b", {"franchise_id": fid, "week": 28})
+
+
+def _perform_cpu_job(fid: str, _ctx: dict) -> None:
+    franchise_routes._persist_cpu_sim_job(
+        ObjectId(fid),
+        1,
+        {"status": "running", "phase": "cpu", "matchups": {}},
+    )
+
+
+def _perform_cpu_claim(fid: str, _ctx: dict) -> None:
+    franchise_routes._release_cpu_sim_claim(ObjectId(fid), 1, "owner-1")
+
+
+def _perform_player_image(fid: str, ctx: dict) -> None:
+    with patch.object(player_image_routes.r2_images, "is_configured", return_value=True), patch.object(
+        player_image_routes.r2_images, "exists", return_value=True
+    ), patch.object(
+        player_image_routes,
+        "_resolve_signed",
+        return_value=("img-1", str(ctx["teams"][0])),
+    ), patch(
+        "BackEnd.utils.uniform_archive.ensure_uniform",
+        return_value={"status": "painted", "uniform_key": "uniforms/img-1.png"},
+    ):
+        _post(
+            "/player-image/ensure",
+            {"franchise_id": fid, "player_id": ctx["player_id"]},
+        )
+
+
+def _perform_player_warm(fid: str, ctx: dict) -> None:
+    with patch.object(player_image_routes.r2_images, "is_configured", return_value=True), patch(
+        "BackEnd.utils.uniform_archive.ensure_uniform",
+        return_value={"status": "painted", "uniform_key": "uniforms/img-1.png"},
+    ):
+        res = client.post(
+            "/player-image/warm-teams",
+            json={"franchise_id": fid, "teams": [str(ctx["teams"][0])]},
+        )
+    assert res.status_code == 200, res.text
+
+
+def _perform_ensure_ftd(fid: str, ctx: dict) -> None:
+    gameplan_routes.ensure_team_objects_exist("franchise", fid, str(ctx["teams"][0]))
+
+
+def _setup_home_slot() -> tuple[str, dict]:
+    fid, team = _insert_franchise(home_slot=1)
+    return fid, {"teams": [team]}
+
+
+def _setup_eos_heal() -> tuple[str, dict]:
+    fid, team = _insert_franchise(week=29)
+    return fid, {"teams": [team]}
+
+
+def _setup_cpu_claim() -> tuple[str, dict]:
+    fid, team = _insert_franchise()
+    db.franchises.update_one(
+        {"_id": ObjectId(fid)},
+        {"$set": {"cpu_sim_jobs.1.claim": {"active": True, "owner": "owner-1"}}},
+    )
+    return fid, {"teams": [team]}
+
+
+def _setup_playbook_backfill() -> tuple[str, dict]:
+    fid, team = _insert_franchise()
+    franchise_team_data_collection.insert_one(
+        {
+            "franchise_id": ObjectId(fid),
+            "team_id": team,
+            "playbook_settings": {"position_filters": {}},
+            "plays": {},
+        }
+    )
+    return fid, {"teams": [team]}
+
+
+def _setup_image_player() -> tuple[str, dict]:
+    fid, ctx = _setup_player()
+    franchise_players_data_collection.update_one(
+        {"franchise_id": fid, "player_id": ctx["player_id"]},
+        {"$set": {"meta.image_id": "img-1"}},
+    )
+    franchise_team_data_collection.insert_one(
+        {
+            "franchise_id": ObjectId(fid),
+            "team_id": ctx["teams"][0],
+            "players": [ctx["player_id"]],
+        }
+    )
+    return fid, ctx
+
+
 def _setup_championship() -> tuple[str, dict]:
     home, away = ObjectId(), ObjectId()
     db.teams.insert_many(
@@ -573,6 +769,18 @@ WRITERS: tuple[Writer, ...] = (
     Writer("seen-week-36-results", _setup_seen, _seen("/franchise/week-36-results-seen")),
     Writer("seen-recruiting-wire", _setup_seen, _seen("/franchise/recruiting-wire-seen")),
     Writer("seen-walk-on-welcome", _setup_seen, _seen("/franchise/walk-on-welcome-modal-seen")),
+    Writer("dismiss-championship-moment", _setup_seen, _perform_dismiss),
+    Writer("team-builder-apply", _setup_home_slot, _perform_team_builder),
+    Writer("week-35-awards", lambda: _insert_pair(35), _perform_awards),
+    Writer("get-playbooks-backfill", _setup_playbook_backfill, _perform_playbooks_backfill),
+    Writer("franchise-list-home-slot", lambda: _insert_pair(1), _perform_list),
+    Writer("select-team", _setup_home_slot, _perform_select),
+    Writer("eos-heal", _setup_eos_heal, _perform_eos_heal),
+    Writer("cpu-sim-job-persist", lambda: _insert_pair(1), _perform_cpu_job),
+    Writer("cpu-sim-claim-release", _setup_cpu_claim, _perform_cpu_claim),
+    Writer("player-image-ensure", _setup_image_player, _perform_player_image),
+    Writer("player-image-warm", _setup_image_player, _perform_player_warm),
+    Writer("ensure-team-objects", _setup_seen, _perform_ensure_ftd),
 )
 
 

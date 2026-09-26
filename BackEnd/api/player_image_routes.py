@@ -20,6 +20,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 
 from BackEnd.persistence import get_store
+from BackEnd.utils.browse_cache import bump_browse_rev
 _store = get_store()
 db = _store.db
 franchise_players_data_collection = _store.franchise_players_data_collection
@@ -193,6 +194,7 @@ def ensure_player_image(req: EnsurePlayerImageRequest, user: dict = Depends(get_
         franchise_players_data_collection.update_one(
             {"franchise_id": str(req.franchise_id), "player_id": str(req.player_id)},
             {"$set": {"meta.uniform_key": result["uniform_key"], "meta.image_painted": True}})
+        bump_browse_rev(req.franchise_id)
 
         # Mirror to the legacy key for surfaces not yet threaded. Server-side copy:
         # no download, no repaint.
@@ -322,6 +324,7 @@ def warm_teams_now(franchise_id: str, team_refs: list[str]) -> dict:
     if not jobs:
         summary["status"] = "nothing_to_do"
         return summary
+    wrote = [False]
     if len(jobs) > WARM_MAX_PLAYERS:
         logger.warning("[WARM] capping %s jobs at %s franchise=%s",
                        len(jobs), WARM_MAX_PLAYERS, franchise_id)
@@ -337,6 +340,7 @@ def warm_teams_now(franchise_id: str, team_refs: list[str]) -> dict:
                 {"franchise_id": str(franchise_id), "player_id": job["player_id"]},
                 {"$set": {"meta.uniform_key": res["uniform_key"], "meta.image_painted": True}},
             )
+            wrote[0] = True
         return res["status"]
 
     with ThreadPoolExecutor(max_workers=WARM_CONCURRENCY) as pool:
@@ -345,6 +349,9 @@ def warm_teams_now(franchise_id: str, team_refs: list[str]) -> dict:
                 summary[status] += 1
             else:
                 summary["failed"] += 1
+
+    if wrote[0]:
+        bump_browse_rev(franchise_id)
 
     summary["status"] = "ok"
     logger.info("[WARM] franchise=%s teams=%s %s", franchise_id, team_refs, summary)

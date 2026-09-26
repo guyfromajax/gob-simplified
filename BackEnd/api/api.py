@@ -24,7 +24,7 @@ if _sentry_dsn and not is_loopback():
 
 # Bootstrap: get app with /health so server starts even if rest fails
 from BackEnd.api._bootstrap import app
-from BackEnd.utils.browse_cache import browse_cached
+from BackEnd.utils.browse_cache import browse_cached, bump_browse_rev, fold_browse_rev
 import traceback
 
 def _persisted_strategy_settings(team) -> dict:
@@ -284,7 +284,7 @@ try:
             )
             franchises_collection.update_one(
                 {"_id": franchise_oid},
-                {"$set": {"cpu_playbook_schedule": schedule_meta}},
+                fold_browse_rev({"$set": {"cpu_playbook_schedule": schedule_meta}}),
             )
             franchise_doc["cpu_playbook_schedule"] = schedule_meta
 
@@ -337,6 +337,7 @@ try:
             franchise_team_data_collection=franchise_team_data_collection,
         )
         if refreshed:
+            bump_browse_rev(franchise_id_str)
             logger.warning(
                 "✅ [CPU PLAYBOOK INIT] Refreshed CPU playbooks franchise_id=%s week=%s group=%s teams=%s",
                 franchise_id_str,
