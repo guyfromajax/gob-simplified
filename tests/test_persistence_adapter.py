@@ -553,7 +553,16 @@ def test_sqlite_generated_columns_and_real_indexes(tmp_path: Path):
     }
     sql, _params = compile_filter(setup_filt)
     assert "g_week" in sql and "g_franchise_id" in sql
-    assert filter_fully_compiled(setup_filt) is False
+    assert "team1_id" in sql and " OR " in sql
+    assert filter_fully_compiled(setup_filt) is True
+    residual = {
+        "week": 2,
+        "franchise_id": fid,
+        "$or": [{"team1_id": {"$regex": "A"}}],
+    }
+    residual_sql, _residual_params = compile_filter(residual)
+    assert "g_week" in residual_sql and "OR" not in residual_sql
+    assert filter_fully_compiled(residual) is False
     week_val = store._conn.execute(
         "SELECT g_week FROM games WHERE id = ?",
         ('raw:"g2"',),
@@ -756,3 +765,126 @@ def test_sqlite_generated_schema_survives_reopen(tmp_path: Path):
         ('raw:"g1"',),
     ).fetchone()
     assert row[0] == "fid"
+
+
+def _office_snapshot_round_trip(store) -> None:
+    coll = store.franchises_collection
+    fid = coll.insert_one({"week": 3, "current_season": 1, "browse_rev": 0}).inserted_id
+    week3 = {"national_rank_before": 12, "team_measures": {"shot_threshold": 1}}
+    coll.update_one(
+        {"_id": fid},
+        {"$set": {"office_week_snapshots.1.3": week3}},
+    )
+    coll.update_one(
+        {"_id": fid},
+        {"$set": {"office_week_snapshots.1.4": {"national_rank_before": 8}}},
+    )
+    doc = coll.find_one({"_id": fid})
+    snaps = doc["office_week_snapshots"]["1"]
+    assert snaps["3"]["national_rank_before"] == 12
+    assert snaps["3"]["team_measures"]["shot_threshold"] == 1
+    assert snaps["4"]["national_rank_before"] == 8
+    coll.update_one(
+        {"_id": fid},
+        {"$set": {"office_week_snapshots.1.3": snaps["3"]}},
+    )
+    again = coll.find_one({"_id": fid})
+    assert again["office_week_snapshots"]["1"]["3"]["national_rank_before"] == 12
+    assert again["office_week_snapshots"]["1"]["4"]["national_rank_before"] == 8
+    whole = {"1": {"3": snaps["3"], "4": snaps["4"]}}
+    coll.update_one({"_id": fid}, {"$set": {"office_week_snapshots": whole}})
+    replaced = coll.find_one({"_id": fid})
+    assert replaced["office_week_snapshots"]["1"]["3"]["national_rank_before"] == 12
+
+
+def test_nested_office_snapshot_round_trips_on_mongo(tmp_path: Path):
+    _office_snapshot_round_trip(create_store(_mongomock_env(tmp_path)))
+
+
+def test_nested_office_snapshot_round_trips_on_sqlite(tmp_path: Path):
+    _office_snapshot_round_trip(SqliteStore(_sqlite_env(tmp_path)))
+
+
+def _or_match_ids(store) -> set:
+    away, home, other = ObjectId(), ObjectId(), ObjectId()
+    games = store.games_collection
+    games.insert_one(
+        {
+            "_id": "hit",
+            "franchise_id": "fid",
+            "week": 3,
+            "team1_id": away,
+            "team2_id": home,
+            "blob": "x" * 2000,
+        }
+    )
+    games.insert_one(
+        {
+            "_id": "miss",
+            "franchise_id": "fid",
+            "week": 3,
+            "team1_id": other,
+            "team2_id": ObjectId(),
+            "blob": "y" * 2000,
+        }
+    )
+    games.insert_one(
+        {
+            "_id": "other-week",
+            "franchise_id": "fid",
+            "week": 2,
+            "team1_id": away,
+            "team2_id": home,
+        }
+    )
+    query = {
+        "franchise_id": "fid",
+        "week": 3,
+        "$or": [
+            {"team1_id": away, "team2_id": home},
+            {"team1_id": str(away), "team2_id": str(home)},
+            {"team1_id": home, "team2_id": away},
+        ],
+    }
+    return {doc["_id"] for doc in games.find(query)}
+
+
+def test_or_equality_matches_on_mongo(tmp_path: Path):
+    assert _or_match_ids(create_store(_mongomock_env(tmp_path))) == {"hit"}
+
+
+def test_or_equality_matches_on_sqlite(tmp_path: Path):
+    assert _or_match_ids(SqliteStore(_sqlite_env(tmp_path))) == {"hit"}
+
+
+def test_or_equality_skips_unmatched_game_decode(tmp_path: Path, monkeypatch):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    away, home = ObjectId(), ObjectId()
+    games = store.games_collection
+    games.insert_one(
+        {"_id": "hit", "franchise_id": "fid", "week": 3, "team1_id": str(away), "team2_id": str(home), "blob": "a" * 3000}
+    )
+    games.insert_one(
+        {"_id": "miss", "franchise_id": "fid", "week": 3, "team1_id": "nope", "team2_id": "nope", "blob": "b" * 3000}
+    )
+    from BackEnd.persistence import sqlite_collection as sc
+
+    decoded = []
+    orig = sc.decode_doc
+
+    def counting(raw):
+        decoded.append(1)
+        return orig(raw)
+
+    monkeypatch.setattr(sc, "decode_doc", counting)
+    hits = list(
+        games.find(
+            {
+                "franchise_id": "fid",
+                "week": 3,
+                "$or": [{"team1_id": str(away), "team2_id": str(home)}],
+            }
+        )
+    )
+    assert [doc["_id"] for doc in hits] == ["hit"]
+    assert decoded == [1]

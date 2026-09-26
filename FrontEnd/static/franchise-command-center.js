@@ -709,6 +709,10 @@ async function hydrateFccDisplayColorPreference() {
     syncFccDisplayColorFromAccountSettings(window.__gobAuthMeData);
     return;
   }
+  if (window.GOB_BUILD_PROFILE === 'desktop') {
+    applyFccDisplayColor('default');
+    return;
+  }
   if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl || !API_CONFIG.getAuthHeaders) {
     applyFccDisplayColor('default');
     return;

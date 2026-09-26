@@ -108,6 +108,7 @@ async function boot() {
     return;
   }
 
+  process.env.GOB_BUILD_ID = engine.resolveBuildId(root);
   const userData = app.getPath('userData');
   fs.mkdirSync(userData, { recursive: true });
   const logPath = path.join(userData, 'engine.log');
