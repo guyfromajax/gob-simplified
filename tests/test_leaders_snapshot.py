@@ -1,5 +1,7 @@
 """Leaders snapshot: same boards as the live scan, invalidated when season stats change."""
 
+import copy
+
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
@@ -7,7 +9,8 @@ from BackEnd.api.api import app
 from BackEnd.api.franchise_routes import get_leaders
 from BackEnd.db import db, franchise_players_data_collection
 from BackEnd.persistence import get_store
-from BackEnd.utils.leaders_snapshot import note_season_stats_written
+from BackEnd.utils import leaders_snapshot
+from BackEnd.utils.leaders_snapshot import note_season_stats_written, read_snapshot
 
 client = TestClient(app)
 
@@ -220,3 +223,88 @@ def test_missing_snapshot_uses_the_live_scan():
     stored = get_store().leaders_snapshots_collection.find_one({"_id": str(fid)})
     assert stored is not None
     assert stored.get("stale") is False
+    assert stored.get("gen") == 0
+
+
+def _process_memory() -> dict:
+    """Copy any process-local caches so a second process can be simulated."""
+    saved = {}
+    for name in ("_stale_marked", "_local_gen", "_built_gen"):
+        slot = getattr(leaders_snapshot, name, None)
+        if isinstance(slot, (set, dict)):
+            saved[name] = copy.deepcopy(slot)
+    return saved
+
+
+def _install_process_memory(saved: dict) -> None:
+    for name in ("_stale_marked", "_local_gen", "_built_gen"):
+        slot = getattr(leaders_snapshot, name, None)
+        if isinstance(slot, set):
+            slot.clear()
+            slot.update(saved.get(name) or ())
+        elif isinstance(slot, dict):
+            slot.clear()
+            slot.update(saved.get(name) or {})
+
+
+def test_second_process_rebuild_does_not_let_the_writer_skip_the_next_mark():
+    """Process A marks, B rebuilds, A writes again. The next read must see the write."""
+    fid = _seed_two_conferences()
+    note_season_stats_written(fid)
+    assert read_snapshot(fid) is None
+
+    before = _board(fid, scope="season", view_scope="national")
+    assert before["PTS"][0]["name"] == "Cal Beta"
+    assert read_snapshot(fid).get("stale") is False
+
+    note_season_stats_written(fid)
+    writer = _process_memory()
+    _install_process_memory({})
+    rebuilt = _board(fid, scope="season", view_scope="national")
+    assert rebuilt["PTS"][0]["name"] == "Cal Beta"
+    assert read_snapshot(fid).get("stale") is False
+
+    _install_process_memory(writer)
+    franchise_players_data_collection.update_one(
+        {"franchise_id": fid, "player_id": "ann"},
+        {"$set": {"season.PTS": 1000}},
+    )
+    note_season_stats_written(fid)
+    _install_process_memory({})
+
+    after = _board(fid, scope="season", view_scope="national")
+    assert after["PTS"][0]["name"] == "Ann Alpha"
+    assert after["PTS"][0]["value"] == 100.0
+
+
+def test_write_between_load_and_store_is_not_saved(monkeypatch):
+    fid = _seed_two_conferences()
+    _board(fid, scope="season", view_scope="national")
+    note_season_stats_written(fid)
+    frozen = read_snapshot(fid)
+    assert frozen.get("stale") is True
+    frozen_pts = next(row[7] for row in frozen["rows"] if row[0] == "ann")
+
+    real_load = leaders_snapshot.load_lines
+
+    def load_then_write(franchise_id):
+        rows = real_load(franchise_id)
+        franchise_players_data_collection.update_one(
+            {"franchise_id": franchise_id, "player_id": "ann"},
+            {"$set": {"season.PTS": 1000}},
+        )
+        note_season_stats_written(franchise_id)
+        return rows
+
+    monkeypatch.setattr(leaders_snapshot, "load_lines", load_then_write)
+    during = _board(fid, scope="season", view_scope="national")
+    assert during["PTS"][0]["name"] == "Cal Beta"
+
+    held = read_snapshot(fid)
+    assert held.get("stale") is True
+    assert next(row[7] for row in held["rows"] if row[0] == "ann") == frozen_pts
+
+    monkeypatch.undo()
+    after = _board(fid, scope="season", view_scope="national")
+    assert after["PTS"][0]["name"] == "Ann Alpha"
+    assert after["PTS"][0]["value"] == 100.0

@@ -11091,7 +11091,7 @@ def leaders(
     week = int(header.get("week") or 1)
     season = int(header.get("current_season") or 1)
     stored = read_snapshot(str(franchise_id))
-    if snapshot_is_fresh(stored, week=week, season=season, franchise_id=str(franchise_id)):
+    if snapshot_is_fresh(stored, week=week, season=season):
         rows = list(stored.get("rows") or [])
         team_games = dict(stored.get("team_games") or {})
     else:
