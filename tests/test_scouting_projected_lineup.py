@@ -157,6 +157,40 @@ def test_enrich_projected_five_zero_gp_and_def():
     assert rows[0]["def_pct"] == 0
 
 
+def test_practice_squad_recruit_name_only_shape_does_not_raise():
+    """FRD practice-squad slots store ``name`` and omit first_name/last_name.
+
+    That is the week-3 desktop save shape (``ps_A_1`` is twelve recruits).
+    ``Player`` requires the two keys; the display read splits the stored name
+    and leaves the caller's payload — and therefore the HTTP body — unchanged.
+    """
+    from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
+
+    players = []
+    for pid, pos, name in (
+        ("1", "PG", "Clinton Vang"),
+        ("2", "SG", "Ada Lovelace"),
+        ("3", "SF", "Madonna"),
+        ("4", "PF", "Grace Hopper"),
+        ("5", "C", "Alan Turing"),
+    ):
+        row = _p(pid, {pos: 90})
+        del row["first_name"]
+        del row["last_name"]
+        row["name"] = name
+        row["source"] = "frd"
+        players.append(row)
+
+    rows = build_enriched_projected_starting_five(players, {})
+    assert len(rows) == 5
+    by_pos = {r["position"]: r for r in rows}
+    assert by_pos["PG"]["name"] == "Clinton Vang"
+    assert by_pos["SF"]["name"] == "Madonna"
+    assert "first_name" not in players[0]
+    assert "last_name" not in players[0]
+    assert players[0]["name"] == "Clinton Vang"
+
+
 def test_build_enriched_projected_starting_five():
     from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
 

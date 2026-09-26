@@ -3,7 +3,8 @@
 ``json_extract`` in a WHERE clause still walks every row in C. Generated
 columns persist franchise_id / player_id / team_id / week as real columns so
 the query planner can seek. Filters that cannot be compiled fall back to a
-full-table decode; ``match_query`` always remains the correctness gate.
+full-table decode and ``match_query``. A fully compiled filter, including
+range comparisons on those columns, is applied in SQL.
 """
 
 from __future__ import annotations
@@ -182,6 +183,98 @@ def index_sql_values(value: Any) -> list[str] | None:
     return [str(value)]
 
 
+# Comparison ops on an extracted column. ``$in`` / ``$eq`` compile alongside
+# them when every operator in the dict is one of these.
+_CMP_OPS = {"$gt": ">", "$gte": ">=", "$lt": "<", "$lte": "<="}
+_ADJACENT_OPS = set(_CMP_OPS) | {"$in", "$eq"}
+
+
+def _is_real_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def compile_indexed_value(column: str, value: Any) -> tuple[str, list[Any]] | None:
+    """SQL for one extracted-column predicate, or None if ``match_query`` must run it.
+
+    Equality and ``$in`` stay string matches against the TEXT generated column.
+    ``$gt`` / ``$gte`` / ``$lt`` / ``$lte`` compile too. Numeric bounds use
+    ``CAST(column AS REAL)`` plus a numeric-text guard, because ``g_week`` is
+    TEXT and ``"10" <= "26"`` is false in SQLite. String bounds stay text
+    comparisons. A dict that also contains ``$in`` or ``$eq`` compiles when
+    every operator is one of those. Anything else (``$ne``, ``$regex``, …)
+    returns None so the row is still decoded and checked in Python.
+    """
+    if isinstance(value, dict) and any(op in _CMP_OPS for op in value):
+        return _compile_comparison_value(column, value)
+    compiled = index_sql_values(value)
+    if compiled is None:
+        return None
+    if not compiled:
+        return f"{column} IS NULL", []
+    if len(compiled) == 1:
+        return f"{column} = ?", list(compiled)
+    placeholders = ",".join("?" * len(compiled))
+    return f"{column} IN ({placeholders})", list(compiled)
+
+
+def _compile_comparison_value(column: str, value: dict[str, Any]) -> tuple[str, list[Any]] | None:
+    if not set(value) <= _ADJACENT_OPS:
+        return None
+    bounds = [(op, value[op]) for op in _CMP_OPS if op in value]
+    kinds: list[str] = []
+    for _op, bound in bounds:
+        if _is_real_number(bound):
+            kinds.append("num")
+        elif isinstance(bound, str):
+            kinds.append("str")
+        else:
+            return None
+    if len(set(kinds)) != 1:
+        return None
+    numeric = kinds[0] == "num"
+    parts: list[str] = []
+    params: list[Any] = []
+    if "$in" in value:
+        compiled = index_sql_values({"$in": value["$in"]})
+        if compiled is None:
+            return None
+        if not compiled:
+            parts.append("0")
+        else:
+            placeholders = ",".join("?" * len(compiled))
+            parts.append(f"{column} IN ({placeholders})")
+            params.extend(compiled)
+    if "$eq" in value:
+        compiled = index_sql_values(value["$eq"])
+        if compiled is None:
+            return None
+        if not compiled:
+            parts.append(f"{column} IS NULL")
+        elif len(compiled) == 1:
+            parts.append(f"{column} = ?")
+            params.append(compiled[0])
+        else:
+            placeholders = ",".join("?" * len(compiled))
+            parts.append(f"{column} IN ({placeholders})")
+            params.extend(compiled)
+    for op, bound in bounds:
+        sql_op = _CMP_OPS[op]
+        if numeric:
+            # Reject stored text that is not itself a number. SQLite's CAST
+            # turns 'abc' into 0, which would disagree with Python's TypeError
+            # (match_query treats that comparison as a non-match).
+            parts.append(
+                f"(CAST({column} AS REAL) {sql_op} ? AND {column} = CAST({column} AS REAL))"
+            )
+            params.append(bound)
+        else:
+            parts.append(f"{column} {sql_op} ?")
+            params.append(bound)
+    if not parts:
+        return None
+    return " AND ".join(parts), params
+
+
 def compile_filter(filt: dict[str, Any] | None) -> tuple[str, list[Any]] | None:
     """Push every compilable clause to SQL; leave the rest to ``match_query``.
 
@@ -216,20 +309,13 @@ def compile_filter(filt: dict[str, Any] | None) -> tuple[str, list[Any]] | None:
             continue
         if key not in COLUMN_FOR_FIELD:
             continue
-        compiled = index_sql_values(value)
-        if compiled is None:
-            continue
         column = COLUMN_FOR_FIELD[key]
-        if not compiled:
-            clauses.append(f"{column} IS NULL")
+        compiled_sql = compile_indexed_value(column, value)
+        if compiled_sql is None:
             continue
-        if len(compiled) == 1:
-            clauses.append(f"{column} = ?")
-            params.append(compiled[0])
-        else:
-            placeholders = ",".join("?" * len(compiled))
-            clauses.append(f"{column} IN ({placeholders})")
-            params.extend(compiled)
+        clause, clause_params = compiled_sql
+        clauses.append(clause)
+        params.extend(clause_params)
     if not clauses:
         return None
     return " AND ".join(clauses), params
@@ -246,6 +332,6 @@ def filter_fully_compiled(filt: dict[str, Any] | None) -> bool:
             continue
         if key not in COLUMN_FOR_FIELD:
             return False
-        if index_sql_values(value) is None:
+        if compile_indexed_value(COLUMN_FOR_FIELD[key], value) is None:
             return False
     return True

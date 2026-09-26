@@ -132,9 +132,9 @@ class SqliteCollection:
     """One JSON1 table with generated-column indexes for hot equality filters.
 
     Queries that compile to ``id`` / ``g_franchise_id`` / ``g_player_id`` /
-    ``g_team_id`` are index seeks. Everything else still full-scans. Python
-    ``match_query`` always re-checks decoded rows so a SQL miss is never a
-    correctness miss.
+    ``g_team_id`` / ``g_week`` (equality, ``$in``, or ``$gt``/``$gte``/``$lt``/
+    ``$lte``) are pushed to SQL. Everything else still full-scans. When the
+    filter is not fully compiled, ``match_query`` re-checks decoded rows.
     """
 
     def __init__(
@@ -270,7 +270,19 @@ class SqliteCollection:
             cursor.limit(kwargs["limit"])
         return cursor
 
-    def find_one(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None):
+    def find_one(
+        self,
+        filter: dict[str, Any] | None = None,
+        projection: dict[str, Any] | None = None,
+        sort: list | None = None,
+    ):
+        """One document. ``sort`` matches ``find(...).sort(...).limit(1)``.
+
+        Unsorted ``find_one`` keeps the SQL ``LIMIT 1`` seek. A sort has to
+        order every match first, so it cannot limit in SQL before ordering.
+        """
+        if sort:
+            return next(iter(self.find(filter, projection, sort=sort, limit=1)), None)
         projected = inclusion_projection_fields(projection) if filter_fully_compiled(filter) else None
         for _row_id, doc in self._select(filter, one=True, projection=projection):
             out = copy.deepcopy(doc)

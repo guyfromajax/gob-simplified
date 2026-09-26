@@ -586,6 +586,132 @@ def test_sqlite_projection_skips_full_doc_decode(tmp_path: Path, monkeypatch):
     assert decoded == []
 
 
+def test_sqlite_week_range_compiles_and_skips_decode(tmp_path: Path, monkeypatch):
+    """$gte/$lte on g_week (TEXT) must be numeric, and the inclusion projection applies."""
+    from BackEnd.persistence.sqlite_schema import compile_filter, filter_fully_compiled
+
+    store = SqliteStore(_sqlite_env(tmp_path))
+    games = store.games_collection
+    for week in (1, 3, 10, 26, 27):
+        games.insert_one(
+            {
+                "_id": f"g{week}",
+                "franchise_id": "fid",
+                "week": week,
+                "team1_id": ObjectId("69a6fcb68d2c56aa82e48a54"),
+                "home_team_id": "LANCASTER",
+                "blob": "x" * 4000,
+            }
+        )
+    games.insert_one(
+        {
+            "_id": "gabc",
+            "franchise_id": "fid",
+            "week": "abc",
+            "team1_id": "t",
+            "blob": "x" * 4000,
+        }
+    )
+    games.insert_one(
+        {
+            "_id": "gother",
+            "franchise_id": "other",
+            "week": 10,
+            "team1_id": "z",
+            "blob": "y" * 4000,
+        }
+    )
+
+    filt = {"franchise_id": "fid", "week": {"$gte": 1, "$lte": 26}}
+    assert filter_fully_compiled(filt) is True
+    sql, params = compile_filter(filt)
+    assert "CAST(g_week AS REAL)" in sql
+    assert "g_franchise_id" in sql
+    assert params[params.index(1) :][:1] == [1]
+    assert 26 in params
+
+    # Lexicographic TEXT order would drop week 10 ("10" > "26") and keep nothing useful.
+    decoded = []
+    from BackEnd.persistence import sqlite_collection as sc
+
+    orig = sc.decode_doc
+
+    def counting(raw):
+        decoded.append(1)
+        return orig(raw)
+
+    monkeypatch.setattr(sc, "decode_doc", counting)
+    projection = {"_id": 1, "week": 1, "team1_id": 1, "home_team_id": 1}
+    docs = list(games.find(filt, projection))
+    assert sorted(doc["week"] for doc in docs) == [1, 3, 10, 26]
+    assert all("blob" not in doc for doc in docs)
+    assert decoded == []
+    week_10 = next(doc for doc in docs if doc["week"] == 10)
+    assert week_10["team1_id"] == ObjectId("69a6fcb68d2c56aa82e48a54")
+    assert week_10["home_team_id"] == "LANCASTER"
+
+    # Same rows as a full decode + Python match, so the SQL predicate is equivalent.
+    monkeypatch.setattr(sc, "decode_doc", orig)
+    full = list(games.find(filt))
+    assert sorted(doc["week"] for doc in full) == [1, 3, 10, 26]
+
+    adjacent = {"franchise_id": "fid", "week": {"$in": [1, 10, 27], "$gte": 10, "$lte": 26}}
+    assert filter_fully_compiled(adjacent) is True
+    assert sorted(doc["week"] for doc in games.find(adjacent, {"week": 1})) == [10]
+
+    open_high = {"franchise_id": "fid", "week": {"$gt": 3, "$lt": 26}}
+    assert filter_fully_compiled(open_high) is True
+    assert sorted(doc["week"] for doc in games.find(open_high, {"week": 1})) == [10]
+
+    assert filter_fully_compiled({"franchise_id": "fid", "week": {"$ne": 10}}) is False
+    assert filter_fully_compiled({"team_id": {"$gte": "L", "$lt": "M"}}) is True
+    team_sql, _team_params = compile_filter({"team_id": {"$gte": "L", "$lt": "M"}})
+    assert "CAST(" not in team_sql
+    assert "g_team_id >= ?" in team_sql
+
+
+def test_sqlite_find_one_sort_matches_find_and_mongo(tmp_path: Path):
+    docs = [
+        {"_id": "a", "franchise_id": "fid", "n": 1},
+        {"_id": "c", "franchise_id": "fid", "n": 3},
+        {"_id": "b", "franchise_id": "fid", "n": 2},
+    ]
+    sqlite_store = SqliteStore(_sqlite_env(tmp_path))
+    mongo_store = MongoStore(_mongomock_env(tmp_path))
+    for doc in docs:
+        sqlite_store.games_collection.insert_one(dict(doc))
+        mongo_store.games_collection.insert_one(dict(doc))
+
+    filt = {"franchise_id": "fid"}
+    for spec in ([("n", -1)], [("n", 1)], [("_id", -1)], [("_id", 1)]):
+        sqlite_hit = sqlite_store.games_collection.find_one(filt, sort=spec)
+        via_find = next(iter(sqlite_store.games_collection.find(filt).sort(spec).limit(1)))
+        mongo_hit = mongo_store.games_collection.find_one(filt, sort=spec)
+        assert sqlite_hit["_id"] == via_find["_id"] == mongo_hit["_id"]
+
+    assert sqlite_store.games_collection.find_one({"franchise_id": "missing"}, sort=[("_id", -1)]) is None
+
+    # Unsorted find_one still seeks one row (SQL LIMIT 1), not the whole match set.
+    decoded = []
+    from BackEnd.persistence.sqlite_collection import SqliteCollection
+
+    orig_select = SqliteCollection._select
+
+    def counting_select(self, filt=None, **kwargs):
+        rows = orig_select(self, filt, **kwargs)
+        if self.name == "games":
+            decoded.append(len(rows))
+        return rows
+
+    SqliteCollection._select = counting_select
+    try:
+        hit = sqlite_store.games_collection.find_one({"_id": "b"})
+    finally:
+        SqliteCollection._select = orig_select
+    assert hit["n"] == 2
+    assert decoded == [1]
+
+
 def test_sqlite_persist_transaction_is_one_commit(tmp_path: Path):
     store = SqliteStore(_sqlite_env(tmp_path))
     path = store.sqlite_path
