@@ -42,7 +42,7 @@ function resultBlock(overrides) {
     leader: {
       player_id: 'p-jalen',
       name: 'Jalen Carter',
-      stats: { pts: 24, reb: 6, ast: 4, fgm: 9, fga: 16, fg3m: 3, fg3a: 7, min: 34 },
+      stats: { pts: 24, reb: 6, ast: 4, fgm: 9, fga: 16, fg3m: 3, fg3a: 7, min: 2040 },
     },
     headline: 'Carter closes it late',
     box_score: {
@@ -61,8 +61,8 @@ function nextBlock(overrides) {
     opponent_team_id: 'cccccccccccccccccccccccc',
     opponent: 'Morristown',
     rank: 40,
-    record: '11-8',
-    conference: 'East',
+    record: { wins: 11, losses: 8 },
+    conference: 1,
     top_scorer: { name: 'Avery Cole', average: 18.4 },
     top_rebounder: { name: 'Noah Peck', average: 9.1 },
     projected_starting_five: null,
@@ -349,6 +349,30 @@ async function openOffice(page, data) {
   await page.waitForTimeout(900);
 }
 
+const OFFICE_BAD_TEXT = /\[object Object\]|\bNaN\b|\bnull\b|\bundefined\b|N\/A|\{["']?\w+["']?\s*:/;
+
+async function assertOfficeText(page) {
+  const text = await page.locator('#office-root').innerText();
+  expect(text).not.toMatch(OFFICE_BAD_TEXT);
+  return text;
+}
+
+async function assertHeadersClear(page) {
+  const overlap = await page.evaluate(() => {
+    return [...document.querySelectorAll('#office-root .office-col')].map((col) => {
+      const head = col.querySelector('.office-h');
+      const card = col.querySelector('.card');
+      if (!head || !card) return null;
+      const gap = card.getBoundingClientRect().top - head.getBoundingClientRect().bottom;
+      return Math.round(gap * 10) / 10;
+    });
+  });
+  overlap.forEach((gap, index) => {
+    expect(gap, 'column ' + (index + 1) + ' header clearance').not.toBeNull();
+    expect(gap, 'column ' + (index + 1) + ' header overlaps its card').toBeGreaterThanOrEqual(0);
+  });
+}
+
 async function mouseClick(page, selector) {
   const loc = page.locator(selector).first();
   const box = await loc.boundingBox();
@@ -385,8 +409,8 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
     for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
       await page.setViewportSize({ width: size[0], height: size[1] });
       await openOffice(page, STATES[name]);
-      const text = await page.locator('#office-root').innerText();
-      expect(text).not.toMatch(/\bnull\b|\bundefined\b|N\/A/);
+      await assertOfficeText(page);
+      await assertHeadersClear(page);
       expect(await page.locator('#office-root .office-col').count()).toBe(3);
       expect(await page.locator('#gob-main h1')).toHaveText('');
       if (name === 'signing_day') {
@@ -457,6 +481,9 @@ test('advance mirror matches the top bar', async ({ page }) => {
       };
     });
     await expect(page.locator('#play-now')).toBeVisible();
+    await expect(page.locator('[data-advance-mirror="1"] .td-l')).toHaveText(
+      ((await page.locator('#play-now').textContent()) || '').trim()
+    );
     const todoUrl = await captureNav(page, '[data-advance-mirror="1"]');
     await openOffice(page, row[1]);
     await page.evaluate(() => {
@@ -491,8 +518,17 @@ test('live mid-season digest', async ({ page }) => {
   for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
     await page.setViewportSize({ width: size[0], height: size[1] });
     await openOffice(page, data);
-    const text = await page.locator('#office-root').innerText();
-    expect(text).not.toMatch(/\bnull\b|\bundefined\b|N\/A/);
+    await assertOfficeText(page);
+    await assertHeadersClear(page);
+    await expect(page.locator('#office-root .nx-sub')).toContainText('7–7');
+    await expect(page.locator('#office-root .nx-sub')).toContainText('A1');
+    await expect(page.locator('[data-advance-mirror="1"] .td-l')).toHaveText(
+      ((await page.locator('#play-now').textContent()) || '').trim()
+    );
+    if (size[2] === '1920') {
+      await expect(page.locator('#office-root .pg-extra')).toContainText('20');
+      await expect(page.locator('#office-root .pg-extra')).not.toContainText('1237');
+    }
     if (size[2] === '1280') {
       const numbers = await measure(page);
       expect(numbers.mainScroll).toBeLessThanOrEqual(1);

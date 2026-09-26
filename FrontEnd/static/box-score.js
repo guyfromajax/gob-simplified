@@ -1094,12 +1094,6 @@ function renderPlayerStatsTable(team, players) {
   }
 }
 
-// Format minutes (convert seconds to integer minutes only)
-function formatMinutes(seconds) {
-  if (!seconds) return '0';
-  return Math.floor(seconds / 60).toString();
-}
-
 // Helper function to create table cell
 function createTableCell(text) {
   const td = document.createElement('td');

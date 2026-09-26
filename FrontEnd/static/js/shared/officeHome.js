@@ -55,6 +55,34 @@
     return value != null && value !== '';
   }
 
+  function advanceLabel() {
+    var play = document.getElementById('play-now');
+    var text = play ? String(play.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    if (!text || text === 'STARTING…') return '';
+    return text;
+  }
+
+  function winsLosses(record) {
+    if (!record || typeof record !== 'object') return '';
+    if (!present(record.wins) || !present(record.losses)) return '';
+    return record.wins + '–' + record.losses;
+  }
+
+  function conferenceLabel(value) {
+    if (!present(value) || typeof value === 'object') return '';
+    if (typeof global.formatConferenceShortLabel === 'function') {
+      return global.formatConferenceShortLabel(value) || '';
+    }
+    return '';
+  }
+
+  function wholeMinutes(value) {
+    var seconds = Number(value);
+    if (!isFinite(seconds)) return '';
+    if (typeof global.formatMinutes !== 'function') return '';
+    return global.formatMinutes(seconds);
+  }
+
   function reducedMotion() {
     try {
       return global.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -330,7 +358,9 @@
       if (todo.done) box.appendChild(checkMark());
       row.appendChild(box);
       var text = el('span', 'td-t');
-      var copy = TODO_COPY[todo.label_key] || labelize(todo.label_key);
+      var copy = todo.is_advance_action
+        ? advanceLabel()
+        : (TODO_COPY[todo.label_key] || labelize(todo.label_key));
       text.appendChild(el('span', 'td-l', copy));
       if (todo.gates_advance || todo.is_advance_action) {
         var tags = el('span', 'td-tags');
@@ -493,10 +523,13 @@
         extra.appendChild(threes);
       }
       if (present(stats.min)) {
-        var min = el('div');
-        min.appendChild(el('b', '', String(stats.min)));
-        min.appendChild(el('span', '', 'MIN'));
-        extra.appendChild(min);
+        var minutes = wholeMinutes(stats.min);
+        if (minutes) {
+          var min = el('div');
+          min.appendChild(el('b', '', minutes));
+          min.appendChild(el('span', '', 'MIN'));
+          extra.appendChild(min);
+        }
       }
       if (extra.childNodes.length) node.appendChild(extra);
     }
@@ -538,7 +571,7 @@
     var record = moved.record || {};
     var rankCell = movedCell('National rank', present(rank.now) ? '#' + rank.now : null, rank.delta, 0);
     var confCell = movedCell('Conference', present(conf.now) ? conf.now : null, conf.delta, 1);
-    var recordText = present(record.wins) && present(record.losses) ? record.wins + '–' + record.losses : null;
+    var recordText = winsLosses(record) || null;
     var recordCell = movedCell('Record', recordText, null, 2);
     if (recordCell && present(moved.streak)) {
       var streak = streakChip(moved.streak);
@@ -708,8 +741,10 @@
       names.appendChild(opp);
     }
     var sub = [];
-    if (present(game.record)) sub.push(String(game.record));
-    if (present(game.conference)) sub.push(String(game.conference));
+    var recordLine = winsLosses(game.record);
+    var confLine = conferenceLabel(game.conference);
+    if (recordLine) sub.push(recordLine);
+    if (confLine) sub.push(confLine);
     if (present(game.week)) sub.push('Week ' + game.week);
     if (sub.length) names.appendChild(el('span', 'nx-sub', sub.join(' · ')));
     if (names.childNodes.length) main.appendChild(names);

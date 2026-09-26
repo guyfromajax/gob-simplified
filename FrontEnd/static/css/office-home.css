@@ -34,6 +34,22 @@
 .gob .office-snap .spread i:nth-child(5) { background: var(--white-12); }
 .gob .office-snap .spread i.is-low { background: var(--red); }
 
+.gob .office .office-h,
+.gob.gob-1280 .office .office-h {
+  height: auto;
+  align-items: baseline;
+}
+.gob .office .office-h { min-height: var(--dsz-22); }
+.gob.gob-1280 .office .office-h { min-height: 20px; }
+.gob .office .office-h h2,
+.gob .office .office-h span {
+  margin: 0;
+}
+.gob .office .office-h h2 {
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .gob.gob-1280 .office-col { gap: 6px; }
 .gob.gob-1280 .office .card { padding-top: 8px; padding-bottom: 8px; }
 .gob.gob-1280 .office-res { gap: 6px; }
