@@ -569,3 +569,17 @@ Schema (absent values are JSON null):
 ```
 
 `state` is `regular`, `first_week`, `tournament`, `signing_day`, `win`, or `loss`. `team_snapshot.state` is `set_after_camp` until the first prior-week snapshot exists. Rank and conference deltas are previous minus current. Measure deltas are current minus previous. Player RT in recruiting targets is a letter grade. Team RT is not returned. Stars, filmed grade, a calendar date, a neutral site, a projected starting five, seeds, and stakes copy are null because the game does not store them. A headline is returned only when `season_news` has a story whose `game_id` is that game.
+
+### 13.2 Browse cache contract
+
+`franchises.browse_rev` is an integer, 0 when absent. Every franchise-scoped write that a browse GET can observe increments it. Fold the `$inc` into the franchise update that write already sends. When the write does not touch the franchise document, call `bump_browse_rev` once after it succeeds.
+
+Browse GETs go through `@browse_cached`. The tag is computed before the handler from one projected franchise read:
+
+`W/"<franchise_id>:<season>:<week>:<browse_rev>:<BUILD>:<route-signature>"`
+
+`BUILD` is the deployed commit id, so a deploy invalidates every tag. The route signature includes the path and sorted query parameters. A matching `If-None-Match` is 304 with no body, and the handler does not run. Otherwise the handler runs and the response gets that `ETag` and `Cache-Control: private, no-cache`. `profile=1` skips the 304 and always runs the handler. A handler that increments `browse_rev` itself is stamped with the post-write tag; the 304 path stays one read.
+
+Excluded from `browse_rev`: `GET /api/game/{id}` (box score), `POST /api/simulate-quarter`, press-conference session writes, and in-progress lineup saves on the game document. Do not increment inside the sim, `cpu_week_pool`, or end-of-game persistence. Phase A does increment: command-center reads `season_inbox` before phase B.
+
+A new write must bump. A new browse GET must use the dependency. UESS step payloads are unchanged.

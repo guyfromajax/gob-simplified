@@ -201,3 +201,19 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 | `season_preview` | `first_week` only. Preseason rank is the current national rank. Conference projection, team RT, returning starters, and top returner are null. Newcomers only when `pending_walk_on_welcome` is stored. Opener is `next_game`. |
 
 The week-advance snapshot is the only new stored field: `franchises.office_week_snapshots.{season}.{completed_week}` with `national_rank_before`, `conference_position_before`, `team_measures`, and `team_measures_before` when a prior week exists. It is written in the same franchise `$set` as the week persist, before national rank is updated, and skipped when that week is already stored or rank/prestige for that week was already applied.
+
+## 11. Browse cache contract
+
+`franchises.browse_rev` is an integer. A document without the field is revision 0. Every franchise-scoped write that can change a browse GET increments it once. `fold_browse_rev` adds that `$inc` to an update the route is already sending to the franchise document. `bump_browse_rev` is one extra update when the write does not touch the franchise document (game plan, playbooks, development focus, week-35 recruiting orders).
+
+Browse GETs use one dependency, `@browse_cached`. Before the handler it reads `_id`, `current_season`, `week`, and `browse_rev` and builds:
+
+`W/"<franchise_id>:<season>:<week>:<browse_rev>:<BUILD>:<route-signature>"`
+
+`BUILD` is the deployed commit, so a deploy invalidates every tag. The route signature is the path plus the sorted query string. A matching `If-None-Match` returns 304 with an empty body and the handler does not run. Any other result runs the handler and sets `ETag` plus `Cache-Control: private, no-cache`. `profile=1` always runs the handler.
+
+A GET that still writes (command-center region reconcile, playbooks first-open, practice-squad stat backfill) stamps the post-write tag on that response. The 304 path does not do a second read.
+
+Not on this rev: `GET /api/game/{id}`, `POST /api/simulate-quarter`, press-conference sessions, and lineup or game-plan saves that target an in-progress game (`game_id`). The sim, `cpu_week_pool`, and end-of-game persistence do not increment it. Phase A does, because command-center returns `season_inbox` before phase B.
+
+A new franchise write must fold or bump. A new browse GET must use the dependency.

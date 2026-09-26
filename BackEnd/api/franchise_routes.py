@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+from BackEnd.utils.browse_cache import browse_cached, bump_browse_rev, fold_browse_rev
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from starlette.responses import Response
 from fastapi.encoders import jsonable_encoder
@@ -6538,7 +6540,10 @@ def _maybe_reconcile_region_for_eos(
     if updated_rt is None:
         return False
     franchise_doc["region_tournaments"] = updated_rt
-    db.franchises.update_one({"_id": franchise_oid}, {"$set": {"region_tournaments": updated_rt}})
+    db.franchises.update_one(
+        {"_id": franchise_oid},
+        fold_browse_rev({"$set": {"region_tournaments": updated_rt}}),
+    )
     logger.warning(
         "[EOS-REGION-RECONCILE] context=%s week=%s franchise_id=%s persisted=%s ftd_team_count=%s",
         context_label,
@@ -7719,7 +7724,7 @@ def _finalize_franchise_week_after_cpu_games(
         update_fields["post_game_status.community_highlight_pending"] = community_highlight_pending
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": update_fields},
+        fold_browse_rev({"$set": update_fields}),
     )
     try:
         flush_community_highlight_pending_after_week(franchise_id, week)
@@ -8753,7 +8758,7 @@ def _complete_week_finish_cpu_and_persist(
                 partial_update[_eos_key] = _eos_val
         db.franchises.update_one(
             {"_id": franchise_id},
-            {"$set": partial_update},
+            fold_browse_rev({"$set": partial_update}),
         )
         cpu_job = _persist_cpu_sim_job(
             franchise_id,
@@ -9062,7 +9067,7 @@ def complete_week_phase_a(req: CompleteWeekRequest):
 
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": phase_a_fields},
+        fold_browse_rev({"$set": phase_a_fields}),
     )
 
     return {
@@ -9680,6 +9685,7 @@ def set_player_development_focus(
 
     updates["updated_at"] = datetime.utcnow()
     franchise_players_data_collection.update_one({"_id": fpd["_id"]}, {"$set": updates})
+    bump_browse_rev(oid)
     updates.pop("updated_at", None)
     return {"updated": True, "player_id": str(body.player_id), **updates}
 
@@ -9780,6 +9786,7 @@ def _build_office_digest_for_command_center(
 
 
 @router.get("/franchise/command-center/data")
+@browse_cached
 def command_center_data(
     franchise_id: str = None,
     user: dict = Depends(get_current_user),
@@ -10259,7 +10266,10 @@ def command_center_data(
                 )
                 if updated_rt is not None:
                     franchise_doc["region_tournaments"] = updated_rt
-                    db.franchises.update_one({"_id": fid_obj}, {"$set": {"region_tournaments": updated_rt}})
+                    db.franchises.update_one(
+                        {"_id": fid_obj},
+                        fold_browse_rev({"$set": {"region_tournaments": updated_rt}}),
+                    )
                     fcc_reconcile_persisted = True
                 logger.warning(
                     "[EOS-REGION-RECONCILE] context=fcc week=%s franchise_id=%s persisted=%s ftd_team_count=%s",
@@ -10752,6 +10762,7 @@ def _build_season_schedule_payload(
 
 
 @router.get("/franchise/standings")
+@browse_cached
 def standings(
     franchise_id: str,
     profile: bool = False,
@@ -10878,6 +10889,7 @@ def standings(
 
 
 @router.get("/franchise/schedule")
+@browse_cached
 def season_schedule(franchise_id: str, conference: Optional[int] = None, user_team_only: bool = False):
     if conference is not None and (not isinstance(conference, int) or conference < 1 or conference > 16):
         raise HTTPException(status_code=422, detail="conference must be an integer from 1 to 16")
@@ -10889,6 +10901,7 @@ def season_schedule(franchise_id: str, conference: Optional[int] = None, user_te
 
 
 @router.get("/franchise/schedule/national")
+@browse_cached
 def national_schedule(franchise_id: str):
     return _build_season_schedule_payload(franchise_id=franchise_id)
 
@@ -11053,6 +11066,7 @@ def get_leaders(
 
 
 @router.get("/franchise/leaders")
+@browse_cached
 def leaders(
     franchise_id: str,
     scope: str = "season",
@@ -11127,6 +11141,7 @@ def leaders(
 
 
 @router.get("/franchise/team-stats")
+@browse_cached
 def team_stats(franchise_id: str, scope: str = "national"):
     """Get team stats by aggregating player stats from franchise document.
     
@@ -11446,6 +11461,7 @@ def get_team_player_stats(
 
 
 @router.get("/franchise/team-player-stats/{team_id}")
+@browse_cached
 def team_player_stats_endpoint(
     team_id: str,
     franchise_id: str,
@@ -11469,6 +11485,7 @@ def team_player_stats_endpoint(
 
 
 @router.get("/franchise/team-player-stats")
+@browse_cached
 def user_team_player_stats_endpoint(
     franchise_id: str,
     scope: str = "season",
@@ -11520,6 +11537,7 @@ def recruits(franchise_id: str = Query(...)):
 
 
 @router.get("/recruit/{recruit_id}")
+@browse_cached
 def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
     """Single recruit for the detail page (player-detail.html in recruit mode).
 
@@ -12364,7 +12382,7 @@ def _apply_complete_week_recruiting_lean_updates(
         {"team_id": 1, "recruit_visit": 1},
     ))
     if not ftd_docs:
-        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+        db.franchises.update_one({"_id": fid}, fold_browse_rev({"$set": {f"recruiting_lean_updates_applied.{week}": True}}))
         return [], []
 
     visited_recruit_ids: set[str] = set()
@@ -12391,7 +12409,7 @@ def _apply_complete_week_recruiting_lean_updates(
         recruit_visit_pairs.append((team_id, recruit_id))
 
     if not recruit_visit_pairs:
-        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+        db.franchises.update_one({"_id": fid}, fold_browse_rev({"$set": {f"recruiting_lean_updates_applied.{week}": True}}))
         return [], []
 
     recruit_ids = [recruit_id for _, recruit_id in recruit_visit_pairs]
@@ -12456,7 +12474,7 @@ def _apply_complete_week_recruiting_lean_updates(
     )
     db.franchises.update_one(
         {"_id": fid},
-        {"$set": {f"recruiting_lean_updates_applied.{week}": True}},
+        fold_browse_rev({"$set": {f"recruiting_lean_updates_applied.{week}": True}}),
     )
     return new_lean_events, movement_events
 
@@ -14730,6 +14748,7 @@ def _run_week_35_signings(franchise_doc: dict[str, Any]) -> dict[str, Any]:
     }
 
 @router.get("/franchise/recruiting-data")
+@browse_cached
 def get_recruiting_data(
     franchise_id: str,
     user: dict = Depends(get_current_user),
@@ -14858,6 +14877,7 @@ def get_recruiting_data(
 
 
 @router.get("/franchise/news")
+@browse_cached
 def get_franchise_news(
     franchise_id: str,
     category: str | None = Query(
@@ -14888,6 +14908,7 @@ def get_franchise_news(
 
 
 @router.get("/franchise/practice-squad/standings")
+@browse_cached
 def get_practice_squad_standings(
     franchise_id: str,
     user: dict = Depends(get_current_user),
@@ -14906,6 +14927,7 @@ def get_practice_squad_standings(
 
 
 @router.get("/franchise/practice-squad/schedule")
+@browse_cached
 def get_practice_squad_schedule(
     franchise_id: str,
     week: int | None = None,
@@ -14943,6 +14965,7 @@ def get_practice_squad_schedule(
 
 
 @router.get("/franchise/practice-squad/brackets")
+@browse_cached
 def get_practice_squad_brackets(
     franchise_id: str,
     user: dict = Depends(get_current_user),
@@ -14959,6 +14982,7 @@ def get_practice_squad_brackets(
 
 
 @router.get("/franchise/practice-squad/team")
+@browse_cached
 def get_practice_squad_team(
     franchise_id: str,
     ps_team_id: str = Query(...),
@@ -14973,7 +14997,7 @@ def get_practice_squad_team(
         ps = ensure_ps_season_stats_backfilled(str(franchise_id), ps)
         db.franchises.update_one(
             {"_id": franchise_doc["_id"]},
-            {"$set": {"practice_squad": ps}},
+            fold_browse_rev({"$set": {"practice_squad": ps}}),
         )
     team = (ps.get("teams") or {}).get(ps_team_id)
     if not team:
@@ -15083,6 +15107,7 @@ def get_practice_squad_team(
 
 
 @router.get("/franchise/recruiting-results")
+@browse_cached
 def get_recruiting_results(
     franchise_id: str,
     week: int | None = None,
@@ -15094,6 +15119,7 @@ def get_recruiting_results(
 
 
 @router.get("/franchise/awards")
+@browse_cached
 def get_franchise_awards(
     franchise_id: str,
     user: dict = Depends(get_current_user),
@@ -15200,6 +15226,7 @@ def save_recruiting_orders(
                     }
                 },
             )
+        bump_browse_rev(fid)
         return {"status": "success", "saved_orders_week_35": orders_payload, "results_week": None}
 
     recruit_ids = [str(recruit_id) for recruit_id in (req.recruit_ids or []) if recruit_id]
@@ -15227,7 +15254,7 @@ def save_recruiting_orders(
     # "Recruits" persists across weeks and so can't answer "sent THIS week".
     db.franchises.update_one(
         {"_id": fid},
-        {"$set": {RECRUITING_BOARD_SAVED_WEEK_FIELD: week}},
+        fold_browse_rev({"$set": {RECRUITING_BOARD_SAVED_WEEK_FIELD: week}}),
     )
     return {"status": "success", "saved_orders": orders_payload, "results_week": None}
 
@@ -15279,7 +15306,7 @@ def run_week_35_recruiting(
         update_fields["season_news"] = franchise_doc.get("season_news") or []
     db.franchises.update_one(
         {"_id": fid},
-        {"$set": update_fields},
+        fold_browse_rev({"$set": update_fields}),
     )
 
     # Warm the user's REGION portraits for the Signing Day reveal, off the request
@@ -15344,6 +15371,7 @@ def get_latest_training(franchise_id: str):
 
 
 @router.get("/franchise/state")
+@browse_cached
 def get_franchise_state(franchise_id: str, profile: bool = False):
     """
     Get the full franchise document (for loading team data in Command Center).
@@ -15378,6 +15406,7 @@ def get_franchise_state(franchise_id: str, profile: bool = False):
 
 
 @router.get("/franchise/team-data")
+@browse_cached
 def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: str = None):
     """
     Get team data (attributes, plays, scouting_data) from FTD.
@@ -15739,6 +15768,7 @@ def cut_franchise_players(
             )
             ps_initialized = False
 
+    bump_browse_rev(fid)
     return {
         "status": "success",
         "cut_count": required_cut_count,
@@ -15863,6 +15893,7 @@ def cut_franchise_players_final(
             " ".join(x for x in [meta.get("first_name", ""), meta.get("last_name", "")] if x).strip() or pid
         )
     _hard_release_players(fid, team_object_id, requested)
+    bump_browse_rev(fid)
     return {"status": "success", "cut_count": len(requested), "cut_names": cut_names}
 
 
@@ -15884,6 +15915,7 @@ def _scouting_usage_unlocks_for_week(current_week: int, user_film_study: int) ->
 
 
 @router.get("/franchise/scouting-report")
+@browse_cached
 def get_scouting_report(franchise_id: str, team_name: str):
     """
     Get scouting report for a team, including last game's play usage data.
@@ -16195,13 +16227,13 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
     if int(training_status.get("cpu_training_complete_week") or 0) == week:
         db.franchises.update_one(
             {"_id": franchise_id},
-            {
+            fold_browse_rev({
                 "$set": {
                     "training_status.training_completed": True,
                     "training_status.week": week,
                     "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
                 }
-            },
+            }),
         )
         user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
         team_id = user_team_object_id
@@ -16263,7 +16295,7 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
         if ps_job.get("status") != "complete":
             db.franchises.update_one(
                 {"_id": franchise_id},
-                {"$set": {"practice_squad": ps_state}},
+                fold_browse_rev({"$set": {"practice_squad": ps_state}}),
             )
             return {
                 "status": "processing",
@@ -16288,7 +16320,7 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
     if season_news_prepend:
         _prepend_season_news_stories(franchise_doc, season_news_prepend)
         cpu_update["season_news"] = franchise_doc["season_news"]
-    db.franchises.update_one({"_id": franchise_id}, {"$set": cpu_update})
+    db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": cpu_update}))
     return {
         "status": "success",
         "week": week,
@@ -17089,7 +17121,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             ftd_ops,
         )
 
-    db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update_user})
+    db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": franchise_update_user}))
 
     if phase == "user_only":
         return {
@@ -17124,7 +17156,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     }
     if cuts_ran_this_call:
         cpu_update["training_status.cpu_training_camp_cuts_applied"] = True
-    db.franchises.update_one({"_id": franchise_id}, {"$set": cpu_update})
+    db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": cpu_update}))
 
     return {
         "status": "success",
@@ -17646,7 +17678,7 @@ def mark_region_bye_modal_seen(
     current_season = int(franchise_doc.get("current_season", 1) or 1)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {REGION_BYE_MODAL_SEEN_SEASON_FIELD: current_season}},
+        fold_browse_rev({"$set": {REGION_BYE_MODAL_SEEN_SEASON_FIELD: current_season}}),
     )
     return {"seen": True, "season": current_season}
 
@@ -17665,7 +17697,7 @@ def mark_conference_rs_region_modal_seen(
     current_season = int(franchise_doc.get("current_season", 1) or 1)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD: current_season}},
+        fold_browse_rev({"$set": {CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD: current_season}}),
     )
     return {"seen": True, "season": current_season}
 
@@ -17693,7 +17725,7 @@ def mark_bracket_reveal_modal_seen(
     seen[reveal_key] = True
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {seen_field: seen}},
+        fold_browse_rev({"$set": {seen_field: seen}}),
     )
     return {"seen": True, "reveal_key": reveal_key}
 
@@ -17712,7 +17744,7 @@ def mark_recruiting_results_modal_seen(
     current_season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD: current_season}},
+        fold_browse_rev({"$set": {RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD: current_season}}),
     )
     return {"seen": True, "season": current_season}
 
@@ -17774,7 +17806,7 @@ def toggle_recruiting_watchlist(
 
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {RECRUITING_WATCHLIST_FIELD: watchlist}},
+        fold_browse_rev({"$set": {RECRUITING_WATCHLIST_FIELD: watchlist}}),
     )
     return {"watching": watching, "count": len(watchlist), "watchlist": watchlist}
 
@@ -17813,7 +17845,7 @@ def mark_recruit_visit_modal_seen(
     week = int(franchise_doc.get("week", 1) or 1)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {RECRUIT_VISIT_MODAL_SEEN_WEEK_FIELD: week}},
+        fold_browse_rev({"$set": {RECRUIT_VISIT_MODAL_SEEN_WEEK_FIELD: week}}),
     )
     return {"seen_week": week}
 
@@ -17832,7 +17864,7 @@ def mark_invite_seed_modal_seen(
     season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {INVITE_SEED_MODAL_SEEN_SEASON_FIELD: season}},
+        fold_browse_rev({"$set": {INVITE_SEED_MODAL_SEEN_SEASON_FIELD: season}}),
     )
     return {"seen_season": season}
 
@@ -17852,7 +17884,7 @@ def mark_week_35_reveal_seen(
     season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {WEEK_35_REVEAL_SEEN_SEASON_FIELD: season}},
+        fold_browse_rev({"$set": {WEEK_35_REVEAL_SEEN_SEASON_FIELD: season}}),
     )
     return {"seen_season": season}
 
@@ -17872,7 +17904,7 @@ def mark_week_36_results_seen(
     season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {WEEK_36_RESULTS_SEEN_SEASON_FIELD: season}},
+        fold_browse_rev({"$set": {WEEK_36_RESULTS_SEEN_SEASON_FIELD: season}}),
     )
     return {"seen_season": season}
 
@@ -17892,7 +17924,7 @@ def mark_recruiting_wire_seen(
     week = int(franchise_doc.get("week", 1) or 1)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {RECRUITING_WIRE_SEEN_WEEK_FIELD: week}},
+        fold_browse_rev({"$set": {RECRUITING_WIRE_SEEN_WEEK_FIELD: week}}),
     )
     return {"seen": True, "seen_week": week}
 
@@ -17916,10 +17948,10 @@ def mark_walk_on_welcome_modal_seen(
     current_season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {
+        fold_browse_rev({"$set": {
             WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD: current_season,
             PENDING_WALK_ON_WELCOME_FIELD: [],
-        }},
+        }}),
     )
     return {"seen": True, "season": current_season}
 
@@ -18008,7 +18040,10 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             )
             if updated_rt is not None:
                 franchise_doc["region_tournaments"] = updated_rt
-                db.franchises.update_one({"_id": franchise_id}, {"$set": {"region_tournaments": updated_rt}})
+                db.franchises.update_one(
+                    {"_id": franchise_id},
+                    fold_browse_rev({"$set": {"region_tournaments": updated_rt}}),
+                )
                 sim_rest_reconcile_persisted = True
             logger.warning(
                 "[EOS-REGION-RECONCILE] context=sim_rest week=%s franchise_id=%s persisted=%s ftd_team_count=%s",
@@ -18232,7 +18267,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     if ts_reset:
         update_fields.update(ts_reset)
 
-    db.franchises.update_one({"_id": franchise_id}, {"$set": update_fields})
+    db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": update_fields}))
     logger.warning(
         "[EOS-SIM-REST] franchise=%s week=%s | total=%.1fs | next_week=%s",
         franchise_id_str, week, time.time() - _cpu_week_t0, update_fields.get("week", week),
@@ -18322,7 +18357,7 @@ def sim_championship(req: SimChampionshipRequest):
         ts_reset = _training_status_reset_after_advance_to_week(35)
         if ts_reset:
             champ_patch.update(ts_reset)
-        db.franchises.update_one({"_id": franchise_id}, {"$set": champ_patch})
+        db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": champ_patch}))
         refreshed = db.franchises.find_one({"_id": franchise_id})
         if refreshed:
             _persist_week_35_awards_if_needed(refreshed)
@@ -19146,7 +19181,7 @@ def finish_season(req: FinishSeasonRequest):
     awards_reset = {}
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": {
+        fold_browse_rev({"$set": {
             "current_season": next_season,
             "week": 1,
             # append the set consumed this rollover (never reused within the franchise)
@@ -19197,7 +19232,7 @@ def finish_season(req: FinishSeasonRequest):
             "stats.top_10_steals": [],
             RANK_PRESTIGE_SYSTEM_VERSION_FIELD: rank_prestige_system_version,
             RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD: 0,
-        }}
+        }}),
     )
     
     logger.info(f"✅ [FINISH SEASON] Started season {next_season}")

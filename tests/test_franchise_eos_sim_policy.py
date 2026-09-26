@@ -627,7 +627,7 @@ def test_mark_region_bye_modal_seen_persists_current_season(monkeypatch):
     assert response == {"seen": True, "season": 5}
     mock_db.franchises.update_one.assert_called_once_with(
         {"_id": franchise_id},
-        {"$set": {"region_bye_modal_seen_season": 5}},
+        {"$set": {"region_bye_modal_seen_season": 5}, "$inc": {"browse_rev": 1}},
     )
 
 

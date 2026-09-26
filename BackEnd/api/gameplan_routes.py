@@ -7,6 +7,7 @@ import logging
 from typing import Optional
 
 from BackEnd.persistence import get_store
+from BackEnd.utils.browse_cache import browse_cached, bump_browse_rev
 _store = get_store()
 db = _store.db
 games_collection = _store.games_collection
@@ -1433,6 +1434,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
 
 
 @router.get("/api/gameplan")
+@browse_cached
 def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None, source: str = None):
     """
     Get game plan settings for a team in the specified mode.
@@ -1868,6 +1870,9 @@ def update_gameplan(request: GamePlanUpdateRequest):
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to save game plan settings")
+
+        if request.mode == "franchise" and request.franchise_id and not request.game_id:
+            bump_browse_rev(request.franchise_id)
         
         logger.info(f"✅ Updated game plan for team {actual_team_id} in {request.mode} mode")
         return {"success": True, "message": "Game plan saved successfully"}
@@ -1880,6 +1885,7 @@ def update_gameplan(request: GamePlanUpdateRequest):
 
 
 @router.get("/api/playbooks")
+@browse_cached
 def get_playbooks(
     mode: str,
     team_id: str,
@@ -2427,6 +2433,7 @@ def get_playbooks(
                     {"$set": ftd_entry},
                     upsert=True
                 )
+                bump_browse_rev(doc_id)
                 
                 team_obj = {
                     "playbook_settings": playbook_settings,
@@ -2466,6 +2473,7 @@ def get_playbooks(
                     {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                     {"$set": {"playbook_settings": playbook_settings}}
                 )
+                bump_browse_rev(doc_id)
                 team_obj["playbook_settings"] = playbook_settings
         elif actual_team_id and (not team_obj or not team_obj.get("playbook_settings")):
             # Tournament/single mode - existing logic
@@ -3279,6 +3287,9 @@ def save_playbooks(request: PlaybookSettingsRequest):
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to save playbook settings")
+
+        if request.mode == "franchise" and request.franchise_id and not request.game_id:
+            bump_browse_rev(request.franchise_id)
         
         logger.warning(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
         

@@ -24,6 +24,7 @@ if _sentry_dsn and not is_loopback():
 
 # Bootstrap: get app with /health so server starts even if rest fails
 from BackEnd.api._bootstrap import app
+from BackEnd.utils.browse_cache import browse_cached
 import traceback
 
 def _persisted_strategy_settings(team) -> dict:
@@ -384,6 +385,13 @@ try:
                 return resp
 
         return await call_next(request)
+
+    @app.middleware("http")
+    async def browse_etag_middleware(request: Request, call_next):
+        from BackEnd.utils.browse_cache import attach_browse_etag_header
+
+        response = await call_next(request)
+        return attach_browse_etag_header(request, response)
 
     @app.middleware("http")
     async def team_builder_feature_middleware(request: Request, call_next):
@@ -1978,6 +1986,7 @@ try:
     # We don't need an explicit OPTIONS handler - the middleware does this
     
     @app.get("/teams")
+    @browse_cached
     def get_team_names(franchise_id: str | None = None):
         # conference + region are required by the franchise team-select / Team Builder
         # picker (search, conference grouping, region filter). Additive fields only —
@@ -6930,6 +6939,7 @@ try:
     
     
     @app.get("/roster/{team_identifier}")
+    @browse_cached
     def get_team_roster(team_identifier: str, team_id: str | None = None, tournament_id: str | None = None, franchise_id: str | None = None, response: Response = None, profile: bool = False):
         if profile:
             from BackEnd.utils.profiling import run_profiled
@@ -7963,6 +7973,7 @@ try:
         return {"ok": True, "deleted": True}
 
     @app.get("/player/{player_id}")
+    @browse_cached
     def get_player(
         player_id: str,
         mode: Optional[str] = None,
