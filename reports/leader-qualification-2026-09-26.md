@@ -94,4 +94,36 @@ The first open of a week is still a multi-second scan. A repeat open in that sam
 - Standings: `tests/test_roster_team_record.py` 9 passed. Office digest also calls `GET /franchise/standings`.
 - `tests/test_community_highlights_game_copy.py` 15 passed and `tests/test_franchise_stats.py` 2 passed (26 passed together).
 
+## Follow-up
+
+Same week-15 copy. `LEADER_QUALIFICATION_FLOORS` was not changed. No leaders snapshot.
+
+### Zero FG% teams
+
+One team.
+
+| Team | Id | W+L | Season FGA | FPD rows | Top 3 FGA (GP) |
+| --- | --- | --- | --- | --- | --- |
+| Lancaster | `69a6fcb68d2c56aa82e48a54` | 14 | 62 | 15 | Roger Henrich 19 (1), Norris Khan 7 (1), Benny Pena 7 (1) |
+
+The team-games lookup is the same id as `meta.team_id`. All 1,920 player rows match a standings key, and this team has the same 15 rows as the others. No practice-squad extras and no orphan FGA. A full team on this save (822 season FGA, GP max 14) has 7 players at 5 FGA per team game.
+
+Lancaster's season line was already one game on the week-5 source copy: 62 FGA, max GP 1, while `results` already had 4 games. The measurement advance then stored 10 more final scores with no box score, so season FGA stayed 62 while W+L became 14. The floor is 5 × 14 = 70 FGA. Nobody on that roster has it. That is incomplete user-team season data, not a bug in `qualifies` or the team-games lookup, and not a team that actually shot a normal volume. No code change and no new test.
+
+### Floor sweep
+
+Full 128-team census. League totals ignore Lancaster, because that roster qualifies for none of these floors. The min of 0 on FG% 4, FG% 5, and DEF% 4, 5, and 6 is that one team. Dropping it, those mins are 2, 1, 5, 2, and 1. DEF% at 7 still has 7 other teams at 0. DEF% at 8 still has 36 other teams at 0.
+
+| Stat | Floor | Min | Median | Max | League |
+| --- | --- | --- | --- | --- | --- |
+| FG% | 4 | 0 | 5.5 | 9 | 726 |
+| FG% | 5 | 0 | 4 | 7 | 472 |
+| DEF% | 4 | 0 | 9 | 12 | 1158 |
+| DEF% | 5 | 0 | 7 | 10 | 914 |
+| DEF% | 6 | 0 | 5 | 10 | 662 |
+| DEF% | 7 | 0 | 3 | 9 | 392 |
+| DEF% | 8 | 0 | 1 | 6 | 191 |
+
+DEF_A per team game, players with GP >= 10 (1,524 players, team games 14): 50th percentile 5.50, 75th 7.00, 90th 8.29, max 12.93.
+
 STATUS: COMPLETE
