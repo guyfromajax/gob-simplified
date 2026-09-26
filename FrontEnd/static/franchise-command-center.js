@@ -48,6 +48,12 @@ async function fetchJSON(url) {
   return (await fetchJSONWithStatus(url)).data;
 }
 
+// Profiling stays available as ?cc_profile=1. The Office load itself does not request it.
+function fccCommandCenterDataUrl(franchiseId) {
+  const profile = new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : '';
+  return `${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}${profile}`;
+}
+
 // A franchise_id that 404s is a franchise that no longer exists — almost always one
 // the user just deleted, where the delete landed server-side but the client did not
 // see the confirmation. Without this the FCC silently bailed out of init and left
@@ -138,7 +144,7 @@ async function recoverCpuSimsBeforeFccRender(topData) {
         localStorage.removeItem('franchise_eog_pgpc_snapshot');
       }
     } catch (_) {}
-    const refreshed = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+    const refreshed = await fetchJSON(fccCommandCenterDataUrl(franchiseId));
     return refreshed || topData;
   } catch (err) {
     console.error('[FCC CPU SIM RESUME] Could not finish computer games:', err);
@@ -3828,7 +3834,7 @@ async function init() {
     // showing it directly causes a stale-data flash on FCC entry.
   }
   const topDataStartTime = performance.now();
-  const topDataResult = await fetchJSONWithStatus(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+  const topDataResult = await fetchJSONWithStatus(fccCommandCenterDataUrl(franchiseId));
   let topData = topDataResult.data;
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
@@ -5489,7 +5495,7 @@ async function renderTournamentBracket() {
 
   let topData = commandCenterTopDataCache;
   try {
-    topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+    topData = await fetchJSON(fccCommandCenterDataUrl(franchiseId));
     commandCenterTopDataCache = topData;
   } catch (e) {
     console.warn('[FCC] Could not refresh command-center data for bracket:', e);

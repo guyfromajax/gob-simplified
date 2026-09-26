@@ -512,3 +512,60 @@ related implementation details are not backlog items:
 - Batted-OOB contact and exit positions are backend-owned. The frontend's
   imperative OOB bounce path controls cosmetic trajectory shape only; moving
   that shape into schema is optional cleanup, not a gameplay-correctness task.
+
+## 13. API contracts
+
+### 13.1 Office digest
+
+`GET /franchise/command-center/data` returns `office_digest` beside the existing command-center payload. There is no separate Office endpoint. The frontend renders the block. It does not derive Office state, deltas, streaks, or the Advance to-do list.
+
+The only new stored data is `franchises.office_week_snapshots`, keyed by season and completed week. `_finalize_franchise_week_after_cpu_games` adds that map to the existing franchise `$set` after CPU games for the week are persisted. The snapshot is taken before `_apply_regular_season_rank_prestige_updates`, so `national_rank_before` and `conference_position_before` are entering-week values. `team_measures` are the team-measure values at persist time. A retry that already stored the week, or that already applied rank/prestige for that week, does not write the snapshot again. This is not a new sim step and does not draw from `sim_rng`.
+
+Everything else in `office_digest` is computed on that read: one projected last-game query (no `turns`), one projected EM read for attitude counts, and fields the command-center load already fetched. Null means the game does not store that handoff value.
+
+Schema (absent values are JSON null):
+
+```json
+{
+  "state": "win",
+  "what_moved": {
+    "national_rank": {"now": 18, "prev": 22, "delta": 4},
+    "conference_standing": {"now": 1, "prev": 3, "delta": 2},
+    "record": {"wins": 12, "losses": 4},
+    "streak": "W4",
+    "attribute_changes": [
+      {"player_id": "p9", "name": "Fresh Recruit", "attribute": "SC", "from": 6, "to": 7}
+    ]
+  },
+  "team_snapshot": {
+    "state": "ready",
+    "chemistry": {"value": 18, "max": 25},
+    "attitude": {"player_count": 1, "buckets": [{"id": "em_80_plus", "min": 80, "max": null, "count": 1}]},
+    "moved_most": [{"measure": "fight", "value": 4, "delta": 2}]
+  },
+  "result": {
+    "week": 18,
+    "site": "away",
+    "neutral": null,
+    "user_won": true,
+    "leader_role": "potg",
+    "headline": null,
+    "box_score": {"path": "/box-score.html", "params": {"mode": "franchise", "franchise_id": "fid", "game_id": "g18"}}
+  },
+  "next_game": {
+    "week": 19,
+    "date": null,
+    "site": "home",
+    "projected_starting_five": null,
+    "team_rt": null
+  },
+  "todos": [
+    {"id": "play_next_game", "label_key": "play_next_game", "required": true, "done": false, "gates_advance": false, "is_advance_action": true, "route": "/set-lineup.html"}
+  ],
+  "recruiting_wire": {"status": "No recruiting movement", "events": [], "pending_count": 0, "urgent": false, "unseen_count": 0},
+  "signing_day": null,
+  "season_preview": null
+}
+```
+
+`state` is `regular`, `first_week`, `tournament`, `signing_day`, `win`, or `loss`. `team_snapshot.state` is `set_after_camp` until the first prior-week snapshot exists. Rank and conference deltas are previous minus current. Measure deltas are current minus previous. Player RT in recruiting targets is a letter grade. Team RT is not returned. Stars, filmed grade, a calendar date, a neutral site, a projected starting five, seeds, and stakes copy are null because the game does not store them. A headline is returned only when `season_news` has a story whose `game_id` is that game.

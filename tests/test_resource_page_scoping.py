@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from bson import ObjectId
 
 from BackEnd.api import franchise_routes
+from BackEnd.utils.franchise_standings import standings_display_sort_key
 
 
 def test_standings_region_filter(monkeypatch):
@@ -37,7 +38,8 @@ def test_standings_region_filter(monkeypatch):
         calculate_franchise_standings=lambda results, team_list: {
             str(team_a): {"W": 1, "L": 0, "PF": 50, "PA": 40},
             str(team_b): {"W": 0, "L": 1, "PF": 40, "PA": 50},
-        }
+        },
+        standings_display_sort_key=standings_display_sort_key,
     ))
 
     payload = franchise_routes.standings(str(franchise_id), region="A")

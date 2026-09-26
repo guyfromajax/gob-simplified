@@ -654,7 +654,11 @@
   }
 
   function apiUrl(franchiseId) {
-    return window.API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId) + '&profile=1';
+    var profile = '';
+    try {
+      profile = new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : '';
+    } catch (err) {}
+    return window.API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId) + profile;
   }
 
   function defaultFetchJSON(url) {
