@@ -185,13 +185,6 @@
     return box;
   }
 
-  function monogram(name) {
-    var mark = el('span', 'logo');
-    mark.style.setProperty('--tc', '#3a4254');
-    mark.textContent = initials(name).charAt(0) || '';
-    return mark;
-  }
-
   function linkName(className, label, url) {
     if (!present(label)) return null;
     var node = el(url ? 'a' : 'span', className, label);
@@ -308,13 +301,21 @@
     return { arriving: true, calm: lost };
   }
 
-  function column(index, title, aside) {
+  function column(index, title, aside, linkUrl) {
     var col = el('section', 'office-col');
     var head = el('header', 'office-h');
     var h2 = el('h2');
     h2.appendChild(el('i', '', index));
     h2.appendChild(document.createTextNode(title));
-    head.appendChild(h2);
+    if (linkUrl) {
+      var link = el('a', 'col-link');
+      link.href = linkUrl;
+      link.appendChild(h2);
+      bindGo(link, linkUrl);
+      head.appendChild(link);
+    } else {
+      head.appendChild(h2);
+    }
     if (present(aside)) head.appendChild(el('span', '', aside));
     col.appendChild(head);
     return col;
@@ -324,14 +325,6 @@
     var node = el('section', 'card ' + className + ' ar-card');
     node.style.setProperty('--i', String(index));
     return node;
-  }
-
-  function weekAside(digest) {
-    var next = digest.next_game;
-    if (next && present(next.week)) return 'Week ' + next.week;
-    var result = digest.result;
-    if (result && present(result.week)) return 'Week ' + result.week;
-    return '';
   }
 
   function attrParts(raw) {
@@ -422,8 +415,6 @@
       if (nextIndex === -1 && todo && !todo.done && todo.required !== false) nextIndex = index;
     });
     var strip = el('div', 'week-strip' + (list.length > 6 ? ' is-tight' : ''));
-    var label = weekAside(digest);
-    if (label) strip.appendChild(el('span', 'week-k', label));
     var track = el('div', 'week-track');
     list.forEach(function (todo, index) {
       if (!todo) return;
@@ -454,9 +445,7 @@
         ? advanceLabel()
         : (TODO_COPY[todo.label_key] || labelize(todo.label_key));
       row.appendChild(el('span', 'td-l', copy));
-      if (!todo.done && todo.is_advance_action) {
-        row.appendChild(el('span', 'td-adv', 'ADVANCE'));
-      } else if (!todo.done && todo.gates_advance) {
+      if (!todo.done && todo.gates_advance && !todo.is_advance_action) {
         row.appendChild(el('span', 'td-gate', 'BLOCKS ADVANCE'));
       }
       row.addEventListener('click', function () {
@@ -515,7 +504,7 @@
     return node;
   }
 
-  function resultCard(result, countScores, index) {
+  function resultCard(result, countScores, index, userRank) {
     if (!result) return null;
     var mine = userSide(result);
     var theirs = otherSide(result);
@@ -540,8 +529,10 @@
         left.href = leftUrl;
         bindGo(left, leftUrl);
       }
-      left.appendChild(monogram(mine.name));
-      left.appendChild(el('span', 'rs-n', mine.name));
+      var userName = el('span', 'rs-n');
+      if (present(userRank)) userName.appendChild(el('em', '', '#' + userRank));
+      userName.appendChild(document.createTextNode(mine.name));
+      left.appendChild(userName);
       score.appendChild(left);
     }
     if (mine && present(mine.score)) score.appendChild(scoreNode(mine.score, 'rs-pts', countScores));
@@ -558,7 +549,6 @@
       if (present(result.opponent_rank)) name.appendChild(el('em', '', '#' + result.opponent_rank));
       name.appendChild(document.createTextNode(theirs.name));
       right.appendChild(name);
-      right.appendChild(monogram(theirs.name));
       score.appendChild(right);
     }
     if (score.childNodes.length) node.appendChild(score);
@@ -726,25 +716,46 @@
     return row;
   }
 
+  function recruitKey(event) {
+    if (!event) return '';
+    if (present(event.recruit_id)) return 'id:' + event.recruit_id;
+    if (present(event.recruit)) return 'name:' + event.recruit;
+    return '';
+  }
+
+  function latestRecruitEvents(events) {
+    var order = [];
+    var map = {};
+    (Array.isArray(events) ? events : []).forEach(function (event) {
+      var key = recruitKey(event);
+      if (!key) return;
+      var seen = order.indexOf(key);
+      if (seen !== -1) order.splice(seen, 1);
+      order.push(key);
+      map[key] = event;
+    });
+    return order.map(function (key) { return map[key]; });
+  }
+
+  function recruitCap() {
+    return document.documentElement.classList.contains('gob-1920') ? 12 : 8;
+  }
+
   function wireCard(wire, oneLine, index) {
-    var events = wire && Array.isArray(wire.events) ? wire.events : [];
+    var events = latestRecruitEvents(wire && wire.events);
+    var cap = recruitCap();
+    if (events.length > cap) events = events.slice(events.length - cap);
     var node = card('office-wire', index);
-    var head = el('div', 'card-h');
-    head.appendChild(el('h3', '', 'Recruiting wire'));
-    var open = el('a', 'lnk', 'Recruiting');
-    var url = recruitingHref();
-    open.href = url;
-    bindGo(open, url);
-    head.appendChild(open);
-    node.appendChild(head);
     var rows = [];
     if (!oneLine) {
       events.forEach(function (event, eventIndex) {
         var row = wireRow(event, eventIndex);
-        if (row) rows.push(row);
+        if (!row) return;
+        var key = recruitKey(event);
+        if (key) row.dataset.recruitKey = key;
+        rows.push(row);
       });
     }
-    if (rows.length && wire && present(wire.status)) head.insertBefore(el('span', 'meta', wire.status), open);
     rows.forEach(function (row) { node.appendChild(row); });
     if (!rows.length) {
       var line = (oneLine && wire && present(wire.status))
@@ -821,22 +832,31 @@
     }
     var top = el('div', 'nx-top');
     var main = el('div', 'nx-m');
-    if (present(game.opponent)) main.appendChild(monogram(game.opponent));
     var names = el('div');
     var site = game.site === 'away' ? 'AT' : (game.site === 'home' ? 'VS' : '');
     if (site) names.appendChild(el('span', 'nx-at', site));
     var oppUrl = teamHref(game.opponent_team_id);
-    var opp = linkName('nx-name', game.opponent, oppUrl);
-    if (opp) {
-      if (present(game.rank)) opp.insertBefore(el('em', '', '#' + game.rank + ' '), opp.firstChild);
+    if (present(game.opponent)) {
+      var opp = el(oppUrl ? 'a' : 'span', 'nx-name');
+      if (present(game.rank)) opp.appendChild(el('span', 'nx-rank', game.rank + '. '));
+      opp.appendChild(document.createTextNode(game.opponent));
+      if (oppUrl) {
+        opp.href = oppUrl;
+        bindGo(opp, oppUrl);
+      }
       names.appendChild(opp);
     }
     var sub = [];
     var recordLine = winsLosses(game.record);
     var confLine = conferenceLabel(game.conference);
     if (recordLine) sub.push(recordLine);
-    if (confLine) sub.push(confLine);
-    if (present(game.week)) sub.push('Week ' + game.week);
+    if (confLine) {
+      var place = 'Conference ' + confLine;
+      if (present(game.conference_position) && present(game.conference_size)) {
+        place += ' (' + game.conference_position + ' of ' + game.conference_size + ')';
+      }
+      sub.push(place);
+    }
     if (sub.length) names.appendChild(el('span', 'nx-sub', sub.join(' · ')));
     if (names.childNodes.length) main.appendChild(names);
     if (main.childNodes.length) top.appendChild(main);
@@ -864,13 +884,16 @@
     node.appendChild(head);
     var chemistry = snap.chemistry || {};
     if (present(chemistry.value) && present(chemistry.max) && Number(chemistry.max) > 0) {
+      var chemValue = Number(chemistry.value);
+      var band = chemValue <= 8 ? 'red' : (chemValue <= 16 ? 'yellow' : 'green');
       var row = el('div', 'sn-row');
       row.appendChild(el('span', 'sn-l', 'Chemistry'));
       row.appendChild(el('span', 'sn-v', chemistry.value + '/' + chemistry.max));
       node.appendChild(row);
-      var meter = el('div', 'meter');
+      var meter = el('div', 'meter chem is-' + band);
+      meter.dataset.chemBand = band;
       var fill = el('i');
-      var pct = Math.max(0, Math.min(100, (Number(chemistry.value) / Number(chemistry.max)) * 100));
+      var pct = Math.max(0, Math.min(100, (chemValue / Number(chemistry.max)) * 100));
       fill.style.width = pct + '%';
       meter.appendChild(fill);
       node.appendChild(meter);
@@ -879,23 +902,29 @@
     var buckets = Array.isArray(attitude.buckets) ? attitude.buckets : [];
     if (buckets.length) {
       node.appendChild(el('div', 'sub-h', 'Attitude'));
-      var spread = el('div', 'spread');
-      var key = el('div', 'sp-key');
-      var any = buckets.some(function (bucket) { return Number(bucket && bucket.count) > 0; });
+      var total = Number(attitude.player_count);
+      if (!total) {
+        total = buckets.reduce(function (sum, bucket) {
+          return sum + (Number(bucket && bucket.count) || 0);
+        }, 0);
+      }
+      var spread = el('div', 'att');
       buckets.forEach(function (bucket) {
         if (!bucket) return;
         var count = Number(bucket.count) || 0;
-        var seg = el('i');
-        seg.style.flex = any ? String(count) : '1';
-        if (bucket.id === 'em_0_19' && count > 0) seg.classList.add('is-low');
-        spread.appendChild(seg);
-        var item = el('span', bucket.id === 'em_0_19' && count > 0 ? 'bad' : '');
-        item.appendChild(el('b', '', EMOJI[bucket.id] || ''));
-        item.appendChild(document.createTextNode(String(count)));
-        key.appendChild(item);
+        var col = el('div', 'att-col');
+        col.dataset.bucket = bucket.id || '';
+        col.appendChild(el('span', 'att-emoji', EMOJI[bucket.id] || ''));
+        col.appendChild(el('span', 'att-n', String(count)));
+        var bar = el('span', 'att-bar');
+        var share = el('i');
+        var width = total > 0 ? Math.max(0, Math.min(100, (count / total) * 100)) : 0;
+        share.style.width = width + '%';
+        bar.appendChild(share);
+        col.appendChild(bar);
+        spread.appendChild(col);
       });
       node.appendChild(spread);
-      node.appendChild(key);
     }
     var moved = Array.isArray(snap.moved_most) ? snap.moved_most : [];
     if (snap.state === 'set_after_camp') {
@@ -978,6 +1007,119 @@
     return node;
   }
 
+  function standingsHref() {
+    var current = new URLSearchParams(global.location.search);
+    var params = { tab: 'standings-tab' };
+    if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
+    var teamId = current.get('team_id') || current.get('user_team_id');
+    if (teamId) params.team_id = teamId;
+    return href('/franchise-command-center.html', params);
+  }
+
+  function standingsWindow(rows, size) {
+    size = size || 5;
+    if (!rows || rows.length <= size) return rows || [];
+    var user = -1;
+    rows.forEach(function (row, index) {
+      if (user === -1 && row && row.is_user) user = index;
+    });
+    if (user < 0) user = 0;
+    var start = user - Math.floor((size - 1) / 2);
+    if (start < 0) start = 0;
+    if (start + size > rows.length) start = rows.length - size;
+    return rows.slice(start, start + size);
+  }
+
+  function standingsRow(row) {
+    if (!row) return null;
+    var line = el('div', 'st-r' + (row.is_user ? ' me' : ''));
+    line.dataset.teamId = row.team_id || '';
+    line.appendChild(el('span', '', present(row.position) ? String(row.position) : ''));
+    line.appendChild(el('span', 'st-n', present(row.team_name) ? String(row.team_name) : ''));
+    var record = '';
+    if (present(row.wins) && present(row.losses)) record = row.wins + '-' + row.losses;
+    line.appendChild(el('span', '', record));
+    return line;
+  }
+
+  function paintStandingsRows(node, rows, truncated) {
+    node.querySelectorAll('.st-r, .st-more').forEach(function (child) { child.remove(); });
+    var head = el('div', 'st-r st-hd');
+    head.appendChild(el('span', '', '#'));
+    head.appendChild(el('span', '', 'Team'));
+    head.appendChild(el('span', '', 'W-L'));
+    node.appendChild(head);
+    rows.forEach(function (row) {
+      var line = standingsRow(row);
+      if (line) node.appendChild(line);
+    });
+    if (truncated) {
+      var moreUrl = standingsHref();
+      var more = el('a', 'lnk st-more', 'Full standings');
+      more.href = moreUrl;
+      bindGo(more, moreUrl);
+      node.appendChild(more);
+    }
+    node.dataset.standingsShown = String(rows.length);
+    node.dataset.standingsMode = truncated ? 'window' : 'all';
+  }
+
+  function standingsCard(table, index) {
+    var rows = table && Array.isArray(table.rows) ? table.rows.filter(Boolean) : [];
+    if (!rows.length) return null;
+    var node = card('office-st', index);
+    var label = conferenceLabel(table.conference);
+    var head = el('div', 'card-h');
+    head.appendChild(el('h3', '', label || 'Conference'));
+    node.appendChild(head);
+    node._rows = rows;
+    node.dataset.standingsTotal = String(rows.length);
+    if (present(table.region)) node.dataset.region = String(table.region);
+    if (present(table.conference)) node.dataset.conference = String(table.conference);
+    paintStandingsRows(node, rows, false);
+    return node;
+  }
+
+  function foldBottom() {
+    var main = document.querySelector('html.gob-shell .main') || document.querySelector('.main');
+    if (!main) return global.innerHeight;
+    return main.getBoundingClientRect().top + main.clientHeight;
+  }
+
+  function columnPastFold(node) {
+    if (!node) return false;
+    var main = document.querySelector('html.gob-shell .main') || document.querySelector('.main');
+    if (main && main.scrollHeight - main.clientHeight > 1) return true;
+    if (node.scrollHeight - node.clientHeight > 1) return true;
+    return node.getBoundingClientRect().bottom > foldBottom() + 1;
+  }
+
+  function fitStandings(root) {
+    var card = root.querySelector('.office-st');
+    if (!card || !card._rows || card._rows.length <= 3) return;
+    var col = card.closest('.office-col');
+    if (!columnPastFold(col)) return;
+    var shown = Number(card.dataset.standingsShown) || card._rows.length;
+    if (shown > 5) paintStandingsRows(card, standingsWindow(card._rows, 5), true);
+    if (columnPastFold(col) && Number(card.dataset.standingsShown) > 3) {
+      paintStandingsRows(card, standingsWindow(card._rows, 3), true);
+    }
+  }
+
+  function trimRecruiting(root) {
+    var wire = root.querySelector('.office-wire');
+    if (!wire) return;
+    var guard = 0;
+    while (guard < 20) {
+      var rows = wire.querySelectorAll(':scope > .wr');
+      if (!rows.length) break;
+      var last = rows[rows.length - 1];
+      if (last.getBoundingClientRect().bottom <= foldBottom() + 0.5) break;
+      last.remove();
+      guard += 1;
+    }
+  }
+
   function paintRail(wire) {
     var btn = document.getElementById('gob-rail-recruiting');
     if (!btn) return;
@@ -1004,7 +1146,7 @@
     root.appendChild(el('div', 'week-strip office-skel'));
     var grid = el('div', 'office-grid');
     ['01', '02', '03'].forEach(function (index, nth) {
-      var titles = ['Since last week', 'Next game', 'Recruiting'];
+      var titles = ['Since last week', 'This Week', 'Recruiting'];
       var col = column(index, titles[nth], '');
       col.appendChild(el('div', 'card office-skel'));
       grid.appendChild(col);
@@ -1030,27 +1172,41 @@
     root.setAttribute('aria-busy', 'false');
     root.replaceChildren();
 
+    var userRank = digest.what_moved && digest.what_moved.national_rank
+      ? digest.what_moved.national_rank.now
+      : null;
     var col1 = column('01', 'Since last week', '');
-    var col2 = column('02', 'Next game', '');
-    var col3 = column('03', 'Recruiting', '');
+    var col2 = column('02', 'This Week', '');
+    var col3 = column('03', 'Recruiting', '', recruitingHref());
     var first = [];
     var second = [];
     var third = [];
     if (digest.state === 'first_week') {
       first = [previewCard(digest.season_preview, 1)];
-      second = [nextCard(digest.next_game, digest, 2), snapshotCard(digest.team_snapshot, 3)];
-      third = [wireCard(digest.recruiting_wire, true, 4)];
+      second = [
+        nextCard(digest.next_game, digest, 2),
+        snapshotCard(digest.team_snapshot, 3),
+        standingsCard(digest.conference_standings, 4)
+      ];
+      third = [wireCard(digest.recruiting_wire, true, 5)];
     } else if (digest.state === 'signing_day') {
-      first = [resultCard(digest.result, false, 1), whatMovedCard(digest.what_moved, digest, 2)];
-      second = [snapshotCard(digest.team_snapshot, 3)];
-      third = [signingCard(digest.signing_day, 4)];
+      first = [resultCard(digest.result, false, 1, userRank), whatMovedCard(digest.what_moved, digest, 2)];
+      second = [
+        snapshotCard(digest.team_snapshot, 3),
+        standingsCard(digest.conference_standings, 4)
+      ];
+      third = [signingCard(digest.signing_day, 5)];
     } else {
       first = [
-        resultCard(digest.result, countScores, 1),
+        resultCard(digest.result, countScores, 1, userRank),
         whatMovedCard(digest.what_moved, digest, 2)
       ];
-      second = [nextCard(digest.next_game, digest, 3), snapshotCard(digest.team_snapshot, 4)];
-      third = [wireCard(digest.recruiting_wire, false, 5)];
+      second = [
+        nextCard(digest.next_game, digest, 3),
+        snapshotCard(digest.team_snapshot, 4),
+        standingsCard(digest.conference_standings, 5)
+      ];
+      third = [wireCard(digest.recruiting_wire, false, 6)];
     }
     first.forEach(function (node) { if (node) col1.appendChild(node); });
     second.forEach(function (node) { if (node) col2.appendChild(node); });
@@ -1060,6 +1216,17 @@
     var strip = weekStrip(digest);
     root.append(strip, grid);
     tightenStrip(strip);
+    function settle() {
+      fitStandings(root);
+      trimRecruiting(root);
+    }
+    settle();
+    if (global.requestAnimationFrame) {
+      global.requestAnimationFrame(function () {
+        settle();
+        global.requestAnimationFrame(settle);
+      });
+    }
     if (countScores) countUp(root);
   }
 

@@ -503,3 +503,137 @@ def test_last_completed_game_is_one_projected_query(monkeypatch):
     assert projection is LAST_GAME_PROJECTION
     assert found["game_id"] == "game-1"
     assert found["week"] == 18
+
+
+def test_conference_standings_and_opponent_place_match_standings_api(monkeypatch):
+    """Ties follow standings_display_sort_key and the conference slice of GET /franchise/standings."""
+    from BackEnd.api import franchise_routes
+    from BackEnd.utils import franchise_team_display as display
+
+    user = ObjectId()
+    ahead = ObjectId()
+    twin = ObjectId()
+    cellar = ObjectId()
+    high = ObjectId()
+    opp = ObjectId()
+    low = ObjectId()
+    fid = ObjectId()
+    results = {
+        "1": [
+            {"away_id": str(cellar), "home_id": str(ahead), "away_score": 40, "home_score": 100},
+            {"away_id": str(low), "home_id": str(high), "away_score": 50, "home_score": 80},
+        ],
+        "2": [
+            {"away_id": str(cellar), "home_id": str(user), "away_score": 60, "home_score": 70},
+            {"away_id": str(low), "home_id": str(opp), "away_score": 55, "home_score": 60},
+        ],
+        "3": [
+            {"away_id": str(cellar), "home_id": str(twin), "away_score": 70, "home_score": 80},
+        ],
+    }
+    franchise = {
+        "_id": fid,
+        "week": 4,
+        "schedule": [],
+        "results": results,
+        "current_season": 1,
+    }
+    ftd_docs = [
+        {"team_id": ahead, "natl_rank": 10},
+        {"team_id": user, "natl_rank": 20},
+        {"team_id": twin, "natl_rank": 30},
+        {"team_id": cellar, "natl_rank": 40},
+        {"team_id": high, "natl_rank": 5},
+        {"team_id": opp, "natl_rank": 15},
+        {"team_id": low, "natl_rank": 50},
+    ]
+    team_docs = [
+        {"_id": ahead, "name": "Ahead", "conference": 2, "region": "A"},
+        {"_id": user, "name": "Lancaster", "conference": 2, "region": "A"},
+        {"_id": twin, "name": "Twin", "conference": 2, "region": "A"},
+        {"_id": cellar, "name": "Cellar", "conference": 2, "region": "A"},
+        {"_id": high, "name": "High", "conference": 3, "region": "B"},
+        {"_id": opp, "name": "Crickstown", "conference": 3, "region": "B"},
+        {"_id": low, "name": "Low", "conference": 3, "region": "B"},
+    ]
+
+    class _Find:
+        def __init__(self, docs):
+            self.docs = docs
+
+        def find(self, *_args, **_kwargs):
+            return list(self.docs)
+
+        def find_one(self, *_args, **_kwargs):
+            return franchise
+
+    monkeypatch.setattr(franchise_routes.db, "franchises", _Find([]))
+    monkeypatch.setattr(franchise_routes.db, "teams", _Find(team_docs))
+    monkeypatch.setattr(franchise_routes.franchise_team_data_collection, "find", lambda *_a, **_k: list(ftd_docs))
+    monkeypatch.setattr(display, "teams_collection", _Find(team_docs))
+
+    payload = franchise_routes.standings(str(fid), profile=False)
+    conf2 = [row for row in payload["standings"] if row.get("conference") == 2]
+    conf3 = [row for row in payload["standings"] if row.get("conference") == 3]
+    assert [row["name"] for row in conf2] == ["Ahead", "Lancaster", "Twin", "Cellar"]
+    assert [row["name"] for row in conf3] == ["High", "Crickstown", "Low"]
+
+    rankings = []
+    for doc in team_docs:
+        match = next(row for row in payload["standings"] if row["team_id"] == str(doc["_id"]))
+        rankings.append({
+            "team_id": match["team_id"],
+            "team_name": match["name"],
+            "conference": match["conference"],
+            "region": match["region"],
+            "W": match["W"],
+            "L": match["L"],
+            "PF": match["PF"],
+            "PA": match["PA"],
+            "natl_rank": match["natl_rank"],
+        })
+    digest = build_office_digest({
+        "franchise_doc": {"_id": str(fid), "current_season": 1, "week": 4, "results": {}},
+        "user_team_id": str(user),
+        "week": 4,
+        "national_rank": 20,
+        "user_conference": 2,
+        "chemistry": 20,
+        "rankings": rankings,
+        "em_values": [],
+        "advance_flags": {"week": 4, "training_completed": True, "session_type": "in-season"},
+        "last_game": None,
+        "next_game": {
+            "week": 4,
+            "matchup_label": "vs",
+            "opponent_team_id": str(opp),
+            "opponent_team_name": "Crickstown",
+            "rank": 21,
+            "record": {"wins": 1, "losses": 0},
+            "opponent_team_conference": 3,
+        },
+    })
+    table = digest["conference_standings"]
+    assert table["conference"] == 2
+    assert table["region"] == "A"
+    assert [row["team_id"] for row in table["rows"]] == [row["team_id"] for row in conf2]
+    assert [row["position"] for row in table["rows"]] == [1, 2, 3, 4]
+    assert table["rows"][1]["is_user"] is True
+    assert table["rows"][1]["team_name"] == "Lancaster"
+    assert table["rows"][1]["wins"] == 1
+    assert table["rows"][1]["losses"] == 0
+    assert table["rows"][0]["differential"] > table["rows"][1]["differential"]
+    assert table["rows"][1]["wins"] == table["rows"][2]["wins"]
+    assert table["rows"][1]["differential"] == table["rows"][2]["differential"]
+    opp_place = next(index for index, row in enumerate(conf3, start=1) if row["team_id"] == str(opp))
+    assert digest["next_game"]["conference_position"] == opp_place == 2
+    assert digest["next_game"]["conference_size"] == len(conf3) == 3
+
+    missing = build_office_digest(_ctx(next_game={
+        "week": 19,
+        "matchup_label": "vs",
+        "opponent_team_name": "Ghost",
+        "rank": 21,
+    }))
+    assert missing["next_game"]["conference_position"] is None
+    assert missing["next_game"]["conference_size"] is None

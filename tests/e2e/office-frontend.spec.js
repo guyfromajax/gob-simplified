@@ -10,6 +10,7 @@ const FID = 'f-e2e-office';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/office-frontend');
 const V2 = path.join(__dirname, '../../reports/office-v2');
+const V3 = path.join(__dirname, '../../reports/office-v3');
 const FRAMES = path.join(__dirname, '../../_documentation_master/projects/design_handoff_office_shell/frames');
 
 const FRAME_SHOTS = [
@@ -60,10 +61,12 @@ function nextBlock(overrides) {
     site: 'away',
     neutral: null,
     opponent_team_id: 'cccccccccccccccccccccccc',
-    opponent: 'Morristown',
-    rank: 40,
+    opponent: 'Crickstown',
+    rank: 21,
     record: { wins: 11, losses: 8 },
-    conference: 1,
+    conference: 2,
+    conference_position: 2,
+    conference_size: 8,
     top_scorer: { name: 'Avery Cole', average: 18.4 },
     top_rebounder: { name: 'Noah Peck', average: 9.1 },
     projected_starting_five: null,
@@ -128,6 +131,25 @@ function snapshotBlock(overrides) {
   }, overrides || {});
 }
 
+function standingsBlock() {
+  const names = ['Alpha', 'Crickstown', 'Gamma', 'Amariabi International', 'Delta', 'Echo', 'Foxtrot', 'Golf'];
+  return {
+    conference: 2,
+    region: 'A',
+    rows: names.map(function (name, index) {
+      return {
+        team_id: index === 3 ? TID : ('team-' + index),
+        team_name: name,
+        wins: 14 - index,
+        losses: index,
+        differential: 24 - index * 4,
+        position: index + 1,
+        is_user: index === 3,
+      };
+    }),
+  };
+}
+
 function digest(state, patch) {
   const body = {
     state: state,
@@ -145,6 +167,7 @@ function digest(state, patch) {
     team_snapshot: snapshotBlock(),
     result: resultBlock(),
     next_game: nextBlock(),
+    conference_standings: standingsBlock(),
     todos: [
       { id: 'run_training', label_key: 'run_training', required: true, done: true, gates_advance: false, is_advance_action: false, route: '/training.html' },
       { id: 'review_recruit_invites', label_key: 'review_recruit_invites', required: true, done: false, gates_advance: true, is_advance_action: false, route: '/recruiting.html' },
@@ -317,16 +340,20 @@ async function installApi(page, data) {
       return;
     }
     if (pathname.startsWith('/franchise/standings')) {
-      var rec = data.office_digest && data.office_digest.what_moved && data.office_digest.what_moved.record;
+      var table = (data.office_digest && data.office_digest.conference_standings) || standingsBlock();
       await fulfillJson(route, {
-        standings: [{
-          team_id: TID,
-          name: 'Lancaster',
-          W: rec ? rec.wins : 0,
-          L: rec ? rec.losses : 0,
-          conference: 1,
-          region: 'A',
-        }],
+        standings: (table.rows || []).map(function (row) {
+          return {
+            team_id: row.team_id,
+            name: row.team_name,
+            display_name: row.team_name,
+            W: row.wins,
+            L: row.losses,
+            differential: row.differential,
+            conference: table.conference,
+            region: table.region,
+          };
+        }),
       });
       return;
     }
@@ -360,16 +387,7 @@ async function assertOfficeText(page) {
 }
 
 async function assertMonograms(page) {
-  const bad = await page.evaluate(() => {
-    return [...document.querySelectorAll('#office-root .logo')].filter((node) => {
-      const box = node.getBoundingClientRect();
-      return Math.abs(box.width - box.height) > 1 || box.width < 28 || box.height < 28;
-    }).map((node) => {
-      const box = node.getBoundingClientRect();
-      return node.textContent.trim() + ' ' + Math.round(box.width) + 'x' + Math.round(box.height);
-    });
-  });
-  expect(bad, 'monogram not square').toEqual([]);
+  expect(await page.locator('#office-root .office-res .logo, #office-root .office-next .logo').count()).toBe(0);
 }
 
 async function assertLabelsFit(page) {
@@ -466,6 +484,7 @@ function measure(page) {
 test.beforeAll(() => {
   fs.mkdirSync(OUT, { recursive: true });
   fs.mkdirSync(V2, { recursive: true });
+  fs.mkdirSync(V3, { recursive: true });
 });
 
 test('six states fit at 1280 and 1920', async ({ page }) => {
@@ -501,7 +520,8 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         expect(await page.locator('#office-root .sp-card').count()).toBe(1);
         expect(await page.locator('#office-root').getByText('Set after camp').count()).toBe(2);
         expect(await page.locator('#office-root .td-gate').count()).toBe(0);
-        expect(await page.locator('#office-root .td-adv').count()).toBe(1);
+        expect(await page.locator('#office-root .td-adv').count()).toBe(0);
+        expect(await page.locator('#office-root .week-k').count()).toBe(0);
         await expect(page.locator('#office-root .wr-empty')).toHaveText('Opens with the invite period');
       }
       if (name !== 'first_week') {
@@ -523,10 +543,10 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         });
         await assertOneVerticalScroll(page);
       }
-      await page.screenshot({ path: path.join(V2, name + '-' + size[2] + '.png') });
+      await page.screenshot({ path: path.join(V3, name + '-' + size[2] + '.png') });
     }
   }
-  fs.writeFileSync(path.join(V2, 'fit.json'), JSON.stringify(fit, null, 2));
+  fs.writeFileSync(path.join(V3, 'fit.json'), JSON.stringify(fit, null, 2));
 });
 
 test('frames at their design sizes', async ({ page }) => {
@@ -610,7 +630,8 @@ test('live mid-season digest', async ({ page }) => {
     await assertMonograms(page);
     await assertWireFitsContent(page);
     expect(await page.locator('#office-root .td-gate').count()).toBe(0);
-    expect(await page.locator('#office-root .td-adv').count()).toBe(1);
+    expect(await page.locator('#office-root .td-adv').count()).toBe(0);
+    expect(await page.locator('#office-root .week-k').count()).toBe(0);
     await expect(page.locator('#office-root .wr-empty')).toHaveText('No recruiting movement this week');
     await expect(page.locator('#office-root .nx-sub')).toContainText('7–7');
     await expect(page.locator('#office-root .nx-sub')).toContainText('A1');
@@ -626,7 +647,7 @@ test('live mid-season digest', async ({ page }) => {
       expect(numbers.mainScroll).toBeLessThanOrEqual(1);
       await assertOneVerticalScroll(page);
     }
-    await page.screenshot({ path: path.join(V2, 'live-' + size[2] + '.png') });
+    await page.screenshot({ path: path.join(V3, 'live-' + size[2] + '.png') });
   }
 });
 
@@ -641,7 +662,21 @@ test('week strip states and clicks', async ({ page }) => {
   expect(steps.map((step) => step.state)).toEqual(['done', 'blocking', 'upcoming', 'upcoming', 'upcoming']);
   expect(steps[1].next).toBe(true);
   expect(steps[1].text).toContain('BLOCKS ADVANCE');
+  expect(await page.locator('#office-root .td-adv').count()).toBe(0);
+  expect(await page.locator('#office-root .week-k').count()).toBe(0);
   expect(await page.locator('#office-root .wk-step.gated .td-adv').count()).toBe(0);
+  const inset = await page.locator('#office-root .wk-step.is-next').evaluate((node) => {
+    const dot = node.querySelector('.wk-dot');
+    const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dsp-8'));
+    const pads = [...document.querySelectorAll('#office-root .wk-step')].map((step) => getComputedStyle(step).padding);
+    return {
+      inset: dot.getBoundingClientRect().left - node.getBoundingClientRect().left,
+      pad: pad,
+      pads: pads,
+    };
+  });
+  expect(inset.inset).toBeGreaterThanOrEqual(inset.pad - 0.5);
+  expect(new Set(inset.pads).size).toBe(1);
   const doneOpacity = await page.locator('#office-root .wk-step.done').evaluate((node) => getComputedStyle(node).opacity);
   expect(doneOpacity).toBe('0.38');
   const strip = await page.locator('#office-root .week-strip').evaluate((node) => ({
@@ -710,6 +745,129 @@ test('attribute chips group, order, and cap', async ({ page }) => {
   await openOffice(page, data);
   expect(await page.locator('#office-root .mv-p').count()).toBe(6);
   expect(await page.locator('#office-root .office-mv .lnk').count()).toBe(0);
+  const edge = await page.evaluate(() => {
+    const row = document.querySelector('#office-root .mv-p');
+    const card = row.closest('.card');
+    const chips = row.querySelectorAll('.attr-chip');
+    const chip = chips[chips.length - 1];
+    const style = getComputedStyle(card);
+    const contentRight = card.getBoundingClientRect().right - parseFloat(style.paddingRight);
+    return Math.abs(contentRight - chip.getBoundingClientRect().right);
+  });
+  expect(edge).toBeLessThanOrEqual(1);
+});
+
+test('next game, standings, chemistry, and attitude', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openOffice(page, STATES.win);
+  await assertOfficeText(page);
+  const rankStyle = await page.locator('#office-root .nx-rank').evaluate((node) => ({
+    style: getComputedStyle(node).fontStyle,
+    family: getComputedStyle(node).fontFamily,
+    text: node.parentElement.textContent.replace(/\s+/g, ' ').trim(),
+  }));
+  expect(rankStyle.style).toBe('normal');
+  expect(rankStyle.family).toMatch(/Bebas/i);
+  expect(rankStyle.text).toBe('21. Crickstown');
+  await expect(page.locator('#office-root .nx-sub')).toContainText('Conference A2 (2 of 8)');
+  await expect(page.locator('#office-root .nx-sub')).not.toContainText('Week');
+  await expect(page.locator('#office-root .rs-n').first()).toContainText('#18');
+  await expect(page.locator('#office-root .office-h').nth(1)).toHaveText(/This Week/);
+  const heading = page.locator('#office-root .office-col').nth(2).locator('.col-link');
+  await expect(heading).toHaveAttribute('href', /recruiting\.html/);
+  expect(await page.locator('#office-root .office-wire h3').count()).toBe(0);
+  const shown = await page.locator('#office-root .office-st .st-r:not(.st-hd)').evaluateAll((nodes) => {
+    return nodes.map((node) => ({
+      me: node.classList.contains('me'),
+      name: node.querySelector('.st-n').textContent,
+      pos: node.firstElementChild.textContent,
+    }));
+  });
+  const mode = await page.locator('#office-root .office-st').getAttribute('data-standings-mode');
+  const order = standingsBlock().rows.map((row) => row.team_name);
+  const visible = shown.map((row) => row.name);
+  const start = order.indexOf(visible[0]);
+  expect(order.slice(start, start + visible.length)).toEqual(visible);
+  expect(shown.some((row) => row.me && row.name === 'Amariabi International')).toBe(true);
+  if (mode === 'window') {
+    expect(visible).toHaveLength(5);
+    await expect(page.locator('#office-root .st-more')).toHaveAttribute('href', /tab=standings-tab/);
+  } else {
+    expect(visible).toEqual(order);
+  }
+  const attitude = await page.locator('#office-root .att-col').evaluateAll((nodes) => {
+    const widths = nodes.map((node) => node.getBoundingClientRect().width);
+    const centers = nodes.map((node) => {
+      const emoji = node.querySelector('.att-emoji').getBoundingClientRect();
+      const bar = node.querySelector('.att-bar').getBoundingClientRect();
+      return Math.abs((emoji.left + emoji.width / 2) - (bar.left + bar.width / 2));
+    });
+    return { widths: widths, centers: centers, count: nodes.length };
+  });
+  expect(attitude.count).toBe(5);
+  expect(Math.max(...attitude.widths) - Math.min(...attitude.widths)).toBeLessThanOrEqual(1);
+  attitude.centers.forEach((delta) => expect(delta).toBeLessThanOrEqual(1));
+
+  for (const band of [[5, 'red'], [13, 'yellow'], [20, 'green']]) {
+    const data = commandCenter(digest('win', {
+      team_snapshot: snapshotBlock({ chemistry: { value: band[0], max: 25 } }),
+    }));
+    await openOffice(page, data);
+    await expect(page.locator('#office-root .meter.chem')).toHaveAttribute('data-chem-band', band[1]);
+    const paint = await page.locator('#office-root .meter.chem i').evaluate((node) => getComputedStyle(node).backgroundImage);
+    expect(paint).toContain('gradient');
+    expect(paint.toLowerCase()).not.toContain('74, 144, 217');
+  }
+});
+
+test('recruiting keeps the latest event and whole rows', async ({ page }) => {
+  const events = [];
+  for (let i = 0; i < 10; i += 1) {
+    events.push({
+      recruit_id: 'r' + i,
+      recruit: 'Recruit ' + i,
+      position: 'SG',
+      event_text: 'Moved ' + i,
+      direction: 'up',
+    });
+  }
+  events.push({
+    recruit_id: 'r1',
+    recruit: 'Recruit 1',
+    position: 'SG',
+    event_text: 'Latest for 1',
+    direction: 'down',
+  });
+  const data = commandCenter(digest('win', {
+    recruiting_wire: wireBlock({ events: events, status: 'Busy' }),
+  }));
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openOffice(page, data);
+  const rows = await page.locator('#office-root .office-wire .wr').evaluateAll((nodes) => {
+    return nodes.map((node) => node.dataset.recruitKey);
+  });
+  expect(new Set(rows).size).toBe(rows.length);
+  expect(rows).not.toContain('id:r0');
+  expect(rows).toContain('id:r1');
+  await expect(page.locator('#office-root .office-wire')).toContainText('Latest for 1');
+  expect(rows.length).toBeLessThanOrEqual(8);
+  const cut = await page.evaluate(() => {
+    const main = document.querySelector('html.gob-shell .main');
+    const limit = main.getBoundingClientRect().bottom;
+    return [...document.querySelectorAll('#office-root .office-wire .wr')].filter((node) => {
+      return node.getBoundingClientRect().bottom > limit + 1;
+    }).length;
+  });
+  expect(cut).toBe(0);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openOffice(page, data);
+  expect(await page.locator('#office-root .office-wire .wr').count()).toBeLessThanOrEqual(12);
+  const empty = commandCenter(digest('regular', {
+    recruiting_wire: wireBlock({ events: [], status: 'No recruiting movement', pending_count: 0, urgent: false }),
+  }));
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openOffice(page, empty);
+  await expect(page.locator('#office-root .wr-empty')).toHaveText('No recruiting movement this week');
 });
 
 async function logoBox(page) {

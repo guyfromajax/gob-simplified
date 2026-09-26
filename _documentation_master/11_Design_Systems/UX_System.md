@@ -194,7 +194,8 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 | `team_snapshot.attitude` | Counts in the EM buckets 0–19, 20–39, 40–59, 60–79, 80+. |
 | `team_snapshot.moved_most` | Up to two `{measure, value, delta}` rows. Delta is this week's stored measure minus the previous snapshot. Empty until a prior snapshot exists. |
 | `result` | Last completed user game, or null. Scores, site (`home` / `away`), `neutral` (always null; no stored neutral site), opponent rank, round name for weeks 27–34, POTG on a win or the user's highest-PTS player on a loss, box-score path and params. `headline` only when a `season_news` story stores this game's id. |
-| `next_game` | Opponent, rank, record, conference, site, week, top scorer, top rebounder. `date`, `neutral`, `projected_starting_five`, `seeds`, `stakes`, and `team_rt` are null. |
+| `next_game` | Opponent, rank, record, conference, site, week, top scorer, top rebounder. `conference_position` and `conference_size` are the opponent's 1-based place in its own conference and the number of teams there, using the Standings order. Both are null when the opponent cannot be placed. `date`, `neutral`, `projected_starting_five`, `seeds`, `stakes`, and `team_rt` are null. |
+| `conference_standings` | The user's conference in Standings order. `conference` is the conference number, `region` is the stored region or the letter derived from that number (1–2 = A … 15–16 = H), and `rows` are `{team_id, team_name, wins, losses, differential, position, is_user}`. Ties follow `standings_display_sort_key` (wins, then point differential) and match `GET /franchise/standings` for the same results. Null when the user has no conference. |
 | `todos` | `{id, label_key, required, done, gates_advance, is_advance_action, route}` from the same flags as `gobAdvance.js`. A blocking task is the Advance action. |
 | `recruiting_wire` | Status line, events (`recruit`, `position`, `stars` and `filmed_grade` always null, `event_type`, `event_text` from the stored lean-event sentence, `list_position`, `direction`), `pending_count`, `urgent`, `unseen_count`. |
 | `signing_day` | Week 35 only. Points remaining out of 50, playing-time promises, open roster spots, up to three targets. Otherwise null. |
@@ -251,35 +252,38 @@ The Office fills `.main` edge to edge inside the standard page padding (`--page-
 
 While the digest is absent the page shows a skeleton strip and three skeleton cards. There is no spinner.
 
-A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. The left end reads `Week N` from `next_game.week`, or from `result.week` when there is no next game. Each `todos[]` entry is one step, in order, joined left to right. Labels use the same copy as before. An `is_advance_action` step that is not done copies the top-bar Advance label and shows only the ADVANCE tag. A gating step that is not the Advance action shows BLOCKS ADVANCE. Steps size to their labels. If the row is wider than the page, padding and tag size come down before the labels do. Labels are not truncated. The strip does not scroll and does not wrap to a second row.
+A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. It does not repeat the week number. The top bar already shows it. Each `todos[]` entry is one step, in order, joined left to right. Labels use the same copy as before. An `is_advance_action` step that is not done copies the top-bar Advance label and does not add an ADVANCE tag. The only Advance button on the page is the green top-bar control. A gating step that is not the Advance action shows BLOCKS ADVANCE. Every step uses the same padding. The status circle sits at least `--dsp-8` in from the left edge of the pill at both densities. Steps size to their labels. If the row is wider than the page, the gap between steps comes down before the labels do. Labels are not truncated. The strip does not scroll and does not wrap to a second row.
 
 | Step | Rule |
 |---|---|
 | Done | Check mark, opacity 38%, still clickable. Opens `route`. |
-| Next | The first not-done required step. Neutral bright outline (`--text-100`). Green stays on the top-bar Advance only. If this step is `is_advance_action`, it shows ADVANCE and runs the same click as the top bar. |
+| Next | The first not-done required step. Neutral bright outline (`--text-100`). Green stays on the top-bar Advance only. If this step is `is_advance_action`, its label copies the top bar and the click runs the same action. |
 | Blocking | `gates_advance` on a step that is not `is_advance_action` draws an orange outline and BLOCKS ADVANCE. |
 | Upcoming | The remaining steps. |
 
-| State | Column 1 · Since last week | Column 2 · Next game | Column 3 · Recruiting |
+| State | Column 1 · Since last week | Column 2 · This Week | Column 3 · Recruiting |
 |---|---|---|---|
-| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot | Recruiting wire, sized to its events. No events: "No recruiting movement this week". |
-| `first_week` | Season preview | Next game · Team snapshot | One-line wire. The digest status when it is set, otherwise the empty-state line. |
-| `signing_day` | Result · What moved | Team snapshot (`next_game` is null) | Signing Day card. The wire is hidden. |
+| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot · Conference standings | Recruiting wire. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
+| `first_week` | Season preview | Next game · Team snapshot · Conference standings | One-line wire. The digest status when it is set, otherwise the empty-state line. The column heading is the hub link. |
+| `signing_day` | Result · What moved | Team snapshot · Conference standings (`next_game` is null) | Signing Day card. The wire is hidden. The column heading still links to the hub. |
 
 The three columns are equal width. The wire card is as tall as its rows. "Recruiting →" opens the recruiting hub. Result team names wrap, and at the 1280 density the score is smaller so a long name is not cut off.
 
 | Component | Digest fields |
 |---|---|
-| Week strip | `todos[]` `label_key`, `done`, `required`, `gates_advance`, `is_advance_action`, `route`. Week number from `next_game.week` or `result.week`. |
-| Result | `result` scores, names, `opponent_rank`, `site`, `round_name`, `user_won`, `headline`, `leader`, `leader_role`, `box_score` |
+| Week strip | `todos[]` `label_key`, `done`, `required`, `gates_advance`, `is_advance_action`, `route`. No week label and no ADVANCE tag. |
+| Result | `result` scores, names, `opponent_rank`, `site`, `round_name`, `user_won`, `headline`, `leader`, `leader_role`, `box_score`. The user name is prefixed with `#` plus `what_moved.national_rank.now` when that rank is set. No team monograms. |
 | What moved | `what_moved.national_rank`, `conference_standing`, `record`, `streak`, `attribute_changes` |
-| Recruiting wire | `recruiting_wire.status`, `events` (`event_text`, `position`, `list_position`, `direction`). Rail badge uses `pending_count` and `urgent`. |
-| Next game | `next_game` opponent, `rank`, `record`, `conference`, `site`, `week`, `round_name`, `top_scorer`, `top_rebounder` |
-| Team snapshot | `team_snapshot.chemistry`, `attitude.buckets`, `moved_most`, `state` |
+| Recruiting wire | Deduped `recruiting_wire.events` (`event_text`, `position`, `list_position`, `direction`). One row per `recruit_id`, or per name when the id is missing, keeping the latest event. At most 8 rows at the 1280 density and 12 at 1920, and only whole rows that sit above the fold. The column heading opens the hub. Rail badge uses `pending_count` and `urgent`. |
+| Next game | `next_game` opponent, `rank` as `21. Name` in upright Bebas, `record`, `Conference` plus the short label and `(place of size)` from `conference_position` and `conference_size`. The place is omitted when either is null. No week callout and no monogram. |
+| Team snapshot | `team_snapshot.chemistry` (red 0–8, yellow 9–16, green 17–25), five equal attitude columns, `moved_most`, `state` |
+| Conference standings | `conference_standings.rows` under the snapshot. Header is the short label (`A2`). The user row uses the navy selected-row treatment. When every row fits above the fold, show them all. Otherwise show five rows centred on the user. If five still clip, show three centred on the user. "Full standings" goes to League › Standings. |
 | Signing Day | `signing_day.points_remaining`, `points_total`, `promises_made`, `open_roster_spots`, `targets` |
 | Season preview | `season_preview` fields that are non-null. The opener is the next-game card. |
 
-Attribute changes are one row per `player_id`. The row is the player name, linked to the player page, then chips flowing left from the name and wrapping under it. A chip shows the attribute abbreviation in Bebas at `--fs-22` and `--text-100` (larger than the player name, the largest text in the chip), the new first-digit value in the tier colour from `attributeDisplay.js`, and a green ▲ or red ▼. Chips are not truncated. The previous value is not shown. The chip `title` is the full name from `ATTRIBUTE_NAMES` (`BH` → "Ball Handling"). Players sort by total absolute movement, then name. Inside a row, increases come before decreases. At 1280 the card shows up to 5 players. At 1920 it shows up to 8. When the list is longer, "All changes →" opens the training report for `result.week` (or `next_game.week` when there is no result). Rank, conference, and record tiles omit the delta chip when the delta is 0 or null.
+Attribute changes are one row per `player_id`. The player name stays on the left and links to the player page. Chips are right-justified: the rightmost chip meets the card's right content edge, and the others sit to its left with a consistent gap. If they do not fit on one line they wrap, still right-aligned, under the name. A chip shows the attribute abbreviation in Bebas at `--fs-22` and `--text-100` (larger than the player name, the largest text in the chip), the new first-digit value in the tier colour from `attributeDisplay.js`, and a green ▲ or red ▼. Chips are not truncated. The previous value is not shown. The chip `title` is the full name from `ATTRIBUTE_NAMES` (`BH` → "Ball Handling"). Players sort by total absolute movement, then name. Inside a row, increases come before decreases. At 1280 the card shows up to 5 players. At 1920 it shows up to 8. When the list is longer, "All changes →" opens the training report for `result.week` (or `next_game.week` when there is no result). Rank, conference, and record tiles omit the delta chip when the delta is 0 or null.
+
+Chemistry fill uses the red, yellow, and green tokens for 0–8, 9–16, and 17–25. The track stays neutral. Attitude is five equal columns, 😡 😕 😐 😊 😎, each with the count and a short bar for that bucket's share of the roster. The bar colours run red, orange, neutral, green, bright green. The emoji, count, and bar are centred in the column.
 
 Attribute `from` / `to` are already the first-digit scale. Player RT on a signing target is the letter already on the digest. Attitude counts use the EM emoji buckets. A loss result uses the calm card (no wash, no count-up). A win counts the scores up once, on the first open after that result. `prefers-reduced-motion` shows the final state immediately.
 

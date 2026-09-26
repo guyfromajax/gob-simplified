@@ -514,7 +514,8 @@ test('cut players shows the shorter roster', async ({ page }) => {
 test('week advance shows the new week', async ({ page }) => {
   const state = freshState();
   await boot(page, state);
-  await expect(page.locator('#office-root .week-k')).toHaveText('Week 3');
+  await expect(page.locator('#gob-week-value')).toHaveText('Week 3');
+  expect(await page.locator('#office-root .week-k').count()).toBe(0);
   await page.evaluate(async function (fid) {
     await fetch('/franchise/complete-week', {
       method: 'POST',
@@ -527,7 +528,7 @@ test('week advance shows the new week', async ({ page }) => {
     const root = document.getElementById('office-root');
     return root && root.getAttribute('aria-busy') === 'false';
   });
-  await expect(page.locator('#office-root .week-k')).toHaveText('Week 4');
+  await expect(page.locator('#gob-week-value')).toHaveText('Week 4');
   await expect(page.locator('#office-root .res-hl')).toHaveText('Week advanced');
 });
 

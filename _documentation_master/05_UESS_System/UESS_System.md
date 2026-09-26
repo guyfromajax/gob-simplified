@@ -556,8 +556,17 @@ Schema (absent values are JSON null):
     "week": 19,
     "date": null,
     "site": "home",
+    "conference_position": 2,
+    "conference_size": 8,
     "projected_starting_five": null,
     "team_rt": null
+  },
+  "conference_standings": {
+    "conference": 2,
+    "region": "A",
+    "rows": [
+      {"team_id": "t1", "team_name": "Crickstown", "wins": 13, "losses": 1, "differential": 20, "position": 1, "is_user": false}
+    ]
   },
   "todos": [
     {"id": "play_next_game", "label_key": "play_next_game", "required": true, "done": false, "gates_advance": false, "is_advance_action": true, "route": "/set-lineup.html"}
@@ -569,6 +578,8 @@ Schema (absent values are JSON null):
 ```
 
 `state` is `regular`, `first_week`, `tournament`, `signing_day`, `win`, or `loss`. `team_snapshot.state` is `set_after_camp` until the first prior-week snapshot exists. Rank and conference deltas are previous minus current. Measure deltas are current minus previous. Player RT in recruiting targets is a letter grade. Team RT is not returned. Stars, filmed grade, a calendar date, a neutral site, a projected starting five, seeds, and stakes copy are null because the game does not store them. A headline is returned only when `season_news` has a story whose `game_id` is that game.
+
+`next_game.conference_position` and `next_game.conference_size` are the opponent's place in its own conference and the size of that conference. `conference_standings` is the user's conference in the same order as `GET /franchise/standings`: wins, then point differential (`standings_display_sort_key`). `conference` is the conference number and `region` is the letter for the short label (`A2`). Both are computed on read. Neither is a stored field.
 
 ### 13.2 Browse cache contract
 

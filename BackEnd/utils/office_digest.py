@@ -194,28 +194,97 @@ def attitude_counts(em_values: Iterable[Any]) -> dict[str, Any]:
     }
 
 
-def conference_position(
+def _region_letter(conference: Any) -> Optional[str]:
+    """Region letter for conferences 1–16: 1–2 = A, 3–4 = B, … 15–16 = H."""
+    if isinstance(conference, bool) or not isinstance(conference, int):
+        return None
+    if conference < 1 or conference > 16:
+        return None
+    return chr(ord("A") + (conference - 1) // 2)
+
+
+def _conference_member_rows(
     standings: Mapping[str, Mapping[str, Any]],
     conference_by_team: Mapping[str, Any],
-    user_team_id: str,
-    user_conference: Any,
-) -> Optional[int]:
-    """1-based place in the user's conference, using ``standings_display_sort_key``."""
-    if user_conference is None or not user_team_id:
-        return None
+    conference: Any,
+) -> list[dict[str, Any]]:
+    """Teams in one conference, ordered by ``standings_display_sort_key``."""
+    if conference is None:
+        return []
     rows: list[dict[str, Any]] = []
-    for team_id, conference in conference_by_team.items():
-        if conference != user_conference:
+    for team_id, team_conference in conference_by_team.items():
+        if team_conference != conference:
             continue
         tid = str(team_id)
         row = dict(standings.get(tid) or {})
         row["team_id"] = tid
         rows.append(row)
     rows.sort(key=standings_display_sort_key)
+    return rows
+
+
+def _row_differential(row: Mapping[str, Any]) -> int:
+    if "PF" in row or "PA" in row:
+        return int(row.get("PF", 0) or 0) - int(row.get("PA", 0) or 0)
+    return int(row.get("differential", 0) or 0)
+
+
+def conference_position(
+    standings: Mapping[str, Mapping[str, Any]],
+    conference_by_team: Mapping[str, Any],
+    user_team_id: str,
+    user_conference: Any,
+) -> Optional[int]:
+    """1-based place in one conference, using ``standings_display_sort_key``."""
+    if user_conference is None or not user_team_id:
+        return None
+    rows = _conference_member_rows(standings, conference_by_team, user_conference)
     for index, row in enumerate(rows, start=1):
         if row["team_id"] == str(user_team_id):
             return index
     return None
+
+
+def conference_standings_digest(
+    standings: Mapping[str, Mapping[str, Any]],
+    conference_by_team: Mapping[str, Any],
+    user_team_id: str,
+    user_conference: Any,
+    name_by_team: Mapping[str, Any],
+    region_by_team: Mapping[str, Any],
+) -> Optional[dict[str, Any]]:
+    """User's conference in Standings order, plus the number and region the short label needs."""
+    if user_conference is None:
+        return None
+    members = _conference_member_rows(standings, conference_by_team, user_conference)
+    if not members:
+        return None
+    region = None
+    for member in members:
+        stored = region_by_team.get(member["team_id"])
+        if stored:
+            region = str(stored)
+            break
+    if region is None:
+        region = _region_letter(user_conference)
+    rows: list[dict[str, Any]] = []
+    for index, member in enumerate(members, start=1):
+        tid = member["team_id"]
+        name = name_by_team.get(tid)
+        rows.append({
+            "team_id": tid,
+            "team_name": name if name else None,
+            "wins": int(member.get("W", 0) or 0),
+            "losses": int(member.get("L", 0) or 0),
+            "differential": _row_differential(member),
+            "position": index,
+            "is_user": tid == str(user_team_id),
+        })
+    return {
+        "conference": user_conference,
+        "region": region,
+        "rows": rows,
+    }
 
 
 def _season_snapshots(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
@@ -898,6 +967,16 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
         for row in rankings
         if isinstance(row, dict) and row.get("team_id") is not None
     }
+    name_by_team = {
+        str(row.get("team_id")): row.get("team_name")
+        for row in rankings
+        if isinstance(row, dict) and row.get("team_id") is not None and row.get("team_name")
+    }
+    region_by_team = {
+        str(row.get("team_id")): row.get("region")
+        for row in rankings
+        if isinstance(row, dict) and row.get("team_id") is not None and row.get("region")
+    }
     user_conference = ctx.get("user_conference")
     if user_conference is None:
         user_conference = conference_by_team.get(user_team_id)
@@ -1001,6 +1080,20 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
             "stakes": None,
             "team_rt": None,
         }
+        opponent_id = str(next_summary.get("opponent_team_id") or "")
+        opponent_conference = next_summary.get("opponent_team_conference")
+        if opponent_conference is None and opponent_id:
+            opponent_conference = conference_by_team.get(opponent_id)
+        opponent_position = (
+            conference_position(standings, conference_by_team, opponent_id, opponent_conference)
+            if opponent_id
+            else None
+        )
+        opponent_size = None
+        if opponent_conference is not None and opponent_position is not None:
+            opponent_size = sum(1 for conference in conference_by_team.values() if conference == opponent_conference)
+        next_game["conference_position"] = opponent_position
+        next_game["conference_size"] = opponent_size
 
     state = office_state(week=week, eos_tournament_active=bool(flags.get("eos_tournament_active")), user_won=user_won)
     wire = recruiting_wire_digest(ctx.get("recruiting_wire"), ctx.get("recruit_lookup"), week=week)
@@ -1042,6 +1135,14 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
         "team_snapshot": team_snapshot,
         "result": result,
         "next_game": next_game,
+        "conference_standings": conference_standings_digest(
+            standings,
+            conference_by_team,
+            user_team_id,
+            user_conference,
+            name_by_team,
+            region_by_team,
+        ),
         "todos": build_todos(flags),
         "recruiting_wire": wire,
         "signing_day": signing,

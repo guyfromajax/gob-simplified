@@ -60,7 +60,8 @@
   white-space: nowrap;
 }
 
-.gob.gob-1280 .office-col { gap: 6px; }
+.gob.gob-1280 .office { gap: 2px; }
+.gob.gob-1280 .office-col { gap: 1px; }
 .gob.gob-1280 .office .card { padding-top: 8px; padding-bottom: 8px; }
 .gob.gob-1280 .office-res { gap: 6px; }
 .gob.gob-1280 .office .rs-pts { font-size: var(--fs-28); }
@@ -145,11 +146,11 @@ html.gob-shell.gob-office .office {
 .gob .wk-step {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--dsp-8);
   flex: 0 1 auto;
   min-width: max-content;
   height: 36px;
-  padding: 0 10px;
+  padding: 0 var(--dsp-8);
   border-radius: var(--radius-10);
   background: var(--white-3p5);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -167,7 +168,7 @@ html.gob-shell.gob-office .office {
   height: 1px;
   background: var(--line-strong);
 }
-.gob .week-strip.is-tight .wk-step { padding: 0 4px; gap: 4px; }
+.gob .week-strip.is-tight .wk-step { padding: 0 var(--dsp-8); gap: var(--dsp-8); }
 .gob .week-strip.is-tight .wk-step + .wk-step { margin-left: 8px; }
 .gob .week-strip.is-tight .wk-step + .wk-step::before { left: -8px; width: 8px; }
 .gob .week-strip.is-tight .td-adv,
@@ -176,7 +177,7 @@ html.gob-shell.gob-office .office {
   letter-spacing: 0.04em;
   padding: 2px 4px;
 }
-.gob .week-strip.is-tighter .wk-step { padding: 0 2px; gap: 3px; }
+.gob .week-strip.is-tighter .wk-step { padding: 0 var(--dsp-8); gap: var(--dsp-8); }
 .gob .week-strip.is-tighter .wk-step + .wk-step { margin-left: 6px; }
 .gob .week-strip.is-tighter .wk-step + .wk-step::before { left: -6px; width: 6px; }
 .gob .week-strip.is-tighter .td-l { font-size: var(--fs-12); }
@@ -226,11 +227,14 @@ html.gob-shell.gob-office .office {
   font-weight: var(--fw-semibold);
   color: var(--text-60);
 }
+.gob .office-wire > .wr:first-child { border-top: 0; }
 
 .gob .mv-p {
   flex-wrap: wrap;
   justify-content: flex-start;
   align-items: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 .gob .mv-p .nm {
   flex: 0 0 auto;
@@ -239,7 +243,16 @@ html.gob-shell.gob-office .office {
   white-space: nowrap;
   font-size: var(--fs-16);
 }
-.gob .attr-run { display: contents; }
+.gob .attr-run {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 0;
+}
 .gob .attr-chip {
   display: inline-flex;
   align-items: center;
@@ -268,3 +281,93 @@ html.gob-shell.gob-office .office {
 .gob .attr-chip .arr.up { color: var(--delta-up); }
 .gob .attr-chip .arr.down { color: var(--delta-down); }
 .gob .office-mv .lnk { align-self: flex-end; }
+.gob .nx-rank {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: var(--fw-bold);
+}
+.gob .office-h a.col-link:hover h2 {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.gob .meter.chem i {
+  background-color: transparent;
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--chem, var(--white-62)) 68%, var(--black)), var(--chem, var(--white-62)));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--chem, transparent) 42%, transparent);
+}
+.gob .meter.chem.is-red { --chem: var(--red); }
+.gob .meter.chem.is-yellow { --chem: var(--yellow); }
+.gob .meter.chem.is-green { --chem: var(--green); }
+.gob .att {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.gob .att-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+.gob .att-emoji { font-size: 16px; line-height: 1; }
+.gob .att-n {
+  font: var(--fw-bold) var(--fs-12)/1 var(--font-display);
+  color: var(--text-87);
+}
+.gob .att-bar {
+  width: 72%;
+  height: 4px;
+  border-radius: var(--radius-4);
+  background: var(--white-7);
+  overflow: hidden;
+}
+.gob .att-bar i { display: block; height: 100%; }
+.gob .att-col[data-bucket="em_0_19"] .att-bar i { background: var(--red); }
+.gob .att-col[data-bucket="em_20_39"] .att-bar i { background: var(--orange); }
+.gob .att-col[data-bucket="em_40_59"] .att-bar i { background: var(--white-45); }
+.gob .att-col[data-bucket="em_60_79"] .att-bar i { background: color-mix(in srgb, var(--green) 58%, var(--white-18)); }
+.gob .att-col[data-bucket="em_80_plus"] .att-bar i {
+  background: var(--green);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--green) 45%, transparent);
+}
+.gob .office-st { gap: 0; }
+.gob .office-st .card-h h3 { letter-spacing: var(--tracking-4); }
+.gob .office-st .st-r {
+  grid-template-columns: 1.6em minmax(0, 1fr) auto;
+  gap: 6px;
+  padding: 0;
+  line-height: 16px;
+}
+.gob .office-st .st-n {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: nowrap;
+}
+.gob .office-st .st-more { align-self: flex-end; margin-top: 2px; }
+.gob .office .wk-step,
+.gob .office .week-strip.is-tight .wk-step,
+.gob .office .week-strip.is-tighter .wk-step {
+  padding: 0 var(--dsp-8);
+  gap: var(--dsp-8);
+}
+.gob.gob-1280 .office-st { padding: 0 8px; }
+.gob.gob-1280 .office-st .st-r { line-height: 11px; font-size: 11px; }
+.gob.gob-1280 .office .meter { height: 4px; }
+.gob.gob-1280 .office-snap .sn-v { font-size: var(--fs-16); }
+.gob.gob-1280 .office-st .card-h h3 { font-size: var(--fs-14); }
+.gob.gob-1280 .office-snap { gap: 2px; padding-top: 4px; padding-bottom: 2px; }
+.gob.gob-1280 .office-snap .msr { padding: 0; }
+.gob.gob-1280 .office-snap .sub-h { margin-top: 1px; }
+.gob.gob-1280 .office-next { gap: 2px; padding-top: 4px; padding-bottom: 2px; }
+.gob.gob-1280 .office-next .ptw { padding: 2px 0; }
+.gob.gob-1280 .office-next .nx-name { font-size: var(--fs-24); line-height: 1; }
+.gob.gob-1280 .office-next.tier { padding-top: 2px; padding-bottom: 0; }
+.gob.gob-1280 .office-next.tier .ptw { padding-top: 1px; padding-bottom: 1px; }
+.gob.gob-1280 .office-next.tier .tn-round { font-size: 14px; line-height: 1; }
+.gob.gob-1280 .office-next.tier .tn-band { padding-bottom: 0; }
+.gob.gob-1280 .office-next.tier .tn-lock { max-height: 22px; overflow: hidden; }
+.gob.gob-1280 .att-emoji { font-size: 14px; }
+.gob.gob-1280 .att-col { gap: 1px; }
