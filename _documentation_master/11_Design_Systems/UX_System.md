@@ -294,3 +294,19 @@ Chemistry fill uses the red, yellow, and green tokens for 0–8, 9–16, and 17�
 Attribute `from` / `to` are already the first-digit scale. Player RT on a signing target is the letter already on the digest. Attitude counts use the EM emoji buckets. A loss result uses the calm card (no wash, no count-up). A win counts the scores up once, on the first open after that result. `prefers-reduced-motion` shows the final state immediately.
 
 Tournament weeks keep the top-bar tier from `tierEmblem.js`. The next-game card takes the same metal tokens. `projected_starting_five`, `team_rt`, `seeds`, `stakes`, `date`, `neutral`, `stars`, and `filmed_grade` stay off the page because they are null. There is no Team RT row and no coach-stat block.
+
+## 13. Leader qualification
+
+A rate leader qualifies when attempts are at least the floor times the games that player's team has completed in the scope being read (attempts per team game). Team games are wins plus losses from `franchise.results`. There is no separate games-played rule. The floors live in `LEADER_QUALIFICATION_FLOORS` (`BackEnd/constants/leader_qualification.py`). `qualifies(stat, attempts, team_games)` is the only check.
+
+| Stat | Floor (attempts per team game) | Attempt field |
+| --- | --- | --- |
+| FG% | 5 | FGA |
+| 3PT% | 2 | 3PTA |
+| FT% | 2 | FTA |
+| DEF% | 8 | DEF_A |
+| SCR% | 5 | SCR_A |
+
+Season Leaders (FG% and DEF%), the league-news FG% and DEF% boards, and the community-highlights top defender use this rule. SCR%, 3PT%, and FT% are defined for any later consumer. Leaders does not show those three today.
+
+Career Leaders keep the older rule for FG% and DEF%: attempts at least 5 times that player's own games played. Zero team games never qualifies a season rate. Exactly the floor qualifies. One attempt below does not.

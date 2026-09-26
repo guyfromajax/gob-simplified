@@ -10998,6 +10998,71 @@ def franchise_league_news(
     return build_franchise_league_news(franchise_doc)
 
 
+def _completed_team_games(franchise_id: str) -> dict[str, int]:
+    """Wins + losses per team from this franchise's completed results."""
+    from BackEnd.constants.leader_qualification import team_games_from_record
+    from BackEnd.utils.franchise_standings import calculate_franchise_standings
+
+    try:
+        oid = ObjectId(franchise_id)
+    except Exception:
+        return {}
+    doc = db.franchises.find_one({"_id": oid}, {"results": 1})
+    if not doc:
+        return {}
+    standings = calculate_franchise_standings(doc.get("results") or {}, {})
+    return {
+        str(team_id): team_games_from_record(row.get("W"), row.get("L"))
+        for team_id, row in standings.items()
+    }
+
+
+def _player_in_leader_scope(meta: dict, allowed_team_ids, allowed_team_names) -> bool:
+    if not allowed_team_ids and not allowed_team_names:
+        return True
+    team_id = str(meta.get("team_id") or "")
+    team_name = str(meta.get("team") or "")
+    if allowed_team_ids and team_id in allowed_team_ids:
+        return True
+    if allowed_team_names and team_name in allowed_team_names:
+        return True
+    return False
+
+
+def _season_percentage_leaders(
+    franchise_id: str,
+    stat: str,
+    limit: int,
+    allowed_team_ids,
+    allowed_team_names,
+) -> list[dict[str, Any]]:
+    """FG% / DEF% for season scope, qualified on team games rather than player GP."""
+    from BackEnd.constants.leader_qualification import qualifies
+
+    numerator_field = "FGM" if stat == "FG%" else "DEF_S"
+    denominator_field = "FGA" if stat == "FG%" else "DEF_A"
+    team_games = _completed_team_games(franchise_id)
+    players = franchise_players_data_collection.find(
+        {"franchise_id": str(franchise_id)},
+        {"player_id": 1, "meta": 1, "season": 1},
+    )
+    ranked: list[tuple[float, int, dict[str, Any]]] = []
+    for player in players:
+        meta = player.get("meta") or {}
+        if not _player_in_leader_scope(meta, allowed_team_ids, allowed_team_names):
+            continue
+        season = player.get("season") or {}
+        attempts = int(season.get(denominator_field) or 0)
+        games = team_games.get(str(meta.get("team_id") or ""), 0)
+        if not qualifies(stat, attempts, games):
+            continue
+        made = float(season.get(numerator_field) or 0)
+        value = (made / attempts) * 100.0 if attempts else 0.0
+        ranked.append((value, attempts, {"player_id": player.get("player_id"), "meta": meta, "value": value}))
+    ranked.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    return [row[2] for row in ranked[:limit]]
+
+
 def get_leaders(
     franchise_id: str,
     scope: str = "season",
@@ -11009,6 +11074,9 @@ def get_leaders(
     """Return the top players for a given stat within a franchise.
 
     ✅ FPD: Reads from franchise_players_data (season/career stats), not franchise.players.
+
+    Season FG% and DEF% qualify on team games (``qualifies``). Career FG% and
+    DEF% keep attempts >= 5 * the player's own GP.
     """
     start_time = time.time()
 
@@ -11024,95 +11092,104 @@ def get_leaders(
     elif stat == "TPA":
         stat_field = "3PTA"
 
-    # ✅ FPD: Aggregate from franchise_players_data (season/career live here)
-    aggregation_start = time.time()
-    pipeline = [{"$match": {"franchise_id": str(franchise_id)}}]
-    if allowed_team_ids or allowed_team_names:
-        team_filters = []
-        if allowed_team_ids:
-            team_filters.append({"meta.team_id": {"$in": list(allowed_team_ids)}})
-        if allowed_team_names:
-            team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
-        pipeline.append({"$match": {"$or": team_filters}})
-
     per_game_stats = {"PTS", "REB", "AST"}
-    if stat in {"FG%", "DEF%"}:
-        numerator_field = "FGM" if stat == "FG%" else "DEF_S"
-        denominator_field = "FGA" if stat == "FG%" else "DEF_A"
-        pipeline.extend([
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "gp": {"$ifNull": [f"${scope}.GP", 0]},
-                    "numerator": {"$ifNull": [f"${scope}.{numerator_field}", 0]},
-                    "denominator": {"$ifNull": [f"${scope}.{denominator_field}", 0]},
-                }
-            },
-            {
-                "$match": {
-                    "$expr": {
-                        "$and": [
-                            {"$gt": ["$gp", 0]},
-                            {"$gte": ["$denominator", {"$multiply": ["$gp", 5]}]},
-                        ]
-                    }
-                }
-            },
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "value": {
-                        "$cond": [
-                            {"$gt": ["$denominator", 0]},
-                            {"$multiply": [{"$divide": ["$numerator", "$denominator"]}, 100]},
-                            0,
-                        ]
-                    },
-                    "tiebreak_volume": "$denominator",
-                }
-            },
-            {"$sort": {"value": -1, "tiebreak_volume": -1}},
-            {"$limit": limit},
-        ])
-    elif stat in per_game_stats:
-        pipeline.extend([
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "gp": {"$ifNull": [f"${scope}.GP", 0]},
-                    "total": {"$ifNull": [f"${scope}.{stat_field}", 0]},
-                }
-            },
-            {"$match": {"gp": {"$gt": 0}}},
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "value": {"$divide": ["$total", "$gp"]},
-                    "tiebreak_total": "$total",
-                }
-            },
-            {"$sort": {"value": -1, "tiebreak_total": -1}},
-            {"$limit": limit},
-        ])
+    # Season rate leaders filter in Python after the team-games lookup.
+    # A $limit inside the aggregate would drop real qualifiers.
+    if stat in {"FG%", "DEF%"} and str(scope or "season") != "career":
+        agg = _season_percentage_leaders(
+            str(franchise_id), stat, limit, allowed_team_ids, allowed_team_names
+        )
+        aggregation_time = time.time() - start_time
     else:
-        pipeline.extend([
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "value": {"$ifNull": [f"${scope}.{stat_field}", 0]},
-                }
-            },
-            {"$sort": {"value": -1}},
-            {"$limit": limit},
-        ])
+        # ✅ FPD: Aggregate from franchise_players_data (season/career live here)
+        aggregation_start = time.time()
+        pipeline = [{"$match": {"franchise_id": str(franchise_id)}}]
+        if allowed_team_ids or allowed_team_names:
+            team_filters = []
+            if allowed_team_ids:
+                team_filters.append({"meta.team_id": {"$in": list(allowed_team_ids)}})
+            if allowed_team_names:
+                team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
+            pipeline.append({"$match": {"$or": team_filters}})
 
-    agg = list(franchise_players_data_collection.aggregate(pipeline))
-    aggregation_time = time.time() - aggregation_start
+        if stat in {"FG%", "DEF%"}:
+            # Career scope only. Season FG%/DEF% returned above.
+            numerator_field = "FGM" if stat == "FG%" else "DEF_S"
+            denominator_field = "FGA" if stat == "FG%" else "DEF_A"
+            pipeline.extend([
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "gp": {"$ifNull": [f"${scope}.GP", 0]},
+                        "numerator": {"$ifNull": [f"${scope}.{numerator_field}", 0]},
+                        "denominator": {"$ifNull": [f"${scope}.{denominator_field}", 0]},
+                    }
+                },
+                {
+                    "$match": {
+                        "$expr": {
+                            "$and": [
+                                {"$gt": ["$gp", 0]},
+                                {"$gte": ["$denominator", {"$multiply": ["$gp", 5]}]},
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "value": {
+                            "$cond": [
+                                {"$gt": ["$denominator", 0]},
+                                {"$multiply": [{"$divide": ["$numerator", "$denominator"]}, 100]},
+                                0,
+                            ]
+                        },
+                        "tiebreak_volume": "$denominator",
+                    }
+                },
+                {"$sort": {"value": -1, "tiebreak_volume": -1}},
+                {"$limit": limit},
+            ])
+        elif stat in per_game_stats:
+            pipeline.extend([
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "gp": {"$ifNull": [f"${scope}.GP", 0]},
+                        "total": {"$ifNull": [f"${scope}.{stat_field}", 0]},
+                    }
+                },
+                {"$match": {"gp": {"$gt": 0}}},
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "value": {"$divide": ["$total", "$gp"]},
+                        "tiebreak_total": "$total",
+                    }
+                },
+                {"$sort": {"value": -1, "tiebreak_total": -1}},
+                {"$limit": limit},
+            ])
+        else:
+            pipeline.extend([
+                {
+                    "$project": {
+                        "player_id": 1,
+                        "meta": 1,
+                        "value": {"$ifNull": [f"${scope}.{stat_field}", 0]},
+                    }
+                },
+                {"$sort": {"value": -1}},
+                {"$limit": limit},
+            ])
+
+        agg = list(franchise_players_data_collection.aggregate(pipeline))
+        aggregation_time = time.time() - aggregation_start
     # logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline (FPD): {aggregation_time:.3f}s")
     results: list[dict[str, Any]] = []
     for p in agg:
