@@ -140,14 +140,20 @@ def test_snapshot_matches_live_scan_for_every_category():
     assert live_national["PTS"][0]["value"] == 30.0
     assert live_national["REB"][0]["value"] == 8.0
     assert live_national["AST"][0]["value"] == 4.0
-    assert live_national["3PTM"][0] == {
-        "player_id": "cal",
-        "name": "Cal Beta",
-        "team": "Beta College",
-        "value": 40,
-        "conference": "West",
-        "region": "South",
-    }
+    threes = live_national["3PTM"][0]
+    assert threes["player_id"] == "cal"
+    assert threes["name"] == "Cal Beta"
+    assert threes["team"] == "Beta College"
+    assert threes["value"] == 40
+    assert threes["conference"] == "West"
+    assert threes["region"] == "South"
+    assert threes["team_id"]
+    assert threes["position"] == ""
+    assert threes["year"] == ""
+    assert "qualification_caption" not in threes
+    assert live_national["FG%"][0]["qualification_caption"] == "min 5 FGA per team game"
+    assert live_national["DEF%"][0]["qualification_caption"] == "min 6 DEF_A per team game"
+    assert all("qualification_caption" not in row for row in live_career["FG%"])
     assert live_national["BLK"][0]["value"] == 8
     assert live_national["STL"][0]["value"] == 20
     assert live_national["FG%"][0]["value"] == 70.0
@@ -183,6 +189,64 @@ def test_snapshot_matches_live_scan_for_every_category():
             )
             assert [row["player_id"] for row in board[stat]] == [row["player_id"] for row in ranked]
             assert [row["value"] for row in board[stat]] == [row["value"] for row in ranked]
+
+
+def test_basis_and_row_fields_match_on_snapshot_and_live_scan():
+    fid = _seed_two_conferences()
+    franchise_players_data_collection.update_one(
+        {"franchise_id": fid, "player_id": "ann"},
+        {"$set": {"meta.position": "PG", "meta.year": "SR"}},
+    )
+
+    def board(basis):
+        resp = client.get(
+            "/franchise/leaders",
+            params={
+                "franchise_id": fid,
+                "scope": "season",
+                "limit": 10,
+                "view_scope": "national",
+                "basis": basis,
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        return resp.json()
+
+    for basis in ("per_game", "totals"):
+        get_store().leaders_snapshots_collection.delete_many({})
+        live = board(basis)
+        snap = board(basis)
+        assert snap == live
+        for stat in CATEGORIES:
+            ranked = get_leaders(fid, scope="season", stat=stat, limit=10, basis=basis)
+            assert [row["player_id"] for row in live[stat]] == [row["player_id"] for row in ranked]
+            assert [row["value"] for row in live[stat]] == [row["value"] for row in ranked]
+            assert [row["team_id"] for row in live[stat]] == [row["team_id"] for row in ranked]
+            assert [row["position"] for row in live[stat]] == [row["position"] for row in ranked]
+            assert [row["year"] for row in live[stat]] == [row["year"] for row in ranked]
+            for row in live[stat]:
+                assert "team_id" in row and "position" in row and "year" in row
+
+    per_game = board("per_game")
+    totals = board("totals")
+    assert per_game["PTS"][0]["value"] == 30.0
+    assert totals["PTS"][0]["player_id"] == "cal"
+    assert totals["PTS"][0]["value"] == 300
+    assert per_game["STL"][0]["value"] != totals["STL"][0]["value"]
+    ann = next(row for row in per_game["PTS"] if row["player_id"] == "ann")
+    assert ann["position"] == "PG"
+    assert ann["year"] == "SR"
+    assert ann["team_id"]
+    assert "qualification_caption" not in ann
+    assert per_game["FG%"][0]["qualification_caption"] == "min 5 FGA per team game"
+    assert totals["DEF%"][0]["qualification_caption"] == "min 6 DEF_A per team game"
+    # Omitted basis stays the previous per-stat default: points per game, steals as a total.
+    omitted = client.get(
+        "/franchise/leaders",
+        params={"franchise_id": fid, "scope": "season", "limit": 10, "view_scope": "national"},
+    ).json()
+    assert omitted["PTS"][0]["value"] == per_game["PTS"][0]["value"]
+    assert omitted["STL"][0]["value"] == totals["STL"][0]["value"]
 
 
 def test_midweek_season_stat_write_is_visible_on_the_next_read():

@@ -1011,7 +1011,7 @@
 
   function standingsHref() {
     var current = new URLSearchParams(global.location.search);
-    var params = { tab: 'standings-tab' };
+    var params = { tab: 'standings-view' };
     if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
     var teamId = current.get('team_id') || current.get('user_team_id');
     if (teamId) params.team_id = teamId;

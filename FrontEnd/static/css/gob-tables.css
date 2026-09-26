@@ -1,0 +1,464 @@
+/* Shared table template for League browse views. Narrow tables pin their
+   header under the measured page head. Wide tables scroll inside the card. */
+
+html.gob-shell .pg-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+html.gob-shell .gob-search {
+  width: 9.5rem;
+  max-width: 36vw;
+  height: 28px;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  background: transparent;
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+html.gob-shell .gob-search::placeholder {
+  color: var(--text-38);
+}
+
+.gob-tgrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: 0;
+  padding-bottom: var(--space-16);
+}
+
+html.gob-shell.gob-1920 .gob-tgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+}
+
+.gob-tcard {
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  overflow: clip;
+}
+
+.gob-tcard h2 {
+  margin: 0;
+  padding: var(--space-12) var(--space-12) var(--space-8);
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-87);
+}
+
+.gob-tcard h2 em {
+  margin-left: var(--space-10);
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
+}
+
+.gob-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+  color: var(--text-100);
+}
+
+.gob-tbl th,
+.gob-tbl td {
+  padding: var(--space-8) var(--space-8);
+  text-align: right;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.gob-tbl th {
+  position: sticky;
+  top: var(--gob-stick-top);
+  z-index: var(--z-sticky);
+  background: var(--surface-th-top);
+  color: var(--text-60);
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-6);
+}
+
+.gob-tbl th.team,
+.gob-tbl td.team,
+.gob-tbl th.left,
+.gob-tbl td.left {
+  text-align: left;
+}
+
+.gob-tbl tbody tr:nth-child(even) td {
+  background-color: var(--white-2);
+}
+
+.gob-tbl thead tr th.gshade,
+.gob-tbl tbody tr td.gshade,
+.gob-tbl tbody tr th.gshade {
+  background-color: var(--group-shade);
+}
+
+.gob-tbl tbody tr.me td,
+.gob-tbl tbody tr.is-user td {
+  background-color: #1c2a52;
+}
+
+.gob-tbl th.s {
+  cursor: pointer;
+}
+
+.gob-tbl th.s::after {
+  content: "";
+  display: inline-block;
+  margin-left: 4px;
+  border: 3px solid transparent;
+  border-top-color: var(--text-38);
+  vertical-align: middle;
+}
+
+.gob-tbl th.s.asc::after {
+  border-top-color: transparent;
+  border-bottom-color: var(--text-100);
+  transform: translateY(-2px);
+}
+
+.gob-tbl th.s.desc::after {
+  border-top-color: var(--text-100);
+}
+
+.gob-tbl th.on {
+  box-shadow: inset 0 -2px 0 var(--text-60);
+}
+
+.gob-tbl td.on,
+.gob-tbl th.on {
+  background-image: linear-gradient(var(--white-12), var(--white-12));
+}
+
+.gob-tbl tr.gob-groups th {
+  height: var(--dsz-22);
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-10);
+  color: var(--text-38);
+  text-align: center;
+  background: var(--surface-th-top);
+  border-bottom: 1px solid var(--line);
+}
+
+.gob-tbl tr.gob-rep th {
+  position: static;
+  background: var(--surface-th-bottom);
+}
+
+.gob-team,
+.gob-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-100);
+  text-decoration: none;
+}
+
+.gob-team img,
+.gob-next img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex: none;
+}
+
+.gob-diff {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-8);
+}
+
+.gob-diff i {
+  position: relative;
+  display: inline-block;
+  width: var(--dsz-40);
+  height: var(--dsz-6);
+  border-radius: var(--radius-2);
+  background: var(--white-4);
+  flex: none;
+}
+
+.gob-diff i::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--white-25);
+}
+
+.gob-diff i::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: calc(var(--v, 0) * 50%);
+  border-radius: var(--radius-2);
+  background: var(--white-55);
+}
+
+.gob-diff i.neg::after {
+  left: auto;
+  right: 50%;
+  background: var(--white-25);
+}
+
+.gob-diff > span {
+  display: inline-block;
+  min-width: 4.2ch;
+  text-align: right;
+}
+
+.gob-diff.neg > span {
+  color: var(--text-60);
+}
+
+.gob-xs {
+  overflow-x: auto;
+  overflow-y: visible;
+  max-width: 100%;
+}
+
+.gob-xs .gob-tbl {
+  width: max-content;
+  min-width: 1760px;
+}
+
+.gob-xs .gob-tbl th {
+  position: static;
+  top: auto;
+}
+
+.gob-xs .gob-tbl th.pin,
+.gob-xs .gob-tbl td.pin {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.gob-xs .gob-tbl th.pin,
+.gob-xs .gob-tbl tr:not(.me):not(.is-user) td.pin {
+  background-color: var(--surface-1);
+}
+
+.gob-xs.can-l {
+  box-shadow: inset 16px 0 14px -12px rgba(0, 0, 0, 0.65);
+}
+
+.gob-xs.can-r {
+  box-shadow: inset -16px 0 14px -12px rgba(0, 0, 0, 0.65);
+}
+
+.gob-xs.can-l.can-r {
+  box-shadow:
+    inset 16px 0 14px -12px rgba(0, 0, 0, 0.65),
+    inset -16px 0 14px -12px rgba(0, 0, 0, 0.65);
+}
+
+.gob-ldr {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dsp-12);
+  padding-bottom: var(--space-16);
+}
+
+.gob-ldb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  padding: var(--space-12);
+}
+
+.gob-ldb .card-h h3 {
+  margin: 0;
+}
+
+.gob-ldb .cap,
+.gob-full .cap {
+  margin: 0;
+  color: var(--text-38);
+  font: var(--fw-regular) var(--fs-11)/1.3 var(--font-body);
+}
+
+.gob-ldb .ldb-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--dsp-10);
+  padding: var(--dsp-8) var(--dsp-10);
+  border-radius: var(--radius-10);
+  background: var(--white-3);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.gob-ldb .av {
+  width: 36px;
+  height: 36px;
+  font-size: var(--fs-13);
+}
+
+.gob-ldb .ldb-id {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.gob-ldb .ldb-id .nm {
+  font-size: var(--fs-14);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gob-ldb .ldb-id > span {
+  font-size: var(--fs-11);
+  color: var(--text-60);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gob-ldb .ldb-v {
+  font: var(--fw-bold) var(--fs-32)/0.9 var(--font-display);
+  color: var(--text-100);
+  white-space: nowrap;
+}
+
+.gob-ldb .ldb-v em {
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: var(--tracking-6);
+  color: var(--text-60);
+  margin-left: 3px;
+}
+
+.gob-ldb .ldb-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.gob-ldb .ldb-r {
+  display: grid;
+  grid-template-columns: var(--dsz-18) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--dsp-8);
+  height: var(--dsz-28);
+  padding: 0 var(--dsp-8);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-12);
+}
+
+.gob-ldb .ldb-r:first-child {
+  border-top: 0;
+}
+
+.gob-ldb .ldb-r > span:first-child {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  color: var(--text-38);
+}
+
+.gob-ldb .ldb-n {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.gob-ldb .ldb-n .nm {
+  font-weight: var(--fw-medium);
+  color: var(--text-87);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gob-ldb .ldb-n em {
+  font-style: normal;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-6);
+  color: var(--text-38);
+}
+
+.gob-ldb .ldb-r b {
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  color: var(--text-87);
+}
+
+.gob-ldb .ldb-top.me,
+.gob-ldb .ldb-r.me,
+.gob-ldb .ldb-top.is-user,
+.gob-ldb .ldb-r.is-user,
+.gob-full tr.me td {
+  background: #1c2a52;
+}
+
+.gob-ldb .ldb-r.me {
+  border-radius: 6px;
+  border-top-color: transparent;
+}
+
+.gob-ldb .ldb-top.me {
+  border-radius: var(--radius-10);
+}
+
+.gob-ldb .full,
+.gob-board {
+  align-self: flex-end;
+  margin-top: var(--space-4);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-60);
+  cursor: pointer;
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+.gob-full {
+  padding-bottom: var(--space-16);
+}
+
+.gob-empty {
+  padding: var(--space-16);
+  color: var(--text-60);
+}
+
+.gob-view-skel-bar,
+.gob-view-skel-row {
+  animation: gob-skel var(--dur-skeleton) ease-in-out infinite;
+}
+
+@keyframes gob-skel {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gob-view-skel-bar,
+  .gob-view-skel-row {
+    animation: none;
+  }
+}

@@ -174,7 +174,7 @@ test('rankings opens in place, stays cached, and restores history', async ({ pag
     await openFcc(page, true);
     const before = await docStamp(page);
     await mouseClick(page, '[data-gob-section="league"]');
-    await expect(page.locator('#standings-tab.tab-content.active')).toBeVisible();
+    await expect(page.locator('#standings-view.tab-content.active')).toBeVisible();
     const leagueIdx = await page.evaluate(() => history.state && history.state.gobIdx);
 
     let ccHits = [];
@@ -201,7 +201,7 @@ test('rankings opens in place, stays cached, and restores history', async ({ pag
 
     ccHits = [];
     await mouseClick(page, stab(page, 'Standings'));
-    await expect(page.locator('#standings-tab.tab-content.active')).toBeVisible();
+    await expect(page.locator('#standings-view.tab-content.active')).toBeVisible();
     expect(ccHits, 'standings refetches command center').toEqual([]);
     expect(await docStamp(page)).toEqual(after);
 

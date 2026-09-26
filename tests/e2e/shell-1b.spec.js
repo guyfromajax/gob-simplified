@@ -242,9 +242,9 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     ['prep', 'Game Plan', 'game-plan-tab'],
     ['prep', 'Playbooks', 'playbooks-tab'],
     ['prep', 'Scouting Report', 'coaches-tab'],
-    ['league', 'Standings', 'standings-tab'],
-    ['league', 'Leaders', 'awards-tab'],
-    ['league', 'Team Stats', 'fcc-team-stats-summary-tab'],
+    ['league', 'Standings', 'standings-view'],
+    ['league', 'Leaders', 'leaders-view'],
+    ['league', 'Team Stats', 'team-stats-view'],
     ['news', 'News', 'press-tab'],
   ];
   for (const row of panels) {
@@ -350,7 +350,7 @@ test('office team league back returns to team then office', async ({ page }) => 
   await mouseClick(page, '[data-gob-section="team"]');
   await expect(page.locator('#roster-tab.tab-content.active')).toBeVisible();
   await mouseClick(page, '[data-gob-section="league"]');
-  await expect(page.locator('#standings-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#standings-view.tab-content.active')).toBeVisible();
   await page.goBack();
   await expect(page.locator('#roster-tab.tab-content.active')).toBeVisible();
   await expect(page.locator('[data-gob-section="team"]')).toHaveClass(/on/);

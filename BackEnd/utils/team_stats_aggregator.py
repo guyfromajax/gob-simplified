@@ -320,9 +320,35 @@ def aggregate_team_stats_from_players(
             log_func(f"🔍 [{collection_type.upper()}_TEAM_STATS] Team {team_name}: "
                     f"PTS={stats.get('PTS')}, REB={stats.get('REB')}, AST={stats.get('AST')}")
 
+        attach_rate_fields(stats)
         output.append({"team": team_name, "team_id": team_id_str, "stats": stats})
 
     return output
+
+
+def attach_rate_fields(stats: dict) -> dict:
+    """Made/attempt rates as percents. Null when there are no attempts."""
+    pairs = (
+        ("FGM", "FGA", "FG_PCT"),
+        ("3PTM", "3PTA", "TP_PCT"),
+        ("FTM", "FTA", "FT_PCT"),
+        ("SCR_S", "SCR_A", "SCR_PCT"),
+        ("DEF_S", "DEF_A", "DEF_PCT"),
+    )
+    for made_key, att_key, out_key in pairs:
+        try:
+            attempts = float(stats.get(att_key) or 0)
+        except (TypeError, ValueError):
+            attempts = 0
+        if attempts <= 0:
+            stats[out_key] = None
+            continue
+        try:
+            made = float(stats.get(made_key) or 0)
+        except (TypeError, ValueError):
+            made = 0
+        stats[out_key] = round(made / attempts * 100, 1)
+    return stats
 
 
 def resolve_team_name(team_id_str: str, teams_collection: Collection, collection_type: str = 'tournament') -> str:

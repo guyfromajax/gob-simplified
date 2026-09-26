@@ -488,6 +488,37 @@ def _build_next_matchup_map(
     return matchup_map
 
 
+def _build_next_opponent_detail(franchise_doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Opponent id, site, and week for each team's next game. No day or time."""
+    week = int(franchise_doc.get("week", 1) or 1)
+    detail: dict[str, dict[str, Any]] = {}
+    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+    eos_has_state = bool(
+        franchise_doc.get("conference_tournaments")
+        or franchise_doc.get("region_tournaments")
+        or franchise_doc.get("national_tournament")
+    )
+    pairs: list[tuple[Any, Any]] = []
+    if eos_tournament_active and eos_has_state and week in ft.EOS_WEEKS:
+        for game in ft.get_eos_week_games(franchise_doc, week):
+            away_id = game.get("away_id")
+            home_id = game.get("home_id")
+            if away_id and home_id:
+                pairs.append((away_id, home_id))
+    else:
+        schedule = franchise_doc.get("schedule") or []
+        next_games = schedule[week - 1] if week - 1 < len(schedule) else []
+        for game in next_games:
+            if isinstance(game, (list, tuple)) and len(game) >= 2:
+                pairs.append((game[0], game[1]))
+    for away_id, home_id in pairs:
+        away = str(away_id)
+        home = str(home_id)
+        detail[away] = {"next_opponent_id": home, "next_week": week, "next_site": "at"}
+        detail[home] = {"next_opponent_id": away, "next_week": week, "next_site": "vs"}
+    return detail
+
+
 def _build_previous_week_result_map(
     franchise_doc: dict[str, Any],
     team_name_by_id: dict[str, str],
@@ -10888,11 +10919,14 @@ def standings(
         week = franchise_doc.get("week", 1)
         from BackEnd.utils.franchise_standings import (
             calculate_franchise_standings,
+            current_streaks,
             standings_display_sort_key,
         )
         franchise_results = franchise_doc.get("results", {})
         team_list = _ftd_team_list_for_franchise(franchise_id)
         standings_data = calculate_franchise_standings(franchise_results, team_list)
+        streaks = current_streaks(franchise_results)
+        next_detail = _build_next_opponent_detail(franchise_doc)
         # natl_rank is display data for the next-opponent label, not the standings order.
         fid = ObjectId(franchise_id)
         ftd_rank_docs = list(franchise_team_data_collection.find(
@@ -10908,8 +10942,9 @@ def standings(
         matchup_map = _build_next_matchup_map(franchise_doc, display_name_by_id, natl_rank_by_team_id)
         teams = list(db.teams.find(
             {"_id": {"$in": team_ids_list}},
-            {"name": 1, "_id": 1, "region": 1, "conference": 1}
+            {"name": 1, "_id": 1, "region": 1, "conference": 1, "primary_color": 1}
         ))
+        name_by_id = {str(t["_id"]): t.get("name", "") for t in teams}
         output = []
         for t in teams:
             team_id_str = str(t["_id"])
@@ -10923,11 +10958,14 @@ def standings(
             differential = pf - pa
             natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
             core_name = t.get("name", "")
+            upcoming = next_detail.get(team_id_str) or {}
+            opponent_id = upcoming.get("next_opponent_id") or ""
             output.append({
                 "team_id": team_id_str,
                 # Identity = core; chrome = display_name (never overwrite name).
                 "name": core_name,
                 "display_name": display_name_by_id.get(team_id_str, core_name),
+                "primary_color": t.get("primary_color") or "",
                 "region": t.get("region") or "",
                 "conference": t.get("conference"),
                 "W": wins,
@@ -10936,29 +10974,46 @@ def standings(
                 "PF": pf,
                 "PA": pa,
                 "differential": differential,
+                "streak": streaks.get(team_id_str, ""),
                 "natl_rank": natl_rank,
-                "next": matchup_map.get(team_id_str, "")
+                "next": matchup_map.get(team_id_str, ""),
+                "next_opponent_id": opponent_id,
+                "next_opponent_name": name_by_id.get(opponent_id, "") if opponent_id else "",
+                "next_week": upcoming.get("next_week"),
+                "next_site": upcoming.get("next_site") or "",
             })
         # Same order the Standings page presents: wins desc, then point differential desc.
         output.sort(key=standings_display_sort_key)
 
-        # Optional: return only user + sister conference (lighter payload for FCC Standings tab)
+        # Optional scopes filter the already-sorted list. Order inside a scope
+        # is the same standings_display_sort_key order; nothing re-sorts.
         result = {"standings": output}
-        if scope == "user_region" and team_id:
+        user_conf = None
+        user_region_value = None
+        if team_id:
             try:
                 tid = ObjectId(team_id) if ObjectId.is_valid(team_id) else None
                 if tid:
-                    user_team_doc = db.teams.find_one({"_id": tid}, {"conference": 1})
-                    user_conf = user_team_doc.get("conference") if user_team_doc else None
-                    if user_conf is not None and isinstance(user_conf, int):
-                        sister = _sister_conference(user_conf)
-                        allowed = {user_conf, sister}
-                        output_filtered = [x for x in output if x.get("conference") in allowed]
-                        result["standings"] = output_filtered
+                    user_team_doc = db.teams.find_one({"_id": tid}, {"conference": 1, "region": 1})
+                    if user_team_doc:
+                        user_conf = user_team_doc.get("conference")
+                        user_region_value = user_team_doc.get("region") or ""
                         result["user_conference"] = user_conf
-                        result["sister_conference"] = sister
+                        result["user_region"] = user_region_value
             except Exception as e:
-                logger.warning("standings scope=user_region failed: %s", e)
+                logger.warning("standings user team lookup failed: %s", e)
+        if scope == "user_region" and isinstance(user_conf, int):
+            sister = _sister_conference(user_conf)
+            result["standings"] = [x for x in output if x.get("conference") in {user_conf, sister}]
+            result["sister_conference"] = sister
+        elif scope == "conference" and user_conf is not None:
+            result["standings"] = [x for x in output if x.get("conference") == user_conf]
+        elif scope == "region" and user_region_value:
+            region_key = str(user_region_value).strip().upper()
+            result["standings"] = [
+                x for x in output
+                if str(x.get("region") or "").strip().upper() == region_key
+            ]
 
         if region:
             region_normalized = str(region).strip().upper()
@@ -11025,6 +11080,7 @@ def get_leaders(
     limit: int = 10,
     allowed_team_ids: Optional[set[str]] = None,
     allowed_team_names: Optional[set[str]] = None,
+    basis: Optional[str] = None,
 ):
     """Return the top players for a given stat within a franchise.
 
@@ -11047,6 +11103,7 @@ def get_leaders(
         if doc:
             results = doc.get("results") or {}
     rows = load_lines(str(franchise_id))
+    leader_basis = basis if basis in {"per_game", "totals"} else None
     return rank_lines(
         rows,
         scope=scope,
@@ -11055,6 +11112,7 @@ def get_leaders(
         team_games=team_games_from_results(results),
         allowed_team_ids=allowed_team_ids,
         allowed_team_names=allowed_team_names,
+        basis=leader_basis,
     )
 
 
@@ -11065,6 +11123,7 @@ def leaders(
     scope: str = "season",
     limit: int = 10,
     view_scope: str = "national",
+    basis: Optional[str] = None,
 ):
     from BackEnd.utils.leaders_snapshot import fresh_lines, lines_for_request, rank_lines
 
@@ -11114,6 +11173,7 @@ def leaders(
                 team_docs = list(db.teams.find(query, {"_id": 1, "name": 1}))
                 allowed_team_ids = {str(team["_id"]) for team in team_docs}
                 allowed_team_names = {team.get("name", "") for team in team_docs if team.get("name")}
+    leader_basis = basis if basis in {"per_game", "totals"} else None
     result: dict[str, list[dict[str, Any]]] = {}
     for cat in categories:
         top = rank_lines(
@@ -11124,16 +11184,23 @@ def leaders(
             team_games=team_games,
             allowed_team_ids=allowed_team_ids,
             allowed_team_names=allowed_team_names,
+            basis=leader_basis,
         )
-        result[cat] = [
-            {
+        result[cat] = []
+        for p in top:
+            entry = {
                 "player_id": p.get("player_id"),
                 "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
                 "team": p.get("team"),
+                "team_id": p.get("team_id") or "",
+                "position": p.get("position") or "",
+                "year": p.get("year") or "",
                 "value": p.get("value", 0),
             }
-            for p in top
-        ]
+            caption = p.get("qualification_caption")
+            if caption:
+                entry["qualification_caption"] = caption
+            result[cat].append(entry)
     all_team_names = set()
     for cat in categories:
         for entry in result[cat]:

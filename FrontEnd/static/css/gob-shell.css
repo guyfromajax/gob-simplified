@@ -288,9 +288,10 @@ html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i {
 }
 
 /* Collapsed labels have a zero box inside the face, so a glyph cannot
-   paint past the 64px edge. max-width snaps open immediately on hover
-   (still invisible) and snaps shut only after the collapse fade. Opacity
-   is the fade, on the same clock as the face width. */
+   paint past the 64px edge. max-width stays zero until the face starts
+   opening: an immediate snap overflowed the still-collapsed face, and the
+   rail's view-transition snapshot (the nav is overflow:visible) could
+   keep that glyph. Opacity is the fade, on the same clock as the face. */
 html.gob-shell.gob-1280 .rail-i > .rail-l {
   display: inline;
   position: absolute;
@@ -313,7 +314,7 @@ html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i > .rail-l {
   max-width: 148px;
   opacity: 1;
   transition-duration: 0s, var(--dur-rail);
-  transition-delay: 0s, 400ms;
+  transition-delay: 400ms, 400ms;
 }
 
 html.gob-shell.gob-1280 .rail-i > .inbox-badge {

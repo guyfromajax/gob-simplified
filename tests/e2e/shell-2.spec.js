@@ -657,7 +657,7 @@ test('rankings sub-tab replaces in place and back leaves League', async ({ page 
   const afterRank = await page.evaluate(() => (history.state && history.state.gobIdx));
   expect(afterRank).toBe(mid);
   await stab(page, 'Standings').click();
-  await expect(page.locator('#standings-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#standings-view.tab-content.active')).toBeVisible();
   await expect(page.locator('#gob-subtabs .stab.on')).toHaveText('Standings');
   const after = await page.evaluate(() => (history.state && history.state.gobIdx));
   expect(after).toBe(mid);

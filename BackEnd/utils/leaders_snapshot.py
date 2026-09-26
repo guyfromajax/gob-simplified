@@ -71,6 +71,9 @@ def leader_projection() -> dict[str, int]:
         "meta.last_name": 1,
         "meta.team": 1,
         "meta.team_id": 1,
+        "meta.position": 1,
+        "meta.year": 1,
+        "meta.yr": 1,
     }
     for scope in ("season", "career"):
         for key in STAT_KEYS:
@@ -86,6 +89,16 @@ def team_games_from_results(results: dict | None) -> dict[str, int]:
         str(team_id): team_games_from_record(row.get("W"), row.get("L"))
         for team_id, row in standings.items()
     }
+
+
+def _display_year(raw: Any) -> str:
+    """Class year as the UI abbreviation. Empty stays empty."""
+    if raw is None or str(raw).strip() in ("", "--"):
+        return ""
+    from BackEnd.utils.player_year import format_player_year_abbrev
+
+    text = format_player_year_abbrev(raw)
+    return "" if text == "--" else text
 
 
 def _stat_block(raw: dict | None) -> list[int | float]:
@@ -118,6 +131,8 @@ def lines_from_player_docs(docs) -> list[list[Any]]:
                 str(meta.get("team") or ""),
                 *_stat_block(doc.get("season")),
                 *_stat_block(doc.get("career")),
+                meta.get("position") or "",
+                _display_year(meta.get("year") or meta.get("yr")),
             ]
         )
     return rows
@@ -133,19 +148,24 @@ def _line_fields() -> list[str]:
     ]
     for scope in ("season", "career"):
         fields.extend(f"{scope}.{key}" for key in STAT_KEYS)
+    fields.extend(["meta.position", "meta.year", "meta.yr"])
     return fields
 
 
 def _lines_from_tuples(raw_rows: list[tuple]) -> list[list[Any]]:
     season_at = 5
     career_at = season_at + len(STAT_KEYS)
+    tail_at = career_at + len(STAT_KEYS)
     lines: list[list[Any]] = []
     for raw in raw_rows:
         team = raw[3]
         team_id = raw[4]
         display = team if team is not None else ("" if team_id is None else team_id)
         season = [0 if value is None else value for value in raw[season_at:career_at]]
-        career = [0 if value is None else value for value in raw[career_at:]]
+        career = [0 if value is None else value for value in raw[career_at:tail_at]]
+        position = raw[tail_at] if len(raw) > tail_at else ""
+        year = raw[tail_at + 1] if len(raw) > tail_at + 1 else ""
+        yr = raw[tail_at + 2] if len(raw) > tail_at + 2 else ""
         lines.append(
             [
                 raw[0],
@@ -156,6 +176,8 @@ def _lines_from_tuples(raw_rows: list[tuple]) -> list[list[Any]]:
                 str(team or ""),
                 *season,
                 *career,
+                "" if position is None else str(position),
+                _display_year(year or yr),
             ]
         )
     return lines
@@ -211,6 +233,18 @@ def _in_scope(team_id: str, team_name: str, allowed_team_ids, allowed_team_names
     return False
 
 
+def line_width() -> int:
+    """Identity, both stat blocks, then position and year."""
+    return 6 + (2 * len(STAT_KEYS)) + 2
+
+
+def _identity(row: list[Any]) -> tuple[str, str]:
+    pos_at = 6 + (2 * len(STAT_KEYS))
+    position = row[pos_at] if len(row) > pos_at else ""
+    year = row[pos_at + 1] if len(row) > pos_at + 1 else ""
+    return str(position or ""), str(year or "")
+
+
 def rank_lines(
     rows: list[list[Any]],
     *,
@@ -220,12 +254,29 @@ def rank_lines(
     team_games: dict[str, int],
     allowed_team_ids=None,
     allowed_team_names=None,
+    basis: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Same order and rounding as the old aggregate: value, then volume, stable."""
+    """Same order and rounding as the old aggregate: value, then volume, stable.
+
+    Omitted basis keeps the previous defaults: PTS/REB/AST per game, other
+    counting stats as totals. ``per_game`` divides every counting stat by GP.
+    ``totals`` leaves counting stats as sums. Percentages ignore basis.
+    """
     use_career = str(scope or "season") == "career"
     stat_field = {"TPM": "3PTM", "TPA": "3PTA"}.get(stat, stat)
+    leader_basis = basis if basis in {"per_game", "totals"} else None
+    per_game = stat not in RATE_STATS and (
+        leader_basis == "per_game" or (leader_basis is None and stat in PER_GAME_STATS)
+    )
     offset = 6 + (len(STAT_KEYS) if use_career else 0)
     index = {key: offset + position for position, key in enumerate(STAT_KEYS)}
+    caption = ""
+    if stat in RATE_STATS and not use_career:
+        from BackEnd.constants.leader_qualification import (
+            ATTEMPT_FIELDS,
+            LEADER_QUALIFICATION_FLOORS,
+        )
+        caption = f"min {LEADER_QUALIFICATION_FLOORS[stat]} {ATTEMPT_FIELDS[stat]} per team game"
     ranked: list[tuple[float, float, dict[str, Any]]] = []
     for row in rows:
         team_id = str(row[4] or "")
@@ -233,6 +284,7 @@ def rank_lines(
         scope_name = str(row[5] or "")
         if not _in_scope(team_id, scope_name, allowed_team_ids, allowed_team_names):
             continue
+        position, year = _identity(row)
         gp = float(row[index["GP"]] or 0)
         if stat in RATE_STATS:
             made_key = "FGM" if stat == "FG%" else "DEF_S"
@@ -246,8 +298,10 @@ def rank_lines(
                 continue
             value = (made / attempts) * 100.0 if attempts else 0.0
             tiebreak = attempts
-        elif stat in PER_GAME_STATS:
+        elif per_game:
             if gp <= 0:
+                continue
+            if stat_field not in index:
                 continue
             total = float(row[index[stat_field]] or 0)
             value = total / gp
@@ -258,26 +312,26 @@ def rank_lines(
             else:
                 value = float(row[index[stat_field]] or 0)
             tiebreak = 0.0
-        ranked.append(
-            (
-                value,
-                tiebreak,
-                {
-                    "player_id": row[0],
-                    "first_name": row[1] or "",
-                    "last_name": row[2] or "",
-                    "team": team_name,
-                    "value": value,
-                },
-            )
-        )
+        payload = {
+            "player_id": row[0],
+            "first_name": row[1] or "",
+            "last_name": row[2] or "",
+            "team": team_name,
+            "team_id": team_id,
+            "position": position,
+            "year": year,
+            "value": value,
+        }
+        if caption:
+            payload["qualification_caption"] = caption
+        ranked.append((value, tiebreak, payload))
     # Two stable passes match the SQLite aggregate ($sort value, then volume).
     ranked.sort(key=lambda item: item[1], reverse=True)
     ranked.sort(key=lambda item: item[0], reverse=True)
     chosen = ranked[:limit]
     results: list[dict[str, Any]] = []
     for value, _tiebreak, payload in chosen:
-        if stat in PER_GAME_STATS or stat == "FG%":
+        if per_game or stat == "FG%":
             payload["value"] = round(float(value or 0), 1)
         elif stat == "DEF%":
             payload["value"] = int(round(float(value or 0)))
@@ -339,7 +393,11 @@ def fresh_lines(franchise_id: str, *, week: int, season: int) -> tuple[list[list
         return None
     if _generation(lines) != built:
         return None
-    return list(lines.get("rows") or []), dict(lines.get("team_games") or {})
+    rows = list(lines.get("rows") or [])
+    # A line from before position/year were stored cannot match a live scan.
+    if any(len(row) < line_width() for row in rows):
+        return None
+    return rows, dict(lines.get("team_games") or {})
 
 
 def note_season_stats_written(franchise_id: str | None) -> None:

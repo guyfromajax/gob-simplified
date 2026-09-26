@@ -776,7 +776,7 @@ function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
 function buildTeamLink(t) {
   const teamLink = document.createElement('a');
   const label = standingsTeamLabel(t);
-  teamLink.href = buildFranchiseTeamPageUrl(t.team_id, label, 'standings-tab');
+  teamLink.href = buildFranchiseTeamPageUrl(t.team_id, label, 'standings-view');
   teamLink.setAttribute('data-return', '');
   const rank = Number(t?.natl_rank);
   const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
