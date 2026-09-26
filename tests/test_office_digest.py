@@ -10,7 +10,10 @@ from BackEnd.utils.office_digest import (
     capture_office_week_snapshot,
     last_game_match_query,
     merge_office_snapshot,
+    missing_wire_recruit_ids,
     office_snapshot_payload,
+    recruit_lookup_from_docs,
+    recruiting_wire_digest,
     resolve_advance_mode,
 )
 
@@ -380,6 +383,114 @@ def test_streak_attribute_changes_and_next_game_absences():
     assert digest["next_game"]["site"] == "home"
 
 
+def test_wire_event_detail_uses_the_full_name_and_every_kind():
+    """Names with suffixes, recruits missing from the lean set, and each kind."""
+    hardwood = "hf"
+    nickel = "nb"
+    appalachia = "ap"
+    events = [
+        {
+            "kind": "moved_up", "rank": 2, "recruit_id": "jr",
+            "line": "Brice Monroe Jr moved you to #2",
+        },
+        {
+            "kind": "gained_you", "rank": 3, "recruit_id": "db",
+            "line": "Denton Burch added you at #3 — after the Hardwood Fields win",
+            "cause": {"type": "win", "opponent_team_id": hardwood},
+        },
+        {
+            "kind": "rival_took_your_top", "rank": 2, "recruit_id": "bc",
+            "rival_team_id": nickel, "top_team_id": nickel,
+            "line": "Braeden Coleman moved Nickel Beach to #1 — you're now #2",
+        },
+        {
+            "kind": "moved_down", "rank": 3, "recruit_id": "cn",
+            "line": "Casey Ng moved you down to #3",
+        },
+        {
+            "kind": "dropped_you", "recruit_id": "ad", "top_team_id": nickel,
+            "line": "Ada Drop dropped you — Nickel Beach moved to #1",
+        },
+        {
+            "kind": "displaced", "rank": 1, "recruit_id": "sp", "displaced_team_id": appalachia,
+            "line": "Sam Poe dropped Appalachia — you're still #1",
+        },
+        {
+            "kind": "moved_up", "rank": 1, "recruit_id": "on-record",
+            "recruit": "Brice Monroe Jr", "position": "SG",
+            "line": "Brice Monroe Jr moved you to #1",
+        },
+        {
+            "kind": "moved_up", "rank": 2, "recruit_id": "ghost",
+            "line": "Someone moved you to #2",
+        },
+        {
+            "recruit_id": "strip",
+            "recruit": "Brice Monroe Jr",
+            "line": "Brice Monroe Jr moved you to #2",
+        },
+        {
+            "recruit_id": "jr",
+            "line": "Brice moved you to #2",
+        },
+    ]
+    lookup = {
+        "jr": {"name": "Brice Monroe Jr", "position": "SG"},
+        "db": {"name": "Denton Burch", "position": "PF"},
+        "bc": {"name": "Braeden Coleman", "position": "PG"},
+        "cn": {"name": "Casey Ng", "position": "C"},
+        "ad": {"name": "Ada Drop", "position": "SF"},
+        "sp": {"name": "Sam Poe", "position": "SG"},
+    }
+    wire = recruiting_wire_digest(
+        {"events": events, "counts": {}},
+        lookup,
+        week=10,
+        team_name_map={hardwood: "Hardwood Fields", nickel: "Nickel Beach", appalachia: "Appalachia"},
+    )
+    by_id = {event["recruit_id"]: event for event in wire["events"]}
+    junior = wire["events"][0]
+    assert junior["recruit"] == "Brice Monroe Jr"
+    assert junior["event_text"] == "Brice Monroe Jr moved you to #2"
+    assert junior["event_detail"] == "Moved you to #2"
+    assert "Brice Monroe Jr" not in junior["event_detail"]
+    assert by_id["db"]["event_detail"] == "Added you at #3 — after the Hardwood Fields win"
+    assert by_id["bc"]["event_detail"] == "Moved Nickel Beach to #1 — you're now #2"
+    assert by_id["cn"]["event_detail"] == "Moved you down to #3"
+    assert by_id["ad"]["event_detail"] == "Dropped you — Nickel Beach moved to #1"
+    assert by_id["sp"]["event_detail"] == "Dropped Appalachia — you're still #1"
+    recorded = [event for event in wire["events"] if event["recruit_id"] == "on-record"][0]
+    assert recorded["recruit"] == "Brice Monroe Jr"
+    assert recorded["position"] == "SG"
+    assert recorded["event_detail"] == "Moved you to #1"
+    ghost = by_id["ghost"]
+    assert ghost["recruit"] is None
+    assert ghost["position"] is None
+    assert ghost["event_text"] == "Someone moved you to #2"
+    assert ghost["event_detail"] == "Moved you to #2"
+    stripped = [event for event in wire["events"] if event["recruit_id"] == "strip"][0]
+    assert stripped["event_text"] == "Brice Monroe Jr moved you to #2"
+    assert stripped["event_detail"] == "Moved you to #2"
+    partial = wire["events"][-1]
+    assert partial["recruit"] == "Brice Monroe Jr"
+    assert partial["event_text"] == "Brice moved you to #2"
+    assert partial["event_detail"] is None
+    assert missing_wire_recruit_ids(events, lookup) == ["on-record", "ghost", "strip"]
+
+
+def test_recruit_lookup_position_comes_from_ratings_or_a_stored_position():
+    lookup = recruit_lookup_from_docs(
+        [
+            {"recruit_id": "rated", "name": "  Brice Monroe Jr  ", "position_ratings": {"SG": 40, "PG": 80}},
+            {"recruit_id": "plain", "name": "Plain", "position": "PF"},
+        ],
+        USER,
+    )
+    assert lookup["rated"]["name"] == "Brice Monroe Jr"
+    assert lookup["rated"]["position"] == "PG"
+    assert lookup["plain"]["position"] == "PF"
+
+
 def test_attitude_bucket_edges():
     attitude = attitude_counts([19, 20, 39, 40, 59, 60, 79, 80, None, "nope"])
     by_id = {bucket["id"]: bucket["count"] for bucket in attitude["buckets"]}
@@ -406,10 +517,15 @@ def test_recruiting_wire_and_todos_follow_the_advance_ladder():
     assert wire["events"][0]["stars"] is None
     assert wire["events"][0]["filmed_grade"] is None
     assert wire["events"][0]["event_text"] is None
+    assert wire["events"][0]["event_detail"] == "Moved you to #4"
+    assert wire["events"][0]["recruit"] == "Ada"
     assert wire["events"][0]["direction"] == "up"
     assert wire["events"][0]["position"] == "PG"
     assert wire["events"][1]["direction"] == "down"
+    assert wire["events"][1]["event_detail"] == "Dropped you"
     assert wire["events"][2]["direction"] is None
+    assert wire["events"][2]["recruit"] is None
+    assert wire["events"][2]["event_detail"] is None
 
     flags = {"week": 19, "cut_required": True, "training_completed": False}
     assert resolve_advance_mode(flags) == "cut-players"

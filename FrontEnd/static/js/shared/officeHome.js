@@ -693,8 +693,16 @@
     return node;
   }
 
+  function wireDetail(event) {
+    if (present(event.event_detail)) return String(event.event_detail);
+    if (present(event.event_text)) return String(event.event_text);
+    return '';
+  }
+
   function wireRow(event, index) {
     if (!event) return null;
+    var detail = wireDetail(event);
+    if (!present(event.recruit) && !detail) return null;
     var url = recruitingHref();
     var row = el('a', 'wr ar-item');
     row.style.setProperty('--i', String(index));
@@ -705,10 +713,8 @@
     var line = el('span', 'wr-1');
     if (present(event.recruit)) line.appendChild(el('span', 'nm', event.recruit));
     if (present(event.position)) line.appendChild(el('span', 'wr-m', event.position));
-    if (line.childNodes.length) body.appendChild(line);
-    if (present(event.event_text)) body.appendChild(el('span', 'wr-2', event.event_text));
-    if (!body.childNodes.length) return null;
-    if (present(event.list_position)) row.appendChild(el('span', 'chip', '#' + event.list_position));
+    body.appendChild(line);
+    body.appendChild(el('span', 'wr-2', detail));
     row.appendChild(body);
     if (event.direction === 'up' || event.direction === 'down') {
       row.appendChild(el('span', 'wr-tag', event.direction === 'up' ? '▲' : '▼'));
@@ -1086,21 +1092,30 @@
     return !!(main && main.scrollHeight - main.clientHeight > 1);
   }
 
+  function standingsOverflow(card) {
+    if (mainPastFold()) return true;
+    var col = card.closest('.office-col');
+    var last = col && col.lastElementChild;
+    if (last && last.getBoundingClientRect().bottom > foldBottom() + 1) return true;
+    var tight = document.documentElement.classList.contains('gob-1280');
+    return !!(tight && col && col.scrollHeight - col.clientHeight > 1);
+  }
+
   function fitStandings(root) {
     var card = root.querySelector('.office-st');
-    if (!card || !card._rows || card._rows.length <= 3) return;
+    if (!card || !card._rows || card._rows.length <= 2) return;
     var rows = card._rows;
     if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, rows, false);
-    if (!mainPastFold()) return;
+    if (!standingsOverflow(card)) return;
     var size = rows.length - 1;
     while (size >= 5) {
       paintStandingsRows(card, standingsWindow(rows, size), true);
-      if (!mainPastFold()) return;
+      if (!standingsOverflow(card)) return;
       size -= 1;
     }
-    while (size >= 3 && mainPastFold()) {
+    while (size >= 2 && standingsOverflow(card)) {
       paintStandingsRows(card, standingsWindow(rows, size), true);
-      if (!mainPastFold()) return;
+      if (!standingsOverflow(card)) return;
       size -= 1;
     }
   }

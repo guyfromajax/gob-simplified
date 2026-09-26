@@ -229,6 +229,69 @@ def render_lean_event(
     return f"{head} — {cause}" if cause else head
 
 
+def lean_event_detail(event: dict[str, Any], name_of) -> str | None:
+    """The update sentence without the recruit's name.
+
+    Built from ``kind`` and the structured fields. Returns None when a team
+    name the sentence needs cannot be resolved, so the caller can fall back
+    to stripping a known name off the stored line.
+    """
+    kind = event.get("kind")
+    rank = event.get("rank")
+    resolve = name_of or (lambda _team_id: "")
+    cause_raw = event.get("cause") if isinstance(event.get("cause"), dict) else None
+    if (
+        cause_raw
+        and cause_raw.get("type") in ("win", "quality_loss")
+        and cause_raw.get("opponent_team_id")
+        and not resolve(cause_raw.get("opponent_team_id"))
+    ):
+        return None
+    cause = _cause_clause(cause_raw, resolve)
+
+    if kind == GAINED_YOU:
+        if rank is None:
+            return None
+        head = f"Added you at #{rank}"
+    elif kind == DROPPED_YOU:
+        top_id = event.get("top_team_id")
+        top = resolve(top_id) if top_id else ""
+        if top_id and not top:
+            return None
+        if top:
+            return f"Dropped you — {top} moved to #1"
+        head = "Dropped you"
+    elif kind == MOVED_UP:
+        if rank is None:
+            return None
+        head = f"Moved you to #{rank}"
+    elif kind == MOVED_DOWN:
+        if rank is None:
+            return None
+        head = f"Moved you down to #{rank}"
+    elif kind == RIVAL_TOOK_YOUR_TOP:
+        rival_id = event.get("rival_team_id") or event.get("top_team_id")
+        rival = resolve(rival_id) if rival_id else ""
+        if rival_id and not rival:
+            return None
+        if rival and rank is not None:
+            return f"Moved {rival} to #1 — you're now #{rank}"
+        if rank is None:
+            return None
+        head = f"Moved you down to #{rank}"
+    elif kind == DISPLACED:
+        other = resolve(event.get("displaced_team_id"))
+        if not other:
+            return None
+        if rank:
+            return f"Dropped {other} — you're still #{rank}"
+        head = f"Dropped {other}"
+    else:
+        return None
+
+    return f"{head} — {cause}" if cause else head
+
+
 def summarize_kinds(events: Iterable[dict[str, Any]]) -> dict[str, int]:
     """Per-kind counts, for the write-time diagnostic log."""
     counts: dict[str, int] = {}

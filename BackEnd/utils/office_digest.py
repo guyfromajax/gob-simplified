@@ -16,6 +16,7 @@ from BackEnd.utils.franchise_standings import (
     calculate_franchise_standings,
     standings_display_sort_key,
 )
+from BackEnd.utils.recruiting_lean_events import lean_event_detail
 from BackEnd.utils.rt_display import rt_letter_grade
 
 # Same field the rank/prestige writer uses. Duplicated as a string so this
@@ -747,14 +748,88 @@ def _best_rt_letter(position_ratings: Any) -> Optional[str]:
     return None if letter == "--" else letter
 
 
+def _clean_text(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    return text or None
+
+
+def _record_recruit_name(event: Mapping[str, Any]) -> Optional[str]:
+    """Display name stored on the event itself. The copy placeholder is not a name."""
+    for key in ("recruit", "recruit_name", "name"):
+        text = _clean_text(event.get(key))
+        if text and text.lower() != "a recruit":
+            return text
+    return None
+
+
+def _record_position(event: Mapping[str, Any]) -> Optional[str]:
+    text = _clean_text(event.get("position"))
+    if not text or text.isdigit():
+        return None
+    return text
+
+
+def missing_wire_recruit_ids(
+    events: Any,
+    recruit_lookup: Mapping[str, Mapping[str, Any]] | None,
+) -> list[str]:
+    """Recruit ids on the wire that are not in the loaded lean-recruit set.
+
+    One list, in first-seen order, for a single projected lookup.
+    """
+    lookup = recruit_lookup or {}
+    missing: list[str] = []
+    seen: set[str] = set()
+    for event in events or []:
+        if not isinstance(event, dict):
+            continue
+        recruit_id = str(event.get("recruit_id") or "")
+        if not recruit_id or recruit_id in lookup or recruit_id in seen:
+            continue
+        seen.add(recruit_id)
+        missing.append(recruit_id)
+    return missing
+
+
+def _strip_leading_name(line: Any, name: Optional[str]) -> Optional[str]:
+    """Drop a leading name only when the whole name matches, then capitalise."""
+    text = _clean_text(line)
+    if not text or not name:
+        return None
+    prefix = name + " "
+    if not text.startswith(prefix):
+        return None
+    rest = text[len(prefix):].strip()
+    if not rest:
+        return None
+    return rest[0].upper() + rest[1:]
+
+
+def _event_detail(event: Mapping[str, Any], recruit_name: Optional[str], name_of) -> Optional[str]:
+    structured = lean_event_detail(dict(event), name_of)
+    if structured:
+        return structured
+    return _strip_leading_name(event.get("line"), recruit_name)
+
+
 def recruiting_wire_digest(
     wire: Mapping[str, Any] | None,
     recruit_lookup: Mapping[str, Mapping[str, Any]] | None,
     *,
     week: int,
+    team_name_map: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     wire = wire or {}
     lookup = recruit_lookup or {}
+    names = team_name_map or {}
+
+    def name_of(team_id: Any) -> str:
+        if team_id is None:
+            return ""
+        return str(names.get(str(team_id)) or "")
+
     counts = wire.get("counts") if isinstance(wire.get("counts"), dict) else {}
     moved = _as_int(counts.get("moved"), 0) or 0
     dropped = _as_int(counts.get("dropped"), 0) or 0
@@ -769,14 +844,18 @@ def recruiting_wire_digest(
         recruit_id = str(event.get("recruit_id") or "") or None
         recruit = lookup.get(recruit_id or "") or {}
         kind = str(event.get("kind") or "")
+        name = _clean_text(recruit.get("name")) or _record_recruit_name(event)
+        position = _clean_text(recruit.get("position")) or _record_position(event)
+        line = event.get("line") or None
         events.append({
             "recruit_id": recruit_id,
-            "recruit": recruit.get("name") or event.get("recruit") or None,
-            "position": recruit.get("position"),
+            "recruit": name,
+            "position": position,
             "stars": None,
             "filmed_grade": None,
             "event_type": kind or None,
-            "event_text": event.get("line") or None,
+            "event_text": line,
+            "event_detail": _event_detail(event, name, name_of),
             "list_position": event.get("rank"),
             "direction": _direction(kind),
         })
@@ -1096,7 +1175,12 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
         next_game["conference_size"] = opponent_size
 
     state = office_state(week=week, eos_tournament_active=bool(flags.get("eos_tournament_active")), user_won=user_won)
-    wire = recruiting_wire_digest(ctx.get("recruiting_wire"), ctx.get("recruit_lookup"), week=week)
+    wire = recruiting_wire_digest(
+        ctx.get("recruiting_wire"),
+        ctx.get("recruit_lookup"),
+        week=week,
+        team_name_map=ctx.get("team_name_map") if isinstance(ctx.get("team_name_map"), dict) else None,
+    )
     signing = signing_day_digest(
         week=week,
         orders=ctx.get("signing_orders"),
@@ -1165,9 +1249,10 @@ def recruit_lookup_from_docs(recruits: Any, user_team_id: str) -> dict[str, dict
                 lean_rank = int(slot)
                 break
         ratings = recruit.get("position_ratings")
+        position = _best_position(ratings) or _clean_text(recruit.get("position"))
         lookup[rid] = {
-            "name": recruit.get("name"),
-            "position": _best_position(ratings),
+            "name": _clean_text(recruit.get("name")),
+            "position": position,
             "rt": _best_rt_letter(ratings),
             "lean_rank": lean_rank,
         }

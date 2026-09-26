@@ -49,7 +49,7 @@
   height: auto;
   align-items: baseline;
 }
-.gob .office .office-h { min-height: var(--dsz-22); }
+.gob .office .office-h { min-height: var(--dsz-22); margin-bottom: 0; }
 .gob.gob-1280 .office .office-h { min-height: 20px; }
 .gob .office .office-h h2,
 .gob .office .office-h span {
@@ -61,7 +61,7 @@
 }
 
 .gob.gob-1280 .office { gap: 2px; }
-.gob.gob-1280 .office-col { gap: 0; }
+html.gob-shell.gob-office .office-col { gap: var(--dsp-12); }
 .gob.gob-1280 .office .card { padding-top: 8px; padding-bottom: 8px; }
 .gob.gob-1280 .office-res { gap: 6px; }
 .gob.gob-1280 .office .rs-pts { font-size: var(--fs-28); }
@@ -228,6 +228,15 @@ html.gob-shell.gob-office .office {
   color: var(--text-60);
 }
 .gob .office-wire > .wr:first-child { border-top: 0; }
+html.gob-shell.gob-office .office-wire .wr,
+html.gob-shell.gob-office.gob-1920 .office-wire .wr {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+html.gob-shell.gob-office .office-wire .wr-2 {
+  display: block;
+  min-height: calc(var(--fs-12) * 1.35);
+  line-height: 1.35;
+}
 
 .gob .mv-p {
   flex-wrap: wrap;

@@ -9704,7 +9704,11 @@ def _build_office_digest_for_command_center(
     last_game: Optional[dict[str, Any]],
 ) -> dict[str, Any]:
     """Assemble office_digest from data this request already loaded, plus one EM projection."""
-    from BackEnd.utils.office_digest import build_office_digest, recruit_lookup_from_docs
+    from BackEnd.utils.office_digest import (
+        build_office_digest,
+        missing_wire_recruit_ids,
+        recruit_lookup_from_docs,
+    )
 
     franchise_doc = franchise_doc or {}
     team_doc = team_doc or {}
@@ -9712,6 +9716,17 @@ def _build_office_digest_for_command_center(
     wire = response.get("recruiting_wire") if isinstance(response.get("recruiting_wire"), dict) else {}
     lean_recruits = response.get("lean_recruits") or []
     lookup = recruit_lookup_from_docs(lean_recruits, str(team_id or ""))
+    wire_events = wire.get("events") if isinstance(wire.get("events"), list) else []
+    missing_ids = missing_wire_recruit_ids(wire_events, lookup)
+    if missing_ids and franchise_doc.get("_id") is not None:
+        supplemental = list(franchise_recruits_data_collection.find(
+            {
+                "franchise_id": str(franchise_doc["_id"]),
+                "recruit_id": {"$in": missing_ids},
+            },
+            {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1},
+        ))
+        lookup.update(recruit_lookup_from_docs(supplemental, str(team_id or "")))
     em_values: list[Any] = []
     player_ids = [pid for pid in (team_doc.get("_office_player_ids") or []) if pid]
     if franchise_doc.get("_id") is not None and player_ids:
@@ -9784,6 +9799,7 @@ def _build_office_digest_for_command_center(
         "training_report": franchise_doc.get("latest_training") or {},
         "recruiting_wire": wire,
         "recruit_lookup": lookup,
+        "team_name_map": response.get("team_name_map") if isinstance(response.get("team_name_map"), dict) else {},
         "signing_orders": team_doc.get("_office_signing_orders"),
         "signing_points_total": WEEK_35_RECRUITING_POINTS_BUDGET,
         "roster_spots": roster_spots,
