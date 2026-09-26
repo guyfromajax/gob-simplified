@@ -9973,6 +9973,8 @@ def command_center_data(
                                 "conference": core_row.get("conference"),
                                 "W": int((standings_data.get(tid, {}) or {}).get("W", 0) or 0),
                                 "L": int((standings_data.get(tid, {}) or {}).get("L", 0) or 0),
+                                "PF": int((standings_data.get(tid, {}) or {}).get("PF", 0) or 0),
+                                "PA": int((standings_data.get(tid, {}) or {}).get("PA", 0) or 0),
                                 "last_week": (previous_week_result_map.get(tid) or {}).get("text", ""),
                                 "last_week_result": (previous_week_result_map.get(tid) or {}).get(
                                     "result", ""
@@ -10780,11 +10782,14 @@ def standings(
             raise HTTPException(status_code=404, detail="Franchise not found")
         schedule = franchise_doc.get("schedule", [])
         week = franchise_doc.get("week", 1)
-        from BackEnd.utils.franchise_standings import calculate_franchise_standings
+        from BackEnd.utils.franchise_standings import (
+            calculate_franchise_standings,
+            standings_display_sort_key,
+        )
         franchise_results = franchise_doc.get("results", {})
         team_list = _ftd_team_list_for_franchise(franchise_id)
         standings_data = calculate_franchise_standings(franchise_results, team_list)
-        # Load natl_rank from FTD for tiebreaker (lower natl_rank = higher in standings)
+        # natl_rank is display data for the next-opponent label, not the standings order.
         fid = ObjectId(franchise_id)
         ftd_rank_docs = list(franchise_team_data_collection.find(
             {"franchise_id": fid},
@@ -10830,8 +10835,8 @@ def standings(
                 "natl_rank": natl_rank,
                 "next": matchup_map.get(team_id_str, "")
             })
-        # Primary: wins desc. Tiebreaker: natl_rank asc (lower = higher in standings)
-        output.sort(key=lambda x: (-x["W"], x["natl_rank"]))
+        # Same order the Standings page presents: wins desc, then point differential desc.
+        output.sort(key=standings_display_sort_key)
 
         # Optional: return only user + sister conference (lighter payload for FCC Standings tab)
         result = {"standings": output}

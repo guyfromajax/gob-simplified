@@ -12,7 +12,10 @@ from typing import Any, Iterable, Mapping, Optional
 
 from bson import ObjectId
 
-from BackEnd.utils.franchise_standings import calculate_franchise_standings
+from BackEnd.utils.franchise_standings import (
+    calculate_franchise_standings,
+    standings_display_sort_key,
+)
 from BackEnd.utils.rt_display import rt_letter_grade
 
 # Same field the rank/prestige writer uses. Duplicated as a string so this
@@ -194,25 +197,23 @@ def attitude_counts(em_values: Iterable[Any]) -> dict[str, Any]:
 def conference_position(
     standings: Mapping[str, Mapping[str, Any]],
     conference_by_team: Mapping[str, Any],
-    rank_by_team: Mapping[str, Any],
     user_team_id: str,
     user_conference: Any,
 ) -> Optional[int]:
-    """1-based place in the user's conference. Wins desc, then national rank asc (lower is better)."""
+    """1-based place in the user's conference, using ``standings_display_sort_key``."""
     if user_conference is None or not user_team_id:
         return None
-    rows: list[tuple[int, int, int, str]] = []
+    rows: list[dict[str, Any]] = []
     for team_id, conference in conference_by_team.items():
         if conference != user_conference:
             continue
         tid = str(team_id)
-        row = standings.get(tid) or {}
-        wins = _as_int(row.get("W"), 0) or 0
-        rank = _as_int(rank_by_team.get(tid), 999) or 999
-        rows.append((-wins, rank, 0, tid))
-    rows.sort()
+        row = dict(standings.get(tid) or {})
+        row["team_id"] = tid
+        rows.append(row)
+    rows.sort(key=standings_display_sort_key)
     for index, row in enumerate(rows, start=1):
-        if row[3] == str(user_team_id):
+        if row["team_id"] == str(user_team_id):
             return index
     return None
 
@@ -345,7 +346,6 @@ def capture_office_week_snapshot(
     position = conference_position(
         standings,
         conference_by_team,
-        rank_by_team,
         user_key,
         conference_by_team.get(user_key),
     )
@@ -879,7 +879,12 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
     week = _as_int(ctx.get("week"), 1) or 1
     rankings = ctx.get("rankings") or []
     standings = {
-        str(row.get("team_id")): {"W": row.get("W", 0), "L": row.get("L", 0)}
+        str(row.get("team_id")): {
+            "W": row.get("W", 0),
+            "L": row.get("L", 0),
+            "PF": row.get("PF", 0),
+            "PA": row.get("PA", 0),
+        }
         for row in rankings
         if isinstance(row, dict) and row.get("team_id") is not None
     }
@@ -899,7 +904,7 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
     now_rank = _as_int(ctx.get("national_rank"))
     if now_rank is None:
         now_rank = rank_by_team.get(user_team_id)
-    now_position = conference_position(standings, conference_by_team, rank_by_team, user_team_id, user_conference)
+    now_position = conference_position(standings, conference_by_team, user_team_id, user_conference)
     snapshot = latest_snapshot(franchise_doc, week)
     prev_rank = _as_int(snapshot.get("national_rank_before")) if snapshot else None
     prev_position = _as_int(snapshot.get("conference_position_before")) if snapshot else None

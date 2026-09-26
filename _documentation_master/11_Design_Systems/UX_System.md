@@ -179,7 +179,7 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 |---|---|
 | `state` | `regular`, `first_week` (week ≤ 1), `tournament` (EOS active, weeks 27–34), `signing_day` (week 35), `win`, `loss` |
 | `what_moved.national_rank` | `{now, prev, delta}`. Delta is previous minus current (positive means the team climbed). `prev` comes from the week-advance snapshot. |
-| `what_moved.conference_standing` | Same shape. Place is wins, then national rank. |
+| `what_moved.conference_standing` | Same shape. Place is the Standings order: wins, then point differential. |
 | `what_moved.record` | `{wins, losses}` from standings already on the response. |
 | `what_moved.streak` | `W4` or `L1`, from results. Null when the user has no decided game. |
 | `what_moved.attribute_changes` | `{player_id, name, attribute, from, to}`. `from` and `to` are the first-digit display scale (`value // 10`). Keyed by player id. Legacy name-keyed direction maps are omitted. |

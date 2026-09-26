@@ -5,7 +5,7 @@ Shared utility for calculating franchise standings from franchise.results
 Used by both /franchise/standings and /franchise/team-stats endpoints
 """
 
-from typing import Dict, Any
+from typing import Any, Dict, Mapping
 
 
 def calculate_franchise_standings(
@@ -75,4 +75,19 @@ def calculate_franchise_standings(
             standings_data[home_id_str]["PA"] += away_score
     
     return standings_data
+
+
+def standings_display_sort_key(row: Mapping[str, Any]) -> tuple[int, int]:
+    """Wins descending, then point differential descending.
+
+    This is the order the Standings page applies
+    (``(b.W - a.W) || (b.differential - a.differential)``) and the order
+    ``GET /franchise/standings`` returns. Differential is PF minus PA.
+    """
+    wins = int(row.get("W", 0) or 0)
+    if "PF" in row or "PA" in row:
+        differential = int(row.get("PF", 0) or 0) - int(row.get("PA", 0) or 0)
+    else:
+        differential = int(row.get("differential", 0) or 0)
+    return (-wins, -differential)
 

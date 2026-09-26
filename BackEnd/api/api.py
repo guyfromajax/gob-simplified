@@ -7385,7 +7385,10 @@ try:
         response_data["team_record"] = None
         if franchise_id and team.get("_id") is not None:
             try:
-                from BackEnd.utils.franchise_standings import calculate_franchise_standings
+                from BackEnd.utils.franchise_standings import (
+                    calculate_franchise_standings,
+                    standings_display_sort_key,
+                )
                 from BackEnd.utils.game_team_scoreboard_enrichment import (
                     natl_rank_from_ftd_document,
                 )
@@ -7403,15 +7406,10 @@ try:
                 own = standings.get(str(team["_id"]), {}) or {}
                 wins = int(own.get("W", 0) or 0)
                 losses = int(own.get("L", 0) or 0)
-                # Conference place by wins, then point differential — same ordering the
-                # Standings tab presents.
+                # Conference place uses the Standings page order (wins, then point differential).
                 ranked = sorted(
                     conf_team_ids.keys(),
-                    key=lambda tid: (
-                        -int((standings.get(tid, {}) or {}).get("W", 0) or 0),
-                        -(int((standings.get(tid, {}) or {}).get("PF", 0) or 0)
-                          - int((standings.get(tid, {}) or {}).get("PA", 0) or 0)),
-                    ),
+                    key=lambda tid: standings_display_sort_key(standings.get(tid, {}) or {}),
                 )
                 place = ranked.index(str(team["_id"])) + 1 if str(team["_id"]) in ranked else None
                 ftd_rank_doc = franchise_team_data_collection.find_one(

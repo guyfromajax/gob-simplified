@@ -213,6 +213,77 @@ def test_capture_reads_before_rank_update_and_retry_does_not_rewrite():
     assert ftd.calls == calls_before
 
 
+def test_snapshot_conference_position_matches_standings_api(monkeypatch):
+    """Same wins: point differential decides, not national rank, and the just-completed week is excluded."""
+    from BackEnd.api import franchise_routes
+    from BackEnd.utils import franchise_team_display as display
+
+    user = ObjectId()
+    ahead = ObjectId()
+    weak = ObjectId()
+    fid = ObjectId()
+    before = {
+        "1": [{"away_id": str(weak), "home_id": str(user), "away_score": 60, "home_score": 70}],
+        "2": [{"away_id": str(weak), "home_id": str(ahead), "away_score": 40, "home_score": 100}],
+    }
+    franchise = {
+        "_id": fid,
+        "week": 3,
+        "schedule": [],
+        "results": before,
+        "current_season": 1,
+        "rank_prestige_last_applied_week": 0,
+    }
+    ftd_docs = [
+        {"team_id": user, "natl_rank": 5, "team_attributes": {"fight": 1}},
+        {"team_id": ahead, "natl_rank": 40, "team_attributes": {}},
+        {"team_id": weak, "natl_rank": 80, "team_attributes": {}},
+    ]
+    team_docs = [
+        {"_id": user, "name": "User", "conference": 1, "region": "A"},
+        {"_id": ahead, "name": "Ahead", "conference": 1, "region": "A"},
+        {"_id": weak, "name": "Weak", "conference": 1, "region": "A"},
+    ]
+
+    class _Find:
+        def __init__(self, docs):
+            self.docs = docs
+
+        def find(self, *_args, **_kwargs):
+            return list(self.docs)
+
+        def find_one(self, *_args, **_kwargs):
+            return franchise
+
+    monkeypatch.setattr(franchise_routes.db, "franchises", _Find([]))
+    monkeypatch.setattr(franchise_routes.db, "teams", _Find(team_docs))
+    monkeypatch.setattr(franchise_routes.franchise_team_data_collection, "find", lambda *_a, **_k: list(ftd_docs))
+    monkeypatch.setattr(display, "teams_collection", _Find(team_docs))
+
+    payload = franchise_routes.standings(str(fid), profile=False)
+    conference = [row for row in payload["standings"] if row.get("conference") == 1]
+    api_place = next(index for index, row in enumerate(conference, start=1) if row["team_id"] == str(user))
+    assert [row["team_id"] for row in conference] == [str(ahead), str(user), str(weak)]
+    assert api_place == 2
+
+    snap_doc = dict(franchise)
+    snap_doc["results"] = dict(before)
+    snap_doc["results"]["3"] = [{
+        "away_id": str(ahead),
+        "home_id": str(user),
+        "away_score": 50,
+        "home_score": 90,
+    }]
+    stored = capture_office_week_snapshot(
+        snap_doc,
+        str(user),
+        3,
+        ftd_collection=_Find(ftd_docs),
+        teams_collection=_Find(team_docs),
+    )
+    assert stored["1"]["3"]["conference_position_before"] == api_place
+
+
 def test_preseason_first_week_and_signing_day_states():
     preseason = build_office_digest(_ctx(
         franchise_doc={"_id": "fid", "current_season": 1, "week": 1, "results": {}},
