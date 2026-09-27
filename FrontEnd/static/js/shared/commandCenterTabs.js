@@ -66,6 +66,7 @@ function initCommandCenterTabs(options) {
   function canonicalTab(tabName) {
     if (tabName === 'roster-tab') return 'roster-view';
     if (tabName === 'team-stats-tab') return 'team-attributes-view';
+    if (tabName === 'player-stats-tab') return 'player-stats-view';
     return tabName;
   }
 

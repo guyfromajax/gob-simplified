@@ -112,7 +112,7 @@ The shared tab module also serves any other command center that calls `initComma
 |---|---|---|
 | Office | (none) | `home-tab` |
 | Team | Roster | `roster-view` (in-page module view; `team-roster-view.html` redirects here and keeps `franchise_id`, `team_id`, `roster_team_id`, and return params). `?tab=roster-tab` opens this view. |
-| Team | Player Stats | `player-stats-tab` |
+| Team | Player Stats | `player-stats-view` (in-page module view). `?tab=player-stats-tab` opens this view. |
 | Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
 | Team | Schedule | `schedule-tab` (the user team's schedule) |
 | Prep | Training | `training-tab` |
@@ -240,7 +240,7 @@ The ETag is `franchise:season:week:browse_rev:BUILD:signature`. The store rememb
 
 `GOBStore.mutate(url, options)` is the write wrapper. `window.fetch` sends POST, PUT, PATCH, and DELETE on `/franchise/`, `/api/gameplan`, and `/api/playbooks` through it. After a successful response it clears that franchise's memory and `sessionStorage`. The next GET is a full read and picks up the new revision. A flow page that navigates away after a write does not have to do anything else.
 
-Cached routes are the browse GETs: command-center, standings, schedule (including national), leaders, team-stats, team-player-stats, team-data, news, recruiting-data, recruiting-results, practice-squad, awards, scouting-report, roster, player, player-detail, team-detail, recruit, teams, game plan, and playbooks.
+Cached routes are the browse GETs: command-center, standings, schedule (including national), leaders, team-stats, team-player-stats, player-stats, team-data, news, recruiting-data, recruiting-results, practice-squad, awards, scouting-report, roster, player, player-detail, team-detail, recruit, teams, game plan, and playbooks.
 
 Never cached: `GET /api/game/{id}`, `POST /api/simulate-quarter`, `/api/auth`, and any URL with `profile=1`. `profile=1` is only added when the page URL has `cc_profile=1`.
 
@@ -335,7 +335,7 @@ The first open paints a neutral skeleton in the shape of the view. No spinner. D
 
 An unknown module, or an import that fails, paints a quiet error card with Retry in that panel. The rest of the app stays up. Retry loads the module again. A `?tab=` that is neither a panel nor a registered view still falls back to the section default, as today's tabs do.
 
-Opening a player from Roster writes `gob-view-roster-order` in `sessionStorage`: a JSON array of the player ids in the order on screen at that click. The Leaders full list (and each Leaders board card) writes `gob-view-leaders-order`, the same shape. Standings writes `gob-view-standings-order` as `{ ids, label }`, the visible team ids in that conference card and the card label (for example `A2`). The detail URL carries `pager=roster`, `pager=leaders`, or `pager=standings`. No `pager` param means no pager, even if a key is sitting in the session. Paging replaces the history entry and stops at the ends. The Roster Varsity / Practice Squad segment is `gob-view-roster-scope` (`varsity` or `practice`).
+Opening a player from Roster writes `gob-view-roster-order` in `sessionStorage`: a JSON array of the player ids in the order on screen at that click. The Leaders full list (and each Leaders board card) writes `gob-view-leaders-order`, the same shape. Player Stats writes `gob-view-player-stats-order`, the same shape, and the detail URL carries `pager=player-stats` with `origin=team` and `return_tab=player-stats-view`. Standings writes `gob-view-standings-order` as `{ ids, label }`, the visible team ids in that conference card and the card label (for example `A2`). The detail URL carries `pager=roster`, `pager=leaders`, `pager=player-stats`, or `pager=standings`. No `pager` param means no pager, even if a key is sitting in the session. Paging replaces the history entry and stops at the ends. The Roster Varsity / Practice Squad segment is `gob-view-roster-scope` (`varsity` or `practice`).
 
 `player-view` and `team-view` are drill-ins, not sub-tabs. A list opens them with a push. The rail highlights `origin` (`team`, `league`, `office`, or `prep`). The page's `team_id` stays the user's team. The team being read is `view_team_id`.
 

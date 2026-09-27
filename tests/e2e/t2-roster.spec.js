@@ -248,12 +248,12 @@ test('roster and team attributes navigate, restore scroll, and redirect', async 
   const saved = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);
   expect(saved).toBeGreaterThan(200);
   await mouseClick(page, stab(page, 'Player Stats'));
-  await expect(page.locator('#player-stats-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#player-stats-view.tab-content.active')).toBeVisible();
   expect(await page.evaluate(() => history.state && history.state.gobIdx)).toBe(teamIdx);
   await page.goBack();
   await expect(page.locator('#home-tab.tab-content.active')).toBeVisible();
   await page.goForward();
-  await page.waitForURL(/tab=player-stats-tab/);
+  await page.waitForURL(/tab=player-stats-view/);
   await page.goBack();
   await mouseClick(page, '[data-gob-section="team"]');
   await page.waitForSelector('#roster-view a.gob-player');

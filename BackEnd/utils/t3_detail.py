@@ -237,6 +237,128 @@ def stat_line(block: Any) -> dict[str, Any]:
     }
 
 
+# Counting stats the Player Stats table shows. Rates stay on ``stat_line``.
+_COUNT_KEYS = (
+    "GP", "MIN", "PTS", "FGM", "FGA", "3PTM", "3PTA", "FTM", "FTA",
+    "OREB", "DREB", "REB", "AST", "TO", "STL", "BLK", "F",
+)
+_PLAYER_STATS_PROJECTION = {
+    "player_id": 1,
+    "meta.first_name": 1,
+    "meta.last_name": 1,
+    "meta.position": 1,
+    "meta.year": 1,
+    "meta.jersey": 1,
+    "meta.team_id": 1,
+    "meta.team": 1,
+    "position_ratings": 1,
+    "training_position": 1,
+    "resolved_training_position": 1,
+    "season.GP": 1,
+    "season.MIN": 1,
+    "season.PTS": 1,
+    "season.REB": 1,
+    "season.OREB": 1,
+    "season.DREB": 1,
+    "season.AST": 1,
+    "season.STL": 1,
+    "season.BLK": 1,
+    "season.FGM": 1,
+    "season.FGA": 1,
+    "season.3PTM": 1,
+    "season.3PTA": 1,
+    "season.FTM": 1,
+    "season.FTA": 1,
+    "season.TO": 1,
+    "season.F": 1,
+    "season.DEF_S": 1,
+    "season.DEF_A": 1,
+}
+
+
+def season_bases(block: Any) -> dict[str, Any]:
+    """Per-game and total counting stats, plus the rates ``stat_line`` already computes.
+
+    Per-game counting stats are null when GP is 0. Rates are null when that
+    attempt count is 0. GP is the game count in both bases.
+    """
+    raw = block if isinstance(block, dict) else {}
+    line = stat_line(raw)
+    games = _total(raw, "GP")
+    totals: dict[str, Any] = {}
+    per_game: dict[str, Any] = {}
+    for key in _COUNT_KEYS:
+        total = _total(raw, key)
+        totals[key] = total
+        per_game[key] = total if key == "GP" else _per_game(total, games)
+    return {
+        "per_game": per_game,
+        "totals": totals,
+        "rates": {
+            "fg_pct": line["fg_pct"],
+            "tp_pct": line["tp_pct"],
+            "ft_pct": line["ft_pct"],
+            "def_pct": line["def_pct"],
+        },
+    }
+
+
+def build_player_stats(franchise_id: str, team_id: str) -> dict[str, Any]:
+    """One varsity row per ``franchise_team_data.players`` entry. Rates are server-side."""
+    store = _store()
+    fid = _oid(franchise_id, "franchise ID")
+    tid = _oid(team_id, "team ID")
+    franchise = store.franchises_collection.find_one(
+        {"_id": fid},
+        {"user_team_id": 1, "user_team_object_id": 1},
+    )
+    if not franchise:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    ftd = store.franchise_team_data_collection.find_one(
+        {"franchise_id": fid, "team_id": tid},
+        {"players": 1},
+    )
+    roster = []
+    if ftd and isinstance(ftd.get("players"), list):
+        roster = [str(pid) for pid in ftd["players"] if pid is not None and str(pid)]
+    user_team_id, user_team_name = _user_team(franchise)
+    on_user = _on_user_team(str(tid), None, user_team_id, user_team_name)
+    by_id: dict[str, Mapping[str, Any]] = {}
+    if roster:
+        cursor = store.franchise_players_data_collection.find(
+            {"franchise_id": str(franchise_id), "player_id": {"$in": roster}},
+            _PLAYER_STATS_PROJECTION,
+        )
+        for doc in cursor:
+            by_id[str(doc.get("player_id") or "")] = doc
+    players = []
+    for pid in roster:
+        doc = by_id.get(pid)
+        if not doc:
+            continue
+        meta = doc.get("meta") if isinstance(doc.get("meta"), dict) else {}
+        ratings = doc.get("position_ratings") if isinstance(doc.get("position_ratings"), dict) else {}
+        season = doc.get("season") if isinstance(doc.get("season"), dict) else {}
+        bases = season_bases(season)
+        players.append({
+            "player_id": pid,
+            "name": _player_name(meta),
+            "position": _roster_position(
+                meta.get("position"),
+                ratings,
+                doc.get("training_position"),
+                doc.get("resolved_training_position"),
+                on_user_team=on_user,
+            ),
+            "year": format_player_year_abbrev(meta.get("year")),
+            "jersey": meta.get("jersey"),
+            "per_game": bases["per_game"],
+            "totals": bases["totals"],
+            "rates": bases["rates"],
+        })
+    return {"team_id": str(tid), "players": players}
+
+
 def emphasises(position: str, focus: str) -> list[str]:
     """Up to three attributes this focus weights above ``standard``.
 

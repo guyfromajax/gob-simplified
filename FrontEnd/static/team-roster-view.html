@@ -12,7 +12,7 @@
         params.set('view_team_id', viewed);
         if (!params.get('origin')) {
           var ret = params.get('return_tab') || '';
-          var teamTabs = { 'roster-view': 1, 'schedule-tab': 1, 'player-stats-tab': 1, 'team-attributes-view': 1 };
+          var teamTabs = { 'roster-view': 1, 'schedule-tab': 1, 'player-stats-tab': 1, 'player-stats-view': 1, 'team-attributes-view': 1 };
           params.set('origin', ret === 'home-tab' ? 'office' : (teamTabs[ret] ? 'team' : 'league'));
         }
       } else {

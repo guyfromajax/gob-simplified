@@ -11897,6 +11897,15 @@ def user_team_player_stats_endpoint(
     return {"players": players}
 
 
+@router.get("/franchise/player-stats")
+@browse_cached
+def player_stats(franchise_id: str, team_id: str):
+    """Varsity season lines for Team › Player Stats. Rates and per-game values are computed here."""
+    from BackEnd.utils.t3_detail import build_player_stats
+
+    return build_player_stats(franchise_id, team_id)
+
+
 @router.get("/franchise/recruits")
 def recruits(franchise_id: str = Query(...)):
     """Get recruits for a specific franchise. Reads from FRD (franchise_recruits_data)."""

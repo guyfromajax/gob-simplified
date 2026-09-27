@@ -23,6 +23,7 @@
     '/franchise/leaders',
     '/franchise/team-stats',
     '/franchise/team-player-stats',
+    '/franchise/player-stats',
     '/franchise/team-data',
     '/franchise/state',
     '/franchise/news',

@@ -337,7 +337,7 @@ test('session walk revalidates with 304 on the second visit', async ({ page }) =
     await seen;
   }
   await openTab(page, 'team', 'roster-view');
-  await openTab(page, 'team', 'player-stats-tab');
+  await openTab(page, 'team', 'player-stats-view');
   await openTab(page, 'team', 'team-attributes-view');
   await openTab(page, 'team', 'schedule-tab');
   await visit('/standings.html', '/franchise/standings');

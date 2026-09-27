@@ -25,7 +25,7 @@
     { id: 'office', label: 'Office', title: "Coach's Office", icon: 'office', tabs: [{ id: 'home-tab' }] },
     { id: 'team', label: 'Team', title: 'Team', icon: 'team', tabs: [
       { id: 'roster-view', label: 'Roster' },
-      { id: 'player-stats-tab', label: 'Player Stats' },
+      { id: 'player-stats-view', label: 'Player Stats' },
       { id: 'team-attributes-view', label: 'Team Attributes' },
       { id: 'schedule-tab', label: 'Schedule' }
     ]},
@@ -60,6 +60,7 @@
     'roster-tab': 'team',
     'roster-view': 'team',
     'player-stats-tab': 'team',
+    'player-stats-view': 'team',
     'team-stats-tab': 'team',
     'team-attributes-view': 'team',
     'schedule-tab': 'team',

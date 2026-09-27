@@ -235,7 +235,7 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   await openFcc(page, cc({ week: 1 }));
   const panels = [
     ['team', 'Roster', 'roster-view'],
-    ['team', 'Player Stats', 'player-stats-tab'],
+    ['team', 'Player Stats', 'player-stats-view'],
     ['team', 'Team Attributes', 'team-attributes-view'],
     ['team', 'Schedule', 'schedule-tab'],
     ['prep', 'Training', 'training-tab'],

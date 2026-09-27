@@ -227,6 +227,14 @@
   });
 
   register({
+    id: 'player-stats-view',
+    section: 'team',
+    subtab: 'player-stats-view',
+    title: 'Player Stats',
+    module: viewModule('playerStatsView.js')
+  });
+
+  register({
     id: 'team-attributes-view',
     section: 'team',
     subtab: 'team-attributes-view',

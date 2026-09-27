@@ -852,3 +852,42 @@ html.gob-shell .gob-focus.stats-toggle button {
   text-decoration: none;
 }
 .gob-roster.is-compact { max-height: none; }
+
+#player-stats-view { min-width: 0; }
+#player-stats-view .gob-tcard { max-width: 100%; min-width: 0; }
+#player-stats-view .gob-scroll { max-width: 100%; overflow: visible; }
+#player-stats-view .gob-scroll .gob-tbl { width: max-content; min-width: 100%; }
+#player-stats-view .gob-scroll.gob-xs { overflow-x: auto; overflow-y: visible; }
+#player-stats-view .gob-xs .gob-tbl { min-width: 0; width: max-content; }
+#player-stats-view tbody tr { cursor: pointer; }
+#player-stats-view .gob-player { align-items: center; }
+#player-stats-view .av {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: var(--surface-3);
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text-87);
+}
+#player-stats-view .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#player-stats-view .gob-id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+  text-align: left;
+}
+#player-stats-view .gob-id b { font-weight: 600; }
+#player-stats-view .gob-id .sub { color: var(--text-38); font-size: 11px; font-weight: 500; }
+html.gob-shell .main #player-stats-view .gob-xs thead th.pin {
+  position: sticky !important;
+  left: 0;
+  top: auto !important;
+  z-index: 2;
+  background-color: var(--surface-1);
+}

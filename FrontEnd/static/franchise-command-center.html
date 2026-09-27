@@ -82,7 +82,7 @@
       <div class="tab-buttons">
         <button data-tab="home-tab" class="active">Coach's Office</button>
         <button data-tab="roster-tab">Roster</button>
-        <button data-tab="player-stats-tab">Player Stats</button>
+        <button data-tab="player-stats-view">Player Stats</button>
         <button data-tab="team-stats-tab">Team Measures</button>
         <button data-tab="game-plan-tab">Game Plan</button>
         <button data-tab="playbooks-tab">Playbooks</button>
@@ -164,48 +164,7 @@
           </div>
         </section>
       </div>
-      <div id="player-stats-tab" class="tab-content">
-        <div class="attr-toolbar">
-          <button type="button" class="scope-btn" data-player-stats-scope="varsity" aria-pressed="true">Varsity<span class="n" data-player-stats-count="varsity">0</span></button>
-          <button type="button" class="scope-btn" data-player-stats-scope="practice" aria-pressed="false">Practice Squad<span class="n" data-player-stats-count="practice">0</span></button>
-          <span class="attr-rowcount" id="player-stats-rowcount"></span>
-        </div>
-        <section class="fcc-data-card">
-          <div class="fcc-data-card-body scroll-x">
-            <table class="stats-table">
-              <thead>
-                <tr>
-                  <th class="sortable" data-stat="name">Player</th>
-                  <th class="sortable" data-stat="PTS">PTS</th>
-                  <th class="sortable" data-stat="FGM">FGM</th>
-                  <th class="sortable" data-stat="FGA">FGA</th>
-                  <th class="sortable" data-stat="FG%">FG%</th>
-                  <th class="sortable" data-stat="3PTM">3PTM</th>
-                  <th class="sortable" data-stat="TPA">3PTA</th>
-                  <th class="sortable" data-stat="3PT%">3PT%</th>
-                  <th class="sortable" data-stat="FTM">FTM</th>
-                  <th class="sortable" data-stat="FTA">FTA</th>
-                  <th class="sortable" data-stat="FT%">FT%</th>
-                  <th class="sortable" data-stat="DREB">DREB</th>
-                  <th class="sortable" data-stat="OREB">OREB</th>
-                  <th class="sortable" data-stat="TREB">TREB</th>
-                  <th class="sortable" data-stat="AST">AST</th>
-                  <th class="sortable" data-stat="STL">STL</th>
-                  <th class="sortable" data-stat="BLK">BLK</th>
-                  <th class="sortable" data-stat="F">F</th>
-                  <th class="sortable" data-stat="MIN">MIN</th>
-                  <th class="sortable" data-stat="TO">TO</th>
-                  <th class="sortable" data-stat="SCR_A">SCRA</th>
-                  <th class="sortable" data-stat="SCR%">SCR%</th>
-                  <th class="sortable" data-stat="DEF_A">DEFA</th>
-                  <th class="sortable" data-stat="DEF%">DEF%</th>
-                </tr>
-              </thead>
-              <tbody id="player-stats-body"></tbody>
-            </table>
-          </div>
-        </section>
-      </div>
+      <div id="player-stats-view" class="tab-content"></div>
       <div id="game-plan-tab" class="tab-content">
         <section class="fcc-data-card fcc-game-plan-card">
           <div class="fcc-data-card-body fcc-game-plan-card-body">

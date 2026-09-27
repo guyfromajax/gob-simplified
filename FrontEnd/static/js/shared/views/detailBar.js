@@ -6,6 +6,7 @@
 var PAGES = {
   'roster-view': 'Roster',
   'player-stats-tab': 'Player Stats',
+  'player-stats-view': 'Player Stats',
   'team-attributes-view': 'Team Attributes',
   'schedule-tab': 'Schedule',
   'standings-view': 'Standings',
@@ -56,6 +57,7 @@ export function readPager(currentId) {
   var kind = query().get('pager') || '';
   var key = kind === 'roster' ? 'gob-view-roster-order'
     : kind === 'leaders' ? 'gob-view-leaders-order'
+    : kind === 'player-stats' ? 'gob-view-player-stats-order'
     : kind === 'standings' ? 'gob-view-standings-order'
     : '';
   if (!key) return null;

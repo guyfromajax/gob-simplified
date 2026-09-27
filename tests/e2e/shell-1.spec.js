@@ -12,7 +12,7 @@ const OUT = path.join(__dirname, '../../reports/shell-1');
 const TABS = [
   ['home-tab', 'office'],
   ['roster-tab', 'team', 'roster-view'],
-  ['player-stats-tab', 'team'],
+  ['player-stats-tab', 'team', 'player-stats-view'],
   ['team-stats-tab', 'team', 'team-attributes-view'],
   ['schedule-tab', 'team'],
   ['game-plan-tab', 'prep'],
@@ -193,7 +193,7 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
   const shots = [
     ['office', 'home-tab', null],
     ['team', 'roster-view', 'Roster'],
-    ['team-player-stats', 'player-stats-tab', 'Player Stats'],
+    ['team-player-stats', 'player-stats-view', 'Player Stats'],
     ['team-attributes', 'team-attributes-view', 'Team Attributes'],
     ['team-schedule', 'schedule-tab', 'Schedule'],
     ['prep', 'training-tab', 'Training'],
@@ -285,9 +285,9 @@ test('back restores the section as it was left, including scroll', async ({ page
   await openFcc(page, cc());
   await mouseClick(page, '[data-gob-section="team"]');
   await mouseClick(page, stab(page, 'Player Stats'));
-  await expect(page.locator('#player-stats-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#player-stats-view.tab-content.active')).toBeVisible();
   const scrolled = await page.evaluate(() => {
-    const panel = document.getElementById('player-stats-tab');
+    const panel = document.getElementById('player-stats-view');
     const main = document.querySelector('html.gob-shell .main');
     panel.style.minHeight = '2400px';
     main.scrollTop = 640;
@@ -297,7 +297,7 @@ test('back restores the section as it was left, including scroll', async ({ page
   await mouseClick(page, '[data-gob-section="league"]');
   await expect(page.locator('#standings-view.tab-content.active')).toBeVisible();
   await page.goBack();
-  await expect(page.locator('#player-stats-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#player-stats-view.tab-content.active')).toBeVisible();
   await expect(page.locator('[data-gob-section="team"]')).toHaveClass(/on/);
   const top = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);
   expect(top).toBeGreaterThan(500);
