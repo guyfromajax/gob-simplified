@@ -15631,10 +15631,23 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-data COMPLETE: {total_time:.3f}s")
+    from BackEnd.utils.office_digest import prior_measure_snapshot, team_attribute_measures
+    snap_doc = db.franchises.find_one(
+        {"_id": fid},
+        {"current_week": 1, "current_season": 1, "office_week_snapshots": 1},
+    ) or {}
+    try:
+        week = int(snap_doc.get("current_week") or 0)
+    except (TypeError, ValueError):
+        week = 0
+    before, closed = prior_measure_snapshot(snap_doc, week)
+    measure_view = team_attribute_measures(team_attributes, before, closed)
     return {
         "team_attributes": team_attributes,
         "plays_data": plays_data,
-        "scouting_data": scouting_data
+        "scouting_data": scouting_data,
+        "measures": measure_view["measures"],
+        "updated_after_week": measure_view["updated_after_week"],
     }
 
 

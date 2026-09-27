@@ -203,8 +203,13 @@
   }
 
   function rosterHref(franchiseId, teamId, teamName, returnTab) {
+    var owner = '';
+    try { owner = new URLSearchParams(global.location.search).get('team_id') || ''; }
+    catch (err) { owner = ''; }
+    var viewed = teamId || '';
     return '/team-roster-view.html?mode=franchise&franchise_id=' + encodeURIComponent(franchiseId || '')
-      + '&team_id=' + encodeURIComponent(teamId || '')
+      + '&team_id=' + encodeURIComponent(owner || viewed)
+      + '&roster_team_id=' + encodeURIComponent(viewed)
       + '&team_name=' + encodeURIComponent(teamName || '')
       + '&return_tab=' + encodeURIComponent(returnTab || '');
   }

@@ -336,9 +336,9 @@ test('session walk revalidates with 304 on the second visit', async ({ page }) =
     await page.goto(target, { waitUntil: 'domcontentloaded' });
     await seen;
   }
-  await openTab(page, 'team', 'roster-tab');
+  await openTab(page, 'team', 'roster-view');
   await openTab(page, 'team', 'player-stats-tab');
-  await openTab(page, 'team', 'team-stats-tab');
+  await openTab(page, 'team', 'team-attributes-view');
   await openTab(page, 'team', 'schedule-tab');
   await visit('/standings.html', '/franchise/standings');
   await visit('/leaders.html', '/franchise/leaders');
@@ -471,8 +471,8 @@ test('playbooks save shows the new play', async ({ page }) => {
 test('development focus shows the new focus', async ({ page }) => {
   const state = freshState();
   await boot(page, state);
-  await openTab(page, 'team', 'roster-tab');
-  await expect(page.locator('#team-body')).toContainText('Standard');
+  await openTab(page, 'team', 'roster-view');
+  await expect(page.locator('#roster-view')).toContainText('Standard');
   await page.evaluate(async function (fid) {
     await fetch('/franchise/player/development-focus', {
       method: 'POST',
@@ -485,15 +485,15 @@ test('development focus shows the new focus', async ({ page }) => {
     const root = document.getElementById('office-root');
     return root && root.getAttribute('aria-busy') === 'false';
   });
-  await openTab(page, 'team', 'roster-tab');
-  await expect(page.locator('#team-body')).toContainText('Rebounding');
+  await openTab(page, 'team', 'roster-view');
+  await expect(page.locator('#roster-view')).toContainText('Rebounding');
 });
 
 test('cut players shows the shorter roster', async ({ page }) => {
   const state = freshState();
   await boot(page, state);
-  await openTab(page, 'team', 'roster-tab');
-  await expect(page.locator('#team-body')).toContainText('Bea Cutter');
+  await openTab(page, 'team', 'roster-view');
+  await expect(page.locator('#roster-view')).toContainText('Bea Cutter');
   await page.evaluate(async function (fid) {
     await fetch('/franchise/cut-players', {
       method: 'POST',
@@ -506,9 +506,9 @@ test('cut players shows the shorter roster', async ({ page }) => {
     const root = document.getElementById('office-root');
     return root && root.getAttribute('aria-busy') === 'false';
   });
-  await openTab(page, 'team', 'roster-tab');
-  await expect(page.locator('#team-body')).toContainText('Ada Keeper');
-  await expect(page.locator('#team-body')).not.toContainText('Bea Cutter');
+  await openTab(page, 'team', 'roster-view');
+  await expect(page.locator('#roster-view')).toContainText('Ada Keeper');
+  await expect(page.locator('#roster-view')).not.toContainText('Bea Cutter');
 });
 
 test('week advance shows the new week', async ({ page }) => {

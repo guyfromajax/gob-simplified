@@ -6,8 +6,8 @@
  *   - FCC Roster tab
  *   - FCC Recruits tab
  *   - team-roster-view.html
- *
- * Everything else that displays attributes is deliberately untouched.
+ *   - Roster module view
+ *   - Office "What moved" chips (value-only tile)
  *
  * Display rules (product-wide, via GOB_AttributeDisplay):
  *   - Values render as the first digit of the raw attribute (floor of raw/10),

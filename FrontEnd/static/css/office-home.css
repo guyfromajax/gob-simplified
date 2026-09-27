@@ -282,6 +282,11 @@ html.gob-shell.gob-office .office-wire .wr-2 {
   letter-spacing: var(--tracking-2);
 }
 .gob .attr-chip .tdig { font-size: var(--fs-16); }
+.gob .attr-chip .attr-tile {
+  width: 22px;
+  height: 22px;
+}
+.gob .attr-chip .attr-tile s { font-size: var(--fs-16); }
 .gob .attr-chip .arr {
   font-style: normal;
   font-size: var(--fs-13);

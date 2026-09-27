@@ -111,9 +111,9 @@ The shared tab module also serves any other command center that calls `initComma
 | Rail | Sub-tab | Opens |
 |---|---|---|
 | Office | (none) | `home-tab` |
-| Team | Roster | `roster-tab` |
+| Team | Roster | `roster-view` (in-page module view; `team-roster-view.html` redirects here and keeps `franchise_id`, `team_id`, `roster_team_id`, and return params). `?tab=roster-tab` opens this view. |
 | Team | Player Stats | `player-stats-tab` |
-| Team | Team Attributes | `team-stats-tab` (Team Measures) |
+| Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
 | Team | Schedule | `schedule-tab` (the user team's schedule) |
 | Prep | Training | `training-tab` |
 | Prep | Game Plan | `game-plan-tab` |
@@ -169,7 +169,7 @@ A page or brief is done only when this file is updated if the shell, the section
 | team-stats.html | browse | League | Team Stats (`team-stats-view`; the file redirects) |
 | stats.html | browse | League | none |
 | player-detail.html | browse | return context; else Team or League | none |
-| team-roster-view.html | browse | return context; else Team or League | none |
+| team-roster-view.html | redirect to `franchise-command-center.html?tab=roster-view` | Team | Roster |
 | box-score.html | browse when `return_url` is set; otherwise focus | League when browse | none |
 | set-lineup.html, training.html, training-report.html, training-squad-report.html, training-playbooks.html, cut-players.html, game-plan.html, playbooks.html, playbook-report.html | focus | — | — |
 
@@ -315,7 +315,7 @@ Career Leaders keep the older rule for FG% and DEF%: attempts at least 5 times t
 
 A view is a section of the franchise app that lives at `franchise-command-center.html?tab=<view-id>`. That is the same URL rule as today's in-page tabs. Rail clicks still push. Sub-tabs still replace. Back restores the view and the scroll position `GOBNav` already stores. There is no second URL scheme.
 
-In-page tabs (Roster, the Office) stay as panels already in the page. Standings, Rankings, Leaders, and Team Stats are module views. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant. The old Standings, Leaders, and Team Stats panels remain in the page so an old `?tab=` still resolves.
+The Office stays a panel already in the page. Roster, Team Attributes, Standings, Rankings, Leaders, and Team Stats are module views. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant. The old Roster and Team Measures panels remain in the page. `?tab=roster-tab` and `?tab=team-stats-tab` open the new views. An old Standings, Leaders, or Team Stats `?tab=` still opens the old panel.
 
 ### Add a module view
 
@@ -332,3 +332,5 @@ In-page tabs (Roster, the Office) stay as panels already in the page. Standings,
 The first open paints a neutral skeleton in the shape of the view. No spinner. Data comes from `GOBStore.get`. The module stays in the panel after the user leaves. Opening it again shows that panel immediately and calls `GOBStore.revalidate`. The view re-renders only when the body changed. A 304 keeps the table on screen.
 
 An unknown module, or an import that fails, paints a quiet error card with Retry in that panel. The rest of the app stays up. Retry loads the module again. A `?tab=` that is neither a panel nor a registered view still falls back to the section default, as today's tabs do.
+
+Opening a player from Roster writes `gob-view-roster-order` in `sessionStorage`: a JSON array of the player ids in the order on screen at that click. A later pager reads that key. The Roster Varsity / Practice Squad segment is `gob-view-roster-scope` (`varsity` or `practice`).
