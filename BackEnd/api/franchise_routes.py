@@ -3512,6 +3512,147 @@ def _normalize_team_id(team_id: str):
         return doc["_id"]
 
 
+def _phase_a_conflict(reason: str, message: str) -> None:
+    raise HTTPException(status_code=409, detail={"reason": reason, "message": message})
+
+
+def _find_game_doc(game_id: str | None) -> dict | None:
+    if not game_id:
+        return None
+    game_id_str = str(game_id)
+    found = db.games.find_one({"_id": game_id_str})
+    if found:
+        return found
+    if ObjectId.is_valid(game_id_str):
+        try:
+            found = db.games.find_one({"_id": ObjectId(game_id_str)})
+        except Exception:
+            found = None
+        if found:
+            return found
+    return None
+
+
+def _team_identity_aliases(team_ref: Any) -> set[str]:
+    aliases: set[str] = set()
+    if team_ref is None:
+        return aliases
+    if isinstance(team_ref, dict):
+        for key in ("_id", "team_id", "name", "code", "$oid"):
+            if team_ref.get(key):
+                aliases |= _team_identity_aliases(team_ref.get(key))
+        return aliases
+    text = str(team_ref).strip()
+    if not text or text == "None":
+        return aliases
+    aliases.add(text)
+    doc = None
+    if ObjectId.is_valid(text) and len(text) == 24:
+        try:
+            doc = db.teams.find_one({"_id": ObjectId(text)})
+        except Exception:
+            doc = None
+    if doc is None:
+        doc = db.teams.find_one({"$or": [{"team_id": text}, {"name": text}, {"code": text}]})
+    if doc:
+        aliases.add(str(doc.get("_id")))
+        for key in ("team_id", "name", "code"):
+            if doc.get(key):
+                aliases.add(str(doc.get(key)))
+    return {alias for alias in aliases if alias and alias != "None"}
+
+
+def _game_identity_aliases(game_doc: dict | None) -> set[str]:
+    if not isinstance(game_doc, dict):
+        return set()
+    refs: list[Any] = [
+        game_doc.get("home_team_id"),
+        game_doc.get("away_team_id"),
+        game_doc.get("team1_id"),
+        game_doc.get("team2_id"),
+        game_doc.get("home_team"),
+        game_doc.get("away_team"),
+    ]
+    teams = game_doc.get("teams")
+    if isinstance(teams, dict):
+        refs.extend(list(teams.keys()))
+        for row in teams.values():
+            if isinstance(row, dict):
+                refs.append(row.get("team_id") or row.get("name"))
+    aliases: set[str] = set()
+    for ref in refs:
+        aliases |= _team_identity_aliases(ref)
+    return aliases
+
+
+def _request_matches_game_matchup(game_doc: dict | None, team1_id: Any, team2_id: Any) -> bool:
+    aliases = _game_identity_aliases(game_doc)
+    if not aliases:
+        return False
+    side_a = _team_identity_aliases(team1_id)
+    side_b = _team_identity_aliases(team2_id)
+    return bool(side_a & aliases) and bool(side_b & aliases)
+
+
+def _game_doc_week(game_doc: dict | None) -> int | None:
+    if not isinstance(game_doc, dict) or game_doc.get("week") is None:
+        return None
+    try:
+        return int(game_doc.get("week"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _iter_box_player_rows(box: Any):
+    if isinstance(box, dict):
+        for value in box.values():
+            if isinstance(value, dict) and (value.get("playerId") or value.get("player_id")):
+                yield value
+            elif isinstance(value, dict):
+                yield from _iter_box_player_rows(value)
+            elif isinstance(value, list):
+                yield from _iter_box_player_rows(value)
+    elif isinstance(box, list):
+        for value in box:
+            if isinstance(value, dict) and (value.get("playerId") or value.get("player_id")):
+                yield value
+
+
+def _box_player_count(game_doc: dict | None) -> int:
+    if not isinstance(game_doc, dict):
+        return 0
+    count = 0
+    teams = game_doc.get("teams")
+    if isinstance(teams, dict):
+        for row in teams.values():
+            if isinstance(row, dict):
+                count += sum(1 for _ in _iter_box_player_rows(row.get("box_score")))
+    count += sum(1 for _ in _iter_box_player_rows(game_doc.get("box_score")))
+    return count
+
+
+def _game_id_already_applied(franchise_doc: dict, game_id: str | None, game_doc: dict | None) -> bool:
+    applied = {str(item) for item in (franchise_doc.get("applied_games") or []) if item is not None}
+    if not applied:
+        return False
+    candidates = []
+    if game_id:
+        candidates.append(str(game_id))
+    if isinstance(game_doc, dict) and game_doc.get("_id") is not None:
+        candidates.append(str(game_doc.get("_id")))
+    return any(candidate in applied for candidate in candidates)
+
+
+def _stored_box_is_different_matchup(game_doc: dict | None, team1_id: Any, team2_id: Any, week: int) -> bool:
+    """True when this document already holds a box for another week or pairing."""
+    if _box_player_count(game_doc) <= 0:
+        return False
+    stored_week = _game_doc_week(game_doc)
+    if stored_week is not None and stored_week != int(week):
+        return True
+    return not _request_matches_game_matchup(game_doc, team1_id, team2_id)
+
+
 def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franchise_id=None, game_id=None):
     """
     Save or update game result in games collection.
@@ -3534,6 +3675,7 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
     Returns:
         Dictionary with team IDs and scores
     """
+    existing = None
     # ✅ SS&S: If game_id is provided, use it directly (this is the actual gameplay document)
     if game_id:
         try:
@@ -3548,6 +3690,7 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
                     game_oid = ObjectId(game_id_str)
                     existing_oid = db.games.find_one({"_id": game_oid})
                 if existing_oid:
+                    existing = existing_oid
                     filter_doc = {"_id": game_oid}
                     # [EOG-IDGUARD-FIRED] Tier-3 Phase-0 (log-only): the canonical string-_id
                     # doc was missing and a legacy ObjectId-_id doc was updated instead — the
@@ -3590,6 +3733,17 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
     
     if franchise_id:
         update_fields["franchise_id"] = str(franchise_id)
+
+    if game_id and _stored_box_is_different_matchup(existing, team1_id, team2_id, week):
+        logger.warning(
+            "🚫 [_SAVE_GAME_RESULT] Refusing to retarget game_id=%s week=%s; stored box is a different matchup",
+            game_id,
+            week,
+        )
+        _phase_a_conflict(
+            "stale_game_id",
+            "This game was already played as a different matchup. Sim this game again to record it.",
+        )
 
     db.games.update_one(
         filter_doc,
@@ -7022,6 +7176,47 @@ def _complete_week_process_user_game_block(
     
     # ✅ SS&S: Use provided game_id if available (this is the actual gameplay document with box_score)
     user_game_id = req.game_id
+    posted_doc = req.game_document if isinstance(req.game_document, dict) else None
+    stored_doc = _find_game_doc(str(user_game_id)) if user_game_id else None
+    if user_game_id or posted_doc is not None:
+        if user_game_id and _game_id_already_applied(franchise_doc, str(user_game_id), stored_doc):
+            same_week = stored_doc is not None and _game_doc_week(stored_doc) == int(req.week)
+            same_teams = stored_doc is not None and _request_matches_game_matchup(
+                stored_doc, team1_id, team2_id
+            )
+            if not (same_week and same_teams):
+                _phase_a_conflict(
+                    "stale_game_id",
+                    "This game was already saved for a different week. Sim this game again to record it.",
+                )
+            logger.warning(
+                "🧭 [COMPLETE-WEEK] Idempotent user game game_id=%s week=%s (already applied)",
+                user_game_id,
+                req.week,
+            )
+            user_res = {
+                "team1_id": str(team1_id),
+                "team2_id": str(team2_id),
+                "team1_score": user.team1_score,
+                "team2_score": user.team2_score,
+            }
+            user_row = {
+                "away_id": user_res["team1_id"],
+                "home_id": user_res["team2_id"],
+                "away_score": user_res["team1_score"],
+                "home_score": user_res["team2_score"],
+            }
+            return user_res, user_row, 0, None, str(user_game_id)
+        if _stored_box_is_different_matchup(stored_doc, team1_id, team2_id, req.week):
+            _phase_a_conflict(
+                "stale_game_id",
+                "This game was already played as a different matchup. Sim this game again to record it.",
+            )
+        if _box_player_count(posted_doc) <= 0 and _box_player_count(stored_doc) <= 0:
+            _phase_a_conflict(
+                "missing_box_score",
+                "This game has no box score, so the result was not saved. Sim this game to record it.",
+            )
     bulk_sim_used = _resolve_user_game_bulk_sim_used(req)
     eos_g_meta = None
     if req.week in ft.EOS_WEEKS:
