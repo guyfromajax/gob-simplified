@@ -256,7 +256,7 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     ['league', 'Standings', 'standings-view'],
     ['league', 'Leaders', 'leaders-view'],
     ['league', 'Team Stats', 'team-stats-view'],
-    ['news', 'News', 'press-tab'],
+    ['news', 'News', 'news-view'],
   ];
   const prepEditor = {
     'training-tab': /\/training(-report)?\.html/,
@@ -341,8 +341,10 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   expect(psUrl).toBe(psHref);
 
   await mouseClick(page, '[data-gob-section="news"]');
-  const awardsUrl = await expectGo('Awards', '/awards.html');
-  expect(awardsUrl).toContain('franchise_id=');
+  await mouseClick(page, stab(page, 'Awards'));
+  await expect(page.locator('#awards-view.tab-content.active')).toBeVisible();
+  expect(page.url()).toContain('tab=awards-view');
+  expect(page.url()).not.toContain('awards.html');
 
   await mouseClick(page, '[data-gob-section="recruiting"]');
   await page.waitForFunction(() => (window.__shellNav || []).some((url) => url.indexOf('/recruiting.html') !== -1));
@@ -352,7 +354,7 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   expect(recruitingUrl).toContain('team_id=' + TID);
   expect(recruitingUrl).toContain('return_url=');
   await expect(page.locator('#recruits-tab.tab-content.active')).toHaveCount(0);
-  await expect(page.locator('#press-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#awards-view.tab-content.active')).toBeVisible();
 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await openFcc(page, cc({ week: opens }));

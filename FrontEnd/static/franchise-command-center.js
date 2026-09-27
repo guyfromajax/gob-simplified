@@ -209,7 +209,6 @@ let userRosterDataCache = null;
 let homeTeamLeaderCategory = 'PTS';
 let userScheduleDataCache = null;
 let homeLastGameDataCache = null;
-let fccNewsListCache = null;
 const homeOpponentRosterCache = new Map();
 const FCC_SESSION_CACHE_PREFIX = 'fcc-shell';
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
@@ -388,7 +387,6 @@ function adoptAuthoritativeFccTeamId(topData) {
 function invalidateHomeWeekSensitiveCaches() {
   userScheduleDataCache = null;
   homeLastGameDataCache = null;
-  fccNewsListCache = null;
   homeOpponentRosterCache.clear();
 }
 
@@ -1694,55 +1692,10 @@ function buildStandaloneNewsUrl(storyId) {
   const q = emptyParams();
   if (franchiseId) q.set('franchise_id', franchiseId);
   if (userTeamId) q.set('team_id', userTeamId);
+  q.set('tab', 'news-view');
   if (storyId) q.set('story', storyId);
   const qs = q.toString();
-  return `/news.html${qs ? `?${qs}` : ''}`;
-}
-
-async function renderNewsTab() {
-  const host = document.getElementById('fcc-news-list');
-  if (!host) return;
-  if (!fccNewsListCache) {
-    const data = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/news')}?franchise_id=${franchiseId}`);
-    if (!data) {
-      host.innerHTML = '<div class="fcc-news-tab-empty">Failed to load news.</div>';
-      return;
-    }
-    fccNewsListCache = Array.isArray(data.news) ? data.news : [];
-  }
-  const news = fccNewsListCache;
-  if (!news.length && !fccTeamDispatches(commandCenterTopDataCache).length) {
-    host.innerHTML = '<div class="fcc-news-tab-empty">No News To Report</div>';
-    return;
-  }
-  // Group by release week, newest first. Your team's own dispatches (training report,
-  // Practice Squad report, results) are interleaved into the same cards, above that week's
-  // league headlines and styled apart — one week reads as one story, and the Inbox tab that
-  // used to hold them separately is retired.
-  const mine = fccTeamDispatches(commandCenterTopDataCache);
-  const byWeek = new Map();
-  const bucket = (week) => {
-    const w = Number(week || 0);
-    if (!byWeek.has(w)) byWeek.set(w, { mine: [], stories: [] });
-    return byWeek.get(w);
-  };
-  mine.forEach((m) => { if (Number.isFinite(m.week)) bucket(m.week).mine.push(m.html); });
-  news.forEach((story) => bucket(story.week).stories.push(story));
-
-  const weeks = [...byWeek.keys()].sort((a, b) => b - a);
-  host.innerHTML = weeks.map((week) => {
-    const b = byWeek.get(week);
-    return `
-    <section class="fcc-data-card fcc-news-tab-week">
-      <div class="fcc-news-tab-week-title">Week ${week}</div>
-      <div class="fcc-news-tab-week-body">
-        ${b.mine.join('')}
-        ${b.stories.map((story) => `
-          <a class="fcc-news-tab-headline" href="${buildStandaloneNewsUrl(story.story_id)}">${escapeHomeHtml(story.headline || '--')}</a>
-        `).join('')}
-      </div>
-    </section>
-  `; }).join('');
+  return `/franchise-command-center.html${qs ? `?${qs}` : ''}`;
 }
 
 async function renderHomeTab() {
@@ -4524,9 +4477,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'recruits-tab') {
           renderFccRecruits();
         }
-        if (tabName === 'press-tab') {
-          void renderNewsTab();
-        }
         // Prep v2: the shell no longer opens these tabs. The summary
         // renderers stay; navigation goes to the editor pages instead.
         if (tabName === 'game-plan-tab') {
@@ -4640,67 +4590,6 @@ function fccMaxPositionRating(player) {
     if (isFinite(v) && v > best) best = v;
   });
   return best === -Infinity ? -1 : best;
-}
-
-/**
- * Your team's own dispatches — training report, Practice Squad development report, game
- * results with box scores. These used to live in a separate Inbox tab; the Inbox is gone
- * and they now run inside News, interleaved into the same week cards as league headlines
- * so one week reads as one story.
- *
- * Returns entries keyed by week: { week, html }. Rendering belongs to renderNewsTab.
- */
-function fccTeamDispatches(topData) {
-  const out = [];
-  const items = Array.isArray(topData?.season_inbox) ? topData.season_inbox : [];
-  const tid = (topData && topData.team_id) || userTeamId;
-  const w = topData && topData.last_training_report_week;
-
-  const entry = (week, href, text, linkText) => {
-    const a = href
-      ? '<a class="fcc-news-mine-link" href="' + href + '">' + escapeHomeHtml(linkText) + '</a>'
-      : '';
-    out.push({
-      week: Number(week),
-      html: '<div class="fcc-news-mine">' + escapeHomeHtml(text) + (a ? ' ' + a : '') + '</div>',
-    });
-  };
-
-  if (w != null && w !== '' && franchiseId && tid) {
-    const weekNum = Number(w);
-    if (Number.isFinite(weekNum) && weekNum >= 1) {
-      const q = emptyParams();
-      q.set('mode', 'franchise');
-      q.set('franchise_id', String(franchiseId));
-      q.set('team_id', String(tid));
-      q.set('week', String(weekNum));
-      q.set('from', 'news');
-      entry(weekNum, '/training-report.html?' + q.toString(),
-        'Week ' + weekNum + ' training report', 'view');
-    }
-  }
-
-  items.forEach((item) => {
-    if (!item) return;
-    if (item.type === 'training_squad_report') {
-      const q = emptyParams();
-      q.set('franchise_id', String(franchiseId || ''));
-      q.set('team_id', String(tid || ''));
-      q.set('from', 'news');
-      entry(item.week, '/training-squad-report.html?' + q.toString(),
-        'Week ' + Number(item.week) + ' Practice Squad development report', 'view');
-      return;
-    }
-    if (item.type !== 'game_result') return;
-    const verb = item.result === 'win' ? 'defeated' : 'lost to';
-    const text = (Number.isFinite(Number(item.week)) && item.user_team_name && item.opponent_team_name)
-      ? `${item.user_team_name} ${verb} ${item.opponent_team_name} ${item.user_score}-${item.opponent_score}`
-      : item.copy;
-    if (!text) return;
-    entry(item.week, item.box_score_url || '', text, 'box score');
-  });
-
-  return out;
 }
 
 // Team Report and Playbook Summary functions (adapted from training-report.js)

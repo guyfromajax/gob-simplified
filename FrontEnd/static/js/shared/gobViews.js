@@ -274,6 +274,22 @@
     module: viewModule('teamView.js')
   });
 
+  register({
+    id: 'news-view',
+    section: 'news',
+    subtab: 'news-view',
+    title: 'News',
+    module: viewModule('newsView.js')
+  });
+
+  register({
+    id: 'awards-view',
+    section: 'news',
+    subtab: 'awards-view',
+    title: 'Awards',
+    module: viewModule('awardsView.js')
+  });
+
   global.GOBViews = {
     register: register,
     has: has,
