@@ -111,9 +111,9 @@ The shared tab module also serves any other command center that calls `initComma
 | Rail | Sub-tab | Opens |
 |---|---|---|
 | Office | (none) | `home-tab` |
-| Team | Roster | `roster-tab` |
+| Team | Roster | `roster-view` (in-page module view; `team-roster-view.html` redirects here and keeps `franchise_id`, `team_id`, `roster_team_id`, and return params). `?tab=roster-tab` opens this view. |
 | Team | Player Stats | `player-stats-tab` |
-| Team | Team Attributes | `team-stats-tab` (Team Measures) |
+| Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
 | Team | Schedule | `schedule-tab` (the user team's schedule) |
 | Prep | Training | `training-tab` |
 | Prep | Game Plan | `game-plan-tab` |
@@ -169,7 +169,7 @@ A page or brief is done only when this file is updated if the shell, the section
 | team-stats.html | browse | League | Team Stats (`team-stats-view`; the file redirects) |
 | stats.html | browse | League | none |
 | player-detail.html | browse | return context; else Team or League | none |
-| team-roster-view.html | browse | return context; else Team or League | none |
+| team-roster-view.html | redirect to `franchise-command-center.html?tab=roster-view` | Team | Roster |
 | box-score.html | browse when `return_url` is set; otherwise focus | League when browse | none |
 | set-lineup.html, training.html, training-report.html, training-squad-report.html, training-playbooks.html, cut-players.html, game-plan.html, playbooks.html, playbook-report.html | focus | — | — |
 
@@ -315,7 +315,7 @@ Career Leaders keep the older rule for FG% and DEF%: attempts at least 5 times t
 
 A view is a section of the franchise app that lives at `franchise-command-center.html?tab=<view-id>`. That is the same URL rule as today's in-page tabs. Rail clicks still push. Sub-tabs still replace. Back restores the view and the scroll position `GOBNav` already stores. There is no second URL scheme.
 
-In-page tabs (Roster, the Office) stay as panels already in the page. Standings, Rankings, Leaders, and Team Stats are module views. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant. The old Standings, Leaders, and Team Stats panels remain in the page so an old `?tab=` still resolves.
+The Office stays a panel already in the page. Roster, Team Attributes, Standings, Rankings, Leaders, and Team Stats are module views. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant. The old Roster and Team Measures panels remain in the page. `?tab=roster-tab` and `?tab=team-stats-tab` open the new views. An old Standings, Leaders, or Team Stats `?tab=` still opens the old panel.
 
 ### Add a module view
 
@@ -332,6 +332,8 @@ In-page tabs (Roster, the Office) stay as panels already in the page. Standings,
 The first open paints a neutral skeleton in the shape of the view. No spinner. Data comes from `GOBStore.get`. The module stays in the panel after the user leaves. Opening it again shows that panel immediately and calls `GOBStore.revalidate`. The view re-renders only when the body changed. A 304 keeps the table on screen.
 
 An unknown module, or an import that fails, paints a quiet error card with Retry in that panel. The rest of the app stays up. Retry loads the module again. A `?tab=` that is neither a panel nor a registered view still falls back to the section default, as today's tabs do.
+
+Opening a player from Roster writes `gob-view-roster-order` in `sessionStorage`: a JSON array of the player ids in the order on screen at that click. A later pager reads that key. The Roster Varsity / Practice Squad segment is `gob-view-roster-scope` (`varsity` or `practice`).
 
 ## 15. Detail data
 
@@ -376,18 +378,26 @@ No stored tip time, neutral site, or hometown. Those stay off the page.
 
 ### Team attributes
 
-`GET /franchise/team-data?franchise_id&team_id` stays `@browse_cached`. It still returns `team_attributes`, `plays_data`, and `scouting_data`. It also returns `measures`, the league-rank field set for the six Team Attributes. The page does not sort the league or decide which end of a measure is good.
+`GET /franchise/team-data?franchise_id&team_id` stays `@browse_cached`. It still returns `team_attributes`, `plays_data`, and `scouting_data`. It returns one `measures` list and `updated_after_week`. The page does not sort the league or decide which end of a measure is good.
+
+`updated_after_week` is the closed week of the latest earlier office snapshot, or null. The line "Updated after Week N" renders only when it is set.
+
+There are always six rows, in family order. Character: Chemistry, Fight, Discipline. On the floor: Shooting (`shot_threshold`), Rebounding (`rebound_modifier`), Defensive efficiency. A missing stored value is still a row, with `value` null.
 
 | Field | Meaning |
 |---|---|
-| `key` | `team_chemistry`, `fight`, `discipline`, `shot_threshold`, `rebound_modifier`, `defensive_efficiency`. |
-| `label` | Chemistry, Fight, Discipline, Shooting, Rebounding, Defensive efficiency. |
-| `value` | The stored number for this week, the same attributes Office already reads. Null when the team has no stored value. The zero-fill on `team_attributes` does not apply here. |
+| `family`, `family_label` | `character` / Character, or `floor` / On the floor. |
+| `key`, `label` | The six measures and the labels above. |
+| `value` | The stored number for this week. Null when the team has no stored value. The zero-fill on `team_attributes` does not apply here. The page shows it only for Chemistry, as `9/25`. |
 | `scale_max` | 25 for Chemistry. Null for the others. |
-| `direction` | `higher_better` or `lower_better`. Null when the sim uses the measure both ways, which is Fight and Discipline today. Those two keep `value` and leave `rank`, `rank_of`, `percentile`, and `rank_delta` null. |
-| `rank` | 1 is the best end of `direction`. Ties share a place and the next place skips (`1, 2, 2, 4`). |
-| `rank_of` | How many teams in the franchise have a stored value for this measure. A missing value is not ranked and is not counted. |
-| `percentile` | 0–100. 100 is the best end, including a tie for best. 0 is the worst end, including a tie for worst. `100 × (teams strictly worse) / (teams strictly better + teams strictly worse)`. One team, or a measure where every stored value is equal, is 100. |
-| `rank_delta` | How many places the user's team climbed since the latest earlier `office_week_snapshots` `team_measures` for this season. Positive means it moved up. The snapshot is the user team only, so every other team is null. Chemistry is not in that snapshot, so Chemistry is null. Fight and Discipline are null because they are not ranked. |
+| `meter_pct` | Chemistry only: `value / 25 × 100`, clamped 0–100. Null when Chemistry has no value, and null on the other five. The bar does not read this. |
+| `delta` | Change in the stored value since the user team's snapshot. Null when there is no prior value. The page does not show this chip. |
+| `description` | Null until a sentence is stored. |
+| `direction` | `higher_better` for Chemistry, Fight, Discipline, Rebounding, and Defensive efficiency. `lower_better` for Shooting: a make is `shot_score >= shot_threshold`. |
+| `rank` | 1 is the best end of `direction`. Ties share a place and the next place skips (`1, 2, 2, 4`). Null when `value` is null. |
+| `rank_of` | How many teams in the franchise have a stored value. A missing value is not counted. |
+| `percentile` | 0–100. 100 is the best end, including a tie for best. 0 is the worst end, including a tie for worst. The bar fills to this. `100 × (teams strictly worse) / (teams strictly better + teams strictly worse)`. One team, or a measure where every stored value is equal, is 100. |
+| `rank_delta` | How many places the user's team climbed since the latest earlier `office_week_snapshots` `team_measures`. Positive means it moved up. The snapshot is the user team only, so every other team is null. Chemistry is not in that snapshot, so Chemistry is null. The chip is ▲ green (`--delta-up`) or ▼ red (`--delta-down`). Null and 0 draw nothing. |
+| `tied` | True when this rank is shared. The place then reads `T-34th of 128`. |
 
-Shooting (`shot_threshold`) is `lower_better`: a make is `shot_score >= shot_threshold`. Chemistry, Rebounding (`rebound_modifier`), and Defensive efficiency are `higher_better`.
+The place reads `34th of 128`. A null rank reads an em dash and the bar is empty. The bar fill is the neutral DIFF white, not navy.

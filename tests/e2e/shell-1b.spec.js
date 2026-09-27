@@ -234,9 +234,9 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   await page.setViewportSize({ width: 1280, height: 720 });
   await openFcc(page, cc({ week: 1 }));
   const panels = [
-    ['team', 'Roster', 'roster-tab'],
+    ['team', 'Roster', 'roster-view'],
     ['team', 'Player Stats', 'player-stats-tab'],
-    ['team', 'Team Attributes', 'team-stats-tab'],
+    ['team', 'Team Attributes', 'team-attributes-view'],
     ['team', 'Schedule', 'schedule-tab'],
     ['prep', 'Training', 'training-tab'],
     ['prep', 'Game Plan', 'game-plan-tab'],
@@ -348,11 +348,11 @@ test('office team league back returns to team then office', async ({ page }) => 
   await page.setViewportSize({ width: 1280, height: 720 });
   await openFcc(page, cc());
   await mouseClick(page, '[data-gob-section="team"]');
-  await expect(page.locator('#roster-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#roster-view.tab-content.active')).toBeVisible();
   await mouseClick(page, '[data-gob-section="league"]');
   await expect(page.locator('#standings-view.tab-content.active')).toBeVisible();
   await page.goBack();
-  await expect(page.locator('#roster-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#roster-view.tab-content.active')).toBeVisible();
   await expect(page.locator('[data-gob-section="team"]')).toHaveClass(/on/);
   await page.goBack();
   await expect(page.locator('#home-tab.tab-content.active')).toBeVisible();

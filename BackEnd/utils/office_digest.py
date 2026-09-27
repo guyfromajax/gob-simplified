@@ -314,6 +314,69 @@ def prior_measure_baseline(franchise_doc: Mapping[str, Any], completed_week: int
     return {str(key): value for key, value in measures.items() if _num(value) is not None}
 
 
+def prior_measure_snapshot(franchise_doc: Mapping[str, Any], completed_week: int) -> tuple[Optional[dict[str, float]], Optional[int]]:
+    """Latest earlier snapshot's team measures, and the week that snapshot closed."""
+    snaps = _season_snapshots(franchise_doc)
+    earlier = sorted(int(key) for key in snaps if str(key).isdigit() and int(key) < int(completed_week))
+    if not earlier:
+        return None, None
+    closed = earlier[-1]
+    payload = snaps.get(str(closed)) or {}
+    measures = payload.get("team_measures") if isinstance(payload, dict) else None
+    if not isinstance(measures, dict):
+        return None, closed
+    return {str(key): value for key, value in measures.items() if _num(value) is not None}, closed
+
+
+_MEASURE_FAMILIES = (
+    ("character", "Character", (
+        ("team_chemistry", "Chemistry", 25),
+        ("fight", "Fight", None),
+        ("discipline", "Discipline", None),
+    )),
+    ("floor", "On the floor", (
+        ("shot_threshold", "Shooting", None),
+        ("rebound_modifier", "Rebounding", None),
+        ("defensive_efficiency", "Defensive efficiency", None),
+    )),
+)
+
+
+def team_attribute_measures(
+    attributes: Optional[Mapping[str, Any]],
+    before: Optional[Mapping[str, Any]],
+    updated_after_week: Optional[int],
+) -> dict[str, Any]:
+    """Rows the Team Attributes view renders. Scales stay unset where none is stored."""
+    attrs = attributes if isinstance(attributes, Mapping) else {}
+    prior = before if isinstance(before, Mapping) else {}
+    rows: list[dict[str, Any]] = []
+    for family, family_label, keys in _MEASURE_FAMILIES:
+        for key, label, scale in keys:
+            raw = attrs.get(key) if key in attrs else None
+            value = _num(raw) if raw is not None else None
+            delta = None
+            if value is not None and key in prior:
+                prev = _num(prior.get(key))
+                if prev is not None:
+                    delta = value - prev
+            meter = None
+            if value is not None and scale:
+                meter = max(0.0, min(100.0, (value / float(scale)) * 100.0))
+            rows.append({
+                "family": family,
+                "family_label": family_label,
+                "key": key,
+                "label": label,
+                "value": value,
+                "scale_max": scale,
+                "meter_pct": meter,
+                "delta": delta,
+                "description": None,
+            })
+    return {"measures": rows, "updated_after_week": updated_after_week}
+
+
 def office_snapshot_payload(
     *,
     completed_week: int,

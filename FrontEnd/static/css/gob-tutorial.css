@@ -10,7 +10,9 @@
 
 :root {
   /* brand */
-  --blue:        #27408e;   /* primary anchor */
+  /* Do not set --blue here. This sheet is injected on the command center,
+     and :root --blue would override the shell token on html.gob.
+     Shell --blue / --tier-blue is the bright tier blue, #4A90D9. */
   --blue-top:    #2b4794;
   --blue-mid:    #1e3068;
   --blue-deep:   #141f4a;

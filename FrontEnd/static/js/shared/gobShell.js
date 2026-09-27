@@ -24,9 +24,9 @@
   var SECTIONS = [
     { id: 'office', label: 'Office', title: "Coach's Office", icon: 'office', tabs: [{ id: 'home-tab' }] },
     { id: 'team', label: 'Team', title: 'Team', icon: 'team', tabs: [
-      { id: 'roster-tab', label: 'Roster' },
+      { id: 'roster-view', label: 'Roster' },
       { id: 'player-stats-tab', label: 'Player Stats' },
-      { id: 'team-stats-tab', label: 'Team Attributes' },
+      { id: 'team-attributes-view', label: 'Team Attributes' },
       { id: 'schedule-tab', label: 'Schedule' }
     ]},
     { id: 'prep', label: 'Prep', title: 'Prep', icon: 'prep', tabs: [
@@ -54,8 +54,10 @@
   var TAB_SECTION = {
     'home-tab': 'office',
     'roster-tab': 'team',
+    'roster-view': 'team',
     'player-stats-tab': 'team',
     'team-stats-tab': 'team',
+    'team-attributes-view': 'team',
     'schedule-tab': 'team',
     'training-tab': 'prep',
     'game-plan-tab': 'prep',
@@ -541,10 +543,10 @@
     topId.addEventListener('click', function (event) {
       event.preventDefault();
       var tab = currentTab();
-      if (tab === 'roster-tab') return;
+      if (tab === 'roster-view' || tab === 'roster-tab') return;
       playClick();
       var mode = (TAB_SECTION[tab] || 'office') === 'team' ? 'replace' : 'push';
-      openTab('roster-tab', mode);
+      openTab('roster-view', mode);
     });
 
     var divider = document.createElement('div');
@@ -873,9 +875,9 @@
     topId.addEventListener('click', function (event) {
       event.preventDefault();
       if (!pageMode) return;
-      if (pageMode.section === 'team' && pageMode.sub === 'roster-tab') return;
+      if (pageMode.section === 'team' && (pageMode.sub === 'roster-view' || pageMode.sub === 'roster-tab')) return;
       playClick();
-      var href = fccHref('roster-tab');
+      var href = fccHref('roster-view');
       var nav = window.GOBNav;
       if (pageMode.section === 'team') {
         if (nav && nav.replace) nav.replace(href);

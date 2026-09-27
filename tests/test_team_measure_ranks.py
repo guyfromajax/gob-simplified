@@ -40,8 +40,8 @@ def test_direction_table():
     directions = {spec["key"]: spec["direction"] for spec in MEASURE_SPECS}
     assert directions == {
         "team_chemistry": "higher_better",
-        "fight": None,
-        "discipline": None,
+        "fight": "higher_better",
+        "discipline": "higher_better",
         "shot_threshold": "lower_better",
         "rebound_modifier": "higher_better",
         "defensive_efficiency": "higher_better",
@@ -120,20 +120,27 @@ def test_missing_values_are_excluded_from_rank_of():
     assert missing["percentile"] is None
 
 
-def test_two_sided_measures_keep_the_value_and_do_not_rank():
+def test_fight_and_discipline_rank_higher_better_and_mark_ties():
     rows = [
-        _row("a", fight=-1, discipline=4),
-        _row("b", fight=6, discipline=-2),
+        _row("a", fight=2, discipline=4),
+        _row("b", fight=6, discipline=4),
+        _row("c", fight=0, discipline=-2),
+        _row("d", fight=6, discipline=1),
     ]
-    fight = _by_key(build_measures(rows, "a", {"fight": 0, "discipline": 0}))["fight"]
-    discipline = _by_key(build_measures(rows, "a"))["discipline"]
-    assert fight["value"] == -1
-    assert fight["direction"] is None
-    assert fight["rank"] is None
-    assert fight["rank_of"] is None
-    assert fight["rank_delta"] is None
-    assert discipline["direction"] is None
-    assert discipline["rank"] is None
+    fight = _by_key(build_measures(rows, "a", {"fight": -1}))["fight"]
+    discipline = _by_key(build_measures(rows, "b"))["discipline"]
+    assert fight["direction"] == "higher_better"
+    assert fight["value"] == 2
+    assert fight["rank"] == 3
+    assert fight["rank_of"] == 4
+    assert fight["rank_delta"] == 1
+    assert fight["tied"] is False
+    tied = _by_key(build_measures(rows, "b"))["fight"]
+    assert tied["rank"] == 1
+    assert tied["tied"] is True
+    assert discipline["direction"] == "higher_better"
+    assert discipline["rank"] == 1
+    assert discipline["tied"] is True
 
 
 def test_team_data_route_attaches_ranks_and_the_user_delta():
@@ -177,9 +184,15 @@ def test_team_data_route_attaches_ranks_and_the_user_delta():
     measures = _by_key(body["measures"])
     assert list(measures) == [spec["key"] for spec in MEASURE_SPECS]
 
+    assert body["updated_after_week"] == 2
     chemistry = measures["team_chemistry"]
+    assert chemistry["family"] == "character"
+    assert chemistry["family_label"] == "Character"
+    assert chemistry["label"] == "Chemistry"
     assert chemistry["value"] == 18
     assert chemistry["scale_max"] == 25
+    assert chemistry["meter_pct"] == 72
+    assert chemistry["description"] is None
     assert chemistry["direction"] == "higher_better"
     assert chemistry["rank"] == 2
     assert chemistry["rank_of"] == 4
@@ -187,19 +200,31 @@ def test_team_data_route_attaches_ranks_and_the_user_delta():
     assert chemistry["rank_delta"] is None
 
     shooting = measures["shot_threshold"]
+    assert shooting["family"] == "floor"
+    assert shooting["label"] == "Shooting"
     assert shooting["direction"] == "lower_better"
+    assert shooting["meter_pct"] is None
     assert shooting["rank"] == 2
     assert shooting["rank_of"] == 4
     assert shooting["rank_delta"] == 2
 
     rebounding = measures["rebound_modifier"]
+    assert rebounding["label"] == "Rebounding"
+    assert rebounding["meter_pct"] is None
     assert rebounding["rank_of"] == 3
     assert rebounding["value"] == 0.48
 
-    assert measures["fight"]["value"] == -1
-    assert measures["fight"]["rank"] is None
+    fight = measures["fight"]
+    assert fight["value"] == -1
+    assert fight["direction"] == "higher_better"
+    assert fight["meter_pct"] is None
+    assert fight["rank"] == 4
+    assert fight["rank_of"] == 4
+    assert fight["percentile"] == 0
+    assert fight["rank_delta"] == -2
     assert measures["discipline"]["value"] is None
     assert measures["discipline"]["rank"] is None
+    assert measures["discipline"]["meter_pct"] is None
 
     other = client.get(f"/franchise/team-data?franchise_id={fid}&team_id={OTHER}")
     assert other.status_code == 200

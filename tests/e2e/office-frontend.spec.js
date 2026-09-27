@@ -802,7 +802,8 @@ test('attribute chips group, order, and cap', async ({ page }) => {
     id: node.dataset.playerId,
     chips: [...node.querySelectorAll('.attr-chip')].map((chip) => ({
       code: chip.querySelector('.attr-code').textContent,
-      value: chip.querySelector('.tdig').textContent,
+      value: chip.querySelector('.attr-tile s').textContent,
+      tier: chip.querySelector('.attr-tile').className,
       title: chip.getAttribute('title'),
       dir: chip.querySelector('.arr').classList.contains('up') ? 'up' : 'down',
       text: chip.textContent,
@@ -811,6 +812,8 @@ test('attribute chips group, order, and cap', async ({ page }) => {
   expect(rows.map((row) => row.id)).toEqual(['p-amy', 'p-eve', 'p-cal', 'p-bob', 'p-dee']);
   expect(rows[0].chips.map((chip) => chip.code + chip.dir + chip.value)).toEqual(['BHup5', 'NDdown7']);
   expect(rows[0].chips[0].title).toBe('Ball Handling');
+  expect(rows[0].chips[0].tier).toContain('is-mid');
+  expect(rows[0].chips[1].tier).toContain('is-hi');
   expect(rows[0].chips[0].text).not.toContain('3');
   expect(rows[1].chips.map((chip) => chip.dir)).toEqual(['up', 'down']);
   await expect(page.locator('#office-root .office-mv .lnk')).toHaveText(/All changes/);

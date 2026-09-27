@@ -85,3 +85,28 @@ Fields are in `UX_System.md` §15, Team attributes.
 ## Commit
 
 `68208f648` on `api/team-measure-ranks`: Rank team attribute measures across the league on team-data.
+
+## Follow-up
+
+Fight and Discipline are `higher_better`. Jamie's call: that is the net effect as the game is coded. They rank with the others. A missing value is still the only unranked case.
+
+`origin/develop` is merged. develop's `app/t2-roster` already returned `measures[]` (`family`, `family_label`, `key`, `label`, `value`, `scale_max`, `meter_pct`, `delta`, `description`) and `updated_after_week`. There is one list: those objects, plus `direction`, `rank`, `rank_of`, `percentile`, `rank_delta`, and `tied`. Family grouping and labels stay T2's. `meter_pct` stays on Chemistry only (value / 25). The bar reads `percentile`. The league read is still the projected scan. The route stays `@browse_cached`. The snapshot week is the franchise `week` field, which is what the rest of the app stores; `current_week` is the fallback.
+
+The Team Attributes view shows the label, then Chemistry's `9/25`, then the place (`34th of 128`, or `T-34th of 128` when `tied`). The bar is the neutral DIFF white, filled to the percentile. An empty rank is an em dash and an empty bar. `rank_delta` is ▲ in `--delta-up` or ▼ in `--delta-down`. Null and 0 draw no chip. Fight, Discipline, Shooting, Rebounding, and Defensive efficiency do not show the raw engine number.
+
+Lancaster on the save copy, week 3, no office snapshot, so no chips:
+
+| Measure | Place |
+|---|---|
+| Chemistry 9/25 | T-92nd of 128 |
+| Fight | T-61st of 128 |
+| Discipline | T-112th of 128 |
+| Shooting | T-64th of 128 |
+| Rebounding | T-64th of 128 |
+| Defensive efficiency | T-36th of 128 |
+
+Shots, pointer in `.main`: `reports/team-measure-ranks/team-attributes-1280x720.png` and `team-attributes-1920x1080.png`.
+
+Tests. Backend on mongomock and on `GOB_PERSISTENCE=sqlite` / `GOB_DB_MODE=mongomock`: `test_team_measure_ranks`, `test_team_attribute_measures`, `test_office_digest`, `test_persistence_adapter`, `test_t3_detail` (69 passed on SQLite). Playwright, workers 1: `t2-roster`, `shell-1`, `shell-2`, `office-frontend` — 34 passed, 1 skipped (the live mid-season office digest).
+
+`UX_System.md` §15 Team attributes describes this single shape.

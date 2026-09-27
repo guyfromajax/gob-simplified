@@ -144,6 +144,22 @@
     module: viewModule('teamStatsView.js')
   });
 
+  register({
+    id: 'roster-view',
+    section: 'team',
+    subtab: 'roster-view',
+    title: 'Roster',
+    module: viewModule('rosterView.js')
+  });
+
+  register({
+    id: 'team-attributes-view',
+    section: 'team',
+    subtab: 'team-attributes-view',
+    title: 'Team Attributes',
+    module: viewModule('teamAttributesView.js')
+  });
+
   global.GOBViews = {
     register: register,
     has: has,

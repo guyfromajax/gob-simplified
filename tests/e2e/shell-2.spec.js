@@ -534,7 +534,7 @@ test('sticky table headers sit on the first row, then pin under the page head', 
   const cases = [
     ['rankings.html', '#rankings-table', '#rankings-table thead th', '#rankings-table tbody tr', ''],
     ['recruiting.html', 'table.pool', 'table.pool thead th', 'table.pool tbody tr', ''],
-    ['team-roster-view.html', '#roster-table', '#roster-table thead th', '#roster-table tbody tr', ''],
+    ['team-roster-view.html', '#roster-view .gob-tbl', '#roster-view .gob-tbl thead th', '#roster-view .gob-tbl tbody tr', ''],
     ['box-score.html', '#quarter-scoring-table', '#quarter-scoring-table thead th', '#quarter-scoring-table tbody tr', '&return_url=' + encodeURIComponent('/schedule.html') + '&game_id=g-box&home=Lancaster&away=Four%20Corners'],
     ['box-score.html', '#home-player-stats-table', '#home-player-stats-table thead th', '#home-player-stats-body tr', '&return_url=' + encodeURIComponent('/schedule.html') + '&game_id=g-box&home=Lancaster&away=Four%20Corners'],
   ];
@@ -547,12 +547,12 @@ test('sticky table headers sit on the first row, then pin under the page head', 
       await page.waitForFunction(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gob-stick-top')) > 20);
       const wide = await page.evaluate((tableSel) => {
         const table = document.querySelector(tableSel);
-        return !!(table && table.closest('.gob-wide-wrap'));
+        return !!(table && (table.closest('.gob-wide-wrap') || table.closest('.gob-xs')));
       }, item[1]);
       if (wide) {
         const contained = await page.evaluate((tableSel) => {
           const main = document.querySelector('html.gob-shell .main');
-          const wrap = document.querySelector(tableSel).closest('.gob-wide-wrap');
+          const wrap = document.querySelector(tableSel).closest('.gob-wide-wrap, .gob-xs');
           const header = document.querySelector(tableSel + ' thead th');
           return wrap.getBoundingClientRect().right <= main.getBoundingClientRect().right + 1
             && getComputedStyle(header).position !== 'sticky';

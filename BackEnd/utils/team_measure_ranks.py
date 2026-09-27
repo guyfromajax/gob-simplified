@@ -1,20 +1,18 @@
 """League ranks for the Team Attributes measures on GET /franchise/team-data.
 
-develop has no ``measures[]`` on that route. This module is the field set the
-route attaches. It does not build the roster-page family rows.
-
-Direction comes from how the sim consumes the stored number. ``fight`` and
-``discipline`` are left unranked: each one helps the team in one check and
-hurts it in another, so neither end is "best" until that call is made.
+The route's ``measures[]`` is the roster rows (family, label, value, scale,
+meter, value delta, description) with these rank fields added. This module
+does not write snapshots.
 
 ``rank_delta`` uses the user team's prior ``team_measures`` snapshot
 (``office_week_snapshots`` / ``TEAM_MEASURE_KEYS``). Chemistry is not in that
-snapshot, so its delta stays null. This module does not write snapshots.
+snapshot, so its delta stays null.
 """
 
 from __future__ import annotations
 
 import json
+from collections import Counter
 from typing import Any, Mapping, Optional
 
 from bson import ObjectId
@@ -25,8 +23,8 @@ from BackEnd.utils.office_digest import CHEMISTRY_MAX, TEAM_MEASURE_KEYS
 # have no display scale.
 MEASURE_SPECS: tuple[dict[str, Any], ...] = (
     {"key": "team_chemistry", "label": "Chemistry", "direction": "higher_better", "scale_max": CHEMISTRY_MAX},
-    {"key": "fight", "label": "Fight", "direction": None, "scale_max": None},
-    {"key": "discipline", "label": "Discipline", "direction": None, "scale_max": None},
+    {"key": "fight", "label": "Fight", "direction": "higher_better", "scale_max": None},
+    {"key": "discipline", "label": "Discipline", "direction": "higher_better", "scale_max": None},
     {"key": "shot_threshold", "label": "Shooting", "direction": "lower_better", "scale_max": None},
     {"key": "rebound_modifier", "label": "Rebounding", "direction": "higher_better", "scale_max": None},
     {"key": "defensive_efficiency", "label": "Defensive efficiency", "direction": "higher_better", "scale_max": None},
@@ -155,6 +153,7 @@ def build_measures(
             "rank_of": None,
             "percentile": None,
             "rank_delta": None,
+            "tied": False,
         }
         if direction not in ("higher_better", "lower_better"):
             measures.append(entry)
@@ -175,6 +174,7 @@ def build_measures(
         entry["rank"] = ranks[key]
         entry["rank_of"] = len(scored)
         entry["percentile"] = percentile(scored[key], board, higher_better=higher_better)
+        entry["tied"] = Counter(ranks.values())[entry["rank"]] > 1
         entry["rank_delta"] = _rank_delta(
             measure_key,
             key,
@@ -260,3 +260,29 @@ def measures_for_team(
     if not any(row["team_id"] == key for row in rows):
         rows.append({"team_id": key, "values": _values_from_attributes(own_attributes)})
     return build_measures(rows, key, prior_measures)
+
+
+def merge_display_ranks(
+    display_rows: list[Mapping[str, Any]],
+    ranked_rows: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """T2 measure objects plus rank fields. One list, display order.
+
+    ``meter_pct`` stays on Chemistry only. The bar reads ``percentile``.
+    """
+    ranked = {row.get("key"): row for row in ranked_rows}
+    merged: list[dict[str, Any]] = []
+    for row in display_rows:
+        key = row.get("key")
+        extra = ranked.get(key) or {}
+        out = dict(row)
+        out["direction"] = extra.get("direction")
+        out["rank"] = extra.get("rank")
+        out["rank_of"] = extra.get("rank_of")
+        out["percentile"] = extra.get("percentile")
+        out["rank_delta"] = extra.get("rank_delta")
+        out["tied"] = bool(extra.get("tied"))
+        if key != "team_chemistry":
+            out["meter_pct"] = None
+        merged.append(out)
+    return merged

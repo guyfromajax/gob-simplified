@@ -11,9 +11,9 @@ const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/shell-1');
 const TABS = [
   ['home-tab', 'office'],
-  ['roster-tab', 'team'],
+  ['roster-tab', 'team', 'roster-view'],
   ['player-stats-tab', 'team'],
-  ['team-stats-tab', 'team'],
+  ['team-stats-tab', 'team', 'team-attributes-view'],
   ['schedule-tab', 'team'],
   ['game-plan-tab', 'prep'],
   ['playbooks-tab', 'prep'],
@@ -189,9 +189,9 @@ test('office before and after at both sizes', async ({ page }) => {
 test('sections and sub-tabs open the matching panel', async ({ page }) => {
   const shots = [
     ['office', 'home-tab', null],
-    ['team', 'roster-tab', 'Roster'],
+    ['team', 'roster-view', 'Roster'],
     ['team-player-stats', 'player-stats-tab', 'Player Stats'],
-    ['team-attributes', 'team-stats-tab', 'Team Attributes'],
+    ['team-attributes', 'team-attributes-view', 'Team Attributes'],
     ['team-schedule', 'schedule-tab', 'Schedule'],
     ['prep', 'training-tab', 'Training'],
     ['prep-plan', 'game-plan-tab', 'Game Plan'],
@@ -363,7 +363,7 @@ test('rail active state follows deep links and back, and exit calls the existing
   await mouseClick(page, '[data-gob-section="prep"]');
   await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'prep');
   await page.goBack();
-  await expect(page.locator('#roster-tab.tab-content.active')).toBeVisible();
+  await expect(page.locator('#roster-view.tab-content.active')).toBeVisible();
   await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'team');
   await page.goForward();
   await expect(page.locator('#training-tab.tab-content.active')).toBeVisible();
