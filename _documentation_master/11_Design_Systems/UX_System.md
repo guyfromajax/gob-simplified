@@ -127,8 +127,8 @@ The shared tab module also serves any other command center that calls `initComma
 | League | Practice Squad | existing `#fcc-ps-season-link` (`practice-squad-standings.html`, `franchise_id` and `team_id`) |
 | League | Tournament | existing `brackets.html` href, or the same resource query already on the rankings link. Before the first week `GOBTierEmblem.tierForWeek` returns a tier, the control is disabled: same shape, `--text-38`, `not-allowed`, not focusable, title `Opens Week N`. |
 | Recruiting | Pool, Leans, Visits | `recruiting.html?hub=pool\|leans\|visits` via `openRecruitingSurface` / `GOBNav.go` from the rail (`franchise_id`, `team_id`, `from=fcc`, `return_url`). The sub-tab replaces `hub` on that same document. The name search sits in `.pg-tools` as `.gob-search` ("Search name…", `/` to focus). Weeks 35 and 36 hide the row; the sign board or the results list is the page. Focus mode hides the head, including the row. An old `?tab=recruits-tab` deep link opens `home-tab`. |
-| News | News | `press-tab` |
-| News | Awards | `awards.html` with the resource query already on the rankings link. There is no dedicated awards anchor on the page |
+| News | News | `news-view` (in-page module view; `news.html` redirects here and keeps `franchise_id`, `team_id`, `story`, and return params). `?tab=press-tab` opens this view. |
+| News | Awards | `awards-view` (in-page module view; `awards.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
 
 History is not a section.
 
@@ -173,8 +173,8 @@ env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HO
 | practice-squad-standings.html | browse | League | Practice Squad |
 | practice-squad-bracket.html | browse | League | Practice Squad |
 | brackets.html | browse | League | Tournament |
-| awards.html | browse | News | Awards |
-| news.html | browse | News | News |
+| awards.html | redirect to `franchise-command-center.html?tab=awards-view` | News | Awards |
+| news.html | redirect to `franchise-command-center.html?tab=news-view` (`story` is kept) | News | News |
 | leaders.html | browse | League | Leaders (`leaders-view`; the file redirects) |
 | standings.html | browse | League | Standings (`standings-view`; the file redirects) |
 | team-stats.html | browse | League | Team Stats (`team-stats-view`; the file redirects) |
@@ -326,7 +326,11 @@ Career Leaders keep the older rule for FG% and DEF%: attempts at least 5 times t
 
 A view is a section of the franchise app that lives at `franchise-command-center.html?tab=<view-id>`. That is the same URL rule as today's in-page tabs. Rail clicks still push. Sub-tabs still replace. Back restores the view and the scroll position `GOBNav` already stores. There is no second URL scheme.
 
-The Office stays a panel already in the page. Roster, Player Stats, Team Attributes, Team Schedule, Standings, Rankings, Leaders, Team Stats, and League Schedule are module views. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant. The old Roster and Team Measures panels remain in the page. `?tab=roster-tab` and `?tab=team-stats-tab` open the new views. An old Standings, Leaders, or Team Stats `?tab=` still opens the old panel. Team › Schedule reads `GET /franchise/team-detail`. League › Schedule reads `GET /franchise/schedule/week` (`@browse_cached`, one week). The whole-season national route stays for other callers. The next-game row on the team table is a neutral tint. Navy (`tr.me`) is only the user's game on the league week, the same mark the Office uses for the user's team. The league row reads Away, the score, Home, then a quiet Box score link. The team row is Week, Site, Opponent, Result, Box score. Both tables fill the card. The name columns take the spare width, and the short columns stay compact.
+The Office stays a panel already in the page. Roster, Player Stats, Team Attributes, Team Schedule, Standings, Rankings, Leaders, Team Stats, League Schedule, News, and Awards are module views. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant. The old Roster and Team Measures panels remain in the page. `?tab=roster-tab` and `?tab=team-stats-tab` open the new views. An old Standings, Leaders, or Team Stats `?tab=` still opens the old panel. Team › Schedule reads `GET /franchise/team-detail`. League › Schedule reads `GET /franchise/schedule/week` (`@browse_cached`, one week). The whole-season national route stays for other callers. The next-game row on the team table is a neutral tint. Navy (`tr.me`) is only the user's game on the league week, the same mark the Office uses for the user's team. The league row reads Away, the score, Home, then a quiet Box score link. The team row is Week, Site, Opponent, Result, Box score. Both tables fill the card. The name columns take the spare width, and the short columns stay compact.
+
+News reads `GET /franchise/news` (`@browse_cached`). `news` is `season_news` as stored, newest first, grouped by week. `dispatches` are your-team rows built on the server from `latest_training` and `season_inbox` (training report, Practice Squad development report, your game result). Each dispatch is `{week, type, headline, target, link_label, yours}`. `yours` is the navy left edge. Headlines are plain text. A headline push opens that story's `rich_lines` or `lines` in the same panel; Back returns to the feed. `news.html?story=` redirects here with the story param. The Office card still uses `news_headlines` (five, upset reports excluded).
+
+Awards reads `GET /franchise/awards` (`@browse_cached`). Before week 35 the route is 400 and the view says "Awards are not available yet." From week 35 the snapshot is `all_american_teams` (1st, 2nd, 3rd) with the stored stat line. The user's team row is `tr.me`. There is no season list and no portrait.
 
 ### Add a module view
 

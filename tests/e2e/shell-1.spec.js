@@ -23,7 +23,7 @@ const TABS = [
   ['awards-tab', 'league'],
   ['training-tab', 'prep'],
   ['recruits-tab', 'office', 'home-tab'],
-  ['press-tab', 'news'],
+  ['press-tab', 'news', 'news-view'],
 ];
 
 function cc(overrides) {
@@ -203,7 +203,7 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
     ['league', 'standings-view', 'Standings'],
     ['league-leaders', 'leaders-view', 'Leaders'],
     ['league-team-stats', 'team-stats-view', 'Team Stats'],
-    ['news', 'press-tab', 'News'],
+    ['news', 'news-view', 'News'],
   ];
   for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
     await page.setViewportSize({ width: size[0], height: size[1] });

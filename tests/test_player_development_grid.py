@@ -230,32 +230,33 @@ def test_the_inbox_tab_is_gone_with_nothing_dangling():
 def test_tab_order_is_training_then_recruiting_then_news():
     bar = FCC_HTML[FCC_HTML.index('data-tab="standings-tab"'):FCC_HTML.index("</div>", FCC_HTML.index('data-tab="standings-tab"'))]
     order = [bar.index(t) for t in ('data-tab="awards-tab"', 'data-tab="training-tab"',
-                                    'data-tab="recruits-tab"', 'data-tab="press-tab"')]
+                                    'data-tab="recruits-tab"', 'data-tab="news-view"')]
     assert order == sorted(order)
 
 
 def test_everything_the_inbox_published_now_runs_in_news():
-    """Training report, Practice Squad development report, and game results/box scores."""
-    fn = FCC_JS[FCC_JS.index("function fccTeamDispatches"):]
-    fn = fn[:fn.index("\nfunction renderNewsTab") if "\nfunction renderNewsTab" in fn else len(fn)]
-    assert "training report" in fn
-    assert "training_squad_report" in fn
-    assert "game_result" in fn
-    assert "box score" in fn
+    """Training report, Practice Squad development report, and game results/box scores.
+    The sentences are built on the news route, not in the browser."""
+    src = (S.parent.parent / "BackEnd" / "api" / "franchise_routes.py").read_text()
+    assert 'f"Week {report_week} training report"' in src
+    assert 'f"Week {week} Practice Squad development report"' in src
+    assert '"type": "game_result"' in src
+    assert '"link_label": "box score"' in src
+    assert "function fccTeamDispatches" not in FCC_JS
 
 
 def test_dispatches_interleave_into_the_week_cards():
-    fn = FCC_JS[FCC_JS.index("async function renderNewsTab"):]
-    fn = fn[:fn.index("\nasync function renderHomeTab")]
-    assert "fccTeamDispatches(" in fn
-    assert "b.mine.join('')" in fn, "your items render inside the week card, not beside it"
+    view = (S / "js" / "shared" / "views" / "newsView.js").read_text()
+    mine = view.index("group.mine.forEach")
+    stories = view.index("group.stories.forEach")
+    assert mine < stories, "your items render above that week's headlines"
 
 
 def test_a_shared_report_link_still_has_its_back_button():
     """Links already out in the wild carry from=inbox; the tab they named is gone, but the
     Back button must still work and must now return to News."""
     assert "_reportFromRaw === 'news' || _reportFromRaw === 'inbox'" in REPORT_JS
-    assert "tab: 'press-tab'" in REPORT_JS
+    assert "tab: 'news-view'" in REPORT_JS
     assert "tutorials-tab" not in REPORT_JS
 
 

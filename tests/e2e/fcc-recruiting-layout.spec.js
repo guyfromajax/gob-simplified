@@ -135,7 +135,7 @@ test.describe('wire card: drops as visible as gains', () => {
 test.describe('tab badge', () => {
   test('.inbox-badge renders on the Recruiting tab and the tab is renamed', async ({ page }) => {
     const start = HTML.indexOf('<div class="tab-buttons">');
-    const end = HTML.indexOf('</div>', HTML.indexOf('data-tab="press-tab"'));
+    const end = HTML.indexOf('</div>', HTML.indexOf('data-tab="news-view"'));
     const tabBar = HTML.slice(start, end + 6);
     await mount(page, `<div id="tournament-tabs">${tabBar}</div>`);
     const result = await page.evaluate(() => {

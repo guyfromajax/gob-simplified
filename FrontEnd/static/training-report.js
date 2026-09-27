@@ -435,8 +435,8 @@ function setupLockerRoomButton() {
     if (mode === 'franchise') {
       if (reportFrom === 'news') {
         const lockerRoomUrl = (typeof buildFranchiseLockerRoomUrl === 'function')
-          ? buildFranchiseLockerRoomUrl(franchiseId, teamId, { tab: 'press-tab' })
-          : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tab=press-tab`;
+          ? buildFranchiseLockerRoomUrl(franchiseId, teamId, { tab: 'news-view' })
+          : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tab=news-view`;
         if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl);
         else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
         else window.location.replace(lockerRoomUrl);
