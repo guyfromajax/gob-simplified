@@ -47,6 +47,34 @@
     return new URLSearchParams(search || '');
   }
 
+  function gameplayKeysOwnedByOneGame() {
+    return [
+      'game_id',
+      'quarter',
+      'period',
+      'clock',
+      'resume_from_timeout',
+      'resume_from_anchor',
+      'consume_resume_anchor',
+      'active_resume',
+      'anchor_type',
+      'quarter_break_from',
+      'lineup_checkpoint',
+    ];
+  }
+
+  function inboundNamesNewMatchup(stored, fromUrl) {
+    var keys = ['week', 'home_id', 'away_id', 'home', 'away'];
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      if (!Object.prototype.hasOwnProperty.call(fromUrl, key)) continue;
+      var incoming = String(fromUrl[key]);
+      var previous = stored[key] == null ? '' : String(stored[key]);
+      if (incoming !== previous) return true;
+    }
+    return false;
+  }
+
   function applySearchToLocation(loc, history, search) {
     var qs = search ? (search.charAt(0) === '?' ? search : '?' + search) : '';
     var pathname = (loc && loc.pathname) || '';
@@ -154,7 +182,19 @@
         if (value != null && value !== '') fromUrl[key] = String(value);
       });
     } catch (e) { /* ignore */ }
+    var previous = stored;
     var merged = Object.assign({}, stored, fromUrl);
+    // A new week or matchup navigates without game_id (Play Next Game). The
+    // previous game's id must not ride along, or phase A records the new score
+    // on last week's document.
+    if (
+      !Object.prototype.hasOwnProperty.call(fromUrl, 'game_id') &&
+      inboundNamesNewMatchup(previous, fromUrl)
+    ) {
+      gameplayKeysOwnedByOneGame().forEach(function (key) {
+        if (!Object.prototype.hasOwnProperty.call(fromUrl, key)) delete merged[key];
+      });
+    }
     if (!isRuntime(merged.runtime)) merged.runtime = defaultRuntime();
     return merged;
   };

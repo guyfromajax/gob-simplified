@@ -66,6 +66,88 @@ async function recoverFranchiseWeek(franchiseId) {
   return null;
 }
 
+function idOfGameDoc(doc) {
+  if (!doc || typeof doc !== 'object') return null;
+  const raw = doc.game_id || doc._id;
+  if (raw && typeof raw === 'object' && raw.$oid) return String(raw.$oid);
+  if (raw == null || raw === '') return null;
+  return String(raw);
+}
+
+function documentHasBoxPlayers(doc) {
+  if (!doc || typeof doc !== 'object') return false;
+  const rows = [];
+  const take = (box) => {
+    if (!box || typeof box !== 'object') return;
+    Object.values(box).forEach((value) => {
+      if (!value || typeof value !== 'object') return;
+      if (value.playerId || value.player_id) rows.push(value);
+      else take(value);
+    });
+  };
+  const teams = doc.teams;
+  if (teams && typeof teams === 'object') {
+    Object.values(teams).forEach((team) => {
+      if (team && typeof team === 'object') take(team.box_score);
+    });
+  }
+  take(doc.box_score);
+  return rows.length > 0;
+}
+
+function phaseAGameDocument(simData) {
+  if (!simData || typeof simData !== 'object') return null;
+  if (simData.final_game_document && documentHasBoxPlayers(simData.final_game_document)) {
+    return simData.final_game_document;
+  }
+  if (documentHasBoxPlayers(simData)) return simData;
+  return null;
+}
+
+function retryPhaseAWithBoxDocument(requestBody, playedDocument, postedGameId) {
+  if (!playedDocument || !documentHasBoxPlayers(playedDocument)) return null;
+  const boxId = idOfGameDoc(playedDocument);
+  if (!boxId || String(boxId) === String(postedGameId)) return null;
+  return {
+    ...requestBody,
+    game_id: boxId,
+    game_document: playedDocument,
+  };
+}
+
+async function postPhaseA(requestBody) {
+  return fetch(API_CONFIG.buildUrl('/franchise/complete-week/phase-a'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  });
+}
+
+async function readPhaseAError(res) {
+  let body = null;
+  try {
+    body = await res.json();
+  } catch (error) {
+    body = null;
+  }
+  const detail = body && body.detail;
+  if (detail && typeof detail === 'object') {
+    return {
+      reason: detail.reason || null,
+      message: detail.message || '',
+    };
+  }
+  return { reason: null, message: typeof detail === 'string' ? detail : '' };
+}
+
+function clearStaleGameIdFromContext() {
+  const ctx = franchiseCtx();
+  if (!ctx || typeof ctx.set !== 'function') return;
+  ['game_id', 'quarter', 'period', 'clock', 'resume_from_timeout', 'resume_from_anchor', 'consume_resume_anchor', 'active_resume', 'anchor_type', 'quarter_break_from'].forEach((key) => {
+    try { ctx.set(key, null); } catch (error) { /* session may be unavailable */ }
+  });
+}
+
 export async function finalizeGame({ simData, franchiseId, game }) {
   console.warn('[COMPLETE-WEEK TRACE] finalizeGame ENTRY', { hasSimData: !!simData, franchiseId });
   // ✅ UNIFIED STRUCTURE: Extract team names with priority: unified structure > backward compatibility
@@ -183,6 +265,7 @@ export async function finalizeGame({ simData, franchiseId, game }) {
   let franchiseCompleteWeekPayload = undefined;
   let franchisePhaseBPending = undefined;
   let franchisePhaseAOk = undefined;
+  let finalScorePhaseABlocked = undefined;
 
   if (canCompleteWeek) {
     try {
@@ -202,8 +285,9 @@ export async function finalizeGame({ simData, franchiseId, game }) {
         simData.homeTeamId ||
         homeTeamObj.name ||
         simData.home_team;
-      // ✅ SS&S: Extract game_id from simData (actual gameplay document ID)
-      const gameId = simData.game_id || simData._id;
+      const playedDocument = phaseAGameDocument(simData);
+      // The id that owns the box, not a session id left over from last week.
+      const gameId = idOfGameDoc(playedDocument) || simData.game_id || simData._id;
       const quarter = simData.quarter || simData.quarters || 'N/A';
       const isFinal = simData.is_final || false;
       console.log(
@@ -223,27 +307,46 @@ export async function finalizeGame({ simData, franchiseId, game }) {
         },
       };
 
-      if (simData && simData.final_game_document) {
-        console.log('✅ Passing final_game_document to phase-a (eliminates race condition)');
-        requestBody.game_document = simData.final_game_document;
+      if (playedDocument) {
+        console.log('✅ Passing game document to phase-a (eliminates race condition)');
+        requestBody.game_document = playedDocument;
       }
 
       franchiseCompleteWeekPayload = requestBody;
-      franchisePhaseBPending = { franchise_id: franchiseId, week };
 
       // Phase A: persist user game only; EOG "Post-Game Press Conference" → phase-b (CPU + week advance) in PGPC modal
       showStatus('Saving game...');
       console.warn('[COMPLETE-WEEK TRACE] POSTing /franchise/complete-week/phase-a', { week, gameId, franchiseId });
-      const res = await fetch(API_CONFIG.buildUrl('/franchise/complete-week/phase-a'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
+      let res = await postPhaseA(requestBody);
+      let phaseAError = res.ok ? null : await readPhaseAError(res);
+      if (!res.ok && phaseAError && phaseAError.reason === 'stale_game_id') {
+        const retry = retryPhaseAWithBoxDocument(requestBody, playedDocument, gameId);
+        if (retry) {
+          console.warn('[COMPLETE-WEEK TRACE] Retrying phase-a with the box document id', retry.game_id);
+          res = await postPhaseA(retry);
+          phaseAError = res.ok ? null : await readPhaseAError(res);
+          if (res.ok) {
+            requestBody.game_id = retry.game_id;
+            requestBody.game_document = retry.game_document;
+          }
+        }
+      }
       hideStatus();
       franchisePhaseAOk = res.ok;
       if (!res.ok) {
-        console.error('❌ Failed franchise phase-a:', await res.text());
+        console.error('❌ Failed franchise phase-a:', phaseAError || res.status);
+        franchisePhaseBPending = undefined;
+        const blocked = phaseAError && (phaseAError.reason === 'stale_game_id' || phaseAError.reason === 'missing_box_score');
+        if (blocked) {
+          clearStaleGameIdFromContext();
+          franchisePhaseAOk = false;
+          finalScorePhaseABlocked = {
+            reason: phaseAError.reason,
+            message: phaseAError.message || 'This game was not saved. Sim this game to record the result.',
+          };
+        }
       } else {
+        franchisePhaseBPending = { franchise_id: franchiseId, week };
         console.log('✅ Franchise phase-a completed.');
         try {
           if (franchiseId && window.FranchiseLS) {
@@ -253,7 +356,7 @@ export async function finalizeGame({ simData, franchiseId, game }) {
             });
             const teamIdSnap =
               params.get('team_id') || params.get('home_id') || params.get('away_id') || null;
-            const gid = simData.game_id || simData._id;
+            const gid = requestBody.game_id || simData.game_id || simData._id;
             window.FranchiseLS.setEogSnapshot(franchiseId, {
               gameId: gid,
               franchiseId,
@@ -289,6 +392,7 @@ export async function finalizeGame({ simData, franchiseId, game }) {
     franchiseCompleteWeekPayload,
     franchisePhaseBPending,
     franchisePhaseAOk,
+    phaseABlocked: finalScorePhaseABlocked,
   };
 
   if (game && game.events) {

@@ -426,7 +426,13 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
   }
   const boxScoreUrl = `/box-score.html?${boxScoreParams.toString()}`;
 
-  const lockerActionHtml = franchisePgpcOnly
+  const phaseABlocked = finalScore && finalScore.phaseABlocked;
+  const phaseABlockedMessage = phaseABlocked
+    ? (phaseABlocked.message || 'This game was not saved. Sim this game to record the result.')
+    : '';
+  const lockerActionHtml = phaseABlocked
+    ? `<p class="gc-phase-a-blocked">${phaseABlockedMessage}</p><button type="button" class="completion-button locker-room-button sim-this-game-button">Sim this game</button>`
+    : franchisePgpcOnly
     ? `<button type="button" class="completion-button locker-room-button franchise-pgpc-button">Post-Game Press Conference</button>`
     : `<a href="${lockerRoomUrl}" class="completion-button locker-room-button">Go To Locker Room</a>`;
 
@@ -909,6 +915,18 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
   if (lockerRoomBtn) {
     lockerRoomBtn.addEventListener('click', () => {
       if (typeof window.playSound === 'function') window.playSound('click-tiny.wav');
+      if (!phaseABlocked) return;
+      const params = liveParams();
+      ['game_id', 'quarter', 'period', 'clock', 'resume_from_timeout', 'resume_from_anchor', 'consume_resume_anchor', 'active_resume', 'anchor_type', 'quarter_break_from', 'lineup_checkpoint'].forEach((key) => {
+        params.delete(key);
+      });
+      params.set('quarter', '1');
+      if (franchiseCtx() && typeof franchiseCtx().commitParams === 'function') {
+        franchiseCtx().commitParams(params);
+      }
+      const lineupUrl = `/set-lineup.html?${params.toString()}`;
+      if (window.GOBNav) window.GOBNav.go(lineupUrl);
+      else window.location.assign(lineupUrl);
     });
   }
 

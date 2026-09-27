@@ -95,7 +95,7 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
 // game_id is optional for new games (will be created by init-game), but if present must be in URL
 // Note: This is a snapshot of initial URL state - always read from currentSearch() when needed
-const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
+let gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 /** game_id from URL (updated by init-game replaceState); falls back to page-load snapshot. */
 function getActiveGameId() {
   const fromUrl = liveParams().get('game_id');
@@ -413,10 +413,16 @@ if (gameId && quarter === 1 && !urlParams.has('resume_from_timeout')) {
     : (storedHome && storedAway && (storedHome !== homeTeam || storedAway !== awayTeam));
   
   if (isNewMatchup) {
-    // Teams changed = definitely a new matchup, clear game_id from URL
+    // Teams changed = definitely a new matchup, clear game_id from URL.
+    // The page-load snapshot must drop too, or init-game is skipped and the
+    // previous week's document is simmed again.
+    gameId = null;
     if (franchiseCtx()) {
       const clean = cloneParams(urlParams);
       clean.delete('game_id');
+      ['quarter', 'period', 'clock', 'resume_from_timeout', 'resume_from_anchor', 'consume_resume_anchor', 'active_resume', 'anchor_type', 'quarter_break_from', 'lineup_checkpoint'].forEach((key) => {
+        clean.delete(key);
+      });
       // In-place: drop a stale game_id for a new matchup. Do not navigate.
       franchiseCtx().commitParams(clean);
     }
@@ -2780,14 +2786,15 @@ async function init() {
       // (FTE v2 tutorial mode is NOT here — init-game runs earlier on the
       // situation page so the engine state + roster are available when this
       // page loads. By the time the user hits Play, game_id is already in URL.)
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !resumeFromAnchor && modeParam === 'single' && quarter === 1) {
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !resumeFromAnchor && (modeParam === 'single' || modeParam === 'franchise') && quarter === 1) {
         if (!initGameInProgress) {
           console.log('⏳ [SET-LINEUP] PLAY GAME: game_id not found, calling init-game...');
           initGameInProgress = true;
           try {
-            const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: 'single' };
+            const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: modeParam || 'single' };
             attachMatchupTeamIds(initPayload);
             if (myTeamSide) initPayload.user_team_side = myTeamSide;
+            if (modeParam === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
             const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
               method: 'POST',
               headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
