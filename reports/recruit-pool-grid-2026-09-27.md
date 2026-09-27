@@ -81,3 +81,19 @@ Python: `test_recruiting_watchlist`, `test_recruiting_wire_payload`, `test_recru
 - `FrontEnd/static/js/config/api-config.js` — local recruit URL is the white master
 - `desktop/README.md` — unsigned portraits on the packaging checklist
 - Specs listed above
+
+## Follow-up
+
+Clifton Aguirre's document has the fields. Best position rating is SG 90, attributes are present (Outside Defense 105, Shooting 99, Scoring 82, and the rest), and Lean rank 1 is a school. The row builder emits RT, twelve tiles, and the lean ladder for him. A fresh element screenshot of that row shows A+ → A++, the digits, and BOI. The full-page shot did not, because `.pool thead th` used `backdrop-filter` while the wide-table wrap sets `overflow-y: clip`. That pair drops the first body row's RT, tiles, and lean from the painted layer. Plain text in the same row still paints, and the cells still hit-test, so it looked like a missing payload or an off-by-one header row. It was neither. The header repeat still starts at index 16. Removing the backdrop-filter puts the first row back. Row height stayed 42px.
+
+Tiles now use the roster size: `var(--dsz-30)` by `var(--dsz-26)`, bold `var(--font-display)` at `var(--fs-20)`. That is 30×26 with a 20px digit at 1280, and 35.5×30.5 with a 23.5px digit at 1920. Attribute columns are `calc(var(--dsz-30) + var(--space-8))`, the same formula as the compact roster, and the wide table scrolls.
+
+The portrait is the roster circle: 28×28, `border-radius: var(--radius-round)`, initials at 11px bold, image cover at 50% 22%.
+
+`recruits-pool` asserts the first data row has an RT grade and twelve tile digits, and that the stylesheet uses those roster tokens. The spec stubs the recruiting payload, so it cannot open the sqlite save. On the real week-3 save the first row is Clifton Aguirre, RT A+, digits 8 9 6 10 6 5 4 6 8 5 6 6.
+
+`office-frontend` at 1440 ("standings window shown 4, expected ≥ 5") passed 3/3 on a clean `origin/develop` worktree (`d4a5ed707`) and 3/3 on this branch. The assertion was not loosened and no Office layout change was made.
+
+Re-run: recruits-pool 29 passed. recruiting-tabs, attr-tiles, subtabs, and shell-1b passed in the same batch (59 passed, and the one failure was the tile-size check before it was pointed at the token rather than a hardcoded 30px; recruits-pool was then re-run clean). office-frontend 9 passed, three times.
+
+Retaken: `real-pool-w3-1280.png`, `real-pool-w3-1920.png`, `fix-pool-w22-1280.png`, `fix-pool-w22-1920.png`.

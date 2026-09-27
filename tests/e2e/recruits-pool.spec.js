@@ -228,6 +228,45 @@ test.describe('columns and headers', () => {
     });
     expect(m.tiles).toBe(12);
     expect(m.labels).toBe(0);
+    const first = await page.evaluate(() => {
+      const row = document.querySelector('#hub-pool tbody tr.rec');
+      const rt = row.querySelector('td.rt .rtl b:not(.pot)');
+      const digits = [...row.querySelectorAll('.attr-tile s')].map((s) => s.textContent.trim());
+      const tile = row.querySelector('.attr-tile');
+      const digit = tile.querySelector('s');
+      const tileBox = tile.getBoundingClientRect();
+      const av = row.querySelector('.pc-av');
+      const rowBox = row.getBoundingClientRect();
+      return {
+        rt: rt ? rt.textContent.trim() : '',
+        digits,
+        tileW: tileBox.width,
+        tileH: tileBox.height,
+        digitSize: parseFloat(getComputedStyle(digit).fontSize),
+        digitWeight: getComputedStyle(digit).fontWeight,
+        digitFamily: getComputedStyle(digit).fontFamily,
+        radius: getComputedStyle(av).borderRadius,
+        avW: av.getBoundingClientRect().width,
+        rowH: rowBox.height,
+      };
+    });
+    expect(CSS).toContain('.pool .attr-tile{width:var(--dsz-30);height:var(--dsz-26);border-radius:var(--radius-5)}');
+    expect(CSS).toContain('font:var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display)');
+    expect(CSS).toContain('border-radius:var(--radius-round)');
+    expect(first.rt).toMatch(/^[A-F]/);
+    expect(first.digits).toHaveLength(12);
+    for (const digit of first.digits) expect(digit, 'tile digit').toMatch(/^\d+$/);
+    // The harness page does not load gob-tokens, so --dsz-30 / --fs-20 do not resolve
+    // there. When they do (the shell), the tile must be the roster size.
+    const dszW = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dsz-30')));
+    if (Number.isFinite(dszW)) {
+      expect(first.tileW).toBeCloseTo(dszW, 0);
+      expect(first.tileH).toBeCloseTo(first.digitSize === 23.5 ? 30.5 : 26, 0);
+      expect([20, 23.5]).toContain(first.digitSize);
+      expect(Number(first.digitWeight)).toBeGreaterThanOrEqual(700);
+      const round = first.radius === '50%' || Math.abs(parseFloat(first.radius) - first.avW / 2) < 1;
+      expect(round, 'portrait radius ' + first.radius).toBe(true);
+    }
     expect(m.groups.map((g) => g.name)).toEqual(['Offense', 'Defense', 'Skills', 'Grit', 'Body', 'Mind']);
     expect(m.groups.every((g) => g.span === 2)).toBe(true);
     expect(Math.abs(m.offenseCenter - m.pairCenter)).toBeLessThan(2);

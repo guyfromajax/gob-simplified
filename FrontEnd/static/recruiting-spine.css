@@ -213,7 +213,11 @@ a{color:var(--orange);text-decoration:none}a:hover{color:#ffb454}
 /* Sizes to its CONTENT (~1030px), not to the container. A stretched table opens dead
    space between the name and Pos; the name column is capped rather than flexed. */
 table.pool{border-collapse:collapse;font-size:12px;width:max-content;min-width:100%;table-layout:fixed}
-.pool thead th{position:sticky;top:0;z-index:3;background:linear-gradient(180deg,rgba(34,38,50,.99),rgba(24,27,37,.99));backdrop-filter:blur(6px);font:800 10px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);padding:11px 6px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+/* No backdrop-filter. The wide-table wrap clips overflow-y, and that clip plus a
+   header backdrop drops the first body row's RT, tiles, and lean from the painted
+   layer. The cells stay in the DOM and still hit-test. Plain text in the same row
+   keeps painting, which is why only those three look empty. */
+.pool thead th{position:sticky;top:0;z-index:3;background:linear-gradient(180deg,rgba(34,38,50,.99),rgba(24,27,37,.99));font:800 10px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);padding:11px 6px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 .pool thead tr.gob-cols th{top:32px}
 .pool tbody tr.gob-rep th{position:static;top:auto;background:rgba(24,27,37,.99);cursor:default}
 .pool thead th.num{text-align:center}
@@ -276,12 +280,17 @@ tr.region-row td{padding:0;border:0}
 .pool col.c-ht{width:52px}
 .pool col.c-wt{width:44px}
 .pool col.c-rgn{width:44px}
-.pool col.c-attr{width:32px}
+.pool col.c-attr{width:calc(var(--dsz-30) + var(--space-8))}
 .pool col.c-lean{width:132px}
 .pool col.c-add{width:46px}
 .pool .rtl{display:inline-flex;align-items:baseline;gap:3px;white-space:nowrap}
 .pool .rtl i{font-style:normal;color:var(--text-38, var(--muted-3))}
 .pool td.gshade,.pool th.gshade{background:rgba(255,255,255,.035)}
+/* Same tile as the roster grid: 30×26, bold display numeral, 20px at 1280 and
+   23.5px at 1920 via --fs-20. The wider column scrolls with the table. */
+.pool .attr-tile{width:var(--dsz-30);height:var(--dsz-26);border-radius:var(--radius-5)}
+.pool .attr-tile s{font:var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);padding-top:var(--space-1)}
+.pool tbody td:has(.attr-tile){padding-left:0;padding-right:0}
 
 .pool thead th.attrs-col{text-align:center;padding-left:0;padding-right:0}
 .pool thead th.watch-col,.pool thead th.lean-h{text-align:center;cursor:default}
@@ -289,10 +298,12 @@ tr.region-row td{padding:0;border:0}
 
 /* Name cell: headshot + name/archetype, clipped rather than wrapped. */
 .pool td.name-col .pc-id{display:flex;align-items:center;gap:10px;min-width:0}
-.pool .pc-av{width:28px;height:28px;border-radius:4px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
-  background:rgba(255,255,255,.08);display:inline-grid;place-items:center;color:var(--text-60, var(--muted));
-  font:700 11px/1 var(--display);letter-spacing:.02em}
-.pool .pc-av img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+/* Same circular monogram as Roster/Leaders: .gob .av at the roster's 28px size. */
+.pool .pc-av{width:28px;height:28px;border-radius:var(--radius-round);flex:0 0 auto;overflow:hidden;
+  background:var(--surface-3);display:inline-grid;place-items:center;color:var(--text-60);
+  font-weight:var(--fw-bold);font-size:11px;letter-spacing:var(--tracking-2);
+  box-shadow:inset 0 0 0 1px var(--line-strong)}
+.pool .pc-av img{width:100%;height:100%;object-fit:cover;object-position:50% 22%;display:block}
 .pool .pc-txt{min-width:0}
 .pool .pc-txt .pc-name{display:flex;align-items:center;gap:8px;min-width:0}
 .pool .pc-txt .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
