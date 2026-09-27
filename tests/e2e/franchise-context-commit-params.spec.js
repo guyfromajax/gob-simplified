@@ -130,7 +130,10 @@ test.describe('set-lineup reads the resume bag slice 2 writes', () => {
     }));
     expect(read.resume).toBe('true');
     expect(read.anchor).toBe('true');
-    expect(read.qbreak).toBe('mid_game_resume');
+    // 11b62d0cf strips quarter_break_from on arrival so Back cannot replay the
+    // break. Durable resume flags stay. The court treats lineup_checkpoint as
+    // the return signal when the marker was dropped (a6ad2d6d4).
+    expect(read.qbreak).toBeNull();
     expect(read.locked).toBe('true');
 
     await page.evaluate(() => {
@@ -148,6 +151,7 @@ test.describe('set-lineup reads the resume bag slice 2 writes', () => {
     expect(await page.evaluate(() => window.FranchiseContext.get('resume_from_timeout'))).toBe('true');
     expect(await page.evaluate(() => window.FranchiseContext.get('resume_from_anchor'))).toBe('true');
     expect(await page.evaluate(() => window.FranchiseContext.get('lineup_checkpoint'))).toBe('true');
+    expect(await page.evaluate(() => window.FranchiseContext.get('quarter_break_from'))).toBeNull();
 
     const documentLoads = await commitAndHold(page, () => {
       const p = window.FranchiseContext.toSearchParams();
@@ -175,7 +179,7 @@ test.describe('set-lineup reads the resume bag slice 2 writes', () => {
       checkpoint: window.FranchiseContext.get('lineup_checkpoint'),
     }));
     expect(read.resume).toBe('false');
-    expect(read.qbreak).toBe('play_quarter');
+    expect(read.qbreak).toBeNull();
     expect(read.checkpoint).toBe('true');
 
     await page.evaluate(() => {
@@ -188,7 +192,7 @@ test.describe('set-lineup reads the resume bag slice 2 writes', () => {
     await page.waitForURL('**/court.html**');
     await page.waitForFunction(() => window.FranchiseContext && window.FranchiseContext.get);
 
-    expect(await page.evaluate(() => window.FranchiseContext.get('quarter_break_from'))).toBe('play_quarter');
+    expect(await page.evaluate(() => window.FranchiseContext.get('quarter_break_from'))).toBeNull();
     expect(await page.evaluate(() => window.FranchiseContext.get('lineup_checkpoint'))).toBe('true');
 
     const documentLoads = await commitAndHold(page, () => {
