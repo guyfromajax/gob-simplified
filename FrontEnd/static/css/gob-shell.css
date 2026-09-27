@@ -536,7 +536,8 @@ html.gob-shell .main #tr-scroll.gob-wide-wrap {
 }
 
 html.gob-shell .main .gob-wide-wrap thead th,
-html.gob-shell .main .gob-xs thead th {
+html.gob-shell .main .gob-xs thead th,
+html.gob-shell .main .gob-roster.is-compact thead th {
   position: static !important;
   top: auto !important;
 }

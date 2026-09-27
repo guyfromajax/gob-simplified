@@ -534,7 +534,7 @@ html.gob-shell.gob-1920 .gob-tgrid {
 
 .gob-roster.is-compact {
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .gob-roster.is-compact .gob-tbl {
@@ -548,12 +548,6 @@ html.gob-shell.gob-1920 .gob-tgrid {
 .gob-roster.is-compact col.c-yr { width: 2.15rem; }
 .gob-roster.is-compact col.c-ht { width: 3rem; }
 .gob-roster.is-compact col.c-attr { width: calc(var(--dsz-30) + var(--space-8)); }
-
-.gob-roster.is-compact th {
-  position: static;
-  top: auto;
-  z-index: auto;
-}
 
 .gob-roster.is-compact th,
 .gob-roster.is-compact td {

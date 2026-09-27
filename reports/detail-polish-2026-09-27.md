@@ -61,3 +61,9 @@ The RT column had no width, and `table-layout: fixed` collapsed it onto the name
 Development focus is a 3×2 grid of equal segments. The six names stay visible in two rows of three at 1280 and 1920, which reads more clearly than a dropdown that would hide five of them. Save stays orange while it is enabled.
 
 t3-detail, t2-roster, shell-1, shell-2, and app-router passed (41). `offline-team-opp` and `offline-player-user` were retaken at both sizes.
+
+## Follow-up 2
+
+On the offline Little York page at 1280, the header row's box sat at the top of the table, but the header cells did not. Each `thead th` computed to `position: sticky` and `top: 102px`. `102px` is `--gob-stick-top`, the measured page head, set by `html.gob-shell .main thead th`. `.gob-roster.is-compact` was `overflow: hidden`, so that card was the sticky box. The page-head offset landed inside the card: the cells painted at y=541, under Derrick Smith (y=495), and the row's own box stayed at y=439. That empty band was the header's original slot. No transform, and no spacer row. The earlier test measured the row, so it passed while the cells were somewhere else.
+
+Compact headers are now `position: static`, with the same override the wide tables already use, and the compact card no longer clips. The painted header is the first row. On the retake, header top is 439, Starters 467, Derrick Smith 495, and the gap under the Roster title is 0. The same order holds at 1920. The geometric check uses the header cell's box, on the fixture and on the offline save. t3-detail passed, 13 tests, including that offline check.

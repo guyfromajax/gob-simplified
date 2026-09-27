@@ -527,7 +527,6 @@ async function assertCompactRoster(page) {
   const table = page.locator('#team-view .gob-roster.is-compact table');
   await expect(table.locator('tr').first().locator('th').first()).toHaveText('Player');
   const shape = await table.evaluate((node) => {
-    const first = node.rows[0];
     const bodyFirst = node.tBodies[0] && node.tBodies[0].rows[0];
     function rects(cell) {
       const bits = cell.querySelectorAll('.rtl, .gob-player span:last-child, .attr-tile');
@@ -561,16 +560,24 @@ async function assertCompactRoster(page) {
       && rtText.top >= rtBox.top - 0.5
       && rtText.bottom <= rtBox.bottom + 0.5
       && rtText.width > 0);
+    const header = node.querySelector('thead th').getBoundingClientRect();
+    const starters = bodyFirst ? bodyFirst.getBoundingClientRect() : null;
+    const playerRow = node.tBodies[0] && node.tBodies[0].rows[1];
+    const player = playerRow ? playerRow.getBoundingClientRect() : null;
+    const title = node.closest('.gob-tcard').querySelector('.card-h').getBoundingClientRect();
     return {
-      headerFirst: first.parentElement.tagName === 'THEAD' && first.cells[0].tagName === 'TH',
-      bodyStarts: bodyFirst ? bodyFirst.innerText.trim() : '',
+      headerTop: header.top,
+      startersTop: starters ? starters.top : 0,
+      playerTop: player ? player.top : 0,
+      gap: header.top - title.bottom,
       repeats: node.querySelectorAll('tbody tr.gob-rep').length,
       problems: problems,
       rtInside: rtInside,
     };
   });
-  expect(shape.headerFirst).toBe(true);
-  expect(shape.bodyStarts.toLowerCase()).toBe('starters');
+  expect(shape.headerTop).toBeLessThan(shape.startersTop);
+  expect(shape.startersTop).toBeLessThan(shape.playerTop);
+  expect(shape.gap).toBeLessThan(16);
   expect(shape.repeats).toBe(0);
   expect(shape.problems).toEqual([]);
   expect(shape.rtInside).toBe(true);
@@ -598,6 +605,29 @@ test('the team page roster is the compact five-attribute grid', async ({ page })
       return main.scrollWidth - main.clientWidth;
     });
     expect(overflow).toBeLessThanOrEqual(1);
+  }
+});
+
+test('compact header sits under the title on the offline save', async ({ page }) => {
+  let up = false;
+  try {
+    const res = await page.request.get('http://127.0.0.1:8766/franchise-command-center.html', { timeout: 2000 });
+    up = res.status() < 500;
+  } catch (err) {
+    up = false;
+  }
+  test.skip(!up, 'offline loopback is not running');
+  await page.addInitScript(() => {
+    window.GOB_BUILD_PROFILE = 'desktop';
+    window.GOB_LOOPBACK_PORT = 8766;
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('http://127.0.0.1:8766/franchise-command-center.html?franchise_id=6ab284847ab3853ae89a1184&team_id=69a6fcb68d2c56aa82e48a54&tab=team-view&view_team_id=69a6fcb68d2c56aa82e48a58&origin=league', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#team-view .gob-roster.is-compact tbody td.rt');
+  for (const size of [[1280, 720], [1920, 1080]]) {
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    await page.waitForTimeout(150);
+    await assertCompactRoster(page);
   }
 });
 
