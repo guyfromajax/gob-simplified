@@ -33,6 +33,9 @@ _TOURNAMENT_LABELS = {
     34: "National Championship",
 }
 
+_SIDE_ID = re.compile(r'"(home_team_id|away_team_id)"\s*:\s*"([^"]+)"')
+_PREFIX_CHARS = 3200
+_ID_IN_CHUNK = 400
 _TEAM_OID = re.compile(r'"team_id"\s*:\s*\{\s*"\$oid"\s*:\s*"([0-9a-fA-F]{24})"\s*\}')
 _TEAM_STR = re.compile(r'"team_id"\s*:\s*"([0-9a-fA-F]{24})"')
 _RANK = re.compile(r'"natl_rank"\s*:\s*(-?\d+)')
@@ -60,6 +63,17 @@ def _as_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _decode_row_id(row_id: str) -> str:
+    if row_id.startswith("raw:"):
+        try:
+            return str(json.loads(row_id[4:]))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return row_id[4:].strip('"')
+    if row_id.startswith("oid:"):
+        return row_id[4:]
+    return row_id
 
 
 def _sql_rows(collection: Any, sql: str, params: tuple[Any, ...]) -> list[tuple] | None:
@@ -104,10 +118,11 @@ def _rank_map(franchise_id: str) -> dict[str, int | None]:
     return ranks
 
 
-def matchup_game_ids(franchise_id: str) -> dict[tuple[int, str, str], str]:
+def matchup_game_ids(franchise_id: str, stamp: tuple[Any, ...] | None = None) -> dict[tuple[int, str, str], str]:
     """(week, away id, home id) -> game id. Latest stamp only, per franchise."""
     key = str(franchise_id)
-    stamp = _light_stamp(key)
+    if stamp is None:
+        stamp = _light_stamp(key)
     cached = _GAME_IDS.get(key)
     if cached is not None and cached[0] == stamp:
         return cached[1]
@@ -177,18 +192,25 @@ def _read_game_ids(franchise_id: str) -> dict[tuple[int, str, str], str]:
             return text
         return by_canon.get(_canon(text), "")
 
-    fields = ["_id", "week", "away_team_id", "home_team_id", "team1_id", "team2_id"]
     games = db.games
-    found: dict[tuple[int, str, str], str] = {}
     from BackEnd.persistence.sqlite_collection import SqliteCollection
 
     if isinstance(games, SqliteCollection):
-        rows = games.projected_tuples({"franchise_id": franchise_id}, fields)
-        for game_id, week_raw, away_raw, home_raw, team1_raw, team2_raw in rows:
-            _store_matchup(found, resolve, week_raw, away_raw, home_raw, team1_raw, team2_raw, game_id)
-        return found
+        return _read_game_ids_sqlite(games, franchise_id, resolve)
+    return _read_game_ids_find(games, franchise_id, resolve)
 
-    for doc in games.find({"franchise_id": franchise_id}, {name: 1 for name in fields}):
+
+_GAME_ID_FIELDS = ["_id", "week", "away_team_id", "home_team_id", "team1_id", "team2_id"]
+
+
+def _apply_projected_rows(found: dict[tuple[int, str, str], str], resolve, rows: list[tuple]) -> None:
+    for game_id, week_raw, away_raw, home_raw, team1_raw, team2_raw in rows:
+        _store_matchup(found, resolve, week_raw, away_raw, home_raw, team1_raw, team2_raw, game_id)
+
+
+def _read_game_ids_find(games: Any, franchise_id: str, resolve) -> dict[tuple[int, str, str], str]:
+    found: dict[tuple[int, str, str], str] = {}
+    for doc in games.find({"franchise_id": franchise_id}, {name: 1 for name in _GAME_ID_FIELDS}):
         _store_matchup(
             found,
             resolve,
@@ -198,6 +220,76 @@ def _read_game_ids(franchise_id: str) -> dict[tuple[int, str, str], str]:
             doc.get("team1_id"),
             doc.get("team2_id"),
             doc.get("_id"),
+        )
+    return found
+
+
+def projected_game_ids(franchise_id: str) -> dict[tuple[int, str, str], str]:
+    """Every matchup via json_extract. The hybrid reader must match this."""
+    teams = list(db.teams.find({}, {"_id": 1, "name": 1, "team_id": 1}))
+    by_canon: dict[str, str] = {}
+    for team in teams:
+        oid = str(team.get("_id") or "")
+        if not oid:
+            continue
+        by_canon[_canon(team.get("name"))] = oid
+        slug = team.get("team_id")
+        if slug:
+            by_canon[_canon(slug)] = oid
+
+    def resolve(raw: str) -> str:
+        text = str(raw or "")
+        if _HEX_ID.match(text):
+            return text
+        return by_canon.get(_canon(text), "")
+
+    games = db.games
+    from BackEnd.persistence.sqlite_collection import SqliteCollection
+
+    if isinstance(games, SqliteCollection):
+        found: dict[tuple[int, str, str], str] = {}
+        _apply_projected_rows(
+            found,
+            resolve,
+            games.projected_tuples({"franchise_id": str(franchise_id)}, _GAME_ID_FIELDS),
+        )
+        return found
+    return _read_game_ids_find(games, str(franchise_id), resolve)
+
+
+def _read_game_ids_sqlite(games: Any, franchise_id: str, resolve) -> dict[tuple[int, str, str], str]:
+    """Prefix scan, then one projected read for documents the prefix did not finish."""
+    table = getattr(games, "name", "games")
+    rows = _sql_rows(
+        games,
+        f'SELECT g_week, id, substr(doc, 1, {_PREFIX_CHARS}) FROM "{table}" WHERE g_franchise_id = ?',
+        (franchise_id,),
+    )
+    found: dict[tuple[int, str, str], str] = {}
+    if rows is None:
+        _apply_projected_rows(
+            found,
+            resolve,
+            games.projected_tuples({"franchise_id": franchise_id}, _GAME_ID_FIELDS),
+        )
+        return found
+    missing: list[str] = []
+    for week_raw, row_id, prefix in rows:
+        sides: dict[str, str] = {}
+        for match in _SIDE_ID.finditer(prefix or ""):
+            sides.setdefault(match.group(1), match.group(2))
+        away = sides.get("away_team_id", "")
+        home = sides.get("home_team_id", "")
+        if away and home:
+            _store_matchup(found, resolve, week_raw, away, home, None, None, _decode_row_id(str(row_id)))
+            continue
+        missing.append(_decode_row_id(str(row_id)))
+    for start in range(0, len(missing), _ID_IN_CHUNK):
+        chunk = missing[start:start + _ID_IN_CHUNK]
+        _apply_projected_rows(
+            found,
+            resolve,
+            games.projected_tuples({"_id": {"$in": chunk}}, _GAME_ID_FIELDS),
         )
     return found
 
@@ -468,7 +560,7 @@ def _bundle(franchise_id: str, eos_builder: Callable[..., Any]) -> dict[str, Any
     franchise = _load_franchise(franchise_id)
     ranks = _rank_map(str(franchise_id))
     directory = _directory(franchise, ranks)
-    game_ids = matchup_game_ids(str(franchise_id))
+    game_ids = matchup_game_ids(str(franchise_id), stamp)
     conferences = {team_id: row.get("conference") for team_id, row in directory.items()}
     eos_schedule, _ids = eos_builder(franchise, conferences)
     user_id = _user_team_id(franchise)

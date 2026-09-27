@@ -94,3 +94,22 @@ Retaken: `save-team`, `save-league`, `fixture-team`, and `fixture-league` at 128
 
 - `tests/test_schedule_week.py` and `tests/test_t3_detail.py`: 6 passed on mongomock, 6 passed on sqlite.
 - `schedule-views`, `subtabs`, `t1-tables`, `t3-detail`: 28 passed, 1 skipped.
+
+## Follow-up 2
+
+The full-document `json_extract` is no longer the game-id read. SQLite scans `substr(doc, 1, 3200)` and the side-id regex first. A document that does not have both `away_team_id` and `home_team_id` in that prefix is collected and read once, with `projected_tuples` and an `_id` `$in` list. The mongomock path is still the projected `find`. On the offline Lancaster save the prefix already holds both side ids for all 293 game documents, so the fallback does not run. The hybrid map and the full extract are the same 190 matchups. `test_ids_past_the_prefix_match_the_projected_read` puts one document's side ids past the prefix and asserts the two maps are equal, on mongomock and on sqlite.
+
+| Call | Full extract | Hybrid |
+|---|---|---|
+| Game-id read | 1,137 ms, then 516 ms (and 429 ms warm in this pass) | 102 ms once the blobs are in the process; the first touch of those blobs is the cold week |
+| Cold week 3 | 2,251 ms | 657 ms (64 games, 63 linked) |
+| Later weeks | 32 ms, 64 ms, then 4.5 ms and 7.4 ms | 10.6, 10.0, 9.8, 9.8 ms |
+
+Warm week changes stay under 150 ms. 657 ms is the same band as the original prefix cold open (397 ms and 644 ms), not the 2.25 s extract. Team-detail warm is 309 ms, the same as the call with the matchup map removed (307 ms). A process-cold team-detail is 930 ms against 544 ms without the map. The difference is that one prefix read of the game documents. It is not a second full extract.
+
+The schedule tables are `width: 100%` of the card again, the way Standings is. Away and Home share the spare width, left-aligned. Opponent takes the spare width on the team table, left-aligned. Week, Site, the score, Result, and Box score stay one content-width wide. At 1280 the league table is 1,178 px inside a 1,180 px card: Away 518, score 52, Home 535, Box score 72. The team table is Week 39, Site 33, Opponent 983, Result 64, Box score 59.
+
+Retaken: `save-team`, `save-league`, `fixture-team`, and `fixture-league` at 1280 and 1920.
+
+- `tests/test_schedule_week.py` and `tests/test_t3_detail.py`: 7 passed on mongomock, 7 passed on sqlite.
+- `schedule-views` and `t3-detail`: 18 passed, 1 skipped.

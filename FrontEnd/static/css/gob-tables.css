@@ -956,12 +956,10 @@ html.gob-shell .pg-tools .gob-wk-label {
   min-width: 72px;
   text-align: center;
 }
-/* Score line: Away · Result · Home · Box, sized to the names rather than the page. */
+/* Score line fills the card. Name columns take the spare width; the short columns stay tight. */
 #league-schedule-view.tab-content table.gob-sched,
 #team-schedule-view.tab-content table.gob-sched {
-  display: inline-table;
-  width: max-content;
-  max-width: 100%;
+  width: 100%;
 }
 #league-schedule-view .gob-sched th.team,
 #league-schedule-view .gob-sched td.team,
@@ -973,9 +971,9 @@ html.gob-shell .pg-tools .gob-wk-label {
 #team-schedule-view .gob-sched td.wk,
 #team-schedule-view .gob-sched th.site,
 #team-schedule-view .gob-sched td.site {
+  width: 1%;
   white-space: nowrap;
   text-align: left;
-  padding-right: 16px;
 }
 #league-schedule-view .gob-sched th.num,
 #league-schedule-view .gob-sched td.num,
@@ -985,6 +983,7 @@ html.gob-shell .pg-tools .gob-wk-label {
 #league-schedule-view .gob-sched td.box,
 #team-schedule-view .gob-sched th.box,
 #team-schedule-view .gob-sched td.box {
+  width: 1%;
   white-space: nowrap;
 }
 #league-schedule-view a.gob-box,

@@ -182,3 +182,33 @@ def test_week_advance_shows_the_new_box_score_without_clearing_the_cache():
     assert isinstance(browse._GAME_IDS[str(fid)][0], tuple)
     assert browse._GAME_IDS[str(fid)][0][0] == 9
     assert browse._GAME_IDS[str(fid)][0][3] == 2
+
+
+def test_ids_past_the_prefix_match_the_projected_read():
+    """A document whose side ids sit past the prefix must still match the full extract."""
+    from BackEnd.persistence.sqlite_collection import SqliteCollection
+    from BackEnd.utils import schedule_browse as browse
+
+    fid = seed()
+    inserted = db.games.insert_one({
+        "franchise_id": str(fid),
+        "week": 8,
+        "blob": "x" * (browse._PREFIX_CHARS + 800),
+        "away_team_id": "FOUR_CORNERS",
+        "home_team_id": "YORK",
+    }).inserted_id
+    if isinstance(db.games, SqliteCollection):
+        stored = db.games._conn.execute(
+            'SELECT doc FROM games WHERE g_franchise_id = ? AND length(doc) > ?',
+            (str(fid), browse._PREFIX_CHARS + 500),
+        ).fetchone()
+        assert stored is not None
+        text = stored[0]
+        assert text.find('"away_team_id"') > browse._PREFIX_CHARS
+        assert text.find('"home_team_id"') > browse._PREFIX_CHARS
+
+    clear_schedule_browse_cache()
+    hybrid = browse._read_game_ids(str(fid))
+    full = browse.projected_game_ids(str(fid))
+    assert hybrid == full
+    assert hybrid[(8, str(SISTER), str(OTHER))] == str(inserted)
