@@ -120,7 +120,7 @@ function cloneParams(params) {
           vtOff.textContent = "@view-transition { navigation: none; }";
           head.appendChild(vtOff);
         }
-        ["/js/shared/gobAdvance.js", "/js/shared/gobShell.js"].forEach(function (src) {
+        ["/js/shared/gobAdvance.js", "/js/shared/gobSubtabs.js", "/js/shared/gobShell.js"].forEach(function (src) {
           if (document.querySelector('script[src="' + src + '"]')) return;
           var script = document.createElement("script");
           script.src = src;

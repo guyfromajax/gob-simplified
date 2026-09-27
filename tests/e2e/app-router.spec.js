@@ -148,7 +148,7 @@ async function mouseClick(page, target) {
 }
 
 function stab(page, label) {
-  return page.locator('#gob-subtabs .stab').filter({ hasText: new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$') });
+  return page.getByRole('tab', { name: label, exact: true });
 }
 
 async function docStamp(page) {

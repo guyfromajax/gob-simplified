@@ -43,7 +43,14 @@ html.gob-shell .main {
 }
 
 html.gob-shell .pg-head {
+  --pg-head-h: calc(var(--page-pad) + var(--fs-32) + var(--space-12) + var(--dsz-44) + var(--dsp-8));
   height: auto;
+  min-width: 0;
+}
+
+html.gob-shell .pg-head:has(.nav-row:not([hidden])) {
+  height: auto;
+  padding-bottom: var(--dsp-8);
 }
 
 /* The handoff stripe sits on .main. The office already paints its own
@@ -93,6 +100,16 @@ html.gob-shell #franchise-container #tournament-tabs > .tab-content.active {
   overflow: visible;
   height: auto;
   max-height: none;
+}
+
+/* The section panel was a second rounded frame around the page. The head
+   sits on .main, and the cards inside the panel stay as they are. */
+html.gob-shell:not(.gob-office) #franchise-container .tab-content {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 html.gob-shell.gob-office .main {
@@ -678,6 +695,296 @@ html.gob-shell .app > nav.rail {
 
 @keyframes gob-page-in {
   from { opacity: 0; }
+}
+
+/* Underline sub-tabs. Shared .sx rules and direction A only.
+   The row is neutral white. Tools stay the existing segment and search. */
+html.gob-shell .pg-head .nav-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-24);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: var(--dsz-44);
+  box-shadow: inset 0 -1px 0 var(--line-strong);
+}
+
+html.gob-shell .pg-head .nav-row[hidden] {
+  display: none;
+}
+
+html.gob-shell .pg-head .tabs {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  height: 100%;
+  min-width: 0;
+  gap: 26px;
+}
+
+html.gob-shell .pg-head .tb {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex: none;
+  height: 100%;
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+  font: var(--fw-bold) var(--fs-17)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-5);
+  color: var(--text-60);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  outline: none;
+  text-align: left;
+  text-decoration: none;
+  transition: color var(--dur-hover);
+}
+
+html.gob-shell .pg-head .tb svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin-top: -2px;
+}
+
+html.gob-shell .pg-head .tb:hover,
+html.gob-shell .pg-head a.tb:hover {
+  color: var(--text-87);
+}
+
+html.gob-shell .pg-head .tb[aria-selected="true"],
+html.gob-shell .pg-head .tb[aria-selected="true"]:hover,
+html.gob-shell .pg-head a.tb[aria-selected="true"]:hover {
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .tb[aria-disabled="true"],
+html.gob-shell .pg-head .tb[aria-disabled="true"]:hover,
+html.gob-shell .pg-head .tb[aria-disabled="true"]:focus {
+  color: var(--text-38);
+  cursor: not-allowed;
+}
+
+html.gob-shell .pg-head .tb:not([aria-selected="true"]):not([aria-disabled="true"]):hover::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--white-30);
+}
+
+html.gob-shell .pg-head .tb:focus-visible {
+  outline: none;
+}
+
+html.gob-shell .pg-head .tb:focus-visible::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--space-6));
+  right: calc(-1 * var(--space-6));
+  top: var(--space-8);
+  bottom: var(--space-8);
+  border-radius: var(--radius-6);
+  box-shadow: 0 0 0 2px var(--white);
+}
+
+html.gob-shell .pg-head .ink {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-100);
+  pointer-events: none;
+}
+
+html.gob-shell .pg-head .ink.ready {
+  transition: transform var(--dur-tab) var(--ease-out), width var(--dur-tab) var(--ease-out);
+}
+
+html.gob-shell .pg-head .tb.ovf {
+  display: none;
+}
+
+html.gob-shell .pg-head .more-w {
+  position: relative;
+  display: none;
+  flex: none;
+  height: 100%;
+}
+
+html.gob-shell .pg-head .more-w.show {
+  display: flex;
+}
+
+html.gob-shell .pg-head .more svg {
+  width: 14px;
+  height: 14px;
+  margin-top: 0;
+  transition: transform var(--dur-toggle);
+}
+
+html.gob-shell .pg-head .more[aria-expanded="true"] {
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .more[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+html.gob-shell .pg-head .mmenu {
+  position: absolute;
+  top: calc(100% + var(--space-6));
+  left: auto;
+  right: 0;
+  min-width: 212px;
+  padding: var(--space-6);
+  border-radius: var(--radius-10);
+  background: var(--surface-popover);
+  box-shadow: var(--shadow-popover);
+  display: none;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: var(--z-popover);
+}
+
+html.gob-shell .pg-head .mmenu.open {
+  display: flex;
+}
+
+html.gob-shell .pg-head .mi {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  height: 34px;
+  padding: 0 var(--space-10);
+  border: 0;
+  border-radius: var(--radius-7);
+  background: none;
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-87);
+  cursor: pointer;
+  outline: none;
+  white-space: nowrap;
+  text-align: left;
+}
+
+html.gob-shell .pg-head .mi svg {
+  width: 12px;
+  height: 12px;
+  margin-top: -2px;
+}
+
+html.gob-shell .pg-head .mi em {
+  margin-left: auto;
+  font: var(--fw-medium) var(--fs-11)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: 0;
+  color: var(--text-38);
+}
+
+html.gob-shell .pg-head .mi:hover,
+html.gob-shell .pg-head .mi:focus-visible {
+  background: var(--white-6);
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .mi[aria-disabled="true"],
+html.gob-shell .pg-head .mi[aria-disabled="true"]:hover {
+  background: none;
+  color: var(--text-38);
+  cursor: not-allowed;
+}
+
+html.gob-shell .pg-head .mi:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--white);
+}
+
+html.gob-shell .pg-head .ltip {
+  position: absolute;
+  top: calc(100% + var(--space-6));
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-10) var(--space-12);
+  border-radius: var(--radius-10);
+  background: var(--surface-popover);
+  box-shadow: var(--shadow-popover);
+  white-space: nowrap;
+  z-index: var(--z-popover);
+  cursor: default;
+  text-align: left;
+}
+
+html.gob-shell .pg-head .ltip b {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .ltip span {
+  font: var(--fw-regular) var(--fs-12)/var(--lh-body) var(--font-body);
+  letter-spacing: 0;
+  color: var(--text-87);
+}
+
+html.gob-shell .pg-head .tb[aria-disabled="true"]:hover .ltip,
+html.gob-shell .pg-head .tb[aria-disabled="true"]:focus .ltip {
+  display: flex;
+}
+
+html.gob-shell .pg-head .pg-tools {
+  margin-left: auto;
+}
+
+html.gob-shell .pg-head .gob-search.is-collapsed {
+  display: none;
+}
+
+html.gob-shell .pg-head .sbtn {
+  display: none;
+  place-items: center;
+  flex: none;
+  width: calc(var(--dsz-28) + 6px);
+  height: calc(var(--dsz-28) + 6px);
+  padding: 0;
+  border-radius: var(--radius-9);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-60);
+  cursor: pointer;
+  transition: background var(--dur-hover), color var(--dur-hover);
+}
+
+html.gob-shell .pg-head .sbtn.show {
+  display: grid;
+}
+
+html.gob-shell .pg-head .sbtn svg {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
+html.gob-shell .pg-head .sbtn:hover {
+  background: var(--white-6);
+  color: var(--text-87);
+}
+
+html.gob-shell .pg-head .sbtn:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 1px;
 }
 
 @media (prefers-reduced-motion: reduce) {

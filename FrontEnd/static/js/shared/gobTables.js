@@ -138,15 +138,17 @@
     var old = slotHost.querySelector('.pg-tools');
     if (typeof render !== 'function') {
       if (old) old.remove();
-      return;
+    } else if (!(old && old.getAttribute('data-owner') === currentTab())) {
+      if (old) old.remove();
+      var slot = document.createElement('div');
+      slot.className = 'pg-tools';
+      slot.setAttribute('data-owner', currentTab());
+      slotHost.appendChild(slot);
+      render(slot);
     }
-    if (old && old.getAttribute('data-owner') === currentTab()) return;
-    if (old) old.remove();
-    var slot = document.createElement('div');
-    slot.className = 'pg-tools';
-    slot.setAttribute('data-owner', currentTab());
-    slotHost.appendChild(slot);
-    render(slot);
+    if (window.GOBSubtabs && typeof window.GOBSubtabs.syncTools === 'function') {
+      window.GOBSubtabs.syncTools(slotHost);
+    }
   }
 
   function bindWide(card) {

@@ -330,7 +330,7 @@ async function mouseClick(page, target) {
 }
 
 function stab(page, label) {
-  return page.locator('#gob-subtabs .stab').filter({ hasText: new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$') });
+  return page.getByRole('tab', { name: label, exact: true });
 }
 
 async function assertNoHorizontalOverflow(page) {
@@ -511,7 +511,8 @@ test('tournament stays locked on standalone league pages at week 1', async ({ pa
     const tab = stab(page, 'Tournament');
     await expect(tab).toHaveClass(/is-locked/);
     await expect(tab).toHaveAttribute('aria-disabled', 'true');
-    await expect(tab).toHaveAttribute('title', /Opens Week \d+/);
+    await expect(tab.locator('.ltip b')).toHaveText(/Opens Week \d+/);
+    await expect(tab.locator('.ltip span')).toHaveText('Tournament opens when the regular season ends.');
   }
 });
 
@@ -646,19 +647,19 @@ test('rankings sub-tab replaces in place and back leaves League', async ({ page 
   await openPage(page, 'franchise-command-center.html', cc());
   await page.waitForSelector('#play-now.advance');
   await mouseClick(page, '.rail [data-gob-section="league"]');
-  await expect(page.locator('#gob-subtabs .stab.on')).toHaveText('Standings');
+  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"] .tb-l')).toHaveText('Standings');
   const mid = await page.evaluate(() => (history.state && history.state.gobIdx));
   const navs = await page.evaluate(() => performance.getEntriesByType('navigation').length);
   await mouseClick(page, stab(page, 'Rankings'));
   await expect(page.locator('#rankings-view.tab-content.active')).toBeVisible();
-  await expect(page.locator('#gob-subtabs .stab.on')).toHaveText('Rankings');
+  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"] .tb-l')).toHaveText('Rankings');
   expect(page.url()).toContain('tab=rankings-view');
   expect(await page.evaluate(() => performance.getEntriesByType('navigation').length)).toBe(navs);
   const afterRank = await page.evaluate(() => (history.state && history.state.gobIdx));
   expect(afterRank).toBe(mid);
   await stab(page, 'Standings').click();
   await expect(page.locator('#standings-view.tab-content.active')).toBeVisible();
-  await expect(page.locator('#gob-subtabs .stab.on')).toHaveText('Standings');
+  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"] .tb-l')).toHaveText('Standings');
   const after = await page.evaluate(() => (history.state && history.state.gobIdx));
   expect(after).toBe(mid);
   await page.goBack();
@@ -716,7 +717,7 @@ test('record comes from rankings when team_record is absent', async ({ page }) =
 test('top bar and rail stay put from Rankings to Schedule to Office', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openPage(page, 'rankings.html', cc());
-  await page.waitForSelector('#gob-subtabs .stab');
+  await page.waitForSelector('#gob-subtabs .tb');
   const names = await page.evaluate(() => ({
     top: getComputedStyle(document.querySelector('.top')).viewTransitionName,
     rail: getComputedStyle(document.querySelector('nav.rail')).viewTransitionName,
@@ -726,7 +727,7 @@ test('top bar and rail stay put from Rankings to Schedule to Office', async ({ p
   expect(names.rail).toBe('gob-chrome-rail');
   expect(names.main).toBe('none');
   const before = await chromeRects(page);
-  await page.waitForSelector('#gob-subtabs .stab.is-locked');
+  await page.waitForSelector('#gob-subtabs .tb.is-locked');
   await stab(page, 'Schedule').click();
   await page.waitForURL(/schedule\.html/, { timeout: 15000 });
   fs.mkdirSync(OUT2, { recursive: true });

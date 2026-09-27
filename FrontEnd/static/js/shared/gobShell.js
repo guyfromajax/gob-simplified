@@ -254,80 +254,50 @@
     return section.tabs.filter(function (tab) { return tab.label; });
   }
 
-  function renderSubtabs(section, tab) {
-    if (!subtabHost) return;
-    var tabs = labeledTabs(section);
-    subtabHost.innerHTML = '';
-    if (!tabs.length) {
-      subtabHost.hidden = true;
+  function activateSubtab(item) {
+    if (!item || item.lockedWeek) return;
+    if (item.link) {
+      if (pageMode && pageMode.sub === item.link) return;
+      goLink(item.link);
       return;
     }
-    subtabHost.hidden = false;
-    tabs.forEach(function (item) {
-      var el;
+    if (pageMode) {
+      if (pageMode.sub === item.id) return;
+      playClick();
+      var href = fccHref(item.id);
+      if (window.GOBNav && window.GOBNav.replace) window.GOBNav.replace(href);
+      else window.location.replace(href);
+      return;
+    }
+    if (currentTab() === item.id) return;
+    playClick();
+    openTab(item.id, 'replace');
+  }
+
+  function renderSubtabs(section, tab) {
+    if (!subtabHost || !window.GOBSubtabs) return;
+    var tabs = labeledTabs(section).map(function (item) {
       var lockedWeek = item.lock === 'tournament' ? tournamentLockWeek() : 0;
-      if (lockedWeek) {
-        el = document.createElement('button');
-        el.type = 'button';
-        el.className = 'stab is-locked';
-        el.setAttribute('aria-disabled', 'true');
-        el.tabIndex = -1;
-        el.title = 'Opens Week ' + lockedWeek;
-        el.addEventListener('click', function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-        });
-        el.addEventListener('keydown', function (event) {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            event.stopPropagation();
-          }
-        });
-      } else if (item.link) {
-        el = document.createElement('a');
-        el.href = '#';
-        el.className = 'stab';
-        el.dataset.link = item.link;
-        el.addEventListener('click', function (event) {
-          event.preventDefault();
-          if (pageMode && pageMode.sub === item.link) return;
-          goLink(item.link);
-        });
-      } else {
-        el = document.createElement('button');
-        el.type = 'button';
-        el.className = 'stab';
-        el.dataset.tab = item.id;
-        el.addEventListener('click', function () {
-          if (pageMode) {
-            if (pageMode.sub === item.id) return;
-            playClick();
-            var href = fccHref(item.id);
-            if (window.GOBNav && window.GOBNav.replace) window.GOBNav.replace(href);
-            else window.location.replace(href);
-            return;
-          }
-          if (currentTab() === item.id) return;
-          playClick();
-          openTab(item.id, 'replace');
-        });
-      }
-      el.textContent = item.label;
-      subtabHost.appendChild(el);
+      return {
+        id: item.id,
+        label: item.label,
+        link: item.link || '',
+        lockedWeek: lockedWeek
+      };
     });
-    markSubtabs(tab);
+    window.GOBSubtabs.render(subtabHost, {
+      label: section.label,
+      tabs: tabs,
+      selected: tab || '',
+      onActivate: activateSubtab
+    });
     if (window.GOBTables && typeof window.GOBTables.placeTools === 'function') window.GOBTables.placeTools(subtabHost);
+    window.GOBSubtabs.syncTools(subtabHost);
   }
 
   function markSubtabs(tab) {
-    if (!subtabHost) return;
-    subtabHost.querySelectorAll('.stab').forEach(function (el) {
-      if (el.classList.contains('is-locked')) {
-        el.classList.remove('on');
-        return;
-      }
-      el.classList.toggle('on', el.dataset.tab === tab || (!!el.dataset.link && el.dataset.link === tab));
-    });
+    if (!subtabHost || !window.GOBSubtabs) return;
+    window.GOBSubtabs.select(subtabHost, tab || '');
   }
 
   function detailOrigin(tab) {
@@ -363,6 +333,7 @@
     } else {
       markSubtabs(mark);
       if (window.GOBTables && typeof window.GOBTables.placeTools === 'function') window.GOBTables.placeTools(subtabHost);
+      else if (window.GOBSubtabs) window.GOBSubtabs.syncTools(subtabHost);
     }
   }
 
@@ -520,8 +491,8 @@
     if (paintedSection !== 'league' || !subtabHost) return;
     var tab = pageMode ? (pageMode.sub || '') : currentTab();
     var wantLock = !!tournamentLockWeek();
-    var hasLock = !!subtabHost.querySelector('.stab.is-locked');
-    var on = subtabHost.querySelector('.stab.on');
+    var hasLock = !!subtabHost.querySelector('.tb.is-locked');
+    var on = subtabHost.querySelector('.tb[aria-selected="true"]');
     var onKey = on ? (on.dataset.tab || on.dataset.link || '') : '';
     if (wantLock === hasLock && onKey === tab && subtabHost.childElementCount) return;
     renderSubtabs(sectionById('league'), tab);
@@ -664,7 +635,7 @@
     titleEl = document.createElement('h1');
     titleRow.appendChild(titleEl);
     subtabHost = document.createElement('div');
-    subtabHost.className = 'subtabs';
+    subtabHost.className = 'nav-row';
     subtabHost.id = 'gob-subtabs';
     head.appendChild(titleRow);
     head.appendChild(subtabHost);
@@ -1170,7 +1141,7 @@
     titleEl = document.createElement('h1');
     titleRow.appendChild(titleEl);
     subtabHost = document.createElement('div');
-    subtabHost.className = 'subtabs';
+    subtabHost.className = 'nav-row';
     subtabHost.id = 'gob-subtabs';
     head.appendChild(titleRow);
     head.appendChild(subtabHost);

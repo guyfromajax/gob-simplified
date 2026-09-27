@@ -658,15 +658,16 @@ html.gob-shell #team-view {
 }
 
 .gob-dt-bar {
-  position: sticky;
-  top: 0;
-  z-index: 3;
+  position: static;
+  top: auto;
+  z-index: auto;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 44px;
+  margin-top: 0;
   margin-bottom: 12px;
-  background: var(--bg-page-solid, var(--bg, #0b1220));
+  background: transparent;
 }
 
 .gob-dt-up {

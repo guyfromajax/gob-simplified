@@ -105,7 +105,7 @@ async function mouseClick(page, target) {
 }
 
 function stab(page, label) {
-  return page.locator('#gob-subtabs .stab').filter({ hasText: new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$') });
+  return page.getByRole('tab', { name: label, exact: true });
 }
 
 function assertRailMonotonic(samples) {
@@ -254,7 +254,7 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   }
   await expect(page.locator('#gob-stats-toggle')).toHaveCount(0);
   await mouseClick(page, '[data-gob-section="team"]');
-  await expect(page.locator('#gob-subtabs .stab', { hasText: 'Practice Squad' })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Practice Squad', exact: true })).toHaveCount(0);
 
   await page.evaluate(() => {
     window.__shellNav = [];
@@ -263,7 +263,7 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   await mouseClick(page, '[data-gob-section="league"]');
   const locked = stab(page, 'Tournament');
   await expect(locked).toHaveAttribute('aria-disabled', 'true');
-  await expect(locked).toHaveAttribute('tabindex', '-1');
+  await expect(locked).not.toHaveAttribute('title');
   const opens = await page.evaluate(() => {
     for (let w = 1; w <= 40; w++) {
       if (window.GOBTierEmblem.tierForWeek(w)) return w;
@@ -271,7 +271,10 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     return 0;
   });
   expect(opens).toBeGreaterThan(0);
-  await expect(locked).toHaveAttribute('title', 'Opens Week ' + opens);
+  await expect(locked.locator('.ltip b')).toHaveText('Opens Week ' + opens);
+  await expect(locked.locator('.ltip span')).toHaveText('Tournament opens when the regular season ends.');
+  await locked.focus();
+  await expect(locked.locator('.ltip')).toBeVisible();
   const color = await locked.evaluate((el) => getComputedStyle(el).color);
   const cursor = await locked.evaluate((el) => getComputedStyle(el).cursor);
   expect(cursor).toBe('not-allowed');
@@ -281,8 +284,8 @@ test('section map opens the right panel or the existing page', async ({ page }) 
       const cs = getComputedStyle(el);
       return { fontFamily: cs.fontFamily, fontSize: cs.fontSize, height: cs.height };
     };
-    const lockedEl = document.querySelector('#gob-subtabs .stab.is-locked');
-    const enabled = Array.from(document.querySelectorAll('#gob-subtabs .stab')).find((el) => !el.classList.contains('is-locked'));
+    const lockedEl = document.querySelector('#gob-subtabs .tb.is-locked');
+    const enabled = Array.from(document.querySelectorAll('#gob-subtabs .tabs > .tb')).find((el) => !el.classList.contains('is-locked'));
     return { locked: read(lockedEl), enabled: read(enabled) };
   });
   expect(stabType.locked).toEqual(stabType.enabled);

@@ -210,7 +210,7 @@ async function mouseClick(page, target) {
 }
 
 function stab(page, label) {
-  return page.locator('#gob-subtabs .stab').filter({ hasText: new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$') });
+  return page.getByRole('tab', { name: label, exact: true });
 }
 
 async function assertNoMainOverflow(page) {
@@ -241,8 +241,8 @@ test('roster and team attributes navigate, restore scroll, and redirect', async 
   await mouseClick(page, '[data-gob-section="team"]');
   await page.waitForSelector('#roster-view .gob-tbl tbody tr');
   await expect(page.locator('#roster-view.tab-content.active')).toBeVisible();
-  await expect(stab(page, 'Roster')).toHaveClass(/on/);
-  await expect(page.locator('#gob-subtabs .stab', { hasText: 'Development' })).toHaveCount(0);
+  await expect(stab(page, 'Roster')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Development', exact: true })).toHaveCount(0);
   const teamIdx = await page.evaluate(() => history.state && history.state.gobIdx);
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 420; });
   const saved = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);

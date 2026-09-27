@@ -249,7 +249,7 @@ async function mouseClick(page, target) {
 }
 
 function stab(page, label) {
-  return page.locator('#gob-subtabs .stab').filter({ hasText: new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$') });
+  return page.getByRole('tab', { name: label, exact: true });
 }
 
 async function docStamp(page) {
@@ -336,7 +336,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await parkPointer(page);
     await assertCollapsedRail(page);
     await expect(page.locator('#standings-view')).not.toContainText(/Mon|Tue|Wed|Thu|Fri|Sat|Sun|\d{1,2}:\d{2}/);
-    const labels = await page.locator('#gob-subtabs .stab').allTextContents();
+    const labels = await page.locator('#gob-subtabs .tabs > .tb .tb-l').allTextContents();
     expect(labels.map(function (text) { return text.trim(); }).filter(Boolean)).toEqual([
       'Standings', 'Rankings', 'Leaders', 'Team Stats', 'Schedule', 'Practice Squad', 'Tournament',
     ]);
@@ -379,7 +379,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await assertNoMainOverflow(page);
     await parkPointer(page);
     await assertCollapsedRail(page);
-    await expect(page.locator('#gob-subtabs .stab.on')).toHaveCount(1);
+    await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveCount(1);
     await page.screenshot({ path: path.join(OUT, 'leaders-' + size[2] + '.png') });
 
     const statsFirst = await timedOpen(page, 'Team Stats', '#teamstats-body tr');
@@ -403,7 +403,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await assertNoMainOverflow(page);
     await parkPointer(page);
     await assertCollapsedRail(page);
-    await expect(page.locator('#gob-subtabs .stab.on')).toHaveCount(1);
+    await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveCount(1);
     await page.screenshot({ path: path.join(OUT, 'team-stats-' + size[2] + '.png') });
     await page.evaluate(() => {
       const card = document.querySelector('#team-stats-view .gob-xs');
@@ -417,7 +417,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await page.waitForSelector('#standings-view .gob-tcard');
     await parkPointer(page);
     await assertCollapsedRail(page);
-    await expect(page.locator('#gob-subtabs .stab.on')).toHaveCount(1);
+    await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveCount(1);
     await page.screenshot({ path: path.join(OUT, 'standings-' + size[2] + '.png') });
     await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
     await page.getByRole('button', { name: 'National', exact: true }).click();
