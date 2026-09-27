@@ -725,7 +725,12 @@ html.gob-shell .pg-head .tabs {
   gap: 26px;
 }
 
-html.gob-shell .pg-head .tb {
+html.gob-shell .pg-head .tb,
+html.gob-shell .pg-head a.tb:link,
+html.gob-shell .pg-head a.tb:visited,
+html.gob-shell .pg-head a.tb:hover,
+html.gob-shell .pg-head a.tb:focus,
+html.gob-shell .pg-head a.tb:active {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -738,11 +743,14 @@ html.gob-shell .pg-head .tb {
   letter-spacing: var(--tracking-5);
   color: var(--text-60);
   background: none;
+  background-image: none;
   border: 0;
+  box-shadow: none;
   cursor: pointer;
   outline: none;
   text-align: left;
   text-decoration: none;
+  text-decoration-line: none;
   transition: color var(--dur-hover);
 }
 

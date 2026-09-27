@@ -109,7 +109,7 @@ async function settle(page) {
 
 async function park(page) {
   const box = await page.locator('html.gob-shell .main').boundingBox();
-  if (box) await page.mouse.move(box.x + Math.min(320, box.width / 2), box.y + 88);
+  if (box) await page.mouse.move(box.x + Math.min(320, box.width / 2), box.y + Math.min(280, box.height - 24));
 }
 
 function tab(page, label) {
@@ -314,4 +314,58 @@ test('section shots, locked tooltip, more menu, and a detail view', async ({ pag
   await page.waitForURL(/recruiting\.html/);
   await expect(page.locator('#gob-subtabs .tb')).toHaveCount(0);
   await expect(page.locator('#gob-subtabs')).toBeHidden();
+});
+
+test('unselected link tabs have no stray underline', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openFcc(page);
+  const sections = ['team', 'prep', 'league', 'news'];
+  let links = 0;
+  for (const section of sections) {
+    await page.locator('[data-gob-section="' + section + '"]').click();
+    await settle(page);
+    await park(page);
+    const rows = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('#gob-subtabs .tabs > .tb')).filter(function (el) {
+        return !el.classList.contains('more');
+      }).map(function (el) {
+        const cs = getComputedStyle(el);
+        const after = getComputedStyle(el, '::after');
+        return {
+          tag: el.tagName,
+          label: (el.querySelector('.tb-l') || {}).textContent || '',
+          selected: el.getAttribute('aria-selected'),
+          decoration: cs.textDecorationLine,
+          border: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth].join(' '),
+          shadow: cs.boxShadow,
+          after: after.content,
+          hovered: el.matches(':hover'),
+        };
+      });
+    });
+    expect(rows.length, section).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.decoration, section + ' ' + row.label).toBe('none');
+      expect(row.border, section + ' ' + row.label).toBe('0px 0px 0px 0px');
+      expect(row.hovered, section + ' ' + row.label).toBe(false);
+      if (row.selected !== 'true') expect(row.after, section + ' ' + row.label).toBe('none');
+      if (!row.hovered) expect(row.shadow, section + ' ' + row.label).toBe('none');
+      if (row.tag === 'A' && row.selected !== 'true') links += 1;
+    }
+  }
+  expect(links).toBeGreaterThan(0);
+
+  await page.locator('[data-gob-section="league"]').click();
+  await tab(page, 'Schedule').hover();
+  const preview = await tab(page, 'Schedule').evaluate((el) => getComputedStyle(el, '::after').content);
+  expect(preview).not.toBe('none');
+  await park(page);
+  const resting = await tab(page, 'Schedule').evaluate((el) => ({
+    decoration: getComputedStyle(el).textDecorationLine,
+    after: getComputedStyle(el, '::after').content,
+    hovered: el.matches(':hover'),
+  }));
+  expect(resting.hovered).toBe(false);
+  expect(resting.decoration).toBe('none');
+  expect(resting.after).toBe('none');
 });
