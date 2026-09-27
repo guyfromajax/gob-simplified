@@ -49,12 +49,14 @@ async function mount(page) {
   });
 }
 
-test('column order is Player RT POS YR HT WT Attributes', async ({ page }) => {
+test('column order is Player RT POS YR HT WT Attributes DEV FOCUS', async ({ page }) => {
   await mount(page);
   const labels = await page.evaluate(() =>
     [...document.querySelectorAll('#roster-tab thead th')].map((t) => t.textContent.replace(/cur.*pot/i,'').trim()));
+  // 5a585b349: DEV FOCUS trails the attribute tiles — the evidence, then the coaching call.
   expect(labels.slice(0, 6)).toEqual(['Player', 'RT', 'POS', 'YR', 'HT', 'WT']);
-  expect(labels).toHaveLength(7);
+  expect(labels[labels.length - 1]).toBe('DEV FOCUS');
+  expect(labels).toHaveLength(8);
 });
 
 test('every header carries a sort key except the grouped attribute cell', async ({ page }) => {
@@ -63,7 +65,7 @@ test('every header carries a sort key except the grouped attribute cell', async 
     withKey: [...document.querySelectorAll('#roster-tab thead th[data-sort-col]')].map((t) => t.dataset.sortCol),
     attrControls: document.querySelectorAll('#roster-tab [data-attr-sort]').length,
   }));
-  expect(m.withKey).toEqual(['Name', 'RT', 'POS', 'Year', 'Height', 'Weight']);
+  expect(m.withKey).toEqual(['Name', 'RT', 'POS', 'Year', 'Height', 'Weight', 'Focus']);
   expect(m.attrControls).toBe(12);   // all 12 attributes sortable
 });
 
