@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GOB · Sub-tab row · Underline (approved)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<link rel="stylesheet" href="templates.css">
+<link rel="stylesheet" href="subtabs.css">
+<style>
+html,body{margin:0;background:#d9dadd}
+#canvas{width:1280px;margin:0 auto;padding:24px 0 120px;display:flex;flex-direction:column}
+.jump{position:sticky;top:0;z-index:10;display:flex;gap:8px;justify-content:center;padding:12px;background:rgba(217,218,221,.92);backdrop-filter:blur(6px);border-bottom:1px solid rgba(0,0,0,.08)}
+.jump a{font:600 14px/1 Inter,sans-serif;color:#16181d;text-decoration:none;padding:9px 16px;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.jump a:hover{color:#16181d;background:#f1f2f4}
+.dirh{margin-top:72px}.dirh:first-child{margin-top:0}
+.cv-l{margin:28px 0 12px}
+a{color:inherit}a:hover{color:inherit}
+.cv{position:relative;flex:none}
+.cv-h{font:700 44px/1 'Bebas Neue Pro','Bebas Neue',sans-serif;letter-spacing:.03em;color:#16181d}
+.cv-s{margin-top:6px;font:500 15px/1.35 Inter,sans-serif;color:#4a4d55;max-width:1180px}
+.cv-l{font:600 13px/1 Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#5b5e66}
+.fr{box-shadow:0 18px 50px rgba(0,0,0,.28)}
+</style>
+</head>
+<body>
+
+<div id="canvas"></div>
+<script src="shell-chrome.js"></script>
+<script src="roster-table.js"></script>
+<script src="standings-table.js"></script>
+<script src="subtabs.js"></script>
+<script>
+(function(){
+const {S,head,row,fit,wire,applyState}=SX;
+const ROSTER=ROSTER_TABLE.replace(/<div class="tip"[\s\S]*?<\/div>/,'').replace(' is-hover','');
+const D={
+A:{name:'A · Underline',x:0,sub:'Text tabs, 2px ink that slides to the selection, one full-width hairline. No container at all — the row is a rule the content hangs from.',
+thesis:'The quietest option that still reads unmistakably as navigation. Selection is luminance plus a 2px ink; the hairline is the only structure. Recommended default.',
+notes:['<b>Row</b> 44px · 1px <code>--line-strong</code> hairline across the full content width, under tools too','<b>Tab</b> Bebas 700 fs-17 · tracking-5 · gap 26 · no min-width, no fill','<b>Rest</b> t60 · <b>Hover</b> t87 + 1px w-30 underline preview · <b>Selected</b> t100 + 2px white ink','<b>Motion</b> ink slides between tabs · <code>--dur-tab</code> 160ms <code>--ease-out</code> · none under reduced motion','<b>Focus</b> 2px white ring, radius 6, 6px outside the label — only on keyboard','<b>Locked</b> t38 + 12px lock · tooltip on hover/focus · stays focusable (aria-disabled)','<b>Sticky head</b> 118 → 114px · table <code>--th-top: 114px</code>','<b>Tools</b> unchanged <code>.seg</code> / <code>.search</code>, vertically centred on the row']},
+B:{name:'B · Segmented',x:1360,sub:'One restrained track, a sliding neutral thumb. Tool segments drop their track so the row has exactly one container.',
+thesis:'Compact and very legible as a set, but it is still a container, and it reads as a filter. Beside scope segments it needs the tools demoted to stay unambiguous.',
+notes:['<b>Track</b> padding 3 · radius 10 · w-3 · inset 1px <code>--line</code>','<b>Item</b> 32px · padding 0×16 · radius 7 · Bebas 700 fs-16 tracking-4','<b>Rest</b> t60 · <b>Hover</b> t87 + w-4 · <b>Selected</b> t100 on a w-10 thumb with the <code>.seg.on</code> inset highlight','<b>Motion</b> thumb slides, <code>--dur-tab</code> <code>--ease-out</code>','<b>Focus</b> 2px white inset ring on the item','<b>B only:</b> tool <code>.seg</code> loses its track + border so two segmented idioms don\u2019t compete','<b>Sticky head</b> 118 → 112px · <code>--th-top: 112px</code>','<b>Trade-off</b> 32px per-tab padding overflows sooner than A']},
+C:{name:'C · Inline index',x:2720,sub:'Section title, sub-tabs and tools on one line. The head shrinks from 118 to 68px; the crumb becomes a line that scrolls away.',
+thesis:'The most content-first option: it gives the table 50px back once you scroll. Costs: the title shares the row, so crowded sections (League) collapse search earliest.',
+notes:['<b>Row</b> 40px · h1 Bebas fs-32 · 1px × 22 divider · tabs Bebas 700 fs-17 gap 22','<b>Rest</b> t60 · <b>Hover</b> t87 + 1px w-30 underline · <b>Selected</b> t100 + 2px ink 6px under the label','<b>No hairline at rest</b> — a 1px <code>--line</code> appears on the head only once content scrolls beneath it','<b>Crumb</b> moves to a 30px non-sticky context line above the table','<b>Sticky head</b> 118 → 68px · <code>--th-top: 68px</code>','<b>Focus / locked / motion</b> as A','<b>Overflow</b> League collapses search to an icon at 1280 (see frame 2)','<b>Trade-off</b> section title no longer stands alone as a page heading']}};
+const cv=document.getElementById('canvas');
+const add=(x,y,html,cls='cv',w)=>{const d=document.createElement('div');d.className=cls;if(w)d.style.width=w+'px';d.innerHTML=html;cv.appendChild(d);return d;};
+const rows=[];
+function shell(dir,sec,body,label){
+return '<div class="gob gob-1280 sx d'+dir+'" data-screen-label="'+label+'"><div class="app">'+SHELL_TOP+SHELL_RAIL+'<main class="main scroll">'+head(dir,sec)+(dir==='C'&&sec.crumb?'<div class="ctx">'+sec.crumb+'</div>':'')+body+'<div class="dt-pad"></div></main></div></div>';}
+function frame(dir,x,y,sec,body,label){
+const f=add(x,y,shell(dir,sec,body,label),'cv fr');f.style.width='1280px';f.style.height='720px';
+const rails=f.querySelectorAll('.rail-i');rails.forEach(r=>r.classList.remove('on'));rails[sec.rail].classList.add('on');
+const m=f.querySelector('.main'),h=f.querySelector('.pg-head');
+if(dir==='C')m.addEventListener('scroll',()=>h.classList.toggle('stuck',m.scrollTop>0));
+rows.push(f.querySelector('.nav-row'));}
+const spec=(label,html,cls='')=>'<div class="spec"><div class="spec-l">'+label+'</div><div class="spec-b '+cls+'">'+html+'</div></div>';
+const T=S.team,L=S.league,Tn=Object.assign({},T,{tools:[]});
+const lockEx={title:'League',tabs:['Schedule','Practice Squad',SX.LT],active:0,tools:[]};
+function sheet(dir){
+const d=D[dir];
+const stateRow=(sec,st)=>'<div data-state=\''+JSON.stringify(st||{})+'\'>'+row(dir,sec)+'</div>';
+const lad=(label,sec,w,st)=>'<div class="lad"><div class="spec-l">'+label+'</div><div class="spec-b mid" style="width:'+(w+36)+'px"><div data-state=\''+JSON.stringify(st||{})+'\'>'+(dir==='C'?head(dir,sec,{static:true}):row(dir,sec))+'</div></div></div>';
+return '<div class="gob sx sheet d'+dir+'" data-screen-label="'+dir+' spec">'+
+'<div><h2>'+d.name+'</h2><p class="thesis">'+d.thesis+'</p></div>'+
+'<section><h3>States</h3><div class="sgrid">'+
+spec('<b>Rest</b> · Roster selected',stateRow(Tn))+
+spec('<b>Hover</b> · Player Stats',stateRow(Tn,{hover:'Player Stats'}))+
+spec('<b>Keyboard focus</b> · Team Attributes (Tab lands on the selection, ← → move)',stateRow(Tn,{focus:'Team Attributes'}))+
+spec('<b>Locked</b> · Tournament, hover or focus',stateRow(lockEx,{tip:'Tournament'}),'tall')+
+spec('<b>Overflow menu open</b> · League at 560px, keyboard on Schedule',stateRow(L,{menu:true,menuFocus:0}),'tall')+
+'<div class="spec"><div class="spec-l"><b>Keyboard</b></div><div class="spec-b"><div class="kmap"><kbd>Tab</kbd><span>Lands on the selected tab (roving tabindex), then the tools</span><kbd>← →</kbd><span>Move and select — pages switch instantly, so selection follows focus</span><kbd>Home End</kbd><span>First / last visible tab</span><kbd>Locked</kbd><span>Focusable so its reason is announced; Enter does nothing</span><kbd>More</kbd><span>Enter or ↓ opens · ↑↓ move · Esc closes and returns focus</span><kbd>/</kbd><span>Focuses search — expands it if collapsed</span></div></div></div>'+
+'</div></section>'+
+'<section><h3>Every section · 1280 content width (1170)</h3><div class="stack">'+
+['team','prep','league','recruiting','news'].map(k=>'<div class="spec-b" data-state="{}">'+head(dir,S[k],{static:true})+'</div>').join('')+
+'</div></section>'+
+'<section><h3>When tabs + tools don\u2019t fit · measured, not by breakpoint</h3><div class="stack">'+
+lad(dir==='C'?'<b>1 · League › Standings at 1170</b> · title shares the row, so search is already an icon':'<b>1 · Fits as-is</b> · League › Standings, 7 tabs + segment + search, at 1170',L,1170)+
+lad('<b>2 · Search collapses to an icon first</b> · League › Team Stats, 7 tabs + 2 segments + search, at 1170',S.leagueStats,1170)+
+lad('<b>3 · Trailing tabs fold into More</b> · the selected tab never folds · 720',L,720)+
+lad('<b>4 · Search opened</b> from the icon or “/” — it takes priority and more tabs fold · 720',L,720,{searchOpen:1})+
+'</div></section>'+
+'<section><h3>Spec</h3><ul class="notes">'+d.notes.map(n=>'<li><span>'+n+'</span></li>').join('')+'</ul></section>'+
+'</div>';}
+for(const k of ['A']){
+const d=D[k];
+const hd=add(d.x,0,'<div class="cv-h">'+d.name+'</div><div class="cv-s">'+d.sub+'</div>','cv dirh',1280);hd.id='dir-'+k;hd.style.scrollMarginTop='80px';
+add(d.x,96,'<div class="cv-l">Team › Roster · 1280 × 720</div>');
+frame(k,d.x,122,T,'<div class="tcard">'+ROSTER+'</div>',k+' Roster');
+add(d.x,878,'<div class="cv-l">League › Standings · 7 tabs, Tournament locked, segment + search · 1280 × 720</div>');
+frame(k,d.x,904,L,STANDINGS_TABLE,k+' Standings');
+add(d.x,1660,'<div class="cv-l">States · sections · overflow</div>');
+const s=add(d.x,1686,sheet(k),'cv fr',1280);
+s.querySelectorAll('[data-state]').forEach(w=>{const r=w.querySelector('.nav-row');r._st=JSON.parse(w.dataset.state);rows.push(r);});
+}
+const run=r=>{const w=r.clientWidth;if(!w)return;r._lw=w;try{fit(r);applyState(r,r._st);}catch(e){console.warn(e);}};
+rows.forEach(r=>{if(r._st&&r._st.searchOpen)r.dataset.searchOpen='1';wire(r);r._lw=0;});
+const ro=new ResizeObserver(es=>es.forEach(e=>{const r=e.target,w=Math.round(e.contentRect.width);if(w&&w!==r._lw){r._lw=w;run(r);}}));
+rows.forEach(r=>ro.observe(r));
+const all=()=>rows.forEach(run);
+const zoomFit=()=>{cv.style.zoom=Math.min(1,(document.documentElement.clientWidth-32)/1280);};zoomFit();window.addEventListener('resize',zoomFit);
+let n=0;const poll=setInterval(()=>{n++;rows.forEach(r=>{const w=r.clientWidth;if(w&&w!==r._lw)run(r);});if(n>=40&&rows.every(r=>r._lw))clearInterval(poll);},250);
+document.fonts.ready.then(()=>requestAnimationFrame(()=>requestAnimationFrame(all)));
+window.addEventListener('load',()=>{requestAnimationFrame(()=>requestAnimationFrame(all));setTimeout(all,300);});
+setTimeout(all,300);setTimeout(all,1000);
+})();
+</script>
+</body>
+</html>
