@@ -204,9 +204,21 @@ async function openFcc(page, state, search) {
 
 async function mouseClick(page, target) {
   const loc = typeof target === 'string' ? page.locator(target).first() : target;
-  // A box sampled before the click goes stale once the sticky page head moves
-  // after a scroll, and the point lands on the head instead of the tab.
-  // locator.click hit-tests the point it actually clicks.
+  const onRail = await loc.evaluate((el) => !!el.closest('nav.rail'));
+  if (!onRail) {
+    // The 1280 rail face overlays .main while the pointer rests on the rail.
+    // A tab click into that overlay never lands. Park off the rail and wait
+    // until the face is back to the column width, then hit-test the click.
+    await page.mouse.move(480, 240);
+    await page.waitForFunction(() => {
+      const html = document.documentElement;
+      const face = document.querySelector('html.gob-shell .rail-face');
+      if (!face || !html.classList.contains('gob-1280')) return true;
+      const rail = document.querySelector('html.gob-shell .rail');
+      const collapsed = rail ? rail.getBoundingClientRect().width : 64;
+      return face.getBoundingClientRect().width <= collapsed + 2;
+    });
+  }
   await loc.click();
 }
 
