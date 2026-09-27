@@ -123,3 +123,62 @@ def test_week_defaults_sorts_and_marks_the_user_game():
 
     bad = client.get("/franchise/schedule/week", params={"franchise_id": str(fid), "week": 40})
     assert bad.status_code == 422
+
+
+def test_week_advance_shows_the_new_box_score_without_clearing_the_cache():
+    """A new result must invalidate the game-id map. Do not clear it by hand."""
+    from BackEnd.utils import schedule_browse as browse
+
+    fid = seed()
+    before = client.get(
+        "/franchise/team-detail",
+        params={"franchise_id": str(fid), "team_id": str(USER)},
+    )
+    assert before.status_code == 200, before.text
+    assert all(row["week"] != 9 for row in before.json()["results"])
+    assert str(fid) in browse._GAME_IDS
+
+    doc = db.franchises.find_one({"_id": fid})
+    schedule = list(doc["schedule"])
+    while len(schedule) < 9:
+        schedule.append([])
+    schedule[8] = [[str(OTHER), str(USER)]]
+    results = dict(doc["results"])
+    results["9"] = [{
+        "away_id": str(OTHER),
+        "home_id": str(USER),
+        "away_score": 55,
+        "home_score": 77,
+    }]
+    db.franchises.update_one(
+        {"_id": fid},
+        {"$set": {"schedule": schedule, "results": results, "week": 9}},
+    )
+    inserted = db.games.insert_one({
+        "franchise_id": str(fid),
+        "week": 9,
+        "away_team_id": "YORK",
+        "home_team_id": "LANCASTER",
+    }).inserted_id
+
+    after = client.get(
+        "/franchise/team-detail",
+        params={"franchise_id": str(fid), "team_id": str(USER)},
+    )
+    assert after.status_code == 200, after.text
+    week9 = [row for row in after.json()["results"] if row["week"] == 9]
+    assert len(week9) == 1
+    assert week9[0]["game_id"] == str(inserted)
+
+    week = client.get("/franchise/schedule/week", params={"franchise_id": str(fid), "week": 9})
+    assert week.status_code == 200, week.text
+    match = [game for game in week.json()["games"] if game["is_user"]]
+    assert len(match) == 1
+    assert match[0]["game_id"] == str(inserted)
+    assert match[0]["status"] == "complete"
+
+    assert list(browse._GAME_IDS) == [str(fid)]
+    assert list(browse._BUNDLES) == [str(fid)]
+    assert isinstance(browse._GAME_IDS[str(fid)][0], tuple)
+    assert browse._GAME_IDS[str(fid)][0][0] == 9
+    assert browse._GAME_IDS[str(fid)][0][3] == 2

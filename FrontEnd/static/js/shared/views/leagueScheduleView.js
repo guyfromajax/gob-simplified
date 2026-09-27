@@ -160,8 +160,8 @@ export function mount(container, ctx) {
       : '';
     var html = '<section class="gob-tcard">';
     if (title) html += '<p class="gob-sch-round">' + tables.esc(title) + '</p>';
-    html += '<div class="gob-scroll"><table class="gob-tbl"><thead><tr>'
-      + '<th>Away</th><th>Home</th><th>Result</th><th>Box score</th>'
+    html += '<div class="gob-scroll"><table class="gob-tbl gob-sched"><thead><tr>'
+      + '<th class="team">Away</th><th class="num">Result</th><th class="team">Home</th><th class="box">Box score</th>'
       + '</tr></thead><tbody>';
     if (!games.length) {
       var empty = payload && payload.week >= 27
@@ -172,10 +172,10 @@ export function mount(container, ctx) {
     games.forEach(function (game) {
       var cls = game.is_user ? ' class="me is-user"' : '';
       html += '<tr' + cls + '>'
-        + '<td>' + teamCell(game.away) + '</td>'
-        + '<td>' + teamCell(game.home) + '</td>'
-        + '<td>' + scoreCell(game) + '</td>'
-        + '<td>' + boxCell(game) + '</td></tr>';
+        + '<td class="team">' + teamCell(game.away) + '</td>'
+        + '<td class="num">' + scoreCell(game) + '</td>'
+        + '<td class="team">' + teamCell(game.home) + '</td>'
+        + '<td class="box">' + boxCell(game) + '</td></tr>';
     });
     html += '</tbody></table></div></section>';
     container.innerHTML = html;

@@ -117,22 +117,22 @@ export function mount(container, ctx) {
 
   function render(payload) {
     var rows = seasonRows(payload);
-    var html = '<section class="gob-tcard"><div class="gob-scroll"><table class="gob-tbl"><thead><tr>'
-      + '<th>Week</th><th>Site</th><th>Opponent</th><th>Result</th><th>Box score</th>'
+    var html = '<section class="gob-tcard"><div class="gob-scroll"><table class="gob-tbl gob-sched"><thead><tr>'
+      + '<th class="wk">Week</th><th class="site">Site</th><th class="team">Opponent</th><th class="num">Result</th><th class="box">Box score</th>'
       + '</tr></thead><tbody>';
     rows.forEach(function (row) {
       var cls = row.kind === 'next' ? ' class="is-next"' : '';
       var site = row.kind === 'open' ? '—' : (row.site === 'home' ? 'vs' : 'at');
       var opponent = row.kind === 'open' ? 'Open' : opponentCell(row);
       html += '<tr' + cls + ' data-week="' + row.week + '">'
-        + '<td>' + row.week + '</td>'
-        + '<td>' + site + '</td>'
-        + '<td>' + opponent + '</td>'
-        + '<td>' + resultCell(row) + '</td>'
-        + '<td>' + boxCell(row) + '</td></tr>';
+        + '<td class="wk">' + row.week + '</td>'
+        + '<td class="site">' + site + '</td>'
+        + '<td class="team">' + opponent + '</td>'
+        + '<td class="num">' + resultCell(row) + '</td>'
+        + '<td class="box">' + boxCell(row) + '</td></tr>';
     });
     EOS_ROWS.forEach(function (label) {
-      html += '<tr class="is-eos"><td></td><td>—</td><td>' + tables.esc(label) + '</td><td>—</td><td>—</td></tr>';
+      html += '<tr class="is-eos"><td class="wk"></td><td class="site">—</td><td class="team">' + tables.esc(label) + '</td><td class="num">—</td><td class="box">—</td></tr>';
     });
     html += '</tbody></table></div></section>';
     container.innerHTML = html;

@@ -73,3 +73,24 @@ The team view does not derive the winner. It colors the server's `W` or `L` with
 - `subtabs`, `t1-tables`, `t3-detail`, `shell-1b`, `navigation-history`: 30 passed, 1 skipped.
 
 Screenshots in `reports/schedule-views/`: the offline Lancaster save (week 3, results on the league table, Next on the team table) and the fixture week 8, at 1280×720 and 1920×1080. The pointer was parked in `.main`.
+
+## Follow-up
+
+`_BUNDLES` already kept one stamp per franchise: a new stamp replaces the previous value, so seasons do not accumulate. `_GAME_IDS` was a map with no stamp, so team-detail kept the old box-score links until the process restarted. It is now the same shape, one `(stamp, map)` per franchise. The stamp is week, `browse_rev`, season, and result count. A new result changes the count even when `browse_rev` does not. `tests/test_schedule_week.py` advances the week, writes the new result, and inserts the game, then reads team-detail and the week route again without clearing the cache. The new `game_id` is on both.
+
+Game ids come from `projected_tuples` of `_id`, `week`, `home_team_id`, `away_team_id`, `team1_id`, and `team2_id` on SQLite, and from the same `find` projection on mongomock. Both resolve a slug or a 24-hex id the same way. On the offline save the projected map and the old 3,200-character prefix scan resolve the same 190 matchups (week 3 is still 63 of 64). When two documents share a week and matchup, the greater id wins, so Mongo and SQLite return the same link.
+
+| Call | Before (prefix scan) | After (`projected_tuples`) |
+|---|---|---|
+| Game-id read, all documents | inside the cold week (397 ms, 644 ms on a second process) | 1,137 ms, then 516 ms |
+| Cold week 3 | 397 ms, 644 ms | 2,251 ms |
+| Later weeks | 1.5–4.7 ms | 32 ms, 64 ms, then 4.5 ms and 7.4 ms |
+
+Warm week changes stay under 150 ms. The cold open is slower because `json_extract` parses the full game documents. Week 3 is still 64 games, 63 complete, 63 linked.
+
+The league row reads Away, the score, Home, then Box score. That is the one-line score, with both teams left-aligned and the score between them. The team row is Week, Site, Opponent, Result, Box score. `#franchise-container .tab-content table { width: 100% }` was stretching both tables; the schedule tables are `max-content` at a higher specificity, so the columns sit on the names. Box score is a quiet text link: no underline until hover.
+
+Retaken: `save-team`, `save-league`, `fixture-team`, and `fixture-league` at 1280 and 1920.
+
+- `tests/test_schedule_week.py` and `tests/test_t3_detail.py`: 6 passed on mongomock, 6 passed on sqlite.
+- `schedule-views`, `subtabs`, `t1-tables`, `t3-detail`: 28 passed, 1 skipped.

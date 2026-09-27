@@ -33,15 +33,15 @@ _TOURNAMENT_LABELS = {
     34: "National Championship",
 }
 
-_SIDE_ID = re.compile(r'"(home_team_id|away_team_id)"\s*:\s*"([^"]+)"')
 _TEAM_OID = re.compile(r'"team_id"\s*:\s*\{\s*"\$oid"\s*:\s*"([0-9a-fA-F]{24})"\s*\}')
 _TEAM_STR = re.compile(r'"team_id"\s*:\s*"([0-9a-fA-F]{24})"')
 _RANK = re.compile(r'"natl_rank"\s*:\s*(-?\d+)')
 _HEX_ID = re.compile(r"^[0-9a-fA-F]{24}$")
 
-# franchise id -> (stamp, bundle). Stamp includes week, browse_rev, and result count.
+# One slot per franchise: the latest (stamp, value). A new week, browse_rev,
+# season, or result count replaces the previous slot, so seasons do not pile up.
 _BUNDLES: dict[str, tuple[tuple[Any, ...], dict[str, Any]]] = {}
-_GAME_IDS: dict[str, dict[tuple[int, str, str], str]] = {}
+_GAME_IDS: dict[str, tuple[tuple[Any, ...], dict[tuple[int, str, str], str]]] = {}
 
 
 def clear_schedule_browse_cache() -> None:
@@ -60,17 +60,6 @@ def _as_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _decode_row_id(row_id: str) -> str:
-    if row_id.startswith("raw:"):
-        try:
-            return str(json.loads(row_id[4:]))
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return row_id[4:].strip('"')
-    if row_id.startswith("oid:"):
-        return row_id[4:]
-    return row_id
 
 
 def _sql_rows(collection: Any, sql: str, params: tuple[Any, ...]) -> list[tuple] | None:
@@ -116,13 +105,58 @@ def _rank_map(franchise_id: str) -> dict[str, int | None]:
 
 
 def matchup_game_ids(franchise_id: str) -> dict[tuple[int, str, str], str]:
-    """(week, away id, home id) -> game id. Cached per franchise."""
-    cached = _GAME_IDS.get(str(franchise_id))
-    if cached is not None:
-        return cached
-    found = _read_game_ids(str(franchise_id))
-    _GAME_IDS[str(franchise_id)] = found
+    """(week, away id, home id) -> game id. Latest stamp only, per franchise."""
+    key = str(franchise_id)
+    stamp = _light_stamp(key)
+    cached = _GAME_IDS.get(key)
+    if cached is not None and cached[0] == stamp:
+        return cached[1]
+    found = _read_game_ids(key)
+    _GAME_IDS[key] = (stamp, found)
     return found
+
+
+def _side_text(value: Any) -> str:
+    """Team id as stored: a slug, a hex id, or an ``{'$oid': ...}`` object."""
+    if value is None:
+        return ""
+    if isinstance(value, dict):
+        oid = value.get("$oid")
+        return str(oid) if oid else ""
+    if isinstance(value, ObjectId):
+        return str(value)
+    text = str(value).strip()
+    if text.startswith("{") and "$oid" in text:
+        try:
+            parsed = json.loads(text)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return text
+        if isinstance(parsed, dict) and parsed.get("$oid"):
+            return str(parsed["$oid"])
+    return text
+
+
+def _store_matchup(
+    found: dict[tuple[int, str, str], str],
+    resolve,
+    week_raw: Any,
+    away_raw: Any,
+    home_raw: Any,
+    team1_raw: Any,
+    team2_raw: Any,
+    game_id: Any,
+) -> None:
+    week = _as_int(week_raw)
+    away = resolve(_side_text(away_raw) or _side_text(team1_raw))
+    home = resolve(_side_text(home_raw) or _side_text(team2_raw))
+    ident = _side_text(game_id)
+    if week is None or not away or not home or not ident:
+        return
+    # Two documents can share a week and matchup. Keep the greater id so
+    # Mongo find order and the SQLite scan return the same link.
+    previous = found.get((week, away, home))
+    if previous is None or ident > previous:
+        found[(week, away, home)] = ident
 
 
 def _read_game_ids(franchise_id: str) -> dict[tuple[int, str, str], str]:
@@ -143,39 +177,28 @@ def _read_game_ids(franchise_id: str) -> dict[tuple[int, str, str], str]:
             return text
         return by_canon.get(_canon(text), "")
 
+    fields = ["_id", "week", "away_team_id", "home_team_id", "team1_id", "team2_id"]
     games = db.games
-    table = getattr(games, "name", "games")
-    rows = _sql_rows(
-        games,
-        f'SELECT g_week, id, substr(doc, 1, 3200) FROM "{table}" WHERE g_franchise_id = ?',
-        (franchise_id,),
-    )
     found: dict[tuple[int, str, str], str] = {}
-    if rows is None:
-        for doc in games.find(
-            {"franchise_id": franchise_id},
-            {"_id": 1, "week": 1, "home_team_id": 1, "away_team_id": 1, "team1_id": 1, "team2_id": 1},
-        ):
-            week = _as_int(doc.get("week"))
-            away = resolve(str(doc.get("away_team_id") or doc.get("team1_id") or ""))
-            home = resolve(str(doc.get("home_team_id") or doc.get("team2_id") or ""))
-            if week is None or not away or not home:
-                continue
-            found[(week, away, home)] = str(doc.get("_id"))
+    from BackEnd.persistence.sqlite_collection import SqliteCollection
+
+    if isinstance(games, SqliteCollection):
+        rows = games.projected_tuples({"franchise_id": franchise_id}, fields)
+        for game_id, week_raw, away_raw, home_raw, team1_raw, team2_raw in rows:
+            _store_matchup(found, resolve, week_raw, away_raw, home_raw, team1_raw, team2_raw, game_id)
         return found
 
-    for week_raw, row_id, prefix in rows:
-        week = _as_int(week_raw)
-        if week is None or not prefix:
-            continue
-        sides: dict[str, str] = {}
-        for match in _SIDE_ID.finditer(prefix):
-            sides.setdefault(match.group(1), match.group(2))
-        away = resolve(sides.get("away_team_id", ""))
-        home = resolve(sides.get("home_team_id", ""))
-        if not away or not home:
-            continue
-        found[(week, away, home)] = _decode_row_id(str(row_id))
+    for doc in games.find({"franchise_id": franchise_id}, {name: 1 for name in fields}):
+        _store_matchup(
+            found,
+            resolve,
+            doc.get("week"),
+            doc.get("away_team_id"),
+            doc.get("home_team_id"),
+            doc.get("team1_id"),
+            doc.get("team2_id"),
+            doc.get("_id"),
+        )
     return found
 
 
@@ -275,11 +298,22 @@ def _default_week(current: int, enabled: dict[int, bool]) -> int:
     return current if _WEEK_MIN <= current <= _WEEK_MAX else 1
 
 
+def _result_count(results: Any) -> int:
+    if not isinstance(results, dict):
+        return 0
+    total = 0
+    for games in results.values():
+        if isinstance(games, list):
+            total += len(games)
+    return total
+
+
 def _stamp(franchise: dict[str, Any]) -> tuple[Any, ...]:
     return (
         _as_int(franchise.get("week")) or 0,
         _as_int(franchise.get("browse_rev")) or 0,
         _as_int(franchise.get("current_season")) or 0,
+        _result_count(franchise.get("results")),
     )
 
 
@@ -290,7 +324,7 @@ def _light_stamp(franchise_id: str) -> tuple[Any, ...]:
         raise HTTPException(status_code=422, detail="Invalid franchise ID") from exc
     doc = db.franchises.find_one(
         {"_id": key},
-        {"week": 1, "browse_rev": 1, "current_season": 1},
+        {"week": 1, "browse_rev": 1, "current_season": 1, "results": 1},
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
@@ -431,7 +465,6 @@ def _bundle(franchise_id: str, eos_builder: Callable[..., Any]) -> dict[str, Any
     cached = _BUNDLES.get(str(franchise_id))
     if cached and cached[0] == stamp:
         return cached[1]
-    _GAME_IDS.pop(str(franchise_id), None)
     franchise = _load_franchise(franchise_id)
     ranks = _rank_map(str(franchise_id))
     directory = _directory(franchise, ranks)
