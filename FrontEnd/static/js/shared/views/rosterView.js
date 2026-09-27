@@ -112,6 +112,77 @@ function devText(player, userTeam) {
   return api.focusLabel(player) || '';
 }
 
+export function rosterTableHtml(tables, rows, options) {
+  var opts = options || {};
+  var sortKey = opts.sortKey || '';
+  var lineup = !!opts.lineup;
+  var userTeam = !!opts.userTeam;
+  var hrefFor = opts.playerHref || function () { return '#'; };
+  var html = '<div class="gob-xs gob-roster' + (opts.compact ? ' is-compact' : '') + '"><table class="gob-tbl"><thead>';
+  html += '<tr class="gob-groups"><th colspan="6"></th>';
+  GROUPS.forEach(function (group) {
+    html += '<th class="gob-g' + (group.shade ? ' gshade' : '') + '" colspan="2">' + tables.esc(group.name) + '</th>';
+  });
+  html += '<th></th></tr>';
+  html += headerRow(tables, sortKey, opts.sortDir);
+  html += '</thead><tbody>';
+  var seenStarter = false;
+  var seenBench = false;
+  rows.forEach(function (player, index) {
+    if (index > 0 && index % 16 === 0) html += headerRow(tables, sortKey, opts.sortDir, true);
+    if (lineup && player.starter && !seenStarter) {
+      html += '<tr class="gob-sep"><td colspan="19">Starters</td></tr>';
+      seenStarter = true;
+    }
+    if (lineup && !player.starter && seenStarter && !seenBench) {
+      html += '<tr class="gob-sep"><td colspan="19">Bench</td></tr>';
+      seenBench = true;
+    }
+    html += '<tr>';
+    html += '<td class="pin team"><a class="gob-team gob-player" href="' + tables.esc(hrefFor(player)) + '">'
+      + '<span class="av">' + portraitHtml(tables, player) + '</span><span>' + tables.esc(displayName(player)) + '</span></a></td>';
+    html += '<td class="' + (sortKey === 'rt' ? 'on' : '') + '">' + rtHtml(tables, player) + '</td>';
+    html += '<td class="' + (sortKey === 'pos' ? 'on' : '') + '">' + tables.esc(player.position || '') + '</td>';
+    html += '<td class="' + (sortKey === 'yr' ? 'on' : '') + '">' + tables.esc(player.year || '') + '</td>';
+    html += '<td class="' + (sortKey === 'ht' ? 'on' : '') + '">' + tables.esc(heightText(player.height)) + '</td>';
+    html += '<td class="' + (sortKey === 'wt' ? 'on' : '') + '">' + (player.weight == null || player.weight === '' ? '' : tables.esc(player.weight)) + '</td>';
+    GROUPS.forEach(function (group) {
+      group.keys.forEach(function (key) {
+        var tiles = window.GOB_AttrTiles;
+        var value = tiles ? tiles.tileValue(player.attributes || {}, key) : null;
+        var cell = tiles ? tiles.tileHtml(key, value, false) : '';
+        var cls = (group.shade ? 'gshade' : '') + (sortKey === key ? ' on' : '');
+        html += '<td class="' + cls.trim() + '">' + cell + '</td>';
+      });
+    });
+    var focus = devText(player, userTeam);
+    html += '<td class="dev' + (focus ? '' : ' none') + (sortKey === 'dev' ? ' on' : '') + '">' + tables.esc(focus) + '</td>';
+    html += '</tr>';
+  });
+  return html + '</tbody></table></div>';
+}
+
+function headerRow(tables, sortKey, sortDir, repeat) {
+  var html = '<tr' + (repeat ? ' class="gob-rep"' : '') + '>';
+  IDENTITY.forEach(function (col) {
+    var cls = 's' + (col.pin ? ' pin team' : '') + (sortKey === col.key ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
+    html += '<th class="' + cls.trim() + '" data-sort="' + col.key + '">' + tables.esc(col.label) + '</th>';
+  });
+  GROUPS.forEach(function (group) {
+    group.keys.forEach(function (key) {
+      var on = sortKey === key;
+      var cls = 's' + (group.shade ? ' gshade' : '') + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
+      html += '<th class="' + cls.trim() + '" data-sort="' + key + '"'
+        + ' data-tooltip="' + tables.esc(tip(key)) + '"'
+        + ' aria-label="Sort by ' + tables.esc(fullName(key)) + '"'
+        + ' title="' + tables.esc(fullName(key)) + '">' + tables.esc(key) + '</th>';
+    });
+  });
+  var devOn = sortKey === 'dev';
+  html += '<th class="s' + (devOn ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '') + '" data-sort="dev">Dev focus</th>';
+  return html + '</tr>';
+}
+
 export function mount(container, ctx) {
   var tables = window.GOBTables;
   var franchiseId = (ctx && ctx.franchiseId) || '';
@@ -216,36 +287,18 @@ export function mount(container, ctx) {
     return tiles.tileValue(player.attributes || {}, key);
   }
 
-  function headerRow(repeat) {
-    var html = '<tr' + (repeat ? ' class="gob-rep"' : '') + '>';
-    IDENTITY.forEach(function (col) {
-      var cls = 's' + (col.pin ? ' pin team' : '') + (sortKey === col.key ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
-      html += '<th class="' + cls.trim() + '" data-sort="' + col.key + '">' + tables.esc(col.label) + '</th>';
-    });
-    GROUPS.forEach(function (group) {
-      group.keys.forEach(function (key) {
-        var on = sortKey === key;
-        var cls = 's' + (group.shade ? ' gshade' : '') + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
-        html += '<th class="' + cls.trim() + '" data-sort="' + key + '"'
-          + ' data-tooltip="' + tables.esc(tip(key)) + '"'
-          + ' aria-label="Sort by ' + tables.esc(fullName(key)) + '"'
-          + ' title="' + tables.esc(fullName(key)) + '">' + tables.esc(key) + '</th>';
-      });
-    });
-    var devOn = sortKey === 'dev';
-    html += '<th class="s' + (devOn ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '') + '" data-sort="dev">Dev focus</th>';
-    return html + '</tr>';
-  }
-
   function playerHref(player) {
-    var q = new URLSearchParams();
-    q.set('id', idOf(player));
-    q.set('mode', 'franchise');
-    if (franchiseId) q.set('franchise_id', franchiseId);
-    if (userId) q.set('team_id', userId);
+    var q = new URLSearchParams(window.location.search);
+    q.set('tab', 'player-view');
+    q.set('player_id', idOf(player));
+    q.set('origin', 'team');
+    q.set('up', 'Roster');
     q.set('return_tab', 'roster-view');
-    q.set('return_url', window.location.pathname + window.location.search);
-    return '/player-detail.html?' + q.toString();
+    q.set('pager', 'roster');
+    q.delete('view_team_id');
+    q.delete('id');
+    var text = q.toString();
+    return window.location.pathname + (text ? '?' + text : '');
   }
 
   function render() {
@@ -264,47 +317,13 @@ export function mount(container, ctx) {
     } else if (sortKey) {
       rows = tables.sortRows(rows, function (player) { return readValue(player, sortKey); }, sortDir);
     }
-    var html = backHtml() + '<section class="gob-tcard"><div class="gob-xs gob-roster"><table class="gob-tbl"><thead>';
-    html += '<tr class="gob-groups"><th colspan="6"></th>';
-    GROUPS.forEach(function (group) {
-      html += '<th class="gob-g' + (group.shade ? ' gshade' : '') + '" colspan="2">' + tables.esc(group.name) + '</th>';
-    });
-    html += '<th></th></tr>' + headerRow(false) + '</thead><tbody>';
-    var seenStarter = false;
-    var seenBench = false;
-    var userTeam = !!(body && body.is_user_team);
-    rows.forEach(function (player, index) {
-      if (index > 0 && index % 16 === 0) html += headerRow(true);
-      if (lineup && player.starter && !seenStarter) {
-        html += '<tr class="gob-sep"><td colspan="19">Starters</td></tr>';
-        seenStarter = true;
-      }
-      if (lineup && !player.starter && seenStarter && !seenBench) {
-        html += '<tr class="gob-sep"><td colspan="19">Bench</td></tr>';
-        seenBench = true;
-      }
-      html += '<tr>';
-      html += '<td class="pin team"><a class="gob-team gob-player" href="' + tables.esc(playerHref(player)) + '">'
-        + '<span class="av">' + portraitHtml(tables, player) + '</span><span>' + tables.esc(displayName(player)) + '</span></a></td>';
-      html += '<td class="' + (sortKey === 'rt' ? 'on' : '') + '">' + rtHtml(tables, player) + '</td>';
-      html += '<td class="' + (sortKey === 'pos' ? 'on' : '') + '">' + tables.esc(player.position || '') + '</td>';
-      html += '<td class="' + (sortKey === 'yr' ? 'on' : '') + '">' + tables.esc(player.year || '') + '</td>';
-      html += '<td class="' + (sortKey === 'ht' ? 'on' : '') + '">' + tables.esc(heightText(player.height)) + '</td>';
-      html += '<td class="' + (sortKey === 'wt' ? 'on' : '') + '">' + (player.weight == null || player.weight === '' ? '' : tables.esc(player.weight)) + '</td>';
-      GROUPS.forEach(function (group) {
-        group.keys.forEach(function (key) {
-          var tiles = window.GOB_AttrTiles;
-          var value = tiles ? tiles.tileValue(player.attributes || {}, key) : null;
-          var cell = tiles ? tiles.tileHtml(key, value, false) : '';
-          var cls = (group.shade ? 'gshade' : '') + (sortKey === key ? ' on' : '');
-          html += '<td class="' + cls.trim() + '">' + cell + '</td>';
-        });
-      });
-      var focus = devText(player, userTeam);
-      html += '<td class="dev' + (focus ? '' : ' none') + (sortKey === 'dev' ? ' on' : '') + '">' + tables.esc(focus) + '</td>';
-      html += '</tr>';
-    });
-    html += '</tbody></table></div></section>';
+    var html = backHtml() + '<section class="gob-tcard">' + rosterTableHtml(tables, rows, {
+      sortKey: sortKey,
+      sortDir: sortDir,
+      lineup: lineup,
+      userTeam: !!(body && body.is_user_team),
+      playerHref: playerHref
+    }) + '</section>';
     container.innerHTML = html;
     tables.bindWide(container.querySelector('.gob-xs'));
     bindBack();
@@ -321,9 +340,14 @@ export function mount(container, ctx) {
     });
     var order = rows.map(idOf);
     container.querySelectorAll('a.gob-player').forEach(function (link) {
-      link.addEventListener('click', function () {
+      link.addEventListener('click', function (event) {
         try { sessionStorage.setItem('gob-view-roster-order', JSON.stringify(order)); }
         catch (err) { /* the pager reads this later */ }
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button) return;
+        event.preventDefault();
+        if (window.GOBViews && typeof window.GOBViews.open === 'function') {
+          window.GOBViews.open(link.getAttribute('href'), 'push');
+        }
       });
     });
     if (typeof window.initAttributeTooltips === 'function') {

@@ -770,7 +770,16 @@ function standingsTeamLabel(t) {
 }
 
 function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
-  return `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId)}&team_name=${encodeURIComponent(teamName)}&return_tab=${returnTab}`;
+  const owner = new URLSearchParams(window.location.search).get('team_id') || teamId;
+  const params = new URLSearchParams();
+  params.set('mode', 'franchise');
+  if (franchiseId) params.set('franchise_id', franchiseId);
+  params.set('team_id', owner);
+  if (teamId) params.set('roster_team_id', teamId);
+  if (teamName) params.set('team_name', teamName);
+  if (returnTab) params.set('return_tab', returnTab);
+  params.set('origin', 'league');
+  return '/team-roster-view.html?' + params.toString();
 }
 
 function buildTeamLink(t) {

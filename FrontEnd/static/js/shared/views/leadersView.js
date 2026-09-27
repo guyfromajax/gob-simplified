@@ -163,6 +163,38 @@ export function mount(container, ctx) {
       + '" onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';}">';
   }
 
+  function playerHref(playerId) {
+    var q = new URLSearchParams(window.location.search);
+    q.set('tab', 'player-view');
+    q.set('player_id', playerId || '');
+    q.set('origin', 'league');
+    q.set('up', 'Leaders');
+    q.set('return_tab', 'leaders-view');
+    q.set('pager', 'leaders');
+    q.delete('view_team_id');
+    var text = q.toString();
+    return window.location.pathname + (text ? '?' + text : '');
+  }
+
+  function bindPlayers(order) {
+    container.querySelectorAll('a.gob-player').forEach(function (link) {
+      link.addEventListener('click', function (event) {
+        var list = order;
+        var raw = link.getAttribute('data-order');
+        if (raw) {
+          try { list = JSON.parse(raw); } catch (err) { list = order; }
+        }
+        try { sessionStorage.setItem('gob-view-leaders-order', JSON.stringify(list)); }
+        catch (err) { /* the pager reads this later */ }
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        if (window.GOBViews && typeof window.GOBViews.open === 'function') {
+          window.GOBViews.open(link.getAttribute('href'), 'push');
+        }
+      });
+    });
+  }
+
   function teamBits(row) {
     return [row.team, row.position, row.year].filter(Boolean).join(' · ');
   }
@@ -178,21 +210,28 @@ export function mount(container, ctx) {
       html += '<article class="gob-ldb"><header class="card-h"><h3>' + tables.esc(LABELS[stat] || stat)
         + '</h3>' + (meta ? '<span class="meta">' + tables.esc(meta) + '</span>' : '') + '</header>';
       if (hero) {
-        var href = tables.rosterHref(franchiseId, hero.team_id, hero.team || '', 'leaders-view');
+        var href = tables.rosterHref(franchiseId, hero.team_id, hero.team || '', 'leaders-view') + '&origin=league';
         var who = teamBits(hero);
+        var cardIds = tables.esc(JSON.stringify(rows.slice(0, 5).map(function (item) { return String(item.player_id || ''); }).filter(Boolean)));
+        var heroPlayer = hero.player_id
+          ? '<a class="gob-player nm" data-order="' + cardIds + '" href="' + tables.esc(playerHref(hero.player_id)) + '">' + tables.esc(hero.name || '') + '</a>'
+          : '<span class="nm">' + tables.esc(hero.name || '') + '</span>';
         html += '<div class="ldb-top' + (mine(hero) ? ' me is-user' : '') + '">'
           + '<span class="av">' + portraitHtml(hero.player_id, hero.name) + '</span>'
-          + '<span class="ldb-id"><span class="nm">' + tables.esc(hero.name || '') + '</span>'
+          + '<span class="ldb-id">' + heroPlayer
           + '<span>' + (hero.team_id
             ? '<a class="gob-team" data-return href="' + tables.esc(href) + '">' + tables.esc(who) + '</a>'
             : tables.esc(who)) + '</span></span>'
           + '<span class="ldb-v">' + tables.esc(showValue(stat, hero.value))
           + (suffix ? '<em>' + tables.esc(suffix) + '</em>' : '') + '</span></div><div class="ldb-list">';
         rows.slice(1, 5).forEach(function (row, index) {
-          var rowHref = tables.rosterHref(franchiseId, row.team_id, row.team || '', 'leaders-view');
+          var rowHref = tables.rosterHref(franchiseId, row.team_id, row.team || '', 'leaders-view') + '&origin=league';
           var code = abbr(row.team);
+          var rowPlayer = row.player_id
+            ? '<a class="gob-player nm" data-order="' + cardIds + '" href="' + tables.esc(playerHref(row.player_id)) + '">' + tables.esc(row.name || '') + '</a>'
+            : '<span class="nm">' + tables.esc(row.name || '') + '</span>';
           html += '<div class="ldb-r' + (mine(row) ? ' me is-user' : '') + '"><span>' + (index + 2) + '</span>'
-            + '<span class="ldb-n"><span class="nm">' + tables.esc(row.name || '') + '</span>'
+            + '<span class="ldb-n">' + rowPlayer
             + (code ? '<em>' + (row.team_id
               ? '<a class="gob-team" data-return href="' + tables.esc(rowHref) + '">' + tables.esc(code) + '</a>'
               : tables.esc(code)) + '</em>' : '')
@@ -209,6 +248,13 @@ export function mount(container, ctx) {
         setLeader(button.getAttribute('data-stat'));
       });
     });
+    var order = [];
+    CATS.forEach(function (stat) {
+      ((board && board[stat]) || []).filter(matches).slice(0, 5).forEach(function (row) {
+        if (row.player_id) order.push(String(row.player_id));
+      });
+    });
+    bindPlayers(order);
   }
 
   function renderFull() {
@@ -218,10 +264,13 @@ export function mount(container, ctx) {
       + '</h2><button type="button" class="gob-board">Board</button>'
       + '<table class="gob-tbl"><thead><tr><th class="left">#</th><th class="left">Player</th><th class="left">Team</th><th>Value</th></tr></thead><tbody>';
     rows.forEach(function (row, index) {
-      var href = tables.rosterHref(franchiseId, row.team_id, row.team || '', 'leaders-view');
+      var href = tables.rosterHref(franchiseId, row.team_id, row.team || '', 'leaders-view') + '&origin=league';
+      var nameCell = row.player_id
+        ? '<a class="gob-player" href="' + tables.esc(playerHref(row.player_id)) + '">' + tables.esc(row.name || '') + '</a>'
+        : tables.esc(row.name || '');
       html += '<tr' + (mine(row) ? ' class="me is-user"' : '') + '>'
         + '<td class="left">' + (index + 1) + '</td>'
-        + '<td class="left">' + tables.esc(row.name || '') + '</td>'
+        + '<td class="left">' + nameCell + '</td>'
         + '<td class="left">' + (row.team_id
           ? '<a class="gob-team" data-return href="' + tables.esc(href) + '">' + tables.esc(row.team || '') + '</a>'
           : tables.esc(row.team || '')) + '</td>'
@@ -231,6 +280,7 @@ export function mount(container, ctx) {
     container.innerHTML = html;
     var back = container.querySelector('.gob-board');
     if (back) back.addEventListener('click', function () { setLeader(''); });
+    bindPlayers(rows.map(function (row) { return String(row.player_id || ''); }).filter(Boolean));
   }
 
   function render() {

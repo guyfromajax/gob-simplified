@@ -168,8 +168,8 @@ A page or brief is done only when this file is updated if the shell, the section
 | standings.html | browse | League | Standings (`standings-view`; the file redirects) |
 | team-stats.html | browse | League | Team Stats (`team-stats-view`; the file redirects) |
 | stats.html | browse | League | none |
-| player-detail.html | browse | return context; else Team or League | none |
-| team-roster-view.html | redirect to `franchise-command-center.html?tab=roster-view` | Team | Roster |
+| player-detail.html | redirect to `?tab=player-view` unless `recruit_id` or `mode=recruit` | return context | none |
+| team-roster-view.html | redirect to `roster-view`, or `team-view` when `roster_team_id` is set | Team or League | Roster or the team drill-in |
 | box-score.html | browse when `return_url` is set; otherwise focus | League when browse | none |
 | set-lineup.html, training.html, training-report.html, training-squad-report.html, training-playbooks.html, cut-players.html, game-plan.html, playbooks.html, playbook-report.html | focus | — | — |
 
@@ -333,7 +333,9 @@ The first open paints a neutral skeleton in the shape of the view. No spinner. D
 
 An unknown module, or an import that fails, paints a quiet error card with Retry in that panel. The rest of the app stays up. Retry loads the module again. A `?tab=` that is neither a panel nor a registered view still falls back to the section default, as today's tabs do.
 
-Opening a player from Roster writes `gob-view-roster-order` in `sessionStorage`: a JSON array of the player ids in the order on screen at that click. A later pager reads that key. The Roster Varsity / Practice Squad segment is `gob-view-roster-scope` (`varsity` or `practice`).
+Opening a player from Roster writes `gob-view-roster-order` in `sessionStorage`: a JSON array of the player ids in the order on screen at that click. The Leaders full list (and each Leaders board card) writes `gob-view-leaders-order`, the same shape. Standings writes `gob-view-standings-order` as `{ ids, label }`, the visible team ids in that conference card and the card label (for example `A2`). The detail URL carries `pager=roster`, `pager=leaders`, or `pager=standings`. No `pager` param means no pager, even if a key is sitting in the session. Paging replaces the history entry and stops at the ends. The Roster Varsity / Practice Squad segment is `gob-view-roster-scope` (`varsity` or `practice`).
+
+`player-view` and `team-view` are drill-ins, not sub-tabs. A list opens them with a push. The rail highlights `origin` (`team`, `league`, `office`, or `prep`). The page's `team_id` stays the user's team. The team being read is `view_team_id`.
 
 ## 15. Detail data
 

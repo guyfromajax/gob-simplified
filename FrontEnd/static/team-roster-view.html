@@ -6,7 +6,18 @@
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
-      params.set('tab', 'roster-view');
+      var viewed = params.get('roster_team_id') || '';
+      if (viewed) {
+        params.set('tab', 'team-view');
+        params.set('view_team_id', viewed);
+        if (!params.get('origin')) {
+          var ret = params.get('return_tab') || '';
+          var teamTabs = { 'roster-view': 1, 'schedule-tab': 1, 'player-stats-tab': 1, 'team-attributes-view': 1 };
+          params.set('origin', ret === 'home-tab' ? 'office' : (teamTabs[ret] ? 'team' : 'league'));
+        }
+      } else {
+        params.set('tab', 'roster-view');
+      }
       var qs = params.toString();
       window.location.replace('/franchise-command-center.html' + (qs ? '?' + qs : ''));
     })();

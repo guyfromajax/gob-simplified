@@ -31,6 +31,8 @@
     '/franchise/practice-squad',
     '/franchise/awards',
     '/franchise/scouting-report',
+    '/franchise/player-detail',
+    '/franchise/team-detail',
     '/api/gameplan',
     '/api/playbooks',
     '/teams',

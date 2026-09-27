@@ -1,6 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('mode') === 'recruit' || params.get('recruit_id')) return;
+      var id = params.get('player_id') || params.get('id') || '';
+      params.delete('id');
+      if (id) params.set('player_id', id);
+      params.set('tab', 'player-view');
+      if (!params.get('origin')) {
+        var ret = params.get('return_tab') || '';
+        params.set('origin', ret === 'home-tab' ? 'office' : (ret === 'roster-view' || ret === 'schedule-tab' ? 'team' : 'league'));
+      }
+      var qs = params.toString();
+      window.location.replace('/franchise-command-center.html' + (qs ? '?' + qs : ''));
+    })();
+  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>

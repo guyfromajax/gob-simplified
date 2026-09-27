@@ -173,6 +173,7 @@ export function mount(container, ctx) {
     var filtered = visibleRows(rows, userConference, userRegion);
     var cards = groups(filtered, userConference, userRegion);
     var franchiseId = (ctx && ctx.franchiseId) || '';
+    var linkMeta = [];
     var html = '<div class="gob-tgrid">';
     if (!cards.length) {
       html += '<p class="gob-empty">No standings.</p>';
@@ -204,7 +205,13 @@ export function mount(container, ctx) {
           var cell = '';
           if (col.team) {
             var name = row.display_name || row.name || '';
-            cell = tables.teamLink(tables.rosterHref(franchiseId, row.team_id, name, 'standings-view'), name, row.name || name, row.primary_color);
+            var href = tables.rosterHref(franchiseId, row.team_id, name, 'standings-view')
+              + '&origin=league&pager=standings';
+            cell = tables.teamLink(href, name, row.name || name, row.primary_color);
+            linkMeta.push({
+              ids: shown.map(function (item) { return String(item.team_id || ''); }),
+              label: String(card.region || '') + String(card.conference == null ? '' : card.conference)
+            });
           } else if (col.diff) {
             cell = tables.diffCell(row.differential, maxAbs);
           } else if (col.next) {
@@ -232,6 +239,14 @@ export function mount(container, ctx) {
     });
     html += '</div>';
     container.innerHTML = html;
+    container.querySelectorAll('a.gob-team').forEach(function (link, index) {
+      link.addEventListener('click', function () {
+        var meta = linkMeta[index];
+        if (!meta) return;
+        try { sessionStorage.setItem('gob-view-standings-order', JSON.stringify(meta)); }
+        catch (err) { /* the pager reads this later */ }
+      });
+    });
     container.querySelectorAll('th.s').forEach(function (th) {
       th.addEventListener('click', function () {
         var key = th.getAttribute('data-sort');

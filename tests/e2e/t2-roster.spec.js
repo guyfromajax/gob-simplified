@@ -252,7 +252,7 @@ test('roster and team attributes navigate, restore scroll, and redirect', async 
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 360; });
   const scrolled = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);
   await page.locator('#roster-view a.gob-player').first().evaluate((anchor) => anchor.click());
-  await page.waitForURL(/player-detail\.html/);
+  await page.waitForURL(/tab=player-view/);
   const order = await page.evaluate(() => JSON.parse(sessionStorage.getItem('gob-view-roster-order') || '[]'));
   expect(order[0]).toBe('p0');
   expect(order.length).toBe(30);
