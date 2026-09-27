@@ -330,8 +330,24 @@
     });
   }
 
+  function detailOrigin(tab) {
+    if (tab !== 'player-view' && tab !== 'team-view') return '';
+    var origin = '';
+    try { origin = new URLSearchParams(window.location.search).get('origin') || ''; }
+    catch (err) { origin = ''; }
+    if (origin === 'team' || origin === 'league' || origin === 'office' || origin === 'prep') return origin;
+    return 'league';
+  }
+
+  function detailMark(tab) {
+    if (tab !== 'player-view' && tab !== 'team-view') return tab;
+    try { return new URLSearchParams(window.location.search).get('return_tab') || ''; }
+    catch (err) { return ''; }
+  }
+
   function sync(tab) {
-    var sectionId = TAB_SECTION[tab] || 'office';
+    var sectionId = detailOrigin(tab) || TAB_SECTION[tab] || 'office';
+    var mark = detailMark(tab);
     var section = sectionById(sectionId);
     document.querySelectorAll('.rail [data-gob-section]').forEach(function (el) {
       el.classList.toggle('on', el.getAttribute('data-gob-section') === sectionId);
@@ -342,10 +358,10 @@
     if (titleEl) titleEl.textContent = sectionId === 'office' ? '' : section.title;
     document.documentElement.classList.toggle('gob-office', sectionId === 'office');
     if (paintedSection !== sectionId) {
-      renderSubtabs(section, tab);
+      renderSubtabs(section, mark);
       paintedSection = sectionId;
     } else {
-      markSubtabs(tab);
+      markSubtabs(mark);
       if (window.GOBTables && typeof window.GOBTables.placeTools === 'function') window.GOBTables.placeTools(subtabHost);
     }
   }

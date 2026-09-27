@@ -57,6 +57,26 @@
     if (button) button.addEventListener('click', onRetry);
   }
 
+  function open(url, mode) {
+    if (!url) return;
+    if (mode === 'push' && global.GOBNav && typeof global.GOBNav.pushSection === 'function') {
+      global.GOBNav.pushSection(url);
+    } else if (global.history && global.history.replaceState) {
+      global.history.replaceState(global.history.state, '', url);
+      if (global.GOBNav && typeof global.GOBNav.syncCurrent === 'function') global.GOBNav.syncCurrent();
+    }
+    var tab = '';
+    try { tab = new URL(url, global.location.origin).searchParams.get('tab') || ''; }
+    catch (err) { tab = ''; }
+    if (global.CommandCenterTabs && tab && typeof global.CommandCenterTabs.show === 'function') {
+      global.CommandCenterTabs.show(tab);
+    }
+    if (mode === 'push') {
+      var main = document.querySelector('html.gob-shell .main');
+      if (main) main.scrollTop = 0;
+    }
+  }
+
   function show(id) {
     var spec = registry[id];
     var host = panel(id);
@@ -160,10 +180,27 @@
     module: viewModule('teamAttributesView.js')
   });
 
+  register({
+    id: 'player-view',
+    section: 'team',
+    subtab: '',
+    title: 'Player',
+    module: viewModule('playerView.js')
+  });
+
+  register({
+    id: 'team-view',
+    section: 'league',
+    subtab: '',
+    title: 'Team',
+    module: viewModule('teamView.js')
+  });
+
   global.GOBViews = {
     register: register,
     has: has,
     show: show,
+    open: open,
     unmount: unmount
   };
 })(typeof window !== 'undefined' ? window : this);

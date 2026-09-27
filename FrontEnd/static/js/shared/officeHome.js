@@ -138,11 +138,12 @@
   function playerHref(playerId) {
     if (!present(playerId)) return '';
     var current = new URLSearchParams(global.location.search);
-    var params = { id: playerId };
+    var params = { id: playerId, return_tab: 'home-tab', origin: 'office', up: 'Office' };
     if (current.get('franchise_id')) {
       params.mode = 'franchise';
       params.franchise_id = current.get('franchise_id');
     }
+    if (current.get('team_id')) params.team_id = current.get('team_id');
     return href('/player-detail.html', params);
   }
 

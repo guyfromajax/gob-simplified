@@ -260,8 +260,8 @@
     return c % 2 === 0 ? c - 1 : c + 1;
   }
 
-  function buildTeamLink(teamId, displayName, rawName) {
-    return `<a data-return href="/team-roster-view.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId || rawName)}&team_name=${encodeURIComponent(rawName)}&return_tab=schedule-tab">${escapeHtml(displayName)}</a>`;
+  function buildTeamLink(opponentId, displayName, rawName) {
+    return `<a data-return href="/team-roster-view.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(teamId)}&roster_team_id=${encodeURIComponent(opponentId || '')}&team_name=${encodeURIComponent(rawName)}&return_tab=schedule-tab&origin=team">${escapeHtml(displayName)}</a>`;
   }
 
   function sortGamesForWeek(games, userConference) {

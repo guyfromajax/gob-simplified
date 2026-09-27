@@ -462,7 +462,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
   });
   const scrollBefore = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);
   await link.evaluate((anchor) => anchor.click());
-  await page.waitForURL(/tab=roster-view/, { timeout: 15000 });
+  await page.waitForURL(/tab=team-view/, { timeout: 15000 });
   await page.goBack();
   await page.waitForURL(/tab=standings-view/);
   await page.waitForSelector('#standings-view .gob-tbl tbody tr');
@@ -615,7 +615,7 @@ test('leaders full list replaces in place and per-game values keep a decimal', a
   const saved = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);
   expect(saved).toBeGreaterThan(80);
   await mouseClick(page, link);
-  await page.waitForURL(/tab=roster-view/);
+  await page.waitForURL(/tab=team-view/);
   await page.goBack();
   await page.waitForURL(/leader=PTS/);
   await page.waitForSelector('#leaders-view .gob-full tbody tr');

@@ -241,7 +241,7 @@ test('rankings opens in place, stays cached, and restores history', async ({ pag
     });
     const scrollBeforeLeave = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);
     await mouseClick(page, link);
-    await page.waitForURL(/tab=roster-view/);
+    await page.waitForURL(/tab=team-view/);
     await page.goBack();
     await page.waitForURL(/tab=rankings-view/);
     await expect(page.locator('#rankings-view.tab-content.active')).toBeVisible();

@@ -80,10 +80,14 @@ export function mount(container, ctx) {
   function buildTeamLink(row) {
     var a = document.createElement('a');
     var franchiseId = (ctx && ctx.franchiseId) || '';
+    var owner = '';
+    try { owner = new URLSearchParams(window.location.search).get('team_id') || ''; }
+    catch (err) { owner = ''; }
     a.href = '/team-roster-view.html?mode=franchise&franchise_id=' + encodeURIComponent(franchiseId)
-      + '&team_id=' + encodeURIComponent(row.team_id || '')
+      + '&team_id=' + encodeURIComponent(owner || row.team_id || '')
+      + '&roster_team_id=' + encodeURIComponent(row.team_id || '')
       + '&team_name=' + encodeURIComponent(row.team_name || '')
-      + '&return_tab=rankings-view';
+      + '&return_tab=rankings-view&origin=league';
     a.setAttribute('data-return', '');
     a.textContent = row.team_name || '';
     a.style.color = '#4a90e2';
