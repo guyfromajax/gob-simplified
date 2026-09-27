@@ -204,9 +204,10 @@ async function openFcc(page, state, search) {
 
 async function mouseClick(page, target) {
   const loc = typeof target === 'string' ? page.locator(target).first() : target;
-  const box = await loc.boundingBox();
-  if (!box) throw new Error('missing target');
-  await page.mouse.click(box.x + box.width / 2, box.y + Math.min(box.height / 2, 20));
+  // A box sampled before the click goes stale once the sticky page head moves
+  // after a scroll, and the point lands on the head instead of the tab.
+  // locator.click hit-tests the point it actually clicks.
+  await loc.click();
 }
 
 function stab(page, label) {
