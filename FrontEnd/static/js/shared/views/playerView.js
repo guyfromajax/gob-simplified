@@ -104,15 +104,16 @@ function focusHtml(tables, development) {
   }
   var api = window.GOBDevelopmentFocus;
   var focuses = (api && api.FOCUSES) || [];
-  var html = '<div class="gob-focus-edit"><select class="gob-focus" aria-label="Development focus">';
+  var html = '<div class="gob-focus-edit"><div class="gob-focus stats-toggle" role="radiogroup" aria-label="Development focus">';
   focuses.forEach(function (item) {
     var id = item.value || item.id || item;
     var text = item.label || id;
-    html += '<option value="' + tables.esc(id) + '"' + (id === dev.focus ? ' selected' : '') + '>'
-      + tables.esc(text) + '</option>';
+    html += '<button type="button" data-value="' + tables.esc(id) + '"'
+      + (id === dev.focus ? ' class="on"' : '') + '>' + tables.esc(text) + '</button>';
   });
-  html += '</select><button type="button" class="gob-save" disabled>Save</button></div>';
+  html += '</div>';
   if (line) html += '<p class="gob-focus-note">' + tables.esc(line) + '</p>';
+  html += '<button type="button" class="gob-save" disabled>Save</button></div>';
   return html;
 }
 
@@ -242,28 +243,67 @@ export function mount(container, ctx) {
     return query().get('up') || 'Player';
   }
 
+  function selectedFocus() {
+    var on = container.querySelector('.gob-focus button.on');
+    return on ? (on.getAttribute('data-value') || '') : '';
+  }
+
+  function postFocus(value) {
+    var config = window.API_CONFIG;
+    var url = config && typeof config.buildUrl === 'function'
+      ? config.buildUrl('/franchise/player/development-focus')
+      : '/franchise/player/development-focus';
+    var headers = { 'Content-Type': 'application/json' };
+    if (config && typeof config.getAuthHeaders === 'function') {
+      headers = Object.assign(headers, config.getAuthHeaders());
+    }
+    var init = {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        franchise_id: franchiseId,
+        player_id: playerId(),
+        training_focus: value
+      })
+    };
+    var store = window.GOBStore;
+    var sent = store && typeof store.mutate === 'function'
+      ? store.mutate(url, init)
+      : fetch(url, init);
+    return sent.then(function (res) {
+      if (!res.ok) throw new Error('save failed');
+      return res.json().catch(function () { return {}; });
+    });
+  }
+
   function bindFocus() {
-    var select = container.querySelector('.gob-focus');
+    var group = container.querySelector('.gob-focus');
     var button = container.querySelector('.gob-save');
-    if (!select || !button) return;
-    var saved = select.value;
-    select.addEventListener('change', function () {
-      button.disabled = select.value === saved;
+    if (!group || !button) return;
+    var saved = selectedFocus();
+    group.querySelectorAll('button').forEach(function (choice) {
+      choice.addEventListener('click', function () {
+        group.querySelectorAll('button').forEach(function (other) { other.classList.remove('on'); });
+        choice.classList.add('on');
+        var dirty = selectedFocus() !== saved;
+        button.disabled = !dirty;
+        button.textContent = 'Save';
+        button.classList.remove('is-saved');
+      });
     });
     button.addEventListener('click', function () {
       if (button.disabled) return;
-      var api = window.GOBDevelopmentFocus;
-      if (!api || typeof api.save !== 'function') return;
+      var next = selectedFocus();
       button.disabled = true;
-      api.save(franchiseId, playerId(), 'training_focus', select.value).then(function () {
-        saved = select.value;
+      postFocus(next).then(function () {
+        saved = next;
+        button.textContent = 'Saved';
+        button.classList.add('is-saved');
         button.disabled = true;
-        loaded = false;
-        signature = '';
-        load();
       }, function () {
-        select.value = saved;
-        button.disabled = select.value === saved;
+        button.textContent = 'Save';
+        button.classList.remove('is-saved');
+        button.disabled = selectedFocus() === saved;
       });
     });
   }

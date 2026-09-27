@@ -519,15 +519,39 @@ html.gob-shell.gob-1920 .gob-tgrid {
 .gob-roster .rt-mid { color: var(--tier-yellow); }
 .gob-roster .rt-low { color: var(--tier-red); }
 
-.gob-roster .attr-tile {
+.gob-roster .attr-tile,
+.gob-apan .attr-tile {
   width: var(--dsz-30);
   height: var(--dsz-26);
   border-radius: var(--radius-5);
 }
 
-.gob-roster .attr-tile s {
+.gob-roster .attr-tile s,
+.gob-apan .attr-tile s {
   font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
   padding-top: var(--space-1);
+}
+
+.gob-roster.is-compact {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.gob-roster.is-compact .gob-tbl {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.gob-roster.is-compact th,
+.gob-roster.is-compact td {
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+}
+
+.gob-roster.is-compact .gob-player span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gob-roster tr.gob-sep td {
@@ -755,15 +779,14 @@ html.gob-1920 .gob-apan { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .gob-chg .is-up i { color: #8fd18f; }
 .gob-chg .is-down i { color: #e07a7a; }
 .gob-chg em { margin-left: auto; color: var(--text-38); font-style: normal; font-size: var(--fs-11); }
-.gob-focus-read, .gob-focus-edit { display: flex; align-items: center; gap: 12px; }
-.gob-focus-read { flex-direction: column; align-items: flex-start; }
-.gob-focus-note { margin: 6px 0 0; color: var(--text-60); font-size: var(--fs-12); }
-.gob-focus {
-  height: 34px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--text-100);
+.gob-focus-read, .gob-focus-edit { display: flex; align-items: stretch; gap: 12px; }
+.gob-focus-read, .gob-focus-edit { flex-direction: column; align-items: flex-start; }
+.gob-focus-note { margin: 0; color: var(--text-60); font-size: var(--fs-12); }
+.gob-focus.stats-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  height: auto;
+  max-width: 100%;
 }
 .gob-save {
   height: 34px;

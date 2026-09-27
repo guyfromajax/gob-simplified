@@ -134,7 +134,7 @@ export function mount(container, ctx) {
       return tables.teamLink(tables.rosterHref(franchiseId, row.team_id, name, 'team-stats-view'), name, name, row.primary_color);
     }
     var value = valueOf(row, col);
-    if (value == null) return '';
+    if (value == null) return col.decimal ? '—' : '';
     if (col.decimal) return tables.esc(tables.formatOneDecimal(value));
     return tables.esc(value);
   }

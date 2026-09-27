@@ -455,7 +455,8 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
     await expect(chemistry.locator('.gob-meter i')).toHaveAttribute('style', /--w:\s*80%/);
     await expect(chemistry.locator('.chip')).toHaveCount(0);
     await expect(fight.locator('.val')).toHaveCount(0);
-    await expect(fight.locator('.place')).toHaveText('T-34th of 128');
+    await expect(fight.locator('.place')).toHaveText('34th of 128');
+    await expect(page.locator('#team-attributes-view')).not.toContainText('T-');
     await expect(fight.locator('.chip.up')).toHaveText('▲2');
     await expect(shooting.locator('.val')).toHaveCount(0);
     await expect(shooting.locator('.place')).toHaveText('8th of 128');

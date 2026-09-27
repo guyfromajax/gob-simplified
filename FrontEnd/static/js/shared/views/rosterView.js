@@ -112,8 +112,49 @@ function devText(player, userTeam) {
   return api.focusLabel(player) || '';
 }
 
+var COMPACT_ATTRS = ['SC', 'SH', 'ID', 'OD', 'RB'];
+
+function compactRosterHtml(tables, rows, opts) {
+  var hrefFor = opts.playerHref || function () { return '#'; };
+  var lineup = !!opts.lineup;
+  var cols = 5 + COMPACT_ATTRS.length;
+  var html = '<div class="gob-roster is-compact"><table class="gob-tbl"><thead><tr>';
+  html += '<th class="s pin team">Player</th><th class="s">RT</th><th class="s">POS</th><th class="s">YR</th><th class="s">HT</th>';
+  COMPACT_ATTRS.forEach(function (key) {
+    html += '<th class="s" data-tooltip="' + tables.esc(tip(key)) + '"'
+      + ' title="' + tables.esc(fullName(key)) + '">' + tables.esc(key) + '</th>';
+  });
+  html += '</tr></thead><tbody>';
+  var seenStarter = false;
+  var seenBench = false;
+  rows.forEach(function (player) {
+    if (lineup && player.starter && !seenStarter) {
+      html += '<tr class="gob-sep"><td colspan="' + cols + '">Starters</td></tr>';
+      seenStarter = true;
+    }
+    if (lineup && !player.starter && seenStarter && !seenBench) {
+      html += '<tr class="gob-sep"><td colspan="' + cols + '">Bench</td></tr>';
+      seenBench = true;
+    }
+    html += '<tr><td class="pin team"><a class="gob-team gob-player" href="' + tables.esc(hrefFor(player)) + '">'
+      + '<span class="av">' + portraitHtml(tables, player) + '</span><span>' + tables.esc(displayName(player)) + '</span></a></td>';
+    html += '<td>' + rtHtml(tables, player) + '</td>';
+    html += '<td>' + tables.esc(player.position || '') + '</td>';
+    html += '<td>' + tables.esc(player.year || '') + '</td>';
+    html += '<td>' + tables.esc(heightText(player.height)) + '</td>';
+    COMPACT_ATTRS.forEach(function (key) {
+      var tiles = window.GOB_AttrTiles;
+      var value = tiles ? tiles.tileValue(player.attributes || {}, key) : null;
+      html += '<td>' + (tiles ? tiles.tileHtml(key, value, false) : '') + '</td>';
+    });
+    html += '</tr>';
+  });
+  return html + '</tbody></table></div>';
+}
+
 export function rosterTableHtml(tables, rows, options) {
   var opts = options || {};
+  if (opts.compact) return compactRosterHtml(tables, rows, opts);
   var sortKey = opts.sortKey || '';
   var lineup = !!opts.lineup;
   var userTeam = !!opts.userTeam;

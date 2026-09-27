@@ -204,8 +204,13 @@
 
   function rosterHref(franchiseId, teamId, teamName, returnTab) {
     var owner = '';
-    try { owner = new URLSearchParams(global.location.search).get('team_id') || ''; }
-    catch (err) { owner = ''; }
+    try {
+      var params = new URLSearchParams(global.location.search);
+      owner = params.get('team_id') || params.get('user_team_id') || '';
+    } catch (err) { owner = ''; }
+    if (!owner && global.GOBViews && typeof global.GOBViews.userTeamId === 'function') {
+      owner = global.GOBViews.userTeamId() || '';
+    }
     var viewed = teamId || '';
     return '/team-roster-view.html?mode=franchise&franchise_id=' + encodeURIComponent(franchiseId || '')
       + '&team_id=' + encodeURIComponent(owner || viewed)

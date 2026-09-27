@@ -51,9 +51,7 @@ export function mount(container, ctx) {
 
   function placeText(row) {
     if (row.rank == null || row.rank === '' || row.rank_of == null || row.rank_of === '') return '—';
-    var label = ordinal(row.rank);
-    if (row.tied) label = 'T-' + label;
-    return label + ' of ' + row.rank_of;
+    return ordinal(row.rank) + ' of ' + row.rank_of;
   }
 
   function rankDeltaChip(delta) {

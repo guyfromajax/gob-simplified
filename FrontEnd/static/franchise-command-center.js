@@ -342,8 +342,26 @@ function invalidateFccTeamScopedCaches() {
   invalidateHomeWeekSensitiveCaches();
 }
 
+function publishFccUserTeam(teamId) {
+  if (!franchiseId || !window.GOBViews || typeof window.GOBViews.noteUserTeam !== 'function') return;
+  window.GOBViews.noteUserTeam(franchiseId, teamId || '');
+}
+
+function teamIdFromCommandCenter(topData) {
+  if (!topData) return '';
+  const digest = topData.office_digest;
+  return String(
+    topData.team_id
+    || topData.user_team_id
+    || topData.user_team_object_id
+    || (digest && (digest.user_team_id || digest.team_id))
+    || ''
+  );
+}
+
 function adoptAuthoritativeFccTeamId(topData) {
-  const authoritativeTeamId = topData?.team_id ? String(topData.team_id) : '';
+  const authoritativeTeamId = teamIdFromCommandCenter(topData);
+  publishFccUserTeam(authoritativeTeamId);
   if (!authoritativeTeamId) return false;
 
   const previousTeamId = userTeamId ? String(userTeamId) : '';
@@ -3767,11 +3785,18 @@ async function init() {
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData && topDataResult.status === 404) {
     showFranchiseGoneNotice();
+    publishFccUserTeam('');
     return;
   }
-  if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
+  if (!topData) {
+    publishFccUserTeam('');
+    return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
+  }
   topData = await recoverCpuSimsBeforeFccRender(topData);
-  if (!topData) return;
+  if (!topData) {
+    publishFccUserTeam('');
+    return;
+  }
   const previousWeek = Number(commandCenterTopDataCache?.week || 0);
   const nextWeek = Number(topData?.week || 0);
   if (previousWeek && nextWeek && previousWeek !== nextWeek) {

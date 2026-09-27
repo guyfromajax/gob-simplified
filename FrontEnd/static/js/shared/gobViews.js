@@ -9,22 +9,72 @@
   var registry = Object.create(null);
   var mounted = Object.create(null);
   var attempts = Object.create(null);
+  var notedTeams = Object.create(null);
+  var teamWaiters = Object.create(null);
 
-  function ctx() {
-    var params;
+  function readParams() {
+    var fromUrl = new URLSearchParams();
+    var fromCtx = null;
+    try { fromUrl = new URLSearchParams(global.location.search); }
+    catch (err) { fromUrl = new URLSearchParams(); }
     try {
-      params = global.FranchiseContext && typeof global.FranchiseContext.toSearchParams === 'function'
-        ? global.FranchiseContext.toSearchParams()
-        : new URLSearchParams(global.location.search);
-    } catch (err) {
-      params = new URLSearchParams();
+      if (global.FranchiseContext && typeof global.FranchiseContext.toSearchParams === 'function') {
+        fromCtx = global.FranchiseContext.toSearchParams();
+      }
+    } catch (err) { fromCtx = null; }
+    function pick(name) {
+      return fromUrl.get(name) || (fromCtx && fromCtx.get(name)) || '';
     }
     return {
-      franchiseId: params.get('franchise_id') || '',
-      teamId: params.get('team_id') || params.get('user_team_id') || '',
+      franchiseId: pick('franchise_id'),
+      urlTeamId: pick('team_id') || pick('user_team_id')
+    };
+  }
+
+  function teamFromFranchise(franchiseId) {
+    if (!franchiseId) return '';
+    try {
+      if (global.FranchiseLS && typeof global.FranchiseLS.get === 'function') {
+        var stored = global.FranchiseLS.get(franchiseId, 'user_team_id');
+        if (stored) return String(stored);
+      }
+    } catch (err) { /* the command-center note is the other source */ }
+    return notedTeams[franchiseId] || '';
+  }
+
+  function resolveTeamId(read) {
+    if (read.urlTeamId) return read.urlTeamId;
+    return teamFromFranchise(read.franchiseId);
+  }
+
+  function ctx() {
+    var read = readParams();
+    return {
+      franchiseId: read.franchiseId,
+      teamId: resolveTeamId(read),
       store: global.GOBStore || null,
       nav: global.GOBNav || null
     };
+  }
+
+  function noteUserTeam(franchiseId, teamId) {
+    var fid = String(franchiseId || '');
+    if (!fid) return;
+    if (teamId) notedTeams[fid] = String(teamId);
+    var waiting = teamWaiters[fid] || [];
+    teamWaiters[fid] = [];
+    waiting.forEach(function (done) { done(); });
+  }
+
+  function ensureTeam(done) {
+    var context = ctx();
+    if (context.teamId || !context.franchiseId) {
+      done(context);
+      return;
+    }
+    var fid = context.franchiseId;
+    if (!teamWaiters[fid]) teamWaiters[fid] = [];
+    teamWaiters[fid].push(function () { done(ctx()); });
   }
 
   function register(spec) {
@@ -92,12 +142,16 @@
     if (host.__gobViewPending) return host.__gobViewPending;
     skeleton(host);
     var attempt = attempts[id] || 0;
-    var pending = Promise.resolve().then(function () {
-      return spec.module(attempt);
-    }).then(function (mod) {
-      var mount = mod && (mod.mount || (mod.default && mod.default.mount));
+    var pending = new Promise(function (resolve) {
+      ensureTeam(resolve);
+    }).then(function (context) {
+      return spec.module(attempt).then(function (mod) {
+        return { mod: mod, context: context };
+      });
+    }).then(function (ready) {
+      var mount = ready.mod && (ready.mod.mount || (ready.mod.default && ready.mod.default.mount));
       if (typeof mount !== 'function') throw new Error('missing mount');
-      var handle = mount(host, ctx()) || {};
+      var handle = mount(host, ready.context) || {};
       mounted[id] = handle;
       host.__gobViewPending = null;
       return handle;
@@ -201,6 +255,8 @@
     has: has,
     show: show,
     open: open,
-    unmount: unmount
+    unmount: unmount,
+    noteUserTeam: noteUserTeam,
+    userTeamId: function () { return ctx().teamId; }
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -146,8 +146,9 @@ export function mount(container, ctx) {
   }
 
   function showValue(stat, value) {
+    if (value == null || value === '') return /%$/.test(stat) ? '—' : '';
     var n = Number(value);
-    if (!isFinite(n)) return value == null ? '' : String(value);
+    if (!isFinite(n)) return String(value);
     if (TOTALS[stat]) return String(Math.round(n));
     return tables.formatOneDecimal(n);
   }
