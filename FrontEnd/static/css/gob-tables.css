@@ -519,9 +519,22 @@ html.gob-shell.gob-1920 .gob-tgrid {
 .gob-roster .rt-mid { color: var(--tier-yellow); }
 .gob-roster .rt-low { color: var(--tier-red); }
 
+.gob-roster .attr-tile {
+  width: var(--dsz-30);
+  height: var(--dsz-26);
+  border-radius: var(--radius-5);
+}
+
+.gob-roster .attr-tile s {
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  padding-top: var(--space-1);
+}
+
 .gob-roster tr.gob-sep td {
-  height: var(--dsz-22);
-  padding-top: 8px;
+  height: var(--dsz-28);
+  padding-top: var(--space-6);
+  padding-left: var(--dsp-14);
+  text-align: left;
   font: var(--fw-bold) var(--fs-10)/1 var(--font-display);
   letter-spacing: var(--tracking-10);
   color: var(--text-38);

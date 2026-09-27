@@ -376,6 +376,51 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
     expect(tiles[0].fill).toBe('rgba(0, 0, 0, 0)');
     expect(tiles[1].fill).not.toBe('rgba(0, 0, 0, 0)');
     expect(tiles[3].ring).not.toBe('none');
+    const elite = await page.locator('#roster-view .attr-tile.is-elite s').first().evaluate((el) => {
+      function parse(color) {
+        const match = String(color).match(/rgba?\(([^)]+)\)/);
+        if (!match) return [0, 0, 0, 1];
+        const parts = match[1].split(',').map((part) => parseFloat(part));
+        return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
+      }
+      function lin(channel) {
+        const s = channel / 255;
+        return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+      }
+      function lum(rgb) {
+        return 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+      }
+      function over(top, bottom) {
+        const alpha = top[3] + bottom[3] * (1 - top[3]);
+        const mix = (index) => (top[index] * top[3] + bottom[index] * bottom[3] * (1 - top[3])) / (alpha || 1);
+        return [mix(0), mix(1), mix(2), alpha];
+      }
+      let bg = [11, 13, 20, 1];
+      const stack = [];
+      for (let node = el.parentElement; node; node = node.parentElement) stack.push(node);
+      stack.reverse().forEach((node) => {
+        const layer = parse(getComputedStyle(node).backgroundColor);
+        if (layer[3] > 0) bg = over(layer, bg);
+      });
+      const fg = parse(getComputedStyle(el).color);
+      const hi = Math.max(lum(fg), lum(bg));
+      const lo = Math.min(lum(fg), lum(bg));
+      const cs = getComputedStyle(el);
+      return {
+        color: cs.color,
+        ratio: (hi + 0.05) / (lo + 0.05),
+        size: parseFloat(cs.fontSize),
+        weight: cs.fontWeight,
+        family: cs.fontFamily,
+      };
+    });
+    expect(elite.color).toBe('rgb(107, 164, 224)');
+    expect(elite.ratio).toBeGreaterThanOrEqual(4.5);
+    expect(elite.size).toBe(size[0] === 1280 ? 20 : 23.5);
+    expect(Number(elite.weight)).toBeGreaterThanOrEqual(700);
+    expect(elite.family).toContain('Bebas');
+    const sepAlign = await page.locator('#roster-view tr.gob-sep td').first().evaluate((td) => getComputedStyle(td).textAlign);
+    expect(sepAlign).toBe('left');
     const tip = await page.locator('#roster-view thead th[data-sort="SC"]').getAttribute('data-tooltip');
     expect(tip).toContain('Scoring');
     expect(tip).toContain("player's ability to put the ball in the hoop");
@@ -401,6 +446,17 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
     const chip = await page.locator('#office-root .attr-chip').first().locator('.attr-tile');
     await expect(chip).toHaveClass(/is-mid/);
     await expect(chip.locator('s')).toHaveText('5');
+    const chipType = await page.locator('#office-root .attr-chip').first().evaluate((node) => {
+      const code = getComputedStyle(node.querySelector('.attr-code'));
+      const digit = getComputedStyle(node.querySelector('.attr-tile s'));
+      return {
+        code: parseFloat(code.fontSize),
+        digit: parseFloat(digit.fontSize),
+        weight: digit.fontWeight,
+      };
+    });
+    expect(chipType.digit).toBeGreaterThanOrEqual(chipType.code);
+    expect(Number(chipType.weight)).toBeGreaterThanOrEqual(700);
     await park(page);
     await page.screenshot({ path: path.join(OUT, 'office-chips-' + size[2] + '.png') });
   }

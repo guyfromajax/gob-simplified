@@ -426,7 +426,7 @@ test('standings team page returns instantly with in-app Back and browser Back', 
   await expect(teamLink).toBeVisible({ timeout: 20000 });
   await page.evaluate(() => { window.__standingsMark = 'alive'; });
   await teamLink.click();
-  await expect(page).toHaveURL(/team-roster-view\.html/, { timeout: 20000 });
+  await expect(page).toHaveURL(/tab=roster-view/, { timeout: 20000 });
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.GOBNav && history.state && history.state.gobIdx > 0);
   await page.locator('#back-button').click();
@@ -439,7 +439,7 @@ test('standings team page returns instantly with in-app Back and browser Back', 
   expect(afterInApp.mark === 'alive' || afterInApp.type === 'back_forward', JSON.stringify(afterInApp)).toBe(true);
   await page.evaluate(() => { window.__standingsMark = 'alive'; });
   await page.locator('#standings-by-region a').first().click();
-  await expect(page).toHaveURL(/team-roster-view\.html/, { timeout: 20000 });
+  await expect(page).toHaveURL(/tab=roster-view/, { timeout: 20000 });
   await page.goBack({ waitUntil: 'commit' });
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 15000 }).toBe('/franchise-command-center.html');
   expect(new URL(page.url()).searchParams.get('tab')).toBe('standings-tab');

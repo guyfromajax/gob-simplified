@@ -3,8 +3,9 @@
  * Attribute tiles — shared builder, shared hover, four surfaces.
  *
  * In scope: Recruits screen (Hub pool), FCC Roster tab, FCC Recruits tab,
- * team-roster-view.html. Everything else that shows attributes is deliberately
- * untouched, and the last describe block guards that.
+ * and the Roster module view. team-roster-view.html redirects there.
+ * Everything else that shows attributes is deliberately untouched, and the
+ * last describe block guards that.
  *
  * Run: npx playwright test tests/e2e/attr-tiles.spec.js --project=chromium
  */
@@ -165,11 +166,10 @@ test.describe('tiers', () => {
 // the page. Its alignment and column-count coverage moved to standalone-roster.spec.js,
 // which mounts the real renderer instead of a hand-built stand-in of the old markup.
 
-test.describe('the four in-scope surfaces all use the shared builder', () => {
+test.describe('the in-scope surfaces all use the shared builder', () => {
   const SURFACES = [
     ['recruiting-hub.js', 'Recruits screen (Hub pool)'],
     ['franchise-command-center.js', 'FCC Roster + Recruits tabs'],
-    ['team-roster-view.js', 'team-roster-view'],
   ];
 
   for (const [file, label] of SURFACES) {
@@ -179,8 +179,14 @@ test.describe('the four in-scope surfaces all use the shared builder', () => {
     });
   }
 
+  test('the roster module paints each attribute with the shared tile', async () => {
+    const view = read('js/shared/views/rosterView.js');
+    expect(view).toContain('GOB_AttrTiles');
+    expect(view).toContain('tileHtml');
+  });
+
   test('each in-scope page loads the module and stylesheet', async () => {
-    for (const page of ['recruiting.html', 'franchise-command-center.html', 'team-roster-view.html']) {
+    for (const page of ['recruiting.html', 'franchise-command-center.html']) {
       const html = read(page);
       expect(html, page).toContain('/js/shared/attrTiles.js');
       expect(html, page).toContain('/css/attr-tiles.css');
@@ -189,22 +195,27 @@ test.describe('the four in-scope surfaces all use the shared builder', () => {
     }
   });
 
+  test('the old roster page redirects instead of loading its own tile script', async () => {
+    const html = read('team-roster-view.html');
+    expect(html).toContain("params.set('tab', 'roster-view')");
+    expect(html).not.toContain('/js/shared/attrTiles.js');
+    expect(html).not.toContain('<th>SC</th>');
+  });
+
   test('no in-scope surface still emits 12 separate attribute columns', async () => {
-    for (const page of ['franchise-command-center.html', 'team-roster-view.html']) {
-      const html = read(page);
-      expect(html, page).not.toContain('<th>SC</th>');
-      expect(html, page).not.toContain('data-sort-key="SC"');
-      expect(html, page).not.toContain('data-sort="SC"');
-    }
+    const html = read('franchise-command-center.html');
+    expect(html).not.toContain('<th>SC</th>');
+    expect(html).not.toContain('data-sort-key="SC"');
   });
 
   test('every surface routes its attribute header through the grouped builder', async () => {
     // The header markup is rendered, not authored, so assert on the caller.
-    // The FCC renders both of its tabs' headers (Roster and Recruiting); the standalone
-    // roster renders its own. recruiting-common.js supplies rows, never the header.
+    // The FCC renders both of its tabs' headers (Roster and Recruiting).
+    // The roster module view renders one tile per cell. recruiting-common.js
+    // supplies rows, never the header.
     const fcc = read('franchise-command-center.js').split('GOB_AttrTiles.groupedHeaderHtml').length - 1;
     expect(fcc).toBe(2);
-    expect(read('team-roster-view.js')).toContain('GOB_AttrTiles.groupedHeaderHtml');
+    expect(read('js/shared/views/rosterView.js')).toContain('tileHtml');
   });
 
   test('out-of-scope surfaces are untouched', async () => {

@@ -281,12 +281,20 @@ html.gob-shell.gob-office .office-wire .wr-2 {
   color: var(--text-100);
   letter-spacing: var(--tracking-2);
 }
-.gob .attr-chip .tdig { font-size: var(--fs-16); }
-.gob .attr-chip .attr-tile {
-  width: 22px;
-  height: 22px;
+.gob .attr-chip .tdig {
+  font: var(--fw-bold) var(--fs-22)/1 var(--font-display);
 }
-.gob .attr-chip .attr-tile s { font-size: var(--fs-16); }
+.gob .attr-chip .attr-tile {
+  width: auto;
+  height: auto;
+  min-width: calc(var(--fs-22) + 8px);
+  min-height: calc(var(--fs-22) + 4px);
+  padding: 0 4px;
+}
+.gob .attr-chip .attr-tile s {
+  font: var(--fw-bold) var(--fs-22)/1 var(--font-display);
+  padding-top: var(--space-1);
+}
 .gob .attr-chip .arr {
   font-style: normal;
   font-size: var(--fs-13);
