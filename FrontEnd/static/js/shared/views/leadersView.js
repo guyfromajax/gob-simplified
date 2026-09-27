@@ -135,8 +135,8 @@ export function mount(container, ctx) {
   }
 
   function headerMeta(stat) {
-    if (PER_GAME[stat]) return stat + ' · per game';
-    if (TOTALS[stat]) return stat + ' · total';
+    if (PER_GAME[stat]) return 'per game';
+    if (TOTALS[stat]) return 'total';
     return '';
   }
 

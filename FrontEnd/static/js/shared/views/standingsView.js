@@ -162,6 +162,14 @@ export function mount(container, ctx) {
         return true;
       });
     }
+    var colorById = Object.create(null);
+    var colorByName = Object.create(null);
+    rows.forEach(function (row) {
+      if (!row || !row.primary_color) return;
+      if (row.team_id) colorById[row.team_id] = row.primary_color;
+      if (row.name) colorByName[row.name] = row.primary_color;
+      if (row.display_name) colorByName[row.display_name] = row.primary_color;
+    });
     var filtered = visibleRows(rows, userConference, userRegion);
     var cards = groups(filtered, userConference, userRegion);
     var franchiseId = (ctx && ctx.franchiseId) || '';
@@ -196,11 +204,15 @@ export function mount(container, ctx) {
           var cell = '';
           if (col.team) {
             var name = row.display_name || row.name || '';
-            cell = tables.teamLink(tables.rosterHref(franchiseId, row.team_id, name, 'standings-view'), name, row.name || name);
+            cell = tables.teamLink(tables.rosterHref(franchiseId, row.team_id, name, 'standings-view'), name, row.name || name, row.primary_color);
           } else if (col.diff) {
             cell = tables.diffCell(row.differential, maxAbs);
           } else if (col.next) {
-            cell = tables.nextCell(row.next_opponent_name, row.next_week);
+            cell = tables.nextCell(
+              row.next_opponent_name,
+              row.next_week,
+              colorById[row.next_opponent_id] || colorByName[row.next_opponent_name] || ''
+            );
           } else if (col.key === 'rank') {
             cell = tables.esc(row._rank);
           } else if (col.key === 'streak') {

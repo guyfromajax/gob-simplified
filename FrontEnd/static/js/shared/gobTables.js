@@ -36,26 +36,50 @@
   }
 
   function logo(name) {
+    if (!name) return '';
     try {
-      if (name && typeof global.getTeamAssetPath === 'function') {
-        return global.getTeamAssetPath(name, 'logo_square');
+      if (typeof global.getTeamAssetPath === 'function') {
+        return global.getTeamAssetPath(name, 'logo_square') || '';
       }
     } catch (err) { /* generated art can fail closed */ }
     return '/images/teams/general/general_logo_square.png';
   }
 
-  function teamLink(href, name, logoName) {
-    var src = logo(logoName || name);
+  function safeColor(color) {
+    var text = String(color || '').trim();
+    if (/^#[0-9a-fA-F]{3,8}$/.test(text)) return text;
+    return '#27408E';
+  }
+
+  function letterOf(name) {
+    var text = String(name || '').trim();
+    return text ? text.charAt(0).toUpperCase() : '';
+  }
+
+  function monogram(name, color) {
+    return '<span class="gob-mark" style="background:' + esc(safeColor(color)) + '">'
+      + esc(letterOf(name)) + '</span>';
+  }
+
+  function markHtml(name, color) {
+    var src = logo(name);
+    if (!src) return monogram(name, color);
+    return '<img alt="" src="' + esc(src) + '" data-letter="' + esc(letterOf(name))
+      + '" data-color="' + esc(safeColor(color))
+      + '" onerror="var s=document.createElement(\'span\');s.className=\'gob-mark\';s.style.background=this.getAttribute(\'data-color\')||\'\';s.textContent=this.getAttribute(\'data-letter\')||\'\';this.replaceWith(s);">';
+  }
+
+  function teamLink(href, name, logoName, color) {
     return '<a class="gob-team" data-return href="' + esc(href) + '">'
-      + '<img alt="" src="' + esc(src) + '">'
+      + markHtml(logoName || name, color)
       + '<span>' + esc(name || '') + '</span></a>';
   }
 
-  function nextCell(name, week) {
+  function nextCell(name, week, color) {
     if (!name && (week == null || week === '')) return '';
-    var img = name ? '<img alt="" src="' + esc(logo(name)) + '">' : '';
+    var mark = name ? markHtml(name, color) : '';
     var label = week == null || week === '' ? '' : ('W' + week);
-    return '<span class="gob-next">' + img + '<span>' + esc(label) + '</span></span>';
+    return '<span class="gob-next">' + mark + '<span>' + esc(label) + '</span></span>';
   }
 
   function diffCell(value, maxAbs) {
@@ -196,6 +220,7 @@
     readKey: readKey,
     writeKey: writeKey,
     logo: logo,
+    markHtml: markHtml,
     teamLink: teamLink,
     nextCell: nextCell,
     diffCell: diffCell,

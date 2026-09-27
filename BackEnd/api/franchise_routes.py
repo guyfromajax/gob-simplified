@@ -11298,12 +11298,13 @@ def team_stats(franchise_id: str, scope: str = "national"):
     # logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
     team_ids_for_meta = [ObjectId(t["team_id"]) for t in output if t.get("team_id")]
     if team_ids_for_meta:
-        team_meta_docs = list(db.teams.find({"_id": {"$in": team_ids_for_meta}}, {"_id": 1, "conference": 1, "region": 1, "mascot": 1}))
+        team_meta_docs = list(db.teams.find({"_id": {"$in": team_ids_for_meta}}, {"_id": 1, "conference": 1, "region": 1, "mascot": 1, "primary_color": 1}))
         id_to_meta = {
             str(d["_id"]): {
                 "conference": d.get("conference"),
                 "region": d.get("region", ""),
                 "mascot": d.get("mascot", ""),
+                "primary_color": d.get("primary_color") or "",
             }
             for d in team_meta_docs
         }
@@ -11312,6 +11313,7 @@ def team_stats(franchise_id: str, scope: str = "national"):
             t["conference"] = meta.get("conference")
             t["region"] = meta.get("region", "")
             t["mascot"] = meta.get("mascot", "")
+            t["primary_color"] = meta.get("primary_color", "")
             t["natl_rank"] = natl_rank_by_team_id.get(t.get("team_id", ""), 999)
     else:
         for t in output:

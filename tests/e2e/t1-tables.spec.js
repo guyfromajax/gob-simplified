@@ -87,6 +87,7 @@ function teamStats(week) {
     teams.push({
       team: mine ? 'Lancaster' : ('Club ' + (i + 1)),
       team_id: mine ? TID : ('cstat' + i).padEnd(24, 'd'),
+      primary_color: i === 0 ? '#112233' : (i === 1 ? '#445566' : '#1c2a52'),
       natl_rank: i + 1,
       conference: (i % 4) + 1,
       region: 'A',
@@ -353,8 +354,12 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await expect(page.locator('#gob-subtabs .pg-tools')).not.toContainText('Per game');
     await expect(page.locator('#gob-subtabs .pg-tools')).not.toContainText('Totals');
     const cards = page.locator('#leaders-view .gob-ldb');
-    await expect(cards.nth(0).locator('.card-h')).toContainText('PTS · per game');
-    await expect(cards.nth(1).locator('.card-h')).toContainText('3PTM · total');
+    await expect(cards.nth(0).locator('.meta')).toHaveText('per game');
+    await expect(cards.nth(1).locator('.meta')).toHaveText('total');
+    await expect(cards.nth(2).locator('.meta')).toHaveText('per game');
+    await expect(cards.nth(3).locator('.meta')).toHaveText('total');
+    await expect(cards.nth(5).locator('.meta')).toHaveText('per game');
+    await expect(cards.nth(6).locator('.meta')).toHaveText('total');
     await expect(cards.nth(4).locator('.card-h .meta')).toHaveCount(0);
     await expect(cards.nth(7).locator('.card-h .meta')).toHaveCount(0);
     await expect(cards.nth(0).locator('.ldb-v')).toContainText('20.0');
@@ -618,4 +623,43 @@ test('leaders full list replaces in place and per-game values keep a decimal', a
     const main = document.querySelector('html.gob-shell .main');
     return main && Math.abs(main.scrollTop - top) <= 2;
   }, saved, { timeout: 8000 });
+});
+
+test('a team with no logo URL and a team whose logo 404s both render a monogram', async ({ page }) => {
+  const state = { week: 1 };
+  await installApi(page, state);
+  await page.route('**/images/teams/no-such/**', (route) => route.fulfill({ status: 404, body: '' }));
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openFcc(page);
+  await page.evaluate(() => {
+    const real = window.getTeamAssetPath;
+    window.getTeamAssetPath = function (name, key, visual) {
+      if (name === 'Club 1') return '';
+      if (name === 'Club 2') return '/images/teams/no-such/no-such_logo_square.png';
+      return real ? real(name, key, visual) : '';
+    };
+  });
+  await mouseClick(page, '[data-gob-section="league"]');
+  await page.waitForSelector('#standings-view .gob-tbl tbody tr');
+  await clickStab(page, 'Team Stats');
+  await page.waitForSelector('#team-stats-view tr');
+  function teamCell(name) {
+    return page.locator('#team-stats-view a.gob-team').filter({
+      has: page.locator('span', { hasText: new RegExp('^' + name + '$') }),
+    });
+  }
+  const club1 = teamCell('Club 1');
+  const club2 = teamCell('Club 2');
+  await expect(club1.locator('.gob-mark')).toHaveText('C');
+  await expect(club1.locator('img')).toHaveCount(0);
+  await expect(club1.locator('.gob-mark')).toHaveCSS('background-color', 'rgb(17, 34, 51)');
+  await expect(club2.locator('.gob-mark')).toHaveText('C');
+  await expect(club2.locator('img')).toHaveCount(0);
+  await expect(club2.locator('.gob-mark')).toHaveCSS('background-color', 'rgb(68, 85, 102)');
+  const broken = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll('#team-stats-view img')).filter(function (img) {
+      return img.complete && img.naturalWidth === 0;
+    }).length;
+  });
+  expect(broken).toBe(0);
 });

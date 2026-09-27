@@ -131,7 +131,7 @@ export function mount(container, ctx) {
   function cellText(row, col) {
     if (col.key === 'team') {
       var name = row.team || '';
-      return tables.teamLink(tables.rosterHref(franchiseId, row.team_id, name, 'team-stats-view'), name, name);
+      return tables.teamLink(tables.rosterHref(franchiseId, row.team_id, name, 'team-stats-view'), name, name, row.primary_color);
     }
     var value = valueOf(row, col);
     if (value == null) return '';

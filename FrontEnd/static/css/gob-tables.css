@@ -168,11 +168,21 @@ html.gob-shell.gob-1920 .gob-tgrid {
 }
 
 .gob-team img,
-.gob-next img {
+.gob-next img,
+.gob-mark {
   width: 18px;
   height: 18px;
   object-fit: contain;
   flex: none;
+}
+
+.gob-mark {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 3px;
+  color: #fff;
+  font: var(--fw-bold) 10px/1 var(--font-display);
+  letter-spacing: 0;
 }
 
 .gob-diff {
