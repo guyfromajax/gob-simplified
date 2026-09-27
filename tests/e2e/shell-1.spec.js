@@ -116,9 +116,12 @@ async function openFcc(page, data, search) {
 
 async function mouseClick(page, target) {
   const loc = typeof target === 'string' ? page.locator(target).first() : target;
-  const box = await loc.boundingBox();
-  if (!box) throw new Error('missing target');
-  await page.mouse.click(box.x + box.width / 2, box.y + Math.min(box.height / 2, 20));
+  // Coordinate clicks sample the box, then fire while the 1280 rail face is
+  // still collapsing (120ms delay, then the width transition). The point that
+  // was on Prep is over the team panel by mouseup, so the section never
+  // changes. locator.click waits until the button is stable and hit-tests the
+  // point it actually clicks.
+  await loc.click({ position: { x: 16, y: 16 } });
 }
 
 function stab(page, label) {

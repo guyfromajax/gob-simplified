@@ -5546,6 +5546,9 @@ def team_builder_apply(
             },
         }),
     )
+    from BackEnd.utils.standings_snapshot import note_standings_stale
+
+    note_standings_stale(str(franchise_id))
 
     # Rewrite FPD meta.team for the replaced slot so leaders / baked identity match.
     try:
@@ -8011,6 +8014,13 @@ def _finalize_franchise_week_after_cpu_games(
             season=int(franchise_doc.get("current_season") or 1),
             results=existing_results,
         )
+        _refresh_standings_for_committed_week(
+            franchise_doc,
+            franchise_id_str,
+            int(update_fields.get("week") or (week + 1)),
+            int(franchise_doc.get("current_season") or 1),
+            existing_results,
+        )
         db.franchises.update_one(
             {"_id": franchise_id},
             fold_browse_rev({"$set": update_fields}),
@@ -8247,6 +8257,10 @@ def _eos_heal_phase_from_games(
     if slots_total or adv_steps:
         patch[bracket_field] = fresh.get(bracket_field) or ({} if bracket_field != "national_tournament" else {})
     db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": patch}))
+    if rows_total:
+        from BackEnd.utils.standings_snapshot import note_standings_stale
+
+        note_standings_stale(franchise_id_str)
     out["did_work"] = True
     out["results_rows_added"] = rows_total
     out["bracket_slots_synced"] = slots_total
@@ -9049,6 +9063,9 @@ def _complete_week_finish_cpu_and_persist(
             {"_id": franchise_id},
             fold_browse_rev({"$set": partial_update}),
         )
+        from BackEnd.utils.standings_snapshot import note_standings_stale
+
+        note_standings_stale(franchise_id_str)
         cpu_job = _persist_cpu_sim_job(
             franchise_id,
             week,
@@ -9358,6 +9375,9 @@ def complete_week_phase_a(req: CompleteWeekRequest):
         {"_id": franchise_id},
         fold_browse_rev({"$set": phase_a_fields}),
     )
+    from BackEnd.utils.standings_snapshot import note_standings_stale
+
+    note_standings_stale(str(franchise_id))
 
     return {
         "status": "ok",
@@ -11080,6 +11100,101 @@ def _build_season_schedule_payload(
     }
 
 
+def _standings_rows_from_doc(franchise_doc: dict) -> list:
+    """Sorted standings rows. The route filters scopes; it does not recompute."""
+    from BackEnd.utils.franchise_standings import (
+        calculate_franchise_standings,
+        current_streaks,
+        standings_display_sort_key,
+    )
+
+    franchise_id = franchise_doc.get("_id")
+    franchise_results = franchise_doc.get("results", {})
+    team_list = _ftd_team_list_for_franchise(franchise_id)
+    standings_data = calculate_franchise_standings(franchise_results, team_list)
+    streaks = current_streaks(franchise_results)
+    next_detail = _build_next_opponent_detail(franchise_doc)
+    # natl_rank is display data for the next-opponent label, not the standings order.
+    fid = ObjectId(franchise_id)
+    ftd_rank_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": fid},
+        {"team_id": 1, "natl_rank": 1},
+    ))
+    natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
+    # Display names at the edge (Team Builder overlay); standings join keys stay ObjectIds.
+    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+    team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
+    display_name_by_id = resolve_team_name_map(franchise_doc, team_ids_list)
+    matchup_map = _build_next_matchup_map(franchise_doc, display_name_by_id, natl_rank_by_team_id)
+    teams = list(db.teams.find(
+        {"_id": {"$in": team_ids_list}},
+        {"name": 1, "_id": 1, "region": 1, "conference": 1, "primary_color": 1}
+    ))
+    name_by_id = {str(t["_id"]): t.get("name", "") for t in teams}
+    output = []
+    for t in teams:
+        team_id_str = str(t["_id"])
+        team_standings = standings_data.get(team_id_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
+        wins = team_standings.get("W", 0)
+        losses = team_standings.get("L", 0)
+        games_played = wins + losses
+        pct = round(wins / games_played, 3) if games_played else 0.0
+        pf = team_standings.get("PF", 0)
+        pa = team_standings.get("PA", 0)
+        differential = pf - pa
+        natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
+        core_name = t.get("name", "")
+        upcoming = next_detail.get(team_id_str) or {}
+        opponent_id = upcoming.get("next_opponent_id") or ""
+        output.append({
+            "team_id": team_id_str,
+            # Identity = core; chrome = display_name (never overwrite name).
+            "name": core_name,
+            "display_name": display_name_by_id.get(team_id_str, core_name),
+            "primary_color": t.get("primary_color") or "",
+            "region": t.get("region") or "",
+            "conference": t.get("conference"),
+            "W": wins,
+            "L": losses,
+            "pct": pct,
+            "PF": pf,
+            "PA": pa,
+            "differential": differential,
+            "streak": streaks.get(team_id_str, ""),
+            "natl_rank": natl_rank,
+            "next": matchup_map.get(team_id_str, ""),
+            "next_opponent_id": opponent_id,
+            "next_opponent_name": name_by_id.get(opponent_id, "") if opponent_id else "",
+            "next_week": upcoming.get("next_week"),
+            "next_site": upcoming.get("next_site") or "",
+        })
+    # Same order the Standings page presents: wins desc, then point differential desc.
+    output.sort(key=standings_display_sort_key)
+    return output
+
+
+def _refresh_standings_for_committed_week(
+    franchise_doc: dict,
+    franchise_id_str: str,
+    week: int,
+    season: int,
+    results: dict,
+) -> None:
+    """Rebuild inside the week-advance transaction from the document about to be saved."""
+    from BackEnd.utils.standings_snapshot import refresh_standings_snapshot
+
+    snap = dict(franchise_doc)
+    snap["results"] = results
+    snap["week"] = int(week)
+    refresh_standings_snapshot(
+        franchise_id_str,
+        week=int(week),
+        season=int(season or 1),
+        rows=_standings_rows_from_doc(snap),
+    )
+
+
 @router.get("/franchise/standings")
 @browse_cached
 def standings(
@@ -11091,94 +11206,50 @@ def standings(
 ):
     """Add ?profile=1 for profile_summary. scope=user_region&team_id=... returns only user + sister conference."""
     def _build():
-        franchise_doc = db.franchises.find_one(
-            {"_id": ObjectId(franchise_id)},
-            {
-                "schedule": 1,
-                "week": 1,
-                "eos_tournament": 1,
-                "eos_tournament_active": 1,
-                "conference_tournaments": 1,
-                "region_tournaments": 1,
-                "national_tournament": 1,
-                "results": 1,
-                "team_builder": 1,
-                "_id": 1,
-            }
-        )
-        found = franchise_doc is not None
-        logger.info("standings franchise_id=%s found=%s", franchise_id, found)
-        if not franchise_doc:
-            raise HTTPException(status_code=404, detail="Franchise not found")
-        schedule = franchise_doc.get("schedule", [])
-        week = franchise_doc.get("week", 1)
-        from BackEnd.utils.franchise_standings import (
-            calculate_franchise_standings,
-            current_streaks,
-            standings_display_sort_key,
-        )
-        franchise_results = franchise_doc.get("results", {})
-        team_list = _ftd_team_list_for_franchise(franchise_id)
-        standings_data = calculate_franchise_standings(franchise_results, team_list)
-        streaks = current_streaks(franchise_results)
-        next_detail = _build_next_opponent_detail(franchise_doc)
-        # natl_rank is display data for the next-opponent label, not the standings order.
-        fid = ObjectId(franchise_id)
-        ftd_rank_docs = list(franchise_team_data_collection.find(
-            {"franchise_id": fid},
-            {"team_id": 1, "natl_rank": 1},
-        ))
-        natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
-        # Display names at the edge (Team Builder overlay); standings join keys stay ObjectIds.
-        from BackEnd.utils.franchise_team_display import resolve_team_name_map
+        from BackEnd.utils.standings_snapshot import fresh_rows, rows_for_request
 
-        team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
-        display_name_by_id = resolve_team_name_map(franchise_doc, team_ids_list)
-        matchup_map = _build_next_matchup_map(franchise_doc, display_name_by_id, natl_rank_by_team_id)
-        teams = list(db.teams.find(
-            {"_id": {"$in": team_ids_list}},
-            {"name": 1, "_id": 1, "region": 1, "conference": 1, "primary_color": 1}
-        ))
-        name_by_id = {str(t["_id"]): t.get("name", "") for t in teams}
-        output = []
-        for t in teams:
-            team_id_str = str(t["_id"])
-            team_standings = standings_data.get(team_id_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
-            wins = team_standings.get("W", 0)
-            losses = team_standings.get("L", 0)
-            games_played = wins + losses
-            pct = round(wins / games_played, 3) if games_played else 0.0
-            pf = team_standings.get("PF", 0)
-            pa = team_standings.get("PA", 0)
-            differential = pf - pa
-            natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
-            core_name = t.get("name", "")
-            upcoming = next_detail.get(team_id_str) or {}
-            opponent_id = upcoming.get("next_opponent_id") or ""
-            output.append({
-                "team_id": team_id_str,
-                # Identity = core; chrome = display_name (never overwrite name).
-                "name": core_name,
-                "display_name": display_name_by_id.get(team_id_str, core_name),
-                "primary_color": t.get("primary_color") or "",
-                "region": t.get("region") or "",
-                "conference": t.get("conference"),
-                "W": wins,
-                "L": losses,
-                "pct": pct,
-                "PF": pf,
-                "PA": pa,
-                "differential": differential,
-                "streak": streaks.get(team_id_str, ""),
-                "natl_rank": natl_rank,
-                "next": matchup_map.get(team_id_str, ""),
-                "next_opponent_id": opponent_id,
-                "next_opponent_name": name_by_id.get(opponent_id, "") if opponent_id else "",
-                "next_week": upcoming.get("next_week"),
-                "next_site": upcoming.get("next_site") or "",
-            })
-        # Same order the Standings page presents: wins desc, then point differential desc.
-        output.sort(key=standings_display_sort_key)
+        try:
+            franchise_oid = ObjectId(franchise_id)
+        except Exception:
+            raise HTTPException(status_code=404, detail="Franchise not found")
+        header = db.franchises.find_one(
+            {"_id": franchise_oid},
+            {"week": 1, "current_season": 1},
+        )
+        found = header is not None
+        logger.info("standings franchise_id=%s found=%s", franchise_id, found)
+        if not header:
+            raise HTTPException(status_code=404, detail="Franchise not found")
+        try:
+            week = int(header.get("week") or 1)
+        except (TypeError, ValueError):
+            week = 1
+        try:
+            season = int(header.get("current_season") or 1)
+        except (TypeError, ValueError):
+            season = 1
+        output = fresh_rows(franchise_id, week=week, season=season)
+        if output is None:
+            franchise_doc = db.franchises.find_one(
+                {"_id": franchise_oid},
+                {
+                    "schedule": 1,
+                    "week": 1,
+                    "current_season": 1,
+                    "eos_tournament": 1,
+                    "eos_tournament_active": 1,
+                    "conference_tournaments": 1,
+                    "region_tournaments": 1,
+                    "national_tournament": 1,
+                    "results": 1,
+                    "team_builder": 1,
+                    "_id": 1,
+                },
+            )
+            if not franchise_doc:
+                raise HTTPException(status_code=404, detail="Franchise not found")
+            output = _standings_rows_from_doc(franchise_doc)
+            rows_for_request(franchise_id, week=week, season=season, live_rows=output)
 
         # Optional scopes filter the already-sorted list. Order inside a scope
         # is the same standings_display_sort_key order; nothing re-sorts.
@@ -18626,6 +18697,13 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             season=int(franchise_doc.get("current_season") or 1),
             results=existing_results,
         )
+        _refresh_standings_for_committed_week(
+            franchise_doc,
+            franchise_id_str,
+            int(update_fields.get("week") or (week + 1)),
+            int(franchise_doc.get("current_season") or 1),
+            existing_results,
+        )
         db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": update_fields}))
     logger.warning(
         "[EOS-SIM-REST] franchise=%s week=%s | total=%.1fs | next_week=%s",
@@ -19596,7 +19674,10 @@ def finish_season(req: FinishSeasonRequest):
             RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD: 0,
         }}),
     )
-    
+    from BackEnd.utils.standings_snapshot import note_standings_stale
+
+    note_standings_stale(str(franchise_id))
+
     logger.info(f"✅ [FINISH SEASON] Started season {next_season}")
 
     logger.info(

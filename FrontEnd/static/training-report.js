@@ -259,12 +259,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   setupProjectedLineupToggle();
   
-  // Set up locker room button
+  // Set up locker room button. Also wire immediately: this script sits after
+  // the button, and DOMContentLoaded is later than the first moment the
+  // button can take a click.
   setupLockerRoomButton();
   
   // Load training report data
   loadTrainingReport();
 });
+
+setupLockerRoomButton();
 
 function setupProjectedLineupToggle() {
   const buttons = document.querySelectorAll('.projected-lineup-toggle .toggle-btn');
@@ -411,7 +415,10 @@ function setupViewToggle() {
 
 function setupLockerRoomButton() {
   const btn = document.getElementById('locker-room-btn');
-  if (!btn) return;
+  if (!btn || btn.dataset.exitWired === '1') return;
+  // The button is in the HTML above this script. A click during parse, before
+  // DOMContentLoaded, used to miss this listener and leave the report open.
+  btn.dataset.exitWired = '1';
 
   if (reportFrom === 'news' && mode === 'franchise') {
     btn.textContent = 'Back';

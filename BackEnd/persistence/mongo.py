@@ -32,6 +32,7 @@ _COLLECTION_BINDINGS: tuple[tuple[str, str], ...] = (
     ("franchise_team_data_collection", "franchise_team_data"),
     ("franchise_players_data_collection", "franchise_players_data"),
     ("leaders_snapshots_collection", "leaders_snapshots"),
+    ("standings_snapshots_collection", "standings_snapshots"),
     ("franchise_recruits_data_collection", "franchise_recruits_data"),
     ("plays_collection", "plays"),
     ("defenses_collection", "defenses"),
@@ -240,6 +241,8 @@ class MongoStore:
         self.franchise_players_data_collection.delete_many({"franchise_id": sid})
         self.leaders_snapshots_collection.delete_one({"_id": sid})
         self.leaders_snapshots_collection.delete_one({"_id": f"meta:{sid}"})
+        self.standings_snapshots_collection.delete_one({"_id": sid})
+        self.standings_snapshots_collection.delete_one({"_id": f"meta:{sid}"})
         self.franchise_recruits_data_collection.delete_many({"franchise_id": sid})
         self.games_collection.delete_many({"franchise_id": sid})
         self.press_conference_sessions_collection.delete_many(either)

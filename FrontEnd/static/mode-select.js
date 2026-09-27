@@ -1724,6 +1724,9 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
     }
   } catch (e) {
+    // Leaving the page aborts this fetch. A restored snapshot must not be
+    // sent to login, and must not stay on the session check.
+    if (e && e.name === 'AbortError') return;
     console.error('[AUTH] Mode select auth validation failed:', e);
     redirectToLogin();
     return;
@@ -1763,9 +1766,13 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   setLeaderboardView('geek_points');
   wireLeaderboardViewToggles(currentUsername);
-  await loadCommunityLeaderboard(currentUsername);
-  await loadCommunityHighlights();
-  await loadAroundTheLeague();
+  // Community cards must not hold the session panel. A stalled highlights
+  // manifest (or any other community fetch) used to leave the page on
+  // "Checking your session…" for the whole navigation, including a Back
+  // onto this document.
+  loadCommunityLeaderboard(currentUsername);
+  loadCommunityHighlights();
+  loadAroundTheLeague();
   wireAroundTheLeaguePolling();
   wireLeadersByTeamModal();
 
@@ -1813,5 +1820,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   }));
 
   renderFranchiseSlots(franchisesList, teamsById, teamsByName, commandCenterById);
+  revealModeSelect();
+});
+
+window.addEventListener('pageshow', function (event) {
+  if (!event.persisted) return;
+  if (!document.body || !document.body.classList.contains('mode-select-loading')) return;
   revealModeSelect();
 });
