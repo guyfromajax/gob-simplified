@@ -199,3 +199,99 @@
 #rankings-view .rankings-results-table .last-week-tie {
   font-weight: 700;
 }
+
+.gob-news-empty {
+  margin: 12px 0;
+  color: var(--text-60);
+  font: var(--fw-semibold) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+
+.gob-news-week {
+  margin: 0 0 18px;
+}
+
+.gob-news-week h3,
+.gob-awards h3 {
+  margin: 0 0 8px;
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-6);
+  color: var(--text-38);
+}
+
+.gob-news-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  color: var(--text-100);
+  text-decoration: none;
+  border-top: 1px solid var(--line);
+}
+
+.gob-news-row p {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.gob-news-row.is-yours {
+  box-shadow: inset 3px 0 0 #1c2a52;
+}
+
+.gob-news-type {
+  flex: none;
+  color: var(--text-38);
+  font: var(--fw-semibold) var(--fs-11)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-6);
+}
+
+.gob-news-link {
+  color: var(--text-60);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.gob-news-link:hover {
+  text-decoration: underline;
+}
+
+.gob-news-story {
+  max-width: 920px;
+}
+
+.gob-news-headline {
+  margin: 8px 0 4px;
+  font: var(--fw-bold) var(--fs-22)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-2);
+}
+
+.gob-news-meta,
+.gob-news-line {
+  margin: 0 0 8px;
+  color: var(--text-87);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+
+.gob-news-gap {
+  height: 10px;
+}
+
+.gob-news-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+#awards-view .gob-tbl th:not(.team),
+#awards-view .gob-tbl td:not(.team),
+#news-view .gob-news-body .gob-tbl th:not(.team),
+#news-view .gob-news-body .gob-tbl td:not(.team) {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.gob-awards {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}

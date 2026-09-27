@@ -15275,6 +15275,95 @@ def get_recruiting_data(
     }
 
 
+def _news_dispatch_week(value: Any) -> int | None:
+    try:
+        week = int(value)
+    except (TypeError, ValueError):
+        return None
+    if week != value and str(value).strip() != str(week):
+        return None
+    return week
+
+
+def _news_dispatch_items(franchise_doc: dict[str, Any]) -> list[dict[str, Any]]:
+    """Your-team rows for the news feed, from the same stored fields the old
+    press tab read. Wording matches that tab. The view only formats them.
+
+    Written beside ``season_news`` on the week-advance ``$set`` (``season_inbox``)
+    and on the training ``$set`` (``latest_training``). Both already fold
+    ``browse_rev``, so these rows share the news route's week and rev stamp.
+    """
+    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    team_id = str(user_team_object_id or "")
+    franchise_key = str(franchise_doc.get("_id") or "")
+    items: list[dict[str, Any]] = []
+
+    latest = franchise_doc.get("latest_training") or {}
+    report_week = _news_dispatch_week(latest.get("week"))
+    if report_week is not None and report_week >= 1 and franchise_key and team_id:
+        query = urlencode([
+            ("mode", "franchise"),
+            ("franchise_id", franchise_key),
+            ("team_id", team_id),
+            ("week", str(report_week)),
+            ("from", "news"),
+        ])
+        items.append({
+            "week": report_week,
+            "type": "training_report",
+            "headline": f"Week {report_week} training report",
+            "target": f"/training-report.html?{query}",
+            "link_label": "view",
+            "yours": True,
+        })
+
+    for item in franchise_doc.get("season_inbox") or []:
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("type")
+        week = _news_dispatch_week(item.get("week"))
+        if week is None:
+            continue
+        if kind == "training_squad_report":
+            query = urlencode([
+                ("franchise_id", franchise_key),
+                ("team_id", team_id),
+                ("from", "news"),
+            ])
+            items.append({
+                "week": week,
+                "type": "training_squad_report",
+                "headline": f"Week {week} Practice Squad development report",
+                "target": f"/training-squad-report.html?{query}",
+                "link_label": "view",
+                "yours": True,
+            })
+            continue
+        if kind != "game_result":
+            continue
+        verb = "defeated" if item.get("result") == "win" else "lost to"
+        user_name = item.get("user_team_name")
+        opponent_name = item.get("opponent_team_name")
+        if user_name and opponent_name:
+            headline = (
+                f"{user_name} {verb} {opponent_name} "
+                f"{item.get('user_score')}-{item.get('opponent_score')}"
+            )
+        else:
+            headline = str(item.get("copy") or "")
+        if not headline:
+            continue
+        items.append({
+            "week": week,
+            "type": "game_result",
+            "headline": headline,
+            "target": str(item.get("box_score_url") or ""),
+            "link_label": "box score",
+            "yours": True,
+        })
+    return items
+
+
 @router.get("/franchise/news")
 @browse_cached
 def get_franchise_news(
@@ -15285,11 +15374,11 @@ def get_franchise_news(
     ),
     user: dict = Depends(get_current_user),
 ):
-    """Season news feed for the standalone news page (newest first; cleared at season rollover).
+    """Season news feed (newest first; cleared at season rollover).
 
-    ``category=recruiting`` narrows to the ``recruiting_*`` story types
-    (``recruiting_report``, ``recruiting_results``, ``recruiting_movement``, and any
-    legacy ``recruiting_leans``) so recruiting news can be read on its own.
+    ``category=recruiting`` narrows ``news`` to the ``recruiting_*`` story types.
+    ``dispatches`` are your-team rows from ``season_inbox`` and ``latest_training``,
+    included on every response. Headlines are the stored sentences.
     """
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     news = franchise_doc.get("season_news") or []
@@ -15303,6 +15392,7 @@ def get_franchise_news(
         "week": int(franchise_doc.get("week", 1) or 1),
         "category": category,
         "news": news,
+        "dispatches": _news_dispatch_items(franchise_doc),
     }
 
 

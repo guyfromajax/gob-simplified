@@ -50,8 +50,8 @@
       { id: 'visits', label: 'Visits' }
     ]},
     { id: 'news', label: 'News', title: 'News', icon: 'news', tabs: [
-      { id: 'press-tab', label: 'News' },
-      { id: 'awards-page', label: 'Awards', link: 'awards' }
+      { id: 'news-view', label: 'News' },
+      { id: 'awards-view', label: 'Awards' }
     ]}
   ];
 
@@ -78,7 +78,9 @@
     'schedule-page': 'league',
     'fcc-team-stats-summary-tab': 'league',
     'awards-tab': 'league',
-    'press-tab': 'news'
+    'press-tab': 'news',
+    'news-view': 'news',
+    'awards-view': 'news'
   };
 
   var sectionEls = {};
@@ -96,8 +98,8 @@
     '/practice-squad-standings.html': { kind: 'browse', section: 'league', sub: 'practice' },
     '/practice-squad-bracket.html': { kind: 'browse', section: 'league', sub: 'practice', keepBack: true },
     '/brackets.html': { kind: 'browse', section: 'league', sub: 'brackets' },
-    '/awards.html': { kind: 'browse', section: 'news', sub: 'awards' },
-    '/news.html': { kind: 'browse', section: 'news', sub: 'press-tab' },
+    '/awards.html': { kind: 'browse', section: 'news', sub: 'awards-view' },
+    '/news.html': { kind: 'browse', section: 'news', sub: 'news-view' },
     '/leaders.html': { kind: 'browse', section: 'league', sub: 'leaders-view' },
     '/standings.html': { kind: 'browse', section: 'league', sub: 'standings-view' },
     '/team-stats.html': { kind: 'browse', section: 'league', sub: 'team-stats-view' },

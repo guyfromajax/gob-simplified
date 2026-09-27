@@ -975,7 +975,7 @@ def build_game_results_story(
         q += f"&team_id={team_id}"
 
     story_id = f"w{week}-ps-game-results"
-    news_return = f"/news.html?{q}&story={story_id}"
+    news_return = f"/franchise-command-center.html?{q}&tab=news-view&story={story_id}"
     return_url = quote(news_return, safe="")
 
     rich_lines: list[dict[str, Any]] = [

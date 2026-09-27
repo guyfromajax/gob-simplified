@@ -96,7 +96,7 @@
         <button data-tab="training-tab">Training</button>
         <!-- Same slot, renamed. Carries .inbox-badge when the wire needs attention. -->
         <button data-tab="recruits-tab">Recruiting</button>
-        <button data-tab="press-tab">News</button>
+        <button data-tab="news-view">News</button>
       </div>
       <div id="home-tab" class="tab-content active">
         <div id="office-root" class="office" data-office-state="loading" aria-busy="true">
@@ -297,11 +297,8 @@
           </section>
         </div>
       </div>
-      <div id="press-tab" class="tab-content">
-        <div id="fcc-news-list" class="fcc-news-tab-list">
-          <div class="fcc-news-tab-empty">Loading news…</div>
-        </div>
-      </div>
+      <div id="news-view" class="tab-content"></div>
+      <div id="awards-view" class="tab-content"></div>
       <div id="recruits-tab" class="tab-content">
         <div id="fcc-recruits-invite" hidden></div>
         <h3>Recruits Leaning Your Way</h3>
