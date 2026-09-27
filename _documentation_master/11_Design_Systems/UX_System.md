@@ -373,3 +373,21 @@ An unknown module, or an import that fails, paints a quiet error card with Retry
 | `upcoming` | Later unplayed schedule games, same shape as `next_game`, not including `next_game`. |
 
 No stored tip time, neutral site, or hometown. Those stay off the page.
+
+### Team attributes
+
+`GET /franchise/team-data?franchise_id&team_id` stays `@browse_cached`. It still returns `team_attributes`, `plays_data`, and `scouting_data`. It also returns `measures`, the league-rank field set for the six Team Attributes. The page does not sort the league or decide which end of a measure is good.
+
+| Field | Meaning |
+|---|---|
+| `key` | `team_chemistry`, `fight`, `discipline`, `shot_threshold`, `rebound_modifier`, `defensive_efficiency`. |
+| `label` | Chemistry, Fight, Discipline, Shooting, Rebounding, Defensive efficiency. |
+| `value` | The stored number for this week, the same attributes Office already reads. Null when the team has no stored value. The zero-fill on `team_attributes` does not apply here. |
+| `scale_max` | 25 for Chemistry. Null for the others. |
+| `direction` | `higher_better` or `lower_better`. Null when the sim uses the measure both ways, which is Fight and Discipline today. Those two keep `value` and leave `rank`, `rank_of`, `percentile`, and `rank_delta` null. |
+| `rank` | 1 is the best end of `direction`. Ties share a place and the next place skips (`1, 2, 2, 4`). |
+| `rank_of` | How many teams in the franchise have a stored value for this measure. A missing value is not ranked and is not counted. |
+| `percentile` | 0–100. 100 is the best end, including a tie for best. 0 is the worst end, including a tie for worst. `100 × (teams strictly worse) / (teams strictly better + teams strictly worse)`. One team, or a measure where every stored value is equal, is 100. |
+| `rank_delta` | How many places the user's team climbed since the latest earlier `office_week_snapshots` `team_measures` for this season. Positive means it moved up. The snapshot is the user team only, so every other team is null. Chemistry is not in that snapshot, so Chemistry is null. Fight and Discipline are null because they are not ranked. |
+
+Shooting (`shot_threshold`) is `lower_better`: a make is `shot_score >= shot_threshold`. Chemistry, Rebounding (`rebound_modifier`), and Defensive efficiency are `higher_better`.

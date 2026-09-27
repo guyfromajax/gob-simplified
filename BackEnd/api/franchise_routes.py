@@ -15783,7 +15783,40 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     
     if not ftd_doc:
         raise HTTPException(status_code=404, detail=f"Team data not found in FTD for team_id: {actual_team_id}")
-    
+
+    # League ranks use the stored attributes, before the zero-fill below.
+    # develop has no measures[] here; this is the rank field set the route attaches.
+    from BackEnd.utils.office_digest import latest_snapshot
+    from BackEnd.utils.team_measure_ranks import measures_for_team
+
+    franchise_meta = db.franchises.find_one(
+        {"_id": fid},
+        {
+            "week": 1,
+            "current_season": 1,
+            "office_week_snapshots": 1,
+            "user_team_object_id": 1,
+        },
+    )
+    prior_measures = None
+    if franchise_meta and str(franchise_meta.get("user_team_object_id") or "") == str(actual_team_id):
+        week_raw = franchise_meta.get("week")
+        try:
+            current_week = int(week_raw) if week_raw is not None else 0
+        except (TypeError, ValueError):
+            current_week = 0
+        snapshot = latest_snapshot(franchise_meta, current_week)
+        stored = snapshot.get("team_measures") if isinstance(snapshot, dict) else None
+        if isinstance(stored, dict):
+            prior_measures = stored
+    measures = measures_for_team(
+        franchise_team_data_collection,
+        fid,
+        actual_team_id,
+        prior_measures=prior_measures,
+        own_attributes=ftd_doc.get("team_attributes"),
+    )
+
     # Extract team attributes from FTD
     team_attributes = ftd_doc.get("team_attributes", {})
     # Ensure all expected keys exist (with defaults if missing)
@@ -15847,7 +15880,8 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     return {
         "team_attributes": team_attributes,
         "plays_data": plays_data,
-        "scouting_data": scouting_data
+        "scouting_data": scouting_data,
+        "measures": measures,
     }
 
 
