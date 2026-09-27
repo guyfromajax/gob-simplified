@@ -51,3 +51,10 @@ Offline copy of the save, Lancaster franchise `6ab284847ab3853ae89a1184`, team `
 ## Shots
 
 `reports/player-stats-view/`. Pointer parked in `.main`. Real save and fixture, per game and totals, plus the scrolled-right frame, at 1280×720 and 1920×1080.
+
+## Follow-up
+
+The Player cell used `gob-player` without `gob-team`, so the portrait sat above the name and the name kept the browser underline. Rows were about 72px. It now uses the Roster markup (`a.gob-team.gob-player` plus `span.av`): a 28px circular portrait on the left, the name in `--text-100` with POS · YR in `--text-60` beside it, and no underline (Roster does not underline the name on hover either). The identity block is capped at the portrait height, so the row is the Roster row height. On the save copy the row measures 46px at both 1280 and 1920, the portrait is 28px, and the name sits to its right.
+
+`player-stats.spec.js` asserts the Player Stats row is no taller than the Roster row and that the name's `text-decoration-line` is `none`. That spec, t2-roster, and shell-1b passed. One shell-1b recruiting `goBack` aborted on the first pass and passed on retry. `save-per-game` and `save-totals` were retaken at 1280 and 1920.
+

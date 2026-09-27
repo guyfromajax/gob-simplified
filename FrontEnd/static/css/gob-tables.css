@@ -860,30 +860,48 @@ html.gob-shell .gob-focus.stats-toggle button {
 #player-stats-view .gob-scroll.gob-xs { overflow-x: auto; overflow-y: visible; }
 #player-stats-view .gob-xs .gob-tbl { min-width: 0; width: max-content; }
 #player-stats-view tbody tr { cursor: pointer; }
-#player-stats-view .gob-player { align-items: center; }
+#player-stats-view .gob-player {
+  align-items: center;
+  color: var(--text-100);
+  text-decoration: none;
+}
+#player-stats-view .gob-player:hover,
+#player-stats-view .gob-player:hover .gob-id span { text-decoration: none; }
 #player-stats-view .av {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
   overflow: hidden;
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-  background: var(--surface-3);
-  font-weight: 700;
-  font-size: 11px;
-  color: var(--text-87);
+  flex: none;
 }
-#player-stats-view .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#player-stats-view .av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  display: block;
+}
 #player-stats-view .gob-id {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  height: 28px;
   min-width: 0;
-  line-height: 1.15;
+  line-height: 1;
   text-align: left;
 }
-#player-stats-view .gob-id b { font-weight: 600; }
-#player-stats-view .gob-id .sub { color: var(--text-38); font-size: 11px; font-weight: 500; }
+#player-stats-view .gob-id > span:first-child {
+  color: var(--text-100);
+  font-size: 13px;
+  line-height: 14px;
+  text-decoration: none;
+}
+#player-stats-view .gob-id .sub {
+  color: var(--text-60);
+  font-size: 11px;
+  line-height: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
 html.gob-shell .main #player-stats-view .gob-xs thead th.pin {
   position: sticky !important;
   left: 0;

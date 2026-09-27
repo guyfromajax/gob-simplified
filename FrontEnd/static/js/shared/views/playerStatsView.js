@@ -161,9 +161,9 @@ export function mount(container, ctx) {
     if (col.key === 'name') {
       var name = row.name || 'Player';
       var sub = subline(row);
-      return '<a class="gob-player" href="' + tables.esc(playerHref(row.player_id)) + '">'
+      return '<a class="gob-team gob-player" href="' + tables.esc(playerHref(row.player_id)) + '">'
         + '<span class="av">' + portraitHtml(tables, row) + '</span>'
-        + '<span class="gob-id"><b>' + tables.esc(name) + '</b>'
+        + '<span class="gob-id"><span>' + tables.esc(name) + '</span>'
         + (sub ? '<span class="sub">' + tables.esc(sub) + '</span>' : '')
         + '</span></a>';
     }

@@ -105,6 +105,27 @@ async function installApi(page, mode) {
       await fulfillJson(route, cc());
       return;
     }
+    if (pathname.startsWith('/roster/')) {
+      await fulfillJson(route, {
+        team: 'Lancaster',
+        is_user_team: true,
+        players: [{
+          _id: 'ada',
+          name: 'Ada Ace',
+          year: 'JR',
+          position: 'SG',
+          height: 76,
+          weight: 210,
+          rt: 80,
+          starter: true,
+          lineup_order: 0,
+          attributes: { SC: 60, SH: 60, ID: 60, OD: 60, PS: 60, BH: 60, RB: 60, AG: 60, ST: 60, ND: 60, IQ: 60, FT: 60 },
+        }],
+        training_squad: [],
+        practice_squad_recruits: [],
+      });
+      return;
+    }
     if (pathname.startsWith('/franchise/player-stats')) {
       hits += 1;
       if (mode === 'error' && hits === 1) {
@@ -141,6 +162,28 @@ async function mainOverflow(page) {
     return main.scrollWidth - main.clientWidth;
   });
 }
+
+test('player cell matches the roster row', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await installApi(page, 'ok');
+  await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=roster-view');
+  await page.waitForSelector('#roster-view a.gob-player');
+  const rosterH = await page.locator('#roster-view a.gob-player').first().evaluate((el) => {
+    return el.closest('tr').getBoundingClientRect().height;
+  });
+  await page.mouse.move(980, 420);
+  await page.locator('#gob-subtabs [data-tab="player-stats-view"]').evaluate((el) => el.click());
+  await page.waitForSelector('#player-stats-view a.gob-player');
+  const stats = await page.locator('#player-stats-view a.gob-player').first().evaluate((el) => {
+    const name = el.querySelector('.gob-id > span:first-child');
+    return {
+      height: el.closest('tr').getBoundingClientRect().height,
+      deco: getComputedStyle(name).textDecorationLine,
+    };
+  });
+  expect(Math.round(stats.height)).toBeLessThanOrEqual(Math.round(rosterH));
+  expect(stats.deco).toBe('none');
+});
 
 test('team sub-tab opens player stats and the old id maps', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
