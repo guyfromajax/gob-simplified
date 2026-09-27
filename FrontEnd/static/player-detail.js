@@ -316,7 +316,7 @@ function cloneParams(params) {
       <td class="pd-career-num">${stats.STL ?? 0}</td>
       <td class="pd-career-num">${stats.BLK ?? 0}</td>
       <td class="pd-career-num">${stats.F ?? 0}</td>
-      <td class="pd-career-num">${stats.MIN ?? 0}</td>
+      <td class="pd-career-num">${Math.round(Number(stats.MIN) || 0)}</td>
       <td class="pd-career-num">${stats.TO ?? 0}</td>
       <td class="pd-career-num">${scrA}</td>
       <td class="pd-career-num">${formatPct(scrS, scrA)}</td>

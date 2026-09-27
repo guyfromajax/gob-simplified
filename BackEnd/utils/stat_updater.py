@@ -61,6 +61,17 @@ def _clean_stat_block(stats: Dict[str, Any]) -> Dict[str, float]:
     return clean
 
 
+def played_in_game(stat_block: Dict[str, Any]) -> bool:
+    """A box-score row earns GP only with game ``MIN`` (seconds) > 0."""
+    seconds = (stat_block or {}).get("MIN")
+    return isinstance(seconds, (int, float)) and seconds > 0
+
+
+def season_minutes(seconds: float) -> float:
+    """Season/career MIN is unrounded minutes; game box MIN is seconds."""
+    return seconds / 60
+
+
 def _per_game_block(totals: Dict[str, Any]) -> Dict[str, float]:
     """Return per-game averages for a totals block."""
 
@@ -377,13 +388,12 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     # Initialize increment document for tournament document
                     tournament_inc_doc: Dict[str, Any] = {}
                     for stat, val in game_stats.items():
-                        # ✅ MIN special handling: Convert seconds to minutes (integer division)
                         if stat == "MIN":
-                            val = val // 60  # Convert seconds to minutes (integer division)
+                            val = season_minutes(val)
                         tournament_inc_doc[f"players.{str(query_pid)}.season.{stat}"] = val
                     
-                    # Increment GP (games played)
-                    tournament_inc_doc[f"players.{str(query_pid)}.season.GP"] = 1
+                    if played_in_game(stat_block):
+                        tournament_inc_doc[f"players.{str(query_pid)}.season.GP"] = 1
                     
                     # Get player metadata from players_collection (for name, team, etc.)
                     player_doc = players_collection.find_one(
@@ -834,10 +844,8 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
             continue
         stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
         for stat, val in _clean_stat_block(stat_block).items():
-            # ✅ MIN special handling: Convert seconds to minutes (integer division)
-            # Game MIN is tracked in seconds, but season/career MIN should be in minutes
             if stat == "MIN":
-                val = val // 60  # Convert seconds to minutes (integer division)
+                val = season_minutes(val)
             # ✅ SS&S: Write to players object (single source of truth), not player_stats
             inc_doc[f"players.{pid}.season.{stat}"] = inc_doc.get(
                 f"players.{pid}.season.{stat}", 0
@@ -845,12 +853,13 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
             inc_doc[f"players.{pid}.career.{stat}"] = inc_doc.get(
                 f"players.{pid}.career.{stat}", 0
             ) + val
-        inc_doc[f"players.{pid}.season.GP"] = inc_doc.get(
-            f"players.{pid}.season.GP", 0
-        ) + 1
-        inc_doc[f"players.{pid}.career.GP"] = inc_doc.get(
-            f"players.{pid}.career.GP", 0
-        ) + 1
+        if played_in_game(stat_block):
+            inc_doc[f"players.{pid}.season.GP"] = inc_doc.get(
+                f"players.{pid}.season.GP", 0
+            ) + 1
+            inc_doc[f"players.{pid}.career.GP"] = inc_doc.get(
+                f"players.{pid}.career.GP", 0
+            ) + 1
 
         # ✅ SS&S: Set meta in players object if not already present
         meta = players_collection.find_one(
@@ -1514,9 +1523,8 @@ def _finalize_game_impl(
                 for stat, val in cleaned_stats.items():
                     if stat in ["playerId", "name", "jersey", "x", "y", "coords", "team", "pos"]:
                         continue
-                    # MIN special handling: Convert seconds to minutes
                     if stat == "MIN":
-                        val = val // 60
+                        val = season_minutes(val)
                     # ✅ SS&S: Accumulate stats (in case same stat appears multiple times)
                     inc_doc[f"players.{pid_str}.season.{stat}"] = inc_doc.get(
                         f"players.{pid_str}.season.{stat}", 0
@@ -1525,7 +1533,7 @@ def _finalize_game_impl(
                 # ✅ FIX: Increment GP exactly once per player per game
                 # processed_player_ids ensures each player is only processed once per game
                 # So GP should only be incremented once, not accumulated
-                if f"players.{pid_str}.season.GP" not in inc_doc:
+                if played_in_game(stat_block) and f"players.{pid_str}.season.GP" not in inc_doc:
                     inc_doc[f"players.{pid_str}.season.GP"] = 1
                 # If GP is already in inc_doc, it means this player was processed twice (shouldn't happen)
                 # Don't increment again - this is a bug if it happens
@@ -2114,10 +2122,8 @@ def _finalize_game_impl(
                     # Skip non-stat fields (playerId, name, jersey, etc.)
                     if stat in ["playerId", "name", "jersey", "x", "y", "coords", "team", "pos"]:
                         continue
-                    # ✅ MIN special handling: Convert seconds to minutes (integer division)
-                    # Game MIN is tracked in seconds, but season/career MIN should be in minutes
                     if stat == "MIN":
-                        val = val // 60  # Convert seconds to minutes (integer division)
+                        val = season_minutes(val)
                     inc_doc[f"players.{pid_str}.season.{stat}"] = inc_doc.get(
                         f"players.{pid_str}.season.{stat}", 0
                     ) + val
@@ -2130,13 +2136,13 @@ def _finalize_game_impl(
                 if stats_added == 0:
                     logger.warning(f"⚠️ [FINALIZE_GAME] No stats added for player {pid_str} (team={current_team_name}, pos={pos_key}) - cleaned stats: {_clean_stat_block(stat_block)}")
                 
-                # ✅ SS&S: Increment GP (games played) for all players who participated
-                inc_doc[f"players.{pid_str}.season.GP"] = inc_doc.get(
-                    f"players.{pid_str}.season.GP", 0
-                ) + 1
-                inc_doc[f"players.{pid_str}.career.GP"] = inc_doc.get(
-                    f"players.{pid_str}.career.GP", 0
-                ) + 1
+                if played_in_game(stat_block):
+                    inc_doc[f"players.{pid_str}.season.GP"] = inc_doc.get(
+                        f"players.{pid_str}.season.GP", 0
+                    ) + 1
+                    inc_doc[f"players.{pid_str}.career.GP"] = inc_doc.get(
+                        f"players.{pid_str}.career.GP", 0
+                    ) + 1
                 
                 # ✅ FIX: Set meta.team_id to ObjectId string (not team_id string) for aggregation compatibility
                 # Franchise uses ObjectId strings (from FTD-derived maps).

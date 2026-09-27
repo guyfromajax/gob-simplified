@@ -611,7 +611,8 @@ function trStatsHeadHtml() {
 function trStatValue(stats, col, gp) {
   const raw = Number(stats[col.k] != null ? stats[col.k] : 0) || 0;
   if (col.pct) return raw.toFixed(1);                      // ratios ignore the toggle
-  if (TR_STATE.per === 'total' || !gp) return Math.round(raw);
+  if (TR_STATE.per === 'total') return Math.round(raw);
+  if (!gp) return '—';
   return (raw / gp).toFixed(1);
 }
 

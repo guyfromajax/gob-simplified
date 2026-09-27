@@ -10,6 +10,7 @@ from bson import ObjectId
 from BackEnd.constants import BOX_SCORE_KEYS
 
 from BackEnd.persistence import get_store
+from BackEnd.utils.stat_updater import played_in_game, season_minutes
 _store = get_store()
 franchise_players_data_collection = _store.franchise_players_data_collection
 franchise_recruits_data_collection = _store.franchise_recruits_data_collection
@@ -130,7 +131,7 @@ def apply_ps_game_stats(
             else:
                 continue
 
-        inc: dict[str, int] = {}
+        inc: dict[str, float] = {}
         for key in _PS_STAT_KEYS:
             if key not in row:
                 continue
@@ -141,18 +142,8 @@ def apply_ps_game_stats(
             if val:
                 inc[f"ps_season_stats.{key}"] = val
 
-        min_val = row.get("MIN")
-        if min_val is not None:
-            try:
-                mins = int(min_val)
-                if mins > 300:
-                    mins = mins // 60
-                if mins:
-                    inc["ps_season_stats.MIN"] = mins
-            except (TypeError, ValueError):
-                pass
-
-        if inc:
+        if played_in_game(row):
+            inc["ps_season_stats.MIN"] = season_minutes(row["MIN"])
             inc["ps_season_stats.GP"] = 1
 
         if not inc:

@@ -62,7 +62,7 @@ def _gp(fid, pid):
 
 
 def _box(pid, fga=8):
-    return {"PG": {"playerId": pid, "name": "Roger Henrich", "FGA": fga, "PTS": 11}}
+    return {"PG": {"playerId": pid, "name": "Roger Henrich", "FGA": fga, "PTS": 11, "MIN": 1200}}
 
 
 def test_reused_game_id_returns_409_and_leaves_week_one_untouched():
