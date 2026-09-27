@@ -51,3 +51,13 @@ Offline Lancaster save, pointer parked in `.main`, 1280×720 and 1920×1080, in 
 | `offline-roster-no-team-*` | Roster, URL has no `team_id`, Varsity 12 |
 
 Cold offline player first open was 310ms. The cold roster open with no `team_id` was 926ms, which includes waiting for the command-center payload before the roster request.
+
+## Follow-up
+
+The compact roster header was `position: sticky` with the page-head offset, inside a card that clips overflow, so the header painted under the first starter. Compact headers stay in normal flow. The header row is first, then Starters, then the players. The compact table does not repeat a header in the body, so the every-16-rows repeat cannot land on row 1.
+
+The RT column had no width, and `table-layout: fixed` collapsed it onto the names. The player column has a minimum width and ellipsizes a long name inside that cell. RT has its own 4.75rem column. A row's text boxes no longer overlap, and the RT letters sit inside the RT cell, at 1280 and 1920, including a long name.
+
+Development focus is a 3×2 grid of equal segments. The six names stay visible in two rows of three at 1280 and 1920, which reads more clearly than a dropdown that would hide five of them. Save stays orange while it is enabled.
+
+t3-detail, t2-roster, shell-1, shell-2, and app-router passed (41). `offline-team-opp` and `offline-player-user` were retaken at both sizes.

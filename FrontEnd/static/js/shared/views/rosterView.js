@@ -118,10 +118,12 @@ function compactRosterHtml(tables, rows, opts) {
   var hrefFor = opts.playerHref || function () { return '#'; };
   var lineup = !!opts.lineup;
   var cols = 5 + COMPACT_ATTRS.length;
-  var html = '<div class="gob-roster is-compact"><table class="gob-tbl"><thead><tr>';
-  html += '<th class="s pin team">Player</th><th class="s">RT</th><th class="s">POS</th><th class="s">YR</th><th class="s">HT</th>';
+  var html = '<div class="gob-roster is-compact"><table class="gob-tbl"><colgroup><col class="c-player"><col class="c-rt"><col class="c-pos"><col class="c-yr"><col class="c-ht">';
+  COMPACT_ATTRS.forEach(function () { html += '<col class="c-attr">'; });
+  html += '</colgroup><thead><tr>';
+  html += '<th class="pin team">Player</th><th class="rt">RT</th><th>POS</th><th>YR</th><th>HT</th>';
   COMPACT_ATTRS.forEach(function (key) {
-    html += '<th class="s" data-tooltip="' + tables.esc(tip(key)) + '"'
+    html += '<th data-tooltip="' + tables.esc(tip(key)) + '"'
       + ' title="' + tables.esc(fullName(key)) + '">' + tables.esc(key) + '</th>';
   });
   html += '</tr></thead><tbody>';
@@ -138,7 +140,7 @@ function compactRosterHtml(tables, rows, opts) {
     }
     html += '<tr><td class="pin team"><a class="gob-team gob-player" href="' + tables.esc(hrefFor(player)) + '">'
       + '<span class="av">' + portraitHtml(tables, player) + '</span><span>' + tables.esc(displayName(player)) + '</span></a></td>';
-    html += '<td>' + rtHtml(tables, player) + '</td>';
+    html += '<td class="rt">' + rtHtml(tables, player) + '</td>';
     html += '<td>' + tables.esc(player.position || '') + '</td>';
     html += '<td>' + tables.esc(player.year || '') + '</td>';
     html += '<td>' + tables.esc(heightText(player.height)) + '</td>';

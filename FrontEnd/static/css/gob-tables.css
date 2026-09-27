@@ -542,16 +542,51 @@ html.gob-shell.gob-1920 .gob-tgrid {
   table-layout: fixed;
 }
 
+.gob-roster.is-compact col.c-player { width: auto; }
+.gob-roster.is-compact col.c-rt { width: 4.75rem; }
+.gob-roster.is-compact col.c-pos { width: 2.4rem; }
+.gob-roster.is-compact col.c-yr { width: 2.15rem; }
+.gob-roster.is-compact col.c-ht { width: 3rem; }
+.gob-roster.is-compact col.c-attr { width: calc(var(--dsz-30) + var(--space-8)); }
+
+.gob-roster.is-compact th {
+  position: static;
+  top: auto;
+  z-index: auto;
+}
+
 .gob-roster.is-compact th,
 .gob-roster.is-compact td {
   padding-left: var(--space-4);
   padding-right: var(--space-4);
+  overflow: hidden;
 }
 
-.gob-roster.is-compact .gob-player span {
+.gob-roster.is-compact td.team,
+.gob-roster.is-compact th.team {
+  min-width: 8.5rem;
+}
+
+.gob-roster.is-compact td.rt,
+.gob-roster.is-compact th.rt {
+  width: 4.75rem;
+  min-width: 4.75rem;
+}
+
+.gob-roster.is-compact .gob-player {
+  max-width: 100%;
+}
+
+.gob-roster.is-compact .gob-player .av {
+  flex: none;
+}
+
+.gob-roster.is-compact .gob-player span:last-child {
   display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gob-roster tr.gob-sep td {
@@ -782,11 +817,18 @@ html.gob-1920 .gob-apan { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .gob-focus-read, .gob-focus-edit { display: flex; align-items: stretch; gap: 12px; }
 .gob-focus-read, .gob-focus-edit { flex-direction: column; align-items: flex-start; }
 .gob-focus-note { margin: 0; color: var(--text-60); font-size: var(--fs-12); }
-.gob-focus.stats-toggle {
-  display: flex;
-  flex-wrap: wrap;
-  height: auto;
+html.gob-shell .gob-focus.stats-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
   max-width: 100%;
+}
+
+html.gob-shell .gob-focus.stats-toggle button {
+  white-space: nowrap;
+  text-align: center;
+  min-width: 0;
+  padding: var(--space-8) var(--space-4);
 }
 .gob-save {
   height: 34px;

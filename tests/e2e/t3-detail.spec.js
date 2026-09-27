@@ -33,7 +33,7 @@ function rosterBody(focus) {
   for (let i = 0; i < 12; i += 1) {
     players.push({
       _id: 'p' + i,
-      name: i === 0 ? 'Cedric Buckles' : ('Player ' + i),
+      name: i === 0 ? 'Cedric Buckles' : (i === 1 ? 'Montgomery Worthington-Blake' : ('Player ' + i)),
       year: 'JR',
       height: 76,
       weight: 210,
@@ -364,6 +364,23 @@ test('development focus posts and the roster shows the saved label', async ({ pa
   await expect(page.locator('#player-view select')).toHaveCount(0);
   await expect(page.locator('#player-view .gob-focus-note')).toHaveText('Emphasises SC · SH · ID');
   await expect(page.locator('#player-view .gob-save')).toBeDisabled();
+  for (const size of [[1280, 720], [1920, 1080]]) {
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    await page.waitForTimeout(50);
+    const rows = await page.locator('#player-view .gob-focus button').evaluateAll((buttons) => {
+      const byTop = {};
+      buttons.forEach((button) => {
+        const top = Math.round(button.getBoundingClientRect().top);
+        byTop[top] = (byTop[top] || 0) + 1;
+      });
+      return {
+        counts: Object.values(byTop),
+        fits: buttons.every((button) => button.scrollWidth <= button.clientWidth + 1),
+      };
+    });
+    expect(rows.counts).toEqual([3, 3]);
+    expect(rows.fits).toBe(true);
+  }
   await page.evaluate(() => {
     const orig = window.GOBStore.mutate.bind(window.GOBStore);
     window.__gobMutations = 0;
@@ -374,6 +391,8 @@ test('development focus posts and the roster shows the saved label', async ({ pa
   });
   await page.locator('#player-view .gob-focus [data-value="rebounding"]').click();
   await expect(page.locator('#player-view .gob-save')).toBeEnabled();
+  const saveColor = await page.locator('#player-view .gob-save').evaluate((button) => getComputedStyle(button).backgroundColor);
+  expect(saveColor).toBe('rgb(247, 148, 32)');
   await page.locator('#player-view .gob-save').click();
   await expect.poll(() => state.posted && state.posted.training_focus).toBe('rebounding');
   await expect.poll(() => page.evaluate(() => window.__gobMutations)).toBe(1);
@@ -504,24 +523,82 @@ test('a null percentage renders an em dash and a real zero stays 0.0', async ({ 
   await expect(row).toContainText('—');
 });
 
+async function assertCompactRoster(page) {
+  const table = page.locator('#team-view .gob-roster.is-compact table');
+  await expect(table.locator('tr').first().locator('th').first()).toHaveText('Player');
+  const shape = await table.evaluate((node) => {
+    const first = node.rows[0];
+    const bodyFirst = node.tBodies[0] && node.tBodies[0].rows[0];
+    function rects(cell) {
+      const bits = cell.querySelectorAll('.rtl, .gob-player span:last-child, .attr-tile');
+      if (bits.length) return [...bits].map((bit) => bit.getBoundingClientRect());
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      return [...range.getClientRects()].filter((box) => box.width > 1 && box.height > 1);
+    }
+    function hits(a, b) {
+      return a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+    }
+    const problems = [];
+    [...node.rows].forEach((row) => {
+      const cells = [...row.cells].map((cell) => ({ rects: rects(cell), text: cell.innerText.trim() }));
+      for (let i = 0; i < cells.length; i += 1) {
+        for (let j = i + 1; j < cells.length; j += 1) {
+          cells[i].rects.forEach((a) => {
+            cells[j].rects.forEach((b) => {
+              if (hits(a, b)) problems.push(cells[i].text + ' | ' + cells[j].text);
+            });
+          });
+        }
+      }
+    });
+    const rt = node.querySelector('tbody td.rt');
+    const rtBox = rt ? rt.getBoundingClientRect() : null;
+    const rtText = rt ? rt.querySelector('.rtl').getBoundingClientRect() : null;
+    const rtInside = !!(rtBox && rtText
+      && rtText.left >= rtBox.left - 0.5
+      && rtText.right <= rtBox.right + 0.5
+      && rtText.top >= rtBox.top - 0.5
+      && rtText.bottom <= rtBox.bottom + 0.5
+      && rtText.width > 0);
+    return {
+      headerFirst: first.parentElement.tagName === 'THEAD' && first.cells[0].tagName === 'TH',
+      bodyStarts: bodyFirst ? bodyFirst.innerText.trim() : '',
+      repeats: node.querySelectorAll('tbody tr.gob-rep').length,
+      problems: problems,
+      rtInside: rtInside,
+    };
+  });
+  expect(shape.headerFirst).toBe(true);
+  expect(shape.bodyStarts.toLowerCase()).toBe('starters');
+  expect(shape.repeats).toBe(0);
+  expect(shape.problems).toEqual([]);
+  expect(shape.rtInside).toBe(true);
+}
+
 test('the team page roster is the compact five-attribute grid', async ({ page }) => {
   const state = { focus: 'offensive' };
   await openFcc(page, state, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=team-view&view_team_id=' + OPP + '&origin=league');
-  await page.setViewportSize({ width: 1280, height: 720 });
   await page.waitForSelector('#team-view .gob-roster.is-compact');
   const headers = await page.locator('#team-view .gob-roster thead th').allTextContents();
   expect(headers.map((text) => text.trim())).toEqual(['Player', 'RT', 'POS', 'YR', 'HT', 'SC', 'SH', 'ID', 'OD', 'RB']);
   await expect(page.locator('#team-view .gob-roster')).toContainText('Starters');
   await expect(page.locator('#team-view .gob-roster')).toContainText('Bench');
+  await expect(page.locator('#team-view .gob-roster')).toContainText('Montgomery Worthington-Blake');
   await expect(page.locator('#team-view .gob-roster thead')).not.toContainText('Dev focus');
   await expect(page.locator('#team-view .gob-roster thead')).not.toContainText('PS');
-  const fit = await page.locator('#team-view .gob-roster.is-compact').evaluate((el) => el.scrollWidth - el.clientWidth);
-  expect(fit).toBeLessThanOrEqual(1);
-  const overflow = await page.evaluate(() => {
-    const main = document.querySelector('html.gob-shell .main');
-    return main.scrollWidth - main.clientWidth;
-  });
-  expect(overflow).toBeLessThanOrEqual(1);
+  for (const size of [[1280, 720], [1920, 1080]]) {
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    await page.waitForTimeout(100);
+    await assertCompactRoster(page);
+    const fit = await page.locator('#team-view .gob-roster.is-compact').evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(fit).toBeLessThanOrEqual(1);
+    const overflow = await page.evaluate(() => {
+      const main = document.querySelector('html.gob-shell .main');
+      return main.scrollWidth - main.clientWidth;
+    });
+    expect(overflow).toBeLessThanOrEqual(1);
+  }
 });
 
 test('each view opens when the URL has no team_id', async ({ page }) => {
