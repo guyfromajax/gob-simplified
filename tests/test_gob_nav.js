@@ -58,6 +58,7 @@ function fakeWindow(start, seed) {
       querySelectorAll() { return []; },
     },
     addEventListener(type, fn) { listeners[type] = fn; },
+    setTimeout(fn) { fn(); return 0; },
     navigations: [],
     listeners,
   };
@@ -202,6 +203,20 @@ test('replace fallback keeps return_tab when return_url has no tab', () => {
   assert.match(last[1], /tab=roster-tab/);
 });
 
+test('exitFlow waits out an in-progress load before jumping back', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=home-tab' });
+  win.GOBNav.go('/training.html?franchise_id=f1');
+  win.location.pathname = '/training-report.html';
+  win.location.search = '?franchise_id=f1';
+  win.listeners.pageshow({ persisted: false });
+  win.document.readyState = 'loading';
+  win.navigations.length = 0;
+  win.GOBNav.exitFlow('/franchise-command-center.html?franchise_id=f1', { tab: 'home-tab' });
+  assert.equal(win.navigations.some((row) => row[0] === 'go'), false);
+  win.listeners.load();
+  assert.deepEqual(win.navigations.at(-1), ['go', -1]);
+});
+
 test('exitFlow backs into the locker room that launched the flow', () => {
   const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=game-plan-tab' });
   win.GOBNav.go('/set-lineup.html?franchise_id=f1&game_id=g1');
@@ -251,6 +266,19 @@ test('locker room load applies a pending exit tab', () => {
   assert.ok(replaced);
   assert.match(replaced[1], /tab=home-tab/);
   assert.equal(win.sessionStorage.getItem('gob_nav_exit'), null);
+});
+
+test('bfcache exit replace waits until the history traversal finishes', () => {
+  const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1&tab=game-plan-tab' });
+  const queued = [];
+  win.setTimeout = (fn) => { queued.push(fn); return 0; };
+  win.sessionStorage.setItem('gob_nav_exit', JSON.stringify({ tab: 'home-tab', fresh: true }));
+  win.navigations.length = 0;
+  win.listeners.pageshow({ persisted: true });
+  assert.equal(win.navigations.some((row) => row[0] === 'replace'), false);
+  queued.forEach((fn) => fn());
+  assert.equal(win.navigations.at(-1)[0], 'replace');
+  assert.match(win.navigations.at(-1)[1], /home-tab/);
 });
 
 test('bfcache locker room with a pending exit reloads instead of showing stale data', () => {

@@ -318,8 +318,19 @@ async function openLockerRoom(page) {
   await expect(page.locator('#play-now')).toBeEnabled({ timeout: 20000 });
 }
 
+async function leaveTrainingReport(page) {
+  const btn = page.locator('#locker-room-btn[data-exit-wired="1"]');
+  await btn.waitFor();
+  // history.go is ignored while the report document is still loading. The
+  // button is in the first HTML chunk, so a click before onload never leaves
+  // the report. Wait until the load that installs the handler has finished.
+  await page.waitForFunction(() => document.readyState === 'complete');
+  await btn.click();
+}
+
 async function backToModeSelect(page) {
   await expect(page.locator('#play-now')).toBeEnabled({ timeout: 20000 });
+  await page.waitForFunction(() => document.readyState === 'complete');
   await page.goBack({ waitUntil: 'commit' });
   await expect(page).toHaveURL(/mode-select\.html/, { timeout: 15000 });
 }
@@ -345,7 +356,7 @@ test('training submit lands on the report, then one Back reaches mode-select', a
   await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
   expect(new URL(page.url()).pathname).toBe('/training-report.html');
   await page.waitForFunction(() => window.GOBNav);
-  await page.locator('#locker-room-btn').click();
+  await leaveTrainingReport(page);
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
   await backToModeSelect(page);
 });
@@ -440,9 +451,9 @@ test('standings team page returns instantly with in-app Back and browser Back', 
   await page.evaluate(() => { window.__standingsMark = 'alive'; });
   await page.locator('#standings-by-region a').first().click();
   await expect(page).toHaveURL(/tab=team-view/, { timeout: 20000 });
+  await page.waitForFunction(() => document.readyState === 'complete');
   await page.goBack({ waitUntil: 'commit' });
-  await expect.poll(() => new URL(page.url()).pathname, { timeout: 15000 }).toBe('/franchise-command-center.html');
-  expect(new URL(page.url()).searchParams.get('tab')).toBe('standings-tab');
+  await expect.poll(() => new URL(page.url()).searchParams.get('tab'), { timeout: 15000 }).toBe('standings-tab');
   const afterBrowser = await page.evaluate(() => {
     const nav = performance.getEntriesByType('navigation')[0];
     return { mark: window.__standingsMark || null, type: nav ? nav.type : '' };
@@ -486,7 +497,7 @@ test('custom playbooks adds one step and Back removes it, then training still re
   await page.locator('#submit-btn').click();
   await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
   await page.waitForFunction(() => window.GOBNav);
-  await page.locator('#locker-room-btn').click();
+  await leaveTrainingReport(page);
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
   await backToModeSelect(page);
 });

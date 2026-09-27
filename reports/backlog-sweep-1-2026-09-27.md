@@ -33,3 +33,35 @@ The week-advance rebuild runs inside the existing transaction, next to the leade
 `tests/test_standings_snapshot.py` on mongomock and on `GOB_PERSISTENCE=sqlite`: the snapshot equals the live rows (streak, next opponent, pct, differential), and conference, region, user-region, and `region=` filters match. A results write without a stale mark still serves the old rows; after the mark, Beta's streak is `W1`.
 
 SQLite timings on a copy of the Lancaster save, five interleaved pairs, full 128-team payload. Before, back-to-back live builds: 222.6/75.8, 73.0/76.7, 79.6/79.9, 81.6/104.3, 80.0/73.8 ms. Medians 80.0 and 76.7. After, snapshot deleted before each cold call: 238.4/15.2, 86.0/14.5, 79.4/15.3, 87.1/14.7, 87.1/13.7 ms. Medians 87.1 cold and 14.7 warm. Week-advance rebuild: 74.1, 72.6, 88.3, 102.7, 80.1 ms. Median 80.1.
+
+## 3. Flaky tests
+
+### shell-1, "sections and sub-tabs open the matching panel"
+
+The helper clicked a coordinate it had sampled from the rail button. At gob-1280 the rail face is 64px wide and grows on hover, then collapses after a 120ms delay plus the width transition. A point that was on Prep is over the team panel by mouseup, so the section never changes. Alone, the face had already collapsed, so the same click hit Prep.
+
+`locator.click({ position: { x: 16, y: 16 } })` waits until the button is stable and hit-tests the point it clicks. The rail CSS was left alone.
+
+Five runs, workers=1, 10 passed each: 13.1s, 16.4s, 15.4s, 15.6s, 15.7s.
+
+### navigation-fixes-3
+
+Two different clicks were being lost, and one Back was landing on a duplicate locker-room entry.
+
+Mode select awaited the community leaderboard, highlights manifest, and around-the-league fetch before it revealed the page. A stalled one of those left the document on "Checking your session…", including a Back onto a bfcache copy. An aborted auth fetch also sent that copy to login. Those three loads are no longer awaited. An AbortError returns instead of redirecting. A persisted pageshow reveals the page if the loading class is still on. Franchise list, teams, and command center are still awaited before the slots render.
+
+The box-score exit collapses history onto the locker room, then `reloadIfStale` replaces that document so Forward cannot walk back into the game. The replace ran inside the bfcache `pageshow`, and Chrome stored it as a second locker-room entry. Advance was already enabled on the snapshot, so the test's Back ran before the replacement committed and stayed on `franchise-command-center.html?tab=home-tab`. The exit landing now disables `#play-now` and schedules that replace with `setTimeout(0)`, after the traversal commits. A flow-start return (training, lineup) still replaces synchronously.
+
+The training-report "Go To Locker Room" button is in the HTML above `training-report.js`. The tests waited only for `window.GOBNav`, which the head script sets while `document.readyState` is still `loading`. Measured on the failing click: index 2, flow start 1, previous entry the locker room, `readyState` `loading`. The same history with `readyState` `complete` left the report. Chrome drops `history.go` while the document is loading, and a click before the button is wired never calls `exitFlow` at all. The script now wires the button as soon as it runs (`data-exit-wired`). The test clicks that button only after `readyState` is `complete`. `exitFlow` still queues the jump until the load event and the following macrotask when a click does land early, then `history.go`s to the recorded locker-room index.
+
+The standings browser Back had the same ignored traversal. `goBack` during the team-view load did nothing. The page is already `franchise-command-center.html`, so a pathname poll passed while the tab was still `team-view`. That Back now waits for `complete` and polls the tab.
+
+`node --test tests/test_gob_nav.js`: 30 passed, including the deferred exit replace and the load-wait jump.
+
+Five runs of `navigation-fixes-3.spec.js`, workers=1, 9 passed each: 3.6m, 2.9m, 2.1m, 2.2m, 1.9m. Earlier attempts on port 8000 died with `ERR_CONNECTION_REFUSED` because another worktree's `seed_and_serve.py` was already bound there; those runs were discarded. The five greens used port 8001.
+
+### Full suite
+
+`tests/e2e`, workers=1, `desktop-*` ignored: 425 passed, 48 failed, 1 skipped, 14.5m. `navigation-fixes-3` and `shell-1` are not in the failures. The 48 fail on their own and are outside this diff. `fcc-invite-step` evals `updatePlayButton`, which is now a one-line delegate to `GOBAdvance`, so the extracted stub leaves the button on "Run Training". The roster tab has a DEV FOCUS column the column-order spec does not expect. `homepage-v3.html` no longer redirects. The season-advance spec searches source for a call that is no longer in that file.
+
+STATUS: COMPLETE

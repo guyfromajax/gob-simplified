@@ -386,10 +386,29 @@
       if (exitHere) applyExitTab(exit.tab || 'home-tab');
       removeKey(RELOAD_KEY);
       showReturnCover();
-      // Replace, rather than reload, so the browser drops every entry in front
-      // of this one. Forward must not walk back into the finished flow.
-      win.location.replace(currentUrl());
+      // This document is the bfcache snapshot. Advance is already enabled on it,
+      // so a Back that runs before the replace commits is dropped and the next
+      // entry is still the locker room. Hold Advance until the replacement
+      // document loads.
+      // A replace inside this pageshow is stored as a second locker-room entry,
+      // so one Back stays on the locker room. Schedule it after the traversal
+      // commits. That replace, not a reload, drops every entry in front so
+      // Forward cannot walk back into the finished flow.
+      holdAdvanceUntilReload();
+      var url = currentUrl();
+      // Only the exit landing defers. A replace inside that pageshow is stored
+      // as a second locker-room entry, so one Back stays on the locker room.
+      // A flow-start return (training, lineup) keeps the synchronous replace.
+      if (exitHere && typeof win.setTimeout === 'function') win.setTimeout(function () { win.location.replace(url); }, 0);
+      else win.location.replace(url);
       return true;
+    }
+
+    function holdAdvanceUntilReload() {
+      var doc = win.document;
+      if (!doc || typeof doc.getElementById !== 'function') return;
+      var play = doc.getElementById('play-now');
+      if (play) play.disabled = true;
     }
 
     function go(url) {
@@ -484,6 +503,27 @@
       return true;
     }
 
+    // Chrome drops history.go while this document's load is still in progress,
+    // including a go issued inside the load event itself. The training report
+    // button is in the first HTML chunk, so a click can land before onload
+    // and the jump back to the locker room never starts.
+    function goWhenSettled(delta) {
+      function run() {
+        if (typeof win.setTimeout === 'function') {
+          win.setTimeout(function () { win.history.go(delta); }, 0);
+          return;
+        }
+        win.history.go(delta);
+      }
+      var doc = win.document;
+      var state = doc && doc.readyState;
+      if ((state === 'loading' || state === 'interactive') && typeof win.addEventListener === 'function') {
+        win.addEventListener('load', run);
+        return;
+      }
+      run();
+    }
+
     function exitFlow(hubUrl, options) {
       options = options || {};
       var locker = isFccPath(hubUrl);
@@ -495,7 +535,7 @@
         if (locker) writeExitMarker(hub, tab);
         removeKey(FLOW_START_KEY);
         writeIdx(start.idx);
-        win.history.go(start.idx - current);
+        goWhenSettled(start.idx - current);
         return;
       }
       if (start && typeof current === 'number' && current === start.idx) {
