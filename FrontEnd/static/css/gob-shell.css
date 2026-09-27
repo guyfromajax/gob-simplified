@@ -584,6 +584,17 @@ html.gob-shell .main .gob-wide-wrap.is-fade-left.is-fade-right {
   mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
 }
 
+/* The pool already scrolls inside .pool-scroll. The wide-table mask on that
+   box paints a hole over the phase strip and the filter row, and
+   contain:inline-size collapses the column so the story and filters stop
+   short of the phase strip. Keep the horizontal scroll. Drop the mask and
+   the containment. */
+html.gob-shell .main .pool-scroll.gob-wide-wrap {
+  contain: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
 /* Page shells sized themselves with 100vw, which ignores the rail and runs
    past .main. Under the shell, content width is .main minus page padding.
    Wide tables keep their min-width and scroll inside their own wrap. */
@@ -603,6 +614,29 @@ html.gob-shell .main .hub-root {
   margin-left: 0 !important;
   margin-right: 0 !important;
   box-sizing: border-box;
+}
+
+/* The section h1 is the title. The hub does not draw a second card or a
+   second "Recruiting Hub" heading. The phase strip is the first content,
+   8px under the row hairline (the head's own padding). */
+html.gob-shell .main .spine {
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.gob-shell .main .spine-phase {
+  padding: 0 20px;
+}
+
+html.gob-shell .main .spine-switch {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 8px;
 }
 
 html.gob-shell .main .scroll-x,

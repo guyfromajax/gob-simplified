@@ -2371,30 +2371,27 @@
     var root = document.getElementById('hub-root');
     var signing = state.phase === 'day', results = state.phase === 'results';
     var body = shellBodyHtml();
-    root.innerHTML =
-      '<div class="spine-topbar"><span class="spine-h">Recruiting <b>Hub</b></span><span id="hub-anchor-mount"></span></div>' +
-      '<div class="spine-topbar" style="padding-top:12px;padding-bottom:0"><div style="flex:1" id="hub-phase"></div></div>' + body;
+    // The section h1 already says Recruiting. Pool and Leans show the pool on the
+    // page, and Visits and Results have nothing to jump to. Signing Day is the
+    // exception: My Orders replaces the pool, so the Recruit Pool / My Orders
+    // switch stays.
+    root.innerHTML = (signing ? '<div class="spine-switch" id="hub-anchor-mount"></div>' : '') +
+      '<div class="spine-phase" id="hub-phase"></div>' + body;
     var phaseHost = document.getElementById('hub-phase');
     phaseHost.innerHTML = Spine.Phase.stripHtml({ phase: state.phase, week: state.week,
       inviteSent: Math.max(0, INVITE_WEEKS.filter(function (w) { return w < state.week; }).length),
       points: remaining() });
     Spine.Phase.bind(phaseHost);
-    var mount = document.getElementById('hub-anchor-mount');
-    // Signing Day pairs the pool anchor with a My Orders view: the same two things the
-    // screen is about, switched from one place. Outside Signing Day there is no orders
-    // view to switch to, so the anchor stands alone as before.
-    mount.innerHTML = Spine.Anchor.html()
-      + (signing
-        ? '<button class="hub-anchor hub-anchor--orders' + (state.sView === 'orders' ? ' is-on' : '') +
-          '" id="hub-orders-toggle" type="button" aria-pressed="' + (state.sView === 'orders' ? 'true' : 'false') +
-          '"><span class="ic">◧</span> My Orders</button>'
-        : '');
-    Spine.Anchor.bind(mount.querySelector('.hub-anchor'), {
-      poolSelector: signing ? '.spool' : results ? '.signings-wrap' : '.pool-wrap',
-      onDismiss: null   // weekly-results panel is persistent now; the anchor only scrolls to the pool
-    });
     if (signing) {
-      // The pool anchor is also the way back: pressing it leaves the orders-only view.
+      var mount = document.getElementById('hub-anchor-mount');
+      mount.innerHTML = Spine.Anchor.html() +
+        '<button class="hub-anchor hub-anchor--orders' + (state.sView === 'orders' ? ' is-on' : '') +
+        '" id="hub-orders-toggle" type="button" aria-pressed="' + (state.sView === 'orders' ? 'true' : 'false') +
+        '"><span class="ic">◧</span> My Orders</button>';
+      Spine.Anchor.bind(mount.querySelector('.hub-anchor'), {
+        poolSelector: '.spool',
+        onDismiss: null
+      });
       var poolBtn = mount.querySelector('.hub-anchor:not(.hub-anchor--orders)');
       if (poolBtn) poolBtn.addEventListener('click', function () { setSignView('pool'); });
       var ordersBtn = document.getElementById('hub-orders-toggle');

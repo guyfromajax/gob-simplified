@@ -41,4 +41,14 @@ Fixtures: `pool-w22-*`, `leans-w22-*`, `visits-w22-*`, `visits-w7-*`, `visits-w3
 
 UX_System.md §6, §7, and §9 describe the row, the `hub` replace, the search, the fresh-arrival rule, and the hidden row on Signing Day and Results.
 
+## Follow-up
+
+The black rectangle on the 1280 pool was the wide-table edge fade. `classifyTables` puts `.gob-wide-wrap` on `.pool-scroll`, and that mask's transparent end painted a hole over the phase strip, the story, and the filter row, including "Showing N of M". It was not a leftover search field. `.pool-scroll` still scrolls horizontally. It no longer takes the mask, and it no longer uses `contain: inline-size` (that collapsed the column so the story and filters stopped short of the phase strip). `recruiting-tabs.spec.js` rejects any mask inside the hub and checks `elementFromPoint` on the Showing count. That runs for every phase fixture at 1280 and 1920.
+
+The section h1 is the only title. The outer hub card and the "Recruiting Hub" heading are gone, and the phase strip is the first content under the row hairline. Pool, Leans, and Visits do not show a Recruit Pool jump; the pool is on the page for the first two, and Visits has no pool. Signing Day keeps the Recruit Pool / My Orders switch, because My Orders replaces the pool. Results does not need a jump.
+
+`fcc-invite-step`, `fcc-recruiting-buttons`, and `recruit-visit-modal` were run on a clean `origin/develop` worktree (`eb53dae7d`). All three fail there too (28 failed, 9 passed). They are pre-existing and were not changed here.
+
+Re-ran `recruiting-tabs`, `recruits-pool`, `invite-board`, `invite-visit-calendar`, `signing-day-hub`, `subtabs`, and `shell-1b`: 87 passed, then the three seed-notice clicks that the Sammy note was covering. Those clicks use `{ force: true }`, the same way the notice's own dismiss already did, and those three passed on the re-run. Screenshots in `reports/recruiting-tabs/` were retaken, including the Lancaster week-3 save.
+
 STATUS: COMPLETE

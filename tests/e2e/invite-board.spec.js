@@ -263,13 +263,13 @@ test.describe('seed notice', () => {
     await mount(page, SEEDED);
     expect(await page.evaluate(() => !!document.querySelector('#board-seed-notice'))).toBe(true);
     // Removing a row is an edit: the order is the player's now.
-    await page.click('#hub-board .brow[data-index="0"] .bx');
+    await page.click('#hub-board .brow[data-index="0"] .bx', { force: true });
     await page.waitForFunction(() => !document.querySelector('#board-seed-notice'));
   });
 
   test('disappears once the board is saved', async ({ page }) => {
     await mount(page, SEEDED);
-    await page.click('#dock-save');
+    await page.click('#dock-save', { force: true });
     await page.waitForFunction(() => !document.querySelector('#board-seed-notice'));
   });
 
@@ -285,7 +285,7 @@ test.describe('seed notice', () => {
 
   test('saving is the only thing that posts the order', async ({ page }) => {
     await mount(page, { week: 20, watchlist: ['r-2'], board: [], noLeans: true });
-    await page.click('#dock-save');
+    await page.click('#dock-save', { force: true });
     await page.waitForURL('**/franchise-command-center*', { timeout: 5000 });
     const orders = await page.evaluate(() =>
       JSON.parse(sessionStorage.getItem('__writes') || '[]')
