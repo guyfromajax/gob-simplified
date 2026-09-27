@@ -535,9 +535,20 @@ html.gob-shell .main #tr-scroll.gob-wide-wrap {
   box-sizing: border-box;
 }
 
-html.gob-shell .main .gob-wide-wrap thead th {
+html.gob-shell .main .gob-wide-wrap thead th,
+html.gob-shell .main .gob-xs thead th {
   position: static !important;
   top: auto !important;
+}
+
+html.gob-shell .main .gob-xs {
+  overflow-x: auto !important;
+  overflow-y: clip !important;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  contain: inline-size;
+  box-sizing: border-box;
 }
 
 html.gob-shell .main .gob-wide-wrap.is-fade-right {

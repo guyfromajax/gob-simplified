@@ -36,7 +36,7 @@ function initCommandCenterTabs(options) {
   if (!tabButtons.length || !tabContents.length) return;
 
   var urlParams = liveParams();
-  var activeTab = urlParams.get('tab') || defaultTab;
+  var activeTab = canonicalTab(urlParams.get('tab') || defaultTab);
 
   function isKnown(tabName) {
     if (!tabName) return false;
@@ -63,7 +63,14 @@ function initCommandCenterTabs(options) {
     } catch (err) { /* ignore */ }
   }
 
+  function canonicalTab(tabName) {
+    if (tabName === 'roster-tab') return 'roster-view';
+    if (tabName === 'team-stats-tab') return 'team-attributes-view';
+    return tabName;
+  }
+
   function show(tabName, historyMode) {
+    tabName = canonicalTab(tabName);
     if (!isKnown(tabName)) tabName = defaultTab;
     if (window.GOB_BUILD_PROFILE === 'desktop' && window.FranchiseContext && typeof window.FranchiseContext.set === 'function') {
       window.FranchiseContext.set('tab', tabName);
@@ -100,7 +107,7 @@ function initCommandCenterTabs(options) {
 
   function showTabFromUrl() {
     var bag = liveParams();
-    var tabName = bag.get('tab') || defaultTab;
+    var tabName = canonicalTab(bag.get('tab') || defaultTab);
     if (!isKnown(tabName)) tabName = defaultTab;
     setActive(tabName);
     onTabShow(tabName);

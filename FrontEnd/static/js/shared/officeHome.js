@@ -149,8 +149,11 @@
   function teamHref(teamId) {
     if (!present(teamId)) return '';
     var current = new URLSearchParams(global.location.search);
-    var params = { team_id: teamId };
+    var params = { roster_team_id: teamId, return_tab: 'home-tab' };
     if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
+    var owner = current.get('team_id') || current.get('user_team_id');
+    if (owner) params.team_id = owner;
+    else params.team_id = teamId;
     return href('/team-roster-view.html', params);
   }
 
@@ -393,7 +396,14 @@
     var node = el('span', 'attr-chip');
     node.title = parts.title;
     node.appendChild(el('b', 'attr-code', parts.code));
-    node.appendChild(el('b', 'tdig ' + digitClass(change.to), String(change.to)));
+    var tiles = global.GOB_AttrTiles;
+    if (tiles && typeof tiles.tileHtml === 'function') {
+      var holder = el('span');
+      holder.innerHTML = tiles.tileHtml(parts.code, change.to, false);
+      if (holder.firstChild) node.appendChild(holder.firstChild);
+    } else {
+      node.appendChild(el('b', 'tdig ' + digitClass(change.to), String(change.to)));
+    }
     node.appendChild(el('i', 'arr ' + (change.delta > 0 ? 'up' : 'down'), change.delta > 0 ? '▲' : '▼'));
     return node;
   }

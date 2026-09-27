@@ -241,7 +241,7 @@ test('rankings opens in place, stays cached, and restores history', async ({ pag
     });
     const scrollBeforeLeave = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);
     await mouseClick(page, link);
-    await page.waitForURL(/team-roster-view\.html/);
+    await page.waitForURL(/tab=roster-view/);
     await page.goBack();
     await page.waitForURL(/tab=rankings-view/);
     await expect(page.locator('#rankings-view.tab-content.active')).toBeVisible();
@@ -354,7 +354,7 @@ test('rankings.html keeps franchise, team, and return params', async ({ page }) 
   await page.goto('/team-roster-view.html?mode=franchise&franchise_id=' + FID + '&team_id=' + TID + '&team_name=Lancaster&return_url=' + encodeURIComponent(backTo));
   await page.waitForSelector('#back-button');
   await mouseClick(page, '#back-button');
-  await page.waitForURL(/franchise-command-center\.html/);
+  await page.waitForURL(/tab=rankings-view/);
   const returned = new URL(page.url());
   expect(returned.searchParams.get('tab')).toBe('rankings-view');
   expect(returned.searchParams.get('franchise_id')).toBe(FID);

@@ -7160,6 +7160,12 @@ try:
                     "resolved_training_focus": p.get("resolved_training_focus"),
                 } if is_user_team else {}),
             })
+            from BackEnd.utils.roster_display import stamp_roster_player
+            stamp_roster_player(
+                players[-1],
+                on_user_team=bool(is_user_team),
+                stored_position=p.get("position") or (p.get("meta") or {}).get("position"),
+            )
             
             # ✅ DEBUG: Log final attributes for first player (or Kevin Nelson)
             if len(players) == 1 or "Nelson" in player_name:
@@ -7291,6 +7297,12 @@ try:
                             "ps_stats": d.get("ps_season_stats") or {},
                             "is_recruit": False,
                         })
+                        from BackEnd.utils.roster_display import stamp_roster_player
+                        stamp_roster_player(
+                            training_squad[-1],
+                            on_user_team=bool(is_user_team),
+                            stored_position=ts_meta.get("position"),
+                        )
             except Exception:
                 training_squad = []
 
@@ -7341,6 +7353,12 @@ try:
                             "ps_stats": frd_stats.get(s.get("recruit_id"), {}),
                             "is_recruit": True,
                         })
+                        from BackEnd.utils.roster_display import stamp_roster_player
+                        stamp_roster_player(
+                            practice_squad_recruits[-1],
+                            on_user_team=bool(is_user_team),
+                            stored_position=s.get("position"),
+                        )
             except Exception:
                 practice_squad_recruits = []
 
@@ -7384,6 +7402,8 @@ try:
             projected_starting_five = build_enriched_projected_starting_five(
                 players, season_map
             )
+            from BackEnd.utils.roster_display import apply_lineup_roles
+            apply_lineup_roles(players, projected_starting_five)
 
         response_data = {
             "team": team.get("name", match if match else team_identifier),
