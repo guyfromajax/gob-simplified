@@ -73,8 +73,8 @@ test('FCC scope and session wiring use the full roster cache, not top-data summa
 });
 
 test('Player Stats uses one Varsity/Practice Squad scoped table', () => {
-  expect(FCC_HTML).toContain('data-player-stats-scope="varsity"');
-  expect(FCC_HTML).toContain('data-player-stats-scope="practice"');
+  expect(FCC_HTML).toContain('id="player-stats-view"');
+  expect(FCC_HTML).not.toContain('id="player-stats-tab"');
   expect(FCC_HTML).not.toContain('id="ps-stats-table"');
   expect(FCC_SOURCE).toContain("? fccPracticeSquadPlayers()");
   expect(FCC_SOURCE).toContain(": (userRosterDataCache?.players || [])");

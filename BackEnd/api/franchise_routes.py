@@ -11320,6 +11320,17 @@ def national_schedule(franchise_id: str):
     return _build_season_schedule_payload(franchise_id=franchise_id)
 
 
+@router.get("/franchise/schedule/week")
+@browse_cached
+def schedule_week(franchise_id: str, week: Optional[int] = None):
+    """One national week. The season bundle stays in process so the next week is a slice."""
+    if week is not None and (week < 1 or week > 34):
+        raise HTTPException(status_code=422, detail="week must be from 1 to 34")
+    from BackEnd.utils.schedule_browse import build_schedule_week
+
+    return build_schedule_week(franchise_id, week, _build_eos_schedule_payload)
+
+
 @router.get("/franchise/league-news")
 def franchise_league_news(
     franchise_id: str,

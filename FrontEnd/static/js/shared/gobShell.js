@@ -27,7 +27,7 @@
       { id: 'roster-view', label: 'Roster' },
       { id: 'player-stats-view', label: 'Player Stats' },
       { id: 'team-attributes-view', label: 'Team Attributes' },
-      { id: 'schedule-tab', label: 'Schedule' }
+      { id: 'team-schedule-view', label: 'Schedule' }
     ]},
     { id: 'prep', label: 'Prep', title: 'Prep', icon: 'prep', tabs: [
       { id: 'training-tab', label: 'Training' },
@@ -40,7 +40,7 @@
       { id: 'rankings-view', label: 'Rankings' },
       { id: 'leaders-view', label: 'Leaders' },
       { id: 'team-stats-view', label: 'Team Stats' },
-      { id: 'schedule-page', label: 'Schedule', link: 'schedule' },
+      { id: 'league-schedule-view', label: 'Schedule' },
       { id: 'practice-squad', label: 'Practice Squad', link: 'practice' },
       { id: 'brackets', label: 'Tournament', link: 'brackets', lock: 'tournament' }
     ]},
@@ -64,6 +64,7 @@
     'team-stats-tab': 'team',
     'team-attributes-view': 'team',
     'schedule-tab': 'team',
+    'team-schedule-view': 'team',
     'training-tab': 'prep',
     'game-plan-tab': 'prep',
     'playbooks-tab': 'prep',
@@ -73,6 +74,8 @@
     'rankings-view': 'league',
     'leaders-view': 'league',
     'team-stats-view': 'league',
+    'league-schedule-view': 'league',
+    'schedule-page': 'league',
     'fcc-team-stats-summary-tab': 'league',
     'awards-tab': 'league',
     'press-tab': 'news'
@@ -131,6 +134,7 @@
   function currentTab() {
     var urlTab = tabFromUrl();
     if (urlTab === 'recruits-tab') return 'home-tab';
+    if (urlTab === 'schedule-tab') return 'team-schedule-view';
     var actives = document.querySelectorAll('#tournament-tabs > .tab-content.active');
     var i;
     if (urlTab) {

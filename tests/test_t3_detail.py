@@ -255,6 +255,8 @@ def test_team_detail_record_place_and_a_team_with_no_games_left():
         "opponent_name": "Four-Corners",
         "opponent_primary_color": "#445566",
         "opponent_natl_rank": 21,
+        "opponent_wins": 1,
+        "opponent_losses": 1,
     }]
 
     done = client.get("/franchise/team-detail", params={"franchise_id": fid, "team_id": str(DONE)})

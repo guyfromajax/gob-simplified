@@ -102,7 +102,7 @@ Rail and sub-tab clicks play `click-tiny.wav` through `playSfx`. Advance does no
 - In-app flows (Play Game, Run Training, and the other Advance routes) still return to the locker-room entry via `exitFlow`. That collapse is separate from the section stack.
 - `exitFlow` jumps back to the locker-room index that launched the flow. In-app Back uses `history.back()` only when the previous entry is that parent.
 
-Old `?tab=` values still open the matching section and sub-tab. `schedule-tab` is Team › Schedule. `fcc-team-stats-summary-tab` is League › Team Stats. `recruits-tab` opens Office (`home-tab`). Each tab's `onTabShow` lazy-load still runs.
+Old `?tab=` values still open the matching section and sub-tab. `schedule-tab` opens Team › Schedule (`team-schedule-view`). `fcc-team-stats-summary-tab` is League › Team Stats. `recruits-tab` opens Office (`home-tab`). Each tab's `onTabShow` lazy-load still runs.
 
 The shared tab module also serves any other command center that calls `initCommandCenterTabs`. Button clicks there stay on `replace`. Do not make those clicks push.
 
@@ -114,7 +114,7 @@ The shared tab module also serves any other command center that calls `initComma
 | Team | Roster | `roster-view` (in-page module view; `team-roster-view.html` redirects here and keeps `franchise_id`, `team_id`, `roster_team_id`, and return params). `?tab=roster-tab` opens this view. |
 | Team | Player Stats | `player-stats-view` (in-page module view). `?tab=player-stats-tab` opens this view. |
 | Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
-| Team | Schedule | `schedule-tab` (the user team's schedule) |
+| Team | Schedule | `team-schedule-view` (in-page module view). `?tab=schedule-tab` opens this view. Weeks 1–26, then the three tournament labels. The bracket stays on League › Tournament. |
 | Prep | Training | `training-tab` |
 | Prep | Game Plan | `game-plan-tab` |
 | Prep | Playbooks | `playbooks-tab` |
@@ -123,7 +123,7 @@ The shared tab module also serves any other command center that calls `initComma
 | League | Rankings | `rankings-view` (in-page module view; `rankings.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
 | League | Leaders | `leaders-view` (in-page module view; `leaders.html` redirects here). `?tab=awards-tab` still opens the old panel. |
 | League | Team Stats | `team-stats-view` (in-page module view; `team-stats.html` redirects here). `?tab=fcc-team-stats-summary-tab` still opens the old panel. |
-| League | Schedule | existing `#schedule-full-link` (`schedule.html` with `franchise_id`, `team_id`, `return_url`) |
+| League | Schedule | `league-schedule-view` (in-page module view; `schedule.html` redirects here and keeps `franchise_id`, `team_id`, `week`, and return params). |
 | League | Practice Squad | existing `#fcc-ps-season-link` (`practice-squad-standings.html`, `franchise_id` and `team_id`) |
 | League | Tournament | existing `brackets.html` href, or the same resource query already on the rankings link. Before the first week `GOBTierEmblem.tierForWeek` returns a tier, the control is disabled: same shape, `--text-38`, `not-allowed`, not focusable, title `Opens Week N`. |
 | Recruiting | Pool, Leans, Visits | `recruiting.html?hub=pool\|leans\|visits` via `openRecruitingSurface` / `GOBNav.go` from the rail (`franchise_id`, `team_id`, `from=fcc`, `return_url`). The sub-tab replaces `hub` on that same document. The name search sits in `.pg-tools` as `.gob-search` ("Search name…", `/` to focus). Weeks 35 and 36 hide the row; the sign board or the results list is the page. Focus mode hides the head, including the row. An old `?tab=recruits-tab` deep link opens `home-tab`. |
@@ -169,7 +169,7 @@ env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HO
 | franchise-command-center.html | browse | per tab | per tab |
 | recruiting.html | browse, or focus while that week's invites, Signing Day orders, or `action=run` are the task | Recruiting | Pool, Leans, or Visits (`hub`). The row is hidden on Signing Day and Results, and while focus hides the head. |
 | rankings.html | redirect to `franchise-command-center.html?tab=rankings-view` | League | Rankings |
-| schedule.html | browse | League | Schedule |
+| schedule.html | redirect to `franchise-command-center.html?tab=league-schedule-view` | League | Schedule |
 | practice-squad-standings.html | browse | League | Practice Squad |
 | practice-squad-bracket.html | browse | League | Practice Squad |
 | brackets.html | browse | League | Tournament |
@@ -326,7 +326,7 @@ Career Leaders keep the older rule for FG% and DEF%: attempts at least 5 times t
 
 A view is a section of the franchise app that lives at `franchise-command-center.html?tab=<view-id>`. That is the same URL rule as today's in-page tabs. Rail clicks still push. Sub-tabs still replace. Back restores the view and the scroll position `GOBNav` already stores. There is no second URL scheme.
 
-The Office stays a panel already in the page. Roster, Team Attributes, Standings, Rankings, Leaders, and Team Stats are module views. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant. The old Roster and Team Measures panels remain in the page. `?tab=roster-tab` and `?tab=team-stats-tab` open the new views. An old Standings, Leaders, or Team Stats `?tab=` still opens the old panel.
+The Office stays a panel already in the page. Roster, Player Stats, Team Attributes, Team Schedule, Standings, Rankings, Leaders, Team Stats, and League Schedule are module views. A module view is the same kind of panel, loaded the first time it opens and left mounted so the next open is instant. The old Roster and Team Measures panels remain in the page. `?tab=roster-tab` and `?tab=team-stats-tab` open the new views. An old Standings, Leaders, or Team Stats `?tab=` still opens the old panel. Team › Schedule reads `GET /franchise/team-detail`. League › Schedule reads `GET /franchise/schedule/week` (`@browse_cached`, one week). The whole-season national route stays for other callers. The next-game row on the team table is a neutral tint. Navy (`tr.me`) is only the user's game on the league week, the same mark the Office uses for the user's team. The league row reads Away, the score, Home, then a quiet Box score link. The team row is Week, Site, Opponent, Result, Box score. Both tables fill the card. The name columns take the spare width, and the short columns stay compact.
 
 ### Add a module view
 
@@ -383,8 +383,8 @@ Opening a player from Roster writes `gob-view-roster-order` in `sessionStorage`:
 | `natl_rank` | Current `franchise_team_data.natl_rank`. |
 | `conference_place` | `1st of 8`. Place is `standings_display_sort_key` only (wins, then point differential). The size is the number of franchise teams in that conference. Null when the team has no conference. |
 | `streak` | `W4` or `L1` from `current_streaks`. Null when the team has no decided game. A tie ends the streak. |
-| `next_game` | The next schedule game that has no result. Null when none remain. `{week, site, opponent_id, opponent_name, opponent_primary_color, opponent_natl_rank}`. `site` is `home` or `away`. Opponent rank is that team's current national rank. |
-| `results` | Completed games, newest week first. The next-game fields plus `team_score`, `opp_score`, and `result` (`W` or `L`). A tie has `result` null. |
+| `next_game` | The next schedule game that has no result. Null when none remain. `{week, site, opponent_id, opponent_name, opponent_primary_color, opponent_natl_rank, opponent_wins, opponent_losses}`. `site` is `home` or `away`. Opponent rank is that team's current national rank. Wins and losses come from `calculate_franchise_standings`. |
+| `results` | Completed games, newest week first. The next-game fields plus `team_score`, `opp_score`, and `result` (`W` or `L`). A tie has `result` null. `game_id` is set when a played game document matches the matchup. |
 | `upcoming` | Later unplayed schedule games, same shape as `next_game`, not including `next_game`. |
 
 No stored tip time, neutral site, or hometown. Those stay off the page.

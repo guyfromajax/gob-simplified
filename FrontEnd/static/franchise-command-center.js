@@ -1827,9 +1827,12 @@ function bindResourcesLinks() {
   const standingsFullLink = document.getElementById('standings-full-link');
   if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
   const scheduleFullLink = document.getElementById('schedule-full-link');
-  if (scheduleFullLink) scheduleFullLink.href = `/schedule.html${q()}`;
+  const leagueScheduleHref = q()
+    ? `/franchise-command-center.html${q()}&tab=league-schedule-view`
+    : '/franchise-command-center.html?tab=league-schedule-view';
+  if (scheduleFullLink) scheduleFullLink.href = leagueScheduleHref;
   const tournamentScheduleLink = document.getElementById('tournament-schedule-link');
-  if (tournamentScheduleLink) tournamentScheduleLink.href = `/schedule.html${q()}`;
+  if (tournamentScheduleLink) tournamentScheduleLink.href = leagueScheduleHref;
   const statsNavBtn = document.getElementById('stats-nav-btn');
   if (statsNavBtn) statsNavBtn.dataset.route = '';
   const teamStatsFullLink = document.getElementById('team-stats-full-link');
@@ -1841,7 +1844,9 @@ function bindResourcesLinks() {
   const rStats = document.getElementById('resources-stats');
   if (rStats) rStats.href = `/stats.html${q()}`;
   const rSchedule = document.getElementById('resources-schedule');
-  if (rSchedule) rSchedule.href = `/schedule.html${q()}`;
+  if (rSchedule) rSchedule.href = q()
+    ? `/franchise-command-center.html${q()}&tab=league-schedule-view`
+    : '/franchise-command-center.html?tab=league-schedule-view';
   const rTraits = document.getElementById('resources-team-traits');
   if (rTraits) rTraits.href = `/team-traits.html${q()}`;
   const rRankings = document.getElementById('resources-rankings');

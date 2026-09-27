@@ -259,6 +259,31 @@ async function installApi(page, data, rich) {
       });
       return;
     }
+    if (pathname.startsWith('/franchise/schedule/week')) {
+      const opp = (rich && rich.opp) || 'bbbbbbbbbbbbbbbbbbbbbbbb';
+      const games = [];
+      for (let i = 0; i < 24; i += 1) {
+        games.push({
+          away: { team_id: opp, name: 'Four Corners', natl_rank: 21, wins: 1, losses: 0, primary_color: '#445566' },
+          home: { team_id: TID, name: 'Lancaster', natl_rank: 4, wins: 1, losses: 0, primary_color: '#112233' },
+          away_score: 60,
+          home_score: 70,
+          status: 'complete',
+          game_id: 'g-box',
+          is_user: i === 0,
+          tournament_context: null,
+        });
+      }
+      await fulfillJson(route, {
+        week: 8,
+        label: 'Week 8',
+        current_week: 8,
+        user_team_id: TID,
+        weeks: [{ week: 8, label: 'Week 8', enabled: true }],
+        games: games,
+      });
+      return;
+    }
     if (rich && pathname.startsWith('/franchise/schedule/national')) {
       const names = {};
       names[TID] = 'Lancaster';
@@ -583,22 +608,14 @@ test('sticky table headers sit on the first row, then pin under the page head', 
     }
     await openPage(page, 'schedule.html', season.data, '', season);
     await page.setViewportSize({ width: size[0], height: size[1] });
-    await page.waitForSelector('.schedule-game-row');
-    expect(await page.locator('.main thead').count()).toBe(0);
-    const scheduleGap = await page.evaluate(() => {
-      const main = document.querySelector('html.gob-shell .main');
-      function gap() {
-        const card = document.querySelector('.schedule-week-card');
-        const title = card.querySelector('.schedule-week-title').getBoundingClientRect();
-        const row = card.querySelector('.schedule-game-row').getBoundingClientRect();
-        return Math.abs(title.bottom - row.top);
-      }
-      main.scrollTop = 0;
-      const atTop = gap();
-      main.scrollTop = 600;
-      return { atTop: atTop, scrolled: gap() };
-    });
-    expect(Math.abs(scheduleGap.atTop - scheduleGap.scrolled), 'schedule ' + size[0]).toBeLessThanOrEqual(1);
+    await page.waitForSelector('#league-schedule-view tbody tr');
+    await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
+    const scheduleTop = await stickyGeometry(page, '#league-schedule-view thead th', '#league-schedule-view tbody tr');
+    expect(scheduleTop.headerToRow, 'schedule ' + size[0] + ' scroll 0').toBeLessThanOrEqual(1);
+    await pinTable(page, '#league-schedule-view table');
+    const scheduleStuck = await stickyGeometry(page, '#league-schedule-view thead th', '#league-schedule-view tbody tr');
+    expect(scheduleStuck.headToHeader, 'schedule ' + size[0] + ' scrolled').toBeLessThanOrEqual(1);
+    expect(scheduleStuck.gapRows, 'schedule ' + size[0] + ' gap').toEqual(0);
   }
 });
 
@@ -729,7 +746,8 @@ test('top bar and rail stay put from Rankings to Schedule to Office', async ({ p
   const before = await chromeRects(page);
   await page.waitForSelector('#gob-subtabs .tb.is-locked');
   await stab(page, 'Schedule').click();
-  await page.waitForURL(/schedule\.html/, { timeout: 15000 });
+  await page.waitForSelector('#league-schedule-view');
+  await expect(page).toHaveURL(/league-schedule-view/);
   fs.mkdirSync(OUT2, { recursive: true });
   await page.screenshot({ path: path.join(OUT2, 'transition-rankings-schedule.png') });
   expect(await chromeRects(page)).toEqual(before);
@@ -737,7 +755,8 @@ test('top bar and rail stay put from Rankings to Schedule to Office', async ({ p
   await page.waitForURL(/franchise-command-center\.html/, { timeout: 15000 });
   expect(await chromeRects(page)).toEqual(before);
   await page.goBack();
-  await page.waitForURL(/schedule\.html/, { timeout: 15000 });
+  await page.waitForSelector('#league-schedule-view');
+  await expect(page).toHaveURL(/league-schedule-view/);
   expect(await chromeRects(page)).toEqual(before);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.reload();
