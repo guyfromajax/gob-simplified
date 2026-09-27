@@ -954,6 +954,26 @@ html.gob-shell .pg-head .tb[aria-disabled="true"]:focus .ltip {
 
 html.gob-shell .pg-head .pg-tools {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+html.gob-shell .pg-head .gob-search {
+  width: 9.5rem;
+  max-width: 36vw;
+  height: 28px;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  background: transparent;
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+html.gob-shell .pg-head .gob-search::placeholder {
+  color: var(--text-38);
 }
 
 html.gob-shell .pg-head .gob-search.is-collapsed {

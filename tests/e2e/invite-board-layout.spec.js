@@ -94,7 +94,7 @@ async function mountPool(page, opts = {}) {
   await page.route('**/', (route) => (route.request().resourceType() === 'document'
     ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
     : route.continue()));
-  await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
+  await page.goto('/?franchise_id=fid-test&team_id=user-team-id&hub=pool');
   await page.setContent(`
     <style>${CSS}</style>
     <style>body{margin:0;background:#0b0d14}.doc{max-width:1180px;margin:0 auto;padding:20px}</style>

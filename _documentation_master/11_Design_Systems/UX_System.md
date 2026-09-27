@@ -70,7 +70,7 @@ Rail order: Office, Team, Prep, League, Recruiting, News, then the utility group
 
 Recruiting carries the existing `.inbox-badge` when `recruitingIsPrompted` is true. That is a presence dot, not a count. Do not pulse it unless a field already says the recruiting task gates Advance. Turning Advance into the recruiting task is the gating; it is not a pulse signal.
 
-Sub-tabs sit in `.pg-head` (sticky title plus `.subtabs`). Office and Recruiting have no sub-tab row. Recruiting is a rail item that leaves the page: it calls the existing `openRecruitingSurface` (`GOBNav.go` to the recruiting URL the app already builds). On the Office, link sub-tabs call `GOBNav.go` with the href the page already built. On a standalone browse page, every sub-tab uses `GOBNav.replace`: an Office tab goes to `franchise-command-center.html?tab=<id>`, and a link sub-tab goes to that standalone page. Rail section clicks on a standalone page `GOBNav.go` to that section's first Office tab (or to recruiting). There is no Players | Team toggle.
+Sub-tabs sit in `.pg-head` (sticky title plus `.subtabs`). Office has no sub-tab row. Recruiting is a rail item that leaves the page: it calls the existing `openRecruitingSurface` (`GOBNav.go` to the recruiting URL the app already builds). On that page the row is Pool, Leans, and Visits. On the Office, link sub-tabs call `GOBNav.go` with the href the page already built. On a standalone browse page, a link sub-tab uses `GOBNav.replace`: an Office tab goes to `franchise-command-center.html?tab=<id>`, and a link sub-tab goes to that standalone page. Recruiting's own Pool, Leans, and Visits stay on `recruiting.html` and do not use `GOBNav.replace`. Rail section clicks on a standalone page `GOBNav.go` to that section's first Office tab (or to recruiting). There is no Players | Team toggle.
 
 Focus mode (`html.gob-focus`): the top bar only — logo, Record, National Rank, Week, and the Settings gear at the right (`#gob-focus-settings`). No rail. No Advance. The settings host anchors at `left: 0` and `top: var(--top-h)`. The page's own primary action and its exit or back control stay, including `exitFlow` back to the locker room.
 
@@ -96,7 +96,7 @@ Rail and sub-tab clicks play `click-tiny.wav` through `playSfx`. Advance does no
 
 - `go(url)` leaves the page. From the franchise command center it records the flow start (unless the destination is a peek), stamps the next index for the following load, and assigns.
 - `pushSection(url)` is the same-page section push. It saves `.main` scroll, increments `gobIdx` on the new history entry immediately, and does not write the pending-index key (the document is not reloading).
-- `replace(url)` keeps the current index and replaces the page. In-page sub-tabs on the Office do not call it. They use `history.replaceState` through `CommandCenterTabs.show(tab, 'replace')` so the franchise page stays one entry. Sub-tabs on a standalone browse page do call `GOBNav.replace`, including the return to an Office tab.
+- `replace(url)` keeps the current index and replaces the page. In-page sub-tabs on the Office do not call it. They use `history.replaceState` through `CommandCenterTabs.show(tab, 'replace')` so the franchise page stays one entry. Link sub-tabs on a standalone browse page do call `GOBNav.replace`, including the return to an Office tab. Recruiting's Pool, Leans, and Visits also stay on one entry: `activateSubtab` writes `hub=pool|leans|visits` with `history.replaceState` and calls `RecruitingHub.show`. It does not call `GOBNav.replace` and it does not call `fccHref`. A reload and a `popstate` read `hub` back into `pageMode.sub`.
 - Rail section clicks call `CommandCenterTabs.show(tab, 'push')`, except Recruiting, which leaves the page with `GOBNav.go`. Sub-tabs call `show(tab, 'replace')`.
 - Browser Back and Forward restore the section, the sub-tab, and the scroll position from `popstate` (`showTabFromUrl` plus `GOBNav.restoreScroll`). Scroll is stored per URL on `.main` when `html.gob-shell` is present, otherwise on the active tab panel.
 - In-app flows (Play Game, Run Training, and the other Advance routes) still return to the locker-room entry via `exitFlow`. That collapse is separate from the section stack.
@@ -126,13 +126,13 @@ The shared tab module also serves any other command center that calls `initComma
 | League | Schedule | existing `#schedule-full-link` (`schedule.html` with `franchise_id`, `team_id`, `return_url`) |
 | League | Practice Squad | existing `#fcc-ps-season-link` (`practice-squad-standings.html`, `franchise_id` and `team_id`) |
 | League | Tournament | existing `brackets.html` href, or the same resource query already on the rankings link. Before the first week `GOBTierEmblem.tierForWeek` returns a tier, the control is disabled: same shape, `--text-38`, `not-allowed`, not focusable, title `Opens Week N`. |
-| Recruiting | (none) | `recruiting.html` via `openRecruitingSurface` / `GOBNav.go` (`franchise_id`, `team_id`, `from=fcc`, `return_url`). An old `?tab=recruits-tab` deep link opens `home-tab`. |
+| Recruiting | Pool, Leans, Visits | `recruiting.html?hub=pool\|leans\|visits` via `openRecruitingSurface` / `GOBNav.go` from the rail (`franchise_id`, `team_id`, `from=fcc`, `return_url`). The sub-tab replaces `hub` on that same document. The name search sits in `.pg-tools` as `.gob-search` ("Search name…", `/` to focus). Weeks 35 and 36 hide the row; the sign board or the results list is the page. Focus mode hides the head, including the row. An old `?tab=recruits-tab` deep link opens `home-tab`. |
 | News | News | `press-tab` |
 | News | Awards | `awards.html` with the resource query already on the rankings link. There is no dedicated awards anchor on the page |
 
 History is not a section.
 
-A fresh Recruiting Hub arrival (not a back/forward restore of filters the user already changed) opens "Leans to me" when `viewCounts().leans` is greater than 0. Otherwise it opens region = `team_region` (the existing "your region" value) and view = all. Filter changes after that stick for the rest of the visit, including a back/forward restore.
+A fresh Recruiting Hub arrival with no `hub` query (not a back/forward restore of filters the user already changed) selects the Leans tab when `viewCounts().leans` is greater than 0. Otherwise it selects Pool and sets region = `team_region` (the existing "your region" value). A reload or `popstate` with `hub` already set restores that tab. Region, position, year, Watchlist, Unranked by me, and the name search stick for the rest of the visit, including a back/forward restore. Weeks 20–26 keep the visit calendar, the weekly results panel, and the invite board on Pool; Leans is that same stack with the pool limited to recruits leaning to the user; Visits is the calendar plus the weekly panel. Weeks 1–19 Visits shows the calendar as a preview ("Invite window opens Week 20") with the seven weeks upcoming. Weeks 27–34 Visits shows `visit_history` for weeks 20–26.
 
 To add a section: add one rail item, one entry in the shell section list, and the `?tab=` ids that belong to it. Default the rail click to the first in-page sub-tab and push. To add a sub-tab: add it under that section. In-page sub-tabs replace. Links use an href the page already builds and `GOBNav.go`. Then update this table.
 
@@ -156,7 +156,7 @@ A page or brief is done only when this file is updated if the shell, the section
 | Page | Mode | Section | Sub-tab |
 |---|---|---|---|
 | franchise-command-center.html | browse | per tab | per tab |
-| recruiting.html | browse, or focus while that week's invites, Signing Day orders, or `action=run` are the task | Recruiting | none |
+| recruiting.html | browse, or focus while that week's invites, Signing Day orders, or `action=run` are the task | Recruiting | Pool, Leans, or Visits (`hub`). The row is hidden on Signing Day and Results, and while focus hides the head. |
 | rankings.html | redirect to `franchise-command-center.html?tab=rankings-view` | League | Rankings |
 | schedule.html | browse | League | Schedule |
 | practice-squad-standings.html | browse | League | Practice Squad |

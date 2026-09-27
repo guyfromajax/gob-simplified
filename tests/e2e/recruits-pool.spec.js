@@ -82,7 +82,7 @@ async function mountPool(page, opts = {}) {
   await page.route('**/', (route) => (route.request().resourceType() === 'document'
     ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
     : route.continue()));
-  await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
+  await page.goto('/?franchise_id=fid-test&team_id=user-team-id&hub=pool');
   await page.setContent(`
     <style>${CSS}</style>
     <style>body{margin:0;background:#0b0d14}.doc{max-width:1180px;margin:0 auto;padding:20px}</style>
@@ -161,7 +161,7 @@ test.describe('450 rows', () => {
   test('re-render on a filter keystroke stays responsive', async ({ page }) => {
     await mountPool(page);
     const ms = await page.evaluate(() => {
-      const input = document.querySelector('#pool-search');
+      const input = document.querySelector('.gob-search');
       const t0 = performance.now();
       input.value = 'Recruit 1';
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -299,9 +299,9 @@ test.describe('filters compose', () => {
     expect(m.shown).toBe(m.rows);
   });
 
-  test('Leans to me view keeps only recruits leaning to the user', async ({ page }) => {
+  test('Leans tab keeps only recruits leaning to the user', async ({ page }) => {
     await mountPool(page);
-    await page.click('#hub-pool .pool-view[data-view="leans"]');
+    await page.evaluate(() => window.RecruitingHub.show('leans'));
     const m = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('#hub-pool tbody tr.rec')];
       return { n: rows.length, allMine: rows.every((r) => r.classList.contains('mine') || r.classList.contains('list-mine')) };
@@ -309,13 +309,15 @@ test.describe('filters compose', () => {
     expect(m.n).toBeGreaterThan(0);
     expect(m.n).toBeLessThan(450);
     expect(m.allMine).toBe(true);
+    await page.evaluate(() => window.RecruitingHub.show('pool'));
+    expect(await rowCount(page)).toBe(450);
   });
 
   test('clicking the active view clears it', async ({ page }) => {
-    await mountPool(page);
-    await page.click('#hub-pool .pool-view[data-view="leans"]');
+    await mountPool(page, { watchlist: ['r-3', 'r-9'] });
+    await page.click('#hub-pool .pool-view[data-view="watch"]');
     const filtered = await rowCount(page);
-    await page.click('#hub-pool .pool-view[data-view="leans"]');
+    await page.click('#hub-pool .pool-view[data-view="watch"]');
     expect(await rowCount(page)).toBe(450);
     expect(filtered).toBeLessThan(450);
   });

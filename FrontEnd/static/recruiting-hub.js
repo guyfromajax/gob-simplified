@@ -46,7 +46,7 @@
     recruits: [], byId: {}, newLeanIds: new Set(),
     board: [],                       // ordered recruit ids (invite phase)
     search: '', region: 'all', pos: 'all', year: 'all',
-    view: 'all',                     // 'all' | 'watch' | 'leans' | 'unranked'
+    view: 'all',                     // toolbar: 'all' | 'watch' | 'unranked'
     watchlist: new Set(),            // unordered, uncapped shortlist of recruit ids
     wire: {},                        // Prompt 1 event log (recruiting_wire payload)
     boardSeeded: false,              // drives the seed notice; cleared on save/reorder
@@ -74,6 +74,9 @@
   // No per-recruit cap: the 50-point budget is the only limit, so every point can go
   // on one recruit if that is the call the coach wants to make.
   var SIGN = { TOTAL: 50, PROMISE_W: 18 };
+  var hubView = 'pool';
+  var hubReady = false;
+  var pendingHub = '';
 
   function boardActive() { return state.phase === 'invite'; }
   function regionOf(rec) { var v = rec && rec.homeRegion ? String(rec.homeRegion).trim().toUpperCase() : ''; return v ? v.charAt(0) : ''; }
@@ -100,8 +103,8 @@
       if (state.region !== 'all' && regionOf(r) !== state.region) return false;
       if (state.pos !== 'all' && String(r.pos).toUpperCase() !== state.pos) return false;
       if (state.year !== 'all' && r.year !== state.year) return false;
+      if (hubView === 'leans' && !r.leansToUser) return false;
       if (state.view === 'watch' && !state.watchlist.has(String(r.recruitId))) return false;
-      if (state.view === 'leans' && !r.leansToUser) return false;
       if (state.view === 'unranked' && state.board.indexOf(r.recruitId) !== -1) return false;
       if (q && String(r.name).toLowerCase().indexOf(q) === -1) return false;
       return true;
@@ -270,8 +273,22 @@
       }));
     } catch (err) {}
   }
+  function readHubParam() {
+    try {
+      var hub = new URLSearchParams(window.location.search).get('hub') || '';
+      if (hub === 'pool' || hub === 'leans' || hub === 'visits') return hub;
+    } catch (err) {}
+    return '';
+  }
+  function publishHub(hub) {
+    hubView = hub;
+    if (window.GOBShell && typeof window.GOBShell.replaceRecruitingHub === 'function') {
+      window.GOBShell.replaceRecruitingHub(hub, { silent: true });
+    }
+  }
   function applyLandingFilters() {
     if (filtersTouched) return;
+    var explicit = readHubParam();
     var back = false;
     try {
       var nav = performance.getEntriesByType('navigation')[0];
@@ -283,12 +300,14 @@
         if (raw) {
           var saved = JSON.parse(raw);
           if (saved && saved.touched) {
-            state.view = saved.view || 'all';
+            var savedView = saved.view || 'all';
+            state.view = (savedView === 'watch' || savedView === 'unranked') ? savedView : 'all';
             state.region = saved.region || 'all';
             state.pos = saved.pos || 'all';
             state.year = saved.year || 'all';
             state.search = typeof saved.search === 'string' ? saved.search : '';
             filtersTouched = true;
+            publishHub(explicit || (saved.view === 'leans' ? 'leans' : 'pool'));
             return;
           }
         }
@@ -296,11 +315,15 @@
     } else {
       try { sessionStorage.removeItem(filterStorageKey()); } catch (err3) {}
     }
+    if (explicit) {
+      publishHub(explicit);
+      return;
+    }
     var counts = viewCounts();
-    if (counts.leans > 0) state.view = 'leans';
-    else if (state.userRegion) {
-      state.view = 'all';
-      state.region = state.userRegion;
+    if (counts.leans > 0) publishHub('leans');
+    else {
+      if (state.userRegion) state.region = state.userRegion;
+      publishHub('pool');
     }
   }
   function viewBtn(value, label, count, iconSvg) {
@@ -317,17 +340,15 @@
       }).join('');
     var posOpts = [{ value: 'all', label: 'All' }].concat(POS_ORDER.map(function (p) { return { value: p, label: p }; }));
     var activeFilters = (state.region !== 'all') + (state.pos !== 'all') + (state.year !== 'all')
-      + (state.view !== 'all') + (state.search.trim() ? 1 : 0);
+      + (state.view !== 'all') + (state.search.trim() ? 1 : 0) + (hubView === 'leans' ? 1 : 0);
     return '<div class="pool-fbar">' +
       '<div class="pool-frow"><span class="pool-flab">Filter</span>' +
         '<span class="pool-sel"><select id="pool-region" aria-label="Region">' + regionOpts + '</select></span>' +
         segHtml('pos', posOpts, state.pos) +
         segHtml('year', YEAR_FILTERS, state.year) +
-        '<input class="pool-srch" id="pool-search" placeholder="Search name…" value="' + Common.escapeHtml(state.search) + '">' +
       '</div>' +
       '<div class="pool-frow"><span class="pool-flab">Views</span>' +
         viewBtn('watch', 'Watchlist', counts.watch, STAR) +
-        viewBtn('leans', 'Leans to me', counts.leans) +
         viewBtn('unranked', 'Unranked by me', counts.unranked) +
         '<span class="pool-fcount">Showing <b>' + shown + '</b> of ' + total +
           (activeFilters ? '' : ' · no filters') + '</span>' +
@@ -344,8 +365,6 @@
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['th', 'td', '.attr-tile']);
   }
   function bindPool(host) {
-    var search = host.querySelector('#pool-search');
-    if (search) search.addEventListener('input', function () { state.search = this.value; noteFilterChange(); renderPoolBodyOnly(); updateCount(); });
     var region = host.querySelector('#pool-region');
     if (region) region.addEventListener('change', function () { state.region = this.value; noteFilterChange(); renderPool(); });
     host.querySelectorAll('.pool-seg button[data-pos]').forEach(function (b) {
@@ -409,6 +428,39 @@
   function updateCount() {
     var el = document.querySelector('#hub-pool .pool-fcount b');
     if (el) el.textContent = filteredRecruits().length;
+  }
+  function mountSearch() {
+    if (state.phase === 'day' || state.phase === 'results') return;
+    var row = document.getElementById('gob-subtabs');
+    var host = (row && !row.hidden) ? row : document.getElementById('hub-root');
+    if (!host) return;
+    document.querySelectorAll('.pg-tools[data-owner="recruiting"]').forEach(function (node) {
+      if (node.parentElement !== host) node.remove();
+    });
+    var existing = host.querySelector('.pg-tools[data-owner="recruiting"] .gob-search');
+    if (existing) {
+      if (document.activeElement !== existing && existing.value !== state.search) existing.value = state.search;
+      return;
+    }
+    var slot = document.createElement('div');
+    slot.className = 'pg-tools';
+    slot.setAttribute('data-owner', 'recruiting');
+    var input = document.createElement('input');
+    input.className = 'gob-search';
+    input.type = 'search';
+    input.placeholder = 'Search name…';
+    input.setAttribute('aria-label', 'Search name…');
+    input.value = state.search;
+    input.addEventListener('input', function () {
+      state.search = input.value;
+      noteFilterChange();
+      if (document.getElementById('hub-pool')) { renderPoolBodyOnly(); updateCount(); }
+    });
+    slot.appendChild(input);
+    host.appendChild(slot);
+    if (row && host === row && window.GOBSubtabs && typeof window.GOBSubtabs.syncTools === 'function') {
+      window.GOBSubtabs.syncTools(row);
+    }
   }
 
   // ---------- watchlist ----------
@@ -2261,38 +2313,64 @@
       '</div>';
   }
 
-  function visitCalendarHtml() {
-    var hist = state.visitHistory || [];
+  function visitCalendarHtml(mode) {
+    var preview = mode === 'preview';
+    var hist = (state.visitHistory || []).slice();
+    if (!hist.length && preview) {
+      hist = INVITE_WEEKS.map(function (w) {
+        return { week: w, recruit_id: null, name: null, lean: null };
+      });
+    }
     if (!hist.length) return '';
+    var title = preview ? 'Invite window opens Week 20' : 'Invite Visits';
     return '<section class="vcal">' +
       // No counter: the seven squares ARE the count, and a number beside them restated
       // what the row already shows.
-      '<div class="vcal-head"><div class="vcal-title">Invite Visits</div></div>' +
+      '<div class="vcal-head"><div class="vcal-title">' + title + '</div></div>' +
       '<div class="vcal-grid">' + hist.map(visitWeekTileHtml).join('') + '</div>' +
       '</section>';
   }
 
   // ===================== SHELL =====================
+  function columnHtml(inner) {
+    return '<div class="spine-body no-dock" style="padding-top:14px">' +
+      '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' + inner + '</div></div>';
+  }
+  function visitsMountHtml() {
+    var mode = 'invite';
+    if (state.phase !== 'invite') mode = state.week < 20 ? 'preview' : 'history';
+    return '<div id="hub-visits" data-vmode="' + mode + '"></div>';
+  }
+  function shellBodyHtml() {
+    if (state.phase === 'day') return '<div class="hub-body-sign" id="hub-sign"></div>';
+    if (state.phase === 'results') return '<div id="hub-signings"></div>';
+    var weekly = showWeeklyPanel() ? '<div id="hub-weekly"></div>' : '';
+    var pool = '<div class="pool-wrap"><div id="hub-pool"></div></div>';
+    if (state.phase === 'invite') {
+      if (hubView === 'visits') return weekly + columnHtml(visitsMountHtml());
+      return weekly + columnHtml(visitsMountHtml() + '<div id="hub-board"></div>' + pool);
+    }
+    if (hubView === 'visits') return columnHtml(visitsMountHtml());
+    return columnHtml((state.phase === 'passive' ? storyHtml() : '') + pool);
+  }
+  function syncHubChrome() {
+    var showRow = state.phase !== 'day' && state.phase !== 'results';
+    if (window.GOBShell && typeof window.GOBShell.setRecruitingTabs === 'function') {
+      window.GOBShell.setRecruitingTabs(showRow);
+      return;
+    }
+    if (showRow) mountSearch();
+  }
+  function showHub(hub) {
+    if (hub !== 'pool' && hub !== 'leans' && hub !== 'visits') hub = 'pool';
+    if (!hubReady) { pendingHub = hub; return; }
+    hubView = hub;
+    renderShell();
+  }
   function renderShell() {
     var root = document.getElementById('hub-root');
     var signing = state.phase === 'day', results = state.phase === 'results';
-    var body;
-    if (signing) body = '<div class="hub-body-sign" id="hub-sign"></div>';
-    else if (results) body = '<div id="hub-signings"></div>';
-    else body =
-      (showWeeklyPanel() ? '<div id="hub-weekly"></div>' : '') +
-      // Single column in every phase. The invite phase used to carry a 306px rail
-      // (This week / Roster capacity) beside the board, which squeezed the pool table
-      // and pushed its Lean and Watch columns out of view — the two columns the pool
-      // exists to be scanned for.
-      '<div class="spine-body no-dock" style="padding-top:14px">' +
-        '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' +
-          (state.phase === 'passive' ? storyHtml() : '') +
-          // Invite phase: the seven-week visit calendar sits ABOVE the board — what the
-          // season has bought, then what is still ranked to buy — with the pool beneath
-          // as the add source.
-          (hasDock() ? '<div id="hub-visits"></div><div id="hub-board"></div>' : '') +
-          '<div class="pool-wrap"><div id="hub-pool"></div></div></div></div>';
+    var body = shellBodyHtml();
     root.innerHTML =
       '<div class="spine-topbar"><span class="spine-h">Recruiting <b>Hub</b></span><span id="hub-anchor-mount"></span></div>' +
       '<div class="spine-topbar" style="padding-top:12px;padding-bottom:0"><div style="flex:1" id="hub-phase"></div></div>' + body;
@@ -2325,10 +2403,18 @@
       });
     }
     var visits = document.getElementById('hub-visits');
-    if (visits) visits.innerHTML = visitCalendarHtml();
-    if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); applySignView(); bindSignBoard(); }
-    else if (results) { renderSignings(); }
-    else { renderPool(); if (hasDock()) renderDock(); if (showWeeklyPanel()) loadWeeklyPanel(); }
+    if (visits) visits.innerHTML = visitCalendarHtml(visits.getAttribute('data-vmode') || 'invite');
+    try {
+      if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); applySignView(); bindSignBoard(); }
+      else if (results) { renderSignings(); }
+      else {
+        if (document.getElementById('hub-pool')) renderPool();
+        if (document.getElementById('hub-board')) renderDock();
+        if (document.getElementById('hub-weekly')) loadWeeklyPanel();
+      }
+    } finally {
+      syncHubChrome();
+    }
   }
 
   // ===================== INIT =====================
@@ -2415,7 +2501,14 @@
         // LAST, so it lays over the server copy, the watchlist seed and the restored
         // week-35 entries alike — an unsubmitted edit is newer than all three.
         restoreDraft();
-        applyLandingFilters();
+        if (pendingHub) {
+          hubView = pendingHub;
+          pendingHub = '';
+          publishHub(hubView);
+        } else {
+          applyLandingFilters();
+        }
+        hubReady = true;
         var canAutoRun = context.action === 'run' && state.phase === 'day' &&
           !state.week35Ran && committedIds().length > 0;
         if (!canAutoRun) {
@@ -2435,6 +2528,16 @@
         if (root) root.innerHTML = '<div class="hub-error">Failed to load recruits.</div>';
       });
   }
+
+  window.RecruitingHub = {
+    show: showHub,
+    current: function () { return hubReady ? hubView : ''; },
+    rowVisible: function () {
+      if (!hubReady) return true;
+      return state.phase !== 'day' && state.phase !== 'results';
+    },
+    mountSearch: mountSearch
+  };
 
   init();
   window.addEventListener('pageshow', function () {

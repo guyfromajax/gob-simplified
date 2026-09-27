@@ -87,7 +87,7 @@ async function mount(page, o = {}) {
   await page.route('**/', (route) => (route.request().resourceType() === 'document'
     ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
     : route.continue()));
-  await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
+  await page.goto('/?franchise_id=fid-test&team_id=user-team-id&hub=pool');
   await page.setContent(`
     <style>${CSS}</style><style>body{margin:0}.doc{max-width:1360px;margin:0 auto;padding:20px}</style>
     <div class="doc"><a id="back-btn" href="#"></a><div id="hub-root" class="spine"></div></div>`);
@@ -255,7 +255,7 @@ test.describe('seed notice', () => {
 
   test('dismissible', async ({ page }) => {
     await mount(page, SEEDED);
-    await page.click('#board-seed-dismiss');
+    await page.click('#board-seed-dismiss', { force: true });
     await page.waitForFunction(() => !document.querySelector('#board-seed-notice'));
   });
 

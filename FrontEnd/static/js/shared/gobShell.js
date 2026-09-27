@@ -44,7 +44,11 @@
       { id: 'practice-squad', label: 'Practice Squad', link: 'practice' },
       { id: 'brackets', label: 'Tournament', link: 'brackets', lock: 'tournament' }
     ]},
-    { id: 'recruiting', label: 'Recruiting', title: 'Recruiting', icon: 'recruiting', go: 'recruiting', tabs: [] },
+    { id: 'recruiting', label: 'Recruiting', title: 'Recruiting', icon: 'recruiting', go: 'recruiting', tabs: [
+      { id: 'pool', label: 'Pool' },
+      { id: 'leans', label: 'Leans' },
+      { id: 'visits', label: 'Visits' }
+    ]},
     { id: 'news', label: 'News', title: 'News', icon: 'news', tabs: [
       { id: 'press-tab', label: 'News' },
       { id: 'awards-page', label: 'Awards', link: 'awards' }
@@ -79,6 +83,7 @@
   var paintedSection = '';
   var currentWeek = 0;
   var pageMode = null;
+  var recruitingRowOff = false;
 
   var PAGES = {
     '/recruiting.html': { kind: 'browse', section: 'recruiting', sub: '', file: 'recruiting' },
@@ -254,8 +259,81 @@
     return section.tabs.filter(function (tab) { return tab.label; });
   }
 
+  function hubFromUrl() {
+    try {
+      var hub = new URLSearchParams(window.location.search).get('hub') || '';
+      if (hub === 'pool' || hub === 'leans' || hub === 'visits') return hub;
+    } catch (err) {}
+    return '';
+  }
+
+  function isRecruitingHubTab(item) {
+    return !!(item && (item.id === 'pool' || item.id === 'leans' || item.id === 'visits'));
+  }
+
+  function recruitingHubHref(hub) {
+    var q = new URLSearchParams(window.location.search);
+    q.set('hub', hub);
+    var search = q.toString();
+    var path = window.location.pathname || '/recruiting.html';
+    return path + (search ? '?' + search : '');
+  }
+
+  function replaceRecruitingHub(hub, opts) {
+    opts = opts || {};
+    if (!pageMode || pageMode.file !== 'recruiting') return;
+    if (hub !== 'pool' && hub !== 'leans' && hub !== 'visits') return;
+    var href = recruitingHubHref(hub);
+    var here = (window.location.pathname || '') + (window.location.search || '');
+    if (here !== href && window.history && window.history.replaceState) {
+      window.history.replaceState(window.history.state, '', href);
+      if (window.GOBNav && typeof window.GOBNav.syncCurrent === 'function') window.GOBNav.syncCurrent();
+    }
+    pageMode.sub = hub;
+    if (subtabHost && !recruitingRowOff) renderSubtabs(sectionById('recruiting'), hub);
+    if (!opts.silent && window.RecruitingHub && typeof window.RecruitingHub.show === 'function') {
+      window.RecruitingHub.show(hub);
+      return;
+    }
+    if (!recruitingRowOff && window.RecruitingHub && typeof window.RecruitingHub.mountSearch === 'function') {
+      window.RecruitingHub.mountSearch();
+    }
+  }
+
+  function setRecruitingTabs(visible) {
+    if (!pageMode || pageMode.file !== 'recruiting' || !subtabHost) return;
+    recruitingRowOff = !visible;
+    if (!visible) {
+      subtabHost.hidden = true;
+      var tools = subtabHost.querySelector('.pg-tools[data-owner="recruiting"]');
+      if (tools) tools.remove();
+      return;
+    }
+    subtabHost.hidden = false;
+    renderSubtabs(sectionById('recruiting'), pageMode.sub || '');
+    if (window.RecruitingHub && typeof window.RecruitingHub.mountSearch === 'function') {
+      window.RecruitingHub.mountSearch();
+    }
+  }
+
+  function onRecruitingPop() {
+    if (!pageMode || pageMode.file !== 'recruiting') return;
+    var hub = hubFromUrl() || 'pool';
+    pageMode.sub = hub;
+    if (subtabHost && !recruitingRowOff) renderSubtabs(sectionById('recruiting'), hub);
+    if (window.RecruitingHub && typeof window.RecruitingHub.show === 'function') {
+      window.RecruitingHub.show(hub);
+    }
+  }
+
   function activateSubtab(item) {
     if (!item || item.lockedWeek) return;
+    if (pageMode && pageMode.file === 'recruiting' && isRecruitingHubTab(item)) {
+      if (pageMode.sub === item.id) return;
+      playClick();
+      replaceRecruitingHub(item.id);
+      return;
+    }
     if (item.link) {
       if (pageMode && pageMode.sub === item.link) return;
       goLink(item.link);
@@ -276,6 +354,10 @@
 
   function renderSubtabs(section, tab) {
     if (!subtabHost || !window.GOBSubtabs) return;
+    if (pageMode && pageMode.file === 'recruiting' && recruitingRowOff) {
+      subtabHost.hidden = true;
+      return;
+    }
     var tabs = labeledTabs(section).map(function (item) {
       var lockedWeek = item.lock === 'tournament' ? tournamentLockWeek() : 0;
       return {
@@ -702,8 +784,12 @@
     syncTop: syncTop,
     syncRecord: paintRecord,
     classifyTables: classifyTables,
-    noteCommandCenter: noteCommandCenter
+    noteCommandCenter: noteCommandCenter,
+    replaceRecruitingHub: replaceRecruitingHub,
+    setRecruitingTabs: setRecruitingTabs
   };
+
+  window.addEventListener('popstate', onRecruitingPop);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
@@ -743,6 +829,7 @@
       file: spec.file || '',
       keepBack: !!spec.keepBack
     };
+    if (out.file === 'recruiting') out.sub = hubFromUrl();
     if (out.section === 'context') out.section = sectionFromReturn();
     return out;
   }
@@ -755,7 +842,25 @@
     });
     if (titleEl) titleEl.textContent = section.title;
     paintedSection = '';
-    renderSubtabs(section, pageMode.sub || '');
+    if (pageMode.file === 'recruiting' && window.RecruitingHub && typeof window.RecruitingHub.rowVisible === 'function' && window.RecruitingHub.rowVisible() === false) {
+      setRecruitingTabs(false);
+      paintedSection = section.id;
+      return;
+    }
+    var sub = pageMode.sub || '';
+    if (pageMode.file === 'recruiting' && !sub && window.RecruitingHub && typeof window.RecruitingHub.current === 'function') {
+      sub = window.RecruitingHub.current() || '';
+      if (sub) {
+        pageMode.sub = sub;
+        replaceRecruitingHub(sub, { silent: true });
+        paintedSection = section.id;
+        return;
+      }
+    }
+    renderSubtabs(section, sub);
+    if (pageMode.file === 'recruiting' && window.RecruitingHub && typeof window.RecruitingHub.mountSearch === 'function') {
+      window.RecruitingHub.mountSearch();
+    }
     paintedSection = section.id;
   }
 

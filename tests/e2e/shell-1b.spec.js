@@ -415,16 +415,21 @@ async function openHub(page, leans) {
 test('recruiting hub lands on leans, otherwise the user region', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openHub(page, true);
-  await expect(page.locator('.pool-view[data-view="leans"]')).toHaveClass(/is-on/);
+  await expect(stab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
+  expect(page.url()).toContain('hub=leans');
+  await expect(page.locator('.pool-view[data-view="leans"]')).toHaveCount(0);
   await page.screenshot({ path: path.join(OUT, 'hub-leans-1280.png') });
-  await mouseClick(page, '.pool-view[data-view="leans"]');
-  await expect(page.locator('.pool-view[data-view="leans"]')).not.toHaveClass(/is-on/);
+  await mouseClick(page, stab(page, 'Pool'));
+  await expect(stab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
+  expect(page.url()).toContain('hub=pool');
   await page.goto('/login.html');
   await page.goBack();
   await page.waitForSelector('#pool-region');
-  await expect(page.locator('.pool-view[data-view="leans"]')).not.toHaveClass(/is-on/);
+  await expect(stab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
+  expect(page.url()).toContain('hub=pool');
 
   await openHub(page, false);
+  await expect(stab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.pool-view.is-on')).toHaveCount(0);
   await expect(page.locator('#pool-region')).toHaveValue('C');
   await expect(page.locator('body')).not.toContainText('Practice Squad');

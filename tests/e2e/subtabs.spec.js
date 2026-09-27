@@ -312,8 +312,10 @@ test('section shots, locked tooltip, more menu, and a detail view', async ({ pag
 
   await page.locator('[data-gob-section="recruiting"]').click();
   await page.waitForURL(/recruiting\.html/);
-  await expect(page.locator('#gob-subtabs .tb')).toHaveCount(0);
-  await expect(page.locator('#gob-subtabs')).toBeHidden();
+  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
+  await expect(tab(page, 'Leans')).toBeVisible();
+  await expect(tab(page, 'Visits')).toBeVisible();
+  await expect(page.locator('#gob-subtabs')).toBeVisible();
 });
 
 test('unselected link tabs have no stray underline', async ({ page }) => {
