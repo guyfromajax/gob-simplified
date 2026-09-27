@@ -113,3 +113,4 @@ Retaken: `save-team`, `save-league`, `fixture-team`, and `fixture-league` at 128
 
 - `tests/test_schedule_week.py` and `tests/test_t3_detail.py`: 7 passed on mongomock, 7 passed on sqlite.
 - `schedule-views` and `t3-detail`: 18 passed, 1 skipped.
+- Full Playwright suite after merging `origin/develop`, workers=1: 495 passed, 2 skipped.
