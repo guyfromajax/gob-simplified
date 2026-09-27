@@ -85,7 +85,7 @@ async function mountPool(page, opts = {}) {
   await page.goto('/?franchise_id=fid-test&team_id=user-team-id&hub=pool');
   await page.setContent(`
     <style>${CSS}</style>
-    <style>body{margin:0;background:#0b0d14}.doc{max-width:1180px;margin:0 auto;padding:20px}</style>
+    <style>body{margin:0;background:#0b0d14}.doc{max-width:${opts.docWidth || 1180}px;margin:0 auto;padding:20px}</style>
     <div class="doc"><a id="back-btn" href="#">Back</a><div id="hub-root" class="spine"></div></div>
   `);
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
@@ -131,16 +131,21 @@ test.describe('450 rows', () => {
   test('all 450 render and the pool scrolls, not the page', async ({ page }) => {
     await mountPool(page);
     expect(await rowCount(page)).toBe(450);
-    expect(await page.locator('#hub-pool tbody tr.gob-rep').count()).toBe(28);
     const m = await page.evaluate(() => {
       const s = document.querySelector('#hub-pool .pool-scroll');
+      const table = document.querySelector('#hub-pool table.pool');
+      const fits = table.scrollWidth <= s.clientWidth + 1;
       return {
         scrollable: s.scrollHeight > s.clientHeight,
         bodyOverflowsX: document.body.scrollWidth > window.innerWidth + 1,
+        fits,
+        reps: document.querySelectorAll('#hub-pool tbody tr.gob-rep').length,
       };
     });
     expect(m.scrollable).toBe(true);
     expect(m.bodyOverflowsX).toBe(false);
+    // Narrow tables drop the 16-row repeat; a table that still overflows keeps all 28.
+    expect(m.reps).toBe(m.fits ? 0 : 28);
   });
 
   test('header stays pinned while the body scrolls', async ({ page }) => {
@@ -283,9 +288,10 @@ test.describe('columns and headers', () => {
     expect(m.condensedClass).toBe(false);
     expect(m.chipsVisible).toBe(12);
     expect(Math.round(m.nameWidth)).toBe(248);
-    // Content-sized. Twelve separate tiles plus the lean ladder run past the
-    // old single Attributes column; the table is still the column sum, not the page.
-    expect(m.tableWidth).toBeGreaterThan(1100);
+    // Column sum, not the page. The harness does not resolve --dsz-30, so the
+    // attribute columns shrink to their content here; in the shell they are 38px
+    // and the passive table is 1140.
+    expect(m.tableWidth).toBeGreaterThan(900);
     expect(m.tableWidth).toBeLessThan(1400);
   });
 
@@ -610,26 +616,65 @@ test.describe('invite phase runs full width (no board rail)', () => {
     expect(m.board).toBe(true);                   // the invite board itself stays
   });
 
-  test('the Lean and Watch columns are rendered, but still overflow (known limitation)', async ({ page }) => {
+  test('at 1280 a passive week shows Lean inside the viewport with no horizontal overflow', async ({ page }) => {
+    await mountPool(page, { week: 7 });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const m = await page.evaluate(() => {
+      const sc = document.querySelector('#hub-pool .pool-scroll');
+      const lean = document.querySelector('#hub-pool tbody tr.rec td.lean-col');
+      const th = document.querySelector('#hub-pool thead th');
+      return {
+        leanRight: lean.getBoundingClientRect().right,
+        inner: window.innerWidth,
+        overflow: sc.scrollWidth - sc.clientWidth,
+        reps: document.querySelectorAll('#hub-pool tbody tr.gob-rep').length,
+        sticky: getComputedStyle(th).position,
+        backdrop: getComputedStyle(th).backdropFilter,
+      };
+    });
+    expect(m.leanRight).toBeLessThanOrEqual(m.inner + 1);
+    expect(m.overflow).toBeLessThanOrEqual(1);
+    expect(m.reps).toBe(0);
+    expect(m.sticky).toBe('sticky');
+    expect(m.backdrop).toBe('none');
+  });
+
+  test('a table wider than its scrollport keeps the repeated header', async ({ page }) => {
+    await mountPool(page, { week: 7, docWidth: 640 });
+    const m = await page.evaluate(() => {
+      const sc = document.querySelector('#hub-pool .pool-scroll');
+      return {
+        overflow: sc.scrollWidth - sc.clientWidth,
+        reps: document.querySelectorAll('#hub-pool tbody tr.gob-rep').length,
+      };
+    });
+    expect(m.overflow).toBeGreaterThan(1);
+    expect(m.reps).toBe(28);
+  });
+
+  test('Lean stays on screen when the invite column is open', async ({ page }) => {
     await mountPool(page, { week: 22 });
     const m = await page.evaluate(() => {
       const sc = document.querySelector('#hub-pool .pool-scroll');
-      const heads = [...document.querySelectorAll('#hub-pool thead th')].map((h) => h.className);
+      const lean = document.querySelector('#hub-pool tbody tr.rec td.lean-col');
+      const box = sc.getBoundingClientRect();
+      const fits = sc.scrollWidth <= sc.clientWidth + 1;
       return {
-        hasLean: heads.some((c) => c.includes('lean')),
-        hasWatch: heads.some((c) => c.includes('watch')),
-        client: sc.clientWidth,
+        hasLean: !!document.querySelector('#hub-pool thead th.lean-h'),
+        hasWatch: !!document.querySelector('#hub-pool thead th.watch-col'),
+        hasAdd: !!document.querySelector('#hub-pool thead th.act'),
+        leanInside: lean.getBoundingClientRect().right <= box.left + sc.clientWidth + 1,
         overflowBy: sc.scrollWidth - sc.clientWidth,
+        reps: document.querySelectorAll('#hub-pool tbody tr.gob-rep').length,
+        fits,
       };
     });
-    // Both columns exist and are reachable by scrolling .pool-scroll.
     expect(m.hasLean).toBe(true);
     expect(m.hasWatch).toBe(true);
-
-    // The grouped grid is wider than the card, so it scrolls inside .pool-scroll.
-    // Watch is the first column now; Lean and the invite cell sit at the right edge.
-    expect(m.overflowBy).toBeGreaterThan(0);
+    expect(m.hasAdd).toBe(true);
+    expect(m.leanInside).toBe(true);
     expect(m.overflowBy).toBeLessThan(320);
+    expect(m.reps).toBe(m.fits ? 0 : 28);
   });
 
   test('the passive phase is unchanged — it never had a rail', async ({ page }) => {

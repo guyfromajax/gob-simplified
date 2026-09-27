@@ -210,9 +210,10 @@ a{color:var(--orange);text-decoration:none}a:hover{color:#ffb454}
 .pool-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:6px;border:2px solid var(--panel)}
 .pool-scroll::-webkit-scrollbar-track{background:transparent}
 
-/* Sizes to its CONTENT (~1030px), not to the container. A stretched table opens dead
-   space between the name and Pos; the name column is capped rather than flexed. */
-table.pool{border-collapse:collapse;font-size:12px;width:max-content;min-width:100%;table-layout:fixed}
+/* Sizes to its columns. A min-width of 100% used to stretch the spare viewport
+   into the gaps between columns; the columns are capped, so a wider window
+   leaves that spare space beside the table. */
+table.pool{border-collapse:collapse;font-size:12px;width:max-content;table-layout:fixed}
 /* No backdrop-filter. The wide-table wrap clips overflow-y, and that clip plus a
    header backdrop drops the first body row's RT, tiles, and lean from the painted
    layer. The cells stay in the DOM and still hit-test. Plain text in the same row
@@ -223,7 +224,7 @@ table.pool{border-collapse:collapse;font-size:12px;width:max-content;min-width:1
 .pool thead th.num{text-align:center}
 .pool thead th .arrow{color:var(--orange);margin-left:3px;font-size:9px}
 .pool thead th.name-col{text-align:left;padding-left:16px}
-.pool thead th.lean-col{text-align:left;cursor:default;padding-left:14px}
+.pool thead th.lean-col,.pool thead th.lean-h{text-align:left;cursor:default;padding-left:4px;padding-right:6px}
 .pool thead th:hover{color:var(--text)}
 .pool thead th.lean-col:hover{color:var(--muted-2)}
 
@@ -247,6 +248,8 @@ tr.region-row td{padding:0;border:0}
 .pool tbody tr.rec.list-mine{box-shadow:inset 3px 0 0 var(--list)}
 .pool tbody td{padding:0 6px;height:42px;vertical-align:middle}
 .pool td.name-col{padding-left:16px;min-width:150px}
+.pool td.watch-cell,.pool td.act{padding:0}
+.pool td.pos,.pool td.rt,.pool td.year,.pool td.num{padding-left:2px;padding-right:2px}
 .pc-name{display:flex;align-items:center;gap:9px}
 .pc-name .nm{font-weight:600;color:var(--text-100, var(--text))}
 .pool a.recruit-name-link{color:var(--text-100, var(--text))}
@@ -262,7 +265,7 @@ tr.region-row td{padding:0;border:0}
 .attr-hi{color:#bfe9ff}.attr-mid{color:var(--muted)}.attr-lo{color:var(--muted-2)}.attr-zero{color:var(--muted-3)}
 .pool td.rt{text-align:center}
 .pool td.rt .v{font:400 18px/1 var(--display);letter-spacing:.02em}
-.pool td.lean-col{padding-left:14px;padding-right:14px;position:relative;min-width:230px}
+.pool td.lean-col{padding-left:4px;padding-right:6px;position:relative}
 .attr-sep{border-left:1px solid rgba(255,255,255,.05)}
 
 /* .pool.condensed is GONE by design. It hid the attribute columns whenever the dock
@@ -270,19 +273,22 @@ tr.region-row td{padding:0;border:0}
    Attributes stay visible in every phase. */
 
 /* ---------- Pool v2: fixed column widths, headers centered over their columns ----------
-   Widths sum to ~1030px with the 12-chip attribute block sized to its content, so the
-   header can centre over the whole block rather than over the first chip. */
+   Short columns are the measured content (header or value, whichever is wider)
+   plus 2px of cell padding. The lean column is the 3×52 ladder plus its gaps
+   and the lock badge's overhang — the ladder component is unchanged. Attribute
+   columns stay the roster tile plus the 8px gutter. */
 .pool col.c-watch{width:36px}
 .pool col.c-name{width:248px}
-.pool col.c-pos{width:44px}
-.pool col.c-rt{width:86px}
-.pool col.c-yr{width:40px}
-.pool col.c-ht{width:52px}
-.pool col.c-wt{width:44px}
-.pool col.c-rgn{width:44px}
+.pool col.c-pos{width:32px}
+.pool col.c-rt{width:68px}
+.pool col.c-yr{width:24px}
+.pool col.c-ht{width:36px}
+.pool col.c-wt{width:30px}
+.pool col.c-rgn{width:32px}
 .pool col.c-attr{width:calc(var(--dsz-30) + var(--space-8))}
-.pool col.c-lean{width:132px}
-.pool col.c-add{width:46px}
+.pool col.c-lean{width:178px}
+.pool col.c-add{width:30px}
+.pool thead th.num,.pool tbody tr.gob-rep th.num{padding-left:2px;padding-right:2px}
 .pool .rtl{display:inline-flex;align-items:baseline;gap:3px;white-space:nowrap}
 .pool .rtl i{font-style:normal;color:var(--text-38, var(--muted-3))}
 .pool td.gshade,.pool th.gshade{background:rgba(255,255,255,.035)}

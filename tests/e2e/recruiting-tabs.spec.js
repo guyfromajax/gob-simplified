@@ -287,6 +287,12 @@ test('pool grid matches the roster tiles and the league content edge', async ({ 
     const gap = phase.getBoundingClientRect().top - hair.getBoundingClientRect().bottom;
     const dsp = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dsp-8'));
     const headPad = parseFloat(getComputedStyle(hair).paddingBottom);
+    const main = document.querySelector('html.gob-shell .main');
+    const mainCs = getComputedStyle(main);
+    const contentRight = main.getBoundingClientRect().right - (parseFloat(mainCs.paddingRight) || 0);
+    const sc = document.querySelector('#hub-pool .pool-scroll');
+    const head = document.querySelector('#hub-pool thead tr.gob-groups th');
+    const lean = row.querySelector('td.lean-col');
     return {
       left: phase.getBoundingClientRect().left,
       gap,
@@ -297,6 +303,12 @@ test('pool grid matches the roster tiles and the league content edge', async ({ 
       orange: getComputedStyle(link).color === 'rgb(247, 148, 32)',
       rt: row.querySelector('.rtl').textContent,
       portrait: !!(av.querySelector('img') || av.textContent.trim()),
+      leanInside: lean.getBoundingClientRect().right <= contentRight + 1,
+      overflow: sc.scrollWidth - sc.clientWidth,
+      wide: sc.classList.contains('gob-wide-wrap'),
+      headTop: getComputedStyle(head).top,
+      stickTop: getComputedStyle(document.documentElement).getPropertyValue('--gob-stick-top').trim(),
+      backdrop: getComputedStyle(head).backdropFilter,
     };
   });
   expect(Math.abs(hub.headPad - hub.dsp)).toBeLessThan(0.6);
@@ -306,6 +318,11 @@ test('pool grid matches the roster tiles and the league content edge', async ({ 
   expect(hub.orange).toBe(false);
   expect(hub.rt).toMatch(/[A-F]/);
   expect(hub.portrait).toBe(true);
+  expect(hub.leanInside).toBe(true);
+  expect(hub.overflow).toBeLessThanOrEqual(1);
+  expect(hub.wide).toBe(false);
+  expect(hub.headTop).toBe(hub.stickTop);
+  expect(hub.backdrop).toBe('none');
 
   await page.goto('/standings.html?franchise_id=' + FID + '&team_id=' + TID);
   await page.waitForFunction(() => !document.documentElement.classList.contains('gob-pending'));

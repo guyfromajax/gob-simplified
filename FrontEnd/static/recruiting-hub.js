@@ -282,6 +282,20 @@
     });
     return html;
   }
+  // A table that fits .pool-scroll is narrow: one sticky header under the page
+  // head, no repeated column row. A table that still overflows keeps the
+  // 16-row repeat, and the shell's wide-wrap rule pins that header static.
+  function poolTableFits() {
+    var table = document.querySelector('#hub-pool table.pool');
+    var sc = document.querySelector('#hub-pool .pool-scroll');
+    if (!table || !sc || sc.clientWidth < 200) return false;
+    return table.scrollWidth <= sc.clientWidth + 1;
+  }
+  function syncPoolHeaderMode() {
+    var table = document.querySelector('#hub-pool table.pool');
+    if (!table || !poolTableFits()) return;
+    table.querySelectorAll('tbody tr.gob-rep').forEach(function (row) { row.remove(); });
+  }
 
   /**
    * Region <option>s with the user's own region lifted to the top, above a divider.
@@ -424,6 +438,7 @@
     host.innerHTML = toolbarHtml(state.recruits.length, filteredRecruits().length) +
       '<div class="pool-scroll"><table class="pool gob-tbl">' + colgroupHtml() + headHtml() +
       '<tbody>' + poolBodyHtml() + '</tbody></table></div>';
+    syncPoolHeaderMode();
     bindPool(host);
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['th', 'td', '.attr-tile']);
   }
@@ -466,6 +481,7 @@
   }
   function renderPoolBodyOnly() {
     var tbody = document.querySelector('#hub-pool tbody'); if (tbody) tbody.innerHTML = poolBodyHtml();
+    syncPoolHeaderMode();
     bindPoolBodyHandlers(document.getElementById('hub-pool'));
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(document.getElementById('hub-pool'), ['td', '.attr-tile']);
   }
