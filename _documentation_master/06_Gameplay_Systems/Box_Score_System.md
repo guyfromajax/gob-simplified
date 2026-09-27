@@ -9,7 +9,7 @@ A "box score" in GOB is the per-player stat lines plus team totals for a single 
 ## 1. The Stat Model
 
 - Each in-engine player carries `player.stats["game"]` — a flat dict keyed by the stat names in `BOX_SCORE_KEYS` (`BackEnd/constants.py`): PTS, FGM/FGA, 3PTM/3PTA, FTM/FTA, REB (OREB/DREB), AST, STL, BLK, TO, F, MIN, DEF_A/DEF_S, plus special stats (fast break, outlet, HCT, FCP, points off turnovers, etc.).
-- **MIN is tracked in seconds** during a game; it is converted to whole minutes (integer division by 60) only when rolled into season/career totals.
+- **MIN is tracked in seconds** during a game and stays seconds on the game doc. Season/career `MIN` is **unrounded minutes** (`seconds / 60`, a float — 13:59 adds 13.983). See Section 5.
 - Team totals come from `TeamManager.get_team_game_stats()` (`BackEnd/models/team_manager.py`) — a sum across the roster, exposed as `GameManager.team_totals` keyed by team **name**.
 - `GameManager.get_box_score()` (`BackEnd/models/game_manager.py`) snapshots the full roster: lineup players keyed by position (`PG`…`C`), bench players keyed by their position attribute or `BENCH` (collisions get a `{pos}_{player_id[:8]}` suffix). Each row is `{ name, playerId, jersey, ...player.stats["game"] }`. The outer map is keyed by **`team.team_id`** (name only as fallback).
 
@@ -73,7 +73,12 @@ Notes on the other paths and modes:
   - **`franchises.applied_matchups`** — atomic `$addToSet` on `{week}:{sorted_home_team_id}:{sorted_away_team_id}` (`franchise_matchup_claim_key` in `BackEnd/utils/game_id_utils.py`). Prevents the **same franchise-week game** from rolling up twice when two Mongo `games` records exist for one played game (historically: simulate-quarter saved under **ObjectId** `_id` while phase-A upserted a **string** `_id` duplicate — different `applied_games` tokens, same box score → ~2× FPD `season`).
   - Either claim already present → early return; FPD is not updated. Multiple finalize call-sites (phase A, complete-week fallback, save-result) remain safe.
 - **Source:** the game doc's `box_score` (top level, else built from `teams[*].box_score`, else legacy `home_team`/`away_team`). The `players[]` array is deliberately **not** used — it only reliably holds the final lineup.
-- **Processing:** every player row in the box score gets all stat fields `$inc`'d into both `season.*` and `career.*` (non-stat fields like `name`/`jersey`/`pos` skipped; `MIN` seconds → minutes), plus `GP + 1`, and `meta.team_id` set to the team's ObjectId string.
+- **Processing:** every player row in the box score gets all stat fields `$inc`'d into both `season.*` and `career.*` (non-stat fields like `name`/`jersey`/`pos` skipped), and `meta.team_id` set to the team's ObjectId string.
+  - **GP:** `+1` only when the row's game `MIN` (seconds) is **> 0** (`played_in_game`). A bench player listed in the box with 0 seconds gets no GP; his other stats are all 0.
+  - **MIN:** `seconds / 60` unrounded (`season_minutes`). Never floored per game — flooring cost ~30 s/game and credited <60 s as 0.
+  - Same two rules on every rollup path: `rollup_game_to_franchise`, the tournament branch of `finalize_game`, `apply_stats_from_summary`, and practice-squad `apply_ps_game_stats` (`ps_season_stats`).
+  - The two rules only change the values placed into the existing per-player `$inc`; the one-`bulk_write`-per-game FPD batch and the claims are unchanged.
+- **Existing saves (no backfill):** totals written before 2026-09-27 keep floored minutes and a GP for every 0-second box appearance. FPD totals do not record which game docs fed them, and re-deriving from `games` is not reliable: saves hold duplicate docs for one matchup (one save has 126 docs for a 63-game week), random-score fallbacks have no box, and career spans seasons. New games accumulate under the rules above, so a season that spans the change mixes both.
 - **Destination:** `franchise_players_data` (FPD), one doc per `(franchise_id, player_id)`. Missing FPD docs are created on the fly from the universal `players` doc with zeroed stats.
 - **Not practice squad:** PS game stats roll into FPD/FRD **`ps_season_stats`** only (`BackEnd/practice_squad/stats.py`); they do not feed `season` or Team Stats aggregation.
 - `apply_stats_from_summary` is an older equivalent that writes to the universal `players` collection; it survives only on a legacy `franchise_manager.py` path.

@@ -314,6 +314,8 @@ function formatTrainingSeasonStat(stats, col) {
       if (s.TREB != null && s.TREB !== '') return String(s.TREB);
       return String(num(s.OREB) + num(s.DREB));
     }
+    case 'MIN':
+      return String(Math.round(num(s.MIN)));
     default: {
       const v = s[col];
       if (v == null || v === '') return '0';

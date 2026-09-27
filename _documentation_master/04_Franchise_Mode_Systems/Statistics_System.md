@@ -93,15 +93,16 @@ The Statistics System tracks comprehensive player-level and team-level statistic
     - **Location:** `BackEnd/models/turn_manager.py` - `update_clock_and_possession()` method
   - **Storage Format:**
     - **Game Stats:** Stored in **seconds** (e.g., 240 seconds = 4 minutes of gameplay)
-    - **Season/Career Stats:** Stored in **minutes** (e.g., 4 minutes) - converted from game seconds using integer division (`// 60`) at end of game
+    - **Season/Career Stats:** Stored in **unrounded minutes** (float, `seconds / 60`; 839 s adds 13.983) at end of game
   - **Display Format:**
     - **Box Score:** Displays integer minutes only (e.g., "4", not "4:00" or "4 min")
-    - **Command Centers (TCC/FCC):** Displays season stats directly (already in minutes format)
+    - **Season totals tables:** round season `MIN` to a whole number; per-game MIN shows one decimal; per-game values at GP 0 show "—"
     - **Conversion:** `Math.floor(game_minutes / 60)` for game stats display
-  - **End of Game Accumulation:**
-    - **Tournament Mode:** Game MIN (seconds) converted to minutes (`// 60`) and added to `season.MIN`
-    - **Franchise Mode:** Game MIN (seconds) converted to minutes (`// 60`) and added to both `season.MIN` and `career.MIN`
-    - **Location:** `BackEnd/utils/stat_updater.py` - `apply_stats_from_summary()` and `finalize_game()` functions
+  - **End of Game Accumulation (GP and MIN):**
+    - `GP` `+1` only when game `MIN` seconds > 0; a 0-second box row adds no GP
+    - Tournament: added to `season.MIN` / `season.GP`. Franchise: `season.*` and `career.*`. Practice squad: `ps_season_stats.*`
+    - **Location:** `played_in_game()` / `season_minutes()` in `BackEnd/utils/stat_updater.py`, used by `finalize_game()`, `rollup_game_to_franchise()`, `apply_stats_from_summary()`, and `BackEnd/practice_squad/stats.py`
+    - Totals written before 2026-09-27 are not backfilled (see `06_Gameplay_Systems/Box_Score_System.md` §5)
 
 **Team-Level Stats (Scouting Data):**
 
