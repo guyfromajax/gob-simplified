@@ -47,6 +47,9 @@ function rosterBody(focus) {
       training_focus: i === 0 ? (focus || 'offensive') : 'standard',
     });
   }
+  // Roster order is not lineup order. The team page has to group the five
+  // the route marked, even when a bench player is first in the payload.
+  players.push(players.shift());
   return { team: 'Lancaster', is_user_team: true, players: players, training_squad: [], practice_squad_recruits: [] };
 }
 
@@ -591,6 +594,17 @@ test('the team page roster is the compact five-attribute grid', async ({ page })
   expect(headers.map((text) => text.trim())).toEqual(['Player', 'RT', 'POS', 'YR', 'HT', 'SC', 'SH', 'ID', 'OD', 'RB']);
   await expect(page.locator('#team-view .gob-roster')).toContainText('Starters');
   await expect(page.locator('#team-view .gob-roster')).toContainText('Bench');
+  const split = await page.locator('#team-view .gob-roster tbody tr').evaluateAll((rows) => {
+    const labels = rows.map((row) => row.innerText.replace(/\s+/g, ' ').trim().toLowerCase());
+    const starters = labels.findIndex((text) => text === 'starters');
+    const bench = labels.findIndex((text) => text === 'bench');
+    return {
+      between: bench - starters - 1,
+      first: labels[starters + 1] || '',
+    };
+  });
+  expect(split.between).toBe(5);
+  expect(split.first).toContain('cedric buckles');
   await expect(page.locator('#team-view .gob-roster')).toContainText('Montgomery Worthington-Blake');
   await expect(page.locator('#team-view .gob-roster thead')).not.toContainText('Dev focus');
   await expect(page.locator('#team-view .gob-roster thead')).not.toContainText('PS');

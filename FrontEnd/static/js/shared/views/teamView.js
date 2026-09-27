@@ -4,7 +4,7 @@
  */
 
 import { barHtml, bindPager, bindUp, query, readPager, stampOrigin, withParams } from './detailBar.js';
-import { rosterTableHtml } from './rosterView.js';
+import { orderLineup, rosterTableHtml } from './rosterView.js';
 
 function siteWord(site) {
   return site === 'home' ? 'vs' : 'at';
@@ -120,7 +120,7 @@ export function mount(container, ctx) {
     var rank = body.natl_rank == null ? '—' : '#' + body.natl_rank;
     var streak = body.streak || '—';
     var scout = scoutHref(body.next_game);
-    var players = (roster && roster.players) || [];
+    var players = orderLineup((roster && roster.players) || []);
     var html = barHtml(tables, body.name || '', pager);
     html += '<section class="gob-hero' + (color ? '' : ' is-neutral') + '"'
       + (color ? ' style="--tc:' + tables.esc(color) + '"' : '') + '>'

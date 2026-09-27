@@ -154,6 +154,16 @@ function compactRosterHtml(tables, rows, opts) {
   return html + '</tbody></table></div>';
 }
 
+export function orderLineup(rows) {
+  return (rows || []).slice().sort(function (a, b) {
+    var as = a.starter ? 0 : 1;
+    var bs = b.starter ? 0 : 1;
+    if (as !== bs) return as - bs;
+    if (a.starter) return (Number(a.lineup_order) || 0) - (Number(b.lineup_order) || 0);
+    return displayName(a).localeCompare(displayName(b));
+  });
+}
+
 export function rosterTableHtml(tables, rows, options) {
   var opts = options || {};
   if (opts.compact) return compactRosterHtml(tables, rows, opts);
@@ -347,17 +357,9 @@ export function mount(container, ctx) {
   function render() {
     var counts = lists();
     var source = scope === 'practice' ? counts.practice : counts.varsity;
-    var rows = source.slice();
     var lineup = scope === 'varsity' && !sortKey;
-    if (lineup) {
-      rows.sort(function (a, b) {
-        var as = a.starter ? 0 : 1;
-        var bs = b.starter ? 0 : 1;
-        if (as !== bs) return as - bs;
-        if (a.starter) return (Number(a.lineup_order) || 0) - (Number(b.lineup_order) || 0);
-        return displayName(a).localeCompare(displayName(b));
-      });
-    } else if (sortKey) {
+    var rows = lineup ? orderLineup(source) : source.slice();
+    if (sortKey) {
       rows = tables.sortRows(rows, function (player) { return readValue(player, sortKey); }, sortDir);
     }
     var html = backHtml() + '<section class="gob-tcard">' + rosterTableHtml(tables, rows, {
