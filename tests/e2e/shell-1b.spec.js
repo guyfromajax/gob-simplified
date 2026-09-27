@@ -99,9 +99,20 @@ async function openFcc(page, data) {
 
 async function mouseClick(page, target) {
   const loc = typeof target === 'string' ? page.locator(target).first() : target;
-  const box = await loc.boundingBox();
-  if (!box) throw new Error('missing target');
-  await page.mouse.click(box.x + box.width / 2, box.y + Math.min(box.height / 2, 20));
+  const onRail = await loc.evaluate((el) => !!el.closest('nav.rail'));
+  if (!onRail) {
+    await page.mouse.move(480, 240);
+    await page.waitForFunction(() => {
+      const html = document.documentElement;
+      const face = document.querySelector('html.gob-shell .rail-face');
+      if (!face || !html.classList.contains('gob-1280')) return true;
+      const rail = document.querySelector('html.gob-shell .rail');
+      const collapsed = rail ? rail.getBoundingClientRect().width : 64;
+      return face.getBoundingClientRect().width <= collapsed + 2;
+    });
+  }
+  const disabled = await loc.evaluate((el) => el.getAttribute('aria-disabled') === 'true' || el.hasAttribute('disabled'));
+  await loc.click(disabled ? { force: true } : undefined);
 }
 
 function stab(page, label) {
@@ -247,10 +258,20 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     ['league', 'Team Stats', 'team-stats-view'],
     ['news', 'News', 'press-tab'],
   ];
+  const prepEditor = {
+    'training-tab': /\/training(-report)?\.html/,
+    'game-plan-tab': /\/game-plan\.html/,
+    'playbooks-tab': /\/playbooks\.html/,
+  };
   for (const row of panels) {
     await mouseClick(page, '[data-gob-section="' + row[0] + '"]');
     await mouseClick(page, stab(page, row[1]));
-    await expect(page.locator('#' + row[2] + '.tab-content.active')).toBeVisible();
+    if (prepEditor[row[2]]) {
+      await page.waitForURL(prepEditor[row[2]]);
+      await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveAttribute('data-tab', row[2]);
+    } else {
+      await expect(page.locator('#' + row[2] + '.tab-content.active')).toBeVisible();
+    }
   }
   await expect(page.locator('#gob-stats-toggle')).toHaveCount(0);
   await mouseClick(page, '[data-gob-section="team"]');

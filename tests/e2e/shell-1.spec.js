@@ -116,17 +116,33 @@ async function openFcc(page, data, search) {
 
 async function mouseClick(page, target) {
   const loc = typeof target === 'string' ? page.locator(target).first() : target;
-  // Coordinate clicks sample the box, then fire while the 1280 rail face is
-  // still collapsing (120ms delay, then the width transition). The point that
-  // was on Prep is over the team panel by mouseup, so the section never
-  // changes. locator.click waits until the button is stable and hit-tests the
-  // point it actually clicks.
-  await loc.click({ position: { x: 16, y: 16 } });
+  const onRail = await loc.evaluate((el) => !!el.closest('nav.rail'));
+  if (!onRail) {
+    // The 1280 rail face overlays the underline row while the pointer rests
+    // on the rail. Park off the rail and wait until the face is back to the
+    // column width, then hit-test the click.
+    await page.mouse.move(480, 240);
+    await page.waitForFunction(() => {
+      const html = document.documentElement;
+      const face = document.querySelector('html.gob-shell .rail-face');
+      if (!face || !html.classList.contains('gob-1280')) return true;
+      const rail = document.querySelector('html.gob-shell .rail');
+      const collapsed = rail ? rail.getBoundingClientRect().width : 64;
+      return face.getBoundingClientRect().width <= collapsed + 2;
+    });
+  }
+  await loc.click();
 }
 
 function stab(page, label) {
   return page.getByRole('tab', { name: label, exact: true });
 }
+
+const PREP_EDITOR = {
+  'training-tab': /\/training\.html/,
+  'game-plan-tab': /\/game-plan\.html/,
+  'playbooks-tab': /\/playbooks\.html/,
+};
 
 test.beforeAll(() => {
   fs.mkdirSync(OUT, { recursive: true });
@@ -217,7 +233,12 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
     for (const row of shots) {
       await mouseClick(page, '[data-gob-section="' + sectionFor[row[0]] + '"]');
       if (row[2]) await mouseClick(page, stab(page, row[2]));
-      await expect(page.locator('#' + row[1] + '.tab-content.active')).toBeVisible();
+      if (PREP_EDITOR[row[1]]) {
+        await page.waitForURL(PREP_EDITOR[row[1]]);
+        await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveAttribute('data-tab', row[1]);
+      } else {
+        await expect(page.locator('#' + row[1] + '.tab-content.active')).toBeVisible();
+      }
       const activeRail = page.locator('.rail [data-gob-section].on');
       await expect(activeRail).toHaveCount(1);
       await expect(activeRail).toHaveAttribute('data-gob-section', sectionFor[row[0]]);
@@ -309,8 +330,13 @@ test('old tab query opens the new section', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   for (const pair of TABS) {
     await openFcc(page, cc(), '?franchise_id=' + FID + '&team_id=' + TID + '&tab=' + pair[0]);
-    const activeId = pair[2] || pair[0];
-    await expect(page.locator('#' + activeId + '.tab-content.active')).toBeVisible();
+    if (PREP_EDITOR[pair[0]]) {
+      await page.waitForURL(PREP_EDITOR[pair[0]]);
+      await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveAttribute('data-tab', pair[0]);
+    } else {
+      const activeId = pair[2] || pair[0];
+      await expect(page.locator('#' + activeId + '.tab-content.active')).toBeVisible();
+    }
     await expect(page.locator('[data-gob-section="' + pair[1] + '"]')).toHaveClass(/on/);
   }
 });
@@ -369,7 +395,8 @@ test('rail active state follows deep links and back, and exit calls the existing
   await expect(page.locator('#roster-view.tab-content.active')).toBeVisible();
   await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'team');
   await page.goForward();
-  await expect(page.locator('#training-tab.tab-content.active')).toBeVisible();
+  await page.waitForURL(/\/training\.html/);
+  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveAttribute('data-tab', 'training-tab');
   await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'prep');
   await page.evaluate(() => {
     const exit = document.getElementById('exit-franchise');

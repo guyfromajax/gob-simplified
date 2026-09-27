@@ -587,3 +587,255 @@ input[type="range"]::-moz-range-thumb {
 
 /* The nest supplies the bottom spacing; its last child should not double it. */
 .slider-nest .slider-group:last-child { margin-bottom: 8px; }
+
+/* Prep v2 game plan. Tokens only. Ported from the handoff .gt / .gpr / .nest. */
+html.gob-shell .resource-page-container.fcc-brand-page-shell:has(.gpc),
+html.gob-shell .game-plan-card:has(.gpc),
+html.gob-shell .game-plan-card:has(.gpc) .game-plan-card-body {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+}
+
+html.gob-shell .game-plan-page-header,
+html.gob-shell .game-plan-back-link[hidden] {
+  display: none !important;
+}
+
+html.gob-shell .pg-head .pg-tools .button-container,
+html.gob-shell.gob-focus .button-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  flex-wrap: nowrap;
+}
+
+html.gob-shell.gob-focus .button-container {
+  margin-bottom: var(--space-8);
+}
+
+html.gob-shell .pg-head .pg-tools .btn-o,
+html.gob-shell .button-container .btn-o {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--dsz-30);
+  min-width: 0;
+  padding: var(--space-1) var(--space-12) 0;
+  border-radius: var(--radius-8);
+  background: var(--orange);
+  color: var(--badge-ink);
+  border: 0;
+  box-shadow: none;
+  font: var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  text-align: center;
+  white-space: nowrap;
+}
+
+html.gob-shell .pg-head .pg-tools .btn-o:hover,
+html.gob-shell .button-container .btn-o:hover {
+  filter: brightness(1.06);
+  transform: none;
+}
+
+html.gob-shell .pg-head .pg-tools .btn-o:focus-visible,
+html.gob-shell .button-container .btn-o:focus-visible,
+html.gob-shell .button-container .btn-secondary:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+html.gob-shell .button-container .btn-secondary {
+  height: var(--dsz-30);
+  min-width: 0;
+  padding: var(--space-1) var(--space-12) 0;
+  border: 0;
+  border-radius: var(--radius-8);
+  background: var(--white-4);
+  color: var(--text-87);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font: var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+}
+
+html.gob-shell .gpc.cols2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8) calc(var(--col-gap) * 2);
+  align-items: start;
+}
+
+html.gob-shell .gpc .sh {
+  display: flex;
+  align-items: baseline;
+  min-height: 0;
+  margin: 0 0 var(--space-2);
+}
+
+html.gob-shell .gpc .sh h2 {
+  margin: 0;
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+
+html.gob-shell .gpc .gpr {
+  display: grid;
+  grid-template-columns: minmax(0, 210px) minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: center;
+  min-height: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+html.gob-shell .gpc .gpr-n b {
+  display: block;
+  font: var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-100);
+}
+
+html.gob-shell .gpc .gpr-n span {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--fs-12);
+  line-height: 1.25;
+  color: var(--text-60);
+}
+
+html.gob-shell .gpc .gt {
+  position: relative;
+  height: 36px;
+  margin: 0 var(--space-2);
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+html.gob-shell .gpc .gt:focus {
+  outline: none;
+}
+
+html.gob-shell .gpc .gt:focus-visible .gt-k {
+  box-shadow: 0 0 0 3px var(--bg-page-solid), 0 0 0 5px var(--white);
+}
+
+html.gob-shell .gpc .gt-r,
+html.gob-shell .gpc .gt-s,
+html.gob-shell .gpc .gt-k {
+  position: absolute;
+  font-style: normal;
+}
+
+html.gob-shell .gpc .gt-r {
+  left: 8px;
+  right: 8px;
+  top: 8px;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: var(--white-10);
+}
+
+html.gob-shell .gpc .gt-s {
+  top: 8px;
+  width: 2px;
+  height: 10px;
+  margin: -5px 0 0 -1px;
+  border-radius: 1px;
+  background: var(--white-30);
+}
+
+html.gob-shell .gpc .gt-s.n {
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--white-20);
+}
+
+html.gob-shell .gpc .gt-k {
+  top: 8px;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 0 0 3px var(--bg-page-solid), 0 0 0 4px var(--white-25), 0 2px 6px var(--black-35);
+}
+
+html.gob-shell .gpc .gt-l {
+  position: absolute;
+  top: 16px;
+  max-width: calc(50% - 20px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-2);
+  line-height: var(--lh-1);
+  color: var(--text-38);
+  white-space: nowrap;
+}
+
+html.gob-shell .gpc .gt-l.a { left: 0; }
+html.gob-shell .gpc .gt-l.b { left: 50%; transform: translateX(-50%); max-width: none; }
+html.gob-shell .gpc .gt-l.c { right: 0; left: auto; text-align: right; }
+html.gob-shell .gpc .gt-l.on { color: var(--text-100); }
+html.gob-shell .gpc .gt-l.nr { color: var(--text-60); }
+
+html.gob-shell .gpc .nest {
+  position: relative;
+  padding-left: var(--space-12);
+}
+
+html.gob-shell .gpc .nest::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--line-strong);
+}
+
+html.gob-shell .gpc .nest .gpr {
+  grid-template-columns: minmax(0, 198px) minmax(0, 1fr);
+}
+
+html.gob-shell .gpc .nest-h {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-4) 0 var(--space-1);
+}
+
+html.gob-shell .gpc .eb {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+html.gob-shell .gpc .grp-h {
+  display: block;
+  padding: var(--space-6) 0 var(--space-1);
+}
+
+html.gob-shell .nest .slider-nest__info:focus-visible {
+  border-color: var(--line-strong);
+  color: var(--text-100);
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}

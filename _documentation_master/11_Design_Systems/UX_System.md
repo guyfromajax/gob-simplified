@@ -115,10 +115,10 @@ The shared tab module also serves any other command center that calls `initComma
 | Team | Player Stats | `player-stats-view` (in-page module view). `?tab=player-stats-tab` opens this view. |
 | Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
 | Team | Schedule | `team-schedule-view` (in-page module view). `?tab=schedule-tab` opens this view. Weeks 1–26, then the three tournament labels. The bracket stays on League › Tournament. |
-| Prep | Training | `training-tab` |
-| Prep | Game Plan | `game-plan-tab` |
-| Prep | Playbooks | `playbooks-tab` |
-| Prep | Scouting Report | `coaches-tab` |
+| Prep | Training | `training.html`. The underline tab replaces. `?tab=training-tab` redirects here. The FCC summary panel stays in the page and is no longer opened by the shell. |
+| Prep | Game Plan | `game-plan.html`. `?tab=game-plan-tab` redirects here. `resume_from_timeout=true` and `mode=tutorial` stay focus, with no rail and no underline row. |
+| Prep | Playbooks | `playbooks.html`. `?tab=playbooks-tab` redirects here. The FCC summary panel stays in the page and is no longer opened by the shell. |
+| Prep | Scouting Report | `coaches-tab` on the franchise command center. The underline tab replaces there. |
 | League | Standings | `standings-view` (in-page module view; `standings.html` redirects here and keeps `franchise_id`, `team_id`, and return params). `?tab=standings-tab` still opens the old panel. |
 | League | Rankings | `rankings-view` (in-page module view; `rankings.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
 | League | Leaders | `leaders-view` (in-page module view; `leaders.html` redirects here). `?tab=awards-tab` still opens the old panel. |
@@ -182,7 +182,11 @@ env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HO
 | player-detail.html | redirect to `?tab=player-view` unless `recruit_id` or `mode=recruit` | return context | none |
 | team-roster-view.html | redirect to `roster-view`, or `team-view` when `roster_team_id` is set | Team or League | Roster or the team drill-in |
 | box-score.html | browse when `return_url` is set; otherwise focus | League when browse | none |
-| set-lineup.html, training.html, training-report.html, training-squad-report.html, training-playbooks.html, cut-players.html, game-plan.html, playbooks.html, playbook-report.html | focus | — | — |
+| training.html | browse | Prep | Training |
+| training-report.html | browse | Prep | Training |
+| game-plan.html | browse, or focus when `resume_from_timeout=true` or `mode=tutorial` | Prep | Game Plan |
+| playbooks.html | browse | Prep | Playbooks |
+| set-lineup.html, training-squad-report.html, training-playbooks.html, cut-players.html, playbook-report.html | focus | — | — |
 
 The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` reuses a response the page already requested. Otherwise it fetches that URL once. Record on a browse page uses that same payload: `team_record` when present, otherwise the user team's `W`-`L` in `rankings`.
 

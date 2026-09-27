@@ -4527,6 +4527,8 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'press-tab') {
           void renderNewsTab();
         }
+        // Prep v2: the shell no longer opens these tabs. The summary
+        // renderers stay; navigation goes to the editor pages instead.
         if (tabName === 'game-plan-tab') {
           renderGamePlanSummary();
         }

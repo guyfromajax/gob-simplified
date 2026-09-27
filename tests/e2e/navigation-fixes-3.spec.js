@@ -350,7 +350,7 @@ test('training submit lands on the report, then one Back reaches mode-select', a
     const el = document.getElementById('points-remaining');
     return el && String(el.textContent || '').replace(/\s/g, '').includes('0');
   }, null, { timeout: 15000 });
-  await page.locator('input[name="coaching-focus"][value="authoritarian-discipline"]').check({ force: true });
+  await page.locator('label.archetype-option', { hasText: 'Discipline' }).click();
   await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
   await page.locator('#submit-btn').click();
   await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
@@ -492,7 +492,7 @@ test('custom playbooks adds one step and Back removes it, then training still re
     const el = document.getElementById('points-remaining');
     return el && String(el.textContent || '').replace(/\s/g, '').includes('0');
   }, null, { timeout: 15000 });
-  await page.locator('input[name="coaching-focus"][value="authoritarian-discipline"]').check({ force: true });
+  await page.locator('label.archetype-option', { hasText: 'Discipline' }).click();
   await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
   await page.locator('#submit-btn').click();
   await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
