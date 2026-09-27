@@ -15,6 +15,13 @@ function sameId(a, b) {
   return String(a || '') !== '' && String(a) === String(b || '');
 }
 
+function formatYear(year) {
+  if (window.GOB_PlayerYear && typeof window.GOB_PlayerYear.formatDisplay === 'function') {
+    return window.GOB_PlayerYear.formatDisplay(year);
+  }
+  return year || '--';
+}
+
 function statText(stats, key) {
   var value = stats ? stats[key] : null;
   if (value == null || value === '') return '--';
@@ -30,6 +37,19 @@ export function mount(container, ctx) {
   var alive = true;
   var userId = (ctx && ctx.teamId) || '';
   var franchiseId = (ctx && ctx.franchiseId) || '';
+
+  function playerHref(player) {
+    var params = new URLSearchParams(window.location.search);
+    params.set('tab', 'player-view');
+    params.set('player_id', player.player_id || '');
+    params.set('origin', 'league');
+    params.set('up', 'Awards');
+    params.set('return_tab', 'awards-view');
+    params.delete('story');
+    params.delete('view_team_id');
+    var text = params.toString();
+    return window.location.pathname + (text ? '?' + text : '');
+  }
 
   function teamHref(player) {
     var params = new URLSearchParams(window.location.search);
@@ -53,16 +73,25 @@ export function mount(container, ctx) {
     var html = '<div class="gob-awards">';
     TEAMS.forEach(function (team) {
       var players = teams[team.key] || [];
-      html += '<section class="gob-tcard"><h3>' + tables.esc(team.label) + '</h3>';
-      html += '<table class="gob-tbl"><thead><tr><th class="team">Player</th><th class="team">Team</th>';
+      html += '<section><h3>' + tables.esc(team.label) + '</h3><div class="gob-tcard">';
+      html += '<table class="gob-tbl gob-awards-tbl"><colgroup><col class="c-player"><col class="c-yr"><col class="c-team">';
+      STATS.forEach(function () { html += '<col class="c-stat">'; });
+      html += '</colgroup><thead><tr><th class="left">Player</th><th class="left">Yr</th><th class="left">Team</th>';
       STATS.forEach(function (key) { html += '<th>' + tables.esc(key) + '</th>'; });
       html += '</tr></thead><tbody>';
+      if (!players.length) {
+        html += '<tr><td class="left gob-awards-empty" colspan="9">No selections</td></tr>';
+      }
       players.forEach(function (player) {
         var mine = sameId(player.team_id, userId);
         var stats = player.stats || {};
+        var name = tables.esc(player.name || '--');
         html += '<tr' + (mine ? ' class="me is-user"' : '') + '>';
-        html += '<td class="team">' + tables.esc(player.name || '--') + '</td>';
-        html += '<td class="team">' + tables.teamLink(
+        html += '<td class="left">' + (player.player_id
+          ? '<a class="gob-player" href="' + tables.esc(playerHref(player)) + '">' + name + '</a>'
+          : name) + '</td>';
+        html += '<td class="left">' + tables.esc(formatYear(player.year)) + '</td>';
+        html += '<td class="left">' + tables.teamLink(
           teamHref(player),
           player.team_name || '--',
           player.team_name || '',
@@ -73,11 +102,11 @@ export function mount(container, ctx) {
         });
         html += '</tr>';
       });
-      html += '</tbody></table></section>';
+      html += '</tbody></table></div></section>';
     });
     html += '</div>';
     container.innerHTML = html;
-    container.querySelectorAll('a.gob-team').forEach(function (link) {
+    container.querySelectorAll('a.gob-team, a.gob-player').forEach(function (link) {
       link.addEventListener('click', function (event) {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button) return;
         event.preventDefault();

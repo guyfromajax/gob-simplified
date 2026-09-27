@@ -108,7 +108,7 @@ export function renderRichLines(richLines) {
     if (type === 'game_result') {
       var line = esc(item.text);
       if (item.box_score_href) {
-        line += ' <a class="gob-news-link" href="' + esc(item.box_score_href) + '">Box Score</a>';
+        line += ' <a class="lnk" href="' + esc(item.box_score_href) + '">Box Score</a>';
       }
       return '<p class="gob-news-line">' + line + '</p>';
     }

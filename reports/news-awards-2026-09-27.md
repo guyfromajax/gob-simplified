@@ -54,4 +54,21 @@ No new stored fields. `GET /franchise/news` adds `dispatches`, each `{week, type
 - `save-news-*` and `save-awards-*`: offline copy of the schedule-time save (Lancaster, week 3). The feed shows week groups, type labels, and the navy edge on the training report and the game result. Awards is the week-35 empty state.
 - `fixture-news-*` and `fixture-awards-*`: week 12 feed (game-result dispatch on top, upset, recruiting) and a 1st-team row marked `tr.me` with DEF% 61.
 
+## Fix pass
+
+Headings. The winning rule was `#franchise-container .tab-content h3` in `franchise-command-center.css` (`font-size: 30px`, `letter-spacing: 0.03em`). Specificity (1, 1, 1) beat `.gob-news-week h3`, so the titles stayed about 30px Inter. The replacement selectors are `#franchise-container #news-view .gob-news-week > h3` and `#franchise-container #awards-view .gob-awards > section > h3`: display, `--fs-16`, `--tracking-8`, `--text-60`, the same face as `.gob .card-h h3`. Each heading sits outside its card. Week groups read "Week 12". Awards read "1st Team All-American", "2nd Team All-American", "3rd Team All-American".
+
+Navy edge. `.gob-news-row.is-yours` now uses `var(--navy)` (`#27408E` in `gob-tokens.css`). There is no separate yours-edge token in `gob-tables.css` or `gob-components.css`. The hex `#1c2a52` is still the row fill in `gob-tables.css`: `tr.me` / `tr.is-user` (around line 110) and the leaders board `.ldb-top.me` / `.ldb-r.me` / `.gob-full tr.me` (around line 435). Those were left as they were.
+
+Row links. Dispatch targets use `.lnk`. The view title-cases `link_label` ("View", "Box Score"); the arrow is the existing `::after`. The payload is unchanged. A story `game_result` Box Score uses the same class.
+
+Awards tables. Columns are Player, Yr (`year` through `GOB_PlayerYear.formatDisplay`), Team (logo and name), PTS, REB, AST, STL, BLK, DEF%. The table is `max-content` with column widths so the stats sit against the team at 1280 and 1920. The player name pushes `player-view` with `player_id`. An empty tier is one quiet "No selections" row.
+
+Story body. The shared wide-table floor (`.gob-xs .gob-tbl { min-width: 1760px }`) was pushing the attribute columns and the RT letter off the story. The story table is content-sized, so the headers, luminance tiles, and RT letter sit with the name. `story-player-1280.png` is a walk-ons `player_table`. `story-upset-1280.png` is an upset `game_result` with the Box Score link.
+
+`origin/develop` was already at this branch tip. Full suite on port 8010: 501 passed, 2 skipped, 7.5m, exit 0, workers=1. Screenshots in `reports/news-awards/` were replaced (feed and awards at 1280 and 1920, save and fixture, plus the two story shots).
+
+Each All-American card is `width: fit-content; max-width: 100%`, so it hugs the table at 1280 and 1920. `fixture-awards-1280.png` and `fixture-awards-1920.png` were retaken.
+`tests/e2e/news-awards.spec.js` on port 8012: 6 passed, 8.6s, exit 0, workers=1.
+
 STATUS: COMPLETE

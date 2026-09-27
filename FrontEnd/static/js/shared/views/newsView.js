@@ -40,6 +40,12 @@ function feedUrl() {
   return window.location.pathname + (text ? '?' + text : '');
 }
 
+function presentLabel(label) {
+  return String(label || '').replace(/\b\w/g, function (letter) {
+    return letter.toUpperCase();
+  });
+}
+
 function storyUrl(id) {
   var params = new URLSearchParams(window.location.search);
   params.set('tab', 'news-view');
@@ -131,14 +137,14 @@ export function mount(container, ctx) {
     var html = '<div class="gob-news">';
     order.forEach(function (key) {
       var group = byWeek[key];
-      html += '<section class="gob-news-week"><h3>Week ' + tables.esc(group.week) + '</h3>';
+      html += '<section class="gob-news-week"><h3>Week ' + tables.esc(group.week) + '</h3><div class="gob-tcard gob-news-card">';
       group.mine.forEach(function (item) {
         html += '<div class="gob-news-row' + (item.yours ? ' is-yours' : '') + '">'
           + '<span class="gob-news-type">' + tables.esc(typeLabel(item.type)) + '</span>'
           + '<p>' + tables.esc(item.headline || '') + '</p>';
         if (item.target) {
-          html += '<a class="gob-news-link" href="' + tables.esc(item.target) + '">'
-            + tables.esc(item.link_label || '') + '</a>';
+          html += '<a class="lnk" href="' + tables.esc(item.target) + '">'
+            + tables.esc(presentLabel(item.link_label || '')) + '</a>';
         }
         html += '</div>';
       });
@@ -148,7 +154,7 @@ export function mount(container, ctx) {
           + '<span class="gob-news-type">' + tables.esc(typeLabel(item.type)) + '</span>'
           + '<p>' + tables.esc(item.headline || '') + '</p></a>';
       });
-      html += '</section>';
+      html += '</div></section>';
     });
     html += '</div>';
     container.innerHTML = html;

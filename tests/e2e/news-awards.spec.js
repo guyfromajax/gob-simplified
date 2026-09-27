@@ -91,6 +91,7 @@ function awardsBody() {
       first_team: [{
         player_id: 'p1',
         name: 'A. Cole',
+        year: 'Senior',
         team_id: TID,
         team_name: 'Lancaster',
         stats: { PTS: 22, REB: 5, AST: 6, STL: 2, BLK: 1, 'DEF%': 61 },
@@ -98,6 +99,7 @@ function awardsBody() {
       second_team: [{
         player_id: 'p2',
         name: 'B. Dunn',
+        year: 'Junior',
         team_id: OTHER,
         team_name: 'Four Corners',
         stats: { PTS: 18, REB: 8, AST: 2, STL: 1, BLK: 2, 'DEF%': 55 },
@@ -201,7 +203,16 @@ test('news and awards tabs stay in the page', async ({ page }) => {
   const firstRow = page.locator('#news-view .gob-news-week').first().locator('.gob-news-row').first();
   await expect(firstRow).toHaveClass(/is-yours/);
   await expect(firstRow).toContainText('Lancaster defeated Four Corners 70-64');
-  await expect(firstRow.locator('a')).toHaveAttribute('href', '/box-score.html?game_id=g1');
+  await expect(firstRow.locator('a.lnk')).toHaveAttribute('href', '/box-score.html?game_id=g1');
+  await expect(firstRow.locator('a.lnk')).toHaveText('Box Score');
+  const head = await page.locator('#news-view .gob-news-week > h3').first().evaluate(function (el) {
+    const style = getComputedStyle(el);
+    return { size: style.fontSize, family: style.fontFamily };
+  });
+  expect(head.size).toBe('16px');
+  expect(head.family).toContain('Bebas');
+  const edge = await firstRow.evaluate(function (el) { return getComputedStyle(el).boxShadow; });
+  expect(edge).toContain('39, 64, 142');
   expect(page.url()).toContain('tab=news-view');
   expect(page.url()).not.toContain('news.html');
   expect(await page.evaluate(() => performance.getEntriesByType('navigation').length)).toBe(navs);
@@ -210,10 +221,16 @@ test('news and awards tabs stay in the page', async ({ page }) => {
   await expect(page.locator('#awards-view.tab-content.active')).toBeVisible();
   await expect(page.locator('#awards-view h3').first()).toHaveText('1st Team All-American');
   await expect(page.locator('#awards-view tr.me')).toContainText('A. Cole');
+  await expect(page.locator('#awards-view tr.me')).toContainText('SR');
   await expect(page.locator('#awards-view tr.me')).toContainText('61%');
   await expect(page.locator('#awards-view tbody tr').nth(1)).not.toHaveClass(/me/);
+  await expect(page.locator('#awards-view .gob-awards-empty')).toHaveText('No selections');
   expect(page.url()).toContain('tab=awards-view');
   expect(page.url()).not.toContain('awards.html');
+  const player = page.locator('#awards-view tr.me a.gob-player');
+  await player.click();
+  await expect.poll(function () { return page.url(); }).toContain('tab=player-view');
+  expect(page.url()).toContain('player_id=p1');
 });
 
 test('a headline pushes the story and back restores the feed scroll', async ({ page }) => {
