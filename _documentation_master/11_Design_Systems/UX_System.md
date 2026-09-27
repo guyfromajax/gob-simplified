@@ -152,6 +152,15 @@ A page or brief is done only when this file is updated if the shell, the section
 8. Settings opens from the rail gear on a full shell page, from the top-bar gear in focus mode, and from the auth-bar gear everywhere else.
 9. Attribute digits and RT letters are unchanged.
 10. This document matches what shipped.
+11. The Playwright suite is green before merge. See "Running the suite" below.
+
+### Running the suite
+
+From the repo root, pick a port that is not already listening (another worktree may be on 8000) and run one worker. Leave `CI` unset so retries stay at 0. `desktop-*.spec.js` is ignored by the default config; run that file on its own only when a change touches the desktop play flow.
+
+```
+env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright" PYTHON_PATH=".venv/bin/python" ./node_modules/.bin/playwright test tests/e2e --workers=1 --reporter=line
+```
 
 ## 9. Browse and focus pages
 
