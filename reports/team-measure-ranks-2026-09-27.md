@@ -84,4 +84,4 @@ Fields are in `UX_System.md` §15, Team attributes.
 
 ## Commit
 
-Recorded on `api/team-measure-ranks` with this report.
+`68208f648` on `api/team-measure-ranks`: Rank team attribute measures across the league on team-data.
