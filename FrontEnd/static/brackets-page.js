@@ -45,7 +45,9 @@ function cloneParams(params) {
     backBtn.setAttribute('data-gob-up', backBtn.href);
   }
   if (footerSchedule && franchiseId && teamId) {
-    footerSchedule.href = `/schedule.html${resourceQuery()}`;
+    const scheduleParams = resourceQuery();
+    const joiner = scheduleParams.indexOf('?') === -1 ? '?' : '&';
+    footerSchedule.href = `/franchise-command-center.html${scheduleParams}${scheduleParams ? joiner : '?'}tab=league-schedule-view`;
   }
 
   async function fetchJSON(url) {

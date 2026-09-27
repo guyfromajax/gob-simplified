@@ -587,6 +587,7 @@ def _opponent(
     teams_by_id: Mapping[str, Mapping[str, Any]],
     ranks: Mapping[str, Any],
     franchise: Mapping[str, Any],
+    standings: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     display = resolve_team_display(
         franchise,
@@ -594,11 +595,14 @@ def _opponent(
         core_doc=teams_by_id.get(opponent_id) or {},
     )
     name = display.get("name") or None
+    record = (standings or {}).get(opponent_id) or {}
     return {
         "opponent_id": opponent_id,
         "opponent_name": name or None,
         "opponent_primary_color": display.get("primary_color") if teams_by_id.get(opponent_id) else None,
         "opponent_natl_rank": _as_int(ranks.get(opponent_id)),
+        "opponent_wins": int(record.get("W") or 0),
+        "opponent_losses": int(record.get("L") or 0),
     }
 
 
@@ -711,6 +715,9 @@ def build_team_detail(franchise_id: str, team_id: str) -> dict[str, Any]:
 
     completed = _completed(results)
     played_keys = set(completed)
+    from BackEnd.utils.schedule_browse import matchup_game_ids
+
+    game_ids = matchup_game_ids(str(fid))
     results_rows = []
     for (week, away_id, home_id), (away_score, home_score) in completed.items():
         if team_id not in {away_id, home_id}:
@@ -723,14 +730,18 @@ def build_team_detail(franchise_id: str, team_id: str) -> dict[str, Any]:
             site = "away"
             opponent_id = home_id
             team_score, opp_score = away_score, home_score
-        results_rows.append({
+        row = {
             "week": week,
             "site": site,
             "team_score": team_score,
             "opp_score": opp_score,
             "result": _result_letter(team_score, opp_score),
-            **_opponent(opponent_id, teams_by_id, ranks, franchise),
-        })
+            **_opponent(opponent_id, teams_by_id, ranks, franchise, standings),
+        }
+        game_id = game_ids.get((week, away_id, home_id))
+        if game_id:
+            row["game_id"] = game_id
+        results_rows.append(row)
     results_rows.sort(key=lambda row: -row["week"])
 
     remaining = []
@@ -746,7 +757,7 @@ def build_team_detail(franchise_id: str, team_id: str) -> dict[str, Any]:
         remaining.append({
             "week": week,
             "site": site,
-            **_opponent(opponent_id, teams_by_id, ranks, franchise),
+            **_opponent(opponent_id, teams_by_id, ranks, franchise, standings),
         })
     remaining.sort(key=lambda row: row["week"])
     next_game = remaining[0] if remaining else None

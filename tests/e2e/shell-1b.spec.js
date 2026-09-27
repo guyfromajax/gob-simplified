@@ -237,7 +237,7 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     ['team', 'Roster', 'roster-view'],
     ['team', 'Player Stats', 'player-stats-view'],
     ['team', 'Team Attributes', 'team-attributes-view'],
-    ['team', 'Schedule', 'schedule-tab'],
+    ['team', 'Schedule', 'team-schedule-view'],
     ['prep', 'Training', 'training-tab'],
     ['prep', 'Game Plan', 'game-plan-tab'],
     ['prep', 'Playbooks', 'playbooks-tab'],
@@ -303,9 +303,10 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     expect(url).toContain('team_id=' + TID);
     return url;
   }
-  const scheduleUrl = await expectGo('Schedule', '/schedule.html');
-  const scheduleHref = await page.locator('#schedule-full-link').getAttribute('href');
-  expect(scheduleUrl).toBe(scheduleHref);
+  await mouseClick(page, stab(page, 'Schedule'));
+  await expect(page.locator('#league-schedule-view.tab-content.active')).toBeVisible();
+  expect(page.url()).toContain('tab=league-schedule-view');
+  expect(page.url()).not.toContain('schedule.html');
   const navBeforeRankings = await page.evaluate(() => window.__shellNav.length);
   const docBeforeRankings = await page.evaluate(() => window.__docStamp || (window.__docStamp = 'shell1b'));
   await mouseClick(page, stab(page, 'Rankings'));

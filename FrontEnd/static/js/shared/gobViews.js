@@ -219,6 +219,14 @@
   });
 
   register({
+    id: 'league-schedule-view',
+    section: 'league',
+    subtab: 'league-schedule-view',
+    title: 'Schedule',
+    module: viewModule('leagueScheduleView.js')
+  });
+
+  register({
     id: 'roster-view',
     section: 'team',
     subtab: 'roster-view',
@@ -232,6 +240,14 @@
     subtab: 'player-stats-view',
     title: 'Player Stats',
     module: viewModule('playerStatsView.js')
+  });
+
+  register({
+    id: 'team-schedule-view',
+    section: 'team',
+    subtab: 'team-schedule-view',
+    title: 'Schedule',
+    module: viewModule('teamScheduleView.js')
   });
 
   register({
