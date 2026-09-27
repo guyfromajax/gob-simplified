@@ -115,3 +115,25 @@ Playwright (`game-start-sequence`, `navigation-fixes-3`, `navigation-history`): 
 ## Commit
 
 See the git log on `fix/user-week-stats`.
+
+## Pre-merge
+
+`navigation-fixes-3.spec.js`, workers=1, same machine, back to back. Baseline is a clean worktree of `origin/develop` (`276f6931c`), removed with `git worktree remove` after the three runs. Branch is `fix/user-week-stats` (`6e189aa0f`). P = pass, F = fail.
+
+| Test | Baseline 1 | 2 | 3 | Branch 1 | 2 | 3 |
+|---|---|---|---|---|---|---|
+| training submit lands on the report, then one Back reaches mode-select | P | P | P | P | P | P |
+| end-of-game locker room link returns to the locker room, and Forward stays out of the game | P | P | P | P | P | P |
+| end-of-game box score exit returns to the locker room | F | F | P | P | P | P |
+| standings team page returns instantly with in-app Back and browser Back | P | P | P | P | P | P |
+| a corrupted exit index still lands on the locker room | P | P | P | P | P | P |
+| custom playbooks adds one step and Back removes it, then training still returns with one Back | P | P | P | P | P | P |
+| Enter Franchise gives the locker room its own step, and one Back returns to mode-select | P | P | P | P | P | P |
+| a replayed quarter 409 leaves the court unpainted and returns to the lineup | P | P | P | P | P | P |
+| recruiting and cut-players exits return to the locker room they started from | P | P | P | P | P | P |
+
+No test failed on the branch in two or more runs. Nothing in `franchiseContext.js`, `set-lineup.js`, `finalizeGame.js`, or `gameCompletionPopup.js` was changed for this check. A new matchup still drops `game_id`. A same-matchup refresh still keeps it.
+
+The four failures from the earlier combined run did not reproduce when this spec ran alone. Three of them (corrupted exit, custom playbooks, replayed quarter) passed all three times on develop and all three times on this branch. The box-score exit failed twice on develop and never on this branch, so it is a pre-existing flake and was left alone. Develop run 1: teardown of that test exceeded the 120s timeout while the locker room was still on "Checking your session" (suite 31.8m). Develop run 2: `backToModeSelect` stayed on the locker room instead of mode-select (suite 1.9m). Develop run 3 passed (1.8m). Branch runs were 1.8m, 1.8m, and 1.7m.
+
+Final sweep on the branch, workers=1, one run: `game-start-sequence`, `navigation-fixes-3`, `navigation-history`, `store-client`, `office-frontend`, `shell-1`, `shell-2`. 62 passed, 1 skipped (`office-frontend` live mid-season digest; the dump file is absent), 3.8m.
