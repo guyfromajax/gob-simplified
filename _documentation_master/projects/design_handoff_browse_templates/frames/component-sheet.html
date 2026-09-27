@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GOB · Component sheet (Office + Shell + Browse templates)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="../templates.css">
+<style>
+body{margin:0;background:var(--bg);color:var(--text-87);font-family:var(--font-body);padding:var(--space-24) 40px 80px}
+h1{font:var(--fw-bold) 48px/1 var(--font-display);letter-spacing:var(--tracking-4);color:var(--text-100);margin:0 0 var(--space-24)}
+.sheet-sec{padding:var(--space-24) 0;border-top:1px solid var(--line)}
+.sheet-sec h2{font:var(--fw-bold) 28px/1 var(--font-display);letter-spacing:var(--tracking-5);color:var(--text-100);margin:0 0 var(--space-6)}
+.sheet-sec>p{margin:0 0 var(--space-16);font-size:13px;color:var(--text-60)}
+.sheet-row{display:flex;flex-wrap:wrap;gap:var(--space-24);align-items:flex-start}
+.sheet-item{margin:0;display:flex;flex-direction:column;gap:var(--space-8)}
+.sheet-item figcaption{font-size:11px;font-weight:var(--fw-bold);letter-spacing:var(--tracking-8);text-transform:uppercase;color:var(--text-38)}
+.gob.spec{height:auto;overflow:visible;background:transparent}
+.spec .top{height:var(--top-h);border:1px solid var(--line);border-radius:var(--radius-10)}
+.spec .rail{width:100%;border:1px solid var(--line);border-radius:var(--radius-10)}
+.spec .set-scrim{display:none}
+.spec .settings{animation:none}
+.sheet-flow{display:flex;flex-wrap:wrap;gap:var(--space-14);align-items:center}
+.sheet-ctl{display:flex;align-items:center;gap:var(--space-18);min-height:44px}
+.sheet-ctl>span:first-child{width:170px;font-size:11px;font-weight:var(--fw-bold);letter-spacing:var(--tracking-8);text-transform:uppercase;color:var(--text-38)}
+.spec .tbl th{position:relative;top:auto}.spec .pg-head{position:static}.sheet-part{font:var(--fw-bold) 40px/1 var(--font-display);letter-spacing:var(--tracking-4);color:var(--text-100);margin:56px 0 8px;padding-top:24px;border-top:2px solid var(--line-strong)}
+</style>
+</head>
+<body>
+<h1>GOB · component sheet</h1><p style="margin:-12px 0 24px;color:var(--text-60);font-size:13px">Part 1 · Office + Shell (Round 2, unchanged) · Part 2 · Browse templates (T1 table · T2 attribute grid · T3 detail) — jump: <a href="#browse" style="color:var(--text-100)">Browse templates ↓</a></p>
+<section class="sheet-sec">
+  <h2>Top bar</h2><p>56px @1280 / 64px @1920. Tier weeks: emblem + metal hairline + faint glow.</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption>Regular</figcaption>
+      <div class="gob gob-1280 spec" style="width:1280px">
+        <header class="top " >
+          <a class="top-id"><span class="logo" style="--tc:#A3243B;width:32px;height:32px;font-size:20px">L</span><span class="top-name">Lawrence Lions</span></a>
+          <div class="top-div">
+          </div>
+          <div class="top-stats">
+            <div class="ts">
+              <b>16–5</b><span>Record</span>
+            </div>
+            <div class="ts">
+              <b>#14</b><span>National</span>
+            </div>
+            <div class="ts ">
+              <div class="ts">
+                <b>Week 22</b><span>Regular Season</span>
+              </div>
+            </div>
+          </div>
+          <div class="top-sp">
+          </div>
+          <div class="adv-wrap">
+            <button class="advance " >PLAY NEXT GAME</button>
+          </div>
+        </header>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Tournament · conference</figcaption>
+      <div class="gob gob-1280 spec" style="width:1280px">
+        <header class="top is-tier" style="--tier-metal:#C79A5B;--tier-metal-hi:#EAC488">
+          <a class="top-id"><span class="logo" style="--tc:#A3243B;width:32px;height:32px;font-size:20px">L</span><span class="top-name">Lawrence Lions</span></a>
+          <div class="top-div">
+          </div>
+          <div class="top-stats">
+            <div class="ts">
+              <b>22–6</b><span>Record</span>
+            </div>
+            <div class="ts">
+              <b>#12</b><span>National</span>
+            </div>
+            <div class="ts ts-tier">
+              <svg width="20" height="24.0" viewBox="0 0 100 120" fill="none" style="flex:none;overflow:visible"><defs><linearGradient id="froe4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6DFAE"/><stop offset="1" stop-color="#9c7434"/></linearGradient><radialGradient id="fdoe4" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#16161f"/><stop offset="1" stop-color="#07070d"/></radialGradient></defs><path d="M14 12 H86 V60 C86 96 66 108 50 112 C34 108 14 96 14 60 Z" fill="url(#fdoe4)" stroke="url(#froe4)" stroke-width="4" stroke-linejoin="round"/><path d="M50.00 34.00L55.43 48.52L70.92 49.20L58.79 58.86L62.93 73.80L50.00 65.24L37.07 73.80L41.21 58.86L29.08 49.20L44.57 48.52Z" fill="#EAC488"/></svg>
+              <div class="ts">
+                <b>Week 28</b><span>Conference Tourney</span>
+              </div>
+            </div>
+          </div>
+          <div class="top-sp">
+          </div>
+          <div class="adv-wrap">
+            <button class="advance " >PLAY CONFERENCE SEMIFINAL</button>
+          </div>
+        </header>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Tournament · region</figcaption>
+      <div class="gob gob-1280 spec" style="width:1280px">
+        <header class="top is-tier" style="--tier-metal:#B9C1CD;--tier-metal-hi:#F0F4FA">
+          <a class="top-id"><span class="logo" style="--tc:#A3243B;width:32px;height:32px;font-size:20px">L</span><span class="top-name">Lawrence Lions</span></a>
+          <div class="top-div">
+          </div>
+          <div class="top-stats">
+            <div class="ts">
+              <b>22–6</b><span>Record</span>
+            </div>
+            <div class="ts">
+              <b>#12</b><span>National</span>
+            </div>
+            <div class="ts ts-tier">
+              <svg width="20" height="24.0" viewBox="0 0 100 120" fill="none" style="flex:none;overflow:visible"><defs><linearGradient id="froe5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#8b929e"/></linearGradient><radialGradient id="fdoe5" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#16161f"/><stop offset="1" stop-color="#07070d"/></radialGradient></defs><path d="M27 13 H73 L91 60 L73 107 H27 L9 60 Z" fill="url(#fdoe5)" stroke="url(#froe5)" stroke-width="4" stroke-linejoin="round"/><path d="M32.78 44.46L36.62 54.72L47.56 55.20L38.99 62.02L41.91 72.57L32.78 66.53L23.65 72.57L26.57 62.02L18.00 55.20L28.94 54.72Z" fill="#F0F4FA"/><path d="M67.22 44.46L71.06 54.72L82.00 55.20L73.43 62.02L76.35 72.57L67.22 66.53L58.09 72.57L61.01 62.02L52.44 55.20L63.38 54.72Z" fill="#F0F4FA"/></svg>
+              <div class="ts">
+                <b>Week 31</b><span>Region</span>
+              </div>
+            </div>
+          </div>
+          <div class="top-sp">
+          </div>
+          <div class="adv-wrap">
+            <button class="advance " >PLAY REGION FINAL</button>
+          </div>
+        </header>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Tournament · national</figcaption>
+      <div class="gob gob-1280 spec" style="width:1280px">
+        <header class="top is-tier" style="--tier-metal:#D4A848;--tier-metal-hi:#F0C560">
+          <a class="top-id"><span class="logo" style="--tc:#A3243B;width:32px;height:32px;font-size:20px">L</span><span class="top-name">Lawrence Lions</span></a>
+          <div class="top-div">
+          </div>
+          <div class="top-stats">
+            <div class="ts">
+              <b>22–6</b><span>Record</span>
+            </div>
+            <div class="ts">
+              <b>#12</b><span>National</span>
+            </div>
+            <div class="ts ts-tier">
+              <svg width="20" height="24.0" viewBox="0 0 100 120" fill="none" style="flex:none;overflow:visible"><defs><linearGradient id="froe6" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7E3A0"/><stop offset="1" stop-color="#9c7a1e"/></linearGradient><radialGradient id="fdoe6" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#16161f"/><stop offset="1" stop-color="#07070d"/></radialGradient></defs><line x1="100.00" y1="60.00" x2="105.50" y2="60.00" stroke="url(#froe6)" stroke-width="2.2"/><line x1="98.75" y1="71.13" x2="104.11" y2="72.35" stroke="url(#froe6)" stroke-width="2.2"/><line x1="95.05" y1="81.69" x2="100.00" y2="84.08" stroke="url(#froe6)" stroke-width="2.2"/><line x1="89.09" y1="91.17" x2="93.39" y2="94.60" stroke="url(#froe6)" stroke-width="2.2"/><line x1="81.17" y1="99.09" x2="84.60" y2="103.39" stroke="url(#froe6)" stroke-width="2.2"/><line x1="71.69" y1="105.05" x2="74.08" y2="110.00" stroke="url(#froe6)" stroke-width="2.2"/><line x1="61.13" y1="108.75" x2="62.35" y2="114.11" stroke="url(#froe6)" stroke-width="2.2"/><line x1="50.00" y1="110.00" x2="50.00" y2="115.50" stroke="url(#froe6)" stroke-width="2.2"/><line x1="38.87" y1="108.75" x2="37.65" y2="114.11" stroke="url(#froe6)" stroke-width="2.2"/><line x1="28.31" y1="105.05" x2="25.92" y2="110.00" stroke="url(#froe6)" stroke-width="2.2"/><line x1="18.83" y1="99.09" x2="15.40" y2="103.39" stroke="url(#froe6)" stroke-width="2.2"/><line x1="10.91" y1="91.17" x2="6.61" y2="94.60" stroke="url(#froe6)" stroke-width="2.2"/><line x1="4.95" y1="81.69" x2="-0.00" y2="84.08" stroke="url(#froe6)" stroke-width="2.2"/><line x1="1.25" y1="71.13" x2="-4.11" y2="72.35" stroke="url(#froe6)" stroke-width="2.2"/><line x1="0.00" y1="60.00" x2="-5.50" y2="60.00" stroke="url(#froe6)" stroke-width="2.2"/><line x1="1.25" y1="48.87" x2="-4.11" y2="47.65" stroke="url(#froe6)" stroke-width="2.2"/><line x1="4.95" y1="38.31" x2="-0.00" y2="35.92" stroke="url(#froe6)" stroke-width="2.2"/><line x1="10.91" y1="28.83" x2="6.61" y2="25.40" stroke="url(#froe6)" stroke-width="2.2"/><line x1="18.83" y1="20.91" x2="15.40" y2="16.61" stroke="url(#froe6)" stroke-width="2.2"/><line x1="28.31" y1="14.95" x2="25.92" y2="10.00" stroke="url(#froe6)" stroke-width="2.2"/><line x1="38.87" y1="11.25" x2="37.65" y2="5.89" stroke="url(#froe6)" stroke-width="2.2"/><line x1="50.00" y1="10.00" x2="50.00" y2="4.50" stroke="url(#froe6)" stroke-width="2.2"/><line x1="61.13" y1="11.25" x2="62.35" y2="5.89" stroke="url(#froe6)" stroke-width="2.2"/><line x1="71.69" y1="14.95" x2="74.08" y2="10.00" stroke="url(#froe6)" stroke-width="2.2"/><line x1="81.17" y1="20.91" x2="84.60" y2="16.61" stroke="url(#froe6)" stroke-width="2.2"/><line x1="89.09" y1="28.83" x2="93.39" y2="25.40" stroke="url(#froe6)" stroke-width="2.2"/><line x1="95.05" y1="38.31" x2="100.00" y2="35.92" stroke="url(#froe6)" stroke-width="2.2"/><line x1="98.75" y1="48.87" x2="104.11" y2="47.65" stroke="url(#froe6)" stroke-width="2.2"/><circle cx="50" cy="60" r="46" fill="url(#fdoe6)" stroke="url(#froe6)" stroke-width="4"/><circle cx="50" cy="60" r="40" fill="none" stroke="url(#froe6)" stroke-width="1.4" opacity="0.7"/><path d="M50.00 34.38L54.77 47.14L68.37 47.73L57.72 56.21L61.36 69.33L50.00 61.81L38.64 69.33L42.28 56.21L31.63 47.73L45.23 47.14Z" fill="#F0C560"/><path d="M28.58 58.32L31.69 66.64L40.56 67.03L33.61 72.56L35.99 81.11L28.58 76.21L21.17 81.11L23.55 72.56L16.60 67.03L25.47 66.64Z" fill="#F0C560"/><path d="M71.42 58.32L74.53 66.64L83.40 67.03L76.45 72.56L78.83 81.11L71.42 76.21L64.01 81.11L66.39 72.56L59.44 67.03L68.31 66.64Z" fill="#F0C560"/></svg>
+              <div class="ts">
+                <b>Week 33</b><span>Nationals</span>
+              </div>
+            </div>
+          </div>
+          <div class="top-sp">
+          </div>
+          <div class="adv-wrap">
+            <button class="advance " >PLAY NATIONAL SEMIFINAL</button>
+          </div>
+        </header>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Gated (Advance disabled + hint)</figcaption>
+      <div class="gob gob-1280 spec" style="width:1280px">
+        <header class="top " >
+          <a class="top-id"><span class="logo" style="--tc:#A3243B;width:32px;height:32px;font-size:20px">L</span><span class="top-name">Lawrence Lions</span></a>
+          <div class="top-div">
+          </div>
+          <div class="top-stats">
+            <div class="ts">
+              <b>0–0</b><span>Record</span>
+            </div>
+            <div class="ts">
+              <b>#31</b><span>National</span>
+            </div>
+            <div class="ts ">
+              <div class="ts">
+                <b>Week 1</b><span>Training Camp</span>
+              </div>
+            </div>
+          </div>
+          <div class="top-sp">
+          </div>
+          <div class="adv-wrap">
+            <a class="adv-hint">Assign Practice Squad to continue</a><button class="advance is-disabled" aria-disabled="true"><i class="adv-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg></i>RUN TRAINING</button>
+          </div>
+        </header>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Advance button</h2><p>Labels and states.</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption>Labels</figcaption>
+      <div class="gob gob-1280 spec" style="width:auto">
+        <div class="sheet-flow">
+          <div class="adv-wrap">
+            <button class="advance " >RUN TRAINING</button>
+          </div>
+          <div class="adv-wrap">
+            <button class="advance " >PLAY NEXT GAME</button>
+          </div>
+          <div class="adv-wrap">
+            <button class="advance " >PLAY CONFERENCE SEMIFINAL</button>
+          </div>
+          <div class="adv-wrap">
+            <button class="advance " >RUN SIGNING DAY</button>
+          </div>
+          <div class="adv-wrap">
+            <button class="advance " >GO TO NEXT SEASON</button>
+          </div>
+        </div>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Rest · hover · pressed · loading · disabled</figcaption>
+      <div class="gob gob-1280 spec" style="width:auto">
+        <div class="sheet-flow">
+          <div class="adv-wrap">
+            <button class="advance " >PLAY NEXT GAME</button>
+          </div>
+          <div class="adv-wrap">
+            <button class="advance is-hover" >PLAY NEXT GAME</button>
+          </div>
+          <div class="adv-wrap">
+            <button class="advance is-press" >PLAY NEXT GAME</button>
+          </div>
+          <div class="adv-wrap">
+            <button class="advance is-loading" >STARTING…</button>
+          </div>
+          <div class="adv-wrap">
+            <button class="advance is-disabled" aria-disabled="true"><i class="adv-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg></i>PLAY NEXT GAME</button>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Left rail</h2><p>Collapsed 64px @1280 · expanded 200px @1920. Badge: none / count / urgent pulse. Utility group; Feedback online only.</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption>Collapsed · no badge</figcaption>
+      <div class="gob gob-1280 spec" style="width:64px;height:664px;display:flex">
+        <nav class="rail">
+          <a class="rail-i  on " title="Office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h17M5 10v10M19 10v10M8 10V6.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6.5V10"/><path d="M9 14h6"/></svg><span>Office</span></a><a class="rail-i   " title="Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="2.7"/><circle cx="16" cy="9" r="2.3"/><path d="M3.5 19c0-2.9 2.2-5 5-5 1.8 0 3.3.9 4.2 2.3"/><path d="M13.5 19c.3-2.3 1.9-3.7 3.9-3.7 1.8 0 3.4 1.3 3.6 3.7"/></svg><span>Team</span></a><a class="rail-i   " title="Prep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h12a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"/><path d="M9 3h6v3H9z"/><path d="M8.5 12l2 2 4-4.5M8.5 17.5h7"/></svg><span>Prep</span></a><a class="rail-i   " title="League"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/><path d="M9 5v15"/></svg><span>League</span></a><a class="rail-i   " title="Recruiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.1"/><path d="M3.8 20c0-3.3 2.6-5.6 5.7-5.6 1.4 0 2.7.5 3.7 1.3"/><path d="M17.5 13.5v6M14.5 16.5h6"/></svg><span>Recruiting</span></a><a class="rail-i   " title="News"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a1.5 1.5 0 0 0 1.5 1.5H6A2 2 0 0 1 4 18.5Z"/><path d="M17 9h3v10a1.5 1.5 0 0 1-3 0"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/></svg><span>News</span></a>
+          <div class="rail-sp">
+          </div>
+          <div class="rail-div">
+          </div>
+          <a class="rail-i util  " title="Tutorials"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17.2v.1"/></svg><span>Tutorials</span></a><a class="rail-i util  " title="Feedback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4 3.5v-3.5h-.5a2 2 0 0 1-2-2Z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/></svg><span>Feedback</span></a><a class="rail-i util  " title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg><span>Settings</span></a>
+          <div class="rail-div q">
+          </div>
+          <a class="rail-i exit  " title="Exit Franchise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 16l-4-4 4-4M6 12h9"/></svg><span>Exit Franchise</span></a>
+        </nav>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Count badge</figcaption>
+      <div class="gob gob-1280 spec" style="width:64px;height:664px;display:flex">
+        <nav class="rail">
+          <a class="rail-i  on " title="Office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h17M5 10v10M19 10v10M8 10V6.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6.5V10"/><path d="M9 14h6"/></svg><span>Office</span></a><a class="rail-i   " title="Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="2.7"/><circle cx="16" cy="9" r="2.3"/><path d="M3.5 19c0-2.9 2.2-5 5-5 1.8 0 3.3.9 4.2 2.3"/><path d="M13.5 19c.3-2.3 1.9-3.7 3.9-3.7 1.8 0 3.4 1.3 3.6 3.7"/></svg><span>Team</span></a><a class="rail-i   " title="Prep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h12a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"/><path d="M9 3h6v3H9z"/><path d="M8.5 12l2 2 4-4.5M8.5 17.5h7"/></svg><span>Prep</span></a><a class="rail-i   " title="League"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/><path d="M9 5v15"/></svg><span>League</span></a><a class="rail-i   " title="Recruiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.1"/><path d="M3.8 20c0-3.3 2.6-5.6 5.7-5.6 1.4 0 2.7.5 3.7 1.3"/><path d="M17.5 13.5v6M14.5 16.5h6"/></svg><span>Recruiting</span><em class="">3</em></a><a class="rail-i   " title="News"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a1.5 1.5 0 0 0 1.5 1.5H6A2 2 0 0 1 4 18.5Z"/><path d="M17 9h3v10a1.5 1.5 0 0 1-3 0"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/></svg><span>News</span></a>
+          <div class="rail-sp">
+          </div>
+          <div class="rail-div">
+          </div>
+          <a class="rail-i util  " title="Tutorials"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17.2v.1"/></svg><span>Tutorials</span></a><a class="rail-i util  " title="Feedback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4 3.5v-3.5h-.5a2 2 0 0 1-2-2Z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/></svg><span>Feedback</span></a><a class="rail-i util  " title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg><span>Settings</span></a>
+          <div class="rail-div q">
+          </div>
+          <a class="rail-i exit  " title="Exit Franchise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 16l-4-4 4-4M6 12h9"/></svg><span>Exit Franchise</span></a>
+        </nav>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Urgent · pulsing</figcaption>
+      <div class="gob gob-1280 spec" style="width:64px;height:664px;display:flex">
+        <nav class="rail">
+          <a class="rail-i  on " title="Office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h17M5 10v10M19 10v10M8 10V6.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6.5V10"/><path d="M9 14h6"/></svg><span>Office</span></a><a class="rail-i   " title="Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="2.7"/><circle cx="16" cy="9" r="2.3"/><path d="M3.5 19c0-2.9 2.2-5 5-5 1.8 0 3.3.9 4.2 2.3"/><path d="M13.5 19c.3-2.3 1.9-3.7 3.9-3.7 1.8 0 3.4 1.3 3.6 3.7"/></svg><span>Team</span></a><a class="rail-i   " title="Prep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h12a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"/><path d="M9 3h6v3H9z"/><path d="M8.5 12l2 2 4-4.5M8.5 17.5h7"/></svg><span>Prep</span></a><a class="rail-i   " title="League"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/><path d="M9 5v15"/></svg><span>League</span></a><a class="rail-i   " title="Recruiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.1"/><path d="M3.8 20c0-3.3 2.6-5.6 5.7-5.6 1.4 0 2.7.5 3.7 1.3"/><path d="M17.5 13.5v6M14.5 16.5h6"/></svg><span>Recruiting</span><em class="urgent">1</em></a><a class="rail-i   " title="News"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a1.5 1.5 0 0 0 1.5 1.5H6A2 2 0 0 1 4 18.5Z"/><path d="M17 9h3v10a1.5 1.5 0 0 1-3 0"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/></svg><span>News</span></a>
+          <div class="rail-sp">
+          </div>
+          <div class="rail-div">
+          </div>
+          <a class="rail-i util  " title="Tutorials"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17.2v.1"/></svg><span>Tutorials</span></a><a class="rail-i util  " title="Feedback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4 3.5v-3.5h-.5a2 2 0 0 1-2-2Z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/></svg><span>Feedback</span></a><a class="rail-i util  " title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg><span>Settings</span></a>
+          <div class="rail-div q">
+          </div>
+          <a class="rail-i exit  " title="Exit Franchise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 16l-4-4 4-4M6 12h9"/></svg><span>Exit Franchise</span></a>
+        </nav>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Offline</figcaption>
+      <div class="gob gob-1280 spec" style="width:64px;height:664px;display:flex">
+        <nav class="rail">
+          <a class="rail-i  on " title="Office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h17M5 10v10M19 10v10M8 10V6.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6.5V10"/><path d="M9 14h6"/></svg><span>Office</span></a><a class="rail-i   " title="Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="2.7"/><circle cx="16" cy="9" r="2.3"/><path d="M3.5 19c0-2.9 2.2-5 5-5 1.8 0 3.3.9 4.2 2.3"/><path d="M13.5 19c.3-2.3 1.9-3.7 3.9-3.7 1.8 0 3.4 1.3 3.6 3.7"/></svg><span>Team</span></a><a class="rail-i   " title="Prep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h12a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"/><path d="M9 3h6v3H9z"/><path d="M8.5 12l2 2 4-4.5M8.5 17.5h7"/></svg><span>Prep</span></a><a class="rail-i   " title="League"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/><path d="M9 5v15"/></svg><span>League</span></a><a class="rail-i   " title="Recruiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.1"/><path d="M3.8 20c0-3.3 2.6-5.6 5.7-5.6 1.4 0 2.7.5 3.7 1.3"/><path d="M17.5 13.5v6M14.5 16.5h6"/></svg><span>Recruiting</span><em class="">3</em></a><a class="rail-i   " title="News"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a1.5 1.5 0 0 0 1.5 1.5H6A2 2 0 0 1 4 18.5Z"/><path d="M17 9h3v10a1.5 1.5 0 0 1-3 0"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/></svg><span>News</span></a>
+          <div class="rail-sp">
+          </div>
+          <div class="rail-div">
+          </div>
+          <a class="rail-i util  " title="Tutorials"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17.2v.1"/></svg><span>Tutorials</span></a><a class="rail-i util  " title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg><span>Settings</span></a>
+          <div class="rail-div q">
+          </div>
+          <a class="rail-i exit  " title="Exit Franchise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 16l-4-4 4-4M6 12h9"/></svg><span>Exit Franchise</span></a>
+        </nav>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Expanded · online</figcaption>
+      <div class="gob gob-1920 spec" style="width:200px;height:760px;display:flex">
+        <nav class="rail">
+          <a class="rail-i  on " title="Office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h17M5 10v10M19 10v10M8 10V6.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6.5V10"/><path d="M9 14h6"/></svg><span>Office</span></a><a class="rail-i   " title="Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="2.7"/><circle cx="16" cy="9" r="2.3"/><path d="M3.5 19c0-2.9 2.2-5 5-5 1.8 0 3.3.9 4.2 2.3"/><path d="M13.5 19c.3-2.3 1.9-3.7 3.9-3.7 1.8 0 3.4 1.3 3.6 3.7"/></svg><span>Team</span></a><a class="rail-i   " title="Prep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h12a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"/><path d="M9 3h6v3H9z"/><path d="M8.5 12l2 2 4-4.5M8.5 17.5h7"/></svg><span>Prep</span></a><a class="rail-i   " title="League"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/><path d="M9 5v15"/></svg><span>League</span></a><a class="rail-i   " title="Recruiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.1"/><path d="M3.8 20c0-3.3 2.6-5.6 5.7-5.6 1.4 0 2.7.5 3.7 1.3"/><path d="M17.5 13.5v6M14.5 16.5h6"/></svg><span>Recruiting</span><em class="">3</em></a><a class="rail-i   " title="News"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a1.5 1.5 0 0 0 1.5 1.5H6A2 2 0 0 1 4 18.5Z"/><path d="M17 9h3v10a1.5 1.5 0 0 1-3 0"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/></svg><span>News</span></a>
+          <div class="rail-sp">
+          </div>
+          <div class="rail-div">
+          </div>
+          <a class="rail-i util  " title="Tutorials"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17.2v.1"/></svg><span>Tutorials</span></a><a class="rail-i util  " title="Feedback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4 3.5v-3.5h-.5a2 2 0 0 1-2-2Z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/></svg><span>Feedback</span></a><a class="rail-i util  " title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg><span>Settings</span></a>
+          <div class="rail-div q">
+          </div>
+          <a class="rail-i exit  " title="Exit Franchise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 16l-4-4 4-4M6 12h9"/></svg><span>Exit Franchise</span></a>
+        </nav>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Expanded · offline · urgent</figcaption>
+      <div class="gob gob-1920 spec" style="width:200px;height:760px;display:flex">
+        <nav class="rail">
+          <a class="rail-i  on " title="Office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h17M5 10v10M19 10v10M8 10V6.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6.5V10"/><path d="M9 14h6"/></svg><span>Office</span></a><a class="rail-i   " title="Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="2.7"/><circle cx="16" cy="9" r="2.3"/><path d="M3.5 19c0-2.9 2.2-5 5-5 1.8 0 3.3.9 4.2 2.3"/><path d="M13.5 19c.3-2.3 1.9-3.7 3.9-3.7 1.8 0 3.4 1.3 3.6 3.7"/></svg><span>Team</span></a><a class="rail-i   " title="Prep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h12a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"/><path d="M9 3h6v3H9z"/><path d="M8.5 12l2 2 4-4.5M8.5 17.5h7"/></svg><span>Prep</span></a><a class="rail-i   " title="League"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/><path d="M9 5v15"/></svg><span>League</span></a><a class="rail-i   " title="Recruiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.1"/><path d="M3.8 20c0-3.3 2.6-5.6 5.7-5.6 1.4 0 2.7.5 3.7 1.3"/><path d="M17.5 13.5v6M14.5 16.5h6"/></svg><span>Recruiting</span><em class="urgent">1</em></a><a class="rail-i   " title="News"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a1.5 1.5 0 0 0 1.5 1.5H6A2 2 0 0 1 4 18.5Z"/><path d="M17 9h3v10a1.5 1.5 0 0 1-3 0"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/></svg><span>News</span></a>
+          <div class="rail-sp">
+          </div>
+          <div class="rail-div">
+          </div>
+          <a class="rail-i util  " title="Tutorials"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17.2v.1"/></svg><span>Tutorials</span></a><a class="rail-i util  " title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg><span>Settings</span></a>
+          <div class="rail-div q">
+          </div>
+          <a class="rail-i exit  " title="Exit Franchise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 16l-4-4 4-4M6 12h9"/></svg><span>Exit Franchise</span></a>
+        </nav>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Settings open</figcaption>
+      <div class="gob gob-1920 spec" style="width:200px;height:760px;display:flex">
+        <nav class="rail">
+          <a class="rail-i  on " title="Office"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10h17M5 10v10M19 10v10M8 10V6.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 6.5V10"/><path d="M9 14h6"/></svg><span>Office</span></a><a class="rail-i   " title="Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="2.7"/><circle cx="16" cy="9" r="2.3"/><path d="M3.5 19c0-2.9 2.2-5 5-5 1.8 0 3.3.9 4.2 2.3"/><path d="M13.5 19c.3-2.3 1.9-3.7 3.9-3.7 1.8 0 3.4 1.3 3.6 3.7"/></svg><span>Team</span></a><a class="rail-i   " title="Prep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4.5h12a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1Z"/><path d="M9 3h6v3H9z"/><path d="M8.5 12l2 2 4-4.5M8.5 17.5h7"/></svg><span>Prep</span></a><a class="rail-i   " title="League"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h16M4 20h16"/><path d="M9 5v15"/></svg><span>League</span></a><a class="rail-i   " title="Recruiting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="8" r="3.1"/><path d="M3.8 20c0-3.3 2.6-5.6 5.7-5.6 1.4 0 2.7.5 3.7 1.3"/><path d="M17.5 13.5v6M14.5 16.5h6"/></svg><span>Recruiting</span><em class="">3</em></a><a class="rail-i   " title="News"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14a1.5 1.5 0 0 0 1.5 1.5H6A2 2 0 0 1 4 18.5Z"/><path d="M17 9h3v10a1.5 1.5 0 0 1-3 0"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/></svg><span>News</span></a>
+          <div class="rail-sp">
+          </div>
+          <div class="rail-div">
+          </div>
+          <a class="rail-i util  " title="Tutorials"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17.2v.1"/></svg><span>Tutorials</span></a><a class="rail-i util  " title="Feedback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4 3.5v-3.5h-.5a2 2 0 0 1-2-2Z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/></svg><span>Feedback</span></a><a class="rail-i util  open" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg><span>Settings</span></a>
+          <div class="rail-div q">
+          </div>
+          <a class="rail-i exit  " title="Exit Franchise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 16l-4-4 4-4M6 12h9"/></svg><span>Exit Franchise</span></a>
+        </nav>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Sub-tab row</h2><p>Parallelogram tabs per the style guide. Rest / hover / active.</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption></figcaption>
+      <div class="gob gob-1280 spec" style="width:auto">
+        <div class="subtabs">
+          <a class="stab on">Roster</a><a class="stab ">Stats</a><a class="stab ">Development</a><a class="stab ">Practice Squad</a><a class="stab ">History</a>
+        </div>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>To-do row</h2><p>Required · gated · advance-mirror · done · optional note.</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption></figcaption>
+      <div class="gob gob-1280 spec" style="width:380px">
+        <div class="todo-list">
+          <button class="todo   " style="--i:0"><span class="cbox"></span><span class="td-t"><span class="td-l">Review Recruit Invites</span><span class="td-m">Invite Wk 3 of 7</span></span><span class="td-c"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span></button><button class="todo  gated " style="--i:0"><span class="cbox"></span><span class="td-t"><span class="td-l">Assign Practice Squad</span><span class="td-m">Required before camp</span><span class="td-tags"><span class="td-gate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>Blocks advance</span></span></span><span class="td-c"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span></button><button class="todo   " style="--i:0"><span class="cbox"></span><span class="td-t"><span class="td-l">Play Next Game vs Morristown</span><span class="td-m">Fri · Away · Keystone Conference</span><span class="td-tags"><span class="td-adv">Advance</span></span></span><span class="td-c"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span></button><button class="todo done  " style="--i:0"><span class="cbox"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></span><span class="td-t"><span class="td-l">Run Training</span><span class="td-m">Completed · Week 22</span></span><span class="td-c"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span></button><button class="todo is-hover   " style="--i:0"><span class="cbox"></span><span class="td-t"><span class="td-l">Review Recruit Invites</span><span class="td-m">Invite Wk 3 of 7</span></span><span class="td-c"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span></button>
+        </div>
+        <div class="note-list">
+          <a class="note" style="--i:0"><span class="nt-b"></span><span class="nt-l">Playbooks not saved for this week</span><span class="lnk">Playbooks</span></a>
+        </div>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>1920 (second line)</figcaption>
+      <div class="gob gob-1920 spec" style="width:460px">
+        <button class="todo   " style="--i:0"><span class="cbox"></span><span class="td-t"><span class="td-l">Review Recruit Invites</span><span class="td-m">Invite Wk 3 of 7</span><span class="td-m2">3 invites awaiting your call before Friday</span></span><span class="td-c"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span></button>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Delta chip</h2><p>▲ up · ▼ down · — flat · streak · standing.</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption></figcaption>
+      <div class="gob gob-1280 spec" style="width:auto">
+        <div class="sheet-flow">
+          <span class="chip up ar-pop" style="--i:0">▲3</span><span class="chip down ar-pop" style="--i:0">▼2</span><span class="chip flat ar-pop" style="--i:0">—</span><span class="chip flat ar-pop" style="--i:0">W4</span><span class="chip flat ar-pop" style="--i:0">L1</span><span class="chip up ar-pop" style="--i:0">▲1st</span><span class="chip down ar-pop" style="--i:0">▼2nd</span><span class="chip flat ar-pop" style="--i:0">T-1st</span>
+        </div>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>What moved</h2><p>Stat-delta cells + attribute-change rows (digits in tier colours).</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption></figcaption>
+      <div class="gob gob-1280 spec" style="width:460px">
+        <section class="card office-mv ar-card">
+          <div class="card-h">
+            <h3>What moved</h3><span class="meta">Since Week 21</span>
+          </div>
+          <div class="mv-strip">
+            <a class="mv-cell ar-item" style="--i:0"><span class="mv-l">National rank</span><span class="mv-v"><b data-cu-from="17" data-cu-to="14" data-cu-pre="#" data-cu-suf="">#14</b><span class="chip up ar-pop" style="--i:0">▲3</span></span></a><a class="mv-cell ar-item" style="--i:1"><span class="mv-l">Keystone Conf.</span><span class="mv-v"><b>2nd</b><span class="chip up ar-pop" style="--i:1">▲1</span></span></a><a class="mv-cell ar-item" style="--i:2"><span class="mv-l">Record</span><span class="mv-v"><b data-cu-from="15" data-cu-to="16" data-cu-pre="" data-cu-suf="–5">16–5</b><span class="chip flat ar-pop" style="--i:2">W4</span></span></a>
+          </div>
+          <div class="mv-list">
+            <a class="mv-p ar-item" style="--i:3"><span class="mv-pn"><span class="nm">Jalen Carter</span><span>SG · Shooting</span></span><span class="mv-ft"><b class="tdig t-yellow ">6</b><i>→</i><b class="tdig t-green ">7</b></span><span class="chip up ar-pop" style="--i:3">▲1</span></a><a class="mv-p ar-item" style="--i:4"><span class="mv-pn"><span class="nm">Marcus Ruiz</span><span>PF · Endurance</span></span><span class="mv-ft"><b class="tdig t-green ">7</b><i>→</i><b class="tdig t-yellow ">6</b></span><span class="chip down ar-pop" style="--i:4">▼1</span></a>
+          </div>
+        </section>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Recruiting wire row</h2><p>Gain · hold · drop — drops mirror gains exactly.</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption></figcaption>
+      <div class="gob gob-1280 spec" style="width:460px">
+        <section class="card office-wire">
+          <a class="wr ar-item " style="--i:0"><span class="chip up ar-pop" style="--i:0">▲</span><span class="wr-b"><span class="wr-1"><span class="nm">Eli Brooks</span><span class="wr-m">C · <span class="stars">★★★<i>★★</i></span></span></span><span class="wr-2">Moved you to #2 on his list</span></span><span class="wr-tag">#2</span></a><a class="wr ar-item " style="--i:1"><span class="chip flat ar-pop" style="--i:1">—</span><span class="wr-b"><span class="wr-1"><span class="nm">Dante Moss</span><span class="wr-m">PG · <span class="stars">★★★★<i>★</i></span> · Filmed B</span></span><span class="wr-2">Still has you #1 on his list</span></span><span class="wr-tag">#1</span></a><a class="wr ar-item dn" style="--i:2"><span class="chip down ar-pop" style="--i:2">▼</span><span class="wr-b"><span class="wr-1"><span class="nm">Tyrese Hall</span><span class="wr-m">SF · <span class="stars">★★★★<i>★</i></span></span></span><span class="wr-2">Committed to <span class="nm">Lancaster</span></span></span><span class="wr-tag">Gone</span></a>
+        </section>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Result card</h2><p>Win (team-colour wash) · loss (neutral, quiet).</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption>Win</figcaption>
+      <div class="gob gob-1280 spec" style="width:460px">
+        <section class="card office-res  ar-card">
+          <div class="res-k">
+            <span class="wl win">WIN</span><span class="res-when">Final · Week 21 · Home</span><a class="lnk">Box Score</a>
+          </div>
+          <div class="res-score">
+            <a class="rs-team"><span class="logo" style="--tc:#A3243B;width:34px;height:34px;font-size:21px">L</span><span class="rs-n">Lawrence</span></a><b class="rs-pts ">71</b><span class="rs-dash">–</span><b class="rs-pts them">64</b><a class="rs-team r "><span class="rs-n"><em>#9</em>Four Corners</span><span class="logo" style="--tc:#1E7A74;width:34px;height:34px;font-size:21px">F</span></a>
+          </div>
+          <a class="res-hl">Lions stun #9 Four Corners behind Carter's 24</a>
+          <div class="potg">
+            <span class="portrait" style="width:46px;height:46px"><img src="../assets/portrait-placeholder.png" alt=""></span>
+            <div class="pg-id">
+              <span class="eyebrow">Player of the game</span><a class="nm pg-n">Jalen Carter</a><span class="pg-p">SG · RT <b class="tdig t-blue ">9</b></span>
+            </div>
+            <div class="pg-line">
+              <div>
+                <b>24</b><span>PTS</span>
+              </div>
+              <div>
+                <b>9</b><span>REB</span>
+              </div>
+              <div>
+                <b>5</b><span>AST</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Loss</figcaption>
+      <div class="gob gob-1280 spec" style="width:460px">
+        <section class="card office-res is-loss ar-card">
+          <div class="res-k">
+            <span class="wl loss">LOSS</span><span class="res-when">Final · Week 21 · Away</span><a class="lnk">Box Score</a>
+          </div>
+          <div class="res-score">
+            <a class="rs-team"><span class="logo" style="--tc:#A3243B;width:34px;height:34px;font-size:21px">L</span><span class="rs-n">Lawrence</span></a><b class="rs-pts them">58</b><span class="rs-dash">–</span><b class="rs-pts ">66</b><a class="rs-team r won"><span class="rs-n"><em>#22</em>Morristown</span><span class="logo" style="--tc:#5B3A8E;width:34px;height:34px;font-size:21px">M</span></a>
+          </div>
+          <a class="res-hl">Morristown holds Lions to 58 in road loss</a>
+          <div class="potg">
+            <span class="portrait" style="width:46px;height:46px"><img src="../assets/portrait-placeholder.png" alt=""></span>
+            <div class="pg-id">
+              <span class="eyebrow">Lawrence leader</span><a class="nm pg-n">Jalen Carter</a><span class="pg-p">SG · RT <b class="tdig t-blue ">9</b></span>
+            </div>
+            <div class="pg-line">
+              <div>
+                <b>17</b><span>PTS</span>
+              </div>
+              <div>
+                <b>6</b><span>REB</span>
+              </div>
+              <div>
+                <b>3</b><span>AST</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Season final (signing day)</figcaption>
+      <div class="gob gob-1280 spec" style="width:460px">
+        <section class="card office-res is-loss ar-card">
+          <a class="res-season">Season complete · 26–7 · Keystone Tournament champions</a>
+          <div class="res-k">
+            <span class="wl loss">LOSS</span><span class="res-when">Season final · Region Semifinal · Neutral</span><a class="lnk">Box Score</a>
+          </div>
+          <div class="res-score">
+            <a class="rs-team"><span class="logo" style="--tc:#A3243B;width:34px;height:34px;font-size:21px">L</span><span class="rs-n">Lawrence</span></a><b class="rs-pts them">61</b><span class="rs-dash">–</span><b class="rs-pts ">67</b><a class="rs-team r won"><span class="rs-n"><em>#5</em>Allentown</span><span class="logo" style="--tc:#8A3B12;width:34px;height:34px;font-size:21px">A</span></a>
+          </div>
+          <a class="res-hl">Lions fall at the Region semis to #5 Allentown</a>
+          <div class="potg">
+            <span class="portrait" style="width:46px;height:46px"><img src="../assets/portrait-placeholder.png" alt=""></span>
+            <div class="pg-id">
+              <span class="eyebrow">Lawrence leader</span><a class="nm pg-n">Marcus Ruiz</a><span class="pg-p">PF · RT <b class="tdig t-green ">8</b></span>
+            </div>
+            <div class="pg-line">
+              <div>
+                <b>21</b><span>PTS</span>
+              </div>
+              <div>
+                <b>10</b><span>REB</span>
+              </div>
+              <div>
+                <b>2</b><span>BLK</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Next-game card</h2><p>Regular · tournament tier.</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption>Regular</figcaption>
+      <div class="gob gob-1280 spec" style="width:340px">
+        <section class="card office-next ar-card">
+          <div class="nx-top">
+            <span class="meta">Fri · 7:00 PM · Away</span>
+          </div>
+          <div class="nx-m">
+            <span class="logo" style="--tc:#5B3A8E;width:44px;height:44px;font-size:27px">M</span>
+            <div>
+              <span class="nx-at">at</span><a class="nx-name">Morristown</a><span class="nx-sub">#22 · 13–8 · Keystone Conference</span>
+            </div>
+          </div>
+          <div class="nx-rt">
+            <span>Team RT</span><span>LAW <b class="grade t-blue">A−</b></span><span>MOR <b class="grade t-green">B+</b></span>
+          </div>
+          <div class="sub-h">
+            Players to watch
+          </div>
+          <a class="ptw"><span class="nm">D. Price</span><span class="ptw-r">Top scorer</span><b>18.4</b><em>PPG</em></a><a class="ptw"><span class="nm">K. Owens</span><span class="ptw-r">Top rebounder</span><b>9.1</b><em>RPG</em></a>
+          <div class="card-f">
+            <a class="lnk">Scout them</a>
+          </div>
+        </section>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Tournament</figcaption>
+      <div class="gob gob-1280 spec" style="width:340px">
+        <section class="card office-next tier ar-card">
+          <div class="tn-band">
+            <span class="lockup"><svg width="28" height="33.6" viewBox="0 0 100 120" fill="none" style="flex:none;overflow:visible"><defs><linearGradient id="froe7" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6DFAE"/><stop offset="1" stop-color="#9c7434"/></linearGradient><radialGradient id="fdoe7" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#16161f"/><stop offset="1" stop-color="#07070d"/></radialGradient></defs><path d="M14 12 H86 V60 C86 96 66 108 50 112 C34 108 14 96 14 60 Z" fill="url(#fdoe7)" stroke="url(#froe7)" stroke-width="4" stroke-linejoin="round"/><path d="M50.00 34.00L55.43 48.52L70.92 49.20L58.79 58.86L62.93 73.80L50.00 65.24L37.07 73.80L41.21 58.86L29.08 49.20L44.57 48.52Z" fill="#EAC488"/></svg><span class="lk-txt"><span class="lk-l1">CONFERENCE</span><span class="lk-l2">TOURNAMENT</span></span></span><span class="tn-round">Semifinal</span>
+          </div>
+          <div class="tn-vs">
+            <a class="tn-side"><span class="tn-lg"><span class="logo" style="--tc:#A3243B;width:38px;height:38px;font-size:24px">L</span><span class="tn-seed">2</span></span><span class="tn-name">Lawrence</span><span class="tn-rec">22–6 · #12 · RT <b class="grade t-blue">A−</b></span></a><span class="tn-x">VS</span><a class="tn-side"><span class="tn-lg"><span class="logo" style="--tc:#3F4654;width:38px;height:38px;font-size:24px">L</span><span class="tn-seed">1</span></span><span class="tn-name">Lancaster</span><span class="tn-rec">23–4 · #6 · RT <b class="grade t-blue">A</b></span></a>
+          </div>
+          <div class="tn-when">
+            <span>Sat · 7:00 PM · Hershey Arena · Neutral</span><span>Winner → Keystone Final</span>
+          </div>
+          <div class="sub-h">
+            Players to watch
+          </div>
+          <a class="ptw"><span class="nm">T. Vance</span><span class="ptw-r">Top scorer</span><b>21.2</b><em>PPG</em></a><a class="ptw"><span class="nm">M. Ellis</span><span class="ptw-r">Top rebounder</span><b>10.4</b><em>RPG</em></a>
+          <div class="card-f">
+            <a class="lnk">Scout them</a>
+          </div>
+        </section>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Regular · 1920</figcaption>
+      <div class="gob gob-1920 spec" style="width:520px">
+        <section class="card office-next ar-card">
+          <div class="nx-top">
+            <span class="meta">Fri · 7:00 PM · Away</span>
+          </div>
+          <div class="nx-m">
+            <span class="logo" style="--tc:#5B3A8E;width:56px;height:56px;font-size:35px">M</span>
+            <div>
+              <span class="nx-at">at</span><a class="nx-name">Morristown</a><span class="nx-sub">#22 · 13–8 · Keystone Conference</span>
+            </div>
+          </div>
+          <div class="nx-rt">
+            <span>Team RT</span><span>LAW <b class="grade t-blue">A−</b></span><span>MOR <b class="grade t-green">B+</b></span>
+          </div>
+          <div class="sub-h">
+            Projected starting five
+          </div>
+          <div class="five">
+            <a class="f5"><span class="av" style="width:28px;height:28px;font-size:10px">JR</span><span class="f5-n"><span class="nm">J. Reyes</span></span><span class="f5-p">PG</span><b class="tdig t-green ">8</b><span class="f5-s">11.2<em>PPG</em></span></a><a class="f5"><span class="av" style="width:28px;height:28px;font-size:10px">DP</span><span class="f5-n"><span class="nm">D. Price</span><span class="f5-tag">Top scorer</span></span><span class="f5-p">SG</span><b class="tdig t-blue ">10</b><span class="f5-s">18.4<em>PPG</em></span></a><a class="f5"><span class="av" style="width:28px;height:28px;font-size:10px">TM</span><span class="f5-n"><span class="nm">T. Mills</span></span><span class="f5-p">SF</span><b class="tdig t-green ">7</b><span class="f5-s">9.6<em>PPG</em></span></a><a class="f5"><span class="av" style="width:28px;height:28px;font-size:10px">AG</span><span class="f5-n"><span class="nm">A. Grant</span></span><span class="f5-p">PF</span><b class="tdig t-yellow ">6</b><span class="f5-s">7.8<em>RPG</em></span></a><a class="f5"><span class="av" style="width:28px;height:28px;font-size:10px">KO</span><span class="f5-n"><span class="nm">K. Owens</span><span class="f5-tag">Top rebounder</span></span><span class="f5-p">C</span><b class="tdig t-blue ">9</b><span class="f5-s">9.1<em>RPG</em></span></a>
+          </div>
+          <div class="card-f">
+            <a class="lnk">Scout them</a>
+          </div>
+        </section>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Team snapshot / Signing day / Season preview / Final standings</h2>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption>Team snapshot</figcaption>
+      <div class="gob gob-1280 spec" style="width:340px">
+        <section class="card office-snap ar-card">
+          <div class="card-h">
+            <h3>Team Snapshot</h3><a class="lnk">Team measures</a>
+          </div>
+          <div class="sn-g">
+            <div class="sn-row">
+              <span class="sn-l">Team chemistry</span><b class="sn-v">19<i>/25</i></b>
+            </div>
+            <div class="meter">
+              <i style="width:76%"></i>
+            </div>
+          </div>
+          <div class="sn-g">
+            <div class="sn-row">
+              <span class="sn-l">Player attitude</span><span class="meta">12 players</span>
+            </div>
+            <div class="spread">
+              <i style="flex:5"></i><i style="flex:4"></i><i style="flex:2"></i><i style="flex:1"></i>
+            </div>
+            <div class="sp-key">
+              <span class=""><b>5</b>Driven</span><span class=""><b>4</b>Content</span><span class=""><b>2</b>Restless</span><span class="bad"><b>1</b>Unhappy</span>
+            </div>
+          </div>
+          <div class="sub-h">
+            Moved most this week
+          </div>
+          <a class="msr"><span>Defensive efficiency</span><b>11</b><span class="chip up ar-pop" style="--i:8">▲2</span></a><a class="msr"><span>Discipline</span><b>8</b><span class="chip down ar-pop" style="--i:8">▼1</span></a>
+        </section>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Signing day</figcaption>
+      <div class="gob gob-1280 spec" style="width:340px">
+        <section class="card office-sign ar-card">
+          <div class="card-h">
+            <h3>Signing Day</h3><span class="meta">Week 35 · Class of 2027</span>
+          </div>
+          <a class="sg-pts"><span class="mv-l">Points remaining</span><span class="sg-pv"><b>34</b><i>/ 50</i></span>
+          <div class="meter">
+            <i style="width:68%"></i>
+          </div>
+          </a>
+          <div class="sg-2">
+            <a class="mv-cell"><span class="mv-l">Promises made</span><span class="mv-v"><b>2</b></span></a><a class="mv-cell"><span class="mv-l">Roster spots open</span><span class="mv-v"><b>3</b></span></a>
+          </div>
+          <div class="sub-h">
+            Top targets · where you stand
+          </div>
+          <a class="wr sg-t "><span class="chip up ar-pop" style="--i:0">▲1st</span><span class="wr-b"><span class="wr-1"><span class="nm">Dante Moss</span><span class="wr-m">PG · <span class="stars">★★★★<i>★</i></span></span></span><span class="wr-2">Leaning you</span></span><span class="td-c"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span></a><a class="wr sg-t dn"><span class="chip down ar-pop" style="--i:1">▼2nd</span><span class="wr-b"><span class="wr-1"><span class="nm">Eli Brooks</span><span class="wr-m">C · <span class="stars">★★★<i>★★</i></span></span></span><span class="wr-2">Lancaster leads by a hair</span></span><span class="td-c"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span></a><a class="wr sg-t "><span class="chip flat ar-pop" style="--i:2">T-1st</span><span class="wr-b"><span class="wr-1"><span class="nm">Jordan Kail</span><span class="wr-m">SF · <span class="stars">★★★<i>★★</i></span></span></span><span class="wr-2">Toss-up · 3 schools</span></span><span class="td-c"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span></a>
+          <div class="card-f">
+            <a class="lnk">Promises</a><a class="lnk">Signing Board</a>
+          </div>
+        </section>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Season preview</figcaption>
+      <div class="gob gob-1280 spec" style="width:460px">
+        <section class="card sp-card ar-card">
+          <div class="sp-k">
+            <span class="sp-tag">SEASON PREVIEW</span><span class="meta">Week 1 · No games played</span>
+          </div>
+          <a class="sp-title">Lions open camp at #31, picked 4th in the Keystone</a>
+          <div class="mv-strip">
+            <a class="mv-cell"><span class="mv-l">Preseason rank</span><span class="mv-v"><b>#31</b></span></a><a class="mv-cell"><span class="mv-l">Keystone outlook</span><span class="mv-v"><b>Picked 4th</b></span></a><a class="mv-cell"><span class="mv-l">Team RT</span><span class="mv-v"><b class="grade t-green">B</b></span></a>
+          </div>
+          <div class="mv-list">
+            <a class="mv-p"><span class="mv-pn"><span>Returning starters</span></span><b class="sn-v">3 of 5</b></a><a class="mv-p"><span class="mv-pn"><span>Top returner</span><span class="nm">Jalen Carter</span></span><span class="f5-p">SG</span><b class="tdig t-blue ">9</b></a><a class="mv-p"><span class="mv-pn"><span>Newcomers</span></span><b class="sn-v">4</b></a>
+          </div>
+          <div class="card-f">
+            <a class="lnk">Roster</a><a class="lnk">Season schedule</a>
+          </div>
+        </section>
+        <section class="card ar-card">
+          <div class="card-h">
+            <h3>Recruiting Wire</h3><span class="meta">Opens with the invite period · Week 14</span>
+          </div>
+          <div class="card-f" style="justify-content:flex-start">
+            <a class="lnk">Build your watchlist</a>
+          </div>
+        </section>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Final standings</figcaption>
+      <div class="gob gob-1280 spec" style="width:460px">
+        <section class="card office-final ar-card">
+          <div class="card-h">
+            <h3>Final standings</h3><a class="lnk">League</a>
+          </div>
+          <div class="mv-strip">
+            <a class="mv-cell ar-item" style="--i:0"><span class="mv-l">Final national rank</span><span class="mv-v"><b>#9</b><span class="chip up ar-pop" style="--i:0">▲3</span></span></a><a class="mv-cell ar-item" style="--i:1"><span class="mv-l">Keystone Conf.</span><span class="mv-v"><b>1st</b><span class="chip flat ar-pop" style="--i:1">—</span></span></a><a class="mv-cell ar-item" style="--i:2"><span class="mv-l">Final record</span><span class="mv-v"><b>26–7</b><span class="chip flat ar-pop" style="--i:2">Region SF</span></span></a>
+          </div>
+          <div class="st-t">
+            <div class="st-r st-hd">
+              <span>#</span><span>Keystone Conference</span><span>Conf</span><span>Overall</span>
+            </div>
+            <a class="st-r me ar-item" style="--i:3"><span>1</span><span class="st-n"><span class="logo" style="--tc:#A3243B;width:18px;height:18px;font-size:11px">L</span><span class="nm">Lawrence</span><em>Tourney champs</em></span><span>12–2</span><span>26–7</span></a><a class="st-r  ar-item" style="--i:4"><span>2</span><span class="st-n"><span class="logo" style="--tc:#3F4654;width:18px;height:18px;font-size:11px">L</span><span class="nm">Lancaster</span></span><span>12–2</span><span>25–6</span></a><a class="st-r  ar-item" style="--i:5"><span>3</span><span class="st-n"><span class="logo" style="--tc:#5B3A8E;width:18px;height:18px;font-size:11px">M</span><span class="nm">Morristown</span></span><span>9–5</span><span>18–12</span></a><a class="st-r  ar-item" style="--i:6"><span>4</span><span class="st-n"><span class="logo" style="--tc:#1E7A74;width:18px;height:18px;font-size:11px">F</span><span class="nm">Four Corners</span></span><span>8–6</span><span>19–11</span></a><a class="st-r  ar-item" style="--i:7"><span>5</span><span class="st-n"><span class="logo" style="--tc:#7A5C2E;width:18px;height:18px;font-size:11px">Y</span><span class="nm">York</span></span><span>6–8</span><span>14–16</span></a>
+          </div>
+        </section>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Settings panel + controls</h2>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption>Panel · online</figcaption>
+      <div class="gob gob-1280 spec" style="width:440px;height:664px;--rail-w:0px;--top-h:0px">
+        <div class="set-scrim">
+        </div>
+        <aside class="settings">
+          <div class="set-h">
+            <h2>Settings</h2><button class="set-x" title="Close (Esc)">×</button>
+          </div>
+          <div class="set-b">
+            <section class="set-s">
+              <h3>Audio <span>Changes apply instantly</span></h3>
+              <div class="aud ">
+                <button class="mute " title="Mute Master"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><span class="aud-l">Master</span>
+                <div class="slider">
+                  <i style="width:80%"></i><b style="left:80%"></b>
+                </div>
+                <span class="aud-v">80</span>
+              </div>
+              <div class="aud ">
+                <button class="mute " title="Mute Music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><span class="aud-l">Music</span>
+                <div class="slider">
+                  <i style="width:55%"></i><b style="left:55%"></b>
+                </div>
+                <span class="aud-v">55</span>
+              </div>
+              <div class="aud ">
+                <button class="mute " title="Mute Sound Effects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><span class="aud-l">Sound Effects</span>
+                <div class="slider">
+                  <i style="width:70%"></i><b style="left:70%"></b>
+                </div>
+                <span class="aud-v">70</span>
+              </div>
+              <div class="aud is-muted">
+                <button class="mute on" title="Unmute Ambience"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button><span class="aud-l">Ambience</span>
+                <div class="slider">
+                  <i style="width:40%"></i><b style="left:40%"></b>
+                </div>
+                <span class="aud-v">40</span>
+              </div>
+            </section>
+            <section class="set-s">
+              <h3>Coach stats <a class="lnk">Coach profile</a></h3>
+              <div class="cs-grid">
+                <a class="cs"><b>212–98</b><span>Career record</span></a><a class="cs"><b>3</b><span>Titles</span></a><a class="cs"><b>5</b><span>All-Americans coached</span></a><a class="cs"><b>11</b><span>Seasons coached</span></a>
+              </div>
+            </section>
+            <section class="set-s">
+              <h3>Account</h3>
+              <div class="acct">
+                <span>Username</span><b>coach_jamie</b><span>Email</span><b>jamie.r@gmail.com</b>
+              </div>
+              <button class="btn-ghost" style="margin-top:6px">Log Out</button>
+            </section>
+          </div>
+          <div class="set-f">
+            <span>Alpha 0.9 · build 1234</span><span class="conn "><i></i>Online</span>
+          </div>
+        </aside>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Panel · offline</figcaption>
+      <div class="gob gob-1280 spec" style="width:440px;height:664px;--rail-w:0px;--top-h:0px">
+        <div class="set-scrim">
+        </div>
+        <aside class="settings">
+          <div class="set-h">
+            <h2>Settings</h2><button class="set-x" title="Close (Esc)">×</button>
+          </div>
+          <div class="set-b">
+            <section class="set-s">
+              <h3>Audio <span>Changes apply instantly</span></h3>
+              <div class="aud ">
+                <button class="mute " title="Mute Master"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><span class="aud-l">Master</span>
+                <div class="slider">
+                  <i style="width:80%"></i><b style="left:80%"></b>
+                </div>
+                <span class="aud-v">80</span>
+              </div>
+              <div class="aud ">
+                <button class="mute " title="Mute Music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><span class="aud-l">Music</span>
+                <div class="slider">
+                  <i style="width:55%"></i><b style="left:55%"></b>
+                </div>
+                <span class="aud-v">55</span>
+              </div>
+              <div class="aud ">
+                <button class="mute " title="Mute Sound Effects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><span class="aud-l">Sound Effects</span>
+                <div class="slider">
+                  <i style="width:70%"></i><b style="left:70%"></b>
+                </div>
+                <span class="aud-v">70</span>
+              </div>
+              <div class="aud is-muted">
+                <button class="mute on" title="Unmute Ambience"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button><span class="aud-l">Ambience</span>
+                <div class="slider">
+                  <i style="width:40%"></i><b style="left:40%"></b>
+                </div>
+                <span class="aud-v">40</span>
+              </div>
+            </section>
+            <section class="set-s">
+              <h3>Coach stats <a class="lnk">Coach profile</a></h3>
+              <div class="cs-grid">
+                <a class="cs"><b>212–98</b><span>Career record</span></a><a class="cs"><b>3</b><span>Titles</span></a><a class="cs"><b>5</b><span>All-Americans coached</span></a><a class="cs"><b>11</b><span>Seasons coached</span></a>
+              </div>
+            </section>
+            <section class="set-s">
+              <h3>Account</h3><p class="set-note">Playing offline. Account settings return when you're back online.</p>
+            </section>
+          </div>
+          <div class="set-f">
+            <span>Alpha 0.9 · build 1234</span><span class="conn off"><i></i>Offline</span>
+          </div>
+        </aside>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Controls</figcaption>
+      <div class="gob gob-1280 spec" style="width:auto">
+        <div class="sheet-ctl">
+          <span>Slider rest · hover · drag</span>
+          <div class="slider" style="width:180px">
+            <i style="width:60%"></i><b style="left:60%"></b>
+          </div>
+          <div class="slider is-hover" style="width:180px">
+            <i style="width:60%"></i><b style="left:60%"></b>
+          </div>
+          <div class="slider is-drag" style="width:180px">
+            <i style="width:60%"></i><b style="left:60%"></b>
+          </div>
+        </div>
+        <div class="sheet-ctl">
+          <span>Mute off · hover · on</span><button class="mute"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><button class="mute is-hover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button><button class="mute on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button>
+        </div>
+        <div class="sheet-ctl">
+          <span>Switch off · on</span><span class="tgl"></span><span class="tgl on"></span>
+        </div>
+        <div class="sheet-ctl">
+          <span>Secondary button</span><button class="btn-ghost">Log Out</button>
+        </div>
+      </div>
+    </figure>
+  </div>
+</section>
+<section class="sheet-sec">
+  <h2>Gameplay audio popover</h2><p>Speaker in the scoreboard strip cap; popover open / closed.</p>
+  <div class="sheet-row">
+    <figure class="sheet-item">
+      <figcaption>Open</figcaption>
+      <div class="gob gob-1280 spec" style="width:760px;height:230px">
+        <div class="gp" style="background:none">
+          <div class="sb">
+            <div class="sb-t">
+              <span class="logo" style="--tc:#A3243B;width:28px;height:28px;font-size:17px">L</span><b>LAW</b><strong>54</strong>
+            </div>
+            <div class="sb-c">
+              <b>Q3 · 4:12</b><span>BONUS</span>
+            </div>
+            <div class="sb-t">
+              <strong>49</strong><b>MOR</b><span class="logo" style="--tc:#5B3A8E;width:28px;height:28px;font-size:17px">M</span>
+            </div>
+            <div class="sb-snd">
+              <button class="open" title="Sound"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button>
+              <div class="snd-pop">
+                <div class="snd-m">
+                  <span>Mute all</span><span class="tgl"></span>
+                </div>
+                <div class="snd-r">
+                  <span>Music</span>
+                  <div class="slider">
+                    <i style="width:45%"></i><b style="left:45%"></b>
+                  </div>
+                  <span>45</span>
+                </div>
+                <div class="snd-r">
+                  <span>SFX</span>
+                  <div class="slider">
+                    <i style="width:75%"></i><b style="left:75%"></b>
+                  </div>
+                  <span>75</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </figure>
+    <figure class="sheet-item">
+      <figcaption>Closed</figcaption>
+      <div class="gob gob-1280 spec" style="width:760px;height:90px">
+        <div class="gp" style="background:none">
+          <div class="sb">
+            <div class="sb-t">
+              <span class="logo" style="--tc:#A3243B;width:28px;height:28px;font-size:17px">L</span><b>LAW</b><strong>54</strong>
+            </div>
+            <div class="sb-c">
+              <b>Q3 · 4:12</b><span>BONUS</span>
+            </div>
+            <div class="sb-t">
+              <strong>49</strong><b>MOR</b><span class="logo" style="--tc:#5B3A8E;width:28px;height:28px;font-size:17px">M</span>
+            </div>
+            <div class="sb-snd">
+              <button class="" title="Sound"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </div>
+</section>
+<h1 class="sheet-part" id="browse">Part 2 · Browse templates</h1><section class="sheet-sec"><h2>Page tools</h2><p>Right end of the sticky sub-tab row (no extra sticky height). Segmented scope · search. Neutral selection — navy stays reserved for your own row.</p><div class="sheet-row"><figure class="sheet-item"><figcaption>Segmented · default / hover / selected</figcaption><div class="gob gob-1280 spec" style="width:560px"><div style="display:flex;gap:16px;padding:8px"><div class="seg" role="radiogroup"><button class="" role="radio" aria-checked="false">Conference</button><button class="on" role="radio" aria-checked="true">Region</button><button class="" role="radio" aria-checked="false">National</button></div><div class="seg" role="radiogroup"><button class="on" role="radio" aria-checked="true">Varsity<em>12</em></button><button class="" role="radio" aria-checked="false">Practice Squad<em>3</em></button></div></div></div></figure><figure class="sheet-item"><figcaption>Search · default / focus</figcaption><div class="gob gob-1280 spec" style="width:430px"><div style="display:flex;gap:16px;padding:8px"><label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input type="text" placeholder="Find a team"><kbd>/</kbd></label><label class="search is-focus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input type="text" placeholder="Find a recruit" value="Whit"><kbd>/</kbd></label></div></div></figure></div><div class="sheet-row"><figure class="sheet-item"><figcaption>Page head with tools (T1/T2)</figcaption><div class="gob gob-1280 spec" style="width:1180px"><div class="pg-head" style="position:static;height:auto;padding-top:0"><div class="pg-title"><h1>League</h1><span class="crumb">128 teams · 16 conferences · 8 regions</span></div><div class="subtabs"><a class="stab on">Standings</a><a class="stab">Rankings</a><a class="stab">Leaders</a><a class="stab">Team Stats</a><a class="stab">Schedule</a><div class="pg-tools"><div class="seg" role="radiogroup"><button class="" role="radio" aria-checked="false">Conference</button><button class="on" role="radio" aria-checked="true">Region</button><button class="" role="radio" aria-checked="false">National</button></div><label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input type="text" placeholder="Find a team"><kbd>/</kbd></label></div></div></div></div></figure></div></section><section class="sheet-sec"><h2>Table (T1)</h2><p>Header 34 · row 40 (×1.18 at 1920). Numbers right-aligned, tabular. First header cell names the group so it stays visible while stuck. Sort indicator is neutral (▾/▴ + 2px w-70 underline); the sorted column gets a w-3 wash.</p><div class="sheet-row"><figure class="sheet-item"><figcaption>Sortable header · default / hover / sorted ▾ / sorted ▴ (numeric right, text left)</figcaption><div class="gob gob-1280 spec" style="width:560px"><div class="tcard" style="padding:0"><table class="tbl"><thead><tr><th class="l s">Team</th><th class="s">PF</th><th class="s is-hover">PA</th><th class="s on">W</th><th class="s on asc">L</th><th class="l s on">Name</th></tr></thead></table></div></div></figure><figure class="sheet-item"><figcaption>Grouped header (two rows) + group start rule</figcaption><div class="gob gob-1280 spec" style="width:520px"><div class="tcard"><table class="tbl grp"><thead><tr class="g"><th class="l" rowspan="2">Team</th><th rowspan="2" class="s on">PPG</th><th colspan="3" class="gs">Shooting</th><th colspan="3" class="gs">3-Point</th></tr><tr><th class="s gs">FGM</th><th class="s">FGA</th><th class="s">FG%</th><th class="s gs">3PM</th><th class="s">3PA</th><th class="s">3P%</th></tr></thead></table></div></div></figure></div><div class="sheet-row"><figure class="sheet-item"><figcaption>Rows · default · zebra · hover · your team (navy) — Standings cells: team, diff bar, streak, next</figcaption><div class="gob gob-1280 spec" style="width:1180px"><div class="tcard"><table class="tbl"><thead><tr><th class="l gname" colspan="2">A2 Conference<em>Yours</em></th><th class="s on">W</th><th class="s">L</th><th class="s">PF</th><th class="s">PA</th><th class="s">Diff</th><th class="c s">Strk</th><th class="l">Next</th></tr></thead><tbody><tr class=""><td class="rk">1</td><td class="l w"><span class="tm"><span class="logo" style="--tc:#B8561B;width:20px;height:20px;font-size:12px">C</span><em>#6</em><a class="nm">Crickstown</a></span></td><td class="on b">18</td><td>3</td><td class="dim">1,344</td><td class="dim">1,151</td><td><span class="dv"><i style="--v:0.88"></i></span><span class="dvn">+193</span></td><td class="c"><span class="stk">W6</span></td><td class="l"><span class="nxc"><i>at</i><span class="logo" style="--tc:#2A3F5B;width:18px;height:18px;font-size:11px">H</span><a class="nm">Hummelstown</a><em>Fri</em></span></td></tr><tr class="me"><td class="rk">2</td><td class="l w"><span class="tm"><span class="logo" style="--tc:#8C1D40;width:20px;height:20px;font-size:12px">C</span><em>#14</em><a class="nm">Chapel Hill</a></span></td><td class="on b">16</td><td>5</td><td class="dim">1,296</td><td class="dim">1,170</td><td><span class="dv"><i style="--v:0.57"></i></span><span class="dvn">+126</span></td><td class="c"><span class="stk">W4</span></td><td class="l"><span class="nxc"><i>vs</i><span class="logo" style="--tc:#1E5B3A;width:18px;height:18px;font-size:11px">L</span><a class="nm">Lancaster</a><em>Fri</em></span></td></tr><tr class="is-hover"><td class="rk">3</td><td class="l w"><span class="tm"><span class="logo" style="--tc:#23395B;width:20px;height:20px;font-size:12px">Y</span><em>#22</em><a class="nm">York</a></span></td><td class="on b">14</td><td>7</td><td class="dim">1,299</td><td class="dim">1,260</td><td><span class="dv"><i style="--v:0.18"></i></span><span class="dvn">+39</span></td><td class="c"><span class="stk l">L1</span></td><td class="l"><span class="nxc"><i>at</i><span class="logo" style="--tc:#5B2A1F;width:18px;height:18px;font-size:11px">S</span><a class="nm">Steelton</a><em>Fri</em></span></td></tr><tr class=""><td class="rk">4</td><td class="l w"><span class="tm"><span class="logo" style="--tc:#4B2A7B;width:20px;height:20px;font-size:12px">H</span><a class="nm">Hanover</a></span></td><td class="on b">12</td><td>9</td><td class="dim">1,251</td><td class="dim">1,246</td><td><span class="dv"><i style="--v:0.02"></i></span><span class="dvn">+5</span></td><td class="c"><span class="stk">W3</span></td><td class="l"><span class="nxc"><i>at</i><span class="logo" style="--tc:#5A2A6B;width:18px;height:18px;font-size:11px">L</span><a class="nm">Lebanon</a><em>Fri</em></span></td></tr><tr class=""><td class="rk">6</td><td class="l w"><span class="tm"><span class="logo" style="--tc:#7A5A1A;width:20px;height:20px;font-size:12px">C</span><a class="nm">Carlisle</a></span></td><td class="on b">8</td><td>13</td><td class="dim">1,197</td><td class="dim">1,216</td><td><span class="dv neg"><i style="--v:0.09"></i></span><span class="dvn neg">−19</span></td><td class="c"><span class="stk">W2</span></td><td class="l"><span class="nxc"><i>at</i><span class="logo" style="--tc:#7A1F3A;width:18px;height:18px;font-size:11px">M</span><a class="nm">Mechanicsburg</a><em>Fri</em></span></td></tr></tbody></table></div></div></figure></div><div class="sheet-row"><figure class="sheet-item"><figcaption>Divider row (lineup order only — dropped while sorted)</figcaption><div class="gob gob-1280 spec" style="width:560px"><div class="tcard"><table class="tbl"><tbody><tr class="sep"><td colspan="3">Bench</td></tr><tr><td class="l w"><span class="pc"><span class="jn">5</span><a class="nm">Tre Holloway</a></span></td><td class="c"><span class="pos">SG</span></td><td class="dim">6'3"</td></tr></tbody></table></div></div></figure><figure class="sheet-item"><figcaption>Diverging bar (direction channel, no hue)</figcaption><div class="gob gob-1280 spec" style="width:360px"><div style="display:flex;flex-direction:column;gap:10px;padding:12px;font-size:13px"><span><span class="dv"><i style="--v:0.88"></i></span><span class="dvn">+193</span></span><span><span class="dv"><i style="--v:0.18"></i></span><span class="dvn">+39</span></span><span><span class="dv"><i style="--v:0.02"></i></span><span class="dvn">+4</span></span><span><span class="dv neg"><i style="--v:0.09"></i></span><span class="dvn neg">−19</span></span><span><span class="dv neg"><i style="--v:0.38"></i></span><span class="dvn neg">−84</span></span></div></div></figure></div></section><section class="sheet-sec"><h2>Empty and loading</h2><p>No spinners. Loading keeps the real header and draws neutral skeleton bars in the final shapes (row count = expected rows, capped at the viewport). Pulse: opacity 1 → .45, --dur-skeleton 1.4s; off under reduced motion.</p><div class="sheet-row"><figure class="sheet-item"><figcaption>Empty state (Week 1, before any game)</figcaption><div class="gob gob-1280 spec" style="width:760px"><div class="tcard"><table class="tbl"><thead><tr><th class="l gname" colspan="2">A2 Conference</th><th>W</th><th>L</th><th>PF</th><th>PA</th><th>Diff</th><th class="c">Strk</th><th class="l">Next</th></tr></thead><tbody><tr><td class="empty-td" colspan="9"><div class="empty"><b>No games played yet</b><p>Standings fill in after Week 1. Your season opener is Friday vs Lancaster.</p><a class="lnk">Season schedule</a></div></td></tr></tbody></table></div></div></figure><figure class="sheet-item"><figcaption>Skeleton rows</figcaption><div class="gob gob-1280 spec" style="width:760px"><div class="tcard"><table class="tbl"><thead><tr><th class="l gname" colspan="2">A2 Conference</th><th>W</th><th>L</th><th>PF</th><th>PA</th><th>Diff</th><th class="c">Strk</th><th class="l">Next</th></tr></thead><tbody><tr><td class="rk"><span class="sk" style="width:10px"></span></td><td class="l w"><span class="tm"><span class="sk" style="width:20px;height:20px;border-radius:5px"></span><span class="sk" style="width:110px"></span></span></td><td><span class="sk" style="width:22px"></span></td><td><span class="sk" style="width:22px"></span></td><td><span class="sk" style="width:34px"></span></td><td><span class="sk" style="width:34px"></span></td><td><span class="sk" style="width:70px"></span></td><td><span class="sk" style="width:24px"></span></td><td class="l"><span class="sk" style="width:120px"></span></td></tr><tr><td class="rk"><span class="sk" style="width:10px"></span></td><td class="l w"><span class="tm"><span class="sk" style="width:20px;height:20px;border-radius:5px"></span><span class="sk" style="width:147px"></span></span></td><td><span class="sk" style="width:22px"></span></td><td><span class="sk" style="width:22px"></span></td><td><span class="sk" style="width:34px"></span></td><td><span class="sk" style="width:34px"></span></td><td><span class="sk" style="width:70px"></span></td><td><span class="sk" style="width:24px"></span></td><td class="l"><span class="sk" style="width:120px"></span></td></tr><tr><td class="rk"><span class="sk" style="width:10px"></span></td><td class="l w"><span class="tm"><span class="sk" style="width:20px;height:20px;border-radius:5px"></span><span class="sk" style="width:124px"></span></span></td><td><span class="sk" style="width:22px"></span></td><td><span class="sk" style="width:22px"></span></td><td><span class="sk" style="width:34px"></span></td><td><span class="sk" style="width:34px"></span></td><td><span class="sk" style="width:70px"></span></td><td><span class="sk" style="width:24px"></span></td><td class="l"><span class="sk" style="width:120px"></span></td></tr><tr><td class="rk"><span class="sk" style="width:10px"></span></td><td class="l w"><span class="tm"><span class="sk" style="width:20px;height:20px;border-radius:5px"></span><span class="sk" style="width:161px"></span></span></td><td><span class="sk" style="width:22px"></span></td><td><span class="sk" style="width:22px"></span></td><td><span class="sk" style="width:34px"></span></td><td><span class="sk" style="width:34px"></span></td><td><span class="sk" style="width:70px"></span></td><td><span class="sk" style="width:24px"></span></td><td class="l"><span class="sk" style="width:120px"></span></td></tr></tbody></table></div></div></figure></div><div class="sheet-row"><figure class="sheet-item"><figcaption>Skeleton · leader card</figcaption><div class="gob gob-1280 spec" style="width:290px"><section class="card ldb"><div class="card-h"><h3>Points</h3><span class="meta">PTS · per game</span></div><div class="ldb-top"><span class="sk o" style="width:36px;height:36px"></span><span class="ldb-id"><span class="sk" style="width:110px"></span><span class="sk" style="width:80px;height:8px"></span></span><span class="sk lg" style="width:48px;height:26px"></span></div><div class="ldb-list"><div class="ldb-r"><span class="sk" style="width:8px"></span><span class="sk" style="width:120px"></span><span class="sk" style="width:26px"></span></div><div class="ldb-r"><span class="sk" style="width:8px"></span><span class="sk" style="width:120px"></span><span class="sk" style="width:26px"></span></div><div class="ldb-r"><span class="sk" style="width:8px"></span><span class="sk" style="width:120px"></span><span class="sk" style="width:26px"></span></div><div class="ldb-r"><span class="sk" style="width:8px"></span><span class="sk" style="width:120px"></span><span class="sk" style="width:26px"></span></div></div></section></div></figure><figure class="sheet-item"><figcaption>Skeleton · attribute grid row</figcaption><div class="gob gob-1280 spec" style="width:760px"><div class="tcard"><table class="tbl agrid"><tbody><tr><td class="l pcol"><span class="pc"><span class="sk" style="width:16px"></span><span class="sk" style="width:120px"></span></span></td><td class="c"><span class="sk" style="width:44px"></span></td><td class="a gs"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a gs"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a gs"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a gs"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a gs"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a gs"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td><td class="a"><span class="sk" style="width:26px;height:22px;border-radius:5px"></span></td></tr></tbody></table></div></div></figure><figure class="sheet-item"><figcaption>Skeleton · detail hero</figcaption><div class="gob gob-1280 spec" style="width:620px"><section class="hero neutral"><span class="sk" style="width:118px;height:142px;border-radius:10px"></span><div class="hero-id"><span class="sk" style="width:120px;height:9px"></span><span class="sk" style="width:260px;height:36px"></span><span class="sk" style="width:180px"></span><span class="sk" style="width:120px;height:28px"></span></div><div></div></section></div></figure></div></section><section class="sheet-sec"><h2>Wide table · horizontal scroll inside its own card</h2><p>Only when a table is genuinely wider than the page (League › Team Stats at 1280). The header does NOT stick (it is inside an overflow container); instead it repeats every 16 rows. The team column pins left. Edge fades show there is more; the card header carries group jumps, a position map and ◂ ▸ paging (80% of the visible width). Shift+wheel / trackpad scroll horizontally. The page keeps its one vertical scroll.</p><div class="sheet-row"><figure class="sheet-item"><figcaption>Scrolled to the middle — both fades, pinned column shadow, “Rebounding” active</figcaption><div class="gob gob-1280 spec" style="width:900px"><div class="xs" data-start-x="560"><div class="xs-h"><span class="xs-t">Region A</span><span class="meta">32 teams</span><div class="xs-jump"><button data-xs-group="Shooting">Shooting</button><button data-xs-group="3-Point">3-Point</button><button data-xs-group="Free Throws">Free Throws</button><button data-xs-group="Rebounding">Rebounding</button><button data-xs-group="Other">Other</button><button data-xs-group="Defense">Defense</button></div><span class="xs-map"><i></i></span><div class="xs-nav"><button data-xs="prev" aria-label="Scroll left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></button><button data-xs="next" aria-label="Scroll right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></button></div></div><div class="xs-wrap"><div class="xs-body"><table class="tbl grp tight"><thead><tr class="g"><th class="l s pin" rowspan="2" style="padding-left:var(--dsp-14)">Team</th><th rowspan="2" class="s">GP</th><th rowspan="2" class="s on">PPG</th><th colspan="3" class="gs" data-group="Shooting">Shooting</th><th colspan="3" class="gs" data-group="3-Point">3-Point</th><th colspan="3" class="gs" data-group="Free Throws">Free Throws</th><th colspan="3" class="gs" data-group="Rebounding">Rebounding</th><th colspan="5" class="gs" data-group="Other">Other</th><th colspan="4" class="gs" data-group="Defense">Defense</th></tr><tr><th class="s gs">FGM</th><th class="s">FGA</th><th class="s">FG%</th><th class="s gs">3PM</th><th class="s">3PA</th><th class="s">3P%</th><th class="s gs">FTM</th><th class="s">FTA</th><th class="s">FT%</th><th class="s gs">OREB</th><th class="s">DREB</th><th class="s">REB</th><th class="s gs">AST</th><th class="s">STL</th><th class="s">BLK</th><th class="s">TO</th><th class="s">PF</th><th class="s gs">OPP PPG</th><th class="s">OPP FG%</th><th class="s">OPP 3P%</th><th class="s">DEF%</th></tr></thead><tbody><tr class=""><td class="l pin"><span class="tm"><b class="tsr">1</b><span class="logo" style="--tc:#1E5B3A;width:20px;height:20px;font-size:12px">L</span><em>#3</em><a class="nm">Lancaster</a><em class="tsc">A1</em></span></td><td class="dim">21</td><td class="on b">65.7</td><td class="gs dim">24.2</td><td class="dim">53.7</td><td class="">45.1</td><td class="gs dim">7.2</td><td class="dim">18.5</td><td class="">38.7</td><td class="gs dim">10.2</td><td class="dim">13.2</td><td class="">76.8</td><td class="gs dim">8.6</td><td class="dim">21.5</td><td class="dim">30.1</td><td class="gs dim">13.6</td><td class="dim">5.9</td><td class="dim">2.3</td><td class="dim">11.6</td><td class="dim">17.2</td><td class="gs dim">62.7</td><td class="">40.0</td><td class="">30.6</td><td class="">62.8</td></tr><tr class=""><td class="l pin"><span class="tm"><b class="tsr">2</b><span class="logo" style="--tc:#B8561B;width:20px;height:20px;font-size:12px">C</span><em>#6</em><a class="nm">Crickstown</a><em class="tsc">A2</em></span></td><td class="dim">21</td><td class="on b">64.0</td><td class="gs dim">23.0</td><td class="dim">49.5</td><td class="">46.5</td><td class="gs dim">5.8</td><td class="dim">18.5</td><td class="">31.4</td><td class="gs dim">12.1</td><td class="dim">19.2</td><td class="">62.8</td><td class="gs dim">10.0</td><td class="dim">25.5</td><td class="dim">35.6</td><td class="gs dim">14.0</td><td class="dim">9.0</td><td class="dim">2.4</td><td class="dim">15.5</td><td class="dim">16.5</td><td class="gs dim">54.8</td><td class="">40.9</td><td class="">30.8</td><td class="">62.0</td></tr><tr class=""><td class="l pin"><span class="tm"><b class="tsr">3</b><span class="logo" style="--tc:#6B1F2E;width:20px;height:20px;font-size:12px">H</span><em>#9</em><a class="nm">Harrisburg</a><em class="tsc">A3</em></span></td><td class="dim">21</td><td class="on b">62.5</td><td class="gs dim">25.1</td><td class="dim">55.0</td><td class="">45.6</td><td class="gs dim">3.9</td><td class="dim">12.3</td><td class="">31.3</td><td class="gs dim">8.5</td><td class="dim">13.6</td><td class="">62.4</td><td class="gs dim">12.1</td><td class="dim">24.4</td><td class="dim">36.4</td><td class="gs dim">15.1</td><td class="dim">9.3</td><td class="dim">5.3</td><td class="dim">11.2</td><td class="dim">16.8</td><td class="gs dim">59.5</td><td class="">40.6</td><td class="">31.1</td><td class="">60.8</td></tr><tr class=""><td class="l pin"><span class="tm"><b class="tsr">4</b><span class="logo" style="--tc:#23395B;width:20px;height:20px;font-size:12px">Y</span><em>#22</em><a class="nm">York</a><em class="tsc">A2</em></span></td><td class="dim">21</td><td class="on b">61.9</td><td class="gs dim">23.6</td><td class="dim">52.6</td><td class="">44.8</td><td class="gs dim">6.2</td><td class="dim">19.7</td><td class="">31.8</td><td class="gs dim">8.5</td><td class="dim">13.6</td><td class="">62.5</td><td class="gs dim">10.8</td><td class="dim">21.0</td><td class="dim">31.8</td><td class="gs dim">11.9</td><td class="dim">7.4</td><td class="dim">2.9</td><td class="dim">10.3</td><td class="dim">14.2</td><td class="gs dim">60.0</td><td class="">41.2</td><td class="">32.6</td><td class="">58.9</td></tr><tr class=""><td class="l pin"><span class="tm"><b class="tsr">5</b><span class="logo" style="--tc:#1F4A3A;width:20px;height:20px;font-size:12px">R</span><em>#16</em><a class="nm">Reading</a><em class="tsc">A3</em></span></td><td class="dim">21</td><td class="on b">61.8</td><td class="gs dim">22.5</td><td class="dim">52.4</td><td class="">43.0</td><td class="gs dim">6.2</td><td class="dim">18.0</td><td class="">34.2</td><td class="gs dim">10.5</td><td class="dim">15.1</td><td class="">70.0</td><td class="gs dim">11.5</td><td class="dim">25.4</td><td class="dim">36.9</td><td class="gs dim">11.8</td><td class="dim">6.3</td><td class="dim">4.5</td><td class="dim">13.3</td><td class="dim">18.7</td><td class="gs dim">59.9</td><td class="">41.3</td><td class="">31.3</td><td class="">60.3</td></tr></tbody></table></div><div class="xs-fade l"></div><div class="xs-fade r"></div></div></div></div></figure></div></section><section class="sheet-sec"><h2>Leaders board (T1 variant)</h2><p>8 category cards, 4 × 2 at 1280. Leader block + ranks 2–5 + “Full list →” (opens the category as a T1 table). Your players carry the navy row.</p><div class="sheet-row"><figure class="sheet-item"><figcaption>Leader card · your player leads / your player in the list</figcaption><div class="gob gob-1280 spec" style="width:600px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><section class="card ldb"><div class="card-h"><h3>Assists</h3><span class="meta">AST · per game</span></div><a class="ldb-top me"><span class="av" style="width:36px;height:36px;font-size:13px">DP</span><span class="ldb-id"><span class="nm">Devin Park</span><span>Chapel Hill · PG · JR</span></span><span class="ldb-v">6.1<em>APG</em></span></a><div class="ldb-list"><a class="ldb-r"><span>2</span><span class="ldb-n"><span class="nm">Rashad Hayes</span><em>CRK</em></span><b>5.8</b></a><a class="ldb-r"><span>3</span><span class="ldb-n"><span class="nm">Jordy Mack</span><em>HAN</em></span><b>5.2</b></a><a class="ldb-r"><span>4</span><span class="ldb-n"><span class="nm">Tomas Reyes</span><em>YRK</em></span><b>4.9</b></a><a class="ldb-r"><span>5</span><span class="ldb-n"><span class="nm">Ben Kowal</span><em>CMP</em></span><b>4.4</b></a></div><div class="card-f"><a class="lnk">Full list</a></div></section><section class="card ldb"><div class="card-h"><h3>Rebounds</h3><span class="meta">REB · per game</span></div><a class="ldb-top"><span class="av" style="width:36px;height:36px;font-size:13px">ME</span><span class="ldb-id"><span class="nm">Malik Ellis</span><span>Crickstown · C · SR</span></span><span class="ldb-v">10.4<em>RPG</em></span></a><div class="ldb-list"><a class="ldb-r me"><span>2</span><span class="ldb-n"><span class="nm">Marcus Ruiz</span><em>CHL</em></span><b>9.6</b></a><a class="ldb-r"><span>3</span><span class="ldb-n"><span class="nm">Jonah Pike</span><em>CRK</em></span><b>8.1</b></a><a class="ldb-r"><span>4</span><span class="ldb-n"><span class="nm">Dom Keane</span><em>CAR</em></span><b>8.0</b></a><a class="ldb-r"><span>5</span><span class="ldb-n"><span class="nm">Sam Ostrowski</span><em>PAL</em></span><b>7.7</b></a></div><div class="card-f"><a class="lnk">Full list</a></div></section></div></div></figure></div></section><section class="sheet-sec"><h2>Attribute grid (T2)</h2><p>Attributes are a single digit = floor(raw/10), no cap. Hue on the glyph = tier (0–4 red · 5–6 yellow · 7–8 green · 9+ blue). Behind it, neutral luminance by tier (none · w-3 · w-6 · w-10 + ring) so strengths read as bright blocks and weaknesses recede — without spending hue on a fill. Pairs are grouped under OFFENSE · DEFENSE · SKILLS · GRIT · BODY · MIND with a group-start rule and alternate-group banding.</p><div class="sheet-row"><figure class="sheet-item"><figcaption>Digit cell · 0 → 12</figcaption><div class="gob gob-1280 spec" style="width:520px"><div style="display:flex;gap:6px;padding:10px"><span class="ad t-red">0</span><span class="ad t-red">2</span><span class="ad t-red">4</span><span class="ad t-yellow">5</span><span class="ad t-yellow">6</span><span class="ad t-green">7</span><span class="ad t-green">8</span><span class="ad t-blue">9</span><span class="ad t-blue">10</span><span class="ad t-blue">11</span><span class="ad t-blue">12</span></div></div></figure><figure class="sheet-item"><figcaption>RT lockup · current → potential (letters only)</figcaption><div class="gob gob-1280 spec" style="width:340px"><div style="display:flex;gap:18px;padding:12px"><span class="rtl"><b class="t-blue">A−</b><i>→</i><b class="pot t-blue">A</b></span><span class="rtl"><b class="t-green">B+</b><i>→</i><b class="pot t-blue">A−</b></span><span class="rtl"><b class="t-yellow">C</b><i>→</i><b class="pot t-green">B</b></span><span class="rtl"><b class="t-red">D+</b><i>→</i><b class="pot t-yellow">C+</b></span><span class="rtl"><b class="t-red">F</b><i>→</i><b class="pot t-red">D</b></span></div></div></figure><figure class="sheet-item"><figcaption>Position chip · dev focus</figcaption><div class="gob gob-1280 spec" style="width:260px"><div style="display:flex;gap:10px;align-items:center;padding:12px"><span class="pos">PG</span><span class="pos">C</span><span class="dev">Outside Offense</span><span class="dev none">Not set</span></div></div></figure></div><div class="sheet-row"><figure class="sheet-item"><figcaption>Header · group row + sortable abbreviations; hover shows the full name (tooltip) · sorted column</figcaption><div class="gob gob-1280 spec" style="width:560px"><div class="tcard" style="margin-bottom:96px"><table class="tbl grp agrid"><thead><tr class="g"><th colspan="2" class="ag gs">Offense</th><th colspan="2" class="ag gs">Defense</th><th colspan="2" class="ag gs">Skills</th><th colspan="2" class="ag gs">Grit</th><th colspan="2" class="ag gs">Body</th><th colspan="2" class="ag gs">Mind</th></tr><tr><th class="aa s gs" title="Scoring" aria-label="Scoring">SC</th><th class="aa s" title="Shooting" aria-label="Shooting">SH</th><th class="aa s gs on" title="Inside Defense" aria-label="Inside Defense">ID</th><th class="aa s is-hover" title="Outside Defense" aria-label="Outside Defense">OD<div class="tip" role="tooltip"><b>Outside Defense<em>OD</em></b><p>Guarding the perimeter and drives.</p><small>Click to sort · high → low</small></div></th><th class="aa s gs" title="Passing" aria-label="Passing">PS</th><th class="aa s" title="Ball Handling" aria-label="Ball Handling">BH</th><th class="aa s gs" title="Rebounding" aria-label="Rebounding">RB</th><th class="aa s" title="Strength" aria-label="Strength">ST</th><th class="aa s gs" title="Agility" aria-label="Agility">AG</th><th class="aa s" title="Endurance" aria-label="Endurance">ND</th><th class="aa s gs" title="Basketball IQ" aria-label="Basketball IQ">IQ</th><th class="aa s" title="Free Throws" aria-label="Free Throws">FT</th></tr></thead><tbody><tr><td class="a gs"><span class="ad t-green">8</span></td><td class="a"><span class="ad t-red">2</span></td><td class="a gs gb on"><span class="ad t-blue">10</span></td><td class="a gb"><span class="ad t-red">3</span></td><td class="a gs"><span class="ad t-red">3</span></td><td class="a"><span class="ad t-red">2</span></td><td class="a gs gb"><span class="ad t-blue">9</span></td><td class="a gb"><span class="ad t-blue">10</span></td><td class="a gs"><span class="ad t-red">4</span></td><td class="a"><span class="ad t-yellow">6</span></td><td class="a gs gb"><span class="ad t-yellow">6</span></td><td class="a gb"><span class="ad t-red">4</span></td></tr></tbody></table></div></div></figure><figure class="sheet-item"><figcaption>Recruit-pool cells · watch star off / hover / on (orange = save) · lean standing</figcaption><div class="gob gob-1280 spec" style="width:520px"><div style="display:flex;flex-direction:column;gap:12px;padding:12px"><div style="display:flex;gap:8px"><button class="wst"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.8l2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8Z"/></svg></button><button class="wst is-hover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.8l2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8Z"/></svg></button><button class="wst on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.8l2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8Z"/></svg></button></div><span class="lean"><b class="">1st</b><span class="lean-l"><span class="logo you" style="--tc:#8C1D40;width:18px;height:18px;font-size:11px">C</span><span class="logo" style="--tc:#6B1F2E;width:18px;height:18px;font-size:11px">H</span><span class="logo" style="--tc:#23395B;width:18px;height:18px;font-size:11px">Y</span></span></span><span class="lean"><b class="">3rd</b><span class="lean-l"><span class="logo" style="--tc:#1E5B3A;width:18px;height:18px;font-size:11px">L</span><span class="logo" style="--tc:#23395B;width:18px;height:18px;font-size:11px">Y</span><span class="logo you" style="--tc:#8C1D40;width:18px;height:18px;font-size:11px">C</span></span></span><span class="lean"><b class="out">Not in top 3</b><span class="lean-l"><span class="logo" style="--tc:#1F4A3A;width:18px;height:18px;font-size:11px">R</span><span class="logo" style="--tc:#1E5B3A;width:18px;height:18px;font-size:11px">L</span><span class="logo" style="--tc:#5A3E1B;width:18px;height:18px;font-size:11px">H</span></span></span><span class="lean"><b class="out">No leans yet</b></span></div></div></figure></div></section><section class="sheet-sec"><h2>Team measures (Team › Team Attributes)</h2><p>Name + one-line “what it drives” · value / scale · neutral meter · weekly delta chip. Only movers get a coloured chip; flat is “—”.</p><div class="sheet-row"><figure class="sheet-item"><figcaption>Measure rows</figcaption><div class="gob gob-1280 spec" style="width:580px"><section class="card"><div class="card-h"><h3>Character</h3><span class="meta">What holds the team together</span></div><a class="mrow"><span class="mrow-n"><b>Chemistry</b><span>How well the 12 play off each other. Moves with minutes, winning and roles.</span></span><span class="mrow-v">18<i>/25</i></span><span class="meter"><i style="width:72%"></i></span><span class="chip up">▲1</span></a><a class="mrow"><span class="mrow-n"><b>Fight</b><span>Resistance when trailing — how often runs get answered.</span></span><span class="mrow-v">71<i>/100</i></span><span class="meter"><i style="width:71%"></i></span><span class="chip flat">—</span></a><a class="mrow"><span class="mrow-n"><b>Discipline</b><span>Fouls, turnovers and assignment errors under pressure.</span></span><span class="mrow-v">64<i>/100</i></span><span class="meter"><i style="width:64%"></i></span><span class="chip down">▼2</span></a></section></div></figure></div></section><section class="sheet-sec"><h2>Detail page (T3)</h2><p>Third level only (player / team / recruit). Sticky bar: “up one level” back (goes to the list the user came from, restoring its scroll, sort and scope) + breadcrumb + prev/next within that list. Hero: identity + RT letters + key numbers. Body: sectioned cards, no tabs, one page scroll.</p><div class="sheet-row"><figure class="sheet-item"><figcaption>Bar · back default / hover · crumb · pager</figcaption><div class="gob gob-1280 spec" style="width:900px"><div class="dt-bar" style="position:static"><a class="up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5.5M11 5.5L4.5 12l6.5 6.5"/></svg>Roster</a><a class="up is-hover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5.5M11 5.5L4.5 12l6.5 6.5"/></svg>Standings</a><span class="dt-crumb"><a>Team</a><i>/</i><a>Roster</a><i>/</i><b>Marcus Ruiz</b></span><div class="pager"><button aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg></button><span>4 of 12</span><button aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5L16 12l-6.5 6.5"/></svg></button></div></div></div></figure></div><div class="sheet-row"><figure class="sheet-item"><figcaption>Hero · recruit (neutral surface — no team wash; orange = non-advancing action)</figcaption><div class="gob gob-1280 spec" style="width:1000px"><section class="hero neutral"><span class="portrait" style="display:grid;place-items:center;color:var(--text-38);font:600 11px/1.3 ui-monospace,Menlo,monospace;text-align:center">recruit<br>headshot</span><div class="hero-id"><div class="hero-k"><span>Recruit</span><span>·</span><span>Class of 2027</span><span>·</span><span>Region A</span></div><h1 class="hero-n">Keon Albright</h1><div class="hero-bio"><span class="pos">C</span><span>6'10"</span><i>·</i><span>228 lb</span><span class="tg">Invited</span><span class="tg">Visit · Wk 5</span></div><div class="hero-rt"><b class="t-green">B−</b><i>→</i><b class="pot t-blue">A−</b><span>Rating · current → potential</span></div><div class="hero-act"><button class="btn-o">Offer promise</button><button class="wst on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.8l2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8Z"/></svg></button></div></div><div class="hero-stats"><span class="eyebrow">Lean · your standing</span><span class="lean"><b class="" style="font:700 var(--fs-40)/.85 var(--font-display);color:var(--text-100)">1st</b><span class="lean-l"><span class="logo you" style="--tc:#8C1D40;width:18px;height:18px;font-size:11px">C</span><span class="logo" style="--tc:#6B1F2E;width:18px;height:18px;font-size:11px">H</span><span class="logo" style="--tc:#23395B;width:18px;height:18px;font-size:11px">Y</span></span></span></div></section></div></figure></div><div class="sheet-row"><figure class="sheet-item"><figcaption>Orange action · default / hover / pressed / disabled</figcaption><div class="gob gob-1280 spec" style="width:560px"><div style="display:flex;gap:12px;padding:10px"><button class="btn-o">Offer promise</button><button class="btn-o is-hover">Offer promise</button><button class="btn-o is-press">Offer promise</button><button class="btn-o is-disabled">Offer promise</button></div></div></figure><figure class="sheet-item"><figcaption>Status tags (neutral)</figcaption><div class="gob gob-1280 spec" style="width:260px"><div style="display:flex;gap:8px;padding:12px"><span class="tg">Invited</span><span class="tg">Visit · Wk 5</span><span class="tg">Committed</span></div></div></figure><figure class="sheet-item"><figcaption>Attribute panel group (detail)</figcaption><div class="gob gob-1280 spec" style="width:260px"><div class="apg" style="padding:8px"><h4>Grit</h4><div class="apr"><span class="apr-n"><b>Rebounding<em>RB</em></b></span><span class="ad t-blue">10</span></div><div class="apr"><span class="apr-n"><b>Strength<em>ST</em></b></span><span class="ad t-blue">9</span></div></div></div></figure></div><div class="sheet-row"><figure class="sheet-item"><figcaption>Schedule rows · result win / loss · vs your team (navy) · upcoming</figcaption><div class="gob gob-1280 spec" style="width:460px"><div class="sch"><a class="sch-r"><span class="sch-w">Wk 21</span><span class="nxc"><i>at</i><span class="logo" style="--tc:#4B2A7B;width:20px;height:20px;font-size:12px">H</span><span class="nm">Hanover</span></span><span class="sch-res"><em>W</em>66–52</span></a><a class="sch-r"><span class="sch-w">Wk 16</span><span class="nxc"><i>vs</i><span class="logo" style="--tc:#1E5B3A;width:20px;height:20px;font-size:12px">L</span><em style="margin:0">#3</em><span class="nm">Lancaster</span></span><span class="sch-res l"><em>L</em>54–60</span></a><a class="sch-r me"><span class="sch-w">Wk 19</span><span class="nxc"><i>at</i><span class="logo" style="--tc:#8C1D40;width:20px;height:20px;font-size:12px">C</span><em style="margin:0">#14</em><span class="nm">Chapel Hill</span></span><span class="sch-res"><em>W</em>61–57</span></a><a class="sch-r"><span class="sch-w">Wk 23</span><span class="nxc"><i>vs</i><span class="logo" style="--tc:#7A5A1A;width:20px;height:20px;font-size:12px">C</span><span class="nm">Carlisle</span></span><span class="sch-up">Fri · 7:00 PM</span></a></div></div></figure></div></section>
+<script src="../templates.js"></script>
+</body>
+</html>
