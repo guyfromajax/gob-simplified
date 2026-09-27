@@ -11,6 +11,7 @@ const path = require('path');
 const S = path.join(__dirname, '../../FrontEnd/static');
 const CSS = fs.readFileSync(path.join(S, 'franchise-command-center.css'), 'utf8');
 const JS = fs.readFileSync(path.join(S, 'franchise-command-center.js'), 'utf8');
+const ADVANCE = fs.readFileSync(path.join(S, 'js/shared/gobAdvance.js'), 'utf8');
 
 /** Inject only the cover helpers; the module is a classic script full of page globals. */
 async function mount(page, { season = 3 } = {}) {
@@ -111,17 +112,28 @@ test.describe('Advancing To Season cover', () => {
 
 test.describe('the rollover flow takes the screen', () => {
   test('the confirm modal is dismissed before the request, not after', async () => {
-    // Source-level: closeModal() and the cover must both precede the fetch, or the
-    // dialog and its re-armed button sit on screen for the whole rollover.
-    const proceed = JS.slice(JS.indexOf("#fcc-new-season-proceed"), JS.indexOf("/franchise/play-next-game"));
+    // The proceed handler lives in gobAdvance (53ed664c3). closeModal() must run
+    // before finish-season is defined, or the dialog sits up for the whole rollover.
+    const start = ADVANCE.indexOf("#fcc-new-season-proceed");
+    const proceed = ADVANCE.slice(start, ADVANCE.indexOf("/franchise/play-next-game", start));
     const closeAt = proceed.indexOf('closeModal();');
-    const coverAt = proceed.indexOf('showSeasonAdvanceOverlay(');
     const fetchAt = proceed.indexOf('/franchise/finish-season');
     expect(closeAt).toBeGreaterThan(-1);
+    expect(fetchAt).toBeGreaterThan(closeAt);
+
+    // No seniors: raise the cover, then await the request.
+    const noSeniors = proceed.slice(proceed.indexOf('if (!seniors.length'));
+    const coverAt = noSeniors.indexOf('showCover(');
+    const awaitAt = noSeniors.indexOf('await startFinishSeason()');
     expect(coverAt).toBeGreaterThan(-1);
-    expect(closeAt).toBeLessThan(fetchAt);
-    expect(coverAt).toBeLessThan(fetchAt);
-    // And the cover must NOT be torn down in a finally — it stays up through navigation.
+    expect(awaitAt).toBeGreaterThan(coverAt);
+
+    // Seniors: finish-season starts behind the tribute; the cover comes up if
+    // that request is still pending when the walk-on advances. It is not a finally.
+    const tribute = proceed.slice(proceed.indexOf('var finishPromise'));
+    expect(tribute.indexOf('startFinishSeason()')).toBeGreaterThan(-1);
+    expect(tribute.indexOf('startFinishSeason()')).toBeLessThan(tribute.indexOf('showCover('));
+    expect(tribute).toContain("finishState === 'pending'");
     expect(proceed).not.toMatch(/finally\s*\{[^}]*advanceOverlay/);
   });
 });

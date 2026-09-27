@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 /**
  * Marketing home: public (authGuard), nav + auth chrome, auth assets load.
- * Covers canonical /homepage.html and legacy /homepage-v3.html redirect.
+ * Covers canonical /homepage.html and the homepage-v3.html candidate (a0ea3d36d kept it).
  */
 
 function marketingPaths() {
@@ -27,10 +27,12 @@ test.describe('homepage (v3 design) — public access & auth UI', () => {
     });
   }
 
-  test('homepage-v3.html redirects to homepage.html', async ({ page }) => {
+  test('homepage-v3.html stays the marketing candidate', async ({ page }) => {
     await page.goto('/static/homepage-v3.html');
-    await page.waitForURL(/homepage\.html/i, { timeout: 10000 });
-    await expect(page).toHaveURL(/homepage\.html/);
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page).toHaveURL(/homepage-v3\.html/);
+    await expect(page).not.toHaveURL(/\/login\.html/);
+    await expect(page.locator('img.hero-logo')).toBeVisible();
   });
 
   test('authGuard / authBarInit not 404 on main homepage', async ({ page }) => {

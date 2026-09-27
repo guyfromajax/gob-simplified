@@ -35,7 +35,7 @@ async function boot(page) {
     catch { await route.continue(); }
   });
   page.on('pageerror', (e) => console.log('[page exception]', String(e).slice(0, 300)));
-  await page.goto('http://localhost:8000/depth-harness.html');
+  await page.goto('/depth-harness.html');
   await page.waitForFunction(() => window.__HARNESS_READY === true, null, { timeout: 30000 });
   await page.waitForFunction(() => typeof window.__GOB_DEPTH_REPORT === 'function',
     null, { timeout: 30000 });
