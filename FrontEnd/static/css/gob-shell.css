@@ -627,8 +627,17 @@ html.gob-shell .main .spine {
   box-shadow: none;
 }
 
+html.gob-shell .main .doc {
+  padding: 0 !important;
+}
+
 html.gob-shell .main .spine-phase {
-  padding: 0 20px;
+  padding: 0;
+}
+
+html.gob-shell .main .spine-body {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 html.gob-shell .main .spine-switch {
@@ -636,7 +645,7 @@ html.gob-shell .main .spine-switch {
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
-  padding: 0 20px 8px;
+  padding: 0 0 8px;
 }
 
 html.gob-shell .main .scroll-x,

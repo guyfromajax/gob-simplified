@@ -1,0 +1,20 @@
+{
+  "firstRenderMs": 422,
+  "navToRowsMs": 1096,
+  "refilterMs": 35.6,
+  "refilterNarrowMs": 64.6,
+  "refilterFullMs": 62.1,
+  "rows": 450,
+  "portraits": {
+    "rows": 450,
+    "imgs": 0,
+    "letters": 450,
+    "empty": 0
+  },
+  "wide": {
+    "wide": true,
+    "sticky": "static",
+    "reps": 28,
+    "mask": "none"
+  }
+}

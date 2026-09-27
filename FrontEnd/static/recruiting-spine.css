@@ -214,6 +214,8 @@ a{color:var(--orange);text-decoration:none}a:hover{color:#ffb454}
    space between the name and Pos; the name column is capped rather than flexed. */
 table.pool{border-collapse:collapse;font-size:12px;width:max-content;min-width:100%;table-layout:fixed}
 .pool thead th{position:sticky;top:0;z-index:3;background:linear-gradient(180deg,rgba(34,38,50,.99),rgba(24,27,37,.99));backdrop-filter:blur(6px);font:800 10px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);padding:11px 6px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+.pool thead tr.gob-cols th{top:32px}
+.pool tbody tr.gob-rep th{position:static;top:auto;background:rgba(24,27,37,.99);cursor:default}
 .pool thead th.num{text-align:center}
 .pool thead th .arrow{color:var(--orange);margin-left:3px;font-size:9px}
 .pool thead th.name-col{text-align:left;padding-left:16px}
@@ -242,11 +244,13 @@ tr.region-row td{padding:0;border:0}
 .pool tbody td{padding:0 6px;height:42px;vertical-align:middle}
 .pool td.name-col{padding-left:16px;min-width:150px}
 .pc-name{display:flex;align-items:center;gap:9px}
-.pc-name .nm{font-weight:600;color:var(--text)}
+.pc-name .nm{font-weight:600;color:var(--text-100, var(--text))}
+.pool a.recruit-name-link{color:var(--text-100, var(--text))}
+.pool a.recruit-name-link:hover{color:var(--text-100, var(--text))}
 .pc-name .flag{font:700 8px/1 var(--body);letter-spacing:.08em;padding:3px 5px;border-radius:4px;text-transform:uppercase}
 .pc-name .flag.new{color:#a9ff9c;background:var(--you-soft);border:1px solid var(--you-line)}
 .pc-name .flag.lost{color:#ffb3b3;background:rgba(255,109,109,.12);border:1px solid rgba(255,109,109,.35)}
-.pc-arch{color:var(--muted-2);font-size:11px}
+.pc-arch{color:var(--text-60, var(--muted));font-size:11px}
 .pool td.num{text-align:center;color:var(--muted)}
 .pool td.pos{font-weight:700;color:var(--muted);letter-spacing:.03em}
 .pool td.year{font-weight:700;color:var(--muted-2);font-size:11px}
@@ -264,6 +268,7 @@ tr.region-row td{padding:0;border:0}
 /* ---------- Pool v2: fixed column widths, headers centered over their columns ----------
    Widths sum to ~1030px with the 12-chip attribute block sized to its content, so the
    header can centre over the whole block rather than over the first chip. */
+.pool col.c-watch{width:36px}
 .pool col.c-name{width:248px}
 .pool col.c-pos{width:44px}
 .pool col.c-rt{width:86px}
@@ -271,10 +276,12 @@ tr.region-row td{padding:0;border:0}
 .pool col.c-ht{width:52px}
 .pool col.c-wt{width:44px}
 .pool col.c-rgn{width:44px}
-.pool col.c-attrs{width:340px}
+.pool col.c-attr{width:32px}
 .pool col.c-lean{width:132px}
-.pool col.c-watch{width:52px}
 .pool col.c-add{width:46px}
+.pool .rtl{display:inline-flex;align-items:baseline;gap:3px;white-space:nowrap}
+.pool .rtl i{font-style:normal;color:var(--text-38, var(--muted-3))}
+.pool td.gshade,.pool th.gshade{background:rgba(255,255,255,.035)}
 
 .pool thead th.attrs-col{text-align:center;padding-left:0;padding-right:0}
 .pool thead th.watch-col,.pool thead th.lean-h{text-align:center;cursor:default}
@@ -282,8 +289,9 @@ tr.region-row td{padding:0;border:0}
 
 /* Name cell: headshot + name/archetype, clipped rather than wrapped. */
 .pool td.name-col .pc-id{display:flex;align-items:center;gap:10px;min-width:0}
-.pool .pc-av{width:36px;height:36px;border-radius:7px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
-  background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));display:flex;align-items:flex-end;justify-content:center}
+.pool .pc-av{width:28px;height:28px;border-radius:4px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
+  background:rgba(255,255,255,.08);display:inline-grid;place-items:center;color:var(--text-60, var(--muted));
+  font:700 11px/1 var(--display);letter-spacing:.02em}
 .pool .pc-av img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
 .pool .pc-txt{min-width:0}
 .pool .pc-txt .pc-name{display:flex;align-items:center;gap:8px;min-width:0}

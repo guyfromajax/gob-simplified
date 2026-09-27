@@ -446,10 +446,10 @@ test.describe('board shape tiles', () => {
 test('the pool now shows Wt', async ({ page }) => {
   await mountPool(page, { week: 7 });
   const m = await page.evaluate(() => {
-    const heads = [...document.querySelectorAll('#hub-pool thead th')].map((h) => h.textContent.trim());
+    const heads = [...document.querySelectorAll('#hub-pool thead tr.gob-cols th')].map((h) => h.textContent.replace(/[▲▼]/g, '').trim());
     const cells = document.querySelectorAll('#hub-pool tbody tr.rec:first-child td').length;
     return { heads, cells };
   });
-  expect(m.heads).toContain('Wt');
+  expect(m.heads).toContain('WT');
   expect(m.cells).toBe(m.heads.length);   // header and body stay in step
 });

@@ -589,7 +589,7 @@ const API_CONFIG = {
     if (this.usePlayerImageRemote()) {
       return this._remotePlayerImageUrl(`${this.RECRUIT_IMAGE_WHITE_PREFIX}/${imageId}.png`, size);
     }
-    return this.buildStaticPath(`/images/recruits/${imageId}.png`);
+    return this.buildStaticPath(`/images/recruits/white/${imageId}.png`);
   },
 
   // --- Lazy paint (generate-on-miss) ----------------------------------------

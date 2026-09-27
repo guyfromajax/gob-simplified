@@ -28,6 +28,15 @@
     { value: 'JH', label: 'JH' }
   ];
   var SORTABLE = { name: 'text', pos: 'num', year: 'num', height: 'num', weight: 'num', region: 'text', rt: 'num' };
+  // Same groups and shade rhythm as the Roster grid (rosterView.js GROUPS).
+  var POOL_GROUPS = [
+    { name: 'Offense', keys: ['SC', 'SH'], shade: false },
+    { name: 'Defense', keys: ['ID', 'OD'], shade: true },
+    { name: 'Skills', keys: ['PS', 'BH'], shade: false },
+    { name: 'Grit', keys: ['RB', 'ST'], shade: true },
+    { name: 'Body', keys: ['AG', 'ND'], shade: false },
+    { name: 'Mind', keys: ['IQ', 'FT'], shade: true }
+  ];
   var INVITE_WEEKS = [20, 21, 22, 23, 24, 25, 26];
   var POS_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
   var MAX_BOARD = 20;
@@ -82,7 +91,7 @@
   function regionOf(rec) { var v = rec && rec.homeRegion ? String(rec.homeRegion).trim().toUpperCase() : ''; return v ? v.charAt(0) : ''; }
   // Recruit | Pos | RT | Yr | Ht | Rgn | Attributes | Lean | Watch — attributes are a
   // single cell of chips now, not 12 columns. +1 for the add column in the invite phase.
-  function colspan() { return (boardActive() ? 1 : 0) + 10; }   // +1: Wt
+  function colspan() { return 21 + (boardActive() ? 1 : 0); }
 
   var CHEVRON = '<svg class="region-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"></path></svg>';
   var ARROW_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M7 17L17 7M9 7h8v8"></path></svg>';
@@ -136,46 +145,94 @@
   }
 
   // ---------- head ----------
-  // Order: Recruit | Pos | RT | Yr | Ht | Rgn | Attributes | Lean | Watch.
-  // Name/Pos/RT lead because they answer "is he worth watching" fastest, and it keeps
-  // the sorted column beside the name. Lean and Watch pair at the right edge: both are
-  // about you and him, not about him.
+  // Watch, then the recruit, then the roster identity columns, then the six
+  // attribute groups, then Lean. The invite add/rank cell is last, and only
+  // while the board is open (weeks 20–26).
   function colgroupHtml() {
-    return '<colgroup>' +
-      (boardActive() ? '<col class="c-add">' : '') +
-      '<col class="c-name"><col class="c-pos"><col class="c-rt"><col class="c-yr"><col class="c-ht">' +
-      '<col class="c-wt"><col class="c-rgn"><col class="c-attrs"><col class="c-lean"><col class="c-watch">' +
-      '</colgroup>';
+    var cols = '<col class="c-watch"><col class="c-name"><col class="c-pos"><col class="c-rt"><col class="c-yr"><col class="c-ht"><col class="c-wt"><col class="c-rgn">';
+    POOL_GROUPS.forEach(function (group) {
+      group.keys.forEach(function () { cols += '<col class="c-attr">'; });
+    });
+    cols += '<col class="c-lean">';
+    if (boardActive()) cols += '<col class="c-add">';
+    return '<colgroup>' + cols + '</colgroup>';
+  }
+  function groupHeadHtml() {
+    var html = '<tr class="gob-groups"><th colspan="8"></th>';
+    POOL_GROUPS.forEach(function (group) {
+      html += '<th class="gob-g' + (group.shade ? ' gshade' : '') + '" colspan="2">' + group.name + '</th>';
+    });
+    html += '<th></th>';
+    if (boardActive()) html += '<th></th>';
+    return html + '</tr>';
+  }
+  function colsHeadHtml(repeat) {
+    var html = '<tr class="gob-cols' + (repeat ? ' gob-rep' : '') + '">' +
+      '<th class="watch-col" aria-label="Watch"></th>' +
+      th('name', 'Recruit', 'name-col') +
+      th('pos', 'POS') +
+      '<th class="num" data-sortkey="rt" data-tooltip="Current → Potential" title="Current → Potential">RT' + arrow('rt') + '</th>' +
+      th('year', 'YR') +
+      th('height', 'HT') +
+      th('weight', 'WT') +
+      th('region', 'RGN');
+    POOL_GROUPS.forEach(function (group) {
+      group.keys.forEach(function (key) {
+        var names = window.GOB_AttrTiles && window.GOB_AttrTiles.ATTR_FULL_NAMES;
+        var tip = (names && names[key]) || key;
+        html += '<th class="num' + (group.shade ? ' gshade' : '') + '" data-tooltip="' + Common.escapeHtml(tip) + '" title="' + Common.escapeHtml(tip) + '">' + key + '</th>';
+      });
+    });
+    html += '<th class="lean-h">Lean</th>';
+    if (boardActive()) html += '<th class="act" aria-label="Invite board"></th>';
+    return html + '</tr>';
   }
   function headHtml() {
-    return '<thead><tr>' +
-      (boardActive() ? '<th class="act"></th>' : '') +
-      th('name', 'Recruit', 'name-col') +
-      th('pos', 'Pos') +
-      '<th class="num" data-sortkey="rt" data-tooltip="current/potential" title="current/potential">RT' + arrow('rt') + '</th>' +
-      th('year', 'Yr') +
-      th('height', 'Ht') +
-      th('weight', 'Wt') +
-      th('region', 'Rgn') +
-      '<th class="attrs-col attr-tiles-head">Attributes</th>' +
-      '<th class="lean-h">Lean</th>' +
-      '<th class="watch-col">Watch</th>' +
-      '</tr></thead>';
+    return '<thead>' + groupHeadHtml() + colsHeadHtml(false) + '</thead>';
   }
 
   // ---------- row ----------
-  function headshotHtml(r) {
-    var imageId = r.imageId;
-    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
-      return '<span class="pc-av"></span>';
-    }
-    return '<span class="pc-av"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
-      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"></span>';
+  function initials(name) {
+    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   }
-  // Delegates to the shared builder so this screen, the FCC Roster/Recruits tabs and
-  // team-roster-view all render identical tiles with identical hover copy.
-  function attrChipsHtml(r) {
-    return window.GOB_AttrTiles.tilesHtml(r.rawAttrs);
+  function portraitSpan(r, cls) {
+    var letters = Common.escapeHtml(initials(r && r.name));
+    var imageId = r && r.imageId;
+    if (!r) return '<span class="' + cls + '"></span>';
+    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
+      return '<span class="' + cls + '">' + letters + '</span>';
+    }
+    return '<span class="' + cls + '"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
+      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"' +
+      ' data-letters="' + letters + '"' +
+      ' onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';}"></span>';
+  }
+  function headshotHtml(r) {
+    return portraitSpan(r, 'pc-av av');
+  }
+  function attrCellsHtml(r) {
+    var tiles = window.GOB_AttrTiles;
+    var html = '';
+    POOL_GROUPS.forEach(function (group) {
+      group.keys.forEach(function (key) {
+        var value = tiles ? tiles.tileValue(r.rawAttrs, key) : null;
+        var cell = tiles ? tiles.tileHtml(key, value, false) : '';
+        html += '<td class="' + (group.shade ? 'gshade' : '') + '">' + cell + '</td>';
+      });
+    });
+    return html;
+  }
+  function rtCellHtml(r) {
+    var bucket = typeof getRtBucketClass === 'function' ? getRtBucketClass : function () { return ''; };
+    var fmt = typeof formatRtDisplay === 'function' ? formatRtDisplay : function (v) { return v == null ? '' : String(v); };
+    var html = '<span class="rtl"><b class="' + bucket(r.rt) + '">' + Common.escapeHtml(fmt(r.rt)) + '</b>';
+    if (r.potentialRt != null && r.potentialRt !== '') {
+      html += '<i>→</i><b class="pot ' + bucket(r.potentialRt) + '">' + Common.escapeHtml(fmt(r.potentialRt)) + '</b>';
+    }
+    return html + '</span>';
   }
 
   function watchButtonHtml(r) {
@@ -197,19 +254,20 @@
       if (idx !== -1) rowCls += ' on-board';
     }
     var flags = (state.newLeanIds.has(String(r.recruitId)) ? '<span class="flag new">New</span>' : '');
-    return '<tr class="rec ' + rowCls + '" data-rec-id="' + r.recruitId + '">' + actCell +
+    return '<tr class="rec ' + rowCls + '" data-rec-id="' + r.recruitId + '">' +
+      '<td class="watch-cell">' + watchButtonHtml(r) + '</td>' +
       '<td class="name-col"><div class="pc-id">' + headshotHtml(r) + '<span class="pc-txt">' +
         '<span class="pc-name"><span class="nm">' + Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) + '</span>' + flags + '</span>' +
         '<span class="pc-arch">' + Common.escapeHtml(r.archetype) + '</span></span></div></td>' +
       '<td class="pos">' + Common.escapeHtml(r.pos) + '</td>' +
-      '<td class="rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></td>' +
+      '<td class="rt" data-tooltip="Current → Potential" title="Current → Potential">' + rtCellHtml(r) + '</td>' +
       '<td class="year">' + Common.escapeHtml(r.yearDisplay) + '</td>' +
       '<td class="num">' + Common.escapeHtml(r.height) + '</td>' +
       '<td class="num">' + (r.weight != null ? Common.escapeHtml(r.weight) : '--') + '</td>' +
-      '<td class="num">' + Common.escapeHtml(regionOf(r) || '--') + '</td>' +
-      '<td class="attr-tiles-cell">' + attrChipsHtml(r) + '</td>' +
+      '<td class="num rgn">' + Common.escapeHtml(regionOf(r) || '--') + '</td>' +
+      attrCellsHtml(r) +
       '<td class="lean-col">' + Spine.Lean.ladderHtml(r.leanModel) + '</td>' +
-      '<td class="watch-cell">' + watchButtonHtml(r) + '</td>' +
+      actCell +
       '</tr>';
   }
   function poolBodyHtml() {
@@ -217,7 +275,12 @@
     if (!recs.length) {
       return '<tr><td colspan="' + colspan() + '" style="padding:26px;text-align:center;color:var(--muted-3)">No recruits match your filters.</td></tr>';
     }
-    return recs.map(rowHtml).join('');
+    var html = '';
+    recs.forEach(function (r, index) {
+      if (index > 0 && index % 16 === 0) html += colsHeadHtml(true);
+      html += rowHtml(r);
+    });
+    return html;
   }
 
   /**
@@ -359,7 +422,7 @@
   function renderPool() {
     var host = document.getElementById('hub-pool'); if (!host) return;
     host.innerHTML = toolbarHtml(state.recruits.length, filteredRecruits().length) +
-      '<div class="pool-scroll"><table class="pool">' + colgroupHtml() + headHtml() +
+      '<div class="pool-scroll"><table class="pool gob-tbl">' + colgroupHtml() + headHtml() +
       '<tbody>' + poolBodyHtml() + '</tbody></table></div>';
     bindPool(host);
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['th', 'td', '.attr-tile']);
@@ -399,25 +462,6 @@
     });
     host.querySelectorAll('.wt[data-watch-id]').forEach(function (b) {
       b.addEventListener('click', function (e) { e.stopPropagation(); toggleWatch(this); });
-    });
-    bindHeadshotFallbacks(host);
-  }
-  // Lazy paint: on a 404 ask the backend to paint the master, retry once, then generic.
-  function bindHeadshotFallbacks(host) {
-    host.querySelectorAll('.pc-av img[data-image-id]').forEach(function (img) {
-      if (img.dataset.fallbackBound) return;
-      img.dataset.fallbackBound = '1';
-      img.addEventListener('error', function () {
-        var el = this, imageId = el.dataset.imageId;
-        if (el.dataset.retried || typeof API_CONFIG === 'undefined') {
-          el.remove();
-          return;
-        }
-        el.dataset.retried = '1';
-        API_CONFIG.ensureRecruitImage(imageId).then(function () {
-          el.src = API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' }) + '?r=1';
-        }).catch(function () { el.remove(); });
-      });
     });
   }
   function renderPoolBodyOnly() {
@@ -662,13 +706,7 @@
   }
 
   function headshotBoxHtml(r, cls) {
-    if (!r) return '<span class="' + cls + '"></span>';
-    var imageId = r.imageId;
-    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
-      return '<span class="' + cls + '"></span>';
-    }
-    return '<span class="' + cls + '"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
-      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"></span>';
+    return portraitSpan(r, cls);
   }
 
   // ---------- hero: the top unvisited recruit ----------
@@ -903,7 +941,6 @@
     if (dismiss) dismiss.addEventListener('click', function () { state.seedNoticeDismissed = true; renderDock(); });
     var save = host.querySelector('#dock-save');
     if (save) save.addEventListener('click', saveBoard);
-    bindHeadshotFallbacks(host);
   }
 
   function saveBoard() {

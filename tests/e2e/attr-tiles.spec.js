@@ -167,17 +167,18 @@ test.describe('tiers', () => {
 // which mounts the real renderer instead of a hand-built stand-in of the old markup.
 
 test.describe('the in-scope surfaces all use the shared builder', () => {
-  const SURFACES = [
-    ['recruiting-hub.js', 'Recruits screen (Hub pool)'],
-    ['franchise-command-center.js', 'FCC Roster + Recruits tabs'],
-  ];
+  test('Recruits screen (Hub pool) calls GOB_AttrTiles', async () => {
+    // The pool uses the roster tile, one attribute per cell. The group header
+    // carries the abbreviation, so the tile is drawn without its own label.
+    const hub = read('recruiting-hub.js');
+    expect(hub).toContain('GOB_AttrTiles');
+    expect(hub).toContain('tileHtml');
+    expect(hub).toContain('tileHtml(key, value, false)');
+  });
 
-  for (const [file, label] of SURFACES) {
-    test(`${label} calls GOB_AttrTiles`, async () => {
-      // Grouped surfaces build a whole 6-pair cell; the Hub pool still renders a flat strip.
-      expect(read(file)).toMatch(/GOB_AttrTiles\.(grouped)?[tT]ilesHtml/);
-    });
-  }
+  test('FCC Roster + Recruits tabs calls GOB_AttrTiles', async () => {
+    expect(read('franchise-command-center.js')).toMatch(/GOB_AttrTiles\.groupedTilesHtml/);
+  });
 
   test('the roster module paints each attribute with the shared tile', async () => {
     const view = read('js/shared/views/rosterView.js');

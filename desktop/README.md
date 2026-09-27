@@ -112,6 +112,7 @@ Source mode (`python -m BackEnd.loopback` from `.venv`) is the default and is wh
 
 ## Packaging checklist
 
+- Unsigned recruit portraits. `getRecruitImageUrl` points at `recruits/white/<image_id>.png`. Those masters live in R2 and are not in the static tree, and the loopback paint path returns unconfigured without R2. The pool shows the initials monogram until the white masters are packaged beside the app. This is not a path bug: a file that is present at `FrontEnd/static/images/recruits/white/<image_id>.png` is what the offline build serves.
 - Team mini logos. `getTeamAssetPath(name, 'logo_square')` points at `FrontEnd/static/images/teams/<slug>/<slug>_logo_square.png`. 77 core teams are in `CORE_TEAM_ASSET_SLUGS` but that file was never written (most of those folders have `logo_primary.png` instead; Empire City has no logo file at all). The tables fall back to a letter monogram when the image 404s. Before a desktop pack, generate the missing `logo_square.png` files or the monogram stays in their place. This is not a path or bundling bug: the loopback serves the static tree, and the files are absent from it.
 
 ## Production league check (Jamie, before beta)

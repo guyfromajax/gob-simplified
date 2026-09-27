@@ -275,6 +275,58 @@ test('signing day and results hide the tab row', async ({ page }) => {
   }
 });
 
+test('pool grid matches the roster tiles and the league content edge', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openHub(page, 3);
+  const hub = await page.evaluate(() => {
+    const phase = document.querySelector('#hub-phase .pstrip');
+    const hair = document.querySelector('.pg-head');
+    const row = document.querySelector('#hub-pool tbody tr.rec');
+    const link = row.querySelector('.recruit-name-link');
+    const av = row.querySelector('.pc-av');
+    const gap = phase.getBoundingClientRect().top - hair.getBoundingClientRect().bottom;
+    const dsp = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dsp-8'));
+    const headPad = parseFloat(getComputedStyle(hair).paddingBottom);
+    return {
+      left: phase.getBoundingClientRect().left,
+      gap,
+      dsp,
+      headPad,
+      tiles: row.querySelectorAll('.attr-tile').length,
+      labels: row.querySelectorAll('.attr-tile u').length,
+      orange: getComputedStyle(link).color === 'rgb(247, 148, 32)',
+      rt: row.querySelector('.rtl').textContent,
+      portrait: !!(av.querySelector('img') || av.textContent.trim()),
+    };
+  });
+  expect(Math.abs(hub.headPad - hub.dsp)).toBeLessThan(0.6);
+  expect(hub.gap).toBeLessThan(1.5);
+  expect(hub.tiles).toBe(12);
+  expect(hub.labels).toBe(0);
+  expect(hub.orange).toBe(false);
+  expect(hub.rt).toMatch(/[A-F]/);
+  expect(hub.portrait).toBe(true);
+
+  await page.goto('/standings.html?franchise_id=' + FID + '&team_id=' + TID);
+  await page.waitForFunction(() => !document.documentElement.classList.contains('gob-pending'));
+  const leagueLeft = await page.evaluate(() => {
+    const main = document.querySelector('.main');
+    const head = document.querySelector('.pg-head');
+    if (!main || !head) return null;
+    const headBottom = head.getBoundingClientRect().bottom;
+    let best = null;
+    main.querySelectorAll('*').forEach((el) => {
+      if (head.contains(el)) return;
+      const r = el.getBoundingClientRect();
+      if (r.width < 200 || r.height < 12 || r.top < headBottom - 1) return;
+      if (!best || r.top < best.top - 1) best = r;
+    });
+    return best ? best.left : null;
+  });
+  expect(leagueLeft).not.toBeNull();
+  expect(Math.abs(leagueLeft - hub.left)).toBeLessThan(1.5);
+});
+
 test('focus mode still hides the head during an unsaved invite week', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openHub(page, 22, {}, { board_saved_week: 0 });

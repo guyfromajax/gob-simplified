@@ -24,7 +24,7 @@ function player(over = {}) {
 async function mount(page, payloadKey, payload) {
   await page.goto('/');
   await page.setContent('<div id="franchise-container"></div>');
-  for (const f of ['js/shared/rtBucket.js', 'js/shared/playerYear.js', 'common.js']) {
+  for (const f of ['js/utils/attributeDisplay.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js', 'common.js']) {
     await page.addScriptTag({ content: read(f) });
   }
   await page.addScriptTag({ content: 'window.franchiseId = "f1";' });

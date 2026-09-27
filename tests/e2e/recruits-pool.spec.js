@@ -131,6 +131,7 @@ test.describe('450 rows', () => {
   test('all 450 render and the pool scrolls, not the page', async ({ page }) => {
     await mountPool(page);
     expect(await rowCount(page)).toBe(450);
+    expect(await page.locator('#hub-pool tbody tr.gob-rep').count()).toBe(28);
     const m = await page.evaluate(() => {
       const s = document.querySelector('#hub-pool .pool-scroll');
       return {
@@ -180,17 +181,17 @@ test.describe('450 rows', () => {
 });
 
 test.describe('columns and headers', () => {
-  test('column order is Recruit Pos RT Yr Ht Wt Rgn Attributes Lean Watch', async ({ page }) => {
+  test('column order is Watch Recruit POS RT YR HT WT RGN then the six groups then Lean', async ({ page }) => {
     await mountPool(page);
     const labels = await page.evaluate(() =>
-      [...document.querySelectorAll('#hub-pool thead th')].map((t) => t.textContent.replace(/[▲▼]/g, '').trim()));
-    expect(labels).toEqual(['Recruit', 'Pos', 'RT', 'Yr', 'Ht', 'Wt', 'Rgn', 'Attributes', 'Lean', 'Watch']);
+      [...document.querySelectorAll('#hub-pool thead tr.gob-cols th')].map((t) => t.textContent.replace(/[▲▼]/g, '').trim()));
+    expect(labels).toEqual(['', 'Recruit', 'POS', 'RT', 'YR', 'HT', 'WT', 'RGN', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'Lean']);
   });
 
   test('every header is centered over its column', async ({ page }) => {
     await mountPool(page);
     const offsets = await page.evaluate(() => {
-      const heads = [...document.querySelectorAll('#hub-pool thead th')];
+      const heads = [...document.querySelectorAll('#hub-pool thead tr.gob-cols th')];
       const cells = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child td')];
       return heads.map((th, i) => {
         const h = th.getBoundingClientRect(), c = cells[i].getBoundingClientRect();
@@ -202,24 +203,34 @@ test.describe('columns and headers', () => {
     for (const o of offsets) expect(o.delta, `${o.label} column`).toBeLessThan(1.5);
   });
 
-  test('Attributes header centers across the whole 12-chip block, not the first chip', async ({ page }) => {
+  test('each attribute is a label-less roster tile under its group header', async ({ page }) => {
     await mountPool(page);
     const m = await page.evaluate(() => {
-      const th = [...document.querySelectorAll('#hub-pool thead th')].find((t) => t.textContent.trim() === 'Attributes');
-      const chips = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child .attr-tile')];
-      const first = chips[0].getBoundingClientRect(), last = chips[chips.length - 1].getBoundingClientRect();
-      const h = th.getBoundingClientRect();
+      const row = document.querySelector('#hub-pool tbody tr.rec');
+      const tiles = [...row.querySelectorAll('.attr-tile')];
+      const groups = [...document.querySelectorAll('#hub-pool thead tr.gob-groups th.gob-g')].map((th) => ({
+        name: th.textContent.trim(),
+        span: Number(th.colSpan),
+      }));
+      const offense = document.querySelector('#hub-pool thead tr.gob-groups th.gob-g');
+      const sc = row.querySelector('.attr-tile[data-attr="SC"]');
+      const sh = row.querySelector('.attr-tile[data-attr="SH"]');
+      const head = offense.getBoundingClientRect();
+      const a = sc.getBoundingClientRect();
+      const b = sh.getBoundingClientRect();
       return {
-        chipCount: chips.length,
-        headerCenter: h.left + h.width / 2,
-        blockCenter: (first.left + last.right) / 2,
-        firstChipCenter: first.left + first.width / 2,
+        tiles: tiles.length,
+        labels: row.querySelectorAll('.attr-tile u').length,
+        groups,
+        offenseCenter: head.left + head.width / 2,
+        pairCenter: (a.left + b.right) / 2,
       };
     });
-    expect(m.chipCount).toBe(12);
-    expect(Math.abs(m.headerCenter - m.blockCenter)).toBeLessThan(2);
-    // Explicitly NOT left-aligned over the first chip.
-    expect(Math.abs(m.headerCenter - m.firstChipCenter)).toBeGreaterThan(20);
+    expect(m.tiles).toBe(12);
+    expect(m.labels).toBe(0);
+    expect(m.groups.map((g) => g.name)).toEqual(['Offense', 'Defense', 'Skills', 'Grit', 'Body', 'Mind']);
+    expect(m.groups.every((g) => g.span === 2)).toBe(true);
+    expect(Math.abs(m.offenseCenter - m.pairCenter)).toBeLessThan(2);
   });
 
   test('attributes are visible (no condensed mode) and the name column is capped', async ({ page }) => {
@@ -233,22 +244,23 @@ test.describe('columns and headers', () => {
     expect(m.condensedClass).toBe(false);
     expect(m.chipsVisible).toBe(12);
     expect(Math.round(m.nameWidth)).toBe(248);
-    // Content-sized, not stretched to a much wider container. Wt widened it ~44px;
-    // see the known-limitation note on the invite-phase width test.
-    expect(m.tableWidth).toBeLessThan(1250);
+    // Content-sized. Twelve separate tiles plus the lean ladder run past the
+    // old single Attributes column; the table is still the column sum, not the page.
+    expect(m.tableWidth).toBeGreaterThan(1100);
+    expect(m.tableWidth).toBeLessThan(1400);
   });
 
   test('RT sorts descending by default and is the active sort', async ({ page }) => {
     await mountPool(page);
     const m = await page.evaluate(() => {
       const rtTh = [...document.querySelectorAll('#hub-pool thead th')].find((t) => t.textContent.includes('RT'));
-      const vals = [...document.querySelectorAll('#hub-pool tbody tr.rec td.rt .v')].slice(0, 12).map((e) => e.textContent.trim());
+      const vals = [...document.querySelectorAll('#hub-pool tbody tr.rec td.rt .rtl b:not(.pot)')].slice(0, 12).map((e) => e.textContent.trim());
       return { arrow: rtTh.textContent.includes('▼'), vals };
     });
     expect(m.arrow).toBe(true);
     // Letter grades: A++ > A+ > A > B+ > B > C+ > C > D > F.
     const ORDER = ['A++', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
-    const ranks = m.vals.map((v) => ORDER.indexOf(v.split('/')[0].trim()));
+    const ranks = m.vals.map((v) => ORDER.indexOf(v.trim()));
     for (let i = 1; i < ranks.length; i++) expect(ranks[i]).toBeGreaterThanOrEqual(ranks[i - 1]);
   });
 
@@ -257,6 +269,27 @@ test.describe('columns and headers', () => {
     const href = await page.evaluate(() =>
       document.querySelector('#hub-pool tbody tr.rec .nm a')?.getAttribute('href') || '');
     expect(href).toContain('recruit');
+  });
+
+  test('names are not orange, RT is letters, and every headshot is an image or a monogram', async ({ page }) => {
+    await mountPool(page);
+    const m = await page.evaluate(() => {
+      const link = document.querySelector('#hub-pool .recruit-name-link');
+      const color = getComputedStyle(link).color;
+      const cell = document.querySelector('#hub-pool td.rt');
+      const rt = cell.querySelector('.rtl').textContent.replace(/\s/g, '');
+      const shots = [...document.querySelectorAll('#hub-pool tbody tr.rec .pc-av')];
+      const empty = shots.filter((el) => !el.querySelector('img') && !el.textContent.trim()).length;
+      const withImg = shots.filter((el) => el.querySelector('img')).length;
+      const letters = shots.filter((el) => !el.querySelector('img') && el.textContent.trim()).length;
+      return { color, rt, title: cell.getAttribute('title'), empty, withImg, letters, rows: shots.length };
+    });
+    expect(m.color).not.toBe('rgb(247, 148, 32)');
+    expect(m.rt).toMatch(/^[A-F][+\-−]*$/);
+    expect(m.title).toBe('Current → Potential');
+    expect(m.empty).toBe(0);
+    expect(m.withImg + m.letters).toBe(m.rows);
+    expect(m.letters).toBeGreaterThan(0);
   });
 });
 
@@ -281,10 +314,9 @@ test.describe('filters compose', () => {
     // Every surviving row must satisfy all three at once.
     const ok = await page.evaluate(() =>
       [...document.querySelectorAll('#hub-pool tbody tr.rec')].every((tr) => {
-        const td = tr.querySelectorAll('td');
-        return td[1].textContent.trim() === 'PG'
-          && td[3].textContent.trim() === 'JR'
-          && td[5].textContent.trim() === 'C';
+        return tr.querySelector('td.pos').textContent.trim() === 'PG'
+          && tr.querySelector('td.year').textContent.trim() === 'JR'
+          && tr.querySelector('td.rgn').textContent.trim() === 'C';
       }));
     expect(ok).toBe(true);
   });
@@ -555,18 +587,10 @@ test.describe('invite phase runs full width (no board rail)', () => {
     expect(m.hasLean).toBe(true);
     expect(m.hasWatch).toBe(true);
 
-    // KNOWN LIMITATION, recorded rather than asserted away.
-    //
-    // Removing the 306px rail gave the pool that width back, but the table still needs
-    // ~88px more than it has, so Lean and Watch sit off the right edge until the user
-    // scrolls sideways. The cause is NOT the rail: `.doc { max-width: 1360px }` in
-    // recruiting-spine.css caps the whole hub page, so the pool measures the same
-    // 1096px at 1440, 1600, 1920 and 2200 viewports. Fixing it means raising that cap,
-    // narrowing the 12-tile attributes column, or dropping a column — a product call.
-    //
-    // Asserts the CURRENT truth so the suite stays honest; flip to toBe(0) once settled.
+    // The grouped grid is wider than the card, so it scrolls inside .pool-scroll.
+    // Watch is the first column now; Lean and the invite cell sit at the right edge.
     expect(m.overflowBy).toBeGreaterThan(0);
-    expect(m.overflowBy).toBeLessThan(200);   // if this grows, something else regressed
+    expect(m.overflowBy).toBeLessThan(320);
   });
 
   test('the passive phase is unchanged — it never had a rail', async ({ page }) => {

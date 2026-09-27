@@ -7,53 +7,29 @@
  * own week. The step's branch order relative to cut_required is the reason the whole
  * thing works, so it is asserted here too.
  *
- * Extracts the REAL updatePlayButton source out of franchise-command-center.js and
- * evaluates it against a stub #play-now, so the test tracks the shipped branch order
+ * Calls the REAL GOBAdvance.updatePlayButton (the Office and the FCC both delegate
+ * to it) against a stub #play-now, so the test tracks the shipped branch order
  * rather than a copy of it.
  *
  * Run: npx playwright test tests/e2e/fcc-invite-step.spec.js --project=chromium
  */
 const { test, expect } = require('@playwright/test');
-const fs = require('fs');
 const path = require('path');
 
-const JS = fs.readFileSync(
-  path.join(__dirname, '../../FrontEnd/static/franchise-command-center.js'), 'utf8');
+const ADVANCE = path.join(__dirname, '../../FrontEnd/static/js/shared/gobAdvance.js');
 
-function extractFunction(source, name) {
-  const lines = source.split('\n');
-  const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
-  if (start === -1) throw new Error(`${name} not found`);
-  const end = lines.findIndex((l, i) => i > start && l === '}');
-  return lines.slice(start, end + 1).join('\n');
-}
-
-/** Pulled from source, so a moved week boundary moves these tests with it. */
-function extractConst(source, name) {
-  const m = source.match(new RegExp(`^const ${name} = \\d+;$`, 'm'));
-  if (!m) throw new Error(`${name} not found`);
-  return m[0];
-}
-
-const UPDATE_PLAY_BUTTON = extractFunction(JS, 'updatePlayButton');
-const CONSTS = ['SIGNING_DAY_WEEK', 'INVITE_FIRST_WEEK', 'INVITE_LAST_WEEK']
-  .map((n) => extractConst(JS, n)).join('\n');
-
-/** Call the real function with synthetic command-center data; report the button. */
-async function runWith(page, data) {
-  return page.evaluate(({ src, consts, data }) => {
-    document.body.innerHTML = '<button id="play-now">Run Training</button>';
-    window.fccCpuSimNeedsRecovery = () => false;
-    window.userTeamId = 'user-team';
-    // Label lookups only; no test here asserts postseason copy.
-    window.EOS_PLAY_CTA_BY_WEEK = {};
-    window.EOS_SIM_CTA_BY_WEEK = {};
-    // eslint-disable-next-line no-eval
-    eval(`${consts}\n${src}\nwindow.__updatePlayButton = updatePlayButton;`);
-    window.__updatePlayButton(data);
+/** Call the real advance button with synthetic command-center data; report the button. */
+async function runWith(page, data, recover) {
+  await page.setContent('<button id="play-now">Run Training</button>');
+  await page.addScriptTag({ path: ADVANCE });
+  return page.evaluate(({ data, recover }) => {
+    window.GOBAdvance.updatePlayButton(data, {
+      userTeamId: 'user-team',
+      fccCpuSimNeedsRecovery: () => !!recover,
+    });
     const btn = document.getElementById('play-now');
     return { text: btn.textContent.trim(), mode: btn.dataset.mode || null };
-  }, { src: UPDATE_PLAY_BUTTON, consts: CONSTS, data });
+  }, { data, recover: !!recover });
 }
 
 /** Board sent in week `w` — the marker the step reads. */
@@ -126,22 +102,17 @@ test.describe('branch order', () => {
     expect(r.mode).toBe('week35-recruiting');
   });
 
-  test('week 36 still offers the season transition', async ({ page }) => {
-    const r = await runWith(page, { week: 36, ...NEVER_SENT });
-    expect(r.mode).toBe('new-season');
+  test('week 36 shows results until they are seen, then the season transition', async ({ page }) => {
+    const unseen = await runWith(page, { week: 36, ...NEVER_SENT });
+    expect(unseen.mode).toBe('view-recruiting-results');
+    const seen = await runWith(page, { week: 36, recruiting_wire: { week_36_results_seen: true } });
+    expect(seen.mode).toBe('new-season');
   });
 
   test('cpu-sim recovery still preempts everything', async ({ page }) => {
-    const r = await page.evaluate(({ src, consts }) => {
-      document.body.innerHTML = '<button id="play-now"></button>';
-      window.fccCpuSimNeedsRecovery = () => true;
-      window.userTeamId = 'user-team';
-      // eslint-disable-next-line no-eval
-      eval(`${consts}\n${src}\nwindow.__u = updatePlayButton;`);
-      window.__u({ week: 20, cut_required: true, recruiting_wire: { has_saved_board: false } });
-      const btn = document.getElementById('play-now');
-      return { text: btn.textContent.trim(), mode: btn.dataset.mode };
-    }, { src: UPDATE_PLAY_BUTTON, consts: CONSTS });
+    const r = await runWith(page, {
+      week: 20, cut_required: true, recruiting_wire: { has_saved_board: false },
+    }, true);
     expect(r.mode).toBe('finish-cpu-sims');
   });
 });
