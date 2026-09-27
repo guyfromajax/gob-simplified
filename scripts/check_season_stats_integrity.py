@@ -21,28 +21,7 @@ import sqlite3
 import sys
 from collections import defaultdict
 from pathlib import Path
-
-
-def _aliases(ref, teams_by_key: dict[str, dict]) -> set[str]:
-    if ref is None:
-        return set()
-    if isinstance(ref, dict):
-        out: set[str] = set()
-        for key in ("$oid", "_id", "team_id", "name", "code"):
-            if ref.get(key) is not None:
-                out |= _aliases(ref.get(key), teams_by_key)
-        return out
-    text = str(ref).strip()
-    if not text or text == "None":
-        return set()
-    out = {text}
-    doc = teams_by_key.get(text)
-    if doc:
-        out.add(str(doc.get("_id") or ""))
-        for key in ("team_id", "name", "code"):
-            if doc.get(key):
-                out.add(str(doc[key]))
-    return {item for item in out if item}
+from urllib.parse import urlparse
 
 
 def _box_team_keys(game: dict) -> set[str]:
@@ -67,16 +46,38 @@ def _box_team_keys(game: dict) -> set[str]:
     return keys
 
 
-def _pair_matches(left: set[str], right: set[str], teams_by_key: dict[str, dict]) -> bool:
-    if not left or not right:
-        return True
-    left_aliases: set[str] = set()
-    right_aliases: set[str] = set()
-    for ref in left:
-        left_aliases |= _aliases(ref, teams_by_key)
-    for ref in right:
-        right_aliases |= _aliases(ref, teams_by_key)
-    return left_aliases == right_aliases or left_aliases <= right_aliases or right_aliases <= left_aliases
+def database_name_from_uri(uri: str | None) -> str | None:
+    """Database name is the URI path. ``mongodb://host:27017/gob`` → ``gob``."""
+    if not uri:
+        return None
+    path = (urlparse(uri).path or "").strip("/")
+    name = path.split("/")[0] if path else ""
+    return name or None
+
+
+def resolve_mongo_database(db_arg: str | None, uri: str | None) -> str:
+    """``--db`` wins. Otherwise the URI path. Error when neither names a database."""
+    if db_arg:
+        return db_arg
+    name = database_name_from_uri(uri)
+    if not name:
+        raise SystemExit("Pass --db or a Mongo URI whose path is the database name")
+    return name
+
+
+def _resolved_name(ref, teams_by_key: dict[str, dict]) -> str:
+    """Team display name when the ref is an id, code, or name already in the index."""
+    text = _ref_text(ref).strip()
+    if not text or text == "None":
+        return ""
+    doc = teams_by_key.get(text)
+    if doc and doc.get("name"):
+        return str(doc["name"])
+    return text
+
+
+def _name_set(refs, teams_by_key: dict[str, dict]) -> set[str]:
+    return {name for name in (_resolved_name(ref, teams_by_key) for ref in refs) if name}
 
 
 class _Store:
@@ -158,7 +159,8 @@ def _team_label(ref, teams_by_key: dict[str, dict]) -> str:
     return text
 
 
-def check(store: _Store, franchise_id: str | None) -> int:
+def check(store: _Store, franchise_id: str | None, database_name: str) -> int:
+    print(f"database {database_name}")
     teams_by_key = _team_index(store)
     fpd_gp: dict[tuple[str, str], int] = defaultdict(int)
     for _row_id, doc in store.rows("franchise_players_data"):
@@ -218,19 +220,21 @@ def check(store: _Store, franchise_id: str | None) -> int:
         away = game.get("away_team_id")
         box_keys = _box_team_keys(game)
         canonical = {str(item) for item in (home, away) if item}
-        result_pair = {_ref_text(item) for item in (game.get("team1_id"), game.get("team2_id")) if item}
-        box_pair = box_keys or canonical
-        if not box_pair or not result_pair:
+        result_refs = [item for item in (game.get("team1_id"), game.get("team2_id")) if item]
+        box_refs = list(box_keys or canonical)
+        box_names = _name_set(box_refs, teams_by_key)
+        stored_names = _name_set(result_refs, teams_by_key)
+        if not box_names or not stored_names:
             continue
-        if _pair_matches(box_pair, result_pair, teams_by_key):
+        if box_names == stored_names:
             continue
         if wanted and game_fid and wanted != game_fid:
             continue
         box_disagreements += 1
         print(
             f"box/matchup game {gid} franchise {game_fid or '-'} week {game.get('week')}: "
-            f"box={sorted(_team_label(item, teams_by_key) for item in box_pair)} "
-            f"stored_teams={sorted(_team_label(item, teams_by_key) for item in result_pair)}"
+            f"box={sorted(box_names)} "
+            f"stored_teams={sorted(stored_names)}"
         )
 
     print(
@@ -240,7 +244,7 @@ def check(store: _Store, franchise_id: str | None) -> int:
     return 0
 
 
-def _open_store(args: argparse.Namespace) -> _Store:
+def _open_store(args: argparse.Namespace) -> tuple[_Store, str]:
     sqlite_path = args.sqlite or os.environ.get("GOB_SQLITE_PATH")
     persistence = (os.environ.get("GOB_PERSISTENCE") or "").strip().lower()
     mongo_uri = args.mongo or os.environ.get("MONGO_URI")
@@ -249,20 +253,21 @@ def _open_store(args: argparse.Namespace) -> _Store:
             raise SystemExit("SQLite check needs --sqlite or GOB_SQLITE_PATH")
         if not Path(sqlite_path).is_file():
             raise SystemExit(f"SQLite file not found: {sqlite_path}")
-        return SqliteStore(sqlite_path)
+        return SqliteStore(sqlite_path), Path(sqlite_path).name
     if not mongo_uri:
         raise SystemExit("Pass --sqlite PATH or --mongo URI (or set GOB_SQLITE_PATH / MONGO_URI)")
-    return MongoStore(mongo_uri, args.db)
+    return MongoStore(mongo_uri, resolve_mongo_database(args.db, mongo_uri)), resolve_mongo_database(args.db, mongo_uri)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only season stats integrity check")
     parser.add_argument("--sqlite", help="Path to a SQLite save. Opened read-only.")
     parser.add_argument("--mongo", help="Mongo connection string. Reads only.")
-    parser.add_argument("--db", default=os.environ.get("MONGO_DB") or "gob")
+    parser.add_argument("--db", default=None, help="Mongo database name. Defaults to the URI path.")
     parser.add_argument("--franchise-id", default=None)
     args = parser.parse_args(argv)
-    return check(_open_store(args), args.franchise_id)
+    store, database_name = _open_store(args)
+    return check(store, args.franchise_id, database_name)
 
 
 if __name__ == "__main__":

@@ -11525,6 +11525,24 @@ def team_stats(franchise_id: str, scope: str = "national"):
     return {"teams": output}
 
 
+@router.get("/franchise/player-detail")
+@browse_cached
+def player_detail(franchise_id: str, player_id: str):
+    """T3 player page. Additive beside GET /player/{id}, which player-detail.html still uses."""
+    from BackEnd.utils.t3_detail import build_player_detail
+
+    return build_player_detail(franchise_id, player_id)
+
+
+@router.get("/franchise/team-detail")
+@browse_cached
+def team_detail(franchise_id: str, team_id: str):
+    """T3 team page for any franchise team. The roster table stays on GET /roster/{id}."""
+    from BackEnd.utils.t3_detail import build_team_detail
+
+    return build_team_detail(franchise_id, team_id)
+
+
 @router.get("/franchise/team-traits")
 def team_traits(franchise_id: str, scope: str = "national"):
     """Get team attribute totals for all teams in franchise.

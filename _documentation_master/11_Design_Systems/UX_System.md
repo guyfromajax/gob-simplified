@@ -238,7 +238,7 @@ The ETag is `franchise:season:week:browse_rev:BUILD:signature`. The store rememb
 
 `GOBStore.mutate(url, options)` is the write wrapper. `window.fetch` sends POST, PUT, PATCH, and DELETE on `/franchise/`, `/api/gameplan`, and `/api/playbooks` through it. After a successful response it clears that franchise's memory and `sessionStorage`. The next GET is a full read and picks up the new revision. A flow page that navigates away after a write does not have to do anything else.
 
-Cached routes are the browse GETs: command-center, standings, schedule (including national), leaders, team-stats, team-player-stats, team-data, news, recruiting-data, recruiting-results, practice-squad, awards, scouting-report, roster, player, recruit, teams, game plan, and playbooks.
+Cached routes are the browse GETs: command-center, standings, schedule (including national), leaders, team-stats, team-player-stats, team-data, news, recruiting-data, recruiting-results, practice-squad, awards, scouting-report, roster, player, player-detail, team-detail, recruit, teams, game plan, and playbooks.
 
 Never cached: `GET /api/game/{id}`, `POST /api/simulate-quarter`, `/api/auth`, and any URL with `profile=1`. `profile=1` is only added when the page URL has `cc_profile=1`.
 
@@ -332,3 +332,44 @@ In-page tabs (Roster, the Office) stay as panels already in the page. Standings,
 The first open paints a neutral skeleton in the shape of the view. No spinner. Data comes from `GOBStore.get`. The module stays in the panel after the user leaves. Opening it again shows that panel immediately and calls `GOBStore.revalidate`. The view re-renders only when the body changed. A 304 keeps the table on screen.
 
 An unknown module, or an import that fails, paints a quiet error card with Retry in that panel. The rest of the app stays up. Retry loads the module again. A `?tab=` that is neither a panel nor a registered view still falls back to the section default, as today's tabs do.
+
+## 15. Detail data
+
+`player-detail.html` still reads `GET /player/{id}`. The T3 player page reads `GET /franchise/player-detail`. The T3 team page reads `GET /franchise/team-detail`. Both are `@browse_cached`. The page formats the numbers. It does not derive a rate, a place, a streak, or an attribute bucket. The roster table on the team page is still `GET /roster/{team}`. There is no server pager. The client keeps the list order it already sorted.
+
+### Player
+
+`GET /franchise/player-detail?franchise_id&player_id`
+
+| Field | Meaning |
+|---|---|
+| `player_id`, `name`, `team_id`, `team_name`, `team_primary_color` | Identity. Color is null when the team document is missing. |
+| `position` | Same rule as the roster chip (`_roster_position`). |
+| `year` | Class abbreviation from `format_player_year_abbrev` (`FR`, `SO`, `JR`, `SR`). Unknown is `--`. |
+| `height_in`, `weight`, `jersey` | Stored meta. Height is inches. |
+| `is_user_team` | This player's team is the franchise's user team. |
+| `rt` | Highest numeric position rating. The same number the roster page passes to `rtBucket.js`. Null when there is no rating. |
+| `potential` | `potential_rt_ratcheted`. Already ratcheted. Null when there is no projection, and the page shows the current rating alone. |
+| `attributes` | Six groups, in order: Offense `SC` `SH`, Defense `ID` `OD`, Skills `PS` `BH`, Grit `RB` `ST`, Body `AG` `ND`, Mind `IQ` `FT`. Each attribute is `{attr, raw, display}`. `display` is `floor(raw / 10)`. Missing raw is null, and so is display. |
+| `season`, `career` | `gp`, `min_per_game`, `pts_per_game`, `reb_per_game`, `ast_per_game`, `stl_per_game`, `blk_per_game`, `fg_pct`, `tp_pct`, `ft_pct`, `def_pct`, and `totals`. Per-game is null when GP is 0. A percentage is makes / attempts × 100, and null when attempts are 0. `totals` holds `GP`, `MIN`, `PTS`, `REB`, `AST`, `STL`, `BLK`, `FGM`, `FGA`, `3PTM`, `3PTA`, `FTM`, `FTA`, `DEF_S`, `DEF_A`. |
+| `recent_changes` | This season's training reports for this player, newest week first. `{week, session_type, changes}`. A current-shape week stores display buckets: `{attr, from, to}`. An older week stores a name-keyed signed raw delta and cannot supply from/to: `{attr, delta}` only. Zero changes are omitted. A week with none is omitted. `session_type` is the stored value, or `preseason` for week ≤ 1 and `in-season` after that. |
+| `development` | `{focus, focus_label, emphasises, editable}`. `emphasises` is the attributes whose weight in `TRAINING_FOCUS_PERCENTAGES[position][focus]` is above `standard`, highest first, at most three. Ties keep the group order above. `standard` emphasises nothing. `editable` is true only on the user's team. |
+
+### Team
+
+`GET /franchise/team-detail?franchise_id&team_id` for any team in the franchise.
+
+| Field | Meaning |
+|---|---|
+| `team_id`, `name`, `primary_color` | Display name and color, including a Team Builder overlay on the replaced slot. |
+| `conference` | Short label: region letter plus the conference's own number (`A1`, `A2`, `B3` … `H16`). |
+| `region` | Stored region, or the letter derived from the conference number. |
+| `record` | `{wins, losses}` from `calculate_franchise_standings`. |
+| `natl_rank` | Current `franchise_team_data.natl_rank`. |
+| `conference_place` | `1st of 8`. Place is `standings_display_sort_key` only (wins, then point differential). The size is the number of franchise teams in that conference. Null when the team has no conference. |
+| `streak` | `W4` or `L1` from `current_streaks`. Null when the team has no decided game. A tie ends the streak. |
+| `next_game` | The next schedule game that has no result. Null when none remain. `{week, site, opponent_id, opponent_name, opponent_primary_color, opponent_natl_rank}`. `site` is `home` or `away`. Opponent rank is that team's current national rank. |
+| `results` | Completed games, newest week first. The next-game fields plus `team_score`, `opp_score`, and `result` (`W` or `L`). A tie has `result` null. |
+| `upcoming` | Later unplayed schedule games, same shape as `next_game`, not including `next_game`. |
+
+No stored tip time, neutral site, or hometown. Those stay off the page.
