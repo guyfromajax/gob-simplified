@@ -464,7 +464,7 @@ function renderPlayUsage(plays, emptyMessage = 'No previous game data available.
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${play.name || 'Unknown'}</td>
+      <td class="l">${play.name || 'Unknown'}</td>
       <td>${timesRun}</td>
       <td>${successRate}%</td>
       <td>${usagePct}%</td>

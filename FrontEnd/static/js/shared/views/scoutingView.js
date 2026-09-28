@@ -131,7 +131,8 @@ function playerPortraitHtml(row) {
     src = window.API_CONFIG.getPlayerImageUrl(pid, { size: 'card' });
   }
   if (src) {
-    return '<span class="av"><img src="' + esc(src) + '" alt="" loading="lazy" width="28" height="28"></span>';
+    return '<span class="av"><img src="' + esc(src) + '" alt="" loading="lazy" width="28" height="28" data-letters="'
+      + esc(mono) + '" onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';this.remove();}"></span>';
   }
   return '<span class="av">' + esc(mono) + '</span>';
 }
