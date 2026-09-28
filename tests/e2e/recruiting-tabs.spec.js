@@ -170,17 +170,19 @@ test('invite weeks keep the stack on pool and leans, and visits is the calendar'
   await openHub(page, 22, {
     visit_history: history({ 20: { id: 'r-lean', name: 'Ada Lean', lean: { 1: TID } } }),
   });
-  await expect(tab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
-  expect(page.url()).toContain('hub=leans');
-  await expect(page.locator('.pool-view[data-view="leans"]')).toHaveCount(0);
+  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
+  expect(page.url()).toContain('hub=pool');
+  await expect(page.locator('.pool-view[data-view="leans"]')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('#gob-subtabs .gob-search')).toHaveAttribute('placeholder', 'Search name…');
   await expect(page.locator('#hub-visits .vcal')).toBeVisible();
   await expect(page.locator('#hub-board')).toBeVisible();
   await expect(page.locator('#hub-pool')).toBeVisible();
   await expect(page.locator('#hub-weekly')).toHaveCount(0);
-  await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(1);
+  await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(2);
 
   const before = await page.evaluate(() => history.length);
+  await tab(page, 'Leans').click();
+  await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(1);
   await tab(page, 'Pool').click();
   await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
   expect(page.url()).toContain('hub=pool');
@@ -264,6 +266,8 @@ test('a processed invite week has no results panel and no gap above the visits',
   const baseline = await gapUnder();
 
   const results = await openHub(page, 21, invite(21, true));
+  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
+  await tab(page, 'Leans').click();
   await expect(tab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
   const strip = page.locator('#hub-phase .pstrip');
   await expect(strip).toContainText('Invite Season');
@@ -411,6 +415,128 @@ test('pool grid matches the roster tiles and the league content edge', async ({ 
   });
   expect(leagueLeft).not.toBeNull();
   expect(Math.abs(leagueLeft - hub.left)).toBeLessThan(1.5);
+});
+
+// fullPool(): 14 recruits over regions A-E. The user is first or second in the lean of
+// r-0/1/3/4/6/7/9/10/12/13. Region C (his) holds r-2, r-7 and r-12; r-7 and r-12 lean to him.
+const LEANS_OUT = path.join(__dirname, '../../reports/recruit-leans-toggle');
+const leansBtn = (page) => page.locator('#hub-pool .pool-view[data-view="leans"]');
+const poolIds = (page) => page.locator('#hub-pool tbody tr.rec').evaluateAll((rows) =>
+  rows.map((row) => row.dataset.recId).sort());
+const fcount = (page) => page.locator('#hub-pool .pool-fcount').innerText();
+
+async function showPoolBar(page) {
+  await page.evaluate(() => {
+    const main = document.querySelector('html.gob-shell .main');
+    const bar = document.querySelector('#hub-pool .pool-fbar');
+    main.scrollTop += bar.getBoundingClientRect().top - main.getBoundingClientRect().top - 12;
+  });
+  await page.mouse.move(4, 4);
+}
+
+test('week 21 focus flow lands on the region pool, and Leans toggles to leaners and back', async ({ page }) => {
+  const fs = require('fs');
+  fs.mkdirSync(LEANS_OUT, { recursive: true });
+  for (const size of [[1280, 720], [1920, 1080]]) {
+    const tag = size[0] + 'x' + size[1];
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    await openHub(page, 21, { recruits: fullPool() }, { board_saved_week: 0 });
+    await expect(page.locator('html.gob-focus')).toHaveCount(1);
+    await expect(page.locator('#gob-subtabs [role="tab"]:visible')).toHaveCount(0);
+    await expect(page.locator('#hub-board')).toBeVisible();
+    const views = await page.locator('#hub-pool .pool-view').evaluateAll((b) => b.map((x) => x.dataset.view));
+    expect(views).toEqual(['leans', 'watch', 'unranked']);
+    await expect(page.locator('#pool-region')).toHaveValue('C');
+    await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'false');
+    await expect(leansBtn(page).locator('.n')).toHaveText('10');
+    expect(await poolIds(page)).toEqual(['r-12', 'r-2', 'r-7']);
+    expect(await fcount(page)).toMatch(/Showing\s*3\s*of 14$/);
+    await showPoolBar(page);
+    await page.screenshot({ path: path.join(LEANS_OUT, 'focus-w21-default-' + tag + '.png') });
+
+    await leansBtn(page).click();
+    await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'true');
+    await expect(leansBtn(page)).toHaveClass(/is-on/);
+    expect(await poolIds(page)).toEqual(['r-12', 'r-7']);
+    expect(await fcount(page)).toMatch(/Showing\s*2\s*of 14$/);
+
+    await page.selectOption('#pool-region', 'all');
+    expect((await poolIds(page)).length).toBe(10);
+    await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'true');
+    await showPoolBar(page);
+    await page.screenshot({ path: path.join(LEANS_OUT, 'focus-w21-leans-' + tag + '.png') });
+
+    // One view at a time: Watchlist turns Leans off, and Leans turns Watchlist off.
+    await page.locator('#hub-pool .pool-view[data-view="watch"]').click();
+    await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'false');
+    await leansBtn(page).click();
+    await expect(page.locator('#hub-pool .pool-view[data-view="watch"]')).toHaveAttribute('aria-pressed', 'false');
+    expect((await poolIds(page)).length).toBe(10);
+
+    await leansBtn(page).click();
+    await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'false');
+    expect((await poolIds(page)).length).toBe(14);
+    expect(await fcount(page)).toMatch(/Showing\s*14\s*of 14 · no filters$/);
+  }
+
+  // Back/forward restore keeps the toggle and the filters.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openHub(page, 21, { recruits: fullPool() }, { board_saved_week: 0 });
+  await page.selectOption('#pool-region', 'all');
+  await leansBtn(page).click();
+  await page.goto('/login.html');
+  await page.goBack();
+  await page.waitForSelector('#hub-pool .pool-view');
+  await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#pool-region')).toHaveValue('all');
+  expect((await poolIds(page)).length).toBe(10);
+
+  // A fresh visit (not back/forward) lands on the default again.
+  await openHub(page, 21, { recruits: fullPool() }, { board_saved_week: 0 });
+  await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('#pool-region')).toHaveValue('C');
+
+});
+
+test('browse hub keeps the Leans tab and the Leans toggle in sync', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openHub(page, 22, { recruits: fullPool() });
+  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
+  await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('#pool-region')).toHaveValue('C');
+
+  await leansBtn(page).click();
+  await expect(tab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
+  expect(page.url()).toContain('hub=leans');
+  expect(await poolIds(page)).toEqual(['r-12', 'r-7']);
+
+  await tab(page, 'Pool').click();
+  await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'false');
+  expect(page.url()).toContain('hub=pool');
+  expect((await poolIds(page)).length).toBe(3);
+
+  await page.locator('#hub-pool .pool-view[data-view="watch"]').click();
+  await tab(page, 'Leans').click();
+  await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#hub-pool .pool-view[data-view="watch"]')).toHaveAttribute('aria-pressed', 'false');
+  expect(await poolIds(page)).toEqual(['r-12', 'r-7']);
+
+  await page.locator('#hub-pool .pool-view[data-view="unranked"]').click();
+  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
+  await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'false');
+
+  await leansBtn(page).click();
+  await leansBtn(page).click();
+  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
+  expect(page.url()).toContain('hub=pool');
+
+  await tab(page, 'Leans').click();
+  await page.goto('/login.html');
+  await page.goBack();
+  await page.waitForSelector('#hub-pool .pool-view');
+  await expect(tab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
+  await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'true');
+  expect(await poolIds(page)).toEqual(['r-12', 'r-7']);
 });
 
 test('focus mode still hides the head during an unsaved invite week', async ({ page }) => {

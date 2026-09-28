@@ -439,7 +439,7 @@ test('recruiting hub lands on leans, otherwise the user region', async ({ page }
   await openHub(page, true);
   await expect(stab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
   expect(page.url()).toContain('hub=leans');
-  await expect(page.locator('.pool-view[data-view="leans"]')).toHaveCount(0);
+  await expect(page.locator('.pool-view[data-view="leans"]')).toHaveAttribute('aria-pressed', 'true');
   await page.screenshot({ path: path.join(OUT, 'hub-leans-1280.png') });
   await mouseClick(page, stab(page, 'Pool'));
   await expect(stab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
