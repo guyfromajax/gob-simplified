@@ -122,7 +122,7 @@ function build() {
     + '    <section class="set-s" data-coach hidden><h3>Coach stats</h3><div class="cs-grid" data-coach-grid></div></section>'
     + '    <section class="set-s" data-account></section>'
     + '  </div>'
-    + '  <div class="set-f"><span data-build></span><span class="conn" data-conn><i></i><span data-conn-label>Online</span></span></div>'
+    + '  <div class="set-f"><span class="set-f-l"><a class="lnk" href="/faqs.html" target="_blank" rel="noopener" data-settings-faqs>FAQs</a><span data-build></span></span><span class="conn" data-conn><i></i><span data-conn-label>Online</span></span></div>'
     + '</aside>';
   document.body.appendChild(host);
   bindGobDensity(host);

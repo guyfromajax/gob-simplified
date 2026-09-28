@@ -83,6 +83,74 @@ test('offline profile hides Account and shows the offline note', async ({ page }
   await expect(page.locator('[data-conn-label]')).toHaveText('Offline');
 });
 
+// FAQs sits in the panel footer, outside the Account section the offline profile
+// replaces. It opens in a new tab; the game page stays put.
+async function checkFaqs(page, shot) {
+  const faqs = page.locator('#gob-settings-host .set-f a[data-settings-faqs]');
+  await expect(faqs).toBeVisible();
+  const hit = await faqs.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { ok: top === el || el.contains(top), bottom: r.bottom, vh: innerHeight };
+  });
+  expect(hit.ok, JSON.stringify(hit)).toBe(true);
+  expect(hit.bottom).toBeLessThanOrEqual(hit.vh);
+  await expect(faqs).toHaveText('FAQs');
+  await expect(faqs).toHaveClass(/\blnk\b/);
+  await expect(faqs).toHaveAttribute('href', '/faqs.html');
+  await expect(faqs).toHaveAttribute('target', '_blank');
+  await expect(faqs).toHaveAttribute('rel', /\bnoopener\b/);
+
+  let focused = false;
+  for (let i = 0; i < 30 && !focused; i++) {
+    await page.keyboard.press('Tab');
+    focused = await faqs.evaluate((el) => document.activeElement === el);
+  }
+  expect(focused, 'FAQs reachable with Tab').toBe(true);
+  const ring = await faqs.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), visible: el.matches(':focus-visible') };
+  });
+  expect(ring.visible).toBe(true);
+  expect(ring.style).toBe('solid');
+  expect(ring.width).toBeGreaterThanOrEqual(2);
+  await page.locator('#gob-settings-host .settings').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+  await page.screenshot({ path: shot });
+
+  const before = page.url();
+  const [popup] = await Promise.all([page.waitForEvent('popup'), faqs.click()]);
+  await popup.waitForLoadState('domcontentloaded');
+  expect(new URL(popup.url()).pathname).toMatch(/\/faqs\.html$/);
+  await expect(popup.locator('h1').first()).toBeVisible();
+  expect(page.url()).toBe(before);
+  await popup.close();
+}
+
+test('settings footer links FAQs in a new tab online', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await stubAuth(page);
+  await stubMe(page, ME);
+  await page.goto('/mode-select.html');
+  await page.locator('#auth-settings-btn').click();
+  await expect(page.locator('#gob-settings-host [data-settings-logout]')).toBeVisible();
+  await expect(page.locator('[data-conn-label]')).toHaveText('Online');
+  await checkFaqs(page, 'reports/settings-faqs/settings-online-1280x720.png');
+});
+
+test('settings footer links FAQs in a new tab offline', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => { window.GOB_BUILD_PROFILE = 'desktop'; });
+  await stubAuth(page);
+  await page.goto('/mode-select.html');
+  await page.evaluate(async () => {
+    const mod = await import('/js/shared/gobSettings.js');
+    mod.openSettings();
+  });
+  await expect(page.locator('.set-note')).toBeVisible();
+  await expect(page.locator('[data-conn-label]')).toHaveText('Offline');
+  await checkFaqs(page, 'reports/settings-faqs/settings-offline-1280x720.png');
+});
+
 const COURT_RECTS = {
   '1280x720': {
     scoreboard: { x: 0, y: 0, w: 1280, h: 120 },
