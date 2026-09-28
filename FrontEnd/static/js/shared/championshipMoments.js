@@ -700,6 +700,12 @@
       const tmp = document.createElement('div');
       tmp.innerHTML = html.trim();
       const variationNode = tmp.firstChild;
+      if (options && options.queueLabel) {
+        const ey = variationNode.querySelector('[class*="eyebrow"]');
+        if (ey && ey.textContent) {
+          ey.textContent = options.queueLabel + ' · ' + ey.textContent;
+        }
+      }
       root.appendChild(variationNode);
 
       // Animate-in: needs to render first, then add is-visible on root.

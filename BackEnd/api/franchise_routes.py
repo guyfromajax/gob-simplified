@@ -10741,6 +10741,24 @@ def command_center_data(
         response["recruit_visit_modal"] = (
             _build_recruit_visit_modal_payload(franchise_doc, team_id) if franchise_doc else None
         )
+        from BackEnd.utils.moment_queue import build_moment_queue
+
+        queue = build_moment_queue(
+            championship_moments=response.get("pending_championship_moments"),
+            conference_rs_region_modal=response.get("conference_rs_region_modal"),
+            region_bye_modal_eligible=bool(response.get("region_bye_modal_eligible")),
+            walk_on_welcome_modal=response.get("walk_on_welcome_modal"),
+            recruit_visit_modal=response.get("recruit_visit_modal"),
+            bracket_reveal_modal=response.get("bracket_reveal_modal"),
+            bracket_update_modal=response.get("bracket_update_modal"),
+            archetype_evolution_pending=(user or {}).get("archetype_evolution_pending"),
+        )
+        response["moments"] = queue["moments"]
+        response["moments_for_this_visit"] = queue["moments_for_this_visit"]
+        response["weekly_card_items"] = queue["weekly_card_items"]
+        response["archetype_evolution_pending"] = str(
+            (user or {}).get("archetype_evolution_pending") or ""
+        )
         response["recruiting_wire"] = _build_recruiting_wire_payload(
             franchise_doc, str(team_id) if team_id else None
         )
@@ -10751,6 +10769,8 @@ def command_center_data(
             team_doc,
             _cached_last_completed_game(),
         )
+        if isinstance(response.get("office_digest"), dict):
+            response["office_digest"]["weekly_card_items"] = queue["weekly_card_items"]
         _cc_lap("modals_digest", cc_t)
         return response
     if profile:

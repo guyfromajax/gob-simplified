@@ -215,6 +215,26 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 | `recruiting_wire` | Status line, events (`recruit`, `position`, `stars` and `filmed_grade` always null, `event_type`, `event_text` from the stored lean-event sentence, `event_detail`, `list_position`, `direction`), `pending_count`, `urgent`, `unseen_count`. |
 | `signing_day` | Week 35 only. Points remaining out of 50, playing-time promises, open roster spots, up to three targets. Otherwise null. |
 | `season_preview` | `first_week` only. Preseason rank is the current national rank. Conference projection, team RT, returning starters, and top returner are null. Newcomers only when `pending_walk_on_welcome` is stored. Opener is `next_game`. |
+| `weekly_card_items` | WEEKLY-tier moments from the server moment queue (bracket update, recruit visit). The Office paints them with the existing card helper. They are not pop-ups. |
+
+`GET /franchise/command-center/data` also returns `moments`, `moments_for_this_visit`, and `weekly_card_items`. The browser does not rank, cap, or pick which moment opens. `BackEnd/utils/moment_queue.py` builds the list from the existing eligibility flags (`pending_championship_moments`, `conference_rs_region_modal`, `region_bye_modal_eligible`, `walk_on_welcome_modal`, `recruit_visit_modal`, `bracket_reveal_modal`, `bracket_update_modal`, `user.archetype_evolution_pending`). `recruiting_results_modal` is not queued; the signing celebration is the week-35 hub reveal.
+
+Priority (lower number first):
+
+| Priority | Kind | Tier | Duration | Pop-up? |
+|---|---|---|---|---|
+| 10 | championship | SEASON PEAK | long | Yes |
+| 20 | bracket_reveal | MILESTONE | long | Yes |
+| 30 | walk_on_welcome | MILESTONE | long | Yes |
+| 40 | conference_rs_region | MILESTONE | short | Yes |
+| 50 | region_bye | MILESTONE | short | Yes |
+| 60 | archetype_evolution | MILESTONE | short | Yes |
+| 70 | bracket_update | WEEKLY | — | Office card |
+| 80 | recruit_visit | WEEKLY | — | Office card |
+
+Cap: `moments_for_this_visit` is the first pop-up-tier item. A second item is included only when the first is `duration=short` and the second is MILESTONE or SEASON PEAK. Remaining pop-up-tier items stay in `moments` (still eligible next visit; seen keys are not marked until shown). WEEKLY items go to `weekly_card_items` and never take a pop-up slot.
+
+Cut-players (blocking) and tutorial return alerts stay outside the queue. Tutorial alerts settle first. The queue plays next. The cut modal waits for both.
 
 `recruit` is the recruit's display name. It comes from the lean-recruit set already loaded for the request. When the recruit is not in that set, the name on the event record is used (`recruit`, `recruit_name`, or `name`). Otherwise one projected read of `franchise_recruits_data` loads every missing `recruit_id` at once (`name`, `position`, `position_ratings`, `Lean`). The name is null only when none of those have it. The copy placeholder "A recruit" is not a name. `position` is the best `position_ratings` entry, or a stored position string, or the position on the event. It is null only when none of those exist.
 
@@ -265,7 +285,7 @@ The Office does not call `GET /franchise/state`. Season counting stats for the u
 
 ## 12. Office
 
-The home tab of `franchise-command-center.html` is the Office (`.office` inside `.main`). It has no page title and no sub-tab row. `js/shared/officeHome.js` paints it from `office_digest` only. Grouping and sorting attribute changes for display is allowed. A null field is omitted. The page does not substitute another payload, and it does not write "N/A".
+The home tab of `franchise-command-center.html` is the Office (`.office` inside `.main`). It has no page title and no sub-tab row. `js/shared/officeHome.js` paints it from `office_digest` only. Grouping and sorting attribute changes for display is allowed. A null field is omitted. The page does not substitute another payload, and it does not write "N/A". WEEKLY moments from `office_digest.weekly_card_items` use the existing card chrome in the This Week column. Pop-ups come from `moments_for_this_visit` through `js/shared/momentQueue.js`, which only opens the existing modal for each kind. The 300-retry Big News wait loop is not part of the Office flow.
 
 The Office fills `.main` edge to edge inside the standard page padding (`--page-pad`). There is no 1664px cap. At a viewport of 2400px or wider the Office caps at 2200px and stays centred. The collapsed rail still overlays the page on hover. The Office does not reserve space for that overlay.
 

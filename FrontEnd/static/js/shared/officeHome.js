@@ -822,6 +822,22 @@
     return node.childNodes.length > 1 ? node : null;
   }
 
+  function weeklyCard(items, index) {
+    if (!Array.isArray(items) || !items.length) return null;
+    var node = card('office-weekly', index);
+    var head = el('div', 'card-h');
+    head.appendChild(el('h3', '', 'This week'));
+    node.appendChild(head);
+    items.forEach(function (item) {
+      if (!item) return;
+      var row = el('div', 'sn-row');
+      if (present(item.title)) row.appendChild(el('span', 'sn-l', item.title));
+      if (present(item.line)) row.appendChild(el('span', '', item.line));
+      if (row.childNodes.length) node.appendChild(row);
+    });
+    return node.childNodes.length > 1 ? node : null;
+  }
+
   function nextCard(game, digest, index) {
     if (!game) return null;
     var tournament = digest.state === 'tournament';
@@ -1245,6 +1261,8 @@
     }
     first.forEach(function (node) { if (node) col1.appendChild(node); });
     second.forEach(function (node) { if (node) col2.appendChild(node); });
+    var weekly = weeklyCard(digest.weekly_card_items, 2);
+    if (weekly) second.unshift(weekly);
     third.forEach(function (node) { if (node) col3.appendChild(node); });
     var grid = el('div', 'office-grid');
     grid.append(col1, col2, col3);
