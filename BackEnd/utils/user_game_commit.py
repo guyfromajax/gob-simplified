@@ -61,6 +61,12 @@ def commit_user_game_record(game: dict, franchise_id, home_team_name, away_team_
             logger.warning("[record] franchise %s has no user_id; skipping commit", franchise_id)
             return
         user_oid = _to_oid(user_id)
+        # The desktop principal has no users doc (the SQLite save refuses `users`);
+        # its career lives on the local coach doc, created on first commit.
+        from BackEnd.utils.local_coach import LOCAL_COACH_ID, coach_collection, is_local_owner
+        local = is_local_owner(user_id)
+        coach = coach_collection() if local else users_collection
+        coach_key = LOCAL_COACH_ID if local else user_oid
 
         # Forward-only counter for the tutorial-alert prompts (Scouting after the
         # 3rd game, Recruiting after the 6th). Scoped to the user's enrolled (first)
@@ -68,16 +74,17 @@ def commit_user_game_record(game: dict, franchise_id, home_team_name, away_team_
         # authoritative server-side increment — it replaces the fragile frontend
         # `tut_alert=game_complete` URL param, which the franchise box-score return
         # path bypasses via `return_url` (so the count never reached the threshold).
-        try:
-            users_collection.update_one(
-                {"_id": user_oid, "tutorial_alerts_franchise_id": str(franchise_id)},
-                {
-                    "$inc": {"tutorial_alerts_games": 1},
-                    "$set": {"updated_at": datetime.now(timezone.utc)},
-                },
-            )
-        except Exception:
-            logger.exception("[record] tutorial_alerts_games increment failed (non-fatal)")
+        if not local:
+            try:
+                users_collection.update_one(
+                    {"_id": user_oid, "tutorial_alerts_franchise_id": str(franchise_id)},
+                    {
+                        "$inc": {"tutorial_alerts_games": 1},
+                        "$set": {"updated_at": datetime.now(timezone.utc)},
+                    },
+                )
+            except Exception:
+                logger.exception("[record] tutorial_alerts_games increment failed (non-fatal)")
 
         teams_obj = game.get("teams") or {}
         home_obj = teams_obj.get(game.get("home_team_id")) or {}
@@ -122,11 +129,12 @@ def commit_user_game_record(game: dict, franchise_id, home_team_name, away_team_
         if periods:
             inc["archetypes.total"] = len(periods)
 
-        updated = users_collection.find_one_and_update(
-            {"_id": user_oid},
+        updated = coach.find_one_and_update(
+            {"_id": coach_key},
             {"$inc": inc},
             projection={"record": 1, "archetypes": 1},
             return_document=ReturnDocument.AFTER,
+            upsert=local,
         )
         if not updated:
             logger.warning("[record] user %s not found; record not committed", user_oid)
@@ -140,8 +148,8 @@ def commit_user_game_record(game: dict, franchise_id, home_team_name, away_team_
         # tolerate any stray non-digit key without raising.
         recent_keys = [periods[q] for q in sorted(periods, key=lambda k: (0, int(k)) if str(k).isdigit() else (1, str(k)))]
         lead = compute_lead_archetype(updated.get("archetypes", {}), recent_keys=recent_keys)
-        users_collection.update_one(
-            {"_id": user_oid},
+        coach.update_one(
+            {"_id": coach_key},
             {"$set": {
                 "record.total_games": rec["total_games"],
                 "record.win_rate": rec["win_rate"],

@@ -218,6 +218,10 @@ body.mode-select-page .around-the-league-panel {
   padding: 20px 22px 22px;
 }
 
+body.mode-select-page .mode-wrapper > section[hidden] {
+  display: none;
+}
+
 body.mode-select-page .around-the-league-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

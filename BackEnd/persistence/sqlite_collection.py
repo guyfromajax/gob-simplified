@@ -511,7 +511,9 @@ class SqliteCollection:
         result = self.update_one(filter, update, upsert=bool(kwargs.get("upsert")))
         if result.matched_count == 0 and result.upserted_id is None:
             return None
-        if kwargs.get("return_document") and str(kwargs.get("return_document")).endswith("AFTER"):
+        # pymongo's ReturnDocument.AFTER is the bool True.
+        after = kwargs.get("return_document")
+        if after is True or (after and str(after).endswith("AFTER")):
             return self.find_one(filter) or self.find_one({"_id": result.upserted_id})
         return doc
 
