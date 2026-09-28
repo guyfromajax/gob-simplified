@@ -11136,7 +11136,6 @@ def _standings_rows_from_doc(franchise_doc: dict) -> list:
         {"_id": {"$in": team_ids_list}},
         {"name": 1, "_id": 1, "region": 1, "conference": 1, "primary_color": 1}
     ))
-    name_by_id = {str(t["_id"]): t.get("name", "") for t in teams}
     output = []
     for t in teams:
         team_id_str = str(t["_id"])
@@ -11170,7 +11169,7 @@ def _standings_rows_from_doc(franchise_doc: dict) -> list:
             "natl_rank": natl_rank,
             "next": matchup_map.get(team_id_str, ""),
             "next_opponent_id": opponent_id,
-            "next_opponent_name": name_by_id.get(opponent_id, "") if opponent_id else "",
+            "next_opponent_name": display_name_by_id.get(opponent_id, "") if opponent_id else "",
             "next_week": upcoming.get("next_week"),
             "next_site": upcoming.get("next_site") or "",
         })

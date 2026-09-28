@@ -221,7 +221,7 @@ def test_no_column_reserves_height_it_is_not_using():
 
 def test_the_before_you_submit_bar_became_a_pill():
     assert 'class="req-bar"' not in HTML
-    assert 'class="req-pill"' in HTML
+    assert 'class="req-pill bud"' in HTML
     # Same ids, so the same updateRequirementsBar drives it.
     for el_id in ("requirements-bar", "req-points", "req-focus", "req-points-used",
                   "req-points-total", "req-points-meter", "req-focus-value",
@@ -246,7 +246,7 @@ def test_back_stacks_above_the_tutorial_button():
 
 def test_the_pill_sits_under_the_page_title():
     title = HTML.index('class="page-title"')
-    pill = HTML.index('class="req-pill"')
+    pill = HTML.index('class="req-pill bud"')
     actions = HTML.index('class="header-actions"')
     assert title < pill < actions
 
@@ -297,5 +297,5 @@ def test_leaving_for_the_chart_saves_the_draft_first():
 def test_tally_recounts_after_a_save():
     """Counting lives with the grid now; a save repaints both tallies."""
     grid = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "playerDevelopmentGrid.js").read_text()
-    saved = grid[grid.index("dev.bind(grid,"):]
-    assert "paintTallies(host, rows);" in saved[:1400]
+    saved = grid[grid.index("dev.bind(grid,"): grid.index("function paintTallies", grid.index("dev.bind(grid,"))]
+    assert "paintTallies(host, rows);" in saved

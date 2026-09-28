@@ -156,7 +156,15 @@ A page or brief is done only when this file is updated if the shell, the section
 
 ### Running the suite
 
-From the repo root, pick a port that is not already listening (another worktree may be on 8000) and run one worker. Leave `CI` unset so retries stay at 0. `desktop-*.spec.js` is ignored by the default config; run that file on its own only when a change touches the desktop play flow.
+From the repo root, run both gates before merge. Leave `CI` unset so Playwright retries stay at 0. Pick a port that is not already listening (another worktree may be on 8000). `desktop-*.spec.js` is ignored by the default config; run that file on its own only when a change touches the desktop play flow.
+
+**Python (required):** zero failures.
+
+```
+.venv/bin/python -m pytest --ignore=tests/e2e -q
+```
+
+**Playwright (required):** one worker on the chosen port.
 
 ```
 env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright" PYTHON_PATH=".venv/bin/python" ./node_modules/.bin/playwright test tests/e2e --workers=1 --reporter=line
