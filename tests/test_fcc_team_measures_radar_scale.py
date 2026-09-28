@@ -14,11 +14,10 @@ def test_team_measures_and_scouting_share_plus_minus_twenty_radar_scale():
     assert "const ringValues = [20, 13.3, 6.7, 0, -6.7, -13.3, -20];" in source
     assert "TEAM_MEASURES_RADAR_MAX - TEAM_MEASURES_RADAR_MIN" in source
 
-    # Both FCC surfaces must continue to consume the same renderer so their
-    # scales cannot drift independently.
-    assert source.count("buildTeamMeasuresRadarMarkup(") == 3
+    # Prep Scouting no longer mounts the FCC radar; Team Measures tab is the sole caller.
+    assert source.count("radarHost.innerHTML = buildTeamMeasuresRadarMarkup") == 1
+    assert "buildTeamMeasuresRadarMarkup(attrs)" not in source
     assert "radarHost.innerHTML = buildTeamMeasuresRadarMarkup(teamAttrs);" in source
-    assert "radarHost.innerHTML = buildTeamMeasuresRadarMarkup(attrs);" in source
 
     radar_source = source[
         source.index("function buildTeamMeasuresRadarMarkup") :
