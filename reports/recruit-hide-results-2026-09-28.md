@@ -93,4 +93,22 @@ The new e2e test measures the status-bar-bottom → Invite Visits top distance i
 
 `2d330a786` Drop the This Week's Results panel so Invite Visits sits under the invite-season strip. This report is committed on top of it.
 
+## Full suite before merge (2026-09-28)
+
+**Merge.** `git fetch origin` then `git merge origin/develop`: already up to date. `origin/develop` is still `a8eac84ce`, the commit this branch was cut from, so no merge commit was needed and nothing had to be reconciled.
+
+**Command.** UX_System §8, "Running the suite": one worker, `CI` unset (retries 0), port 8157. This worktree has no `.venv` or `node_modules`, so the Python and Playwright paths point at `~/gob-simplified`:
+
+```
+env -u CI PORT=8157 BASE_URL=http://localhost:8157 PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright" PYTHON_PATH="$HOME/gob-simplified/venv/bin/python" NODE_PATH="$HOME/gob-simplified/node_modules" ~/gob-simplified/node_modules/.bin/playwright test tests/e2e --workers=1 --reporter=line
+```
+
+**Result.** **502 passed, 0 failed, 0 flaky, 0 skipped** in 7.4 min; exit 0. As the default config specifies, `desktop-*.spec.js` is excluded; this change doesn't touch the desktop play flow.
+
+**Server.** Playwright's `seed_and_serve` on 8157 exited with the run, and port 8157 was free afterwards. The only other `seed_and_serve` running was `~/gob-ux`'s, which I left alone.
+
+**Regenerated artifacts: not committed.** The suite rewrote 67 tracked images under `reports/`, including `reports/recruiting-tabs/*.png` and this report's own two screenshots. I restored all of them with `git checkout -- reports`. It also created nine untracked folders of fresh output: `app-router`, `court-sound`, `game-start-frames`, `office-frontend`, `office-v3c`, `shell-1`, `shell-1b`, `shell-2`, `shell-2b` (186 png, 3 json, 6 txt, all written during this run). I deleted those.
+
+**Doc fix.** `_documentation_master/11_Design_Systems/UX_System.md` §7 still said invite weeks show "the weekly results panel" on Pool and Visits. §8 item 10 requires the doc to match what shipped, so it now says the calendar sits directly under the phase strip and that there is no weekly results panel. It is committed with this section.
+
 STATUS: COMPLETE
