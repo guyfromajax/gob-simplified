@@ -251,16 +251,14 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     ['team', 'Schedule', 'team-schedule-view'],
     ['prep', 'Training', 'training-view'],
     ['prep', 'Game Plan', 'game-plan-view'],
-    ['prep', 'Playbooks', 'playbooks-tab'],
+    ['prep', 'Playbooks', 'playbooks-view'],
     ['prep', 'Scouting Report', 'coaches-tab'],
     ['league', 'Standings', 'standings-view'],
     ['league', 'Leaders', 'leaders-view'],
     ['league', 'Team Stats', 'team-stats-view'],
     ['news', 'News', 'news-view'],
   ];
-  const prepEditor = {
-    'playbooks-tab': /\/playbooks\.html/,
-  };
+  const prepEditor = {};
   for (const row of panels) {
     await mouseClick(page, '[data-gob-section="' + row[0] + '"]');
     await mouseClick(page, stab(page, row[1]));

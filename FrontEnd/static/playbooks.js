@@ -300,6 +300,7 @@ function cloneParams(params) {
         positionFilters: {},
         evenDistributionAll: false,
         activeTab: "offense",
+        openPlayId: "",
       };
 
       this.toastTimer = null;
@@ -434,6 +435,9 @@ function cloneParams(params) {
         }
         if (draft.activeTab === "offense" || draft.activeTab === "defense") {
           this.state.activeTab = draft.activeTab;
+        }
+        if (typeof draft.openPlayId === "string") {
+          this.state.openPlayId = draft.openPlayId;
         }
         ENFORCED_SECTIONS.forEach((key) => ensureEnforcedBalance(this.state[key]));
       } catch (error) {
@@ -571,6 +575,7 @@ function cloneParams(params) {
         locked: motionLocks.has(String(play.play_id)),
         effectiveness: parseInteger(play.effectiveness, 0),
         top_scorer: play.top_scorer || "N/A",
+        copy_1: play.copy && play.copy.copy_1 ? String(play.copy.copy_1) : "",
         isActive: true,
       }));
 
@@ -584,6 +589,7 @@ function cloneParams(params) {
         locked: setLocks.has(String(play.play_id)),
         effectiveness: parseInteger(play.effectiveness, 0),
         top_scorer: play.top_scorer || "N/A",
+        copy_1: play.copy && play.copy.copy_1 ? String(play.copy.copy_1) : "",
         isActive: true,
         _apiIndex: index,
       }));
@@ -685,16 +691,20 @@ function cloneParams(params) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
       };
-      set("motion-count", `${this.state.motion.length} plays · enforced`);
-      set("set-plays-count", `${this.state.setPlays.length} plays · enforced`);
-      const manActive = activeItems(this.state.manDefense).length;
-      set(
-        "man-defense-count",
-        `${manActive} of ${this.state.manDefense.length} active · enforced`
-      );
-      set("zone-defense-count", `${this.state.zoneDefense.length} plays · enforced`);
-      set("fast-breaks-count", `${this.state.fastBreaks.length} plays · normalize`);
-      set("hc-traps-count", `${this.state.hcTraps.length} plays · normalize`);
+      const describe = (arr, flexible) => {
+        const live = activeItems(arr).length;
+        const later = arr.filter((item) => item.isActive === false).length;
+        let text = `${live} play${live === 1 ? "" : "s"}`;
+        if (later) text += ` · ${later} coming later`;
+        if (flexible) text += " · must total 100";
+        return text;
+      };
+      set("motion-count", describe(this.state.motion, false));
+      set("set-plays-count", describe(this.state.setPlays, false));
+      set("man-defense-count", describe(this.state.manDefense, false));
+      set("zone-defense-count", describe(this.state.zoneDefense, false));
+      set("fast-breaks-count", describe(this.state.fastBreaks, true));
+      set("hc-traps-count", describe(this.state.hcTraps, true));
     }
 
     renderEnforcedGrid(sectionKey, container, side, options) {
@@ -721,43 +731,96 @@ function cloneParams(params) {
         });
         container.appendChild(tile);
         this.bindEnforcedTile(tile, sectionKey, idx, side, options);
+        if (this.state.openPlayId === item.id) {
+          const detail = this.buildPlayDetail(item, sectionKey, side, options, tile._detailFlags || {});
+          container.appendChild(detail);
+          this.bindPlayDetail(detail, tile, sectionKey, idx, side, options);
+        }
       });
     }
 
     buildDeadTile(item) {
       const el = document.createElement("div");
-      el.className = "et is-dead";
+      el.className = "play lk";
       el.dataset.id = item.id;
       el.title = "Not editable until this play ships";
       el.innerHTML = `
-        <div class="et-top">
-          <span class="et-deadpill">${LOCK_SVG} Coming Later</span>
-          <span class="et-name">${escapeHtml(item.name)}</span>
-          <span></span>
-          <span class="et-pct"><span class="et-computed" style="color:var(--faint)">—</span></span>
-        </div>
-        <div class="et-slider"><div class="et-track"><div class="et-fill" style="width:0"></div><div class="et-thumb" style="left:0"></div></div></div>
-        <div class="et-meta">
-          <span class="et-top-s" style="color:var(--faint)">Not yet available</span>
-          <span class="et-cmd"><span class="et-cmd-l">CMD</span><span class="et-cmd-v" style="color:var(--faint)">—</span></span>
-        </div>
+        <div class="pn"><b>${escapeHtml(item.name)}</b><span>Coming later</span></div>
+        <span></span>
+        <span></span>
+        <span class="slot lk" aria-hidden="true">${LOCK_SVG}</span>
       `;
       return el;
     }
 
-    buildPccButton(item, side) {
+    playCanJoinCallSheet(sectionKey) {
+      return sectionKey === "motion" || sectionKey === "setPlays"
+        || sectionKey === "manDefense" || sectionKey === "zoneDefense";
+    }
+
+    buildPccButton(item, side, sectionKey) {
+      if (!this.playCanJoinCallSheet(sectionKey)) return "<span></span>";
       const assigned = this.inPCC(item.id, side);
       const badge = this.pccBadge(item.id, side);
       const full = this.state.pcOrder[side].length >= MAX_PC_ITEMS_PER_SIDE && !assigned;
-      const sc = side === "offense" ? "side-off" : "side-def";
-      const sl = side === "offense" ? "OFF" : "DEF";
       if (assigned) {
-        return `<button class="et-pcc ${sc} is-assigned" type="button" data-pcc-toggle="${escapeHtml(item.id)}" data-side="${side}">${sl} · <span class="slot">${badge}</span></button>`;
+        return `<button class="slot" type="button" data-pcc-toggle="${escapeHtml(item.id)}" data-side="${side}" title="Call sheet slot ${badge}">${badge}</button>`;
       }
       if (full) {
-        return `<button class="et-pcc ${sc}" type="button" data-pcc-toggle="${escapeHtml(item.id)}" data-side="${side}" disabled>PCC full</button>`;
+        return `<button class="slot add" type="button" data-pcc-toggle="${escapeHtml(item.id)}" data-side="${side}" disabled title="Call sheet full">+</button>`;
       }
-      return `<button class="et-pcc ${sc}" type="button" data-pcc-toggle="${escapeHtml(item.id)}" data-side="${side}"><span class="plus">+</span> ${sl}</button>`;
+      return `<button class="slot add" type="button" data-pcc-toggle="${escapeHtml(item.id)}" data-side="${side}" title="Add to call sheet">+</button>`;
+    }
+
+    playMeta(item, options) {
+      if (options.kind === "motion") return `Focus · ${displayMotionFocusLabel(item.motion_focus)}`;
+      if (options.kind === "set") return `Target shooter · ${item.target_shooter || "PG"}`;
+      if (item.top_scorer && item.top_scorer !== "N/A") return `Top scorer · ${item.top_scorer}`;
+      return "";
+    }
+
+    toggleOpenPlay(id) {
+      this.state.openPlayId = this.state.openPlayId === id ? "" : id;
+      this.render();
+    }
+
+    buildPlayDetail(item, sectionKey, side, options, flags) {
+      const detail = document.createElement("div");
+      detail.className = "pdet";
+      const copy = item.copy_1 ? `<p>${escapeHtml(item.copy_1)}</p>` : "";
+      const slot = this.pccBadge(item.id, side);
+      const shooter = options.kind === "set"
+        ? `<div><span class="lbl">Target shooter</span><b>${escapeHtml(item.target_shooter || "PG")}${item.top_scorer && item.top_scorer !== "N/A" ? `<small>${escapeHtml(item.top_scorer)}</small>` : ""}</b></div>`
+        : options.kind === "motion"
+          ? `<div><span class="lbl">Focus</span><b>${escapeHtml(displayMotionFocusLabel(item.motion_focus))}</b></div>`
+          : "";
+      const top = item.top_scorer && item.top_scorer !== "N/A"
+        ? `<div><span class="lbl">Top scorer</span><b>${escapeHtml(item.top_scorer)}</b></div>`
+        : "";
+      const sheet = this.playCanJoinCallSheet(sectionKey)
+        ? `<div><span class="lbl">Call sheet</span><b>${slot ? `${slot}<small>of 8</small>` : "—"}</b></div>`
+        : "";
+      const selectHtml = this.buildSelectControl(item, options);
+      const lockHtml = ENFORCED_SECTIONS.has(sectionKey)
+        ? `<button class="play-lock" type="button" data-lock="${escapeHtml(item.id)}" title="${item.locked ? "Unlock" : "Lock"}">${LOCK_SVG}<span>${item.locked ? "Unlock" : "Lock"}</span></button>`
+        : "";
+      const note = flags.isComputed ? `<p class="pdet-note">${escapeHtml(flags.computedNote || "")}</p>` : "";
+      const noSlack = flags.noSlackHere ? `<p class="pdet-note">${NOSLACK_COPY}</p>` : "";
+      detail.innerHTML = `
+        ${copy}
+        ${note}
+        ${noSlack}
+        <div class="kv">
+          <div><span class="lbl">Weight</span><b>${item.percentage}%</b></div>
+          <div><span class="lbl">CMD</span><b>${parseInteger(item.effectiveness, 0)}</b></div>
+          ${shooter}
+          ${top}
+          ${sheet}
+        </div>
+        ${selectHtml}
+        ${lockHtml}
+      `;
+      return detail;
     }
 
     buildSelectControl(item, options) {
@@ -782,7 +845,10 @@ function cloneParams(params) {
       const inPcc = this.inPCC(item.id, side);
       const dim = item.percentage === 0 && !inPcc && !item.locked && !flags.noSlack;
       const noSlackHere = item.percentage === 0 && !inPcc && flags.noSlack;
-      const classes = ["et"];
+      const open = this.state.openPlayId === item.id;
+      const classes = ["play"];
+      if (inPcc) classes.push("on");
+      if (open) classes.push("open");
       if (item.locked) classes.push("is-locked");
       if (dim) classes.push("is-dim");
       if (noSlackHere) classes.push("is-noslack");
@@ -792,49 +858,31 @@ function cloneParams(params) {
       el.dataset.id = item.id;
       el.dataset.section = sectionKey;
 
-      const topScorer = item.top_scorer && item.top_scorer !== "N/A"
-        ? `<span class="et-top-s"><b>${escapeHtml(item.top_scorer)}</b></span>`
-        : '<span class="et-top-s"></span>';
-      const selectHtml = this.buildSelectControl(item, options);
+      const meta = this.playMeta(item, options);
       const pctBlock = flags.isComputed
-        ? `<span class="et-pct"><span class="et-computed">= ${item.percentage}%</span></span>`
-        : `<span class="et-pct"><input class="et-pct-input${item.percentage >= 100 ? " threed" : ""}" data-pct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric"><span class="et-suf">%</span></span>`;
-      const nameHtml = (options.kind === "motion" || options.kind === "set")
-        ? `<button class="et-name et-name-btn" type="button">${escapeHtml(item.name)}</button>`
-        : `<span class="et-name">${escapeHtml(item.name)}</span>`;
+        ? `<b>${item.percentage}%</b>`
+        : `<input class="et-pct-input${item.percentage >= 100 ? " threed" : ""}" data-pct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric" aria-label="Weight"><b aria-hidden="true">%</b>`;
+      const slider = flags.isComputed || item.locked
+        ? `<span class="wb" aria-hidden="true"><i style="width:${item.percentage}%"></i></span>`
+        : `<span class="wb et-slider" data-sl="${escapeHtml(item.id)}" role="slider" aria-valuenow="${item.percentage}" aria-valuemin="0" aria-valuemax="100"><i style="width:${item.percentage}%"></i></span>`;
 
       el.innerHTML = `
-        <div class="et-top">
-          ${this.buildPccButton(item, side)}
-          ${nameHtml}
-          <button class="et-lock" type="button" data-lock="${escapeHtml(item.id)}" title="${item.locked ? "Unlock" : "Lock"}">${LOCK_SVG}</button>
-          ${pctBlock}
-        </div>
-        ${flags.isComputed
-          ? `<div class="et-computed-note">${flags.computedNote || "Determined — the only unlocked play."}</div>`
-          : `<div class="et-slider" data-sl="${escapeHtml(item.id)}"><div class="et-track"><div class="et-floor-wall"></div><div class="et-fill" style="width:${item.percentage}%"></div><div class="et-thumb" style="left:${item.percentage}%"></div></div></div>`}
-        ${noSlackHere ? `<div class="et-noslack">${LOCK_SVG} ${NOSLACK_COPY}</div>` : ""}
-        <div class="et-meta">
-          ${selectHtml}
-          ${topScorer}
-          <span class="et-cmd"><span class="et-cmd-l">CMD</span><span class="et-cmd-v ${cmdClass(item.effectiveness)}">${parseInteger(item.effectiveness, 0)}</span></span>
-        </div>
+        <div class="pn"><b>${escapeHtml(item.name)}</b>${meta ? `<span>${escapeHtml(meta)}</span>` : ""}</div>
+        <div class="wt">${slider}${pctBlock}</div>
+        <div class="cmd"><b>${parseInteger(item.effectiveness, 0)}</b></div>
+        ${this.buildPccButton(item, side, sectionKey)}
       `;
+      el._detailFlags = { ...flags, noSlackHere };
       return el;
     }
 
-    bindEnforcedTile(tile, sectionKey, idx, side, options) {
+    bindPlayDetail(detail, tile, sectionKey, idx, side, options) {
       const arr = this.state[sectionKey];
       const item = arr[idx];
-      if (!item || item.isActive === false) return;
+      if (!item) return;
 
-      tile.querySelector(".et-name-btn")?.addEventListener("click", () => {
-        this.persistDraftState();
-        this.markDraftForNextLoad();
-        window.location.href = buildPlayDetailsUrl(this.context, item);
-      });
-
-      tile.querySelector("[data-lock]")?.addEventListener("click", () => {
+      detail.querySelector("[data-lock]")?.addEventListener("click", (event) => {
+        event.stopPropagation();
         playSound("click-tiny.wav");
         item.locked = !item.locked;
         this.state.evenDistributionAll = false;
@@ -843,14 +891,7 @@ function cloneParams(params) {
         this.scheduleShotWeightsPreview();
       });
 
-      tile.querySelector("[data-pcc-toggle]")?.addEventListener("click", (event) => {
-        const button = event.currentTarget;
-        if (button.disabled) return;
-        playSound("click-tiny.wav");
-        this.togglePcc(item.id, side);
-      });
-
-      const select = tile.querySelector(".motion-focus-select, .target-shooter-select");
+      const select = detail.querySelector(".motion-focus-select, .target-shooter-select");
       if (select) {
         select.addEventListener("change", () => {
           playSound("click-tiny.wav");
@@ -860,10 +901,30 @@ function cloneParams(params) {
             item.target_shooter = select.value;
           }
           this.state.evenDistributionAll = false;
-          this.renderPcLists();
+          this.render();
           this.scheduleShotWeightsPreview();
         });
       }
+    }
+
+    bindEnforcedTile(tile, sectionKey, idx, side, options) {
+      const arr = this.state[sectionKey];
+      const item = arr[idx];
+      if (!item || item.isActive === false) return;
+
+      tile.addEventListener("click", (event) => {
+        if (event.target.closest("[data-pcc-toggle], .et-pct-input, .et-slider, .play-lock, select")) return;
+        playSound("click-tiny.wav");
+        this.toggleOpenPlay(item.id);
+      });
+
+      tile.querySelector("[data-pcc-toggle]")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const button = event.currentTarget;
+        if (button.disabled) return;
+        playSound("click-tiny.wav");
+        this.togglePcc(item.id, side);
+      });
 
       if (tile.classList.contains("is-computed") || item.locked) {
         return;
@@ -873,9 +934,7 @@ function cloneParams(params) {
       if (slider) {
         let dragging = false;
         const move = (clientX) => {
-          const track = slider.querySelector(".et-track");
-          if (!track) return;
-          const rect = track.getBoundingClientRect();
+          const rect = slider.getBoundingClientRect();
           const ratio = rect.width > 0 ? (clientX - rect.left) / rect.width : 0;
           setEnforced(arr, idx, ratio * 100);
           this.paintEnforcedSection(sectionKey);
@@ -883,6 +942,7 @@ function cloneParams(params) {
         };
         slider.addEventListener("pointerdown", (event) => {
           if (item.locked) return;
+          event.stopPropagation();
           dragging = true;
           this.sliderDragging = true;
           this.elements.editColumn?.classList.add("no-anim");
@@ -908,6 +968,7 @@ function cloneParams(params) {
 
       const input = tile.querySelector(".et-pct-input");
       if (input) {
+        input.addEventListener("click", (event) => event.stopPropagation());
         input.addEventListener("input", () => {
           input.value = input.value.replace(/[^0-9]/g, "");
         });
@@ -938,12 +999,12 @@ function cloneParams(params) {
       const arr = this.state[sectionKey];
       arr.forEach((item) => {
         if (item.isActive === false) return;
-        const tile = document.querySelector(`.et[data-id="${CSS.escape(item.id)}"]`);
+        const tile = document.querySelector(`.play[data-id="${CSS.escape(item.id)}"]`);
         if (!tile) return;
-        const fill = tile.querySelector(".et-fill");
-        const thumb = tile.querySelector(".et-thumb");
+        const fill = tile.querySelector(".wb i");
         if (fill) fill.style.width = `${item.percentage}%`;
-        if (thumb) thumb.style.left = `${item.percentage}%`;
+        const slider = tile.querySelector(".et-slider");
+        if (slider) slider.setAttribute("aria-valuenow", String(item.percentage));
         const input = tile.querySelector(".et-pct-input");
         if (input && document.activeElement !== input) {
           input.value = String(item.percentage);
@@ -956,50 +1017,53 @@ function cloneParams(params) {
     renderChipStrip(sectionKey, container) {
       if (!container) return;
       container.innerHTML = "";
+      const side = sectionKey === "hcTraps" ? "defense" : "offense";
       this.state[sectionKey].forEach((item) => {
         const chip = document.createElement("div");
-        chip.className = "chip";
+        const open = this.state.openPlayId === item.id;
+        chip.className = `play${open ? " open" : ""}`;
         chip.dataset.id = item.id;
         chip.dataset.section = sectionKey;
-        const hasCmd = Number.isFinite(item.effectiveness) && item.effectiveness > 0;
-        const top = item.top_scorer
-          ? `<span class="chip-top-s">${escapeHtml(item.top_scorer)}</span>`
-          : '<span class="chip-top-s"></span>';
-        const cmd = hasCmd
-          ? `<span class="et-cmd"><span class="et-cmd-l">CMD</span><span class="et-cmd-v ${cmdClass(item.effectiveness)}">${parseInteger(item.effectiveness, 0)}</span></span>`
-          : "";
+        const meta = this.playMeta(item, {});
+        const cmd = Number.isFinite(item.effectiveness) ? parseInteger(item.effectiveness, 0) : "—";
         chip.innerHTML = `
-          <div class="chip-top">
-            <span class="chip-name">${escapeHtml(item.name)}</span>
-            <span class="chip-pct"><input data-cpct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric"><span class="chip-suf">%</span></span>
+          <div class="pn"><b>${escapeHtml(item.name)}</b>${meta ? `<span>${escapeHtml(meta)}</span>` : ""}</div>
+          <div class="wt">
+            <span class="wb et-slider chip-slider" data-csl="${escapeHtml(item.id)}"><i style="width:${item.percentage}%"></i></span>
+            <input data-cpct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric" aria-label="Weight">
+            <b aria-hidden="true">%</b>
           </div>
-          <div class="chip-slider" data-csl="${escapeHtml(item.id)}">
-            <div class="chip-track">
-              <div class="chip-fill" style="width:${item.percentage}%"></div>
-              <div class="chip-thumb" style="left:${item.percentage}%"></div>
-            </div>
-          </div>
-          <div class="chip-meta">${top}${cmd}</div>
+          <div class="cmd"><b>${cmd}</b></div>
+          <span></span>
         `;
         container.appendChild(chip);
         this.bindChip(chip, sectionKey, item);
+        if (open) {
+          const detail = this.buildPlayDetail(item, sectionKey, side, {}, {});
+          container.appendChild(detail);
+        }
       });
     }
 
     bindChip(chip, sectionKey, item) {
+      chip.addEventListener("click", (event) => {
+        if (event.target.closest("[data-cpct], .chip-slider")) return;
+        playSound("click-tiny.wav");
+        this.toggleOpenPlay(item.id);
+      });
+
       const slider = chip.querySelector(".chip-slider");
       if (slider) {
         let dragging = false;
         const move = (clientX) => {
-          const track = slider.querySelector(".chip-track");
-          if (!track) return;
-          const rect = track.getBoundingClientRect();
+          const rect = slider.getBoundingClientRect();
           const ratio = rect.width > 0 ? (clientX - rect.left) / rect.width : 0;
           item.percentage = Math.max(0, Math.min(100, Math.round(ratio * 100)));
           this.paintChip(item);
           this.updateTotals();
         };
         slider.addEventListener("pointerdown", (event) => {
+          event.stopPropagation();
           dragging = true;
           this.elements.editColumn?.classList.add("no-anim");
           slider.setPointerCapture(event.pointerId);
@@ -1023,6 +1087,7 @@ function cloneParams(params) {
 
       const input = chip.querySelector("[data-cpct]");
       if (input) {
+        input.addEventListener("click", (event) => event.stopPropagation());
         input.addEventListener("input", () => {
           input.value = input.value.replace(/[^0-9]/g, "");
         });
@@ -1049,11 +1114,9 @@ function cloneParams(params) {
     }
 
     paintChip(item) {
-      document.querySelectorAll(`.chip[data-id="${CSS.escape(item.id)}"]`).forEach((chip) => {
-        const fill = chip.querySelector(".chip-fill");
-        const thumb = chip.querySelector(".chip-thumb");
+      document.querySelectorAll(`.play[data-id="${CSS.escape(item.id)}"]`).forEach((chip) => {
+        const fill = chip.querySelector(".wb i");
         if (fill) fill.style.width = `${item.percentage}%`;
-        if (thumb) thumb.style.left = `${item.percentage}%`;
         const input = chip.querySelector("[data-cpct]");
         if (input && document.activeElement !== input) {
           input.value = String(item.percentage);
@@ -1117,55 +1180,50 @@ function cloneParams(params) {
       const open = MAX_PC_ITEMS_PER_SIDE - order.length;
       if (capEl) {
         capEl.classList.toggle("full", open === 0);
-        capEl.innerHTML = open === 0
-          ? "Full — 8 calls set"
-          : `<b>${order.length}</b> of 8 set · <b>${open}</b> open`;
+        capEl.innerHTML = `<i>${order.length}</i> of 8`;
       }
 
-      for (let index = 0; index < MAX_PC_ITEMS_PER_SIDE; index += 1) {
-        if (open === 0 && !order[index]) break;
+      order.forEach((id, index) => {
+        const item = this.findItemById(listType, id);
+        if (!item) return;
+        const section = this.getPcItemSection(item);
+        const row = document.createElement("div");
+        row.className = "csr";
+        row.draggable = true;
+        row.dataset.id = id;
+        row.dataset.listType = listType;
+        row.dataset.slotIndex = String(index);
+        row.innerHTML = `
+          <i>${index + 1}</i>
+          <span class="gr" aria-hidden="true"></span>
+          <span class="cs-n">${escapeHtml(item.name)}${section ? `<small>${escapeHtml(section)}</small>` : ""}</span>
+          <span class="cs-p">${item.percentage}%</span>
+          <span class="cs-c">${parseInteger(item.effectiveness, 0)}</span>
+          <button class="pc-remove-btn" type="button" aria-label="Remove ${escapeHtml(item.name)}">×</button>
+        `;
+        row.addEventListener("dragover", (event) => this.handleDragOver(event, row));
+        row.addEventListener("dragleave", () => this.clearDropHints());
+        row.addEventListener("drop", (event) => this.handleDrop(event, listType, index));
+        row.addEventListener("dragstart", (event) => this.handleDragStart(event, listType, id));
+        row.addEventListener("dragend", () => this.handleDragEnd());
+        row.querySelector(".pc-remove-btn").addEventListener("click", () => {
+          playSound("click-tiny.wav");
+          this.state.pcOrder[listType] = this.state.pcOrder[listType].filter((entry) => entry !== id);
+          this.state.pcErrors[listType] = "";
+          this.render();
+          this.scheduleShotWeightsPreview();
+        });
+        container.appendChild(row);
+      });
 
-        const id = order[index];
-        const item = id ? this.findItemById(listType, id) : null;
-        const slot = document.createElement("div");
-        slot.className = "pc-slot";
-        slot.dataset.listType = listType;
-        slot.dataset.slotIndex = String(index);
-        slot.addEventListener("dragover", (event) => this.handleDragOver(event, slot));
-        slot.addEventListener("dragleave", () => this.clearDropHints());
-        slot.addEventListener("drop", (event) => this.handleDrop(event, listType, index));
-
-        if (item) {
-          const detail = this.getPcItemDetail(item, listType);
-          const row = document.createElement("div");
-          row.className = "pc-slot-filled";
-          row.draggable = true;
-          row.dataset.id = id;
-          row.dataset.listType = listType;
-          row.innerHTML = `
-            <span class="pc-drag-handle" aria-hidden="true">⋮⋮</span>
-            <span class="pc-slot-name"><span class="pc-slot-number">${index + 1}.</span> <span class="pc-slot-primary">${escapeHtml(item.name)}</span>${detail ? ` <span class="pc-slot-detail">— ${escapeHtml(detail)}</span>` : ""}</span>
-            <button class="pc-remove-btn" type="button" aria-label="Remove ${escapeHtml(item.name)}">×</button>
-          `;
-          row.addEventListener("dragstart", (event) => this.handleDragStart(event, listType, id));
-          row.addEventListener("dragend", () => this.handleDragEnd());
-          row.querySelector(".pc-remove-btn").addEventListener("click", () => {
-            playSound("click-tiny.wav");
-            this.state.pcOrder[listType] = this.state.pcOrder[listType].filter((entry) => entry !== id);
-            this.state.pcErrors[listType] = "";
-            this.render();
-            this.scheduleShotWeightsPreview();
-          });
-          slot.appendChild(row);
-        } else {
-          slot.classList.add("is-empty");
-          const empty = document.createElement("div");
-          empty.className = "pc-slot-empty";
-          empty.innerHTML = `<span class="pc-slot-number">${index + 1}.</span> <span class="pc-slot-detail open-call">open call</span>`;
-          slot.appendChild(empty);
-        }
-
-        container.appendChild(slot);
+      if (open > 0) {
+        const filler = document.createElement("div");
+        filler.className = "csr open";
+        filler.textContent = `${open} open`;
+        filler.addEventListener("dragover", (event) => this.handleDragOver(event, filler));
+        filler.addEventListener("dragleave", () => this.clearDropHints());
+        filler.addEventListener("drop", (event) => this.handleDrop(event, listType, order.length));
+        container.appendChild(filler);
       }
     }
 
@@ -1176,7 +1234,7 @@ function cloneParams(params) {
     }
 
     handleDragEnd() {
-      document.querySelectorAll(".pc-slot-filled.dragging").forEach((node) => node.classList.remove("dragging"));
+      document.querySelectorAll(".csr.dragging").forEach((node) => node.classList.remove("dragging"));
       this.clearDropHints();
       this.dragContext = null;
     }
@@ -1215,9 +1273,18 @@ function cloneParams(params) {
     }
 
     clearDropHints() {
-      document.querySelectorAll(".pc-slot.drop-target").forEach((node) => {
+      document.querySelectorAll(".csr.drop-target").forEach((node) => {
         node.classList.remove("drop-target");
       });
+    }
+
+    getPcItemSection(item) {
+      if (!item) return "";
+      if (this.state.motion.some((play) => play.id === item.id)) return "Motion";
+      if (this.state.setPlays.some((play) => play.id === item.id)) return "Set";
+      if (this.state.manDefense.some((play) => play.id === item.id)) return "Man";
+      if (this.state.zoneDefense.some((play) => play.id === item.id)) return "Zone";
+      return "";
     }
 
     getPcItemDetail(item, listType) {
@@ -1256,17 +1323,13 @@ function cloneParams(params) {
 
     renderSectionTotal(element, total, enforced) {
       if (!element) return;
-      if (enforced) {
-        element.innerHTML = `<span class="sec-tot"><span class="chk">${CHK_SVG}</span>100 · balanced</span>`;
-        return;
-      }
-      if (total === 100) {
-        element.innerHTML = `<span class="sec-tot"><span class="chk">${CHK_SVG}</span>100 · balanced</span>`;
+      if (enforced || total === 100) {
+        element.innerHTML = `<em>Total</em>100%`;
         return;
       }
       const left = 100 - total;
-      const copy = left > 0 ? `${left} left to assign` : `${-left} over`;
-      element.innerHTML = `<span class="sec-tot warn"><span class="chk">!</span>${copy}</span>`;
+      const copy = left > 0 ? `${left} left` : `${-left} over`;
+      element.innerHTML = `<em>Total</em><span class="tot-warn">${total}% · ${copy}</span>`;
     }
 
     updateTotals() {
@@ -1289,13 +1352,11 @@ function cloneParams(params) {
       const ready = this.elements.sectionsReadyIndicator;
       if (ready) {
         const copy = ready.querySelector(".ready-copy") || ready;
+        const check = ready.querySelector(".ck");
         ready.classList.toggle("ok", okCount === 2);
         ready.classList.toggle("warn", okCount !== 2);
-        if (okCount === 2) {
-          copy.innerHTML = "<b>Ready to save</b> · all sections balanced";
-        } else {
-          copy.innerHTML = `<b>${okCount} of 2</b> flexible sections balanced`;
-        }
+        if (check) check.classList.toggle("on", okCount === 2);
+        copy.innerHTML = `<b>${okCount} of 2</b> flexible sections balanced`;
       }
       if (this.elements.saveBtn) {
         this.elements.saveBtn.disabled = okCount !== 2;
@@ -1429,7 +1490,11 @@ function cloneParams(params) {
         }
 
         this.showToast("Playbooks Saved", "", { accentColor: "#34EC27" });
-        window.setTimeout(() => this.handleBack(), SAVE_NAV_DELAY_MS);
+        if (!document.getElementById("playbooks-view")) {
+          window.setTimeout(() => this.handleBack(), SAVE_NAV_DELAY_MS);
+        } else {
+          this.updateTotals();
+        }
       } catch (error) {
         console.error("Failed to save playbooks:", error);
         this.showToast("Failed to save playbooks", "", { accentColor: "#F79420" });
@@ -1510,12 +1575,14 @@ function cloneParams(params) {
     }
   }
 
-  window.addEventListener("DOMContentLoaded", async () => {
+  async function initPlaybooks() {
+    if (window.__playbooksPage) return window.__playbooksPage;
+    const page = new PlaybooksPage();
+    window.__playbooksPage = page;
     try {
-      const page = new PlaybooksPage();
       await page.init();
-      window.__playbooksPage = page;
     } catch (error) {
+      window.__playbooksPage = null;
       console.error("Failed to initialize playbooks page:", error);
       const toast = document.getElementById("toast");
       if (toast) {
@@ -1542,6 +1609,15 @@ function cloneParams(params) {
           window.setTimeout(() => { toast.hidden = true; }, 220);
         }, 3000);
       }
+      throw error;
     }
-  });
+    return page;
+  }
+
+  window.initPlaybooks = initPlaybooks;
+  if (document.readyState === "loading") {
+    window.addEventListener("DOMContentLoaded", () => {
+      initPlaybooks().catch(() => {});
+    });
+  }
 })();

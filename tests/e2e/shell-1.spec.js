@@ -16,7 +16,7 @@ const TABS = [
   ['team-stats-tab', 'team', 'team-attributes-view'],
   ['schedule-tab', 'team', 'team-schedule-view'],
   ['game-plan-tab', 'prep', 'game-plan-view'],
-  ['playbooks-tab', 'prep'],
+  ['playbooks-tab', 'prep', 'playbooks-view'],
   ['coaches-tab', 'prep'],
   ['standings-tab', 'league'],
   ['fcc-team-stats-summary-tab', 'league'],
@@ -138,9 +138,7 @@ function stab(page, label) {
   return page.getByRole('tab', { name: label, exact: true });
 }
 
-const PREP_EDITOR = {
-  'playbooks-tab': /\/playbooks\.html/,
-};
+const PREP_EDITOR = {};
 
 test.beforeAll(() => {
   fs.mkdirSync(OUT, { recursive: true });
@@ -212,7 +210,7 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
     ['team-schedule', 'team-schedule-view', 'Schedule'],
     ['prep', 'training-view', 'Training'],
     ['prep-plan', 'game-plan-view', 'Game Plan'],
-    ['prep-playbooks', 'playbooks-tab', 'Playbooks'],
+    ['prep-playbooks', 'playbooks-view', 'Playbooks'],
     ['prep-scouting', 'coaches-tab', 'Scouting Report'],
     ['league', 'standings-view', 'Standings'],
     ['league-leaders', 'leaders-view', 'Leaders'],

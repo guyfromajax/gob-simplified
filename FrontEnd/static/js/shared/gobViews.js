@@ -332,6 +332,14 @@
     module: viewModule('gamePlanView.js')
   });
 
+  register({
+    id: 'playbooks-view',
+    section: 'prep',
+    subtab: 'playbooks-view',
+    title: 'Playbooks',
+    module: viewModule('playbooksView.js')
+  });
+
   global.GOBViews = {
     register: register,
     has: has,

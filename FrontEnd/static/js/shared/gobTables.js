@@ -132,6 +132,7 @@
     catch (err) { tab = ''; }
     if (tab === 'training-tab') return 'training-view';
     if (tab === 'game-plan-tab') return 'game-plan-view';
+    if (tab === 'playbooks-tab') return 'playbooks-view';
     return tab;
   }
 
