@@ -738,6 +738,38 @@ test('game plan tracks step from the keyboard and a timeout stays focus', async 
   expect(focusFold).toBeLessThanOrEqual(1);
 });
 
+test('game plan tick labels do not overlap at 1280 or 1920', async ({ page }) => {
+  async function assertNoOverlap() {
+    await page.waitForSelector('#game-plan-view .gt-l, html.gob-focus .gt-l');
+    const overlaps = await page.evaluate(() => {
+      function boxes(root) {
+        return [...root.querySelectorAll('.gt')].map((track) => {
+          return [...track.querySelectorAll('.gt-l')].map((el) => el.getBoundingClientRect());
+        });
+      }
+      const host = document.getElementById('game-plan-view') || document.querySelector('.gpc') || document.body;
+      const hits = [];
+      boxes(host).forEach((row) => {
+        for (let i = 0; i < row.length; i++) {
+          for (let j = i + 1; j < row.length; j++) {
+            const a = row[i];
+            const b = row[j];
+            const overlap = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+            if (overlap) hits.push([Math.round(a.width), Math.round(b.width)]);
+          }
+        }
+      });
+      return hits;
+    });
+    expect(overlaps).toEqual([]);
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openPage(page, 'game-plan.html', cc(), '&from=command_center&mode=franchise');
+  await assertNoOverlap();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await assertNoOverlap();
+});
+
 const OUT2 = path.join(__dirname, '../../reports/shell-2b');
 
 async function chromeRects(page) {

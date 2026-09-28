@@ -243,7 +243,7 @@
     if (o.tallies) host._pdgTallies = o.tallies;
     grid.innerHTML = rows.length
       ? (o.layout === 'table'
-        ? '<table class="pdg-table"><tbody>' + rows.map(tableRowHtml).join('') + '</tbody></table>'
+        ? '<table class="pdg-table"><thead><tr><th colspan="3" class="l">Player</th><th class="c">RT</th><th class="c">Pos</th><th class="l">Training</th></tr></thead><tbody>' + rows.map(tableRowHtml).join('') + '</tbody></table>'
         : rows.map(cardHtml).join(''))
       : '<div class="pdg-empty">No active players.</div>';
     paintTallies(host, rows);

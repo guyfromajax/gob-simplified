@@ -1887,8 +1887,10 @@ function renderTrainingNotes() {
     const placeholder = document.createElement('p');
     placeholder.className = 'notes-placeholder';
     placeholder.textContent = 'No training notes for this session.';
-    placeholder.style.color = '#9a9a9a';
-    placeholder.style.fontStyle = 'italic';
+    if (!document.getElementById('training-report-view')) {
+      placeholder.style.color = '#9a9a9a';
+      placeholder.style.fontStyle = 'italic';
+    }
     container.appendChild(placeholder);
     return;
   }
@@ -1913,9 +1915,11 @@ function renderTrainingNotes() {
       const hero = document.createElement('article');
       hero.className = 'training-notes-hero-card';
       if (muted) hero.classList.add('is-muted');
-      hero.style.setProperty('--notes-accent', config.accent);
-      hero.style.setProperty('--notes-accent-border', config.accentBorder);
-      hero.style.setProperty('--notes-accent-tint', config.accentTint);
+      if (!document.getElementById('training-report-view')) {
+        hero.style.setProperty('--notes-accent', config.accent);
+        hero.style.setProperty('--notes-accent-border', config.accentBorder);
+        hero.style.setProperty('--notes-accent-tint', config.accentTint);
+      }
 
       const label = document.createElement('div');
       label.className = 'training-notes-hero-label';

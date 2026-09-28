@@ -801,22 +801,25 @@ html.gob-shell .gpc .gt-k {
   box-shadow: 0 0 0 3px var(--bg-page-solid), 0 0 0 4px var(--white-25), 0 2px 6px var(--black-35);
 }
 
+html.gob-shell .gpc .gt {
+  overflow: visible;
+  min-height: 52px;
+}
 html.gob-shell .gpc .gt-l {
   position: absolute;
-  top: 16px;
-  max-width: none;
+  top: 22px;
+  max-width: calc(50% - 28px);
   overflow: visible;
-  text-overflow: clip;
   font-size: var(--fs-10);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-2);
-  line-height: var(--lh-1);
+  line-height: 1.15;
   color: var(--text-38);
-  white-space: nowrap;
+  white-space: normal;
 }
 
 html.gob-shell .gpc .gt-l.a { left: 0; }
-html.gob-shell .gpc .gt-l.b { left: 50%; transform: translateX(-50%); max-width: none; }
+html.gob-shell .gpc .gt-l.b { left: 50%; transform: translateX(-50%); max-width: none; white-space: nowrap; }
 html.gob-shell .gpc .gt-l.c { right: 0; left: auto; text-align: right; }
 html.gob-shell .gpc .gt-l.on { color: var(--text-100); }
 html.gob-shell .gpc .gt-l.nr { color: var(--text-60); }

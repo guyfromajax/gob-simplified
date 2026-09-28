@@ -52,7 +52,7 @@
         <!-- The two submit requirements, in the one place a coach already looks. Replaces
              the full-width "Before you submit" bar; the ids are unchanged so the same
              updateRequirementsBar() drives it. -->
-        <div class="req-pill" id="requirements-bar" aria-label="Before you submit">
+        <div class="req-pill bud" id="requirements-bar" aria-label="Before you submit">
           <span class="req-pill-seg req-chip req-chip--points" id="req-points">
             <span class="req-chip-check" aria-hidden="true"></span>
             <span class="req-pill-label">Points</span>
@@ -85,7 +85,7 @@
         <div class="section-container">
           <div class="drill-stack">
             <div class="drill-group">
-              <h3 class="drill-title">Offense Drills</h3>
+              <h3 class="drill-title">Offense</h3>
               <label class="slider-label">
                 <span class="label-text">Inside Offense</span>
                 <div class="slider-container">
@@ -101,7 +101,7 @@
             </div>
 
             <div class="drill-group">
-              <h3 class="drill-title">Defense Drills</h3>
+              <h3 class="drill-title">Defense</h3>
               <label class="slider-label">
                 <span class="label-text">Inside Defense</span>
                 <div class="slider-container">
@@ -117,7 +117,7 @@
             </div>
 
             <div class="drill-group">
-              <h3 class="drill-title">Technical Drills</h3>
+              <h3 class="drill-title">Technical</h3>
               <label class="slider-label">
                 <span class="label-text">Passing</span>
                 <div class="slider-container">
@@ -197,6 +197,7 @@
 
           <!-- Playbook mode sits under the install rows it governs. -->
           <div class="playbook-mode-selection">
+            <h3 class="drill-title">Playbook training</h3>
             <p id="custom-playbook-banner" class="custom-playbook-banner" hidden>
               Custom playbook is configured for this session (CMD gains only on selected plays).
             </p>
@@ -216,57 +217,58 @@
         <h2 class="section-header">Full Team Sessions</h2>
         <div class="section-container">
           <div class="drill-stack">
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Strength Training</h3>
+            <h3 class="drill-title drill-title--spacer" aria-hidden="true">&nbsp;</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Strength Training</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-strength" data-category="player-drills">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Agility Training</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Agility Training</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-agility" data-category="player-drills">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Conditioning</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Conditioning</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-conditioning" data-category="general">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Free Throws</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Free Throws</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-free-throws" data-category="general">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Film Study</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Film Study</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-film-study" data-category="general">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Breaks</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Breaks</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-breaks" data-category="general">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Scrimmages</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Scrimmages</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-scrimmages" data-category="team-drills">
                 </div>
@@ -279,7 +281,7 @@
 
     <!-- Coaching Style / Focus Section -->
     <div class="coaching-section">
-      <h2 class="coaching-title">Coaching Style / Focus</h2>
+      <h2 class="coaching-title">Coaching Focus</h2>
       <p class="coaching-subtitle">Sets what you emphasize across drills, scrimmages and locker-room talks.</p>
       <div class="archetypes-grid">
         <!-- Authoritarian -->

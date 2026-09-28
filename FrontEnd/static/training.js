@@ -1982,7 +1982,7 @@ function injectAttributeChip(slider, d) {
   if (!lt || lt.querySelector('.attr-chip')) return;
   const chip = document.createElement('span');
   chip.className = 'attr-chip';
-  chip.style.background = d.color;
+  if (!document.getElementById('training-view')) chip.style.background = d.color;
   chip.textContent = d.code;
   chip.setAttribute('aria-hidden', 'true');
   lt.appendChild(chip);

@@ -8,10 +8,16 @@ var CSS = [
 ];
 
 function placeReportTools(slot) {
+  var news = document.getElementById('back-button');
+  if (news) {
+    news.setAttribute('data-tool-home', '#training-report-tools-home');
+    slot.appendChild(news);
+  }
   var btn = document.getElementById('locker-room-btn');
-  if (!btn || btn.hidden) return;
-  btn.setAttribute('data-tool-home', '#training-report-tools-home');
-  slot.appendChild(btn);
+  if (btn && !btn.hidden) {
+    btn.setAttribute('data-tool-home', '#training-report-tools-home');
+    slot.appendChild(btn);
+  }
 }
 
 export function mount(host) {

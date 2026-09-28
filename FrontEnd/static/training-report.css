@@ -1661,3 +1661,179 @@ body.training-report-page .playbook-empty-state {
   color: var(--text-100);
   border-bottom: 1px solid var(--line);
 }
+
+/* Prep v2 report view: flat page, quiet notes, no green/red/orange. Tokens only. */
+#training-report-view .training-report-container,
+#training-report-view .resource-page-container,
+#training-report-view .fcc-brand-page-shell,
+#training-report-view .training-report-resource-shell,
+#training-report-view .training-notes-section,
+#training-report-view .team-section,
+#training-report-view .players-section,
+#training-report-view .projected-lineup-section,
+#training-report-view .playbook-summary-section {
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  backdrop-filter: none;
+}
+
+#franchise-container #training-report-view h2 {
+  margin: 0 0 var(--dsp-6);
+  padding-bottom: 0;
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+#franchise-container #training-report-view h2::after {
+  display: none;
+}
+
+#training-report-view .report-header {
+  padding: 0 0 var(--dsp-16);
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+}
+#training-report-view .page-title {
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  color: var(--text-100);
+}
+#training-report-view .header-meta-line,
+#training-report-view .training-notes-brief {
+  font-size: var(--fs-12);
+  color: var(--text-60);
+}
+#training-report-view .training-notes-header-accent,
+#training-report-view .training-notes-rule,
+#training-report-view .training-notes-subrule {
+  display: none;
+}
+
+#training-report-view .training-notes-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 var(--col-gap);
+  margin: 0 0 var(--dsp-16);
+  padding: 0 0 var(--dsp-10);
+  border-bottom: 1px solid var(--line);
+}
+#training-report-view .training-notes-hero-card,
+#training-report-view .training-notes-hero-card.is-muted {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  min-height: var(--dsz-40);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  --notes-accent: var(--text-60);
+  --notes-accent-border: var(--line);
+  --notes-accent-tint: transparent;
+}
+#training-report-view .training-notes-tactical-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+#training-report-view .training-notes-tactical-pill {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--dsp-10) 0;
+  border-bottom: 1px solid var(--line);
+}
+#training-report-view .training-notes-hero-label,
+#training-report-view .training-notes-tactical-label,
+#training-report-view .training-notes-misc-label {
+  color: var(--text-60);
+}
+#training-report-view .training-notes-hero-name,
+#training-report-view .training-notes-hero-meta,
+#training-report-view .training-notes-tactical-value,
+#training-report-view .training-notes-tactical-pill.is-positive .training-notes-tactical-value,
+#training-report-view .training-notes-tactical-pill.is-negative .training-notes-tactical-value,
+#training-report-view .training-notes-misc-value {
+  color: var(--text-87);
+}
+#training-report-view .training-notes-tactical-pill,
+#training-report-view .training-notes-tactical-pill.is-positive,
+#training-report-view .training-notes-tactical-pill.is-negative,
+#training-report-view .training-notes-misc-row {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+#training-report-view .team-attributes-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+#training-report-view .team-attr-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  height: var(--dsz-40);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#training-report-view .team-attr-item.is-delta {
+  box-shadow: none;
+}
+#training-report-view .notes-placeholder {
+  color: var(--text-38);
+  font-style: normal;
+}
+
+#training-report-view .training-report-container {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--dsp-16) calc(var(--col-gap) * 2);
+  width: 100%;
+}
+#training-report-view .report-header,
+#training-report-view .players-section,
+#training-report-view .projected-lineup-section,
+#training-report-view .playbook-summary-section,
+#training-report-view #back-button {
+  grid-column: 1 / -1;
+}
+#training-report-view #back-button {
+  justify-self: start;
+  height: var(--dsz-30);
+  margin: 0 0 var(--dsp-10);
+}
+#training-report-view .report-header .page-title { display: none; }
+#training-report-view .toggle-btn,
+#training-report-view .toggle-btn.active {
+  min-height: var(--dsz-28);
+  padding: 0 var(--space-10);
+  border: 0;
+  border-radius: var(--radius-7);
+  background: transparent;
+  color: var(--text-60);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  font-family: var(--font-body);
+  letter-spacing: 0;
+}
+#training-report-view .toggle-btn.active {
+  background: var(--white-11);
+  color: var(--text-100);
+  box-shadow: inset 0 1px 0 var(--white-9), inset 0 0 0 1px var(--white-12);
+}
+#training-report-view .view-toggle {
+  display: inline-flex;
+  gap: 0;
+  border-radius: var(--radius-8);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
