@@ -341,7 +341,7 @@
     try {
       sessionStorage.setItem(filterStorageKey(), JSON.stringify({
         touched: true,
-        view: state.view,
+        view: hubView === 'leans' ? 'leans' : state.view,
         region: state.region,
         pos: state.pos,
         year: state.year,
@@ -395,16 +395,34 @@
       publishHub(explicit);
       return;
     }
-    var counts = viewCounts();
-    if (counts.leans > 0) publishHub('leans');
-    else {
-      if (state.userRegion) state.region = state.userRegion;
-      publishHub('pool');
+    // From the invite window on, the coach recruits his own region: land on all of it,
+    // Leans off. Earlier weeks keep the old landing (Leans when anyone leans to him).
+    if (state.week < 20 && viewCounts().leans > 0) {
+      publishHub('leans');
+      return;
     }
+    if (state.userRegion) state.region = state.userRegion;
+    publishHub('pool');
+  }
+  function viewIsOn(value) {
+    return value === 'leans' ? hubView === 'leans' : state.view === value;
   }
   function viewBtn(value, label, count, iconSvg) {
-    return '<button class="pool-view' + (state.view === value ? ' is-on' : '') + '" data-view="' + value + '" type="button">' +
+    var on = viewIsOn(value);
+    return '<button class="pool-view' + (on ? ' is-on' : '') + '" data-view="' + value + '" type="button" aria-pressed="' + on + '">' +
       (iconSvg || '') + label + '<span class="n">' + count + '</span></button>';
+  }
+  // Leans, Watchlist and Unranked are one view at a time. Leans is the hub's 'leans'
+  // view, so the underline Leans tab and this toggle are the same state.
+  function setPoolView(value) {
+    var off = viewIsOn(value);
+    if (value === 'leans') {
+      if (!off) state.view = 'all';
+      publishHub(off ? 'pool' : 'leans');
+    } else {
+      state.view = off ? 'all' : value;
+      if (!off && hubView === 'leans') publishHub('pool');
+    }
   }
   function toolbarHtml(total, shown) {
     var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z" fill="currentColor"/></svg>';
@@ -416,14 +434,14 @@
       }).join('');
     var posOpts = [{ value: 'all', label: 'All' }].concat(POS_ORDER.map(function (p) { return { value: p, label: p }; }));
     var activeFilters = (state.region !== 'all') + (state.pos !== 'all') + (state.year !== 'all')
-      + (state.view !== 'all') + (state.search.trim() ? 1 : 0) + (hubView === 'leans' ? 1 : 0);
-    return '<div class="pool-fbar">' +
+      + (state.view !== 'all') + (state.search.trim() ? 1 : 0) + (hubView === 'leans' ? 1 : 0);    return '<div class="pool-fbar">' +
       '<div class="pool-frow"><span class="pool-flab">Filter</span>' +
         '<span class="pool-sel"><select id="pool-region" aria-label="Region">' + regionOpts + '</select></span>' +
         segHtml('pos', posOpts, state.pos) +
         segHtml('year', YEAR_FILTERS, state.year) +
       '</div>' +
       '<div class="pool-frow"><span class="pool-flab">Views</span>' +
+        viewBtn('leans', 'Leans', counts.leans) +
         viewBtn('watch', 'Watchlist', counts.watch, STAR) +
         viewBtn('unranked', 'Unranked by me', counts.unranked) +
         '<span class="pool-fcount">Showing <b>' + shown + '</b> of ' + total +
@@ -453,7 +471,7 @@
     host.querySelectorAll('.pool-view[data-view]').forEach(function (b) {
       // Views are mutually exclusive; clicking the active one clears it.
       b.addEventListener('click', function () {
-        state.view = state.view === this.dataset.view ? 'all' : this.dataset.view;
+        setPoolView(this.dataset.view);
         noteFilterChange();
         renderPool();
       });
@@ -2339,7 +2357,10 @@
   function showHub(hub) {
     if (hub !== 'pool' && hub !== 'leans' && hub !== 'visits') hub = 'pool';
     if (!hubReady) { pendingHub = hub; return; }
+    var changed = hub !== hubView;
     hubView = hub;
+    if (hub === 'leans') state.view = 'all';
+    if (changed && hub !== 'visits') noteFilterChange();
     renderShell();
   }
   function renderShell() {
