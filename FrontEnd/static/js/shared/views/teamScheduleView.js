@@ -99,6 +99,18 @@ export function mount(container, ctx) {
     return '<a class="gob-res" href="' + tables.esc(boxHref(row.game_id)) + '">' + text + '</a>';
   }
 
+  function tournamentRowHtml(row) {
+    var site = row.site === 'home' ? 'vs' : 'at';
+    var sub = row.round_label ? tables.esc(row.round_label) : ('Wk ' + row.week);
+    var opponent = opponentCell(row);
+    var res = resultCell(row);
+    return '<tr class="is-tourney" data-week="' + row.week + '">'
+      + '<td class="wk" title="' + sub + '">' + row.week + '</td>'
+      + '<td class="site">' + site + '</td>'
+      + '<td class="team">' + opponent + '</td>'
+      + '<td class="res">' + res + '</td></tr>';
+  }
+
   function rowHtml(row) {
     var cls = row.kind === 'next' ? 'is-next' : (row.kind === 'open' ? 'is-open' : '');
     var site = row.kind === 'open' ? '' : (row.site === 'home' ? 'vs' : 'at');
@@ -110,14 +122,20 @@ export function mount(container, ctx) {
       + '<td class="res">' + resultCell(row) + '</td></tr>';
   }
 
-  function columnHtml(column, rows) {
+  function columnHtml(column, rows, payload) {
     var body = rows.filter(function (row) {
       return row.week >= column.from && row.week <= column.to;
     }).map(rowHtml).join('');
     if (column.eos) {
+      var tourney = (payload && payload.tournament_by_phase) || {};
       EOS_ROWS.forEach(function (label) {
+        var key = label.indexOf('Conference') === 0 ? 'conference'
+          : label.indexOf('Region') === 0 ? 'region' : 'national';
         body += '<tr class="is-eos"><td class="wk"></td><td class="team" colspan="3">'
           + tables.esc(label) + '</td></tr>';
+        (tourney[key] || []).forEach(function (row) {
+          body += tournamentRowHtml(row);
+        });
       });
     }
     return '<section class="gob-tcard gob-schcol"><table class="gob-tbl gob-schwk">'
@@ -148,7 +166,7 @@ export function mount(container, ctx) {
   function render(payload) {
     var rows = seasonRows(payload);
     container.innerHTML = '<div class="gob-schcols">'
-      + COLUMNS.map(function (column) { return columnHtml(column, rows); }).join('')
+      + COLUMNS.map(function (column) { return columnHtml(column, rows, payload); }).join('')
       + '</div>';
     container.querySelectorAll('a[data-gob-drill]').forEach(function (link) {
       link.addEventListener('click', function (event) {

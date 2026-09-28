@@ -114,7 +114,7 @@ The shared tab module also serves any other command center that calls `initComma
 | Team | Roster | `roster-view` (in-page module view; `team-roster-view.html` redirects here and keeps `franchise_id`, `team_id`, `roster_team_id`, and return params). `?tab=roster-tab` opens this view. |
 | Team | Player Stats | `player-stats-view` (in-page module view). `?tab=player-stats-tab` opens this view. |
 | Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
-| Team | Schedule | `team-schedule-view` (in-page module view). `?tab=schedule-tab` opens this view. Four week columns (1–7, 8–14, 15–21, 22–26), with the three tournament labels under 22–26. Two columns below 1100px. The bracket stays on League › Tournament. |
+| Team | Schedule | `team-schedule-view` (in-page module view). `?tab=schedule-tab` opens this view. Four week columns (1–7, 8–14, 15–21, 22–26), with the three tournament labels under 22–26 and the user's EOS games listed under each label when present. Two columns below 1100px. The bracket stays on League › Tournament. |
 | Team | Practice Squad | `practice-squad-view` (in-page module view). The regional practice-squad league. `practice-squad-standings.html` and `practice-squad-bracket.html` redirect here. |
 | Prep | Training | `training.html`. The underline tab replaces. `?tab=training-tab` redirects here. The FCC summary panel stays in the page and is no longer opened by the shell. |
 | Prep | Game Plan | `game-plan.html`. `?tab=game-plan-tab` redirects here. `resume_from_timeout=true` and `mode=tutorial` stay focus, with no rail and no underline row. |
@@ -125,7 +125,7 @@ The shared tab module also serves any other command center that calls `initComma
 | League | Leaders | `leaders-view` (in-page module view; `leaders.html` redirects here). `?tab=awards-tab` still opens the old panel. |
 | League | Team Stats | `team-stats-view` (in-page module view; `team-stats.html` redirects here). `?tab=fcc-team-stats-summary-tab` still opens the old panel. |
 | League | Schedule | `league-schedule-view` (in-page module view; `schedule.html` redirects here and keeps `franchise_id`, `team_id`, `week`, and return params). |
-| League | Tournament | existing `brackets.html` href, or the same resource query already on the rankings link. Before the first week `GOBTierEmblem.tierForWeek` returns a tier, the control is disabled: same shape, `--text-38`, `not-allowed`, not focusable, title `Opens Week N`. |
+| League | Tournament | `tournament-view` (in-page module view). `brackets.html` redirects here. Before week 27 the control is disabled: same shape, `--text-38`, `not-allowed`, not focusable, title `Opens Week N`. |
 | Recruiting | Pool, Leans, Visits | `recruiting.html?hub=pool\|leans\|visits` via `openRecruitingSurface` / `GOBNav.go` from the rail (`franchise_id`, `team_id`, `from=fcc`, `return_url`). The sub-tab replaces `hub` on that same document. The name search sits in `.pg-tools` as `.gob-search` ("Search name…", `/` to focus). Weeks 35 and 36 hide the row; the sign board or the results list is the page. Focus mode hides the head, including the row. An old `?tab=recruits-tab` deep link opens `home-tab`. |
 | News | News | `news-view` (in-page module view; `news.html` redirects here and keeps `franchise_id`, `team_id`, `story`, and return params). `?tab=press-tab` opens this view. |
 | News | Awards | `awards-view` (in-page module view; `awards.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
@@ -172,7 +172,7 @@ env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HO
 | schedule.html | redirect to `franchise-command-center.html?tab=league-schedule-view` | League | Schedule |
 | practice-squad-standings.html | browse | League | Practice Squad |
 | practice-squad-bracket.html | browse | League | Practice Squad |
-| brackets.html | browse | League | Tournament |
+| brackets.html | browse | League | Tournament (`tournament-view`) |
 | awards.html | redirect to `franchise-command-center.html?tab=awards-view` | News | Awards |
 | news.html | redirect to `franchise-command-center.html?tab=news-view` (`story` is kept) | News | News |
 | leaders.html | browse | League | Leaders (`leaders-view`; the file redirects) |

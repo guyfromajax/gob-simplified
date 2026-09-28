@@ -227,6 +227,14 @@
   });
 
   register({
+    id: 'tournament-view',
+    section: 'league',
+    subtab: 'tournament-view',
+    title: 'Tournament',
+    module: viewModule('tournamentView.js')
+  });
+
+  register({
     id: 'roster-view',
     section: 'team',
     subtab: 'roster-view',

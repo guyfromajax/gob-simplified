@@ -549,3 +549,46 @@ html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
   text-align: center;
   white-space: nowrap;
 }
+
+/* League › Tournament (tournament-view) */
+#franchise-container #tournament-view .gob-tour-phases button.on {
+  background: var(--white-10);
+  color: var(--white);
+}
+
+#franchise-container #tournament-view .gob-tour-note,
+#franchise-container #tournament-view .gob-tour-locked,
+#franchise-container #tournament-view .gob-tour-empty {
+  color: var(--text-60);
+  margin: 0 0 var(--space-12);
+}
+
+#franchise-container #tournament-view .gob-tour-champ {
+  color: var(--text-100);
+  margin: 0 0 var(--space-12);
+}
+
+#franchise-container #tournament-view .gob-tour-bracket {
+  margin-top: var(--space-12);
+}
+
+#franchise-container #tournament-view .fcc-tb-team--user {
+  box-shadow: inset 3px 0 0 var(--navy);
+}
+
+#franchise-container #tournament-view a.gob-res {
+  color: var(--text-87);
+  text-decoration: none;
+}
+
+#franchise-container #tournament-view a.gob-res:hover,
+#franchise-container #tournament-view a.gob-res:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+#franchise-container #team-schedule-view tr.is-tourney td.wk {
+  color: var(--text-60);
+}

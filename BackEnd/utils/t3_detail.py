@@ -744,6 +744,34 @@ def build_team_detail(franchise_id: str, team_id: str) -> dict[str, Any]:
         results_rows.append(row)
     results_rows.sort(key=lambda row: -row["week"])
 
+    from BackEnd.tournament.browse import (
+        user_tournament_games_by_phase,
+        WEEK_PHASE,
+        week_round_label,
+    )
+
+    for row in results_rows:
+        wk = int(row.get("week") or 0)
+        if wk in WEEK_PHASE:
+            row["phase"] = WEEK_PHASE[wk]
+            label = week_round_label(wk)
+            if label:
+                row["round_label"] = label
+
+    tournament_by_phase = user_tournament_games_by_phase(franchise, team_id)
+    for phase, games in tournament_by_phase.items():
+        enriched = []
+        for game in games:
+            opp_id = str(game.get("opponent_id") or "")
+            if opp_id and opp_id not in teams_by_id:
+                extra = _team_docs(store, [opp_id])
+                teams_by_id.update(extra)
+            row = dict(game)
+            row.update(_opponent(opp_id, teams_by_id, ranks, franchise, standings))
+            row["kind"] = "played" if row.get("result") else "upcoming"
+            enriched.append(row)
+        tournament_by_phase[phase] = enriched
+
     remaining = []
     for week, away_id, home_id in _schedule_rows(franchise.get("schedule")):
         if team_id not in {away_id, home_id}:
@@ -779,4 +807,5 @@ def build_team_detail(franchise_id: str, team_id: str) -> dict[str, Any]:
         "next_game": next_game,
         "results": results_rows,
         "upcoming": upcoming,
+        "tournament_by_phase": tournament_by_phase,
     }

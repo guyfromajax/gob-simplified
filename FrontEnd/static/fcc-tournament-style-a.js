@@ -477,6 +477,19 @@
     }
     card.appendChild(createTeamRowEl(topSlot, userTeamId));
     card.appendChild(createTeamRowEl(botSlot, userTeamId));
+    if (m && m.game_id && m.winner && opts.boxScoreHref) {
+      var scLink = scoresFor(m, hid, aid, teamName(hid, teamIdToNameMap), teamName(aid, teamIdToNameMap));
+      if (scLink.as !== '' && scLink.hs !== '') {
+        var href = typeof opts.boxScoreHref === 'function' ? opts.boxScoreHref(m.game_id) : '';
+        if (href) {
+          var res = document.createElement('a');
+          res.className = 'gob-res fcc-tb-res-link';
+          res.href = href;
+          res.textContent = String(scLink.as) + '-' + String(scLink.hs);
+          card.appendChild(res);
+        }
+      }
+    }
     if (!opts.revealMode) {
       wrap.dataset.winnerId = winnerTeamIdFromMatchup(m) || '';
     }
@@ -597,10 +610,21 @@
     var r1 = model.r1;
     var r2 = model.r2;
     var fin = model.fin;
-    var slotOpts = { revealMode: revealMode, recordMap: recordMap };
+    var slotOpts = {
+      revealMode: revealMode,
+      recordMap: recordMap,
+      boxScoreHref: opts.boxScoreHref || null,
+    };
     var finOpts = revealMode
-      ? { championship: true, revealMode: true, recordMap: recordMap }
-      : { championship: true, showCrown: true, showChampion: true, revealMode: false, recordMap: recordMap };
+      ? { championship: true, revealMode: true, recordMap: recordMap, boxScoreHref: opts.boxScoreHref || null }
+      : {
+        championship: true,
+        showCrown: true,
+        showChampion: true,
+        revealMode: false,
+        recordMap: recordMap,
+        boxScoreHref: opts.boxScoreHref || null,
+      };
 
     grid.appendChild(
       col('fcc-tb-col--r1l', wl.r1 || 'WEEK 27 · ROUND 1', [
@@ -824,15 +848,26 @@
     var r1 = normalizeRegionRound1Matchups(bracket);
     // Display-only: single-bye finals put the bye team on top (see helper).
     var fin = regionChampionshipMatchupForDisplay(bracket);
-    var slotOpts = { revealMode: revealMode, recordMap: recordMap };
+    var slotOpts = {
+      revealMode: revealMode,
+      recordMap: recordMap,
+      boxScoreHref: opts.boxScoreHref || null,
+    };
     var finOpts = revealMode
-      ? { championship: true, revealMode: true, suppressBye: true, recordMap: recordMap }
+      ? {
+        championship: true,
+        revealMode: true,
+        suppressBye: true,
+        recordMap: recordMap,
+        boxScoreHref: opts.boxScoreHref || null,
+      }
       : {
           championship: true,
           showCrown: true,
           showChampion: true,
           revealMode: false,
           suppressBye: true,
+          boxScoreHref: opts.boxScoreHref || null,
           recordMap: recordMap,
         };
 
@@ -900,6 +935,7 @@
         recordMap: recordMap,
         tier: tier,
         revealMode: revealMode,
+        boxScoreHref: config.boxScoreHref || null,
       });
       return;
     }
@@ -931,6 +967,7 @@
       userTeamId: userTeamId,
       rankMap: rankMap,
       recordMap: recordMap,
+      boxScoreHref: config.boxScoreHref || null,
       nationalRegionChips: natChips,
       weekLines: weekLines,
       finalBadge: badge,
