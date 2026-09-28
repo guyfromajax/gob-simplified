@@ -432,6 +432,7 @@ function placeGamePlanTools() {
   const row = document.querySelector('.button-container');
   const host = document.getElementById('gob-subtabs');
   if (!row || !host) return;
+  if (!row.getAttribute('data-tool-home')) row.setAttribute('data-tool-home', '#game-plan-tools-home');
   let tools = host.querySelector('.pg-tools');
   if (!tools) {
     tools = document.createElement('div');
@@ -1223,7 +1224,9 @@ function showUnsavedChangesWarning(onContinue) {
   document.body.appendChild(overlay);
 }
 
-async function init() {
+async function initGamePlan() {
+  if (window.__gobGamePlanInit) return;
+  window.__gobGamePlanInit = true;
   if (window.GOBNav) window.GOBNav.warnOnLeave(function () { return hasUnsavedChanges; });
   setHeader();
   setupSliders();
@@ -1232,6 +1235,8 @@ async function init() {
   // Check where user came from (command_center vs lineup)
   const urlParams = liveParams();
   const from = urlParams.get('from') || 'lineup';  // Default to lineup for backwards compatibility
+  const planHost = document.getElementById('game-plan-view');
+  const hostedInView = !!(planHost && planHost.contains(document.querySelector('.gpc')));
   
   // Button event listeners
   // ✅ TASK 0: Updated button IDs
@@ -1247,7 +1252,11 @@ async function init() {
                                from === 'tournament-command-center' ||
                                from === 'franchise-command-center';
 
-  if (isFromCommandCenter) {
+  if (hostedInView) {
+    if (pageBackLink) pageBackLink.hidden = true;
+    if (btnBackToLineup) btnBackToLineup.style.display = 'none';
+    if (btnCancel) btnCancel.style.display = 'none';
+  } else if (isFromCommandCenter) {
     // From command center (FCC/TCC): use page-level ghost back link, hide footer navigation buttons
     if (pageBackLink) {
       pageBackLink.hidden = false;
@@ -1320,4 +1329,5 @@ async function init() {
   placeGamePlanTools();
 }
 
-document.addEventListener('DOMContentLoaded', init);
+window.initGamePlan = initGamePlan;
+document.addEventListener('DOMContentLoaded', initGamePlan);

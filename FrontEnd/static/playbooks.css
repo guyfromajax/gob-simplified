@@ -1014,3 +1014,920 @@ input[type="reset"] {
     min-width: 860px;
   }
 }
+
+/* Prep v2 Playbooks view. Tokens only. Beats #franchise-container .tab-content h3.
+   Re-bind hairlines so playbooks.css :root gold --line / --line-strong cannot leak. */
+#franchise-container #playbooks-view.tab-content,
+#playbooks-view {
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+}
+
+#franchise-container #playbooks-view.tab-content {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#playbooks-view .playbooks-page-header-wrap,
+#playbooks-view .playbooks-page-card-header .playbooks-page-title,
+#playbooks-view .playbooks-back-link {
+  display: none;
+}
+
+#playbooks-view .playbooks-page-card-header {
+  display: none;
+}
+
+#playbooks-view .resource-page-container,
+#playbooks-view .fcc-brand-page-shell,
+#playbooks-view .playbooks-resource-shell,
+#playbooks-view .playbooks-page,
+#playbooks-view .playbooks-main,
+#playbooks-view .playbooks-page-card,
+#playbooks-view .playbooks-page-card-body,
+#playbooks-view .fcc-data-card,
+#playbooks-view .fcc-data-card-body,
+#playbooks-view .settings-card,
+#playbooks-view .pc-card {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+  backdrop-filter: none;
+}
+
+#playbooks-view .resource-page-container.fcc-brand-page-shell::before,
+#playbooks-view .resource-page-container.fcc-brand-page-shell::after,
+#playbooks-view .fcc-data-card::before,
+#playbooks-view .fcc-data-card::after {
+  content: none;
+}
+
+#playbooks-view .pbc,
+#playbooks-view .playbooks-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(var(--dsz-118) * 3.4);
+  gap: calc(var(--col-gap) * 2);
+  align-items: start;
+  width: 100%;
+  max-width: 1180px;
+}
+
+html.gob-1920 #playbooks-view .pbc,
+html.gob-1920 #playbooks-view .playbooks-layout {
+  max-width: 1480px;
+}
+
+#playbooks-view .playbooks-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+#franchise-container #playbooks-view h1,
+#franchise-container #playbooks-view h2,
+#franchise-container #playbooks-view h3 {
+  margin: 0;
+  padding: 0;
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+  white-space: nowrap;
+}
+
+#franchise-container #playbooks-view h2::after,
+#franchise-container #playbooks-view h3::after {
+  display: none;
+}
+
+#playbooks-view .pbs {
+  margin-top: var(--dsp-16);
+}
+
+#playbooks-view .sh,
+#playbooks-view .pb-sec-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px 56px 28px;
+  align-items: end;
+  gap: var(--space-16);
+  margin: 0;
+  padding: 0 0 var(--space-6);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+#playbooks-view .pcs-h .sh {
+  display: block;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+#playbooks-view .pb-sec-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+#playbooks-view .pb-sec-title .m,
+#playbooks-view .pb-sec-title .cnt {
+  font-size: var(--fs-12);
+  font-weight: var(--fw-regular);
+  color: var(--text-60);
+  letter-spacing: 0;
+}
+
+#playbooks-view .section-total,
+#playbooks-view .tot,
+#playbooks-view .pb-sec-actions {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  font: var(--fw-bold) var(--fs-17)/var(--lh-1) var(--font-display);
+  color: var(--text-87);
+  letter-spacing: var(--tracking-2);
+}
+
+#playbooks-view .tot em,
+#playbooks-view .section-total em {
+  font: var(--fw-semibold) var(--fs-11)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  color: var(--text-38);
+  margin-right: var(--space-6);
+  letter-spacing: 0;
+}
+
+#playbooks-view .tot-warn {
+  color: var(--text-60);
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+#playbooks-view .cmd-h {
+  display: block;
+  text-align: right;
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-38);
+  padding-bottom: var(--space-2);
+}
+
+#playbooks-view .slot-h {
+  width: 24px;
+}
+
+#playbooks-view .et-grid,
+#playbooks-view .chips {
+  display: block;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+#playbooks-view .play {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px 56px 28px;
+  align-items: center;
+  gap: var(--space-16);
+  min-height: var(--dsz-44);
+  padding: 0 var(--space-10);
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  color: var(--text-100);
+}
+
+#playbooks-view .play:hover {
+  background: var(--white-3);
+}
+
+#playbooks-view .play.on {
+  background: color-mix(in srgb, var(--navy) 35%, transparent);
+  border-bottom-color: transparent;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--navy-hi) 35%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--navy-hi) 35%, transparent);
+}
+
+#playbooks-view .play.open {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--navy-hi) 35%, transparent);
+}
+
+#playbooks-view .play.lk {
+  color: var(--text-38);
+  cursor: default;
+}
+
+#playbooks-view .pn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+#playbooks-view .pn b {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  color: var(--text-100);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#playbooks-view .pn span {
+  font-size: var(--fs-11);
+  color: var(--text-60);
+}
+
+#playbooks-view .play.lk .pn b,
+#playbooks-view .play.lk .pn span {
+  color: var(--text-38);
+}
+
+#playbooks-view .wt {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-10);
+}
+
+#playbooks-view .wb {
+  position: relative;
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--white-6);
+  overflow: hidden;
+}
+
+#playbooks-view .wb.et-slider,
+#playbooks-view .wb.chip-slider {
+  cursor: ew-resize;
+}
+
+#playbooks-view .wb i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: var(--white-55);
+}
+
+#playbooks-view .wt b,
+#playbooks-view .wt input {
+  min-width: 0;
+  text-align: right;
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  color: var(--text-100);
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+#playbooks-view .wt input {
+  width: 2.4ch;
+}
+#playbooks-view .wt input + b {
+  width: auto;
+  margin-left: calc(-1 * var(--space-10));
+}
+
+#playbooks-view .cmd {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+}
+
+#playbooks-view .cmd b {
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  color: var(--text-87);
+}
+
+#playbooks-view .slot {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: var(--space-1) 0 0;
+  border: 0;
+  border-radius: var(--radius-6);
+  background: transparent;
+  font: var(--fw-bold) var(--fs-14)/var(--lh-1) var(--font-display);
+  color: var(--text-100);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy-hi) 55%, transparent);
+  cursor: pointer;
+}
+
+#playbooks-view .slot.add {
+  color: var(--text-60);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font: var(--fw-regular) var(--fs-16)/var(--lh-1) var(--font-body);
+  padding: 0 0 1px;
+}
+
+#playbooks-view .slot.add:hover {
+  color: var(--text-100);
+  background: var(--white-6);
+}
+
+#playbooks-view .slot.lk {
+  box-shadow: none;
+  color: var(--text-38);
+  cursor: default;
+}
+
+#playbooks-view .slot svg {
+  width: 12px;
+  height: 12px;
+}
+
+#playbooks-view .pdet {
+  padding: var(--space-12) var(--space-10) var(--dsp-14);
+  background: color-mix(in srgb, var(--navy) 16%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--navy-hi) 35%, transparent);
+}
+
+#playbooks-view .pdet p {
+  margin: 0;
+  font-size: var(--fs-13);
+  line-height: 1.45;
+  color: var(--text-87);
+  max-width: 64ch;
+  text-wrap: pretty;
+}
+
+#playbooks-view .pdet-note {
+  margin-top: var(--space-8);
+  color: var(--text-60);
+}
+
+#playbooks-view .kv {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8) var(--dsp-24);
+  margin-top: var(--space-10);
+}
+
+#playbooks-view .kv div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+#playbooks-view .kv .lbl,
+#playbooks-view .lbl {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
+}
+
+#playbooks-view .kv b {
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  color: var(--text-100);
+  letter-spacing: var(--tracking-2);
+}
+
+#playbooks-view .kv b small {
+  font: var(--fw-semibold) var(--fs-12)/1 var(--font-body);
+  color: var(--text-60);
+  margin-left: var(--space-4);
+}
+
+#playbooks-view .pdet-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-top: var(--space-10);
+}
+
+#playbooks-view .pdet .sel {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  height: var(--dsz-28);
+  min-width: 68px;
+  margin: 0;
+  padding: 0 var(--space-10);
+  border-radius: var(--radius-7);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-87);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#playbooks-view .pdet .sel.lg {
+  min-width: 136px;
+}
+
+#playbooks-view .pdet .sel:hover {
+  background: var(--white-7);
+}
+
+#playbooks-view .pdet .sel::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  margin-top: -3px;
+  border-right: 1.5px solid var(--text-38);
+  border-bottom: 1.5px solid var(--text-38);
+  transform: rotate(45deg);
+  pointer-events: none;
+  flex: none;
+}
+
+#playbooks-view .pdet .sel select {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-87);
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+  cursor: pointer;
+}
+
+#playbooks-view .pdet .sel select:focus {
+  outline: none;
+}
+
+#playbooks-view .pdet .sel:focus-within {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+#playbooks-view .pdet .sel select:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+#playbooks-view .pdet .caret {
+  display: none;
+}
+
+#playbooks-view .play-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin: 0;
+  height: var(--dsz-28);
+  padding: 0 var(--space-8);
+  border: 0;
+  border-radius: var(--radius-7);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-60);
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+  cursor: pointer;
+}
+
+#playbooks-view .play-lock svg {
+  width: 12px;
+  height: 12px;
+}
+
+#playbooks-view .pcs {
+  position: sticky;
+  top: var(--pg-head-h);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+#playbooks-view .pcs-h p {
+  margin: var(--space-4) 0 0;
+  font-size: var(--fs-12);
+  color: var(--text-60);
+}
+
+#playbooks-view .pcs-g {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: var(--dsp-12);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--line);
+}
+
+#playbooks-view .pcs-g b {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-87);
+}
+
+#playbooks-view .pcs-g span,
+#playbooks-view .pc-cap {
+  font-size: var(--fs-12);
+  color: var(--text-60);
+}
+
+#playbooks-view .pcs-g span i,
+#playbooks-view .pc-cap i {
+  font-style: normal;
+  color: var(--text-100);
+  font-weight: var(--fw-semibold);
+}
+
+#playbooks-view .csr-l,
+#playbooks-view .pc-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+#playbooks-view .csr {
+  display: grid;
+  grid-template-columns: 18px 12px minmax(0, 1fr) auto auto 18px;
+  align-items: center;
+  gap: var(--space-10);
+  height: var(--dsz-34);
+  padding: 0 var(--space-10) 0 var(--space-8);
+  border-radius: var(--radius-6);
+  background: color-mix(in srgb, var(--navy) 35%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy-hi) 35%, transparent);
+  cursor: grab;
+  color: var(--text-100);
+}
+
+#playbooks-view .csr.dragging {
+  opacity: 0.7;
+}
+
+#playbooks-view .csr.drop-target {
+  box-shadow: inset 0 0 0 1px var(--white-45);
+}
+
+#playbooks-view .csr > i {
+  font: normal var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  color: var(--text-60);
+  text-align: right;
+  padding-top: var(--space-1);
+}
+
+#playbooks-view .csr .gr {
+  width: 8px;
+  height: 12px;
+  background-image: radial-gradient(circle, var(--white-40) 1.1px, transparent 1.3px);
+  background-size: 4px 4px;
+}
+
+#playbooks-view .csr .cs-n {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  color: var(--text-100);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#playbooks-view .csr .cs-n small {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-regular);
+  color: var(--text-60);
+  margin-left: var(--space-6);
+}
+
+#playbooks-view .csr .cs-p,
+#playbooks-view .csr .cs-c {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  text-align: right;
+}
+
+#playbooks-view .csr .cs-p {
+  color: var(--text-87);
+  min-width: 3ch;
+}
+
+#playbooks-view .csr .cs-c {
+  color: var(--text-60);
+  min-width: 2ch;
+}
+
+#playbooks-view .csr .pc-remove-btn {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-60);
+  font: var(--fw-bold) var(--fs-15)/1 var(--font-body);
+  cursor: pointer;
+}
+
+#playbooks-view .csr.open {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  box-shadow: none;
+  cursor: default;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  font-size: var(--fs-12);
+  color: var(--text-38);
+}
+
+#playbooks-view .pc-inline-error {
+  min-height: 0;
+  margin: 0;
+  font-size: var(--fs-12);
+  color: var(--text-60);
+}
+
+#playbooks-view .psw,
+#playbooks-view .playbooks-shot-weights-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--dsp-20);
+  min-height: var(--dsz-50);
+  margin: 0;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#playbooks-view .psw-strip-label,
+#playbooks-view .psw-l {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+#playbooks-view .playbooks-shot-weights-strip .psw-live-pill,
+#playbooks-view .psw-live-pill,
+#playbooks-view .tg {
+  display: inline-flex;
+  align-items: center;
+  height: var(--dsz-20, 20px);
+  padding: var(--space-1) var(--space-7, 7px) 0;
+  border: 0;
+  border-radius: var(--radius-4, 4px);
+  background: transparent;
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-10);
+  color: var(--text-60);
+  box-shadow: inset 0 0 0 1px var(--text-60);
+}
+
+#playbooks-view .psw-root,
+#playbooks-view .psw-c {
+  display: flex;
+  align-items: center;
+  gap: var(--dsp-24);
+  margin-left: auto;
+}
+
+#playbooks-view .psw-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--dsp-12);
+  flex: none;
+  margin-left: 0;
+}
+
+#playbooks-view .psw-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  flex: none;
+}
+
+#playbooks-view .psw-group-label {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
+  color: var(--text-38);
+  white-space: nowrap;
+}
+
+#playbooks-view .psw-pill {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 4.5ch;
+  padding: 0;
+  border: 0 !important;
+  background: transparent;
+  overflow: visible;
+}
+
+#playbooks-view .psw-pill-pos {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+#playbooks-view .psw-pill-val {
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  white-space: nowrap;
+}
+
+#playbooks-view .psw-pill-accent {
+  display: none;
+}
+
+#playbooks-view .psw-unavailable {
+  margin: 0;
+  font-size: var(--fs-12);
+  color: var(--text-38);
+}
+
+#playbooks-view .norm-btn,
+#playbooks-view .btn-q {
+  height: var(--dsz-28);
+  padding: 0 var(--space-8);
+  border: 0;
+  border-radius: var(--radius-7);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-87);
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#playbooks-view .gameplay-lockout-card .empty-state-copy {
+  font-size: var(--fs-13);
+  color: var(--text-60);
+}
+
+html.gob-shell .pg-head .pg-tools .playbooks-tools-row {
+  display: flex;
+  align-items: center;
+  flex: none;
+  flex-wrap: nowrap;
+  gap: var(--space-8);
+  min-width: 0;
+  max-width: 100%;
+}
+
+html.gob-shell .pg-head .pg-tools .playbooks-tabs,
+html.gob-shell .pg-head .pg-tools .seg {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-9);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+html.gob-shell .pg-head .pg-tools .playbooks-tab {
+  display: inline-flex;
+  align-items: center;
+  height: var(--dsz-28);
+  padding: 0 var(--space-12);
+  border: 0;
+  border-radius: var(--radius-7);
+  background: transparent;
+  box-shadow: none;
+  clip-path: none;
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+  letter-spacing: 0;
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+html.gob-shell .pg-head .pg-tools .playbooks-tab:hover {
+  color: var(--text-87);
+  background: var(--white-4);
+}
+
+html.gob-shell .pg-head .pg-tools .playbooks-tab.on {
+  background: var(--white-11);
+  color: var(--text-100);
+  box-shadow: inset 0 1px 0 var(--white-9);
+}
+
+html.gob-shell .pg-head .pg-tools .playbooks-tab.on::before,
+html.gob-shell .pg-head .pg-tools .playbooks-tab .dot {
+  display: none;
+}
+
+html.gob-shell .pg-head .pg-tools .tl-div {
+  width: 1px;
+  height: 22px;
+  background: var(--line-strong);
+  flex: none;
+}
+
+html.gob-shell .pg-head .pg-tools .playbooks-sections-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  white-space: nowrap;
+}
+
+html.gob-shell .pg-head .pg-tools .ck {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--white-25);
+  background: transparent;
+}
+
+html.gob-shell .pg-head .pg-tools .ck.on {
+  background: var(--white-90);
+  box-shadow: none;
+}
+
+html.gob-shell .pg-head .pg-tools .ck.on::after {
+  content: "";
+  position: absolute;
+  left: 4.5px;
+  top: 2.5px;
+  width: 3.5px;
+  height: 6.5px;
+  border-right: 2px solid var(--bg);
+  border-bottom: 2px solid var(--bg);
+  transform: rotate(45deg);
+}
+
+html.gob-shell .pg-head .pg-tools .ck svg {
+  display: none;
+}
+
+html.gob-shell .pg-head .pg-tools .bal,
+html.gob-shell .pg-head .pg-tools .ready-copy {
+  font-size: var(--fs-12);
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+html.gob-shell .pg-head .pg-tools .bal b,
+html.gob-shell .pg-head .pg-tools .ready-copy b {
+  color: var(--text-100);
+  font-weight: var(--fw-semibold);
+}
+
+html.gob-shell .pg-head .pg-tools .btn-o,
+html.gob-shell .pg-head .pg-tools #save-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--dsz-30);
+  min-width: 0;
+  min-height: 0;
+  width: auto;
+  padding: var(--space-1) var(--space-12) 0;
+  border: 0;
+  border-radius: var(--radius-8);
+  background: var(--orange);
+  color: var(--badge-ink);
+  box-shadow: none;
+  font: var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  text-align: center;
+  white-space: nowrap;
+}
+
+html.gob-shell .pg-head .pg-tools #save-btn:disabled {
+  background: var(--white-6);
+  color: var(--text-38);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+html.gob-shell .pg-head .pg-tools #save-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: none;
+}

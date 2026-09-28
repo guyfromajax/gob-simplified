@@ -183,7 +183,7 @@
     var open = function (e) {
       var name = e.target.closest ? e.target.closest('.pdg-name') : null;
       if (!name) return;
-      var card = name.closest('.pdg-card');
+      var card = name.closest('.pdg-card') || name.closest('tr[data-pdg-player]');
       var lookup = grid._pdgById || byId;
       var player = card && lookup[String(card.dataset.pdgPlayer)];
       if (player) showHoverCard(name, player);
@@ -239,8 +239,12 @@
     var grid = host.querySelector('.pdg-grid');
     if (!grid) return;
 
+    if (o.layout === 'table') host.classList.add('pdg-layout-table');
+    if (o.tallies) host._pdgTallies = o.tallies;
     grid.innerHTML = rows.length
-      ? rows.map(cardHtml).join('')
+      ? (o.layout === 'table'
+        ? '<table class="pdg-table"><thead><tr><th colspan="3" class="l">Player</th><th class="c">RT</th><th class="c">Pos</th><th class="l">Training</th></tr></thead><tbody>' + rows.map(tableRowHtml).join('') + '</tbody></table>'
+        : rows.map(cardHtml).join(''))
       : '<div class="pdg-empty">No active players.</div>';
     paintTallies(host, rows);
 
@@ -258,15 +262,29 @@
       var row = null;
       rows.forEach(function (r) { if (String(r.id) === String(playerId)) row = r; });
       if (row) {
+        var prevResolved = field === 'training_focus' ? row.resolved_training_focus : row.resolved_training_position;
         row[field] = value;
         row[field === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position'] = value;
         // The row keeps its place; only the number it shows moves. Re-sorting here would
         // pull the row out from under the coach the instant he used it.
+        if (host._pdgTallies && prevResolved !== value) {
+          var maps = host._pdgTallies;
+          var bag = field === 'training_focus' ? maps.focuses : maps.positions;
+          if (bag) {
+            if (prevResolved && Object.prototype.hasOwnProperty.call(bag, prevResolved)) {
+              bag[prevResolved] = Math.max(0, (bag[prevResolved] || 0) - 1);
+            }
+            if (value && Object.prototype.hasOwnProperty.call(bag, value)) bag[value] = (bag[value] || 0) + 1;
+          }
+        }
         if (field === 'training_position') {
           var cell = grid.querySelector('[data-pdg-player="' + CSS.escape(String(playerId)) + '"] [data-pdg-rt]');
           if (cell) {
             var rt = rtAtTrainingPosition(row);
             cell.textContent = rt == null ? '--' : formatRtDisplay(rt);
+            if (typeof window.getRtBucketClass === 'function') {
+              cell.className = rt == null ? '' : window.getRtBucketClass(rt);
+            }
           }
         }
       }
@@ -278,8 +296,67 @@
   function paintTallies(host, rows) {
     var pos = host.querySelector('.pdg-tally-positions');
     var foc = host.querySelector('.pdg-tally-focuses');
+    var maps = host._pdgTallies;
+    if (maps && maps.positions && maps.focuses) {
+      if (pos) pos.innerHTML = serverTallyHtml(maps.positions, 'position');
+      if (foc) foc.innerHTML = serverTallyHtml(maps.focuses, 'focus');
+      return;
+    }
     if (pos) pos.innerHTML = tallyHtml(rows, 'position');
     if (foc) foc.innerHTML = tallyHtml(rows, 'focus');
+  }
+
+  function serverTallyHtml(counts, kind) {
+    var dev = window.GOBDevelopmentFocus;
+    var keys = kind === 'position'
+      ? dev.POSITIONS.map(function (p) { return { k: p, label: p }; })
+      : dev.FOCUSES.map(function (f) { return { k: f.value, label: f.label }; });
+    return keys.map(function (o) {
+      var n = counts[o.k] || 0;
+      return '<span class="pdg-tally-item' + (n ? '' : ' is-zero') + '">' +
+        esc(o.label) + ' <b>' + n + '</b></span>';
+    }).join('');
+  }
+
+  function portraitHtml(player) {
+    var letters = String(player.name || '').split(/\s+/).filter(Boolean).slice(0, 2)
+      .map(function (part) { return part.charAt(0).toUpperCase(); }).join('');
+    var url = '';
+    var api = window.API_CONFIG;
+    if (player.portrait_source === 'recruit' && player.image_id && api && typeof api.getRecruitImageUrl === 'function') {
+      url = api.getRecruitImageUrl(player.image_id);
+    } else if (player.id && api && typeof api.getPlayerImageUrl === 'function') {
+      url = api.getPlayerImageUrl(player.id, { size: 'card' });
+    }
+    if (!url) return esc(letters);
+    return '<img alt="" src="' + esc(url) + '" data-letters="' + esc(letters)
+      + '" onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';}">';
+  }
+
+  function rtPairHtml(player) {
+    var current = rtAtTrainingPosition(player);
+    var bucket = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass : function () { return ''; };
+    var show = typeof window.formatRtDisplay === 'function' ? window.formatRtDisplay : function (n) { return String(n); };
+    var currentText = current == null ? '--' : show(current);
+    var html = '<span class="rtl"><b data-pdg-rt class="' + (current == null ? '' : bucket(current)) + '">' + esc(currentText) + '</b>';
+    if (player.potential_rt_ratcheted != null && player.potential_rt_ratcheted !== '') {
+      html += '<i>→</i><b class="pot ' + bucket(player.potential_rt_ratcheted) + '">'
+        + esc(show(player.potential_rt_ratcheted)) + '</b>';
+    }
+    return html + '</span>';
+  }
+
+  function tableRowHtml(player) {
+    var dev = window.GOBDevelopmentFocus;
+    var jersey = player.jersey == null || player.jersey === '' ? '' : String(player.jersey);
+    return '<tr data-pdg-player="' + esc(player.id) + '">' +
+      '<td class="pdg-av">' + portraitHtml(player) + '</td>' +
+      '<td class="pdg-jn">' + esc(jersey) + '</td>' +
+      '<td class="pdg-name" tabindex="0">' + esc(player.name) + '</td>' +
+      '<td class="pdg-rt">' + rtPairHtml(player) + '</td>' +
+      '<td class="pdg-pos">' + esc(player.pos || '') + '</td>' +
+      '<td class="pdg-controls">' + dev.positionSelectHtml(player) + dev.focusSelectHtml(player) + '</td>' +
+    '</tr>';
   }
 
   window.GOBPlayerDevelopmentGrid = {

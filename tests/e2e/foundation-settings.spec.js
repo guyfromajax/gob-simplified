@@ -83,6 +83,349 @@ test('offline profile hides Account and shows the offline note', async ({ page }
   await expect(page.locator('[data-conn-label]')).toHaveText('Offline');
 });
 
+// FAQs sits in the panel footer, outside the Account section the offline profile
+// replaces. It opens in a new tab; the game page stays put.
+async function checkFaqs(page, shot) {
+  const faqs = page.locator('#gob-settings-host .set-f a[data-settings-faqs]');
+  await expect(faqs).toBeVisible();
+  const hit = await faqs.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { ok: top === el || el.contains(top), bottom: r.bottom, vh: innerHeight };
+  });
+  expect(hit.ok, JSON.stringify(hit)).toBe(true);
+  expect(hit.bottom).toBeLessThanOrEqual(hit.vh);
+  await expect(faqs).toHaveText('FAQs');
+  await expect(faqs).toHaveClass(/\blnk\b/);
+  await expect(faqs).toHaveAttribute('href', '/faqs.html');
+  await expect(faqs).toHaveAttribute('target', '_blank');
+  await expect(faqs).toHaveAttribute('rel', /\bnoopener\b/);
+
+  let focused = false;
+  for (let i = 0; i < 30 && !focused; i++) {
+    await page.keyboard.press('Tab');
+    focused = await faqs.evaluate((el) => document.activeElement === el);
+  }
+  expect(focused, 'FAQs reachable with Tab').toBe(true);
+  const ring = await faqs.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), visible: el.matches(':focus-visible') };
+  });
+  expect(ring.visible).toBe(true);
+  expect(ring.style).toBe('solid');
+  expect(ring.width).toBeGreaterThanOrEqual(2);
+  await page.locator('#gob-settings-host .settings').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+  await page.screenshot({ path: shot });
+
+  const before = page.url();
+  const [popup] = await Promise.all([page.waitForEvent('popup'), faqs.click()]);
+  await popup.waitForLoadState('domcontentloaded');
+  expect(new URL(popup.url()).pathname).toMatch(/\/faqs\.html$/);
+  await expect(popup.locator('h1').first()).toBeVisible();
+  expect(page.url()).toBe(before);
+  await popup.close();
+}
+
+test('settings footer links FAQs in a new tab online', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await stubAuth(page);
+  await stubMe(page, ME);
+  await page.goto('/mode-select.html');
+  await page.locator('#auth-settings-btn').click();
+  await expect(page.locator('#gob-settings-host [data-settings-logout]')).toBeVisible();
+  await expect(page.locator('[data-conn-label]')).toHaveText('Online');
+  await checkFaqs(page, 'reports/settings-faqs/settings-online-1280x720.png');
+});
+
+test('settings footer links FAQs in a new tab offline', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => { window.GOB_BUILD_PROFILE = 'desktop'; });
+  await stubAuth(page);
+  await page.goto('/mode-select.html');
+  await page.evaluate(async () => {
+    const mod = await import('/js/shared/gobSettings.js');
+    mod.openSettings();
+  });
+  await expect(page.locator('.set-note')).toBeVisible();
+  await expect(page.locator('[data-conn-label]')).toHaveText('Offline');
+  await checkFaqs(page, 'reports/settings-faqs/settings-offline-1280x720.png');
+});
+
+// The body (.set-b) is the panel's own scroll area; the header and the footer
+// (FAQs, Online/Offline) stay pinned while it scrolls.
+function panelMetrics(page) {
+  return page.evaluate(() => {
+    const panel = document.querySelector('#gob-settings-host .settings');
+    const head = panel.querySelector('.set-h');
+    const body = panel.querySelector('.set-b');
+    const foot = panel.querySelector('.set-f');
+    const faqs = foot.querySelector('a[data-settings-faqs]');
+    const box = (el) => { const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height) }; };
+    const hits = (el) => {
+      const r = el.getBoundingClientRect();
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return top === el || el.contains(top);
+    };
+    return {
+      panel: box(panel),
+      head: box(head),
+      body: box(body),
+      foot: box(foot),
+      overflow: body.scrollHeight - body.clientHeight,
+      scrollTop: Math.round(body.scrollTop),
+      gutter: body.offsetWidth - body.clientWidth,
+      overflowY: getComputedStyle(body).overflowY,
+      faqsHit: hits(faqs),
+      faqsInFoot: faqs.getBoundingClientRect().bottom <= foot.getBoundingClientRect().bottom + 0.5,
+      sections: [...body.children].filter((s) => !s.hidden).map((s) => {
+        const r = s.getBoundingClientRect();
+        return [Math.round(r.top), Math.round(r.height)];
+      }),
+    };
+  });
+}
+
+async function openPanel(page, offline) {
+  if (offline) await page.addInitScript(() => { window.GOB_BUILD_PROFILE = 'desktop'; });
+  await stubAuth(page);
+  await stubMe(page, ME);
+  await page.goto('/mode-select.html');
+  await page.evaluate(async () => {
+    const mod = await import('/js/shared/gobSettings.js');
+    mod.openSettings();
+  });
+  const panel = page.locator('#gob-settings-host .settings');
+  await expect(panel).toBeVisible();
+  await expect(page.locator(offline ? '#gob-settings-host .set-note' : '#gob-settings-host [data-settings-logout]')).toBeVisible();
+  await panel.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+}
+
+test('the settings body scrolls so Log Out is reachable at 1280x720, footer pinned', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openPanel(page, false);
+  const before = await panelMetrics(page);
+  expect(before.overflowY).toBe('auto');
+  expect(before.overflow, 'content taller than the body at 1280x720 online').toBeGreaterThan(0);
+  expect(before.head.top).toBe(before.panel.top);
+  expect(before.foot.bottom).toBe(before.panel.bottom);
+  expect(before.foot.height).toBe(44);
+  expect(before.faqsHit).toBe(true);
+
+  const logout = page.locator('#gob-settings-host [data-settings-logout]');
+  await logout.scrollIntoViewIfNeeded();
+  await page.locator('#gob-settings-host .set-b').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  const after = await panelMetrics(page);
+  const target = await logout.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const foot = document.querySelector('#gob-settings-host .set-f').getBoundingClientRect();
+    const body = document.querySelector('#gob-settings-host .set-b').getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { hit: top === el || el.contains(top), top: r.top, bottom: r.bottom, footTop: foot.top, bodyTop: body.top, height: r.height };
+  });
+  expect(target.hit, JSON.stringify(target)).toBe(true);
+  expect(target.bottom, JSON.stringify(target)).toBeLessThanOrEqual(target.footTop);
+  expect(target.top).toBeGreaterThanOrEqual(target.bodyTop);
+  expect(target.height).toBeGreaterThanOrEqual(24);
+  expect(after.scrollTop).toBe(before.overflow);
+  // Header and footer do not move while the body scrolls.
+  expect(after.head).toEqual(before.head);
+  expect(after.foot).toEqual(before.foot);
+  expect(after.faqsHit).toBe(true);
+  expect(after.faqsInFoot).toBe(true);
+  await page.mouse.move(900, 400);
+  await page.screenshot({ path: 'reports/settings-scroll/settings-online-1280x720-bottom.png' });
+
+  const [req] = await Promise.all([
+    page.waitForRequest((r) => r.url().includes('/api/auth/logout') && r.method() === 'POST'),
+    logout.click(),
+  ]);
+  expect(req).toBeTruthy();
+  await page.waitForLoadState('load');
+  await expect(page).toHaveURL(/mode-select\.html/);
+});
+
+test('the settings panel keeps its frame online and offline at three sizes', async ({ browser }) => {
+  const fs = require('fs');
+  const out = {};
+  for (const offline of [false, true]) {
+    for (const size of [[1280, 720], [1920, 1080], [1280, 600]]) {
+      const page = await browser.newPage({ viewport: { width: size[0], height: size[1] } });
+      await openPanel(page, offline);
+      const m = await panelMetrics(page);
+      const label = (offline ? 'offline-' : 'online-') + size.join('x');
+      out[label] = m;
+      if (process.env.SETTINGS_PHASE === 'before') { await page.close(); continue; }
+      expect(m.head.top, label).toBe(m.panel.top);
+      expect(m.foot.bottom, label).toBe(m.panel.bottom);
+      expect(m.body.top, label).toBe(m.head.bottom);
+      expect(m.body.bottom, label).toBe(m.foot.top);
+      expect(m.head.height, label).toBe(56);
+      expect(m.foot.height, label).toBe(44);
+      expect(m.faqsHit, label).toBe(true);
+      if (m.overflow <= 0) expect(m.gutter, label + ' no scrollbar when it fits').toBe(0);
+      const body = page.locator('#gob-settings-host .set-b');
+      await body.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+      const last = await body.evaluate((el) => {
+        const kids = [...el.querySelectorAll('.set-s:not([hidden]) > *')];
+        const r = kids[kids.length - 1].getBoundingClientRect();
+        return { bottom: r.bottom, limit: el.getBoundingClientRect().bottom };
+      });
+      expect(last.bottom, label + ' last item inside the body').toBeLessThanOrEqual(last.limit + 0.5);
+      if (size[1] === 600) {
+        await page.mouse.move(900, 300);
+        await page.screenshot({ path: 'reports/settings-scroll/settings-' + label + '-bottom.png' });
+      }
+      await page.close();
+    }
+  }
+  fs.writeFileSync('reports/settings-scroll/' + (process.env.SETTINGS_PHASE || 'after') + '-metrics.json', JSON.stringify(out, null, 2));
+});
+
+// Mute buttons and the close × must never pick up the browser's default button face.
+// Outside the shell the host is `.gob.gob-settings-host` with no .gob ancestor.
+const SHELL_FID = 'f-e2e-settings-icons';
+const SHELL_TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+const ICON_PAGES = [
+  { name: 'mode-select', url: '/mode-select.html', shell: false },
+  { name: 'office', url: '/franchise-command-center.html?franchise_id=' + SHELL_FID + '&team_id=' + SHELL_TID, shell: true },
+  { name: 'standings (browse)', url: '/standings.html?franchise_id=' + SHELL_FID + '&team_id=' + SHELL_TID, shell: true },
+  { name: 'recruiting (focus)', url: '/recruiting.html?franchise_id=' + SHELL_FID + '&team_id=' + SHELL_TID + '&from=fcc', shell: true },
+];
+
+async function installShellApi(page) {
+  await stubAuth(page);
+  await page.route('**/*', async (route) => {
+    let pathname = '';
+    try { pathname = new URL(route.request().url()).pathname; } catch (_err) { return route.continue(); }
+    const json = (body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (pathname.startsWith('/franchise/command-center/data')) {
+      return json({
+        franchise_id: SHELL_FID, team_id: SHELL_TID, user_team_id: SHELL_TID, team: 'Lancaster', week: 21, rank: 14,
+        season: 1, current_season: 1, training_completed: true, session_type: 'in-season',
+        recruiting_wire: { board_saved_week: 21, counts: {} }, user_conference: 1, user_region: 'C',
+        team_record: { wins: 4, losses: 1 },
+      });
+    }
+    if (pathname === '/api/auth/me') return json(ME);
+    if (pathname === '/app-config') return json({ isAlpha: false, version: '1.0' });
+    if (pathname.startsWith('/api/') || pathname.startsWith('/franchise/') || pathname.startsWith('/roster/')) return json({});
+    return route.continue();
+  });
+}
+
+async function openOn(page, spec) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  if (spec.shell) await installShellApi(page);
+  else { await stubAuth(page); await stubMe(page, ME); }
+  await page.goto(spec.url);
+  await page.waitForFunction(() => !document.documentElement.classList.contains('gob-pending'));
+  if (spec.shell) await expect(page.locator('html.gob-shell')).toHaveCount(1);
+  await page.evaluate(async () => {
+    const mod = await import('/js/shared/gobSettings.js');
+    mod.openSettings();
+  });
+  const panel = page.locator('#gob-settings-host .settings');
+  await expect(panel).toBeVisible();
+  await panel.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+}
+
+function iconState(page, selector) {
+  return page.evaluate((sel) => {
+    const host = document.getElementById('gob-settings-host');
+    const token = (name) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(' + name + ')';
+      host.appendChild(probe);
+      const value = getComputedStyle(probe).color;
+      probe.remove();
+      return value;
+    };
+    const el = host.querySelector(sel);
+    const cs = getComputedStyle(el);
+    const svg = el.querySelector('svg');
+    const out = {
+      bg: cs.backgroundColor,
+      bgImage: cs.backgroundImage,
+      borderWidth: cs.borderTopWidth,
+      appearance: cs.appearance,
+      color: cs.color,
+      text60: token('--text-60'),
+      text100: token('--text-100'),
+      red: token('--red'),
+      on: el.classList.contains('on'),
+      pressed: el.getAttribute('aria-pressed'),
+    };
+    if (svg) {
+      const r = svg.getBoundingClientRect();
+      const paths = [...svg.querySelectorAll('path')];
+      const pcs = getComputedStyle(paths[0]);
+      out.svg = { w: r.width, h: r.height, stroke: pcs.stroke, fill: pcs.fill, strokeWidth: pcs.strokeWidth, d: paths.map((p) => p.getAttribute('d')).join(' ') };
+    }
+    return out;
+  }, selector);
+}
+
+function expectFlatButton(state, label) {
+  expect(state.bg, label + ' background').toBe('rgba(0, 0, 0, 0)');
+  expect(state.bgImage, label).toBe('none');
+  expect(state.borderWidth, label + ' border').toBe('0px');
+  expect(state.appearance, label).toBe('none');
+}
+
+for (const spec of ICON_PAGES) {
+  test('settings mute icons and close render flat on ' + spec.name, async ({ page }) => {
+    await openOn(page, spec);
+    const MUTE = '[data-mute="music"]';
+
+    const rest = await iconState(page, MUTE);
+    expectFlatButton(rest, spec.name + ' mute');
+    expect(rest.color).toBe(rest.text60);
+    expect(rest.svg.w).toBeGreaterThan(0);
+    expect(rest.svg.h).toBeGreaterThan(0);
+    expect(rest.svg.fill).toBe('none');
+    expect(rest.svg.stroke).toBe(rest.text60);
+    expect(parseFloat(rest.svg.strokeWidth)).toBeGreaterThan(0);
+    expect(rest.svg.d).toContain('M15.5 9a4 4 0 0 1 0 6');
+    expect(rest.pressed).toBe('false');
+
+    const close = await iconState(page, '.set-x');
+    expectFlatButton(close, spec.name + ' close');
+    expect(close.color).toBe(close.text60);
+
+    await page.hover('#gob-settings-host ' + MUTE);
+    await expect.poll(async () => (await iconState(page, MUTE)).color).toBe(rest.text100);
+
+    await page.click('#gob-settings-host ' + MUTE);
+    await page.mouse.move(900, 400);
+    await expect.poll(async () => (await iconState(page, MUTE)).on).toBe(true);
+    await expect.poll(async () => (await iconState(page, MUTE)).color).toBe(rest.red);
+    const muted = await iconState(page, MUTE);
+    expect(muted.pressed).toBe('true');
+    expect(muted.svg.d).toContain('M16 9.5l5 5');
+    expect(muted.svg.stroke).toBe(rest.red);
+    expect(muted.svg.w).toBeGreaterThan(0);
+
+    const others = await page.evaluate(() => [...document.querySelectorAll('#gob-settings-host [data-mute]')]
+      .map((b) => ({ id: b.dataset.mute, bg: getComputedStyle(b).backgroundColor, on: b.classList.contains('on') })));
+    for (const other of others.filter((o) => o.id !== 'music')) {
+      expect(other.on, other.id).toBe(false);
+      expect(other.bg, other.id).toBe('rgba(0, 0, 0, 0)');
+    }
+
+    if (spec.name === 'mode-select' || spec.name === 'office') {
+      await page.screenshot({ path: 'reports/settings-mute-icons/settings-' + spec.name + '-1280x720-music-muted.png' });
+    }
+
+    await page.click('#gob-settings-host ' + MUTE);
+    await page.mouse.move(900, 400);
+    await expect.poll(async () => (await iconState(page, MUTE)).on).toBe(false);
+    const back = await iconState(page, MUTE);
+    expect(back.pressed).toBe('false');
+    expect(back.svg.d).toContain('M15.5 9a4 4 0 0 1 0 6');
+    await expect.poll(async () => (await iconState(page, MUTE)).color).toBe(rest.text60);
+  });
+}
+
 const COURT_RECTS = {
   '1280x720': {
     scoreboard: { x: 0, y: 0, w: 1280, h: 120 },

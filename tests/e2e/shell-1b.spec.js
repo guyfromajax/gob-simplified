@@ -249,24 +249,23 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     ['team', 'Player Stats', 'player-stats-view'],
     ['team', 'Team Attributes', 'team-attributes-view'],
     ['team', 'Schedule', 'team-schedule-view'],
-    ['prep', 'Training', 'training-tab'],
-    ['prep', 'Game Plan', 'game-plan-tab'],
-    ['prep', 'Playbooks', 'playbooks-tab'],
-    ['prep', 'Scouting Report', 'coaches-tab'],
+    ['prep', 'Training', 'training-view'],
+    ['prep', 'Game Plan', 'game-plan-view'],
+    ['prep', 'Playbooks', 'playbooks-view'],
+    ['prep', 'Scouting Report', 'scouting-view'],
     ['league', 'Standings', 'standings-view'],
     ['league', 'Leaders', 'leaders-view'],
     ['league', 'Team Stats', 'team-stats-view'],
     ['news', 'News', 'news-view'],
   ];
-  const prepEditor = {
-    'training-tab': /\/training(-report)?\.html/,
-    'game-plan-tab': /\/game-plan\.html/,
-    'playbooks-tab': /\/playbooks\.html/,
-  };
+  const prepEditor = {};
   for (const row of panels) {
     await mouseClick(page, '[data-gob-section="' + row[0] + '"]');
     await mouseClick(page, stab(page, row[1]));
-    if (prepEditor[row[2]]) {
+    if (row[2] === 'training-view') {
+      await expect(page.locator('#training-report-view.tab-content.active')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveAttribute('data-tab', 'training-view');
+    } else if (prepEditor[row[2]]) {
       await page.waitForURL(prepEditor[row[2]]);
       await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveAttribute('data-tab', row[2]);
     } else {

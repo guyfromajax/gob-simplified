@@ -186,7 +186,21 @@ function cloneParams(params) {
   // Login is always-remote, so sending the user there strands them offline.
   // window.GOB_BUILD_PROFILE is set by the Electron preload before any page
   // script runs. The web build never sets it, so this branch is dead there.
-  var isDesktop = typeof window !== "undefined" && window.GOB_BUILD_PROFILE === "desktop";
+  var desktopCookie = false;
+  try {
+    desktopCookie = typeof document !== "undefined" && document.cookie.indexOf("GOB_BUILD_PROFILE=desktop") !== -1;
+  } catch (err) {
+    desktopCookie = false;
+  }
+  var isDesktop = typeof window !== "undefined" && (
+    window.GOB_BUILD_PROFILE === "desktop" || desktopCookie
+  );
+  if (isDesktop && window.GOB_BUILD_PROFILE !== "desktop") {
+    window.GOB_BUILD_PROFILE = "desktop";
+    if (!window.GOB_LOOPBACK_PORT && window.location && window.location.port) {
+      window.GOB_LOOPBACK_PORT = window.location.port;
+    }
+  }
   if (!isDesktop) {
     var token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
     if (!token) {

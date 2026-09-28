@@ -151,10 +151,12 @@
     }).then(function (ready) {
       var mount = ready.mod && (ready.mod.mount || (ready.mod.default && ready.mod.default.mount));
       if (typeof mount !== 'function') throw new Error('missing mount');
-      var handle = mount(host, ready.context) || {};
-      mounted[id] = handle;
-      host.__gobViewPending = null;
-      return handle;
+      return Promise.resolve(mount(host, ready.context)).then(function (handle) {
+        handle = handle || {};
+        mounted[id] = handle;
+        host.__gobViewPending = null;
+        return handle;
+      });
     }).catch(function () {
       host.__gobViewPending = null;
       delete mounted[id];
@@ -304,6 +306,46 @@
     subtab: 'awards-view',
     title: 'Awards',
     module: viewModule('awardsView.js')
+  });
+
+  register({
+    id: 'training-view',
+    section: 'prep',
+    subtab: 'training-view',
+    title: 'Training',
+    module: viewModule('trainingView.js')
+  });
+
+  register({
+    id: 'training-report-view',
+    section: 'prep',
+    subtab: 'training-view',
+    title: 'Training',
+    module: viewModule('trainingReportView.js')
+  });
+
+  register({
+    id: 'game-plan-view',
+    section: 'prep',
+    subtab: 'game-plan-view',
+    title: 'Game Plan',
+    module: viewModule('gamePlanView.js')
+  });
+
+  register({
+    id: 'playbooks-view',
+    section: 'prep',
+    subtab: 'playbooks-view',
+    title: 'Playbooks',
+    module: viewModule('playbooksView.js')
+  });
+
+  register({
+    id: 'scouting-view',
+    section: 'prep',
+    subtab: 'scouting-view',
+    title: 'Scouting Report',
+    module: viewModule('scoutingView.js')
   });
 
   global.GOBViews = {

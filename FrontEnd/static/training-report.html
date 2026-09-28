@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search);
+        if (q.get('embed') === '1') return;
+        q.delete('embed');
+        q.set('tab', 'training-report-view');
+        location.replace('/franchise-command-center.html?' + q.toString());
+      } catch (err) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
@@ -43,7 +54,7 @@
       <button id="locker-room-btn" class="locker-room-button">Go To Locker Room</button>
     </header>
 
-    <!-- Training Notes (first: Notes → Players → Team → Plays) -->
+    <!-- Training Notes (Notes → Team → Players → Projected → Playbook) -->
     <section class="training-notes-section">
       <div class="training-notes-header">
         <div class="training-notes-header-main">
@@ -58,6 +69,12 @@
       <div class="training-notes-container" id="training-notes-container">
         <!-- Populated by training-report.js -->
       </div>
+    </section>
+
+    <!-- Team Section -->
+    <section class="team-section">
+      <h2>Team Report</h2>
+      <div class="team-attributes-grid" id="team-attributes-grid"></div>
     </section>
 
     <!-- Players Section -->
@@ -75,12 +92,6 @@
           <tbody id="players-tbody"></tbody>
         </table>
       </div>
-    </section>
-
-    <!-- Team Section -->
-    <section class="team-section">
-      <h2>Team Report</h2>
-      <div class="team-attributes-grid" id="team-attributes-grid"></div>
     </section>
 
     <!-- Projected Starting 5 -->

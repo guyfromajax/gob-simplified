@@ -69,6 +69,10 @@ function initCommandCenterTabs(options) {
     if (tabName === 'player-stats-tab') return 'player-stats-view';
     if (tabName === 'schedule-tab') return 'team-schedule-view';
     if (tabName === 'press-tab') return 'news-view';
+    if (tabName === 'training-tab') return 'training-view';
+    if (tabName === 'game-plan-tab') return 'game-plan-view';
+    if (tabName === 'playbooks-tab') return 'playbooks-view';
+    if (tabName === 'coaches-tab') return 'scouting-view';
     return tabName;
   }
 

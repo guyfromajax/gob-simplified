@@ -15,13 +15,14 @@ const TABS = [
   ['player-stats-tab', 'team', 'player-stats-view'],
   ['team-stats-tab', 'team', 'team-attributes-view'],
   ['schedule-tab', 'team', 'team-schedule-view'],
-  ['game-plan-tab', 'prep'],
-  ['playbooks-tab', 'prep'],
-  ['coaches-tab', 'prep'],
+  ['game-plan-tab', 'prep', 'game-plan-view'],
+  ['playbooks-tab', 'prep', 'playbooks-view'],
+  ['scouting-view', 'prep'],
+  ['coaches-tab', 'prep', 'scouting-view'],
   ['standings-tab', 'league'],
   ['fcc-team-stats-summary-tab', 'league'],
   ['awards-tab', 'league'],
-  ['training-tab', 'prep'],
+  ['training-tab', 'prep', 'training-view'],
   ['recruits-tab', 'office', 'home-tab'],
   ['press-tab', 'news', 'news-view'],
 ];
@@ -138,11 +139,7 @@ function stab(page, label) {
   return page.getByRole('tab', { name: label, exact: true });
 }
 
-const PREP_EDITOR = {
-  'training-tab': /\/training\.html/,
-  'game-plan-tab': /\/game-plan\.html/,
-  'playbooks-tab': /\/playbooks\.html/,
-};
+const PREP_EDITOR = {};
 
 test.beforeAll(() => {
   fs.mkdirSync(OUT, { recursive: true });
@@ -212,10 +209,10 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
     ['team-player-stats', 'player-stats-view', 'Player Stats'],
     ['team-attributes', 'team-attributes-view', 'Team Attributes'],
     ['team-schedule', 'team-schedule-view', 'Schedule'],
-    ['prep', 'training-tab', 'Training'],
-    ['prep-plan', 'game-plan-tab', 'Game Plan'],
-    ['prep-playbooks', 'playbooks-tab', 'Playbooks'],
-    ['prep-scouting', 'coaches-tab', 'Scouting Report'],
+    ['prep', 'training-view', 'Training'],
+    ['prep-plan', 'game-plan-view', 'Game Plan'],
+    ['prep-playbooks', 'playbooks-view', 'Playbooks'],
+    ['prep-scouting', 'scouting-view', 'Scouting Report'],
     ['league', 'standings-view', 'Standings'],
     ['league-leaders', 'leaders-view', 'Leaders'],
     ['league-team-stats', 'team-stats-view', 'Team Stats'],
@@ -396,8 +393,8 @@ test('rail active state follows deep links and back, and exit calls the existing
   await expect(page.locator('#roster-view.tab-content.active')).toBeVisible();
   await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'team');
   await page.goForward();
-  await page.waitForURL(/\/training\.html/);
-  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveAttribute('data-tab', 'training-tab');
+  await expect(page.locator('#training-view.tab-content.active')).toBeVisible();
+  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveAttribute('data-tab', 'training-view');
   await expect(page.locator('.rail [data-gob-section].on')).toHaveAttribute('data-gob-section', 'prep');
   await page.evaluate(() => {
     const exit = document.getElementById('exit-franchise');
