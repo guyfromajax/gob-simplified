@@ -1662,6 +1662,14 @@ body.training-report-page .playbook-empty-state {
   border-bottom: 1px solid var(--line);
 }
 
+#franchise-container #training-report-view.tab-content {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 /* Prep v2 report view: flat page, quiet notes, no green/red/orange. Tokens only. */
 #training-report-view .training-report-container,
 #training-report-view .resource-page-container,
@@ -1672,12 +1680,20 @@ body.training-report-page .playbook-empty-state {
 #training-report-view .players-section,
 #training-report-view .projected-lineup-section,
 #training-report-view .playbook-summary-section {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  overflow: visible;
   background: transparent;
   box-shadow: none;
   border: 0;
   border-radius: 0;
   padding: 0;
   backdrop-filter: none;
+}
+#training-report-view .resource-page-container.fcc-brand-page-shell::before,
+#training-report-view .resource-page-container.fcc-brand-page-shell::after {
+  content: none;
 }
 
 #franchise-container #training-report-view h2 {

@@ -2104,6 +2104,13 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
 }
 
 /* Prep v2 Training view. Tokens only. Beats #franchise-container .tab-content h3. */
+#franchise-container #training-view.tab-content {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
 #training-view .training-header { display: none; }
 #training-view .training-container,
 #training-view .resource-page-container,
@@ -2111,11 +2118,18 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
 #training-view .training-resource-shell {
   width: 100%;
   max-width: none;
+  margin: 0;
   padding: 0 0 var(--dsp-24);
+  overflow: visible;
   background: transparent;
   box-shadow: none;
   border: 0;
+  border-radius: 0;
   backdrop-filter: none;
+}
+#training-view .resource-page-container.fcc-brand-page-shell::before,
+#training-view .resource-page-container.fcc-brand-page-shell::after {
+  content: none;
 }
 #training-view .main-content-grid {
   display: grid;
@@ -2136,6 +2150,7 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   background: transparent;
   box-shadow: none;
   border: 0;
+  border-radius: 0;
   backdrop-filter: none;
 }
 
@@ -2382,13 +2397,19 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
 }
 #training-view .pdg-name:focus-visible { outline-color: var(--text-100); }
 
+html.gob-shell body.training-page .pg-tools {
+  gap: var(--space-12);
+}
 html.gob-shell body.training-page .pg-tools #requirements-bar,
 html.gob-shell body.training-page .pg-tools .req-pill,
 html.gob-shell body.training-page .pg-tools .bud {
   display: flex;
   align-items: center;
+  flex: none;
+  flex-wrap: nowrap;
   gap: var(--space-10);
   height: var(--dsz-30);
+  max-width: none;
   margin: 0;
   padding: 0;
   background: transparent;
@@ -2396,13 +2417,39 @@ html.gob-shell body.training-page .pg-tools .bud {
   border: 0;
   border-radius: 0;
 }
-html.gob-shell body.training-page .pg-tools .req-pill .points-display {
+html.gob-shell body.training-page .pg-tools .req-pill-seg,
+html.gob-shell body.training-page .pg-tools .req-chip,
+html.gob-shell body.training-page .pg-tools .req-chip--points,
+html.gob-shell body.training-page .pg-tools .req-chip--points.is-complete,
+html.gob-shell body.training-page .pg-tools .req-chip--focus,
+html.gob-shell body.training-page .pg-tools .req-chip--focus.is-selected {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-10);
+  min-width: 0;
+  min-height: 0;
+  height: var(--dsz-30);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html.gob-shell body.training-page .pg-tools .req-pill .points-display,
+html.gob-shell body.training-page .pg-tools .points-display {
   position: static;
   width: auto;
   height: auto;
   overflow: visible;
   clip: auto;
   clip-path: none;
+  margin: 0;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  font-family: var(--font-body);
+  letter-spacing: 0;
+  color: var(--text-87);
   white-space: nowrap;
 }
 html.gob-shell body.training-page .pg-tools .req-chip-check {
@@ -2410,9 +2457,13 @@ html.gob-shell body.training-page .pg-tools .req-chip-check {
   width: 14px;
   height: 14px;
   flex: none;
+  border: 0;
   border-radius: 50%;
   box-shadow: inset 0 0 0 1.5px var(--white-25);
   background: transparent;
+}
+html.gob-shell body.training-page .pg-tools .req-chip-check::after {
+  content: none;
 }
 html.gob-shell body.training-page .pg-tools .req-chip.is-complete .req-chip-check,
 html.gob-shell body.training-page .pg-tools .req-chip.is-selected .req-chip-check {
@@ -2426,19 +2477,28 @@ html.gob-shell body.training-page .pg-tools .req-chip--focus .req-pill-label {
   letter-spacing: var(--tracking-8);
   text-transform: uppercase;
   color: var(--text-38);
+  white-space: nowrap;
 }
-html.gob-shell body.training-page .pg-tools .req-chip-value {
+html.gob-shell body.training-page .pg-tools .req-chip-value,
+html.gob-shell body.training-page .pg-tools .req-pill .req-chip-value {
   font: var(--fw-bold) var(--fs-24)/var(--lh-1) var(--font-display);
   letter-spacing: var(--tracking-2);
   color: var(--text-100);
+  white-space: nowrap;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
 }
 html.gob-shell body.training-page .pg-tools #req-points-total {
   font-size: var(--fs-17);
   color: var(--text-38);
 }
-html.gob-shell body.training-page .pg-tools .req-meter {
+html.gob-shell body.training-page .pg-tools .req-meter,
+html.gob-shell body.training-page .pg-tools .req-pill .req-meter {
   width: 72px;
   height: 4px;
+  margin: 0;
+  flex: none;
   border-radius: 2px;
   background: var(--white-6);
   overflow: hidden;
@@ -2451,28 +2511,24 @@ html.gob-shell body.training-page .pg-tools .req-meter-fill {
 html.gob-shell body.training-page .pg-tools .req-chip.is-complete .req-meter-fill {
   background: var(--white-90);
 }
-html.gob-shell body.training-page .pg-tools .points-display {
-  font-size: var(--fs-12);
-  font-weight: var(--fw-semibold);
-  color: var(--text-87);
-}
 html.gob-shell body.training-page .pg-tools .req-pill-div {
   width: 1px;
   height: 22px;
+  flex: none;
+  align-self: center;
   background: var(--line-strong);
 }
 html.gob-shell body.training-page .pg-tools #req-focus {
-  display: flex;
-  align-items: center;
   gap: var(--space-8);
-  background: transparent;
-  box-shadow: none;
-  border: 0;
 }
 html.gob-shell body.training-page .pg-tools #req-focus-value {
   font-size: var(--fs-13);
   font-weight: var(--fw-semibold);
+  font-family: var(--font-body);
   color: var(--text-87);
+}
+html.gob-shell body.training-page .pg-tools .req-focus-nudge {
+  display: none;
 }
 html.gob-shell body.training-page .pg-tools #auto-train-btn.gob-btn,
 html.gob-shell body.training-page .pg-tools #auto-train-btn.gob-btn--ghost {
