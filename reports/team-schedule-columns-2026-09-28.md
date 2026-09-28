@@ -120,4 +120,30 @@ The skeleton/error-retry test now waits for the next row's opponent instead of "
 
 `cffc45a9d` Lay Team › Schedule out as four week columns so the whole season fits above the fold. This report is committed on top of it.
 
+## Full suite before merge (2026-09-28)
+
+**Playwright check.** Before starting, `ps` showed no other agent's `playwright test` or `seed_and_serve`, and I checked again immediately before launch. No wait was needed.
+
+**Merge.** `git fetch origin`, then `git merge origin/develop`, bringing in `d3da2a517` (Merge app/prep-v2 PR1: Prep editors in the browse shell, Game Plan tracks). Merge commit: **`22af4edfa`**.
+
+- One conflict, in `_documentation_master/11_Design_Systems/UX_System.md` §7's section-map table. The branch had changed the Team › Schedule row, and develop had changed the four Prep rows next to it. I kept this branch's Team › Schedule row and develop's Prep rows.
+- Nothing else conflicted. Develop's changes don't touch `gob-tables.css`, `teamScheduleView.js` or either schedule spec.
+
+**Command.** UX_System §8, "Running the suite": one worker, `CI` unset (retries 0), port 8157, with this worktree's Python and Playwright paths pointed at `~/gob-simplified`:
+
+```
+env -u CI PORT=8157 BASE_URL=http://localhost:8157 PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright" PYTHON_PATH="$HOME/gob-simplified/venv/bin/python" NODE_PATH="$HOME/gob-simplified/node_modules" ~/gob-simplified/node_modules/.bin/playwright test tests/e2e --workers=1 --reporter=line
+```
+
+**Result.** **513 passed, 0 failed, 0 flaky, 2 skipped** in 7.5 min; exit 0.
+
+- Both skips are environment-gated in their own specs, not failures:
+  - `t3-detail.spec.js:633` skips when the offline loopback isn't running.
+  - `office-frontend.spec.js:693` skips when there's no live digest dump.
+- `desktop-*.spec.js` is excluded by the default config, and this change doesn't touch the desktop play flow.
+
+**Server.** Playwright's `seed_and_serve` on 8157 exited with the run. Afterwards port 8157 was free, and no `playwright test` or `seed_and_serve` process was left.
+
+**Regenerated artifacts: not committed.** The suite rewrote 65 tracked files under `reports/`, including this change's `reports/team-schedule-columns/*.png`. I restored all of them to their committed versions with `git checkout -- reports`. It also created nine untracked folders of fresh output, which I deleted: `app-router`, `court-sound`, `game-start-frames`, `office-frontend`, `office-v3c`, `shell-1`, `shell-1b`, `shell-2`, `shell-2b`. The working tree was clean before this report edit.
+
 STATUS: COMPLETE
