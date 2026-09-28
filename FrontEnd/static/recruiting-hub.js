@@ -2184,39 +2184,118 @@
     return String.fromCharCode(65 + Math.floor((n - 1) / 2)) + n;
   }
 
-  function leagueRowHtml(e) {
-    return '<div class="lsrow">' +
-      '<span class="lsnm">' + Common.escapeHtml(e.name || '--') + '</span>' +
-      '<span class="lspos">' + Common.escapeHtml(e.pos || '--') + '</span>' +
-      '<span class="lsyr">' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</span>' +
-      '<span class="lsrt ' + Spine.rtClassForYear(e.rt, e.year) + '" ' +
-        'data-tooltip="current/potential" title="current/potential">' +
-        Common.formatRtWithPotential(e.rt, e.potential_rt_ratcheted) + '</span>' +
-      '</div>';
+  function signingRtHtml(e) {
+    return '<span class="' + Spine.rtClassForYear(e.rt, e.year) + '" data-tooltip="current/potential" title="current/potential">' +
+      Common.formatRtWithPotential(e.rt, e.potential_rt_ratcheted) + '</span>';
+  }
+
+  function playerViewHref(playerId) {
+    if (!playerId || !context.franchiseId || !context.teamId) return '';
+    var params = new URLSearchParams();
+    params.set('franchise_id', context.franchiseId);
+    params.set('team_id', context.teamId);
+    params.set('tab', 'player-view');
+    params.set('player_id', String(playerId));
+    return '/franchise-command-center.html?' + params.toString();
+  }
+
+  /** Player detail when `player_id` is on the signing entry (player-view tab). */
+  function signingNameHtml(e) {
+    var name = Common.escapeHtml(e.name || '--');
+    var href = playerViewHref(e.player_id);
+    if (!href) return name;
+    return '<a class="gob-rec-player-link" href="' + Common.escapeHtml(href) + '">' + name + '</a>';
+  }
+
+  function signingPortraitHtml(e) {
+    var r = state.byId[String(e.recruit_id)];
+    var imageId = (r && r.imageId) || e.image_id;
+    var name = e.name || (r && r.name) || '';
+    var letters = Common.escapeHtml(initials(name));
+    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
+      return '<span class="av">' + letters + '</span>';
+    }
+    return '<span class="av"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
+      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"' +
+      ' data-letters="' + letters + '"' +
+      ' onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';}"></span>';
+  }
+
+  function userClassSignings() {
+    var uid = String(state.userTeamId);
+    return (state.week35Results.signed_players || []).filter(function (e) {
+      return e && !e.walk_on && String(e.team_id) === uid;
+    }).sort(function (a, b) {
+      return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1);
+    });
+  }
+
+  function orderSigningGroups(groups) {
+    var user = [];
+    var sister = [];
+    var rest = [];
+    groups.forEach(function (g) {
+      if (g.isUser) user.push(g);
+      else if (g.isSister) sister.push(g);
+      else rest.push(g);
+    });
+    rest.sort(function (a, b) { return String(a.label).localeCompare(String(b.label)); });
+    return user.concat(sister, rest);
+  }
+
+  function yourClassTableHtml(entries) {
+    if (!entries.length) return '';
+    var rows = entries.map(function (e) {
+      return '<tr><td class="c-port">' + signingPortraitHtml(e) + '</td>' +
+        '<td class="left team">' + signingNameHtml(e) + '</td>' +
+        '<td>' + Common.escapeHtml(e.pos || '--') + '</td>' +
+        '<td>' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</td>' +
+        '<td class="rt">' + signingRtHtml(e) + '</td></tr>';
+    }).join('');
+    return '<section class="gob-tcard gob-rec-your-class">' +
+      '<h2>Your class<em>' + entries.length + '</em></h2>' +
+      '<div class="gob-xs gob-rec-class"><table class="gob-tbl"><colgroup>' +
+      '<col class="c-port"><col class="c-name"><col class="c-pos"><col class="c-yr"><col class="c-rt"></colgroup>' +
+      '<thead><tr><th class="c-port"></th><th class="left">Name</th><th>Pos</th><th>Yr</th><th>RT</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div></section>';
+  }
+
+  function leagueSigningRowHtml(e, isUserTeam) {
+    return '<tr' + (isUserTeam ? ' class="me"' : '') + '>' +
+      '<td class="left name">' + signingNameHtml(e) + '</td>' +
+      '<td class="pos">' + Common.escapeHtml(e.pos || '--') + '</td>' +
+      '<td class="yr">' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</td>' +
+      '<td class="rt">' + signingRtHtml(e) + '</td></tr>';
+  }
+
+  function leagueConferenceCardHtml(g) {
+    var eye = g.isUser ? '<p class="gob-rec-eye">Your conference</p>'
+      : g.isSister ? '<p class="gob-rec-eye">Sister conference</p>' : '';
+    var teams = g.teams.map(function (t) {
+      var body = t.signings.map(function (e) {
+        return leagueSigningRowHtml(e, t.isUser);
+      }).join('');
+      return '<div class="gob-rec-team' + (t.isUser ? ' is-user-team' : '') + '">' +
+        '<h3 class="gob-rec-team-h">' + Common.escapeHtml(t.name) + '<em>' + t.signings.length + '</em></h3>' +
+        '<div class="gob-xs gob-rec-league"><table class="gob-tbl">' +
+        '<colgroup><col class="c-name"><col class="c-pos"><col class="c-yr"><col class="c-rt"></colgroup>' +
+        '<tbody>' + body + '</tbody></table></div></div>';
+    }).join('');
+    var head = '<div class="gob-rec-conf-head">' + eye +
+      '<h2>Conference ' + Common.escapeHtml(g.label) + '</h2></div>';
+    return '<section class="gob-tcard gob-rec-conf">' + head + teams + '</section>';
   }
 
   function finalSigningsHtml() {
-    var groups = leagueSigningGroups();
-    if (!groups.length) {
-      return '<div class="rstage"><div class="rempty">No signings to report yet.</div></div>';
+    var groups = orderSigningGroups(leagueSigningGroups());
+    var yours = userClassSignings();
+    if (!groups.length && !yours.length) {
+      return '<div class="gob-rec-results"><p class="gob-rec-empty">No signings to report yet.</p></div>';
     }
-    var body = groups.map(function (g) {
-      var tag = g.isUser ? '<span class="lstag you">Your conference</span>'
-        : g.isSister ? '<span class="lstag sis">Sister conference</span>' : '';
-      var teams = g.teams.map(function (t) {
-        return '<div class="lsteam' + (t.isUser ? ' is-user' : '') + '">' +
-          '<div class="lsteam-h">' + Common.escapeHtml(t.name) +
-            '<span class="lsn">' + t.signings.length + '</span></div>' +
-          t.signings.map(leagueRowHtml).join('') + '</div>';
-      }).join('');
-      return '<section class="lsconf' + (g.isUser ? ' is-user' : '') + '">' +
-        '<div class="lsconf-h"><span class="lsconf-t">Conference ' + g.label + '</span>' + tag + '</div>' +
-        '<div class="lsconf-teams">' + teams + '</div></section>';
-    }).join('');
-    return '<div class="rstage">' +
-      '<div class="rhead"><div class="rhead-t">Signing Day Results</div>' +
-        '<div class="rhead-s">Every signing in the league, by conference.</div></div>' +
-      '<div class="lswrap">' + body + '</div></div>';
+    var league = groups.length
+      ? '<div class="gob-rec-conf-grid">' + groups.map(leagueConferenceCardHtml).join('') + '</div>'
+      : '';
+    return '<div class="gob-rec-results">' + yourClassTableHtml(yours) + league + '</div>';
   }
 
   // The week-36 screen is a league LIST now, not a playback — the reveal moved to

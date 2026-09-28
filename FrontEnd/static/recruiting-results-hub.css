@@ -1,59 +1,182 @@
-/* ===== Recruiting Hub — Results / Signed (D4) ===== */
-/* In-hub read-only state: Week-36 final signings. */
+/* Week 36 signing results — browse templates (#hub-signings). Tokens only. */
 
-.res-switch{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;margin:0 22px}
-.res-switch button{appearance:none;border:0;background:transparent;color:var(--muted-2);font:700 11px/1 var(--body);letter-spacing:.03em;padding:9px 14px;cursor:pointer;transition:.12s}
-.res-switch button+button{border-left:1px solid var(--border)}
-.res-switch button:hover{color:var(--text);background:rgba(255,255,255,.05)}
-.res-switch button.on{background:var(--orange);color:#15181f}
+#hub-signings .gob-rec-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-12) 0 var(--space-20);
+  max-width: 100%;
+  min-width: 0;
+}
 
-/* ---------- final signings (Wk 36) ---------- */
-.signsum{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center;padding:18px 22px;border-bottom:1px solid var(--hair);background:linear-gradient(180deg,rgba(52,236,39,.05),transparent)}
-.signsum-big{display:flex;align-items:baseline;gap:8px;font-family:var(--display);line-height:1}
-.signsum-big .n{font-size:52px;color:var(--green)}
-.signsum-big .of{font-size:24px;color:var(--muted-2)}
-.signsum-cap{font:700 10px/1 var(--body);letter-spacing:.13em;text-transform:uppercase;color:var(--muted-3);margin-top:6px}
-.signsum-breakdown{display:flex;gap:26px}
-.ssb{display:flex;flex-direction:column;gap:3px}
-.ssb .v{font:400 24px/1 var(--display);color:#fff}
-.ssb .v.win{color:var(--green)}.ssb .v.loss{color:var(--red)}
-.ssb .l{font:700 9px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted-3)}
+/* Content-sized tables — same min-width reset as #news-view story player tables. */
+#hub-signings .gob-xs {
+  overflow-x: visible;
+  max-width: 100%;
+}
 
-.signtable{overflow:auto;max-height:600px}
-.signtable::-webkit-scrollbar{width:10px}.signtable::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:6px;border:2px solid var(--panel)}
-.srow,.shdr{display:grid;grid-template-columns:minmax(150px,1fr) 44px 70px 50px 150px minmax(150px,1.2fr) 92px;align-items:center;gap:12px;padding:0 20px}
-.shdr{height:40px;position:sticky;top:0;z-index:2;background:linear-gradient(180deg,rgba(34,38,50,.99),rgba(24,27,37,.99));font:800 9.5px/1 var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted-2);border-bottom:1px solid var(--border)}
-.shdr .c{text-align:center}
-.srow{height:46px;border-bottom:1px solid rgba(255,255,255,.045)}
-.srow.win{background:rgba(52,236,39,.05)}
-.srow.win:hover{background:rgba(52,236,39,.09)}
-.srow:hover{background:rgba(255,255,255,.03)}
-.sname{display:flex;align-items:center;gap:8px;min-width:0}
-.sname .nm{font-weight:600;color:#fff;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sname .arch{font-size:10.5px;color:var(--muted-2)}
-.scol{text-align:center}
-.spos{font-weight:700;color:var(--muted);font-size:12px}
-.sregion{color:var(--muted-2);font-size:11px;text-transform:uppercase}
-.srt .v{font:400 17px/1 var(--display)}
-.sstand{font:700 8.5px/1 var(--body);letter-spacing:.03em;padding:2px 6px;border-radius:4px;display:inline-flex;align-items:center;gap:3px}
-.sstand.you1{color:#a9ff9c;background:var(--you-soft);border:1px solid var(--you-line)}
-.sstand.list{color:#ffdf9e;background:var(--list-soft);border:1px solid var(--list-line)}
-.sstand.none{color:var(--muted-3)}
-.ssigned{display:flex;align-items:center;gap:8px;min-width:0}
-.ssigned .logo{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:700 9px/1 var(--body);flex-shrink:0}
-.ssigned .logo.you{background:var(--you);color:#0c1f0a}
-.ssigned .logo.rival{background:rgba(255,255,255,.08);color:var(--muted);border:1px solid var(--border-soft)}
-.ssigned .team{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ssigned .team.you{color:#fff}.ssigned .team.rival{color:var(--muted-2)}
-.soutcome{justify-self:end;font:700 9px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;padding:5px 9px;border-radius:6px}
-.soutcome.win{color:#a9ff9c;background:var(--you-soft);border:1px solid var(--you-line)}
-.soutcome.loss{color:var(--muted-3);background:rgba(255,255,255,.03);border:1px solid var(--border-soft)}
+#hub-signings .gob-xs .gob-tbl {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
 
-.sign-filter{display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--hair)}
-.sign-filter .chip{appearance:none;height:28px;padding:0 12px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--muted-2);font:700 11px/1 var(--body);cursor:pointer;transition:.12s}
-.sign-filter .chip:hover{color:var(--text)}
-.sign-filter .chip.on{color:#a9ff9c;background:var(--you-soft);border-color:var(--you-line)}
+#hub-signings .gob-xs.can-l,
+#hub-signings .gob-xs.can-r,
+#hub-signings .gob-xs.can-l.can-r {
+  box-shadow: none;
+}
 
-@media (max-width:1080px){
-  .shdr,.srow{grid-template-columns:minmax(120px,1fr) 38px 56px 44px 120px minmax(110px,1fr) 78px;gap:8px}
+#hub-signings .gob-rec-empty {
+  margin: 0;
+  font: var(--fw-medium) var(--fs-13)/var(--lh-1-4) var(--font-body);
+  color: var(--text-38);
+}
+
+#hub-signings .gob-tcard {
+  min-width: 0;
+}
+
+#hub-signings .gob-rec-your-class {
+  max-width: 42rem;
+}
+
+#hub-signings .gob-rec-conf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-12);
+  align-items: start;
+  max-width: 72rem;
+}
+
+@media (min-width: 1600px) {
+  #hub-signings .gob-rec-conf-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  #hub-signings .gob-rec-conf-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+#hub-signings .gob-rec-conf-head {
+  padding: var(--space-12) var(--space-12) var(--space-8);
+}
+
+#hub-signings .gob-rec-conf-head h2 {
+  margin: 0;
+  padding: 0;
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-87);
+}
+
+#hub-signings .gob-rec-eye {
+  display: block;
+  margin: 0 0 var(--space-6);
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+
+#hub-signings .gob-rec-team {
+  padding: 0 var(--space-12) var(--space-12);
+}
+
+#hub-signings .gob-rec-team + .gob-rec-team {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-12);
+}
+
+#hub-signings .gob-rec-team-h {
+  margin: 0 0 var(--space-6);
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1-2) var(--font-body);
+  color: var(--text-87);
+}
+
+#hub-signings .gob-rec-team-h em {
+  margin-left: var(--space-6);
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  color: var(--text-38);
+}
+
+#hub-signings .gob-xs .gob-tbl th,
+#hub-signings .gob-xs .gob-tbl td {
+  padding: var(--space-4) var(--space-8);
+}
+
+#hub-signings .gob-rec-class .av {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-6);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-display);
+  color: var(--text-87);
+  background: var(--white-6);
+}
+
+#hub-signings .gob-rec-class .av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  display: block;
+}
+
+#hub-signings .gob-rec-class .c-port {
+  width: 28px;
+  padding-left: var(--space-4);
+  padding-right: 0;
+}
+
+#hub-signings .gob-rec-class .gob-tbl col.c-port { width: 32px; }
+#hub-signings .gob-rec-class .gob-tbl col.c-name { width: auto; }
+#hub-signings .gob-rec-class .gob-tbl col.c-pos { width: 2.5rem; }
+#hub-signings .gob-rec-class .gob-tbl col.c-yr { width: 2.25rem; }
+#hub-signings .gob-rec-class .gob-tbl col.c-rt { width: 3.25rem; }
+
+#hub-signings .gob-rec-class .gob-tbl td.team {
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#hub-signings .gob-rec-league .gob-tbl col.c-name { width: auto; }
+#hub-signings .gob-rec-league .gob-tbl col.c-pos { width: 2.25rem; }
+#hub-signings .gob-rec-league .gob-tbl col.c-yr { width: 2rem; }
+#hub-signings .gob-rec-league .gob-tbl col.c-rt { width: 3rem; }
+
+#hub-signings .gob-rec-league .gob-tbl td.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#hub-signings .gob-rec-league .gob-tbl td.pos,
+#hub-signings .gob-rec-league .gob-tbl td.yr {
+  color: var(--text-60);
+  font-size: var(--fs-11);
+}
+
+#hub-signings .gob-rec-league .gob-tbl td.rt {
+  font: var(--fw-bold) var(--fs-14)/var(--lh-1) var(--font-display);
+}
+
+#hub-signings .gob-rec-player-link {
+  color: var(--text-100);
+  text-decoration: none;
+}
+
+#hub-signings .gob-rec-player-link:hover,
+#hub-signings .gob-rec-player-link:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
 }
