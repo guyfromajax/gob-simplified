@@ -1,0 +1,1075 @@
+{
+  "1280x720": {
+    "inner": [
+      1280,
+      720
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 720,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      383,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "1440x900": {
+    "inner": [
+      1440,
+      900
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 876,
+    "fold": 900,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      436,
+      281
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 7,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "1920x1080": {
+    "inner": [
+      1920,
+      1080
+    ],
+    "tier": "gob-1920",
+    "compact": false,
+    "lastRowBottom": 1023,
+    "fold": 1080,
+    "rowHeight": 27,
+    "meNavy": true,
+    "moreInHead": false,
+    "card": [
+      539,
+      290
+    ],
+    "standings": {
+      "mode": "all",
+      "shown": 8,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "1066x640": {
+    "inner": [
+      1066,
+      640
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 640,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      311,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 62,
+    "clip": [
+      47,
+      80,
+      0
+    ]
+  },
+  "1024x600": {
+    "inner": [
+      1024,
+      600
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 600,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      297,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 102,
+    "clip": [
+      87,
+      120,
+      0
+    ]
+  },
+  "ten-1280x720": {
+    "inner": [
+      1280,
+      720
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 720,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      383,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 10,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "ten-1920x1080": {
+    "inner": [
+      1920,
+      1080
+    ],
+    "tier": "gob-1920",
+    "compact": false,
+    "lastRowBottom": 1051,
+    "fold": 1080,
+    "rowHeight": 27,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      539,
+      318
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 9,
+      "total": 10,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      16,
+      0
+    ]
+  },
+  "sweep-win-1280x720": {
+    "inner": [
+      1280,
+      720
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 720,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      383,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-win-1440x900": {
+    "inner": [
+      1440,
+      900
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 876,
+    "fold": 900,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      436,
+      281
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 7,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-win-1920x1080": {
+    "inner": [
+      1920,
+      1080
+    ],
+    "tier": "gob-1920",
+    "compact": false,
+    "lastRowBottom": 1023,
+    "fold": 1080,
+    "rowHeight": 27,
+    "meNavy": true,
+    "moreInHead": false,
+    "card": [
+      539,
+      290
+    ],
+    "standings": {
+      "mode": "all",
+      "shown": 8,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-win-1066x640": {
+    "inner": [
+      1066,
+      640
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 640,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      311,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 62,
+    "clip": [
+      47,
+      80,
+      0
+    ]
+  },
+  "sweep-win-1024x600": {
+    "inner": [
+      1024,
+      600
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 600,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      297,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 102,
+    "clip": [
+      87,
+      120,
+      0
+    ]
+  },
+  "sweep-loss-1280x720": {
+    "inner": [
+      1280,
+      720
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 720,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      383,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-loss-1440x900": {
+    "inner": [
+      1440,
+      900
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 876,
+    "fold": 900,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      436,
+      281
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 7,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-loss-1920x1080": {
+    "inner": [
+      1920,
+      1080
+    ],
+    "tier": "gob-1920",
+    "compact": false,
+    "lastRowBottom": 1023,
+    "fold": 1080,
+    "rowHeight": 27,
+    "meNavy": true,
+    "moreInHead": false,
+    "card": [
+      539,
+      290
+    ],
+    "standings": {
+      "mode": "all",
+      "shown": 8,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-loss-1066x640": {
+    "inner": [
+      1066,
+      640
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 640,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      311,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 62,
+    "clip": [
+      0,
+      80,
+      0
+    ]
+  },
+  "sweep-loss-1024x600": {
+    "inner": [
+      1024,
+      600
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 600,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      297,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 102,
+    "clip": [
+      0,
+      120,
+      0
+    ]
+  },
+  "sweep-regular-1280x720": {
+    "inner": [
+      1280,
+      720
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 720,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      383,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-regular-1440x900": {
+    "inner": [
+      1440,
+      900
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 876,
+    "fold": 900,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      436,
+      281
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 7,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-regular-1920x1080": {
+    "inner": [
+      1920,
+      1080
+    ],
+    "tier": "gob-1920",
+    "compact": false,
+    "lastRowBottom": 1023,
+    "fold": 1080,
+    "rowHeight": 27,
+    "meNavy": true,
+    "moreInHead": false,
+    "card": [
+      539,
+      290
+    ],
+    "standings": {
+      "mode": "all",
+      "shown": 8,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-regular-1066x640": {
+    "inner": [
+      1066,
+      640
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 640,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      311,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 62,
+    "clip": [
+      0,
+      80,
+      0
+    ]
+  },
+  "sweep-regular-1024x600": {
+    "inner": [
+      1024,
+      600
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 600,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      297,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 102,
+    "clip": [
+      0,
+      120,
+      0
+    ]
+  },
+  "sweep-first_week-1280x720": {
+    "inner": [
+      1280,
+      720
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 720,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      383,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-first_week-1440x900": {
+    "inner": [
+      1440,
+      900
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 876,
+    "fold": 900,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      436,
+      281
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 7,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-first_week-1920x1080": {
+    "inner": [
+      1920,
+      1080
+    ],
+    "tier": "gob-1920",
+    "compact": false,
+    "lastRowBottom": 1023,
+    "fold": 1080,
+    "rowHeight": 27,
+    "meNavy": true,
+    "moreInHead": false,
+    "card": [
+      539,
+      290
+    ],
+    "standings": {
+      "mode": "all",
+      "shown": 8,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-first_week-1066x640": {
+    "inner": [
+      1066,
+      640
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 640,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      311,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 62,
+    "clip": [
+      0,
+      80,
+      0
+    ]
+  },
+  "sweep-first_week-1024x600": {
+    "inner": [
+      1024,
+      600
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 701,
+    "fold": 600,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      297,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 102,
+    "clip": [
+      0,
+      120,
+      0
+    ]
+  },
+  "sweep-tournament-1280x720": {
+    "inner": [
+      1280,
+      720
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 696,
+    "fold": 720,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      383,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-tournament-1440x900": {
+    "inner": [
+      1440,
+      900
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 871,
+    "fold": 900,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      436,
+      281
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 7,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-tournament-1920x1080": {
+    "inner": [
+      1920,
+      1080
+    ],
+    "tier": "gob-1920",
+    "compact": false,
+    "lastRowBottom": 1045,
+    "fold": 1080,
+    "rowHeight": 27,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      539,
+      210
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 5,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      10,
+      0
+    ]
+  },
+  "sweep-tournament-1066x640": {
+    "inner": [
+      1066,
+      640
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 708,
+    "fold": 640,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      311,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 69,
+    "clip": [
+      2,
+      87,
+      0
+    ]
+  },
+  "sweep-tournament-1024x600": {
+    "inner": [
+      1024,
+      600
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 708,
+    "fold": 600,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      297,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 109,
+    "clip": [
+      42,
+      127,
+      0
+    ]
+  },
+  "sweep-signing_day-1280x720": {
+    "inner": [
+      1280,
+      720
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 676,
+    "fold": 720,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      383,
+      246
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 6,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-signing_day-1440x900": {
+    "inner": [
+      1440,
+      900
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 745,
+    "fold": 900,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": false,
+    "card": [
+      436,
+      315
+    ],
+    "standings": {
+      "mode": "all",
+      "shown": 8,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-signing_day-1920x1080": {
+    "inner": [
+      1920,
+      1080
+    ],
+    "tier": "gob-1920",
+    "compact": false,
+    "lastRowBottom": 791,
+    "fold": 1080,
+    "rowHeight": 27,
+    "meNavy": true,
+    "moreInHead": false,
+    "card": [
+      539,
+      290
+    ],
+    "standings": {
+      "mode": "all",
+      "shown": 8,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      0,
+      0,
+      0
+    ]
+  },
+  "sweep-signing_day-1066x640": {
+    "inner": [
+      1066,
+      640
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 606,
+    "fold": 640,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      311,
+      176
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 4,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 0,
+    "clip": [
+      2,
+      0,
+      0
+    ]
+  },
+  "sweep-signing_day-1024x600": {
+    "inner": [
+      1024,
+      600
+    ],
+    "tier": "gob-1280",
+    "compact": false,
+    "lastRowBottom": 536,
+    "fold": 600,
+    "rowHeight": 35,
+    "meNavy": true,
+    "moreInHead": true,
+    "card": [
+      297,
+      106
+    ],
+    "standings": {
+      "mode": "window",
+      "shown": 2,
+      "total": 8,
+      "column": 2
+    },
+    "mainScroll": 24,
+    "clip": [
+      42,
+      0,
+      0
+    ]
+  }
+}
