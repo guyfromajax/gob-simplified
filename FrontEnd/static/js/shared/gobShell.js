@@ -34,7 +34,7 @@
       { id: 'training-view', label: 'Training' },
       { id: 'game-plan-view', label: 'Game Plan' },
       { id: 'playbooks-tab', label: 'Playbooks' },
-      { id: 'coaches-tab', label: 'Scouting Report' }
+      { id: 'scouting-view', label: 'Scouting Report' }
     ]},
     { id: 'league', label: 'League', title: 'League', icon: 'league', tabs: [
       { id: 'standings-view', label: 'Standings' },
@@ -72,6 +72,7 @@
     'game-plan-tab': 'prep',
     'game-plan-view': 'prep',
     'playbooks-tab': 'prep',
+    'scouting-view': 'prep',
     'coaches-tab': 'prep',
     'standings-tab': 'league',
     'standings-view': 'league',
@@ -144,6 +145,7 @@
     if (urlTab === 'schedule-tab') return 'team-schedule-view';
     if (urlTab === 'training-tab') urlTab = 'training-view';
     if (urlTab === 'game-plan-tab') urlTab = 'game-plan-view';
+    if (urlTab === 'coaches-tab') urlTab = 'scouting-view';
     var actives = document.querySelectorAll('#tournament-tabs > .tab-content.active');
     var i;
     if (urlTab) {

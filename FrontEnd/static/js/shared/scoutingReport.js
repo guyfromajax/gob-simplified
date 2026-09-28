@@ -11,6 +11,9 @@ const SCOUTING_PROJECTED_STATS_COLUMNS = [
   'PTS', 'FGM', 'FGA', 'FG%', '3PTM', '3PTA', '3PT%', 'FTM', 'FTA', 'FT%',
   'DREB', 'OREB', 'TREB', 'AST', 'STL', 'BLK', 'F', 'MIN', 'TO',
 ];
+if (typeof window !== 'undefined') {
+  window.SCOUTING_PROJECTED_STATS_COLUMNS = SCOUTING_PROJECTED_STATS_COLUMNS;
+}
 
 var scoutingProjectedRowsCache = [];
 var scoutingPlayerSeasonStatsCache = {};
@@ -461,7 +464,7 @@ function renderPlayUsage(plays, emptyMessage = 'No previous game data available.
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${play.name || 'Unknown'}</td>
+      <td class="l">${play.name || 'Unknown'}</td>
       <td>${timesRun}</td>
       <td>${successRate}%</td>
       <td>${usagePct}%</td>

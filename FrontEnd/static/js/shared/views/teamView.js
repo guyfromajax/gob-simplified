@@ -104,8 +104,8 @@ export function mount(container, ctx) {
 
   function scoutHref(game) {
     if (!game || String(game.opponent_id || '') !== String(userId || '')) return '';
-    if (!document.getElementById('coaches-tab')) return '';
-    return withParams({ tab: 'coaches-tab', view_team_id: '', player_id: '', pager: '', up: (team && team.name) || 'Team' });
+    if (!document.getElementById('scouting-view') && !document.getElementById('coaches-tab')) return '';
+    return withParams({ tab: 'scouting-view', view_team_id: '', player_id: '', pager: '', up: (team && team.name) || 'Team' });
   }
 
   function render() {

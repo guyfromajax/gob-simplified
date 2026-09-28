@@ -4494,9 +4494,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'playbooks-tab') {
           void renderFccPlaybooksSummary();
         }
-        if (tabName === 'coaches-tab') {
-          void renderScoutingTab();
-        }
         if (tabName === 'schedule-tab') {
           void renderScheduleTab();
         }
@@ -5388,9 +5385,6 @@ async function renderTournamentBracket() {
 // Scouting Report functionality
 let upcomingOpponent = null;
 let upcomingOpponentId = null;
-let scoutingTabDataCache = null;
-let fccScoutingProjectedViewMode = 'attributes';
-
 function disableLegacyFccScoutingModal() {
   const legacyModal = document.getElementById('scouting-report-modal');
   if (legacyModal) legacyModal.remove();
@@ -5476,136 +5470,13 @@ function updateScoutingButton(data) {
   });
 }
 
-function renderFccScoutingProjectedLineup() {
-  if (!scoutingTabDataCache) return;
-  if (typeof renderProjectedStartingFiveCards === 'function') {
-    renderProjectedStartingFiveCards(scoutingTabDataCache.projected_starting_five || [], {
-      containerId: 'fcc-scouting-projected-lineup',
-      emptyClass: 'scouting-projected-empty',
-    });
-  }
-}
-
-function renderFccScoutingMeasures(teamAttrs) {
-  const radarHost = document.getElementById('fcc-scouting-radar-host');
-  const shootingCard = document.getElementById('fcc-scouting-shooting-card');
-  const reboundingCard = document.getElementById('fcc-scouting-rebounding-card');
-  const chemistryCard = document.getElementById('fcc-scouting-chemistry-card');
-  if (!radarHost || !shootingCard || !reboundingCard || !chemistryCard) return;
-
-  const attrs = teamAttrs || {};
-  radarHost.innerHTML = buildTeamMeasuresRadarMarkup(attrs);
-  shootingCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Shooting', 'shot_threshold', Number(attrs.shot_threshold || 0));
-  reboundingCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Rebounding', 'rebound_modifier', Number(attrs.rebound_modifier || 0));
-  chemistryCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Team Chemistry', 'team_chemistry', Number(attrs.team_chemistry || 0));
-}
-
-async function renderScoutingTab() {
-  const status = document.getElementById('fcc-scouting-status');
-  const content = document.getElementById('fcc-scouting-content');
-  const opponentName = document.getElementById('fcc-scouting-opponent-name');
-  const opponentRecord = document.getElementById('fcc-scouting-opponent-record');
-  const opponentRank = document.getElementById('fcc-scouting-opponent-rank');
-  if (!status || !content || !opponentName || !opponentRecord || !opponentRank) return;
-
-  status.style.display = 'block';
-  content.style.display = 'none';
-  status.textContent = 'Loading scouting report...';
-
-  // A return URL can activate coaches-tab in the same event turn that starts
-  // init(). Wait for the FCC's authoritative team identity and top data before
-  // resolving the matchup. Ordinary tab clicks after startup pass through an
-  // already-settled promise, so this adds no repeat fetch or artificial delay.
-  if (fccInitializationPromise) {
-    try {
-      await fccInitializationPromise;
-    } catch (error) {
-      console.error('Error initializing FCC before scouting report:', error);
-      status.textContent = 'Unable to initialize scouting report.';
-      return;
-    }
-  }
-
-  const opponent = await resolveUpcomingOpponentFromMatchup(commandCenterTopDataCache);
-  if (!opponent) {
-    status.textContent = 'No upcoming opponent available for scouting.';
-    return;
-  }
-
-  const opponentTeamName = opponent.name || '--';
-  const standingsEntry = getStandingsTeamEntry(opponent.id);
-  const rankingEntry = getTeamRankingEntry(opponent.id);
-  const wins = Number(standingsEntry?.W ?? rankingEntry?.W ?? 0);
-  const losses = Number(standingsEntry?.L ?? rankingEntry?.L ?? 0);
-  const rank = Number(rankingEntry?.natl_rank || 0);
-
-  opponentName.textContent = opponentTeamName;
-  opponentRecord.textContent = `${wins}-${losses}`;
-  opponentRank.textContent = Number.isFinite(rank) && rank > 0 ? String(rank) : '--';
-
-  const teamPageLink = document.getElementById('fcc-scouting-team-page-link');
-  if (teamPageLink) {
-    if (opponent.id && franchiseId) {
-      teamPageLink.href = buildFranchiseTeamPageUrl(opponent.id, opponentTeamName, 'coaches-tab');
-      teamPageLink.setAttribute('data-return', '');
-    } else {
-      // TODO: wire team page URL when opponent team id is unavailable in matchup context
-      teamPageLink.href = '#';
-    }
-  }
-
-  try {
-    const authHeaders = API_CONFIG.getAuthHeaders();
-    const [teamDataRes, playUsageRes] = await Promise.all([
-      fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(opponent.name)}`, { headers: authHeaders }),
-      fetch(`${API_CONFIG.buildUrl('/franchise/scouting-report')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(opponent.name)}`, { headers: authHeaders })
-    ]);
-
-    if (!teamDataRes.ok) throw new Error('Failed to load team report');
-    if (!playUsageRes.ok) throw new Error('Failed to load play usage');
-
-    const teamData = await teamDataRes.json();
-    const playUsage = await playUsageRes.json();
-    scoutingTabDataCache = playUsage || {};
-    renderFccScoutingProjectedLineup();
-    renderFccScoutingMeasures(teamData.team_attributes || {});
-    if (typeof renderPlayUsage === 'function') {
-      // Backend owns scouting visibility. Regular-season Play Usage is gated by
-      // Film Study; EOS tournament weeks bypass the gate because training does
-      // not run. Until unlocked, each panel shows N/A with a hint.
-      const playUsageUnlocked = playUsage.play_usage_unlocked !== false;
-      renderPlayUsage(
-        playUsageUnlocked ? (playUsage.plays || []) : [],
-        playUsageUnlocked
-          ? 'No previous game data available. Opponent has not played a game yet this season.'
-          : "N/A — Run Film Study in training this week to scout this opponent's play usage.",
-        'fcc-play-usage-body'
-      );
-
-      const extendedUnlocked = playUsage.fast_break_usage_unlocked === true;
-      const extendedHint = "N/A — Set Film Study above 1 in training this week to scout this opponent's play usage.";
-      renderPlayUsage(
-        extendedUnlocked ? (playUsage.fast_break_plays || []) : [],
-        extendedUnlocked
-          ? 'No fast break data available from the opponent\'s last game.'
-          : extendedHint,
-        'fcc-fast-break-usage-body'
-      );
-      renderPlayUsage(
-        (playUsage.hct_usage_unlocked === true) ? (playUsage.hct_trap_plays || []) : [],
-        (playUsage.hct_usage_unlocked === true)
-          ? 'No half-court trap data available from the opponent\'s last game.'
-          : extendedHint,
-        'fcc-hct-usage-body'
-      );
-    }
-    status.style.display = 'none';
-    content.style.display = 'flex';
-  } catch (error) {
-    console.error('Error loading scouting report tab:', error);
-    status.textContent = `Error loading scouting report: ${error.message}`;
-  }
-}
+window.GOBFccPrep = {
+  whenReady: () => fccInitializationPromise,
+  resolveUpcomingOpponent: () => resolveUpcomingOpponentFromMatchup(commandCenterTopDataCache),
+  rankingEntry: getTeamRankingEntry,
+  standingsEntry: getStandingsTeamEntry,
+  teamPageUrl: buildFranchiseTeamPageUrl,
+};
 
 // ============================================================================
 // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
