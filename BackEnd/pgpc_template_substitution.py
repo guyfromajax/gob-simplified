@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any, Dict, Mapping, Optional
 
 from BackEnd.pgpc_context import _team_blob_from_game_doc
+from BackEnd.utils.minutes_display import display_minutes
 from BackEnd.pgpc_qualification import (
     _int,
     _opening_starters,
@@ -175,7 +176,7 @@ def build_pgpc_substitutions(
             out["{player_fouls}"] = str(fouls)
         out["{player_ftm}"] = str(gs("FTM"))
         out["{player_fta}"] = str(gs("FTA"))
-        out["{player_min}"] = str(gs("MIN"))
+        out["{player_min}"] = str(display_minutes(stats.get("MIN")))
     else:
         out["{player_pts}"] = "0"
         out["{player_reb}"] = "0"

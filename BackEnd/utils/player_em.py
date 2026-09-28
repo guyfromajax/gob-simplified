@@ -84,10 +84,9 @@ def roster_rt(player_doc: Optional[dict]) -> int:
 
 def box_minutes(raw_min: Any) -> int:
     """Displayed box-score minutes: floor(seconds / 60). DNP / missing → 0."""
-    seconds = _safe_int(raw_min, 0)
-    if seconds < 0:
-        seconds = 0
-    return seconds // 60
+    from BackEnd.utils.minutes_display import display_minutes
+
+    return display_minutes(raw_min)
 
 
 def training_focus_em_delta(sub_option: Optional[str], rng) -> int:
