@@ -738,6 +738,70 @@ test('game plan tracks step from the keyboard and a timeout stays focus', async 
   expect(focusFold).toBeLessThanOrEqual(1);
 });
 
+test('game plan tick labels do not overlap at 1280 or 1920', async ({ page }) => {
+  async function assertNoOverlap() {
+    await page.waitForSelector('#game-plan-view .gt-l, html.gob-focus .gt-l');
+    const overlaps = await page.evaluate(() => {
+      function boxes(root) {
+        return [...root.querySelectorAll('.gt')].map((track) => {
+          return [...track.querySelectorAll('.gt-l')].map((el) => el.getBoundingClientRect());
+        });
+      }
+      const host = document.getElementById('game-plan-view') || document.querySelector('.gpc') || document.body;
+      const hits = [];
+      boxes(host).forEach((row) => {
+        for (let i = 0; i < row.length; i++) {
+          for (let j = i + 1; j < row.length; j++) {
+            const a = row[i];
+            const b = row[j];
+            const overlap = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+            if (overlap) hits.push([Math.round(a.width), Math.round(b.width)]);
+          }
+        }
+      });
+      return hits;
+    });
+    expect(overlaps).toEqual([]);
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openPage(page, 'game-plan.html', cc(), '&from=command_center&mode=franchise');
+  await assertNoOverlap();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await assertNoOverlap();
+});
+
+test('training tab-row tools do not overlap at 1280 or 1920', async ({ page }) => {
+  async function assertNoOverlap() {
+    await page.waitForSelector('html.gob-shell .pg-head .pg-tools #requirements-bar');
+    const overlaps = await page.evaluate(() => {
+      const slot = document.querySelector('html.gob-shell .pg-head .pg-tools');
+      if (!slot) return ['no-slot'];
+      const els = [...slot.querySelectorAll(':scope > *, #requirements-bar > *')].filter((el) => {
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return r.width > 1 && r.height > 1 && cs.display !== 'none' && cs.visibility !== 'hidden';
+      });
+      const hits = [];
+      for (let i = 0; i < els.length; i++) {
+        for (let j = i + 1; j < els.length; j++) {
+          if (els[i].contains(els[j]) || els[j].contains(els[i])) continue;
+          const a = els[i].getBoundingClientRect();
+          const b = els[j].getBoundingClientRect();
+          const overlap = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+          if (overlap) hits.push([els[i].id || els[i].className, els[j].id || els[j].className]);
+        }
+      }
+      return hits;
+    });
+    expect(overlaps).toEqual([]);
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openPage(page, 'training.html', cc({ training_completed: false, session_type: 'in-season' }));
+  await assertNoOverlap();
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await assertNoOverlap();
+});
+
 const OUT2 = path.join(__dirname, '../../reports/shell-2b');
 
 async function chromeRects(page) {

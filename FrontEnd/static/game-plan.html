@@ -1,6 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search);
+        if (q.get('embed') === '1') return;
+        if (q.get('resume_from_timeout') === 'true' || q.get('mode') === 'tutorial') return;
+        q.delete('embed');
+        q.set('tab', 'game-plan-view');
+        if (!q.get('from')) q.set('from', 'command_center');
+        location.replace('/franchise-command-center.html?' + q.toString());
+      } catch (err) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
@@ -316,9 +329,9 @@
           console.log('✅ game-plan.js loaded with cache buster:', cacheBuster);
           // If DOM is already loaded, manually trigger init() since DOMContentLoaded already fired
           if (document.readyState !== 'loading') {
-            if (typeof init === 'function') {
-              console.log('🚀 Manually calling init() - DOM already loaded');
-              init();
+            if (typeof initGamePlan === 'function') {
+              console.log('🚀 Manually calling initGamePlan() - DOM already loaded');
+              initGamePlan();
             }
           }
           // The script's DOMContentLoaded listener will handle it if DOM is still loading

@@ -438,7 +438,7 @@ test('watchlist toggle shows the new wire', async ({ page }) => {
 test('game plan save shows the new tempo', async ({ page }) => {
   const state = freshState();
   await boot(page, state);
-  await openTab(page, 'prep', 'game-plan-tab');
+  await openTab(page, 'prep', 'game-plan-view');
   await expect(page.locator('#slider-tempo')).toHaveAttribute('aria-valuenow', '0');
   await expect(page.locator('#slider-tempo .gt-l.on')).toHaveText('Slow');
   await page.evaluate(async function (fid) {

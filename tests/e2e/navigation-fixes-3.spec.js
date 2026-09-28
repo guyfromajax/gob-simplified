@@ -345,16 +345,16 @@ test('training submit lands on the report, then one Back reaches mode-select', a
   await openLockerRoom(page);
   await expect(page.locator('#play-now')).toHaveText('Run Training');
   await page.locator('#play-now').click();
-  await expect(page).toHaveURL(/training\.html/, { timeout: 20000 });
+  await expect(page).toHaveURL(/tab=training-view/, { timeout: 20000 });
   await page.waitForFunction(() => {
     const el = document.getElementById('points-remaining');
     return el && String(el.textContent || '').replace(/\s/g, '').includes('0');
   }, null, { timeout: 15000 });
   await page.locator('label.archetype-option', { hasText: 'Discipline' }).click();
-  await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
-  await page.locator('#submit-btn').click();
-  await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
-  expect(new URL(page.url()).pathname).toBe('/training-report.html');
+  await expect(page.locator('#play-now')).toBeEnabled({ timeout: 10000 });
+  await expect(page.locator('#play-now')).toHaveText('Submit Training');
+  await page.locator('#play-now').click();
+  await expect(page).toHaveURL(/tab=training-report-view/, { timeout: 20000 });
   await page.waitForFunction(() => window.GOBNav);
   await leaveTrainingReport(page);
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
@@ -481,21 +481,21 @@ test('custom playbooks adds one step and Back removes it, then training still re
   await openLockerRoom(page);
   await expect(page.locator('#play-now')).toHaveText('Run Training');
   await page.locator('#play-now').click();
-  await expect(page).toHaveURL(/training\.html/, { timeout: 20000 });
+  await expect(page).toHaveURL(/tab=training-view/, { timeout: 20000 });
   await page.waitForLoadState('load');
   await page.locator('#playbook-mode-custom-btn').click();
   await expect(page).toHaveURL(/training-playbooks\.html/, { timeout: 20000 });
   await page.locator('#tp-back').click();
-  await expect(page).toHaveURL(/training\.html/, { timeout: 20000 });
+  await expect(page).toHaveURL(/tab=training-view/, { timeout: 20000 });
   await expect(page).not.toHaveURL(/training-playbooks\.html/);
   await page.waitForFunction(() => {
     const el = document.getElementById('points-remaining');
     return el && String(el.textContent || '').replace(/\s/g, '').includes('0');
   }, null, { timeout: 15000 });
   await page.locator('label.archetype-option', { hasText: 'Discipline' }).click();
-  await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
-  await page.locator('#submit-btn').click();
-  await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
+  await expect(page.locator('#play-now')).toBeEnabled({ timeout: 10000 });
+  await page.locator('#play-now').click();
+  await expect(page).toHaveURL(/tab=training-report-view/, { timeout: 20000 });
   await page.waitForFunction(() => window.GOBNav);
   await leaveTrainingReport(page);
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');

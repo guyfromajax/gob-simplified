@@ -221,6 +221,23 @@ const API_CONFIG = {
     if (typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop') {
       return 'desktop';
     }
+    // The loopback sets this cookie so a browser on the engine matches the
+    // desktop profile without an Electron preload. Some documents deny cookie
+    // reads; that is the web profile, not a crash.
+    var desktopCookie = false;
+    try {
+      desktopCookie = typeof document !== 'undefined'
+        && document.cookie.indexOf('GOB_BUILD_PROFILE=desktop') !== -1;
+    } catch (err) {
+      desktopCookie = false;
+    }
+    if (desktopCookie) {
+      window.GOB_BUILD_PROFILE = 'desktop';
+      if (!window.GOB_LOOPBACK_PORT && window.location && window.location.port) {
+        window.GOB_LOOPBACK_PORT = window.location.port;
+      }
+      return 'desktop';
+    }
     return 'web';
   },
 

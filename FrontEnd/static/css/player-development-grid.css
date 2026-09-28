@@ -174,3 +174,37 @@
 @media (prefers-reduced-motion: reduce) {
   .pdg-hovercard { transition: none; }
 }
+
+.pdg-layout-table .pdg-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pdg-layout-table .pdg-av {
+  width: 28px;
+}
+.pdg-layout-table .pdg-av img,
+.pdg-layout-table .pdg-av {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  text-align: center;
+  line-height: 28px;
+  font-size: var(--fs-10);
+  color: var(--text-60);
+  background: var(--white-6);
+}
+.pdg-layout-table .pdg-jn,
+.pdg-layout-table .pdg-pos {
+  color: var(--text-60);
+  font-variant-numeric: tabular-nums;
+}
+.pdg-layout-table .rtl {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.pdg-layout-table .rtl i {
+  font-style: normal;
+  color: var(--text-38);
+}
