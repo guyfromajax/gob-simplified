@@ -2277,7 +2277,10 @@
       }).join('');
       return '<div class="gob-rec-team' + (t.isUser ? ' is-user-team' : '') + '">' +
         '<h3 class="gob-rec-team-h">' + Common.escapeHtml(t.name) + '<em>' + t.signings.length + '</em></h3>' +
-        '<div class="gob-xs gob-rec-league"><table class="gob-tbl"><tbody>' + body + '</tbody></table></div></div>';
+        '<div class="gob-xs gob-rec-league"><table class="gob-tbl">' +
+        '<colgroup><col><col><col><col></colgroup>' +
+        '<thead><tr><th class="left">Name</th><th>Pos</th><th>Yr</th><th>RT</th></tr></thead>' +
+        '<tbody>' + body + '</tbody></table></div></div>';
     }).join('');
     return '<section class="gob-tcard gob-rec-conf">' + eye +
       '<h2>Conference ' + Common.escapeHtml(g.label) + '</h2>' + teams + '</section>';

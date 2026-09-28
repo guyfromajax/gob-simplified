@@ -1,27 +1,16 @@
 // @ts-check
-/** Week 36 signing results — browse-template layout. */
+/** Week 36 signing results — browse-template layout inside GOB shell. */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
+const { stubAuth } = require('./helpers/auth');
 
-const S = path.join(__dirname, '../../FrontEnd/static');
-const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
+test.describe.configure({ timeout: 120000 });
+
 const OUT = path.join(__dirname, '../../reports/recruit-results-week');
-
-const CSS = read('css/gob-tokens.css') + read('css/gob-tables.css') + read('recruiting-spine.css')
-  + read('recruiting-signing.css') + read('recruiting-results-hub.css') + read('css/attr-tiles.css');
-const SCRIPTS = [
-  'js/shared/franchiseContext.js',
-  'common.js',
-  'js/utils/attributeDisplay.js',
-  'js/shared/attrTiles.js', 'js/shared/rtBucket.js',
-  'js/shared/playerYear.js',
-  'recruiting-common.js',
-  'recruiting-spine.js',
-].map(read);
-const HUB = read('recruiting-hub.js');
-
+const FID = 'f-e2e-recruit-results-week';
 const USER = 'user-team-id';
+
 const regionOf = (c) => String.fromCharCode(65 + Math.floor((Number(c) - 1) / 2));
 
 function withRegions(conferences, userTeamId) {
@@ -76,7 +65,7 @@ function fixtureLeague() {
   return { signed, conferences, teamNames };
 }
 
-function fixturePayload(opts) {
+function recruitingPayload() {
   const { signed, conferences, teamNames } = fixtureLeague();
   return {
     team: 'South Lancaster', team_id: USER, team_region: 'A', week: 36, season: 3,
@@ -91,50 +80,112 @@ function fixturePayload(opts) {
   };
 }
 
-async function mountResults(page) {
-  await page.route('**/', (route) => (route.request().resourceType() === 'document'
-    ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
-    : route.continue()));
-  await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
-  await page.setContent(`
-    <style>${CSS}</style>
-    <style>body{margin:0;background:var(--bg,#0b0d14)}.doc{max-width:1180px;margin:0 auto;padding:20px}</style>
-    <div class="doc"><div id="hub-root" class="spine"></div></div>
-  `);
-  for (const src of SCRIPTS) await page.addScriptTag({ content: src });
-  await page.evaluate((data) => {
-    window.__seen = [];
-    window.API_CONFIG = {
-      buildUrl: (p) => `https://stub.local${p}`,
-      getAuthHeaders: () => ({}),
-      getRecruitImageUrl: (id) => `https://stub.local/img/${id}.png`,
+function commandCenterPayload() {
+  return {
+    franchise_id: FID,
+    team_id: USER,
+    user_team_id: USER,
+    team: 'South Lancaster',
+    week: 36,
+    rank: 14,
+    season: 3,
+    current_season: 3,
+    training_completed: true,
+    session_type: 'in-season',
+    cut_required: false,
+    recruiting_wire: { board_saved_week: 36, counts: {}, week_35_orders_submitted: true },
+    user_conference: 9,
+    user_region: 'A',
+    team_record: { wins: 4, losses: 1 },
+  };
+}
+
+async function fulfillJson(route, body) {
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+}
+
+async function openWeek36Results(page) {
+  const seenCalls = [];
+  await stubAuth(page);
+  await page.route('**/*', async (route) => {
+    const request = route.request();
+    let pathname = '';
+    try { pathname = new URL(request.url()).pathname; } catch (err) {
+      await route.continue();
+      return;
+    }
+    if (pathname.startsWith('/franchise/recruiting-data')) {
+      await fulfillJson(route, recruitingPayload());
+      return;
+    }
+    if (pathname.startsWith('/franchise/command-center/data')) {
+      await fulfillJson(route, commandCenterPayload());
+      return;
+    }
+    if (pathname.includes('week-36-results-seen')) {
+      seenCalls.push(pathname);
+      await fulfillJson(route, {});
+      return;
+    }
+    if (pathname.startsWith('/api/') || pathname.startsWith('/franchise/') || pathname === '/app-config' || pathname === '/teams') {
+      await fulfillJson(route, pathname === '/app-config' ? { isAlpha: false, version: '1.0' } : {});
+      return;
+    }
+    await route.continue();
+  });
+  await page.goto('/recruiting.html?franchise_id=' + FID + '&team_id=' + USER);
+  await page.waitForSelector('#hub-signings .gob-rec-results', { timeout: 15000 });
+  await page.waitForFunction(() => !document.documentElement.classList.contains('gob-pending'));
+  await page.waitForSelector('html.gob-shell .rail', { timeout: 15000 });
+  return seenCalls;
+}
+
+async function assertBrowseChrome(page) {
+  const tcard = page.locator('#hub-signings .gob-tcard').first();
+  await expect(tcard).toBeVisible();
+  const cardPaint = await tcard.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return {
+      bg: cs.backgroundColor,
+      borderWidth: parseFloat(cs.borderTopWidth) || 0,
+      borderAlpha: cs.borderTopColor,
     };
-    window.__fixture = data;
-    const realFetchJSON = window.RecruitingCommon.fetchJSON;
-    window.RecruitingCommon.fetchJSON = function (url, options) {
-      window.__seen.push(String(url));
-      if (String(url).includes('/franchise/recruiting-data')) {
-        return Promise.resolve(window.__fixture);
-      }
-      if (String(url).includes('week-36-results-seen')) {
-        return Promise.resolve({});
-      }
-      return realFetchJSON.call(this, url, options);
-    };
-  }, fixturePayload());
-  await page.addScriptTag({ content: HUB });
-  await page.waitForSelector('.gob-rec-results', { timeout: 10000 });
+  });
+  expect(cardPaint.borderWidth).toBeGreaterThan(0);
+  expect(cardPaint.bg).not.toMatch(/^rgba\(0,\s*0,\s*0,\s*0\)$/);
+
+  const rtHeader = page.locator('#hub-signings .gob-rec-your-class thead th').filter({ hasText: 'RT' });
+  await expect(rtHeader).toBeVisible();
+  const headerFont = await rtHeader.evaluate((el) => getComputedStyle(el).fontFamily.toLowerCase());
+  expect(headerFont).toMatch(/bebas/);
+
+  const countGap = await page.locator('#hub-signings .gob-rec-your-class h2 em').evaluate((el) => {
+    return parseFloat(getComputedStyle(el).marginLeft) || 0;
+  });
+  expect(countGap).toBeGreaterThan(4);
+
+  const rtYour = page.locator('#hub-signings .gob-rec-your-class tbody td.rt').first();
+  await expect(rtYour).toBeVisible();
+  const rtLeague = page.locator('#hub-signings .gob-rec-league td.rt').first();
+  await expect(rtLeague).toBeVisible();
+
+  await expect(page.locator('html.gob-shell .top')).toBeVisible();
+  await expect(page.locator('html.gob-shell .rail')).toBeVisible();
 }
 
 test.describe('week 36 signing results browse layout', () => {
-  test('your class first, conference order, navy rows, seen PATCH once', async ({ page }) => {
-    await mountResults(page);
+  test('your class first, conference order, navy rows, seen PATCH once, styled tables', async ({ page }) => {
+    const seenCalls = await openWeek36Results(page);
+    await assertBrowseChrome(page);
+
     const layout = await page.evaluate(() => {
       const root = document.querySelector('#hub-signings .gob-rec-results');
       const kids = [...root.children].map((el) => el.className);
       const confTitles = [...document.querySelectorAll('#hub-signings .gob-rec-conf h2')].map((h) => h.textContent.trim());
       const navy = document.querySelectorAll('#hub-signings .gob-rec-league tr.me').length;
-      return { kids, confTitles, navy, seen: (window.__seen || []).filter((u) => u.includes('week-36-results-seen')).length };
+      const yourHeaders = [...document.querySelectorAll('#hub-signings .gob-rec-your-class thead th')].map((th) => th.textContent.trim());
+      const leagueHeaders = [...document.querySelectorAll('#hub-signings .gob-rec-league thead th')].map((th) => th.textContent.trim());
+      return { kids, confTitles, navy, yourHeaders, leagueHeaders };
     });
     expect(layout.kids[0]).toContain('gob-rec-lead');
     expect(layout.kids.some((c) => c.includes('gob-rec-your-class'))).toBe(true);
@@ -145,16 +196,20 @@ test.describe('week 36 signing results browse layout', () => {
     expect(layout.confTitles[0]).toBe('Conference E9');
     expect(layout.confTitles[1]).toBe('Conference E10');
     expect(layout.confTitles[2]).toBe('Conference A1');
+    expect(layout.yourHeaders).toEqual(['', 'Name', 'Pos', 'Yr', 'RT']);
+    expect(layout.leagueHeaders.slice(0, 4)).toEqual(['Name', 'Pos', 'Yr', 'RT']);
     expect(layout.navy).toBeGreaterThan(0);
-    expect(layout.seen).toBe(1);
+    expect(seenCalls.length).toBe(1);
     await expect(page.locator('#hub-signings .gob-rec-player-link').first()).toHaveAttribute('href', /player-view/);
+    await expect(page.locator('#hub-signings .gob-rec-your-class h2 em')).toHaveText('5');
   });
 
-  test('screenshots at 1280 and 1920', async ({ page }) => {
+  test('screenshots at 1280 and 1920 with shell', async ({ page }) => {
     fs.mkdirSync(OUT, { recursive: true });
     for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
       await page.setViewportSize({ width: size[0], height: size[1] });
-      await mountResults(page);
+      await openWeek36Results(page);
+      await assertBrowseChrome(page);
       await page.screenshot({ path: path.join(OUT, `results-w36-${size[2]}.png`) });
     }
   });

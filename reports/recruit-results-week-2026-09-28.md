@@ -38,3 +38,18 @@ Full suite: **520 passed, 3 skipped**, ~7.7m, port **8010**, `CI` unset, workers
 `reports/recruit-results-week/results-w36-1280.png`, `results-w36-1920.png` — fixture with six conferences and a full user class.
 
 STATUS: COMPLETE
+
+## Fix pass
+
+**Root cause:** Design tokens live under `.gob` in `gob-tokens.css`. The week-36 e2e fixture used `setContent` with inlined CSS but no `html.gob`, so `--surface-*`, `--line`, and table typography never applied (plain text, “Your class5” with no `h2 em` spacing). Production `recruiting.html` relied on `gobShell.js` to add `gob` after paint; the spec never loaded the shell.
+
+**Fixes**
+- `recruiting.html`: `class="gob"` on `<html>` so browse tokens apply as soon as the page loads (shell still adds `gob-shell`).
+- `recruiting-hub.js`: league team tables get `thead` + colgroup (Name, Pos, Yr, RT) like Your class.
+- `recruit-results-week.spec.js`: real `/recruiting.html` + `stubAuth`, CC + recruiting stubs, wait for `gob-pending` clear and rail; visual assertions (`.gob-tcard` border/background, Bebas RT header, visible RT cells, spaced count in `h2 em`).
+
+**Self-check (screenshots):** Opened `results-w36-1280.png` and `results-w36-1920.png` — GOB top bar + rail, dark `gob-tcard` panels with borders, Your class table with portrait/Name/Pos/Yr/RT and count badge beside the title, conference grid with eyebrows, per-team headers, Pos/Yr/RT columns, navy `#1c2a52` only on user-team rows (`tr.me`).
+
+**Tests:** Recruiting bundle (recruit-results-week, signing-reveal, recruiting-tabs, fcc-invite-step, recruits-pool) **95 passed**, port **8010**, workers=1, `CI` unset. Full suite deferred — another Playwright run active on port 8157 (`gob-stats`).
+
+STATUS: COMPLETE
