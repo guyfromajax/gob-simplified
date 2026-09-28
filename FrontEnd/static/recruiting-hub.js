@@ -2255,7 +2255,7 @@
     return '<section class="gob-tcard gob-rec-your-class">' +
       '<h2>Your class<em>' + entries.length + '</em></h2>' +
       '<div class="gob-xs gob-rec-class"><table class="gob-tbl"><colgroup>' +
-      '<col class="c-port"><col><col><col><col class="c-rt"></colgroup>' +
+      '<col class="c-port"><col class="c-name"><col class="c-pos"><col class="c-yr"><col class="c-rt"></colgroup>' +
       '<thead><tr><th class="c-port"></th><th class="left">Name</th><th>Pos</th><th>Yr</th><th>RT</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></section>';
   }
@@ -2278,12 +2278,12 @@
       return '<div class="gob-rec-team' + (t.isUser ? ' is-user-team' : '') + '">' +
         '<h3 class="gob-rec-team-h">' + Common.escapeHtml(t.name) + '<em>' + t.signings.length + '</em></h3>' +
         '<div class="gob-xs gob-rec-league"><table class="gob-tbl">' +
-        '<colgroup><col><col><col><col></colgroup>' +
-        '<thead><tr><th class="left">Name</th><th>Pos</th><th>Yr</th><th>RT</th></tr></thead>' +
+        '<colgroup><col class="c-name"><col class="c-pos"><col class="c-yr"><col class="c-rt"></colgroup>' +
         '<tbody>' + body + '</tbody></table></div></div>';
     }).join('');
-    return '<section class="gob-tcard gob-rec-conf">' + eye +
-      '<h2>Conference ' + Common.escapeHtml(g.label) + '</h2>' + teams + '</section>';
+    var head = '<div class="gob-rec-conf-head">' + eye +
+      '<h2>Conference ' + Common.escapeHtml(g.label) + '</h2></div>';
+    return '<section class="gob-tcard gob-rec-conf">' + head + teams + '</section>';
   }
 
   function finalSigningsHtml() {
@@ -2295,10 +2295,7 @@
     var league = groups.length
       ? '<div class="gob-rec-conf-grid">' + groups.map(leagueConferenceCardHtml).join('') + '</div>'
       : '';
-    return '<div class="gob-rec-results">' +
-      '<h2 class="gob-rec-lead">Signing Day Results</h2>' +
-      '<p class="gob-rec-sub">Every signing in the league, by conference.</p>' +
-      yourClassTableHtml(yours) + league + '</div>';
+    return '<div class="gob-rec-results">' + yourClassTableHtml(yours) + league + '</div>';
   }
 
   // The week-36 screen is a league LIST now, not a playback — the reveal moved to

@@ -53,3 +53,22 @@ STATUS: COMPLETE
 **Tests:** Recruiting bundle (recruit-results-week, signing-reveal, recruiting-tabs, fcc-invite-step, recruits-pool) **95 passed**, port **8010**, workers=1, `CI` unset. Full suite deferred — another Playwright run active on port 8157 (`gob-stats`).
 
 STATUS: COMPLETE
+
+## Fix pass 2
+
+**Root cause:** Week-36 tables sit in `.gob-xs`, which inherits the **1760px** `min-width` floor and horizontal scroll + `can-r` edge mask from `gob-tables.css` — same failure mode as `#news-view` story tables. Pos/Yr/RT were in the DOM but scrolled off the right of narrow conference cards.
+
+**Fixes**
+- `recruiting-results-hub.css`: `#hub-signings` content-sized table override (mirrors `#news-view .gob-news-body .gob-xs .gob-tbl`: `min-width: 0`, `width: 100%`, `table-layout: fixed`, no scroll/mask on `.gob-xs`), explicit col widths, capped name ellipsis, `min-width: 0` on cards.
+- `recruiting-hub.js`: removed duplicate per-team column headers; conference eyebrow + title in `.gob-rec-conf-head` with card padding; **dropped** loose “Signing Day Results / Every signing…” block (phase strip already reads “Week 36 Results · Signings are final”).
+- `recruit-results-week.spec.js`: RT bounding box inside card + `scrollWidth ≤ clientWidth`; no league `<thead>`; no `.gob-rec-lead`.
+
+**Self-check (screenshots, column-by-column):**
+- **1280 — Your class:** portrait initials L0–L4 · names Lancaster 0–4 · Pos SF · Yr JH/FR/SO/JR · RT letters A+/A+, A/A, etc. (readable, no right fade).
+- **1280 — Conference E9 (user):** eyebrow “YOUR CONFERENCE” above title; South Lancaster rows show truncated names · PG/SF · JR/JH · RT grades; navy on user rows only.
+- **1280 — Sister/other cards:** Pos/Yr/RT visible on each row (e.g. Sign 8 PG JR B+/A); no repeated “Name” headers per team.
+- **1920:** same columns readable across Your class and all conference cards; five-column grid, no horizontal mask on rows.
+
+**Tests:** Recruiting bundle **95 passed**; full suite **520 passed, 3 skipped** (~7.8m), port **8010**, workers=1, `CI` unset.
+
+STATUS: COMPLETE

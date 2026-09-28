@@ -6,25 +6,35 @@
   gap: var(--space-16);
   padding: var(--space-12) 0 var(--space-20);
   max-width: 100%;
+  min-width: 0;
 }
 
-#hub-signings .gob-rec-lead {
-  margin: 0;
-  font: var(--fw-bold) var(--fs-22)/var(--lh-1-1) var(--font-display);
-  letter-spacing: var(--tracking-2);
-  color: var(--text-100);
+/* Content-sized tables — same min-width reset as #news-view story player tables. */
+#hub-signings .gob-xs {
+  overflow-x: visible;
+  max-width: 100%;
 }
 
-#hub-signings .gob-rec-sub {
-  margin: calc(-1 * var(--space-8)) 0 0;
-  font: var(--fw-medium) var(--fs-13)/var(--lh-1-4) var(--font-body);
-  color: var(--text-60);
+#hub-signings .gob-xs .gob-tbl {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+#hub-signings .gob-xs.can-l,
+#hub-signings .gob-xs.can-r,
+#hub-signings .gob-xs.can-l.can-r {
+  box-shadow: none;
 }
 
 #hub-signings .gob-rec-empty {
   margin: 0;
   font: var(--fw-medium) var(--fs-13)/var(--lh-1-4) var(--font-body);
   color: var(--text-38);
+}
+
+#hub-signings .gob-tcard {
+  min-width: 0;
 }
 
 #hub-signings .gob-rec-your-class {
@@ -49,6 +59,18 @@
   #hub-signings .gob-rec-conf-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+#hub-signings .gob-rec-conf-head {
+  padding: var(--space-12) var(--space-12) var(--space-8);
+}
+
+#hub-signings .gob-rec-conf-head h2 {
+  margin: 0;
+  padding: 0;
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-87);
 }
 
 #hub-signings .gob-rec-eye {
@@ -113,10 +135,27 @@
   padding-right: 0;
 }
 
-#hub-signings .gob-rec-league .gob-tbl td.name {
+#hub-signings .gob-rec-class .gob-tbl col.c-port { width: 32px; }
+#hub-signings .gob-rec-class .gob-tbl col.c-name { width: auto; }
+#hub-signings .gob-rec-class .gob-tbl col.c-pos { width: 2.5rem; }
+#hub-signings .gob-rec-class .gob-tbl col.c-yr { width: 2.25rem; }
+#hub-signings .gob-rec-class .gob-tbl col.c-rt { width: 3.25rem; }
+
+#hub-signings .gob-rec-class .gob-tbl td.team {
   max-width: 9rem;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+#hub-signings .gob-rec-league .gob-tbl col.c-name { width: auto; }
+#hub-signings .gob-rec-league .gob-tbl col.c-pos { width: 2.25rem; }
+#hub-signings .gob-rec-league .gob-tbl col.c-yr { width: 2rem; }
+#hub-signings .gob-rec-league .gob-tbl col.c-rt { width: 3rem; }
+
+#hub-signings .gob-rec-league .gob-tbl td.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #hub-signings .gob-rec-league .gob-tbl td.pos,

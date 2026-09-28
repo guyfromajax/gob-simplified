@@ -173,10 +173,39 @@ async function assertBrowseChrome(page) {
   await expect(page.locator('html.gob-shell .rail')).toBeVisible();
 }
 
+/** RT must sit inside the card; compact tables must not scroll horizontally. */
+async function assertTableFitsCard(page, cardSel, wrapSel) {
+  const geom = await page.evaluate(({ cardSel: cSel, wrapSel: wSel }) => {
+    const card = document.querySelector(cSel);
+    const wrap = document.querySelector(wSel);
+    const rt = wrap && wrap.querySelector('td.rt');
+    if (!card || !wrap || !rt) return { ok: false, reason: 'missing nodes' };
+    const cr = card.getBoundingClientRect();
+    const rr = rt.getBoundingClientRect();
+    const rtInside = rr.left >= cr.left - 1 && rr.right <= cr.right + 1
+      && rr.top >= cr.top - 1 && rr.bottom <= cr.bottom + 1;
+    const noHScroll = wrap.scrollWidth <= wrap.clientWidth + 1;
+    const noMask = !wrap.classList.contains('can-r') && !wrap.classList.contains('can-l');
+    return { ok: rtInside && noHScroll, rtInside, noHScroll, noMask, scrollW: wrap.scrollWidth, clientW: wrap.clientWidth };
+  }, { cardSel, wrapSel });
+  expect(geom.ok, JSON.stringify(geom)).toBe(true);
+}
+
 test.describe('week 36 signing results browse layout', () => {
   test('your class first, conference order, navy rows, seen PATCH once, styled tables', async ({ page }) => {
     const seenCalls = await openWeek36Results(page);
     await assertBrowseChrome(page);
+
+    await assertTableFitsCard(
+      page,
+      '#hub-signings .gob-rec-your-class',
+      '#hub-signings .gob-rec-your-class .gob-rec-class',
+    );
+    await assertTableFitsCard(
+      page,
+      '#hub-signings .gob-rec-conf',
+      '#hub-signings .gob-rec-conf .gob-rec-league',
+    );
 
     const layout = await page.evaluate(() => {
       const root = document.querySelector('#hub-signings .gob-rec-results');
@@ -184,11 +213,12 @@ test.describe('week 36 signing results browse layout', () => {
       const confTitles = [...document.querySelectorAll('#hub-signings .gob-rec-conf h2')].map((h) => h.textContent.trim());
       const navy = document.querySelectorAll('#hub-signings .gob-rec-league tr.me').length;
       const yourHeaders = [...document.querySelectorAll('#hub-signings .gob-rec-your-class thead th')].map((th) => th.textContent.trim());
-      const leagueHeaders = [...document.querySelectorAll('#hub-signings .gob-rec-league thead th')].map((th) => th.textContent.trim());
-      return { kids, confTitles, navy, yourHeaders, leagueHeaders };
+      const leagueThead = document.querySelectorAll('#hub-signings .gob-rec-league thead').length;
+      const lead = document.querySelector('#hub-signings .gob-rec-lead');
+      return { kids, confTitles, navy, yourHeaders, leagueThead, lead: !!lead };
     });
-    expect(layout.kids[0]).toContain('gob-rec-lead');
-    expect(layout.kids.some((c) => c.includes('gob-rec-your-class'))).toBe(true);
+    expect(layout.lead).toBe(false);
+    expect(layout.kids[0]).toContain('gob-rec-your-class');
     const classIdx = layout.kids.findIndex((c) => c.includes('gob-rec-your-class'));
     const gridIdx = layout.kids.findIndex((c) => c.includes('gob-rec-conf-grid'));
     expect(classIdx).toBeGreaterThan(-1);
@@ -197,7 +227,7 @@ test.describe('week 36 signing results browse layout', () => {
     expect(layout.confTitles[1]).toBe('Conference E10');
     expect(layout.confTitles[2]).toBe('Conference A1');
     expect(layout.yourHeaders).toEqual(['', 'Name', 'Pos', 'Yr', 'RT']);
-    expect(layout.leagueHeaders.slice(0, 4)).toEqual(['Name', 'Pos', 'Yr', 'RT']);
+    expect(layout.leagueThead).toBe(0);
     expect(layout.navy).toBeGreaterThan(0);
     expect(seenCalls.length).toBe(1);
     await expect(page.locator('#hub-signings .gob-rec-player-link').first()).toHaveAttribute('href', /player-view/);
