@@ -15495,6 +15495,34 @@ def get_practice_squad_schedule(
     }
 
 
+@router.get("/franchise/tournament/brackets")
+@browse_cached
+def get_tournament_brackets(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    from BackEnd.tournament.browse import build_tournament_brackets_response
+    from BackEnd.utils.franchise_standings import calculate_franchise_standings
+
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    _legacy_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    user_team_id = str(user_team_object_id or _legacy_team_id or "")
+    team_doc = None
+    if user_team_object_id and ObjectId.is_valid(str(user_team_object_id)):
+        team_doc = db.teams.find_one({"_id": ObjectId(str(user_team_object_id))})
+    if not user_team_id:
+        raise HTTPException(status_code=400, detail="Franchise has no user team")
+    return build_tournament_brackets_response(
+        franchise_doc,
+        user_team_id=str(user_team_id),
+        user_team_doc=team_doc,
+        teams_collection=db.teams,
+        franchise_team_data_collection=franchise_team_data_collection,
+        get_user_eos_phase_status=_get_user_eos_phase_status,
+        calculate_franchise_standings=calculate_franchise_standings,
+    )
+
+
 @router.get("/franchise/practice-squad/brackets")
 @browse_cached
 def get_practice_squad_brackets(

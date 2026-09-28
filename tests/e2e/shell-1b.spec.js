@@ -364,8 +364,9 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   const openTourney = stab(page, 'Tournament');
   await expect(openTourney).not.toHaveAttribute('aria-disabled', 'true');
   await mouseClick(page, openTourney);
-  const brackets = await page.evaluate(() => window.__shellNav[0] || '');
-  expect(brackets).toContain('/brackets.html');
+  await expect(page.locator('#tournament-view.tab-content.active')).toBeVisible();
+  expect(page.url()).toContain('tab=tournament-view');
+  expect(page.url()).not.toContain('brackets.html');
   await page.screenshot({ path: path.join(OUT, 'tournament-open-1920.png') });
 });
 

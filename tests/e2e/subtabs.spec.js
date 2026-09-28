@@ -367,7 +367,8 @@ test('unselected link tabs have no stray underline', async ({ page }) => {
       if (row.tag === 'A' && row.selected !== 'true') links += 1;
     }
   }
-  expect(links).toBeGreaterThan(0);
+  // League › Tournament and the other module views are in-page buttons at week 28+.
+  expect(links).toBe(0);
 
   await page.locator('[data-gob-section="league"]').click();
   await tab(page, 'Schedule').hover();
