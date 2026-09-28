@@ -30,8 +30,8 @@
       { id: 'team-schedule-view', label: 'Schedule' }
     ]},
     { id: 'prep', label: 'Prep', title: 'Prep', icon: 'prep', tabs: [
-      { id: 'training-tab', label: 'Training' },
-      { id: 'game-plan-tab', label: 'Game Plan' },
+      { id: 'training-view', label: 'Training' },
+      { id: 'game-plan-view', label: 'Game Plan' },
       { id: 'playbooks-tab', label: 'Playbooks' },
       { id: 'coaches-tab', label: 'Scouting Report' }
     ]},
@@ -66,7 +66,10 @@
     'schedule-tab': 'team',
     'team-schedule-view': 'team',
     'training-tab': 'prep',
+    'training-view': 'prep',
+    'training-report-view': 'prep',
     'game-plan-tab': 'prep',
+    'game-plan-view': 'prep',
     'playbooks-tab': 'prep',
     'coaches-tab': 'prep',
     'standings-tab': 'league',
@@ -107,12 +110,12 @@
     '/player-detail.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/team-roster-view.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/set-lineup.html': { kind: 'focus' },
-    '/training.html': { kind: 'browse', section: 'prep', sub: 'training-tab' },
-    '/training-report.html': { kind: 'browse', section: 'prep', sub: 'training-tab' },
+    '/training.html': { kind: 'browse', section: 'prep', sub: 'training-view' },
+    '/training-report.html': { kind: 'browse', section: 'prep', sub: 'training-view' },
     '/training-squad-report.html': { kind: 'focus' },
     '/training-playbooks.html': { kind: 'focus' },
     '/cut-players.html': { kind: 'focus' },
-    '/game-plan.html': { kind: 'browse', section: 'prep', sub: 'game-plan-tab' },
+    '/game-plan.html': { kind: 'browse', section: 'prep', sub: 'game-plan-view' },
     '/playbooks.html': { kind: 'browse', section: 'prep', sub: 'playbooks-tab' },
     '/playbook-report.html': { kind: 'focus' },
     '/box-score.html': { kind: 'flow-or-browse' }
@@ -137,6 +140,8 @@
     var urlTab = tabFromUrl();
     if (urlTab === 'recruits-tab') return 'home-tab';
     if (urlTab === 'schedule-tab') return 'team-schedule-view';
+    if (urlTab === 'training-tab') urlTab = 'training-view';
+    if (urlTab === 'game-plan-tab') urlTab = 'game-plan-view';
     var actives = document.querySelectorAll('#tournament-tabs > .tab-content.active');
     var i;
     if (urlTab) {
@@ -250,8 +255,6 @@
   }
 
   var PREP_EDITOR = {
-    'training-tab': '/training.html',
-    'game-plan-tab': '/game-plan.html',
     'playbooks-tab': '/playbooks.html'
   };
 
@@ -443,6 +446,7 @@
   }
 
   function sync(tab) {
+    if (tab === 'training-report-view') tab = 'training-view';
     var sectionId = detailOrigin(tab) || TAB_SECTION[tab] || 'office';
     var mark = detailMark(tab);
     var section = sectionById(sectionId);
@@ -477,7 +481,14 @@
         if (pageMode && pageMode.section === 'prep') return;
         if (!pageMode && (TAB_SECTION[currentTab()] || 'office') === 'prep') return;
         playClick();
-        goPrepEditor('training-tab', 'push');
+        if (pageMode) {
+          var prepNav = window.GOBNav;
+          var prepHref = fccHref('training-view');
+          if (prepNav && prepNav.go) prepNav.go(prepHref);
+          else window.location.assign(prepHref);
+        } else {
+          openTab('training-view', 'push');
+        }
         return;
       }
       if (pageMode) {

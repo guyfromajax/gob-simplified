@@ -127,8 +127,20 @@
   }
 
   function currentTab() {
-    try { return new URLSearchParams(global.location.search).get('tab') || ''; }
-    catch (err) { return ''; }
+    var tab = '';
+    try { tab = new URLSearchParams(global.location.search).get('tab') || ''; }
+    catch (err) { tab = ''; }
+    if (tab === 'training-tab') return 'training-view';
+    if (tab === 'game-plan-tab') return 'game-plan-view';
+    return tab;
+  }
+
+  function parkTools(slot) {
+    if (!slot) return;
+    slot.querySelectorAll('[data-tool-home]').forEach(function (node) {
+      var home = document.querySelector(node.getAttribute('data-tool-home'));
+      if (home && home !== node.parentNode) home.appendChild(node);
+    });
   }
 
   function placeTools(host) {
@@ -137,9 +149,15 @@
     var render = tools[currentTab()];
     var old = slotHost.querySelector('.pg-tools');
     if (typeof render !== 'function') {
-      if (old) old.remove();
+      if (old) {
+        parkTools(old);
+        old.remove();
+      }
     } else if (!(old && old.getAttribute('data-owner') === currentTab())) {
-      if (old) old.remove();
+      if (old) {
+        parkTools(old);
+        old.remove();
+      }
       var slot = document.createElement('div');
       slot.className = 'pg-tools';
       slot.setAttribute('data-owner', currentTab());

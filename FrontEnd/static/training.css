@@ -2061,3 +2061,81 @@ body.training-page .player-dev-title { margin-bottom: 0; text-align: left; }
 
 /* The grid, its tallies and the hover card are styled by css/player-development-grid.css,
    which the FCC Training tab loads too — one look for the one editor, in two places. */
+
+/* Prep view: six stops, a luminance numeral, and the budget in the tab row. */
+body.training-page .ps {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+body.training-page .ps button {
+  display: block;
+  width: 18px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-3);
+  background: var(--white-6);
+}
+body.training-page .ps button:first-of-type {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+body.training-page .ps button.f { background: var(--white-45); }
+body.training-page .ps button.c { background: var(--white-90); }
+body.training-page .ps button.x {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--white-6);
+}
+body.training-page .ps button:disabled {
+  cursor: not-allowed;
+}
+body.training-page .ps-n {
+  min-width: 1ch;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-100);
+}
+body.training-page .ps-n.z { color: var(--text-38); }
+body.training-page .slider-container .slider:focus-visible ~ .ps {
+  outline: 2px solid var(--text-100);
+  outline-offset: 3px;
+  border-radius: var(--radius-3);
+}
+
+#training-view .training-header { display: none; }
+#training-view .training-container {
+  width: 100%;
+  max-width: none;
+  padding: var(--space-2) 0 var(--space-12);
+}
+#training-view .section-header,
+#training-view .coaching-title {
+  font-size: var(--fs-20);
+}
+#training-view .content-section,
+#training-view .general-section,
+#training-view .coaching-section {
+  gap: var(--space-2);
+}
+#training-view .slider-label {
+  min-height: 24px;
+}
+#training-view .drill-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-12);
+  line-height: 1;
+}
+#training-view .drill-title .attr-chip {
+  min-height: 0;
+}
+#training-view .drill-group,
+#training-view .drill-stack,
+#training-view .section-container {
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+}

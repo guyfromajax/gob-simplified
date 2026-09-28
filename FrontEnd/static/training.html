@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search);
+        if (q.get('embed') === '1' || q.get('mode') === 'tutorial') return;
+        q.delete('embed');
+        q.set('tab', 'training-view');
+        location.replace('/franchise-command-center.html?' + q.toString());
+      } catch (err) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
@@ -59,7 +70,7 @@
         </div>
       </div>
       <div class="header-actions">
-        <button id="auto-train-btn" class="auto-train-button">Auto-Train</button>
+        <button id="auto-train-btn" class="gob-btn gob-btn--ghost auto-train-button" type="button">Auto-Train</button>
         <div class="submit-stack">
           <button id="submit-btn" class="submit-button" disabled>Submit Training</button>
           <button id="recruiting-invites-btn" class="recruiting-invites-button" type="button" style="display:none;">Recruiting Invites</button>

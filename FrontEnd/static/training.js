@@ -50,6 +50,8 @@ let trainingNewswireError = null;
 
 /** @type {{ player_id: string, name: string, attrs: Record<string, number> }[]} */
 let customFocusRoster = [];
+let positionTallies = null;
+let focusTallies = null;
 /** @type {string[]} */
 let customFocusRankingAttrs = [];
 /** @type {Record<string, string[]>} playerId -> up to 3 distinct attr codes */
@@ -175,6 +177,11 @@ function playerDevRows() {
       training_focus: row.training_focus || null,
       resolved_training_position: row.resolved_training_position || null,
       resolved_training_focus: row.resolved_training_focus || null,
+      image_id: row.image_id || null,
+      portrait_source: row.portrait_source || 'player',
+      jersey: row.jersey,
+      pos: row.pos || null,
+      potential_rt_ratcheted: row.potential_rt_ratcheted,
     };
   });
 }
@@ -189,6 +196,10 @@ function renderPlayerDevelopment() {
   }
   playerDevSection.hidden = false;
   grid.render(playerDevSection, rows, {
+    layout: 'table',
+    tallies: (positionTallies && focusTallies)
+      ? { positions: positionTallies, focuses: focusTallies }
+      : null,
     getFranchiseId: playerDevFranchiseId,
     // Write back to the source array so a later re-render keeps the change.
     onSaved: function (playerId, field, value) {
@@ -411,7 +422,8 @@ async function redirectIfTrainingAlreadyCommitted() {
     const returnUrl = urlParams.get('return_url');
     const safeReturnUrl = typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(returnUrl) : null;
     if (safeReturnUrl) params.set('return_url', safeReturnUrl);
-    const reportUrl = `/training-report.html?${params.toString()}`;
+    params.set('tab', 'training-report-view');
+    const reportUrl = `/franchise-command-center.html?${params.toString()}`;
     if (window.GOBNav) window.GOBNav.replace(reportUrl);
     else window.location.replace(reportUrl);
     return true;
@@ -437,17 +449,16 @@ allSliders.forEach(slider => {
 function ensureTrainingSliderVisual(slider) {
   const wrapper = slider?.closest('.slider-container');
   if (!wrapper) return null;
-  let row = wrapper.querySelector('.pipstep');
+  let row = wrapper.querySelector('.ps');
   if (row) return row;
 
   row = document.createElement('div');
-  row.className = 'pipstep';
+  row.className = 'ps';
   for (let i = 0; i <= 5; i++) {
     const pip = document.createElement('button');
     pip.type = 'button';
-    pip.className = 'pipstep-pip';
+    pip.className = 'x';
     pip.dataset.value = String(i);
-    pip.textContent = String(i);
     // The range input carries the accessible name and value; the pips are a shortcut
     // to it, so they stay out of the accessibility tree rather than repeating it.
     pip.setAttribute('aria-hidden', 'true');
@@ -457,6 +468,11 @@ function ensureTrainingSliderVisual(slider) {
     });
     row.appendChild(pip);
   }
+  const numeral = document.createElement('span');
+  numeral.className = 'ps-n z';
+  numeral.setAttribute('aria-hidden', 'true');
+  numeral.textContent = '0';
+  row.appendChild(numeral);
   wrapper.appendChild(row);
   return row;
 }
@@ -480,12 +496,19 @@ function updateTrainingSliderVisual(slider, rawValue) {
   const value = Math.max(0, Math.min(5, Number(rawValue) || 0));
   const spent = calculateTotalPoints();
   const headroom = TOTAL_POINTS - spent + value;   // what this drill alone could reach
-  row.querySelectorAll('.pipstep-pip').forEach((pip, index) => {
-    pip.classList.toggle('is-filled', index <= value);
-    pip.classList.toggle('is-current', index === value);
-    // Dimming what the budget cannot reach beats letting a click silently do nothing.
+  row.querySelectorAll('button').forEach((pip, index) => {
+    pip.classList.remove('f', 'c', 'x');
+    if (index < value) pip.classList.add('f');
+    else if (index === value) pip.classList.add('c');
+    else pip.classList.add('x');
+    // Stops past the remaining budget stay hollow and disabled.
     pip.disabled = index > headroom;
   });
+  const numeral = row.querySelector('.ps-n');
+  if (numeral) {
+    numeral.textContent = String(value);
+    numeral.classList.toggle('z', value === 0);
+  }
 }
 
 /** Repaint every stepper's reachable range after the budget moves. */
@@ -755,14 +778,7 @@ function updatePointsRemaining() {
   const allPointsAllocated = remaining === 0;
   const focusSelected = isCoachingFocusSelected();
   const pmOk = isPlayerMaximizerSubmitReady();
-
-  if (allPointsAllocated && focusSelected && pmOk) {
-    submitBtn.disabled = false;
-    submitBtn.style.opacity = '1';
-  } else {
-    submitBtn.disabled = true;
-    submitBtn.style.opacity = '0.4';
-  }
+  syncTrainingAdvance(allPointsAllocated && focusSelected && pmOk);
 
   updateRequirementsBar();
   // Spending on one drill shrinks every other drill's reachable range, so the disabled
@@ -770,6 +786,27 @@ function updatePointsRemaining() {
   refreshAllTrainingSliderVisuals();
 
   return remaining;
+}
+
+function syncTrainingAdvance(ready) {
+  if (submitBtn) {
+    submitBtn.disabled = !ready;
+    submitBtn.style.opacity = ready ? '1' : '0.4';
+  }
+  let onView = false;
+  try {
+    onView = new URLSearchParams(window.location.search).get('tab') === 'training-view';
+  } catch (_err) {
+    onView = false;
+  }
+  if (!onView || !window.GOBAdvance || typeof window.GOBAdvance.setOverride !== 'function') return;
+  window.GOBAdvance.setOverride({
+    label: 'Submit Training',
+    enabled: !!ready,
+    onClick: function () {
+      submitTraining(document.getElementById('play-now'));
+    },
+  });
 }
 
 /**
@@ -1294,11 +1331,25 @@ function showMessageModal(message, buttonLabel = 'Close') {
   autoTrainModal.classList.add('is-visible');
 }
 
+function rewriteReportRedirect(redirectUrl) {
+  try {
+    const redirect = new URL(redirectUrl, window.location.origin);
+    if (redirect.pathname === '/training-report.html' || redirect.pathname === '/static/training-report.html') {
+      const bag = franchiseCtx().parseSearch(redirect.search);
+      bag.delete('embed');
+      bag.set('tab', 'training-report-view');
+      const qs = bag.toString();
+      return '/franchise-command-center.html' + (qs ? '?' + qs : '');
+    }
+  } catch (_err) {}
+  return redirectUrl;
+}
+
 /**
  * Handle submit button click
  */
-submitBtn.addEventListener('click', async function() {
-  if (this.disabled) return;
+async function submitTraining(button) {
+  if (button && button.disabled) return;
   playSound('confirm-2-lowervol.wav');
   
   const trainingData = collectTrainingData();
@@ -1350,8 +1401,10 @@ submitBtn.addEventListener('click', async function() {
   }
   
   try {
-    this.disabled = true;
-    this.textContent = 'Submitting...';
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Submitting...';
+    }
     if (mode === 'franchise' && franchiseId) {
       showTrainingNewswire(franchiseId);
     } else if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
@@ -1435,12 +1488,17 @@ submitBtn.addEventListener('click', async function() {
       sessionStorage.removeItem(STORAGE_TEAM_DRILLS_SNAPSHOT);
       clearTrainingFormDraftForCurrentContext();
       clearTutorialResumeContext();
+      if (mode === 'franchise' && franchiseId) {
+        sessionStorage.setItem('gob_training_return', String(franchiseId));
+      }
     } catch (_clearErr) {}
 
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
     if (result.redirect) {
       // ✅ FIX: Strip /static/ prefix from backend redirect URLs for Netlify compatibility
       let redirectUrl = result.redirect.replace(/^\/static\//, '/');
+      const headingToReport = /training-report\.html/.test(redirectUrl);
+      redirectUrl = rewriteReportRedirect(redirectUrl);
       const returnUrl = urlParams.get('return_url');
       if (mode === 'franchise' && returnUrl) {
         const safeReturnUrl = typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(returnUrl) : returnUrl;
@@ -1453,7 +1511,7 @@ submitBtn.addEventListener('click', async function() {
         }
       }
       trainingDirty = false;
-      if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(redirectUrl)) {
+      if (!headingToReport && window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(redirectUrl)) {
         window.GOBNav.allowNextLeave();
         window.GOBNav.exitFlow(redirectUrl);
       } else if (window.GOBNav) {
@@ -1497,10 +1555,19 @@ submitBtn.addEventListener('click', async function() {
       window.PageLoadOverlay.hide();
     }
     showMessageModal(error.message || 'Failed to submit training. Please try again.');
-    this.disabled = false;
-    this.textContent = 'Submit Training';
+    if (button) {
+      button.disabled = false;
+      button.textContent = button.id === 'play-now' ? 'Submit Training' : 'Submit Training';
+    }
+    syncTrainingAdvance(false);
   }
-});
+}
+
+if (submitBtn) {
+  submitBtn.addEventListener('click', function () {
+    submitTraining(submitBtn);
+  });
+}
 
 async function resumeCpuTraining(franchiseId) {
   if (!franchiseId) return;
@@ -1568,6 +1635,12 @@ async function initializeTrainingPoints() {
         currentSeason = Number(data.season || 1);
         currentTeamName = data.user_team_name || currentTeamName || '';
         prefetchTrainingNewswire(franchiseId);
+        if (data.position_tallies && typeof data.position_tallies === 'object') {
+          positionTallies = data.position_tallies;
+        }
+        if (data.focus_tallies && typeof data.focus_tallies === 'object') {
+          focusTallies = data.focus_tallies;
+        }
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
           // Same 12 rows, already RT-descending, already carrying training_position /
@@ -2072,3 +2145,11 @@ updateRequirementsBar();
     console.log('🔋 [PAGE LOAD] All sliders:', document.querySelectorAll('.slider[data-category="team-drills"]'));
   }
 })();
+
+window.GOBTraining = {
+  submit: function () { return submitTraining(document.getElementById('play-now')); },
+  syncAdvance: function () {
+    const remaining = TOTAL_POINTS - calculateTotalPoints();
+    syncTrainingAdvance(remaining === 0 && isCoachingFocusSelected() && isPlayerMaximizerSubmitReady());
+  },
+};

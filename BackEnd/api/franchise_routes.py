@@ -16919,6 +16919,8 @@ def _build_custom_focus_roster_for_franchise(
     if not ftd_doc:
         return [], ranking
 
+    from BackEnd.utils.rt_projection import potential_rt_for_player
+
     team_player_ids = ftd_doc.get("players") or []
     rows: List[dict] = []
     for pid in team_player_ids:
@@ -16938,6 +16940,7 @@ def _build_custom_focus_roster_for_franchise(
         position_ratings = (
             {str(k): v for k, v in pr_raw.items()} if isinstance(pr_raw, dict) else {}
         )
+        best = _best_position(position_ratings if isinstance(position_ratings, dict) else {})
         rows.append(
             {
                 "player_id": pid_str,
@@ -16950,6 +16953,16 @@ def _build_custom_focus_roster_for_franchise(
                 # the only fields the card needed that were not here.
                 "height": meta.get("height"),
                 "weight": meta.get("weight"),
+                "image_id": meta.get("image_id") or None,
+                "portrait_source": meta.get("portrait_source") or "player",
+                "jersey": meta.get("jersey"),
+                "pos": best.get("pos") or "--",
+                "potential_rt_ratcheted": potential_rt_for_player(
+                    pid_str,
+                    fpd.get("entry_tier"),
+                    fpd.get("potential_factor"),
+                    position_ratings,
+                ),
                 **training_position_projection(fpd),
                 "_sort_max_rt": _max_position_rating_from_fpd(fpd),
             }
@@ -17004,6 +17017,17 @@ def get_training_points(franchise_id: str):
     custom_roster, ranking_attrs = _build_custom_focus_roster_for_franchise(
         franchise_doc, franchise_id_obj
     )
+    from BackEnd.constants.training_shape import TRAINING_FOCUSES
+    position_order = ("PG", "SG", "SF", "PF", "C")
+    position_tallies = {key: 0 for key in position_order}
+    focus_tallies = {key: 0 for key in TRAINING_FOCUSES}
+    for row in custom_roster:
+        pos_key = row.get("resolved_training_position") or ""
+        focus_key = row.get("resolved_training_focus") or ""
+        if pos_key in position_tallies:
+            position_tallies[pos_key] += 1
+        if focus_key in focus_tallies:
+            focus_tallies[focus_key] += 1
 
     return {
         "training_points": training_points,
@@ -17015,6 +17039,8 @@ def get_training_points(franchise_id: str):
         "season": int(franchise_doc.get("current_season") or 1),
         "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,
+        "position_tallies": position_tallies,
+        "focus_tallies": focus_tallies,
         "player_maximizer_ranking_attrs": ranking_attrs,
         "cpu_training_resume": (
             {

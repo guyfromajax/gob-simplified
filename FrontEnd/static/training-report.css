@@ -1613,3 +1613,51 @@ body.training-report-page .playbook-empty-state {
     grid-template-columns: 1fr;
   }
 }
+
+#training-report-view .report-header .locker-room-button,
+#training-report-view #locker-room-btn[hidden] {
+  display: none;
+}
+
+.training-report-page .change-positive,
+.training-report-page .change-negative,
+.training-report-page .change-elite,
+.training-report-page .change-gold,
+#training-report-view .change-positive,
+#training-report-view .change-negative,
+#training-report-view .change-elite,
+#training-report-view .change-gold {
+  color: var(--text-100);
+}
+
+.training-report-page .change-zero,
+#training-report-view .change-zero {
+  color: var(--text-38);
+}
+
+.training-report-page .is-delta,
+#training-report-view .is-delta {
+  box-shadow: inset 0 0 0 2px var(--text-60);
+}
+
+.training-report-page .delta-mark,
+#training-report-view .delta-mark {
+  margin-left: var(--space-2);
+  color: var(--text-100);
+}
+
+.training-report-page .playbook-summary-table,
+#training-report-view .playbook-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.training-report-page .playbook-summary-table th,
+.training-report-page .playbook-summary-table td,
+#training-report-view .playbook-summary-table th,
+#training-report-view .playbook-summary-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  color: var(--text-100);
+  border-bottom: 1px solid var(--line);
+}

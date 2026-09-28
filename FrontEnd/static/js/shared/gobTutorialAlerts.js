@@ -542,6 +542,42 @@ function cloneParams(params) {
     drainQueue();
   }
 
+  var trainingReturnConsumed = false;
+
+  function officeIsCurrent() {
+    var tab = '';
+    try { tab = new URLSearchParams(window.location.search).get('tab') || ''; }
+    catch (err) { tab = ''; }
+    if (!tab || tab === 'home-tab') return true;
+    var active = document.querySelector('#tournament-tabs > .tab-content.active');
+    return !!(active && active.id === 'home-tab');
+  }
+
+  function readTrainingReturnFlag(franchiseId) {
+    try { return sessionStorage.getItem('gob_training_return') === String(franchiseId); }
+    catch (err) { return false; }
+  }
+
+  function clearTrainingReturnFlag() {
+    try { sessionStorage.removeItem('gob_training_return'); }
+    catch (err) { /* ignore */ }
+  }
+
+  /* One increment per return. The flag is set on a successful training submit and
+     the URL param still rides Back to Office. Either signal counts, and only once,
+     and only once the Office is the surface on screen. */
+  function consumeTrainingReturn(franchiseId, evt) {
+    var flagged = readTrainingReturnFlag(franchiseId);
+    var onOffice = officeIsCurrent();
+    if (flagged && onOffice) clearTrainingReturnFlag();
+    var fromParam = evt === 'training_return';
+    if (!onOffice || trainingReturnConsumed || (!flagged && !fromParam) || !franchiseLocked(franchiseId)) {
+      return Promise.resolve(false);
+    }
+    trainingReturnConsumed = true;
+    return incrementCounter(franchiseId, 'training_returns').then(function () { return true; });
+  }
+
   function onFccDomReady() {
     if (!isFcc()) return;
     var params = liveParams();
@@ -550,11 +586,12 @@ function cloneParams(params) {
     if (!franchiseId) return;
 
     enrollFranchise(franchiseId).then(function () {
-      /* Training returns are still counted client-side via the URL param. Game
-         counts are incremented server-side at commit (user_game_commit.py), so
-         we just read the fresh count rather than incrementing here. */
-      if (evt === 'training_return' && franchiseLocked(franchiseId)) {
-        return incrementCounter(franchiseId, 'training_returns');
+      /* Training returns are still counted client-side. Game counts are
+         incremented server-side at commit (user_game_commit.py). */
+      if ((evt === 'training_return' || readTrainingReturnFlag(franchiseId)) && officeIsCurrent()) {
+        return consumeTrainingReturn(franchiseId, evt).then(function (counted) {
+          if (!counted) return refreshMeFromServer();
+        });
       }
       return refreshMeFromServer();
     }).then(function () {
@@ -635,6 +672,24 @@ function cloneParams(params) {
     refreshMeFromServer: refreshMeFromServer,
     whenReturnAlertsSettled: whenReturnAlertsSettled
   };
+
+  window.addEventListener('gob-tab-shown', function (evt) {
+    var tab = evt && evt.detail && evt.detail.tab;
+    if (tab !== 'home-tab' || !isFcc()) return;
+    var params = liveParams();
+    var franchiseId = params.get('franchise_id');
+    if (!franchiseId || !readTrainingReturnFlag(franchiseId)) return;
+    enrollFranchise(franchiseId).then(function () {
+      return consumeTrainingReturn(franchiseId, params.get('tut_alert'));
+    }).then(function (counted) {
+      if (!counted) return;
+      if (params.get('tut_alert')) {
+        params.delete('tut_alert');
+        franchiseCtx().commitParams(params);
+      }
+      return evaluateAndShow({ franchiseId: franchiseId, checkFccReturn: true });
+    });
+  });
 
   window.addEventListener('gob:auth-me-loaded', function (e) {
     onAuthMeLoaded((e && e.detail) || window.__gobAuthMeData);

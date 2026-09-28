@@ -413,7 +413,7 @@
 
     function go(url) {
       saveScroll();
-      if (isFcc()) {
+      if (isFcc() && !readFlowStart()) {
         var startIdx = readIdx();
         if (typeof startIdx !== 'number') startIdx = ensureIdx();
         if (!isPeekDestination(url)) {
@@ -508,7 +508,12 @@
     // button is in the first HTML chunk, so a click can land before onload
     // and the jump back to the locker room never starts.
     function goWhenSettled(delta) {
-      function run() {
+      // Chrome drops history.go while this document is still loading, including
+      // a go issued inside the load event, so that case stays deferred. Once
+      // the document is complete, go immediately. A deferred go races the
+      // report view: its Advance is already enabled, so a caller that waits
+      // on the button will history.back before the return to the locker starts.
+      function runDeferred() {
         if (typeof win.setTimeout === 'function') {
           win.setTimeout(function () { win.history.go(delta); }, 0);
           return;
@@ -517,11 +522,15 @@
       }
       var doc = win.document;
       var state = doc && doc.readyState;
-      if ((state === 'loading' || state === 'interactive') && typeof win.addEventListener === 'function') {
-        win.addEventListener('load', run);
+      if (state === 'complete') {
+        win.history.go(delta);
         return;
       }
-      run();
+      if (typeof win.addEventListener === 'function') {
+        win.addEventListener('load', runDeferred);
+        return;
+      }
+      runDeferred();
     }
 
     function exitFlow(hubUrl, options) {
@@ -666,7 +675,7 @@
       var parsed = parseUrl(href);
       if (!parsed || parsed.origin !== win.location.origin) return;
       if (link.target && link.target !== '_self') return;
-      if (isFcc() && !isPeekDestination(href)) {
+      if (isFcc() && !isPeekDestination(href) && !readFlowStart()) {
         var startIdx = readIdx();
         if (typeof startIdx !== 'number') startIdx = ensureIdx();
         rememberFlowTab(currentFccTab());

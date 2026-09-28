@@ -238,8 +238,11 @@ const FOCUS_DISPLAY = {
   }
 };
 
-// Initialize page
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize page. A view inserts this script after DOMContentLoaded, so the
+// start also runs immediately when the document is already loaded.
+function startTrainingReport() {
+  if (window.__gobTrainingReportStarted) return;
+  window.__gobTrainingReportStarted = true;
   // SS&S: For tournament mode, round is optional (backend will determine from state)
   // For franchise mode, week is required
   if (!mode || !teamId) {
@@ -266,7 +269,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Load training report data
   loadTrainingReport();
-});
+}
+
+document.addEventListener('DOMContentLoaded', startTrainingReport);
+if (document.readyState !== 'loading') startTrainingReport();
 
 setupLockerRoomButton();
 
@@ -415,6 +421,26 @@ function setupViewToggle() {
   });
 }
 
+function ensureNewsUpLink() {
+  if (document.getElementById('back-button')) return;
+  const notes = document.querySelector('.training-notes-section');
+  if (!notes || !notes.parentNode) return;
+  const bag = emptyParams();
+  if (franchiseId) bag.set('franchise_id', franchiseId);
+  if (teamId) bag.set('team_id', teamId);
+  if (mode) bag.set('mode', mode);
+  bag.set('tab', 'news-view');
+  bag.delete('story');
+  const feed = '/franchise-command-center.html?' + bag.toString();
+  const link = document.createElement('a');
+  link.className = 'gob-dt-up';
+  link.id = 'back-button';
+  link.href = feed;
+  link.setAttribute('data-gob-up', feed);
+  link.textContent = '← News';
+  notes.parentNode.insertBefore(link, notes);
+}
+
 function setupLockerRoomButton() {
   const btn = document.getElementById('locker-room-btn');
   if (!btn || btn.dataset.exitWired === '1') return;
@@ -423,11 +449,14 @@ function setupLockerRoomButton() {
   btn.dataset.exitWired = '1';
 
   if (reportFrom === 'news' && mode === 'franchise') {
-    btn.textContent = 'Back';
-    btn.classList.add('training-report-back-btn');
+    btn.hidden = true;
+    btn.style.display = 'none';
+    ensureNewsUpLink();
   } else {
-    btn.textContent = 'Go To Locker Room';
-    btn.classList.remove('training-report-back-btn');
+    btn.hidden = false;
+    btn.style.display = '';
+    btn.textContent = 'Back to Office';
+    btn.className = 'gob-btn gob-btn--ghost';
   }
 
   btn.addEventListener('click', () => {
@@ -1077,8 +1106,21 @@ function createAttributeCell(attr, value, change, displayMovement = 0) {
     }
     attachChangeTooltip();
   }
-  
+
+  markTrainingDelta(td, change);
   return td;
+}
+
+function markTrainingDelta(td, change) {
+  const n = Number(change);
+  if (!Number.isFinite(n) || n === 0) return;
+  const arrow = describeTrainingChange(n);
+  if (!arrow.text || arrow.text === '–') return;
+  td.classList.add('is-delta');
+  const mark = document.createElement('span');
+  mark.className = 'delta-mark ' + arrow.className;
+  mark.textContent = arrow.text;
+  td.appendChild(mark);
 }
 
 function getEmotionEmoji(em) {
@@ -1256,6 +1298,7 @@ function createChangeCell(change) {
   const arrow = describeTrainingChange(change);
   td.textContent = arrow.text;
   td.className = arrow.className;
+  if (Number(change) !== 0) td.classList.add('is-delta');
   td.setAttribute('aria-label', `Training change ${change > 0 ? '+' : ''}${change}`);
   return td;
 }
@@ -1318,41 +1361,12 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   changeSpan.className = 'attr-change';
   
   if (change !== 0) {
-    if (attrKey === 'rebound_modifier') {
-      // Format rebound_modifier changes to 2 decimal places
-      const formattedChange = change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2);
-      changeSpan.textContent = formattedChange;
-      if (change > 0) {
-        changeSpan.className += change >= getExceptionalGainThreshold() ? ' change-gold' : ' change-positive';
-      } else {
-        changeSpan.className += ' change-negative';
-      }
-    } else if (attrKey === 'shot_threshold') {
-      // Golf score: lower raw threshold is better. Invert sign for user-facing copy (+ green / − red).
-      const displayDelta = -change;
-      const exceptionalThreshold = getExceptionalGainThreshold();
-      const formattedChange =
-        displayDelta > 0 ? `+${displayDelta}` : displayDelta < 0 ? `${displayDelta}` : '0';
-      changeSpan.textContent = formattedChange;
-      if (displayDelta >= exceptionalThreshold) {
-        changeSpan.className += ' change-gold';
-      } else if (displayDelta > 0) {
-        changeSpan.className += ' change-positive';
-      } else if (displayDelta < 0) {
-        changeSpan.className += ' change-negative';
-      } else {
-        changeSpan.className += ' change-zero';
-      }
-    } else {
-      // Standard handling for other attributes
-      const formattedChange = change > 0 ? `+${change}` : change.toString();
-      changeSpan.textContent = formattedChange;
-      if (change > 0) {
-        changeSpan.className += change >= getExceptionalGainThreshold() ? ' change-gold' : ' change-positive';
-      } else {
-        changeSpan.className += ' change-negative';
-      }
-    }
+    // Shot threshold is a golf score: a lower raw value is the better direction.
+    const displayDelta = attrKey === 'shot_threshold' ? -change : change;
+    const arrow = describeTrainingChange(displayDelta);
+    changeSpan.textContent = arrow.text;
+    changeSpan.className = 'attr-change ' + arrow.className;
+    item.classList.add('is-delta');
   } else {
     changeSpan.textContent = 'No change';
     changeSpan.className += ' change-zero';
@@ -1502,8 +1516,74 @@ function renderPlaybookSummary() {
   man_defenses.sort((a, b) => a.name.localeCompare(b.name));
   zone_defenses.sort((a, b) => a.name.localeCompare(b.name));
   
-  container.appendChild(createPlaybookCategorySection('Offense', motion_plays.concat(set_plays), plays_changes));
-  container.appendChild(createPlaybookCategorySection('Defense', man_defenses.concat(zone_defenses), defenses_changes));
+  container.appendChild(createPlaybookSummaryTable([
+    { title: 'Offense', items: motion_plays.concat(set_plays), changes: plays_changes },
+    { title: 'Defense', items: man_defenses.concat(zone_defenses), changes: defenses_changes },
+  ]));
+}
+
+function playSectionLabel(title, item) {
+  if (title === 'Offense') {
+    const kind = String(item.play_type || '');
+    if (kind === 'motion') return 'Motion';
+    if (kind === 'set_play' || kind === 'set') return 'Set';
+  }
+  if (title === 'Defense') {
+    const name = String(item.name || item.display_name || '');
+    if (/zone/i.test(name)) return 'Zone';
+    return 'Man';
+  }
+  return title;
+}
+
+function createPlaybookSummaryTable(groups) {
+  const table = document.createElement('table');
+  table.className = 'playbook-summary-table';
+  const head = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  ['Play', 'Section', 'CMD', 'Change'].forEach(function (label) {
+    const th = document.createElement('th');
+    th.textContent = label;
+    headRow.appendChild(th);
+  });
+  head.appendChild(headRow);
+  table.appendChild(head);
+  const body = document.createElement('tbody');
+  groups.forEach(function (group) {
+    (group.items || []).forEach(function (item) {
+      const change = group.title === 'Offense'
+        ? getTrainingReportPlayChange(group.changes, item)
+        : getTrainingReportDefenseChange(group.changes, item);
+      const tr = document.createElement('tr');
+      const name = document.createElement('td');
+      name.textContent = item.display_name || item.name || '';
+      const section = document.createElement('td');
+      section.textContent = playSectionLabel(group.title, item);
+      const cmd = document.createElement('td');
+      const effectiveness = item && typeof item.effectiveness === 'number' ? item.effectiveness : null;
+      cmd.textContent = effectiveness == null ? '—' : String(effectiveness);
+      const delta = document.createElement('td');
+      const arrow = describeTrainingChange(change);
+      delta.textContent = arrow.text;
+      delta.className = arrow.className;
+      if (Number(change) !== 0) delta.classList.add('is-delta');
+      tr.appendChild(name);
+      tr.appendChild(section);
+      tr.appendChild(cmd);
+      tr.appendChild(delta);
+      body.appendChild(tr);
+    });
+  });
+  if (!body.children.length) {
+    const empty = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.textContent = 'No data available.';
+    empty.appendChild(cell);
+    body.appendChild(empty);
+  }
+  table.appendChild(body);
+  return table;
 }
 
 function looksLikeTrainingReportObjectId(value) {

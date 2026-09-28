@@ -720,6 +720,7 @@ html.gob-shell .gpc .gpr {
   min-height: var(--dsz-60);
   padding: var(--space-6) 0;
   border-bottom: 1px solid var(--line);
+  overflow: visible;
 }
 
 html.gob-shell .gpc .gpr-n b {
@@ -742,6 +743,7 @@ html.gob-shell .gpc .gt {
   position: relative;
   height: 36px;
   margin: 0 var(--space-2);
+  overflow: visible;
   touch-action: none;
   user-select: none;
   cursor: pointer;
@@ -802,9 +804,9 @@ html.gob-shell .gpc .gt-k {
 html.gob-shell .gpc .gt-l {
   position: absolute;
   top: 16px;
-  max-width: calc(50% - 20px);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
   font-size: var(--fs-10);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-2);
@@ -867,4 +869,9 @@ html.gob-shell .nest .slider-nest__info:focus-visible {
   color: var(--text-100);
   outline: 2px solid var(--white);
   outline-offset: 2px;
+}
+
+#game-plan-view .game-plan-page-header-wrap,
+#game-plan-view .game-plan-page-header {
+  display: none;
 }

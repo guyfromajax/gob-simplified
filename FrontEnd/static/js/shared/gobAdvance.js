@@ -160,9 +160,42 @@
     }
   }
 
+  var advanceOverride = null;
+
+  function paintOverride() {
+    var playNowBtn = document.getElementById('play-now');
+    if (!playNowBtn || !advanceOverride) return;
+    playNowBtn.classList.remove('is-loading');
+    playNowBtn.textContent = advanceOverride.label || 'Submit Training';
+    playNowBtn.dataset.mode = 'override';
+    playNowBtn.disabled = advanceOverride.enabled === false;
+  }
+
+  function setOverride(spec) {
+    if (!spec || typeof spec.onClick !== 'function') {
+      clearOverride();
+      return;
+    }
+    advanceOverride = spec;
+    paintOverride();
+  }
+
+  function clearOverride() {
+    if (!advanceOverride) return;
+    advanceOverride = null;
+    var playNowBtn = document.getElementById('play-now');
+    if (playNowBtn) playNowBtn.disabled = false;
+    var data = window.__gobCommandCenterData;
+    if (data) updatePlayButton(data, browseEnv(data));
+  }
+
   function updatePlayButton(data, env) {
     var playNowBtn = document.getElementById('play-now');
     if (!playNowBtn || !data) return;
+    if (advanceOverride) {
+      paintOverride();
+      return;
+    }
     env = env || {};
     var userTeamId = env.userTeamId;
     playNowBtn.classList.remove('is-loading');
@@ -292,6 +325,12 @@
   }
 
   async function onAdvanceClick(playNowBtn, env) {
+    if (advanceOverride) {
+      if (advanceOverride.enabled === false || playNowBtn.disabled) return;
+      if (playNowBtn.classList.contains('is-loading')) return;
+      advanceOverride.onClick();
+      return;
+    }
     if (playNowBtn.classList.contains('is-loading')) return;
     var advanceLabel = playNowBtn.textContent;
     playNowBtn.classList.add('is-loading');
@@ -758,6 +797,8 @@
 
   window.GOBAdvance = {
     updatePlayButton: updatePlayButton,
+    setOverride: setOverride,
+    clearOverride: clearOverride,
     updateEditRecruitingButton: updateEditRecruitingButton,
     bind: bind,
     load: load,
