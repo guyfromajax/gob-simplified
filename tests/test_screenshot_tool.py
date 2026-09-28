@@ -52,6 +52,13 @@ body { margin: 0; background: #07111f; color: white; font-family: sans-serif; }
         return
 
 
+_BROWSERS_PATH = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+needs_chromium = pytest.mark.skipif(
+    bool(_BROWSERS_PATH) and _BROWSERS_PATH != "0" and not Path(_BROWSERS_PATH).is_dir(),
+    reason=f"PLAYWRIGHT_BROWSERS_PATH={_BROWSERS_PATH} does not exist, so Chromium cannot launch",
+)
+
+
 @pytest.fixture(scope="module")
 def screenshot_fixture_url():
     server = ThreadingHTTPServer(("127.0.0.1", 0), ScreenshotFixtureHandler)
@@ -199,6 +206,7 @@ console.log(JSON.stringify({{
     }
 
 
+@needs_chromium
 def test_native_viewport_and_selector_screenshots(screenshot_fixture_url, tmp_path):
     viewport = subprocess.run(
         [
@@ -253,6 +261,7 @@ def test_native_viewport_and_selector_screenshots(screenshot_fixture_url, tmp_pa
     assert png_dimensions(selector_path) == (320, 180)
 
 
+@needs_chromium
 def test_missing_selector_has_specific_bounded_failure(screenshot_fixture_url, tmp_path):
     result = run_node_module(
         f"""

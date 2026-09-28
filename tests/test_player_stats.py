@@ -1,13 +1,13 @@
 """GET /franchise/player-stats. Rates come from stat_line. Runs on mongomock and SQLite."""
 
 import logging
-import os
 
 from bson import ObjectId
 from fastapi.testclient import TestClient
 
 from BackEnd.api.api import app
 from BackEnd.db import db, franchise_players_data_collection, franchise_team_data_collection
+from BackEnd.persistence import get_store
 
 client = TestClient(app)
 
@@ -72,9 +72,9 @@ def seed():
     return fid
 
 
-def test_player_stats_bases_zero_attempts_and_zero_games(caplog):
+def test_player_stats_bases_zero_attempts_and_zero_games(caplog, monkeypatch):
+    monkeypatch.setenv("GOB_SQLITE_QUERY_LOG", "1")
     fid = seed()
-    os.environ["GOB_SQLITE_QUERY_LOG"] = "1"
     with caplog.at_level(logging.WARNING, logger="BackEnd.persistence.sqlite_collection"):
         response = client.get("/franchise/player-stats", params={"franchise_id": str(fid), "team_id": str(TEAM)})
     assert response.status_code == 200
@@ -106,7 +106,9 @@ def test_player_stats_bases_zero_attempts_and_zero_games(caplog):
     assert zero["rates"]["tp_pct"] is None
     assert zero["rates"]["ft_pct"] is None
     assert zero["rates"]["def_pct"] is None
-    if os.environ.get("GOB_PERSISTENCE") == "sqlite":
+    # The store is chosen once per process; another test can leave GOB_PERSISTENCE
+    # set while this process still runs on mongomock.
+    if type(get_store()).__name__ == "SqliteStore":
         player_lines = [
             record.getMessage()
             for record in caplog.records
