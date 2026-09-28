@@ -1,0 +1,100 @@
+/* Prep v2 · Scouting Report in-app view (#scouting-view). Tokens only. */
+html.gob-shell #scouting-view.tab-content {
+  display: none;
+  min-width: 0;
+}
+html.gob-shell #scouting-view.tab-content.active {
+  display: block;
+}
+html.gob-shell #scouting-view .pv {
+  --pg-head-h: calc(var(--page-pad) + var(--fs-32) + var(--space-12) + var(--dsz-44) + var(--dsp-8));
+  max-width: min(100%, 1920px);
+}
+html.gob-shell #scouting-view .tbl {
+  --th-top: var(--pg-head-h);
+}
+html.gob-shell #scouting-view .sh h2 {
+  font: var(--fw-bold) var(--fs-20) / var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+}
+html.gob-shell #scouting-view h3 {
+  font-size: var(--fs-20);
+  line-height: var(--lh-1);
+  max-height: 30px;
+  overflow: hidden;
+}
+html.gob-shell #scouting-view .opp {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+html.gob-shell #scouting-view .opp-ranks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: calc(var(--dsz-118) * 2.2);
+  padding-left: var(--dsp-20);
+  border-left: 1px solid var(--line-strong);
+}
+html.gob-shell #scouting-view .opp-rank-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-12);
+}
+html.gob-shell #scouting-view .opp-rank-row .lbl {
+  display: block;
+}
+html.gob-shell #scouting-view .opp-rank-row .place {
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  color: var(--text-87);
+  white-space: nowrap;
+  text-align: right;
+}
+html.gob-shell #scouting-view .opp-rank-row .gob-meter {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--white-6);
+  overflow: hidden;
+}
+html.gob-shell #scouting-view .opp-rank-row .gob-meter i {
+  display: block;
+  height: 100%;
+  width: var(--w, 0%);
+  background: var(--white-55);
+  border-radius: 2px;
+}
+html.gob-shell #scouting-view .opp-rank-row .gob-meter.is-empty i {
+  width: 0;
+}
+html.gob-shell #scouting-view .logo img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  display: block;
+  border-radius: var(--radius-logo);
+}
+html.gob-shell #scouting-view .ms.hi {
+  color: var(--text-60);
+}
+html.gob-shell #scouting-view .ms.hi b {
+  color: var(--text-87);
+}
+html.gob-shell #scouting-view .ms.hi .dv i {
+  background: var(--white-55);
+}
+html.gob-shell #scouting-view .scouting-status {
+  font-size: var(--fs-13);
+  color: var(--text-60);
+}
+html.gob-shell #scouting-view .ut td.empty-td {
+  padding: var(--dsp-20) var(--dsp-10);
+  font-size: var(--fs-12);
+  color: var(--text-60);
+  text-align: center;
+  white-space: normal;
+  line-height: 1.45;
+}
+html.gob-shell #scouting-view .tcard.scroll-x {
+  overflow-x: auto;
+}

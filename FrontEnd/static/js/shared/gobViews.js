@@ -332,6 +332,14 @@
     module: viewModule('gamePlanView.js')
   });
 
+  register({
+    id: 'scouting-view',
+    section: 'prep',
+    subtab: 'scouting-view',
+    title: 'Scouting Report',
+    module: viewModule('scoutingView.js')
+  });
+
   global.GOBViews = {
     register: register,
     has: has,
