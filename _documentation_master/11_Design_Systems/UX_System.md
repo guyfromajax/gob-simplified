@@ -115,6 +115,7 @@ The shared tab module also serves any other command center that calls `initComma
 | Team | Player Stats | `player-stats-view` (in-page module view). `?tab=player-stats-tab` opens this view. |
 | Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
 | Team | Schedule | `team-schedule-view` (in-page module view). `?tab=schedule-tab` opens this view. Four week columns (1–7, 8–14, 15–21, 22–26), with the three tournament labels under 22–26. Two columns below 1100px. The bracket stays on League › Tournament. |
+| Team | Practice Squad | `practice-squad-view` (in-page module view). The regional practice-squad league. `practice-squad-standings.html` and `practice-squad-bracket.html` redirect here. |
 | Prep | Training | `training.html`. The underline tab replaces. `?tab=training-tab` redirects here. The FCC summary panel stays in the page and is no longer opened by the shell. |
 | Prep | Game Plan | `game-plan.html`. `?tab=game-plan-tab` redirects here. `resume_from_timeout=true` and `mode=tutorial` stay focus, with no rail and no underline row. |
 | Prep | Playbooks | `playbooks.html`. `?tab=playbooks-tab` redirects here. The FCC summary panel stays in the page and is no longer opened by the shell. |
@@ -124,7 +125,6 @@ The shared tab module also serves any other command center that calls `initComma
 | League | Leaders | `leaders-view` (in-page module view; `leaders.html` redirects here). `?tab=awards-tab` still opens the old panel. |
 | League | Team Stats | `team-stats-view` (in-page module view; `team-stats.html` redirects here). `?tab=fcc-team-stats-summary-tab` still opens the old panel. |
 | League | Schedule | `league-schedule-view` (in-page module view; `schedule.html` redirects here and keeps `franchise_id`, `team_id`, `week`, and return params). |
-| League | Practice Squad | existing `#fcc-ps-season-link` (`practice-squad-standings.html`, `franchise_id` and `team_id`) |
 | League | Tournament | existing `brackets.html` href, or the same resource query already on the rankings link. Before the first week `GOBTierEmblem.tierForWeek` returns a tier, the control is disabled: same shape, `--text-38`, `not-allowed`, not focusable, title `Opens Week N`. |
 | Recruiting | Pool, Leans, Visits | `recruiting.html?hub=pool\|leans\|visits` via `openRecruitingSurface` / `GOBNav.go` from the rail (`franchise_id`, `team_id`, `from=fcc`, `return_url`). The sub-tab replaces `hub` on that same document. The name search sits in `.pg-tools` as `.gob-search` ("Search name…", `/` to focus). Weeks 35 and 36 hide the row; the sign board or the results list is the page. Focus mode hides the head, including the row. An old `?tab=recruits-tab` deep link opens `home-tab`. |
 | News | News | `news-view` (in-page module view; `news.html` redirects here and keeps `franchise_id`, `team_id`, `story`, and return params). `?tab=press-tab` opens this view. |
