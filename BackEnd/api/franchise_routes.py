@@ -10327,6 +10327,11 @@ def command_center_data(
                     response["rankings"] = rankings
 
                     if team_id:
+                        own_row = standings_data.get(str(team_id), {}) or {}
+                        response["team_record"] = {
+                            "wins": int(own_row.get("W", 0) or 0),
+                            "losses": int(own_row.get("L", 0) or 0),
+                        }
                         next_game = _find_user_next_game(franchise_doc, str(team_id))
                         if next_game:
                             opponent_id = (

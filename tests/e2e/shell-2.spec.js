@@ -25,17 +25,17 @@ const BROWSE = [
   'standings.html',
   'team-stats.html',
   'stats.html',
+  'training.html',
+  'training-report.html',
+  'game-plan.html',
+  'playbooks.html',
 ];
 
 const FOCUS = [
   'set-lineup.html',
-  'training.html',
-  'training-report.html',
   'training-squad-report.html',
   'training-playbooks.html',
   'cut-players.html',
-  'game-plan.html',
-  'playbooks.html',
   'playbook-report.html',
 ];
 
@@ -684,9 +684,13 @@ test('rankings sub-tab replaces in place and back leaves League', async ({ page 
 });
 
 test('flow pages keep their own exit and the court has no shell', async ({ page }) => {
-  await openPage(page, 'training.html', cc({ training_completed: false }));
-  await expect(page.locator('#back-btn')).toHaveCount(1);
+  await openPage(page, 'set-lineup.html', cc(), '&home=Lancaster&away=Four%20Corners&home_display=Lancaster&away_display=Four%20Corners&my_team=home&game_id=g-mid&week=12');
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await expect(page.locator('.rail')).toHaveCount(0);
+  await openPage(page, 'training.html', cc({ training_completed: false }));
+  await expect(page.locator('nav.rail')).toHaveCount(1);
+  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"] .tb-l')).toHaveText('Training');
+  await expect(page.locator('#play-now.advance')).toHaveCount(1);
   await openPage(page, 'recruiting.html', cc(), '&action=run');
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await stubAuth(page);
@@ -695,6 +699,43 @@ test('flow pages keep their own exit and the court has no shell', async ({ page 
   await page.waitForTimeout(400);
   await expect(page.locator('html.gob-shell')).toHaveCount(0);
   await expect(page.locator('.rail')).toHaveCount(0);
+});
+
+test('game plan tracks step from the keyboard and a timeout stays focus', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openPage(page, 'game-plan.html', cc(), '&from=command_center&mode=franchise');
+  await expect(page.locator('nav.rail')).toHaveCount(1);
+  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"] .tb-l')).toHaveText('Game Plan');
+  await expect(page.locator('#gob-subtabs .pg-tools #btn-save-game-plan')).toBeVisible();
+  await expect(page.locator('#btn-back-to-lineup')).toBeHidden();
+  const tempo = page.locator('#slider-tempo');
+  await tempo.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(tempo).toHaveAttribute('aria-valuenow', '1');
+  await expect(tempo).toHaveAttribute('aria-valuetext', 'between Slow and Normal');
+  await page.keyboard.press('Home');
+  await expect(tempo).toHaveAttribute('aria-valuenow', '0');
+  await page.keyboard.press('End');
+  await expect(tempo).toHaveAttribute('aria-valuenow', '4');
+  const ring = await tempo.locator('.gt-k').evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(ring).not.toBe('none');
+  const fold = await page.evaluate(() => {
+    const main = document.querySelector('.main');
+    return { extra: main.scrollHeight - main.clientHeight, save: !!document.querySelector('#gob-subtabs .pg-tools #btn-save-game-plan') };
+  });
+  expect(fold.extra).toBeLessThanOrEqual(1);
+  expect(fold.save).toBe(true);
+  await openPage(page, 'game-plan.html', cc(), '&resume_from_timeout=true&from=lineup&mode=franchise&game_id=g-mid&quarter=2');
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('nav.rail')).toHaveCount(0);
+  await expect(page.locator('#gob-subtabs')).toHaveCount(0);
+  await expect(page.locator('#btn-save-game-plan')).toBeVisible();
+  await expect(page.locator('#btn-back-to-lineup')).toBeVisible();
+  const focusFold = await page.evaluate(() => {
+    const main = document.querySelector('.main');
+    return main.scrollHeight - main.clientHeight;
+  });
+  expect(focusFold).toBeLessThanOrEqual(1);
 });
 
 const OUT2 = path.join(__dirname, '../../reports/shell-2b');

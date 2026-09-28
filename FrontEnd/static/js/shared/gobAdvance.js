@@ -709,7 +709,8 @@
     if (window.GOBShell && window.GOBShell.noteCommandCenter) window.GOBShell.noteCommandCenter(data, reused);
   }
 
-  function load() {
+  function load(attempt) {
+    attempt = attempt || 0;
     if (window.__gobCommandCenterData) {
       window.__gobAdvanceLoadMs = 0;
       window.__gobAdvanceLoadReused = true;
@@ -727,7 +728,11 @@
         }
         var franchiseId = queryId('franchise_id');
         if (!franchiseId || !window.API_CONFIG) {
-          resolve(null);
+          if (!franchiseId || attempt >= 40) {
+            resolve(null);
+            return;
+          }
+          window.setTimeout(function () { load(attempt + 1).then(resolve); }, 50);
           return;
         }
         var started = performance.now();

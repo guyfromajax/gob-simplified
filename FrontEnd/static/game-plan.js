@@ -42,8 +42,11 @@ const pageLoadParams = {
 console.log('🔍 [GAME-PLAN] PAGE LOAD - URL params:', pageLoadParams);
 console.warn('⚠️ [GAME-PLAN] PAGE LOAD CHECK - game_id:', pageLoadParams.game_id, 'resume_from_timeout:', pageLoadParams.resume_from_timeout);
 
-// ✅ CRITICAL DEBUG: Alert if params are missing (can't be filtered/cleared)
-if (!pageLoadParams.game_id || !pageLoadParams.resume_from_timeout) {
+// A live game, a timeout, or the tutorial needs game_id. Franchise browse does not.
+const pageNeedsGameId = pageLoadParams.resume_from_timeout === 'true'
+  || pageLoadParams.allParams.mode === 'single'
+  || pageLoadParams.allParams.mode === 'tutorial';
+if (pageNeedsGameId && !pageLoadParams.game_id) {
   console.error('❌ [GAME-PLAN] CRITICAL: game_id or resume_from_timeout is MISSING on page load!', pageLoadParams);
 }
 
@@ -311,6 +314,136 @@ const strategySliders = {
   'rebounding': 'slider-rebounding'
 };
 
+const EFFECT_LINES = {
+  offense: 'Motion freedom vs designed set plays.',
+  inside: 'Paint touches. Your highest-percentage shots.',
+  attack: 'Drives and cuts. Draws the most fouls.',
+  outside: 'Perimeter shots. Lowest %, most impact.',
+  tempo: 'Push for early shots or work for a good one.',
+  alterations: 'Follow the script or read and react.',
+  defense: 'Man wins matchups. Zone saves legs and fouls.',
+  aggression: 'More steals, more fatigue and fouls.',
+  hc_trap: 'More turnovers. Faster fatigue, more fouls.',
+  fc_press: 'Bigger disruption than a trap, bigger cost.',
+  fast_breaks: 'How hard you push in transition.',
+  rebounding: 'Second chances vs getting back on D.'
+};
+
+function applyEffectLines() {
+  document.querySelectorAll('[data-effect]').forEach((el) => {
+    const key = el.getAttribute('data-effect');
+    if (EFFECT_LINES[key]) el.textContent = EFFECT_LINES[key];
+  });
+}
+
+function clampTrack(raw) {
+  const n = parseInt(raw, 10);
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(4, n));
+}
+
+function paintTrack(slider, raw) {
+  const value = clampTrack(raw);
+  const labels = slider.querySelectorAll('.gt-l');
+  const names = Array.from(labels).map((el) => el.textContent.trim());
+  let text = names[1] || '';
+  if (value === 0) text = names[0] || '';
+  else if (value === 2) text = names[1] || '';
+  else if (value === 4) text = names[2] || '';
+  else if (value === 1) text = 'between ' + (names[0] || '') + ' and ' + (names[1] || '');
+  else text = 'between ' + (names[1] || '') + ' and ' + (names[2] || '');
+  slider.setAttribute('aria-valuenow', String(value));
+  slider.setAttribute('aria-valuetext', text);
+  const knob = slider.querySelector('.gt-k');
+  if (knob) knob.style.left = 'calc(8px + (100% - 16px) * ' + (value / 4) + ')';
+  labels.forEach((el, index) => {
+    const stop = index * 2;
+    const between = value === 1 || value === 3;
+    el.classList.toggle('on', !between && value === stop);
+    el.classList.toggle('nr', between && Math.abs(stop - value) === 1);
+  });
+  return value;
+}
+
+function valueFromPointer(slider, clientX) {
+  const rail = slider.querySelector('.gt-r') || slider;
+  const rect = rail.getBoundingClientRect();
+  const width = rect.width || 1;
+  let t = (clientX - rect.left) / width;
+  if (t < 0) t = 0;
+  if (t > 1) t = 1;
+  return Math.round(t * 4);
+}
+
+function installTrack(slider) {
+  if (!slider || slider.dataset.trackReady === '1') return;
+  slider.dataset.trackReady = '1';
+  let current = paintTrack(slider, slider.getAttribute('aria-valuenow') || '2');
+  Object.defineProperty(slider, 'value', {
+    configurable: true,
+    get() { return String(current); },
+    set(v) { current = paintTrack(slider, v); }
+  });
+  function commit(next, notify) {
+    const prev = current;
+    current = paintTrack(slider, next);
+    if (!notify || current === prev) return;
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  slider.addEventListener('keydown', (event) => {
+    if (slider.getAttribute('aria-disabled') === 'true') return;
+    let next = null;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') next = current + 1;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') next = current - 1;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = 4;
+    else return;
+    event.preventDefault();
+    if (next === current) return;
+    commit(next, true);
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  slider.addEventListener('pointerdown', (event) => {
+    if (slider.getAttribute('aria-disabled') === 'true') return;
+    if (event.button != null && event.button !== 0) return;
+    slider.focus();
+    try { slider.setPointerCapture(event.pointerId); } catch (err) { /* pointer already gone */ }
+    function at(ev) { commit(valueFromPointer(slider, ev.clientX), true); }
+    function move(ev) {
+      if (ev.pointerId !== event.pointerId) return;
+      at(ev);
+    }
+    function up(ev) {
+      if (ev.pointerId !== event.pointerId) return;
+      slider.removeEventListener('pointermove', move);
+      slider.removeEventListener('pointerup', up);
+      slider.removeEventListener('pointercancel', up);
+      slider.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    at(event);
+    slider.addEventListener('pointermove', move);
+    slider.addEventListener('pointerup', up);
+    slider.addEventListener('pointercancel', up);
+  });
+}
+
+function placeGamePlanTools() {
+  if (document.documentElement.classList.contains('gob-focus')) return;
+  const row = document.querySelector('.button-container');
+  const host = document.getElementById('gob-subtabs');
+  if (!row || !host) return;
+  let tools = host.querySelector('.pg-tools');
+  if (!tools) {
+    tools = document.createElement('div');
+    tools.className = 'pg-tools';
+    host.appendChild(tools);
+  }
+  tools.appendChild(row);
+  if (window.GOBSubtabs && typeof window.GOBSubtabs.syncTools === 'function') {
+    window.GOBSubtabs.syncTools(host);
+  }
+}
+
 function dismissToast() {
   const toast = document.getElementById('toast');
   if (!toast) return;
@@ -424,6 +557,11 @@ function ensureSliderVisual(slider) {
 }
 
 function updateSliderVisual(slider, rawValue) {
+  if (slider && slider.classList && slider.classList.contains('gt')) {
+    if (slider.dataset.trackReady === '1') slider.value = rawValue;
+    else paintTrack(slider, rawValue);
+    return;
+  }
   const shell = ensureSliderVisual(slider);
   if (!shell) return;
   const value = Math.max(0, Math.min(4, Number(rawValue) || 0));
@@ -433,13 +571,14 @@ function updateSliderVisual(slider, rawValue) {
 }
 
 function setupSliders() {
+  applyEffectLines();
   // Setup all sliders (all save to strategy_settings)
   for (const [key, sliderId] of Object.entries(strategySliders)) {
     const slider = document.getElementById(sliderId);
     const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
-    
+
+    if (slider && slider.classList.contains('gt')) installTrack(slider);
     if (slider && valueDisplay) {
-      ensureSliderVisual(slider);
       updateSliderVisual(slider, slider.value);
       slider.addEventListener('input', (e) => {
         const value = parseInt(e.target.value, 10);
@@ -1177,6 +1316,8 @@ async function init() {
   if (modalClose) {
     modalClose.addEventListener('click', hideModal);
   }
+
+  placeGamePlanTools();
 }
 
 document.addEventListener('DOMContentLoaded', init);
