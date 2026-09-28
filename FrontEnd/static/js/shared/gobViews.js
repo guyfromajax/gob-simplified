@@ -333,6 +333,14 @@
   });
 
   register({
+    id: 'playbooks-view',
+    section: 'prep',
+    subtab: 'playbooks-view',
+    title: 'Playbooks',
+    module: viewModule('playbooksView.js')
+  });
+
+  register({
     id: 'scouting-view',
     section: 'prep',
     subtab: 'scouting-view',

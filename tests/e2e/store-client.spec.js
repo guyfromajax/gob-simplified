@@ -456,8 +456,8 @@ test('game plan save shows the new tempo', async ({ page }) => {
 test('playbooks save shows the new play', async ({ page }) => {
   const state = freshState();
   await boot(page, state);
-  await openTab(page, 'prep', 'playbooks-tab');
-  await expect(page.locator('body')).toContainText('Baseline');
+  await openTab(page, 'prep', 'playbooks-view');
+  await expect(page.locator('#playbooks-view')).toContainText('Baseline');
   await page.evaluate(async function (fid) {
     await fetch('/api/playbooks?mode=franchise&franchise_id=' + fid, {
       method: 'POST',

@@ -71,6 +71,7 @@ function initCommandCenterTabs(options) {
     if (tabName === 'press-tab') return 'news-view';
     if (tabName === 'training-tab') return 'training-view';
     if (tabName === 'game-plan-tab') return 'game-plan-view';
+    if (tabName === 'playbooks-tab') return 'playbooks-view';
     if (tabName === 'coaches-tab') return 'scouting-view';
     return tabName;
   }

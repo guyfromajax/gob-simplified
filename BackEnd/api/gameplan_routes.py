@@ -244,6 +244,39 @@ def _build_player_name_lookup(team_obj: dict | None) -> dict[str, str]:
     return player_lookup
 
 
+def _copy_1_text(play_data: dict | None) -> str | None:
+    """Return play-document copy.copy_1 when present and non-empty."""
+    if not isinstance(play_data, dict):
+        return None
+    copy = play_data.get("copy")
+    if isinstance(copy, dict):
+        text = copy.get("copy_1")
+        if isinstance(text, str) and text.strip():
+            return text.strip()
+    return None
+
+
+def _catalog_copy_1_by_key() -> dict[str, str]:
+    """Map catalog play id / name → copy_1. Team snapshots omit the play document copy."""
+    mapping: dict[str, str] = {}
+    try:
+        for doc in plays_collection.find({}, {"copy": 1, "play_id": 1, "name": 1}):
+            text = _copy_1_text(doc)
+            if not text:
+                continue
+            if doc.get("_id") is not None:
+                mapping[str(doc["_id"])] = text
+            play_id = doc.get("play_id")
+            if play_id:
+                mapping[str(play_id)] = text
+            name = doc.get("name")
+            if name:
+                mapping[str(name)] = text
+    except Exception:
+        return {}
+    return mapping
+
+
 def _get_top_scorer_label(play_data: dict, player_lookup: dict[str, str]) -> str | None:
     season_stats = (play_data or {}).get("season_stats", {})
     player_points = season_stats.get("player_points", {}) if isinstance(season_stats, dict) else {}
@@ -2634,6 +2667,7 @@ def get_playbooks(
         player_name_lookup = _build_player_name_lookup(team_obj)
         scouting_data = (team_obj or {}).get("scouting_data", {})
         defense_scouting = scouting_data.get("defense", {}) if isinstance(scouting_data, dict) else {}
+        catalog_copy_1 = _catalog_copy_1_by_key()
 
         for play_key, play_data, display_name in iter_team_plays(plays):
             play_type = play_data.get("play_type", "")
@@ -2648,6 +2682,11 @@ def get_playbooks(
                 "cloaking": play_data.get("cloaking", 0),
                 "top_scorer": _get_top_scorer_label(play_data, player_name_lookup),
             }
+            copy_1 = _copy_1_text(play_data) or catalog_copy_1.get(
+                str(play_data.get("play_id") or "")
+            ) or catalog_copy_1.get(display_name)
+            if copy_1:
+                play_summary["copy"] = {"copy_1": copy_1}
             
             if play_type == "motion":
                 play_summary["motion_focus"] = play_data.get("motion_focus")
