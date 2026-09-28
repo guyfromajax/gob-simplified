@@ -31,8 +31,6 @@ RULE_EXCEPTIONS: dict[str, frozenset[str]] = {
             "BackEnd/persistence/mongo.py",
             # In-memory mongomock only: remote collections never enter the save file.
             "BackEnd/persistence/sqlite.py",
-            # Offline integrity script; optional MongoStore for live DB audits only.
-            "scripts/check_season_stats_integrity.py",
         }
     ),
     # These boundaries inspect and reject file-supplied authorization; they never

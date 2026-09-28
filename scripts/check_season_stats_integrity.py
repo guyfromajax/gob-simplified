@@ -23,6 +23,8 @@ from collections import defaultdict
 from pathlib import Path
 from urllib.parse import urlparse
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 def _box_team_keys(game: dict) -> set[str]:
     keys: set[str] = set()
@@ -113,10 +115,16 @@ class SqliteStore(_Store):
 
 class MongoStore(_Store):
     def __init__(self, uri: str, db_name: str):
-        from pymongo import MongoClient
+        from BackEnd.script_db import connect_script_database
 
-        self.client = MongoClient(uri, serverSelectionTimeoutMS=4000)
-        self.db = self.client[db_name]
+        # Production still needs process-level GOB_DB_ACCESS=read; the connection is read-only.
+        conn = connect_script_database(
+            target=db_name,
+            access="read",
+            pristine_env={**os.environ, "MONGO_URI": uri},
+        )
+        self.client = conn.client
+        self.db = conn.database
 
     def rows(self, collection: str) -> list[tuple[str, dict]]:
         out = []
