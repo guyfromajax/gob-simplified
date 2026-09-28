@@ -144,3 +144,60 @@ def test_route_does_not_mutate_franchise_at_week_30(kind, tmp_path, monkeypatch)
     assert after["browse_rev"] == before["browse_rev"]
     assert after["region_tournaments"] == before["region_tournaments"]
     assert after["week"] == 30
+
+
+def test_stale_region_served_in_response_not_persisted(monkeypatch):
+    from BackEnd.tournament import franchise_tournament as ft
+    from BackEnd.tournament import browse as tb
+
+    uid = str(ObjectId())
+    opp = str(ObjectId())
+    stored = {
+        "A": {
+            "round1": [],
+            "final": [{"home_team": "R1_0", "away_team": None, "winner": None}],
+            "current_round": 1,
+        }
+    }
+    reconciled = {
+        "A": {
+            "round1": [{"home_team": uid, "away_team": opp, "winner": None, "score": {}}],
+            "final": [],
+            "current_round": 1,
+        }
+    }
+    franchise_doc = {
+        "_id": ObjectId(),
+        "week": 30,
+        "region_tournaments": stored,
+        "conference_tournaments": {},
+        "national_tournament": {},
+        "results": {},
+    }
+
+    class _Ftd:
+        def find(self, *args, **kwargs):
+            return [{"team_id": uid}]
+
+    monkeypatch.setattr(tb, "region_tournaments_stale", lambda *a, **k: True)
+    monkeypatch.setattr(
+        ft,
+        "reconcile_region_tournaments_with_canonical",
+        lambda *a, **k: reconciled,
+    )
+    monkeypatch.setattr(tb, "build_teams_map", lambda *a, **k: {})
+
+    from BackEnd.api import franchise_routes as routes
+
+    out = tb.build_tournament_brackets_response(
+        franchise_doc,
+        user_team_id=uid,
+        user_team_doc={"conference": 1, "region": "A"},
+        teams_collection=object(),
+        franchise_team_data_collection=_Ftd(),
+        get_user_eos_phase_status=routes._get_user_eos_phase_status,
+        calculate_franchise_standings=lambda *a, **k: {},
+    )
+    assert out["region_tournaments_stale"] is True
+    assert out["region_tournaments"] == reconciled
+    assert franchise_doc["region_tournaments"] == stored

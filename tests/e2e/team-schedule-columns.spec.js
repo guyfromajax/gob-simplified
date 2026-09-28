@@ -56,18 +56,26 @@ function teamDetail(currentWeek) {
     if (week < currentWeek) results.push(played(week));
     else remaining.push(scheduled(week));
   }
-  if (currentWeek >= 27) {
-    // Tournament rows the payload can carry (results.{27+}); the view keeps them off the grid.
-    results.push(Object.assign(played(27), { week: 27 }));
-    results.push(Object.assign(played(28), { week: 28 }));
-  }
   results.sort((x, y) => y.week - x.week);
+  const tournament_by_phase = currentWeek >= 28
+    ? {
+      conference: [Object.assign(played(27), {
+        week: 27,
+        phase: 'conference',
+        round_label: 'Quarterfinal',
+        kind: 'played',
+      })],
+      region: [],
+      national: [],
+    }
+    : { conference: [], region: [], national: [] };
   return {
     team_id: TID,
     name: 'Lancaster',
     next_game: remaining[0] || null,
     results: results,
     upcoming: remaining.slice(1),
+    tournament_by_phase: tournament_by_phase,
   };
 }
 
@@ -198,13 +206,18 @@ for (const size of [[1280, 720], [1920, 1080]]) {
   test('week 27+ keeps the regular season and the tournament rows at ' + size[0], async ({ page }) => {
     await openTeamSchedule(page, 28, size);
     const g = await grid(page);
-    expect(g.weeks[3]).toEqual([22, 23, 24, 25, 26]);
+    expect(g.weeks[3]).toEqual([22, 23, 24, 25, 26, 27]);
     expect(g.eos[3]).toEqual(['Conference Tournaments', 'Region Tournaments', 'National Tournament']);
-    expect(g.rowTops).toBe(26);
+    expect(g.rowTops).toBe(27);
     await expect(page.locator('#team-schedule-view tr.is-next')).toHaveCount(0);
     await expect(page.locator('#team-schedule-view tr[data-week="26"] .gob-res')).toBeVisible();
+    await expect(page.locator('#team-schedule-view tr.is-tourney')).toHaveCount(1);
+    await expect(page.locator('#team-schedule-view tr.is-tourney a.gob-res')).toBeVisible();
     expect(g.bottom).toBeLessThanOrEqual(g.viewport);
     await page.screenshot({ path: path.join(OUT, 'team-schedule-w28-' + size[0] + '.png') });
+    if (size[0] === 1280) {
+      await page.screenshot({ path: path.join(OUT, 'team-schedule-w28-tournament-1280.png') });
+    }
   });
 }
 

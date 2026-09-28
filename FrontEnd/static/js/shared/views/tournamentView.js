@@ -9,6 +9,12 @@ var PHASE_LABELS = {
   national: 'National'
 };
 
+var PHASE_INFO = [
+  { key: 'conference', label: 'Conference', weeks: 'Weeks 27–29' },
+  { key: 'region', label: 'Region', weeks: 'Weeks 30–31' },
+  { key: 'national', label: 'National', weeks: 'Weeks 32–34' }
+];
+
 function bracketsUrl(tables, franchiseId) {
   return tables.apiBase('/franchise/tournament/brackets')
     + '?franchise_id=' + encodeURIComponent(franchiseId);
@@ -83,19 +89,41 @@ function phaseDrawCopy(data, phase) {
 }
 
 function statusHtml(data) {
-  var parts = [];
+  var tables = window.GOBTables;
   if (data.tournament_complete && data.champion) {
     var teams = data.teams || {};
     var champ = teams[String(data.champion)] || {};
-    parts.push('<p class="gob-tour-champ">Champion: <strong>'
-      + window.GOBTables.esc(champ.name || data.champion) + '</strong></p>');
-  } else if (data.user_eliminated && data.eliminated_in_round) {
-    parts.push('<p class="gob-tour-note">Eliminated in '
-      + window.GOBTables.esc(data.eliminated_in_round) + '</p>');
-  } else if (data.has_bye_this_week) {
-    parts.push('<p class="gob-tour-note">Bye this round</p>');
+    return '<section class="gob-tour-status">'
+      + '<p class="gob-tour-status-eye">Champion</p>'
+      + '<p class="gob-tour-status-name">' + tables.esc(champ.name || data.champion) + '</p>'
+      + '</section>';
   }
-  return parts.join('');
+  if (data.user_eliminated && data.eliminated_in_round) {
+    return '<section class="gob-tour-status">'
+      + '<p class="gob-tour-status-eye">Eliminated</p>'
+      + '<p class="gob-tour-status-name">' + tables.esc(data.eliminated_in_round) + '</p>'
+      + '</section>';
+  }
+  if (data.has_bye_this_week) {
+    return '<section class="gob-tour-status">'
+      + '<p class="gob-tour-status-eye">Bye</p>'
+      + '<p class="gob-tour-status-name">This round</p>'
+      + '</section>';
+  }
+  return '';
+}
+
+function lockedHtml(data) {
+  var tables = window.GOBTables;
+  var first = data.first_week || 27;
+  var rows = PHASE_INFO.map(function (row) {
+    return '<li><span class="label">' + tables.esc(row.label) + '</span>'
+      + '<span class="weeks">' + tables.esc(row.weeks) + '</span></li>';
+  }).join('');
+  return '<section class="gob-tour-locked-block">'
+    + '<p class="gob-tour-locked-title">Tournament opens Week ' + first + '</p>'
+    + '<ul class="gob-tour-phase-info">' + rows + '</ul>'
+    + '</section>';
 }
 
 function phasePickerHtml(data, phase) {
@@ -136,7 +164,7 @@ function renderBracket(host, data, phase, maps, ctx) {
     teamIdMetaMap: maps.meta,
     userTeamId: data.user_team_id,
     topData: { week: data.week, rankings: [] },
-    allBrackets: Number(data.week) > 34,
+    allBrackets: true,
     tierHint: phase,
     displayWeek: data.week,
     boxScoreHref: function (gameId) {
@@ -169,14 +197,15 @@ export function mount(container, ctx) {
     var locked = !!data.locked;
     var html = '';
     if (locked) {
-      html += '<p class="gob-tour-locked">Tournament opens Week ' + (data.first_week || 27) + '.</p>';
+      html += lockedHtml(data);
+    } else {
+      html += statusHtml(data);
+      html += phasePickerHtml(data, phase);
+      html += '<div class="gob-tour-bracket fcc-tournament-bracket"></div>';
     }
-    html += statusHtml(data);
-    html += phasePickerHtml(data, phase);
-    html += '<div class="gob-tour-bracket fcc-tournament-bracket"></div>';
     container.innerHTML = html;
-    bindPhasePicker();
     if (!locked) {
+      bindPhasePicker();
       renderBracket(container.querySelector('.gob-tour-bracket'), data, phase, maps, ctx);
     }
   }

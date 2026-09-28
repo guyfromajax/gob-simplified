@@ -8,13 +8,13 @@ New read-only route `GET /franchise/tournament/brackets` (`@browse_cached`, week
 
 Returns stored `conference_tournaments`, `region_tournaments`, `national_tournament`, plus `eos_tournament` via the same `shape_eos_tournament()` helper the FCC payload uses (phase picked by calendar week). `teams` is a map of bracket participants only (`name`, `mascot`, `conference`, `region`, `natl_rank`, `W`, `L`, `logo` name key). `round_labels` per phase, `user_team_id`, `user_eliminated`, `eliminated_in_round`, `has_eos_game_this_week`, `has_bye_this_week`, `region_qualified`, `tournament_complete`, `champion`, `first_week` (27), and `locked` when `week < 27`.
 
-**Region staleness:** `region_tournaments_stale` is true when `reconcile_region_tournaments_with_canonical()` would return a new blob (read-only compare). That typically happens in region weeks if the user has not yet hit a code path that reconciles (historically `GET /franchise/command-center/data` or play/complete-week). The browse route serves the stored blob as-is.
+**Region staleness:** When `region_tournaments_stale` is true, the browse route still **does not persist**, but the JSON response’s `region_tournaments` is the reconciled blob (same value used for the compare). The flag stays in the payload.
 
-`tests/test_tournament_browse.py`: 4 passed (mongomock + sqlite), including no franchise mutation at weeks 30/31.
+`tests/test_tournament_browse.py`: 5 passed (mongomock + sqlite), including no franchise mutation at weeks 30/31 and `test_stale_region_served_in_response_not_persisted`.
 
 ## View (B2)
 
-`tournamentView.js` registered in `gobViews.js`. Phase segment (Conference · Region · National), default `current_phase`, URL `tournament_phase`. Future phases show “Draws after Week N”. Style A (`fcc-tournament-style-a.js`) with browse tokens in `gob-views.css`; scores use `a.gob-res` when `game_id` is present. User team: `fcc-tb-team--user` (navy edge). Status lines: champion, eliminated round, bye.
+`tournamentView.js` registered in `gobViews.js`. When `locked` (week &lt; 27): no phase segment — quiet “Tournament opens Week 27” plus phase name / week-range info rows. When live: phase segment (Conference · Region · National), default `current_phase`, URL `tournament_phase`. Future phases show “Draws after Week N”. Style A with `allBrackets: true` so completed national brackets stay visible; browse skeleton only (no `#page-load-overlay` ball spinner). Status block matches Practice Squad championship styling (`.gob-tour-status` eyebrow + display name). User team: `fcc-tb-team--user` (navy edge).
 
 Shell: `{ id: 'tournament-view', label: 'Tournament', lock: 'tournament' }` (no `link: 'brackets'`). `brackets.html` redirects to `?tab=tournament-view`. Prep and sim-rest untouched.
 
@@ -30,20 +30,32 @@ Shell: `{ id: 'tournament-view', label: 'Tournament', lock: 'tournament' }` (no 
 | --- | --- |
 | `week-26-locked-1280.png`, `week-26-locked-1920.png` | Locked copy, week 26 |
 | `week-27-conference-1280.png`, `week-27-conference-1920.png` | Conference bracket, score link, navy user row |
-| `week-30-region-1280.png` | Region phase segment |
-| `eliminated-1280.png` | “Eliminated in Quarterfinal” |
-| `complete-1280.png` | National phase, champion line |
+| `week-30-region-1280.png`, `week-30-region-1920.png` | Region bracket |
+| `week-32-national-1280.png`, `week-32-national-1920.png` | National bracket |
+| `eliminated-1280.png`, `eliminated-1920.png` | Eliminated status block |
+| `complete-1280.png`, `complete-1920.png` | Champion status block + national bracket |
+| `offline-week-27-1280.png` | SQLite loopback (`/tmp/tournament-view-offline.sqlite`, port 8025) |
 
-Offline loopback shot was not taken this pass; the route follows the same `@browse_cached` + SQLite path as other browse GETs (`tests/test_tournament_browse.py` sqlite case).
+Team › Schedule B3: `reports/team-schedule-columns/team-schedule-w28-tournament-1280.png` (week-28 column, `tr.is-tourney` + `a.gob-res`).
 
 ## Tests
 
-`tests/e2e/tournament-view.spec.js`: 3 passed (redirect, locked, conference, region, eliminated, complete).
+`tests/e2e/tournament-view.spec.js`: bracket visible (`.fcc-tb-mu`), no `#page-load-overlay`, redirect, all fixture states above; optional offline test when `TOURNEY_OFFLINE_BASE` is set.
 
 `tests/e2e/shell-1b.spec.js`: Tournament opens `#tournament-view` in-page (no `brackets.html` navigation).
 
 `tests/e2e/subtabs.spec.js`: week 28 decoration check; FCC subtabs are buttons (0 link tabs).
 
-Full suite: **518 passed, 2 skipped**, ~7.9m, port 8010, `CI` unset, workers=1. Another agent's Playwright was on 8157 during the run; this worktree used 8010 only. Server stopped with the suite.
+Full suite (fix pass): **517 passed, 3 skipped**, ~7.5m, port 8010, `CI` unset, workers=1. Waited until no other agent Playwright on 8157. Server stopped with the suite.
+
+## Fix pass (2026-09-28)
+
+**Bad screenshots:** E2E did not wait for `#page-load-overlay` to hide (unlike other browse specs), so week-27 shots caught the ball spinner. The complete-state bracket looked empty because Style A week-based reveal hid rounds; the view now passes `allBrackets: true`.
+
+**Modals on tournament tab:** After CC data loads, `championshipMomentsDone.then(…)` in `franchise-command-center.js` normally opens Office/Advance flows. Gated when `?tab=tournament-view` via `fccBrowseTournamentTabActive()` — skips `ConferenceRsRegionModal`, `RegionByeModal`, `WalkOnWelcomeModal`, `RecruitVisitModal`, and `BigNewsModals.maybeShow` (bracket reveal/update, recruiting results). Cut-players and championship-moment queues are unchanged (not in that block).
+
+**Region staleness:** Response serves reconciled `region_tournaments` without writing the franchise doc; `test_stale_region_served_in_response_not_persisted`.
+
+**Offline:** `scripts/seed_tournament_view_offline.py` → throwaway SQLite; loopback on 8025 with `GOB_BUILD_PROFILE=desktop` + `GOB_LOOPBACK_PORT` in the browser (same pattern as desktop e2e).
 
 STATUS: COMPLETE

@@ -368,6 +368,25 @@ def build_tournament_brackets_response(
         if d.get("team_id") is not None
     ]
     region_stale = region_tournaments_stale(franchise_doc, teams_collection, eos_team_ids)
+    region_tournaments = franchise_doc.get("region_tournaments") or {}
+    if region_stale:
+        reconciled = ft.reconcile_region_tournaments_with_canonical(
+            franchise_doc, teams_collection, eos_team_ids
+        )
+        if reconciled is not None:
+            region_tournaments = reconciled
+            team_ids = collect_bracket_team_ids({
+                **franchise_doc,
+                "region_tournaments": region_tournaments,
+            })
+            teams = build_teams_map(
+                franchise_doc,
+                team_ids,
+                teams_collection=teams_collection,
+                franchise_team_data_collection=franchise_team_data_collection,
+                franchise_id=franchise_doc.get("_id"),
+                calculate_franchise_standings=calculate_franchise_standings,
+            )
 
     phase = current_phase(week)
     if tournament_complete and week > max(ft.EOS_NATIONAL_WEEKS):
@@ -385,7 +404,7 @@ def build_tournament_brackets_response(
         },
         "phase_draw_week": PHASE_DRAW_WEEK,
         "conference_tournaments": franchise_doc.get("conference_tournaments") or {},
-        "region_tournaments": franchise_doc.get("region_tournaments") or {},
+        "region_tournaments": region_tournaments,
         "national_tournament": national,
         "eos_tournament": shape_eos_tournament(
             franchise_doc, week, user_conf, user_region, national or None

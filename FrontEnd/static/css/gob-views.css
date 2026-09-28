@@ -556,20 +556,69 @@ html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
   color: var(--white);
 }
 
-#franchise-container #tournament-view .gob-tour-note,
-#franchise-container #tournament-view .gob-tour-locked,
 #franchise-container #tournament-view .gob-tour-empty {
   color: var(--text-60);
   margin: 0 0 var(--space-12);
 }
 
-#franchise-container #tournament-view .gob-tour-champ {
-  color: var(--text-100);
+#franchise-container #tournament-view .gob-tour-locked-block {
+  margin: 0 0 var(--space-16);
+}
+
+#franchise-container #tournament-view .gob-tour-locked-title {
   margin: 0 0 var(--space-12);
+  color: var(--text-60);
+  font: var(--fw-semibold) var(--fs-14)/var(--lh-1-3) var(--font-ui);
+}
+
+#franchise-container #tournament-view .gob-tour-phase-info {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+#franchise-container #tournament-view .gob-tour-phase-info li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-12);
+  color: var(--text-60);
+  font: var(--fw-medium) var(--fs-13)/var(--lh-1-3) var(--font-ui);
+}
+
+#franchise-container #tournament-view .gob-tour-status {
+  margin: 0 0 var(--space-16);
+}
+
+#franchise-container #tournament-view .gob-tour-status-eye {
+  margin: 0;
+  color: var(--text-38);
+  font: var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+}
+
+#franchise-container #tournament-view .gob-tour-status-name {
+  margin: var(--space-6) 0 0;
+  color: var(--text-100);
+  font: var(--fw-bold) var(--fs-22)/var(--lh-1-1) var(--font-display);
+  letter-spacing: var(--tracking-2);
 }
 
 #franchise-container #tournament-view .gob-tour-bracket {
   margin-top: var(--space-12);
+  min-height: 28rem;
+  width: 100%;
+  overflow-x: auto;
+}
+
+#franchise-container #tournament-view .fcc-tb-enter,
+#franchise-container #tournament-view .fcc-tb-enter * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
 
 #franchise-container #tournament-view .fcc-tb-team--user {
