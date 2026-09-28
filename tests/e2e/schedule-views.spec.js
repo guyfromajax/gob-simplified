@@ -218,10 +218,13 @@ test('both schedule tabs open from the row', async ({ page }) => {
   await openFcc(page);
   await openSub(page, 'team', 'team-schedule-view');
   await expect(page.locator('#team-schedule-view.tab-content.active')).toBeVisible();
-  await expect(page.locator('#team-schedule-view tr.is-next')).toContainText('Next');
+  await expect(page.locator('#team-schedule-view .gob-schcol')).toHaveCount(4);
+  await expect(page.locator('#team-schedule-view tr.is-next')).toContainText('York');
+  await expect(page.locator('#team-schedule-view tr.is-next td.res')).toHaveText('');
   await expect(page.locator('#team-schedule-view tr[data-week="1"] .gob-wl')).toHaveText('W');
   await expect(page.locator('#team-schedule-view tr[data-week="1"]')).toContainText('70-60');
-  await expect(page.locator('#team-schedule-view tr[data-week="1"] .gob-box')).toHaveAttribute('href', /box-score\.html/);
+  await expect(page.locator('#team-schedule-view tr[data-week="1"] a.gob-res')).toHaveAttribute('href', /box-score\.html\?game_id=g-team/);
+  await expect(page.locator('#team-schedule-view tr[data-week="1"] a.gob-res')).toHaveText('W 70-60');
   await expect(page.locator('#team-schedule-view tr[data-week="2"]')).toContainText('Open');
   await expect(page.locator('#team-schedule-view tr.is-eos').first()).toContainText('Conference Tournaments');
   expect(page.url()).toContain('tab=team-schedule-view');
@@ -321,5 +324,5 @@ test('skeleton then rows, and error then retry', async ({ page }) => {
   await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=team-schedule-view');
   await expect(page.locator('#team-schedule-view .gob-view-error')).toBeVisible();
   await page.locator('#team-schedule-view .gob-view-retry').click();
-  await expect(page.locator('#team-schedule-view tr.is-next')).toContainText('Next');
+  await expect(page.locator('#team-schedule-view tr.is-next')).toContainText('York');
 });
