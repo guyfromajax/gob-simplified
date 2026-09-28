@@ -1085,6 +1085,7 @@
     nodes.forEach(function (node) {
       if (node === app) return;
       if (node.nodeType === 1 && node.tagName === 'SCRIPT') return;
+      if (node.nodeType === 1 && node.id === 'site-footer') return;
       main.appendChild(node);
     });
   }
