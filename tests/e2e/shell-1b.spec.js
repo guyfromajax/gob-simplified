@@ -276,7 +276,9 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   }
   await expect(page.locator('#gob-stats-toggle')).toHaveCount(0);
   await mouseClick(page, '[data-gob-section="team"]');
-  await expect(page.getByRole('tab', { name: 'Practice Squad', exact: true })).toHaveCount(0);
+  await mouseClick(page, stab(page, 'Practice Squad'));
+  await expect(page.locator('#practice-squad-view.tab-content.active')).toBeVisible();
+  expect(page.url()).toContain('tab=practice-squad-view');
 
   await page.evaluate(() => {
     window.__shellNav = [];
@@ -337,10 +339,6 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   expect(page.url()).not.toContain('rankings.html');
   expect(await page.evaluate(() => window.__shellNav.length)).toBe(navBeforeRankings);
   expect(await page.evaluate(() => window.__docStamp)).toBe(docBeforeRankings);
-  const psUrl = await expectGo('Practice Squad', '/practice-squad-standings.html');
-  const psHref = await page.locator('#fcc-ps-season-link').getAttribute('href');
-  expect(psUrl).toBe(psHref);
-
   await mouseClick(page, '[data-gob-section="news"]');
   await mouseClick(page, stab(page, 'Awards'));
   await expect(page.locator('#awards-view.tab-content.active')).toBeVisible();
@@ -367,8 +365,9 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   const openTourney = stab(page, 'Tournament');
   await expect(openTourney).not.toHaveAttribute('aria-disabled', 'true');
   await mouseClick(page, openTourney);
-  const brackets = await page.evaluate(() => window.__shellNav[0] || '');
-  expect(brackets).toContain('/brackets.html');
+  await expect(page.locator('#tournament-view.tab-content.active')).toBeVisible();
+  expect(page.url()).toContain('tab=tournament-view');
+  expect(page.url()).not.toContain('brackets.html');
   await page.screenshot({ path: path.join(OUT, 'tournament-open-1920.png') });
 });
 
@@ -442,7 +441,7 @@ test('recruiting hub lands on leans, otherwise the user region', async ({ page }
   await openHub(page, true);
   await expect(stab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
   expect(page.url()).toContain('hub=leans');
-  await expect(page.locator('.pool-view[data-view="leans"]')).toHaveCount(0);
+  await expect(page.locator('.pool-view[data-view="leans"]')).toHaveAttribute('aria-pressed', 'true');
   await page.screenshot({ path: path.join(OUT, 'hub-leans-1280.png') });
   await mouseClick(page, stab(page, 'Pool'));
   await expect(stab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');

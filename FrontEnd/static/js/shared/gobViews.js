@@ -229,6 +229,14 @@
   });
 
   register({
+    id: 'tournament-view',
+    section: 'league',
+    subtab: 'tournament-view',
+    title: 'Tournament',
+    module: viewModule('tournamentView.js')
+  });
+
+  register({
     id: 'roster-view',
     section: 'team',
     subtab: 'roster-view',
@@ -250,6 +258,14 @@
     subtab: 'team-schedule-view',
     title: 'Schedule',
     module: viewModule('teamScheduleView.js')
+  });
+
+  register({
+    id: 'practice-squad-view',
+    section: 'team',
+    subtab: 'practice-squad-view',
+    title: 'Practice Squad',
+    module: viewModule('practiceSquadView.js')
   });
 
   register({

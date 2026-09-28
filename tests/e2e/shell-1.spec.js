@@ -247,8 +247,9 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
             return { fontFamily: cs.fontFamily, height: cs.height, clipPath: cs.clipPath };
           };
           const tabs = Array.from(document.querySelectorAll('#gob-subtabs .tabs > .tb'));
-          const button = tabs.find((el) => el.tagName === 'BUTTON' && el.getAttribute('aria-selected') !== 'true' && !el.classList.contains('is-locked'));
-          const link = tabs.find((el) => el.tagName === 'A');
+          const button = tabs.find((el) => el.tagName === 'BUTTON' && el.getAttribute('aria-selected') !== 'true' && !el.classList.contains('is-locked') && !el.classList.contains('more'));
+          const link = tabs.find((el) => el.tagName === 'A')
+            || tabs.find((el) => el.classList.contains('is-locked'));
           return { button: read(button), link: read(link) };
         });
         expect(stabMetrics.button).toEqual(stabMetrics.link);

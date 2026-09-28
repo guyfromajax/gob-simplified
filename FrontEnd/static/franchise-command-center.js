@@ -1809,7 +1809,8 @@ function bindResourcesLinks() {
     const psParams = emptyParams();
     psParams.set('franchise_id', franchiseId);
     psParams.set('team_id', userTeamId);
-    psLink.href = `/practice-squad-standings.html?${psParams.toString()}`;
+    psParams.set('tab', 'practice-squad-view');
+    psLink.href = `/franchise-command-center.html?${psParams.toString()}`;
   }
   const rRecruits = document.getElementById('resources-recruits');
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
@@ -2323,7 +2324,8 @@ function renderFccRecruits() {
     const psParams = emptyParams();
     psParams.set('franchise_id', franchiseId);
     psParams.set('team_id', userTeamId);
-    psLink.href = `/practice-squad-standings.html?${psParams.toString()}`;
+    psParams.set('tab', 'practice-squad-view');
+    psLink.href = `/franchise-command-center.html?${psParams.toString()}`;
   }
   if (lastCol) {
     lastCol.textContent = 'Leans / Your Standing';
@@ -3829,6 +3831,7 @@ async function init() {
     );
   }
   championshipMomentsDone.then(() => {
+    if (fccBrowseTournamentTabActive()) return;
     if (window.ConferenceRsRegionModal) window.ConferenceRsRegionModal.maybeShow(topData);
     if (window.RegionByeModal) window.RegionByeModal.maybeShow(topData);
     // Season-start walk-on reveal. Self-gates on its own payload and defers via
@@ -4034,6 +4037,14 @@ function appendFranchiseBoxScoreUserHints(params, homeTeamName, awayTeamName) {
 // that may not have rendered yet — avoids a render-timing race). Conservative:
 // when in doubt it returns true, so the evolution modal over-yields rather than
 // stacking on another modal.
+function fccBrowseTournamentTabActive() {
+  try {
+    return new URLSearchParams(window.location.search).get('tab') === 'tournament-view';
+  } catch (_) {
+    return false;
+  }
+}
+
 function fccHasCompetingModal(topData) {
   if (typeof document !== 'undefined' && document.querySelector(
       '.cm-overlay.is-visible,.arch-reveal-overlay.is-visible,.afm-overlay.is-visible,'

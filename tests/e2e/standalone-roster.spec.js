@@ -10,10 +10,9 @@ const read = (name) => fs.readFileSync(path.join(S, name), 'utf8');
 
 test('team-roster-view.html redirects into the roster module', async ({ page }) => {
   const html = read('team-roster-view.html');
+  expect(html).toContain("params.get('mode') === 'practice_squad' && params.get('ps_team_id')");
   expect(html).toContain("params.set('tab', 'roster-view')");
   expect(html).toContain("location.replace('/franchise-command-center.html'");
-  expect(html).not.toContain('id="roster-body"');
-  expect(html).not.toContain('team-roster-view.js');
 
   await stubAuth(page);
   await page.goto('/team-roster-view.html?mode=franchise&franchise_id=f1&team_id=t1&team_name=Lancaster&return_tab=standings-tab');

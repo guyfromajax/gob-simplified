@@ -15401,22 +15401,46 @@ def get_franchise_news(
     }
 
 
+def _user_ps_region(franchise_doc: dict) -> str:
+    """Region letter of the user's varsity team. Empty when it is not stored."""
+    _name, team_oid = get_user_team_from_franchise(franchise_doc)
+    if not team_oid:
+        return ""
+    try:
+        team = db.teams.find_one({"_id": ObjectId(str(team_oid))}, {"region": 1}) or {}
+    except Exception:
+        return ""
+    return str(team.get("region") or "").strip().upper()
+
+
 @router.get("/franchise/practice-squad/standings")
 @browse_cached
 def get_practice_squad_standings(
     franchise_id: str,
     user: dict = Depends(get_current_user),
 ):
+    from BackEnd.practice_squad.browse import standings_tiers
+
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     ps = franchise_doc.get("practice_squad") or {}
+    week = int(franchise_doc.get("week", 1) or 1)
     if not ps.get("initialized"):
-        return {"initialized": False, "standings": {}, "teams": {}, "week": int(franchise_doc.get("week", 1) or 1)}
+        return {
+            "initialized": False,
+            "standings": {},
+            "teams": {},
+            "tiers": [],
+            "week": week,
+        }
+    standings = ps.get("standings") or {}
+    teams = ps.get("teams") or {}
     return {
         "initialized": True,
-        "week": int(franchise_doc.get("week", 1) or 1),
-        "standings": ps.get("standings") or {},
-        "teams": ps.get("teams") or {},
+        "week": week,
+        "standings": standings,
+        "teams": teams,
         "tier_names": {str(i): n for i, n in enumerate(["", "All-Americans", "All-Stars", "Varsity", "JV", "Squad", "Scrubs"]) if i},
+        "tiers": standings_tiers(standings, teams, _user_ps_region(franchise_doc)),
     }
 
 
@@ -15429,11 +15453,19 @@ def get_practice_squad_schedule(
 ):
     from BackEnd.practice_squad.manager import _completed_games_for_week
 
+    from BackEnd.practice_squad.browse import ps_open_week
+
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     ps = franchise_doc.get("practice_squad") or {}
     current_week = int(franchise_doc.get("week", 1) or 1)
     if not ps.get("initialized"):
-        return {"initialized": False, "week": current_week, "games": [], "weeks": []}
+        return {
+            "initialized": False,
+            "week": current_week,
+            "current_week": ps_open_week(current_week),
+            "games": [],
+            "weeks": [],
+        }
     schedule = ps.get("schedule") or {}
     teams = ps.get("teams") or {}
     weeks_available = sorted(set(list(int(w) for w in schedule.keys()) + list(range(16, 20))))
@@ -15455,7 +15487,40 @@ def get_practice_squad_schedule(
             upcoming = [g for g in _games_for_week(ps, week) if g.get("status") not in ("completed", "forfeit")]
             games = completed + upcoming
         return {"initialized": True, "week": week, "games": _enrich(games)}
-    return {"initialized": True, "week": current_week, "weeks": weeks_available}
+    return {
+        "initialized": True,
+        "week": current_week,
+        "current_week": ps_open_week(current_week),
+        "weeks": weeks_available,
+    }
+
+
+@router.get("/franchise/tournament/brackets")
+@browse_cached
+def get_tournament_brackets(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    from BackEnd.tournament.browse import build_tournament_brackets_response
+    from BackEnd.utils.franchise_standings import calculate_franchise_standings
+
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    _legacy_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    user_team_id = str(user_team_object_id or _legacy_team_id or "")
+    team_doc = None
+    if user_team_object_id and ObjectId.is_valid(str(user_team_object_id)):
+        team_doc = db.teams.find_one({"_id": ObjectId(str(user_team_object_id))})
+    if not user_team_id:
+        raise HTTPException(status_code=400, detail="Franchise has no user team")
+    return build_tournament_brackets_response(
+        franchise_doc,
+        user_team_id=str(user_team_id),
+        user_team_doc=team_doc,
+        teams_collection=db.teams,
+        franchise_team_data_collection=franchise_team_data_collection,
+        get_user_eos_phase_status=_get_user_eos_phase_status,
+        calculate_franchise_standings=calculate_franchise_standings,
+    )
 
 
 @router.get("/franchise/practice-squad/brackets")

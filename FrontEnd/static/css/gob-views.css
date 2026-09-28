@@ -336,3 +336,369 @@
 #franchise-container #awards-view .gob-awards-empty {
   color: var(--text-38);
 }
+
+#franchise-container #practice-squad-view .gob-ps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  min-width: 0;
+  padding-bottom: var(--space-16);
+}
+
+#franchise-container #practice-squad-view .gob-ps-empty {
+  margin: 0;
+  color: var(--text-60);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-eye {
+  margin: 0;
+  color: var(--text-38);
+  font: var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-12);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row .away {
+  justify-self: end;
+  text-align: right;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row .home {
+  justify-self: start;
+  text-align: left;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row .res {
+  text-align: center;
+}
+
+#franchise-container #practice-squad-view a.gob-team {
+  color: var(--text-100);
+  text-decoration: none;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ a.gob-team {
+  color: var(--text-60);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ a.gob-team.is-win {
+  color: var(--text-100);
+}
+
+#franchise-container #practice-squad-view a.gob-team:hover,
+#franchise-container #practice-squad-view a.gob-team:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+}
+
+#franchise-container #practice-squad-view a.gob-res {
+  color: var(--text-87);
+  text-decoration: none;
+}
+
+#franchise-container #practice-squad-view a.gob-res:hover,
+#franchise-container #practice-squad-view a.gob-res:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+}
+
+#franchise-container #practice-squad-view a.gob-team:focus-visible,
+#franchise-container #practice-squad-view a.gob-res:focus-visible,
+#franchise-container #practice-squad-view .gob-ps-tiers button:focus-visible,
+html.gob-shell .pg-tools[data-owner="practice-squad-view"] button:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+#franchise-container #practice-squad-view .gob-ps-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  width: max-content;
+  max-width: 100%;
+}
+
+#franchise-container #practice-squad-view .gob-ps-tiers button.on {
+  background: var(--white-10);
+  color: var(--white);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket {
+  position: relative;
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  overflow-x: auto;
+  padding-bottom: var(--space-8);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket > svg.conn {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .bracket-col {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1 1 8.5rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-8);
+  min-width: 8.5rem;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .col-head {
+  color: var(--text-60);
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-6);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .mu {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  min-width: 8.5rem;
+  overflow: hidden;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .team {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .team + .team {
+  border-top: 1px solid var(--line);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .tname {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .seed,
+#franchise-container #practice-squad-view .gob-ps-bracket .score {
+  color: var(--text-60);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .trophy,
+#franchise-container #practice-squad-view .gob-ps-bracket .champ-badge,
+#franchise-container #practice-squad-view .gob-ps-bracket .champ-vs,
+#franchise-container #practice-squad-view .gob-ps-bracket .champ-plate,
+#franchise-container #practice-squad-view .gob-ps-bracket .team svg,
+#franchise-container #practice-squad-view .gob-ps-bracket img,
+#franchise-container #practice-squad-view .gob-ps-bracket .logo {
+  display: none;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .mu--user {
+  box-shadow: inset 3px 0 0 var(--navy);
+}
+
+#franchise-container #practice-squad-view .gob-ps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-12);
+  align-items: start;
+}
+
+html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+#franchise-container #practice-squad-view .gob-ps-grid .gob-tbl th,
+#franchise-container #practice-squad-view .gob-ps-grid .gob-tbl td,
+#franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl th,
+#franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl td {
+  padding: var(--space-4) var(--space-8);
+}
+
+#franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl {
+  width: 100%;
+}
+
+#franchise-container #practice-squad-view .gob-ps-schedule th.res,
+#franchise-container #practice-squad-view .gob-ps-schedule td.res {
+  width: 1%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* League › Tournament (tournament-view) */
+#franchise-container #tournament-view .gob-tour-phases button.on {
+  background: var(--white-10);
+  color: var(--white);
+}
+
+#franchise-container #tournament-view .gob-tour-empty {
+  color: var(--text-60);
+  margin: 0 0 var(--space-12);
+}
+
+#franchise-container #tournament-view .gob-tour-locked-block {
+  margin: 0 0 var(--space-16);
+}
+
+#franchise-container #tournament-view .gob-tour-locked-title {
+  margin: 0 0 var(--space-12);
+  color: var(--text-60);
+  font: var(--fw-semibold) var(--fs-14)/var(--lh-1-3) var(--font-ui);
+}
+
+#franchise-container #tournament-view .gob-tour-phase-info {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+#franchise-container #tournament-view .gob-tour-phase-info li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-12);
+  color: var(--text-60);
+  font: var(--fw-medium) var(--fs-13)/var(--lh-1-3) var(--font-ui);
+}
+
+#franchise-container #tournament-view .gob-tour-status {
+  margin: 0 0 var(--space-16);
+}
+
+#franchise-container #tournament-view .gob-tour-status-eye {
+  margin: 0;
+  color: var(--text-38);
+  font: var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+}
+
+#franchise-container #tournament-view .gob-tour-status-name {
+  margin: var(--space-6) 0 0;
+  color: var(--text-100);
+  font: var(--fw-bold) var(--fs-22)/var(--lh-1-1) var(--font-display);
+  letter-spacing: var(--tracking-2);
+}
+
+#franchise-container #tournament-view .gob-tour-bracket {
+  margin-top: var(--space-12);
+  min-height: 28rem;
+  width: 100%;
+  overflow-x: auto;
+}
+
+#franchise-container #tournament-view .fcc-tb-classic,
+#franchise-container #tournament-view .fcc-tb-region--full,
+#franchise-container #tournament-view .fcc-tb-region--4,
+#franchise-container #tournament-view .fcc-tb-region--3 {
+  width: fit-content;
+  max-width: 100%;
+}
+
+#franchise-container #tournament-view .fcc-tb-classic {
+  grid-template-columns: repeat(5, minmax(0, 22rem));
+}
+
+#franchise-container #tournament-view .fcc-tb-region--full,
+#franchise-container #tournament-view .fcc-tb-region--4,
+#franchise-container #tournament-view .fcc-tb-region--3 {
+  grid-template-columns: minmax(0, 22rem) minmax(0, 22rem) minmax(12px, 1fr);
+}
+
+#franchise-container #tournament-view .fcc-tb-region-col {
+  max-width: 22rem;
+}
+
+#franchise-container #tournament-view .fcc-tb-enter,
+#franchise-container #tournament-view .fcc-tb-enter * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+#franchise-container #tournament-view .fcc-tb-mu--user {
+  border-color: color-mix(in srgb, var(--navy-hi) 55%, var(--white-10));
+  box-shadow:
+    inset 3px 0 0 var(--navy),
+    0 8px 22px rgba(0, 0, 0, 0.4);
+}
+
+#franchise-container #tournament-view .fcc-tb-team--user {
+  border-left: 3px solid var(--navy);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--navy) 22%, transparent),
+    transparent
+  );
+  box-shadow: none;
+}
+
+#franchise-container #tournament-view .fcc-tb-team--user .fcc-tb-name-text,
+#franchise-container #tournament-view .fcc-tb-team--user .fcc-tb-score,
+#franchise-container #tournament-view .fcc-tb-team--user a.fcc-tb-score {
+  color: var(--text-87);
+}
+
+#franchise-container #tournament-view .fcc-tb-team--user .fcc-tb-seed {
+  color: var(--text-60);
+}
+
+#franchise-container #tournament-view .fcc-tb-team--champion.fcc-tb-team--user {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--navy) 18%, transparent),
+    color-mix(in srgb, rgba(212, 168, 72, 1) 12%, transparent)
+  );
+}
+
+#franchise-container #tournament-view .fcc-tb-res-link {
+  display: none;
+}
+
+#franchise-container #tournament-view a.gob-res {
+  color: var(--text-87);
+  text-decoration: none;
+}
+
+#franchise-container #tournament-view a.gob-res:hover,
+#franchise-container #tournament-view a.gob-res:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+#franchise-container #tournament-view .fcc-tb-team--winner a.fcc-tb-score {
+  font-weight: var(--fw-semibold);
+}
+
+#franchise-container #team-schedule-view tr.is-tourney td.wk {
+  color: var(--text-60);
+}

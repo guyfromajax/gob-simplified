@@ -1,8 +1,15 @@
 /**
- * Team › Schedule. One season table from GET /franchise/team-detail.
+ * Team › Schedule. Four week columns from GET /franchise/team-detail.
  * The view formats site, the W/L letter, and the next-game row. It does not
  * decide who won.
  */
+
+var COLUMNS = [
+  { label: 'Weeks 1–7', from: 1, to: 7 },
+  { label: 'Weeks 8–14', from: 8, to: 14 },
+  { label: 'Weeks 15–21', from: 15, to: 21 },
+  { label: 'Weeks 22–26', from: 22, to: 26, eos: true }
+];
 
 var EOS_ROWS = [
   'Conference Tournaments',
@@ -76,24 +83,65 @@ export function mount(container, ctx) {
       + '-' + (row.opponent_losses == null ? '0' : row.opponent_losses);
     return '<a class="gob-team" data-gob-drill href="' + tables.esc(teamHref(row.opponent_id)) + '">'
       + tables.markHtml(name, row.opponent_primary_color)
-      + '<span class="gob-id"><span>' + tables.esc(rankName(row)) + '</span>'
+      + '<span class="gob-id"><span title="' + tables.esc(rankName(row)) + '">' + tables.esc(rankName(row)) + '</span>'
       + '<span class="sub">' + tables.esc(record) + '</span></span></a>';
   }
 
   function resultCell(row) {
-    if (row.kind === 'next') return 'Next';
-    if (row.kind !== 'played') return '—';
+    if (row.kind !== 'played') return '';
     var letter = '';
     if (row.result === 'W' || row.result === 'L') {
       letter = '<span class="gob-wl ' + (row.result === 'W' ? 'up' : 'dn') + '">'
         + row.result + '</span> ';
     }
-    return letter + tables.esc(String(row.team_score) + '-' + String(row.opp_score));
+    var text = letter + tables.esc(String(row.team_score) + '-' + String(row.opp_score));
+    if (!row.game_id) return text;
+    return '<a class="gob-res" href="' + tables.esc(boxHref(row.game_id)) + '">' + text + '</a>';
   }
 
-  function boxCell(row) {
-    if (row.kind !== 'played' || !row.game_id) return '—';
-    return '<a class="gob-box" href="' + tables.esc(boxHref(row.game_id)) + '">Box score</a>';
+  function tournamentRowHtml(row) {
+    var site = row.site === 'home' ? 'vs' : 'at';
+    var sub = row.round_label ? tables.esc(row.round_label) : ('Wk ' + row.week);
+    var opponent = opponentCell(row);
+    var res = resultCell(row);
+    return '<tr class="is-tourney" data-week="' + row.week + '">'
+      + '<td class="wk" title="' + sub + '">' + row.week + '</td>'
+      + '<td class="site">' + site + '</td>'
+      + '<td class="team">' + opponent + '</td>'
+      + '<td class="res">' + res + '</td></tr>';
+  }
+
+  function rowHtml(row) {
+    var cls = row.kind === 'next' ? 'is-next' : (row.kind === 'open' ? 'is-open' : '');
+    var site = row.kind === 'open' ? '' : (row.site === 'home' ? 'vs' : 'at');
+    var opponent = row.kind === 'open' ? 'Open' : opponentCell(row);
+    return '<tr' + (cls ? ' class="' + cls + '"' : '') + ' data-week="' + row.week + '">'
+      + '<td class="wk">' + row.week + '</td>'
+      + '<td class="site">' + site + '</td>'
+      + '<td class="team">' + opponent + '</td>'
+      + '<td class="res">' + resultCell(row) + '</td></tr>';
+  }
+
+  function columnHtml(column, rows, payload) {
+    var body = rows.filter(function (row) {
+      return row.week >= column.from && row.week <= column.to;
+    }).map(rowHtml).join('');
+    if (column.eos) {
+      var tourney = (payload && payload.tournament_by_phase) || {};
+      EOS_ROWS.forEach(function (label) {
+        var key = label.indexOf('Conference') === 0 ? 'conference'
+          : label.indexOf('Region') === 0 ? 'region' : 'national';
+        body += '<tr class="is-eos"><td class="wk"></td><td class="team" colspan="3">'
+          + tables.esc(label) + '</td></tr>';
+        (tourney[key] || []).forEach(function (row) {
+          body += tournamentRowHtml(row);
+        });
+      });
+    }
+    return '<section class="gob-tcard gob-schcol"><table class="gob-tbl gob-schwk">'
+      + '<colgroup><col class="c-wk"><col class="c-site"><col><col class="c-res"></colgroup>'
+      + '<thead><tr><th colspan="4">' + tables.esc(column.label) + '</th></tr></thead>'
+      + '<tbody>' + body + '</tbody></table></section>';
   }
 
   function seasonRows(payload) {
@@ -117,25 +165,9 @@ export function mount(container, ctx) {
 
   function render(payload) {
     var rows = seasonRows(payload);
-    var html = '<section class="gob-tcard"><div class="gob-scroll"><table class="gob-tbl gob-sched"><thead><tr>'
-      + '<th class="wk">Week</th><th class="site">Site</th><th class="team">Opponent</th><th class="num">Result</th><th class="box">Box score</th>'
-      + '</tr></thead><tbody>';
-    rows.forEach(function (row) {
-      var cls = row.kind === 'next' ? ' class="is-next"' : '';
-      var site = row.kind === 'open' ? '—' : (row.site === 'home' ? 'vs' : 'at');
-      var opponent = row.kind === 'open' ? 'Open' : opponentCell(row);
-      html += '<tr' + cls + ' data-week="' + row.week + '">'
-        + '<td class="wk">' + row.week + '</td>'
-        + '<td class="site">' + site + '</td>'
-        + '<td class="team">' + opponent + '</td>'
-        + '<td class="num">' + resultCell(row) + '</td>'
-        + '<td class="box">' + boxCell(row) + '</td></tr>';
-    });
-    EOS_ROWS.forEach(function (label) {
-      html += '<tr class="is-eos"><td class="wk"></td><td class="site">—</td><td class="team">' + tables.esc(label) + '</td><td class="num">—</td><td class="box">—</td></tr>';
-    });
-    html += '</tbody></table></div></section>';
-    container.innerHTML = html;
+    container.innerHTML = '<div class="gob-schcols">'
+      + COLUMNS.map(function (column) { return columnHtml(column, rows, payload); }).join('')
+      + '</div>';
     container.querySelectorAll('a[data-gob-drill]').forEach(function (link) {
       link.addEventListener('click', function (event) {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button) return;

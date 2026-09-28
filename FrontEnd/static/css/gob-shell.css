@@ -60,6 +60,7 @@ html.gob-shell .main::after {
 }
 
 html.gob-shell #auth-bar,
+html.gob-shell #site-footer,
 html.gob-shell #alpha-badge,
 html.gob-shell #tournament-top,
 html.gob-shell #franchise-container .tab-buttons {

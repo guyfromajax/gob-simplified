@@ -8,6 +8,7 @@ test.describe.configure({ timeout: 180000 });
 const FID = 'f-e2e-subtabs';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/subtabs-underline');
+let stubWeek = 3;
 
 function cc() {
   return {
@@ -15,7 +16,7 @@ function cc() {
     team_id: TID,
     user_team_id: TID,
     team: 'Lancaster',
-    week: 3,
+    week: stubWeek,
     rank: 14,
     season: 1,
     current_season: 1,
@@ -328,6 +329,8 @@ test('section shots, locked tooltip, more menu, and a detail view', async ({ pag
 });
 
 test('unselected link tabs have no stray underline', async ({ page }) => {
+  stubWeek = 28;
+  try {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openFcc(page);
   const sections = ['team', 'prep', 'league', 'news'];
@@ -364,7 +367,8 @@ test('unselected link tabs have no stray underline', async ({ page }) => {
       if (row.tag === 'A' && row.selected !== 'true') links += 1;
     }
   }
-  expect(links).toBeGreaterThan(0);
+  // League › Tournament and the other module views are in-page buttons at week 28+.
+  expect(links).toBe(0);
 
   await page.locator('[data-gob-section="league"]').click();
   await tab(page, 'Schedule').hover();
@@ -379,4 +383,7 @@ test('unselected link tabs have no stray underline', async ({ page }) => {
   expect(resting.hovered).toBe(false);
   expect(resting.decoration).toBe('none');
   expect(resting.after).toBe('none');
+  } finally {
+    stubWeek = 3;
+  }
 });

@@ -1054,7 +1054,7 @@
     return line;
   }
 
-  function paintStandingsRows(node, rows, truncated) {
+  function paintStandingsRows(node, rows, mode, density) {
     node.querySelectorAll('.st-r, .st-more').forEach(function (child) { child.remove(); });
     var head = el('div', 'st-r st-hd');
     head.appendChild(el('span', '', '#'));
@@ -1065,7 +1065,11 @@
       var line = standingsRow(row);
       if (line) node.appendChild(line);
     });
-    if (truncated) {
+    density = mode === 'all' ? 'normal' : (density || 'compact');
+    node.classList.toggle('is-compact', density !== 'normal');
+    node.classList.toggle('is-tight', density === 'tight');
+    node.dataset.standingsDensity = density;
+    if (mode !== 'all') {
       var moreUrl = standingsHref();
       var more = el('a', 'lnk st-more', 'Full standings');
       more.href = moreUrl;
@@ -1075,7 +1079,7 @@
       else node.appendChild(more);
     }
     node.dataset.standingsShown = String(rows.length);
-    node.dataset.standingsMode = truncated ? 'window' : 'all';
+    node.dataset.standingsMode = mode;
   }
 
   function standingsCard(table, index) {
@@ -1090,7 +1094,7 @@
     node.dataset.standingsTotal = String(rows.length);
     if (present(table.region)) node.dataset.region = String(table.region);
     if (present(table.conference)) node.dataset.conference = String(table.conference);
-    paintStandingsRows(node, rows, false);
+    paintStandingsRows(node, rows, 'all');
     return node;
   }
 
@@ -1104,7 +1108,7 @@
     var col = card.closest('.office-col');
     var last = col && col.lastElementChild;
     if (last && last.getBoundingClientRect().bottom > foldBottom() + 1) return true;
-    var tight = document.documentElement.classList.contains('gob-1280');
+    var tight = document.documentElement.classList.contains('gob-1280') || card.classList.contains('is-compact');
     return !!(tight && col && col.scrollHeight - col.clientHeight > 1);
   }
 
@@ -1112,16 +1116,20 @@
     var card = root.querySelector('.office-st');
     if (!card || !card._rows || card._rows.length <= 2) return;
     var rows = card._rows;
-    if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, rows, false);
+    if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, rows, 'all');
+    if (!standingsOverflow(card)) return;
+    paintStandingsRows(card, rows, 'compact', 'compact');
+    if (!standingsOverflow(card)) return;
+    paintStandingsRows(card, rows, 'compact', 'tight');
     if (!standingsOverflow(card)) return;
     var size = rows.length - 1;
     while (size >= 5) {
-      paintStandingsRows(card, standingsWindow(rows, size), true);
+      paintStandingsRows(card, standingsWindow(rows, size), 'window', 'tight');
       if (!standingsOverflow(card)) return;
       size -= 1;
     }
     while (size >= 2 && standingsOverflow(card)) {
-      paintStandingsRows(card, standingsWindow(rows, size), true);
+      paintStandingsRows(card, standingsWindow(rows, size), 'window', 'tight');
       if (!standingsOverflow(card)) return;
       size -= 1;
     }
