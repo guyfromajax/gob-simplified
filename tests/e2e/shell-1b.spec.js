@@ -254,7 +254,9 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   }
   await expect(page.locator('#gob-stats-toggle')).toHaveCount(0);
   await mouseClick(page, '[data-gob-section="team"]');
-  await expect(page.getByRole('tab', { name: 'Practice Squad', exact: true })).toHaveCount(0);
+  await mouseClick(page, stab(page, 'Practice Squad'));
+  await expect(page.locator('#practice-squad-view.tab-content.active')).toBeVisible();
+  expect(page.url()).toContain('tab=practice-squad-view');
 
   await page.evaluate(() => {
     window.__shellNav = [];
@@ -315,10 +317,6 @@ test('section map opens the right panel or the existing page', async ({ page }) 
   expect(page.url()).not.toContain('rankings.html');
   expect(await page.evaluate(() => window.__shellNav.length)).toBe(navBeforeRankings);
   expect(await page.evaluate(() => window.__docStamp)).toBe(docBeforeRankings);
-  const psUrl = await expectGo('Practice Squad', '/practice-squad-standings.html');
-  const psHref = await page.locator('#fcc-ps-season-link').getAttribute('href');
-  expect(psUrl).toBe(psHref);
-
   await mouseClick(page, '[data-gob-section="news"]');
   await mouseClick(page, stab(page, 'Awards'));
   await expect(page.locator('#awards-view.tab-content.active')).toBeVisible();

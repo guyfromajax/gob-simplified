@@ -338,7 +338,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await expect(page.locator('#standings-view')).not.toContainText(/Mon|Tue|Wed|Thu|Fri|Sat|Sun|\d{1,2}:\d{2}/);
     const labels = await page.locator('#gob-subtabs .tabs > .tb .tb-l').allTextContents();
     expect(labels.map(function (text) { return text.trim(); }).filter(Boolean)).toEqual([
-      'Standings', 'Rankings', 'Leaders', 'Team Stats', 'Schedule', 'Practice Squad', 'Tournament',
+      'Standings', 'Rankings', 'Leaders', 'Team Stats', 'Schedule', 'Tournament',
     ]);
     await clickStab(page, 'Rankings');
     const standingsSecond = await timedOpen(page, 'Standings', '#standings-view .gob-tbl tbody tr');

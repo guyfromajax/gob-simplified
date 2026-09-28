@@ -1811,7 +1811,8 @@ function bindResourcesLinks() {
     const psParams = emptyParams();
     psParams.set('franchise_id', franchiseId);
     psParams.set('team_id', userTeamId);
-    psLink.href = `/practice-squad-standings.html?${psParams.toString()}`;
+    psParams.set('tab', 'practice-squad-view');
+    psLink.href = `/franchise-command-center.html?${psParams.toString()}`;
   }
   const rRecruits = document.getElementById('resources-recruits');
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
@@ -2325,7 +2326,8 @@ function renderFccRecruits() {
     const psParams = emptyParams();
     psParams.set('franchise_id', franchiseId);
     psParams.set('team_id', userTeamId);
-    psLink.href = `/practice-squad-standings.html?${psParams.toString()}`;
+    psParams.set('tab', 'practice-squad-view');
+    psLink.href = `/franchise-command-center.html?${psParams.toString()}`;
   }
   if (lastCol) {
     lastCol.textContent = 'Leans / Your Standing';

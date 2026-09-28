@@ -251,6 +251,14 @@
   });
 
   register({
+    id: 'practice-squad-view',
+    section: 'team',
+    subtab: 'practice-squad-view',
+    title: 'Practice Squad',
+    module: viewModule('practiceSquadView.js')
+  });
+
+  register({
     id: 'team-attributes-view',
     section: 'team',
     subtab: 'team-attributes-view',

@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Roster</title>
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
+      if (params.get('mode') === 'practice_squad' && params.get('ps_team_id')) return;
       var viewed = params.get('roster_team_id') || '';
       if (viewed) {
         params.set('tab', 'team-view');
@@ -20,8 +19,438 @@
       }
       var qs = params.toString();
       window.location.replace('/franchise-command-center.html' + (qs ? '?' + qs : ''));
+      window.stop();
     })();
   </script>
+  <link rel="stylesheet" href="/fonts/app-fonts.css">
+  <!-- Google Tag Manager (production only) -->
+  <script src="/js/shared/gtm-loader.js"></script>
+  <!-- End Google Tag Manager -->
+  <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Team Roster</title>
+<link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/command-center-team-styles.css">
+  <link rel="stylesheet" href="/set-lineup.css">
+  <link rel="stylesheet" href="/scouting-report.css">
+  <link rel="stylesheet" href="/css/rt-buckets.css">
+  <link rel="stylesheet" href="/css/attr-tiles.css">
+  <style>
+    :root {
+      --roster-text: #f4f6ff;
+      --roster-text-muted: rgba(255, 255, 255, 0.62);
+      --roster-line: rgba(255, 255, 255, 0.1);
+      --roster-line-soft: rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--roster-text);
+      background: #0b0d14;
+    }
+
+    button,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"] {
+      font-family: 'Bebas Neue', sans-serif;
+    }
+
+    #back-button {
+      font-size: 14px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0;
+      background: none;
+      color: rgba(255, 255, 255, 0.76);
+      border: 0;
+      box-shadow: none;
+      cursor: pointer;
+      transition: color 0.18s ease, transform 0.18s ease;
+    }
+
+    #back-button::before {
+      content: "←";
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    #back-button:hover {
+      color: #ffffff;
+      transform: translateX(-1px);
+    }
+
+    .team-roster-shell {
+      width: min(1440px, calc(100vw - 24px));
+      padding: 28px 28px 32px;
+      color: var(--roster-text);
+    }
+
+    .team-roster-page-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+
+    #back-button {
+      white-space: nowrap;
+    }
+
+    .section-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.15rem;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      margin: 0 0 16px;
+      color: #f7f9ff;
+    }
+
+    .roster-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .roster-section-header .section-title {
+      margin-bottom: 0;
+    }
+
+    .team-roster-section {
+      margin-top: 22px;
+    }
+
+    #starting-five-section .fcc-scouting-card-head.p5-head {
+      display: flex;
+      justify-content: flex-start;
+      align-items: baseline;
+      gap: 13px;
+      margin: 0;
+      padding: 0 0 12px;
+    }
+
+    #starting-five-section .fcc-scouting-card-head.p5-head h3 {
+      margin: 0;
+      color: #ffffff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 34px;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      font-weight: 400;
+    }
+
+    #starting-five-section .fcc-scouting-p5-body {
+      padding: 14px;
+    }
+
+    .scroll-x {
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
+    }
+
+    .scroll-x::-webkit-scrollbar {
+      height: 10px;
+    }
+
+    .scroll-x::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .scroll-x::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.24);
+      border-radius: 999px;
+    }
+
+    .roster-table,
+    .stats-table {
+      width: max(100%, 1180px);
+      min-width: 1180px;
+      margin: 0;
+      border-collapse: separate;
+      border-spacing: 0;
+      color: var(--roster-text);
+      background: transparent;
+    }
+
+    .roster-table th,
+    .stats-table th {
+      color: rgba(255, 255, 255, 0.66);
+      padding: 12px 10px 10px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      border: 0;
+      border-bottom: 1px solid var(--roster-line);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
+    }
+
+    .roster-table th:hover,
+    .stats-table th:hover {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.03));
+    }
+
+    .roster-table td,
+    .stats-table td {
+      padding: 9px 10px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 13px;
+      text-align: center;
+      border: 0;
+      border-bottom: 1px solid var(--roster-line-soft);
+      background: transparent;
+    }
+
+    /* Row banding lives in the single-surface block below, on <tr> only.
+       It must not be set on <td>: the sticky identity column needs an opaque
+       background of its own, and a td-level !important would show through it. */
+
+    .roster-table th:first-child,
+    .stats-table th:first-child,
+    .roster-table td:first-child,
+    .stats-table td:first-child {
+      text-align: left;
+      padding-left: 16px;
+    }
+
+    .roster-table td:first-child,
+    .stats-table td:first-child {
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .roster-table td:first-child a,
+    .stats-table td:first-child a {
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .roster-table td:first-child a:hover,
+    .stats-table td:first-child a:hover {
+      text-decoration: underline;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .team-roster-empty {
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--roster-text-muted);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    @media (max-width: 1024px) {
+      .team-roster-shell {
+        padding: 24px 18px 26px;
+      }
+
+      .team-roster-page-header {
+        justify-content: center;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        font-size: 14px;
+      }
+
+      .team-roster-shell {
+        width: calc(100vw - 12px);
+        padding: 18px 12px 22px;
+      }
+
+      .section-title {
+        font-size: 1.9rem;
+      }
+    }
+
+    /* ========== Single data surface (Scope x View) ========== */
+    .team-roster-shell {
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.09);
+      background:
+        linear-gradient(160deg, rgba(255,255,255,.028), rgba(255,255,255,.014) 18%, transparent 40%),
+        linear-gradient(132deg, rgba(255,255,255,.014) 0 1px, transparent 1px 7px),
+        rgba(14,16,24,.96);
+      box-shadow: 0 20px 48px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.07);
+      padding: 22px 24px 26px;
+    }
+
+    /* Identity lockup */
+    .tr-lockup { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
+    .tr-lockup__banner {
+      width: 224px; height: 79px; object-fit: cover; flex: 0 0 auto;
+      border-radius: 10px; border: 1px solid rgba(255,255,255,.16);
+    }
+    .tr-lockup__eyebrow {
+      font: 700 9px/1 'Inter', sans-serif; letter-spacing: .13em; text-transform: uppercase;
+      color: rgba(255,255,255,.4); margin-bottom: 6px;
+    }
+    .tr-lockup__name {
+      font: 400 34px/1 'Bebas Neue Pro','Bebas Neue',sans-serif; letter-spacing: .02em; color: #f7f9ff;
+    }
+    .tr-lockup__stats { margin-left: auto; display: flex; gap: 26px; text-align: right; }
+    .tr-stat { display: flex; flex-direction: column; gap: 4px; }
+    .tr-stat__v { font: 400 24px/1 'Bebas Neue Pro','Bebas Neue',sans-serif; color: #f7f9ff; }
+    .tr-stat__l {
+      font: 700 9px/1 'Inter', sans-serif; letter-spacing: .13em; text-transform: uppercase;
+      color: rgba(255,255,255,.4);
+    }
+
+    /* Projected five eyebrow */
+    .tr-p5 { margin-bottom: 18px; }
+    .tr-eyebrow-rule { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .tr-eyebrow-rule span {
+      font: 400 17px/1 'Bebas Neue Pro','Bebas Neue',sans-serif; letter-spacing: .09em;
+      color: rgba(255,255,255,.62); white-space: nowrap;
+    }
+    .tr-eyebrow-rule::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.09); }
+
+    .tr-toolbar__sep { width: 1px; height: 22px; background: rgba(255,255,255,.09); }
+
+    /* Scroll container owns the scroll so the header can stick. */
+    #tr-scroll { max-height: calc(100vh - 340px); overflow: auto; }
+
+    /* Sticky header — both rows in the stats view, single row in attributes. */
+    #roster-table thead th {
+      position: sticky; z-index: 3;
+      background: #191d27;                       /* opaque, or rows bleed through */
+    }
+    #roster-table thead tr:first-child th { top: 0; }
+    #roster-table thead tr.tr-colrow th { top: 26px; }
+    #roster-table thead th.c-ident { left: 0; z-index: 5; }
+
+    /* Sticky identity column, solid per row state (zebra + hover). */
+    #roster-table td.c-ident {
+      position: sticky; left: 0; z-index: 2; text-align: left;
+      background: #12141c;
+    }
+    #roster-table tbody tr:nth-child(even) td.c-ident { background: #16181f; }
+    #roster-table tbody tr:hover td.c-ident { background: #1b1e27; }
+
+    /* Zebra banding — this surface only; the FCC tabs keep their own. */
+    #roster-table tbody tr:nth-child(even) { background: rgba(255,255,255,.022); }
+    #roster-table tbody tr:hover { background: rgba(255,255,255,.05); }
+
+    /* Season-stat group header tier */
+    #roster-table th.tr-grp {
+      font: 700 9px/1 'Inter', sans-serif; letter-spacing: .13em; text-transform: uppercase;
+      color: rgba(255,255,255,.26); text-align: center; padding-bottom: 6px;
+    }
+    #roster-table th.tr-groupstart, #roster-table td.tr-groupstart {
+      border-left: 1px solid rgba(255,255,255,.055);
+    }
+    #roster-table th.tr-grp + th.tr-grp { border-left: 1px solid rgba(255,255,255,.055); }
+    .tr-empty { padding: 24px; text-align: center; color: rgba(255,255,255,.4); }
+  </style>
+  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/development-focus.css">
 </head>
-<body></body>
+<body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+  <div class="resource-page-container fcc-brand-page-shell team-roster-shell">
+    <div class="team-roster-page-header">
+      <button id="back-button" type="button">Back to Locker Room</button>
+    </div>
+
+    <!-- Identity lockup: banner card, team name, record + conference/national rank.
+         No scholarship count — scholarships are sunset. -->
+    <div class="tr-lockup">
+      <img id="team-banner-card" class="tr-lockup__banner" src="/images/teams/general/general_banner_primary.jpg" alt="">
+      <div class="tr-lockup__id">
+        <div class="tr-lockup__eyebrow">Team Roster</div>
+        <div class="tr-lockup__name" id="tr-team-name">--</div>
+      </div>
+      <div class="tr-lockup__stats" id="tr-record-block">
+        <div class="tr-stat"><span class="tr-stat__v" id="tr-record">--</span><span class="tr-stat__l">Record</span></div>
+        <div class="tr-stat"><span class="tr-stat__v" id="tr-standing">--</span><span class="tr-stat__l" id="tr-conference-label">Conference Rank</span></div>
+        <div class="tr-stat"><span class="tr-stat__v" id="tr-natl-rank">--</span><span class="tr-stat__l">National Rank</span></div>
+        <div class="tr-stat"><span class="tr-stat__v" id="tr-recruiting-rank">--</span><span class="tr-stat__l">Recruiting Rank</span></div>
+      </div>
+    </div>
+
+    <!-- Projected starting five — the existing shared card component, headshots and all.
+         Always per game, regardless of the table's Per game / Totals toggle. -->
+    <div id="starting-five-section" class="tr-p5" style="display:none;">
+      <div class="tr-eyebrow-rule"><span>Projected Starting Five</span></div>
+      <div id="roster-starting-five" class="scouting-projected-lineup-wrap"></div>
+    </div>
+
+    <!-- One data surface, two switches. Replaces four stacked tables. -->
+    <div class="attr-toolbar tr-toolbar">
+      <button type="button" class="scope-btn" data-tr-scope="varsity" aria-pressed="true">Varsity<span class="n" data-tr-count="varsity">0</span></button>
+      <button type="button" class="scope-btn" data-tr-scope="practice" aria-pressed="false">Practice Squad<span class="n" data-tr-count="practice">0</span></button>
+      <span class="tr-toolbar__sep" aria-hidden="true"></span>
+      <button type="button" class="scope-btn" data-tr-view="attributes" aria-pressed="true">Attributes</button>
+      <button type="button" class="scope-btn" data-tr-view="stats" aria-pressed="false">Season Stats</button>
+      <span class="seg-track tr-per" id="tr-per-track" style="display:none;">
+        <button type="button" data-tr-per="game" aria-pressed="true">Per game</button>
+        <button type="button" data-tr-per="total" aria-pressed="false">Totals</button>
+      </span>
+      <span class="attr-rowcount" id="tr-rowcount"></span>
+    </div>
+    <div class="fcc-data-card">
+      <div class="fcc-data-card-body">
+        <div class="scroll-x" id="tr-scroll">
+          <table class="roster-table" id="roster-table">
+            <thead id="tr-head"></thead>
+            <tbody id="roster-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/playerYear.js"></script>
+  <script src="/js/shared/attributeTooltips.js"></script>
+  <script src="/js/utils/attributeDisplay.js"></script>
+  <script src="/js/shared/attrTiles.js"></script>
+  <script src="/js/shared/rtBucket.js"></script>
+  <script src="/js/shared/scoutingReport.js"></script>
+  <script src="/js/shared/developmentFocus.js"></script>
+  <script src="/team-roster-view.js"></script>
+  <script type="module">
+    import { resumeFranchiseTrack } from '/js/musicController.js';
+    resumeFranchiseTrack();
+  </script>
+</body>
 </html>

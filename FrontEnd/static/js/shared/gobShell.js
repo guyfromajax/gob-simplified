@@ -27,7 +27,8 @@
       { id: 'roster-view', label: 'Roster' },
       { id: 'player-stats-view', label: 'Player Stats' },
       { id: 'team-attributes-view', label: 'Team Attributes' },
-      { id: 'team-schedule-view', label: 'Schedule' }
+      { id: 'team-schedule-view', label: 'Schedule' },
+      { id: 'practice-squad-view', label: 'Practice Squad' }
     ]},
     { id: 'prep', label: 'Prep', title: 'Prep', icon: 'prep', tabs: [
       { id: 'training-tab', label: 'Training' },
@@ -41,7 +42,6 @@
       { id: 'leaders-view', label: 'Leaders' },
       { id: 'team-stats-view', label: 'Team Stats' },
       { id: 'league-schedule-view', label: 'Schedule' },
-      { id: 'practice-squad', label: 'Practice Squad', link: 'practice' },
       { id: 'brackets', label: 'Tournament', link: 'brackets', lock: 'tournament' }
     ]},
     { id: 'recruiting', label: 'Recruiting', title: 'Recruiting', icon: 'recruiting', go: 'recruiting', tabs: [
@@ -65,6 +65,7 @@
     'team-attributes-view': 'team',
     'schedule-tab': 'team',
     'team-schedule-view': 'team',
+    'practice-squad-view': 'team',
     'training-tab': 'prep',
     'game-plan-tab': 'prep',
     'playbooks-tab': 'prep',
@@ -95,8 +96,8 @@
     '/recruiting.html': { kind: 'browse', section: 'recruiting', sub: '', file: 'recruiting' },
     '/rankings.html': { kind: 'browse', section: 'league', sub: 'rankings' },
     '/schedule.html': { kind: 'browse', section: 'league', sub: 'schedule' },
-    '/practice-squad-standings.html': { kind: 'browse', section: 'league', sub: 'practice' },
-    '/practice-squad-bracket.html': { kind: 'browse', section: 'league', sub: 'practice', keepBack: true },
+    '/practice-squad-standings.html': { kind: 'browse', section: 'team', sub: 'practice-squad-view' },
+    '/practice-squad-bracket.html': { kind: 'browse', section: 'team', sub: 'practice-squad-view', keepBack: true },
     '/brackets.html': { kind: 'browse', section: 'league', sub: 'brackets' },
     '/awards.html': { kind: 'browse', section: 'news', sub: 'awards-view' },
     '/news.html': { kind: 'browse', section: 'news', sub: 'news-view' },
@@ -809,7 +810,8 @@
     var tab = q.get('return_tab') || '';
     if (TAB_SECTION[tab]) return TAB_SECTION[tab];
     var ret = q.get('return_url') || '';
-    if (/standings|rankings|schedule\.html|leaders|brackets|practice-squad/.test(ret)) return 'league';
+    if (/practice-squad/.test(ret)) return 'team';
+    if (/standings|rankings|schedule\.html|leaders|brackets/.test(ret)) return 'league';
     if (/recruiting\.html/.test(ret)) return 'recruiting';
     if (/news\.html|awards\.html/.test(ret)) return 'news';
     if (/training|game-plan|playbook|scout/.test(ret)) return 'prep';

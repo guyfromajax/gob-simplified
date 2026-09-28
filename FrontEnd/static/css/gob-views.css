@@ -336,3 +336,157 @@
 #franchise-container #awards-view .gob-awards-empty {
   color: var(--text-38);
 }
+
+#franchise-container #practice-squad-view .gob-ps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  min-width: 0;
+  padding-bottom: var(--space-16);
+}
+
+#franchise-container #practice-squad-view .gob-ps-empty {
+  margin: 0;
+  color: var(--text-60);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ {
+  margin: 0;
+  color: var(--text-87);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-1) var(--font-body);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ a,
+#franchise-container #practice-squad-view .gob-ps a {
+  color: var(--text-87);
+}
+
+#franchise-container #practice-squad-view .gob-ps a:focus-visible,
+html.gob-shell .pg-tools[data-owner="practice-squad-view"] button:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+#franchise-container #practice-squad-view .gob-ps-brackets {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-12);
+}
+
+html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-brackets {
+  grid-template-columns: 1fr 1fr;
+}
+
+#franchise-container #practice-squad-view .gob-ps-tier h2 {
+  margin: 0 0 var(--space-8);
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket {
+  position: relative;
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  overflow-x: auto;
+  padding-bottom: var(--space-8);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket > svg.conn {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .bracket-col {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1 1 8.5rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-8);
+  min-width: 8.5rem;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .col-head {
+  color: var(--text-60);
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-6);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .mu {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  min-width: 8.5rem;
+  overflow: hidden;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .team {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .team + .team {
+  border-top: 1px solid var(--line);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .tname {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .seed,
+#franchise-container #practice-squad-view .gob-ps-bracket .score {
+  color: var(--text-60);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .trophy,
+#franchise-container #practice-squad-view .gob-ps-bracket .champ-badge,
+#franchise-container #practice-squad-view .gob-ps-bracket .champ-vs,
+#franchise-container #practice-squad-view .gob-ps-bracket .champ-plate,
+#franchise-container #practice-squad-view .gob-ps-bracket .team svg,
+#franchise-container #practice-squad-view .gob-ps-bracket img,
+#franchise-container #practice-squad-view .gob-ps-bracket .logo {
+  display: none;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .mu--user {
+  box-shadow: inset 3px 0 0 var(--navy);
+}
+
+#franchise-container #practice-squad-view .gob-ps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-12);
+  align-items: start;
+}
+
+html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+#franchise-container #practice-squad-view .gob-ps-grid .gob-tbl th,
+#franchise-container #practice-squad-view .gob-ps-grid .gob-tbl td,
+#franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl th,
+#franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl td {
+  padding: var(--space-4) var(--space-8);
+}
+
+#franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl {
+  width: 100%;
+}

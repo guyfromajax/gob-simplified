@@ -1,30 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="stylesheet" href="/fonts/app-fonts.css">
-  <script src="/js/shared/franchiseContext.js"></script>
-  <script src="/js/shared/gobNav.js"></script>
-  <script src="/js/shared/authGuard.js"></script>
-<meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-  <title>Practice Squad Tournament</title>
-<link rel="stylesheet" href="/franchise-command-center.css">
-  <link rel="stylesheet" href="/resource-pages.css">
-  <link rel="stylesheet" href="/css/fonts.css">
+  <meta charset="UTF-8">
+  <title>Practice Squad</title>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      params.set('tab', 'practice-squad-view');
+      var qs = params.toString();
+      window.location.replace('/franchise-command-center.html' + (qs ? '?' + qs : ''));
+    })();
+  </script>
 </head>
-<body class="fcc-brand-page">
-  <div class="resource-page-container fcc-brand-page-shell">
-    <div class="resource-page-header">
-      <a id="back-btn" class="brand-back-link" href="#">Back to Standings</a>
-      <h1 class="resource-page-title">Practice Squad Tournament</h1>
-      <span></span>
-    </div>
-    <div id="ps-brackets-root"></div>
-  </div>
-  <script src="/js/config/api-config.js"></script>
-  <script src="/js/shared/teamAssets.js"></script>
-  <script src="/bracket.js"></script>
-  <script src="/practice-squad-bracket.js"></script>
-</body>
+<body></body>
 </html>
