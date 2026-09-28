@@ -108,13 +108,13 @@
     '/player-detail.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/team-roster-view.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/set-lineup.html': { kind: 'focus' },
-    '/training.html': { kind: 'focus' },
-    '/training-report.html': { kind: 'focus' },
+    '/training.html': { kind: 'browse', section: 'prep', sub: 'training-tab' },
+    '/training-report.html': { kind: 'browse', section: 'prep', sub: 'training-tab' },
     '/training-squad-report.html': { kind: 'focus' },
     '/training-playbooks.html': { kind: 'focus' },
     '/cut-players.html': { kind: 'focus' },
-    '/game-plan.html': { kind: 'focus' },
-    '/playbooks.html': { kind: 'focus' },
+    '/game-plan.html': { kind: 'browse', section: 'prep', sub: 'game-plan-tab' },
+    '/playbooks.html': { kind: 'browse', section: 'prep', sub: 'playbooks-tab' },
     '/playbook-report.html': { kind: 'focus' },
     '/box-score.html': { kind: 'flow-or-browse' }
   };
@@ -161,6 +161,7 @@
   }
 
   function openTab(tabName, historyMode) {
+    if (goPrepEditor(tabName, historyMode || 'push')) return;
     if (!window.CommandCenterTabs || typeof window.CommandCenterTabs.show !== 'function') return;
     window.CommandCenterTabs.show(tabName, historyMode);
   }
@@ -247,6 +248,37 @@
     if (teamId) p.set('team_id', teamId);
     if (tab) p.set('tab', tab);
     return '/franchise-command-center.html?' + p.toString();
+  }
+
+  var PREP_EDITOR = {
+    'training-tab': '/training.html',
+    'game-plan-tab': '/game-plan.html',
+    'playbooks-tab': '/playbooks.html'
+  };
+
+  function prepEditorHref(file) {
+    var q = new URLSearchParams(window.location.search);
+    var p = new URLSearchParams();
+    ['franchise_id', 'team_id', 'user_team_id', 'mode'].forEach(function (key) {
+      if (q.get(key)) p.set(key, q.get(key));
+    });
+    if (!p.get('mode') && p.get('franchise_id')) p.set('mode', 'franchise');
+    if (file === '/game-plan.html') p.set('from', 'command_center');
+    var search = p.toString();
+    return file + (search ? '?' + search : '');
+  }
+
+  function goPrepEditor(tabName, historyMode) {
+    var file = PREP_EDITOR[tabName];
+    if (!file) return false;
+    var href = prepEditorHref(file);
+    var nav = window.GOBNav;
+    if (historyMode === 'replace') {
+      if (nav && typeof nav.replace === 'function') nav.replace(href);
+      else window.location.replace(href);
+    } else if (nav && typeof nav.go === 'function') nav.go(href);
+    else window.location.assign(href);
+    return true;
   }
 
   function goLink(kind) {
@@ -347,6 +379,12 @@
       goLink(item.link);
       return;
     }
+    if (PREP_EDITOR[item.id]) {
+      if (pageMode && pageMode.sub === item.id) return;
+      playClick();
+      goPrepEditor(item.id, 'replace');
+      return;
+    }
     if (pageMode) {
       if (pageMode.sub === item.id) return;
       playClick();
@@ -436,6 +474,13 @@
     btn.innerHTML = ICONS[section.icon] + '<span class="rail-l">' + section.label + '</span>';
     if (section.id === 'recruiting') btn.id = 'gob-rail-recruiting';
     btn.addEventListener('click', function () {
+      if (section.id === 'prep') {
+        if (pageMode && pageMode.section === 'prep') return;
+        if (!pageMode && (TAB_SECTION[currentTab()] || 'office') === 'prep') return;
+        playClick();
+        goPrepEditor('training-tab', 'push');
+        return;
+      }
       if (pageMode) {
         if (pageMode.section === section.id) return;
         playClick();
@@ -491,6 +536,7 @@
     var text = source ? String(source.textContent || '') : '';
     var cut = text.indexOf(':');
     var value = (cut === -1 ? text : text.slice(cut + 1)).trim();
+    if (value === '--' || value === '—' || value === '-') value = '';
     if (!value && data && data.team_record && data.team_record.wins != null && data.team_record.losses != null) {
       value = String(data.team_record.wins) + '-' + String(data.team_record.losses);
     }
@@ -790,7 +836,9 @@
   window.GOBShell = {
     sync: sync,
     syncTop: syncTop,
-    syncRecord: paintRecord,
+    syncRecord: function (data) {
+      paintRecord(data || window.__gobCommandCenterData || null);
+    },
     classifyTables: classifyTables,
     noteCommandCenter: noteCommandCenter,
     replaceRecruitingHub: replaceRecruitingHub,
@@ -831,6 +879,9 @@
       return { kind: 'focus' };
     }
     if (path === '/recruiting.html' && q.get('action') === 'run') return { kind: 'focus', file: 'recruiting' };
+    if (path === '/game-plan.html' && (q.get('resume_from_timeout') === 'true' || q.get('mode') === 'tutorial')) {
+      return { kind: 'focus', section: 'prep', sub: 'game-plan-tab' };
+    }
     var out = {
       kind: spec.kind,
       section: spec.section,
@@ -1293,6 +1344,13 @@
 
   function boot() {
     if (document.getElementById('franchise-container')) {
+      var prepTab = '';
+      try { prepTab = new URLSearchParams(window.location.search).get('tab') || ''; }
+      catch (err) { prepTab = ''; }
+      if (PREP_EDITOR[prepTab]) {
+        goPrepEditor(prepTab, 'replace');
+        return;
+      }
       mount();
       return;
     }

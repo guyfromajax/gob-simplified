@@ -20,14 +20,13 @@ function shellFocusNavigation(pathname, search) {
   var q = new URLSearchParams(search || '');
   if (path === '/box-score.html') return !q.get('return_url');
   if (path === '/recruiting.html' && q.get('action') === 'run') return true;
+  if (path === '/game-plan.html') {
+    return q.get('resume_from_timeout') === 'true' || q.get('mode') === 'tutorial';
+  }
   return path === '/set-lineup.html'
-    || path === '/training.html'
-    || path === '/training-report.html'
     || path === '/training-squad-report.html'
     || path === '/training-playbooks.html'
     || path === '/cut-players.html'
-    || path === '/game-plan.html'
-    || path === '/playbooks.html'
     || path === '/playbook-report.html';
 }
 

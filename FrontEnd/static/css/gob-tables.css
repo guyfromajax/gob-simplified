@@ -909,28 +909,12 @@ html.gob-shell .main #player-stats-view .gob-xs thead th.pin {
   z-index: 2;
   background-color: var(--surface-1);
 }
-#team-schedule-view .gob-id {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 0;
-  line-height: 1.15;
-  text-align: left;
-}
-#team-schedule-view .gob-id > span:first-child {
-  color: var(--text-100);
-  text-decoration: none;
-}
-#team-schedule-view .gob-id .sub,
 #league-schedule-view td .sub {
   display: block;
   color: var(--text-60);
   font-size: 12px;
   line-height: 14px;
   text-decoration: none;
-}
-#team-schedule-view tr.is-next td {
-  background: color-mix(in srgb, var(--text-100) 8%, transparent);
 }
 .gob-wl.up { color: var(--delta-up); }
 .gob-wl.dn { color: var(--delta-down); }
@@ -957,42 +941,150 @@ html.gob-shell .pg-tools .gob-wk-label {
   text-align: center;
 }
 /* Score line fills the card. Name columns take the spare width; the short columns stay tight. */
-#league-schedule-view.tab-content table.gob-sched,
-#team-schedule-view.tab-content table.gob-sched {
+#league-schedule-view.tab-content table.gob-sched {
   width: 100%;
 }
 #league-schedule-view .gob-sched th.team,
-#league-schedule-view .gob-sched td.team,
-#team-schedule-view .gob-sched th.team,
-#team-schedule-view .gob-sched td.team {
-  text-align: left;
-}
-#team-schedule-view .gob-sched th.wk,
-#team-schedule-view .gob-sched td.wk,
-#team-schedule-view .gob-sched th.site,
-#team-schedule-view .gob-sched td.site {
-  width: 1%;
-  white-space: nowrap;
+#league-schedule-view .gob-sched td.team {
   text-align: left;
 }
 #league-schedule-view .gob-sched th.num,
 #league-schedule-view .gob-sched td.num,
-#team-schedule-view .gob-sched th.num,
-#team-schedule-view .gob-sched td.num,
 #league-schedule-view .gob-sched th.box,
-#league-schedule-view .gob-sched td.box,
-#team-schedule-view .gob-sched th.box,
-#team-schedule-view .gob-sched td.box {
+#league-schedule-view .gob-sched td.box {
   width: 1%;
   white-space: nowrap;
 }
-#league-schedule-view a.gob-box,
-#team-schedule-view a.gob-box {
+#league-schedule-view a.gob-box {
   color: var(--text-60);
   text-decoration: none;
 }
-#league-schedule-view a.gob-box:hover,
-#team-schedule-view a.gob-box:hover {
+#league-schedule-view a.gob-box:hover {
   color: var(--text-100);
   text-decoration: underline;
 }
+
+/* Team › Schedule: four week columns. Each is a T1 mini-table; the whole regular
+   season sits above the fold at 1280×720, and density tokens widen rows at 1920. */
+#team-schedule-view .gob-schcols {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dsp-12);
+  align-items: start;
+  padding-bottom: var(--space-16);
+}
+@media (max-width: 1099px) {
+  #team-schedule-view .gob-schcols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+#team-schedule-view .gob-schwk {
+  table-layout: fixed;
+}
+#team-schedule-view .gob-schwk col.c-wk { width: calc(var(--dsz-30) + var(--dsp-8)); }
+#team-schedule-view .gob-schwk col.c-site { width: calc(var(--dsz-20) + var(--dsp-4)); }
+#team-schedule-view .gob-schwk col.c-res { width: calc(var(--dsz-64) + var(--dsp-8)); }
+#team-schedule-view .gob-schwk thead th {
+  height: var(--dsz-28);
+  padding: 0 var(--dsp-10);
+  text-align: left;
+  font-size: var(--fs-12);
+  letter-spacing: var(--tracking-10);
+  color: var(--text-60);
+  border-bottom: 1px solid var(--line);
+}
+#team-schedule-view .gob-schwk tbody td {
+  height: var(--dsz-40);
+  padding: var(--dsp-4) var(--dsp-6);
+  color: var(--text-87);
+  border-top: 1px solid var(--line);
+}
+#team-schedule-view .gob-schwk tbody tr:first-child td { border-top: 0; }
+#team-schedule-view .gob-schcol .gob-schwk tbody tr:nth-child(n),
+#team-schedule-view .gob-schcol .gob-schwk tbody tr:nth-child(n) td {
+  background: transparent;
+}
+#team-schedule-view .gob-schwk td.wk {
+  padding-left: var(--dsp-10);
+  text-align: left;
+  color: var(--text-60);
+  font-variant-numeric: tabular-nums;
+}
+#team-schedule-view .gob-schwk td.site {
+  padding-left: 0;
+  text-align: left;
+  color: var(--text-60);
+}
+#team-schedule-view .gob-schwk td.team {
+  overflow: hidden;
+  text-align: left;
+}
+#team-schedule-view .gob-schwk td.res {
+  padding-right: var(--dsp-6);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#team-schedule-view .gob-schwk .gob-team {
+  display: flex;
+  max-width: 100%;
+  border-radius: var(--radius-4);
+}
+#team-schedule-view .gob-schwk .gob-id {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.15;
+}
+#team-schedule-view .gob-schwk .gob-id > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#team-schedule-view .gob-schwk .gob-id > span:first-child {
+  color: var(--text-87);
+  font-size: var(--fs-12);
+}
+#team-schedule-view .gob-schwk .gob-id .sub {
+  color: var(--text-38);
+  font-size: var(--fs-11);
+}
+#team-schedule-view .gob-schwk a.gob-team:hover .gob-id > span:first-child { color: var(--text-100); }
+#team-schedule-view .gob-schwk tr.is-open td.team,
+#team-schedule-view .gob-schwk tr.is-eos td.team {
+  color: var(--text-38);
+}
+#team-schedule-view .gob-schwk tr.is-eos td {
+  height: var(--dsz-30);
+  font-size: var(--fs-11);
+  letter-spacing: var(--tracking-6);
+}
+#team-schedule-view .gob-schwk a.gob-res {
+  display: inline-block;
+  padding: var(--space-4) var(--space-6);
+  margin-right: calc(-1 * var(--space-6));
+  border-radius: var(--radius-4);
+  color: var(--text-87);
+  text-decoration: none;
+  white-space: nowrap;
+}
+#team-schedule-view .gob-schwk a.gob-res:hover {
+  background-color: var(--white-7);
+  color: var(--text-100);
+}
+#team-schedule-view .gob-schwk a.gob-res:focus-visible,
+#team-schedule-view .gob-schwk a.gob-team:focus-visible {
+  outline: 2px solid var(--text-100);
+  outline-offset: 1px;
+}
+#team-schedule-view .gob-schcol .gob-schwk tbody tr.is-next td {
+  background-color: var(--white-5);
+  color: var(--text-100);
+}
+#team-schedule-view .gob-schwk tr.is-next td.wk { box-shadow: inset 2px 0 0 var(--text-60); }
+#team-schedule-view .gob-schwk tr.is-next .gob-id > span:first-child { color: var(--text-100); }
+#team-schedule-view .gob-schwk tr.is-next .gob-id .sub { color: var(--text-60); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk tbody td { height: calc(var(--dsz-44) + var(--dsz-18)); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk tbody tr.is-eos td { height: var(--dsz-44); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk thead th { height: var(--dsz-40); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk .gob-id > span:first-child { font-size: var(--fs-13); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk .gob-id { gap: var(--dsp-4); }

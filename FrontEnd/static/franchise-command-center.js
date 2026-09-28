@@ -634,13 +634,11 @@ function applyScheduleTabMode(weekArg) {
 function updateTopRecordLabel() {
   const recordLabelEl = document.getElementById('fcc-record-label');
   if (!recordLabelEl) return;
-  let wins = 0;
-  let losses = 0;
-  if (standingsDataCache?.standings?.length && userTeamId) {
-    const teamEntry = standingsDataCache.standings.find((team) => String(team.team_id || '') === String(userTeamId));
-    wins = Number(teamEntry?.W || 0);
-    losses = Number(teamEntry?.L || 0);
-  }
+  if (!standingsDataCache?.standings?.length || !userTeamId) return;
+  const teamEntry = standingsDataCache.standings.find((team) => String(team.team_id || '') === String(userTeamId));
+  if (!teamEntry) return;
+  const wins = Number(teamEntry.W || 0);
+  const losses = Number(teamEntry.L || 0);
   recordLabelEl.textContent = `Record: ${wins}-${losses}`;
   if (window.GOBShell && typeof window.GOBShell.syncRecord === 'function') window.GOBShell.syncRecord();
 }
@@ -4479,6 +4477,8 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'recruits-tab') {
           renderFccRecruits();
         }
+        // Prep v2: the shell no longer opens these tabs. The summary
+        // renderers stay; navigation goes to the editor pages instead.
         if (tabName === 'game-plan-tab') {
           renderGamePlanSummary();
         }

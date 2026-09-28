@@ -72,7 +72,6 @@
     // screens are read for different jobs and a filter carried across surprises.
     sPos: 'all', sYear: 'all', sWatch: false, sView: 'pool',
     // Results (D4)
-    currentResultsWeek: null, weeklyDismissed: false, visitTree: null,
     playback: { index: 0, auto: false, done: false, timer: null },
     week35Results: {}, signFilter: 'all',
     // Signing Day conference reveal (payload `conferences`; `revealSeen` season-stamped
@@ -2222,82 +2221,6 @@
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['div']);
     markSigningsSeen();
   }
-  // ---- Weekly-visit results panel (wks 20-26) ----
-  function showWeeklyPanel() { return state.phase === 'invite' && state.currentResultsWeek === state.week && !state.weeklyDismissed; }
-  function weeklyPanelHtml() {
-    var tree = state.visitTree;
-    if (!tree) return '<div class="wpanel"><div class="wpanel-head"><div class="wpanel-title"><small>Loading</small>This Week\'s Results</div></div></div>';
-    // Flatten team visits → your visit + a recruit→visitors map.
-    var yourVisit = null, visitors = {};
-    (tree.regions || []).forEach(function (rg) {
-      (rg.conferences || []).forEach(function (cf) {
-        (cf.teams || []).forEach(function (t) {
-          if (!t.visit) return;
-          var rid = String(t.visit.recruit_id);
-          (visitors[rid] = visitors[rid] || []).push({ team_id: String(t.team_id), team_name: t.team_name });
-          if (String(t.team_id) === String(state.userTeamId)) yourVisit = t.visit;
-        });
-      });
-    });
-    var mineCount = state.recruits.filter(function (r) { return r.leansToUser; }).length;
-    var invitesLeft = INVITE_WEEKS.filter(function (w) { return w > state.week; }).length;
-
-    // Hero: your visit
-    var heroVisit;
-    if (yourVisit) {
-      var vrec = state.byId[String(yourVisit.recruit_id)];
-      var leanNote = vrec && vrec.leansToUser ? 'now leaning you at <b>#' + (vrec.yourRank || 1) + '</b>. Odds up sharply.' : 'visit logged this week.';
-      heroVisit = '<div class="wvisit"><span class="wvisit-mark gain">' + ARROW_UP + '</span><div class="wvisit-body">' +
-        '<div class="nm">' + Common.recruitNameLinkHtml(yourVisit.recruit_id, context.franchiseId, yourVisit.name) + '<span class="wmeta" data-tooltip="current/potential" title="current/potential"><span class="pos">' + Common.escapeHtml(yourVisit.pos) + '</span>Region ' + Common.escapeHtml(yourVisit.home_region) + ' · ' + Common.formatRtWithPotential(yourVisit.rt, yourVisit.potential_rt_ratcheted) + ' RT</span></div>' +
-        '<div class="sub">Visit landed — ' + leanNote + '</div></div></div>';
-    } else {
-      heroVisit = '<div class="wvisit"><div class="wvisit-body"><div class="nm">No visit this week</div><div class="sub">Your program didn\'t land a visit in Week ' + state.week + '.</div></div></div>';
-    }
-
-    // Contested region activity: your leaners a rival visited this week, grouped by region.
-    var byRegion = {};
-    state.recruits.filter(function (r) { return r.leansToUser; }).forEach(function (r) {
-      var v = visitors[String(r.recruitId)]; if (!v) return;
-      var rival = v.filter(function (x) { return x.team_id !== String(state.userTeamId); })[0];
-      (byRegion[regionOf(r)] = byRegion[regionOf(r)] || []).push({ r: r, rival: rival });
-    });
-    var regionsShown = REGION_ORDER.filter(function (rg) { return byRegion[rg]; }).slice(0, 4);
-    var regionHtml = regionsShown.map(function (rg) {
-      var visits = byRegion[rg].slice(0, 6).map(function (x) {
-        var rivalPart = x.rival
-          ? '<span class="team">' + Common.escapeHtml(Spine.Lean.deriveAbbr(x.rival.team_name, x.rival.team_id)) + '</span><span class="note threat">also visited — contested</span>'
-          : '<span class="note">no rival visits — clear lane</span>';
-        return '<div class="wvrow"><span class="team you">' + Common.escapeHtml(Spine.Lean.deriveAbbr(state.teamName || 'You', state.userTeamId)) + '</span>' +
-          '<span class="who">' + Common.escapeHtml(x.r.name) + '</span><span class="arrow">·</span>' + rivalPart + '</div>';
-      }).join('');
-      return '<div class="wregion-row"><span class="wregion-tag">' + rg + '</span><div class="wregion-visits">' + visits + '</div></div>';
-    }).join('');
-    if (!regionHtml) regionHtml = '<div class="wregion-empty"><span class="note">No contested visits among your leaners this week — clear lanes.</span></div>';
-
-    return '<div class="wpanel"><div class="wpanel-head"><span class="wpanel-badge">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4h13l-2 4 2 4H4"></path></svg></span>' +
-        '<div class="wpanel-title"><small>Week ' + state.week + ' · Visits processed</small>This Week\'s Results</div></div>' +
-      '<div class="wpanel-hero"><div class="whero"><div class="whero-lbl">Your visit</div>' + heroVisit + '</div>' +
-        '<div class="whero"><div class="whero-lbl">What it changed</div><div class="wvisit"><span class="wvisit-mark gain">' + DOT_SVG + '</span>' +
-          '<div class="wvisit-body"><div class="nm">' + state.newLeanIds.size + ' new lean' + (state.newLeanIds.size === 1 ? '' : 's') + ' this week</div>' +
-          '<div class="sub"><b>' + mineCount + '</b> recruits now have your team on their list. ' + invitesLeft + ' invite' + (invitesLeft === 1 ? '' : 's') + ' left this season.</div></div></div></div></div>' +
-      '<div class="wregion">' + regionHtml + '</div></div>';
-  }
-  function dismissWeekly() {
-    state.weeklyDismissed = true;
-    var host = document.getElementById('hub-weekly'); if (host) host.innerHTML = '';
-    var pool = document.querySelector('.pool-wrap');
-    if (pool) window.scrollTo({ top: pool.getBoundingClientRect().top + window.scrollY - 60, behavior: 'smooth' });
-  }
-  function loadWeeklyPanel() {
-    var host = document.getElementById('hub-weekly'); if (!host) return;
-    var render = function () { host.innerHTML = weeklyPanelHtml(); var d = host.querySelector('#weekly-dismiss'); if (d) d.addEventListener('click', dismissWeekly); };
-    if (state.visitTree) { render(); return; }
-    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-results') + '?franchise_id=' + encodeURIComponent(context.franchiseId) + '&week=' + encodeURIComponent(state.week))
-      .then(function (tree) { state.visitTree = tree || {}; render(); })
-      .catch(function (err) { console.error(err); state.weeklyDismissed = true; host.innerHTML = ''; });
-  }
-
   /**
    * Season-panel visit log: every invite week 20-26 in ascending order.
    *
@@ -2397,11 +2320,10 @@
   function shellBodyHtml() {
     if (state.phase === 'day') return '<div class="hub-body-sign" id="hub-sign"></div>';
     if (state.phase === 'results') return '<div id="hub-signings"></div>';
-    var weekly = showWeeklyPanel() ? '<div id="hub-weekly"></div>' : '';
     var pool = '<div class="pool-wrap"><div id="hub-pool"></div></div>';
     if (state.phase === 'invite') {
-      if (hubView === 'visits') return weekly + columnHtml(visitsMountHtml());
-      return weekly + columnHtml(visitsMountHtml() + '<div id="hub-board"></div>' + pool);
+      if (hubView === 'visits') return columnHtml(visitsMountHtml());
+      return columnHtml(visitsMountHtml() + '<div id="hub-board"></div>' + pool);
     }
     if (hubView === 'visits') return columnHtml(visitsMountHtml());
     return columnHtml((state.phase === 'passive' ? storyHtml() : '') + pool);
@@ -2460,7 +2382,6 @@
       else {
         if (document.getElementById('hub-pool')) renderPool();
         if (document.getElementById('hub-board')) renderDock();
-        if (document.getElementById('hub-weekly')) loadWeeklyPanel();
       }
     } finally {
       syncHubChrome();
@@ -2493,7 +2414,6 @@
         state.userRegion = REGION_ORDER.indexOf(String(data.team_region || '').trim().toUpperCase()) !== -1
           ? String(data.team_region).trim().toUpperCase() : '';
         state.teamName = data.team || 'your program';
-        state.currentResultsWeek = data.current_results_week;
         state.week35Results = data.week_35_recruiting_results || {};
         state.newLeanIds = new Set((data.new_lean_recruit_ids || []).map(String));
         var teamNameMap = data.team_name_map || {};
