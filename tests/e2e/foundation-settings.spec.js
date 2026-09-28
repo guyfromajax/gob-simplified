@@ -151,6 +151,136 @@ test('settings footer links FAQs in a new tab offline', async ({ page }) => {
   await checkFaqs(page, 'reports/settings-faqs/settings-offline-1280x720.png');
 });
 
+// The body (.set-b) is the panel's own scroll area; the header and the footer
+// (FAQs, Online/Offline) stay pinned while it scrolls.
+function panelMetrics(page) {
+  return page.evaluate(() => {
+    const panel = document.querySelector('#gob-settings-host .settings');
+    const head = panel.querySelector('.set-h');
+    const body = panel.querySelector('.set-b');
+    const foot = panel.querySelector('.set-f');
+    const faqs = foot.querySelector('a[data-settings-faqs]');
+    const box = (el) => { const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height) }; };
+    const hits = (el) => {
+      const r = el.getBoundingClientRect();
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return top === el || el.contains(top);
+    };
+    return {
+      panel: box(panel),
+      head: box(head),
+      body: box(body),
+      foot: box(foot),
+      overflow: body.scrollHeight - body.clientHeight,
+      scrollTop: Math.round(body.scrollTop),
+      gutter: body.offsetWidth - body.clientWidth,
+      overflowY: getComputedStyle(body).overflowY,
+      faqsHit: hits(faqs),
+      faqsInFoot: faqs.getBoundingClientRect().bottom <= foot.getBoundingClientRect().bottom + 0.5,
+      sections: [...body.children].filter((s) => !s.hidden).map((s) => {
+        const r = s.getBoundingClientRect();
+        return [Math.round(r.top), Math.round(r.height)];
+      }),
+    };
+  });
+}
+
+async function openPanel(page, offline) {
+  if (offline) await page.addInitScript(() => { window.GOB_BUILD_PROFILE = 'desktop'; });
+  await stubAuth(page);
+  await stubMe(page, ME);
+  await page.goto('/mode-select.html');
+  await page.evaluate(async () => {
+    const mod = await import('/js/shared/gobSettings.js');
+    mod.openSettings();
+  });
+  const panel = page.locator('#gob-settings-host .settings');
+  await expect(panel).toBeVisible();
+  await expect(page.locator(offline ? '#gob-settings-host .set-note' : '#gob-settings-host [data-settings-logout]')).toBeVisible();
+  await panel.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+}
+
+test('the settings body scrolls so Log Out is reachable at 1280x720, footer pinned', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openPanel(page, false);
+  const before = await panelMetrics(page);
+  expect(before.overflowY).toBe('auto');
+  expect(before.overflow, 'content taller than the body at 1280x720 online').toBeGreaterThan(0);
+  expect(before.head.top).toBe(before.panel.top);
+  expect(before.foot.bottom).toBe(before.panel.bottom);
+  expect(before.foot.height).toBe(44);
+  expect(before.faqsHit).toBe(true);
+
+  const logout = page.locator('#gob-settings-host [data-settings-logout]');
+  await logout.scrollIntoViewIfNeeded();
+  await page.locator('#gob-settings-host .set-b').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  const after = await panelMetrics(page);
+  const target = await logout.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const foot = document.querySelector('#gob-settings-host .set-f').getBoundingClientRect();
+    const body = document.querySelector('#gob-settings-host .set-b').getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { hit: top === el || el.contains(top), top: r.top, bottom: r.bottom, footTop: foot.top, bodyTop: body.top, height: r.height };
+  });
+  expect(target.hit, JSON.stringify(target)).toBe(true);
+  expect(target.bottom, JSON.stringify(target)).toBeLessThanOrEqual(target.footTop);
+  expect(target.top).toBeGreaterThanOrEqual(target.bodyTop);
+  expect(target.height).toBeGreaterThanOrEqual(24);
+  expect(after.scrollTop).toBe(before.overflow);
+  // Header and footer do not move while the body scrolls.
+  expect(after.head).toEqual(before.head);
+  expect(after.foot).toEqual(before.foot);
+  expect(after.faqsHit).toBe(true);
+  expect(after.faqsInFoot).toBe(true);
+  await page.mouse.move(900, 400);
+  await page.screenshot({ path: 'reports/settings-scroll/settings-online-1280x720-bottom.png' });
+
+  const [req] = await Promise.all([
+    page.waitForRequest((r) => r.url().includes('/api/auth/logout') && r.method() === 'POST'),
+    logout.click(),
+  ]);
+  expect(req).toBeTruthy();
+  await page.waitForLoadState('load');
+  await expect(page).toHaveURL(/mode-select\.html/);
+});
+
+test('the settings panel keeps its frame online and offline at three sizes', async ({ browser }) => {
+  const fs = require('fs');
+  const out = {};
+  for (const offline of [false, true]) {
+    for (const size of [[1280, 720], [1920, 1080], [1280, 600]]) {
+      const page = await browser.newPage({ viewport: { width: size[0], height: size[1] } });
+      await openPanel(page, offline);
+      const m = await panelMetrics(page);
+      const label = (offline ? 'offline-' : 'online-') + size.join('x');
+      out[label] = m;
+      if (process.env.SETTINGS_PHASE === 'before') { await page.close(); continue; }
+      expect(m.head.top, label).toBe(m.panel.top);
+      expect(m.foot.bottom, label).toBe(m.panel.bottom);
+      expect(m.body.top, label).toBe(m.head.bottom);
+      expect(m.body.bottom, label).toBe(m.foot.top);
+      expect(m.head.height, label).toBe(56);
+      expect(m.foot.height, label).toBe(44);
+      expect(m.faqsHit, label).toBe(true);
+      if (m.overflow <= 0) expect(m.gutter, label + ' no scrollbar when it fits').toBe(0);
+      const body = page.locator('#gob-settings-host .set-b');
+      await body.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+      const last = await body.evaluate((el) => {
+        const kids = [...el.querySelectorAll('.set-s:not([hidden]) > *')];
+        const r = kids[kids.length - 1].getBoundingClientRect();
+        return { bottom: r.bottom, limit: el.getBoundingClientRect().bottom };
+      });
+      expect(last.bottom, label + ' last item inside the body').toBeLessThanOrEqual(last.limit + 0.5);
+      if (size[1] === 600) {
+        await page.mouse.move(900, 300);
+        await page.screenshot({ path: 'reports/settings-scroll/settings-' + label + '-bottom.png' });
+      }
+      await page.close();
+    }
+  }
+  fs.writeFileSync('reports/settings-scroll/' + (process.env.SETTINGS_PHASE || 'after') + '-metrics.json', JSON.stringify(out, null, 2));
+});
+
 const COURT_RECTS = {
   '1280x720': {
     scoreboard: { x: 0, y: 0, w: 1280, h: 120 },
