@@ -281,6 +281,151 @@ test('the settings panel keeps its frame online and offline at three sizes', asy
   fs.writeFileSync('reports/settings-scroll/' + (process.env.SETTINGS_PHASE || 'after') + '-metrics.json', JSON.stringify(out, null, 2));
 });
 
+// Mute buttons and the close × must never pick up the browser's default button face.
+// Outside the shell the host is `.gob.gob-settings-host` with no .gob ancestor.
+const SHELL_FID = 'f-e2e-settings-icons';
+const SHELL_TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+const ICON_PAGES = [
+  { name: 'mode-select', url: '/mode-select.html', shell: false },
+  { name: 'office', url: '/franchise-command-center.html?franchise_id=' + SHELL_FID + '&team_id=' + SHELL_TID, shell: true },
+  { name: 'standings (browse)', url: '/standings.html?franchise_id=' + SHELL_FID + '&team_id=' + SHELL_TID, shell: true },
+  { name: 'recruiting (focus)', url: '/recruiting.html?franchise_id=' + SHELL_FID + '&team_id=' + SHELL_TID + '&from=fcc', shell: true },
+];
+
+async function installShellApi(page) {
+  await stubAuth(page);
+  await page.route('**/*', async (route) => {
+    let pathname = '';
+    try { pathname = new URL(route.request().url()).pathname; } catch (_err) { return route.continue(); }
+    const json = (body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (pathname.startsWith('/franchise/command-center/data')) {
+      return json({
+        franchise_id: SHELL_FID, team_id: SHELL_TID, user_team_id: SHELL_TID, team: 'Lancaster', week: 21, rank: 14,
+        season: 1, current_season: 1, training_completed: true, session_type: 'in-season',
+        recruiting_wire: { board_saved_week: 21, counts: {} }, user_conference: 1, user_region: 'C',
+        team_record: { wins: 4, losses: 1 },
+      });
+    }
+    if (pathname === '/api/auth/me') return json(ME);
+    if (pathname === '/app-config') return json({ isAlpha: false, version: '1.0' });
+    if (pathname.startsWith('/api/') || pathname.startsWith('/franchise/') || pathname.startsWith('/roster/')) return json({});
+    return route.continue();
+  });
+}
+
+async function openOn(page, spec) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  if (spec.shell) await installShellApi(page);
+  else { await stubAuth(page); await stubMe(page, ME); }
+  await page.goto(spec.url);
+  await page.waitForFunction(() => !document.documentElement.classList.contains('gob-pending'));
+  if (spec.shell) await expect(page.locator('html.gob-shell')).toHaveCount(1);
+  await page.evaluate(async () => {
+    const mod = await import('/js/shared/gobSettings.js');
+    mod.openSettings();
+  });
+  const panel = page.locator('#gob-settings-host .settings');
+  await expect(panel).toBeVisible();
+  await panel.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+}
+
+function iconState(page, selector) {
+  return page.evaluate((sel) => {
+    const host = document.getElementById('gob-settings-host');
+    const token = (name) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(' + name + ')';
+      host.appendChild(probe);
+      const value = getComputedStyle(probe).color;
+      probe.remove();
+      return value;
+    };
+    const el = host.querySelector(sel);
+    const cs = getComputedStyle(el);
+    const svg = el.querySelector('svg');
+    const out = {
+      bg: cs.backgroundColor,
+      bgImage: cs.backgroundImage,
+      borderWidth: cs.borderTopWidth,
+      appearance: cs.appearance,
+      color: cs.color,
+      text60: token('--text-60'),
+      text100: token('--text-100'),
+      red: token('--red'),
+      on: el.classList.contains('on'),
+      pressed: el.getAttribute('aria-pressed'),
+    };
+    if (svg) {
+      const r = svg.getBoundingClientRect();
+      const paths = [...svg.querySelectorAll('path')];
+      const pcs = getComputedStyle(paths[0]);
+      out.svg = { w: r.width, h: r.height, stroke: pcs.stroke, fill: pcs.fill, strokeWidth: pcs.strokeWidth, d: paths.map((p) => p.getAttribute('d')).join(' ') };
+    }
+    return out;
+  }, selector);
+}
+
+function expectFlatButton(state, label) {
+  expect(state.bg, label + ' background').toBe('rgba(0, 0, 0, 0)');
+  expect(state.bgImage, label).toBe('none');
+  expect(state.borderWidth, label + ' border').toBe('0px');
+  expect(state.appearance, label).toBe('none');
+}
+
+for (const spec of ICON_PAGES) {
+  test('settings mute icons and close render flat on ' + spec.name, async ({ page }) => {
+    await openOn(page, spec);
+    const MUTE = '[data-mute="music"]';
+
+    const rest = await iconState(page, MUTE);
+    expectFlatButton(rest, spec.name + ' mute');
+    expect(rest.color).toBe(rest.text60);
+    expect(rest.svg.w).toBeGreaterThan(0);
+    expect(rest.svg.h).toBeGreaterThan(0);
+    expect(rest.svg.fill).toBe('none');
+    expect(rest.svg.stroke).toBe(rest.text60);
+    expect(parseFloat(rest.svg.strokeWidth)).toBeGreaterThan(0);
+    expect(rest.svg.d).toContain('M15.5 9a4 4 0 0 1 0 6');
+    expect(rest.pressed).toBe('false');
+
+    const close = await iconState(page, '.set-x');
+    expectFlatButton(close, spec.name + ' close');
+    expect(close.color).toBe(close.text60);
+
+    await page.hover('#gob-settings-host ' + MUTE);
+    await expect.poll(async () => (await iconState(page, MUTE)).color).toBe(rest.text100);
+
+    await page.click('#gob-settings-host ' + MUTE);
+    await page.mouse.move(900, 400);
+    await expect.poll(async () => (await iconState(page, MUTE)).on).toBe(true);
+    await expect.poll(async () => (await iconState(page, MUTE)).color).toBe(rest.red);
+    const muted = await iconState(page, MUTE);
+    expect(muted.pressed).toBe('true');
+    expect(muted.svg.d).toContain('M16 9.5l5 5');
+    expect(muted.svg.stroke).toBe(rest.red);
+    expect(muted.svg.w).toBeGreaterThan(0);
+
+    const others = await page.evaluate(() => [...document.querySelectorAll('#gob-settings-host [data-mute]')]
+      .map((b) => ({ id: b.dataset.mute, bg: getComputedStyle(b).backgroundColor, on: b.classList.contains('on') })));
+    for (const other of others.filter((o) => o.id !== 'music')) {
+      expect(other.on, other.id).toBe(false);
+      expect(other.bg, other.id).toBe('rgba(0, 0, 0, 0)');
+    }
+
+    if (spec.name === 'mode-select' || spec.name === 'office') {
+      await page.screenshot({ path: 'reports/settings-mute-icons/settings-' + spec.name + '-1280x720-music-muted.png' });
+    }
+
+    await page.click('#gob-settings-host ' + MUTE);
+    await page.mouse.move(900, 400);
+    await expect.poll(async () => (await iconState(page, MUTE)).on).toBe(false);
+    const back = await iconState(page, MUTE);
+    expect(back.pressed).toBe('false');
+    expect(back.svg.d).toContain('M15.5 9a4 4 0 0 1 0 6');
+    await expect.poll(async () => (await iconState(page, MUTE)).color).toBe(rest.text60);
+  });
+}
+
 const COURT_RECTS = {
   '1280x720': {
     scoreboard: { x: 0, y: 0, w: 1280, h: 120 },
