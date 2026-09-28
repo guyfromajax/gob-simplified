@@ -1,6 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from BackEnd.utils.browse_cache import browse_cached, bump_browse_rev, fold_browse_rev
+from BackEnd.utils.franchise_last_played import (
+    LAST_PLAYED_FIELD,
+    last_played_iso,
+    marks_last_played,
+    most_recent_franchise_id,
+)
+from BackEnd.utils.local_coach import coach_career_payload, is_local_owner, local_coach_doc
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from starlette.responses import Response
 from fastapi.encoders import jsonable_encoder
@@ -5750,6 +5757,7 @@ def play_next_game(
 
 
 @router.post("/franchise/save-result")
+@marks_last_played
 def save_result(req: FranchiseResultRequest):
     logger.info(f"🔍 [SAVE-RESULT] ENDPOINT CALLED - franchise_id={req.franchise_id}, game_id={req.game_id}")
     logger.info(f"🔍 [SAVE-RESULT] Request object: {req}")
@@ -9182,6 +9190,7 @@ def _complete_week_finish_cpu_and_persist(
     return finalized
 
 @router.post("/franchise/complete-week")
+@marks_last_played
 def complete_week(req: CompleteWeekRequest):
     logger.warning(
         "🧭 [COMPLETE-WEEK-ENTRY] franchise_id=%s week=%s game_id=%s has_game_document=%s",
@@ -9287,6 +9296,7 @@ def complete_week(req: CompleteWeekRequest):
 
 
 @router.post("/franchise/complete-week/phase-a")
+@marks_last_played
 def complete_week_phase_a(req: CompleteWeekRequest):
     logger.warning(
         "🧭 [COMPLETE-WEEK-PHASE-A] franchise_id=%s week=%s game_id=%s",
@@ -9488,6 +9498,7 @@ def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
 
 
 @router.post("/franchise/complete-week/phase-b")
+@marks_last_played
 def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
     logger.warning(
         "🧭 [COMPLETE-WEEK-PHASE-B] franchise_id=%s week=%s",
@@ -9673,6 +9684,7 @@ def _franchise_summary_for_list(doc: dict) -> dict:
         "asset_strategy": display.get("asset_strategy") or "core",
         "jersey_preset": display.get("jersey_preset") if display.get("is_custom") else None,
         "court": display.get("court") if display.get("is_custom") else None,
+        "last_played_at": last_played_iso(doc),
     }
 
 
@@ -9723,6 +9735,7 @@ def _ensure_home_slots_for_user(user_id: str) -> list[dict]:
                 "home_slot": 1,
                 # Required for Team Builder resolve_team_display on list cards.
                 "team_builder": 1,
+                LAST_PLAYED_FIELD: 1,
             },
         ).sort("_id", 1)
     )
@@ -9818,7 +9831,29 @@ def list_user_franchises(user: dict = Depends(get_current_user)):
         "franchises": franchises,
         "count": len(franchises),
         "max": MAX_FRANCHISES_PER_USER,
+        "most_recent_franchise_id": most_recent_franchise_id(docs),
     }
+
+
+@router.get("/franchise/coach-career")
+def get_coach_career(user: dict = Depends(get_current_user)):
+    """Career record and championships in the /api/auth/me shape.
+
+    Loopback serves this for the local desktop coach (no /api/auth there); online it
+    reads the same users fields /api/auth/me does.
+    """
+    uid = user.get("user_id")
+    if is_local_owner(uid):
+        doc = local_coach_doc()
+    else:
+        try:
+            doc = _store.users_collection.find_one(
+                {"_id": ObjectId(uid)},
+                {"username": 1, "record": 1, "archetypes": 1, "lead_archetype": 1, "championships_total": 1},
+            ) or {}
+        except Exception:
+            doc = {}
+    return coach_career_payload(doc, user)
 
 
 @router.get("/franchise/current")
@@ -18628,6 +18663,7 @@ def _mark_completed_full_game_summary_final(summary: dict[str, Any]) -> dict[str
 
 
 @router.post("/franchise/sim-rest-of-tournament")
+@marks_last_played
 def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     """Simulate all games in the current EOS round (when user has no game: bye or did not qualify)."""
     try:
@@ -18923,6 +18959,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
 
 
 @router.post("/franchise/sim-championship")
+@marks_last_played
 def sim_championship(req: SimChampionshipRequest):
     """Simulate the national championship game (week 34 final)."""
     try:
@@ -19396,6 +19433,7 @@ def get_senior_tribute(
 
 
 @router.post("/franchise/finish-season")
+@marks_last_played
 def finish_season(req: FinishSeasonRequest):
     """Finish current season and start new season."""
     try:

@@ -382,7 +382,23 @@ function renderCommunityLeaderboard(leaderboardData, currentUsername) {
   renderGeekPointsLeaderboard(leaderboardData, currentUsername);
 }
 
+// Around The League, the leaderboards and Community Highlights are always-remote
+// community routes. The desktop profile has no community backend: no requests,
+// no panels (Home Base fills that zone offline).
+function msCommunityOffline() {
+  if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.getBuildProfile === 'function') {
+    return API_CONFIG.getBuildProfile() === 'desktop';
+  }
+  return typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop';
+}
+
+function hideCommunityPanels() {
+  document.querySelectorAll('.around-the-league-section, .community-section, .community-highlights-section')
+    .forEach(function (section) { section.hidden = true; });
+}
+
 async function loadCommunityLeaderboard(currentUsername) {
+  if (msCommunityOffline()) return;
   if (!leaderboardHost) return;
   const leaderboardData = await safeJsonFetch(API_CONFIG.buildUrl('/api/auth/leaderboard'), {
     headers: getAuthHeaders()
@@ -621,6 +637,7 @@ function renderCommunityHighlights(data) {
 }
 
 async function loadCommunityHighlights() {
+  if (msCommunityOffline()) return;
   if (!communityHighlightsBody) return;
   communityHighlightsBody.innerHTML = '<div class="community-highlights-loading">Loading…</div>';
   var data = await safeJsonFetch(API_CONFIG.buildUrl('/api/community/highlights'), {
@@ -907,7 +924,7 @@ function atlApplyBoardUpdate(nextSlots, opts) {
 }
 
 async function loadAroundTheLeague(options) {
-  if (!aroundTheLeagueGrid) return;
+  if (!aroundTheLeagueGrid || msCommunityOffline()) return;
   options = options || {};
   if (!atlInitialLoadDone) {
     aroundTheLeagueGrid.innerHTML = '<div class="around-the-league-loading">Loading…</div>';
@@ -948,7 +965,7 @@ async function loadAroundTheLeague(options) {
 }
 
 function wireAroundTheLeaguePolling() {
-  if (!aroundTheLeagueGrid || atlPollTimer) return;
+  if (!aroundTheLeagueGrid || atlPollTimer || msCommunityOffline()) return;
   atlPollTimer = window.setInterval(function () {
     loadAroundTheLeague({ poll: true });
   }, ATL_POLL_MS);
@@ -993,7 +1010,7 @@ function displayLbtPoints(geekPoints) {
 async function loadLeadersByTeam() {
   var grid = document.getElementById('leaders-by-team-grid');
   var title = document.querySelector('.leaders-by-team-title');
-  if (!grid) return;
+  if (!grid || msCommunityOffline()) return;
 
   var leaderboardView = currentLeaderboardView === 'titles' ? 'titles' : 'geek_points';
   if (title) {
@@ -1764,17 +1781,21 @@ document.addEventListener('DOMContentLoaded', async function () {
     console.error('[ALPHA] Failed to load app config:', error);
   }
 
-  setLeaderboardView('geek_points');
-  wireLeaderboardViewToggles(currentUsername);
-  // Community cards must not hold the session panel. A stalled highlights
-  // manifest (or any other community fetch) used to leave the page on
-  // "Checking your session…" for the whole navigation, including a Back
-  // onto this document.
-  loadCommunityLeaderboard(currentUsername);
-  loadCommunityHighlights();
-  loadAroundTheLeague();
-  wireAroundTheLeaguePolling();
-  wireLeadersByTeamModal();
+  if (msCommunityOffline()) {
+    hideCommunityPanels();
+  } else {
+    setLeaderboardView('geek_points');
+    wireLeaderboardViewToggles(currentUsername);
+    // Community cards must not hold the session panel. A stalled highlights
+    // manifest (or any other community fetch) used to leave the page on
+    // "Checking your session…" for the whole navigation, including a Back
+    // onto this document.
+    loadCommunityLeaderboard(currentUsername);
+    loadCommunityHighlights();
+    loadAroundTheLeague();
+    wireAroundTheLeaguePolling();
+    wireLeadersByTeamModal();
+  }
 
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function () {
