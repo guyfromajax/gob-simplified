@@ -219,7 +219,8 @@ test.describe('tournament view', () => {
     await openView(page, payload(27));
     await expect(page.locator('#tournament-view .fcc-tb-mu').first()).toBeVisible();
     await expect(page.locator('#tournament-view .fcc-tb-team--user').first()).toBeVisible();
-    await expect(page.locator('#tournament-view a.fcc-tb-res-link').first()).toHaveText('65-72');
+    await expect(page.locator('#tournament-view .fcc-tb-res-link')).toHaveCount(0);
+    await expect(page.locator('#tournament-view a.fcc-tb-score.gob-res').first()).toBeVisible();
     await shot('week-27-conference-1280.png', 1280, 720);
     await shot('week-27-conference-1920.png', 1920, 1080);
 
@@ -249,7 +250,8 @@ test.describe('tournament view', () => {
       current_phase: 'national',
     }));
     await page.locator('#tournament-view [data-tour-phase="national"]').click();
-    await expect(page.locator('#tournament-view .gob-tour-status-name')).toHaveText('Lancaster');
+    await expect(page.locator('#tournament-view .gob-tour-status')).toHaveCount(0);
+    await expect(page.locator('#tournament-view .fcc-tb-team--champion')).toBeVisible();
     await shot('complete-1280.png', 1280, 720);
     await shot('complete-1920.png', 1920, 1080);
   });

@@ -614,6 +614,28 @@ html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
   overflow-x: auto;
 }
 
+#franchise-container #tournament-view .fcc-tb-classic,
+#franchise-container #tournament-view .fcc-tb-region--full,
+#franchise-container #tournament-view .fcc-tb-region--4,
+#franchise-container #tournament-view .fcc-tb-region--3 {
+  width: fit-content;
+  max-width: 100%;
+}
+
+#franchise-container #tournament-view .fcc-tb-classic {
+  grid-template-columns: repeat(5, minmax(0, 22rem));
+}
+
+#franchise-container #tournament-view .fcc-tb-region--full,
+#franchise-container #tournament-view .fcc-tb-region--4,
+#franchise-container #tournament-view .fcc-tb-region--3 {
+  grid-template-columns: minmax(0, 22rem) minmax(0, 22rem) minmax(12px, 1fr);
+}
+
+#franchise-container #tournament-view .fcc-tb-region-col {
+  max-width: 22rem;
+}
+
 #franchise-container #tournament-view .fcc-tb-enter,
 #franchise-container #tournament-view .fcc-tb-enter * {
   animation: none !important;
@@ -621,8 +643,43 @@ html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
   transform: none !important;
 }
 
+#franchise-container #tournament-view .fcc-tb-mu--user {
+  border-color: color-mix(in srgb, var(--navy-hi) 55%, var(--white-10));
+  box-shadow:
+    inset 3px 0 0 var(--navy),
+    0 8px 22px rgba(0, 0, 0, 0.4);
+}
+
 #franchise-container #tournament-view .fcc-tb-team--user {
-  box-shadow: inset 3px 0 0 var(--navy);
+  border-left: 3px solid var(--navy);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--navy) 22%, transparent),
+    transparent
+  );
+  box-shadow: none;
+}
+
+#franchise-container #tournament-view .fcc-tb-team--user .fcc-tb-name-text,
+#franchise-container #tournament-view .fcc-tb-team--user .fcc-tb-score,
+#franchise-container #tournament-view .fcc-tb-team--user a.fcc-tb-score {
+  color: var(--text-87);
+}
+
+#franchise-container #tournament-view .fcc-tb-team--user .fcc-tb-seed {
+  color: var(--text-60);
+}
+
+#franchise-container #tournament-view .fcc-tb-team--champion.fcc-tb-team--user {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--navy) 18%, transparent),
+    color-mix(in srgb, rgba(212, 168, 72, 1) 12%, transparent)
+  );
+}
+
+#franchise-container #tournament-view .fcc-tb-res-link {
+  display: none;
 }
 
 #franchise-container #tournament-view a.gob-res {
@@ -636,6 +693,10 @@ html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
   text-decoration: underline;
   outline: 2px solid var(--white);
   outline-offset: 2px;
+}
+
+#franchise-container #tournament-view .fcc-tb-team--winner a.fcc-tb-score {
+  font-weight: var(--fw-semibold);
 }
 
 #franchise-container #team-schedule-view tr.is-tourney td.wk {

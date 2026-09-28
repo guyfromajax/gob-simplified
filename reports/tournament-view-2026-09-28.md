@@ -58,4 +58,18 @@ Full suite (fix pass): **517 passed, 3 skipped**, ~7.5m, port 8010, `CI` unset, 
 
 **Offline:** `scripts/seed_tournament_view_offline.py` → throwaway SQLite; loopback on 8025 with `GOB_BUILD_PROFILE=desktop` + `GOB_LOOPBACK_PORT` in the browser (same pattern as desktop e2e).
 
+## Fix pass 2 (2026-09-28)
+
+**Box score link:** Removed the loose `65-72` line under match cards (`fcc-tb-res-link`). Tournament browse passes `boxScoreInTeamRow: true` so each team row’s score is an `a.gob-res.fcc-tb-score` to the same box score — same pattern as Team › Schedule (result column link, not a second line).
+
+**Colour law:** In `#tournament-view`, user matchups use navy edge/tint (`.fcc-tb-mu--user`, `.fcc-tb-team--user` overrides in `gob-views.css`; connector “user” paths use `userConnectorNavy`, no green glow). Green remains only on the shell Advance button. **Gold kept (ch7 reward):** championship matchup card (`.fcc-tb-mu--championship` border/glow), winner crown SVG on championship rows, trophy block badges (`★ CONFERENCE ★` / `★ REGION ★` / `★ NATIONAL ★`), gold winner connector strokes, champion row background (`.fcc-tb-team--champion`).
+
+**Width:** Bracket grids use `width: fit-content` with ~22rem column caps so region (2-round) no longer stretches at 1920; conference and national use the same cap.
+
+**Complete state:** Top `.gob-tour-status` champion block removed when the bracket shows the champion; status block only for eliminated and bye.
+
+**B3:** `reports/team-schedule-columns/team-schedule-w28-tournament-1280.png` (tournament games under phase labels).
+
+**Full suite (fix pass 2):** **517 passed, 3 skipped**, ~7.6m, port 8010, `CI` unset, workers=1, no concurrent Playwright on 8157. Server stopped with the suite.
+
 STATUS: COMPLETE

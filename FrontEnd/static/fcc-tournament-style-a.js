@@ -368,7 +368,15 @@
     }
     row.appendChild(nameCell);
 
-    row.appendChild(elSpan('fcc-tb-score', slot.score !== '' && slot.score != null ? String(slot.score) : ''));
+    if (slot.boxHref && slot.score !== '' && slot.score != null) {
+      var scoreLink = document.createElement('a');
+      scoreLink.className = 'gob-res fcc-tb-score';
+      scoreLink.href = slot.boxHref;
+      scoreLink.textContent = String(slot.score);
+      row.appendChild(scoreLink);
+    } else {
+      row.appendChild(elSpan('fcc-tb-score', slot.score !== '' && slot.score != null ? String(slot.score) : ''));
+    }
     return row;
   }
 
@@ -399,6 +407,10 @@
         : side === 'home'
           ? sc.hs
           : sc.as;
+    var rowHref = null;
+    if (opts.boxScoreInTeamRow && opts.gameHref && score !== '' && w != null && !opts.revealMode) {
+      rowHref = opts.gameHref;
+    }
     if (opts.revealMode) {
       won = false;
       lost = false;
@@ -417,6 +429,7 @@
       showCrown: !!opts.showCrown && won,
       showChampion: !!opts.showChampion && won,
       revealMode: !!opts.revealMode,
+      boxHref: rowHref,
     };
   }
 
@@ -455,11 +468,17 @@
       return wrap;
     }
 
+    var gameHref = '';
+    if (m && m.game_id && m.winner && opts.boxScoreHref) {
+      gameHref = typeof opts.boxScoreHref === 'function' ? opts.boxScoreHref(m.game_id) : String(opts.boxScoreHref);
+    }
     var slotOpts = {
       showCrown: !!opts.showCrown,
       showChampion: !!opts.showChampion,
       revealMode: !!opts.revealMode,
       recordMap: opts.recordMap || {},
+      boxScoreInTeamRow: !!opts.boxScoreInTeamRow,
+      gameHref: gameHref,
     };
     var topSlot = homeIsBye
       ? { bye: true }
@@ -477,17 +496,14 @@
     }
     card.appendChild(createTeamRowEl(topSlot, userTeamId));
     card.appendChild(createTeamRowEl(botSlot, userTeamId));
-    if (m && m.game_id && m.winner && opts.boxScoreHref) {
+    if (!opts.boxScoreInTeamRow && m && m.game_id && m.winner && gameHref) {
       var scLink = scoresFor(m, hid, aid, teamName(hid, teamIdToNameMap), teamName(aid, teamIdToNameMap));
       if (scLink.as !== '' && scLink.hs !== '') {
-        var href = typeof opts.boxScoreHref === 'function' ? opts.boxScoreHref(m.game_id) : '';
-        if (href) {
-          var res = document.createElement('a');
-          res.className = 'gob-res fcc-tb-res-link';
-          res.href = href;
-          res.textContent = String(scLink.as) + '-' + String(scLink.hs);
-          card.appendChild(res);
-        }
+        var res = document.createElement('a');
+        res.className = 'gob-res fcc-tb-res-link';
+        res.href = gameHref;
+        res.textContent = String(scLink.as) + '-' + String(scLink.hs);
+        card.appendChild(res);
       }
     }
     if (!opts.revealMode) {
@@ -540,8 +556,15 @@
     return 'winner';
   }
 
-  function applyLineStyle(lineEl, tone) {
+  function applyLineStyle(lineEl, tone, styleOpts) {
+    styleOpts = styleOpts || {};
     if (tone === 'user') {
+      if (styleOpts.userConnectorNavy) {
+        lineEl.setAttribute('stroke', 'rgba(74, 110, 210, 0.72)');
+        lineEl.setAttribute('stroke-width', '2');
+        lineEl.setAttribute('stroke-linecap', 'round');
+        return;
+      }
       lineEl.setAttribute('stroke', '#2bd66a');
       lineEl.setAttribute('stroke-width', '2.4');
       lineEl.setAttribute('stroke-linecap', 'round');
@@ -614,9 +637,16 @@
       revealMode: revealMode,
       recordMap: recordMap,
       boxScoreHref: opts.boxScoreHref || null,
+      boxScoreInTeamRow: !!opts.boxScoreInTeamRow,
     };
     var finOpts = revealMode
-      ? { championship: true, revealMode: true, recordMap: recordMap, boxScoreHref: opts.boxScoreHref || null }
+      ? {
+        championship: true,
+        revealMode: true,
+        recordMap: recordMap,
+        boxScoreHref: opts.boxScoreHref || null,
+        boxScoreInTeamRow: !!opts.boxScoreInTeamRow,
+      }
       : {
         championship: true,
         showCrown: true,
@@ -624,6 +654,7 @@
         revealMode: false,
         recordMap: recordMap,
         boxScoreHref: opts.boxScoreHref || null,
+        boxScoreInTeamRow: !!opts.boxScoreInTeamRow,
       };
 
     grid.appendChild(
@@ -661,7 +692,10 @@
     );
 
     container.appendChild(grid);
-    scheduleConnectorRedraw(grid, userTeamId, { revealMode: revealMode });
+    scheduleConnectorRedraw(grid, userTeamId, {
+      revealMode: revealMode,
+      userConnectorNavy: !!opts.userConnectorNavy,
+    });
   }
 
   function scheduleConnectorRedraw(grid, userTeamId, options) {
@@ -705,6 +739,7 @@
     svg.style.pointerEvents = 'none';
     svg.style.overflow = 'visible';
     ensureConnDefs(svg);
+    var connStyle = { userConnectorNavy: !!options.userConnectorNavy };
 
     function line(x1, y1, x2, y2, tone) {
       var p = document.createElementNS(ns, 'line');
@@ -712,7 +747,7 @@
       p.setAttribute('y1', y1);
       p.setAttribute('x2', x2);
       p.setAttribute('y2', y2);
-      applyLineStyle(p, tone);
+      applyLineStyle(p, tone, connStyle);
       svg.appendChild(p);
     }
 
@@ -797,6 +832,7 @@
     svg.style.pointerEvents = 'none';
     svg.style.overflow = 'visible';
     ensureConnDefs(svg);
+    var connStyle = { userConnectorNavy: !!options.userConnectorNavy };
 
     function line(x1, y1, x2, y2, tone) {
       var p = document.createElementNS(ns, 'line');
@@ -804,7 +840,7 @@
       p.setAttribute('y1', y1);
       p.setAttribute('x2', x2);
       p.setAttribute('y2', y2);
-      applyLineStyle(p, tone);
+      applyLineStyle(p, tone, connStyle);
       svg.appendChild(p);
     }
 
@@ -852,6 +888,7 @@
       revealMode: revealMode,
       recordMap: recordMap,
       boxScoreHref: opts.boxScoreHref || null,
+      boxScoreInTeamRow: !!opts.boxScoreInTeamRow,
     };
     var finOpts = revealMode
       ? {
@@ -860,6 +897,7 @@
         suppressBye: true,
         recordMap: recordMap,
         boxScoreHref: opts.boxScoreHref || null,
+        boxScoreInTeamRow: !!opts.boxScoreInTeamRow,
       }
       : {
           championship: true,
@@ -869,6 +907,7 @@
           suppressBye: true,
           boxScoreHref: opts.boxScoreHref || null,
           recordMap: recordMap,
+          boxScoreInTeamRow: !!opts.boxScoreInTeamRow,
         };
 
     var frame = document.createElement('div');
@@ -905,7 +944,10 @@
     frame.appendChild(c1);
     frame.appendChild(c2);
     container.appendChild(frame);
-    scheduleConnectorRedraw(frame, userTeamId, { revealMode: revealMode });
+    scheduleConnectorRedraw(frame, userTeamId, {
+      revealMode: revealMode,
+      userConnectorNavy: !!opts.userConnectorNavy,
+    });
   }
 
   function renderInto(bodyEl, config) {
@@ -936,6 +978,8 @@
         tier: tier,
         revealMode: revealMode,
         boxScoreHref: config.boxScoreHref || null,
+        boxScoreInTeamRow: !!config.boxScoreInTeamRow,
+        userConnectorNavy: !!config.userConnectorNavy,
       });
       return;
     }
@@ -968,6 +1012,8 @@
       rankMap: rankMap,
       recordMap: recordMap,
       boxScoreHref: config.boxScoreHref || null,
+      boxScoreInTeamRow: !!config.boxScoreInTeamRow,
+      userConnectorNavy: !!config.userConnectorNavy,
       nationalRegionChips: natChips,
       weekLines: weekLines,
       finalBadge: badge,

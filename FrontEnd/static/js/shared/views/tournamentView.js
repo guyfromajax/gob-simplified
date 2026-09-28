@@ -90,14 +90,6 @@ function phaseDrawCopy(data, phase) {
 
 function statusHtml(data) {
   var tables = window.GOBTables;
-  if (data.tournament_complete && data.champion) {
-    var teams = data.teams || {};
-    var champ = teams[String(data.champion)] || {};
-    return '<section class="gob-tour-status">'
-      + '<p class="gob-tour-status-eye">Champion</p>'
-      + '<p class="gob-tour-status-name">' + tables.esc(champ.name || data.champion) + '</p>'
-      + '</section>';
-  }
   if (data.user_eliminated && data.eliminated_in_round) {
     return '<section class="gob-tour-status">'
       + '<p class="gob-tour-status-eye">Eliminated</p>'
@@ -169,7 +161,9 @@ function renderBracket(host, data, phase, maps, ctx) {
     displayWeek: data.week,
     boxScoreHref: function (gameId) {
       return boxHref(ctx.franchiseId, ctx.teamId, gameId);
-    }
+    },
+    boxScoreInTeamRow: true,
+    userConnectorNavy: true
   });
 }
 
