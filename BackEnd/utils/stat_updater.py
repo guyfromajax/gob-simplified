@@ -29,6 +29,7 @@ from bson import ObjectId
 from pymongo import ReturnDocument, UpdateOne
 
 from BackEnd.constants import BOX_SCORE_KEYS
+from BackEnd.utils.minutes_display import display_minutes
 
 from BackEnd.persistence import get_store
 _store = get_store()
@@ -70,6 +71,9 @@ def played_in_game(stat_block: Dict[str, Any]) -> bool:
 def season_minutes(seconds: float) -> float:
     """Season/career MIN is unrounded minutes; game box MIN is seconds."""
     return seconds / 60
+
+
+# display_minutes (re-exported above) is the box-score sibling: floor(seconds / 60).
 
 
 def _per_game_block(totals: Dict[str, Any]) -> Dict[str, float]:
