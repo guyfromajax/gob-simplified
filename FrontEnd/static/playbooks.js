@@ -804,6 +804,9 @@ function cloneParams(params) {
       const lockHtml = ENFORCED_SECTIONS.has(sectionKey)
         ? `<button class="play-lock" type="button" data-lock="${escapeHtml(item.id)}" title="${item.locked ? "Unlock" : "Lock"}">${LOCK_SVG}<span>${item.locked ? "Unlock" : "Lock"}</span></button>`
         : "";
+      const tools = (selectHtml || lockHtml)
+        ? `<div class="pdet-tools">${selectHtml}${lockHtml}</div>`
+        : "";
       const note = flags.isComputed ? `<p class="pdet-note">${escapeHtml(flags.computedNote || "")}</p>` : "";
       const noSlack = flags.noSlackHere ? `<p class="pdet-note">${NOSLACK_COPY}</p>` : "";
       detail.innerHTML = `
@@ -817,8 +820,7 @@ function cloneParams(params) {
           ${top}
           ${sheet}
         </div>
-        ${selectHtml}
-        ${lockHtml}
+        ${tools}
       `;
       return detail;
     }
@@ -829,13 +831,13 @@ function cloneParams(params) {
         const opts = MOTION_FOCUS_OPTIONS.map((option) =>
           `<option value="${option.value}" ${current === option.value ? "selected" : ""}>${option.label}</option>`
         ).join("");
-        return `<div class="et-select-wrap"><select class="motion-focus-select" data-id="${escapeHtml(item.id)}">${opts}</select><span class="caret">▼</span></div>`;
+        return `<label class="sel lg"><select class="motion-focus-select" data-id="${escapeHtml(item.id)}">${opts}</select></label>`;
       }
       if (options.kind === "set") {
         const opts = TARGET_SHOOTER_OPTIONS.map((value) =>
           `<option value="${value}" ${item.target_shooter === value ? "selected" : ""}>${value}</option>`
         ).join("");
-        return `<div class="et-select-wrap is-pos"><select class="target-shooter-select" data-id="${escapeHtml(item.id)}">${opts}</select><span class="caret">▼</span></div>`;
+        return `<label class="sel"><select class="target-shooter-select" data-id="${escapeHtml(item.id)}">${opts}</select></label>`;
       }
       return "";
     }

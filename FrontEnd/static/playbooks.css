@@ -1015,7 +1015,14 @@ input[type="reset"] {
   }
 }
 
-/* Prep v2 Playbooks view. Tokens only. Beats #franchise-container .tab-content h3. */
+/* Prep v2 Playbooks view. Tokens only. Beats #franchise-container .tab-content h3.
+   Re-bind hairlines so playbooks.css :root gold --line / --line-strong cannot leak. */
+#franchise-container #playbooks-view.tab-content,
+#playbooks-view {
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+}
+
 #franchise-container #playbooks-view.tab-content {
   padding: 0;
   border: 0;
@@ -1396,24 +1403,93 @@ html.gob-1920 #playbooks-view .playbooks-layout {
   margin-left: var(--space-4);
 }
 
-#playbooks-view .pdet .et-select-wrap,
-#playbooks-view .pdet select {
+#playbooks-view .pdet-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
   margin-top: var(--space-10);
+}
+
+#playbooks-view .pdet .sel {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
   height: var(--dsz-28);
-  padding: 0 var(--space-8);
-  border: 0;
+  min-width: 68px;
+  margin: 0;
+  padding: 0 var(--space-10);
   border-radius: var(--radius-7);
   background: var(--white-4);
   box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--text-100);
+  color: var(--text-87);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#playbooks-view .pdet .sel.lg {
+  min-width: 136px;
+}
+
+#playbooks-view .pdet .sel:hover {
+  background: var(--white-7);
+}
+
+#playbooks-view .pdet .sel::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  margin-top: -3px;
+  border-right: 1.5px solid var(--text-38);
+  border-bottom: 1.5px solid var(--text-38);
+  transform: rotate(45deg);
+  pointer-events: none;
+  flex: none;
+}
+
+#playbooks-view .pdet .sel select {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-87);
   font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+  cursor: pointer;
+}
+
+#playbooks-view .pdet .sel select:focus {
+  outline: none;
+}
+
+#playbooks-view .pdet .sel:focus-within {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+#playbooks-view .pdet .sel select:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+#playbooks-view .pdet .caret {
+  display: none;
 }
 
 #playbooks-view .play-lock {
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
-  margin-top: var(--space-10);
+  margin: 0;
   height: var(--dsz-28);
   padding: 0 var(--space-8);
   border: 0;
@@ -1450,7 +1526,7 @@ html.gob-1920 #playbooks-view .playbooks-layout {
   justify-content: space-between;
   margin-top: var(--dsp-12);
   padding-bottom: var(--space-6);
-  border-bottom: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
 }
 
 #playbooks-view .pcs-g b {
@@ -1604,61 +1680,79 @@ html.gob-1920 #playbooks-view .playbooks-layout {
   white-space: nowrap;
 }
 
+#playbooks-view .playbooks-shot-weights-strip .psw-live-pill,
 #playbooks-view .psw-live-pill,
 #playbooks-view .tg {
   display: inline-flex;
   align-items: center;
   height: var(--dsz-20, 20px);
   padding: var(--space-1) var(--space-7, 7px) 0;
+  border: 0;
   border-radius: var(--radius-4, 4px);
+  background: transparent;
   font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
   letter-spacing: var(--tracking-10);
-  color: var(--text-87);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text-60);
+  box-shadow: inset 0 0 0 1px var(--text-60);
 }
 
 #playbooks-view .psw-root,
-#playbooks-view .psw-c,
-#playbooks-view .psw-strip {
+#playbooks-view .psw-c {
   display: flex;
   align-items: center;
   gap: var(--dsp-24);
   margin-left: auto;
 }
 
+#playbooks-view .psw-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--dsp-12);
+  flex: none;
+  margin-left: 0;
+}
+
 #playbooks-view .psw-group {
   display: flex;
   align-items: center;
   gap: var(--space-10);
+  flex: none;
 }
 
 #playbooks-view .psw-group-label {
   font-size: var(--fs-10);
   font-weight: var(--fw-bold);
-  letter-spacing: var(--tracking-8);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
   color: var(--text-38);
   white-space: nowrap;
 }
 
 #playbooks-view .psw-pill {
   display: flex;
+  flex: none;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
+  min-width: 4.5ch;
   padding: 0;
   border: 0 !important;
   background: transparent;
+  overflow: visible;
 }
 
 #playbooks-view .psw-pill-pos {
   font-size: var(--fs-10);
   font-weight: var(--fw-bold);
-  letter-spacing: var(--tracking-8);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
   color: var(--text-60);
+  white-space: nowrap;
 }
 
 #playbooks-view .psw-pill-val {
-  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  white-space: nowrap;
 }
 
 #playbooks-view .psw-pill-accent {
