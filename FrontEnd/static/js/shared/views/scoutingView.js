@@ -1,8 +1,6 @@
 import { ensureCss, loadScript } from './prepEmbed.js';
 
 var CSS = [
-  '/css/gob-browse-templates.css',
-  '/css/prep-v2.css',
   '/css/prep-v2-scouting.css',
   '/css/rt-buckets.css'
 ];
@@ -97,17 +95,15 @@ function attrTile(key, attrs) {
 }
 
 function rtLockupHtml(rt, potentialRt) {
-  var curCls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : '';
+  var curCls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : 'rt-unknown';
   var cur = typeof window.formatRtDisplay === 'function' ? window.formatRtDisplay(rt) : (rt == null ? '—' : String(rt));
-  var map = { 'rt-a': 't-blue', 'rt-b': 't-green', 'rt-c': 't-yellow', 'rt-d': 't-red', 'rt-f': 't-red' };
-  var curTone = map[curCls] || '';
-  var html = '<span class="rtl"><b class="' + esc(curTone) + '">' + esc(cur) + '</b><i>→</i>';
+  var html = '<span class="rtl"><b class="' + esc(curCls) + '">' + esc(cur) + '</b><i>→</i>';
   if (potentialRt != null && potentialRt !== '') {
-    var pCls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(potentialRt) : '';
+    var pCls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(potentialRt) : 'rt-unknown';
     var pot = typeof window.formatRtDisplay === 'function' ? window.formatRtDisplay(potentialRt) : String(potentialRt);
-    html += '<b class="pot ' + esc(map[pCls] || '') + '">' + esc(pot) + '</b>';
+    html += '<b class="pot ' + esc(pCls) + '">' + esc(pot) + '</b>';
   } else {
-    html += '<b class="pot">' + esc(cur) + '</b>';
+    html += '<b class="pot ' + esc(curCls) + '">' + esc(cur) + '</b>';
   }
   return html + '</span>';
 }
