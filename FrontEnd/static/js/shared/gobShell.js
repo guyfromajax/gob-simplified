@@ -535,6 +535,7 @@
     var text = source ? String(source.textContent || '') : '';
     var cut = text.indexOf(':');
     var value = (cut === -1 ? text : text.slice(cut + 1)).trim();
+    if (value === '--' || value === '—' || value === '-') value = '';
     if (!value && data && data.team_record && data.team_record.wins != null && data.team_record.losses != null) {
       value = String(data.team_record.wins) + '-' + String(data.team_record.losses);
     }
@@ -834,7 +835,9 @@
   window.GOBShell = {
     sync: sync,
     syncTop: syncTop,
-    syncRecord: paintRecord,
+    syncRecord: function (data) {
+      paintRecord(data || window.__gobCommandCenterData || null);
+    },
     classifyTables: classifyTables,
     noteCommandCenter: noteCommandCenter,
     replaceRecruitingHub: replaceRecruitingHub,

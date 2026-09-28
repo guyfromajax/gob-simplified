@@ -588,17 +588,42 @@ input[type="range"]::-moz-range-thumb {
 /* The nest supplies the bottom spacing; its last child should not double it. */
 .slider-nest .slider-group:last-child { margin-bottom: 8px; }
 
-/* Prep v2 game plan. Tokens only. Ported from the handoff .gt / .gpr / .nest. */
-html.gob-shell .resource-page-container.fcc-brand-page-shell:has(.gpc),
-html.gob-shell .game-plan-card:has(.gpc),
-html.gob-shell .game-plan-card:has(.gpc) .game-plan-card-body {
+/* Prep v2 game plan. Tokens only. Ported from the handoff .gt / .gpr / .nest.
+   The legacy glass shell (::before/::after) and the data-card chrome stay off
+   in browse and in timeout focus. Columns sit on the page. */
+html.gob-shell .main .resource-page-container.fcc-brand-page-shell:has(.gpc),
+html.gob-shell.gob-focus .resource-page-container.fcc-brand-page-shell:has(.gpc) {
   background: transparent;
   border: 0;
   box-shadow: none;
+  border-radius: 0;
   padding: 0;
   margin: 0;
   width: 100%;
   max-width: none;
+  overflow: visible;
+}
+
+html.gob-shell .main .resource-page-container.fcc-brand-page-shell:has(.gpc)::before,
+html.gob-shell .main .resource-page-container.fcc-brand-page-shell:has(.gpc)::after,
+html.gob-shell.gob-focus .resource-page-container.fcc-brand-page-shell:has(.gpc)::before,
+html.gob-shell.gob-focus .resource-page-container.fcc-brand-page-shell:has(.gpc)::after {
+  content: none;
+}
+
+html.gob-shell .main .fcc-data-card.game-plan-card:has(.gpc),
+html.gob-shell .main .fcc-data-card.game-plan-card:has(.gpc) .game-plan-card-body,
+html.gob-shell.gob-focus .fcc-data-card.game-plan-card:has(.gpc),
+html.gob-shell.gob-focus .fcc-data-card.game-plan-card:has(.gpc) .game-plan-card-body {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  overflow: visible;
 }
 
 html.gob-shell .game-plan-page-header,
@@ -669,7 +694,7 @@ html.gob-shell .button-container .btn-secondary {
 html.gob-shell .gpc.cols2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-8) calc(var(--col-gap) * 2);
+  gap: var(--dsp-24) calc(var(--col-gap) * 2);
   align-items: start;
 }
 
@@ -689,27 +714,28 @@ html.gob-shell .gpc .sh h2 {
 
 html.gob-shell .gpc .gpr {
   display: grid;
-  grid-template-columns: minmax(0, 210px) minmax(0, 1fr);
-  gap: var(--space-12);
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: var(--space-20);
   align-items: center;
-  min-height: 0;
-  padding: 0;
+  min-height: var(--dsz-60);
+  padding: var(--space-6) 0;
   border-bottom: 1px solid var(--line);
 }
 
 html.gob-shell .gpc .gpr-n b {
   display: block;
-  font: var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  font: var(--fw-bold) var(--fs-17)/var(--lh-1) var(--font-display);
   letter-spacing: var(--tracking-4);
   color: var(--text-100);
 }
 
 html.gob-shell .gpc .gpr-n span {
   display: block;
-  margin-top: var(--space-2);
+  margin-top: var(--space-5);
   font-size: var(--fs-12);
-  line-height: 1.25;
+  line-height: var(--lh-1);
   color: var(--text-60);
+  white-space: nowrap;
 }
 
 html.gob-shell .gpc .gt {
@@ -795,28 +821,31 @@ html.gob-shell .gpc .gt-l.nr { color: var(--text-60); }
 
 html.gob-shell .gpc .nest {
   position: relative;
-  padding-left: var(--space-12);
+  padding-left: var(--dsp-14);
 }
 
 html.gob-shell .gpc .nest::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 10px;
-  bottom: 8px;
+  top: 14px;
+  bottom: 12px;
   width: 1px;
   background: var(--line-strong);
 }
 
 html.gob-shell .gpc .nest .gpr {
-  grid-template-columns: minmax(0, 198px) minmax(0, 1fr);
+  grid-template-columns: 290px minmax(0, 1fr);
 }
 
 html.gob-shell .gpc .nest-h {
   display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-4) 0 var(--space-1);
+  align-items: baseline;
+  gap: var(--space-10);
+  padding: var(--space-10) 0 var(--space-2);
+  font-size: var(--fs-11);
+  color: var(--text-60);
+  white-space: nowrap;
 }
 
 html.gob-shell .gpc .eb {
@@ -830,7 +859,7 @@ html.gob-shell .gpc .eb {
 
 html.gob-shell .gpc .grp-h {
   display: block;
-  padding: var(--space-6) 0 var(--space-1);
+  padding: var(--space-12) 0 var(--space-2);
 }
 
 html.gob-shell .nest .slider-nest__info:focus-visible {
