@@ -78,6 +78,7 @@ async function fulfillJson(route, body) {
 }
 
 async function openHub(page, week, extra, wire) {
+  const resultsCalls = [];
   await stubAuth(page);
   await page.route('**/*', async (route) => {
     const request = route.request();
@@ -95,6 +96,7 @@ async function openHub(page, week, extra, wire) {
       return;
     }
     if (pathname.startsWith('/franchise/recruiting-results')) {
+      resultsCalls.push(pathname);
       await fulfillJson(route, { regions: [] });
       return;
     }
@@ -107,6 +109,7 @@ async function openHub(page, week, extra, wire) {
   await page.goto('/recruiting.html?franchise_id=' + FID + '&team_id=' + TID);
   await page.waitForSelector('#hub-phase .pstrip');
   await page.waitForFunction(() => !document.documentElement.classList.contains('gob-pending'));
+  return resultsCalls;
 }
 
 // The wide-table fade is a mask. It does not change hit testing, so a covered
@@ -174,7 +177,7 @@ test('invite weeks keep the stack on pool and leans, and visits is the calendar'
   await expect(page.locator('#hub-visits .vcal')).toBeVisible();
   await expect(page.locator('#hub-board')).toBeVisible();
   await expect(page.locator('#hub-pool')).toBeVisible();
-  await expect(page.locator('#hub-weekly')).toBeVisible();
+  await expect(page.locator('#hub-weekly')).toHaveCount(0);
   await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(1);
 
   const before = await page.evaluate(() => history.length);
@@ -185,7 +188,7 @@ test('invite weeks keep the stack on pool and leans, and visits is the calendar'
   await expect(page.locator('#hub-visits')).toBeVisible();
   await expect(page.locator('#hub-board')).toBeVisible();
   await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(2);
-  await expect(page.locator('#hub-weekly')).toBeVisible();
+  await expect(page.locator('#hub-weekly')).toHaveCount(0);
   await assertHubClear(page);
   await shot(page, 'pool-w22-1280.png');
 
@@ -198,7 +201,7 @@ test('invite weeks keep the stack on pool and leans, and visits is the calendar'
   await tab(page, 'Visits').click();
   expect(page.url()).toContain('hub=visits');
   await expect(page.locator('#hub-visits .vcal')).toBeVisible();
-  await expect(page.locator('#hub-weekly')).toBeVisible();
+  await expect(page.locator('#hub-weekly')).toHaveCount(0);
   await expect(page.locator('#hub-board')).toHaveCount(0);
   await expect(page.locator('#hub-pool')).toHaveCount(0);
   await assertHubClear(page);
@@ -223,6 +226,72 @@ test('invite weeks keep the stack on pool and leans, and visits is the calendar'
   await tab(page, 'Visits').click();
   await assertHubClear(page);
   await shot(page, 'visits-w22-1920.png');
+});
+
+function fullPool() {
+  const regions = ['A', 'B', 'C', 'D', 'E'];
+  const years = ['Senior', 'Junior', 'Sophomore'];
+  const archetypes = ['Slasher', 'Sharpshooter', 'Floor General', 'Rim Protector', 'Two-Way Wing'];
+  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const names = ['Ada Lean', 'Bea Other', 'Cal Brooks', 'Dev Moreno', 'Eli Hart', 'Finn Walsh', 'Gus Pratt',
+    'Hal Ortiz', 'Ike Doyle', 'Jon Reyes', 'Kai Fuller', 'Lou Grant', 'Max Rivera', 'Ned Coles'];
+  return names.map((name, i) => Object.assign(recruit('r-' + i, name, i % 3 === 0), {
+    'Home Region': regions[i % regions.length],
+    year: years[i % years.length],
+    archetype: archetypes[i % archetypes.length],
+    position_ratings: { [positions[i % positions.length]]: 70 + (i * 3) % 25 },
+    Lean: i % 3 === 0 ? { 1: TID, 2: 'rival-1', 3: null }
+      : i % 3 === 1 ? { 1: 'rival-1', 2: TID, 3: null } : { 1: 'rival-1', 2: null, 3: null },
+  }));
+}
+
+test('a processed invite week has no results panel and no gap above the visits', async ({ page }) => {
+  const gapUnder = () => page.evaluate(() =>
+    document.querySelector('#hub-visits .vcal').getBoundingClientRect().top -
+    document.querySelector('#hub-phase').getBoundingClientRect().bottom);
+  const invite = (week, processed) => ({
+    recruits: fullPool(),
+    current_results_week: processed ? week : null,
+    new_lean_recruit_ids: processed ? ['r-3'] : [],
+    visit_history: history({
+      20: { id: 'r-0', name: 'Ada Lean', lean: { 1: TID } },
+      21: processed ? { id: 'r-3', name: 'Dev Moreno', lean: { 1: TID } } : undefined,
+    }),
+  });
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openHub(page, 22, invite(22, false));
+  const baseline = await gapUnder();
+
+  const results = await openHub(page, 21, invite(21, true));
+  await expect(tab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
+  const strip = page.locator('#hub-phase .pstrip');
+  await expect(strip).toContainText('Invite Season');
+  await expect(strip).toContainText('Invite 1 recruit per week');
+  await expect(strip.locator('.pstrip-counter .n')).toHaveText(/^1\s*\/\s*7$/);
+  await expect(strip.locator('.pstrip-counter .cap')).toHaveText('Invites sent');
+  await expect(strip.getByRole('button', { name: /Season/ })).toBeVisible();
+  await expect(page.locator('#hub-weekly')).toHaveCount(0);
+  await expect(page.getByText("This Week's Results")).toHaveCount(0);
+  await expect(page.getByText('Visits processed')).toHaveCount(0);
+  await expect(page.locator('#hub-visits .vcal')).toBeVisible();
+  await expect(page.locator('#hub-board')).toBeVisible();
+  await expect(page.locator('#hub-pool')).toBeVisible();
+  expect(Math.abs((await gapUnder()) - baseline)).toBeLessThan(0.5);
+  await assertHubClear(page);
+  await park(page);
+  await page.screenshot({ path: path.join(__dirname, '../../reports/recruit-hide-results/leans-w21-1280.png') });
+
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expect(page.locator('#hub-weekly')).toHaveCount(0);
+  await assertHubClear(page);
+  await park(page);
+  await page.screenshot({ path: path.join(__dirname, '../../reports/recruit-hide-results/leans-w21-1920.png') });
+
+  await tab(page, 'Pool').click();
+  await tab(page, 'Visits').click();
+  await expect(page.locator('#hub-weekly')).toHaveCount(0);
+  expect(results).toEqual([]);
 });
 
 test('passive and tournament visits use the existing calendar tiles', async ({ page }) => {
