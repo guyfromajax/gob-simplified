@@ -265,6 +265,15 @@ test('section shots, locked tooltip, more menu, and a detail view', async ({ pag
     await openFcc(page);
     for (const row of sections) {
       await page.locator('[data-gob-section="' + row[0] + '"]').click();
+      await park(page);
+      await page.waitForFunction(() => {
+        const html = document.documentElement;
+        const face = document.querySelector('html.gob-shell .rail-face');
+        if (!face || !html.classList.contains('gob-1280')) return true;
+        const rail = document.querySelector('html.gob-shell .rail');
+        const collapsed = rail ? rail.getBoundingClientRect().width : 64;
+        return face.getBoundingClientRect().width <= collapsed + 2;
+      });
       await tab(page, row[1]).click();
       await park(page);
       await page.screenshot({ path: path.join(OUT, 'fixture-' + row[2] + '-' + size[2] + '.png') });

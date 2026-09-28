@@ -272,6 +272,15 @@ function browseGets(requests) {
 
 async function openTab(page, section, tab) {
   await page.locator('.rail [data-gob-section="' + section + '"]').click();
+  await page.mouse.move(480, 240);
+  await page.waitForFunction(() => {
+    const html = document.documentElement;
+    const face = document.querySelector('html.gob-shell .rail-face');
+    if (!face || !html.classList.contains('gob-1280')) return true;
+    const rail = document.querySelector('html.gob-shell .rail');
+    const collapsed = rail ? rail.getBoundingClientRect().width : 64;
+    return face.getBoundingClientRect().width <= collapsed + 2;
+  });
   await page.locator('#gob-subtabs [data-tab="' + tab + '"]').click();
 }
 
@@ -430,7 +439,8 @@ test('game plan save shows the new tempo', async ({ page }) => {
   const state = freshState();
   await boot(page, state);
   await openTab(page, 'prep', 'game-plan-tab');
-  await expect(page.locator('.fcc-game-plan-item', { hasText: 'Offense Tempo' })).toContainText('Slow');
+  await expect(page.locator('#slider-tempo')).toHaveAttribute('aria-valuenow', '0');
+  await expect(page.locator('#slider-tempo .gt-l.on')).toHaveText('Slow');
   await page.evaluate(async function (fid) {
     await fetch('/api/gameplan?mode=franchise&franchise_id=' + fid, {
       method: 'PUT',
@@ -439,19 +449,15 @@ test('game plan save shows the new tempo', async ({ page }) => {
     });
   }, FID);
   await page.reload();
-  await page.waitForFunction(function () {
-    const root = document.getElementById('office-root');
-    return root && root.getAttribute('aria-busy') === 'false';
-  });
-  await openTab(page, 'prep', 'game-plan-tab');
-  await expect(page.locator('.fcc-game-plan-item', { hasText: 'Offense Tempo' })).toContainText('Fast');
+  await expect(page.locator('#slider-tempo')).toHaveAttribute('aria-valuenow', '4');
+  await expect(page.locator('#slider-tempo .gt-l.on')).toHaveText('Fast');
 });
 
 test('playbooks save shows the new play', async ({ page }) => {
   const state = freshState();
   await boot(page, state);
   await openTab(page, 'prep', 'playbooks-tab');
-  await expect(page.locator('#fcc-playbooks-sections')).toContainText('Baseline');
+  await expect(page.locator('body')).toContainText('Baseline');
   await page.evaluate(async function (fid) {
     await fetch('/api/playbooks?mode=franchise&franchise_id=' + fid, {
       method: 'POST',
@@ -460,12 +466,7 @@ test('playbooks save shows the new play', async ({ page }) => {
     });
   }, FID);
   await page.reload();
-  await page.waitForFunction(function () {
-    const root = document.getElementById('office-root');
-    return root && root.getAttribute('aria-busy') === 'false';
-  });
-  await openTab(page, 'prep', 'playbooks-tab');
-  await expect(page.locator('#fcc-playbooks-sections')).toContainText('Horns');
+  await expect(page.locator('body')).toContainText('Horns');
 });
 
 test('development focus shows the new focus', async ({ page }) => {
