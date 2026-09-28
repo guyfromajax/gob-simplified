@@ -31,6 +31,8 @@ function bracketsUrl(tables, franchiseId) {
     + '?franchise_id=' + encodeURIComponent(franchiseId);
 }
 
+var TIER_ORDER = ['1', '2', '3', '4', '5'];
+
 function psWeekFromUrl() {
   try {
     var raw = new URLSearchParams(window.location.search).get('ps_week');
@@ -38,6 +40,14 @@ function psWeekFromUrl() {
     if (raw != null && raw !== '' && isFinite(n)) return n;
   } catch (err) { /* the server picks current_week */ }
   return null;
+}
+
+function psTierFromUrl() {
+  try {
+    var raw = new URLSearchParams(window.location.search).get('ps_tier');
+    if (TIER_ORDER.indexOf(String(raw)) !== -1) return String(raw);
+  } catch (err) { /* default All-Americans */ }
+  return '1';
 }
 
 export function mount(container, ctx) {
@@ -52,16 +62,16 @@ export function mount(container, ctx) {
   var loaded = false;
   var signature = '';
 
-  function writeWeek(week) {
+  function writeParam(key, value) {
     try {
       var url = new URL(window.location.href);
       url.searchParams.set('tab', 'practice-squad-view');
-      url.searchParams.set('ps_week', String(week));
+      url.searchParams.set(key, String(value));
       var next = url.pathname + url.search + url.hash;
       if (next === window.location.pathname + window.location.search + window.location.hash) return;
       window.history.replaceState(window.history.state, '', next);
       if (window.GOBNav && typeof window.GOBNav.syncCurrent === 'function') window.GOBNav.syncCurrent();
-    } catch (err) { /* the table still shows the week */ }
+    } catch (err) { /* the table still shows the selection */ }
   }
 
   function rosterHref(psTeamId) {
@@ -148,8 +158,9 @@ export function mount(container, ctx) {
     if (slot) paintTools(slot);
   }
 
-  function teamLink(id, name) {
-    return '<a href="' + tables.esc(rosterHref(id)) + '">' + tables.esc(name || id) + '</a>';
+  function teamLink(id, name, extraClass) {
+    var cls = 'gob-team' + (extraClass ? ' ' + extraClass : '');
+    return '<a class="' + cls + '" href="' + tables.esc(rosterHref(id)) + '">' + tables.esc(name || id) + '</a>';
   }
 
   function standingsHtml() {
@@ -169,7 +180,7 @@ export function mount(container, ctx) {
           + '<td class="team">' + teamLink(row.team_id, row.name) + '</td>'
           + '<td>' + tables.esc(row.w) + '</td>'
           + '<td>' + tables.esc(row.l) + '</td>'
-          + '<td>' + tables.esc(tables.formatPct(row.win_pct)) + '</td></tr>';
+          + '<td class="num">' + tables.esc(tables.formatPct(row.win_pct)) + '</td></tr>';
       });
       html += '</tbody></table></section>';
     });
@@ -177,50 +188,68 @@ export function mount(container, ctx) {
     return html;
   }
 
+  function scoreLink(gameId, text) {
+    if (!gameId || text == null || text === '' || text === '—') return tables.esc(text || '—');
+    return '<a class="gob-res" href="' + tables.esc(boxHref(gameId)) + '">' + tables.esc(text) + '</a>';
+  }
+
   function scheduleHtml() {
     var games = (weekBody && weekBody.games) || [];
     var html = '<section class="gob-tcard gob-ps-schedule"><h2>Schedule</h2>'
       + '<table class="gob-tbl gob-sched"><thead><tr>'
-      + '<th class="team">Away</th><th class="num">Result</th><th class="team">Home</th><th class="box">Box score</th>'
+      + '<th class="team">Away</th><th class="res">Result</th><th class="team">Home</th>'
       + '</tr></thead><tbody>';
     if (!games.length) {
-      html += '<tr><td class="team" colspan="4">No games</td></tr>';
+      html += '<tr><td class="team" colspan="3">No games</td></tr>';
     }
     games.forEach(function (game) {
       var result = '—';
+      var linked = false;
       if (game.status === 'completed' && game.home_score != null && game.away_score != null) {
         result = String(game.away_score) + '-' + String(game.home_score);
+        linked = !!game.game_id;
       } else if (game.status === 'forfeit') {
         result = 'Forfeit';
       }
-      var box = '—';
-      if (game.status === 'completed' && game.game_id) {
-        box = '<a class="gob-box" href="' + tables.esc(boxHref(game.game_id)) + '">Box score</a>';
-      }
       html += '<tr>'
         + '<td class="team">' + teamLink(game.away_team_id, game.away_display || game.away_team_id) + '</td>'
-        + '<td class="num">' + tables.esc(result) + '</td>'
-        + '<td class="team">' + teamLink(game.home_team_id, game.home_display || game.home_team_id) + '</td>'
-        + '<td class="box">' + box + '</td></tr>';
+        + '<td class="res">' + (linked ? scoreLink(game.game_id, result) : tables.esc(result)) + '</td>'
+        + '<td class="team">' + teamLink(game.home_team_id, game.home_display || game.home_team_id) + '</td></tr>';
     });
     html += '</tbody></table></section>';
     return html;
   }
 
+  function championshipGame(champ) {
+    if (!champ) return false;
+    return !!(champ.game_id || champ.home_team_id || champ.away_team_id);
+  }
+
   function championshipHtml() {
+    var week = Number((standings && standings.week) || 0);
     var champ = brackets && brackets.championship;
-    if (!champ || !champ.game_id) return '';
+    if (week < 19 && !championshipGame(champ)) return '';
+    if (!championshipGame(champ)) return '';
     var names = nameMap();
-    var home = names[champ.home_team_id] || '';
-    var away = names[champ.away_team_id] || '';
-    var line = away;
-    if (champ.away_score != null || champ.home_score != null) {
-      line += ' ' + (champ.away_score != null ? champ.away_score : '')
-        + '-' + (champ.home_score != null ? champ.home_score : '');
-    }
-    if (home) line += (line ? ' ' : '') + home;
-    return '<p class="gob-ps-champ">' + tables.esc(line)
-      + ' <a class="gob-box" href="' + tables.esc(boxHref(champ.game_id)) + '">Box score</a></p>';
+    var homeId = champ.home_team_id;
+    var awayId = champ.away_team_id;
+    var home = names[homeId] || '';
+    var away = names[awayId] || '';
+    var awayScore = champ.away_score;
+    var homeScore = champ.home_score;
+    var played = awayScore != null && homeScore != null && awayScore !== '' && homeScore !== '';
+    var awayWin = played && Number(awayScore) > Number(homeScore);
+    var homeWin = played && Number(homeScore) > Number(awayScore);
+    var score = played
+      ? scoreLink(champ.game_id, String(awayScore) + '-' + String(homeScore))
+      : '';
+    return '<section class="gob-ps-champ">'
+      + '<p class="gob-ps-champ-eye">Championship</p>'
+      + '<div class="gob-ps-champ-row">'
+      + '<span class="side away">' + (awayId ? teamLink(awayId, away, awayWin ? 'is-win' : '') : '') + '</span>'
+      + '<span class="res">' + score + '</span>'
+      + '<span class="side home">' + (homeId ? teamLink(homeId, home, homeWin ? 'is-win' : '') : '') + '</span>'
+      + '</div></section>';
   }
 
   function nameMap() {
@@ -238,17 +267,28 @@ export function mount(container, ctx) {
     return !!(standings && standings.initialized && week >= 16 && brackets && brackets.initialized && brackets.tournaments);
   }
 
-  function bracketHtml() {
-    if (!showBracket()) return '';
-    var html = championshipHtml();
-    html += '<div class="gob-ps-brackets">';
-    ['1', '2', '3', '4', '5'].forEach(function (tier) {
-      var state = brackets.tournaments[tier];
-      if (!state || !state.bracket) return;
-      html += '<section class="gob-ps-tier"><h2>' + tables.esc(TIER_LABELS[tier] || ('Tier ' + tier)) + '</h2>'
-        + '<div class="gob-ps-bracket" data-ps-tier="' + tier + '"></div></section>';
+  function tierPickerHtml() {
+    var current = psTierFromUrl();
+    var html = '<div class="stats-toggle gob-ps-tiers" role="group" aria-label="Practice Squad tier">';
+    TIER_ORDER.forEach(function (tier) {
+      html += '<button type="button" data-ps-tier="' + tier + '"'
+        + (tier === current ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"')
+        + '>' + tables.esc(TIER_LABELS[tier]) + '</button>';
     });
     html += '</div>';
+    return html;
+  }
+
+  function bracketHtml() {
+    if (!showBracket()) return '';
+    var tier = psTierFromUrl();
+    var state = brackets.tournaments && brackets.tournaments[tier];
+    var html = championshipHtml() + tierPickerHtml();
+    if (!state || !state.bracket) {
+      html += '<p class="gob-ps-empty">This bracket has not been drawn yet.</p>';
+      return html;
+    }
+    html += '<div class="gob-ps-bracket" data-ps-tier="' + tables.esc(tier) + '"></div>';
     return html;
   }
 
@@ -277,6 +317,14 @@ export function mount(container, ctx) {
     }
     container.innerHTML = '<div class="gob-ps">' + bracketHtml() + standingsHtml() + scheduleHtml() + '</div>';
     paintBrackets();
+    container.querySelectorAll('.gob-ps-tiers button').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var tier = button.getAttribute('data-ps-tier');
+        if (!tier || tier === psTierFromUrl()) return;
+        writeParam('ps_tier', tier);
+        render();
+      });
+    });
     ownTools();
   }
 
@@ -288,7 +336,7 @@ export function mount(container, ctx) {
     }
     signature = stamp;
     loaded = true;
-    if (standings && standings.initialized && shownWeek() !== '') writeWeek(shownWeek());
+    if (standings && standings.initialized && shownWeek() !== '') writeParam('ps_week', shownWeek());
     render();
   }
 

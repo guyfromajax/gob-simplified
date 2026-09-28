@@ -7,14 +7,22 @@ const FID = 'f-e2e-ps';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/ps-view-pr-a');
 
+function winPct(wins, losses) {
+  const played = wins + losses;
+  if (!played) return 0;
+  return Math.round((wins / played) * 1000) / 1000;
+}
+
 function rows(region) {
   return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(function (letter, index) {
+    const wins = 8 - index;
+    const losses = index;
     return {
       team_id: 'ps_' + letter + '_' + region,
       name: 'Region ' + letter + ' Squad',
-      w: 8 - index,
-      l: index,
-      win_pct: index === 0 ? 1 : 0.5,
+      w: wins,
+      l: losses,
+      win_pct: winPct(wins, losses),
       is_user: letter === 'C',
     };
   });
@@ -26,20 +34,27 @@ function tiers() {
   });
 }
 
-function bracket() {
+function bracket(tier) {
   function game(home, away) {
     return { home_team: home, away_team: away, home_score: null, away_score: null, winner: null };
   }
+  const id = String(tier);
   return {
     round1: [
-      game('ps_C_1', 'ps_A_1'),
-      game('ps_B_1', 'ps_D_1'),
-      game('ps_E_1', 'ps_F_1'),
-      game('ps_G_1', 'ps_H_1'),
+      game('ps_C_' + id, 'ps_A_' + id),
+      game('ps_B_' + id, 'ps_D_' + id),
+      game('ps_E_' + id, 'ps_F_' + id),
+      game('ps_G_' + id, 'ps_H_' + id),
     ],
-    round2: [game('ps_C_1', 'ps_B_1'), game('ps_E_1', 'ps_G_1')],
-    final: [game('ps_C_1', 'ps_E_1')],
+    round2: [game('ps_C_' + id, 'ps_B_' + id), game('ps_E_' + id, 'ps_G_' + id)],
+    final: [game('ps_C_' + id, 'ps_E_' + id)],
   };
+}
+
+function tournaments() {
+  const out = {};
+  for (let tier = 1; tier <= 5; tier += 1) out[String(tier)] = { bracket: bracket(tier) };
+  return out;
 }
 
 function names() {
@@ -141,7 +156,7 @@ async function install(page, state) {
       await fulfillJson(route, {
         initialized: true,
         week: state.week,
-        tournaments: { '1': { bracket: bracket() } },
+        tournaments: tournaments(),
         championship: state.championship || {},
         teams: names(),
       });
@@ -196,8 +211,17 @@ test('practice squad view: before init, in season, and the bracket', async ({ pa
     const hits = await openPs(page, { week: 8, initialized: true, currentWeek: 8 });
     await expect(page.locator('#practice-squad-view .gob-ps-grid .gob-tcard')).toHaveCount(5);
     await expect(page.locator('#practice-squad-view tr.me').first()).toContainText('Region C Squad');
+    const sevenOne = page.locator('#practice-squad-view .gob-ps-grid tr', { hasText: 'Region B Squad' }).first();
+    await expect(sevenOne.locator('td').nth(1)).toHaveText('7');
+    await expect(sevenOne.locator('td').nth(2)).toHaveText('1');
+    await expect(sevenOne.locator('td').nth(3)).toHaveText('.875');
+    if (size[2] === '1280') {
+      await page.screenshot({ path: path.join(OUT, 'record-1280.png') });
+    }
+    await expect(page.locator('#practice-squad-view .gob-ps-grid a.gob-team').first()).toHaveCSS('text-decoration-line', 'none');
     await expect(page.locator('#gob-subtabs .gob-wk-label')).toHaveText('Week 8');
-    await expect(page.locator('#practice-squad-view .gob-ps-schedule')).toContainText('60-70');
+    await expect(page.locator('#practice-squad-view .gob-ps-schedule a.gob-res')).toHaveText('60-70');
+    await expect(page.locator('#practice-squad-view .gob-ps-schedule')).not.toContainText('Box score');
     await expect(page.locator('#practice-squad-view .gob-ps-bracket')).toHaveCount(0);
     const weekCalls = hits.filter((search) => search.indexOf('week=') !== -1);
     expect(weekCalls.length).toBe(1);
@@ -217,12 +241,43 @@ test('practice squad view: before init, in season, and the bracket', async ({ pa
         away_score: 71,
       },
     });
-    await expect(page.locator('#practice-squad-view .gob-ps-bracket').first()).toBeVisible();
+    await expect(page.locator('#practice-squad-view .gob-ps-bracket')).toHaveCount(1);
+    await expect(page.locator('#practice-squad-view .gob-ps-bracket')).toHaveAttribute('data-ps-tier', '1');
+    await expect(page.locator('#practice-squad-view .gob-ps-tiers button.on')).toHaveText('All-Americans');
     await expect(page.locator('#practice-squad-view .gob-ps-bracket .tname').first()).toContainText('Region');
-    await expect(page.locator('#practice-squad-view .gob-ps-champ')).toContainText('80');
+    await expect(page.locator('#practice-squad-view .gob-ps-bracket .mu--user').first()).toBeVisible();
+    await expect(page.locator('#practice-squad-view .gob-ps-champ-eye')).toHaveText('Championship');
+    await expect(page.locator('#practice-squad-view .gob-ps-champ a.gob-res')).toHaveText('71-80');
+    await expect(page.locator('#practice-squad-view .gob-ps-champ a.gob-team.is-win')).toContainText('Region C Squad');
     await expect(page.locator('#practice-squad-view .gob-ps-grid')).toBeVisible();
     await page.screenshot({ path: path.join(OUT, 'week-17-' + size[2] + '.png') });
+    await page.locator('#practice-squad-view .gob-ps-tiers button[data-ps-tier="2"]').click();
+    await expect(page).toHaveURL(/ps_tier=2/);
+    await expect(page.locator('#practice-squad-view .gob-ps-bracket')).toHaveAttribute('data-ps-tier', '2');
+    await expect(page.locator('#practice-squad-view .gob-ps-tiers button.on')).toHaveText('All-Stars');
   }
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openPs(page, { week: 17, initialized: true, currentWeek: 17 });
+  await expect(page.locator('#practice-squad-view .gob-ps-bracket')).toHaveCount(1);
+  await expect(page.locator('#practice-squad-view .gob-ps-champ')).toHaveCount(0);
+
+  await openPs(page, {
+    week: 19,
+    initialized: true,
+    currentWeek: 19,
+    championship: {
+      game_id: 'ps-final',
+      home_team_id: 'ps_C_1',
+      away_team_id: 'ps_A_1',
+      home_score: null,
+      away_score: null,
+    },
+  });
+  await expect(page.locator('#practice-squad-view .gob-ps-champ-eye')).toHaveText('Championship');
+  await expect(page.locator('#practice-squad-view .gob-ps-champ')).toContainText('Region A Squad');
+  await expect(page.locator('#practice-squad-view .gob-ps-champ')).toContainText('Region C Squad');
+  await expect(page.locator('#practice-squad-view .gob-ps-champ a.gob-res')).toHaveCount(0);
 
   await page.setViewportSize({ width: 1280, height: 720 });
   await openPs(page, { week: 8, initialized: true, currentWeek: 8 });

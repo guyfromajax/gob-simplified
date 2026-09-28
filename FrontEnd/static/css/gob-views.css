@@ -352,37 +352,89 @@
 }
 
 #franchise-container #practice-squad-view .gob-ps-champ {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
   margin: 0;
-  color: var(--text-87);
-  font: var(--fw-regular) var(--fs-14)/var(--lh-1) var(--font-body);
 }
 
-#franchise-container #practice-squad-view .gob-ps-champ a,
-#franchise-container #practice-squad-view .gob-ps a {
-  color: var(--text-87);
+#franchise-container #practice-squad-view .gob-ps-champ-eye {
+  margin: 0;
+  color: var(--text-38);
+  font: var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
 }
 
-#franchise-container #practice-squad-view .gob-ps a:focus-visible,
+#franchise-container #practice-squad-view .gob-ps-champ-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-12);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row .away {
+  justify-self: end;
+  text-align: right;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row .home {
+  justify-self: start;
+  text-align: left;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row .res {
+  text-align: center;
+}
+
+#franchise-container #practice-squad-view a.gob-team {
+  color: var(--text-100);
+  text-decoration: none;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ a.gob-team {
+  color: var(--text-60);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ a.gob-team.is-win {
+  color: var(--text-100);
+}
+
+#franchise-container #practice-squad-view a.gob-team:hover,
+#franchise-container #practice-squad-view a.gob-team:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+}
+
+#franchise-container #practice-squad-view a.gob-res {
+  color: var(--text-87);
+  text-decoration: none;
+}
+
+#franchise-container #practice-squad-view a.gob-res:hover,
+#franchise-container #practice-squad-view a.gob-res:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+}
+
+#franchise-container #practice-squad-view a.gob-team:focus-visible,
+#franchise-container #practice-squad-view a.gob-res:focus-visible,
+#franchise-container #practice-squad-view .gob-ps-tiers button:focus-visible,
 html.gob-shell .pg-tools[data-owner="practice-squad-view"] button:focus-visible {
   outline: 2px solid var(--white);
   outline-offset: 2px;
 }
 
-#franchise-container #practice-squad-view .gob-ps-brackets {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-12);
+#franchise-container #practice-squad-view .gob-ps-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  width: max-content;
+  max-width: 100%;
 }
 
-html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-brackets {
-  grid-template-columns: 1fr 1fr;
-}
-
-#franchise-container #practice-squad-view .gob-ps-tier h2 {
-  margin: 0 0 var(--space-8);
-  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
-  letter-spacing: var(--tracking-8);
-  color: var(--text-60);
+#franchise-container #practice-squad-view .gob-ps-tiers button.on {
+  background: var(--white-10);
+  color: var(--white);
 }
 
 #franchise-container #practice-squad-view .gob-ps-bracket {
@@ -489,4 +541,11 @@ html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
 
 #franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl {
   width: 100%;
+}
+
+#franchise-container #practice-squad-view .gob-ps-schedule th.res,
+#franchise-container #practice-squad-view .gob-ps-schedule td.res {
+  width: 1%;
+  text-align: center;
+  white-space: nowrap;
 }

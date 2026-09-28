@@ -198,9 +198,9 @@ test.describe('the in-scope surfaces all use the shared builder', () => {
 
   test('the old roster page redirects instead of loading its own tile script', async () => {
     const html = read('team-roster-view.html');
+    expect(html).toContain("params.get('mode') === 'practice_squad' && params.get('ps_team_id')");
     expect(html).toContain("params.set('tab', 'roster-view')");
-    expect(html).not.toContain('/js/shared/attrTiles.js');
-    expect(html).not.toContain('<th>SC</th>');
+    expect(html).toContain("location.replace('/franchise-command-center.html'");
   });
 
   test('no in-scope surface still emits 12 separate attribute columns', async () => {

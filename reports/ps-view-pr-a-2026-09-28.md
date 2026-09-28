@@ -68,3 +68,65 @@ The full suite was not run. Another agent in `~/gob-stats` is running Playwright
 Not touched: cut-players, training-squad-report, box score, sim-rest, the FCC `#schedule-tab` swap, `teamScheduleView.js`, Prep, the sim engine, `cpu_week_pool`, `sim_rng`, finalize.
 
 STATUS: COMPLETE
+
+## Fix pass
+
+### Win %
+
+`GOBTables.formatPct` takes a 0–1 ratio. It runs `Math.abs(n).toFixed(3)` and strips a leading `0`, so `0.875` is `.875`, `1` is `1.000`, and `0.5` is `.500`. Season Standings passes `row.pct` the same way. The view already called `tables.formatPct(row.win_pct)`. The `.500`-only frames were the fixture, which hardcoded `1` or `0.5`. The spec now builds `win_pct` with the server rounding (`Math.round((wins / played) * 1000) / 1000`) and asserts the 7–1 Region B cell is `.875`.
+
+### Bracket tiers
+
+One tier at a time. A white segmented control (`All-Americans · All-Stars · Varsity · JV · Squad`, `.stats-toggle.gob-ps-tiers`, selected chip `var(--white)`) sits above the bracket, default All-Americans. The choice is `ps_tier` in the URL. The user's team stays `mu--user`. A tier with no bracket says "This bracket has not been drawn yet."
+
+### Team links
+
+Standings, schedule, and championship names are `a.gob-team`: plain ink, no underline at rest, underline and `var(--text-100)` on hover and focus. The focus ring is `outline: 2px solid var(--white)`.
+
+### Championship
+
+The raw line is a block above the bracket: eyebrow "Championship", then away · score · home. The score is `a.gob-res` (the box-score link). The higher side gets `is-win` (`var(--text-100)`); the other side is `var(--text-60)`. Before the game is played, both finalists show and the score cell is empty. The block is hidden when there is no championship game, including every week before 19 with an empty championship object. A game that already exists before week 19 is shown.
+
+### Schedule
+
+Away · Result · Home. The completed score is `a.gob-res`. The Box score column is gone. The result column is centered.
+
+### Merge
+
+`origin/develop` is `a67698a5a` ("Merge origin/develop into the practice squad view."). `gobShell.js` auto-merged. The only conflict was `UX_System.md` §7. Both sides kept:
+
+```
+| Team | Schedule | `team-schedule-view` ... Four week columns (1–7, 8–14, 15–21, 22–26)... |
+| Team | Practice Squad | `practice-squad-view` ... regional practice-squad league. standings and bracket html redirect here. |
+| Prep | Training | `training.html`. ... `?tab=training-tab` redirects here. ...
+| Prep | Game Plan | `game-plan.html`. ... `resume_from_timeout=true` and `mode=tutorial` stay focus...
+| Prep | Playbooks | `playbooks.html`. ...
+| Prep | Scouting Report | `coaches-tab` on the franchise command center. ...
+```
+
+`gobShell.js` `PAGES` after the merge:
+
+```
+'/practice-squad-standings.html': { kind: 'browse', section: 'team', sub: 'practice-squad-view' },
+'/practice-squad-bracket.html': { kind: 'browse', section: 'team', sub: 'practice-squad-view', keepBack: true },
+'/training.html': { kind: 'browse', section: 'prep', sub: 'training-tab' },
+'/training-report.html': { kind: 'browse', section: 'prep', sub: 'training-tab' },
+'/game-plan.html': { kind: 'browse', section: 'prep', sub: 'game-plan-tab' },
+'/playbooks.html': { kind: 'browse', section: 'prep', sub: 'playbooks-tab' },
+```
+
+Team › Practice Squad stays in `SECTIONS`. Prep's `PREP_EDITOR` map is untouched. `window.stop()` after the roster redirect was removed; it cancelled `location.replace` and hung `page.goto`.
+
+### Tests
+
+`ps` showed no other Playwright. Port 8010, `CI` unset, workers=1.
+
+`practice-squad-view.spec.js`: 2 passed, including `.875`, `ps_tier=2`, the championship score link, and the unplayed-finalists case.
+
+`t1-tables`, `shell-1`, `shell-1b`, and `shell-2` passed in the targeted run and again in the suite. `shell-1` now falls back to the locked Tournament control when League has no `<a class="tb">` at week 1.
+
+The first full suite was 3 failed, 514 passed. The failures were source checks that still expected `team-roster-view.html` to be a stub, and `subtabs.spec.js` counting unselected link tabs at week 3 (zero, because Practice Squad is in-page and Tournament is locked). Those specs now accept the practice-squad roster page and open the underline check at week 28, when Tournament is an `<a>`. The three re-passed.
+
+Full suite after that: 515 passed, 2 skipped, 0 failed, 7.5m. The server exited with the suite. Port 8010 is free. Regenerated tracked report images were restored. The retaken frames stay in `reports/ps-view-pr-a/`: `week-8-1280.png`, `week-8-1920.png`, `week-17-1280.png`, `week-17-1920.png`, `record-1280.png` (7–1 reads `.875`).
+
+STATUS: COMPLETE
