@@ -149,8 +149,13 @@ export function bindPager(root, onPage) {
   });
 }
 
+// True when the caller should drop this load: either the URL was just stamped
+// (the re-show loads again), or the user has already left `tab` and the entry
+// they are on now belongs to another view.
 export function stampOrigin(isUser, tab) {
-  if (query().get('origin')) return false;
+  var q = query();
+  if (q.get('tab') !== tab) return true;
+  if (q.get('origin')) return false;
   var url = withParams({ origin: isUser ? 'team' : 'league', tab: tab });
   if (window.history && window.history.replaceState) {
     window.history.replaceState(window.history.state, '', url);
