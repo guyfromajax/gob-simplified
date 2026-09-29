@@ -329,16 +329,30 @@ def prior_measure_snapshot(franchise_doc: Mapping[str, Any], completed_week: int
     return {str(key): value for key, value in measures.items() if _num(value) is not None}, closed
 
 
+# The eight trained and compounding measures documented at −20…+20 in
+# Team_Attribute_System.md. Only these carry a signed scale, so only these can be
+# drawn as a diverging pill with zero in the centre. Chemistry (7…25), Shooting
+# (~85…95), Rebounding and Momentum (−10…+10) have no ±20 reading and stay on the
+# league percentile bar.
+SIGNED_MEASURE_SCALE = 20
+
+# (key, label, scale_max, signed_scale). Every stored team measure is a row.
 _MEASURE_FAMILIES = (
     ("character", "Character", (
-        ("team_chemistry", "Chemistry", 25),
-        ("fight", "Fight", None),
-        ("discipline", "Discipline", None),
+        ("team_chemistry", "Chemistry", CHEMISTRY_MAX, None),
+        ("fight", "Fight", None, SIGNED_MEASURE_SCALE),
+        ("discipline", "Discipline", None, SIGNED_MEASURE_SCALE),
+        ("momentum_score", "Momentum", None, None),
     )),
     ("floor", "On the floor", (
-        ("shot_threshold", "Shooting", None),
-        ("rebound_modifier", "Rebounding", None),
-        ("defensive_efficiency", "Defensive efficiency", None),
+        ("offensive_efficiency", "Offense", None, SIGNED_MEASURE_SCALE),
+        ("defensive_efficiency", "Defense", None, SIGNED_MEASURE_SCALE),
+        ("pt_opp_modifier", "P/T Offense", None, SIGNED_MEASURE_SCALE),
+        ("pt_efficiency", "P/T Defense", None, SIGNED_MEASURE_SCALE),
+        ("fb_efficiency", "Fast Break", None, SIGNED_MEASURE_SCALE),
+        ("fb_opp_modifier", "Fast Break Defense", None, SIGNED_MEASURE_SCALE),
+        ("shot_threshold", "Shooting", None, None),
+        ("rebound_modifier", "Rebounding", None, None),
     )),
 )
 
@@ -353,7 +367,7 @@ def team_attribute_measures(
     prior = before if isinstance(before, Mapping) else {}
     rows: list[dict[str, Any]] = []
     for family, family_label, keys in _MEASURE_FAMILIES:
-        for key, label, scale in keys:
+        for key, label, scale, signed_scale in keys:
             raw = attrs.get(key) if key in attrs else None
             value = _num(raw) if raw is not None else None
             delta = None
@@ -371,6 +385,7 @@ def team_attribute_measures(
                 "label": label,
                 "value": value,
                 "scale_max": scale,
+                "signed_scale": signed_scale,
                 "meter_pct": meter,
                 "delta": delta,
                 "description": None,

@@ -70,10 +70,12 @@ export function mount(container, ctx) {
       + '&team_id=' + encodeURIComponent(teamId);
   }
 
+  // Only a ranked opponent carries the prefix. Outside the top 25 the number
+  // says nothing, so the name stands on its own.
   function rankName(row) {
     var rank = Number(row.opponent_natl_rank);
     var name = row.opponent_name || '';
-    if (isFinite(rank) && rank >= 1 && rank < 999) return '#' + rank + ' ' + name;
+    if (isFinite(rank) && rank >= 1 && rank <= 25) return '#' + rank + ' ' + name;
     return name;
   }
 

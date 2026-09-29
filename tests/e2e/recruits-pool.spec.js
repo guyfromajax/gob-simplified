@@ -257,7 +257,7 @@ test.describe('columns and headers', () => {
     });
     expect(CSS).toContain('.pool .attr-tile{width:var(--dsz-30);height:var(--dsz-26);border-radius:var(--radius-5)}');
     expect(CSS).toContain('font:var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display)');
-    expect(CSS).toContain('border-radius:var(--radius-round)');
+    expect(CSS).toContain('border-radius:var(--radius-6)');
     expect(first.rt).toMatch(/^[A-F]/);
     expect(first.digits).toHaveLength(12);
     for (const digit of first.digits) expect(digit, 'tile digit').toMatch(/^\d+$/);
@@ -269,8 +269,9 @@ test.describe('columns and headers', () => {
       expect(first.tileH).toBeCloseTo(first.digitSize === 23.5 ? 30.5 : 26, 0);
       expect([20, 23.5]).toContain(first.digitSize);
       expect(Number(first.digitWeight)).toBeGreaterThanOrEqual(700);
-      const round = first.radius === '50%' || Math.abs(parseFloat(first.radius) - first.avW / 2) < 1;
-      expect(round, 'portrait radius ' + first.radius).toBe(true);
+      // Square, like every other player headshot: a small corner, not half the side.
+      expect(first.radius, 'portrait radius').not.toBe('50%');
+      expect(parseFloat(first.radius) / first.avW).toBeLessThanOrEqual(0.25);
     }
     expect(m.groups.map((g) => g.name)).toEqual(['Offense', 'Defense', 'Skills', 'Grit', 'Body', 'Mind']);
     expect(m.groups.every((g) => g.span === 2)).toBe(true);

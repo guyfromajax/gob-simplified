@@ -38,16 +38,29 @@ def _by_key(measures):
 
 def test_direction_table():
     directions = {spec["key"]: spec["direction"] for spec in MEASURE_SPECS}
+    # Every stored team measure is ranked, so all twelve cells carry a place.
     assert directions == {
         "team_chemistry": "higher_better",
         "fight": "higher_better",
         "discipline": "higher_better",
+        "momentum_score": "higher_better",
+        "offensive_efficiency": "higher_better",
+        "defensive_efficiency": "higher_better",
+        "pt_opp_modifier": "higher_better",
+        "pt_efficiency": "higher_better",
+        "fb_efficiency": "higher_better",
+        "fb_opp_modifier": "higher_better",
+        # A make is shot_score >= shot_threshold, so a lower threshold is better.
         "shot_threshold": "lower_better",
         "rebound_modifier": "higher_better",
-        "defensive_efficiency": "higher_better",
     }
     chemistry = next(spec for spec in MEASURE_SPECS if spec["key"] == "team_chemistry")
     assert chemistry["scale_max"] == 25
+    assert all(
+        spec["scale_max"] is None
+        for spec in MEASURE_SPECS
+        if spec["key"] != "team_chemistry"
+    )
 
 
 def test_ties_share_a_rank_and_the_next_place_skips():

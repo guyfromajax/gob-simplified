@@ -4577,8 +4577,8 @@ const TEAM_ATTR_NAMES = {
   'rebound_modifier': 'Rebounding',
   'offensive_efficiency': 'Offense',
   'defensive_efficiency': 'Defense',
-  'fb_efficiency': 'Fast Breaks',
-  'pt_efficiency': 'Press/Traps',
+  'fb_efficiency': 'Fast Break',
+  'pt_efficiency': 'P/T Defense',
   'fight': 'Fight',
   'discipline': 'Discipline',
   'momentum_score': 'Momentum',
@@ -4766,9 +4766,9 @@ function renderGamePlanSummary() {
 
 const TEAM_MEASURES_RADAR_AXES = [
   { key: 'offensive_efficiency', label: 'Offense', angle: -90 },
-  { key: 'fb_efficiency', label: 'Fast Breaks', angle: -45 },
+  { key: 'fb_efficiency', label: 'Fast Break', angle: -45 },
   { key: 'discipline', label: 'Discipline', angle: 0 },
-  { key: 'pt_efficiency', label: 'Press/Traps', angle: 45 },
+  { key: 'pt_efficiency', label: 'P/T Defense', angle: 45 },
   { key: 'defensive_efficiency', label: 'Defense', angle: 90 },
   { key: 'fb_opp_modifier', label: 'Fast Break Defense', angle: 135 },
   { key: 'fight', label: 'Fight', angle: 180 },

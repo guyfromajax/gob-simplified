@@ -19,15 +19,24 @@ from bson import ObjectId
 
 from BackEnd.utils.office_digest import CHEMISTRY_MAX, TEAM_MEASURE_KEYS
 
-# Order is the Team Attributes list. scale_max is Chemistry's 25; the others
-# have no display scale.
+# Order is the Team Attributes list. scale_max is Chemistry's 25; the others have
+# no display scale. Every stored team measure is ranked, so all twelve rows carry
+# a place and a movement. Directions follow Team_Attribute_System.md: a lower
+# shot_threshold is a make at a lower shot score, so Shooting reads lower-better;
+# every other measure reads higher-better.
 MEASURE_SPECS: tuple[dict[str, Any], ...] = (
     {"key": "team_chemistry", "label": "Chemistry", "direction": "higher_better", "scale_max": CHEMISTRY_MAX},
     {"key": "fight", "label": "Fight", "direction": "higher_better", "scale_max": None},
     {"key": "discipline", "label": "Discipline", "direction": "higher_better", "scale_max": None},
+    {"key": "momentum_score", "label": "Momentum", "direction": "higher_better", "scale_max": None},
+    {"key": "offensive_efficiency", "label": "Offense", "direction": "higher_better", "scale_max": None},
+    {"key": "defensive_efficiency", "label": "Defense", "direction": "higher_better", "scale_max": None},
+    {"key": "pt_opp_modifier", "label": "P/T Offense", "direction": "higher_better", "scale_max": None},
+    {"key": "pt_efficiency", "label": "P/T Defense", "direction": "higher_better", "scale_max": None},
+    {"key": "fb_efficiency", "label": "Fast Break", "direction": "higher_better", "scale_max": None},
+    {"key": "fb_opp_modifier", "label": "Fast Break Defense", "direction": "higher_better", "scale_max": None},
     {"key": "shot_threshold", "label": "Shooting", "direction": "lower_better", "scale_max": None},
     {"key": "rebound_modifier", "label": "Rebounding", "direction": "higher_better", "scale_max": None},
-    {"key": "defensive_efficiency", "label": "Defensive efficiency", "direction": "higher_better", "scale_max": None},
 )
 
 MEASURE_KEYS: tuple[str, ...] = tuple(spec["key"] for spec in MEASURE_SPECS)

@@ -27,13 +27,17 @@ var LEAD = {
   FT: 'Exactly what you would expect.'
 };
 
+// `cls` carries the column's alignment and its share of the table rhythm:
+// `rt` reads left so Current → Pot starts at the column edge, `code` centres the
+// short codes, `num` right-aligns the measurements so their digits line up, and
+// `wt` closes the identity block before the attribute gutter.
 var IDENTITY = [
-  { key: 'name', label: 'Player', pin: true },
-  { key: 'rt', label: 'RT' },
-  { key: 'pos', label: 'POS' },
-  { key: 'yr', label: 'YR' },
-  { key: 'ht', label: 'HT' },
-  { key: 'wt', label: 'WT' }
+  { key: 'name', label: 'Player', pin: true, cls: 'pin team' },
+  { key: 'rt', label: 'RT', cls: 'rt' },
+  { key: 'pos', label: 'POS', cls: 'code' },
+  { key: 'yr', label: 'YR', cls: 'code' },
+  { key: 'ht', label: 'HT', cls: 'num' },
+  { key: 'wt', label: 'WT', cls: 'num wt' }
 ];
 
 function params() {
@@ -194,18 +198,19 @@ export function rosterTableHtml(tables, rows, options) {
     html += '<tr>';
     html += '<td class="pin team"><a class="gob-team gob-player" href="' + tables.esc(hrefFor(player)) + '">'
       + '<span class="av">' + portraitHtml(tables, player) + '</span><span>' + tables.esc(displayName(player)) + '</span></a></td>';
-    html += '<td class="' + (sortKey === 'rt' ? 'on' : '') + '">' + rtHtml(tables, player) + '</td>';
-    html += '<td class="' + (sortKey === 'pos' ? 'on' : '') + '">' + tables.esc(player.position || '') + '</td>';
-    html += '<td class="' + (sortKey === 'yr' ? 'on' : '') + '">' + tables.esc(player.year || '') + '</td>';
-    html += '<td class="' + (sortKey === 'ht' ? 'on' : '') + '">' + tables.esc(heightText(player.height)) + '</td>';
-    html += '<td class="' + (sortKey === 'wt' ? 'on' : '') + '">' + (player.weight == null || player.weight === '' ? '' : tables.esc(player.weight)) + '</td>';
+    html += '<td class="rt' + (sortKey === 'rt' ? ' on' : '') + '">' + rtHtml(tables, player) + '</td>';
+    html += '<td class="code' + (sortKey === 'pos' ? ' on' : '') + '">' + tables.esc(player.position || '') + '</td>';
+    html += '<td class="code' + (sortKey === 'yr' ? ' on' : '') + '">' + tables.esc(player.year || '') + '</td>';
+    html += '<td class="num' + (sortKey === 'ht' ? ' on' : '') + '">' + tables.esc(heightText(player.height)) + '</td>';
+    html += '<td class="num wt' + (sortKey === 'wt' ? ' on' : '') + '">' + (player.weight == null || player.weight === '' ? '' : tables.esc(player.weight)) + '</td>';
     GROUPS.forEach(function (group) {
-      group.keys.forEach(function (key) {
+      group.keys.forEach(function (key, position) {
         var tiles = window.GOB_AttrTiles;
         var value = tiles ? tiles.tileValue(player.attributes || {}, key) : null;
         var cell = tiles ? tiles.tileHtml(key, value, false) : '';
-        var cls = (group.shade ? 'gshade' : '') + (sortKey === key ? ' on' : '');
-        html += '<td class="' + cls.trim() + '">' + cell + '</td>';
+        var cls = (position === 0 ? 'gstart' : 'gend')
+          + (group.shade ? ' gshade' : '') + (sortKey === key ? ' on' : '');
+        html += '<td class="' + cls + '">' + cell + '</td>';
       });
     });
     var focus = devText(player, userTeam);
@@ -218,13 +223,14 @@ export function rosterTableHtml(tables, rows, options) {
 function headerRow(tables, sortKey, sortDir, repeat) {
   var html = '<tr' + (repeat ? ' class="gob-rep"' : '') + '>';
   IDENTITY.forEach(function (col) {
-    var cls = 's' + (col.pin ? ' pin team' : '') + (sortKey === col.key ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
+    var cls = 's ' + col.cls + (sortKey === col.key ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
     html += '<th class="' + cls.trim() + '" data-sort="' + col.key + '">' + tables.esc(col.label) + '</th>';
   });
   GROUPS.forEach(function (group) {
-    group.keys.forEach(function (key) {
+    group.keys.forEach(function (key, position) {
       var on = sortKey === key;
-      var cls = 's' + (group.shade ? ' gshade' : '') + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
+      var cls = 's ' + (position === 0 ? 'gstart' : 'gend')
+        + (group.shade ? ' gshade' : '') + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
       html += '<th class="' + cls.trim() + '" data-sort="' + key + '"'
         + ' data-tooltip="' + tables.esc(tip(key)) + '"'
         + ' aria-label="Sort by ' + tables.esc(fullName(key)) + '"'
@@ -232,7 +238,7 @@ function headerRow(tables, sortKey, sortDir, repeat) {
     });
   });
   var devOn = sortKey === 'dev';
-  html += '<th class="s' + (devOn ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '') + '" data-sort="dev">Dev focus</th>';
+  html += '<th class="s dev' + (devOn ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '') + '" data-sort="dev">Dev focus</th>';
   return html + '</tr>';
 }
 
