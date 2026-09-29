@@ -1,0 +1,249 @@
+{
+ "meta": {
+  "port": 8174,
+  "runs": 5,
+  "passes": [
+   "timing"
+  ],
+  "viewport": {
+   "width": 1280,
+   "height": 800
+  },
+  "startedAt": "2026-09-29T22:47:52.433Z",
+  "seconds": 46
+ },
+ "timing": {
+  "table": {
+   "franchise-command-center.html": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       287,
+       263,
+       258,
+       245,
+       299
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.008731804633140564,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abc402ce65adf8e85dcedfc&tab=home-tab",
+      "median": 263,
+      "worst": 299
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       257,
+       268,
+       287,
+       302,
+       292
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.010000319838523865,
+      "landed": "/franchise-command-center.html?franchise_id=6abc4041e65adf8e85dd1ecb&tab=home-tab",
+      "median": 287,
+      "worst": 302
+     }
+    }
+   },
+   "training-view": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       17,
+       28,
+       29,
+       22,
+       14
+      ],
+      "flags": {
+       "skeleton": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       13,
+       25,
+       26,
+       17,
+       11
+      ],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abc402ce65adf8e85dcedfc&tab=training-view",
+      "median": 22,
+      "worst": 29,
+      "skelMedian": 17
+     },
+     "warm": {
+      "ms": [
+       12,
+       15,
+       17,
+       17,
+       19
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002574281215667724,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abc402ce65adf8e85dcedfc&tab=training-view&mode=franchise",
+      "median": 17,
+      "worst": 19
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       14,
+       14,
+       18,
+       14,
+       21
+      ],
+      "flags": {
+       "skeleton": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       9,
+       8,
+       16,
+       8,
+       17
+      ],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?franchise_id=6abc4041e65adf8e85dd1ecb&tab=training-view&mode=franchise",
+      "median": 14,
+      "worst": 21,
+      "skelMedian": 9
+     },
+     "warm": {
+      "ms": [
+       14,
+       11,
+       11,
+       11,
+       14
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002574281215667724,
+      "landed": "/franchise-command-center.html?franchise_id=6abc4041e65adf8e85dd1ecb&tab=training-view&mode=franchise",
+      "median": 11,
+      "worst": 14
+     }
+    }
+   },
+   "game-plan-view": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       30,
+       29,
+       29,
+       31,
+       33
+      ],
+      "flags": {
+       "skeleton": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       26,
+       25,
+       25,
+       25,
+       29
+      ],
+      "cls": 0.0002574281215667724,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abc402ce65adf8e85dcedfc&tab=game-plan-view&mode=franchise",
+      "median": 30,
+      "worst": 33,
+      "skelMedian": 25
+     },
+     "warm": {
+      "ms": [
+       6,
+       4,
+       7,
+       5,
+       5
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002574281215667724,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abc402ce65adf8e85dcedfc&tab=game-plan-view&mode=franchise",
+      "median": 5,
+      "worst": 7
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       30,
+       29,
+       25,
+       26,
+       30
+      ],
+      "flags": {
+       "skeleton": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       25,
+       25,
+       20,
+       20,
+       25
+      ],
+      "cls": 0.0002574281215667724,
+      "landed": "/franchise-command-center.html?franchise_id=6abc4041e65adf8e85dd1ecb&tab=game-plan-view&mode=franchise",
+      "median": 29,
+      "worst": 30,
+      "skelMedian": 25
+     },
+     "warm": {
+      "ms": [
+       6,
+       4,
+       6,
+       4,
+       7
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002574281215667724,
+      "landed": "/franchise-command-center.html?franchise_id=6abc4041e65adf8e85dd1ecb&tab=game-plan-view&mode=franchise",
+      "median": 6,
+      "worst": 7
+     }
+    }
+   }
+  },
+  "shots": {},
+  "runs": 5
+ }
+}
