@@ -822,6 +822,42 @@
     return node.childNodes.length > 1 ? node : null;
   }
 
+  function weeklyHref(item) {
+    var raw = item && item.href;
+    if (!present(raw)) return '';
+    var current = new URLSearchParams(global.location.search);
+    var url;
+    try { url = new URL(raw, 'http://local.invalid'); } catch (err) { return String(raw); }
+    if (current.get('franchise_id') && !url.searchParams.get('franchise_id')) {
+      url.searchParams.set('franchise_id', current.get('franchise_id'));
+    }
+    var teamId = current.get('team_id') || current.get('user_team_id');
+    if (teamId && !url.searchParams.get('team_id')) url.searchParams.set('team_id', teamId);
+    return url.pathname + (url.search || '');
+  }
+
+  function weeklyCard(items, index) {
+    if (!Array.isArray(items) || !items.length) return null;
+    var node = card('office-weekly', index);
+    items.forEach(function (item) {
+      if (!item) return;
+      var url = weeklyHref(item);
+      var row = el(url ? 'a' : 'div', 'ow-row');
+      if (url) {
+        row.href = url;
+        bindGo(row, url);
+      }
+      var body = el('span', 'ow-b');
+      if (present(item.title)) body.appendChild(el('span', 'ow-k', item.title));
+      if (present(item.line)) body.appendChild(el('span', 'ow-v', item.line));
+      if (!body.childNodes.length) return;
+      row.appendChild(body);
+      row.appendChild(el('span', 'ow-go', '→'));
+      node.appendChild(row);
+    });
+    return node.childNodes.length ? node : null;
+  }
+
   function nextCard(game, digest, index) {
     if (!game) return null;
     var tournament = digest.state === 'tournament';
@@ -1243,6 +1279,8 @@
       ];
       third = [wireCard(digest.recruiting_wire, false, 6)];
     }
+    var weekly = weeklyCard(digest.weekly_card_items, 2);
+    if (weekly) second.unshift(weekly);
     first.forEach(function (node) { if (node) col1.appendChild(node); });
     second.forEach(function (node) { if (node) col2.appendChild(node); });
     third.forEach(function (node) { if (node) col3.appendChild(node); });

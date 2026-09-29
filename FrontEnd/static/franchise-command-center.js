@@ -3817,77 +3817,47 @@ async function init() {
     void renderFccPlaybooksSummary();
   }
   // Your team's dispatches render inside News now; nothing to paint on load.
-  const pendingMoments = Array.isArray(topData?.pending_championship_moments)
-    ? topData.pending_championship_moments
-    : [];
-  let championshipMomentsDone = Promise.resolve();
-  if (pendingMoments.length && typeof window.ChampionshipMoments !== 'undefined') {
-    championshipMomentsDone = window.ChampionshipMoments.processPendingMoments(
-      franchiseId,
-      pendingMoments,
-      {
-        boxScoreUrlBuilder: (moment) => buildFccBoxScoreUrlForMoment(moment),
-      }
-    );
-  }
-  championshipMomentsDone.then(() => {
-    if (fccBrowseTournamentTabActive()) return;
-    if (window.ConferenceRsRegionModal) window.ConferenceRsRegionModal.maybeShow(topData);
-    if (window.RegionByeModal) window.RegionByeModal.maybeShow(topData);
-    // Season-start walk-on reveal. Self-gates on its own payload and defers via
-    // blockerVisible() while any other overlay is up, so ordering here is safe:
-    // the two cannot be eligible on the same visit (a region bye is a week-30
-    // state, this is a week-1 pre-Training-Camp one).
-    if (window.WalkOnWelcomeModal) window.WalkOnWelcomeModal.maybeShow(topData);
-    // Weeks 20-26: who is visiting this week. Both are Moment modals on the shared
-    // Sammy chrome and both self-suppress, so ordering only matters if a season ever
-    // starts inside the invite window — which it cannot.
-    if (window.RecruitVisitModal) window.RecruitVisitModal.maybeShow(topData);
-    if (window.BigNewsModals) {
-      window.BigNewsModals.maybeShow(topData, {
+  const startMomentQueue = () => {
+    if (fccBrowseTournamentTabActive()) return Promise.resolve();
+    if (!window.MomentQueue || typeof window.MomentQueue.play !== 'function') return Promise.resolve();
+    return window.MomentQueue.play(topData, {
+      maps: {
         userTeamId,
         teamIdToNameMap: topData?.team_name_map || {},
         teamIdMetaMap,
-      });
+      },
+      boxScoreUrlBuilder: (moment) => buildFccBoxScoreUrlForMoment(moment),
+    });
+  };
+  const afterTutorial = (fn) => {
+    const ta = window.GOBTutorialAlerts;
+    if (ta && typeof ta.whenReturnAlertsSettled === 'function') ta.whenReturnAlertsSettled(fn);
+    else fn();
+  };
+  afterTutorial(() => {
+    const queueDone = startMomentQueue();
+    if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
+      let shown = false;
+      const overlayUp = () => !!(typeof document !== 'undefined' && document.querySelector(
+        '.cm-overlay.is-visible,.arch-reveal-overlay.is-visible,.afm-overlay.is-visible,'
+        + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show'
+      ));
+      const showTs = () => {
+        if (shown) return;
+        shown = true;
+        showCutPlayersRequiredModal(Number(topData.cut_count || 0));
+      };
+      Promise.resolve(queueDone).then(showTs, showTs);
+      setTimeout(() => {
+        if (shown) return;
+        if (overlayUp()) {
+          Promise.resolve(queueDone).then(showTs, showTs);
+          return;
+        }
+        showTs();
+      }, 8000);
     }
   });
-  if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
-    const showTs = () => showCutPlayersRequiredModal(Number(topData.cut_count || 0));
-    // Sequence behind tutorial alerts: on the season-1 week-1 return the Team
-    // Attributes tutorial must come first. whenReturnAlertsSettled fires once that
-    // alert is dismissed (or immediately if no tutorial alert is showing). Fallback
-    // to showing directly if the tutorial-alert module isn't present.
-    const ta = window.GOBTutorialAlerts;
-    if (ta && typeof ta.whenReturnAlertsSettled === 'function') {
-      let shown = false;
-      const fire = () => { if (shown) return; shown = true; showTs(); };
-      ta.whenReturnAlertsSettled(fire);
-      setTimeout(fire, 8000); // safety net if the settle signal never arrives
-    } else {
-      showTs();
-    }
-  }
-
-  // Lowest-priority coaching-archetype "you have evolved" modal. Runs only after
-  // the rest of the modal sequence has settled (championship moments resolved +
-  // tutorial-return alerts settled + a short delay so any synchronous reveal /
-  // feedback / region-bye / big-news overlay has rendered). On a clean visit it
-  // shows; if anything else claimed the visit it's skipped permanently. The
-  // pending flag is consumed either way (inside ArchetypeEvolutionModal.run).
-  if (window.ArchetypeEvolutionModal) {
-    const runEvo = () => setTimeout(() => {
-      window.ArchetypeEvolutionModal.run(fccHasCompetingModal(topData));
-    }, 1200);
-    const settleThenEvo = () => {
-      const taEvo = window.GOBTutorialAlerts;
-      if (taEvo && typeof taEvo.whenReturnAlertsSettled === 'function') {
-        taEvo.whenReturnAlertsSettled(runEvo);
-      } else {
-        runEvo();
-      }
-    };
-    championshipMomentsDone.then(settleThenEvo, settleThenEvo);
-  }
 
   if (topData && (topData.team_id || topData.team) && userTeamId) {
     console.log('Loading franchise roster for team_id:', userTeamId, 'franchiseId:', franchiseId);
@@ -4051,10 +4021,11 @@ function fccHasCompetingModal(topData) {
       + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show')) {
     return true;
   }
+  if (Array.isArray(topData?.moments_for_this_visit) && topData.moments_for_this_visit.length) return true;
   if (Array.isArray(topData?.pending_championship_moments) && topData.pending_championship_moments.length) return true;
   if (topData?.region_bye_modal_eligible) return true;
   if (topData?.conference_rs_region_modal?.eligible) return true;
-  if (topData?.bracket_reveal_modal?.eligible || topData?.bracket_update_modal?.eligible || topData?.recruiting_results_modal?.eligible) return true;
+  if (topData?.bracket_reveal_modal?.eligible || topData?.bracket_update_modal?.eligible) return true;
   if (topData?.walk_on_welcome_modal?.eligible) return true;
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) return true;
   const me = window.__gobAuthMeData;

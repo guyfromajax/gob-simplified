@@ -9,6 +9,47 @@
   padding: 0;
 }
 .gob .office a { color: inherit; text-decoration: none; }
+.gob .office-weekly {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.gob .office-weekly .ow-row {
+  display: flex;
+  align-items: center;
+  gap: var(--dsp-10);
+  width: 100%;
+  padding: var(--dsp-8) var(--space-2);
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+.gob .office-weekly .ow-row:first-child { border-top: 0; }
+.gob .office-weekly .ow-row:hover { background: var(--white-5); }
+.gob .office-weekly .ow-b {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.gob .office-weekly .ow-k {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-60);
+  white-space: nowrap;
+}
+.gob .office-weekly .ow-v {
+  font-size: var(--fs-13);
+  color: var(--text-87);
+}
+.gob .office-weekly .ow-go {
+  flex: none;
+  color: var(--text-38);
+  font-size: var(--fs-12);
+}
 .gob .office .wr-1 { min-width: 0; }
 .gob .office .nx-m { min-width: 0; flex: 1 1 auto; }
 .gob .office .nx-m > div { min-width: 0; flex: 1 1 auto; }

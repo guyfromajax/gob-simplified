@@ -104,5 +104,50 @@ function cloneParams(params) {
     });
   }
 
-  window.RegionByeModal = { maybeShow: maybeShow };
+  function labeledEyebrow(queue, eyebrow) {
+    return (window.MomentQueue && window.MomentQueue.queueLabel)
+      ? window.MomentQueue.queueLabel(queue, eyebrow)
+      : eyebrow;
+  }
+
+  function showFromQueue(data, queue) {
+    return new Promise(function (resolve) {
+      if (presented || !data || !data.region_bye_modal_eligible) {
+        resolve();
+        return;
+      }
+      presented = true;
+      var franchiseId = window.franchiseId || liveParams().get('franchise_id');
+      Promise.all([
+        import('/js/shared/sammyModal.js'),
+        import('/js/shared/teamCoachAsset.js'),
+      ]).then(function (loaded) {
+        loaded[0].showSammyModal({
+          eyebrow: labeledEyebrow(queue, 'Region Tournament Bye'),
+          body: 'Hey Coach, congratulations! You won both your conference regular-season title and your conference tournament title. This means you\u2019ve earned a bye in the Region Tournament and have automatically qualified for the Region Championship game. Sim this week\u2019s games, then start preparing for the Region Championship!',
+          ctaLabel: 'Sim Region First Round',
+          secondaryLabel: 'Back to Locker Room',
+          imageSrc: loaded[1].getTeamSammyImage(data.team || ''),
+          onCta: function () {
+            try {
+              var playButton = document.getElementById('play-now');
+              if (!playButton || playButton.dataset.mode !== 'sim-rest-tournament') {
+                throw new Error('Region first-round simulation is not available.');
+              }
+              playButton.click();
+            } finally {
+              resolve();
+            }
+          },
+          onSecondary: function () { resolve(); },
+        });
+        return markSeen(franchiseId);
+      }).catch(function (err) {
+        console.error('[RegionByeModal] failed to show:', err);
+        resolve();
+      });
+    });
+  }
+
+  window.RegionByeModal = { maybeShow: maybeShow, showFromQueue: showFromQueue };
 })();

@@ -226,5 +226,42 @@ function cloneParams(params) {
     });
   }
 
-  window.RecruitVisitModal = { maybeShow: maybeShow };
+  function labeledEyebrow(queue, eyebrow) {
+    return (window.MomentQueue && window.MomentQueue.queueLabel)
+      ? window.MomentQueue.queueLabel(queue, eyebrow)
+      : eyebrow;
+  }
+
+  function showFromQueue(data, queue) {
+    return new Promise(function (resolve) {
+      var payload = data && data.recruit_visit_modal;
+      if (presented || !payload || !payload.eligible || !payload.recruit) {
+        resolve();
+        return;
+      }
+      presented = true;
+      ensureStylesheetLoaded();
+      var fid = franchiseId();
+      Promise.all([
+        import('/js/shared/sammyModal.js'),
+        import('/js/shared/teamCoachAsset.js'),
+      ]).then(function (loaded) {
+        loaded[0].showSammyModal({
+          eyebrow: labeledEyebrow(queue, 'Week ' + (payload.week || '') + ' \u00b7 Invite Season'),
+          body: buildBody([payload.recruit]),
+          ctaLabel: 'Go To Locker Room',
+          imageSrc: loaded[1].getTeamSammyImage(data.team || ''),
+          modalClass: 'is-wide',
+          primaryClass: 'is-orange',
+          onCta: function () { resolve(); },
+        });
+        return markSeen(fid);
+      }).catch(function (err) {
+        console.error('[RecruitVisitModal] failed to show:', err);
+        resolve();
+      });
+    });
+  }
+
+  window.RecruitVisitModal = { maybeShow: maybeShow, showFromQueue: showFromQueue };
 })();
