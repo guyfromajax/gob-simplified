@@ -14,9 +14,9 @@ const SFX_FILES = {
   SFX_ADVANCE: 'confirm-1-lowervol.wav',
   SFX_SELECT: 'click-tiny.wav',
   SFX_COMMIT: 'click-beep.wav',
-  STING_WIN: 'sting-win.mp3',
-  STING_MILESTONE: 'sting-milestone.mp3',
-  STING_SEASON_PEAK: 'sting-season-peak.mp3',
+  STING_WIN: 'sting-win.wav',
+  STING_MILESTONE: 'sting-milestone.wav',
+  STING_SEASON_PEAK: 'sting-season-peak.wav',
 };
 
 export const SFX_ADVANCE = SFX_FILES.SFX_ADVANCE;

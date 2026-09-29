@@ -33,7 +33,7 @@ Shell rules that must not restyle existing franchise cards live in `FrontEnd/sta
 
 Persisted in `localStorage` under `gob_audio_v1` (`AUDIO_STORAGE_KEY`). The same record works online and in the offline desktop build.
 
-`playSfx(name, baseVolume)` plays one named sound on the `sfx` channel. `baseVolume` defaults to `0.7`. It still accepts a raw filename so existing callers keep working. Named catalog: `SFX_SELECT` (`click-tiny.wav`), `SFX_ADVANCE` (`confirm-1-lowervol.wav`), `SFX_COMMIT` (`click-beep.wav`), `STING_WIN` (`sting-win.mp3`), `STING_MILESTONE` (`sting-milestone.mp3`), `STING_SEASON_PEAK` (`sting-season-peak.mp3`). Short UI sounds may overlap. A new sting stops the previous sting. A missing file fails silently (one `console.debug` per name) and must not throw or block a modal or navigation.
+`playSfx(name, baseVolume)` plays one named sound on the `sfx` channel. `baseVolume` defaults to `0.7`. It still accepts a raw filename so existing callers keep working. Named catalog: `SFX_SELECT` (`click-tiny.wav`), `SFX_ADVANCE` (`confirm-1-lowervol.wav`), `SFX_COMMIT` (`click-beep.wav`), `STING_WIN` (`sting-win.wav`), `STING_MILESTONE` (`sting-milestone.wav`), `STING_SEASON_PEAK` (`sting-season-peak.wav`). Short UI sounds may overlap. A new sting stops the previous sting. A missing file fails silently (one `console.debug` per name) and must not throw or block a modal or navigation.
 
 One delegated click listener per document plays `data-sfx="<name>"` on buttons, links, and `[role="tab"]`. Unknown names are ignored. The top-bar Advance (`#play-now`) uses `data-sfx="SFX_ADVANCE"` and must not also call `playSfx` from its click handler.
 

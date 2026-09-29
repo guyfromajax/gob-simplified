@@ -147,8 +147,8 @@ test.describe('reward-gold sfx hooks', () => {
         winner_primary_color: '#224488',
       }, {});
     });
-    await page.waitForFunction(() => (window.__sfxPlays || []).some((src) => String(src).indexOf('sting-season-peak.mp3') !== -1));
+    await page.waitForFunction(() => (window.__sfxPlays || []).some((src) => String(src).indexOf('sting-season-peak.wav') !== -1));
     const srcs = await page.evaluate(() => window.__sfxPlays.slice());
-    expect(playsOf(srcs, 'sting-season-peak.mp3')).toHaveLength(1);
+    expect(playsOf(srcs, 'sting-season-peak.wav')).toHaveLength(1);
   });
 });
