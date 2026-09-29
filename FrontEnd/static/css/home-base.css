@@ -42,8 +42,8 @@ body.mode-select-page .alpha-disclaimer {
 .gob .hb>*{position:relative;z-index:var(--z-raised)}
 /* --door-art is trimmed from the handoff's 158/236 to buy the career strip its
    row without pushing the Tutorials row below the fold. See the PR report. */
-.gob-1280 .hb{--hb-left:480px;--hb-gap:48px;--hb-px:32px;--hb-pt:28px;--hb-pb:24px;--door-art:112px;--door-info:66px}
-.gob-1920 .hb{--hb-left:700px;--hb-gap:72px;--hb-px:48px;--hb-pt:44px;--hb-pb:40px;--door-art:196px;--door-info:80px}
+.gob-1280 .hb{--hb-left:480px;--hb-gap:48px;--hb-px:32px;--hb-pt:28px;--hb-pb:24px;--door-art:112px;--door-info:66px;--med:46px;--med-lg:84px;--tsn-h:46px}
+.gob-1920 .hb{--hb-left:700px;--hb-gap:72px;--hb-px:48px;--hb-pt:44px;--hb-pb:40px;--door-art:196px;--door-info:80px;--med:64px;--med-lg:112px;--tsn-h:84px}
 
 /* ── Top bar (wordmark · connection · account) ──────────── */
 .gob .hb-top{display:flex;align-items:center;gap:var(--space-16);padding:0 var(--hb-px);background:var(--bg-chrome);border-bottom:1px solid var(--line)}
@@ -222,6 +222,72 @@ body.mode-select-page .alpha-disclaimer {
 .gob .lbl .ldb-r.me{margin-top:auto}
 .gob .hbt .sec-f{flex:none;border-top:1px solid var(--line);margin-top:var(--dsp-8);padding-top:var(--dsp-10)}
 .gob .hb-empty-r{display:flex;align-items:center;justify-content:center;flex:1;min-height:0;font-size:var(--fs-12);color:var(--text-38)}
+
+/* ── Right zone · offline · "Your Career" ─────────────────────
+   Ported from ch7.css "Right zone · OFFLINE". No remote calls feed this zone;
+   the desktop guard must stay green. Reward gold appears ONLY on title
+   medallions and title-finish text in Top Seasons — never on chrome. */
+/* Open (unboxed) section head, shared by Trophy Case + Top Seasons. */
+.gob .cr .sec{display:flex;flex-direction:column;min-width:0}
+.gob .cr .sec-h{display:flex;align-items:baseline;gap:var(--space-10);padding-bottom:var(--dsp-8);border-bottom:1px solid var(--line-strong)}
+.gob .cr .sec-h h3{font:var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-7);color:var(--text-87);white-space:nowrap}
+.gob .cr .sec-h span{font-size:var(--fs-11);color:var(--text-38);white-space:nowrap}
+.gob .cr .sec-h .r{margin-left:auto;display:flex;align-items:center;gap:var(--space-10);align-self:center}
+.gob .cr .sec-h .r .lnk{font-size:var(--fs-12)}
+
+/* .cr — Your Career zone. Hollow numerals = potential; solid = earned. The base
+   .cr-n grid/borders/span/em are shared with the online strip above; only the
+   numeral scale and cell padding differ, scoped under .cr. */
+.gob .cr{display:flex;flex-direction:column;gap:var(--dsp-20);min-height:0}
+.gob .cr .cr-n>div{gap:var(--space-6);padding:var(--dsp-14) var(--dsp-16) var(--dsp-12)}
+.gob .cr .cr-n b{font:var(--fw-bold) var(--fs-48)/var(--lh-85) var(--font-display);letter-spacing:var(--tracking-1);color:var(--text-100);white-space:nowrap}
+.gob .cr-cap{margin-top:calc(var(--dsp-12) * -1);font-size:var(--fs-12);color:var(--text-60)}
+.gob-1920 .cr{gap:44px}
+.gob-1920 .cr .cr-n b{font-size:80px}
+.gob-1920 .cr .cr-n>div{padding-top:24px;padding-bottom:20px}
+
+/* .tcase + .shelf + .med — trophy shelf. Titles gold, milestones neutral. */
+.gob .tcase{display:flex;flex-direction:column;gap:var(--dsp-12);padding-top:var(--dsp-14);min-height:0}
+/* Inside the career zone the section gap already separates the shelf. */
+.gob .cr .tcase{padding-top:0}
+.gob .tcase .sec-h{border-bottom:0;padding-bottom:0}
+.gob .shelf{position:relative;display:flex;gap:var(--dsp-14);padding:0 var(--space-4) var(--dsp-12)}
+.gob .shelf::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,var(--line-strong) 10%,var(--line-strong) 90%,transparent);box-shadow:0 6px 14px var(--black-45)}
+.gob .tro{display:flex;flex-direction:column;align-items:center;gap:var(--space-8);width:calc(var(--med) * 2.6);text-align:center;min-width:0}
+.gob .tro div b{display:block;font-size:var(--fs-12);font-weight:var(--fw-semibold);color:var(--text-87);line-height:1.25;text-wrap:balance}
+.gob .tro div span{display:block;margin-top:var(--space-2);font-size:var(--fs-11);color:var(--text-60)}
+.gob .tro:hover div b{color:var(--text-100)}
+.gob .med{--ms:var(--med);flex:none;display:grid;place-items:center;width:var(--ms);height:var(--ms);border-radius:var(--radius-round);font:var(--fw-bold) calc(var(--ms) * .46)/var(--lh-1) var(--font-display);padding-top:calc(var(--ms) * .05)}
+.gob .med.gold{color:var(--reward-gold);background:radial-gradient(circle at 50% 32%,color-mix(in srgb,var(--reward-gold) 24%,transparent),color-mix(in srgb,var(--reward-gold) 5%,transparent) 72%);box-shadow:inset 0 0 0 1.5px var(--reward-gold),0 0 18px color-mix(in srgb,var(--reward-gold) 16%,transparent)}
+.gob .med.ms{color:var(--text-87);background:var(--white-4);box-shadow:inset 0 0 0 1.5px var(--white-30)}
+.gob .med.open{background:transparent;border:1.5px dashed var(--white-18)}
+.gob .med.lg{--ms:var(--med-lg)}
+/* empty, labelled medallion slot: what you can still win */
+.gob .tro.slot-e .med{background:transparent;border:1.5px dashed var(--white-20);color:var(--text-38);box-shadow:none}
+.gob .tro.slot-e div b{color:var(--text-60)}
+
+/* .tsn — Top Seasons, in the server's season-GP order. */
+.gob .tsn-l{display:flex;flex-direction:column}
+.gob .tsn{display:grid;grid-template-columns:var(--dsz-28) calc(var(--dsz-40) * 2.84) minmax(0,1fr) var(--dsz-60) minmax(0,1.1fr) var(--dsz-64);align-items:center;gap:var(--dsp-12);height:var(--tsn-h);border-bottom:1px solid var(--line)}
+.gob-1920 .tsn{grid-template-columns:var(--dsz-28) 159px minmax(0,1fr) var(--dsz-60) minmax(0,1.1fr) var(--dsz-64)}
+.gob .tsn>i{font:normal var(--fw-bold) var(--fs-28)/var(--lh-85) var(--font-display);color:var(--text-60);text-align:center;padding-top:var(--space-2);font-style:normal}
+.gob .tsn:first-child>i{color:var(--text-100)}
+.gob .tsn-a{height:var(--dsz-40);border-radius:var(--radius-6);overflow:hidden;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--white-10)}
+.gob-1920 .tsn-a{height:56px}
+.gob .tsn-a img{display:block;width:100%;height:100%;object-fit:cover}
+.gob .tsn-n{display:flex;flex-direction:column;gap:var(--space-3);min-width:0}
+.gob .tsn-n b{font-size:var(--fs-13);font-weight:var(--fw-semibold);color:var(--text-100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gob .tsn-n span{font-size:var(--fs-11);color:var(--text-60);white-space:nowrap}
+.gob .tsn-r{font:var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);color:var(--text-87);text-align:right;white-space:nowrap;padding-top:var(--space-1)}
+.gob .tsn-f{font-size:var(--fs-12);color:var(--text-60);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gob .tsn-f.gold-t{color:var(--reward-gold);font-weight:var(--fw-semibold)}
+.gob .tsn-f .ip{display:inline-flex;align-items:center;gap:var(--space-5);height:var(--dsz-20);padding:0 var(--space-7);border-radius:999px;box-shadow:inset 0 0 0 1px var(--line-strong);font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--tracking-6);text-transform:uppercase;color:var(--text-87)}
+.gob .tsn-g{display:flex;align-items:baseline;justify-content:flex-end;gap:var(--space-3);font:var(--fw-bold) var(--fs-24)/var(--lh-1) var(--font-display);color:var(--text-100);white-space:nowrap;padding-top:var(--space-1)}
+.gob .tsn-g small{font-size:var(--fs-10);font-family:var(--font-body);letter-spacing:var(--tracking-6);color:var(--text-60)}
+.gob .tsn.is-e{grid-template-columns:var(--dsz-28) minmax(0,1fr);border-bottom-style:dashed;border-bottom-color:var(--line-strong)}
+.gob .tsn.is-e>i{color:transparent;-webkit-text-stroke:1px var(--white-30)}
+.gob .tsn.is-e span{font-size:var(--fs-12);color:var(--text-38)}
+.gob .tsn.is-e:first-of-type span{color:var(--text-60)}
 
 /* ── Base pieces Home Base needs that the shared sheets do not carry yet ── */
 .gob .btn-ghost.sm{height:var(--dsz-34);min-width:112px;padding:0 var(--space-14);font-size:var(--fs-15)!important}

@@ -1260,8 +1260,10 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
             titles_current_user_entry = ranked
 
     return LeaderboardResponse(
-        top=ranked_entries[:10],
-        current_user=(None if current_user_entry and current_user_entry.rank <= 10 else current_user_entry),
+        # 15 rows so 1920 can fill its taller list; 1280 renders its own shorter
+        # count (--lb-rows) from the same payload. Titles stays at 5.
+        top=ranked_entries[:15],
+        current_user=(None if current_user_entry and current_user_entry.rank <= 15 else current_user_entry),
         titles_top=ranked_titles_entries[:5],
         titles_current_user=(
             None

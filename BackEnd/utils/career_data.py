@@ -345,6 +345,7 @@ def _season_row(
     wins: int,
     losses: int,
     finish: Optional[str],
+    finish_is_title: bool = False,
     gp: Optional[int],
     in_progress: bool,
     week: Optional[int],
@@ -357,6 +358,9 @@ def _season_row(
         "wins": wins,
         "losses": losses,
         "finish": finish,
+        # Reward gold is reserved for a title finish; the client reads this flag
+        # rather than classifying the finish string itself.
+        "finish_is_title": finish_is_title,
         "season_gp": gp,
         "in_progress": in_progress,
         "week": week,
@@ -384,6 +388,7 @@ def _completed_season_rows(trophies: Iterable[Mapping[str, Any]], season_gp: Map
         gp = _int(detail.get("season_gp"))
         if gp is None:
             gp = season_gp_for(season_gp, fid, season)
+        season_titles = titles_by_season.get((fid, season), set())
         rows.append(
             _season_row(
                 franchise_id=fid,
@@ -391,7 +396,8 @@ def _completed_season_rows(trophies: Iterable[Mapping[str, Any]], season_gp: Map
                 season=season,
                 wins=_int(detail.get("wins")) or 0,
                 losses=_int(detail.get("losses")) or 0,
-                finish=finish_label(detail, titles_by_season.get((fid, season), set())),
+                finish=finish_label(detail, season_titles),
+                finish_is_title=bool(season_titles),
                 gp=gp,
                 in_progress=False,
                 week=None,
