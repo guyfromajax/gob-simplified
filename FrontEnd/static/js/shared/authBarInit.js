@@ -56,6 +56,7 @@ function cloneParams(params) {
     'tutorial-situation.html',
     // Home Base carries its own top bar (Ch7), so the site bar would double it
     'mode-select.html',
+    'trophy-case.html',
     // Optional non-.html route variants
     '/box-score',
     '/game-plan',

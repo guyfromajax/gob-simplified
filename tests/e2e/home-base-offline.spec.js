@@ -276,9 +276,12 @@ test.describe('populated state', () => {
     await expectNothingBelowTheFold(page);
   });
 
-  test('the Trophy Case link stays behind its flag', async ({ page }) => {
+  test('the Trophy Case View all link routes to the standalone page', async ({ page }) => {
     await openOffline(page, { state: 'populated' });
-    await expect(page.locator('[data-hb-trophy-case]')).toHaveCount(0);
+    const link = page.locator('[data-hb-trophy-case]');
+    await expect(link).toBeVisible();
+    await expect(link).toHaveText('View all');
+    await expect(link).toHaveAttribute('href', '/trophy-case.html');
   });
 });
 

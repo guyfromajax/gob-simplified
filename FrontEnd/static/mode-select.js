@@ -96,7 +96,7 @@ let hbCareer = null;
 /** The offline "Your Career" right zone, from the same coach-career payload. */
 let hbCareerZone = null;
 /** PR 5 owns the Trophy Case route; the entry stays off until it lands. */
-const HB_TROPHY_CASE_HREF = '';
+const HB_TROPHY_CASE_HREF = '/trophy-case.html';
 /** How long the loader will wait on the right zone's first view before giving up. */
 const COMMUNITY_FIRST_VIEW_TIMEOUT_MS = 6000;
 

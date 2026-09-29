@@ -3842,7 +3842,7 @@ async function init() {
       let shown = false;
       const overlayUp = () => !!(typeof document !== 'undefined' && document.querySelector(
         '.cm-overlay.is-visible,.arch-reveal-overlay.is-visible,.afm-overlay.is-visible,'
-        + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show,.mm-scrim.is-open'
+        + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show,.mm-scrim.is-open,.pk.is-open,.rv.is-open'
       ));
       const showTs = () => {
         if (shown) return;
@@ -4020,7 +4020,7 @@ function fccBrowseTournamentTabActive() {
 function fccHasCompetingModal(topData) {
   if (typeof document !== 'undefined' && document.querySelector(
       '.cm-overlay.is-visible,.arch-reveal-overlay.is-visible,.afm-overlay.is-visible,'
-      + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show,.mm-scrim.is-open')) {
+      + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show,.mm-scrim.is-open,.pk.is-open,.rv.is-open')) {
     return true;
   }
   if (Array.isArray(topData?.moments_for_this_visit) && topData.moments_for_this_visit.length) return true;
