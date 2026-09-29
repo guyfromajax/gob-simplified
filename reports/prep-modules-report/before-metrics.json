@@ -45,6 +45,8 @@
     ],
     "back": {
       "bg": "rgba(255, 255, 255, 0.06)",
+      "border": "rgba(255, 255, 255, 0.18)",
+      "color": "rgba(255, 255, 255, 0.85)",
       "cls": "gob-btn gob-btn--ghost",
       "w": 138,
       "h": 42

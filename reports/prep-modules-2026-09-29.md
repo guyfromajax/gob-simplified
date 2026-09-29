@@ -101,7 +101,7 @@ Same real fixture (week 12, Four Corners, Roger Henrich, P/T Defense Readiness).
 
 ### Before / after (same fixture)
 
-1280 Office: `before-office-1280.png` · `training-report-after-1280.png`. Notes cards 225px (`before-metrics.json`). After matches. Remaining pixel-level differences: the module Back is restated as a transparent ghost under `#training-report-view #locker-room-btn.gob-btn--ghost` vs develop’s `rgba(255,255,255,0.06)` fill — same outline, no UA grey block. Portraits are the same 40×40 square initials (this fixture’s `p-roger` has no painted master). No mid-word wrap. Toggle at 1920 is the same quiet segment, not orange and not the old light control.
+1280 Office: `before-office-1280.png` · `training-report-after-1280.png`. Notes cards 225px (`before-metrics.json`). After matches, including ← Back: computed fill / border / text are the develop ghost (`rgba(255,255,255,0.06)` / `0.18` / `0.85`). Portraits are the same 40×40 square initials (this fixture’s `p-roger` has no painted master). No mid-word wrap. Toggle at 1920 is the same quiet segment, not orange and not the old light control.
 
 ---
 
@@ -122,8 +122,8 @@ What changed:
 - `init` adds `training-report-page` on the **view root** (`#training-report-view`), never on `document.body`.
 - 161 `body.training-report-page .…` descendant rules remapped to `.training-report-page .…`. The bare `body.training-report-page { }` page chrome stays for leftover `embed=1` only.
 - `#training-report-view .training-notes-container` is a single column (no `word-wrap: break-word`). Hero portraits are 40×40, `border-radius: var(--radius-6)`.
-- `#training-report-view #locker-room-btn.gob-btn--ghost` restates the ghost (transparent fill, `appearance: none`) so the UA light button does not paint a grey block.
-- Visual guard: Notes column widths vs `before-metrics.json` (±16px), no label/name wider than its card, 40×40 square portraits, Back is `gob-btn--ghost` at 138×42 and not the orange locker style, toggle is not orange.
+- `#locker-room-btn` is an `<a role="button">` (not a native `<button>`). Chrome remaps a `<button>`’s used `background-color` / `border-color` to UA `buttonface` (the light-grey block) even when the class is `.gob-btn--ghost` and the specified fill is `rgba(255,255,255,0.06)`. The view rule restates that same ghost fill / `0.18` border / `0.85` text, with `transition: none` so `.gob-btn`’s 140ms background tween cannot sample as a mid-fade.
+- Visual guard: Notes column widths vs `before-metrics.json` (±16px), no label/name wider than its card, 40×40 square portraits, Back is `gob-btn--ghost` at 138×42. Computed `background-color`, `border-color`, and `color` must match the before values (or be transparent). Toggle is not orange.
 
 No gold tokens brought back. No global `:root` / `*` / `body` leaks.
 
@@ -133,7 +133,7 @@ No gold tokens brought back. No global `:root` / `*` / `body` leaks.
 
 - pytest `--ignore=tests/e2e`: **4062 passed**, 16 skipped, 109 xfailed, 1 xpassed, **0 failed**.
 - Full Playwright, workers=1, port 8157, CI unset: **676 passed**, 3 skipped, **0 failed** (clean full run).
-- This-work Playwright: **6 passed** (`prep-modules-report.spec.js` including the geometry guard).
+- This-work Playwright (scoped, no full suite): **8 passed** — `prep-modules-report.spec.js` (6) plus navigation-fixes-3 report-exit (2: training submit → report → Back; custom playbooks → report → Back).
 
 ---
 

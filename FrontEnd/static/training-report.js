@@ -88,7 +88,7 @@ function shellHtml() {
     + '<span class="meta-sep">·</span>'
     + '<span>Training Focus: <span id="training-focus">--</span></span>'
     + '</div></div></div>'
-    + '<button type="button" id="locker-room-btn" class="locker-room-button">Go To Locker Room</button>'
+    + '<a href="#" role="button" id="locker-room-btn" class="locker-room-button">Go To Locker Room</a>'
     + '</header>'
     + '<section class="training-notes-section"><div class="training-notes-header"><div class="training-notes-header-main">'
     + '<div class="training-notes-header-accent" aria-hidden="true"></div>'
@@ -582,7 +582,8 @@ function paintBack() {
   btn.dataset.exitWired = '1';
   if (backClickWired) return;
   backClickWired = true;
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', (ev) => {
+    if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
     playSound('click-strong.wav');
     if (mode === 'franchise') {
       if (reportFrom === 'news') {

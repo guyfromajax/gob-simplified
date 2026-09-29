@@ -1579,15 +1579,18 @@ body.training-report-page {
 #training-report-view #locker-room-btn[hidden] {
   display: none;
 }
-#training-report-view #locker-room-btn.gob-btn--ghost {
+/* Native `<button>` used-values are remapped to UA `buttonface` (light grey)
+   even when the class is `.gob-btn--ghost`. The control is an `<a role="button">`
+   and these values match develop's computed ghost. */
+#training-report-view #locker-room-btn.gob-btn.gob-btn--ghost {
   appearance: none;
   -webkit-appearance: none;
-  color-scheme: dark;
-  background: transparent;
-  background-image: none;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: none;
-  color: rgba(255, 255, 255, 0.85);
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  background-image: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: none !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  transition: none;
 }
 
 .training-report-page .change-positive,

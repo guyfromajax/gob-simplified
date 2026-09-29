@@ -11,6 +11,25 @@ const OUT = path.join(__dirname, '../../reports/prep-modules-report');
 const HEADSHOT = fs.readFileSync(path.join(__dirname, '../../FrontEnd/static/images/players/generic_headshot.png'));
 const BEFORE = JSON.parse(fs.readFileSync(path.join(OUT, 'before-metrics.json'), 'utf8'));
 
+function parseRgba(value) {
+  const m = String(value).match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/i);
+  if (!m) return null;
+  return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]), a: m[4] == null ? 1 : Number(m[4]) };
+}
+
+function samePaint(actual, expected) {
+  if (actual === expected) return true;
+  if (actual === 'transparent' || actual === 'rgba(0, 0, 0, 0)') {
+    const exp = parseRgba(expected);
+    return exp && exp.a <= 0.02;
+  }
+  const a = parseRgba(actual);
+  const b = parseRgba(expected);
+  if (!a || !b) return false;
+  return Math.abs(a.r - b.r) <= 2 && Math.abs(a.g - b.g) <= 2
+    && Math.abs(a.b - b.b) <= 2 && Math.abs(a.a - b.a) <= 0.02;
+}
+
 const REPORT = {
   week: 12,
   upcoming_opponent: 'Four Corners',
@@ -259,6 +278,8 @@ async function reportGeometry(page) {
       portraits,
       back: btn ? {
         bg: bs.backgroundColor,
+        border: bs.borderColor,
+        color: bs.color,
         cls: btn.className,
         w: Math.round(btn.getBoundingClientRect().width),
         h: Math.round(btn.getBoundingClientRect().height),
@@ -276,6 +297,14 @@ test('Notes columns, headshots, and Back match the develop before', async ({ pag
   await page.waitForFunction(() => {
     const nodes = document.querySelectorAll('#training-report-view .training-notes-hero-portrait-img, #training-report-view .training-notes-hero-portrait-fallback');
     return nodes.length >= 3;
+  });
+  await page.waitForFunction(() => {
+    const btn = document.querySelector('#training-report-view #locker-room-btn');
+    if (!btn) return false;
+    const bg = getComputedStyle(btn).backgroundColor;
+    return bg === 'rgba(255, 255, 255, 0.06)'
+      || bg === 'transparent'
+      || bg === 'rgba(0, 0, 0, 0)';
   });
   const after = await reportGeometry(page);
   const before = BEFORE.office;
@@ -299,7 +328,12 @@ test('Notes columns, headshots, and Back match the develop before', async ({ pag
   expect(after.back.cls).not.toContain('locker-room-button');
   expect(after.back.w).toBe(before.back.w);
   expect(after.back.h).toBe(before.back.h);
-  expect(after.back.bg).not.toMatch(/247,\s*148|255,\s*122|#f79420|#ff7a00/i);
+  const bgOk = after.back.bg === 'transparent'
+    || after.back.bg === 'rgba(0, 0, 0, 0)'
+    || samePaint(after.back.bg, before.back.bg);
+  expect(bgOk, `Back background ${after.back.bg} vs ${before.back.bg}`).toBe(true);
+  expect(samePaint(after.back.border, before.back.border), `Back border ${after.back.border} vs ${before.back.border}`).toBe(true);
+  expect(samePaint(after.back.color, before.back.color), `Back color ${after.back.color} vs ${before.back.color}`).toBe(true);
   expect(after.toggle.bg).not.toMatch(/247,\s*148|#f79420/i);
 });
 
