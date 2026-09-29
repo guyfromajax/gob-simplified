@@ -96,15 +96,16 @@ ARCHETYPE_PENDING_FIELD = "post_game_status.community_highlight_archetype_pendin
 
 
 def lead_archetype_for_user(owner_user_id: Any) -> str:
-    """Current denormalized lead_archetype key for a user ('' when none/no games)."""
+    """Current denormalized lead_archetype key for a coach ('' when none/no games).
+
+    Reads the coach doc, so the desktop principal resolves against ``local_coach``
+    (where ``commit_user_game_record`` writes it) rather than the absent users doc.
+    """
     if not owner_user_id:
         return ""
-    try:
-        oid = ObjectId(str(owner_user_id))
-    except Exception:
-        return ""
-    u = users_collection.find_one({"_id": oid}, {"lead_archetype": 1})
-    return str((u or {}).get("lead_archetype") or "")
+    from BackEnd.utils.local_coach import coach_field
+
+    return str(coach_field(owner_user_id, "lead_archetype") or "")
 
 
 def _lead_archetype_for_display_username(display_username: str) -> str:
@@ -143,14 +144,37 @@ def record_archetype_change_if_any(
     # A true *evolution* (changed from a prior archetype, not first-time
     # establishment) also queues the FCC "you have evolved" modal. First-time
     # establishment (lead_before empty) stays with the existing first-reveal modal.
-    if lead_before and owner_user_id:
+    # Both land on the coach doc, so the desktop save carries them too: /api/auth/me
+    # is not served on loopback, and the command-center payload reads them there.
+    if not owner_user_id:
+        return
+    from BackEnd.utils.local_coach import coach_target
+
+    if lead_before:
+        target = coach_target(owner_user_id)
+        if target is not None:
+            coll, doc_id, local = target
+            try:
+                coll.update_one(
+                    {"_id": doc_id},
+                    {"$set": {"archetype_evolution_pending": lead_after}},
+                    upsert=local,
+                )
+            except Exception:
+                logger.exception("[COMMUNITY_HIGHLIGHTS] Failed to set archetype_evolution_pending")
+    else:
+        # First time the lead archetype is established: a career milestone, once per coach.
         try:
-            users_collection.update_one(
-                {"_id": ObjectId(str(owner_user_id))},
-                {"$set": {"archetype_evolution_pending": lead_after}},
+            from BackEnd.utils.trophy_log import (
+                _load_franchise,
+                record_first_archetype_milestone,
             )
+
+            franchise_doc = _load_franchise(franchise_id)
+            if franchise_doc:
+                record_first_archetype_milestone(franchise_doc, lead_after)
         except Exception:
-            logger.exception("[COMMUNITY_HIGHLIGHTS] Failed to set archetype_evolution_pending")
+            logger.exception("[TROPHY] first-archetype milestone failed")
 
 
 def _user_scores_from_row(user_team_id_str: Any, user_row: dict) -> tuple[int, int]:

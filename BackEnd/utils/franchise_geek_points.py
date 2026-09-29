@@ -19,6 +19,114 @@ from BackEnd.tournament import franchise_tournament as ft
 
 logger = logging.getLogger(__name__)
 
+SEASON_GP_FIELD = "season_gp"
+
+
+def season_gp_key(franchise_id: Any, season: Any) -> str | None:
+    """``<franchise_id>:<season>`` map key, or None without both parts.
+
+    A dict path like ``trophy_keys``: the SQLite query engine does not traverse
+    arrays, and Mongo field names cannot hold ``.`` or start with ``$``.
+    """
+    fid = str(franchise_id or "").strip()
+    if not fid:
+        return None
+    try:
+        season_n = int(season)
+    except (TypeError, ValueError):
+        return None
+    return f"{fid}:{season_n}".replace(".", "_").replace("$", "_")
+
+
+def season_gp_path(franchise_id: Any, season: Any) -> str | None:
+    key = season_gp_key(franchise_id, season)
+    return None if key is None else f"{SEASON_GP_FIELD}.{key}"
+
+
+def _franchise_season_for_award(
+    owner_user_id: Any,
+    user_team_id_str: str | None,
+    week: int,
+) -> tuple[Any, Any]:
+    """Franchise id + season for a caller that could not pass them.
+
+    Only the CPU-week sim block reaches this: it awards the user's GP from inside
+    ``_complete_week_finish_cpu_and_persist``, which this change does not touch.
+    One projected read on the owner's franchises; ``week`` separates two saves
+    that coach the same team. Ambiguous → career GP still increments, the season
+    bucket is skipped.
+    """
+    if not owner_user_id or not user_team_id_str:
+        return None, None
+    docs = list(
+        db.franchises.find(
+            {"user_id": str(owner_user_id), "user_team_object_id": str(user_team_id_str)},
+            {"current_season": 1, "week": 1},
+        )
+    )
+    if len(docs) > 1:
+        docs = [d for d in docs if int(d.get("week", 0) or 0) == int(week)]
+    if len(docs) != 1:
+        if docs:
+            logger.warning(
+                "[GP] season bucket skipped; %s franchises match owner=%s team=%s",
+                len(docs), owner_user_id, user_team_id_str,
+            )
+        return None, None
+    return docs[0].get("_id"), docs[0].get("current_season")
+
+
+def apply_geek_points_delta(
+    *,
+    owner_user_id: str | None,
+    user_team_id_str: str | None,
+    delta: int,
+    franchise_id: Any = None,
+    season: Any = None,
+    week: int | None = None,
+) -> None:
+    """Add ``delta`` to the coach's career total, team bucket and season bucket.
+
+    One ``$inc`` on one doc: the online ``users`` doc, or the save's ``local_coach``
+    doc for the desktop principal (same rule and same fields, so Home Base reads
+    one shape). The delta is computed once by the caller and written once here.
+    """
+    if delta <= 0 or not owner_user_id or not user_team_id_str:
+        return
+    from BackEnd.utils.local_coach import LOCAL_COACH_ID, coach_collection, is_local_owner
+
+    local = is_local_owner(owner_user_id)
+    doc_id: Any = LOCAL_COACH_ID
+    if not local:
+        try:
+            doc_id = ObjectId(str(owner_user_id))
+        except Exception:
+            logger.warning("Invalid owner_user_id for geek_points increment: %s", owner_user_id)
+            return
+
+    team_key = geek_points_team_key_for_franchise_user(user_team_id_str)
+    inc_fields: dict[str, int] = {"geek_points": delta}
+    if team_key:
+        # Dot path creates geek_points_by_team and the sub-key on first $inc (lazy).
+        inc_fields[f"geek_points_by_team.{team_key}"] = delta
+    else:
+        logger.warning(
+            "geek_points_by_team not incremented; could not resolve team key (user_team_id_str=%r)",
+            user_team_id_str,
+        )
+    if franchise_id is None or season is None:
+        franchise_id, season = _franchise_season_for_award(
+            owner_user_id, user_team_id_str, int(week or 0)
+        )
+    path = season_gp_path(franchise_id, season)
+    if path:
+        inc_fields[path] = delta
+    if local:
+        # The desktop coach doc is created on its first award.
+        coach_collection().update_one({"_id": doc_id}, {"$inc": inc_fields}, upsert=True)
+    else:
+        users_collection.update_one({"_id": doc_id}, {"$inc": inc_fields})
+
 
 def _resolve_to_object_id_str(team_ref: Any) -> str | None:
     if team_ref is None:
@@ -170,6 +278,8 @@ def maybe_award_franchise_loss_geek_points(
     week: int,
     eos_game_meta: dict | None = None,
     bulk_sim_used: bool = False,
+    franchise_id: Any = None,
+    season: Any = None,
 ) -> None:
     """Increment geek_points when the user's franchise team loses a game they participated in."""
     if not owner_user_id or not user_team_id_str:
@@ -187,26 +297,14 @@ def maybe_award_franchise_loss_geek_points(
         eos_game_meta,
         bulk_sim_used=bulk_sim_used,
     )
-    if delta <= 0:
-        return
-
-    try:
-        oid = ObjectId(owner_user_id)
-    except Exception:
-        logger.warning("Invalid owner_user_id for geek_points loss increment: %s", owner_user_id)
-        return
-
-    team_key = geek_points_team_key_for_franchise_user(user_team_id_str)
-    inc_fields: dict[str, int] = {"geek_points": delta}
-    if team_key:
-        inc_fields[f"geek_points_by_team.{team_key}"] = delta
-    else:
-        logger.warning(
-            "geek_points_by_team not incremented (loss); could not resolve team key (user_team_id_str=%r)",
-            user_team_id_str,
-        )
-
-    users_collection.update_one({"_id": oid}, {"$inc": inc_fields})
+    apply_geek_points_delta(
+        owner_user_id=owner_user_id,
+        user_team_id_str=user_team_id_str,
+        delta=delta,
+        franchise_id=franchise_id,
+        season=season,
+        week=week,
+    )
 
 
 def maybe_award_franchise_win_geek_points(
@@ -217,6 +315,8 @@ def maybe_award_franchise_win_geek_points(
     week: int,
     eos_game_meta: dict | None,
     bulk_sim_used: bool = False,
+    franchise_id: Any = None,
+    season: Any = None,
 ) -> None:
     if not owner_user_id or not user_team_id_str:
         return
@@ -228,24 +328,11 @@ def maybe_award_franchise_win_geek_points(
         eos_game_meta,
         bulk_sim_used=bulk_sim_used,
     )
-    if delta <= 0:
-        return
-
-    try:
-        oid = ObjectId(owner_user_id)
-    except Exception:
-        logger.warning("Invalid owner_user_id for geek_points increment: %s", owner_user_id)
-        return
-
-    team_key = geek_points_team_key_for_franchise_user(user_team_id_str)
-    inc_fields: dict[str, int] = {"geek_points": delta}
-    if team_key:
-        # Dot path creates geek_points_by_team and the sub-key on first $inc (lazy).
-        inc_fields[f"geek_points_by_team.{team_key}"] = delta
-    else:
-        logger.warning(
-            "geek_points_by_team not incremented; could not resolve team key (user_team_id_str=%r)",
-            user_team_id_str,
-        )
-
-    users_collection.update_one({"_id": oid}, {"$inc": inc_fields})
+    apply_geek_points_delta(
+        owner_user_id=owner_user_id,
+        user_team_id_str=user_team_id_str,
+        delta=delta,
+        franchise_id=franchise_id,
+        season=season,
+        week=week,
+    )
