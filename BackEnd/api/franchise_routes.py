@@ -6068,6 +6068,7 @@ def _cpu_sim_job_path(week: int) -> str:
 _CPU_SIM_CLAIM_STALE_SECONDS = 300   # crash backstop; > worst-case uncontended sim
 _CPU_SIM_CLAIM_WAIT_SECONDS = 150    # phase-b bounded wait for an in-flight claim
 _CPU_SIM_CLAIM_POLL_SECONDS = 0.5
+_CPU_SIM_CLAIM_HEARTBEAT_SECONDS = 30  # owner refresh interval; well under the stale window
 
 
 def _cpu_sim_claim_path(week: int) -> str:
@@ -6108,6 +6109,63 @@ def _release_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> Non
         {"_id": franchise_id, f"{path}.owner": owner, f"{path}.active": True},
         fold_browse_rev({"$set": {f"{path}.active": False, f"{path}.released_at": _utc_now_iso()}}),
     )
+
+
+def _refresh_cpu_sim_claim_heartbeat(franchise_id: ObjectId, week: int, owner: str) -> bool:
+    """Bump the claim heartbeat iff this request still owns the active claim.
+
+    Returns False once the claim is released or taken over, so the refresher stops."""
+    path = _cpu_sim_claim_path(week)
+    res = db.franchises.update_one(
+        {"_id": franchise_id, f"{path}.owner": owner, f"{path}.active": True},
+        {"$set": {f"{path}.heartbeat": _utc_now_iso()}},
+    )
+    return bool(getattr(res, "matched_count", 0))
+
+
+class _CpuSimClaimHeartbeat:
+    """Keeps an owned claim fresh while the owner is still simming.
+
+    Without it the heartbeat is only written at acquire, so a week slower than
+    _CPU_SIM_CLAIM_STALE_SECONDS looks crashed and a second request re-claims and
+    sims it again. Daemon thread + stop event; start after acquire, stop in the same
+    finally that releases."""
+
+    def __init__(self, franchise_id: ObjectId, week: int, owner: str):
+        self.franchise_id = franchise_id
+        self.week = week
+        self.owner = owner
+        self._stop = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"cpu-claim-hb-{str(franchise_id)[:8]}-w{week}",
+            daemon=True,
+        )
+
+    def start(self) -> "_CpuSimClaimHeartbeat":
+        self._interval = _CPU_SIM_CLAIM_HEARTBEAT_SECONDS
+        self._thread.start()
+        return self
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=5)
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval):
+            try:
+                if not _refresh_cpu_sim_claim_heartbeat(self.franchise_id, self.week, self.owner):
+                    logger.info(
+                        "[CPU-SIM-CLAIM] heartbeat stopped: claim no longer owned franchise_id=%s week=%s",
+                        str(self.franchise_id), self.week,
+                    )
+                    return
+            except Exception:
+                logger.exception(
+                    "[CPU-SIM-CLAIM] heartbeat refresh failed franchise_id=%s week=%s",
+                    str(self.franchise_id), self.week,
+                )
 
 
 def _await_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> bool:
@@ -9499,7 +9557,9 @@ def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
             "idempotent": True,
             "cpu_sim_job": _cpu_sim_job_public_summary(franchise_doc, req.week),
         }
+    _claim_heartbeat = _CpuSimClaimHeartbeat(franchise_id, req.week, _claim_owner)
     try:
+        _claim_heartbeat.start()
         out = _complete_week_finish_cpu_and_persist(
             franchise_doc,
             franchise_id,
@@ -9517,6 +9577,7 @@ def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
             persist_cpu_results_only=True,
         )
     finally:
+        _claim_heartbeat.stop()
         _release_cpu_sim_claim(franchise_id, req.week, _claim_owner)
     out["idempotent"] = False
     logger.info(
@@ -9599,7 +9660,9 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
             status_code=503,
             detail="CPU sims for this week are still in progress; please retry.",
         )
+    _claim_heartbeat = _CpuSimClaimHeartbeat(franchise_id, req.week, _claim_owner)
     try:
+        _claim_heartbeat.start()
         # Re-read post-wait: start-cpu-sims may have advanced the week or persisted
         # the full CPU slate while we waited.
         franchise_doc = db.franchises.find_one({"_id": franchise_id}) or franchise_doc
@@ -9656,6 +9719,7 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
             community_highlight_pending=None,
         )
     finally:
+        _claim_heartbeat.stop()
         _release_cpu_sim_claim(franchise_id, req.week, _claim_owner)
     out["status"] = "ok"
     out["phase"] = "b"
@@ -16155,20 +16219,6 @@ def run_week_35_recruiting(
         logger.exception("[IMG-WARM] could not start region warm franchise_id=%s", str(fid))
 
     return {"status": "success", "week": 36, "results": results}
-
-
-@router.get("/franchise/debug-names")
-def debug_names():
-    """Debug endpoint to check if franchise names are loading correctly."""
-    from BackEnd.models.franchise_manager import RecruitManager
-    rm = RecruitManager(db)
-    return {
-        "first_names_count": len(rm.first_names),
-        "last_names_count": len(rm.last_names),
-        "sample_first_names": rm.first_names[:10],
-        "sample_last_names": rm.last_names[:10],
-        "using_fallback": len(rm.first_names) == 5 and len(rm.last_names) == 5
-    }
 
 
 @router.get("/franchise/latest-training")

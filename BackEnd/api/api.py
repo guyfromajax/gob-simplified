@@ -190,7 +190,6 @@ try:
     from fastapi.staticfiles import StaticFiles
     from BackEnd.models.animator import Animator   
     # ✅ PERFORMANCE: Removed debug print statements
-    from .training_routes import router as training_router
     from .franchise_routes import router as franchise_router
     from .player_image_routes import router as player_image_router
     from .press_conference_routes import router as press_conference_router
@@ -414,12 +413,6 @@ try:
             )
         return await call_next(request)
 
-    @app.get("/sentry-debug")
-    def sentry_debug():
-        """Test endpoint - raises error to verify backend Sentry capture. Remove before public launch."""
-        raise RuntimeError("Test Sentry backend capture")
-
-    
     @app.get("/app-config")
     def get_app_config():
         """
@@ -529,7 +522,6 @@ try:
     _rate_limit_turn = limiter.limit(SIM_TURN_RATE_LIMIT) if limiter else _no_limit
     
     # Include routers AFTER CORS middleware is configured
-    app.include_router(training_router)
     app.include_router(franchise_router)
     app.include_router(player_image_router)
     app.include_router(press_conference_router)
@@ -563,16 +555,6 @@ try:
             print(f"⚠️ [BILLING] could not log configuration: {_billing_log_exc}",
                   file=sys.stderr, flush=True)
 
-    @app.get("/debug/server-state")
-    def debug_server_state():
-        """
-        Return in-memory and disk state for performance debugging (e.g. on Railway).
-        No auth; restrict in production if desired (e.g. by IP or remove).
-        """
-        return {
-            "ongoing_games_count": len(ongoing_games),
-        }
-    
     templates = Jinja2Templates(directory=str(bundle_path("FrontEnd", "static")))
     
     # Conditionally mount static files (local development and test).
@@ -695,20 +677,34 @@ try:
     # ✅ Add global exception handler to catch all unhandled exceptions
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
-        print(f"🔴 [ERROR] Global exception handler: {type(exc).__name__}: {str(exc)}", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+        # The client gets only an opaque id; the exception text stays in the logs,
+        # findable by that id.
+        import uuid
+        error_id = uuid.uuid4().hex[:12]
+        print(
+            f"🔴 [ERROR] Global exception handler error_id={error_id} "
+            f"{request.method} {request.url.path}: {type(exc).__name__}: {str(exc)}",
+            file=sys.stderr,
+            flush=True,
+        )
+        logging.error(
+            "[UNHANDLED] error_id=%s %s %s",
+            error_id,
+            request.method,
+            request.url.path,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
         # ✅ CORS FIX: Ensure CORS headers are included even on error responses
         response = JSONResponse(
             status_code=500,
-            content={"error": "Internal server error", "type": type(exc).__name__, "message": str(exc)}
+            content={"error": "Internal server error", "error_id": error_id}
         )
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        # CORS headers will be added by middleware, but explicitly set origin header for safety
+        # Reflect the origin only if CORSMiddleware would allow it (same allowlist).
         origin = request.headers.get("origin")
-        if origin and (origin in cors_origins or any(origin.startswith(p) for p in ["https://", "http://localhost"])):
+        if origin and origin in cors_origins:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
@@ -8169,12 +8165,18 @@ try:
         mismatchCount: int
     
     
+    def _diagnostics_enabled() -> bool:
+        """Diagnostic file dumps are unauthenticated and unbounded: off unless opted in."""
+        return os.environ.get("GOB_DIAGNOSTICS_ENABLED") == "1"
+
     @app.post("/api/diagnostics/sim-quarter")
     def save_sim_quarter_diagnostics(request: SimQuarterDiagnosticRequest):
         """
         Save Sim Quarter diagnostic data to a markdown file.
         Tracks score increments and printed events to identify missing prints.
         """
+        if not _diagnostics_enabled():
+            return Response(status_code=204)
         try:
             # Create diagnostics directory if it doesn't exist
             diagnostics_dir = Path("docs/0_Text_Scroll_Debug")
@@ -8334,6 +8336,8 @@ try:
         Save Free Throw and Made Field Goal diagnostic data to a markdown file.
         Tracks free throws and made FGs to identify edge cases where result types don't match.
         """
+        if not _diagnostics_enabled():
+            return Response(status_code=204)
         try:
             # Create diagnostics directory if it doesn't exist
             diagnostics_dir = Path("docs/0_Text_Scroll_Debug")
