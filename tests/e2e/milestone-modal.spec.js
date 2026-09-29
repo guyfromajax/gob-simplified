@@ -12,6 +12,8 @@ test.describe.configure({ timeout: 90000 });
 const FID = 'f-e2e-mm';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OPP = 'bbbbbbbbbbbbbbbbbbbbbbbb';
+const OTHER_A = 'cccccccccccccccccccccccc';
+const OTHER_B = 'dddddddddddddddddddddddd';
 const SHOTS = path.join(__dirname, '../../reports/milestone-modal');
 
 function digest() {
@@ -128,9 +130,12 @@ function bracketPayload() {
     eligible: true, tier: 'conference',
     eyebrow: 'Conference Tournament · Weeks 27–29',
     layout: 'full', reveal_key: 'conference:2', display_week: 27,
-    seeds: { [TID]: 2, [OPP]: 7 },
+    seeds: { [TID]: 2, [OPP]: 7, [OTHER_A]: 3, [OTHER_B]: 6 },
     bracket: {
-      round1: [{ home_team: TID, away_team: OPP }],
+      round1: [
+        { home_team: TID, away_team: OPP },
+        { home_team: OTHER_A, away_team: OTHER_B },
+      ],
       final: [{ home_team: TID, away_team: '' }],
     },
   };
@@ -144,7 +149,15 @@ function visitKind(kind, extras) {
   };
   if (kind === 'signed_class') flags.signed_class = signedClassPayload();
   if (kind === 'walk_on_welcome') flags.walk_on_welcome_modal = walkOnPayload();
-  if (kind === 'bracket_reveal') flags.bracket_reveal_modal = bracketPayload();
+  if (kind === 'bracket_reveal') {
+    flags.bracket_reveal_modal = bracketPayload();
+    flags.team_name_map = {
+      [TID]: 'Lancaster',
+      [OPP]: 'Kingsport',
+      [OTHER_A]: 'Cedar Point',
+      [OTHER_B]: 'Oak Hollow',
+    };
+  }
   if (kind === 'region_bye') flags.region_bye_modal_eligible = true;
   if (kind === 'conference_rs_region') flags.conference_rs_region_modal = { eligible: true, lost_round: 'round1' };
   if (kind === 'first_archetype') flags.first_archetype = { eligible: true, archetype: 'pure_offense' };
@@ -258,15 +271,19 @@ test.describe('milestone modal variants', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openOffice(page, visitSignedThenWalk());
     const modal = await waitOpen(page, 'signed_class');
-    await expect(modal.locator('.mm-eye')).toContainText('Signing class');
+    await expect(modal.locator('.mm-k')).toContainText('Signing Day');
     await expect(modal.locator('.mq i')).toHaveCount(2);
     await expect(modal.locator('.mq i.on')).toHaveCount(1);
+    await expect(modal.locator('.mq')).toContainText('1 of 2');
     await expect(modal.getByText('Dee Prospect')).toBeVisible();
     await expect(modal.getByText('Marcus Vane')).toBeVisible();
     await expect(modal.getByText('PG · B')).toBeVisible();
-    await expect(modal.getByText('2 signed.')).toBeVisible();
-    await expect(modal.locator('.mm-up')).toContainText('Up next');
-    await expect(modal.locator('.mm-go')).toHaveText('Next');
+    await expect(modal.getByText('2 signed.')).toHaveCount(0);
+    await expect(modal.locator('.mm-nx')).toContainText('Up next');
+    await expect(modal.locator('.mm-nx')).toContainText('Walk-ons');
+    await expect(modal.locator('.mm-go')).toContainText('Next');
+    await expect(modal.locator('.mm-go kbd')).toHaveText('Enter');
+    await expect(modal.locator('.rc')).toHaveCount(2);
     await expect(modal.locator('.mm.is-gold')).toHaveCount(1);
     await expect(page.locator('[class*="confetti"]')).toHaveCount(0);
     await page.waitForTimeout(450);
@@ -285,10 +302,18 @@ test.describe('milestone modal variants', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openOffice(page, visitKind('bracket_reveal'));
     const modal = await waitOpen(page, 'bracket_reveal');
-    await expect(modal.locator('.seed')).toContainText('2');
-    await expect(modal.getByText('Lancaster', { exact: true })).toHaveCount(1);
-    await expect(modal.getByText('Kingsport', { exact: true })).toHaveCount(1);
-    await expect(modal.locator('.mm-go')).toHaveText('Done');
+    await expect(modal.locator('.seed-n b')).toHaveText('2');
+    await expect(modal.locator('.seed-n span')).toHaveText('Seed');
+    await expect(modal.getByText('2 your seed')).toHaveCount(0);
+    await expect(modal.locator('.me')).toContainText('Lancaster');
+    await expect(modal.locator('.mu-r').first()).toContainText('Kingsport');
+    await expect(modal.locator('.mu-r').first()).toContainText('Round 1');
+    await expect(modal.getByText(/Week 27/)).toBeVisible();
+    await expect(modal.getByText(/Winner of/)).toBeVisible();
+    await expect(modal.getByText(/Cedar Point/)).toBeVisible();
+    await expect(modal.getByText(/Oak Hollow/)).toBeVisible();
+    await expect(modal.locator('.mm-go')).toContainText('Done');
+    await expect(modal.locator('.mm-go kbd')).toHaveText('Enter');
     await expect(page.locator('[class*="confetti"]')).toHaveCount(0);
     await page.waitForTimeout(450);
     await page.screenshot({ path: path.join(SHOTS, 'bracket-reveal.png') });
@@ -299,7 +324,9 @@ test.describe('milestone modal variants', () => {
     await openOffice(page, visitKind('walk_on_welcome'));
     const modal = await waitOpen(page, 'walk_on_welcome');
     await expect(modal.getByText('Ellis Clemons')).toBeVisible();
-    await expect(modal.getByText('1 walk-on.')).toBeVisible();
+    await expect(modal.getByText('1 walk-on.')).toHaveCount(0);
+    await expect(modal.locator('.rc')).toHaveCount(1);
+    await expect(modal.getByText('PF')).toBeVisible();
     await page.waitForTimeout(450);
     await page.screenshot({ path: path.join(SHOTS, 'walk-ons.png') });
   });
@@ -308,9 +335,10 @@ test.describe('milestone modal variants', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await openOffice(page, visitKind('first_archetype'));
     const modal = await waitOpen(page, 'first_archetype');
-    await expect(modal.locator('#mm-ttl')).toContainText('Pure Offense');
+    await expect(modal.locator('#mm-t')).toContainText('Pure Offense');
     await expect(modal.locator('.arch')).toBeVisible();
-    await expect(modal.locator('.mm-link')).toHaveAttribute('href', '/coaching-archetypes.html');
+    await expect(modal.locator('.med.gold')).toBeVisible();
+    await expect(modal.locator('.mm-f a.lnk')).toHaveAttribute('href', '/coaching-archetypes.html');
     await page.waitForTimeout(450);
     await page.screenshot({ path: path.join(SHOTS, 'first-archetype.png') });
   });
@@ -331,11 +359,14 @@ test.describe('milestone modal variants', () => {
     await expect(modal.locator('.mm.is-quiet')).toHaveCount(1);
     await expect(modal.locator('.mm-dia')).toHaveCount(0);
     await expect(modal.locator('.mm-med')).toHaveCount(0);
-    await expect(modal.getByText('58–66')).toBeVisible();
-    await expect(modal.locator('.fin')).toContainText('Region Tourney Championship');
-    await expect(modal.getByText('24–9')).toBeVisible();
-    await expect(modal.getByText(/Seed/)).toHaveCount(0);
-    await expect(modal.locator('.mm-go')).toHaveText('Done');
+    await expect(modal.locator('.med.gold')).toHaveCount(0);
+    await expect(modal.locator('.fin-s')).toContainText('58');
+    await expect(modal.locator('.fin-s')).toContainText('66');
+    await expect(modal.locator('#mm-t')).toContainText('Region Tourney Championship');
+    await expect(modal.locator('.mm-sum')).toContainText('24–9');
+    await expect(modal.locator('.mm-sum')).toContainText('2nd');
+    await expect(modal.getByText(/#\d+ seed/)).toHaveCount(0);
+    await expect(modal.locator('.mm-go')).toContainText('Done');
     await page.waitForTimeout(350);
     const sfx = await page.evaluate(() => window.__gobMilestoneSfx || []);
     expect(sfx).toEqual([]);
@@ -355,27 +386,26 @@ test('gold accents only on the rule, diamond and medallion', async ({ page }) =>
     const gold = getComputedStyle(goldProbe).color;
     goldProbe.remove();
     const mm = document.querySelector('.mm.is-gold');
-    const rule = mm ? getComputedStyle(mm, '::before').backgroundColor : '';
-    const dia = document.querySelector('.mm-dia');
-    const med = document.querySelector('.mm-med');
+    const kick = document.querySelector('.mm-k');
+    const rule = mm ? getComputedStyle(mm, '::before') : null;
+    const dia = kick ? getComputedStyle(kick, '::before') : null;
     const btn = document.querySelector('.mm-go');
-    const dek = document.querySelector('.mm-dek');
+    const dek = document.querySelector('.mm-d');
     function rgb(el, prop) {
       return el ? getComputedStyle(el)[prop] : '';
     }
     return {
       gold,
-      rule,
-      dia: rgb(dia, 'backgroundColor'),
-      medBorder: med ? getComputedStyle(med).borderTopColor : '',
+      ruleImage: rule ? rule.backgroundImage : '',
+      dia: dia ? dia.backgroundColor : '',
       btnBg: rgb(btn, 'backgroundColor'),
       btnColor: rgb(btn, 'color'),
       dekColor: rgb(dek, 'color'),
     };
   });
-  expect(colors.rule).toBe(colors.gold);
+  const goldBits = (colors.gold.match(/\d+/g) || []).join(',');
+  expect(colors.ruleImage.replace(/\s/g, '')).toContain(goldBits);
   expect(colors.dia).toBe(colors.gold);
-  expect(colors.medBorder).toBe(colors.gold);
   expect(colors.btnBg).not.toBe(colors.gold);
   expect(colors.btnColor).not.toBe(colors.gold);
   expect(colors.dekColor).not.toBe(colors.gold);
@@ -413,7 +443,7 @@ test('Next steps, Done closes, Esc leaves the rest for the next visit', async ({
   await waitOpen(page, 'signed_class');
   await page.locator('.mm-go').click();
   await waitOpen(page, 'walk_on_welcome');
-  await expect(page.locator('.mm-go')).toHaveText('Done');
+  await expect(page.locator('.mm-go')).toContainText('Done');
   await page.locator('.mm-go').click();
   await expect(page.locator('.mm-scrim.is-open')).toHaveCount(0);
   const shown = seen.filter((s) => s.path.indexOf('seen') !== -1);

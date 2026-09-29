@@ -1,27 +1,27 @@
 /**
  * One milestone modal template (.mm) for every MILESTONE-tier Office moment.
- * Opened only by momentQueue from moments_for_this_visit. Does not invent fields.
+ * Markup and classes match design_handoff_ch7/ch7.css. Does not invent fields.
  */
 (function (global) {
   'use strict';
 
   var KIND_META = {
-    signed_class: { eyebrow: 'Signing class', title: 'Signing class', dek: 'The Signing Day reveal stays on the hub. This is the recap.' },
-    walk_on_welcome: { eyebrow: 'Walk-ons', title: 'Walk-ons', dek: 'They are on the roster now.' },
+    signed_class: { eyebrow: 'Signing Day', title: 'Your class is signed', dek: 'The Signing Day reveal stays on the hub. This is the recap.' },
+    walk_on_welcome: { eyebrow: 'Walk-ons', title: 'Walk-ons have arrived', dek: 'They are on the roster now.' },
     bracket_reveal: { eyebrow: 'Bracket reveal', title: 'The bracket is set', dek: 'Your path, from the field that just posted.' },
     region_bye: { eyebrow: 'Region bye', title: 'Region Tournament Bye', dek: 'You sit the first region game.' },
     conference_rs_region: { eyebrow: 'Region field', title: 'Region Tournament Qualified', dek: 'The regular-season finish sent you through.' },
-    first_archetype: { eyebrow: 'Archetype', title: 'Your first archetype', dek: 'How you win, written on the staff.' },
+    first_archetype: { eyebrow: 'Coach archetype', title: 'Your first archetype', dek: 'How you win, written on the staff.' },
     elimination: { eyebrow: 'Season over', title: 'Season over', dek: 'The last result, then the record.' }
   };
 
   var LABEL = {
-    signed_class: 'Signing class',
+    signed_class: 'Signing Day',
     walk_on_welcome: 'Walk-ons',
     bracket_reveal: 'Bracket reveal',
     region_bye: 'Region bye',
     conference_rs_region: 'Region field',
-    first_archetype: 'Archetype',
+    first_archetype: 'Coach archetype',
     elimination: 'Season over',
     championship: 'Championship',
     season_review: 'Season review',
@@ -31,12 +31,19 @@
 
   var REGION_BYE_COPY = 'Hey Coach, congratulations! You won both your conference regular-season title and your conference tournament title. This means you\u2019ve earned a bye in the Region Tournament and have automatically qualified for the Region Championship game. Sim this week\u2019s games, then start preparing for the Region Championship!';
 
+  var ROUND_WEEK = {
+    conference: { round1: 27, round2: 28, final: 29 },
+    region: { round1: 30, final: 31 },
+    national: { round1: 32, round2: 33, final: 34 }
+  };
+
   var STING_MS = 200;
   var host = null;
   var lastFocus = null;
   var keyHandler = null;
   var stingTimer = null;
   var closeResolver = null;
+  var closeReason = null;
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -57,17 +64,35 @@
     return value != null && String(value).trim() !== '' && String(value) !== '--';
   }
 
-  function rtHtml(value) {
+  function rtLetter(value) {
     if (!present(value)) return '';
-    var cls = '';
-    var shown = String(value);
     try {
-      if (typeof global.getRtBucketClass === 'function') cls = global.getRtBucketClass(value) || '';
+      if (typeof global.formatRtDisplay === 'function') {
+        var shown = global.formatRtDisplay(value);
+        return shown && shown !== '--' ? shown : '';
+      }
     } catch (e) { /* ignore */ }
-    try {
-      if (typeof global.formatRtDisplay === 'function') shown = global.formatRtDisplay(value);
-    } catch (e2) { /* ignore */ }
-    return '<span class="rt-letter ' + esc(cls) + '">' + esc(shown) + '</span>';
+    return String(value);
+  }
+
+  function rtTone(value) {
+    var letter = rtLetter(value);
+    var c = letter.charAt(0);
+    if (c === 'A') return 't-blue';
+    if (c === 'B') return 't-green';
+    if (c === 'C') return 't-yellow';
+    return 't-red';
+  }
+
+  function rtPair(now, pot) {
+    var a = rtLetter(now);
+    var b = rtLetter(pot);
+    if (!a && !b) return '';
+    var html = '<span class="rtl">';
+    if (a) html += '<b class="' + rtTone(now) + '">' + esc(a) + '</b>';
+    if (a && b) html += '<i>→</i>';
+    if (b) html += '<b class="pot ' + rtTone(pot) + '">' + esc(b) + '</b>';
+    return html + '</span>';
   }
 
   function avatarHtml(name, imageId) {
@@ -78,7 +103,7 @@
         if (url) inner = '<img src="' + esc(url) + '" alt="">';
       } catch (e) { /* initials */ }
     }
-    return '<div class="av" aria-hidden="true">' + inner + '</div>';
+    return '<span class="av" aria-hidden="true">' + inner + '</span>';
   }
 
   function normalizeRecruit(r) {
@@ -97,18 +122,12 @@
     var r = normalizeRecruit(raw);
     if (!r) return '';
     var meta = [r.position, r.home_region].filter(present).join(' · ');
-    var rtBits = [];
-    if (present(r.rt_now)) rtBits.push(rtHtml(r.rt_now));
-    if (present(r.rt_potential)) rtBits.push(rtHtml(r.rt_potential));
-    var rt = rtBits.length
-      ? '<div class="rt">' + rtBits.join('<span class="rt-arrow"> → </span>') + '</div>'
-      : '';
     return '<div class="rc">'
       + avatarHtml(r.name, r.image_id)
-      + '<div><div class="who">' + esc(present(r.name) ? r.name : '—') + '</div>'
-      + (meta ? '<div class="meta">' + esc(meta) + '</div>' : '')
+      + '<div class="rc-n"><b>' + esc(present(r.name) ? r.name : '—') + '</b>'
+      + (meta ? '<span>' + esc(meta) + '</span>' : '')
       + '</div>'
-      + rt
+      + rtPair(r.rt_now, r.rt_potential)
       + '</div>';
   }
 
@@ -116,23 +135,6 @@
     var tid = String(id || '');
     if (!tid) return '';
     return (names && names[tid]) || tid;
-  }
-
-  function matchupRows(matchup, userTeamId, names, seeds) {
-    if (!matchup || typeof matchup !== 'object') return '';
-    function row(id) {
-      if (!present(id)) return '';
-      var tid = String(id);
-      var you = tid === String(userTeamId || '');
-      var seed = seeds && present(seeds[tid])
-        ? '<span class="sd">#' + esc(String(seeds[tid])) + '</span>'
-        : '';
-      return '<div class="row' + (you ? ' is-you' : '') + '">'
-        + '<span class="who">' + esc(teamName(tid, names)) + '</span>'
-        + seed
-        + '</div>';
-    }
-    return '<div class="mu">' + row(matchup.away_team) + row(matchup.home_team) + '</div>';
   }
 
   function userPathRounds(bracket, userTeamId) {
@@ -145,7 +147,7 @@
         var m = list[i];
         if (!m) continue;
         if (String(m.home_team) === tid || String(m.away_team) === tid) {
-          out.push({ key: rk, matchup: m });
+          out.push({ key: rk, matchup: m, index: i });
           break;
         }
       }
@@ -153,31 +155,86 @@
     return out;
   }
 
-  function roundLabel(key) {
-    if (key === 'round1') return 'First round';
-    if (key === 'round2') return 'Semifinal';
-    if (key === 'final') return 'Final';
+  function siblingMatchup(list, index) {
+    if (!list || !list.length || index == null || index < 0) return null;
+    if (list.length === 2) return list[index === 0 ? 1 : 0] || null;
+    var sib = index % 2 === 0 ? index + 1 : index - 1;
+    return list[sib] || null;
+  }
+
+  function seedTag(id, seeds) {
+    if (!present(id) || !seeds || !present(seeds[String(id)])) return '';
+    return '#' + String(seeds[String(id)]);
+  }
+
+  function teamPhrase(id, names, seeds, userId, asYou) {
+    if (!present(id)) return '';
+    var tid = String(id);
+    var label = (seedTag(tid, seeds) ? seedTag(tid, seeds) + ' ' : '') + teamName(tid, names);
+    if (asYou || tid === String(userId || '')) {
+      return '<span class="me"><b>' + esc(label) + '</b></span>';
+    }
+    return esc(label);
+  }
+
+  function roundCaption(key, pathLen) {
+    if (key === 'round1') return 'Round 1';
+    if (key === 'round2') return 'Round 2';
+    if (key === 'final') return pathLen > 2 ? 'Round 3' : 'Final';
     return key;
+  }
+
+  function weekCaption(tier, key, matchup, userId) {
+    var week = ROUND_WEEK[tier] && ROUND_WEEK[tier][key];
+    if (week == null) return '';
+    var site = '';
+    if (matchup && present(userId)) {
+      if (String(matchup.home_team) === String(userId)) site = ' · Home';
+      else if (String(matchup.away_team) === String(userId)) site = ' · Away';
+    }
+    return 'Week ' + week + site;
+  }
+
+  function winnerOf(matchup, names, seeds, userId) {
+    if (!matchup) return '';
+    var a = teamPhrase(matchup.home_team, names, seeds, userId);
+    var b = teamPhrase(matchup.away_team, names, seeds, userId);
+    if (a && b) return 'Winner of ' + a + ' <em>/</em> ' + b;
+    return '';
+  }
+
+  function vsLine(matchup, names, seeds, userId) {
+    if (!matchup) return '';
+    var home = teamPhrase(matchup.home_team, names, seeds, userId);
+    var away = teamPhrase(matchup.away_team, names, seeds, userId);
+    if (home && away) return home + '<em>vs</em>' + away;
+    return '';
+  }
+
+  function muRow(label, line, week) {
+    if (!line) return '';
+    return '<div class="mu-r"><i>' + esc(label) + '</i><span>'
+      + line + '</span>'
+      + (week ? '<span>' + esc(week) + '</span>' : '')
+      + '</div>';
+  }
+
+  function nextRoundKey(key, tier) {
+    if (key === 'round1') return (ROUND_WEEK[tier] && ROUND_WEEK[tier].round2) ? 'round2' : 'final';
+    if (key === 'round2') return 'final';
+    return '';
   }
 
   function bodySignedClass(p) {
     var rec = (p && p.recruits) || [];
     var rows = rec.map(recruitRow).join('');
-    var count = p && p.count != null ? p.count : rec.length;
-    var sum = p && p.count != null
-      ? '<p class="mm-sum"><strong>' + esc(String(count)) + '</strong> signed.</p>'
-      : '';
-    return (rows ? '<div>' + rows + '</div>' : '') + sum;
+    return rows ? '<div class="rc-l wi" style="--i:1">' + rows + '</div>' : '';
   }
 
   function bodyWalkOn(p) {
     var rec = (p && p.walk_ons) || [];
     var rows = rec.map(recruitRow).join('');
-    var count = p && p.count != null ? p.count : rec.length;
-    var sum = p && p.count != null
-      ? '<p class="mm-sum"><strong>' + esc(String(count)) + '</strong> walk-on' + (Number(count) === 1 ? '' : 's') + '.</p>'
-      : '';
-    return (rows ? '<div>' + rows + '</div>' : '') + sum;
+    return rows ? '<div class="rc-l wi" style="--i:1">' + rows + '</div>' : '';
   }
 
   function bodyBracket(p, maps) {
@@ -185,28 +242,53 @@
     var userId = maps.userTeamId || (p && p.user_team_id) || (p && p.team_id);
     var names = maps.teamIdToNameMap || (p && p.team_id_to_name) || {};
     var seeds = (p && p.seeds) || {};
-    var html = '';
+    var tier = p && p.tier;
     var mySeed = userId != null ? seeds[String(userId)] : null;
+    var html = '<div class="seed wi" style="--i:0">';
     if (present(mySeed)) {
-      html += '<div class="seed is-you"><b>' + esc(String(mySeed)) + '</b> your seed</div>';
+      html += '<div class="seed-n"><b>' + esc(String(mySeed)) + '</b><span>Seed</span></div>';
     }
-    if (!p || !p.bracket) return html;
-    var path = userPathRounds(p.bracket, userId);
-    if (!path.length) return html;
-    html += matchupRows(path[0].matchup, userId, names, seeds);
-    if (path.length > 1 && path[1].key) {
-      var nxt = path[1].matchup || {};
-      var sides = [nxt.home_team, nxt.away_team].filter(present);
-      if (sides.length >= 2) {
-        html += '<p class="mm-sum">Then the ' + esc(roundLabel(path[1].key).toLowerCase()) + '.</p>';
-        html += matchupRows(nxt, userId, names, seeds);
+    if (p && p.bracket) {
+      var path = userPathRounds(p.bracket, userId);
+      var rows = '';
+      var shown = 0;
+      path.forEach(function (step) {
+        var line = vsLine(step.matchup, names, seeds, userId);
+        if (!line) return;
+        shown += 1;
+        rows += muRow(
+          roundCaption(step.key, path.length + 1),
+          line,
+          weekCaption(tier, step.key, step.matchup, userId)
+        );
+      });
+      var first = path[0];
+      if (first) {
+        var sib = siblingMatchup(p.bracket[first.key] || [], first.index);
+        var nxt = nextRoundKey(first.key, tier);
+        var laterFilled = path.some(function (step) {
+          return step.key === nxt && vsLine(step.matchup, names, seeds, userId);
+        });
+        if (sib && nxt && !laterFilled) {
+          var nextLine = winnerOf(sib, names, seeds, userId);
+          if (nextLine) {
+            shown += 1;
+            rows += muRow(
+              roundCaption(nxt, shown + 1),
+              nextLine,
+              weekCaption(tier, nxt, null, userId)
+            );
+          }
+        }
       }
+      if (rows) html += '<div class="mu">' + rows + '</div>';
     }
+    html += '</div>';
     return html;
   }
 
   function bodyRegionBye() {
-    return '<p class="mm-sum">' + esc(REGION_BYE_COPY) + '</p>';
+    return '<p class="mm-d wi" style="--i:0">' + esc(REGION_BYE_COPY) + '</p>';
   }
 
   function bodyConferenceRs(p) {
@@ -214,7 +296,7 @@
     var finalSentence = lost === 'final'
       ? "Let's go on to the Region Tourney now!"
       : "Let's sim the rest of the Conference Tourney, then get ready for the Region Tourney!";
-    return '<p class="mm-sum">Hey Coach, we lost the game, but because you won the regular-season conference title, you still qualify for the Region Tournament. ' + esc(finalSentence) + '</p>';
+    return '<p class="mm-d wi" style="--i:0">Hey Coach, we lost the game, but because you won the regular-season conference title, you still qualify for the Region Tournament. ' + esc(finalSentence) + '</p>';
   }
 
   function bodyArchetype(p) {
@@ -236,32 +318,50 @@
         + (name || 'this')
         + ' coaching archetype. Note this archetype handle will evolve as you develop your program\u2019s identity.';
     }
-    var badge = '';
-    try {
-      if (key && global.GOBArchetype && typeof global.GOBArchetype.badgeHtml === 'function') {
-        badge = global.GOBArchetype.badgeHtml(key, 72);
-      }
-    } catch (e2) { /* ignore */ }
-    var label = name ? '<strong>' + esc(name) + '</strong>. ' : '';
-    return '<div class="arch"><div class="badge">' + badge + '</div><div class="copy">' + label + esc(copy) + '</div></div>';
+    var letter = name ? name.charAt(0).toUpperCase() : 'A';
+    return '<div class="arch wi" style="--i:0"><span class="med gold" style="--ms:64px">' + esc(letter) + '</span><p>' + esc(copy) + '</p></div>';
   }
 
-  function bodyElimination(p) {
-    var bits = [];
+  function ordinal(n) {
+    var v = Number(n);
+    if (!isFinite(v)) return String(n);
+    var j = v % 10;
+    var k = v % 100;
+    var suf = (j === 1 && k !== 11) ? 'st' : (j === 2 && k !== 12) ? 'nd' : (j === 3 && k !== 13) ? 'rd' : 'th';
+    return String(v) + suf;
+  }
+
+  function bodyElimination(p, maps) {
+    maps = maps || {};
+    var userId = maps.userTeamId || (p && p.user_team_id);
+    var names = maps.teamIdToNameMap || {};
+    var you = (userId && names[String(userId)]) || maps.teamName || '';
+    var opp = (p && p.opponent_team_name) || '';
+    var html = '';
     if (p && p.score && (p.score.user != null || p.score.opponent != null)) {
-      bits.push('<div class="sc">' + esc(String(p.score.user)) + '–' + esc(String(p.score.opponent)) + '</div>');
+      html += '<div class="fin">';
+      html += '<div class="fin-t">';
+      if (you) html += '<b>' + esc(you) + '</b>';
+      if (p.user_seed != null) html += '<span>#' + esc(String(p.user_seed)) + ' seed</span>';
+      html += '</div>';
+      html += '<div class="fin-s">' + esc(String(p.score.user)) + '<i>–</i>' + esc(String(p.score.opponent)) + '</div>';
+      html += '<div class="fin-t r">';
+      if (opp) html += '<b>' + esc(opp) + '</b>';
+      if (p.opponent_seed != null) html += '<span>#' + esc(String(p.opponent_seed)) + ' seed</span>';
+      html += '</div></div>';
     }
-    var facts = [];
-    if (p && p.round_name) facts.push('<span><b>' + esc(p.round_name) + '</b></span>');
+    var sums = [];
     if (p && p.record && (p.record.wins != null || p.record.losses != null)) {
-      facts.push('<span>Season <b>' + esc(String(p.record.wins)) + '–' + esc(String(p.record.losses)) + '</b></span>');
+      sums.push('<div><b>' + esc(String(p.record.wins)) + '–' + esc(String(p.record.losses)) + '</b><span>Record</span></div>');
     }
-    if (p && p.conference_place != null) facts.push('<span>Conference <b>' + esc(String(p.conference_place)) + '</b></span>');
-    if (p && p.national_rank != null) facts.push('<span>National <b>' + esc(String(p.national_rank)) + '</b></span>');
-    if (p && p.user_seed != null) facts.push('<span>Seed <b>' + esc(String(p.user_seed)) + '</b></span>');
-    if (p && p.opponent_seed != null) facts.push('<span>Opp seed <b>' + esc(String(p.opponent_seed)) + '</b></span>');
-    if (facts.length) bits.push('<div class="facts">' + facts.join('') + '</div>');
-    return '<div class="fin">' + bits.join('') + '</div>';
+    if (p && p.conference_place != null) {
+      sums.push('<div><b>' + esc(ordinal(p.conference_place)) + '</b><span>Conference</span></div>');
+    }
+    if (p && p.national_rank != null) {
+      sums.push('<div><b>#' + esc(String(p.national_rank)) + '</b><span>National</span></div>');
+    }
+    if (sums.length) html += '<div class="mm-sum">' + sums.join('') + '</div>';
+    return html;
   }
 
   function bodyFor(kind, payload, maps) {
@@ -271,23 +371,42 @@
     if (kind === 'region_bye') return bodyRegionBye();
     if (kind === 'conference_rs_region') return bodyConferenceRs(payload);
     if (kind === 'first_archetype') return bodyArchetype(payload);
-    if (kind === 'elimination') return bodyElimination(payload);
+    if (kind === 'elimination') return bodyElimination(payload, maps);
     return '';
   }
 
-  function titleFor(kind, payload, item) {
+  function titleFor(kind, payload, item, maps) {
     var meta = KIND_META[kind] || { title: 'Moment', dek: '' };
     var title = (item && item.title) || meta.title;
     var dek = (item && item.line) || meta.dek;
-    if (kind === 'bracket_reveal' && payload && payload.eyebrow) title = payload.eyebrow;
+    if (kind === 'signed_class') {
+      title = meta.title;
+      if (item && item.line) dek = item.line;
+    }
+    if (kind === 'bracket_reveal') {
+      var userId = maps && (maps.userTeamId || (payload && payload.user_team_id));
+      var seeds = payload && payload.seeds;
+      var seed = userId != null && seeds ? seeds[String(userId)] : null;
+      var place = '';
+      if (payload && payload.tier === 'conference') place = 'Conference';
+      else if (payload && payload.tier === 'region') place = 'Region';
+      else if (payload && payload.tier === 'national') place = 'National';
+      if (present(seed) && place) title = 'You\u2019re in: ' + String(seed) + ' seed, ' + place;
+      else if (present(seed)) title = 'You\u2019re in: ' + String(seed) + ' seed';
+      else if (payload && payload.eyebrow) title = payload.eyebrow;
+      if (payload && payload.eyebrow) dek = payload.eyebrow;
+    }
     if (kind === 'first_archetype') {
       var key = payload && (payload.archetype || payload.archetype_key);
       try {
         if (key && global.GOBArchetype && typeof global.GOBArchetype.nameFor === 'function') {
           var nm = global.GOBArchetype.nameFor(key);
-          if (nm) title = nm;
+          if (nm) title = 'You\u2019re a ' + nm;
         }
       } catch (e) { /* ignore */ }
+    }
+    if (kind === 'elimination' && payload && payload.round_name) {
+      title = 'Eliminated in the ' + payload.round_name;
     }
     return { title: title, dek: dek };
   }
@@ -357,8 +476,11 @@
 
   function requestClose(reason) {
     if (!host) return;
-    host.classList.add('is-out');
-    var wait = reducedMotion() ? 0 : 180;
+    closeReason = reason;
+    var dialog = host.querySelector('.mm');
+    if (reason === 'next' && dialog && !reducedMotion()) dialog.classList.add('q-out');
+    else host.classList.add('is-out');
+    var wait = reducedMotion() ? 0 : (reason === 'next' ? 180 : 180);
     setTimeout(function () { teardown(reason); }, wait);
   }
 
@@ -380,38 +502,39 @@
 
     lastFocus = document.activeElement;
     var meta = KIND_META[kind] || { eyebrow: 'Moment', title: 'Moment', dek: '' };
-    var titles = titleFor(kind, payload, item);
+    var titles = titleFor(kind, payload, item, opts.maps);
+    var kick = meta.eyebrow;
+    if (kind === 'bracket_reveal' && payload && payload.eyebrow) {
+      kick = String(payload.eyebrow).split('·')[0].trim() || meta.eyebrow;
+    }
     var dots = '';
     for (var i = 1; i <= total; i++) {
       dots += '<i' + (i === index ? ' class="on"' : '') + '></i>';
     }
     var up = isLast
-      ? ''
-      : '<span class="mm-up">Up next · ' + esc(nextTitle || LABEL[nextKind] || nextKind || 'Moment') + '</span>';
-    var follow = '';
-    if (kind === 'first_archetype') {
-      follow = '<a class="mm-link" href="/coaching-archetypes.html">Explore archetypes</a>';
-    }
+      ? (kind === 'first_archetype'
+        ? '<a class="lnk" href="/coaching-archetypes.html">Explore archetypes</a>'
+        : (kind === 'bracket_reveal'
+          ? '<a class="lnk" href="/franchise-command-center.html?tab=tournament-view">Full bracket</a>'
+          : ''))
+      : 'Up next <b>· ' + esc(LABEL[nextKind] || nextTitle || nextKind || 'Moment') + '</b>';
     var btnLabel = isLast ? 'Done' : 'Next';
-    var goldBits = isGold ? '<span class="mm-dia" aria-hidden="true"></span>' : '';
-    var med = isGold ? '<div class="mm-med" aria-hidden="true">★</div>' : '';
 
     var wrap = document.createElement('div');
-    wrap.className = 'mm-scrim';
+    wrap.className = 'mm-scrim mm-in';
     wrap.setAttribute('data-kind', kind);
     wrap.innerHTML =
-      '<div class="mm ' + (isGold ? 'is-gold' : 'is-quiet') + '" role="dialog" aria-modal="true" aria-labelledby="mm-ttl">'
+      '<div class="mm ' + (isGold ? 'is-gold' : 'is-quiet') + '" role="dialog" aria-modal="true" aria-labelledby="mm-t">'
       + '<div class="mm-h">'
-      + '<div class="mm-eye">' + goldBits + esc(meta.eyebrow) + '</div>'
-      + '<div class="mq" aria-label="' + index + ' of ' + total + '">' + dots + '</div>'
-      + '<button type="button" class="mm-x" aria-label="Close">×</button>'
+      + '<div class="mm-k">' + esc(kick) + '</div>'
+      + '<div class="mq" aria-label="Moment ' + index + ' of ' + total + '">' + dots + '<span>' + index + ' of ' + total + '</span></div>'
+      + '<button type="button" class="mm-x" aria-label="Close. Remaining moments wait for your next visit.">×</button>'
       + '</div>'
-      + med
-      + '<h2 class="mm-ttl" id="mm-ttl">' + esc(titles.title) + '</h2>'
-      + '<p class="mm-dek">' + esc(titles.dek) + '</p>'
-      + '<div class="mm-body">' + bodyFor(kind, payload, opts.maps) + '</div>'
-      + '<div class="mm-f">' + up + follow
-      + '<button type="button" class="btn-ghost mm-go">' + esc(btnLabel) + '</button>'
+      + '<div class="mm-c"><div><h2 class="mm-t" id="mm-t">' + esc(titles.title) + '</h2><p class="mm-d">' + esc(titles.dek) + '</p></div>'
+      + bodyFor(kind, payload, opts.maps)
+      + '</div>'
+      + '<div class="mm-f"><div class="mm-nx">' + up + '</div>'
+      + '<button type="button" class="btn-ghost mm-go">' + esc(btnLabel) + ' <kbd>Enter</kbd></button>'
       + '</div></div>';
 
     document.body.appendChild(wrap);
