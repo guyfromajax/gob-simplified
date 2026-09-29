@@ -300,7 +300,11 @@ def test_command_center_week_35_reads_write_each_all_american_once(store, owner,
 
     assert per_read_keys == [n_aas, *([0] * (_CC_READS - 1))]
     assert spy.key_writes == n_aas
-    assert spy.projections == [_TROPHY_KEYS_PROJECTION] * _CC_READS
+    # Exactly one trophy_keys read per Office load, and every other coach read on
+    # the load (the desktop archetype signals) is projected too — never a whole doc.
+    trophy_reads = [p for p in spy.projections if p == _TROPHY_KEYS_PROJECTION]
+    assert trophy_reads == [_TROPHY_KEYS_PROJECTION] * _CC_READS
+    assert all(p for p in spy.projections)
     if trace_sql:
         # The catch-up is real SQL. Later Office loads do not write the coach table.
         assert per_read_sql[0] >= n_aas

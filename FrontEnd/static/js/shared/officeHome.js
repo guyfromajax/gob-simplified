@@ -99,10 +99,23 @@
     }).catch(function () {});
   }
 
+  function inAppView(url) {
+    var views = global.GOBViews;
+    if (!views || typeof views.has !== 'function' || typeof views.open !== 'function') return false;
+    if (!/\/franchise-command-center\.html$/i.test(global.location.pathname || '')) return false;
+    try {
+      var parsed = new URL(url, global.location.origin);
+      return /\/franchise-command-center\.html$/i.test(parsed.pathname) && views.has(parsed.searchParams.get('tab') || '');
+    } catch (err) {
+      return false;
+    }
+  }
+
   function go(url) {
     if (!url) return;
     clickTiny();
-    if (global.GOBNav && typeof global.GOBNav.go === 'function') global.GOBNav.go(url);
+    if (inAppView(url)) global.GOBViews.open(url, 'push');
+    else if (global.GOBNav && typeof global.GOBNav.go === 'function') global.GOBNav.go(url);
     else global.location.assign(url);
   }
 
@@ -135,6 +148,12 @@
     return href(path, params);
   }
 
+  function viewHref(changes, stubPath, stubParams) {
+    var tables = global.GOBTables;
+    if (tables && typeof tables.viewHref === 'function') return tables.viewHref(changes);
+    return href(stubPath, stubParams);
+  }
+
   function playerHref(playerId) {
     if (!present(playerId)) return '';
     var current = new URLSearchParams(global.location.search);
@@ -144,7 +163,9 @@
       params.franchise_id = current.get('franchise_id');
     }
     if (current.get('team_id')) params.team_id = current.get('team_id');
-    return href('/player-detail.html', params);
+    return viewHref({
+      tab: 'player-view', player_id: playerId, return_tab: 'home-tab', origin: 'office', up: 'Office'
+    }, '/player-detail.html', params);
   }
 
   function teamHref(teamId) {
@@ -155,7 +176,9 @@
     var owner = current.get('team_id') || current.get('user_team_id');
     if (owner) params.team_id = owner;
     else params.team_id = teamId;
-    return href('/team-roster-view.html', params);
+    return viewHref({
+      tab: 'team-view', view_team_id: teamId, team_id: params.team_id, return_tab: 'home-tab', origin: 'office'
+    }, '/team-roster-view.html', params);
   }
 
   function recruitingHref() {
@@ -418,7 +441,7 @@
     var week = digest && digest.result && digest.result.week;
     if (!present(week) && digest && digest.next_game) week = digest.next_game.week;
     if (present(week)) params.week = week;
-    return href('/training-report.html', params);
+    return viewHref(Object.assign({ tab: 'training-report-view' }, params), '/training-report.html', params);
   }
 
   function weekStrip(digest) {

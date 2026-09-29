@@ -87,8 +87,13 @@
     'awards-tab': 'league',
     'press-tab': 'news',
     'news-view': 'news',
-    'awards-view': 'news'
+    'awards-view': 'news',
+    // Drill-ins belong to no rail section, so every rail button leaves them.
+    // The highlight follows ?origin= (detailOrigin); without it, nothing is on.
+    'player-view': 'detail',
+    'team-view': 'detail'
   };
+  var DETAIL_SECTION = { id: 'detail', label: '', title: '', tabs: [] };
 
   var sectionEls = {};
   var subtabHost = null;
@@ -406,7 +411,7 @@
     try { origin = new URLSearchParams(window.location.search).get('origin') || ''; }
     catch (err) { origin = ''; }
     if (origin === 'team' || origin === 'league' || origin === 'office' || origin === 'prep') return origin;
-    return 'league';
+    return '';
   }
 
   function detailMark(tab) {
@@ -416,10 +421,11 @@
   }
 
   function sync(tab) {
+    if (leaveLockedTab(tab)) return;
     if (tab === 'training-report-view') tab = 'training-view';
     var sectionId = detailOrigin(tab) || TAB_SECTION[tab] || 'office';
     var mark = detailMark(tab);
-    var section = sectionById(sectionId);
+    var section = sectionId === DETAIL_SECTION.id ? DETAIL_SECTION : sectionById(sectionId);
     document.querySelectorAll('.rail [data-gob-section]').forEach(function (el) {
       el.classList.toggle('on', el.getAttribute('data-gob-section') === sectionId);
     });
@@ -496,6 +502,32 @@
     });
     sectionEls[section.id] = btn;
     return btn;
+  }
+
+  // `.gob .rail-i` sets display, which beats the [hidden] attribute.
+  function setShown(btn, shown) {
+    btn.hidden = !shown;
+    btn.style.display = shown ? '' : 'none';
+  }
+
+  // authBarInit (loaded async by authGuard) creates #feedback-btn after its
+  // stylesheet is ready, which is after a page shell boots. Show the rail item
+  // once that button exists; pages without an auth bar never get one.
+  function revealFeedbackWhenReady(btn) {
+    setShown(btn, false);
+    if (window.GOB_BUILD_PROFILE === 'desktop') return;
+    if (document.getElementById('feedback-btn')) {
+      setShown(btn, true);
+      return;
+    }
+    if (typeof MutationObserver !== 'function' || !document.body) return;
+    var watcher = new MutationObserver(function () {
+      if (!document.getElementById('feedback-btn')) return;
+      setShown(btn, true);
+      watcher.disconnect();
+    });
+    watcher.observe(document.body, { childList: true, subtree: true });
+    setTimeout(function () { watcher.disconnect(); }, 15000);
   }
 
   function utilButton(className, title, icon, id) {
@@ -603,7 +635,33 @@
     refreshTournamentLock();
   }
 
+  // Desktop resumes the last tab when the document was opened without ?tab=.
+  // A resumed tab can be one the sub-tab row would not let you pick; an
+  // explicit ?tab= link keeps its locked screen.
+  var resumePending = (function () {
+    try {
+      var entry = performance.getEntriesByType('navigation')[0];
+      var requested = new URL(entry ? entry.name : window.location.href);
+      return !requested.searchParams.get('tab');
+    } catch (err) {
+      return false;
+    }
+  })();
+
+  // Decided once, when the week is first known; tab toggles during boot pass
+  // through other tabs first.
+  function leaveLockedTab(tab) {
+    if (!resumePending || pageMode) return false;
+    if (!currentWeek || !firstTournamentWeek()) return false;
+    resumePending = false;
+    if (tab !== 'tournament-view' || !tournamentLockWeek()) return false;
+    if (!window.CommandCenterTabs || typeof window.CommandCenterTabs.show !== 'function') return false;
+    openTab('home-tab', 'replace');
+    return true;
+  }
+
   function refreshTournamentLock() {
+    if (leaveLockedTab(currentTab())) return;
     if (paintedSection !== 'league' || !subtabHost) return;
     var tab = pageMode ? (pageMode.sub || '') : currentTab();
     var wantLock = !!tournamentLockWeek();
@@ -716,7 +774,7 @@
       playClick();
       existing.click();
     });
-    if (window.GOB_BUILD_PROFILE === 'desktop') feedback.hidden = true;
+    if (window.GOB_BUILD_PROFILE === 'desktop') setShown(feedback, false);
     face.appendChild(feedback);
 
     var settings = utilButton('util', 'Settings', 'settings', 'gob-rail-settings');
@@ -837,7 +895,7 @@
   function sectionFromReturn() {
     var q = new URLSearchParams(window.location.search);
     var tab = q.get('return_tab') || '';
-    if (TAB_SECTION[tab]) return TAB_SECTION[tab];
+    if (TAB_SECTION[tab] && TAB_SECTION[tab] !== DETAIL_SECTION.id) return TAB_SECTION[tab];
     var ret = q.get('return_url') || '';
     if (/practice-squad/.test(ret)) return 'team';
     if (/standings|rankings|schedule\.html|leaders|brackets/.test(ret)) return 'league';
@@ -1258,7 +1316,7 @@
       playClick();
       existing.click();
     });
-    if (window.GOB_BUILD_PROFILE === 'desktop' || !document.getElementById('feedback-btn')) feedback.hidden = true;
+    revealFeedbackWhenReady(feedback);
     face.appendChild(feedback);
     var settings = utilButton('util', 'Settings', 'settings', 'gob-rail-settings');
     settings.setAttribute('aria-expanded', 'false');

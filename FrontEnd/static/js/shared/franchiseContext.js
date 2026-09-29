@@ -153,13 +153,45 @@
     );
   };
 
+  // The query string is the store on web; there is nothing to absorb.
+  UrlContextProvider.prototype.absorbLocation = function () {};
+
   function SessionContextProvider(opts) {
     opts = opts || {};
     this._storage = opts.storage || (typeof localStorage !== 'undefined' ? localStorage : null);
     this._loc = opts.location || (typeof window !== 'undefined' ? window.location : { search: '' });
     this._state = this._load();
+    this._lastSearch = liveSearch(this._loc);
     this._save();
   }
+
+  // Same-document pushState/replaceState/popstate (drill-ins, Back) change the
+  // URL without a load, so _load never sees them. Apply only what changed
+  // between the last seen URL and this one: session-only keys and keys a
+  // screen stripped through commitParams are left alone.
+  SessionContextProvider.prototype.absorbLocation = function () {
+    var next = liveSearch(this._loc);
+    if (next === this._lastSearch) return;
+    var before = paramsFromSearch(this._lastSearch);
+    var after = paramsFromSearch(next);
+    var state = this._state;
+    var changed = false;
+    before.forEach(function (value, key) {
+      if (!after.has(key) && Object.prototype.hasOwnProperty.call(state, key)) {
+        delete state[key];
+        changed = true;
+      }
+    });
+    after.forEach(function (value, key) {
+      if (before.get(key) === value) return;
+      if (value === '') delete state[key];
+      else state[key] = String(value);
+      changed = true;
+    });
+    this._lastSearch = next;
+    if (!isRuntime(state.runtime)) state.runtime = defaultRuntime();
+    if (changed) this._save();
+  };
 
   SessionContextProvider.prototype._load = function () {
     var fallback = { runtime: defaultRuntime() };
@@ -301,6 +333,10 @@
 
   FranchiseContext.prototype.commitParams = function (params) {
     return this._provider.commitParams(params);
+  };
+
+  FranchiseContext.prototype.absorbLocation = function () {
+    if (typeof this._provider.absorbLocation === 'function') this._provider.absorbLocation();
   };
 
   FranchiseContext.prototype.createParams = function () {

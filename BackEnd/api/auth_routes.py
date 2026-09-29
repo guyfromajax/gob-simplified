@@ -817,6 +817,28 @@ async def update_account_settings(
     }
 
 
+def _set_on_coach(user: dict, fields: dict) -> None:
+    """``$set`` archetype state on whichever doc holds this coach's career.
+
+    Online that is the ``users`` doc. The desktop principal has no users doc — its
+    id is not an ObjectId — so the same keys go to the save's ``local_coach`` doc,
+    the one ``command_center_data`` reads them back from. Without this the two
+    archetype moments could be shown but never marked seen on desktop, and would
+    reappear on every Office load.
+    """
+    from BackEnd.utils.local_coach import coach_target
+
+    target = coach_target(user.get("user_id"))
+    if target is None:
+        return
+    collection, doc_id, is_local = target
+    collection.update_one(
+        {"_id": doc_id},
+        {"$set": {**fields, "updated_at": datetime.now(timezone.utc)}},
+        upsert=is_local,
+    )
+
+
 @router.patch("/archetype-reveal-seen")
 async def mark_archetype_reveal_seen(user: dict = Depends(get_current_user)):
     """Mark the one-time first-archetype reveal modal as seen for this account.
@@ -824,10 +846,7 @@ async def mark_archetype_reveal_seen(user: dict = Depends(get_current_user)):
     Idempotent; called by the frontend when the reveal is shown so it never
     appears again on any device/session.
     """
-    users_collection.update_one(
-        {"_id": ObjectId(user["user_id"])},
-        {"$set": {"archetype_reveal_seen": True, "updated_at": datetime.now(timezone.utc)}}
-    )
+    _set_on_coach(user, {"archetype_reveal_seen": True})
     return {"archetype_reveal_seen": True, "message": "Archetype reveal marked seen"}
 
 
@@ -839,10 +858,7 @@ async def clear_archetype_evolution_pending(user: dict = Depends(get_current_use
     because a higher-priority modal claimed the visit — either way the change is
     consumed and never shown again.
     """
-    users_collection.update_one(
-        {"_id": ObjectId(user["user_id"])},
-        {"$set": {"archetype_evolution_pending": "", "updated_at": datetime.now(timezone.utc)}}
-    )
+    _set_on_coach(user, {"archetype_evolution_pending": ""})
     return {"archetype_evolution_pending": "", "message": "Archetype evolution cleared"}
 
 

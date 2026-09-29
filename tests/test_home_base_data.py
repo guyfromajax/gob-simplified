@@ -223,7 +223,13 @@ def test_coach_career_route_serves_the_local_coach_in_me_shape(store, monkeypatc
     assert (body["record"]["wins"], body["record"]["losses"]) == (12, 5)
     assert body["championships_total"]["national"] == 3
     assert body["trophies"] == []
-    assert set(body) - {"trophies"} <= set(UserResponse.model_fields)
+    # The /api/auth/me shape, plus the trophy log and the server-computed career
+    # numerals Home Base and the Trophy Case read (Chapter 7).
+    career_extras = {
+        "trophies", "win_pct_display", "geek_points", "seasons_completed",
+        "programs", "top_seasons",
+    }
+    assert set(body) - career_extras <= set(UserResponse.model_fields)
 
 
 def test_coach_career_route_reads_users_online(as_user):

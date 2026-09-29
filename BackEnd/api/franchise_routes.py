@@ -7,10 +7,20 @@ from BackEnd.utils.franchise_last_played import (
     marks_last_played,
     most_recent_franchise_id,
 )
-from BackEnd.utils.local_coach import coach_career_payload, is_local_owner, local_coach_doc
+from BackEnd.utils.local_coach import (
+    coach_career_payload,
+    coach_fields,
+    is_local_owner,
+    local_coach_doc,
+)
+from BackEnd.utils.attribute_gain import exceptional_gain_rows
+from BackEnd.utils.career_data import coach_career_extras
+from BackEnd.utils.franchise_geek_points import SEASON_GP_FIELD
 from BackEnd.utils.trophy_log import (
     TROPHIES_FIELD,
     record_all_american_trophies_if_missing,
+    record_first_bracket_milestone,
+    record_first_signing_class_milestone,
     record_season_record_trophy,
     trophies_newest_first,
 )
@@ -32,7 +42,7 @@ import re
 import uuid
 from copy import deepcopy
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.parse import urlencode
@@ -4068,6 +4078,12 @@ CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD = "conference_rs_region_modal_seen_
 BRACKET_REVEAL_SEEN_FIELD = "bracket_reveal_seen"
 BRACKET_UPDATE_SEEN_FIELD = "bracket_update_seen"
 RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_season"
+# The two new season-peak/milestone moments. Season-stamped like the modal flags
+# above, so a new season re-arms them with nothing having to clear the flag. The
+# signing class reuses RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD; it is the same
+# beat, so one stamp covers both surfaces.
+ELIMINATION_SEEN_SEASON_FIELD = "elimination_seen_season"
+SEASON_REVIEW_SEEN_SEASON_FIELD = "season_review_seen_season"
 
 # Signing Day conference reveal: stamped with the season once the playback has been
 # watched, so a refresh after submitting does not replay it. Mirrors the modal flag
@@ -7299,6 +7315,8 @@ def _complete_week_process_user_game_block(
         week=req.week,
         eos_game_meta=eos_matchup_for_user,
         bulk_sim_used=bulk_sim_used,
+        franchise_id=franchise_doc.get("_id"),
+        season=franchise_doc.get("current_season"),
     )
     maybe_award_franchise_loss_geek_points(
         owner_user_id=franchise_doc.get("user_id"),
@@ -7308,6 +7326,8 @@ def _complete_week_process_user_game_block(
         week=req.week,
         eos_game_meta=eos_matchup_for_user,
         bulk_sim_used=bulk_sim_used,
+        franchise_id=franchise_doc.get("_id"),
+        season=franchise_doc.get("current_season"),
     )
     maybe_award_franchise_eos_title_championship(
         owner_user_id=franchise_doc.get("user_id"),
@@ -7972,6 +7992,12 @@ def _finalize_franchise_week_after_cpu_games(
             conference_tournaments=conference_tournaments,
             franchise_id=franchise_id,
         )
+        try:
+            record_first_bracket_milestone(franchise_doc, conference_tournaments)
+        except Exception:
+            logger.exception(
+                "[TROPHY] first-bracket milestone failed franchise_id=%s", franchise_id_str
+            )
         try:
             from BackEnd.utils.franchise_championship_moments import (
                 enqueue_trophy_spotlight_for_user_conference,
@@ -9847,6 +9873,11 @@ def get_coach_career(user: dict = Depends(get_current_user)):
 
     Loopback serves this for the local desktop coach (no /api/auth there); online it
     reads the same users fields /api/auth/me does.
+
+    Everything Home Base and the Trophy Case show is computed here: ``record.win_rate``,
+    career ``geek_points``, ``seasons_completed``, ``programs`` and ``top_seasons``
+    (which ranks in-progress seasons alongside finished ones). The client formats
+    them; it derives none of them.
     """
     uid = user.get("user_id")
     if is_local_owner(uid):
@@ -9861,12 +9892,33 @@ def get_coach_career(user: dict = Depends(get_current_user)):
                     "archetypes": 1,
                     "lead_archetype": 1,
                     "championships_total": 1,
+                    "geek_points": 1,
+                    SEASON_GP_FIELD: 1,
                     TROPHIES_FIELD: 1,
                 },
             ) or {}
         except Exception:
             doc = {}
-    return {**coach_career_payload(doc, user), "trophies": trophies_newest_first(doc.get(TROPHIES_FIELD))}
+    # Trophies survive a deleted program, so a live franchise only adds the
+    # in-progress season and its own program to the counts.
+    franchises = list(
+        db.franchises.find(
+            {"user_id": uid},
+            {
+                "user_team_id": 1,
+                "user_team_object_id": 1,
+                "current_season": 1,
+                "week": 1,
+                "results": 1,
+                "team_builder": 1,
+            },
+        )
+    )
+    return {
+        **coach_career_payload(doc, user),
+        **coach_career_extras(doc, franchises),
+        "trophies": trophies_newest_first(doc.get(TROPHIES_FIELD)),
+    }
 
 
 @router.get("/franchise/current")
@@ -10159,6 +10211,139 @@ def _build_office_digest_for_command_center(
         "roster_spots": roster_spots,
         "newcomers": newcomers,
     })
+
+
+def _build_moment_queue_for_command_center(
+    response: dict[str, Any],
+    franchise_doc: dict[str, Any] | None,
+    team_id: Any,
+    team_doc: dict[str, Any] | None,
+    week: int | None,
+    archetype_signals: Mapping[str, Any],
+    *,
+    is_local: bool,
+) -> dict[str, Any]:
+    """The Office moment queue, plus the three payloads the new kinds point at.
+
+    Every payload is derived here, at route level, from data the load already has:
+    the tournament brackets, the season snapshot reader in ``career_data`` and the
+    week-35 signing results. No sim hook and no new stored field beyond the two
+    season "seen" stamps.
+    """
+    from BackEnd.utils.moment_queue import ARCHETYPES_HREF, build_moment_queue
+    from BackEnd.utils.office_digest import ROUND_NAME_BY_WEEK
+    from BackEnd.utils.season_moments import (
+        TIER_ORDER,
+        elimination_payload,
+        first_archetype_payload,
+        season_review_payload,
+        signed_class_payload,
+        user_in_bracket,
+    )
+
+    franchise_doc = franchise_doc or {}
+    tid = str(team_id) if team_id else ""
+    season = _franchise_current_season(franchise_doc) if franchise_doc else 1
+    week_val = int(week or 0)
+    digest = response.get("office_digest") if isinstance(response.get("office_digest"), dict) else {}
+    what_moved = digest.get("what_moved") if isinstance(digest.get("what_moved"), dict) else {}
+    name_map = response.get("team_name_map") if isinstance(response.get("team_name_map"), dict) else {}
+
+    elimination = None
+    if franchise_doc and team_doc and tid:
+        tier_brackets = []
+        for tier in TIER_ORDER:
+            bracket, seeds = _user_eos_bracket_and_seeds(franchise_doc, team_doc, tier)
+            tier_brackets.append((tier, bracket, seeds))
+        elimination = elimination_payload(
+            tier_brackets=tier_brackets,
+            team_id=tid,
+            season=season,
+            region_qualified=bool(response.get("region_qualified")),
+            seen_season=franchise_doc.get(ELIMINATION_SEEN_SEASON_FIELD),
+            round_name_by_week=ROUND_NAME_BY_WEEK,
+            team_name_of=lambda other: name_map.get(str(other)),
+            record=what_moved.get("record"),
+            conference_place=(what_moved.get("conference_standing") or {}).get("now"),
+            national_rank=(what_moved.get("national_rank") or {}).get("now"),
+        )
+
+    # The season's games are all played once a national champion is decided, or once
+    # the calendar has left the tournament weeks. finish_season has not run yet, so
+    # the franchise still holds everything the review reads.
+    national_champion = bool((franchise_doc.get("national_tournament") or {}).get("champion"))
+    season_over = bool(national_champion or week_val >= 35)
+    season_review = season_review_payload(
+        franchise_doc,
+        tid,
+        season_over=season_over,
+        seen_season=franchise_doc.get(SEASON_REVIEW_SEEN_SEASON_FIELD),
+    ) if franchise_doc and tid else None
+
+    signed_class = signed_class_payload(
+        franchise_doc,
+        tid,
+        results_modal=response.get("recruiting_results_modal"),
+        hub_reveal_seen=int(franchise_doc.get(WEEK_35_REVEAL_SEEN_SEASON_FIELD, 0) or 0) == season,
+    ) if franchise_doc and tid else None
+
+    first_archetype = first_archetype_payload(archetype_signals)
+
+    reveal = response.get("bracket_reveal_modal")
+    in_revealed_bracket = bool(
+        isinstance(reveal, dict) and reveal.get("eligible") and user_in_bracket(reveal.get("bracket"), tid)
+    )
+
+    response["elimination"] = elimination
+    response["season_review"] = season_review
+    response["signed_class"] = signed_class
+    response["first_archetype"] = first_archetype
+
+    return build_moment_queue(
+        championship_moments=response.get("pending_championship_moments"),
+        season_review=season_review,
+        elimination=elimination,
+        conference_rs_region_modal=response.get("conference_rs_region_modal"),
+        region_bye_modal_eligible=bool(response.get("region_bye_modal_eligible")),
+        walk_on_welcome_modal=response.get("walk_on_welcome_modal"),
+        recruit_visit_modal=response.get("recruit_visit_modal"),
+        bracket_reveal_modal=reveal,
+        bracket_update_modal=response.get("bracket_update_modal"),
+        signed_class=signed_class,
+        first_archetype=first_archetype,
+        archetype_evolution_pending=archetype_signals.get("archetype_evolution_pending"),
+        user_in_revealed_bracket=in_revealed_bracket,
+        # The coaching-archetypes page is a community surface, so the weekly row
+        # carries no link on desktop.
+        archetype_href=None if is_local else ARCHETYPES_HREF,
+    )
+
+
+def _coach_archetype_signals(user: dict | None) -> dict[str, Any]:
+    """Archetype fields the Office reads: pending evolution, lead key, reveal gate.
+
+    Online these ride the authenticated principal (they come from /api/auth/me).
+    The desktop principal has no users doc and loopback serves no /api/auth, so the
+    same three keys are read off the save's local_coach doc — where
+    ``commit_user_game_record`` writes ``lead_archetype`` and
+    ``record_archetype_change_if_any`` writes ``archetype_evolution_pending``.
+    That desktop read is projected to these three fields, so an Office load does
+    not pull the coach's whole career back.
+    """
+    user = user or {}
+    doc = user
+    if is_local_owner(user.get("user_id")):
+        doc = coach_fields(
+            user["user_id"],
+            "archetype_evolution_pending",
+            "lead_archetype",
+            "archetype_reveal_seen",
+        )
+    return {
+        "archetype_evolution_pending": str(doc.get("archetype_evolution_pending") or ""),
+        "lead_archetype": str(doc.get("lead_archetype") or ""),
+        "archetype_reveal_seen": bool(doc.get("archetype_reveal_seen")),
+    }
 
 
 @router.get("/franchise/command-center/data")
@@ -10789,24 +10974,12 @@ def command_center_data(
         response["recruit_visit_modal"] = (
             _build_recruit_visit_modal_payload(franchise_doc, team_id) if franchise_doc else None
         )
-        from BackEnd.utils.moment_queue import build_moment_queue
-
-        queue = build_moment_queue(
-            championship_moments=response.get("pending_championship_moments"),
-            conference_rs_region_modal=response.get("conference_rs_region_modal"),
-            region_bye_modal_eligible=bool(response.get("region_bye_modal_eligible")),
-            walk_on_welcome_modal=response.get("walk_on_welcome_modal"),
-            recruit_visit_modal=response.get("recruit_visit_modal"),
-            bracket_reveal_modal=response.get("bracket_reveal_modal"),
-            bracket_update_modal=response.get("bracket_update_modal"),
-            archetype_evolution_pending=(user or {}).get("archetype_evolution_pending"),
-        )
-        response["moments"] = queue["moments"]
-        response["moments_for_this_visit"] = queue["moments_for_this_visit"]
-        response["weekly_card_items"] = queue["weekly_card_items"]
-        response["archetype_evolution_pending"] = str(
-            (user or {}).get("archetype_evolution_pending") or ""
-        )
+        # /api/auth/me is not served on loopback, so the desktop coach's archetype
+        # signals come off the local_coach doc here. Online keeps reading the
+        # principal. Same three keys either way, so the moment queue and the
+        # first-archetype reveal read one shape.
+        archetype_signals = _coach_archetype_signals(user)
+        response.update(archetype_signals)
         response["recruiting_wire"] = _build_recruiting_wire_payload(
             franchise_doc, str(team_id) if team_id else None
         )
@@ -10817,8 +10990,24 @@ def command_center_data(
             team_doc,
             _cached_last_completed_game(),
         )
+        # The queue is built after the digest: the elimination moment reports the
+        # season record, conference place and national rank the digest already
+        # computed, rather than reading them a second time.
+        queue = _build_moment_queue_for_command_center(
+            response,
+            franchise_doc,
+            team_id,
+            team_doc,
+            week,
+            archetype_signals,
+            is_local=is_local_owner(user.get("user_id") if user else None),
+        )
+        response["moments"] = queue["moments"]
+        response["moments_for_this_visit"] = queue["moments_for_this_visit"]
+        response["weekly_card_items"] = queue["weekly_card_items"]
         if isinstance(response.get("office_digest"), dict):
             response["office_digest"]["weekly_card_items"] = queue["weekly_card_items"]
+            response["office_digest"]["also"] = queue["also"]
         _cc_lap("modals_digest", cc_t)
         return response
     if profile:
@@ -15938,6 +16127,11 @@ def run_week_35_recruiting(
         fold_browse_rev({"$set": update_fields}),
     )
 
+    try:
+        record_first_signing_class_milestone(franchise_doc, results.get("signed_players"))
+    except Exception:
+        logger.exception("[TROPHY] first-signing-class milestone failed franchise_id=%s", str(fid))
+
     # Warm the user's REGION portraits for the Signing Day reveal, off the request
     # thread. The reveal holds ~5s per card and a paint costs ~1.2s of CPU, so this
     # gets ahead of the playhead on the first card and stays ahead — while painting
@@ -17821,6 +18015,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             "status": "success",
             "week": week,
             "player_changes": player_logs,
+            "exceptional_gains": exceptional_gain_rows({"week": week, "player_logs": player_logs}),
             "team_changes": team_log,
             "coaching_focus": training_report.get("coaching_focus", {}),
             "session_type": session_type,
@@ -17855,6 +18050,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         "status": "success",
         "week": week,
         "player_changes": player_logs,
+        "exceptional_gains": exceptional_gain_rows({"week": week, "player_logs": player_logs}),
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "session_type": session_type,
@@ -18316,6 +18512,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "player_attribute_display_movements": report_data.get(
                 "player_attribute_display_movements", {}
             ),
+            # Same rule as the Office weekly card's gold marker, computed once on the
+            # server (BackEnd/utils/attribute_gain.py) so the two surfaces cannot drift.
+            "exceptional_gains": exceptional_gain_rows(report_data),
             "team_changes": report_data.get("team_log") or report_data.get("team_changes", {}),
             "training_notes": report_data.get("training_notes", []),
             "plays_data": report_data.get("plays_data", {}),
@@ -18421,6 +18620,44 @@ def mark_bracket_reveal_modal_seen(
         fold_browse_rev({"$set": {seen_field: seen}}),
     )
     return {"seen": True, "reveal_key": reveal_key}
+
+
+class EliminationSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/elimination-seen")
+def mark_elimination_seen(
+    req: EliminationSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist that this season's elimination moment was presented."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    current_season = _franchise_current_season(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        fold_browse_rev({"$set": {ELIMINATION_SEEN_SEASON_FIELD: current_season}}),
+    )
+    return {"seen": True, "season": current_season}
+
+
+class SeasonReviewSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/season-review-seen")
+def mark_season_review_seen(
+    req: SeasonReviewSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist that this season's end-of-season review was presented."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    current_season = _franchise_current_season(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        fold_browse_rev({"$set": {SEASON_REVIEW_SEEN_SEASON_FIELD: current_season}}),
+    )
+    return {"seen": True, "season": current_season}
 
 
 class RecruitingResultsModalSeenRequest(BaseModel):
@@ -18891,6 +19128,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                     winner_team_id=winner_id,
                     week=week,
                     eos_game_meta=g,
+                    franchise_id=franchise_doc.get("_id"),
+                    season=franchise_doc.get("current_season"),
                 )
                 maybe_award_franchise_loss_geek_points(
                     owner_user_id=franchise_doc.get("user_id"),
@@ -18899,6 +19138,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                     participant_team_ids=(aid, hid),
                     week=week,
                     eos_game_meta=g,
+                    franchise_id=franchise_doc.get("_id"),
+                    season=franchise_doc.get("current_season"),
                 )
                 maybe_award_franchise_eos_title_championship(
                     owner_user_id=franchise_doc.get("user_id"),
@@ -19082,6 +19323,8 @@ def sim_championship(req: SimChampionshipRequest):
             winner_team_id=winner_id,
             week=week,
             eos_game_meta={"phase": "national", "round": 3},
+            franchise_id=franchise_doc.get("_id"),
+            season=franchise_doc.get("current_season"),
         )
         maybe_award_franchise_loss_geek_points(
             owner_user_id=franchise_doc.get("user_id"),
@@ -19090,6 +19333,8 @@ def sim_championship(req: SimChampionshipRequest):
             participant_team_ids=(away_id, home_id),
             week=week,
             eos_game_meta={"phase": "national", "round": 3},
+            franchise_id=franchise_doc.get("_id"),
+            season=franchise_doc.get("current_season"),
         )
         maybe_award_franchise_eos_title_championship(
             owner_user_id=franchise_doc.get("user_id"),

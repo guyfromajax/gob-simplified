@@ -762,7 +762,7 @@ test('advance mirror matches the top bar', async ({ page }) => {
         { id: 'run_training', label_key: 'run_training', required: true, done: false, gates_advance: true, is_advance_action: true, route: '/training.html' },
         { id: 'play_next_game', label_key: 'play_next_game', required: true, done: false, gates_advance: false, is_advance_action: false, route: '/set-lineup.html' },
       ],
-    }), { week: 10, training_completed: false }), '/training.html'],
+    }), { week: 10, training_completed: false }), '/franchise-command-center.html'],
     ['game', commandCenter(digest('win'), { week: 12, training_completed: true }), '/set-lineup.html'],
     ['cut', commandCenter(digest('regular', {
       todos: [
@@ -939,11 +939,13 @@ test('attribute chips group, order, and cap', async ({ page }) => {
   expect(rows[1].chips.map((chip) => chip.dir)).toEqual(['up', 'down']);
   await expect(page.locator('#office-root .office-mv .lnk')).toHaveText(/All changes/);
   const href = await page.locator('#office-root .office-mv .lnk').getAttribute('href');
-  expect(href).toContain('/training-report.html');
+  expect(href).toContain('/franchise-command-center.html');
+  expect(href).toContain('tab=training-report-view');
   expect(href).toContain('week=21');
   const nameHref = await page.locator('#office-root .mv-p[data-player-id="p-amy"] .nm').getAttribute('href');
-  expect(nameHref).toContain('/player-detail.html');
-  expect(nameHref).toContain('id=p-amy');
+  expect(nameHref).toContain('/franchise-command-center.html');
+  expect(nameHref).toContain('tab=player-view');
+  expect(nameHref).toContain('player_id=p-amy');
   await page.setViewportSize({ width: 1920, height: 1080 });
   await openOffice(page, data);
   expect(await page.locator('#office-root .mv-p').count()).toBe(6);
