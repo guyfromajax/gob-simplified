@@ -10,7 +10,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.12
+          python-version: "3.11"
       - name: Check desktop-migration ratchets
         run: python scripts/ci/check_migration_gates.py
 
@@ -21,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.12
+          python-version: "3.11"
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

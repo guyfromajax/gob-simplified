@@ -114,7 +114,9 @@ class LiveGameCache(dict):
                     self._evict_keys(keys, "lru_cap")
 
     def _evict_keys(self, keys: Iterable, reason: str) -> None:
-        removed = [k for k in keys if super().pop(k, None) is not None]
+        # dict.pop, not super(): zero-arg super() inside a comprehension raises
+        # TypeError on Python < 3.12 (comprehensions weren't inlined yet).
+        removed = [k for k in keys if dict.pop(self, k, None) is not None]
         for k in keys:
             self._touched.pop(k, None)
         if removed:
