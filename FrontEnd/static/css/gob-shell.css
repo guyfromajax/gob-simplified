@@ -46,6 +46,9 @@ html.gob-shell .pg-head {
   --pg-head-h: calc(var(--page-pad) + var(--fs-32) + var(--space-12) + var(--dsz-44) + var(--dsp-8));
   height: auto;
   min-width: 0;
+  /* Solid fill. The foundation gradient fades to --bg-page (translucent),
+     so table rows scrolling under the last 15% of the head read as ghost text. */
+  background: var(--bg-page-solid);
 }
 
 html.gob-shell .pg-head:has(.nav-row:not([hidden])) {

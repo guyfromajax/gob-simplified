@@ -237,7 +237,8 @@ function paintCoach(me) {
   const tiles = [];
   const record = me && me.record;
   if (record && Number.isFinite(Number(record.wins)) && Number.isFinite(Number(record.losses))) {
-    tiles.push('<div class="cs"><b>' + Number(record.wins) + '\u2013' + Number(record.losses) + '</b><span>Career record</span></div>');
+    tiles.push('<div class="cs cs-rec"><b><em>' + Number(record.wins) + '</em><i>\u2013</i><em>'
+      + Number(record.losses) + '</em></b><span>Career record</span></div>');
   }
   const titles = titleCount(me && me.championships_total);
   if (titles != null && me && me.championships_total) {

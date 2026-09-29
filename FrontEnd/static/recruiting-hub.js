@@ -201,10 +201,11 @@
     var letters = Common.escapeHtml(initials(r && r.name));
     var imageId = r && r.imageId;
     if (!r) return '<span class="' + cls + '"></span>';
+    var box = (cls ? cls + ' ' : '') + 'av';
     if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
-      return '<span class="' + cls + '">' + letters + '</span>';
+      return '<span class="' + box + '">' + letters + '</span>';
     }
-    return '<span class="' + cls + '"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
+    return '<span class="' + box + '"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
       ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"' +
       ' data-letters="' + letters + '"' +
       ' onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';}"></span>';
@@ -2420,7 +2421,8 @@
     var pool = '<div class="pool-wrap"><div id="hub-pool"></div></div>';
     if (state.phase === 'invite') {
       if (hubView === 'visits') return columnHtml(visitsMountHtml());
-      return columnHtml(visitsMountHtml() + '<div id="hub-board"></div>' + pool);
+      return columnHtml(visitsMountHtml() + '<div id="hub-board"></div>'
+        + '<button type="button" class="hub-more" data-scroll-pool>Recruit pool below</button>' + pool);
     }
     if (hubView === 'visits') return columnHtml(visitsMountHtml());
     return columnHtml((state.phase === 'passive' ? storyHtml() : '') + pool);
@@ -2435,6 +2437,7 @@
   }
   function showHub(hub) {
     if (hub !== 'pool' && hub !== 'leans' && hub !== 'visits') hub = 'pool';
+    if (state.phase === 'invite') hub = 'pool';
     if (!hubReady) { pendingHub = hub; return; }
     var changed = hub !== hubView;
     hubView = hub;
@@ -2482,6 +2485,22 @@
       else {
         if (document.getElementById('hub-pool')) renderPool();
         if (document.getElementById('hub-board')) renderDock();
+        var more = root.querySelector('[data-scroll-pool]');
+        if (more) more.addEventListener('click', function () {
+          var pool = document.getElementById('hub-pool');
+          var main = document.querySelector('html.gob-shell .main');
+          if (!pool) return;
+          if (main) {
+            var head = document.querySelector('html.gob-shell .pg-head');
+            var pad = (head ? Math.round(head.getBoundingClientRect().height) : 0) + 8;
+            main.scrollTo({
+              top: main.scrollTop + pool.getBoundingClientRect().top - main.getBoundingClientRect().top - pad,
+              behavior: 'smooth'
+            });
+            return;
+          }
+          pool.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
       }
     } finally {
       syncHubChrome();
@@ -2602,6 +2621,7 @@
   window.RecruitingHub = {
     show: showHub,
     current: function () { return hubReady ? hubView : ''; },
+    week: function () { return state.week || 0; },
     rowVisible: function () {
       if (!hubReady) return true;
       return state.phase !== 'day' && state.phase !== 'results';

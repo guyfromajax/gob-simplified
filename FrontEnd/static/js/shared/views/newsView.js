@@ -1,7 +1,7 @@
 /**
- * News › News. Stored headlines, newest week first.
- * A headline opens the stored story body in this panel (a push).
- * Dispatches are yours=true rows from GET /franchise/news. Headlines stay plain text.
+ * News › News. Newest first: the top story is full width, then a 2- or 3-column
+ * grid. The whole headline is the link. Game results append " (Box Score)" and
+ * open the box score. Other rows open the story or the dispatch target.
  */
 
 import { renderStoryBody } from '/js/shared/newsStory.js';
@@ -40,12 +40,6 @@ function feedUrl() {
   return window.location.pathname + (text ? '?' + text : '');
 }
 
-function presentLabel(label) {
-  return String(label || '').replace(/\b\w/g, function (letter) {
-    return letter.toUpperCase();
-  });
-}
-
 function storyUrl(id) {
   var params = new URLSearchParams(window.location.search);
   params.set('tab', 'news-view');
@@ -79,7 +73,7 @@ export function mount(container, ctx) {
   }
 
   function bindFeed() {
-    container.querySelectorAll('a.gob-news-row').forEach(function (link) {
+    container.querySelectorAll('a.gob-news-card[data-story]').forEach(function (link) {
       link.addEventListener('click', function (event) {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button) return;
         var id = link.getAttribute('data-story');
@@ -88,6 +82,33 @@ export function mount(container, ctx) {
         openStory(id);
       });
     });
+  }
+
+  function isGameResult(item) {
+    return item && (item.type === 'game_result' || !!(item.box_score_href || (item.target && String(item.target).indexOf('box-score') !== -1)));
+  }
+
+  function cardHref(item) {
+    if (isGameResult(item)) return item.box_score_href || item.target || '';
+    if (item.story_id) return storyUrl(item.story_id);
+    return item.target || '';
+  }
+
+  function cardHeadline(item) {
+    var text = String(item.headline || '').replace(/\s*\(Box Score\)\s*$/i, '');
+    if (isGameResult(item)) return text + ' (Box Score)';
+    return text;
+  }
+
+  function cardHtml(item, hero) {
+    var href = cardHref(item);
+    var cls = 'gob-news-card' + (hero ? ' is-hero' : '') + (item.yours ? ' is-yours' : '');
+    var inner = '<span class="gob-news-type">' + tables.esc(typeLabel(item.type)) + '</span>'
+      + '<p>' + tables.esc(cardHeadline(item)) + '</p>'
+      + '<span class="gob-news-when">Week ' + tables.esc(item.week) + '</span>';
+    var story = item.story_id && !isGameResult(item) ? ' data-story="' + tables.esc(item.story_id) + '"' : '';
+    if (!href) return '<div class="' + cls + '"' + story + '>' + inner + '</div>';
+    return '<a class="' + cls + '"' + story + ' href="' + tables.esc(href) + '">' + inner + '</a>';
   }
 
   function render() {
@@ -114,48 +135,27 @@ export function mount(container, ctx) {
         return;
       }
     }
-    if (!news.length && !dispatches.length) {
+    var items = [];
+    dispatches.forEach(function (item) { if (item) items.push(item); });
+    news.forEach(function (item) { if (item) items.push(item); });
+    items.sort(function (a, b) {
+      var week = Number(b.week || 0) - Number(a.week || 0);
+      if (week) return week;
+      if (a.yours && !b.yours) return -1;
+      if (!a.yours && b.yours) return 1;
+      return 0;
+    });
+    if (!items.length) {
       container.innerHTML = '<p class="gob-news-empty">No News To Report</p>';
       return;
     }
-    var byWeek = Object.create(null);
-    var order = [];
-    function bucket(week) {
-      var key = String(Number(week || 0));
-      if (!byWeek[key]) {
-        byWeek[key] = { week: Number(week || 0), mine: [], stories: [] };
-        order.push(key);
-      }
-      return byWeek[key];
-    }
-    dispatches.forEach(function (item) {
-      if (!item || !Number.isFinite(Number(item.week))) return;
-      bucket(item.week).mine.push(item);
-    });
-    news.forEach(function (item) { bucket(item.week).stories.push(item); });
-    order.sort(function (a, b) { return Number(b) - Number(a); });
     var html = '<div class="gob-news">';
-    order.forEach(function (key) {
-      var group = byWeek[key];
-      html += '<section class="gob-news-week"><h3>Week ' + tables.esc(group.week) + '</h3><div class="gob-tcard gob-news-card">';
-      group.mine.forEach(function (item) {
-        html += '<div class="gob-news-row' + (item.yours ? ' is-yours' : '') + '">'
-          + '<span class="gob-news-type">' + tables.esc(typeLabel(item.type)) + '</span>'
-          + '<p>' + tables.esc(item.headline || '') + '</p>';
-        if (item.target) {
-          html += '<a class="lnk" href="' + tables.esc(item.target) + '">'
-            + tables.esc(presentLabel(item.link_label || '')) + '</a>';
-        }
-        html += '</div>';
-      });
-      group.stories.forEach(function (item) {
-        html += '<a class="gob-news-row" data-story="' + tables.esc(item.story_id || '') + '" href="'
-          + tables.esc(storyUrl(item.story_id || '')) + '">'
-          + '<span class="gob-news-type">' + tables.esc(typeLabel(item.type)) + '</span>'
-          + '<p>' + tables.esc(item.headline || '') + '</p></a>';
-      });
-      html += '</div></section>';
-    });
+    html += cardHtml(items[0], true);
+    if (items.length > 1) {
+      html += '<div class="gob-news-grid">';
+      items.slice(1).forEach(function (item) { html += cardHtml(item, false); });
+      html += '</div>';
+    }
     html += '</div>';
     container.innerHTML = html;
     bindFeed();
