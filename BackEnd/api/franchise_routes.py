@@ -10,7 +10,7 @@ from BackEnd.utils.franchise_last_played import (
 from BackEnd.utils.local_coach import coach_career_payload, is_local_owner, local_coach_doc
 from BackEnd.utils.trophy_log import (
     TROPHIES_FIELD,
-    record_all_american_trophies,
+    record_all_american_trophies_if_missing,
     record_season_record_trophy,
     trophies_newest_first,
 )
@@ -14697,7 +14697,7 @@ def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str
         )
         franchise_doc[AWARDS_FIELD] = awards
     try:
-        record_all_american_trophies(franchise_doc, awards)
+        record_all_american_trophies_if_missing(franchise_doc, awards)
     except Exception:
         logger.exception("[TROPHY] All-American entries failed franchise_id=%s", franchise_doc.get("_id"))
     return awards
