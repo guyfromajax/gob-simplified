@@ -412,6 +412,7 @@
     }
 
     function go(url) {
+      if (holdLeave(function () { go(url); })) return;
       saveScroll();
       if (isFcc() && !readFlowStart()) {
         var startIdx = readIdx();
@@ -454,6 +455,7 @@
     }
 
     function replace(url) {
+      if (holdLeave(function () { replace(url); })) return;
       saveScroll();
       replaceIdx();
       var stack = readStack();
@@ -467,6 +469,7 @@
     }
 
     function back(fallbackUrl) {
+      if (holdLeave(function () { back(fallbackUrl); })) return;
       var parent = mergeReturnTab(fallbackUrl || returnUrlFromQuery() || defaultFallback());
       var idx = readIdx();
       var prev = previousEntry();
@@ -631,8 +634,49 @@
       allowLeaveOnce = true;
     }
 
-    function warnOnLeave(fn) {
-      if (typeof fn === 'function') leaveChecks.push(fn);
+    // opts.view scopes the check to one command-center tab. opts.confirm(proceed)
+    // is the owner's in-app confirm; without it only the browser prompt guards.
+    function warnOnLeave(fn, opts) {
+      if (typeof fn !== 'function') return;
+      opts = opts || {};
+      leaveChecks.push({
+        dirty: fn,
+        view: opts.view || '',
+        confirm: typeof opts.confirm === 'function' ? opts.confirm : null
+      });
+    }
+
+    function pendingLeave(view) {
+      for (var i = 0; i < leaveChecks.length; i++) {
+        var check = leaveChecks[i];
+        if (view && check.view !== view) continue;
+        try {
+          if (check.dirty()) return check;
+        } catch (err) {}
+      }
+      return null;
+    }
+
+    // Runs proceed now, or once the owner's confirm lets it. True when held.
+    function confirmLeave(proceed, view) {
+      var check = pendingLeave(view || '');
+      if (!check || !check.confirm) {
+        proceed();
+        return false;
+      }
+      check.confirm(proceed);
+      return true;
+    }
+
+    function holdLeave(retry) {
+      if (allowLeaveOnce) return false;
+      var check = pendingLeave('');
+      if (!check || !check.confirm) return false;
+      check.confirm(function () {
+        allowLeaveOnce = true;
+        retry();
+      });
+      return true;
     }
 
     function resetBusyButtons() {
@@ -684,6 +728,10 @@
       var parsed = parseUrl(href);
       if (!parsed || parsed.origin !== win.location.origin) return;
       if (link.target && link.target !== '_self') return;
+      if (holdLeave(function () { link.click(); })) {
+        event.preventDefault();
+        return;
+      }
       if (isFcc() && !isPeekDestination(href) && !readFlowStart()) {
         var startIdx = readIdx();
         if (typeof startIdx !== 'number') startIdx = ensureIdx();
@@ -737,14 +785,9 @@
         allowLeaveOnce = false;
         return;
       }
-      for (var i = 0; i < leaveChecks.length; i++) {
-        try {
-          if (leaveChecks[i]()) {
-            event.preventDefault();
-            event.returnValue = '';
-            return;
-          }
-        } catch (err) {}
+      if (pendingLeave('')) {
+        event.preventDefault();
+        event.returnValue = '';
       }
     }
 
@@ -811,6 +854,7 @@
       stripParam: stripParam,
       allowNextLeave: allowNextLeave,
       warnOnLeave: warnOnLeave,
+      confirmLeave: confirmLeave,
       resetBusyButtons: resetBusyButtons,
       guardClosedFranchiseGame: guardClosedFranchiseGame,
       saveScroll: saveScroll,

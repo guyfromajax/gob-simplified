@@ -1680,8 +1680,6 @@ html.gob-1920 #playbooks-view .playbooks-layout {
   white-space: nowrap;
 }
 
-#playbooks-view .playbooks-shot-weights-strip .psw-live-pill,
-#playbooks-view .psw-live-pill,
 #playbooks-view .tg {
   display: inline-flex;
   align-items: center;
@@ -1836,13 +1834,6 @@ html.gob-shell .pg-head .pg-tools .playbooks-tab .dot {
   display: none;
 }
 
-html.gob-shell .pg-head .pg-tools .tl-div {
-  width: 1px;
-  height: 22px;
-  background: var(--line-strong);
-  flex: none;
-}
-
 html.gob-shell .pg-head .pg-tools .playbooks-sections-ready {
   display: inline-flex;
   align-items: center;
@@ -1930,4 +1921,153 @@ html.gob-shell .pg-head .pg-tools #save-btn:disabled {
 html.gob-shell .pg-head .pg-tools #save-btn:hover:not(:disabled) {
   filter: brightness(1.06);
   transform: none;
+}
+
+/* ---- Offense / Defense toggle beside the playcall editor ---- */
+#playbooks-view .playbooks-side-row {
+  display: flex;
+  align-items: center;
+  margin: var(--dsp-16) 0 0;
+}
+
+#playbooks-view .playbooks-side-row .playbooks-tabs {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-9);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+#playbooks-view .playbooks-side-row .playbooks-tab {
+  display: inline-flex;
+  align-items: center;
+  height: var(--dsz-28);
+  padding: 0 var(--space-12);
+  border: 0;
+  border-radius: var(--radius-7);
+  background: transparent;
+  box-shadow: none;
+  clip-path: none;
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+  letter-spacing: 0;
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+#playbooks-view .playbooks-side-row .playbooks-tab:hover {
+  color: var(--text-87);
+  background: var(--white-4);
+}
+
+#playbooks-view .playbooks-side-row .playbooks-tab.on {
+  background: var(--white-11);
+  color: var(--text-100);
+  box-shadow: inset 0 1px 0 var(--white-9);
+}
+
+#playbooks-view .playbooks-side-row .playbooks-tab.on::before,
+#playbooks-view .playbooks-side-row .playbooks-tab .dot {
+  display: none;
+}
+
+#playbooks-view .playbooks-side-row .playbooks-tab:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+/* ---- Shot strip: Playbooks vs Playcall Center ---- */
+#playbooks-view .psw-group + .psw-group {
+  padding-left: var(--dsp-24);
+  box-shadow: inset 1px 0 0 var(--line-strong);
+}
+
+/* ---- Weight column: lock slot, wide track, value ---- */
+#playbooks-view {
+  --pb-wt-w: calc(var(--dsz-118) * 2);
+  --pb-lock-w: var(--dsz-20);
+}
+
+#playbooks-view .sh,
+#playbooks-view .pb-sec-head,
+#playbooks-view .play {
+  grid-template-columns: minmax(0, 1fr) var(--pb-wt-w) var(--dsz-52) var(--dsz-28);
+}
+
+#playbooks-view .play .wt {
+  position: relative;
+  justify-content: flex-start;
+  gap: var(--space-8);
+  padding-left: calc(var(--pb-lock-w) + var(--space-8));
+}
+
+#playbooks-view .play .wb {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: var(--space-6);
+  border-radius: var(--space-3);
+  overflow: visible;
+}
+
+#playbooks-view .play .wb i {
+  border-radius: var(--space-3);
+}
+
+#playbooks-view .play .wb.et-slider:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: var(--space-4);
+}
+
+#playbooks-view .play .wt input {
+  flex: none;
+  width: 3ch;
+}
+
+#playbooks-view .play .wt input + b {
+  flex: none;
+  margin-left: calc(-1 * var(--space-8));
+}
+
+#playbooks-view .play .wt > b:only-of-type:not(input + b) {
+  flex: none;
+  min-width: 4ch;
+}
+
+#playbooks-view .wl {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--pb-lock-w);
+  height: var(--pb-lock-w);
+  margin: 0;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: var(--radius-4, 4px);
+  background: transparent;
+  color: var(--text-38);
+  cursor: pointer;
+}
+
+#playbooks-view .wl svg {
+  width: var(--space-12);
+  height: var(--space-12);
+}
+
+#playbooks-view .wl:hover {
+  color: var(--text-87);
+  background: var(--white-4);
+}
+
+#playbooks-view .wl.on {
+  color: var(--text-87);
+}
+
+#playbooks-view .wl:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 1px;
 }

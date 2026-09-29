@@ -56,8 +56,7 @@
           <button type="button" id="btn-save-game-plan" class="btn btn-o btn-save-game-plan">Save Game Plan</button>
         </div>
         <div class="gpc cols2">
-          <section>
-            <div class="sh"><h2>Offense</h2></div>
+          <section aria-label="Offense">
             <div class="gpr">
               <div class="gpr-n"><b>Offense</b><span data-effect="offense"></span></div>
               <div class="gt strategy-slider" id="slider-offense" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Offense">
@@ -81,7 +80,8 @@
                 <span class="eb">Shot diet</span>
                 <button type="button" class="slider-nest__info"
                         aria-label="About the shot diet sliders"
-                        title="These three share touches — raise one, the others compete.">i</button>
+                        aria-describedby="shot-diet-tip">i</button>
+                <span id="shot-diet-tip" hidden>These three share touches — raise one, the others compete.</span>
               </div>
               <div class="gpr">
                 <div class="gpr-n"><b>Inside Offense</b><span data-effect="inside"></span></div>
@@ -132,6 +132,7 @@
                 </div>
               </div>
             </div>
+            <span class="eb grp-h">Execution</span>
             <div class="gpr">
               <div class="gpr-n"><b>Offense Tempo</b><span data-effect="tempo"></span></div>
               <div class="gt strategy-slider" id="slider-tempo" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Offense Tempo">
@@ -165,8 +166,7 @@
               </div>
             </div>
           </section>
-          <section>
-            <div class="sh"><h2>Defense</h2></div>
+          <section aria-label="Defense">
             <div class="gpr">
               <div class="gpr-n"><b>Defense</b><span data-effect="defense"></span></div>
               <div class="gt strategy-slider" id="slider-defense" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Defense">
@@ -231,7 +231,7 @@
                 <span class="slider-value" id="value-fc-press" hidden>2</span>
               </div>
             </div>
-            <span class="eb grp-h">Transition</span>
+            <span class="eb grp-h grp-h-trans">Transition</span>
             <div class="gpr">
               <div class="gpr-n"><b>Fast Break</b><span data-effect="fast_breaks"></span></div>
               <div class="gt strategy-slider" id="slider-fast_breaks" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Fast Break">
@@ -283,6 +283,7 @@
   <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
 
   <script src="/common.js"></script>
+  <script src="/js/shared/attributeTooltips.js"></script>
   <script src="/js/shared/playbookTeamId.js"></script>
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
   <script>

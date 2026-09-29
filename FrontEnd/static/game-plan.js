@@ -272,6 +272,8 @@ let currentSettings = {
 // Track unsaved changes
 let hasUnsavedChanges = false;
 let lastSavedSettings = null;
+// True when mounted as the command center's game-plan-view (embed bridge).
+let gamePlanHosted = false;
 let toastTimer = null;
 let toastHideTimer = null;
 
@@ -316,13 +318,13 @@ const strategySliders = {
 
 const EFFECT_LINES = {
   offense: 'Motion freedom vs designed set plays.',
-  inside: 'Paint touches. Your highest-percentage shots.',
+  inside: 'Your highest-percentage shots.',
   attack: 'Drives and cuts. Draws the most fouls.',
-  outside: 'Perimeter shots. Lowest %, most impact.',
-  tempo: 'Push for early shots or work for a good one.',
+  outside: 'Lowest %, most impact.',
+  tempo: 'Work the offense or shoot fast.',
   alterations: 'Follow the script or read and react.',
-  defense: 'Man wins matchups. Zone saves legs and fouls.',
-  aggression: 'More steals, more fatigue and fouls.',
+  defense: 'Man uses talent. Zone uses IQ.',
+  aggression: 'Play it safe or take more risks.',
   hc_trap: 'More turnovers. Faster fatigue, more fouls.',
   fc_press: 'Bigger disruption than a trap, bigger cost.',
   fast_breaks: 'How hard you push in transition.',
@@ -595,8 +597,61 @@ function setupSliders() {
   }
 }
 
+function wireShotDietTip() {
+  const btn = document.querySelector('#shot-diet-nest .slider-nest__info');
+  const copy = document.getElementById('shot-diet-tip');
+  if (!btn || !copy || btn.dataset.tipReady === '1') return;
+  if (typeof addTextTooltip !== 'function') return;
+  btn.dataset.tipReady = '1';
+  addTextTooltip(btn, copy.textContent.trim());
+}
+
 function markUnsavedChanges() {
   hasUnsavedChanges = true;
+}
+
+function sliderSnapshot(settings) {
+  const source = (settings && settings.strategy_settings) || {};
+  return Object.keys(strategySliders).map((key) => Number(source[key] ?? 2)).join(',');
+}
+
+// Unsaved only while a slider differs from the last load or save; moving one
+// away and back is not an edit.
+function gamePlanHasEdits() {
+  if (!hasUnsavedChanges || !lastSavedSettings) return false;
+  return sliderSnapshot(currentSettings) !== sliderSnapshot(lastSavedSettings);
+}
+
+function revertGamePlan() {
+  if (!lastSavedSettings) return;
+  currentSettings = JSON.parse(JSON.stringify(lastSavedSettings));
+  for (const [key, sliderId] of Object.entries(strategySliders)) {
+    const slider = document.getElementById(sliderId);
+    const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
+    const value = currentSettings.strategy_settings[key] ?? 2;
+    if (slider) slider.value = value;
+    if (valueDisplay) valueDisplay.textContent = value;
+    if (slider) updateSliderVisual(slider, value);
+  }
+  hasUnsavedChanges = false;
+}
+
+function confirmGamePlanLeave(proceed) {
+  if (!window.GOBLeaveConfirm) {
+    showUnsavedChangesWarning(proceed);
+    return;
+  }
+  window.GOBLeaveConfirm.open({
+    title: 'Unsaved Game Plan',
+    copy: 'Save your game plan changes before you leave?',
+    saveLabel: 'Save Game Plan',
+    onSave: async () => {
+      await saveGamePlan();
+      return !gamePlanHasEdits();
+    },
+    onDiscard: revertGamePlan,
+    proceed: proceed,
+  });
 }
 
 function validateOffenseSettings() {
@@ -874,7 +929,12 @@ async function saveGamePlan() {
     // ✅ FIX: Reset unsaved changes flag after successful save
     lastSavedSettings = JSON.parse(JSON.stringify(currentSettings));
     hasUnsavedChanges = false;
-    
+
+    if (gamePlanHosted && window.GOBToast) {
+      window.GOBToast.show('Game plan saved');
+      return;
+    }
+
     showToast('Game Plan Saved', 'Changes applied successfully', {
       onAfterLand: navigateAfterSaveGamePlanFromToast,
       autoDismissMs: 0,
@@ -890,7 +950,7 @@ async function saveGamePlan() {
 
 function navigateToCourt() {
   // Check for unsaved changes before navigating
-  if (hasUnsavedChanges) {
+  if (gamePlanHasEdits()) {
     showUnsavedChangesWarning(() => {
       executeNavigateToCourt();
     });
@@ -996,7 +1056,7 @@ function executeNavigateToCourt() {
 
 function navigateBack() {
   // Check for unsaved changes before navigating
-  if (hasUnsavedChanges) {
+  if (gamePlanHasEdits()) {
     showUnsavedChangesWarning(() => {
       executeNavigateBack();
     });
@@ -1053,7 +1113,7 @@ function executeNavigateBack() {
 
 function navigateToCommandCenter() {
   // Check for unsaved changes before navigating
-  if (hasUnsavedChanges) {
+  if (gamePlanHasEdits()) {
     showUnsavedChangesWarning(() => {
       executeNavigateToCommandCenter();
     });
@@ -1188,7 +1248,7 @@ function showUnsavedChangesWarning(onContinue) {
     playSound('confirm-2-lowervol.wav');
     await saveGamePlan();
     // After successful save, continue with navigation
-    if (!hasUnsavedChanges) {
+    if (!gamePlanHasEdits()) {
       onContinue();
     }
   });
@@ -1227,16 +1287,22 @@ function showUnsavedChangesWarning(onContinue) {
 async function initGamePlan() {
   if (window.__gobGamePlanInit) return;
   window.__gobGamePlanInit = true;
-  if (window.GOBNav) window.GOBNav.warnOnLeave(function () { return hasUnsavedChanges; });
+  const planHost = document.getElementById('game-plan-view');
+  const hostedInView = !!(planHost && planHost.contains(document.querySelector('.gpc')));
+  gamePlanHosted = hostedInView;
+  if (window.GOBNav) {
+    window.GOBNav.warnOnLeave(gamePlanHasEdits, hostedInView
+      ? { view: 'game-plan-view', confirm: confirmGamePlanLeave }
+      : null);
+  }
   setHeader();
   setupSliders();
+  wireShotDietTip();
   await loadSettings();
   
   // Check where user came from (command_center vs lineup)
   const urlParams = liveParams();
   const from = urlParams.get('from') || 'lineup';  // Default to lineup for backwards compatibility
-  const planHost = document.getElementById('game-plan-view');
-  const hostedInView = !!(planHost && planHost.contains(document.querySelector('.gpc')));
   
   // Button event listeners
   // ✅ TASK 0: Updated button IDs

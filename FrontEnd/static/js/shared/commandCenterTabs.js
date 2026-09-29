@@ -37,6 +37,7 @@ function initCommandCenterTabs(options) {
 
   var urlParams = liveParams();
   var activeTab = canonicalTab(urlParams.get('tab') || defaultTab);
+  var shownTab = '';
 
   function isKnown(tabName) {
     if (!tabName) return false;
@@ -49,6 +50,7 @@ function initCommandCenterTabs(options) {
   }
 
   function setActive(tabName) {
+    shownTab = tabName;
     tabButtons.forEach(function (b) {
       b.classList.toggle('active', b.dataset.tab === tabName);
     });
@@ -79,6 +81,13 @@ function initCommandCenterTabs(options) {
   function show(tabName, historyMode) {
     tabName = canonicalTab(tabName);
     if (!isKnown(tabName)) tabName = defaultTab;
+    var nav = window.GOBNav;
+    if (shownTab && shownTab !== tabName && nav && typeof nav.confirmLeave === 'function') {
+      var held = nav.confirmLeave(function () {
+        if (held) show(tabName, historyMode);
+      }, shownTab);
+      if (held) return;
+    }
     if (window.GOB_BUILD_PROFILE === 'desktop' && window.FranchiseContext && typeof window.FranchiseContext.set === 'function') {
       window.FranchiseContext.set('tab', tabName);
     }

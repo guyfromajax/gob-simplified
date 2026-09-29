@@ -104,6 +104,7 @@ Rail and sub-tab clicks play `click-tiny.wav` through `playSfx`. Advance does no
 - Browser Back and Forward restore the section, the sub-tab, and the scroll position from `popstate` (`showTabFromUrl` plus `GOBNav.restoreScroll`). Scroll is stored per URL on `.main` when `html.gob-shell` is present, otherwise on the active tab panel.
 - In-app flows (Play Game, Run Training, and the other Advance routes) still return to the locker-room entry via `exitFlow`. That collapse is separate from the section stack.
 - `exitFlow` jumps back to the locker-room index that launched the flow. In-app Back uses `history.back()` only when the previous entry is that parent.
+- `warnOnLeave(hasEdits, { view, confirm })` registers an unsaved-edit check. `hasEdits` compares the current values with the last saved ones, so moving a control and moving it back is not an edit. A plain boolean "touched" flag is not enough. `CommandCenterTabs.show` asks `confirmLeave(proceed, view)` before it leaves `view`; with real edits the owner's `confirm` opens the in-app `GOBLeaveConfirm` (Keep Editing, Discard, Save) and `proceed` runs after Discard or a landed Save. `go`, `replace`, `back`, and same-origin link clicks ask every check the same way. The browser's own `beforeunload` prompt fires only for a reload or a window close with real edits. A view whose edits persist as a session draft (Training) registers no confirm, because nothing is lost. A Back or Forward `popstate` is not guarded.
 
 Old `?tab=` values still open the matching section and sub-tab. `schedule-tab` opens Team › Schedule (`team-schedule-view`). `fcc-team-stats-summary-tab` is League › Team Stats. `recruits-tab` opens Office (`home-tab`). Each tab's `onTabShow` lazy-load still runs.
 
@@ -386,6 +387,12 @@ Awards reads `GET /franchise/awards` (`@browse_cached`). Before week 35 the rout
 5. Leave the old HTML file as a redirect to `franchise-command-center.html?tab=<view-id>` that copies `franchise_id`, `team_id`, and any return params.
 6. Update the section map in this file.
 7. Cover it with tests: no document navigation, first-open skeleton, failed module, history, and a week-advance refresh.
+
+### Save feedback
+
+A save inside the command center confirms with `GOBToast.show(text)` (`js/shared/gobToast.js`, `css/gob-toast.css`): one short line such as "Playbooks saved", neutral chrome (`--surface-popover`, `--shadow-popover`, `--text-87`; no orange, no green, no icon), `role="status"` with `aria-live="polite"`. It is fixed over the centre of `.main`, `--dsp-24` above the bottom, so it never shifts layout. It fades after `GOBToast.SHOW_MS` (1500ms); a second call restarts the timer. The class is `.gob-save-toast`, because the tutorials' `.gob-toast` is unscoped. A hosted save stays on the view. A failed save uses the same toast with a short retry line. Standalone pages that still load `game-plan.html` or `playbooks.html` directly keep their own `#toast` and navigation.
+
+Unsaved-edit leave: see §6 (`warnOnLeave`, `GOBLeaveConfirm`). Game Plan and Playbooks register a confirm for their view. Training saves each edit as its session draft and restores it on the next open.
 
 ### Loading
 

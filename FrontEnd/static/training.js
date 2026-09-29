@@ -99,6 +99,13 @@ function saveTrainingFormDraft() {
   } catch (_e) {}
 }
 
+// A franchise edit is kept as the session draft that initializeTrainingPoints
+// restores, so leaving the view or reloading loses nothing and nothing warns.
+function noteTrainingEdit() {
+  trainingDirty = true;
+  saveTrainingFormDraft();
+}
+
 function clearTrainingFormDraftForCurrentContext() {
   const urlParams = liveParams();
   const key = trainingFormDraftStorageKey(urlParams);
@@ -727,6 +734,7 @@ function commitCustomFocusFromModal() {
   }
   closeCustomFocusModal();
   updatePointsRemaining();
+  saveTrainingFormDraft();
 }
 
 /**
@@ -840,7 +848,7 @@ allSliders.forEach(slider => {
     
     // Store current value as previous
     this.dataset.prev = this.value;
-    trainingDirty = true;
+    noteTrainingEdit();
     
     // Update points remaining
     updatePointsRemaining();
@@ -1120,6 +1128,7 @@ coachingRadios.forEach(radio => {
 
     // Update submit button state when focus is selected
     updatePointsRemaining();
+    saveTrainingFormDraft();
   });
 });
 

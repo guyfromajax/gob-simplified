@@ -84,6 +84,47 @@ function cloneParams(params) {
     return "Balanced";
   }
 
+  function setPlayFocusLabel(focus) {
+    const key = String(focus || "").toLowerCase();
+    if (key === "inside") return "Inside";
+    if (key === "attack") return "Attack";
+    if (key === "outside") return "Outside";
+    return "";
+  }
+
+  function setPlayFocusRank(focus) {
+    if (typeof getSetPlayFocusRank === "function") return getSetPlayFocusRank(focus);
+    const order = ["inside", "attack", "outside"];
+    const index = order.indexOf(String(focus || "").toLowerCase());
+    return index === -1 ? order.length : index;
+  }
+
+  /** Editor order for Set Plays: Inside, Attack, Outside; CMD high to low inside each. */
+  function compareSetPlaysByFocusCmd(a, b) {
+    return (setPlayFocusRank(a.focus) - setPlayFocusRank(b.focus))
+      || (parseInteger(b.effectiveness, 0) - parseInteger(a.effectiveness, 0))
+      || String(a.name || "").localeCompare(String(b.name || ""))
+      || ((a._apiIndex || 0) - (b._apiIndex || 0));
+  }
+
+  function stableStringify(value) {
+    if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+    if (value && typeof value === "object") {
+      return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+    }
+    return JSON.stringify(value === undefined ? null : value);
+  }
+
+  const EDITABLE_STATE_KEYS = ["motion", "setPlays", "fastBreaks", "hcTraps", "manDefense", "zoneDefense", "pcOrder", "positionFilters", "evenDistributionAll"];
+
+  function sliderStep(event) {
+    let dir = 0;
+    if (event.key === "ArrowRight" || event.key === "ArrowUp") dir = 1;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowDown") dir = -1;
+    if (!dir) return 0;
+    return dir * (event.shiftKey ? 5 : 1);
+  }
+
   function cmdClass(value) {
     const numeric = parseInteger(value, 0);
     if (typeof getPlaybookCmdClass === "function") {
@@ -351,10 +392,60 @@ function cloneParams(params) {
       }
       this.bindGlobalEvents();
       await this.loadData();
+      this.markSaved();
       this.restoreDraftState();
       this.render();
       this.syncStickyOffsets();
       this.scheduleShotWeightsPreview(true);
+    }
+
+    isHosted() {
+      return Boolean(document.getElementById("playbooks-view"));
+    }
+
+    editSnapshot() {
+      const settings = { ...this.buildPreviewPayload().playbook_settings };
+      delete settings._meta;
+      delete settings.even_distribution_all;
+      return stableStringify({ settings, play_updates: this.buildPlayUpdates() });
+    }
+
+    markSaved() {
+      this.savedSnapshot = this.editSnapshot();
+      const saved = {};
+      EDITABLE_STATE_KEYS.forEach((key) => { saved[key] = this.state[key]; });
+      this.savedState = JSON.parse(JSON.stringify(saved));
+    }
+
+    hasEdits() {
+      return this.savedSnapshot != null && this.editSnapshot() !== this.savedSnapshot;
+    }
+
+    revertEdits() {
+      if (!this.savedState) return;
+      const saved = JSON.parse(JSON.stringify(this.savedState));
+      EDITABLE_STATE_KEYS.forEach((key) => { this.state[key] = saved[key]; });
+      this.clearDraftState();
+      this.render();
+      this.scheduleShotWeightsPreview(true);
+    }
+
+    confirmLeave(proceed) {
+      if (!window.GOBLeaveConfirm) {
+        proceed();
+        return;
+      }
+      window.GOBLeaveConfirm.open({
+        title: "Unsaved Playbooks",
+        copy: "Save your playbook changes before you leave?",
+        saveLabel: "Save Playbooks",
+        onSave: async () => {
+          await this.handleSave();
+          return !this.hasEdits();
+        },
+        onDiscard: () => this.revertEdits(),
+        proceed,
+      });
     }
 
     syncStickyOffsets() {
@@ -593,10 +684,7 @@ function cloneParams(params) {
         isActive: true,
         _apiIndex: index,
       }));
-      // Stable focus groups while editing; full %-primary sort runs after Save Playbooks.
-      if (typeof compareSetPlaysForDisplay === "function") {
-        this.state.setPlays.sort((a, b) => compareSetPlaysForDisplay(a, b, { percentPrimary: false }));
-      }
+      this.state.setPlays.sort(compareSetPlaysByFocusCmd);
 
       const fbLocks = lockedSet("fast_breaks");
       this.state.fastBreaks = (data.fast_breaks || []).map((row) => ({
@@ -774,7 +862,11 @@ function cloneParams(params) {
 
     playMeta(item, options) {
       if (options.kind === "motion") return `Focus · ${displayMotionFocusLabel(item.motion_focus)}`;
-      if (options.kind === "set") return `Target shooter · ${item.target_shooter || "PG"}`;
+      if (options.kind === "set") {
+        const focus = setPlayFocusLabel(item.focus);
+        const shooter = `Target shooter ${item.target_shooter || "PG"}`;
+        return focus ? `${focus} · ${shooter}` : shooter;
+      }
       if (item.top_scorer && item.top_scorer !== "N/A") return `Top scorer · ${item.top_scorer}`;
       return "";
     }
@@ -801,12 +893,7 @@ function cloneParams(params) {
         ? `<div><span class="lbl">Call sheet</span><b>${slot ? `${slot}<small>of 8</small>` : "—"}</b></div>`
         : "";
       const selectHtml = this.buildSelectControl(item, options);
-      const lockHtml = ENFORCED_SECTIONS.has(sectionKey)
-        ? `<button class="play-lock" type="button" data-lock="${escapeHtml(item.id)}" title="${item.locked ? "Unlock" : "Lock"}">${LOCK_SVG}<span>${item.locked ? "Unlock" : "Lock"}</span></button>`
-        : "";
-      const tools = (selectHtml || lockHtml)
-        ? `<div class="pdet-tools">${selectHtml}${lockHtml}</div>`
-        : "";
+      const tools = selectHtml ? `<div class="pdet-tools">${selectHtml}</div>` : "";
       const note = flags.isComputed ? `<p class="pdet-note">${escapeHtml(flags.computedNote || "")}</p>` : "";
       const noSlack = flags.noSlackHere ? `<p class="pdet-note">${NOSLACK_COPY}</p>` : "";
       detail.innerHTML = `
@@ -859,18 +946,23 @@ function cloneParams(params) {
       el.className = classes.join(" ");
       el.dataset.id = item.id;
       el.dataset.section = sectionKey;
+      if (options.kind === "set" && item.focus) el.dataset.focus = String(item.focus).toLowerCase();
 
       const meta = this.playMeta(item, options);
+      const name = escapeHtml(item.name);
       const pctBlock = flags.isComputed
         ? `<b>${item.percentage}%</b>`
-        : `<input class="et-pct-input${item.percentage >= 100 ? " threed" : ""}" data-pct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric" aria-label="Weight"><b aria-hidden="true">%</b>`;
+        : `<input class="et-pct-input${item.percentage >= 100 ? " threed" : ""}" data-pct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric" aria-label="${name} weight"><b aria-hidden="true">%</b>`;
       const slider = flags.isComputed || item.locked
         ? `<span class="wb" aria-hidden="true"><i style="width:${item.percentage}%"></i></span>`
-        : `<span class="wb et-slider" data-sl="${escapeHtml(item.id)}" role="slider" aria-valuenow="${item.percentage}" aria-valuemin="0" aria-valuemax="100"><i style="width:${item.percentage}%"></i></span>`;
+        : `<span class="wb et-slider" data-sl="${escapeHtml(item.id)}" role="slider" tabindex="0" aria-label="${name} weight" aria-valuenow="${item.percentage}" aria-valuetext="${item.percentage}%" aria-valuemin="0" aria-valuemax="100"><i style="width:${item.percentage}%"></i></span>`;
+      const lock = ENFORCED_SECTIONS.has(sectionKey)
+        ? `<button class="wl${item.locked ? " on" : ""}" type="button" data-lock="${escapeHtml(item.id)}" aria-pressed="${item.locked ? "true" : "false"}" aria-label="${item.locked ? "Unlock" : "Lock"} ${name}" title="${item.locked ? "Unlock" : "Lock"}">${LOCK_SVG}</button>`
+        : "";
 
       el.innerHTML = `
-        <div class="pn"><b>${escapeHtml(item.name)}</b>${meta ? `<span>${escapeHtml(meta)}</span>` : ""}</div>
-        <div class="wt">${slider}${pctBlock}</div>
+        <div class="pn"><b>${name}</b>${meta ? `<span>${escapeHtml(meta)}</span>` : ""}</div>
+        <div class="wt">${lock}${slider}${pctBlock}</div>
         <div class="cmd"><b>${parseInteger(item.effectiveness, 0)}</b></div>
         ${this.buildPccButton(item, side, sectionKey)}
       `;
@@ -882,16 +974,6 @@ function cloneParams(params) {
       const arr = this.state[sectionKey];
       const item = arr[idx];
       if (!item) return;
-
-      detail.querySelector("[data-lock]")?.addEventListener("click", (event) => {
-        event.stopPropagation();
-        playSound("click-tiny.wav");
-        item.locked = !item.locked;
-        this.state.evenDistributionAll = false;
-        ensureEnforcedBalance(arr);
-        this.render();
-        this.scheduleShotWeightsPreview();
-      });
 
       const select = detail.querySelector(".motion-focus-select, .target-shooter-select");
       if (select) {
@@ -915,7 +997,7 @@ function cloneParams(params) {
       if (!item || item.isActive === false) return;
 
       tile.addEventListener("click", (event) => {
-        if (event.target.closest("[data-pcc-toggle], .et-pct-input, .et-slider, .play-lock, select")) return;
+        if (event.target.closest("[data-pcc-toggle], [data-lock], .et-pct-input, .et-slider, select")) return;
         playSound("click-tiny.wav");
         this.toggleOpenPlay(item.id);
       });
@@ -928,12 +1010,35 @@ function cloneParams(params) {
         this.togglePcc(item.id, side);
       });
 
+      tile.querySelector("[data-lock]")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        playSound("click-tiny.wav");
+        item.locked = !item.locked;
+        this.state.evenDistributionAll = false;
+        ensureEnforcedBalance(arr);
+        this.render();
+        this.scheduleShotWeightsPreview();
+        document.querySelector(`.play[data-id="${CSS.escape(item.id)}"] [data-lock]`)?.focus();
+      });
+
       if (tile.classList.contains("is-computed") || item.locked) {
         return;
       }
 
       const slider = tile.querySelector(".et-slider");
       if (slider) {
+        slider.addEventListener("keydown", (event) => {
+          const step = sliderStep(event);
+          if (!step) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setEnforced(arr, idx, item.percentage + step);
+          this.state.evenDistributionAll = false;
+          this.paintEnforcedSection(sectionKey);
+          this.updateTotals();
+          this.renderPcLists();
+          this.scheduleShotWeightsPreview();
+        });
         let dragging = false;
         const move = (clientX) => {
           const rect = slider.getBoundingClientRect();
@@ -1006,7 +1111,10 @@ function cloneParams(params) {
         const fill = tile.querySelector(".wb i");
         if (fill) fill.style.width = `${item.percentage}%`;
         const slider = tile.querySelector(".et-slider");
-        if (slider) slider.setAttribute("aria-valuenow", String(item.percentage));
+        if (slider) {
+          slider.setAttribute("aria-valuenow", String(item.percentage));
+          slider.setAttribute("aria-valuetext", `${item.percentage}%`);
+        }
         const input = tile.querySelector(".et-pct-input");
         if (input && document.activeElement !== input) {
           input.value = String(item.percentage);
@@ -1031,8 +1139,8 @@ function cloneParams(params) {
         chip.innerHTML = `
           <div class="pn"><b>${escapeHtml(item.name)}</b>${meta ? `<span>${escapeHtml(meta)}</span>` : ""}</div>
           <div class="wt">
-            <span class="wb et-slider chip-slider" data-csl="${escapeHtml(item.id)}"><i style="width:${item.percentage}%"></i></span>
-            <input data-cpct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric" aria-label="Weight">
+            <span class="wb et-slider chip-slider" data-csl="${escapeHtml(item.id)}" role="slider" tabindex="0" aria-label="${escapeHtml(item.name)} weight" aria-valuenow="${item.percentage}" aria-valuetext="${item.percentage}%" aria-valuemin="0" aria-valuemax="100"><i style="width:${item.percentage}%"></i></span>
+            <input data-cpct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric" aria-label="${escapeHtml(item.name)} weight">
             <b aria-hidden="true">%</b>
           </div>
           <div class="cmd"><b>${cmd}</b></div>
@@ -1056,6 +1164,17 @@ function cloneParams(params) {
 
       const slider = chip.querySelector(".chip-slider");
       if (slider) {
+        slider.addEventListener("keydown", (event) => {
+          const step = sliderStep(event);
+          if (!step) return;
+          event.preventDefault();
+          event.stopPropagation();
+          item.percentage = Math.max(0, Math.min(100, item.percentage + step));
+          this.state.evenDistributionAll = false;
+          this.paintChip(item);
+          this.updateTotals();
+          this.scheduleShotWeightsPreview();
+        });
         let dragging = false;
         const move = (clientX) => {
           const rect = slider.getBoundingClientRect();
@@ -1119,6 +1238,11 @@ function cloneParams(params) {
       document.querySelectorAll(`.play[data-id="${CSS.escape(item.id)}"]`).forEach((chip) => {
         const fill = chip.querySelector(".wb i");
         if (fill) fill.style.width = `${item.percentage}%`;
+        const slider = chip.querySelector(".chip-slider");
+        if (slider) {
+          slider.setAttribute("aria-valuenow", String(item.percentage));
+          slider.setAttribute("aria-valuetext", `${item.percentage}%`);
+        }
         const input = chip.querySelector("[data-cpct]");
         if (input && document.activeElement !== input) {
           input.value = String(item.percentage);
@@ -1394,7 +1518,7 @@ function cloneParams(params) {
     paintShotWeights(shotWeights) {
       const container = this.elements.shotWeightsLive;
       if (!container) return;
-      const label = `<div class="psw-strip-label">Expected shot distribution <span class="psw-live-pill">LIVE</span></div>`;
+      const label = `<div class="psw-strip-label">Expected shot distribution</div>`;
       const host = document.createElement("div");
       host.className = "psw-root";
       renderShotWeightsLocal(host, shotWeights, true);
@@ -1485,21 +1609,24 @@ function cloneParams(params) {
           }
         }
 
-        // Re-order Set Plays for read-only venues (% → focus → CMD → name).
-        if (typeof compareSetPlaysForDisplay === "function") {
-          this.state.setPlays.sort((a, b) => compareSetPlaysForDisplay(a, b, { percentPrimary: true }));
-          this.renderEnforcedGrid("setPlays", this.elements.setPlaysGrid, "offense", { kind: "set" });
-        }
+        this.state.setPlays.sort(compareSetPlaysByFocusCmd);
+        this.renderEnforcedGrid("setPlays", this.elements.setPlaysGrid, "offense", { kind: "set" });
+        this.markSaved();
 
-        this.showToast("Playbooks Saved", "", { accentColor: "#34EC27" });
-        if (!document.getElementById("playbooks-view")) {
-          window.setTimeout(() => this.handleBack(), SAVE_NAV_DELAY_MS);
-        } else {
+        if (this.isHosted() && window.GOBToast) {
+          window.GOBToast.show("Playbooks saved");
           this.updateTotals();
+        } else {
+          this.showToast("Playbooks Saved", "", { accentColor: "#34EC27" });
+          window.setTimeout(() => this.handleBack(), SAVE_NAV_DELAY_MS);
         }
       } catch (error) {
         console.error("Failed to save playbooks:", error);
-        this.showToast("Failed to save playbooks", "", { accentColor: "#F79420" });
+        if (this.isHosted() && window.GOBToast) {
+          window.GOBToast.show("Playbooks not saved. Try again.");
+        } else {
+          this.showToast("Failed to save playbooks", "", { accentColor: "#F79420" });
+        }
         this.updateTotals();
       }
     }
@@ -1583,6 +1710,12 @@ function cloneParams(params) {
     window.__playbooksPage = page;
     try {
       await page.init();
+      if (window.GOBNav && typeof window.GOBNav.warnOnLeave === "function") {
+        window.GOBNav.warnOnLeave(
+          () => page.hasEdits(),
+          page.isHosted() ? { view: "playbooks-view", confirm: (proceed) => page.confirmLeave(proceed) } : null
+        );
+      }
     } catch (error) {
       window.__playbooksPage = null;
       console.error("Failed to initialize playbooks page:", error);
