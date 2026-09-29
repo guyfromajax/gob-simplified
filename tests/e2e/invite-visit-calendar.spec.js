@@ -343,13 +343,16 @@ test.describe('the three empty states are three different things', () => {
     expect(by['Wk 21'].cls).not.toContain('is-upcoming');
   });
 
-  test('this week is the only amber square', async ({ page }) => {
+  test('this week uses outline emphasis, not orange', async ({ page }) => {
     await mount(page, { week: 22, visits: { 20: 'r-1' } });
-    const amber = await page.evaluate(() =>
-      [...document.querySelectorAll('#hub-visits .vwk')]
-        .filter((t) => getComputedStyle(t).borderTopColor.includes('247, 148, 32'))
-        .map((t) => t.querySelector('.vwk-wk').textContent));
-    expect(amber).toEqual(['Wk 22']);
+    const info = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-visits .vwk')].map((t) => ({
+        wk: t.querySelector('.vwk-wk').textContent,
+        pending: t.classList.contains('is-pending'),
+        border: getComputedStyle(t).borderTopColor,
+      })));
+    expect(info.filter((x) => x.border.includes('247, 148, 32'))).toEqual([]);
+    expect(info.find((x) => x.wk === 'Wk 22').pending).toBe(true);
   });
 
   test('a week that already resolved is filled even while it is the current week', async ({ page }) => {

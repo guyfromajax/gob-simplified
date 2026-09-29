@@ -5,7 +5,7 @@ Version 1. How to build franchise screens. The look lives in [Styleguide.md](Sty
 ## 1. Principles
 
 - The frontend is a pure renderer. UESS (`_documentation_master/05_UESS_System/UESS_System.md`) owns game logic. A screen formats fields the page already loaded. It does not invent a missing field, derive one, or move a rule to the client.
-- One green Advance per screen. It is the only control that uses the advance color. A blocking task becomes the Advance button (same id, same `updatePlayButton` state machine, same labels and routes). There is no disabled-with-lock state and no hint link.
+- One green Advance per screen. It is the only control that uses the advance color. A blocking task becomes the Advance button (same id, same `updatePlayButton` state machine, same labels and routes). There is no disabled-with-lock state and no hint link. Recruiting chrome follows the same law: green is only Advance and positive data (board gains); orange is only saves (Submit Invites, Submit Orders); navy is only "yours" (your lean, your region, your signing). Phase labels, week tiles, invite counts, and filter chips stay neutral.
 - No spinners. A click that leaves the page switches Advance to the loading look immediately (`is-loading`, label `STARTING…`) and ignores repeat clicks.
 - Blue belongs to RT. Do not use the rating blue for chrome, links, or navigation.
 - Reward gold (`--reward-gold`) is only for milestone and season-peak reward tiers and exceptional stat gains. It is never for buttons, Advance (green), "yours" (navy), choice controls, everyday / weekly chrome, or Home Base chrome. It is the one reward token: tints are `color-mix()` at the point of use, so there are no gold tint or shadow tokens.

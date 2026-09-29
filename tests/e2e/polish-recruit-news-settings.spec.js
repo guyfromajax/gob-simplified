@@ -111,6 +111,11 @@ const ME = {
   championships_total: { conf_rs: 1, conf_t: 0, region: 0, national: 2 },
   geek_points: 1200,
   geek_points_by_team: { IDA: 400, BENTLEY_TRUMAN: 300, LANCASTER: 200 },
+  geek_points_teams: [
+    { team_id: 'IDA', display_name: 'IDA', points: 400 },
+    { team_id: 'BENTLEY_TRUMAN', display_name: 'Bentley-Truman', points: 300 },
+    { team_id: 'LANCASTER', display_name: 'Lancaster', points: 200 },
+  ],
   archetype_reveal_seen: true,
   archetypes: {
     total: 100,
@@ -295,8 +300,9 @@ for (const size of [[1280, 720], [1920, 1080]]) {
     await page.waitForSelector('#gp-by-team .gp-team-name');
     const names = await page.locator('#gp-by-team .gp-team-name').allTextContents();
     expect(names).toContain('IDA');
-    expect(names.join(' ')).toMatch(/Bentley Truman/);
+    expect(names).toContain('Bentley-Truman');
     expect(names.join(' ')).not.toMatch(/BENTLEY_TRUMAN/);
+    expect(names.join(' ')).not.toMatch(/Bentley Truman/);
     const order = await page.locator('.arch-cell .arch-aname').allTextContents();
     expect(order.length).toBeGreaterThan(3);
     const flow = await page.locator('.arch-board-grid').evaluate(function (grid) {

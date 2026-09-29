@@ -444,7 +444,7 @@ test.describe('attribute tiles', () => {
 });
 
 test.describe('watchlist', () => {
-  test('star toggles, is 32px, gold when on, hollow when off, and has no text label', async ({ page }) => {
+  test('star toggles, is 32px, neutral when on, hollow when off, and has no text label', async ({ page }) => {
     await mountPool(page);
     const before = await page.evaluate(() => {
       const b = document.querySelector('#hub-pool .wt');
@@ -464,15 +464,12 @@ test.describe('watchlist', () => {
     await page.click('#hub-pool tbody tr.rec:first-child .wt');
     await page.waitForFunction(() =>
       document.querySelector('#hub-pool tbody tr.rec:first-child .wt').classList.contains('is-on'));
-    // Park the pointer away from the row: .wt.is-on:hover is a different (lighter) gold,
-    // so measuring while hovering would test the wrong state.
+    // Park the pointer away from the row so hover does not tint the resting colour.
     await page.mouse.move(0, 0);
-    // .wt has transition: color .14s, so getComputedStyle mid-flight returns an
-    // interpolated colour. Wait for it to settle on the resting gold — this both waits
-    // and asserts (a colour that never settles fails on timeout).
+    // .wt has transition: color .14s — wait for the resting text colour.
     await page.waitForFunction(() =>
       getComputedStyle(document.querySelector('#hub-pool tbody tr.rec:first-child .wt')).color
-        === 'rgb(255, 215, 0)', null, { timeout: 3000 });
+        === 'rgb(244, 245, 248)', null, { timeout: 3000 });
     const after = await page.evaluate(() => {
       const b = document.querySelector('#hub-pool tbody tr.rec:first-child .wt');
       return {
@@ -483,8 +480,7 @@ test.describe('watchlist', () => {
     });
     expect(after.fill).toBe('currentColor');
     expect(after.pressed).toBe('true');
-    // Gold #FFD700
-    expect(after.color).toBe('rgb(255, 215, 0)');
+    expect(after.color).toBe('rgb(244, 245, 248)');
   });
 
   test('toggle PATCHes the watchlist endpoint and nothing else', async ({ page }) => {

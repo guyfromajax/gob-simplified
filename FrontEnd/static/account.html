@@ -20,6 +20,11 @@
     }
     .acct { max-width: 920px; margin: 0 auto; }
     .acct-title { font-family: var(--bebas); font-weight: 700; font-size: 40px; letter-spacing: 0.04em; margin: 0 0 18px; }
+    /* Colour law: the ambience switch is a choice control, not a save. Neutral on-state. */
+    #acct-ambience-switch.account-switch[aria-checked="true"] {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(255, 255, 255, 0.28);
+    }
 
     .card {
       background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
@@ -186,25 +191,28 @@
       }
     })();
 
-    var TEAM_NAMES = {
-      BENTLEY_TRUMAN: 'Bentley Truman', LANCASTER: 'Lancaster', FOUR_CORNERS: 'Four Corners',
-      OCEAN_CITY: 'Ocean City', MORRISTOWN: 'Morristown', LITTLE_YORK: 'Little York',
-      XAVIEN: 'Xavien', SOUTH_LANCASTER: 'South Lancaster'
-    };
     var TITLE_LABELS = [
       ['national', 'National'], ['region', 'Region'],
       ['conf_t', 'Conference Tournament'], ['conf_rs', 'Conference (Reg. Season)']
     ];
-    function titleCaseName(name) {
-      var text = String(name || '').replace(/_/g, ' ').trim();
-      if (text === 'IDA') return 'IDA';
-      return text.replace(/\S+/g, function (word) {
-        if (word === 'IDA') return 'IDA';
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      });
-    }
-    function teamName(id) { return titleCaseName(TEAM_NAMES[id] || id); }
     function cap(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function gpRows(me, nameById) {
+      nameById = nameById || {};
+      if (Array.isArray(me.geek_points_teams) && me.geek_points_teams.length) {
+        return me.geek_points_teams.filter(function (r) { return Number(r.points) > 0; })
+          .sort(function (a, b) { return Number(b.points) - Number(a.points); });
+      }
+      var gbt = me.geek_points_by_team || {};
+      return Object.keys(gbt).filter(function (k) { return Number(gbt[k]) > 0; })
+        .sort(function (a, b) { return Number(gbt[b]) - Number(gbt[a]); })
+        .map(function (k) {
+          return { team_id: k, display_name: nameById[k] || k, points: Number(gbt[k]) };
+        });
+    }
 
     function render(me) {
       me = me || {};
@@ -222,15 +230,13 @@
         if (b) badgeHost.appendChild(b);
       }
 
-      // geek points
+      // geek points — stored / TB display names, never title-cased from the key
       document.getElementById('gp-total').textContent = Number(me.geek_points || 0).toLocaleString();
-      var gbt = me.geek_points_by_team || {};
-      var teams = Object.keys(gbt).filter(function (k) { return Number(gbt[k]) > 0; })
-        .sort(function (a, b) { return Number(gbt[b]) - Number(gbt[a]); });
+      var teams = gpRows(me, me._teamNameById);
       var gpHost = document.getElementById('gp-by-team');
       gpHost.innerHTML = teams.length
-        ? teams.map(function (k) {
-            return '<div class="gp-team-row"><span class="gp-team-name">' + teamName(k) + '</span><span class="gp-team-pts">' + Number(gbt[k]).toLocaleString() + '</span></div>';
+        ? teams.map(function (row) {
+            return '<div class="gp-team-row"><span class="gp-team-name">' + escapeHtml(row.display_name) + '</span><span class="gp-team-pts">' + Number(row.points).toLocaleString() + '</span></div>';
           }).join('')
         : '<div class="muted-empty">No team points yet.</div>';
 
@@ -279,14 +285,32 @@
       }).catch(function () { /* toggle stays visual if controller unavailable */ });
     }
 
+    function loadTeamNameMap() {
+      var url = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) ? API_CONFIG.buildUrl('/teams') : '/teams';
+      return fetch(url).then(function (r) { return r.ok ? r.json() : []; }).then(function (rows) {
+        var map = {};
+        (Array.isArray(rows) ? rows : []).forEach(function (t) {
+          var id = t && (t.team_id || t.object_id);
+          var name = (t && t.display_name) || (t && t.name);
+          if (id && name) map[id] = name;
+          if (t && t.object_id && name) map[t.object_id] = name;
+        });
+        return map;
+      }).catch(function () { return {}; });
+    }
     function start() {
       window.GOBArchetype.ensureManifest().then(function () {
         var url = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) ? API_CONFIG.buildUrl('/api/auth/me') : '/api/auth/me';
         var headers = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getAuthHeaders) ? API_CONFIG.getAuthHeaders() : {};
-        fetch(url, { headers: headers })
-          .then(function (r) { return r.ok ? r.json() : (window.__gobAuthMeData || {}); })
-          .then(function (me) { render(me); wireAmbience(me); })
-          .catch(function () { render(window.__gobAuthMeData || {}); wireAmbience({}); });
+        Promise.all([
+          fetch(url, { headers: headers }).then(function (r) { return r.ok ? r.json() : (window.__gobAuthMeData || {}); }),
+          loadTeamNameMap()
+        ]).then(function (pair) {
+          var me = pair[0] || {};
+          me._teamNameById = pair[1] || {};
+          render(me);
+          wireAmbience(me);
+        }).catch(function () { render(window.__gobAuthMeData || {}); wireAmbience({}); });
       });
     }
     start();

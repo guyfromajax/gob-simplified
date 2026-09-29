@@ -412,6 +412,81 @@ def resolve_team_name_map(
     return result
 
 
+def _team_doc_for_geek_key(key: str) -> dict[str, Any]:
+    """Resolve a geek-points key to a core ``teams`` doc. Never reformats the name."""
+    text = str(key or "").strip()
+    if not text:
+        return {}
+    doc = teams_collection.find_one({"team_id": text})
+    if doc:
+        return doc
+    oid = _as_object_id_str(text)
+    if oid:
+        try:
+            doc = teams_collection.find_one({"_id": ObjectId(oid)})
+        except Exception:
+            doc = None
+        if doc:
+            return doc
+    return teams_collection.find_one({"name": text}) or {}
+
+
+def _franchises_for_user(user_id: Any) -> list[dict[str, Any]]:
+    if not user_id:
+        return []
+    seen: dict[str, dict[str, Any]] = {}
+    candidates: list[Any] = [str(user_id)]
+    try:
+        candidates.append(ObjectId(str(user_id)))
+    except Exception:
+        pass
+    for uid in candidates:
+        for fr in franchises_collection.find({"user_id": uid}, {TEAM_BUILDER_FIELD: 1, "user_id": 1}):
+            fid = str(fr.get("_id") or id(fr))
+            seen[fid] = fr
+    return list(seen.values())
+
+
+def resolve_geek_points_teams(
+    by_team: Mapping[str, Any] | None,
+    user_id: Any = None,
+) -> list[dict[str, Any]]:
+    """
+    Account Geek Points rows. ``display_name`` is stored / Team Builder chrome.
+
+    Keys on ``geek_points_by_team`` are canonical ``teams.team_id`` slugs.
+    The name is ``teams.name`` unless one of the user's franchises overlays
+    that ObjectId. The key is returned unchanged when no team doc exists —
+    never title-cased, never hyphen-stripped.
+    """
+    overlays: list[tuple[Any, dict[str, Any]]] = []
+    for fr in _franchises_for_user(user_id):
+        ov = get_team_builder_overlay(fr)
+        if ov:
+            overlays.append((fr, ov))
+
+    rows: list[dict[str, Any]] = []
+    for key, pts in (by_team or {}).items():
+        try:
+            n = int(pts or 0)
+        except (TypeError, ValueError):
+            continue
+        if n <= 0:
+            continue
+        team = _team_doc_for_geek_key(str(key))
+        name = str((team or {}).get("name") or key)
+        oid = str(team["_id"]) if team and team.get("_id") is not None else None
+        if oid:
+            for fr, ov in overlays:
+                replaced = _as_object_id_str(ov.get("replaced_object_id") or ov.get("object_id"))
+                if replaced == oid:
+                    name = resolve_team_display(fr, oid, core_doc=team)["name"]
+                    break
+        rows.append({"team_id": str(key), "display_name": name, "points": n})
+    rows.sort(key=lambda r: (-r["points"], r["display_name"]))
+    return rows
+
+
 def apply_overlay_to_identity_writes(
     franchise_doc: MutableMapping[str, Any],
     *,

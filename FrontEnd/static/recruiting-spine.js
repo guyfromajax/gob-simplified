@@ -265,9 +265,9 @@
         '<div class="ptl"><div class="ptl-inner">' +
           '<div class="ptl-track">' + segs + '</div>' +
           '<div class="ptl-key">' +
-            '<span><i style="background:rgba(74,144,217,.6)"></i>Passive · leans build from results</span>' +
-            '<span><i style="background:rgba(52,236,39,.6)"></i>Invite Season · 7 invites</span>' +
-            '<span><i style="background:rgba(247,148,32,.7)"></i>Signing Day · 50 points</span>' +
+            '<span><i style="background:rgba(255,255,255,.28)"></i>Passive · leans build from results</span>' +
+            '<span><i style="background:rgba(255,255,255,.45)"></i>Invite Season · 7 invites</span>' +
+            '<span><i style="background:rgba(255,255,255,.35)"></i>Signing Day · 50 points</span>' +
             '<span><i style="background:rgba(255,255,255,.5)"></i>Results · signed</span>' +
           '</div>' +
           '<div class="ptl-orient">' + INFO + '<span>' + orient + '</span></div>' +
