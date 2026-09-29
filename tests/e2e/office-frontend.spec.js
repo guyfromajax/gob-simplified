@@ -941,6 +941,7 @@ test('attribute chips group, order, and cap', async ({ page }) => {
   const href = await page.locator('#office-root .office-mv .lnk').getAttribute('href');
   expect(href).toContain('/franchise-command-center.html');
   expect(href).toContain('tab=training-report-view');
+  expect(href).toContain('origin=office');
   expect(href).toContain('week=21');
   const nameHref = await page.locator('#office-root .mv-p[data-player-id="p-amy"] .nm').getAttribute('href');
   expect(nameHref).toContain('/franchise-command-center.html');

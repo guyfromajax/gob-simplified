@@ -1243,15 +1243,15 @@ function renderAttributeChangePills(container, attributeDeltas) {
     offensive_efficiency: { label: 'Offense', scale: 20, invert: false },
     defensive_efficiency: { label: 'Defense', scale: 20, invert: false },
     fb_efficiency: { label: 'Fast Break', scale: 20, invert: false },
-    fb_defense: { label: 'FB Defense', scale: 20, invert: false },
-    pt_efficiency: { label: 'Press/Trap', scale: 20, invert: false },
-    pt_breaks: { label: 'P/T Breaks', scale: 20, invert: false },
+    fb_defense: { label: 'Fast Break Defense', scale: 20, invert: false },
+    pt_efficiency: { label: 'P/T Defense', scale: 20, invert: false },
+    pt_breaks: { label: 'P/T Offense', scale: 20, invert: false },
     fight: { label: 'Fight', scale: 20, invert: false },
     discipline: { label: 'Discipline', scale: 20, invert: false },
     momentum_score: { label: 'Momentum', scale: 10, invert: false },
     team_chemistry: { label: 'Chemistry', scale: 10, invert: false },
-    fb_opp_modifier: { label: 'FB Defense', scale: 20, invert: false },
-    pt_opp_modifier: { label: 'P/T Breaks', scale: 20, invert: false },
+    fb_opp_modifier: { label: 'Fast Break Defense', scale: 20, invert: false },
+    pt_opp_modifier: { label: 'P/T Offense', scale: 20, invert: false },
     offensiveefficiency: { label: 'Offense', scale: 20, invert: false },
     defensiveefficiency: { label: 'Defense', scale: 20, invert: false },
     reboundmodifier: { label: 'Rebounding', scale: 0.5, invert: false },
@@ -1259,8 +1259,8 @@ function renderAttributeChangePills(container, attributeDeltas) {
     teamchemistry: { label: 'Chemistry', scale: 10, invert: false },
     momentumscore: { label: 'Momentum', scale: 10, invert: false },
     fbefficiency: { label: 'Fast Break', scale: 20, invert: false },
-    ptefficiency: { label: 'Press/Trap', scale: 20, invert: false },
-    ptbreaks: { label: 'P/T Breaks', scale: 20, invert: false }
+    ptefficiency: { label: 'P/T Defense', scale: 20, invert: false },
+    ptbreaks: { label: 'P/T Offense', scale: 20, invert: false }
   };
   container.innerHTML = '';
   container.className = 'attr-changes';

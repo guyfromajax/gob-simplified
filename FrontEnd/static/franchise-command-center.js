@@ -4479,9 +4479,6 @@ window.addEventListener('DOMContentLoaded', () => {
         if (tabName === 'team-stats-tab') {
           renderTeamReport();
         }
-        if (tabName === 'training-tab') {
-          renderFccTrainingTab();
-        }
         if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
           window.GOBNav.restoreScroll();
         }
@@ -4489,87 +4486,6 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-
-/**
- * Training tab — the second and only other place development is editable.
- *
- * Source is the roster the FCC already holds, NOT /franchise/training-points. That
- * endpoint 400s after week 26 and is the training page's own dependency; using it here
- * would reproduce the very gap this tab closes, where development becomes unreachable once
- * the week's training is submitted and for the whole postseason. The roster payload
- * already carries attributes, year, height, weight, position ratings and both development
- * fields, so nothing extra is fetched.
- */
-function renderFccTrainingTab() {
-  const host = document.getElementById('fcc-training-dev');
-  const grid = window.GOBPlayerDevelopmentGrid;
-  wireFccTrainingTutorialButton();
-  if (!host || !grid) return;
-  const players = (userRosterDataCache && userRosterDataCache.players) || userRosterPlayersCache || [];
-  const rows = players.map((p) => ({
-    id: p._id || p.player_id,
-    _id: p._id || p.player_id,
-    player_id: p._id || p.player_id,
-    name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-    year: p.year,
-    height: p.height,
-    weight: p.weight,
-    attributes: p.attributes || {},
-    position_ratings: p.position_ratings || {},
-    training_position: p.training_position || null,
-    training_focus: p.training_focus || null,
-    resolved_training_position: p.resolved_training_position || null,
-    resolved_training_focus: p.resolved_training_focus || null,
-  }));
-  // Same order the roster tab shows: best-position RT, descending, fixed while editing.
-  rows.sort((a, b) => fccMaxPositionRating(b) - fccMaxPositionRating(a));
-
-  grid.render(host, rows, {
-    getFranchiseId: () => (typeof franchiseId !== 'undefined' && franchiseId)
-      || liveParams().get('franchise_id') || '',
-    // Keep the roster caches in step so the Roster tab's read-only columns agree.
-    onSaved: (playerId, field, value) => {
-      const key = field === 'training_focus'
-        ? 'resolved_training_focus' : 'resolved_training_position';
-      [userRosterDataCache && userRosterDataCache.players, userRosterPlayersCache,
-       rosterTableDataForSorting].forEach((list) => {
-        (list || []).forEach((p) => {
-          if (String(p._id || p.player_id) === String(playerId)) { p[field] = value; p[key] = value; }
-        });
-      });
-    },
-  });
-}
-
-/**
- * "Training by Position" leaves the FCC, so a return context is set the same way the
- * training page sets one — the tutorial's footer uses it to come back here. Unlike the
- * training page there is no draft to protect: every change on this tab is already saved.
- */
-function wireFccTrainingTutorialButton() {
-  const btn = document.getElementById('fcc-training-tutorial-btn');
-  if (!btn || btn.dataset.bound) return;
-  btn.dataset.bound = '1';
-  btn.addEventListener('click', () => {
-    const returnUrl = (typeof getCurrentRelativeUrl === 'function')
-      ? getCurrentRelativeUrl()
-      : window.location.pathname + window.location.search;
-    if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
-      window.GOBTutorialAlertResume.setTrainingPageContext(returnUrl);
-    }
-    window.location.href = '/tutorial-advanced-training-by-position.html';
-  });
-}
-
-function fccMaxPositionRating(player) {
-  const r = player.position_ratings || {};
-  let best = -Infinity;
-  Object.keys(r).forEach((k) => {
-    const v = Number(r[k]);
-    if (isFinite(v) && v > best) best = v;
-  });
-  return best === -Infinity ? -1 : best;
-}
 
 // Team Report and Playbook Summary functions (adapted from training-report.js)
 const TEAM_ATTR_NAMES = {

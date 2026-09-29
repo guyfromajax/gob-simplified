@@ -38,12 +38,11 @@ def _by_key(measures):
 
 def test_direction_table():
     directions = {spec["key"]: spec["direction"] for spec in MEASURE_SPECS}
-    # Every stored team measure is ranked, so all twelve cells carry a place.
+    # The eleven displayed measures carry a place. Momentum is not ranked.
     assert directions == {
         "team_chemistry": "higher_better",
         "fight": "higher_better",
         "discipline": "higher_better",
-        "momentum_score": "higher_better",
         "offensive_efficiency": "higher_better",
         "defensive_efficiency": "higher_better",
         "pt_opp_modifier": "higher_better",

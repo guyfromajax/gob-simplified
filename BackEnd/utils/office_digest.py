@@ -332,17 +332,20 @@ def prior_measure_snapshot(franchise_doc: Mapping[str, Any], completed_week: int
 # The eight trained and compounding measures documented at −20…+20 in
 # Team_Attribute_System.md. Only these carry a signed scale, so only these can be
 # drawn as a diverging pill with zero in the centre. Chemistry (7…25), Shooting
-# (~85…95), Rebounding and Momentum (−10…+10) have no ±20 reading and stay on the
-# league percentile bar.
+# (~85…95) and Rebounding have no ±20 reading and stay on the league percentile bar.
 SIGNED_MEASURE_SCALE = 20
 
-# (key, label, scale_max, signed_scale). Every stored team measure is a row.
+# (key, label, scale_max, signed_scale). Eleven rows.
+#
+# Momentum (`momentum_score`) is deliberately not one of them. It swings game to
+# game rather than accumulating like the trained measures, so a league place and a
+# week-on-week arrow read as noise next to the others. It stays in
+# TEAM_MEASURE_KEYS, so the weekly snapshot still stores it.
 _MEASURE_FAMILIES = (
     ("character", "Character", (
         ("team_chemistry", "Chemistry", CHEMISTRY_MAX, None),
         ("fight", "Fight", None, SIGNED_MEASURE_SCALE),
         ("discipline", "Discipline", None, SIGNED_MEASURE_SCALE),
-        ("momentum_score", "Momentum", None, None),
     )),
     ("floor", "On the floor", (
         ("offensive_efficiency", "Offense", None, SIGNED_MEASURE_SCALE),

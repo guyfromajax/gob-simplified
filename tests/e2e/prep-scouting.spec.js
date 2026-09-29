@@ -16,7 +16,10 @@ const MEASURES = [
   { key: 'team_chemistry', label: 'Chemistry', rank: 20, rank_of: 128, percentile: 55, value: 18, scale_max: 25, direction: 'higher_better' },
 ];
 
-// Attribute keys use raw storage (display = floor(raw / 10); tier from display digit).
+// `attributes` here are on the 0–10 display scale, which is what
+// compute_projected_starting_five actually sends (`int(raw) // 10`). The fixture used to
+// carry raw 0–99 values, so the view's second divide-by-10 looked correct under test and
+// floored every tile to 0 in the real app.
 const PROJECTED = [
   {
     player_id: 'scout-pg-01',
@@ -26,7 +29,7 @@ const PROJECTED = [
     year: 'sr',
     rt: 92,
     potential_rt_ratcheted: 95,
-    attributes: { SC: 75, SH: 88, ID: 42, OD: 71, PS: 92, BH: 81, RB: 34, ST: 45, AG: 79, ND: 68, IQ: 77, FT: 72 },
+    attributes: { SC: 7, SH: 8, ID: 4, OD: 7, PS: 9, BH: 8, RB: 3, ST: 4, AG: 7, ND: 6, IQ: 7, FT: 7 },
   },
   {
     player_id: 'scout-sg-02',
@@ -36,7 +39,7 @@ const PROJECTED = [
     year: 'jr',
     rt: 84,
     potential_rt_ratcheted: 88,
-    attributes: { SC: 91, SH: 98, ID: 38, OD: 63, PS: 55, BH: 66, RB: 41, ST: 44, AG: 73, ND: 58, IQ: 62, FT: 85 },
+    attributes: { SC: 9, SH: 9, ID: 3, OD: 6, PS: 5, BH: 6, RB: 4, ST: 4, AG: 7, ND: 5, IQ: 6, FT: 8 },
   },
   {
     player_id: 'scout-sf-03',
@@ -46,7 +49,7 @@ const PROJECTED = [
     year: 'so',
     rt: 71,
     potential_rt_ratcheted: 78,
-    attributes: { SC: 64, SH: 58, ID: 74, OD: 82, PS: 49, BH: 52, RB: 71, ST: 63, AG: 66, ND: 55, IQ: 54, FT: 61 },
+    attributes: { SC: 6, SH: 5, ID: 7, OD: 8, PS: 4, BH: 5, RB: 7, ST: 6, AG: 6, ND: 5, IQ: 5, FT: 6 },
   },
   {
     player_id: 'scout-pf-04',
@@ -56,7 +59,7 @@ const PROJECTED = [
     year: 'jr',
     rt: 55,
     potential_rt_ratcheted: 55,
-    attributes: { SC: 48, SH: 35, ID: 66, OD: 52, PS: 38, BH: 33, RB: 88, ST: 86, AG: 47, ND: 73, IQ: 44, FT: 41 },
+    attributes: { SC: 4, SH: 3, ID: 6, OD: 5, PS: 3, BH: 3, RB: 8, ST: 8, AG: 4, ND: 7, IQ: 4, FT: 4 },
   },
   {
     player_id: 'scout-c-05',
@@ -66,7 +69,7 @@ const PROJECTED = [
     year: 'fr',
     rt: 36,
     potential_rt_ratcheted: 52,
-    attributes: { SC: 28, SH: 22, ID: 81, OD: 46, PS: 25, BH: 24, RB: 79, ST: 93, AG: 36, ND: 64, IQ: 33, FT: 31 },
+    attributes: { SC: 2, SH: 2, ID: 8, OD: 4, PS: 2, BH: 2, RB: 7, ST: 9, AG: 3, ND: 6, IQ: 3, FT: 3 },
   },
 ];
 
@@ -98,6 +101,9 @@ function cc(overrides) {
 async function fulfillJson(route, body) {
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 }
+
+// Counts scouting-report fetches, so a reopen can be distinguished from a first paint.
+const fetches = { scouting: 0 };
 
 async function installApi(page, opts) {
   const locked = opts && opts.locked;
@@ -165,6 +171,7 @@ async function installApi(page, opts) {
       return;
     }
     if (pathname.startsWith('/franchise/scouting-report')) {
+      fetches.scouting += 1;
       await fulfillJson(route, {
         projected_starting_five: PROJECTED,
         player_season_stats: PLAYER_SEASON_STATS,
@@ -187,6 +194,7 @@ async function installApi(page, opts) {
 }
 
 async function openScouting(page, locked) {
+  fetches.scouting = 0;
   await stubAuth(page);
   await installApi(page, { locked });
   await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=scouting-view');
@@ -227,4 +235,174 @@ test('scouting view at 1920', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await openScouting(page, false);
   await page.screenshot({ path: path.join(OUT, 'scouting-attributes-1920.png'), fullPage: true });
+});
+
+test('projected five attribute values render, not zeros', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openScouting(page, false);
+
+  const tiles = await page.locator('#scouting-view .agrid tbody .ad').allTextContents();
+  expect(tiles.length).toBe(60);
+  // The bug this guards: the server pre-divides by 10, the view divided again, and every
+  // tile floored to 0. A grid of zeros and a grid of dashes are both failures.
+  expect(tiles.every((text) => text.trim() === '0')).toBe(false);
+  expect(tiles.some((text) => text.trim() === '—')).toBe(false);
+
+  const firstRow = await page.locator('#scouting-view .agrid tbody tr').first()
+    .locator('.ad').allTextContents();
+  expect(firstRow.map((text) => text.trim()))
+    .toEqual(['7', '8', '4', '7', '9', '8', '3', '4', '7', '6', '7', '7']);
+});
+
+test('opponent logo resolves to an image that loaded', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openScouting(page, false);
+
+  const logo = await page.locator('#scouting-view .logo img').first().evaluate((img) => ({
+    src: img.getAttribute('src'),
+    naturalWidth: img.naturalWidth,
+    width: Math.round(img.getBoundingClientRect().width),
+  }));
+  expect(logo.src).toBeTruthy();
+  // A broken src still leaves an <img> in the DOM, so the check is that pixels arrived.
+  expect(logo.naturalWidth).toBeGreaterThan(0);
+  expect(logo.width).toBeGreaterThan(0);
+});
+
+test('section rhythm is one token at both densities', async ({ page }) => {
+  for (const size of [[1280, 720], [1920, 1080]]) {
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    await openScouting(page, false);
+
+    const gaps = await page.evaluate(() => {
+      // Every top-level block, not just the <section>s: the opponent header and the
+      // three-up play-usage group are part of the same vertical rhythm.
+      const col = document.querySelector('#scouting-view .scouting-ready');
+      const secs = Array.from(col.children)
+        .filter((node) => node.getBoundingClientRect().height > 0);
+      const out = [];
+      for (let i = 1; i < secs.length; i += 1) {
+        out.push(Math.round(secs[i].getBoundingClientRect().top
+          - secs[i - 1].getBoundingClientRect().bottom));
+      }
+      return out;
+    });
+    expect(gaps.length).toBeGreaterThan(2);
+    // One rhythm: every gap within a pixel of the first.
+    gaps.forEach((gap) => { expect(Math.abs(gap - gaps[0])).toBeLessThanOrEqual(1); });
+    // And no cramped stack.
+    expect(gaps[0]).toBeGreaterThanOrEqual(20);
+  }
+});
+
+test('reopening keeps the rendered panel up', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openScouting(page, false);
+  await expect(page.locator('#scouting-view .agrid tbody tr')).toHaveCount(5);
+
+  // Stamp the live table so a rebuilt one can be told from the one already on screen.
+  await page.evaluate(() => {
+    document.querySelector('#scouting-view .agrid tbody').dataset.stamp = 'first-paint';
+  });
+
+  // Sample every frame while leaving for another Prep tab and coming back.
+  await page.evaluate(() => {
+    window.__blankFrames = 0;
+    window.__watching = true;
+    const tick = () => {
+      if (!window.__watching) return;
+      const panel = document.getElementById('scouting-view');
+      if (panel && !panel.hidden && getComputedStyle(panel).display !== 'none') {
+        const ready = panel.querySelector('.scouting-ready');
+        const rows = panel.querySelectorAll('.agrid tbody tr').length;
+        if (!rows || (ready && ready.hidden)) window.__blankFrames += 1;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+  await page.getByRole('tab', { name: 'Game Plan', exact: true }).click();
+  await expect(page.locator('#scouting-view')).toBeHidden();
+  await page.getByRole('tab', { name: 'Scouting Report', exact: true }).click();
+  await page.waitForTimeout(800);
+
+  const blankFrames = await page.evaluate(() => {
+    window.__watching = false;
+    return window.__blankFrames;
+  });
+
+  expect(blankFrames).toBe(0);
+  await expect(page.locator('#scouting-view .agrid tbody tr')).toHaveCount(5);
+  // The same table came back, so the panel was kept rather than re-rendered.
+  await expect(page.locator('#scouting-view .agrid tbody')).toHaveAttribute('data-stamp', 'first-paint');
+});
+
+test('scouting uses the shared measure vocabulary', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openScouting(page, false);
+
+  const view = page.locator('#scouting-view');
+  for (const label of ['P/T Offense', 'P/T Defense', 'Fast Break', 'Fast Break Defense']) {
+    await expect(view).toContainText(label);
+  }
+  for (const old of ['Press Break', 'Press/Trap Defense', 'Fast Break Offense']) {
+    await expect(view).not.toContainText(old);
+  }
+});
+
+test('scouting report screenshots for the polish batch', async ({ page }) => {
+  const out = path.join(__dirname, '../../reports/polish-prep-train-scout');
+  fs.mkdirSync(out, { recursive: true });
+  for (const size of [[1280, 720], [1920, 1080]]) {
+    await page.setViewportSize({ width: size[0], height: size[1] });
+    await openScouting(page, false);
+    // Portraits 404 under the stub and fall back to initials via onerror. Shooting before
+    // that settles catches empty badges, which is a property of the harness, not the view.
+    await page.waitForFunction(() => {
+      const badges = Array.from(document.querySelectorAll('#scouting-view .agrid .av'));
+      return badges.length > 0 && badges.every((badge) => {
+        const img = badge.querySelector('img');
+        return img ? img.complete : badge.textContent.trim().length > 0;
+      });
+    }, null, { timeout: 15000 });
+    await page.screenshot({
+      path: path.join(out, 'scouting-report-' + size[0] + '.png'),
+      fullPage: true,
+    });
+    // The shell scrolls internally, so the measures and play-usage sections need a
+    // second frame to be looked at at all.
+    await page.evaluate(() => {
+      const sc = document.querySelector('#scouting-view .pv.sc').closest('[class*="scroll"], .tab-content')
+        || document.scrollingElement;
+      const target = document.querySelector('#scouting-view .cols3');
+      if (target) target.scrollIntoView({ block: 'end' });
+      else sc.scrollTop = sc.scrollHeight;
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({
+      path: path.join(out, 'scouting-report-lower-' + size[0] + '.png'),
+      fullPage: true,
+    });
+  }
+});
+
+test('prep sub-tabs: Player Training is named and ordered last', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openScouting(page, false);
+
+  const labels = await page.getByRole('tab').filter({ hasNotText: /^$/ })
+    .evaluateAll((nodes) => nodes.map((node) => node.textContent.trim()));
+  const prep = labels.filter((label) => ['Game Plan', 'Playbooks', 'Scouting Report',
+    'Player Training', 'Training'].includes(label));
+  expect(prep).toEqual(['Game Plan', 'Playbooks', 'Scouting Report', 'Player Training']);
+
+  // The Advance week-flow targets the view id, which the rename left alone.
+  await page.getByRole('tab', { name: 'Player Training', exact: true }).click();
+  await expect(page.locator('#training-view')).toBeVisible();
+
+  const out = path.join(__dirname, '../../reports/polish-prep-train-scout');
+  fs.mkdirSync(out, { recursive: true });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: path.join(out, 'player-training-tabs-1280.png'), fullPage: true });
 });

@@ -25,13 +25,12 @@ const SIGNED_KEYS = [
   'fight', 'discipline', 'offensive_efficiency', 'defensive_efficiency',
   'pt_opp_modifier', 'pt_efficiency', 'fb_efficiency', 'fb_opp_modifier',
 ];
-const UNSIGNED_KEYS = ['team_chemistry', 'momentum_score', 'shot_threshold', 'rebound_modifier'];
+const UNSIGNED_KEYS = ['team_chemistry', 'shot_threshold', 'rebound_modifier'];
 
 const MEASURES = [
   ['team_chemistry', 'Chemistry', 19, 25, null, 12, 80, 1],
   ['fight', 'Fight', 8, null, 20, 21, 84, 3],
   ['discipline', 'Discipline', -4, null, 20, 88, 31, -2],
-  ['momentum_score', 'Momentum', 3, null, null, 40, 62, null],
   ['offensive_efficiency', 'Offense', 11, null, 20, 9, 93, 4],
   ['defensive_efficiency', 'Defense', -7, null, 20, 101, 21, -6],
   ['pt_opp_modifier', 'P/T Offense', 5, null, 20, 33, 74, null],
@@ -42,7 +41,7 @@ const MEASURES = [
   ['rebound_modifier', 'Rebounding', 0.6, null, null, 52, 59, null],
 ];
 
-const CHARACTER = ['team_chemistry', 'fight', 'discipline', 'momentum_score'];
+const CHARACTER = ['team_chemistry', 'fight', 'discipline'];
 
 function teamData() {
   const attrs = {};
@@ -385,7 +384,7 @@ for (const [width, height, tag] of SIZES) {
     await page.setViewportSize({ width: width, height: height });
     await open(page, 'team-attributes-view', '#team-attributes-view .mcell');
 
-    await expect(page.locator('#team-attributes-view .mcell')).toHaveCount(12);
+    await expect(page.locator('#team-attributes-view .mcell')).toHaveCount(11);
     await expect(page.locator('#team-attributes-view .tm-radar-svg')).toHaveCount(1);
 
     // One name per measure: the chart's axes read the same as the cells below it.
@@ -394,6 +393,20 @@ for (const [width, height, tag] of SIZES) {
     const cellNames = await page.locator('#team-attributes-view .mcell .nm')
       .evaluateAll((nodes) => nodes.map((node) => node.textContent.trim()));
     axes.forEach((axis) => { expect(cellNames).toContain(axis); });
+
+    // The radar is neutral. Blue belongs to RT A, attribute 9+ and elite glyphs.
+    const radarPaint = await page.locator('#team-attributes-view .tm-radar-svg *')
+      .evaluateAll((nodes) => nodes.map((node) => {
+        const style = getComputedStyle(node);
+        return [style.fill, style.stroke, style.filter].join(' | ');
+      }));
+    const channels = (text) => (text.match(/rgba?\([^)]*\)/g) || []).map((colour) => {
+      const [r, g, b] = (colour.match(/[\d.]+/g) || []).map(Number);
+      return Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(r - b));
+    });
+    radarPaint.forEach((paint) => {
+      channels(paint).forEach((spread) => { expect(spread).toBeLessThanOrEqual(12); });
+    });
 
     // The chart is drawn at its real size, not shrunk to fit its wrapper.
     const chart = await page.locator('#team-attributes-view .tm-radar-svg')
@@ -405,6 +418,22 @@ for (const [width, height, tag] of SIZES) {
     }));
     expect(grid.columns).toBe(4);
     expect(grid.rows).toBe(3);
+
+    // Eleven cells in twelve slots: the bottom right is empty, not a placeholder.
+    const bottomRow = await page.locator('#team-attributes-view .mcell').evaluateAll((nodes) => {
+      const lowest = Math.max.apply(null, nodes.map((n) => Math.round(n.getBoundingClientRect().top)));
+      return nodes.filter((n) => Math.round(n.getBoundingClientRect().top) === lowest)
+        .map((n) => n.getAttribute('data-measure'));
+    });
+    expect(bottomRow).toEqual(['team_chemistry', 'fight', 'discipline']);
+    const grid4 = await page.locator('#team-attributes-view .mgrid').evaluate((el) => {
+      const cells = Array.from(el.querySelectorAll('.mcell'));
+      const lowest = Math.max.apply(null, cells.map((c) => Math.round(c.getBoundingClientRect().top)));
+      const last = cells.filter((c) => Math.round(c.getBoundingClientRect().top) === lowest).pop();
+      // Nothing is rendered to the right of Discipline in the bottom row.
+      return { right: Math.round(last.getBoundingClientRect().right), gridRight: Math.round(el.getBoundingClientRect().right) };
+    });
+    expect(grid4.gridRight - grid4.right).toBeGreaterThan(80);
 
     // Pairs share a column: each measure sits above or below its partner.
     const centres = await page.locator('#team-attributes-view .mcell').evaluateAll((nodes) => {

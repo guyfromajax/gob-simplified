@@ -82,11 +82,15 @@ def coach_career_payload(doc: dict | None, principal: dict | None = None) -> dic
     if lead is None:
         lead = compute_lead_archetype(archetypes)
     raw_champs = doc.get("championships_total") or {}
+    championships_total = {k: int(raw_champs.get(k, 0) or 0) for k in TITLE_KINDS}
     return {
         "user_id": str(principal.get("user_id") or ""),
         "username": doc.get("username") or principal.get("username") or "Coach",
         "record": record,
         "archetypes": archetypes,
         "lead_archetype": lead,
-        "championships_total": {k: int(raw_champs.get(k, 0) or 0) for k in TITLE_KINDS},
+        "championships_total": championships_total,
+        # The sum across kinds, so the client shows a single titles numeral without
+        # doing arithmetic (Ch7 PR2: the online strip and the offline zone both read it).
+        "titles_total": sum(championships_total.values()),
     }

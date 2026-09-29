@@ -213,21 +213,25 @@ def test_coach_career_route_serves_the_local_coach_in_me_shape(store, monkeypatc
     assert empty["user_id"] == LOCAL_USER_ID
     assert empty["record"]["wins"] == 0
     assert empty["championships_total"] == {"conf_rs": 0, "conf_t": 0, "region": 0, "national": 0}
+    assert empty["titles_total"] == 0
 
     store.db["save_meta"].update_one(
         {"_id": lc.LOCAL_COACH_ID},
-        {"$inc": {"record.wins": 12, "record.losses": 5, "championships_total.national": 3}},
+        {"$inc": {"record.wins": 12, "record.losses": 5,
+                  "championships_total.national": 3, "championships_total.conf_t": 2}},
         upsert=True,
     )
     body = http.get("/franchise/coach-career").json()
     assert (body["record"]["wins"], body["record"]["losses"]) == (12, 5)
     assert body["championships_total"]["national"] == 3
+    # titles_total is the sum across kinds, so the client shows one numeral without math.
+    assert body["titles_total"] == 5
     assert body["trophies"] == []
     # The /api/auth/me shape, plus the trophy log and the server-computed career
     # numerals Home Base and the Trophy Case read (Chapter 7).
     career_extras = {
-        "trophies", "win_pct_display", "geek_points", "seasons_completed",
-        "programs", "top_seasons",
+        "trophies", "titles_total", "win_pct_display", "geek_points",
+        "seasons_completed", "programs", "top_seasons",
     }
     assert set(body) - career_extras <= set(UserResponse.model_fields)
 

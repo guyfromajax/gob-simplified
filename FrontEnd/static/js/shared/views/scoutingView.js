@@ -14,13 +14,17 @@ var ATTR_GROUPS = [
   { label: 'Mind', keys: ['IQ', 'FT'], gs: true }
 ];
 
+/* One vocabulary for the eight ±20 measures, shared with Team › Team Attributes and
+   the radar. `pt_efficiency` is your own press and trap execution, so it reads as
+   P/T Defense; `pt_opp_modifier` is working through the opponent's press, so it
+   reads as P/T Offense. Display labels only — the data keys are unchanged. */
 var MEASURE_ROWS = [
   { key: 'offensive_efficiency', label: 'Offense' },
   { key: 'defensive_efficiency', label: 'Defense' },
-  { key: 'fb_efficiency', label: 'Fast Break Offense' },
+  { key: 'fb_efficiency', label: 'Fast Break' },
   { key: 'fb_opp_modifier', label: 'Fast Break Defense' },
-  { key: 'pt_efficiency', label: 'Press/Trap Defense' },
-  { key: 'pt_opp_modifier', label: 'Press Break' },
+  { key: 'pt_efficiency', label: 'P/T Defense' },
+  { key: 'pt_opp_modifier', label: 'P/T Offense' },
   { key: 'discipline', label: 'Discipline' },
   { key: 'fight', label: 'Fight' }
 ];
@@ -86,10 +90,18 @@ function adTierClass(displayVal) {
   return '';
 }
 
+/**
+ * `projected_starting_five` attributes arrive ALREADY on the 0–10 display scale:
+ * compute_projected_starting_five does `int(raw) // 10` server-side. Running them
+ * through GOB_AttributeDisplay.displayAttr divided a second time and floored every
+ * tile to 0, so the whole grid read as zeros. The legacy card renderer hit this and
+ * prints the value as given; this does the same.
+ */
 function attrTile(key, attrs) {
   var ad = window.GOB_AttributeDisplay;
-  var raw = ad ? ad.rawAttr(attrs, key) : null;
-  var display = ad ? ad.displayAttr(raw) : null;
+  var raw = ad ? ad.rawAttr(attrs, key) : (attrs && attrs[key] != null ? attrs[key] : null);
+  var n = raw == null || raw === '' ? NaN : Number(raw);
+  var display = isFinite(n) ? n : null;
   var text = display == null ? '—' : String(display);
   return '<span class="ad ' + adTierClass(display) + '">' + esc(text) + '</span>';
 }
@@ -284,6 +296,24 @@ export function mount(container, ctx) {
   var userTeamId = userTeamIdFrom(ctx);
   var projectedMode = 'attributes';
   var cache = { playUsage: null, projected: [], stats: {}, teamAttrs: {}, measures: [] };
+  var painted = false;
+  var signature = null;
+
+  // Cheap identity for "is this the same report I already drew". Only the fields the
+  // panel actually renders, so an unrelated change upstream doesn't force a repaint.
+  function signatureOf(opponent, teamData, playUsage) {
+    try {
+      return JSON.stringify([
+        opponent && opponent.id, opponent && opponent.name,
+        teamData && teamData.team_attributes, teamData && teamData.measures,
+        playUsage && playUsage.projected_starting_five,
+        playUsage && playUsage.player_season_stats,
+        playUsage && playUsage.play_usage
+      ]);
+    } catch (err) {
+      return null;
+    }
+  }
 
   container.innerHTML = '<div class="pv sc" data-state="loading">'
     + '<p class="scouting-status" role="status">Loading scouting report…</p>'
@@ -327,15 +357,17 @@ export function mount(container, ctx) {
 
   function teamLogoHtml(teamName) {
     var src = '';
-    if (typeof window.getTeamAssetPath === 'function') {
-      src = window.getTeamAssetPath(teamName, 'logo_square') || '';
-    }
-    if (src) {
-      return '<span class="logo"><img src="' + esc(src) + '" alt="" width="48" height="48"></span>';
-    }
-    var parts = String(teamName || '').trim().split(/\s+/).filter(Boolean);
-    var mono = parts.length ? parts[0].charAt(0).toUpperCase() : '?';
-    return '<span class="logo" style="width:48px;height:48px;font-size:28px">' + esc(mono) + '</span>';
+    // Generated art can fail closed for a team that isn't in the chrome snapshot yet,
+    // and this runs inside paintReady's markup build — an uncaught throw here took the
+    // whole panel to the error state instead of costing one logo.
+    try {
+      if (typeof window.getTeamAssetPath === 'function') {
+        src = window.getTeamAssetPath(teamName, 'logo_square') || '';
+      }
+    } catch (err) { src = ''; }
+    if (!src) src = '/images/teams/general/general_logo_square.png';
+    return '<span class="logo"><img src="' + esc(src) + '" alt="" width="48" height="48"'
+      + ' onerror="this.src=\'/images/teams/general/general_logo_square.png\'"></span>';
   }
 
   function paintProjectedTable() {
@@ -450,7 +482,11 @@ export function mount(container, ctx) {
   }
 
   function load() {
-    setStatus('Loading scouting report…');
+    // Reopening the tab calls revalidate, and blanking to the loading status before the
+    // script loads and both fetches resolve left the panel empty for several frames.
+    // Once something is painted it stays up, and the data is swapped in place below only
+    // if it actually changed.
+    if (!painted) setStatus('Loading scouting report…');
     return loadScript('/js/utils/attributeDisplay.js')
       .then(function () { return loadScript('/js/shared/scoutingReport.js'); })
       .then(function () { return loadScript('/js/shared/playerYear.js'); })
@@ -458,11 +494,11 @@ export function mount(container, ctx) {
       .then(resolveOpponent)
       .then(function (opponent) {
         if (!opponent || !opponent.name) {
-          setStatus('No upcoming opponent available for scouting.');
+          if (!painted) setStatus('No upcoming opponent available for scouting.');
           return;
         }
         if (!franchiseId) {
-          setStatus('Unable to open scouting report.');
+          if (!painted) setStatus('Unable to open scouting report.');
           return;
         }
         var authHeaders = window.API_CONFIG && window.API_CONFIG.getAuthHeaders
@@ -478,12 +514,18 @@ export function mount(container, ctx) {
         ]).then(function (resPair) {
           if (!resPair[0].ok || !resPair[1].ok) throw new Error('load failed');
           return Promise.all([resPair[0].json(), resPair[1].json()]).then(function (payloads) {
+            var next = signatureOf(opponent, payloads[0], payloads[1]);
+            if (painted && next !== null && next === signature) return;
+            signature = next;
             paintReady(opponent, payloads[0], payloads[1]);
+            painted = true;
           });
         });
       })
       .catch(function () {
-        setStatus('Unable to load scouting report.');
+        // A failed refresh behind an already-good panel is not worth throwing the panel
+        // away for; the next revalidate will pick the data back up.
+        if (!painted) setStatus('Unable to load scouting report.');
       });
   }
 

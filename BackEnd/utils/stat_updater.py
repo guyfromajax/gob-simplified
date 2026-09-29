@@ -1843,10 +1843,12 @@ def _finalize_game_impl(
                     return
 
         claim_token = str(game.get("_id") or game_id)
-        matchup_key = franchise_matchup_claim_key(game)
         existing_claim_doc = db.franchises.find_one(
-            {"_id": fid}, {"applied_games": 1, "applied_matchups": 1}
+            {"_id": fid}, {"applied_games": 1, "applied_matchups": 1, "current_season": 1}
         ) or {}
+        matchup_key = franchise_matchup_claim_key(
+            game, season=int(existing_claim_doc.get("current_season", 1) or 1)
+        )
         existing_claims = [str(g) for g in (existing_claim_doc.get("applied_games") or []) if g is not None]
         existing_matchups = [
             str(m) for m in (existing_claim_doc.get("applied_matchups") or []) if m is not None

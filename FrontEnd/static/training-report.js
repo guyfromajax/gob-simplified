@@ -34,7 +34,10 @@ const week = parseInt(urlParams.get('week'), 10);
 // 'news' is where these links come from now that the Inbox tab is retired; 'inbox' is
 // still accepted so already-shared and bookmarked links keep their Back button.
 const _reportFromRaw = urlParams.get('from');
-const reportFrom = (_reportFromRaw === 'news' || _reportFromRaw === 'inbox') ? 'news' : 'training';
+const _reportOrigin = urlParams.get('origin');
+const reportFrom = (_reportFromRaw === 'news' || _reportFromRaw === 'inbox')
+  ? 'news'
+  : (_reportFromRaw === 'office' || _reportOrigin === 'office') ? 'office' : 'training';
 
 let reportData = null;
 let currentView = 'changes'; // 'attributes' or 'changes'
@@ -96,14 +99,14 @@ const TEAM_ATTR_NAMES = {
   'rebound_modifier': 'Rebounding',
   'offensive_efficiency': 'Offense',
   'defensive_efficiency': 'Defense',
-  'fb_efficiency': 'Fast Breaks',
-  'pt_efficiency': 'Press/Trap',
+  'fb_efficiency': 'Fast Break',
+  'pt_efficiency': 'P/T Defense',
   'fight': 'Fight',
   'discipline': 'Discipline',
   'momentum_score': 'Momentum',
   'team_chemistry': 'Team Chemistry',
   'fb_opp_modifier': 'Fast Break Defense',
-  'pt_opp_modifier': 'Press/Trap Breaks'
+  'pt_opp_modifier': 'P/T Offense'
 };
 
 const NOTE_ATTRIBUTE_LABELS = {
@@ -158,6 +161,19 @@ const NOTES_TACTICAL_ORDER_BASE = [
   'Fast Break Readiness',
   'Press/Trap Readiness',
 ];
+
+/**
+ * These titles are the lookup keys the server writes into the stored report, so they can't
+ * be renamed without rewriting history. The shown name comes from here instead, which means
+ * a report generated last season reads with today's vocabulary.
+ */
+const NOTES_TACTICAL_DISPLAY_TITLES = {
+  'Press/Trap Readiness': 'P/T Defense Readiness',
+};
+
+function notesTacticalDisplayTitle(title) {
+  return NOTES_TACTICAL_DISPLAY_TITLES[title] || title;
+}
 
 function getConcerningTeamAttrNoteTitle(sectionMap) {
   if (sectionMap.has('Concerning Progression')) return 'Concerning Progression';
@@ -455,7 +471,9 @@ function setupLockerRoomButton() {
   } else {
     btn.hidden = false;
     btn.style.display = '';
-    btn.textContent = 'Back to Office';
+    // Post-submit still uses the named "Back to Office" + tut_alert one-shot.
+    // A drill-in from Office (or anywhere else) just goes back.
+    btn.textContent = reportFrom === 'training' ? 'Back to Office' : '← Back';
     btn.className = 'gob-btn gob-btn--ghost';
   }
 
@@ -475,9 +493,14 @@ function setupLockerRoomButton() {
         ? resolveFranchiseLockerRoomUrl({
             franchiseId: franchiseId,
             teamId: teamId,
-            extraParams: { tut_alert: 'training_return' }
+            extraParams: reportFrom === 'training' ? { tut_alert: 'training_return' } : {}
           })
-        : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}&tut_alert=training_return`;
+        : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}&team_id=${teamId}`
+          + (reportFrom === 'training' ? '&tut_alert=training_return' : '');
+      if (reportFrom !== 'training' && window.GOBNav && typeof window.GOBNav.back === 'function') {
+        window.GOBNav.back(lockerRoomUrl);
+        return;
+      }
       if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(lockerRoomUrl);
       else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
       else window.location.replace(lockerRoomUrl);
@@ -1972,7 +1995,7 @@ function renderTrainingNotes() {
 
       const label = document.createElement('div');
       label.className = 'training-notes-tactical-label';
-      label.textContent = title;
+      label.textContent = notesTacticalDisplayTitle(title);
       pill.appendChild(label);
 
       const value = document.createElement('div');

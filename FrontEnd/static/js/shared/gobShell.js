@@ -31,10 +31,12 @@
       { id: 'practice-squad-view', label: 'Practice Squad' }
     ]},
     { id: 'prep', label: 'Prep', title: 'Prep', icon: 'prep', tabs: [
-      { id: 'training-view', label: 'Training' },
       { id: 'game-plan-view', label: 'Game Plan' },
       { id: 'playbooks-view', label: 'Playbooks' },
-      { id: 'scouting-view', label: 'Scouting Report' }
+      { id: 'scouting-view', label: 'Scouting Report' },
+      // Last, and named for what it is. The id is unchanged so the Advance week-flow
+      // target (gobAdvance.js) and the /training.html browse route still land here.
+      { id: 'training-view', label: 'Player Training' }
     ]},
     { id: 'league', label: 'League', title: 'League', icon: 'league', tabs: [
       { id: 'standings-view', label: 'Standings' },
@@ -68,7 +70,6 @@
     'practice-squad-view': 'team',
     'training-tab': 'prep',
     'training-view': 'prep',
-    'training-report-view': 'prep',
     'game-plan-tab': 'prep',
     'game-plan-view': 'prep',
     'playbooks-tab': 'prep',
@@ -91,7 +92,11 @@
     // Drill-ins belong to no rail section, so every rail button leaves them.
     // The highlight follows ?origin= (detailOrigin); without it, nothing is on.
     'player-view': 'detail',
-    'team-view': 'detail'
+    'team-view': 'detail',
+    // The training report is a drill-in too. It used to sit in 'prep' and be collapsed
+    // onto training-view for highlighting, which lit Player Training while you were
+    // reading a report — two unrelated screens behind one sub-tab.
+    'training-report-view': 'detail'
   };
   var DETAIL_SECTION = { id: 'detail', label: '', title: '', tabs: [] };
 
@@ -120,7 +125,9 @@
     '/team-roster-view.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/set-lineup.html': { kind: 'focus' },
     '/training.html': { kind: 'browse', section: 'prep', sub: 'training-view' },
-    '/training-report.html': { kind: 'browse', section: 'prep', sub: 'training-view' },
+    // A drill-in, like /player-detail.html: 'context' resolves to whichever section you
+    // came from (sectionFromReturn), and keepBack preserves the return trail.
+    '/training-report.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/training-squad-report.html': { kind: 'focus' },
     '/training-playbooks.html': { kind: 'focus' },
     '/cut-players.html': { kind: 'focus' },
@@ -427,15 +434,19 @@
   }
 
   function detailOrigin(tab) {
-    if (tab !== 'player-view' && tab !== 'team-view') return '';
+    if (tab !== 'player-view' && tab !== 'team-view' && tab !== 'training-report-view') return '';
     var origin = '';
     try { origin = new URLSearchParams(window.location.search).get('origin') || ''; }
     catch (err) { origin = ''; }
-    if (origin === 'team' || origin === 'league' || origin === 'office' || origin === 'prep') return origin;
+    if (origin === 'team' || origin === 'league' || origin === 'office'
+      || origin === 'prep' || origin === 'news') return origin;
     return '';
   }
 
   function detailMark(tab) {
+    // The report marks nothing, even when ?origin=prep lights the Prep rail. Marking the
+    // sub-tab you came from would put the underline back under Player Training.
+    if (tab === 'training-report-view') return '';
     if (tab !== 'player-view' && tab !== 'team-view') return tab;
     try { return new URLSearchParams(window.location.search).get('return_tab') || ''; }
     catch (err) { return ''; }
@@ -443,7 +454,6 @@
 
   function sync(tab) {
     if (leaveLockedTab(tab)) return;
-    if (tab === 'training-report-view') tab = 'training-view';
     var sectionId = detailOrigin(tab) || TAB_SECTION[tab] || 'office';
     var mark = detailMark(tab);
     var section = sectionId === DETAIL_SECTION.id ? DETAIL_SECTION : sectionById(sectionId);
@@ -453,8 +463,16 @@
     Object.keys(sectionEls).forEach(function (id) {
       if (sectionEls[id]) sectionEls[id].classList.toggle('on', id === sectionId);
     });
-    if (titleEl) titleEl.textContent = sectionId === 'office' ? '' : section.title;
-    document.documentElement.classList.toggle('gob-office', sectionId === 'office');
+    // gob-office is the Office-home layout (week cards, no page head). Lighting the
+    // Office rail via ?origin=office on a drill-in must not turn that layout on —
+    // otherwise #home-tab is forced visible and the week cards stack on the report.
+    var officeHome = tab === 'home-tab';
+    if (titleEl) {
+      if (officeHome) titleEl.textContent = '';
+      else if (tab === 'training-report-view') titleEl.textContent = 'Training Report';
+      else titleEl.textContent = sectionId === 'office' ? '' : section.title;
+    }
+    document.documentElement.classList.toggle('gob-office', officeHome);
     if (paintedSection !== sectionId) {
       renderSubtabs(section, mark);
       paintedSection = sectionId;

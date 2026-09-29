@@ -308,6 +308,19 @@ def _hydrate_slot(stored: dict[str, Any]) -> dict[str, Any] | None:
 
     franchise_id = ObjectId(str(franchise_doc["_id"]))
     team_name, primary, secondary, natl_rank = _ftd_team_display(franchise_id, str(user_team_id_str))
+
+    # team_slug + asset_strategy let the client load a program's OWN banner art
+    # (and generate it for Team Builder / custom programs) instead of resolving
+    # from the display name, which falls back to general art for customs.
+    from BackEnd.utils.franchise_team_display import resolve_team_display
+    from BackEnd.utils.team_slug import path_slug_for_display_name
+
+    try:
+        team_display = resolve_team_display(franchise_id, ObjectId(str(user_team_id_str).strip()))
+    except Exception:
+        team_display = {}
+    asset_strategy = str(team_display.get("asset_strategy") or "core")
+    team_slug = path_slug_for_display_name(team_name)
     record = _user_regular_season_record(franchise_doc, str(user_team_id_str))
     wins, losses = 0, 0
     if "-" in record:
@@ -330,6 +343,8 @@ def _hydrate_slot(stored: dict[str, Any]) -> dict[str, Any] | None:
         "username": _display_username_for_highlight(user_doc),
         "lead_archetype": str((user_doc or {}).get("lead_archetype") or ""),
         "team_name": team_name,
+        "team_slug": team_slug,
+        "asset_strategy": asset_strategy,
         "primary_color": primary,
         "secondary_color": secondary,
         "wins": wins,

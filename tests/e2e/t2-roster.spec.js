@@ -107,7 +107,6 @@ const MEASURE_VALUES = {
   team_chemistry: { label: 'Chemistry', value: 18, scale_max: 25, meter_pct: 72, signed: null, rank: 12, pct: 80, delta: null },
   fight: { label: 'Fight', value: 3, signed: SIGNED, rank: 34, pct: 70, delta: 2, tied: true },
   discipline: { label: 'Discipline', value: null, signed: SIGNED, rank: null, pct: null, delta: 0 },
-  momentum_score: { label: 'Momentum', value: 4, signed: null, rank: 41, pct: 60, delta: null },
   offensive_efficiency: { label: 'Offense', value: 7, signed: SIGNED, rank: 19, pct: 85, delta: 3 },
   defensive_efficiency: { label: 'Defense', value: -6, signed: SIGNED, rank: 96, pct: 24, delta: -4 },
   pt_opp_modifier: { label: 'P/T Offense', value: 2, signed: SIGNED, rank: 55, pct: 57, delta: null },
@@ -118,7 +117,7 @@ const MEASURE_VALUES = {
   rebound_modifier: { label: 'Rebounding', value: 0.5, signed: null, rank: 73, pct: 38, delta: null },
 };
 
-const CHARACTER_KEYS = ['team_chemistry', 'fight', 'discipline', 'momentum_score'];
+const CHARACTER_KEYS = ['team_chemistry', 'fight', 'discipline'];
 
 function measureRow(key) {
   const spec = MEASURE_VALUES[key];
@@ -491,14 +490,16 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
     await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=team-attributes-view');
     await page.waitForSelector('#team-attributes-view .mcell');
     await assertNoMainOverflow(page);
-    // Twelve measures, four columns, three rows, in the paired reading order.
-    await expect(page.locator('#team-attributes-view .mcell')).toHaveCount(12);
+    // Eleven measures in four columns, in the paired reading order. Momentum is not
+    // one of them, so the bottom row's fourth cell is simply absent.
+    await expect(page.locator('#team-attributes-view .mcell')).toHaveCount(11);
     const order = await page.locator('#team-attributes-view .mcell .nm').allTextContents();
     expect(order).toEqual([
       'Offense', 'P/T Offense', 'Fast Break', 'Shooting',
       'Defense', 'P/T Defense', 'Fast Break Defense', 'Rebounding',
-      'Chemistry', 'Fight', 'Discipline', 'Momentum',
+      'Chemistry', 'Fight', 'Discipline',
     ]);
+    await expect(page.locator('#team-attributes-view')).not.toContainText('Momentum');
     const columns = await page.locator('#team-attributes-view .mgrid').evaluate((grid) => {
       return getComputedStyle(grid).gridTemplateColumns.split(' ').length;
     });
@@ -518,12 +519,12 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
 
     // The ± pill only on the eight −20…+20 measures; zero sits in the centre.
     await expect(page.locator('#team-attributes-view .dv')).toHaveCount(8);
-    await expect(page.locator('#team-attributes-view .gob-meter')).toHaveCount(4);
+    await expect(page.locator('#team-attributes-view .gob-meter')).toHaveCount(3);
     for (const key of ['fight', 'discipline', 'offensive_efficiency', 'defensive_efficiency',
       'pt_opp_modifier', 'pt_efficiency', 'fb_efficiency', 'fb_opp_modifier']) {
       await expect(page.locator('#team-attributes-view .mcell[data-measure="' + key + '"] .dv')).toHaveCount(1);
     }
-    for (const key of ['team_chemistry', 'momentum_score', 'shot_threshold', 'rebound_modifier']) {
+    for (const key of ['team_chemistry', 'shot_threshold', 'rebound_modifier']) {
       await expect(page.locator('#team-attributes-view .mcell[data-measure="' + key + '"] .dv')).toHaveCount(0);
       await expect(page.locator('#team-attributes-view .mcell[data-measure="' + key + '"] .gob-meter')).toHaveCount(1);
     }

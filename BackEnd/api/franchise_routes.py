@@ -15571,6 +15571,7 @@ def _news_dispatch_items(franchise_doc: dict[str, Any]) -> list[dict[str, Any]]:
             ("team_id", team_id),
             ("week", str(report_week)),
             ("from", "news"),
+            ("origin", "news"),
         ])
         items.append({
             "week": report_week,
@@ -17323,13 +17324,11 @@ def get_training_points(franchise_id: str):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
-    # Training camp is week 1; weeks 2–26 are in-season training.
+    # Training camp is week 1; weeks 2–26 are in-season training. After week 26 there
+    # is no weekly allocation, but player development focus still applies next season —
+    # so this endpoint still returns the roster. `training_unavailable` is how the
+    # client knows not to offer Submit Training.
     week = franchise_doc.get("week", 1)
-    if _postseason_training_disabled_for_week(week):
-        raise HTTPException(
-            status_code=400,
-            detail="Training is unavailable after week 26.",
-        )
     from BackEnd.constants.training_shape import (
         CAMP_POINT_BUDGET,
         CAMP_WEEKS,
@@ -17337,8 +17336,12 @@ def get_training_points(franchise_id: str):
         gain_percentage_matrix,
         is_camp_week,
     )
-    is_first_training = is_camp_week(week)
-    training_points = CAMP_POINT_BUDGET if is_first_training else IN_SEASON_POINT_BUDGET
+    training_unavailable = _postseason_training_disabled_for_week(week)
+    is_first_training = False if training_unavailable else is_camp_week(week)
+    if training_unavailable:
+        training_points = 0
+    else:
+        training_points = CAMP_POINT_BUDGET if is_first_training else IN_SEASON_POINT_BUDGET
     
     total_time = (time.time() - endpoint_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] get_training_points TOTAL: {total_time:.2f}ms, training_points={training_points}, is_first_training={is_first_training}")
@@ -17360,6 +17363,7 @@ def get_training_points(franchise_id: str):
 
     return {
         "training_points": training_points,
+        "training_unavailable": training_unavailable,
         "is_first_training": is_first_training,
         "is_camp_week": is_first_training,
         "camp_weeks": CAMP_WEEKS,
@@ -20156,6 +20160,8 @@ def finish_season(req: FinishSeasonRequest):
             # append the set consumed this rollover (never reused within the franchise)
             "used_recruit_set_ids": _prev_used + ([used_recruit_set_id] if used_recruit_set_id else []),
             "results": {},
+            # Matchup claims are season-scoped; clear so the list doesn't grow forever.
+            "applied_matchups": [],
             "season_inbox": [],
             # Cleared for the new season, then seeded with the prior season's exact
             # Recruiting Results story plus this season's Week-1 stories.
