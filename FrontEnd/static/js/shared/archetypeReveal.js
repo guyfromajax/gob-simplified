@@ -156,8 +156,9 @@
     });
   }
 
-  // Only on the Franchise Command Center.
-  if ((window.location.pathname || '').indexOf('franchise-command-center') === -1) return;
+  // The Office queue owns first_archetype via MilestoneModal. Do not auto-open
+  // the old chrome on the Franchise Command Center.
+  if ((window.location.pathname || '').indexOf('franchise-command-center') !== -1) return;
 
   if (window.__gobAuthMeData) maybeShow(window.__gobAuthMeData);
   window.addEventListener('gob:auth-me-loaded', function (e) {

@@ -40,7 +40,8 @@ function cloneParams(params) {
       + '.afm-overlay.is-visible,'
       + '.gob-talert-overlay,'
       + '.sammy-modal-backdrop.open,'
-      + '.bn-overlay.show'
+      + '.bn-overlay.show,'
+      + '.mm-scrim.is-open'
     ));
   }
 

@@ -1,9 +1,20 @@
 /**
- * Office moment queue. The server picks order and the 1–2 cap.
- * This file only opens the existing modal for each kind in that list.
+ * Client player for the server-owned Office moment queue (UX_System §10).
+ * MILESTONE kinds use MilestoneModal. Championship stays on ChampionshipMoments.
+ * season_review waits for the season-peak PR. WEEKLY kinds stay cards.
  */
 (function (global) {
   'use strict';
+
+  var MILESTONE_KINDS = {
+    signed_class: 1,
+    walk_on_welcome: 1,
+    bracket_reveal: 1,
+    region_bye: 1,
+    conference_rs_region: 1,
+    first_archetype: 1,
+    elimination: 1
+  };
 
   var settled = Promise.resolve();
   var settleWaiters = [];
@@ -35,6 +46,59 @@
     return topData[ref];
   }
 
+  function patchJson(path, body) {
+    var url = path;
+    var headers = { 'Content-Type': 'application/json' };
+    try {
+      if (global.API_CONFIG && typeof global.API_CONFIG.buildUrl === 'function') {
+        url = global.API_CONFIG.buildUrl(path);
+      }
+      if (global.API_CONFIG && typeof global.API_CONFIG.getAuthHeaders === 'function') {
+        Object.assign(headers, global.API_CONFIG.getAuthHeaders());
+      }
+    } catch (e) { /* same-origin fallback */ }
+    return fetch(url, {
+      method: 'PATCH',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify(body || {})
+    }).catch(function () {});
+  }
+
+  function markMilestoneSeen(kind, franchiseId, data) {
+    if (kind === 'first_archetype') {
+      try {
+        if (global.__gobAuthMeData) global.__gobAuthMeData.archetype_reveal_seen = true;
+      } catch (e) { /* ignore */ }
+      return patchJson('/api/auth/archetype-reveal-seen', {});
+    }
+    if (!franchiseId) return Promise.resolve();
+    if (kind === 'conference_rs_region') {
+      return patchJson('/franchise/conference-rs-region-modal-seen', { franchise_id: franchiseId });
+    }
+    if (kind === 'region_bye') {
+      return patchJson('/franchise/region-bye-modal-seen', { franchise_id: franchiseId });
+    }
+    if (kind === 'walk_on_welcome') {
+      return patchJson('/franchise/walk-on-welcome-modal-seen', { franchise_id: franchiseId });
+    }
+    if (kind === 'bracket_reveal') {
+      var key = data && data.reveal_key;
+      if (!key) return Promise.resolve();
+      return patchJson('/franchise/bracket-reveal-modal-seen', { franchise_id: franchiseId, reveal_key: key });
+    }
+    if (kind === 'signed_class') {
+      return patchJson('/franchise/recruiting-results-modal-seen', { franchise_id: franchiseId });
+    }
+    if (kind === 'elimination') {
+      return patchJson('/franchise/elimination-seen', { franchise_id: franchiseId });
+    }
+    if (kind === 'season_review') {
+      return patchJson('/franchise/season-review-seen', { franchise_id: franchiseId });
+    }
+    return Promise.resolve();
+  }
+
   function openChampionship(topData, moment, ctx) {
     var list = payload(topData, moment);
     if (!Array.isArray(list) || !list.length || !global.ChampionshipMoments) {
@@ -54,9 +118,6 @@
     var data = payload(topData, moment);
     if (!data || !data.eligible || !global.BigNewsModals) return Promise.resolve();
     var maps = ctx.maps || {};
-    if (kind === 'bracket_reveal' && global.BigNewsModals.showBracketReveal) {
-      return global.BigNewsModals.showBracketReveal(data, topData, maps, ctx.queue);
-    }
     if (kind === 'bracket_update' && global.BigNewsModals.showBracketUpdate) {
       return global.BigNewsModals.showBracketUpdate(data, topData, maps, ctx.queue);
     }
@@ -65,9 +126,6 @@
 
   function openSammy(kind, topData, moment, ctx) {
     var hosts = {
-      conference_rs_region: global.ConferenceRsRegionModal,
-      region_bye: global.RegionByeModal,
-      walk_on_welcome: global.WalkOnWelcomeModal,
       recruit_visit: global.RecruitVisitModal,
     };
     var host = hosts[kind];
@@ -77,7 +135,11 @@
 
   function openArchetype(topData, moment, ctx) {
     var key = topData && topData.archetype_evolution_pending;
-    if (!key && moment) key = moment.seen_key === 'archetype_evolution_pending' ? (topData && topData.archetype_evolution_pending) : '';
+    if (!key && moment) {
+      key = moment.seen_key === 'archetype_evolution_pending'
+        ? (topData && topData.archetype_evolution_pending)
+        : '';
+    }
     if (!key && global.__gobAuthMeData) key = global.__gobAuthMeData.archetype_evolution_pending;
     if (!key || !global.ArchetypeEvolutionModal || !global.ArchetypeEvolutionModal.showFromQueue) {
       return Promise.resolve();
@@ -85,12 +147,38 @@
     return global.ArchetypeEvolutionModal.showFromQueue(key, ctx.queue);
   }
 
+  function openMilestone(topData, moment, ctx) {
+    if (!global.MilestoneModal || typeof global.MilestoneModal.show !== 'function') {
+      return Promise.resolve();
+    }
+    var data = payload(topData, moment);
+    var queue = ctx.queue || {};
+    var list = ctx.list || [];
+    var index = queue.index || 1;
+    var next = list[index];
+    return global.MilestoneModal.show({
+      item: moment,
+      payload: data,
+      maps: ctx.maps || {},
+      index: index,
+      total: queue.total || 1,
+      nextKind: next && next.kind,
+      nextTitle: next && (next.title || next.kind),
+      isLast: index >= (queue.total || list.length)
+    }).then(function (reason) {
+      var fid = (topData && topData.franchise_id) || global.franchiseId || '';
+      return Promise.resolve(markMilestoneSeen(moment.kind, fid, data)).then(function () {
+        return reason;
+      });
+    });
+  }
+
   function openOne(topData, moment, ctx) {
     var kind = moment && moment.kind;
     if (kind === 'championship') return openChampionship(topData, moment, ctx);
-    if (kind === 'bracket_reveal' || kind === 'bracket_update') {
-      return openBigNews(kind, topData, moment, ctx);
-    }
+    if (kind === 'season_review') return Promise.resolve();
+    if (MILESTONE_KINDS[kind]) return openMilestone(topData, moment, ctx);
+    if (kind === 'bracket_update') return openBigNews(kind, topData, moment, ctx);
     if (kind === 'archetype_evolution') return openArchetype(topData, moment, ctx);
     return openSammy(kind, topData, moment, ctx);
   }
@@ -100,13 +188,18 @@
     var list = Array.isArray(topData && topData.moments_for_this_visit)
       ? topData.moments_for_this_visit
       : [];
+    var aborted = false;
     var run = Promise.resolve();
     list.forEach(function (moment, i) {
       run = run.then(function () {
-        return openOne(topData, moment, {
+        if (aborted) return;
+        return Promise.resolve(openOne(topData, moment, {
           maps: opts.maps,
           boxScoreUrlBuilder: opts.boxScoreUrlBuilder,
           queue: { index: i + 1, total: list.length },
+          list: list,
+        })).then(function (reason) {
+          if (reason === 'dismiss') aborted = true;
         });
       });
     });
