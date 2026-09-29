@@ -566,6 +566,17 @@ tr.region-row td{padding:0;border:0}
 .bpos-t.is-zero b{color:var(--muted-3)}
 .bpos-t.is-zero i{color:var(--muted-3)}
 
+/* Invite weeks: the pool sits below the board. Neutral callout at the fold. */
+.hub-more{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;margin:0;padding:10px 16px;
+  border:1px solid var(--border);border-radius:8px;
+  background:rgba(255,255,255,.03);color:var(--muted-2);
+  font:600 13px/1 var(--body);letter-spacing:.04em;cursor:pointer;
+}
+.hub-more::after{content:"↓";font-size:12px;color:var(--muted-3)}
+.hub-more:hover{color:var(--text);background:rgba(255,255,255,.06)}
+
 /* ============================================================
    INVITE VISITS — the season as seven squares, one per week 20-26.
 

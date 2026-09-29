@@ -13,6 +13,7 @@ const OUT = path.join(__dirname, '../../reports/recruiting-tabs');
 function recruit(id, name, leans) {
   return {
     recruit_id: id,
+    image_id: id,
     name: name,
     archetype: 'Slasher',
     'Home Region': 'C',
@@ -170,23 +171,21 @@ test('invite weeks keep the stack on pool and leans, and visits is the calendar'
   await openHub(page, 22, {
     visit_history: history({ 20: { id: 'r-lean', name: 'Ada Lean', lean: { 1: TID } } }),
   });
-  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
-  expect(page.url()).toContain('hub=pool');
+  await expect(tab(page, 'Pool')).toHaveCount(0);
+  await expect(tab(page, 'Leans')).toHaveCount(0);
+  await expect(tab(page, 'Visits')).toHaveCount(0);
   await expect(page.locator('.pool-view[data-view="leans"]')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('#gob-subtabs .gob-search')).toHaveAttribute('placeholder', 'Search name…');
   await expect(page.locator('#hub-visits .vcal')).toBeVisible();
   await expect(page.locator('#hub-board')).toBeVisible();
   await expect(page.locator('#hub-pool')).toBeVisible();
+  await expect(page.locator('.hub-more')).toBeVisible();
   await expect(page.locator('#hub-weekly')).toHaveCount(0);
   await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(2);
 
-  const before = await page.evaluate(() => history.length);
-  await tab(page, 'Leans').click();
+  await page.locator('.pool-view[data-view="leans"]').click();
   await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(1);
-  await tab(page, 'Pool').click();
-  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
-  expect(page.url()).toContain('hub=pool');
-  expect(await page.evaluate(() => history.length)).toBe(before);
+  await page.locator('.pool-view[data-view="leans"]').click();
   await expect(page.locator('#hub-visits')).toBeVisible();
   await expect(page.locator('#hub-board')).toBeVisible();
   await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(2);
@@ -194,40 +193,20 @@ test('invite weeks keep the stack on pool and leans, and visits is the calendar'
   await assertHubClear(page);
   await shot(page, 'pool-w22-1280.png');
 
-  await tab(page, 'Leans').click();
+  await page.locator('.pool-view[data-view="leans"]').click();
   await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(1);
   await expect(page.locator('#hub-board')).toBeVisible();
   await assertHubClear(page);
   await shot(page, 'leans-w22-1280.png');
 
-  await tab(page, 'Visits').click();
-  expect(page.url()).toContain('hub=visits');
-  await expect(page.locator('#hub-visits .vcal')).toBeVisible();
-  await expect(page.locator('#hub-weekly')).toHaveCount(0);
-  await expect(page.locator('#hub-board')).toHaveCount(0);
-  await expect(page.locator('#hub-pool')).toHaveCount(0);
-  await assertHubClear(page);
-  await shot(page, 'visits-w22-1280.png');
-
-  await page.evaluate(() => {
-    const url = new URL(location.href);
-    url.searchParams.set('hub', 'pool');
-    history.pushState(history.state, '', url.pathname + url.search);
-  });
-  await page.goBack();
-  await expect(tab(page, 'Visits')).toHaveAttribute('aria-selected', 'true');
-  expect(page.url()).toContain('hub=visits');
-
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await tab(page, 'Pool').click();
+  await page.locator('.pool-view[data-view="leans"]').click();
+  await expect(page.locator('#hub-pool tbody tr.rec')).toHaveCount(2);
   await assertHubClear(page);
   await shot(page, 'pool-w22-1920.png');
-  await tab(page, 'Leans').click();
+  await page.locator('.pool-view[data-view="leans"]').click();
   await assertHubClear(page);
   await shot(page, 'leans-w22-1920.png');
-  await tab(page, 'Visits').click();
-  await assertHubClear(page);
-  await shot(page, 'visits-w22-1920.png');
 });
 
 function fullPool() {
@@ -266,9 +245,10 @@ test('a processed invite week has no results panel and no gap above the visits',
   const baseline = await gapUnder();
 
   const results = await openHub(page, 21, invite(21, true));
-  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
-  await tab(page, 'Leans').click();
-  await expect(tab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
+  await expect(tab(page, 'Pool')).toHaveCount(0);
+  await expect(tab(page, 'Leans')).toHaveCount(0);
+  await page.locator('.pool-view[data-view="leans"]').click();
+  await expect(page.locator('.pool-view[data-view="leans"]')).toHaveAttribute('aria-pressed', 'true');
   const strip = page.locator('#hub-phase .pstrip');
   await expect(strip).toContainText('Invite Season');
   await expect(strip).toContainText('Invite 1 recruit per week');
@@ -292,8 +272,6 @@ test('a processed invite week has no results panel and no gap above the visits',
   await park(page);
   await page.screenshot({ path: path.join(__dirname, '../../reports/recruit-hide-results/leans-w21-1920.png') });
 
-  await tab(page, 'Pool').click();
-  await tab(page, 'Visits').click();
   await expect(page.locator('#hub-weekly')).toHaveCount(0);
   expect(results).toEqual([]);
 });
@@ -500,13 +478,10 @@ test('week 21 focus flow lands on the region pool, and Leans toggles to leaners 
 
 test('browse hub keeps the Leans tab and the Leans toggle in sync', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openHub(page, 22, { recruits: fullPool() });
-  await expect(tab(page, 'Pool')).toHaveAttribute('aria-selected', 'true');
-  await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.locator('#pool-region')).toHaveValue('C');
-
-  await leansBtn(page).click();
+  await openHub(page, 7, { recruits: fullPool() });
   await expect(tab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
+  await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'true');
+  await page.selectOption('#pool-region', 'C');
   expect(page.url()).toContain('hub=leans');
   expect(await poolIds(page)).toEqual(['r-12', 'r-7']);
 

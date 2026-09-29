@@ -198,20 +198,13 @@ test('news and awards tabs stay in the page', async ({ page }) => {
   await openFcc(page);
   const navs = await page.evaluate(() => performance.getEntriesByType('navigation').length);
   await openNews(page);
-  await expect(page.locator('#news-view .gob-news-week h3').first()).toHaveText('Week 12');
-  await expect(page.locator('#news-view .gob-news-week h3').nth(1)).toHaveText('Week 8');
-  const firstRow = page.locator('#news-view .gob-news-week').first().locator('.gob-news-row').first();
-  await expect(firstRow).toHaveClass(/is-yours/);
-  await expect(firstRow).toContainText('Lancaster defeated Four Corners 70-64');
-  await expect(firstRow.locator('a.lnk')).toHaveAttribute('href', '/box-score.html?game_id=g1');
-  await expect(firstRow.locator('a.lnk')).toHaveText('Box Score');
-  const head = await page.locator('#news-view .gob-news-week > h3').first().evaluate(function (el) {
-    const style = getComputedStyle(el);
-    return { size: style.fontSize, family: style.fontFamily };
-  });
-  expect(head.size).toBe('16px');
-  expect(head.family).toContain('Bebas');
-  const edge = await firstRow.evaluate(function (el) { return getComputedStyle(el).boxShadow; });
+  const hero = page.locator('#news-view .gob-news-card.is-hero');
+  await expect(hero).toHaveClass(/is-yours/);
+  await expect(hero).toContainText('Lancaster defeated Four Corners 70-64 (Box Score)');
+  await expect(hero).toHaveAttribute('href', '/box-score.html?game_id=g1');
+  await expect(page.locator('#news-view a.lnk')).toHaveCount(0);
+  await expect(page.getByText('View', { exact: true })).toHaveCount(0);
+  const edge = await hero.evaluate(function (el) { return getComputedStyle(el).boxShadow; });
   expect(edge).toContain('39, 64, 142');
   expect(page.url()).toContain('tab=news-view');
   expect(page.url()).not.toContain('news.html');
@@ -239,7 +232,7 @@ test('a headline pushes the story and back restores the feed scroll', async ({ p
   await openNews(page);
   await page.locator('#news-view').evaluate(function (el) { el.style.minHeight = '2400px'; });
   await page.evaluate(function () { document.querySelector('html.gob-shell .main').scrollTop = 480; });
-  await page.locator('#news-view a.gob-news-row').first().evaluate(function (el) { el.click(); });
+  await page.locator('#news-view a.gob-news-card[data-story]').first().evaluate(function (el) { el.click(); });
   await expect(page.locator('#news-view .gob-news-headline')).toHaveText('Week 12 Upset Report');
   await expect(page.locator('#news-view .gob-news-line')).toContainText('Lancaster upset');
   expect(page.url()).toContain('story=w12-upset');
@@ -247,7 +240,7 @@ test('a headline pushes the story and back restores the feed scroll', async ({ p
     return document.querySelector('html.gob-shell .main').scrollTop;
   })).toBe(0);
   await page.locator('#news-view .gob-dt-up').click();
-  await expect(page.locator('#news-view .gob-news-week h3').first()).toHaveText('Week 12');
+  await expect(page.locator('#news-view .gob-news-card.is-hero')).toBeVisible();
   expect(page.url()).not.toContain('story=');
   await expect.poll(async () => page.evaluate(function () {
     return document.querySelector('html.gob-shell .main').scrollTop;
@@ -281,7 +274,7 @@ test('first open shows a skeleton and a failed news load retries', async ({ page
   await page.locator('.rail [data-gob-section="news"]').evaluate(function (el) { el.click(); });
   await page.getByRole('tab', { name: 'News', exact: true }).evaluate(function (el) { el.click(); });
   await expect(page.locator('#news-view .gob-view-skel')).toBeVisible();
-  await expect(page.locator('#news-view .gob-news-week h3').first()).toHaveText('Week 12');
+  await expect(page.locator('#news-view .gob-news-card').first()).toBeVisible();
 
   await page.unroute('**/*');
   await installApi(page, { newsStatus: 500 });
@@ -293,7 +286,7 @@ test('first open shows a skeleton and a failed news load retries', async ({ page
   await page.unroute('**/*');
   await installApi(page, {});
   await page.locator('#news-view .gob-view-retry').click();
-  await expect(page.locator('#news-view .gob-news-week h3').first()).toHaveText('Week 12');
+  await expect(page.locator('#news-view .gob-news-card').first()).toBeVisible();
 });
 
 test('the news and awards panels do not overflow .main', async ({ page }) => {

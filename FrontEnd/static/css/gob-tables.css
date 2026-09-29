@@ -1027,6 +1027,9 @@ html.gob-shell.gob-1920 #league-schedule-view .gob-gf { min-height: var(--dsz-28
 
 /* League › Team Stats: 28 columns sized to fit .main, so the one header row
    pins under the page head instead of scrolling inside a wide card. */
+#team-stats-view .gob-ts {
+  overflow: visible;
+}
 #team-stats-view .gob-ts .gob-tbl th,
 #team-stats-view .gob-ts .gob-tbl td {
   padding: var(--space-6) var(--space-4);
@@ -1034,6 +1037,8 @@ html.gob-shell.gob-1920 #league-schedule-view .gob-gf { min-height: var(--dsz-28
 #team-stats-view .gob-ts .gob-tbl th {
   font-size: var(--fs-11);
   letter-spacing: var(--tracking-6);
+  background: var(--bg-page-solid);
+  box-shadow: 0 -12px 0 var(--bg-page-solid);
 }
 #team-stats-view .gob-ts .gob-tbl th.s::after { margin-left: var(--space-2); }
 #team-stats-view .gob-ts .gob-tbl th.team,

@@ -278,8 +278,23 @@
     else window.location.assign(href);
   }
 
+  function recruitingWeek() {
+    if (currentWeek) return currentWeek;
+    if (window.RecruitingHub && typeof window.RecruitingHub.week === 'function') {
+      return Number(window.RecruitingHub.week()) || 0;
+    }
+    return 0;
+  }
+
   function labeledTabs(section) {
-    return section.tabs.filter(function (tab) { return tab.label; });
+    return section.tabs.filter(function (tab) {
+      if (!tab.label) return false;
+      var week = recruitingWeek();
+      if (section.id === 'recruiting' && isRecruitingHubTab(tab) && week >= 20 && week <= 26) {
+        return false;
+      }
+      return true;
+    });
   }
 
   function hubFromUrl() {
@@ -396,8 +411,14 @@
       selected: tab || '',
       onActivate: activateSubtab
     });
+    if (section.id === 'recruiting' && !tabs.length && recruitingWeek() >= 20 && recruitingWeek() <= 26) {
+      subtabHost.hidden = false;
+    }
     if (window.GOBTables && typeof window.GOBTables.placeTools === 'function') window.GOBTables.placeTools(subtabHost);
     window.GOBSubtabs.syncTools(subtabHost);
+    if (section.id === 'recruiting' && window.RecruitingHub && typeof window.RecruitingHub.mountSearch === 'function') {
+      window.RecruitingHub.mountSearch();
+    }
   }
 
   function markSubtabs(tab) {
@@ -631,6 +652,9 @@
       top.classList.remove('is-tier');
       top.style.removeProperty('--tier-metal');
       top.style.removeProperty('--tier-metal-hi');
+    }
+    if (pageMode && pageMode.file === 'recruiting' && subtabHost && !recruitingRowOff) {
+      renderSubtabs(sectionById('recruiting'), pageMode.sub || '');
     }
     refreshTournamentLock();
   }

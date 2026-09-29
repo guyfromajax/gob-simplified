@@ -247,9 +247,11 @@ def test_everything_the_inbox_published_now_runs_in_news():
 
 def test_dispatches_interleave_into_the_week_cards():
     view = (S / "js" / "shared" / "views" / "newsView.js").read_text()
-    mine = view.index("group.mine.forEach")
-    stories = view.index("group.stories.forEach")
-    assert mine < stories, "your items render above that week's headlines"
+    assert "dispatches.forEach" in view
+    assert "news.forEach" in view
+    yours = view.index("if (a.yours && !b.yours) return -1")
+    week = view.index("Number(b.week || 0) - Number(a.week || 0)")
+    assert week < yours, "newest week first, then yours above that week's other headlines"
 
 
 def test_a_shared_report_link_still_has_its_back_button():

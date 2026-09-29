@@ -77,7 +77,10 @@
     .seg span.on { background: rgba(247,148,32,0.9); color: #15181f; }
 
     /* Archetype board */
-    .arch-board-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+    .arch-board-grid {
+      display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px;
+      grid-auto-flow: column; grid-template-rows: repeat(var(--arch-rows, 4), auto);
+    }
     @media (max-width: 680px) { .arch-board-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
     @media (max-width: 440px) { .arch-board-grid { grid-template-columns: 1fr; } }
     .arch-cell {
@@ -192,7 +195,15 @@
       ['national', 'National'], ['region', 'Region'],
       ['conf_t', 'Conference Tournament'], ['conf_rs', 'Conference (Reg. Season)']
     ];
-    function teamName(id) { return TEAM_NAMES[id] || String(id || '').replace(/_/g, ' '); }
+    function titleCaseName(name) {
+      var text = String(name || '').replace(/_/g, ' ').trim();
+      if (text === 'IDA') return 'IDA';
+      return text.replace(/\S+/g, function (word) {
+        if (word === 'IDA') return 'IDA';
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      });
+    }
+    function teamName(id) { return titleCaseName(TEAM_NAMES[id] || id); }
     function cap(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
 
     function render(me) {
@@ -240,7 +251,7 @@
       if (!entries.length || !total) {
         boardHost.innerHTML = '<div class="muted-empty">Play a franchise game to earn your first coaching archetype.</div>';
       } else {
-        boardHost.innerHTML = '<div class="arch-board-grid">' + entries.map(function (e, i) {
+        boardHost.innerHTML = '<div class="arch-board-grid" style="--arch-rows:' + Math.ceil(entries.length / 3) + '">' + entries.map(function (e, i) {
           var pct = Math.round((e.count / total) * 100);
           var nm = window.GOBArchetype ? window.GOBArchetype.nameFor(e.key) : e.key;
           var badge = window.GOBArchetype ? window.GOBArchetype.badgeHtml(e.key, 30) : '';
