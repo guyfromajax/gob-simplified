@@ -92,6 +92,10 @@ def test_weekly_items_fold_off_the_popup_list():
     assert [m["kind"] for m in q["moments_for_this_visit"]] == ["conference_rs_region"]
     assert [m["kind"] for m in q["weekly_card_items"]] == ["bracket_update", "recruit_visit"]
     assert all(m["kind"] not in ("bracket_update", "recruit_visit") for m in q["moments_for_this_visit"])
+    assert q["weekly_card_items"][0]["href"] == (
+        "/franchise-command-center.html?tab=tournament-view"
+    )
+    assert q["weekly_card_items"][1]["href"] == "/recruiting.html"
 
 
 def test_deferral_to_the_next_visit():

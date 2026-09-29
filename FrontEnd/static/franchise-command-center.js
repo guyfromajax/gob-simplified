@@ -3837,9 +3837,25 @@ async function init() {
   afterTutorial(() => {
     const queueDone = startMomentQueue();
     if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
-      const showTs = () => showCutPlayersRequiredModal(Number(topData.cut_count || 0));
+      let shown = false;
+      const overlayUp = () => !!(typeof document !== 'undefined' && document.querySelector(
+        '.cm-overlay.is-visible,.arch-reveal-overlay.is-visible,.afm-overlay.is-visible,'
+        + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show'
+      ));
+      const showTs = () => {
+        if (shown) return;
+        shown = true;
+        showCutPlayersRequiredModal(Number(topData.cut_count || 0));
+      };
       Promise.resolve(queueDone).then(showTs, showTs);
-      setTimeout(showTs, 8000);
+      setTimeout(() => {
+        if (shown) return;
+        if (overlayUp()) {
+          Promise.resolve(queueDone).then(showTs, showTs);
+          return;
+        }
+        showTs();
+      }, 8000);
     }
   });
 

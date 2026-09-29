@@ -41,6 +41,12 @@ TIER_SEASON_PEAK = "SEASON_PEAK"
 POPUP_TIERS = frozenset({TIER_MILESTONE, TIER_SEASON_PEAK})
 
 
+WEEKLY_HREF = {
+    "bracket_update": "/franchise-command-center.html?tab=tournament-view",
+    "recruit_visit": "/recruiting.html",
+}
+
+
 def _item(
     *,
     kind: str,
@@ -51,6 +57,7 @@ def _item(
     duration: str | None = None,
     title: str,
     line: str,
+    href: str | None = None,
 ) -> dict[str, Any]:
     row: dict[str, Any] = {
         "id": kind,
@@ -64,6 +71,8 @@ def _item(
     }
     if duration:
         row["duration"] = duration
+    if href:
+        row["href"] = href
     return row
 
 
@@ -177,6 +186,7 @@ def collect_moments(
                 seen_key=str(bracket_update_modal.get("update_key") or "bracket_update"),
                 title="Tournament update",
                 line="The tournament bracket moved this week.",
+                href=WEEKLY_HREF["bracket_update"],
             )
         )
     if _eligible_payload(recruit_visit_modal):
@@ -191,6 +201,7 @@ def collect_moments(
                 seen_key="recruit_visit_modal_seen_week",
                 title="Recruit visit",
                 line=f"{name} is visiting this week.",
+                href=WEEKLY_HREF["recruit_visit"],
             )
         )
     rows.sort(key=lambda row: int(row["priority"]))

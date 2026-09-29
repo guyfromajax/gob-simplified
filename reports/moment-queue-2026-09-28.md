@@ -92,26 +92,61 @@ Archetype: if the queue defers it, `run()` no longer consumes the pending flag. 
 - A `long` first moment (championship / bracket reveal / walk-on) blocks a second pop-up even if the second is SEASON PEAK.
 - Several championship moments still count as one visit slot (one kind).
 - WEEKLY moments never pop up, even on a quiet visit. They only appear on the Office card.
-- The 8s cut safety net can still open the cut modal while a queue overlay is up if the queue hangs.
+- The 8s cut safety net no longer opens while a queue overlay is visible; it waits for the queue promise. A hang still delays cut until the promise settles.
 - `recruiting_results_modal` is still on the CC payload. A future caller that opens it from that flag would bring the duplicate signing pop-up back.
 - Sammy `maybeShow` still has the old 300-retry loop for isolated tests; only the Office path is off that loop.
 - Archetype “1 of 2” is available to the modal but the evolution chrome has no eyebrow to show it.
 
-## Gates
+## Fix pass
 
-Related tests during work: `tests/test_moment_queue.py` + sibling modal tests, 25 passed; `tests/e2e/moment-queue.spec.js` passed.
+Merged `origin/develop` (pytest-green + feat/home-base-data). No conflicts.
 
-Full Playwright (`env -u CI`, port 8088, workers=1): **543 passed, 3 skipped** (7.9m). One new spec vs the prior 542 on develop.
+### Weekly card actually renders
 
-`pytest --ignore=tests/e2e` on this branch: **3865 passed**, 9 failed, 14 skipped, 109 xfailed, 1 xpassed. Failures (same names as origin/develop / the audit-agent set):
+`weeklyCard` was unshifted onto `second` *after* `second.forEach` had already appended into column 2, so the card never left the array. It is built and unshifted before the columns fill. It sits at the top of This Week using the existing `card` / `card-h` / `sn-row` chrome. No new colours.
 
-- `test_env_static_safety`
-- `test_fcc_team_measures_radar_scale`
-- `test_resource_page_scoping` ×2
-- `test_tb_leak_detector`
-- `test_training_page_phase5` ×3
-- `test_player_stats` (flake)
+Playwright now asserts the card is visible with a recruit_visit item and a bracket_update item.
 
-No new Python failure from the queue. Servers stopped; regenerated `reports/` images restored.
+### Cut modal once-only
+
+`showTs` ran from the queue promise *and* from `setTimeout(8000)` with no guard. Restored `let shown = false`. The 8s net does not open the cut modal while a queue overlay is visible (same selectors as `fccHasCompetingModal`: championship, archetype reveal, alpha feedback, tutorial alert, Sammy, Big News). If an overlay is up at 8s, it waits for the queue promise instead.
+
+Playwright: one pop-up + `cut_required` → cut modal count is 0 while the pop-up is up, then exactly 1 after dismiss, still 1 after 8.5s.
+
+### Weekly hrefs
+
+Server sets `href` on each WEEKLY item:
+
+- `bracket_update` → `/franchise-command-center.html?tab=tournament-view`
+- `recruit_visit` → `/recruiting.html`
+
+The Office row is an `<a class="sn-row">` with that href (franchise/team ids appended from the current URL). Existing Office link style (`color: inherit`). Text unchanged.
+
+### Weekly-card lifetime (eligibility window; no browser seen-mark)
+
+WEEKLY items no longer go through a modal, so they do not PATCH seen. The card lasts as long as the **existing server flag** stays eligible:
+
+| Kind | Stays while | Ends when |
+|---|---|---|
+| **recruit_visit** | Weeks 20–26 and `_build_recruit_visit_modal_payload` finds a visit for **this week** | The week advances (that week’s assignment is no longer current) or week leaves 20–26. Does not outlive its week. |
+| **bracket_update** | Current week is in `BRACKET_UPDATE_WEEKS` (28, 29, 31, 33, 34, 35) and `_build_bracket_update_modal_payload` is eligible (EOS/national checks, that week’s `update:{tier}:{season}:{week}` key unseen) | The week leaves that map, or that week’s update_key is no longer eligible. Does not outlive its update week. |
+
+No extra server-flag change: both builders are already week-keyed. The old modal seen-stamp only hid the card mid-week after a pop-up; the week window already ended it.
+
+### Self-check (1280)
+
+- `reports/moment-queue/office-weekly-card.png` — Office, three columns. Top of This Week is the existing dark card titled “This week” with two rows: Tournament update / “The tournament bracket moved this week.” and Recruit visit / “Ellis Clemons is visiting this week.” Neutral text, no gold. Next game and Team snapshot sit under it. Advance is the only green button (Play Next Game).
+- `reports/moment-queue/popup-1-of-2.png` — One Sammy modal over the Office. Eyebrow reads “1 OF 2 · REGION TOURNAMENT QUALIFIED”. Body is the conference-title qualification copy. One orange “Go To Locker Room” (existing Sammy chrome). Nothing else stacked.
+- `reports/moment-queue/cut-after-popup.png` — Cut modal only: “Trim Your Roster to Size”, copy about assigning 2 players, green “Assign Practice Squad”. No Sammy / Big News overlay behind it. Advance label is also Assign Practice Squad (existing cut mode).
+
+### Gates (fix pass)
+
+Related tests: `tests/test_moment_queue.py` + sibling modal tests, 25 passed; `tests/e2e/moment-queue.spec.js` 3 passed.
+
+`pytest --ignore=tests/e2e`: **3890 passed**, 0 failed, 14 skipped, 109 xfailed, 1 xpassed.
+
+Full Playwright (`env -u CI`, port 8088, workers=1): **547 passed, 3 skipped** (8.0m).
+
+Servers stopped; regenerated tracked `reports/` images restored. New shots kept under `reports/moment-queue/`.
 
 STATUS: COMPLETE

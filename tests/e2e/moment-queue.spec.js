@@ -3,6 +3,7 @@
  * Three eligible pop-up moments: this visit shows at most two; the rest wait.
  */
 const { test, expect } = require('@playwright/test');
+const path = require('path');
 const { stubAuth } = require('./helpers/auth');
 
 test.describe.configure({ timeout: 90000 });
@@ -85,6 +86,48 @@ function visitOne() {
     region_bye_modal_eligible: true,
     moments,
     moments_for_this_visit: [moments[0], moments[1]],
+    office_digest: Object.assign(digest(), { weekly_card_items: [] }),
+  });
+}
+
+function weeklyItems() {
+  return [
+    {
+      id: 'bracket_update', kind: 'bracket_update', tier: 'WEEKLY', priority: 70,
+      payload_ref: 'bracket_update_modal', seen_key: 'bracket_update',
+      title: 'Tournament update', line: 'The tournament bracket moved this week.',
+      href: '/franchise-command-center.html?tab=tournament-view',
+    },
+    {
+      id: 'recruit_visit', kind: 'recruit_visit', tier: 'WEEKLY', priority: 80,
+      payload_ref: 'recruit_visit_modal', seen_key: 'recruit_visit_modal_seen_week',
+      title: 'Recruit visit', line: 'Ellis Clemons is visiting this week.',
+      href: '/recruiting.html',
+    },
+  ];
+}
+
+function visitWeekly() {
+  const items = weeklyItems();
+  return cc({
+    moments: items,
+    moments_for_this_visit: [],
+    weekly_card_items: items,
+    office_digest: Object.assign(digest(), { weekly_card_items: items }),
+  });
+}
+
+function visitCut() {
+  const conference = { eligible: true, lost_round: 'round1' };
+  const moments = [
+    { id: 'conference_rs_region', kind: 'conference_rs_region', tier: 'MILESTONE', priority: 40, payload_ref: 'conference_rs_region_modal', seen_key: 'conference_rs_region_modal_seen_season', duration: 'short', title: 'Region tournament qualified', line: 'Qualified.' },
+  ];
+  return cc({
+    cut_required: true,
+    cut_count: 2,
+    conference_rs_region_modal: conference,
+    moments,
+    moments_for_this_visit: moments,
     office_digest: Object.assign(digest(), { weekly_card_items: [] }),
   });
 }
@@ -183,8 +226,13 @@ async function dismissSammy(page) {
   }, label, { timeout: 8000 });
 }
 
+const SHOTS = path.join(__dirname, '../../reports/moment-queue');
+
 test('three eligible moments show at most two pop-ups; the rest wait for the next visit', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
   await openOffice(page, visitOne());
+  await expect(page.locator('.sammy-modal-backdrop.open')).toBeVisible({ timeout: 15000 });
+  await page.screenshot({ path: path.join(SHOTS, 'popup-1-of-2.png') });
   await dismissSammy(page);
   await dismissSammy(page);
   await expect.poll(async () => page.evaluate(overlayCount)).toBe(0);
@@ -192,4 +240,31 @@ test('three eligible moments show at most two pop-ups; the rest wait for the nex
   await openOffice(page, visitTwo());
   await dismissSammy(page);
   await expect.poll(async () => page.evaluate(overlayCount)).toBe(0);
+});
+
+test('the weekly card shows a recruit visit and a bracket update', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openOffice(page, visitWeekly());
+  const card = page.locator('#office-root .office-weekly');
+  await expect(card).toBeVisible();
+  await expect(card.getByText('Recruit visit')).toBeVisible();
+  await expect(card.getByText('Ellis Clemons is visiting this week.')).toBeVisible();
+  await expect(card.getByText('Tournament update')).toBeVisible();
+  await expect(card.getByText('The tournament bracket moved this week.')).toBeVisible();
+  await expect(card.locator('a.sn-row[href*="recruiting.html"]')).toHaveCount(1);
+  await expect(card.locator('a.sn-row[href*="tab=tournament-view"]')).toHaveCount(1);
+  await page.screenshot({ path: path.join(SHOTS, 'office-weekly-card.png') });
+});
+
+test('cut modal opens once after the pop-up closes', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openOffice(page, visitCut());
+  await expect(page.locator('.sammy-modal-backdrop.open')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.fcc-cut-required-modal')).toHaveCount(0);
+  await dismissSammy(page);
+  await expect(page.locator('.fcc-cut-required-modal.is-visible')).toHaveCount(1);
+  await expect(page.locator('.sammy-modal-backdrop.open')).toHaveCount(0);
+  await page.screenshot({ path: path.join(SHOTS, 'cut-after-popup.png') });
+  await page.waitForTimeout(8500);
+  await expect(page.locator('.fcc-cut-required-modal')).toHaveCount(1);
 });

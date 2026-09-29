@@ -822,6 +822,20 @@
     return node.childNodes.length > 1 ? node : null;
   }
 
+  function weeklyHref(item) {
+    var raw = item && item.href;
+    if (!present(raw)) return '';
+    var current = new URLSearchParams(global.location.search);
+    var url;
+    try { url = new URL(raw, 'http://local.invalid'); } catch (err) { return String(raw); }
+    if (current.get('franchise_id') && !url.searchParams.get('franchise_id')) {
+      url.searchParams.set('franchise_id', current.get('franchise_id'));
+    }
+    var teamId = current.get('team_id') || current.get('user_team_id');
+    if (teamId && !url.searchParams.get('team_id')) url.searchParams.set('team_id', teamId);
+    return url.pathname + (url.search || '');
+  }
+
   function weeklyCard(items, index) {
     if (!Array.isArray(items) || !items.length) return null;
     var node = card('office-weekly', index);
@@ -830,7 +844,12 @@
     node.appendChild(head);
     items.forEach(function (item) {
       if (!item) return;
-      var row = el('div', 'sn-row');
+      var url = weeklyHref(item);
+      var row = el(url ? 'a' : 'div', 'sn-row');
+      if (url) {
+        row.href = url;
+        bindGo(row, url);
+      }
       if (present(item.title)) row.appendChild(el('span', 'sn-l', item.title));
       if (present(item.line)) row.appendChild(el('span', '', item.line));
       if (row.childNodes.length) node.appendChild(row);
@@ -1259,10 +1278,10 @@
       ];
       third = [wireCard(digest.recruiting_wire, false, 6)];
     }
-    first.forEach(function (node) { if (node) col1.appendChild(node); });
-    second.forEach(function (node) { if (node) col2.appendChild(node); });
     var weekly = weeklyCard(digest.weekly_card_items, 2);
     if (weekly) second.unshift(weekly);
+    first.forEach(function (node) { if (node) col1.appendChild(node); });
+    second.forEach(function (node) { if (node) col2.appendChild(node); });
     third.forEach(function (node) { if (node) col3.appendChild(node); });
     var grid = el('div', 'office-grid');
     grid.append(col1, col2, col3);
