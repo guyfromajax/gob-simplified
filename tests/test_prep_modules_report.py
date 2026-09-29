@@ -26,3 +26,9 @@ def test_page_script_exports_init():
 def test_html_still_redirects_into_the_app():
     assert "tab', 'training-report-view'" in HTML or 'tab", "training-report-view"' in HTML
     assert "location.replace('/franchise-command-center.html?" in HTML
+
+
+def test_page_class_is_on_the_view_root_not_document_body():
+    assert "root.classList.add('training-report-page')" in JS
+    assert "document.body.classList.add('training-report-page')" not in VIEW
+    assert "document.body.classList.toggle('training-report-page'" not in VIEW

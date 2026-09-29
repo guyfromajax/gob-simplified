@@ -89,29 +89,53 @@ Cold ~16 ms (shell then fill). Warm 2–4 ms (panel kept; signature skip). No bl
 
 ## Screenshots (opened)
 
-Same real fixture (week 12, Four Corners, Roger Henrich, P/T Defense Readiness):
+Same real fixture (week 12, Four Corners, Roger Henrich, P/T Defense Readiness). Develop befores were captured from `b9dd1df23` (embed + `body.training-report-page`) in a worktree.
 
 | File | Check |
 |---|---|
-| `training-report-office-1280.png` / `1920.png` | Week 12, opponent, focus, notes + team columns, ← Back, Office rail, Advance = Play Next Game (green). No gold. No Player Training underline. |
-| `training-report-news-1280.png` / `1920.png` | Same report, News rail + ← News. |
-| `training-report-after-1280.png` / `1920.png` | Same fixture as Office after the module mount. There is no embed-era capture of this fixture (the follow-up stub was empty: “Week: --”). Layout is the existing `#training-report-view` treatment, not a restyle. After matches Office. |
+| `before-office-1280.png` / `1920.png` | Develop embed. Three Notes columns, square RH/NS/RH portraits, ghost ← Back, quiet Attributes / Training Changes segment at 1920. |
+| `before-news-1280.png` / `1920.png` | Same report, News rail + ← News. |
+| `training-report-office-1280.png` / `1920.png` | After. Same columns, portraits, ghost Back, Office rail, Play Next Game green. No gold. No Player Training underline. |
+| `training-report-news-1280.png` / `1920.png` | After. Same report, News rail + ← News. |
+| `training-report-after-1280.png` / `1920.png` | Same as Office after. |
+
+### Before / after (same fixture)
+
+1280 Office: `before-office-1280.png` · `training-report-after-1280.png`. Notes cards 225px (`before-metrics.json`). After matches. Remaining pixel-level differences: the module Back is restated as a transparent ghost under `#training-report-view #locker-room-btn.gob-btn--ghost` vs develop’s `rgba(255,255,255,0.06)` fill — same outline, no UA grey block. Portraits are the same 40×40 square initials (this fixture’s `p-roger` has no painted master). No mid-word wrap. Toggle at 1920 is the same quiet segment, not orange and not the old light control.
 
 ---
 
 ## Tests
 
-- `tests/e2e/prep-modules-report.spec.js`: no `training-report.html` fetch, no clash ids inside the view (`#toast` / leftover `#attribute-tooltip`), real data, Office / News / post-submit returns, revalidate keeps the shell.
-- `tests/test_prep_modules_report.py`: source scan — no embed/DOMParser/IIFE in the view; `init` export; HTML still redirects.
+- `tests/e2e/prep-modules-report.spec.js`: no `training-report.html` fetch, no clash ids inside the view (`#toast` / leftover `#attribute-tooltip`), real data, Office / News / post-submit returns, revalidate keeps the shell, geometry guard vs `before-metrics.json`.
+- `tests/test_prep_modules_report.py`: source scan — no embed/DOMParser/IIFE in the view; `init` export; HTML still redirects; `training-report-page` is on the view root, not `document.body`.
 - Existing: player-training-followup, training-report-no-recruiting, `test_player_development_grid` (news or inbox Back), navigation-fixes-3 leave-report (`data-exit-wired`).
+
+---
+
+## Fix pass
+
+The first conversion dropped `document.body.classList.add('training-report-page')` (correct — that leaked). The polished Notes grid, 40×40 square portraits, and in-app chrome still lived under `body.training-report-page …`, so the unscoped 3-column `.training-notes-container` crushed the hero cards, portraits had no size, and the Back/toggle fell back to leftover page styles.
+
+What changed:
+
+- `init` adds `training-report-page` on the **view root** (`#training-report-view`), never on `document.body`.
+- 161 `body.training-report-page .…` descendant rules remapped to `.training-report-page .…`. The bare `body.training-report-page { }` page chrome stays for leftover `embed=1` only.
+- `#training-report-view .training-notes-container` is a single column (no `word-wrap: break-word`). Hero portraits are 40×40, `border-radius: var(--radius-6)`.
+- `#training-report-view #locker-room-btn.gob-btn--ghost` restates the ghost (transparent fill, `appearance: none`) so the UA light button does not paint a grey block.
+- Visual guard: Notes column widths vs `before-metrics.json` (±16px), no label/name wider than its card, 40×40 square portraits, Back is `gob-btn--ghost` at 138×42 and not the orange locker style, toggle is not orange.
+
+No gold tokens brought back. No global `:root` / `*` / `body` leaks.
 
 ---
 
 ## UX_System §8 merge gate
 
-- pytest `--ignore=tests/e2e`: **4061 passed**, 16 skipped, 109 xfailed, 1 xpassed, **0 failed**.
-- Full Playwright, workers=1, port 8157, CI unset: first run 673 passed / 2 failed (`data-exit-wired` missing on the module Back). Restored the attribute. Second full run: **674 passed**, 3 skipped, **1 failed** — this PR’s global-id scan hit a pre-existing duplicate `#alpha-badge` on the command center (not in the report). Scoped the check to view-owned / clash ids. Re-run of `prep-modules-report.spec.js`: **5 passed**. Re-run of the two navigation-fixes-3 report exits: **2 passed**. This-work Playwright (follow-up + new spec + no-recruiting): **17 passed** earlier; the new spec is 5/5 after the scope fix.
+- pytest `--ignore=tests/e2e`: **4062 passed**, 16 skipped, 109 xfailed, 1 xpassed, **0 failed**.
+- Full Playwright, workers=1, port 8157, CI unset: **676 passed**, 3 skipped, **0 failed** (clean full run).
+- This-work Playwright: **6 passed** (`prep-modules-report.spec.js` including the geometry guard).
 
 ---
 
 STATUS: COMPLETE
+

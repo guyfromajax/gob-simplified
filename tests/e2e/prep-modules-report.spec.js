@@ -8,6 +8,8 @@ test.describe.configure({ timeout: 120000 });
 const FID = 'f-e2e-prep-modules-report';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/prep-modules-report');
+const HEADSHOT = fs.readFileSync(path.join(__dirname, '../../FrontEnd/static/images/players/generic_headshot.png'));
+const BEFORE = JSON.parse(fs.readFileSync(path.join(OUT, 'before-metrics.json'), 'utf8'));
 
 const REPORT = {
   week: 12,
@@ -91,6 +93,9 @@ async function installApi(page) {
       || pathname.startsWith('/roster/')
       || pathname === '/teams'
       || pathname === '/app-config';
+    if (pathname.startsWith('/images/players/')) {
+      return route.fulfill({ status: 200, contentType: 'image/png', body: HEADSHOT });
+    }
     if (!api) {
       await route.continue();
       return;
@@ -215,6 +220,87 @@ test('reopening keeps the panel and does not rebuild the shell', async ({ page }
   await expect(page.locator('#training-report-view')).toHaveAttribute('data-keep', '1');
   await expect(page.locator('#training-report-view .training-report-container')).toHaveCount(1);
   await expect(page.locator('#training-report-view #week-number')).toHaveText('12');
+});
+
+async function reportGeometry(page) {
+  return page.evaluate(() => {
+    const host = document.getElementById('training-report-view');
+    const cards = [...host.querySelectorAll('.training-notes-hero-card')].map((el) => {
+      const r = el.getBoundingClientRect();
+      const label = el.querySelector('.training-notes-hero-label');
+      const name = el.querySelector('.training-notes-hero-name');
+      const widerThanColumn = [label, name].filter(Boolean).some((node) => (
+        node.scrollWidth > node.clientWidth + 1
+      ));
+      return {
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+        labelWidth: label ? Math.round(label.getBoundingClientRect().width) : 0,
+        labelHeight: label ? Math.round(label.getBoundingClientRect().height) : 0,
+        wrap: label ? (label.scrollHeight > label.clientHeight + 1) : false,
+        widerThanColumn,
+      };
+    });
+    const portraits = [...host.querySelectorAll('.training-notes-hero-portrait-img, .training-notes-hero-portrait-fallback')].map((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        w: Math.round(r.width),
+        h: Math.round(r.height),
+        natural: el.tagName === 'IMG' ? el.naturalWidth : null,
+        radius: getComputedStyle(el).borderRadius,
+      };
+    });
+    const btn = host.querySelector('#locker-room-btn');
+    const bs = btn ? getComputedStyle(btn) : null;
+    const toggle = host.querySelector('.players-section .toggle-btn.active');
+    const ts = toggle ? getComputedStyle(toggle) : null;
+    return {
+      cards,
+      portraits,
+      back: btn ? {
+        bg: bs.backgroundColor,
+        cls: btn.className,
+        w: Math.round(btn.getBoundingClientRect().width),
+        h: Math.round(btn.getBoundingClientRect().height),
+      } : null,
+      toggle: toggle ? { bg: ts.backgroundColor, color: ts.color } : null,
+      pageClassOnBody: document.body.classList.contains('training-report-page'),
+      pageClassOnView: host.classList.contains('training-report-page'),
+    };
+  });
+}
+
+test('Notes columns, headshots, and Back match the develop before', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openReport(page, { from: 'office', origin: 'office' });
+  await page.waitForFunction(() => {
+    const nodes = document.querySelectorAll('#training-report-view .training-notes-hero-portrait-img, #training-report-view .training-notes-hero-portrait-fallback');
+    return nodes.length >= 3;
+  });
+  const after = await reportGeometry(page);
+  const before = BEFORE.office;
+
+  expect(after.pageClassOnBody).toBe(false);
+  expect(after.pageClassOnView).toBe(true);
+  expect(after.cards).toHaveLength(before.cards.length);
+  after.cards.forEach((card, i) => {
+    expect(Math.abs(card.width - before.cards[i].width)).toBeLessThanOrEqual(16);
+    expect(card.widerThanColumn).toBe(false);
+  });
+  expect(after.portraits).toHaveLength(before.portraits.length);
+  after.portraits.forEach((shot) => {
+    expect(shot.w).toBe(40);
+    expect(shot.h).toBe(40);
+    expect(shot.radius.startsWith('6px')).toBe(true);
+  });
+  const photos = after.portraits.filter((shot) => shot.natural != null);
+  photos.forEach((shot) => expect(shot.natural).toBeGreaterThan(0));
+  expect(after.back.cls).toContain('gob-btn--ghost');
+  expect(after.back.cls).not.toContain('locker-room-button');
+  expect(after.back.w).toBe(before.back.w);
+  expect(after.back.h).toBe(before.back.h);
+  expect(after.back.bg).not.toMatch(/247,\s*148|255,\s*122|#f79420|#ff7a00/i);
+  expect(after.toggle.bg).not.toMatch(/247,\s*148|#f79420/i);
 });
 
 test('post-submit Back to Office keeps tut_alert=training_return', async ({ page }) => {

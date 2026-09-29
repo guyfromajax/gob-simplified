@@ -1,0 +1,114 @@
+{
+  "office": {
+    "cards": [
+      {
+        "width": 225,
+        "height": 82,
+        "labelWidth": 225,
+        "labelHeight": 16,
+        "wrap": false
+      },
+      {
+        "width": 225,
+        "height": 82,
+        "labelWidth": 225,
+        "labelHeight": 16,
+        "wrap": false
+      },
+      {
+        "width": 225,
+        "height": 82,
+        "labelWidth": 225,
+        "labelHeight": 32,
+        "wrap": false
+      }
+    ],
+    "portraits": [
+      {
+        "w": 40,
+        "h": 40,
+        "natural": null,
+        "radius": "6px"
+      },
+      {
+        "w": 40,
+        "h": 40,
+        "natural": null,
+        "radius": "6px"
+      },
+      {
+        "w": 40,
+        "h": 40,
+        "natural": null,
+        "radius": "6px"
+      }
+    ],
+    "back": {
+      "bg": "rgba(255, 255, 255, 0.06)",
+      "cls": "gob-btn gob-btn--ghost",
+      "w": 138,
+      "h": 42
+    },
+    "toggle": {
+      "bg": "rgba(255, 255, 255, 0.11)",
+      "color": "rgb(255, 255, 255)",
+      "font": "\"Bebas Neue Pro\", \"Bebas Neue\", sans-serif"
+    }
+  },
+  "news": {
+    "cards": [
+      {
+        "width": 225,
+        "height": 82,
+        "labelWidth": 225,
+        "labelHeight": 16,
+        "wrap": false
+      },
+      {
+        "width": 225,
+        "height": 82,
+        "labelWidth": 225,
+        "labelHeight": 16,
+        "wrap": false
+      },
+      {
+        "width": 225,
+        "height": 82,
+        "labelWidth": 225,
+        "labelHeight": 32,
+        "wrap": false
+      }
+    ],
+    "portraits": [
+      {
+        "w": 40,
+        "h": 40,
+        "natural": null,
+        "radius": "6px"
+      },
+      {
+        "w": 40,
+        "h": 40,
+        "natural": null,
+        "radius": "6px"
+      },
+      {
+        "w": 40,
+        "h": 40,
+        "natural": null,
+        "radius": "6px"
+      }
+    ],
+    "back": {
+      "bg": "rgba(0, 0, 0, 0)",
+      "cls": "locker-room-button",
+      "w": 0,
+      "h": 0
+    },
+    "toggle": {
+      "bg": "rgba(255, 255, 255, 0.11)",
+      "color": "rgb(255, 255, 255)",
+      "font": "\"Bebas Neue Pro\", \"Bebas Neue\", sans-serif"
+    }
+  }
+}

@@ -151,6 +151,7 @@ function teardown() {
 
 function init(host, options) {
   root = host || document.body;
+  if (root.classList) root.classList.add('training-report-page');
   togglesWired = false;
   backClickWired = false;
   lastSignature = '';
