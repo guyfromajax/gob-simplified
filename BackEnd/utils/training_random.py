@@ -29,8 +29,7 @@ unchanged::
     ...
     random.randint(1, 100)   # same call surface, isolated stream
 
-Converted modules: ``models/training_execution_v2.py``, ``models/training_notes.py``,
-``models/training_manager.py``.
+Converted modules: ``models/training_execution_v2.py``, ``models/training_notes.py``.
 
 NOT CONVERTED, deliberately: ``populate_team_plays`` / ``populate_scouting_data``
 in ``api/gameplan_routes.py`` (function-local ``import random`` at lines 572 and

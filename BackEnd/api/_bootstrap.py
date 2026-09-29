@@ -9,7 +9,20 @@ from BackEnd.env_config import resolve_runtime_db_access
 from BackEnd.loopback_env import is_loopback
 from BackEnd.runtime_paths import bundle_path, bundle_root
 
-app = FastAPI()
+
+def _docs_kwargs(environ=os.environ) -> dict:
+    """No public OpenAPI/Swagger/ReDoc in production; on everywhere else.
+
+    Same ENVIRONMENT resolution as ``BackEnd.utils.auth._is_production`` (not
+    imported: auth opens the store, and this module must load without a DB).
+    """
+    env = (environ.get("ENVIRONMENT") or environ.get("ENV") or environ.get("RAILWAY_ENVIRONMENT") or "").lower()
+    if env == "production":
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {}
+
+
+app = FastAPI(**_docs_kwargs())
 
 
 def _read_build_stamp() -> str:
