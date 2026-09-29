@@ -224,6 +224,45 @@
     }
   }
 
+  var FCC_PATH = '/franchise-command-center.html';
+  // Params owned by one drill-in. A new view URL starts without them so the
+  // previous drill's player, team, pager or return_url never rides along.
+  var DRILL_KEYS = ['player_id', 'view_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
+    'return_url', 'origin', 'return_tab', 'id'];
+  var TEAM_RETURN_TABS = {
+    'roster-view': 1, 'schedule-tab': 1, 'team-schedule-view': 1, 'player-stats-tab': 1,
+    'player-stats-view': 1, 'team-attributes-view': 1
+  };
+
+  function onFcc() {
+    try { return /\/franchise-command-center\.html$/i.test(global.location.pathname || ''); }
+    catch (err) { return false; }
+  }
+
+  // An in-app view URL: the command center's current query (so franchise,
+  // runtime and mode survive) minus the last drill's keys, plus `changes`.
+  // Empty values in `changes` delete the key.
+  function viewHref(changes) {
+    var q = new URLSearchParams();
+    if (onFcc()) {
+      try { q = new URLSearchParams(global.location.search); }
+      catch (err) { q = new URLSearchParams(); }
+    }
+    DRILL_KEYS.forEach(function (key) { q.delete(key); });
+    Object.keys(changes || {}).forEach(function (key) {
+      var value = changes[key];
+      if (value == null || value === '') q.delete(key);
+      else q.set(key, String(value));
+    });
+    var text = q.toString();
+    return FCC_PATH + (text ? '?' + text : '');
+  }
+
+  function originForReturnTab(returnTab) {
+    if (returnTab === 'home-tab') return 'office';
+    return TEAM_RETURN_TABS[returnTab] ? 'team' : 'league';
+  }
+
   function rosterHref(franchiseId, teamId, teamName, returnTab) {
     var owner = '';
     try {
@@ -234,11 +273,16 @@
       owner = global.GOBViews.userTeamId() || '';
     }
     var viewed = teamId || '';
-    return '/team-roster-view.html?mode=franchise&franchise_id=' + encodeURIComponent(franchiseId || '')
-      + '&team_id=' + encodeURIComponent(owner || viewed)
-      + '&roster_team_id=' + encodeURIComponent(viewed)
-      + '&team_name=' + encodeURIComponent(teamName || '')
-      + '&return_tab=' + encodeURIComponent(returnTab || '');
+    var changes = {
+      mode: 'franchise',
+      team_id: owner || viewed,
+      tab: 'team-view',
+      view_team_id: viewed,
+      return_tab: returnTab || '',
+      origin: originForReturnTab(returnTab || '')
+    };
+    if (franchiseId) changes.franchise_id = franchiseId;
+    return viewHref(changes);
   }
 
   function resetScroll() {
@@ -268,6 +312,9 @@
     paintError: paintError,
     backForward: backForward,
     rosterHref: rosterHref,
+    viewHref: viewHref,
+    originForReturnTab: originForReturnTab,
+    drillKeys: function () { return DRILL_KEYS.slice(); },
     resetScroll: resetScroll
   };
 })(typeof window !== 'undefined' ? window : this);

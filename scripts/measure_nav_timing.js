@@ -88,9 +88,16 @@ const OFFICE_DONE = '#home-tab .office-col .nx-name';
 
 const DRILLS = [
   { id: 'player-view', from: 'roster-view', section: 'team', click: '#roster-view a.gob-player', done: '#player-view .gob-hero-n' },
-  // Standings team links go to /team-roster-view.html, whose stub reloads the command center at ?tab=team-view.
-  { id: 'team-view', from: 'standings-view', section: 'league', click: '#standings-view a.gob-team', done: '#team-view .gob-hero-n', page: true },
+  { id: 'team-view', from: 'standings-view', section: 'league', click: '#standings-view a.gob-team', done: '#team-view .gob-hero-n' },
 ];
+
+// A drill link that still points at a redirect stub reloads the document, so it is timed
+// cross-document; an in-app link is timed in the page.
+const STUB_LINK = /\/(team-roster-view|player-detail)\.html/;
+async function isPageLink(page, click) {
+  const href = await page.evaluate((c) => { const el = document.querySelector(c); return el ? el.getAttribute('href') || '' : ''; }, click);
+  return STUB_LINK.test(href);
+}
 
 // Full pages the rail itself leaves for.
 const RAIL_PAGES = [
@@ -507,8 +514,9 @@ async function navChecks(browser, f, profile) {
         await railTo(page, d.section, sec.views[0].done);
         await page.evaluate((id) => { const b = document.querySelector(`#gob-subtabs .tb[data-key="${id}"]`); if (b) b.click(); }, d.from);
         await waitVisible(page, sec.views.find((v) => v.id === d.from).done);
+        const reloads = await isPageLink(page, d.click);
         const click = page.evaluate((c) => document.querySelector(c).click(), d.click);
-        if (d.page) await Promise.all([page.waitForNavigation({ url: /tab=team-view/ }), click]);
+        if (reloads) await Promise.all([page.waitForNavigation({ url: new RegExp('tab=' + d.id) }), click]);
         else await click;
         await waitVisible(page, d.done, 15000);
         await page.evaluate((t) => document.querySelector(`.rail [data-gob-section="${t}"]`).click(), target);
@@ -533,10 +541,11 @@ async function navChecks(browser, f, profile) {
       await page.evaluate(() => document.querySelector('#roster-view a.gob-player').click());
       await sleep(1500);
     }],
-    ['drill standings->team-view (page)', async () => {
+    ['drill standings->team-view', async () => {
       await railTo(page, 'league', SECTIONS[2].views[0].done);
-      await Promise.all([page.waitForNavigation().catch(() => {}), page.evaluate(() => document.querySelector('#standings-view a.gob-team').click())]);
-      await sleep(2000);
+      await page.evaluate(() => document.querySelector('#standings-view a.gob-team').click());
+      await waitVisible(page, DRILLS[1].done, 15000);
+      await sleep(1000);
     }],
   ].concat(RAIL_PAGES.map((p) => [`rail ${p.id}`, async () => {
     await Promise.all([page.waitForNavigation().catch(() => {}), page.evaluate((c) => document.querySelector(c).click(), p.click)]);
@@ -601,6 +610,8 @@ async function passSmoke(browser, pages) {
           text: (document.body && document.body.innerText || '').trim().length,
           viewError: !!document.querySelector('.gob-view-error'),
           feedbackHidden: (() => { const b = document.getElementById('gob-rail-feedback'); return b ? b.hidden : null; })(),
+          // The attribute alone can disagree with what is painted (.rail-i sets display).
+          feedbackPainted: (() => { const b = document.getElementById('gob-rail-feedback'); return b ? getComputedStyle(b).display !== 'none' && b.getBoundingClientRect().height > 0 : null; })(),
         }));
       } catch (e) { facts = { landed: page.url(), evalError: true }; }
       res[profile][name] = Object.assign({ status, errors: [...new Set(errors)].slice(0, 5), failed: [...new Set(failed)].slice(0, 8), remote: [...new Set(remote)] }, facts);
@@ -687,7 +698,9 @@ async function timingSequence(browser, profile, capture) {
           await page.evaluate((id) => document.querySelector(`#gob-subtabs .tb[data-key="${id}"]`).click(), d.from);
         }
         await waitVisible(page, fromDone);
-        put(d.id, phase, await shot(d.id, phase, () => (d.page ? timeToPage(page, d.click, d.done) : timeInPage(page, d.click, d.done, d.id))));
+        const reloads = await isPageLink(page, d.click);
+        const r = await shot(d.id, phase, () => (reloads ? timeToPage(page, d.click, d.done) : timeInPage(page, d.click, d.done, d.id)));
+        put(d.id, phase, Object.assign({ mode: reloads ? 'page' : 'in-app' }, r));
       } catch (err) {
         put(d.id, phase, { error: String(err.message || err).split('\n')[0] });
         await page.goto(fccUrl(f));
