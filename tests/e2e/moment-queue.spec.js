@@ -1,6 +1,7 @@
 // @ts-check
 /**
- * Three eligible pop-up moments: this visit shows at most two; the rest wait.
+ * Server-capped visit list: this visit shows the queued pop-ups; the rest wait.
+ * Fixtures use moment-queue v2 shapes (kind, tier, style, sting, duration, payload_ref).
  */
 const { test, expect } = require('@playwright/test');
 const path = require('path');
@@ -70,15 +71,34 @@ function cc(flags) {
     moments: [],
     moments_for_this_visit: [],
     weekly_card_items: [],
+    team_name_map: { [TID]: 'Lancaster' },
   }, flags || {});
 }
 
 function visitOne() {
   const conference = { eligible: true, lost_round: 'round1' };
   const moments = [
-    { id: 'conference_rs_region', kind: 'conference_rs_region', tier: 'MILESTONE', priority: 40, payload_ref: 'conference_rs_region_modal', seen_key: 'conference_rs_region_modal_seen_season', duration: 'short', title: 'Region tournament qualified', line: 'Qualified.' },
-    { id: 'region_bye', kind: 'region_bye', tier: 'MILESTONE', priority: 50, payload_ref: 'region_bye_modal_eligible', seen_key: 'region_bye_modal_seen_season', duration: 'short', title: 'Region tournament bye', line: 'Bye.' },
-    { id: 'walk_on_welcome', kind: 'walk_on_welcome', tier: 'MILESTONE', priority: 30, payload_ref: 'walk_on_welcome_modal', seen_key: 'walk_on_welcome_modal_seen_season', duration: 'long', title: 'Walk-on welcome', line: '1 walk-on joined the roster.' },
+    {
+      id: 'conference_rs_region', kind: 'conference_rs_region', tier: 'MILESTONE',
+      priority: 65, payload_ref: 'conference_rs_region_modal',
+      seen_key: 'conference_rs_region_modal_seen_season', duration: 'short',
+      title: 'Region tournament qualified', line: 'Qualified.',
+      style: 'gold', sting: 'STING_MILESTONE',
+    },
+    {
+      id: 'region_bye', kind: 'region_bye', tier: 'MILESTONE',
+      priority: 60, payload_ref: 'region_bye_modal_eligible',
+      seen_key: 'region_bye_modal_seen_season', duration: 'short',
+      title: 'Region tournament bye', line: 'Bye.',
+      style: 'gold', sting: 'STING_MILESTONE',
+    },
+    {
+      id: 'walk_on_welcome', kind: 'walk_on_welcome', tier: 'MILESTONE',
+      priority: 50, payload_ref: 'walk_on_welcome_modal',
+      seen_key: 'walk_on_welcome_modal_seen_season', duration: 'long',
+      title: 'Walk-on welcome', line: '1 walk-on joined the roster.',
+      style: 'gold', sting: 'STING_MILESTONE',
+    },
   ];
   return cc({
     walk_on_welcome_modal: walkOn(),
@@ -93,16 +113,18 @@ function visitOne() {
 function weeklyItems() {
   return [
     {
-      id: 'bracket_update', kind: 'bracket_update', tier: 'WEEKLY', priority: 70,
+      id: 'bracket_update', kind: 'bracket_update', tier: 'WEEKLY', priority: 80,
       payload_ref: 'bracket_update_modal', seen_key: 'bracket_update',
       title: 'Tournament update', line: 'The tournament bracket moved this week.',
       href: '/franchise-command-center.html?tab=tournament-view',
+      style: null, sting: null,
     },
     {
-      id: 'recruit_visit', kind: 'recruit_visit', tier: 'WEEKLY', priority: 80,
+      id: 'recruit_visit', kind: 'recruit_visit', tier: 'WEEKLY', priority: 90,
       payload_ref: 'recruit_visit_modal', seen_key: 'recruit_visit_modal_seen_week',
       title: 'Recruit visit', line: 'Ellis Clemons is visiting this week.',
       href: '/recruiting.html',
+      style: null, sting: null,
     },
   ];
 }
@@ -120,7 +142,13 @@ function visitWeekly() {
 function visitCut() {
   const conference = { eligible: true, lost_round: 'round1' };
   const moments = [
-    { id: 'conference_rs_region', kind: 'conference_rs_region', tier: 'MILESTONE', priority: 40, payload_ref: 'conference_rs_region_modal', seen_key: 'conference_rs_region_modal_seen_season', duration: 'short', title: 'Region tournament qualified', line: 'Qualified.' },
+    {
+      id: 'conference_rs_region', kind: 'conference_rs_region', tier: 'MILESTONE',
+      priority: 65, payload_ref: 'conference_rs_region_modal',
+      seen_key: 'conference_rs_region_modal_seen_season', duration: 'short',
+      title: 'Region tournament qualified', line: 'Qualified.',
+      style: 'gold', sting: 'STING_MILESTONE',
+    },
   ];
   return cc({
     cut_required: true,
@@ -135,7 +163,13 @@ function visitCut() {
 function visitTwo() {
   const conference = { eligible: true, lost_round: 'final' };
   const moments = [
-    { id: 'conference_rs_region', kind: 'conference_rs_region', tier: 'MILESTONE', priority: 40, payload_ref: 'conference_rs_region_modal', seen_key: 'conference_rs_region_modal_seen_season', duration: 'short', title: 'Region tournament qualified', line: 'Qualified.' },
+    {
+      id: 'conference_rs_region', kind: 'conference_rs_region', tier: 'MILESTONE',
+      priority: 65, payload_ref: 'conference_rs_region_modal',
+      seen_key: 'conference_rs_region_modal_seen_season', duration: 'short',
+      title: 'Region tournament qualified', line: 'Qualified.',
+      style: 'gold', sting: 'STING_MILESTONE',
+    },
   ];
   return cc({
     walk_on_welcome_modal: { eligible: false },
@@ -193,7 +227,7 @@ async function installApi(page, data) {
 
 function overlayCount() {
   return document.querySelectorAll(
-    '.sammy-modal-backdrop.open, .bn-overlay.show, .cm-overlay.is-visible, .arch-reveal-overlay.is-visible'
+    '.mm-scrim.is-open, .sammy-modal-backdrop.open, .bn-overlay.show, .cm-overlay.is-visible, .arch-reveal-overlay.is-visible'
   ).length;
 }
 
@@ -209,21 +243,18 @@ async function openOffice(page, data) {
   });
 }
 
-async function dismissSammy(page) {
-  const modal = page.locator('.sammy-modal-backdrop.open');
+async function dismissMm(page) {
+  const modal = page.locator('.mm-scrim.is-open');
   await expect(modal).toBeVisible({ timeout: 15000 });
   const count = await page.evaluate(overlayCount);
   expect(count).toBeLessThanOrEqual(2);
-  const label = (await page.locator('.sammy-modal-eyebrow').first().textContent()) || '';
-  const secondary = modal.locator('.sammy-modal-btn-secondary');
-  if (await secondary.count()) await secondary.click();
-  else await modal.locator('.sammy-modal-btn-primary').click();
+  const kind = (await modal.getAttribute('data-kind')) || '';
+  await modal.locator('.mm-go').click();
   await page.waitForFunction((prev) => {
-    const open = document.querySelector('.sammy-modal-backdrop.open');
+    const open = document.querySelector('.mm-scrim.is-open');
     if (!open) return true;
-    const ey = document.querySelector('.sammy-modal-eyebrow');
-    return !!(ey && ey.textContent !== prev);
-  }, label, { timeout: 8000 });
+    return open.getAttribute('data-kind') !== prev;
+  }, kind, { timeout: 8000 });
 }
 
 const SHOTS = path.join(__dirname, '../../reports/moment-queue');
@@ -231,14 +262,15 @@ const SHOTS = path.join(__dirname, '../../reports/moment-queue');
 test('three eligible moments show at most two pop-ups; the rest wait for the next visit', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openOffice(page, visitOne());
-  await expect(page.locator('.sammy-modal-backdrop.open')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.mm-scrim.is-open')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.mm-scrim.is-open')).toHaveAttribute('data-kind', 'conference_rs_region');
   await page.screenshot({ path: path.join(SHOTS, 'popup-1-of-2.png') });
-  await dismissSammy(page);
-  await dismissSammy(page);
+  await dismissMm(page);
+  await dismissMm(page);
   await expect.poll(async () => page.evaluate(overlayCount)).toBe(0);
 
   await openOffice(page, visitTwo());
-  await dismissSammy(page);
+  await dismissMm(page);
   await expect.poll(async () => page.evaluate(overlayCount)).toBe(0);
 });
 
@@ -282,11 +314,11 @@ async function assertCutModalOnTop(page) {
 test('cut modal opens once after the pop-up closes', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openOffice(page, visitCut());
-  await expect(page.locator('.sammy-modal-backdrop.open')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.mm-scrim.is-open')).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.fcc-cut-required-modal')).toHaveCount(0);
-  await dismissSammy(page);
+  await dismissMm(page);
   await expect(page.locator('.fcc-cut-required-modal.is-visible')).toHaveCount(1);
-  await expect(page.locator('.sammy-modal-backdrop.open')).toHaveCount(0);
+  await expect(page.locator('.mm-scrim.is-open')).toHaveCount(0);
   await assertCutModalOnTop(page);
   await page.screenshot({ path: path.join(SHOTS, 'cut-after-popup.png') });
   await page.waitForTimeout(8500);
