@@ -1405,10 +1405,11 @@
       flex: 1;
     }
 
+    /* Square, like every player headshot. */
     .sim-quarter-player-image {
       width: 40px;
       height: 40px;
-      border-radius: 50%;
+      border-radius: 6px;
       object-fit: cover;
       flex-shrink: 0;
       margin-left: 12px;
@@ -2342,11 +2343,13 @@
       animation: hudReveal 2.5s ease-out forwards;
     }
 
+    /* Square, like every player headshot. 10px is the same corner weight at 70px
+       that the 28px table badges get from 6px. */
     .hud-headshot-container {
       position: relative;
       width: 70px;
       height: 70px;
-      border-radius: 50%;
+      border-radius: 10px;
       overflow: hidden;
       border: 3px solid #FFD700;
       background: #1a1a1a;

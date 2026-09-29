@@ -20,8 +20,25 @@ html.gob-shell #scouting-view .pv {
   max-width: min(100%, 1920px);
 }
 
+/* The sections live inside `.scouting-ready`, not directly in `.pv`, so `.pv`'s gap only
+   ever separated the status line from the panel — the sections themselves fell back to
+   whatever margins they happened to have. This is where the rhythm has to sit.
+
+   One token does the whole job: `--dsp-24` is itself density-scaled (24px at 1280, 28.5px
+   at 1920), so there is no density override here. */
+/* `:not([hidden])` matters: a bare `display: flex` here would outrank the UA rule for the
+   hidden attribute and leak the panel into the loading state. */
+html.gob-shell #scouting-view .scouting-ready:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-24);
+}
+
+html.gob-shell #scouting-view .scouting-ready > section {
+  margin: 0;
+}
+
 html.gob-shell.gob-1920 #scouting-view .pv.sc {
-  gap: var(--dsp-16);
   padding-bottom: var(--dsp-10);
 }
 
