@@ -25,24 +25,150 @@ function playSound(filename) {
   import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
 }
 
-const urlParams = liveParams();
-const mode = urlParams.get('mode');
-const franchiseId = urlParams.get('franchise_id');
-const teamId = urlParams.get('team_id');
-const week = parseInt(urlParams.get('week'), 10);
-/** `inbox` = opened from FCC Inbox (Back only). `training` = from training submit / default (Go To Locker Room). */
-// 'news' is where these links come from now that the Inbox tab is retired; 'inbox' is
-// still accepted so already-shared and bookmarked links keep their Back button.
-const _reportFromRaw = urlParams.get('from');
-const _reportOrigin = urlParams.get('origin');
-const reportFrom = (_reportFromRaw === 'news' || _reportFromRaw === 'inbox')
-  ? 'news'
-  : (_reportFromRaw === 'office' || _reportOrigin === 'office') ? 'office' : 'training';
-
+let root = null;
+let mode = '';
+let franchiseId = '';
+let teamId = '';
+let week = NaN;
+let reportFrom = 'training';
 let reportData = null;
-let currentView = 'changes'; // 'attributes' or 'changes'
-/** Projected Starting 5 sub-toggle: 'attributes' | 'stats' */
+let currentView = 'changes';
 let projectedLineupView = 'attributes';
+let lastSignature = '';
+let togglesWired = false;
+let backClickWired = false;
+let loadSeq = 0;
+
+const TOOLTIP_ID = 'training-report-attr-tooltip';
+
+function byId(id) {
+  if (!root) return null;
+  if (root.id === id) return root;
+  return root.querySelector('#' + id);
+}
+
+function qsa(sel) {
+  return root ? root.querySelectorAll(sel) : [];
+}
+
+function inAppShell() {
+  return !!(root && (root.id === 'training-report-view' || (root.closest && root.closest('#training-report-view'))));
+}
+
+function readOptions(options) {
+  options = options || {};
+  let bag;
+  try { bag = liveParams(); }
+  catch (err) { bag = new URLSearchParams(); }
+  function pick(name, alt) {
+    if (options[name] != null && options[name] !== '') return String(options[name]);
+    return bag.get(name) || bag.get(alt) || '';
+  }
+  mode = pick('mode') || 'franchise';
+  franchiseId = pick('franchiseId', 'franchise_id');
+  teamId = pick('teamId', 'team_id');
+  const weekRaw = pick('week');
+  week = parseInt(weekRaw, 10);
+  const fromRaw = pick('from');
+  const originRaw = pick('origin');
+  reportFrom = (fromRaw === 'news' || fromRaw === 'inbox')
+    ? 'news'
+    : (fromRaw === 'office' || originRaw === 'office') ? 'office' : 'training';
+}
+
+function shellHtml() {
+  return (
+    '<div class="training-report-container resource-page-container fcc-brand-page-shell training-report-resource-shell">'
+    + '<header class="report-header"><div class="header-left">'
+    + '<h1 class="page-title">Training Report</h1>'
+    + '<div class="header-meta-row"><div class="header-meta-line">'
+    + '<span><span id="week-label">Week:</span> <span id="week-number">--</span></span>'
+    + '<span class="meta-sep">·</span>'
+    + '<span>Upcoming Opponent: <span id="upcoming-opponent">--</span></span>'
+    + '<span class="meta-sep">·</span>'
+    + '<span>Training Focus: <span id="training-focus">--</span></span>'
+    + '</div></div></div>'
+    + '<button type="button" id="locker-room-btn" class="locker-room-button">Go To Locker Room</button>'
+    + '</header>'
+    + '<section class="training-notes-section"><div class="training-notes-header"><div class="training-notes-header-main">'
+    + '<div class="training-notes-header-accent" aria-hidden="true"></div>'
+    + '<div class="training-notes-header-copy"><h2>Notes</h2>'
+    + '<div id="training-notes-brief" class="training-notes-brief">Week -- Training Brief · For Coaching Staff Only</div>'
+    + '</div></div></div>'
+    + '<div class="training-notes-rule" aria-hidden="true"></div>'
+    + '<div class="training-notes-container" id="training-notes-container"></div></section>'
+    + '<section class="team-section"><h2>Team Report</h2>'
+    + '<div class="team-attributes-grid" id="team-attributes-grid"></div></section>'
+    + '<section class="players-section"><div class="section-header"><h2>Player Report</h2>'
+    + '<div class="view-toggle">'
+    + '<button type="button" class="toggle-btn" data-view="attributes">Attributes</button>'
+    + '<button type="button" class="toggle-btn active" data-view="changes">Training Changes</button>'
+    + '</div></div><div class="scroll-x"><table class="players-table" id="players-table">'
+    + '<thead id="players-thead"></thead><tbody id="players-tbody"></tbody></table></div></section>'
+    + '<section class="projected-lineup-section"><div class="section-header projected-lineup-header">'
+    + '<h2>Projected Starting 5</h2>'
+    + '<div class="view-toggle projected-lineup-toggle" role="group" aria-label="Projected lineup columns">'
+    + '<button type="button" class="toggle-btn active" data-projected-view="attributes">Attributes</button>'
+    + '<button type="button" class="toggle-btn" data-projected-view="stats">Stats</button>'
+    + '</div></div><div class="scroll-x">'
+    + '<div id="training-projected-lineup" class="training-projected-lineup-wrap"></div></div></section>'
+    + '<section class="playbook-summary-section"><h2>Playbook Summary</h2>'
+    + '<div class="playbook-summary-container" id="playbook-summary-container"></div></section>'
+    + '</div>'
+  );
+}
+
+function ensureShell() {
+  if (!root) return;
+  if (!root.querySelector('.training-report-container')) {
+    root.insertAdjacentHTML('beforeend', shellHtml());
+  }
+}
+
+function reportSignature(data) {
+  try { return JSON.stringify(data); }
+  catch (err) { return ''; }
+}
+
+function startTrainingReport() {
+  ensureShell();
+  setupViewToggle();
+  setupProjectedLineupToggle();
+  paintBack();
+  return loadTrainingReport();
+}
+
+function revalidate(options) {
+  readOptions(options);
+  paintBack();
+  return loadTrainingReport();
+}
+
+function teardown() {
+  const tip = document.getElementById(TOOLTIP_ID);
+  if (tip) tip.remove();
+}
+
+function init(host, options) {
+  root = host || document.body;
+  togglesWired = false;
+  backClickWired = false;
+  lastSignature = '';
+  reportData = null;
+  currentView = 'changes';
+  projectedLineupView = 'attributes';
+  readOptions(options);
+  if (!mode || !teamId) {
+    console.error('Missing required URL parameters: mode and team_id are required');
+    return Promise.resolve({ revalidate: revalidate, unmount: teardown });
+  }
+  if (mode === 'franchise' && !week) {
+    console.error('Missing required URL parameter: week is required for franchise mode');
+  }
+  return startTrainingReport().then(function () {
+    return { revalidate: revalidate, unmount: teardown };
+  });
+}
 
 // Season stat columns (aligned with franchise command center roster stats table)
 const TRAINING_PROJECTED_STATS_COLUMNS = [
@@ -254,47 +380,11 @@ const FOCUS_DISPLAY = {
   }
 };
 
-// Initialize page. A view inserts this script after DOMContentLoaded, so the
-// start also runs immediately when the document is already loaded.
-function startTrainingReport() {
-  if (window.__gobTrainingReportStarted) return;
-  window.__gobTrainingReportStarted = true;
-  // SS&S: For tournament mode, round is optional (backend will determine from state)
-  // For franchise mode, week is required
-  if (!mode || !teamId) {
-    console.error('Missing required URL parameters: mode and team_id are required');
-    return;
-  }
-  
-  if (mode === 'franchise' && !week) {
-    console.error('Missing required URL parameter: week is required for franchise mode');
-    return;
-  }
-  
-  // Tournament mode: round is optional - backend will determine from training_status
-
-  // Set up view toggle
-  setupViewToggle();
-
-  setupProjectedLineupToggle();
-  
-  // Set up locker room button. Also wire immediately: this script sits after
-  // the button, and DOMContentLoaded is later than the first moment the
-  // button can take a click.
-  setupLockerRoomButton();
-  
-  // Load training report data
-  loadTrainingReport();
-}
-
-document.addEventListener('DOMContentLoaded', startTrainingReport);
-if (document.readyState !== 'loading') startTrainingReport();
-
-setupLockerRoomButton();
 
 function setupProjectedLineupToggle() {
-  const buttons = document.querySelectorAll('.projected-lineup-toggle .toggle-btn');
-  if (!buttons.length) return;
+  const buttons = qsa('.projected-lineup-toggle .toggle-btn');
+  if (!buttons.length || buttons[0].dataset.wired === '1') return;
+  buttons[0].dataset.wired = '1';
   buttons.forEach((b) => {
     if (b.getAttribute('data-projected-view') === projectedLineupView) b.classList.add('active');
     else b.classList.remove('active');
@@ -356,7 +446,7 @@ function buildSeasonStatsByPlayerId() {
 }
 
 function renderProjectedStartingFiveStats(rows) {
-  const el = document.getElementById('training-projected-lineup');
+  const el = byId('training-projected-lineup');
   if (!el) return;
   el.innerHTML = '';
   if (!rows || rows.length === 0) {
@@ -420,12 +510,14 @@ function renderProjectedStartingFiveSection() {
 }
 
 function setupViewToggle() {
-  const toggleButtons = document.querySelectorAll('.players-section .toggle-btn');
-  // Enforce initial active button from currentView
+  const toggleButtons = qsa('.players-section .view-toggle .toggle-btn');
+  if (!toggleButtons.length) return;
   toggleButtons.forEach(b => {
     if (b.dataset.view === currentView) b.classList.add('active');
     else b.classList.remove('active');
   });
+  if (toggleButtons[0].dataset.wired === '1') return;
+  toggleButtons[0].dataset.wired = '1';
   toggleButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       playSound('click-tiny.wav');
@@ -437,18 +529,28 @@ function setupViewToggle() {
   });
 }
 
-function ensureNewsUpLink() {
-  if (document.getElementById('back-button')) return;
-  const notes = document.querySelector('.training-notes-section');
-  if (!notes || !notes.parentNode) return;
+function newsHref() {
   const bag = emptyParams();
   if (franchiseId) bag.set('franchise_id', franchiseId);
   if (teamId) bag.set('team_id', teamId);
   if (mode) bag.set('mode', mode);
   bag.set('tab', 'news-view');
   bag.delete('story');
-  const feed = '/franchise-command-center.html?' + bag.toString();
-  const link = document.createElement('a');
+  return '/franchise-command-center.html?' + bag.toString();
+}
+
+function ensureNewsUpLink() {
+  const feed = newsHref();
+  let link = byId('back-button');
+  if (link) {
+    link.hidden = false;
+    link.href = feed;
+    link.setAttribute('data-gob-up', feed);
+    return;
+  }
+  const notes = root.querySelector('.training-notes-section');
+  if (!notes || !notes.parentNode) return;
+  link = document.createElement('a');
   link.className = 'gob-dt-up';
   link.id = 'back-button';
   link.href = feed;
@@ -457,18 +559,17 @@ function ensureNewsUpLink() {
   notes.parentNode.insertBefore(link, notes);
 }
 
-function setupLockerRoomButton() {
-  const btn = document.getElementById('locker-room-btn');
-  if (!btn || btn.dataset.exitWired === '1') return;
-  // The button is in the HTML above this script. A click during parse, before
-  // DOMContentLoaded, used to miss this listener and leave the report open.
-  btn.dataset.exitWired = '1';
+function paintBack() {
+  const btn = byId('locker-room-btn');
+  if (!btn) return;
 
   if (reportFrom === 'news' && mode === 'franchise') {
     btn.hidden = true;
     btn.style.display = 'none';
     ensureNewsUpLink();
   } else {
+    const news = byId('back-button');
+    if (news) news.hidden = true;
     btn.hidden = false;
     btn.style.display = '';
     // Post-submit still uses the named "Back to Office" + tut_alert one-shot.
@@ -477,6 +578,9 @@ function setupLockerRoomButton() {
     btn.className = 'gob-btn gob-btn--ghost';
   }
 
+  btn.dataset.exitWired = '1';
+  if (backClickWired) return;
+  backClickWired = true;
   btn.addEventListener('click', () => {
     playSound('click-strong.wav');
     if (mode === 'franchise') {
@@ -524,7 +628,11 @@ async function loadTrainingReport() {
       throw new Error(`Failed to load training report: ${response.statusText}`);
     }
     
-    reportData = await response.json();
+    const next = await response.json();
+    const sig = reportSignature(next);
+    if (sig && sig === lastSignature && reportData) return;
+    reportData = next;
+    lastSignature = sig;
     renderPage();
   } catch (error) {
     console.error('Error loading training report:', error);
@@ -556,15 +664,17 @@ function renderPage() {
 function renderHeader() {
   const periodLabel = 'Week';
   const periodValue = reportData.week;
-  document.getElementById('week-number').textContent = periodValue || '--';
+  const weekNumber = byId('week-number');
+  if (weekNumber) weekNumber.textContent = periodValue || '--';
   
   // Update label
-  const weekLabel = document.getElementById('week-label');
+  const weekLabel = byId('week-label');
   if (weekLabel) {
     weekLabel.textContent = periodLabel + ':';
   }
   
-  document.getElementById('upcoming-opponent').textContent = reportData.upcoming_opponent || '--';
+  const upcoming = byId('upcoming-opponent');
+  if (upcoming) upcoming.textContent = reportData.upcoming_opponent || '--';
   
   const focus = reportData.coaching_focus || {};
   const archetype = focus.archetype || '';
@@ -626,7 +736,8 @@ function renderHeader() {
     }
   }
   
-  document.getElementById('training-focus').textContent = focusText;
+  const focusEl = byId('training-focus');
+  if (focusEl) focusEl.textContent = focusText;
 
 }
 
@@ -971,8 +1082,8 @@ function createPlayerNameCell(player) {
 function renderPlayersTable() {
   if (!reportData || !reportData.players) return;
   
-  const thead = document.getElementById('players-thead');
-  const tbody = document.getElementById('players-tbody');
+  const thead = byId('players-thead');
+  const tbody = byId('players-tbody');
   
   // Clear existing content
   thead.innerHTML = '';
@@ -1271,10 +1382,10 @@ function showAttributeTooltip(event) {
   if (!changeText) return;
   
   // Create tooltip element if it doesn't exist
-  let tooltip = document.getElementById('attribute-tooltip');
+  let tooltip = document.getElementById(TOOLTIP_ID);
   if (!tooltip) {
     tooltip = document.createElement('div');
-    tooltip.id = 'attribute-tooltip';
+    tooltip.id = TOOLTIP_ID;
     tooltip.className = 'attribute-tooltip';
     document.body.appendChild(tooltip);
   }
@@ -1297,14 +1408,14 @@ function showAttributeTooltip(event) {
 }
 
 function hideAttributeTooltip() {
-  const tooltip = document.getElementById('attribute-tooltip');
+  const tooltip = document.getElementById(TOOLTIP_ID);
   if (tooltip) {
     tooltip.style.display = 'none';
   }
 }
 
 function positionAttributeTooltip(event) {
-  const tooltip = document.getElementById('attribute-tooltip');
+  const tooltip = document.getElementById(TOOLTIP_ID);
   if (!tooltip || tooltip.style.display === 'none') return;
   
   const cell = event.currentTarget || event.target;
@@ -1329,7 +1440,7 @@ function createChangeCell(change) {
 function renderTeamAttributes() {
   if (!reportData) return;
   
-  const grid = document.getElementById('team-attributes-grid');
+  const grid = byId('team-attributes-grid');
   grid.innerHTML = '';
   
   const teamAttrs = reportData.team_attributes || {};
@@ -1478,7 +1589,7 @@ function createPill(originalValue, attrKey) {
 function renderPlaybookSummary() {
   if (!reportData) return;
   
-  const container = document.getElementById('playbook-summary-container');
+  const container = byId('playbook-summary-container');
   container.innerHTML = '';
   
   const plays_data = reportData.plays_data || {};
@@ -1896,10 +2007,10 @@ function createPlaybookMetricCard(title, value, maxValue, color) {
 function renderTrainingNotes() {
   if (!reportData) return;
   
-  const container = document.getElementById('training-notes-container');
+  const container = byId('training-notes-container');
   if (!container) return;
   container.innerHTML = '';
-  const brief = document.getElementById('training-notes-brief');
+  const brief = byId('training-notes-brief');
   if (brief) {
     brief.textContent = `Week ${getReportWeekNumber() || '--'} Training Brief · For Coaching Staff Only`;
   }
@@ -1910,7 +2021,7 @@ function renderTrainingNotes() {
     const placeholder = document.createElement('p');
     placeholder.className = 'notes-placeholder';
     placeholder.textContent = 'No training notes for this session.';
-    if (!document.getElementById('training-report-view')) {
+    if (!inAppShell()) {
       placeholder.style.color = '#9a9a9a';
       placeholder.style.fontStyle = 'italic';
     }
@@ -1938,7 +2049,7 @@ function renderTrainingNotes() {
       const hero = document.createElement('article');
       hero.className = 'training-notes-hero-card';
       if (muted) hero.classList.add('is-muted');
-      if (!document.getElementById('training-report-view')) {
+      if (!inAppShell()) {
         hero.style.setProperty('--notes-accent', config.accent);
         hero.style.setProperty('--notes-accent-border', config.accentBorder);
         hero.style.setProperty('--notes-accent-tint', config.accentTint);
@@ -2037,7 +2148,7 @@ function renderTrainingNotes() {
 }
 
 function enhanceProjectedStartingFiveTable() {
-  const table = document.querySelector('#training-projected-lineup table.training-projected-table');
+  const table = root.querySelector('#training-projected-lineup table.training-projected-table');
   if (!table) return;
   const bodyRows = table.querySelectorAll('tbody tr');
   bodyRows.forEach((row) => {
@@ -2055,4 +2166,9 @@ function enhanceProjectedStartingFiveTable() {
       playerCell.classList.add('projected-player-name-cell');
     }
   });
+}
+
+export { init, teardown, revalidate, shellHtml };
+if (typeof window !== 'undefined') {
+  window.GOBTrainingReport = { init: init, teardown: teardown, revalidate: revalidate, shellHtml: shellHtml };
 }

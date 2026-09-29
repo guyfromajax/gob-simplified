@@ -1,4 +1,5 @@
-import { ensureCss, loadScript, loadIsolated, embed, ensureFranchiseMode } from './prepEmbed.js';
+import { ensureCss, loadScript } from './prepEmbed.js';
+import { init as initReport } from '/training-report.js';
 
 var CSS = [
   '/resource-pages.css',
@@ -7,28 +8,40 @@ var CSS = [
   '/training-report.css'
 ];
 
-export function mount(host) {
+var DEPS = [
+  '/common.js',
+  '/js/shared/playerYear.js',
+  '/js/shared/scoutingReport.js',
+  '/defense-display.js',
+  '/js/shared/rtBucket.js',
+  '/js/shared/teamShotThresholdScale.js',
+  '/js/utils/attributeDisplay.js'
+];
+
+function optionsFrom(ctx) {
+  var bag;
+  try { bag = new URLSearchParams(window.location.search); }
+  catch (err) { bag = new URLSearchParams(); }
+  return {
+    mode: bag.get('mode') || 'franchise',
+    franchiseId: (ctx && ctx.franchiseId) || bag.get('franchise_id') || '',
+    teamId: (ctx && ctx.teamId) || bag.get('team_id') || '',
+    week: bag.get('week') || '',
+    from: bag.get('from') || '',
+    origin: bag.get('origin') || ''
+  };
+}
+
+function loadDeps() {
+  return DEPS.reduce(function (chain, src) {
+    return chain.then(function () { return loadScript(src); });
+  }, Promise.resolve());
+}
+
+export function mount(host, ctx) {
   CSS.forEach(ensureCss);
-  document.body.classList.add('training-report-page');
-  return embed('/training-report.html?embed=1', host, ['.training-report-container']).then(function () {
-    ensureFranchiseMode();
-    return loadScript('/js/shared/playerYear.js');
-  }).then(function () {
-    return loadIsolated('/training-report.js');
-  }).then(function () {
-    // Back lives on the report itself. Parking it in the sub-tab tools row hid it
-    // the moment this view became a drill-in with no Prep sub-tabs to host the slot.
-    if (!window.__gobTrainingReportChrome) {
-      window.__gobTrainingReportChrome = true;
-      window.addEventListener('gob-tab-shown', function (evt) {
-        var tab = evt && evt.detail && evt.detail.tab;
-        document.body.classList.toggle('training-report-page', tab === 'training-report-view');
-      });
-    }
-    return {
-      revalidate: function () {
-        document.body.classList.add('training-report-page');
-      }
-    };
+  return loadDeps().then(function () {
+    host.querySelectorAll('.gob-view-skel').forEach(function (node) { node.remove(); });
+    return initReport(host, optionsFrom(ctx));
   });
 }

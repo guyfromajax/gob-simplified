@@ -1,0 +1,163 @@
+{
+ "meta": {
+  "port": 8173,
+  "runs": 5,
+  "passes": [
+   "timing"
+  ],
+  "viewport": {
+   "width": 1280,
+   "height": 800
+  },
+  "startedAt": "2026-09-29T21:29:42.966Z",
+  "seconds": 35
+ },
+ "timing": {
+  "table": {
+   "franchise-command-center.html": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       249,
+       291,
+       269,
+       258,
+       312
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.008722931814193726,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abc2dd6fa3566c46e0d66e8&tab=home-tab",
+      "median": 269,
+      "worst": 312
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       243,
+       249,
+       253,
+       277,
+       363
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0099802783370018,
+      "landed": "/franchise-command-center.html?franchise_id=6abc2de5fa3566c46e0d97b7&tab=home-tab",
+      "median": 253,
+      "worst": 363
+     }
+    }
+   },
+   "training-report-view": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       16,
+       16,
+       14,
+       18,
+       16
+      ],
+      "flags": {
+       "skeleton": 4,
+       "jump": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       13,
+       12,
+       16,
+       12
+      ],
+      "cls": 0.5246783432006835,
+      "shiftSrc": [
+       "0.473 div.training-report-container.resource-page-container"
+      ],
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abc2dd6fa3566c46e0d66e8&tab=training-report-view&week=1&from=office&origin=office&mode=franchise",
+      "median": 16,
+      "worst": 18,
+      "skelMedian": 12.5
+     },
+     "warm": {
+      "ms": [
+       3,
+       3,
+       3,
+       3,
+       4
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abc2dd6fa3566c46e0d66e8&tab=training-report-view&week=1&from=office&origin=office&mode=franchise",
+      "median": 3,
+      "worst": 4
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       19,
+       15,
+       15,
+       17,
+       13
+      ],
+      "flags": {
+       "skeleton": 5,
+       "jump": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       16,
+       10,
+       9,
+       13,
+       9
+      ],
+      "cls": 0.4897304918289185,
+      "shiftSrc": [
+       "0.486 div.training-report-container.resource-page-container",
+       "0.004 section.players-section + section.projected-lineup-section + section.training-notes-section + section.team-section + section.playbook-summary-section"
+      ],
+      "landed": "/franchise-command-center.html?franchise_id=6abc2de5fa3566c46e0d97b7&tab=training-report-view&week=1&from=office&origin=office&mode=franchise",
+      "median": 15,
+      "worst": 19,
+      "skelMedian": 10
+     },
+     "warm": {
+      "ms": [
+       2,
+       2,
+       3,
+       3,
+       2
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0,
+      "landed": "/franchise-command-center.html?franchise_id=6abc2de5fa3566c46e0d97b7&tab=training-report-view&week=1&from=office&mode=franchise&origin=office",
+      "median": 2,
+      "worst": 3
+     }
+    }
+   }
+  },
+  "shots": {},
+  "runs": 5
+ }
+}
