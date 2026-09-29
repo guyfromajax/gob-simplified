@@ -7,27 +7,8 @@ var CSS = [
   '/training-report.css'
 ];
 
-function placeReportTools(slot) {
-  var news = document.getElementById('back-button');
-  if (news) {
-    news.setAttribute('data-tool-home', '#training-report-tools-home');
-    slot.appendChild(news);
-  }
-  var btn = document.getElementById('locker-room-btn');
-  if (btn && !btn.hidden) {
-    btn.setAttribute('data-tool-home', '#training-report-tools-home');
-    slot.appendChild(btn);
-  }
-}
-
 export function mount(host) {
   CSS.forEach(ensureCss);
-  if (!host.querySelector('#training-report-tools-home')) {
-    var park = document.createElement('div');
-    park.id = 'training-report-tools-home';
-    park.hidden = true;
-    host.appendChild(park);
-  }
   document.body.classList.add('training-report-page');
   return embed('/training-report.html?embed=1', host, ['.training-report-container']).then(function () {
     ensureFranchiseMode();
@@ -35,10 +16,8 @@ export function mount(host) {
   }).then(function () {
     return loadIsolated('/training-report.js');
   }).then(function () {
-    if (window.GOBTables && window.GOBTables.registerTools) {
-      window.GOBTables.registerTools('training-report-view', placeReportTools);
-    }
-    if (window.GOBTables && window.GOBTables.placeTools) window.GOBTables.placeTools();
+    // Back lives on the report itself. Parking it in the sub-tab tools row hid it
+    // the moment this view became a drill-in with no Prep sub-tabs to host the slot.
     if (!window.__gobTrainingReportChrome) {
       window.__gobTrainingReportChrome = true;
       window.addEventListener('gob-tab-shown', function (evt) {
@@ -49,7 +28,6 @@ export function mount(host) {
     return {
       revalidate: function () {
         document.body.classList.add('training-report-page');
-        if (window.GOBTables && window.GOBTables.placeTools) window.GOBTables.placeTools();
       }
     };
   });

@@ -33,6 +33,7 @@
   <script src="/js/shared/pageLoadOverlay.js"></script>
   <script src="/js/shared/rtBucket.js"></script>
   <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/gob-toast.css">
   <link rel="stylesheet" href="/css/development-focus.css">
   <link rel="stylesheet" href="/css/player-development-grid.css">
 </head>
@@ -336,26 +337,10 @@
           <a id="leaders-full-link" class="fcc-standings-full-link" href="#">See all leaders here</a>
         </div>
       </div>
-      <!-- Training: the second and only other place development is editable. Same grid,
-           same hover card and same summaries as the training page, from the one shared
-           module — and reachable in any week, which the training page is not. -->
-      <div id="training-tab" class="tab-content">
-        <div class="fcc-training-head">
-          <h2 class="fcc-training-title">Player Development</h2>
-          <button type="button" class="gob-btn gob-btn--ghost" id="fcc-training-tutorial-btn">
-            Training by Position &#8599;
-          </button>
-        </div>
-        <section class="fcc-data-card" id="fcc-training-dev">
-          <div class="fcc-data-card-body">
-            <div class="pdg-tally">
-              <div class="pdg-tally-group pdg-tally-positions"></div>
-              <div class="pdg-tally-group pdg-tally-focuses"></div>
-            </div>
-            <div class="pdg-grid"></div>
-          </div>
-        </section>
-      </div>
+      <!-- The legacy #training-tab / #fcc-training-dev panel is gone. commandCenterTabs
+           already mapped training-tab → training-view, so the panel was unreachable and
+           the post-week-26 fallback it claimed to be never ran. Player Training now
+           keeps the development grid on those weeks itself. -->
     </div>
   </div>
 
@@ -399,6 +384,8 @@
   <script src="/js/shared/bigNewsModals.js"></script>
   <script src="/js/shared/momentQueue.js"></script>
   <script src="/js/shared/tierEmblem.js"></script>
+  <!-- Development Focus saves on change and confirms with the shared toast. -->
+  <script src="/js/shared/gobToast.js"></script>
   <script src="/js/shared/developmentFocus.js"></script>
   <script src="/js/generated/trainingMatrix.js"></script>
   <script src="/js/shared/playerDevelopmentGrid.js"></script>

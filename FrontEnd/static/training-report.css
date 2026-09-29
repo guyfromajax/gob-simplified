@@ -500,7 +500,7 @@ table.training-projected-table {
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
 }
 
-/* +/- Design for Fast Break Defense and Press/Trap Breaks */
+/* +/- Design for Fast Break Defense and P/T Offense */
 .plus-minus-container {
   text-align: center;
   margin-top: var(--spacing-sm);
@@ -1615,7 +1615,9 @@ body.training-report-page .playbook-empty-state {
   }
 }
 
-#training-report-view .report-header .locker-room-button,
+/* The Back control stays on the report. [hidden] is the News path, where ← News
+   is inserted instead. A bare hide-the-header-button rule used to send it to the
+   sub-tab tools row, which a drill-in no longer has. */
 #training-report-view #locker-room-btn[hidden] {
   display: none;
 }

@@ -33,29 +33,8 @@
 .devfocus-select:disabled { opacity: .45; cursor: progress; }
 .devfocus-select option { background: #14161c; color: #fff; }
 
-/* Development Focus confirmation. Bottom-centre so it never covers the control the coach
-   just used, and aria-live so a save is announced rather than only seen. */
-.devfocus-toast {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  transform: translate(-50%, 12px);
-  z-index: 9999;
-  max-width: min(440px, calc(100vw - 32px));
-  padding: 10px 16px;
-  border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, .14);
-  background: #1b1e26;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
-  color: #fff;
-  font: 600 12px/1.35 'Inter', sans-serif;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .16s ease, transform .16s ease;
-}
-.devfocus-toast.is-open { opacity: 1; transform: translate(-50%, 0); }
-.devfocus-toast.is-error { border-color: rgba(229, 87, 73, .55); background: #2a1a18; }
-@media (prefers-reduced-motion: reduce) { .devfocus-toast { transition: opacity .16s ease; } }
+/* The save confirmation is the shared GOBToast (css/gob-toast.css), not a toast of
+   this module's own. Every page that loads developmentFocus.js loads it too. */
 
 /* --- Read-only renderings (roster surfaces) ------------------------------
    The roster tables are for scanning and comparing; the one editor is the training

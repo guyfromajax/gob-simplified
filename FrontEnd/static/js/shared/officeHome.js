@@ -24,8 +24,8 @@
     rebound_modifier: 'Rebounding',
     offensive_efficiency: 'Offense',
     defensive_efficiency: 'Defense',
-    fb_efficiency: 'Fast Breaks',
-    pt_efficiency: 'Press/Traps',
+    fb_efficiency: 'Fast Break',
+    pt_efficiency: 'P/T Defense',
     fight: 'Fight',
     discipline: 'Discipline',
     momentum_score: 'Momentum',
@@ -434,7 +434,10 @@
 
   function trainingReportHref(digest) {
     var current = new URLSearchParams(global.location.search);
-    var params = { mode: 'franchise', from: 'office' };
+    // `origin` lights the Office rail while the report is open, the same way playerHref
+    // does for a player drill-in. `from` is what training-report.js reads to pick its
+    // return affordance ("Back to Office" rather than "← News").
+    var params = { mode: 'franchise', from: 'office', origin: 'office' };
     if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
     var teamId = current.get('team_id') || current.get('user_team_id');
     if (teamId) params.team_id = teamId;

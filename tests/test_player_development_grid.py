@@ -1,7 +1,7 @@
-"""Player Development grid: shared by the training page and the FCC Training tab.
+"""Player Development grid: the one editor is Prep › Player Training.
 
-These are the only two places development is editable, so they render from one module.
-A coach who learns one has learned the other, and neither can drift.
+The legacy FCC #training-tab panel is gone — it was unreachable, and Player Training
+now keeps the grid after week 26 itself.
 
 Covers: RT follows the TRAINING position (not the best one), the hover card carries year /
 height / weight / the core 12, row order never changes under an edit, and the Inbox tab's
@@ -31,35 +31,36 @@ REPORT_JS = (S / "training-report.js").read_text()
 
 # ── one implementation, two hosts ───────────────────────────────────────────
 
-def test_both_editors_render_from_the_one_module():
-    for src in (TRAIN_JS, FCC_JS):
-        assert "GOBPlayerDevelopmentGrid" in src
-    for page in (TRAIN_HTML, FCC_HTML):
-        assert "/js/shared/playerDevelopmentGrid.js" in page
-        assert "/css/player-development-grid.css" in page
+def test_the_training_page_renders_from_the_one_module():
+    assert "GOBPlayerDevelopmentGrid" in TRAIN_JS
+    assert "/js/shared/playerDevelopmentGrid.js" in TRAIN_HTML
+    assert "/css/player-development-grid.css" in TRAIN_HTML
+    # The shell still ships the module so the embed can bind without a second fetch.
+    assert "/js/shared/playerDevelopmentGrid.js" in FCC_HTML
+    assert "renderFccTrainingTab" not in FCC_JS
+    assert 'id="fcc-training-dev"' not in FCC_HTML
 
 
 def test_neither_host_builds_its_own_cards():
     """Card markup lives in the module. A second copy is how two screens start disagreeing."""
-    for src in (TRAIN_JS, FCC_JS):
-        assert "pdg-card" not in src
-        assert "positionSelectHtml" not in src
+    assert "pdg-card" not in TRAIN_JS
+    assert "positionSelectHtml" not in TRAIN_JS
 
 
 def test_the_summaries_sit_above_the_roster():
     """A summary belongs before the detail it summarises, and twelve rows would push it
     below the fold if it sat underneath."""
-    for page in (TRAIN_HTML, FCC_HTML):
-        assert page.index("pdg-tally") < page.index('class="pdg-grid"')
+    assert TRAIN_HTML.index("pdg-tally") < TRAIN_HTML.index('class="pdg-grid"')
 
 
-def test_the_fcc_tab_does_not_depend_on_the_training_endpoint():
-    """/franchise/training-points 400s after week 26 and is the training page's own
-    dependency. Using it here would rebuild the gap this tab exists to close."""
-    fn = FCC_JS[FCC_JS.index("function renderFccTrainingTab"):]
-    fn = fn[:fn.index("\nfunction fccMaxPositionRating")]
-    assert "training-points" not in fn
-    assert "userRosterDataCache" in fn
+def test_player_training_keeps_the_grid_when_there_is_no_weekly_allocation():
+    """After week 26 the weekly budget is gone, but development focus still saves.
+    The page stays put and still asks the points endpoint for the roster — that
+    payload now carries `training_unavailable` instead of 400ing."""
+    assert "applyTrainingWeekState" in TRAIN_JS
+    assert "training_unavailable" in TRAIN_JS
+    assert "No team training during the tournament" in TRAIN_JS
+    assert "function redirectIfTrainingAlreadyCommitted" not in TRAIN_JS
 
 
 # ── behaviour, executed ─────────────────────────────────────────────────────
@@ -130,15 +131,11 @@ def test_a_position_change_repaints_the_number_not_the_order():
     assert ".sort(" not in fn
 
 
-def test_both_editors_link_to_the_training_by_position_chart():
-    """Same affordance in both places. The training page saves its draft first because
-    leaving mid-allocation would lose points; the FCC tab has nothing to protect, since
-    every change there is already saved."""
-    assert 'id="fcc-training-tutorial-btn"' in FCC_HTML
+def test_player_training_links_to_the_training_by_position_chart():
+    """The chart leaves the page, so the in-progress allocation is saved first."""
     assert 'id="player-dev-tutorial-btn"' in TRAIN_HTML
-    for src in (FCC_JS, TRAIN_JS):
-        assert "tutorial-advanced-training-by-position.html" in src
-        assert "setTrainingPageContext" in src, "the chart needs a way back"
+    assert "tutorial-advanced-training-by-position.html" in TRAIN_JS
+    assert "setTrainingPageContext" in TRAIN_JS
     train_fn = TRAIN_JS[TRAIN_JS.index("function wirePlayerDevelopmentTutorialButton"):]
     assert "saveTrainingFormDraft();" in train_fn[:train_fn.index("window.location.href")]
 

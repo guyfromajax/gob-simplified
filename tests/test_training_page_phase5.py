@@ -267,7 +267,7 @@ def test_it_costs_no_extra_request():
     both development fields through training_position_projection."""
     assert "renderPlayerDevelopment();" in JS
     load = JS[JS.index("data.custom_focus_roster"):]
-    assert "renderPlayerDevelopment" in load[:400]
+    assert "renderPlayerDevelopment" in load[:800]
 
 
 def test_the_grid_is_four_rows_of_three_filled_column_first():

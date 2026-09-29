@@ -163,7 +163,7 @@
         save(getFranchiseId(), playerId, field, value).then(
           // SUCCESS. Nothing in here may reject the chain: the rejection handler below
           // reverts the control, so a throw after a SAVED change would put the old value
-          // back on screen while the database held the new one. A missing `toastTimer`
+          // back on screen while the database held the new one. A missing `savedTimer`
           // declaration did exactly that — every first change looked like it failed, and
           // picking a different value second left the control showing neither.
           function (result) {
@@ -171,18 +171,14 @@
             runSafely(function () {
               if (typeof onSaved === 'function') onSaved(playerId, field, value, result);
             });
-            runSafely(function () {
-              toast(field === 'training_focus'
-                ? 'Development focus updated'
-                : 'Training position updated');
-            });
+            runSafely(function () { toastSaved(); });
           },
           // FAILURE. Passed as .then's SECOND argument, not .catch, so it cannot see
           // anything thrown by the success handler above it — only a genuine rejection
           // from save() can revert the control. That is structural, not a convention.
           function (err) {
             if (previous) select.value = previous;
-            runSafely(function () { toast((err && err.message) || 'Could not save', true); });
+            runSafely(function () { toastFailed(); });
           }
         ).finally(function () { select.disabled = false; });
       });
@@ -199,21 +195,36 @@
     }
   }
 
-  var toastTimer = null;
+  // These selects save on change, so working down a twelve-row roster fires a save per
+  // row. Debouncing the confirmation means a run of quick changes reads as one "Saved"
+  // instead of a stutter of them.
+  var SAVED_DEBOUNCE_MS = 400;
+  var savedTimer = null;
 
-  function toast(message, isError) {
-    var el = document.getElementById('devfocus-toast');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'devfocus-toast';
-      el.setAttribute('role', 'status');
-      el.setAttribute('aria-live', 'polite');
-      document.body.appendChild(el);
+  function toast(message) {
+    if (window.GOBToast && typeof window.GOBToast.show === 'function') {
+      window.GOBToast.show(message);
     }
-    el.textContent = message;
-    el.className = isError ? 'devfocus-toast is-error is-open' : 'devfocus-toast is-open';
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.remove('is-open'); }, isError ? 5000 : 2200);
+  }
+
+  function toastSaved() {
+    if (savedTimer) clearTimeout(savedTimer);
+    savedTimer = setTimeout(function () {
+      savedTimer = null;
+      toast('Saved');
+    }, SAVED_DEBOUNCE_MS);
+  }
+
+  /**
+   * A failure is shown at once, and cancels any pending "Saved" — otherwise a save that
+   * succeeded then one that failed would end on the reassuring message.
+   */
+  function toastFailed() {
+    if (savedTimer) {
+      clearTimeout(savedTimer);
+      savedTimer = null;
+    }
+    toast('Not saved. Try again.');
   }
 
   window.GOBDevelopmentFocus = {

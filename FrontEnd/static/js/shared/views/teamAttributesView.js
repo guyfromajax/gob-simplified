@@ -11,7 +11,7 @@
 /**
  * PRESENTATION-ONLY layout. Four columns of paired measures, then the four that
  * have no pair. Emitted row-major, so a CSS grid of four columns puts each pair in
- * one column: Offense/Defense, the two Press/Trap measures, the two Fast Break
+ * one column: Offense/Defense, the two P/T measures, the two Fast Break
  * measures, Shooting/Rebounding.
  *
  * Deliberately separate from the server's family order, which groups by where a
