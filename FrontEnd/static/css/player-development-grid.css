@@ -186,7 +186,7 @@
 .pdg-layout-table .pdg-av {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--radius-6);
   object-fit: cover;
   text-align: center;
   line-height: 28px;

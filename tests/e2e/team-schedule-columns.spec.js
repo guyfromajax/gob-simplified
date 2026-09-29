@@ -236,6 +236,13 @@ test('rows: site, logo, rank + name, record line, and the result is the box-scor
   await expect(page.locator('#team-schedule-view tr[data-week="2"] td.site')).toHaveText('at');
   // Unranked (999) shows the name alone.
   await expect(page.locator('#team-schedule-view tr[data-week="4"] .gob-id > span').first()).toHaveText(opponentFor(4).opponent_name);
+  // Only the top 25 carries a prefix. Week 2 is 25th, week 3 is 36th.
+  expect(opponentFor(2).opponent_natl_rank).toBe(25);
+  expect(opponentFor(3).opponent_natl_rank).toBe(36);
+  await expect(page.locator('#team-schedule-view tr[data-week="2"] .gob-id > span').first())
+    .toHaveText('#25 ' + opponentFor(2).opponent_name);
+  await expect(page.locator('#team-schedule-view tr[data-week="3"] .gob-id > span').first())
+    .toHaveText(opponentFor(3).opponent_name);
   // Bye week.
   await expect(page.locator('#team-schedule-view tr[data-week="9"]')).toHaveClass(/is-open/);
   await expect(page.locator('#team-schedule-view tr[data-week="9"] td.team')).toHaveText('Open');

@@ -27,6 +27,14 @@ Fonts are self-hosted. Display face: `/css/fonts.css` (Bebas Neue Pro). Body fac
 
 Shell rules that must not restyle existing franchise cards live in `FrontEnd/static/css/gob-shell.css`, scoped under `html.gob-shell`. `gob-components.css` is scoped under `.gob`. If a component class (`.logo`, `.nm`, `.lnk`, `.card`) would change existing franchise markup, tighten the shell selector. Do not edit the old content CSS to accommodate the shell.
 
+### Player headshots are square
+
+A player headshot is a square with a small corner. Never a circle. A circle crops the head to its inscribed disc and throws away the shoulders, which is what made headshots read as too small. This holds everywhere a player's face appears — Roster, Leaders, Player Stats, Player detail, Scouting, Training Report, Recruiting — whether the element carries a photo, a monogram or a placeholder.
+
+The corner scales with the box so every headshot reads the same weight: `--radius-6` on the 28–46px table and list badges (`.gob .av`, `.pool .pc-av`, `.pdg-av`, `.wr-hs`), `--radius-10` on the large portrait (`.gob .portrait`, `.pd-portrait-wrap`). A radius past a quarter of the side is closer to a circle than to a square, so treat that as the ceiling.
+
+Team logos and team initials badges are not headshots. They keep `--radius-logo`. The on-court HUD and the sim's headshot marker are game presentation, not this rule.
+
 ## 3. Audio
 
 `uiSfx.js` is the volume bus. Channels: `master`, `music`, `sfx`, `ambience`. Effective gain is master × channel, or 0 when either is muted. Levels are 0–100.
@@ -444,22 +452,29 @@ No stored tip time, neutral site, or hometown. Those stay off the page.
 
 `updated_after_week` is the closed week of the latest earlier office snapshot, or null. The line "Updated after Week N" renders only when it is set.
 
-There are always six rows, in family order. Character: Chemistry, Fight, Discipline. On the floor: Shooting (`shot_threshold`), Rebounding (`rebound_modifier`), Defensive efficiency. A missing stored value is still a row, with `value` null.
+There are always twelve rows — every stored team measure — in family order. Character: Chemistry, Fight, Discipline, Momentum (`momentum_score`). On the floor: Offense (`offensive_efficiency`), Defense (`defensive_efficiency`), P/T Offense (`pt_opp_modifier`), P/T Defense (`pt_efficiency`), Fast Break (`fb_efficiency`), Fast Break Defense (`fb_opp_modifier`), Shooting (`shot_threshold`), Rebounding (`rebound_modifier`). A missing stored value is still a row, with `value` null.
+
+`pt_efficiency` is your own press and trap execution, so it reads as P/T Defense. `pt_opp_modifier` is working through the opponent's press, so it reads as P/T Offense. The radar's axis labels use the same words.
 
 | Field | Meaning |
 |---|---|
 | `family`, `family_label` | `character` / Character, or `floor` / On the floor. |
-| `key`, `label` | The six measures and the labels above. |
-| `value` | The stored number for this week. Null when the team has no stored value. The zero-fill on `team_attributes` does not apply here. The page shows it only for Chemistry, as `9/25`. |
+| `key`, `label` | The twelve measures and the labels above. |
+| `value` | The stored number for this week. Null when the team has no stored value. The zero-fill on `team_attributes` does not apply here. The page shows it for Chemistry as `19/25`, and as a signed number on the eight measures that carry `signed_scale`. |
 | `scale_max` | 25 for Chemistry. Null for the others. |
-| `meter_pct` | Chemistry only: `value / 25 × 100`, clamped 0–100. Null when Chemistry has no value, and null on the other five. The bar does not read this. |
+| `signed_scale` | 20 on the eight trained and compounding measures that `Team_Attribute_System.md` documents at −20…+20: Fight, Discipline, Offense, Defense, P/T Offense, P/T Defense, Fast Break, Fast Break Defense. Null on the other four. Only a row with `signed_scale` may be drawn as a ± pill, because only those have a meaningful zero. Chemistry (7…25), Momentum (−10…+10), Shooting (~85…95) and Rebounding (~0.5) stay on the league percentile bar. |
+| `meter_pct` | Chemistry only: `value / 25 × 100`, clamped 0–100. Null when Chemistry has no value, and null on the other eleven. The bar does not read this. |
 | `delta` | Change in the stored value since the user team's snapshot. Null when there is no prior value. The page does not show this chip. |
 | `description` | Null until a sentence is stored. |
-| `direction` | `higher_better` for Chemistry, Fight, Discipline, Rebounding, and Defensive efficiency. `lower_better` for Shooting: a make is `shot_score >= shot_threshold`. |
+| `direction` | `higher_better` for all eleven others. `lower_better` for Shooting only: a make is `shot_score >= shot_threshold`. |
 | `rank` | 1 is the best end of `direction`. Ties share a place and the next place skips (`1, 2, 2, 4`). Null when `value` is null. |
 | `rank_of` | How many teams in the franchise have a stored value. A missing value is not counted. |
 | `percentile` | 0–100. 100 is the best end, including a tie for best. 0 is the worst end, including a tie for worst. The bar fills to this. `100 × (teams strictly worse) / (teams strictly better + teams strictly worse)`. One team, or a measure where every stored value is equal, is 100. |
-| `rank_delta` | How many places the user's team climbed since the latest earlier `office_week_snapshots` `team_measures`. Positive means it moved up. The snapshot is the user team only, so every other team is null. Chemistry is not in that snapshot, so Chemistry is null. The chip is ▲ green (`--delta-up`) or ▼ red (`--delta-down`). Null and 0 draw nothing. |
+| `rank_delta` | How many places the user's team climbed since the latest earlier `office_week_snapshots` `team_measures`. Positive means it moved up. The snapshot is the user team only, so every other team is null. Chemistry is not in that snapshot, so Chemistry is null. Movement is neutral, matching Prep v2: ▲ at `--text-100`, ▼ at `--text-60`. Null and 0 draw nothing. |
 | `tied` | True when this rank is shared. The place then reads `T-34th of 128`. |
 
 The place reads `34th of 128`. A null rank reads an em dash and the bar is empty. The bar fill is the neutral DIFF white, not navy.
+
+The view is the radar over a grid of four columns by three rows. The radar is `franchise-command-center.js::buildTeamMeasuresRadarMarkup` at its ±20 scale — call it, never write a second one. The grid pairs a measure with its opposite down each column: Offense/Defense, P/T Offense/P/T Defense, Fast Break/Fast Break Defense, Shooting/Rebounding, with the four character measures on the bottom row. Each cell is the name, the place, the gauge, the value and the movement.
+
+The ± pill is the shared `.gob .dv` atom in `gob-components.css`, the same one Prep › Scouting uses: zero in the centre, filling right for positive and left for negative, with `--v` as the magnitude 0–1 and `.neg` flipping the fill.

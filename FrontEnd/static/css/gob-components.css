@@ -72,7 +72,11 @@
 .gob .main>.pg-head{z-index:var(--z-sticky-head)}
 /* atoms */
 .gob .logo{display:inline-grid;place-items:center;flex:none;border-radius:var(--radius-logo);background:linear-gradient(160deg,color-mix(in oklab,var(--tc) 100%,var(--white) 14%),var(--tc));color:var(--white);font-family:var(--font-display);font-weight:var(--fw-bold);line-height:var(--lh-1);box-shadow:var(--shadow-logo);padding-top:.08em}
-.gob .av{display:inline-grid;place-items:center;flex:none;border-radius:var(--radius-round);background:var(--surface-3);color:var(--text-60);font-weight:var(--fw-bold);letter-spacing:var(--tracking-2);box-shadow:inset 0 0 0 1px var(--line-strong)}
+/* Player headshots are square. A circle crops a head to its inscribed disc and
+   throws away the shoulders, which is what made them read as too small. This badge
+   runs 28–36px, where `.portrait`'s 10px would eat a third of the side and land back
+   near a circle, so it takes the corner that reads the same weight at this size. */
+.gob .av{display:inline-grid;place-items:center;flex:none;border-radius:var(--radius-6);overflow:hidden;background:var(--surface-3);color:var(--text-60);font-weight:var(--fw-bold);letter-spacing:var(--tracking-2);box-shadow:inset 0 0 0 1px var(--line-strong)}
 .gob .portrait{flex:none;border-radius:var(--radius-10);overflow:hidden;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--line-strong)}
 .gob .portrait img{width:100%;height:100%;object-fit:cover;object-position:50% 22%;display:block}
 .gob .chip{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-width:var(--dsz-34);height:var(--dsz-20);padding:0 var(--space-6);border-radius:var(--radius-6);font:var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-1);white-space:nowrap}
@@ -89,6 +93,13 @@
 .gob .wl.loss{color:var(--delta-down);background:color-mix(in srgb,var(--delta-down) 12%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--delta-down) 40%,transparent)}
 .gob .meter{height:var(--dsz-6);border-radius:var(--radius-4);background:var(--white-7);overflow:hidden}
 .gob .meter i{display:block;height:100%;background:var(--white-62);border-radius:var(--radius-4)}
+/* Diverging pill: zero in the centre, filling right for positive and left for
+   negative. `--v` is the magnitude 0–1; `.neg` flips the fill. Shared by Prep ›
+   Scouting and Team › Team Attributes, which both read the −20…+20 measures. */
+.gob .dv{position:relative;display:inline-block;width:100%;height:6px;margin:0;vertical-align:middle;border-radius:var(--radius-2);background:var(--white-4)}
+.gob .dv::before{content:'';position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--white-25)}
+.gob .dv i{position:absolute;top:0;bottom:0;left:50%;width:calc(var(--v) * 50%);border-radius:var(--radius-2);background:var(--white-55)}
+.gob .dv.neg i{left:auto;right:50%;background:var(--white-25)}
 .gob .spread{display:flex;gap:var(--space-2);height:var(--dsz-6)}
 .gob .spread i{border-radius:var(--radius-2)}
 .gob .spread i:nth-child(1){background:var(--white-75)}.gob .spread i:nth-child(2){background:var(--white-45)}.gob .spread i:nth-child(3){background:var(--white-22)}.gob .spread i:nth-child(4){background:var(--red)}

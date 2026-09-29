@@ -98,31 +98,62 @@ function roster(week) {
   };
 }
 
-function teamData() {
+// The twelve measure rows the Team Attributes grid renders. `signed_scale` is 20
+// only on the eight documented −20…+20 measures; the other four keep the league
+// percentile bar. Discipline is stored-value-null so the empty cell is covered.
+const SIGNED = 20;
+
+const MEASURE_VALUES = {
+  team_chemistry: { label: 'Chemistry', value: 18, scale_max: 25, meter_pct: 72, signed: null, rank: 12, pct: 80, delta: null },
+  fight: { label: 'Fight', value: 3, signed: SIGNED, rank: 34, pct: 70, delta: 2, tied: true },
+  discipline: { label: 'Discipline', value: null, signed: SIGNED, rank: null, pct: null, delta: 0 },
+  momentum_score: { label: 'Momentum', value: 4, signed: null, rank: 41, pct: 60, delta: null },
+  offensive_efficiency: { label: 'Offense', value: 7, signed: SIGNED, rank: 19, pct: 85, delta: 3 },
+  defensive_efficiency: { label: 'Defense', value: -6, signed: SIGNED, rank: 96, pct: 24, delta: -4 },
+  pt_opp_modifier: { label: 'P/T Offense', value: 2, signed: SIGNED, rank: 55, pct: 57, delta: null },
+  pt_efficiency: { label: 'P/T Defense', value: -20, signed: SIGNED, rank: 128, pct: 0, delta: null },
+  fb_efficiency: { label: 'Fast Break', value: 20, signed: SIGNED, rank: 1, pct: 100, delta: null },
+  fb_opp_modifier: { label: 'Fast Break Defense', value: 0, signed: SIGNED, rank: 64, pct: 50, delta: null },
+  shot_threshold: { label: 'Shooting', value: 90, signed: null, rank: 8, pct: 94, delta: -1 },
+  rebound_modifier: { label: 'Rebounding', value: 0.5, signed: null, rank: 73, pct: 38, delta: null },
+};
+
+const CHARACTER_KEYS = ['team_chemistry', 'fight', 'discipline', 'momentum_score'];
+
+function measureRow(key) {
+  const spec = MEASURE_VALUES[key];
+  const character = CHARACTER_KEYS.indexOf(key) !== -1;
   return {
-    team_attributes: { team_chemistry: 18 },
-    measures: [
-      {
-        family: 'character', family_label: 'Character', key: 'team_chemistry', label: 'Chemistry',
-        value: 18, scale_max: 25, meter_pct: 72, delta: 1, description: null,
-        direction: 'higher_better', rank: 12, rank_of: 128, percentile: 80, rank_delta: null, tied: false,
-      },
-      {
-        family: 'character', family_label: 'Character', key: 'fight', label: 'Fight',
-        value: 3, scale_max: null, meter_pct: null, delta: 0, description: null,
-        direction: 'higher_better', rank: 34, rank_of: 128, percentile: 70, rank_delta: 2, tied: true,
-      },
-      {
-        family: 'floor', family_label: 'On the floor', key: 'shot_threshold', label: 'Shooting',
-        value: 90, scale_max: null, meter_pct: null, delta: null, description: null,
-        direction: 'lower_better', rank: 8, rank_of: 128, percentile: 94, rank_delta: -1, tied: false,
-      },
-      {
-        family: 'character', family_label: 'Character', key: 'discipline', label: 'Discipline',
-        value: null, scale_max: null, meter_pct: null, delta: null, description: null,
-        direction: 'higher_better', rank: null, rank_of: null, percentile: null, rank_delta: 0, tied: false,
-      },
-    ],
+    family: character ? 'character' : 'floor',
+    family_label: character ? 'Character' : 'On the floor',
+    key: key,
+    label: spec.label,
+    value: spec.value,
+    scale_max: spec.scale_max == null ? null : spec.scale_max,
+    signed_scale: spec.signed,
+    meter_pct: spec.meter_pct == null ? null : spec.meter_pct,
+    delta: null,
+    description: null,
+    direction: key === 'shot_threshold' ? 'lower_better' : 'higher_better',
+    rank: spec.rank,
+    rank_of: spec.rank == null ? null : 128,
+    percentile: spec.pct,
+    rank_delta: spec.delta,
+    tied: !!spec.tied,
+  };
+}
+
+function teamData() {
+  const attrs = {};
+  Object.keys(MEASURE_VALUES).forEach((key) => {
+    attrs[key] = MEASURE_VALUES[key].value == null ? 0 : MEASURE_VALUES[key].value;
+  });
+  return {
+    team_attributes: attrs,
+    measures: CHARACTER_KEYS.concat(
+      ['offensive_efficiency', 'defensive_efficiency', 'pt_opp_modifier', 'pt_efficiency',
+        'fb_efficiency', 'fb_opp_modifier', 'shot_threshold', 'rebound_modifier'],
+    ).map(measureRow),
     updated_after_week: 3,
   };
 }
@@ -394,9 +425,11 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
     expect(tiles[2].cls).toContain('is-hi');
     expect(tiles[3].cls).toContain('is-elite');
     expect(tiles[4].cls).toContain('is-elite');
-    expect(tiles[0].fill).toBe('rgba(0, 0, 0, 0)');
-    expect(tiles[1].fill).not.toBe('rgba(0, 0, 0, 0)');
-    expect(tiles[3].ring).not.toBe('none');
+    // The tier lives in the digit. No highlight square behind a high attribute.
+    tiles.forEach((tile) => {
+      expect(tile.fill).toBe('rgba(0, 0, 0, 0)');
+      expect(tile.ring).toBe('none');
+    });
     const elite = await page.locator('#roster-view .attr-tile.is-elite s').first().evaluate((el) => {
       function parse(color) {
         const match = String(color).match(/rgba?\(([^)]+)\)/);
@@ -456,29 +489,84 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
     await park(page);
     await page.screenshot({ path: path.join(OUT, 'roster-practice-' + size[2] + '.png') });
     await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=team-attributes-view');
-    await page.waitForSelector('#team-attributes-view .gob-mrow');
+    await page.waitForSelector('#team-attributes-view .mcell');
     await assertNoMainOverflow(page);
-    const chemistry = page.locator('#team-attributes-view .gob-mrow', { hasText: 'Chemistry' });
-    const fight = page.locator('#team-attributes-view .gob-mrow', { hasText: 'Fight' });
-    const shooting = page.locator('#team-attributes-view .gob-mrow', { hasText: 'Shooting' });
-    const discipline = page.locator('#team-attributes-view .gob-mrow', { hasText: 'Discipline' });
-    await expect(chemistry.locator('.val')).toContainText('18');
-    await expect(chemistry.locator('.val')).toContainText('/25');
+    // Twelve measures, four columns, three rows, in the paired reading order.
+    await expect(page.locator('#team-attributes-view .mcell')).toHaveCount(12);
+    const order = await page.locator('#team-attributes-view .mcell .nm').allTextContents();
+    expect(order).toEqual([
+      'Offense', 'P/T Offense', 'Fast Break', 'Shooting',
+      'Defense', 'P/T Defense', 'Fast Break Defense', 'Rebounding',
+      'Chemistry', 'Fight', 'Discipline', 'Momentum',
+    ]);
+    const columns = await page.locator('#team-attributes-view .mgrid').evaluate((grid) => {
+      return getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+    });
+    expect(columns).toBe(4);
+
+    // The spider chart is back, and it is the shared ±20 renderer.
+    await expect(page.locator('#team-attributes-view .tm-radar-svg')).toHaveCount(1);
+    await expect(page.locator('#team-attributes-view .tm-radar-ring-zero')).toHaveCount(1);
+
+    const cell = (name) => page.locator('#team-attributes-view .mcell', { hasText: name }).first();
+    const chemistry = cell('Chemistry');
+    const fight = page.locator('#team-attributes-view .mcell[data-measure="fight"]');
+    const shooting = cell('Shooting');
+    const discipline = cell('Discipline');
+    const offense = page.locator('#team-attributes-view .mcell[data-measure="offensive_efficiency"]');
+    const defense = page.locator('#team-attributes-view .mcell[data-measure="defensive_efficiency"]');
+
+    // The ± pill only on the eight −20…+20 measures; zero sits in the centre.
+    await expect(page.locator('#team-attributes-view .dv')).toHaveCount(8);
+    await expect(page.locator('#team-attributes-view .gob-meter')).toHaveCount(4);
+    for (const key of ['fight', 'discipline', 'offensive_efficiency', 'defensive_efficiency',
+      'pt_opp_modifier', 'pt_efficiency', 'fb_efficiency', 'fb_opp_modifier']) {
+      await expect(page.locator('#team-attributes-view .mcell[data-measure="' + key + '"] .dv')).toHaveCount(1);
+    }
+    for (const key of ['team_chemistry', 'momentum_score', 'shot_threshold', 'rebound_modifier']) {
+      await expect(page.locator('#team-attributes-view .mcell[data-measure="' + key + '"] .dv')).toHaveCount(0);
+      await expect(page.locator('#team-attributes-view .mcell[data-measure="' + key + '"] .gob-meter')).toHaveCount(1);
+    }
+    await expect(offense.locator('.dv')).not.toHaveClass(/neg/);
+    await expect(offense.locator('.dv')).toHaveAttribute('style', /--v:\s*0\.35/);
+    await expect(offense.locator('b')).toHaveText('+7');
+    await expect(defense.locator('.dv')).toHaveClass(/neg/);
+    await expect(defense.locator('b')).toHaveText('-6');
+    // The fill is measured from the centre line, so ±20 reaches one half exactly.
+    const centred = await page.locator('#team-attributes-view .mcell[data-measure="fb_efficiency"] .dv')
+      .evaluate((pill) => {
+        const track = pill.getBoundingClientRect();
+        const fill = pill.querySelector('i').getBoundingClientRect();
+        return { left: fill.left - track.left, width: fill.width, track: track.width };
+      });
+    expect(Math.abs(centred.left - centred.track / 2)).toBeLessThanOrEqual(1);
+    expect(Math.abs(centred.width - centred.track / 2)).toBeLessThanOrEqual(1);
+
+    await expect(chemistry.locator('b')).toContainText('18');
+    await expect(chemistry.locator('b')).toContainText('/25');
     await expect(chemistry.locator('.place')).toHaveText('12th of 128');
     await expect(chemistry.locator('.gob-meter i')).toHaveAttribute('style', /--w:\s*80%/);
-    await expect(chemistry.locator('.chip')).toHaveCount(0);
-    await expect(fight.locator('.val')).toHaveCount(0);
     await expect(fight.locator('.place')).toHaveText('34th of 128');
     await expect(page.locator('#team-attributes-view')).not.toContainText('T-');
-    await expect(fight.locator('.chip.up')).toHaveText('▲2');
-    await expect(shooting.locator('.val')).toHaveCount(0);
     await expect(shooting.locator('.place')).toHaveText('8th of 128');
-    await expect(shooting.locator('.chip.down')).toHaveText('▼1');
+    await expect(shooting.locator('b')).toHaveText('');
     await expect(discipline.locator('.place')).toHaveText('—');
-    await expect(discipline.locator('.gob-meter')).toHaveClass(/is-empty/);
-    await expect(discipline.locator('.chip')).toHaveCount(0);
-    await expect(page.locator('#team-attributes-view .gob-meter')).toHaveCount(4);
+    await expect(discipline.locator('.dv')).toHaveClass(/is-empty/);
     await expect(page.locator('#team-attributes-view')).not.toContainText('/100');
+
+    // Movement is neutral: ▲ at full text, ▼ muted, and no green or red chip.
+    await expect(page.locator('#team-attributes-view .chip')).toHaveCount(0);
+    await expect(fight.locator('.mv.up')).toHaveText('▲2');
+    await expect(shooting.locator('.mv.down')).toHaveText('▼1');
+    await expect(discipline.locator('.mv')).toHaveText('');
+    const movement = await page.evaluate(() => {
+      const up = document.querySelector('#team-attributes-view .mv.up');
+      const down = document.querySelector('#team-attributes-view .mv.down');
+      const read = (el) => getComputedStyle(el).color;
+      return { up: read(up), down: read(down), text: getComputedStyle(document.body).color };
+    });
+    expect(movement.up).toBe('rgb(255, 255, 255)');
+    expect(movement.down).toBe('rgba(255, 255, 255, 0.6)');
     await park(page);
     await page.screenshot({ path: path.join(OUT, 'team-attributes-' + size[2] + '.png') });
     await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=home-tab');

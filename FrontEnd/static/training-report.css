@@ -1161,11 +1161,12 @@ body.training-report-page .training-notes-hero-portrait {
   height: 40px;
 }
 
+/* Square, like every other player headshot. */
 body.training-report-page .training-notes-hero-portrait-img,
 body.training-report-page .training-notes-hero-portrait-fallback {
   width: 40px;
   height: 40px;
-  border-radius: 999px;
+  border-radius: 6px;
 }
 
 body.training-report-page .training-notes-hero-portrait-img {

@@ -86,11 +86,14 @@ input[type="reset"] {
   font-size: 14px;
 }
 
+/* Square, like every other player headshot. A circle cropped this to its inscribed
+   disc and threw away the shoulders. 10px is the same corner weight at 120px that
+   the 28px table badges get from 6px. */
 .pd-portrait-wrap {
   width: 120px;
   height: 120px;
   margin-top: 20px;
-  border-radius: 50%;
+  border-radius: 10px;
   border: 3px solid rgba(255, 255, 255, 0.12);
   overflow: hidden;
   background: rgba(255, 255, 255, 0.08);
@@ -116,7 +119,7 @@ input[type="reset"] {
 .pd-portrait-placeholder {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
+  border-radius: 10px;
   background: radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
 }
 

@@ -702,3 +702,178 @@ html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
 #franchise-container #team-schedule-view tr.is-tourney td.wk {
   color: var(--text-60);
 }
+
+/* ── Team › Roster rhythm (design review item 4) ──────────────────────────────
+   Nineteen columns read as three groups — identity, six attribute pairs, Dev
+   focus — by giving each group its own gutter instead of one uniform padding.
+   Scoped to the view: the same table also renders compact inside #team-view. */
+
+html.gob-shell #roster-view .gob-tbl th,
+html.gob-shell #roster-view .gob-tbl td {
+  padding-left: var(--dsp-6);
+  padding-right: var(--dsp-6);
+}
+
+/* Current → Pot starts at the column edge so the two grades read as one lockup. */
+html.gob-shell #roster-view .gob-tbl th.rt,
+html.gob-shell #roster-view .gob-tbl td.rt {
+  text-align: left;
+  padding-left: var(--dsp-12);
+  padding-right: var(--dsp-12);
+}
+
+html.gob-shell #roster-view .gob-tbl th.code,
+html.gob-shell #roster-view .gob-tbl td.code {
+  text-align: center;
+  padding-left: var(--dsp-8);
+  padding-right: var(--dsp-8);
+}
+
+html.gob-shell #roster-view .gob-tbl th.num,
+html.gob-shell #roster-view .gob-tbl td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding-left: var(--dsp-8);
+}
+
+/* Close the identity block before the first attribute pair opens. */
+html.gob-shell #roster-view .gob-tbl th.wt,
+html.gob-shell #roster-view .gob-tbl td.wt {
+  padding-right: var(--dsp-16);
+}
+
+/* Attribute values centre under their headers; a pair is tight, pairs are spaced. */
+html.gob-shell #roster-view .gob-tbl th.gstart,
+html.gob-shell #roster-view .gob-tbl td.gstart,
+html.gob-shell #roster-view .gob-tbl th.gend,
+html.gob-shell #roster-view .gob-tbl td.gend {
+  text-align: center;
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+
+html.gob-shell #roster-view .gob-tbl th.gstart,
+html.gob-shell #roster-view .gob-tbl td.gstart { padding-left: var(--dsp-10); }
+
+html.gob-shell #roster-view .gob-tbl th.gend,
+html.gob-shell #roster-view .gob-tbl td.gend { padding-right: var(--dsp-10); }
+
+/* Dev focus keeps its right edge, with the pair gutter opening it. */
+html.gob-shell #roster-view .gob-tbl th.dev,
+html.gob-shell #roster-view .gob-tbl td.dev {
+  text-align: right;
+  padding-left: var(--dsp-16);
+  padding-right: var(--dsp-12);
+}
+
+/* The tier already lives in the digit's colour. The luminance square behind it
+   said the same thing a second time and turned the grid into a heat map. */
+html.gob-shell #roster-view .attr-tile {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ── Team › Team Attributes (design review item 5) ────────────────────────────
+   Four columns of paired measures over three rows. Each cell carries its name and
+   place on one line and its gauge, value and movement on the next, so no row ends
+   in a long empty run. */
+
+/* The card stays a block: `.tm-radar-wrap` already centres the chart, and making it
+   a flex item here would shrink it to fit, which collapses the svg's own width:100%.
+   The chart is sized to leave the twelve cells visible below it. */
+html.gob-shell #team-attributes-view .mradar {
+  padding: var(--dsp-2) var(--dsp-12);
+}
+
+html.gob-shell #team-attributes-view .mradar .tm-radar-wrap { min-height: 0; }
+
+/* The chart is square, so its width is also its height. Bounding it by the viewport
+   keeps the twelve cells on screen at 720px tall and still lets it grow at 1080. */
+html.gob-shell #team-attributes-view .mradar .tm-radar-svg { max-width: min(448px, 44vh); }
+
+html.gob-shell #team-attributes-view .mgrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dsp-10) var(--col-gap);
+  padding: var(--dsp-8) var(--dsp-12);
+}
+
+/* The bottom row's rule would float just above the card's own edge. */
+html.gob-shell #team-attributes-view .mcell:nth-last-child(-n+4) {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+html.gob-shell #team-attributes-view .mcell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  padding-bottom: var(--dsp-8);
+  border-bottom: 1px solid var(--line);
+}
+
+html.gob-shell #team-attributes-view .mtop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+html.gob-shell #team-attributes-view .mtop .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-100);
+  font-size: var(--fs-13);
+}
+
+html.gob-shell #team-attributes-view .mtop .place {
+  flex: none;
+  color: var(--text-38);
+  font-size: var(--fs-11);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+html.gob-shell #team-attributes-view .mbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.6ch 3.4ch;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+html.gob-shell #team-attributes-view .mbar b {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  text-align: right;
+  color: var(--text-87);
+  font-variant-numeric: tabular-nums;
+}
+
+html.gob-shell #team-attributes-view .mbar b em {
+  font-style: normal;
+  font-size: var(--fs-11);
+  color: var(--text-38);
+}
+
+html.gob-shell #team-attributes-view .dv.is-empty i { width: 0; }
+
+/* The percentile meter fills the same track as the ± pill so every gauge in the
+   grid starts and ends on the same two edges. */
+html.gob-shell #team-attributes-view .gob-meter {
+  width: auto;
+  min-width: 0;
+  flex: none;
+}
+
+/* Neutral movement: the arrow says the direction, luminance says the weight. */
+html.gob-shell #team-attributes-view .mv {
+  text-align: right;
+  font-size: var(--fs-11);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+html.gob-shell #team-attributes-view .mv.up { color: var(--text-100); }
+html.gob-shell #team-attributes-view .mv.down { color: var(--text-60); }
