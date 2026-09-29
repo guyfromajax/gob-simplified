@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # Evict a game nobody has touched for this long (user abandoned it).
 ONGOING_GAMES_IDLE_TTL_SECONDS = 2 * 60 * 60
 # Max distinct GameManagers held; least-recently-touched are evicted beyond it.
-ONGOING_GAMES_MAX_GAMES = 20
+ONGOING_GAMES_MAX_GAMES = 150
 
 
 class LiveGameCache(dict):
