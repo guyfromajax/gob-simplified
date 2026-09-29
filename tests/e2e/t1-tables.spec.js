@@ -385,17 +385,19 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     const statsFirst = await timedOpen(page, 'Team Stats', '#teamstats-body tr');
     expect(page.url()).toContain('tab=team-stats-view');
     expect(await page.evaluate(() => history.state && history.state.gobIdx)).toBe(leagueIdx);
-    await expect(page.locator('#team-stats-view tr.gob-rep')).toHaveCount(2);
-    const scrollable = await page.evaluate(() => {
-      const card = document.querySelector('#team-stats-view .gob-xs');
-      const header = document.querySelector('#team-stats-view .gob-xs thead th');
+    await expect(page.locator('#team-stats-view tr.gob-rep')).toHaveCount(0);
+    await expect(page.locator('#team-stats-view thead tr')).toHaveCount(1);
+    await expect(page.locator('#team-stats-view .gob-xs, #team-stats-view .gob-wide-wrap')).toHaveCount(0);
+    const fits = await page.evaluate(() => {
+      const table = document.querySelector('#team-stats-view .gob-tbl');
+      const header = table.querySelector('thead th');
       return {
-        wide: card.scrollWidth > card.clientWidth + 1,
+        over: table.scrollWidth - table.parentElement.clientWidth,
         sticky: getComputedStyle(header).position,
       };
     });
-    expect(scrollable.wide).toBe(true);
-    expect(scrollable.sticky).toBe('static');
+    expect(fits.over).toBeLessThanOrEqual(1);
+    expect(fits.sticky).toBe('sticky');
     await expect(page.locator('#team-stats-view thead th[data-sort="natl_rank"]')).toHaveClass(/asc/);
     await expect(page.locator('#team-stats-view')).toContainText('75.0');
     await expect(page.locator('#team-stats-view')).toContainText('46.7');
@@ -405,10 +407,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await assertCollapsedRail(page);
     await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveCount(1);
     await page.screenshot({ path: path.join(OUT, 'team-stats-' + size[2] + '.png') });
-    await page.evaluate(() => {
-      const card = document.querySelector('#team-stats-view .gob-xs');
-      card.scrollLeft = card.scrollWidth;
-    });
+    await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 600; });
     await page.screenshot({ path: path.join(OUT, 'team-stats-scrolled-' + size[2] + '.png') });
     await clickStab(page, 'Rankings');
     const statsSecond = await timedOpen(page, 'Team Stats', '#teamstats-body tr');
@@ -420,7 +419,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await expect(page.locator('#gob-subtabs .tb[aria-selected="true"]')).toHaveCount(1);
     await page.screenshot({ path: path.join(OUT, 'standings-' + size[2] + '.png') });
     await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
-    await page.getByRole('button', { name: 'National', exact: true }).click();
+    await expect(page.locator('#gob-subtabs .pg-tools .stats-toggle')).toHaveCount(0);
     await expect(page.locator('#standings-view .gob-tcard')).toHaveCount(4);
     if (size[0] >= 1680) {
       const columns = await page.evaluate(() => getComputedStyle(document.querySelector('#standings-view .gob-tgrid')).gridTemplateColumns);
@@ -445,7 +444,6 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
   await page.waitForSelector('#standings-view .gob-tbl tbody tr');
   const leagueIdx = await page.evaluate(() => history.state && history.state.gobIdx);
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
-  await page.getByRole('button', { name: 'National', exact: true }).click();
   await page.waitForSelector('#standings-view .gob-tcard:nth-child(4)');
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 520; });
   const saved = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);

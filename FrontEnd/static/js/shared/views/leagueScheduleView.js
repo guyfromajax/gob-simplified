@@ -1,6 +1,7 @@
 /**
- * League › Schedule. One national week from GET /franchise/schedule/week.
- * Order, scores, ranks, and which weeks have games come from that payload.
+ * League › Schedule. One national week from GET /franchise/schedule/week, as a
+ * four-column grid of compact game cards. Order, scores, ranks, and which weeks
+ * have games come from that payload. Only top-25 ranks are shown.
  */
 
 function weekUrl(tables, franchiseId, week) {
@@ -80,32 +81,35 @@ export function mount(container, ctx) {
       + '&team_id=' + encodeURIComponent(teamId);
   }
 
-  function sideName(side) {
+  function rankHtml(side) {
     var rank = Number(side && side.natl_rank);
-    var name = (side && side.name) || '';
-    if (isFinite(rank) && rank >= 1 && rank < 999) return '#' + rank + ' ' + name;
-    return name;
+    if (!isFinite(rank) || rank < 1 || rank > 25) return '';
+    return '<span class="rk">' + tables.esc(rank) + '</span>';
   }
 
-  function teamCell(side) {
-    if (!side || !side.team_id) return '—';
-    return '<a class="gob-team" data-gob-drill href="' + tables.esc(teamHref(side.team_id)) + '">'
-      + tables.markHtml(side.name, side.primary_color)
-      + '<span>' + tables.esc(sideName(side)) + '</span></a>';
+  function sideRow(side, score, won) {
+    var name = (side && side.name) || 'TBD';
+    var team = side && side.team_id
+      ? '<a class="gob-team" data-gob-drill href="' + tables.esc(teamHref(side.team_id)) + '">'
+        + tables.markHtml(name, side.primary_color) + rankHtml(side)
+        + '<span class="nm">' + tables.esc(name) + '</span></a>'
+      : '<span class="gob-team"><span class="nm">' + tables.esc(name) + '</span></span>';
+    return '<div class="gob-gs' + (won ? ' won' : '') + '">' + team
+      + '<span class="sc">' + (score == null ? '' : tables.esc(score)) + '</span></div>';
   }
 
-  function scoreCell(game) {
-    var text = '—';
-    if (game.status === 'complete' && game.away_score != null && game.home_score != null) {
-      text = String(game.away_score) + '-' + String(game.home_score);
+  function gameCard(game) {
+    var done = game.status === 'complete' && game.away_score != null && game.home_score != null;
+    var away = done ? Number(game.away_score) : null;
+    var home = done ? Number(game.home_score) : null;
+    var foot = '<span class="ctx">' + tables.esc(game.tournament_context || (done ? 'Final' : 'Scheduled')) + '</span>';
+    if (done && game.game_id) {
+      foot += '<a class="gob-box" href="' + tables.esc(boxHref(game.game_id)) + '">Box score</a>';
     }
-    if (!game.tournament_context) return tables.esc(text);
-    return tables.esc(text) + '<span class="sub">' + tables.esc(game.tournament_context) + '</span>';
-  }
-
-  function boxCell(game) {
-    if (game.status !== 'complete' || !game.game_id) return '—';
-    return '<a class="gob-box" href="' + tables.esc(boxHref(game.game_id)) + '">Box score</a>';
+    return '<article class="gob-game' + (game.is_user ? ' me is-user' : '') + '">'
+      + sideRow(game.away, done ? game.away_score : null, done && away > home)
+      + sideRow(game.home, done ? game.home_score : null, done && home > away)
+      + '<div class="gob-gf">' + foot + '</div></article>';
   }
 
   function neighbor(dir) {
@@ -158,26 +162,17 @@ export function mount(container, ctx) {
     var title = payload && payload.label && payload.label.indexOf(':') >= 0
       ? payload.label.split(':').slice(1).join(':').trim()
       : '';
-    var html = '<section class="gob-tcard">';
+    var html = '<section class="gob-lsch">';
     if (title) html += '<p class="gob-sch-round">' + tables.esc(title) + '</p>';
-    html += '<div class="gob-scroll"><table class="gob-tbl gob-sched"><thead><tr>'
-      + '<th class="team">Away</th><th class="num">Result</th><th class="team">Home</th><th class="box">Box score</th>'
-      + '</tr></thead><tbody>';
     if (!games.length) {
       var empty = payload && payload.week >= 27
         ? 'No tournament matchups available yet.'
         : 'No games scheduled.';
-      html += '<tr><td colspan="4">' + tables.esc(empty) + '</td></tr>';
+      html += '<p class="gob-lsch-empty">' + tables.esc(empty) + '</p>';
+    } else {
+      html += '<div class="gob-lgrid">' + games.map(gameCard).join('') + '</div>';
     }
-    games.forEach(function (game) {
-      var cls = game.is_user ? ' class="me is-user"' : '';
-      html += '<tr' + cls + '>'
-        + '<td class="team">' + teamCell(game.away) + '</td>'
-        + '<td class="num">' + scoreCell(game) + '</td>'
-        + '<td class="team">' + teamCell(game.home) + '</td>'
-        + '<td class="box">' + boxCell(game) + '</td></tr>';
-    });
-    html += '</tbody></table></div></section>';
+    html += '</section>';
     container.innerHTML = html;
     container.querySelectorAll('a[data-gob-drill]').forEach(function (link) {
       link.addEventListener('click', function (event) {

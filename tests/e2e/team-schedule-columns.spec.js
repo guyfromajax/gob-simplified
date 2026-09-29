@@ -327,7 +327,7 @@ for (const size of [[1280, 720], [1920, 1080]]) {
   test('league schedule reference at ' + size[0], async ({ page }) => {
     await page.setViewportSize({ width: size[0], height: size[1] });
     await open(page, 21, 'league-schedule-view');
-    await expect(page.locator('#league-schedule-view .gob-sched tbody tr').first()).toBeVisible();
+    await expect(page.locator('#league-schedule-view .gob-game').first()).toBeVisible();
     await park(page);
     const name = process.env.LEAGUE_SHOT || 'league-schedule-' + size[0] + '.png';
     await page.screenshot({ path: path.join(OUT, name.replace('{w}', String(size[0]))) });

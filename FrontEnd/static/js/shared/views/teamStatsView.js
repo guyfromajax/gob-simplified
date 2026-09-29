@@ -1,6 +1,7 @@
 /**
- * League › Team Stats. Wide grouped table. The card scrolls sideways.
- * The header row repeats every 16 team rows. Rates come from the payload.
+ * League › Team Stats. One compact table sized to fit .main, so its single
+ * header row pins under the page head. Group columns keep their shade.
+ * Conference asks the server for scope=conference. Rates come from the payload.
  */
 
 var GROUPS = [
@@ -55,14 +56,22 @@ GROUPS.forEach(function (group) {
       label: col.label,
       pin: !!col.pin,
       shade: group.shade,
+      group: group.name,
       stat: group.name !== '',
       decimal: !!col.decimal
     });
   });
 });
 
-function url(franchiseId) {
-  return window.GOBTables.apiBase('/franchise/team-stats') + '?franchise_id=' + franchiseId;
+var SCOPES = [
+  { id: 'conference', label: 'Conference' },
+  { id: 'national', label: 'National' }
+];
+var SCOPE_KEY = 'gob-view-team-stats-scope';
+
+function url(franchiseId, scope) {
+  var base = window.GOBTables.apiBase('/franchise/team-stats') + '?franchise_id=' + franchiseId;
+  return scope === 'conference' ? base + '&scope=conference' : base;
 }
 
 function sameId(a, b) {
@@ -77,6 +86,7 @@ function num(value) {
 
 export function mount(container, ctx) {
   var tables = window.GOBTables;
+  var scope = tables.readKey(SCOPE_KEY, 'national') === 'conference' ? 'conference' : 'national';
   var query = '';
   var sortKey = 'natl_rank';
   var sortDir = 1;
@@ -99,7 +109,20 @@ export function mount(container, ctx) {
   }
 
   function paintTools(slot) {
-    slot.innerHTML = tables.searchBox('Search teams');
+    slot.innerHTML = tables.segment(SCOPES, scope) + tables.searchBox('Search teams');
+    slot.querySelectorAll('.stats-toggle button').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var next = button.getAttribute('data-value');
+        if (!next || next === scope) return;
+        scope = next;
+        tables.writeKey(SCOPE_KEY, scope);
+        loaded = false;
+        signature = '';
+        tables.resetScroll();
+        paintTools(slot);
+        load();
+      });
+    });
     var input = slot.querySelector('input');
     if (!input) return;
     input.value = query;
@@ -139,13 +162,14 @@ export function mount(container, ctx) {
     return tables.esc(value);
   }
 
-  function headerRow(repeat) {
-    var html = '<tr' + (repeat ? ' class="gob-rep"' : '') + '>';
+  function headerRow() {
+    var html = '<tr>';
     LEAF.forEach(function (col) {
       var on = sortKey === col.key;
       var cls = 's' + (col.pin ? ' pin team' : '') + (col.shade ? ' gshade' : '')
         + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
-      html += '<th class="' + cls + '" data-sort="' + col.key + '">' + tables.esc(col.label) + '</th>';
+      html += '<th class="' + cls + '" data-sort="' + col.key + '"'
+        + (col.group ? ' title="' + tables.esc(col.group) + '"' : '') + '>' + tables.esc(col.label) + '</th>';
     });
     html += '</tr>';
     return html;
@@ -162,15 +186,12 @@ export function mount(container, ctx) {
       LEAF.forEach(function (item) { if (item.key === sortKey) col = item; });
       if (col) rows = tables.sortRows(rows, function (row) { return valueOf(row, col); }, sortDir);
     }
-    var html = '<section class="gob-tcard"><div class="gob-xs"><table class="gob-tbl"><thead>';
-    html += '<tr class="gob-groups">';
-    GROUPS.forEach(function (group) {
-      html += '<th class="gob-g' + (group.shade ? ' gshade' : '') + '" colspan="' + group.cols.length + '">'
-        + tables.esc(group.name) + '</th>';
-    });
-    html += '</tr>' + headerRow(false) + '</thead><tbody id="teamstats-body">';
-    rows.forEach(function (row, index) {
-      if (index > 0 && index % 16 === 0) html += headerRow(true);
+    var html = '<section class="gob-tcard gob-ts"><table class="gob-tbl"><thead>'
+      + headerRow() + '</thead><tbody id="teamstats-body">';
+    if (!rows.length) {
+      html += '<tr><td class="team" colspan="' + LEAF.length + '">No teams.</td></tr>';
+    }
+    rows.forEach(function (row) {
       var mine = sameId(row.team_id, userId);
       html += '<tr' + (mine ? ' class="me is-user"' : '') + '>';
       LEAF.forEach(function (col) {
@@ -179,9 +200,8 @@ export function mount(container, ctx) {
       });
       html += '</tr>';
     });
-    html += '</tbody></table></div></section>';
+    html += '</tbody></table></section>';
     container.innerHTML = html;
-    tables.bindWide(container.querySelector('.gob-xs'));
     container.querySelectorAll('th.s').forEach(function (th) {
       th.addEventListener('click', function () {
         var key = th.getAttribute('data-sort');
@@ -211,9 +231,12 @@ export function mount(container, ctx) {
       return;
     }
     if (!loaded) tables.paintSkeleton(container);
-    store.get(url(franchiseId)).then(function (payload) {
+    var asked = scope;
+    store.get(url(franchiseId, asked)).then(function (payload) {
+      if (asked !== scope) return;
       apply(payload || { teams: [] });
     }).catch(function () {
+      if (asked !== scope) return;
       loaded = false;
       tables.paintError(container, 'Team stats could not be opened.', load);
     });
@@ -222,8 +245,9 @@ export function mount(container, ctx) {
   function revalidate() {
     var store = ctx && ctx.store;
     if (!loaded || !store || typeof store.revalidate !== 'function' || !franchiseId) return;
-    store.revalidate(url(franchiseId)).then(function (payload) {
-      if (payload) apply(payload);
+    var asked = scope;
+    store.revalidate(url(franchiseId, asked)).then(function (payload) {
+      if (payload && asked === scope) apply(payload);
     }).catch(function () { /* keep the mounted table */ });
   }
 

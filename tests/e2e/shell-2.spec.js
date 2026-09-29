@@ -608,14 +608,21 @@ test('sticky table headers sit on the first row, then pin under the page head', 
     }
     await openPage(page, 'schedule.html', season.data, '', season);
     await page.setViewportSize({ width: size[0], height: size[1] });
-    await page.waitForSelector('#league-schedule-view tbody tr');
-    await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
-    const scheduleTop = await stickyGeometry(page, '#league-schedule-view thead th', '#league-schedule-view tbody tr');
-    expect(scheduleTop.headerToRow, 'schedule ' + size[0] + ' scroll 0').toBeLessThanOrEqual(1);
-    await pinTable(page, '#league-schedule-view table');
-    const scheduleStuck = await stickyGeometry(page, '#league-schedule-view thead th', '#league-schedule-view tbody tr');
-    expect(scheduleStuck.headToHeader, 'schedule ' + size[0] + ' scrolled').toBeLessThanOrEqual(1);
-    expect(scheduleStuck.gapRows, 'schedule ' + size[0] + ' gap').toEqual(0);
+    await page.waitForSelector('#league-schedule-view .gob-game');
+    const schedule = await page.evaluate(() => {
+      const main = document.querySelector('html.gob-shell .main');
+      const head = document.querySelector('html.gob-shell .pg-head').getBoundingClientRect();
+      main.scrollTop = 0;
+      const first = document.querySelector('#league-schedule-view .gob-game').getBoundingClientRect();
+      return {
+        headers: document.querySelectorAll('#league-schedule-view thead').length,
+        belowHead: first.top >= head.bottom - 1,
+        sideways: main.scrollWidth - main.clientWidth,
+      };
+    });
+    expect(schedule.headers, 'schedule ' + size[0] + ' cards').toBe(0);
+    expect(schedule.belowHead, 'schedule ' + size[0] + ' below head').toBe(true);
+    expect(schedule.sideways, 'schedule ' + size[0] + ' sideways').toBeLessThanOrEqual(1);
   }
 });
 
