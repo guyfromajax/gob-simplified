@@ -263,7 +263,14 @@ def _run_persist(label: str, sqlite_path: Path, grow_to: int | None = None) -> d
     from BackEnd.utils.game_id_utils import franchise_matchup_claim_key
 
     claim_token = str(gid)
-    matchup_key = franchise_matchup_claim_key(target)
+    _fr_doc = (
+        store.franchises_collection.find_one({"_id": ObjectId(FID)}, {"current_season": 1})
+        or store.franchises_collection.find_one({"_id": FID}, {"current_season": 1})
+        or {}
+    )
+    matchup_key = franchise_matchup_claim_key(
+        target, season=int(_fr_doc.get("current_season", 1) or 1)
+    )
     pull: dict = {"applied_games": claim_token}
     if matchup_key:
         pull["applied_matchups"] = matchup_key

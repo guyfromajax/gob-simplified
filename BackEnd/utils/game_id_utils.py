@@ -144,12 +144,18 @@ def purge_game_id_format_duplicates(games_collection, game_id: str, *, keep_id: 
             games_collection.delete_one({"_id": alt_id})
 
 
-def franchise_matchup_claim_key(game: dict[str, Any]) -> Optional[str]:
+def franchise_matchup_claim_key(
+    game: dict[str, Any], season: Optional[int] = None
+) -> Optional[str]:
     """
-    Stable once-per-franchise-week matchup id for stat rollup idempotency.
+    Stable once-per-franchise-season-week matchup id for stat rollup idempotency.
 
     Prevents double-counting when two game documents (e.g. string vs ObjectId _id)
     exist for the same played game.
+
+    ``season`` scopes the key: schedules are reshuffled every season, so the same
+    pair can land on the same week number again. Without it (legacy callers) the
+    key is ``week:teamA:teamB`` and would collide across seasons.
     """
     week = game.get("week")
     if week is None:
@@ -162,4 +168,6 @@ def franchise_matchup_claim_key(game: dict[str, Any]) -> Optional[str]:
     if not home or not away:
         return None
     left, right = sorted([str(home), str(away)])
+    if season is not None:
+        return f"s{int(season)}:{int(week)}:{left}:{right}"
     return f"{int(week)}:{left}:{right}"
