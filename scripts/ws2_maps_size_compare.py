@@ -224,7 +224,14 @@ def _run_arm(arm: str, size: str, sqlite_path: Path) -> dict:
     away = target.get("away_team_id") or "TEAM002"
     store.games_collection.update_one({"_id": gid}, {"$unset": {"player_em_eog_applied": ""}})
     claim_token = str(gid)
-    matchup_key = franchise_matchup_claim_key(target)
+    _fr_doc = (
+        store.franchises_collection.find_one({"_id": ObjectId(FID)}, {"current_season": 1})
+        or store.franchises_collection.find_one({"_id": FID}, {"current_season": 1})
+        or {}
+    )
+    matchup_key = franchise_matchup_claim_key(
+        target, season=int(_fr_doc.get("current_season", 1) or 1)
+    )
     pull = {"applied_games": claim_token}
     if matchup_key:
         pull["applied_matchups"] = matchup_key

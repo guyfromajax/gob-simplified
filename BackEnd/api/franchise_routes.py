@@ -20156,6 +20156,8 @@ def finish_season(req: FinishSeasonRequest):
             # append the set consumed this rollover (never reused within the franchise)
             "used_recruit_set_ids": _prev_used + ([used_recruit_set_id] if used_recruit_set_id else []),
             "results": {},
+            # Matchup claims are season-scoped; clear so the list doesn't grow forever.
+            "applied_matchups": [],
             "season_inbox": [],
             # Cleared for the new season, then seeded with the prior season's exact
             # Recruiting Results story plus this season's Week-1 stories.
