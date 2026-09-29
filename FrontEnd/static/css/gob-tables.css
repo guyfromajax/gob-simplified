@@ -909,13 +909,6 @@ html.gob-shell .main #player-stats-view .gob-xs thead th.pin {
   z-index: 2;
   background-color: var(--surface-1);
 }
-#league-schedule-view td .sub {
-  display: block;
-  color: var(--text-60);
-  font-size: 12px;
-  line-height: 14px;
-  text-decoration: none;
-}
 .gob-wl.up { color: var(--delta-up); }
 .gob-wl.dn { color: var(--delta-down); }
 .gob-sch-round {
@@ -940,22 +933,88 @@ html.gob-shell .pg-tools .gob-wk-label {
   min-width: 72px;
   text-align: center;
 }
-/* Score line fills the card. Name columns take the spare width; the short columns stay tight. */
-#league-schedule-view.tab-content table.gob-sched {
-  width: 100%;
+/* League › Schedule: four columns of compact game cards. The winner's line is
+   full white, the loser's dims; your game is the navy card. */
+#league-schedule-view .gob-lgrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dsp-10) var(--dsp-12);
+  align-items: start;
+  padding-bottom: var(--space-16);
 }
-#league-schedule-view .gob-sched th.team,
-#league-schedule-view .gob-sched td.team {
-  text-align: left;
+@media (max-width: 1099px) {
+  #league-schedule-view .gob-lgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-#league-schedule-view .gob-sched th.num,
-#league-schedule-view .gob-sched td.num,
-#league-schedule-view .gob-sched th.box,
-#league-schedule-view .gob-sched td.box {
-  width: 1%;
+#league-schedule-view .gob-game {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--dsp-6) var(--dsp-10) var(--dsp-4);
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+}
+#league-schedule-view .gob-game.me {
+  background: color-mix(in srgb, var(--navy) 45%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--navy-hi) 45%, transparent);
+}
+#league-schedule-view .gob-gs {
+  display: flex;
+  align-items: center;
+  gap: var(--dsp-8);
+  height: var(--dsz-28);
+  color: var(--text-60);
+  font-size: var(--fs-13);
+}
+#league-schedule-view .gob-gs.won { color: var(--text-100); }
+#league-schedule-view .gob-gs .gob-team {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--dsp-6);
+  min-width: 0;
+  color: inherit;
+}
+#league-schedule-view .gob-gs .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
+#league-schedule-view .gob-gs a.gob-team:hover .nm { color: var(--text-100); text-decoration: underline; }
+#league-schedule-view .gob-gs .rk {
+  flex: none;
+  color: var(--text-38);
+  font-size: var(--fs-11);
+  font-variant-numeric: tabular-nums;
+}
+#league-schedule-view .gob-gs .sc {
+  flex: none;
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+#league-schedule-view .gob-gf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dsp-8);
+  min-height: var(--dsz-22);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  color: var(--text-38);
+  font-size: var(--fs-11);
+}
+#league-schedule-view .gob-gf .ctx {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#league-schedule-view .gob-lsch-empty {
+  margin: 0;
+  color: var(--text-60);
+  font-size: var(--fs-13);
+}
 #league-schedule-view a.gob-box {
+  flex: none;
   color: var(--text-60);
   text-decoration: none;
 }
@@ -963,6 +1022,38 @@ html.gob-shell .pg-tools .gob-wk-label {
   color: var(--text-100);
   text-decoration: underline;
 }
+html.gob-shell.gob-1920 #league-schedule-view .gob-gs { height: var(--dsz-34); font-size: var(--fs-14); }
+html.gob-shell.gob-1920 #league-schedule-view .gob-gf { min-height: var(--dsz-28); font-size: var(--fs-12); }
+
+/* League › Team Stats: 28 columns sized to fit .main, so the one header row
+   pins under the page head instead of scrolling inside a wide card. */
+#team-stats-view .gob-ts .gob-tbl th,
+#team-stats-view .gob-ts .gob-tbl td {
+  padding: var(--space-6) var(--space-4);
+}
+#team-stats-view .gob-ts .gob-tbl th {
+  font-size: var(--fs-11);
+  letter-spacing: var(--tracking-6);
+}
+#team-stats-view .gob-ts .gob-tbl th.s::after { margin-left: var(--space-2); }
+#team-stats-view .gob-ts .gob-tbl th.team,
+#team-stats-view .gob-ts .gob-tbl td.team { padding-left: var(--space-10); }
+#team-stats-view .gob-ts .gob-team > span {
+  max-width: calc(var(--dsz-118) + var(--dsz-20));
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* League › Rankings: the Standings table treatment, rank first. */
+#rankings-view .gob-rank .gob-tbl th.rk,
+#rankings-view .gob-rank .gob-tbl td.rk {
+  width: 1%;
+  padding-left: var(--space-16);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+#rankings-view .gob-rank .gob-tbl td.rk { color: var(--text-60); }
+#rankings-view .gob-rank .gob-tbl tr.me td.rk { color: var(--text-100); }
 
 /* Team › Schedule: four week columns. Each is a T1 mini-table; the whole regular
    season sits above the fold at 1280×720, and density tokens widen rows at 1920. */

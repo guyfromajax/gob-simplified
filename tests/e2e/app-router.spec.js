@@ -197,7 +197,7 @@ test('rankings opens in place, stays cached, and restores history', async ({ pag
     expect(ccHits, 'first open downloads a new body').toEqual([]);
     await expect(page.locator('#rankings-table tbody tr')).toHaveCount(25);
     await expect(page.locator('#rankings-table tbody tr.is-user')).toHaveCount(1);
-    await expect(page.locator('#rankings-table tbody tr.is-user a')).toHaveText('Lancaster');
+    await expect(page.locator('#rankings-table tbody tr.is-user a')).toContainText('Lancaster');
 
     ccHits = [];
     await mouseClick(page, stab(page, 'Standings'));

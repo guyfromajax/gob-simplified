@@ -236,9 +236,11 @@ test('both schedule tabs open from the row', async ({ page }) => {
   await openSub(page, 'league', 'league-schedule-view');
   await expect(page.locator('#league-schedule-view.tab-content.active')).toBeVisible();
   await expect(page.locator('.gob-wk-label')).toHaveText('Week 8');
-  await expect(page.locator('#league-schedule-view tr.me')).toContainText('70');
-  await expect(page.locator('#league-schedule-view tr.me .gob-box')).toHaveAttribute('href', /game_id=g-box/);
-  await expect(page.locator('#league-schedule-view tbody tr').nth(1)).toContainText('—');
+  await expect(page.locator('#league-schedule-view .gob-game.me')).toContainText('70');
+  await expect(page.locator('#league-schedule-view .gob-game.me .gob-box')).toHaveAttribute('href', /game_id=g-box/);
+  const open = page.locator('#league-schedule-view .gob-game').nth(1);
+  await expect(open).toContainText('Scheduled');
+  await expect(open.locator('.gob-box')).toHaveCount(0);
 });
 
 test('week stepper defaults to the current week and stops at the ends', async ({ page }) => {
@@ -307,7 +309,7 @@ test('main does not scroll sideways at 1280 or 1920', async ({ page }) => {
     await expect(page.locator('#team-schedule-view tr.is-next')).toBeVisible();
     expect(await mainOverflow(page), 'team ' + size[0]).toBeLessThanOrEqual(1);
     await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=league-schedule-view&week=8');
-    await expect(page.locator('#league-schedule-view tr.me')).toBeVisible();
+    await expect(page.locator('#league-schedule-view .gob-game.me')).toBeVisible();
     expect(await mainOverflow(page), 'league ' + size[0]).toBeLessThanOrEqual(1);
   }
 });
@@ -318,7 +320,7 @@ test('skeleton then rows, and error then retry', async ({ page }) => {
   await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=league-schedule-view');
   await expect(page.locator('#league-schedule-view .gob-view-skel')).toBeVisible();
   delayed.release();
-  await expect(page.locator('#league-schedule-view tr.me')).toBeVisible();
+  await expect(page.locator('#league-schedule-view .gob-game.me')).toBeVisible();
 
   await installApi(page, 'error');
   await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=team-schedule-view');

@@ -1,6 +1,7 @@
 /**
- * League › Rankings, mounted inside the command center.
- * Reads the rankings array already on the command-center payload.
+ * League › Rankings, mounted inside the command center. One T1 table in the
+ * Standings treatment. Reads the rankings array already on the command-center
+ * payload. The payload has no previous rank, so there is no movement column.
  */
 
 function commandCenterUrl(franchiseId) {
@@ -38,11 +39,11 @@ function backForward() {
 }
 
 export function mount(container, ctx) {
+  var tables = window.GOBTables;
   var showAll = readShowAll();
   var rankings = [];
   var signature = '';
   var userId = (ctx && ctx.teamId) || '';
-  var rootBuilt = false;
   var loaded = false;
   var restoredScroll = false;
 
@@ -57,136 +58,82 @@ export function mount(container, ctx) {
     });
   }
 
-  function paintSkeleton() {
-    var html = '<div class="gob-view-skel" aria-hidden="true"><div class="gob-view-skel-bar"></div>';
-    var i;
-    for (i = 0; i < 8; i++) html += '<div class="gob-view-skel-row"></div>';
-    html += '</div>';
-    container.innerHTML = html;
-    rootBuilt = false;
-  }
-
-  function showError() {
-    container.innerHTML = '<div class="gob-view-error" role="alert">'
-      + '<p>Rankings could not be opened.</p>'
-      + '<button type="button" class="gob-view-retry">Retry</button>'
+  function paintTools(slot) {
+    slot.innerHTML = '<div class="stats-toggle" role="group" aria-label="Rankings shown">'
+      + '<button type="button" id="rankings-toggle-top25" data-value="top25"'
+      + (showAll ? '' : ' class="on"') + '>Top 25</button>'
+      + '<button type="button" id="rankings-toggle-all" data-value="all"'
+      + (showAll ? ' class="on"' : '') + '>All ' + tables.esc(rankings.length || 128) + '</button>'
       + '</div>';
-    rootBuilt = false;
-    loaded = false;
-    var button = container.querySelector('.gob-view-retry');
-    if (button) button.addEventListener('click', load);
-  }
-
-  function buildTeamLink(row) {
-    var a = document.createElement('a');
-    var franchiseId = (ctx && ctx.franchiseId) || '';
-    a.href = window.GOBTables.rosterHref(franchiseId, row.team_id || '', row.team_name || '', 'rankings-view');
-    a.setAttribute('data-return', '');
-    a.textContent = row.team_name || '';
-    a.style.color = '#4a90e2';
-    a.style.textDecoration = 'none';
-    return a;
-  }
-
-  function render() {
-    var tbody = container.querySelector('#rankings-table-body');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    var toShow = showAll ? rankings : rankings.slice(0, 25);
-    toShow.forEach(function (row) {
-      var tr = document.createElement('tr');
-      if (sameId(row.team_id, userId)) tr.classList.add('is-user');
-
-      var teamTd = document.createElement('td');
-      teamTd.className = 'team-cell';
-      var rankSpan = document.createElement('span');
-      rankSpan.textContent = (row.natl_rank != null ? row.natl_rank : '') + '. ';
-      teamTd.appendChild(rankSpan);
-      var nameSpan = buildTeamLink(row);
-      if (row.conference === 1) {
-        nameSpan.className = 'rankings-team conference-1';
-        nameSpan.style.color = row.primary_color || '#000';
-        nameSpan.style.fontWeight = 'bold';
-      }
-      teamTd.appendChild(nameSpan);
-      tr.appendChild(teamTd);
-
-      var wlTd = document.createElement('td');
-      wlTd.className = 'wl-cell';
-      wlTd.textContent = (row.W || 0) + '-' + (row.L || 0);
-      tr.appendChild(wlTd);
-
-      var lastWeekTd = document.createElement('td');
-      var lastWeekSpan = document.createElement('span');
-      var result = (row.last_week_result || '').toUpperCase();
-      if (result === 'W') lastWeekSpan.className = 'last-week-win';
-      else if (result === 'L') lastWeekSpan.className = 'last-week-loss';
-      else if (result === 'T') lastWeekSpan.className = 'last-week-tie';
-      lastWeekSpan.textContent = row.last_week || '';
-      lastWeekTd.appendChild(lastWeekSpan);
-      tr.appendChild(lastWeekTd);
-
-      var nextTd = document.createElement('td');
-      nextTd.textContent = row.next || '';
-      tr.appendChild(nextTd);
-
-      tbody.appendChild(tr);
+    slot.querySelectorAll('button').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var next = button.getAttribute('data-value') === 'all';
+        if (next === showAll) return;
+        showAll = next;
+        writeShowAll(showAll);
+        paintTools(slot);
+        render();
+      });
     });
   }
 
-  function ensure() {
-    if (rootBuilt && container.querySelector('#rankings-table')) return;
-    container.innerHTML = ''
-      + '<section class="fcc-data-card rankings-page-card">'
-      + '<div class="rankings-page-card-head">'
-      + '<h1 class="rankings-page-title">National Rankings</h1>'
-      + '<div class="rankings-toggle-wrap">'
-      + '<button type="button" id="rankings-toggle-top25" class="rankings-toggle active">Top 25</button>'
-      + '<button type="button" id="rankings-toggle-all" class="rankings-toggle">All 128</button>'
-      + '</div></div>'
-      + '<div class="fcc-data-card-body">'
-      + '<table id="rankings-table" class="leaders-table standings-conference-table rankings-results-table">'
-      + '<thead><tr><th>Team</th><th>W-L</th><th>Last Week</th><th>Next</th></tr></thead>'
-      + '<tbody id="rankings-table-body"></tbody>'
-      + '</table></div></section>';
-    rootBuilt = true;
-    var top = container.querySelector('#rankings-toggle-top25');
-    var all = container.querySelector('#rankings-toggle-all');
-    if (top) {
-      top.addEventListener('click', function () {
-        showAll = false;
-        writeShowAll(false);
-        top.classList.add('active');
-        if (all) all.classList.remove('active');
-        render();
-      });
-    }
-    if (all) {
-      all.addEventListener('click', function () {
-        showAll = true;
-        writeShowAll(true);
-        all.classList.add('active');
-        if (top) top.classList.remove('active');
-        render();
-      });
-    }
-    if (showAll && all) {
-      all.classList.add('active');
-      if (top) top.classList.remove('active');
-    }
+  function ownTools() {
+    tables.registerTools('rankings-view', paintTools);
+    tables.placeTools();
+  }
+
+  function onTab() {
+    if (container.classList.contains('active')) ownTools();
+  }
+
+  function lastWeekCell(row) {
+    var text = row.last_week || '';
+    if (!text) return '';
+    var result = String(row.last_week_result || '').toUpperCase();
+    var tone = result === 'W' ? ' up' : (result === 'L' ? ' dn' : '');
+    var mark = result ? '<span class="gob-wl' + tone + '">' + tables.esc(result) + '</span> ' : '';
+    return mark + tables.esc(text);
+  }
+
+  function render() {
+    var franchiseId = (ctx && ctx.franchiseId) || '';
+    var shown = showAll ? rankings : rankings.slice(0, 25);
+    var html = '<section class="gob-tcard gob-rank"><h2>National Rankings</h2>'
+      + '<table id="rankings-table" class="gob-tbl"><thead><tr>'
+      + '<th class="rk">#</th><th class="team">Team</th><th>W</th><th>L</th><th>PF</th><th>PA</th>'
+      + '<th class="left">Last Week</th><th class="left">Next</th>'
+      + '</tr></thead><tbody id="rankings-table-body">';
+    if (!shown.length) html += '<tr><td class="team" colspan="8">No rankings yet.</td></tr>';
+    shown.forEach(function (row) {
+      var mine = sameId(row.team_id, userId);
+      var name = row.team_name || '';
+      var href = tables.rosterHref(franchiseId, row.team_id || '', name, 'rankings-view');
+      html += '<tr' + (mine ? ' class="me is-user"' : '') + '>'
+        + '<td class="rk">' + tables.esc(row.natl_rank != null ? row.natl_rank : '') + '</td>'
+        + '<td class="team">' + tables.teamLink(href, name, name, row.primary_color) + '</td>'
+        + '<td>' + tables.esc(row.W || 0) + '</td>'
+        + '<td>' + tables.esc(row.L || 0) + '</td>'
+        + '<td>' + tables.esc(row.PF != null ? row.PF : '') + '</td>'
+        + '<td>' + tables.esc(row.PA != null ? row.PA : '') + '</td>'
+        + '<td class="left">' + lastWeekCell(row) + '</td>'
+        + '<td class="left">' + tables.esc(row.next || '') + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></section>';
+    container.innerHTML = html;
+    ownTools();
   }
 
   function apply(body) {
     var rows = (body && body.rankings) || [];
     var next = JSON.stringify(rows);
-    var same = loaded && rootBuilt && next === signature;
+    var same = loaded && next === signature && !!container.querySelector('#rankings-table');
     signature = next;
     rankings = rows;
     if (body) {
       userId = body.user_team_object_id || body.user_team_id || (ctx && ctx.teamId) || userId;
     }
     if (same) return;
-    ensure();
     render();
     loaded = true;
     restoreScroll();
@@ -199,14 +146,16 @@ export function mount(container, ctx) {
   function load() {
     var store = ctx && ctx.store;
     if (!store || typeof store.get !== 'function') {
-      showError();
+      loaded = false;
+      tables.paintError(container, 'Rankings could not be opened.', load);
       return;
     }
-    if (!loaded) paintSkeleton();
+    if (!loaded) tables.paintSkeleton(container);
     store.get(url()).then(function (body) {
       apply(body);
     }).catch(function () {
-      showError();
+      loaded = false;
+      tables.paintError(container, 'Rankings could not be opened.', load);
     });
   }
 
@@ -218,14 +167,19 @@ export function mount(container, ctx) {
     }).catch(function () { /* keep the mounted table */ });
   }
 
-  function unmount() {
-    container.innerHTML = '';
-    rootBuilt = false;
-    loaded = false;
-  }
-
+  document.addEventListener('gob-tab-shown', onTab);
+  ownTools();
   load();
-  return { unmount: unmount, revalidate: revalidate };
+
+  return {
+    revalidate: revalidate,
+    unmount: function () {
+      document.removeEventListener('gob-tab-shown', onTab);
+      tables.registerTools('rankings-view', null);
+      container.innerHTML = '';
+      loaded = false;
+    }
+  };
 }
 
 export function unmount() {}

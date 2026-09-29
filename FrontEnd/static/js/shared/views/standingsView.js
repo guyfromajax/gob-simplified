@@ -16,12 +16,6 @@ var COLS = [
   { key: 'next', label: 'NEXT', next: true }
 ];
 
-var SCOPES = [
-  { id: 'conference', label: 'Conference' },
-  { id: 'region', label: 'Region' },
-  { id: 'national', label: 'National' }
-];
-
 function url(franchiseId, teamId) {
   var base = window.GOBTables.apiBase('/franchise/standings');
   var q = 'franchise_id=' + franchiseId;
@@ -40,8 +34,6 @@ function num(value) {
 
 export function mount(container, ctx) {
   var tables = window.GOBTables;
-  var scope = tables.readKey('gob-view-standings-scope', 'conference');
-  if (scope !== 'region' && scope !== 'national') scope = 'conference';
   var query = '';
   var sortKey = '';
   var sortDir = 1;
@@ -63,18 +55,7 @@ export function mount(container, ctx) {
   }
 
   function paintTools(slot) {
-    slot.innerHTML = tables.segment(SCOPES, scope) + tables.searchBox('Search teams');
-    slot.querySelectorAll('button').forEach(function (button) {
-      button.addEventListener('click', function () {
-        var next = button.getAttribute('data-value');
-        if (!next || next === scope) return;
-        scope = next;
-        tables.writeKey('gob-view-standings-scope', scope);
-        tables.resetScroll();
-        paintTools(slot);
-        render();
-      });
-    });
+    slot.innerHTML = tables.searchBox('Search teams');
     var input = slot.querySelector('input');
     if (input) {
       input.value = query;
@@ -127,14 +108,9 @@ export function mount(container, ctx) {
     return cards;
   }
 
-  function visibleRows(rows, userConference, userRegion) {
+  function visibleRows(rows) {
     var needle = query.trim().toLowerCase();
     return rows.filter(function (row) {
-      if (scope === 'conference' && userConference != null) {
-        if (String(row.conference) !== String(userConference)) return false;
-        if (userRegion && String(row.region || '').toUpperCase() !== String(userRegion).toUpperCase()) return false;
-      }
-      if (scope === 'region' && userRegion && String(row.region || '').toUpperCase() !== String(userRegion).toUpperCase()) return false;
       if (!needle) return true;
       var name = String(row.display_name || row.name || '').toLowerCase();
       return name.indexOf(needle) !== -1;
@@ -170,7 +146,7 @@ export function mount(container, ctx) {
       if (row.name) colorByName[row.name] = row.primary_color;
       if (row.display_name) colorByName[row.display_name] = row.primary_color;
     });
-    var filtered = visibleRows(rows, userConference, userRegion);
+    var filtered = visibleRows(rows);
     var cards = groups(filtered, userConference, userRegion);
     var franchiseId = (ctx && ctx.franchiseId) || '';
     var linkMeta = [];

@@ -19,6 +19,7 @@ var LABELS = {
 var PER_GAME = { PTS: 1, REB: 1, AST: 1 };
 var TOTALS = { '3PTM': 1, BLK: 1, STL: 1 };
 var UNITS = { PTS: 'PPG', REB: 'RPG', AST: 'APG' };
+var BOARD_SIZE = { conference: 5, national: 10 };
 
 function leadersUrl(franchiseId, viewScope, limit) {
   return window.GOBTables.apiBase('/franchise/leaders')
@@ -90,6 +91,7 @@ export function mount(container, ctx) {
         full = null;
         loaded = false;
         tables.resetScroll();
+        paintTools(slot);
         load();
       });
     });
@@ -200,7 +202,12 @@ export function mount(container, ctx) {
     return [row.team, row.position, row.year].filter(Boolean).join(' · ');
   }
 
+  function boardSize() {
+    return BOARD_SIZE[viewScope] || BOARD_SIZE.conference;
+  }
+
   function renderBoard() {
+    var size = boardSize();
     var html = '<div class="gob-ldr">';
     CATS.forEach(function (stat) {
       var rows = ((board && board[stat]) || []).filter(matches);
@@ -213,7 +220,7 @@ export function mount(container, ctx) {
       if (hero) {
         var href = tables.rosterHref(franchiseId, hero.team_id, hero.team || '', 'leaders-view') + '&origin=league';
         var who = teamBits(hero);
-        var cardIds = tables.esc(JSON.stringify(rows.slice(0, 5).map(function (item) { return String(item.player_id || ''); }).filter(Boolean)));
+        var cardIds = tables.esc(JSON.stringify(rows.slice(0, size).map(function (item) { return String(item.player_id || ''); }).filter(Boolean)));
         var heroPlayer = hero.player_id
           ? '<a class="gob-player nm" data-order="' + cardIds + '" href="' + tables.esc(playerHref(hero.player_id)) + '">' + tables.esc(hero.name || '') + '</a>'
           : '<span class="nm">' + tables.esc(hero.name || '') + '</span>';
@@ -225,7 +232,7 @@ export function mount(container, ctx) {
             : tables.esc(who)) + '</span></span>'
           + '<span class="ldb-v">' + tables.esc(showValue(stat, hero.value))
           + (suffix ? '<em>' + tables.esc(suffix) + '</em>' : '') + '</span></div><div class="ldb-list">';
-        rows.slice(1, 5).forEach(function (row, index) {
+        rows.slice(1, size).forEach(function (row, index) {
           var rowHref = tables.rosterHref(franchiseId, row.team_id, row.team || '', 'leaders-view') + '&origin=league';
           var code = abbr(row.team);
           var rowPlayer = row.player_id
@@ -251,7 +258,7 @@ export function mount(container, ctx) {
     });
     var order = [];
     CATS.forEach(function (stat) {
-      ((board && board[stat]) || []).filter(matches).slice(0, 5).forEach(function (row) {
+      ((board && board[stat]) || []).filter(matches).slice(0, size).forEach(function (row) {
         if (row.player_id) order.push(String(row.player_id));
       });
     });
@@ -320,7 +327,7 @@ export function mount(container, ctx) {
       return;
     }
     if (!loaded) tables.paintSkeleton(container);
-    store.get(leadersUrl(franchiseId, viewScope, 5)).then(function (payload) {
+    store.get(leadersUrl(franchiseId, viewScope, boardSize())).then(function (payload) {
       applyBoard(payload || {});
       if (expanded) loadFull();
     }).catch(fail);
@@ -337,7 +344,7 @@ export function mount(container, ctx) {
   function revalidate() {
     var store = ctx && ctx.store;
     if (!loaded || !store || typeof store.revalidate !== 'function' || !franchiseId) return;
-    store.revalidate(leadersUrl(franchiseId, viewScope, expanded ? 50 : 5)).then(function (payload) {
+    store.revalidate(leadersUrl(franchiseId, viewScope, expanded ? 50 : boardSize())).then(function (payload) {
       if (!payload) return;
       if (expanded) applyFull(payload);
       else applyBoard(payload);
