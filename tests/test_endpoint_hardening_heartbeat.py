@@ -1,7 +1,7 @@
 """Endpoint hardening + CPU-week claim heartbeat.
 
 - removed routes 404 (run_training, sentry-debug, debug/server-state, debug-names)
-- diagnostics dumps are 204/no-write unless GOB_DIAGNOSTICS_ENABLED=1
+- diagnostics dumps are 200 {}/no-write unless GOB_DIAGNOSTICS_ENABLED=1
 - API docs off in production only
 - global exception handler: no exception text; origin reflected only if allowlisted
 - claim heartbeat: advances while held, stops after release, owner-only, still blocks
@@ -78,12 +78,12 @@ def _written(tmp_path: Path) -> list:
 
 
 @pytest.mark.parametrize("path,body", _DIAG)
-def test_diagnostics_off_by_default_returns_204_and_writes_nothing(path, body, tmp_path, monkeypatch):
+def test_diagnostics_off_by_default_returns_empty_json_and_writes_nothing(path, body, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("GOB_DIAGNOSTICS_ENABLED", raising=False)
     res = client.post(path, json=body)
-    assert res.status_code == 204
-    assert res.content == b""
+    assert res.status_code == 200
+    assert res.json() == {}
     assert _written(tmp_path) == []
     assert not (tmp_path / "docs").exists()
 

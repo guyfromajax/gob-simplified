@@ -8176,7 +8176,7 @@ try:
         Tracks score increments and printed events to identify missing prints.
         """
         if not _diagnostics_enabled():
-            return Response(status_code=204)
+            return {}  # 200 {} so bootGame.js's response.json() doesn't throw
         try:
             # Create diagnostics directory if it doesn't exist
             diagnostics_dir = Path("docs/0_Text_Scroll_Debug")
@@ -8337,7 +8337,7 @@ try:
         Tracks free throws and made FGs to identify edge cases where result types don't match.
         """
         if not _diagnostics_enabled():
-            return Response(status_code=204)
+            return {}  # 200 {} so bootGame.js's response.json() doesn't throw
         try:
             # Create diagnostics directory if it doesn't exist
             diagnostics_dir = Path("docs/0_Text_Scroll_Debug")
