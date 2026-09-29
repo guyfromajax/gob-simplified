@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="design_doc_mode" content="canvas">
+<title>GOB · Chapter 7 · Home Base + Reward Ladder · frames</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../design_handoff_browse_templates/tokens.css">
+<style>
+body{margin:0;font-family:Inter,sans-serif}
+a{color:#27408E}a:hover{color:#4A6ED2}
+.fr{position:absolute}
+.fr h2{margin:0 0 4px;font:700 30px/1 'Bebas Neue Pro',sans-serif;letter-spacing:.04em;color:#111}
+.fr h1{margin:0 0 6px;font:700 56px/1 'Bebas Neue Pro',sans-serif;letter-spacing:.03em;color:#111}
+.fr p{margin:0 0 14px;max-width:1240px;font-size:15px;line-height:1.45;color:#444}
+.fr p a{font-weight:600}
+.row{display:flex;gap:60px;align-items:flex-start}
+.cell .cap{margin:0 0 8px;font:600 13px/1.3 Inter,sans-serif;color:#555;max-width:1280px}
+.cell .cap b{color:#111;letter-spacing:.02em}
+.cell .cap span{margin-left:8px;font-weight:600;font-size:12px;letter-spacing:.06em;color:#888}
+.card{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.18);background:#0b0d14}
+.card::after{content:'';position:absolute;inset:0}
+.card iframe{display:block;border:0;pointer-events:none}
+.sec{border-top:2px solid #111;padding-top:18px}
+</style>
+</head>
+<body>
+<div id="canvas"></div>
+<script>
+var F='frames/';
+var S=[
+{h:'GOB · Chapter 7 · Home Base + Reward Ladder',p:'Every frame at its real size. Frames are previews only here, so the canvas pans and zooms over them. Use <b>Open</b> on a frame to interact with it (for example the milestone queue’s Next). Spec: <a href="README.md">README.md</a> (decisions, new components, reward-gold token, motion, data needed). New CSS: <a href="ch7.css">ch7.css</a>. Sample values are illustrative; structure, tokens and behaviour are the spec.',big:1},
+{h:'A · Home Base',p:'One layout online and offline. Left: two program slots plus Tutorials / Settings / FAQs. Right swaps: online = Find A Game (Coming Soon) + one tabbed panel, Around GOB ⇄ Leaderboard; offline = Your Career (career numerals incl. Geek Points, Trophy Case, Top Seasons by GP). Exactly one green per screen, in both modes: the last-played program’s Enter. Find Your Program is quiet.',sec:1},
+{rows:[[['home-base.html?net=online&s=first','Online · first launch','No programs. No green on the screen: nothing to continue yet.'],1],
+[['home-base.html?net=online&s=one','Online · 1 program','Last played carries the one green Enter.'],1],
+[['home-base.html?net=online&s=two','Online · 2 programs (slots full)','Second slot’s Enter is quiet. ··· sits outside the card, off the click target.'],1],
+[['home-base.html?net=online&s=live','Online · game in progress','The game in progress takes the green: Resume Game.'],1],
+[['home-base.html?net=online&s=two&tab=lb','Online · Leaderboard tab','Same panel, other tab. Around GOB carries the new-results count.'],1],
+[['home-base.html?net=offline&s=first','Offline · first launch','Potential energy: hollow numerals, labelled empty medallions, five open Top Season ranks.'],1],
+[['home-base.html?net=offline&s=one','Offline · 1 program, no trophies','First season ranks at #1 while in progress; four open ranks below.'],1],
+[['home-base.html?net=offline&s=two','Offline · 2 programs, with trophies','Accomplishment: solid numerals, gold titles, ranked seasons by GP.'],1],
+[['home-base.html?net=offline&s=live','Offline · game in progress','Resume Game on the slot carries the green.'],1]]},
+{rows:[[['home-base.html?net=online&s=two&ui=menu','Delete · menu open','··· opens one item. Red text, not a button.'],['home-base.html?net=online&s=two&ui=confirm','Delete · confirmation','Cancel has focus. Delete is red outline, never green or orange.']]]},
+{h:'Trophy Case',p:'Opens from Home Base (Trophy Case → View all). Titles in gold, milestones neutral, one row per season with its review.',sec:1},
+{rows:[[['trophy-case.html?s=populated','Trophy Case · populated',''],1],[['trophy-case.html?s=empty','Trophy Case · empty','Empty states say what fills them and when.'],1]]},
+{h:'B · Reward ladder · Weekly (Office “Since last week”)',p:'One card replaces Result + What moved, in place, no pop-up, inside the Office column 1 footprint. Everyday rows (recruiting wire, column 3) show the quiet style. Frames play the one-time entrance on load.',sec:1},
+{rows:[[['office-weekly.html?s=win','Weekly · WIN','Team wash, white WIN plate, score counts up once, POTG with portrait + line, four badges, routine gains in neutral.'],['office-weekly.html?s=loss','Weekly · LOSS','No wash, no count-up, no sound. Both scores at the same luminance. Team leader, not POTG. A folded moment sits in “Also”.']],
+[['office-weekly.html?s=gain','Weekly · WIN + exceptional gain','The one weekly gold: diamond, ring and delta on the exceptional chip, plus the key in the section head.'],['office-weekly.html?s=lossgain','Weekly · LOSS + exceptional gain','Training is independent of the result: the gold marker still shows on a loss.']],
+[['office-weekly.html?s=gain&d=1920','Weekly · 1920','Same card at 1920 density.']]]},
+{h:'Milestone · one modal template',p:'Gold accent for celebratory moments, quiet for elimination. Queue position (“1 of 2”) in the header, “Up next” in the footer. In the signing frame, open it and press Next to see the queue step.',sec:1},
+{rows:[[['milestone.html?v=signing','Milestone · signing class (1 of 2)','Next → Coach archetype (2 of 2) → Done.'],['milestone.html?v=bracket','Milestone · first bracket reveal','Seed, your path, Full bracket →. No confetti at this tier.'],['milestone.html?v=elim','Milestone · elimination','Respectful: no gold, no sound, fade only.']]]},
+{h:'Season peak',p:'Full takeover. Gold, confetti and a sound cue. The title moment queues the end-of-season review, which is saved to the Trophy Case.',sec:1},
+{rows:[[['season-peak.html?v=title','Season peak · national title (1 of 2)',''],['season-peak.html?v=review','Season peak · end-of-season review (2 of 2)','Record, finish, titles, best players, awards, class signed.']],[['season-peak.html?v=review&d=1920','Season peak · review · 1920','']]]}
+];
+function cell(c,both){
+var out='';var list=both?[[c[0],1280,720],[c[0]+'&d=1920',1920,1080]]:[[c[0],/d=1920/.test(c[0])?1920:1280,/d=1920/.test(c[0])?1080:720]];
+list.forEach(function(x){out+='<div class="cell"><div class="cap"><b>'+c[1]+'</b><span>'+x[1]+'×'+x[2]+'</span> · <a href="'+F+x[0]+'" target="_blank">Open</a>'+(c[2]&&x[1]===list[0][1]?'<br>'+c[2]:'')+'</div><div class="card"><iframe src="'+F+x[0]+'&embed" width="'+x[1]+'" height="'+x[2]+'" loading="lazy"></iframe></div></div>';});
+return out;
+}
+var cv=document.getElementById('canvas'),blocks=[];
+S.forEach(function(s){
+if(s.h){var d=document.createElement('div');d.className='fr'+(s.sec?' sec':'');d.style.left='40px';d.style.width='3260px';d.innerHTML=(s.big?'<h1>':'<h2>')+s.h+(s.big?'</h1>':'</h2>')+'<p>'+s.p+'</p>';cv.appendChild(d);blocks.push({el:d,hd:1});}
+if(s.rows)s.rows.forEach(function(r){
+var d=document.createElement('div');d.className='fr';d.style.left='40px';
+var h=0,html='';
+if(r.length===2&&r[1]===1){html=cell(r[0],1);h=1080;}
+else{r.forEach(function(c){html+=cell(c,0);if(/d=1920/.test(c[0]))h=Math.max(h,1080);else h=Math.max(h,720);});}
+d.innerHTML='<div class="row">'+html+'</div>';cv.appendChild(d);blocks.push({el:d,h:h});
+});
+});
+function layout(){var y=40;blocks.forEach(function(b){b.el.style.top=y+'px';if(b.hd)y+=b.el.offsetHeight+24;else y+=b.el.offsetHeight+100;});}
+layout();if(document.fonts)document.fonts.ready.then(layout);window.addEventListener('load',layout);
+</script>
+</body>
+</html>
