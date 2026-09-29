@@ -7,9 +7,7 @@
 --navy-hi:#4A6ED2;       /* edge/halo tint for navy selections only */
 --orange:#F79420;        /* saves / non-advancing actions, gated-task tag */
 --green:#34EC27;         /* the ONE Advance action per screen + positive data */
---reward-gold:#E8B84A;   /* ONLY milestone / season-peak rewards + exceptional stat gains. Placeholder until the Chapter 7 Claude Design handoff. */
---reward-gold-12:color-mix(in srgb,var(--reward-gold) 12%,transparent);
---reward-gold-24:color-mix(in srgb,var(--reward-gold) 24%,transparent);
+--reward-gold:#F0C560;   /* ONLY milestone / season-peak rewards + exceptional stat gains. Tints are color-mix() at use. */
 --red:#ff6d6d;
 --yellow:#FFD700;
 --blue:#4A90D9;
@@ -197,7 +195,6 @@
 --shadow-card:inset 0 1px 0 var(--white-5),0 8px 24px var(--black-18);
 --shadow-logo:inset 0 0 0 1px var(--white-22),0 2px 6px var(--black-35);
 --shadow-advance:inset 0 1px 0 var(--white-35),0 4px 18px color-mix(in srgb,var(--green) 18%,transparent);
---shadow-reward:inset 0 1px 0 var(--white-35),0 4px 18px color-mix(in srgb,var(--reward-gold) 18%,transparent);
 --shadow-tier:inset 0 1px 0 color-mix(in srgb,var(--tier-metal-hi) 25%,transparent),0 0 0 1px color-mix(in srgb,var(--tier-metal) 12%,transparent),0 18px 50px color-mix(in srgb,var(--tier-metal) 12%,transparent);
 --shadow-panel:24px 0 60px var(--black-45),inset 1px 0 0 var(--white-4);
 --shadow-popover:0 16px 40px var(--black-50),inset 0 0 0 1px var(--white-12);

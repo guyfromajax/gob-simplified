@@ -54,6 +54,8 @@ function cloneParams(params) {
     // FTE v2 tutorial funnel — immersive screens, no auth bar
     'tutorial-persona-intro.html',
     'tutorial-situation.html',
+    // Home Base carries its own top bar (Ch7), so the site bar would double it
+    'mode-select.html',
     // Optional non-.html route variants
     '/box-score',
     '/game-plan',

@@ -61,14 +61,9 @@ function navigateFromModeSelect(url) {
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
 const ALPHA_DISCLAIMER_VERSION = '2026-08-12-player-attributes-alpha-box';
 
-const franchiseHomeSlots = document.getElementById('franchise-home-slots');
+const homeBaseRoot = document.getElementById('home-base');
 const alphaDisclaimer = document.getElementById('alpha-disclaimer');
 const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
-const leaderboardHost = document.getElementById('community-leaderboard');
-const communityHighlightsBody = document.querySelector('.community-highlights-body');
-const aroundTheLeagueGrid = document.getElementById('around-the-league-grid');
-const leaderboardGeekPointsToggle = document.getElementById('leaderboard-view-geek-points');
-const leaderboardTitlesToggle = document.getElementById('leaderboard-view-titles');
 
 // Primary/secondary from scripts/align_core8_team_colors.py (Mongo teams.primary_color / secondary_color)
 const A1_CONFERENCE_TEAMS = [
@@ -91,6 +86,17 @@ const slotRuntimeById = {};
 let pendingDeleteFranchise = null;
 let currentLeaderboardData = null;
 let currentLeaderboardView = 'geek_points';
+/** Top-level hint from GET /franchise/list: the program that gets the green. */
+let mostRecentFranchiseId = '';
+/** The last view model handed to homeBase.js, so partial updates can reuse it. */
+let hbView = null;
+let hbUsername = '';
+/** Career numerals from GET /franchise/coach-career (online only). */
+let hbCareer = null;
+/** PR 5 owns the Trophy Case route; the entry stays off until it lands. */
+const HB_TROPHY_CASE_HREF = '';
+/** How long the loader will wait on the right zone's first view before giving up. */
+const COMMUNITY_FIRST_VIEW_TIMEOUT_MS = 6000;
 
 // Team name → square logo filename prefix (from images/square-logos/{code}_square.png)
 const TEAM_LOGO_CODE = {
@@ -176,8 +182,30 @@ function redirectToLogin() {
   window.location.replace('/login.html?redirect=' + redirectParam);
 }
 
+/**
+ * Drops the shared branded loader. Only called once Home Base has painted real
+ * content: the session check is done and the slots have rendered.
+ */
 function revealModeSelect() {
-  if (document.body) document.body.classList.remove('mode-select-loading');
+  if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+    window.PageLoadOverlay.hide();
+    return;
+  }
+  const overlay = document.getElementById('page-load-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+/**
+ * Resolves when `promise` settles or `ms` elapses, whichever comes first.
+ * The community payloads gate the loader so the right zone is not blank behind
+ * it, but a stalled community fetch must never strand the page on the loader —
+ * that bug shipped once already.
+ */
+function settledOrAfter(promise, ms) {
+  return Promise.race([
+    Promise.resolve(promise).catch(function () {}),
+    new Promise(function (resolve) { window.setTimeout(resolve, ms); }),
+  ]);
 }
 
 function safeJsonFetch(url, options) {
@@ -270,25 +298,8 @@ function displayCommunityLeaderboardPoints(geekPoints) {
   return (Number.isFinite(n) && n > 0) ? n : '--';
 }
 
-function escapeHtmlMs(text) {
-  if (text == null || text === undefined) return '';
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function setLeaderboardView(view) {
   currentLeaderboardView = view === 'titles' ? 'titles' : 'geek_points';
-  if (leaderboardGeekPointsToggle) leaderboardGeekPointsToggle.classList.toggle('active', currentLeaderboardView === 'geek_points');
-  if (leaderboardTitlesToggle) leaderboardTitlesToggle.classList.toggle('active', currentLeaderboardView === 'titles');
-  var subtitle = document.querySelector('.ms-leaderboard-subtitle');
-  if (subtitle) {
-    subtitle.textContent = currentLeaderboardView === 'titles'
-      ? 'Total Titles (National Titles)'
-      : 'Earn Geek Points after each game based on your coaching performance.';
-  }
 }
 
 // Title-count display: total titles with national titles in parens, e.g. "7 (0)".
@@ -300,36 +311,46 @@ function displayTitlesValue(entry) {
   return total + ' (' + natl + ')';
 }
 
-function renderGeekPointsLeaderboard(leaderboardData, currentUsername) {
-  if (!leaderboardHost) return;
-  const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
-  const topFive = Array.isArray(leaderboardData && leaderboardData.top) ? leaderboardData.top.slice(0, 5) : [];
-  const currentTopEntry = currentUserNormalized
-    ? topFive.find(function (entry) { return safeText(entry && entry.username, '').toLowerCase() === currentUserNormalized; })
-    : null;
-  const currentPinnedEntry = (!currentTopEntry && leaderboardData && leaderboardData.current_user)
-    ? leaderboardData.current_user
-    : null;
-  const rows = topFive.map(function (entry) {
-    const isCurrent = entry.is_current_user || (currentUserNormalized && safeText(entry.username, '').toLowerCase() === currentUserNormalized);
-    const displayPoints = displayCommunityLeaderboardPoints(entry.geek_points);
-    return `
-      <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
-        <div class="community-rank">${entry.rank}.</div>
-        <div class="community-username">${entry.username}${coachArchetypeBadge(entry, 22)}</div>
-        <div class="community-score">${displayPoints}</div>
-      </div>
-    `;
-  }).join('');
-  const pinned = currentPinnedEntry ? `
-    <div class="community-leaderboard-separator"></div>
-    <div class="community-leaderboard-row is-current-user">
-      <div class="community-rank">${currentPinnedEntry.rank}.</div>
-      <div class="community-username">${currentPinnedEntry.username}${coachArchetypeBadge(currentPinnedEntry, 22)}</div>
-      <div class="community-score">${displayCommunityLeaderboardPoints(currentPinnedEntry.geek_points)}</div>
-    </div>
-  ` : '';
-  leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">No alpha leaderboard data yet</div>';
+/**
+ * Flattens /api/auth/leaderboard into the shape Home Base draws: ranked rows
+ * (top three become tiles) plus the current user, pinned separately only when
+ * the server put them outside the returned page.
+ */
+function hbLeaderboardModel(leaderboardData, currentUsername) {
+  const titles = currentLeaderboardView === 'titles';
+  const normalized = safeText(currentUsername, '').toLowerCase();
+  const source = titles
+    ? (leaderboardData && leaderboardData.titles_top)
+    : (leaderboardData && leaderboardData.top);
+  const pinnedEntry = titles
+    ? (leaderboardData && leaderboardData.titles_current_user)
+    : (leaderboardData && leaderboardData.current_user);
+
+  function isMe(entry) {
+    if (!entry) return false;
+    if (entry.is_current_user) return true;
+    return !!normalized && safeText(entry.username, '').toLowerCase() === normalized;
+  }
+  function valueOf(entry) {
+    return titles ? displayTitlesValue(entry) : displayCommunityLeaderboardPoints(entry.geek_points);
+  }
+  function rowOf(entry) {
+    return {
+      rank: entry.rank,
+      name: safeText(entry.username, 'Coach'),
+      value: valueOf(entry),
+      isMe: isMe(entry),
+    };
+  }
+
+  const rows = (Array.isArray(source) ? source : []).map(rowOf);
+  return {
+    view: titles ? 'titles' : 'geek_points',
+    unit: titles ? 'TITLES' : 'GP',
+    rows: rows,
+    meInTop: rows.some(function (row) { return row.isMe; }),
+    me: pinnedEntry ? rowOf(pinnedEntry) : null,
+  };
 }
 
 // Coaching-archetype badge markup for a leaderboard entry (reads entry.lead_archetype).
@@ -343,48 +364,64 @@ function coachArchetypeBadge(entry, size) {
   } catch (e) { return ''; }
 }
 
-function renderTitlesLeaderboard(leaderboardData, currentUsername) {
-  if (!leaderboardHost) return;
-  const currentUserNormalized = safeText(currentUsername, '').toLowerCase();
-  const topFive = Array.isArray(leaderboardData && leaderboardData.titles_top) ? leaderboardData.titles_top.slice(0, 5) : [];
-  const currentTopEntry = currentUserNormalized
-    ? topFive.find(function (entry) { return safeText(entry && entry.username, '').toLowerCase() === currentUserNormalized; })
-    : null;
-  const currentPinnedEntry = (!currentTopEntry && leaderboardData && leaderboardData.titles_current_user)
-    ? leaderboardData.titles_current_user
-    : null;
-  const rows = topFive.map(function (entry) {
-    const isCurrent = entry.is_current_user || (currentUserNormalized && safeText(entry.username, '').toLowerCase() === currentUserNormalized);
-    return `
-      <div class="community-leaderboard-row${isCurrent ? ' is-current-user' : ''}">
-        <div class="community-rank">${entry.rank}.</div>
-        <div class="community-username">${escapeHtmlMs(entry.username)}${coachArchetypeBadge(entry, 22)}</div>
-        <div class="community-score">${displayTitlesValue(entry)}</div>
-      </div>
-    `;
-  }).join('');
-  const pinned = currentPinnedEntry ? `
-    <div class="community-leaderboard-separator"></div>
-    <div class="community-leaderboard-row is-current-user">
-      <div class="community-rank">${currentPinnedEntry.rank}.</div>
-      <div class="community-username">${escapeHtmlMs(currentPinnedEntry.username)}${coachArchetypeBadge(currentPinnedEntry, 22)}</div>
-      <div class="community-score">${displayTitlesValue(currentPinnedEntry)}</div>
-    </div>
-  ` : '';
-  leaderboardHost.innerHTML = (rows + pinned) || '<div class="community-leaderboard-empty">No titles won yet</div>';
-}
-
 function renderCommunityLeaderboard(leaderboardData, currentUsername) {
-  if (currentLeaderboardView === 'titles') {
-    renderTitlesLeaderboard(leaderboardData, currentUsername);
-    return;
-  }
-  renderGeekPointsLeaderboard(leaderboardData, currentUsername);
+  const model = hbLeaderboardModel(leaderboardData, currentUsername);
+  if (hbView) hbView.leaderboard = model;
+  if (window.GOBHomeBase) window.GOBHomeBase.renderLeaderboard(model);
 }
 
-// Around The League, the leaderboards and Community Highlights are always-remote
-// community routes. The desktop profile has no community backend: no requests,
-// no panels (Home Base fills that zone offline).
+/**
+ * GET /franchise/coach-career -> the four career numerals. The server owns every
+ * number here: win % arrives pre-formatted as `win_pct_display` (never derived
+ * from record.win_rate), and a field the payload omits drops its cell.
+ *
+ * Titles is the one exception and the only arithmetic on this page: the payload
+ * carries `championships_total` broken out by kind with no total, so the four
+ * counts are added. Called out in reports/home-base-online-2026-09-29.md.
+ */
+function hbCareerModel(data) {
+  if (!data) return null;
+  const model = {};
+  const record = data.record;
+  if (record && (record.wins != null || record.losses != null)) {
+    const wins = safeNumber(record.wins, 0);
+    const losses = safeNumber(record.losses, 0);
+    model.record = wins + '\u2013' + losses;
+    model.recordEmpty = (wins + losses) === 0;
+    // Shown only when the server sends it; the client does not compute a rate.
+    if (data.win_pct_display) model.winPct = String(data.win_pct_display);
+  }
+  const titles = data.championships_total;
+  if (titles && typeof titles === 'object') {
+    model.titles = Object.keys(titles).reduce(function (total, kind) {
+      return total + (safeNumber(titles[kind], 0));
+    }, 0);
+  }
+  if (data.seasons_completed != null) model.seasons = safeNumber(data.seasons_completed, 0);
+  if (data.geek_points != null) {
+    const gp = safeNumber(data.geek_points, 0);
+    model.geekPointsRaw = gp;
+    model.geekPoints = gp.toLocaleString('en-US');
+  }
+  return Object.keys(model).length ? model : null;
+}
+
+async function loadCoachCareer() {
+  // Online only: PR 2 owns the offline "Your Career" zone.
+  if (msCommunityOffline()) return;
+  const data = await safeJsonFetch(API_CONFIG.buildUrl('/franchise/coach-career'), {
+    headers: getAuthHeaders(),
+  });
+  hbCareer = hbCareerModel(data);
+  if (hbView) {
+    hbView.career = hbCareer;
+    if (window.GOBHomeBase) window.GOBHomeBase.render(hbView);
+  }
+}
+
+// Around GOB and the leaderboards are always-remote community routes. The
+// desktop profile has no community backend: no requests, and the right zone
+// stays empty until "Your Career" fills it.
 function msCommunityOffline() {
   if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.getBuildProfile === 'function') {
     return API_CONFIG.getBuildProfile() === 'desktop';
@@ -392,14 +429,8 @@ function msCommunityOffline() {
   return typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop';
 }
 
-function hideCommunityPanels() {
-  document.querySelectorAll('.around-the-league-section, .community-section, .community-highlights-section')
-    .forEach(function (section) { section.hidden = true; });
-}
-
 async function loadCommunityLeaderboard(currentUsername) {
   if (msCommunityOffline()) return;
-  if (!leaderboardHost) return;
   const leaderboardData = await safeJsonFetch(API_CONFIG.buildUrl('/api/auth/leaderboard'), {
     headers: getAuthHeaders()
   });
@@ -407,259 +438,7 @@ async function loadCommunityLeaderboard(currentUsername) {
   renderCommunityLeaderboard(leaderboardData, currentUsername);
 }
 
-function formatHighlightGpLabel(gpDelta) {
-  var n = parseInt(gpDelta, 10);
-  if (!Number.isFinite(n) || n === 0) return '0 GP';
-  if (n > 0) return '+' + n + ' GP';
-  return String(n) + ' GP';
-}
-
-function chGpBlock(entry) {
-  var gpLabel = formatHighlightGpLabel(entry.gp_delta);
-  var gpNum = parseInt(entry.gp_delta, 10);
-  var gpClass = 'community-highlight-gp' + ((Number.isFinite(gpNum) && gpNum < 0) ? ' is-neg' : ' is-pos');
-  return (
-    '<div class="' +
-    gpClass +
-    '">' +
-    escapeHtmlMs(gpLabel) +
-    '</div>'
-  );
-}
-
-function chRowChromeStyle(entry) {
-  var primary = escapeHtmlMs(entry.primary_color || '#27408E');
-  var secondary = escapeHtmlMs(entry.secondary_color || '#15181f');
-  return '--ch-primary:' + primary + ';--ch-secondary:' + secondary;
-}
-
-function chUsernameHtml(entry) {
-  var uname = escapeHtmlMs((entry && (entry.username || entry.user_name)) || 'Coach');
-  return '<strong class="ch-username">' + uname + '</strong>' + coachArchetypeBadge(entry || {}, 18);
-}
-
-function chStandardCopyHtml(entry) {
-  var ut = escapeHtmlMs(entry.user_team_name || '?');
-  var opp = escapeHtmlMs(entry.opponent_name || '?');
-  var beatLost = entry.user_won ? 'beat' : 'lost to';
-  var rankLabel = escapeHtmlMs(entry.rank_label || '#--');
-  var recRaw = entry.user_team_record != null && String(entry.user_team_record).trim() !== '' ? String(entry.user_team_record).trim() : '';
-  var rec = recRaw ? escapeHtmlMs(recRaw) : '';
-  var tournamentRound = entry.tournament_round_label != null
-    ? String(entry.tournament_round_label).trim()
-    : '';
-  var overtimeCount = parseInt(entry.overtime_count, 10);
-  var overtimeSuffix = '';
-  if (overtimeCount === 1) overtimeSuffix = ' in OT';
-  else if (overtimeCount === 2) overtimeSuffix = ' in double OT';
-  else if (overtimeCount === 3) overtimeSuffix = ' in triple OT';
-  else if (overtimeCount >= 4) overtimeSuffix = ' in ' + overtimeCount + ' overtime quarters';
-  var userStrong = chUsernameHtml(entry);
-  var usc = entry.user_score;
-  var osc = entry.opponent_score;
-  var hasScores =
-    usc != null &&
-    osc != null &&
-    !Number.isNaN(Number(usc)) &&
-    !Number.isNaN(Number(osc));
-  var tailRanked = rec
-    ? ut + ' is now ' + rec + ' & ranked ' + rankLabel + ' in the nation.'
-    : ut + ' is now ranked ' + rankLabel + ' in the nation.';
-  if (tournamentRound) {
-    var rankedTeam = rankLabel + ' ' + ut;
-    var tournamentSuffix = ' in the ' + escapeHtmlMs(tournamentRound);
-    if (hasScores) {
-      return (
-        userStrong + ', coaching ' + rankedTeam + ', ' + beatLost + ' ' + opp + ' ' +
-        Number(usc) + '-' + Number(osc) + overtimeSuffix + tournamentSuffix + '.'
-      );
-    }
-    return userStrong + ', coaching ' + rankedTeam + ', ' + beatLost + ' ' + opp + overtimeSuffix + tournamentSuffix + '.';
-  }
-  if (hasScores) {
-    return (
-      userStrong +
-      ', coaching ' +
-      ut +
-      ', ' +
-      beatLost +
-      ' ' +
-      opp +
-      ' ' +
-      Number(usc) +
-      '-' +
-      Number(osc) +
-      overtimeSuffix +
-      '. ' +
-      tailRanked
-    );
-  }
-  return userStrong + ', coaching ' + ut + ', ' + beatLost + ' ' + opp + overtimeSuffix + '. ' + tailRanked;
-}
-
-// FTE v2 debut entry — copy locked by Coach (Q8):
-//   "Username (bold) has completed his onboarding game. Coaching
-//    {team} he defeated/lost to {opp} by a score of {us}-{them}."
-function chDebutCopyHtml(entry) {
-  var ut = escapeHtmlMs(entry.user_team_name || '?');
-  var opp = escapeHtmlMs(entry.opponent_name || '?');
-  var verb = entry.user_won ? 'defeated' : 'lost to';
-  var userStrong = chUsernameHtml(entry);
-  var usc = entry.user_score;
-  var osc = entry.opponent_score;
-  var hasScores =
-    usc != null &&
-    osc != null &&
-    !Number.isNaN(Number(usc)) &&
-    !Number.isNaN(Number(osc));
-  var scoreSuffix = hasScores
-    ? ' by a score of ' + Number(usc) + '-' + Number(osc)
-    : '';
-  return (
-    userStrong +
-    ' has completed his onboarding game. Coaching ' +
-    ut +
-    ' he ' +
-    verb +
-    ' ' +
-    opp +
-    scoreSuffix +
-    '.'
-  );
-}
-
-// Archetype-evolution entry: badge sits right after the bold username (our
-// standard), then the established/evolved copy. Name resolves from the manifest.
-function chArchetypeCopyHtml(entry) {
-  var userStrong = chUsernameHtml(entry);
-  var name = (window.GOBArchetype && window.GOBArchetype.nameFor)
-    ? window.GOBArchetype.nameFor(entry.lead_archetype)
-    : entry.lead_archetype;
-  var nameEsc = escapeHtmlMs(name || '');
-  if (entry.is_first) {
-    return userStrong + ' has established his coaching archetype as ' + nameEsc + '.';
-  }
-  return userStrong + ' has evolved his coaching archetype to ' + nameEsc + '.';
-}
-
-function chAnnouncementHtml(entry) {
-  var u = String(entry.username || entry.user_name || 'Coach');
-  var raw = String(entry.announcement_line || '');
-  if (raw.indexOf(u + ',') === 0) {
-    var rest = raw.slice(u.length);
-    return chUsernameHtml(entry) + escapeHtmlMs(rest);
-  }
-  return escapeHtmlMs(raw);
-}
-
-function renderCommunityHighlights(data) {
-  if (!communityHighlightsBody) return;
-  var entries = data && Array.isArray(data.entries) ? data.entries : [];
-  if (!entries.length) {
-    communityHighlightsBody.innerHTML =
-      '<div class="community-highlights-empty">No highlights yet — finish a franchise week to show up here.</div>';
-    return;
-  }
-  communityHighlightsBody.innerHTML = entries.map(function (entry) {
-    var type = entry.entry_type || 'standard';
-    var variant = entry.variant || 'standard_row';
-    var rowExtra = variant === 'national_gold' ? ' community-highlight-row--national-gold' : '';
-
-    // FTE v2 debut: gold metallic border, no clickable behavior, no GP block.
-    if (type === 'debut') {
-      var debutCopy = chDebutCopyHtml(entry);
-      return (
-        '<div class="community-highlight-row community-highlight-row--debut" style="' +
-        chRowChromeStyle(entry) +
-        '">' +
-        '<div class="community-highlight-row-inner">' +
-        '<div class="community-highlight-copy">' +
-        debutCopy +
-        '</div>' +
-        '</div>' +
-        '</div>'
-      );
-    }
-
-    // Archetype evolution: standard row chrome, no GP block (no game).
-    if (type === 'archetype_evolution') {
-      return (
-        '<div class="community-highlight-row" style="' +
-        chRowChromeStyle(entry) +
-        '">' +
-        '<div class="community-highlight-row-inner">' +
-        '<div class="community-highlight-copy">' +
-        chArchetypeCopyHtml(entry) +
-        '</div>' +
-        '</div>' +
-        '</div>'
-      );
-    }
-
-    if (type === 'conference_rs_title' || type === 'championship') {
-      var ann = chAnnouncementHtml(entry);
-      var details = escapeHtmlMs(entry.details_line || '');
-      return (
-        '<div class="community-highlight-row community-highlight-row--stacked' +
-        rowExtra +
-        '" style="' +
-        chRowChromeStyle(entry) +
-        '">' +
-        '<div class="community-highlight-row-inner community-highlight-row-inner--stacked">' +
-        '<div class="community-highlight-copy-wrap">' +
-        '<div class="community-highlight-announcement">' +
-        ann +
-        '</div>' +
-        '<div class="community-highlight-details">' +
-        details +
-        '</div>' +
-        '</div>' +
-        chGpBlock(entry) +
-        '</div>' +
-        '</div>'
-      );
-    }
-
-    var copy = chStandardCopyHtml(entry);
-    return (
-      '<div class="community-highlight-row" style="' +
-      chRowChromeStyle(entry) +
-      '">' +
-      '<div class="community-highlight-row-inner">' +
-      '<div class="community-highlight-copy">' +
-      copy +
-      '</div>' +
-      chGpBlock(entry) +
-      '</div>' +
-      '</div>'
-    );
-  }).join('');
-}
-
-async function loadCommunityHighlights() {
-  if (msCommunityOffline()) return;
-  if (!communityHighlightsBody) return;
-  communityHighlightsBody.innerHTML = '<div class="community-highlights-loading">Loading…</div>';
-  var data = await safeJsonFetch(API_CONFIG.buildUrl('/api/community/highlights'), {
-    headers: getAuthHeaders()
-  });
-  if (!data) {
-    communityHighlightsBody.innerHTML =
-      '<div class="community-highlights-empty">Sign in to see community highlights.</div>';
-    return;
-  }
-  // Ensure the archetype name/badge manifest is loaded so archetype-evolution rows
-  // render the proper display name (not a humanized key).
-  try {
-    if (window.GOBArchetype && window.GOBArchetype.ensureManifest) {
-      await window.GOBArchetype.ensureManifest();
-    }
-  } catch (e) {}
-  renderCommunityHighlights(data);
-}
-
 const ATL_LAST_VISIT_KEY = 'gob_atl_last_visit';
-const ATL_ANIMATE_SELF_KEY = 'gob_atl_animate_self';
 const ATL_POLL_MS = 20000;
 const ATL_SLOT_COUNT = 8;
 
@@ -667,17 +446,7 @@ let atlSlots = [];
 let atlBoardSignature = '';
 let atlInitialLoadDone = false;
 let atlPollTimer = null;
-let atlAnimateQueue = [];
-let atlAnimating = false;
 let atlCurrentUserId = '';
-
-function atlPrefersReducedMotion() {
-  try {
-    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch (e) {
-    return false;
-  }
-}
 
 function atlBoardSig(slots) {
   return (slots || []).map(function (s) {
@@ -710,262 +479,93 @@ function atlIsNewSinceLastVisit(completedAt) {
   return Number.isFinite(t) && t > lastVisit;
 }
 
-function atlTeamAccentStyle(primary) {
-  var p = escapeHtmlMs(primary || '#27408e');
-  return '--atl-accent: color-mix(in srgb, ' + p + ' 72%, white);';
-}
-
-function atlCardHtml(entry, options) {
-  options = options || {};
-  var showNew = !!options.showNew;
-  var primary = escapeHtmlMs(entry.primary_color || '#27408e');
-  var secondary = escapeHtmlMs(entry.secondary_color || '#15181f');
-  var rankVal = entry.national_rank != null && entry.national_rank !== ''
-    ? '#' + escapeHtmlMs(entry.national_rank)
-    : '#--';
+/**
+ * One Around GOB slot -> one .agc card. Anything the payload does not carry is
+ * omitted rather than derived; see reports/home-base-online-2026-09-29.md.
+ */
+function hbAroundCard(entry, showNew) {
   var last = entry.last_game || {};
-  var lastWin = !!last.won;
-  var lastClass = lastWin ? 'is-win' : 'is-loss';
-  var lastPrefix = last.is_away ? '@ ' : 'vs ';
-  var nextHtml;
-  if (entry.next_opponent && entry.next_opponent.team_name) {
-    var n = entry.next_opponent;
-    var nPrefix = n.is_away ? '@ ' : 'vs ';
-    nextHtml = '<div class="atl-next">Next: <span class="atl-next-opp">' + nPrefix + escapeHtmlMs(n.team_name) + '</span></div>';
-  } else {
-    nextHtml = '<div class="atl-next is-na">Next: <span class="atl-next-opp">N/A</span></div>';
-  }
-  var statusClass = entry.is_tournament_week ? 'atl-status is-tourney' : 'atl-status';
-  var weekText = escapeHtmlMs(entry.week_label || ('Week ' + (entry.week || '?')));
-  var badge = coachArchetypeBadge(entry, 18);
-  var newMarker = showNew ? '<span class="atl-new-marker" aria-label="New since last visit"></span>' : '';
-  return (
-    '<article class="atl-card" data-user-id="' + escapeHtmlMs(entry.user_id) + '" style="--atl-primary:' + primary + ';--atl-secondary:' + secondary + ';' + atlTeamAccentStyle(entry.primary_color) + '">' +
-    newMarker +
-    '<div class="atl-card-inner">' +
-    '<div class="atl-card-head">' +
-    '<div class="atl-user-row"><div class="atl-user">' + escapeHtmlMs(entry.username || 'Coach') + '</div>' + badge + '</div>' +
-    '<div class="atl-team">' + escapeHtmlMs(entry.team_name || '') + '</div>' +
-    '</div>' +
-    '<div class="atl-chips">' +
-    '<div class="atl-chip"><div class="atl-chip-label">Record</div><div class="atl-chip-value">' + Number(entry.wins || 0) + '-' + Number(entry.losses || 0) + '</div></div>' +
-    '<div class="atl-chip"><div class="atl-chip-label">Nat\'l Rank</div><div class="atl-chip-value">' + rankVal + '</div></div>' +
-    '</div>' +
-    '<div class="' + statusClass + '"><span class="atl-status-dot"></span><span class="atl-status-text">' + weekText + '</span></div>' +
-    nextHtml +
-    '<div class="atl-last ' + lastClass + '">' +
-    '<div class="atl-result">' + (lastWin ? 'W' : 'L') + '</div>' +
-    '<div class="atl-last-detail">' + lastPrefix + escapeHtmlMs(last.opponent || '?') + '</div>' +
-    '<div class="atl-last-score">' + Number(last.user_score || 0) + '&ndash;' + Number(last.opp_score || 0) + '</div>' +
-    '</div>' +
-    '</div>' +
-    '</article>'
-  );
+  var teamName = safeText(entry.team_name, '');
+  var wins = Number(entry.wins || 0);
+  var losses = Number(entry.losses || 0);
+  var haveScores = last.user_score != null && last.opp_score != null;
+  return {
+    userId: String(entry.user_id || ''),
+    coach: safeText(entry.username, 'Coach'),
+    isMe: !!(atlCurrentUserId && String(entry.user_id || '') === String(atlCurrentUserId)),
+    isNew: !!showNew,
+    // The board carries no team slug, so art resolves off the display name with
+    // the same name->slug helper the door art uses.
+    bannerUrl: teamName && typeof getTeamAssetPath === 'function'
+      ? getTeamAssetPath(teamName, 'banner_card')
+      : '',
+    team: teamName,
+    record: wins + '-' + losses,
+    rank: (entry.national_rank != null && entry.national_rank !== '') ? '#' + entry.national_rank : '',
+    season: entry.current_season != null ? entry.current_season : null,
+    week: entry.week != null ? entry.week : null,
+    won: !!last.won,
+    score: haveScores ? (Number(last.user_score) + '\u2013' + Number(last.opp_score)) : '',
+    opponent: safeText(last.opponent, ''),
+  };
 }
 
-function atlEmptyHtml() {
-  return (
-    '<div class="atl-empty">' +
-    '<div class="atl-empty-mark"><span></span></div>' +
-    '<div class="atl-empty-text">Waiting for<br>next result</div>' +
-    '</div>'
-  );
+/** Yours leads the grid; the rest keep the server's recency order. */
+function hbAroundModel(slots, lastVisitMode) {
+  var list = (Array.isArray(slots) ? slots : []).filter(Boolean);
+  var cards = list.map(function (entry) {
+    return hbAroundCard(entry, lastVisitMode && atlIsNewSinceLastVisit(entry.completed_at));
+  });
+  var mine = cards.filter(function (c) { return c.isMe; });
+  var others = cards.filter(function (c) { return !c.isMe; });
+  return mine.concat(others);
+}
+
+function hbAroundNewCount(slots) {
+  return (Array.isArray(slots) ? slots : []).filter(function (entry) {
+    return entry && !(atlCurrentUserId && String(entry.user_id || '') === String(atlCurrentUserId))
+      && atlIsNewSinceLastVisit(entry.completed_at);
+  }).length;
 }
 
 function atlRenderGrid(slots, options) {
-  if (!aroundTheLeagueGrid) return;
   options = options || {};
-  var lastVisitMode = !!options.lastVisitMode;
-  var list = Array.isArray(slots) ? slots.slice(0, ATL_SLOT_COUNT) : [];
-  while (list.length < ATL_SLOT_COUNT) list.push(null);
-  var html = list.map(function (entry) {
-    if (!entry) return atlEmptyHtml();
-    return atlCardHtml(entry, {
-      showNew: lastVisitMode && atlIsNewSinceLastVisit(entry.completed_at),
-    });
-  }).join('');
-  aroundTheLeagueGrid.innerHTML = html;
-}
-
-function atlSnapshotRects() {
-  var map = new Map();
-  if (!aroundTheLeagueGrid) return map;
-  aroundTheLeagueGrid.querySelectorAll('.atl-card[data-user-id]').forEach(function (el) {
-    map.set(el.getAttribute('data-user-id'), el.getBoundingClientRect());
-  });
-  return map;
-}
-
-function atlPlayFlip(prevRects, freshUserId, done) {
-  if (!aroundTheLeagueGrid || atlPrefersReducedMotion()) {
-    if (typeof done === 'function') done();
-    return;
-  }
-  var cards = aroundTheLeagueGrid.querySelectorAll('.atl-card[data-user-id]');
-  var pending = 0;
-  function finishOne() {
-    pending -= 1;
-    if (pending <= 0 && typeof done === 'function') done();
-  }
-  if (!cards.length) {
-    if (typeof done === 'function') done();
-    return;
-  }
-  cards.forEach(function (el) {
-    var uid = el.getAttribute('data-user-id');
-    if (prevRects.has(uid)) {
-      var oldR = prevRects.get(uid);
-      var newR = el.getBoundingClientRect();
-      var dx = oldR.left - newR.left;
-      var dy = oldR.top - newR.top;
-      if (dx || dy) {
-        pending += 1;
-        el.style.transition = 'none';
-        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-        requestAnimationFrame(function () {
-          requestAnimationFrame(function () {
-            el.style.transition = 'transform 500ms cubic-bezier(.22,.61,.36,1)';
-            el.style.transform = '';
-            window.setTimeout(finishOne, 520);
-          });
-        });
-      }
-    } else {
-      pending += 1;
-      el.classList.add('atl-card--enter');
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
-          el.style.transition = 'opacity 480ms ease, transform 480ms cubic-bezier(.22,.61,.36,1)';
-          el.classList.remove('atl-card--enter');
-          window.setTimeout(finishOne, 500);
-        });
-      });
-    }
-    if (freshUserId && uid === freshUserId) {
-      el.classList.add('is-fresh-pulse');
-      window.setTimeout(function () {
-        el.classList.remove('is-fresh-pulse');
-      }, 1500);
-    }
-  });
-  if (pending === 0 && typeof done === 'function') done();
-}
-
-function atlDetectFreshUserId(prevSlots, nextSlots) {
-  var prevHead = prevSlots && prevSlots[0] ? String(prevSlots[0].user_id || '') : '';
-  var nextHead = nextSlots && nextSlots[0] ? String(nextSlots[0].user_id || '') : '';
-  if (!nextHead) return '';
-  if (nextHead !== prevHead) return nextHead;
-  var prevAt = prevSlots && prevSlots[0] ? String(prevSlots[0].completed_at || '') : '';
-  var nextAt = nextSlots && nextSlots[0] ? String(nextSlots[0].completed_at || '') : '';
-  if (nextAt && nextAt !== prevAt) return nextHead;
-  return '';
-}
-
-function atlEnqueueAnimation(job) {
-  atlAnimateQueue.push(job);
-  atlDrainAnimateQueue();
-}
-
-function atlDrainAnimateQueue() {
-  if (atlAnimating || !atlAnimateQueue.length) return;
-  atlAnimating = true;
-  var job = atlAnimateQueue.shift();
-  var prevRects = job.prevRects;
-  var freshUserId = job.freshUserId || '';
-  atlRenderGrid(job.slots, { lastVisitMode: false });
-  atlPlayFlip(prevRects, freshUserId, function () {
-    atlAnimating = false;
-    atlDrainAnimateQueue();
-  });
-}
-
-function atlConsumeSelfAnimateFlag() {
-  try {
-    var v = sessionStorage.getItem(ATL_ANIMATE_SELF_KEY);
-    sessionStorage.removeItem(ATL_ANIMATE_SELF_KEY);
-    return v === '1';
-  } catch (e) {
-    return false;
-  }
+  if (!window.GOBHomeBase) return;
+  var cards = hbAroundModel(slots, !!options.lastVisitMode);
+  var newCount = options.lastVisitMode ? hbAroundNewCount(slots) : 0;
+  if (hbView) { hbView.around = cards; hbView.newCount = newCount; }
+  window.GOBHomeBase.renderAround(cards, newCount);
 }
 
 function atlApplyBoardUpdate(nextSlots, opts) {
   opts = opts || {};
-  var prevSlots = atlSlots.slice();
   var sig = atlBoardSig(nextSlots);
   if (sig === atlBoardSignature && !opts.force) return;
-
-  var animate = !!opts.animate;
-  var lastVisitMode = !!opts.lastVisitMode;
-  var selfAnimate = !!opts.selfAnimate;
-
-  if (!animate || atlPrefersReducedMotion()) {
-    atlSlots = nextSlots.slice();
-    atlBoardSignature = sig;
-    atlRenderGrid(atlSlots, { lastVisitMode: lastVisitMode });
-    return;
-  }
-
-  var freshUserId = '';
-  if (selfAnimate && atlCurrentUserId) {
-    var headId = nextSlots[0] ? String(nextSlots[0].user_id || '') : '';
-    if (headId && headId === atlCurrentUserId) freshUserId = headId;
-  }
-  if (!freshUserId) freshUserId = atlDetectFreshUserId(prevSlots, nextSlots);
-
   atlSlots = nextSlots.slice();
   atlBoardSignature = sig;
-  atlEnqueueAnimation({
-    prevRects: atlSnapshotRects(),
-    slots: atlSlots,
-    freshUserId: freshUserId,
-  });
+  atlRenderGrid(atlSlots, { lastVisitMode: !!opts.lastVisitMode });
 }
 
 async function loadAroundTheLeague(options) {
-  if (!aroundTheLeagueGrid || msCommunityOffline()) return;
+  if (msCommunityOffline()) return;
   options = options || {};
-  if (!atlInitialLoadDone) {
-    aroundTheLeagueGrid.innerHTML = '<div class="around-the-league-loading">Loading…</div>';
-  }
   var data = await safeJsonFetch(API_CONFIG.buildUrl('/api/community/around-the-league'), {
     headers: getAuthHeaders(),
   });
-  if (!data || !Array.isArray(data.slots)) {
-    if (!atlInitialLoadDone) {
-      aroundTheLeagueGrid.innerHTML = '<div class="around-the-league-error">Could not load Around The League.</div>';
-    }
-    return;
-  }
-  try {
-    if (window.GOBArchetype && window.GOBArchetype.ensureManifest) {
-      await window.GOBArchetype.ensureManifest();
-    }
-  } catch (e) {}
+  if (!data || !Array.isArray(data.slots)) return;
 
   var nextSlots = data.slots.slice(0, ATL_SLOT_COUNT);
-  while (nextSlots.length < ATL_SLOT_COUNT) nextSlots.push(null);
 
   if (!atlInitialLoadDone) {
     atlInitialLoadDone = true;
-    var hadLastVisit = atlParseLastVisit() !== null;
-    var selfFlag = atlConsumeSelfAnimateFlag();
-    atlApplyBoardUpdate(nextSlots, {
-      animate: selfFlag,
-      selfAnimate: selfFlag,
-      lastVisitMode: hadLastVisit && !selfFlag,
-    });
+    atlApplyBoardUpdate(nextSlots, { lastVisitMode: atlParseLastVisit() !== null });
     return;
   }
-
-  if (options.poll) {
-    atlApplyBoardUpdate(nextSlots, { animate: true });
-  }
+  if (options.poll) atlApplyBoardUpdate(nextSlots, { lastVisitMode: true });
 }
 
 function wireAroundTheLeaguePolling() {
-  if (!aroundTheLeagueGrid || atlPollTimer || msCommunityOffline()) return;
+  if (atlPollTimer || msCommunityOffline()) return;
   atlPollTimer = window.setInterval(function () {
     loadAroundTheLeague({ poll: true });
   }, ATL_POLL_MS);
@@ -976,21 +576,6 @@ function wireAroundTheLeaguePolling() {
   });
   window.addEventListener('pagehide', atlPersistLastVisit);
   window.addEventListener('beforeunload', atlPersistLastVisit);
-}
-
-function wireLeaderboardViewToggles(currentUsername) {
-  if (leaderboardGeekPointsToggle) {
-    leaderboardGeekPointsToggle.addEventListener('click', function () {
-      setLeaderboardView('geek_points');
-      renderCommunityLeaderboard(currentLeaderboardData, currentUsername);
-    });
-  }
-  if (leaderboardTitlesToggle) {
-    leaderboardTitlesToggle.addEventListener('click', function () {
-      setLeaderboardView('titles');
-      renderCommunityLeaderboard(currentLeaderboardData, currentUsername);
-    });
-  }
 }
 
 function escapeHtmlLbt(text) {
@@ -1076,19 +661,19 @@ async function loadLeadersByTeam() {
   }
 }
 
+// The Home Base leaderboard footer opens this; it has no button of its own.
+function openLeadersByTeamModal() {
+  var leadersByTeamModal = document.getElementById('leaders-by-team-modal');
+  if (!leadersByTeamModal) return;
+  leadersByTeamModal.classList.add('is-visible');
+  leadersByTeamModal.setAttribute('aria-hidden', 'false');
+  loadLeadersByTeam();
+}
+
 function wireLeadersByTeamModal() {
-  var leadersByTeamBtn = document.getElementById('leaders-by-team-btn');
   var leadersByTeamModal = document.getElementById('leaders-by-team-modal');
   var leadersByTeamClose = document.getElementById('leaders-by-team-close');
   var leadersByTeamBackdrop = document.getElementById('leaders-by-team-backdrop');
-
-  if (leadersByTeamBtn && leadersByTeamModal) {
-    leadersByTeamBtn.addEventListener('click', function () {
-      leadersByTeamModal.classList.add('is-visible');
-      leadersByTeamModal.setAttribute('aria-hidden', 'false');
-      loadLeadersByTeam();
-    });
-  }
 
   if (leadersByTeamClose && leadersByTeamModal) {
     leadersByTeamClose.addEventListener('click', function () {
@@ -1194,79 +779,41 @@ function buildActiveGameCourtUrl(franchiseData, resume) {
 // Tournament tier emblem on a mode-select franchise card. Tier comes from the
 // displayed week; value (conference number / region letter) from command-center
 // data — the same sources the FCC uses. Cleared outside an EOS week (27-34).
-function renderModeSelectTierEmblem(slotEl, franchiseData, commandCenterData) {
-  const emblem = slotEl && slotEl.querySelector('.franchise-card-tier-emblem');
-  if (!emblem || !window.GOBTierEmblem) return;
-  const week = (franchiseData && franchiseData.week != null)
-    ? franchiseData.week
-    : (commandCenterData && commandCenterData.week);
-  const tier = window.GOBTierEmblem.tierForWeek(week);
-  if (!tier) { emblem.innerHTML = ''; return; }
-  let value = null;
-  if (tier === 'conference') {
-    const c = commandCenterData ? commandCenterData.user_conference : null;
-    value = (c === 0 || c) ? String(c) : '';
-  } else if (tier === 'region') {
-    const r = commandCenterData ? commandCenterData.user_region : null;
-    if (r) {
-      value = String(r).toUpperCase();
-    } else {
-      const c = Number(commandCenterData ? commandCenterData.user_conference : NaN);
-      if (Number.isInteger(c) && c >= 1 && c <= 16) value = String.fromCharCode(65 + Math.floor((c - 1) / 2));
-    }
-  }
-  window.GOBTierEmblem.injectCss();
-  emblem.innerHTML = window.GOBTierEmblem.renderLockup({ tier, value, size: 40, variant: 'stack', l1: 16, l2: 9 });
+/**
+ * Green rule (Ch7 decision 1): exactly one primary forward action on screen.
+ * A program with a game in progress takes it as "Resume Game"; otherwise the
+ * most recently played program takes it as "Enter". No programs, nothing green.
+ */
+function hbGreenFranchiseId(bySlot) {
+  const present = Object.keys(bySlot)
+    .map(function (k) { return bySlot[k]; })
+    .filter(Boolean);
+  if (!present.length) return '';
+
+  const live = present.find(function (franchiseData) {
+    const runtime = slotRuntimeById[String(franchiseData.franchise_id)];
+    return !!(runtime && runtime.activeGameResume);
+  });
+  if (live) return String(live.franchise_id);
+
+  const recent = present.find(function (franchiseData) {
+    return mostRecentFranchiseId && String(franchiseData.franchise_id) === mostRecentFranchiseId;
+  });
+  if (recent) return String(recent.franchise_id);
+
+  // No server hint (older deploy): /franchise/list is newest-first.
+  const byListOrder = franchisesList.find(function (franchiseData) {
+    return present.some(function (p) {
+      return String(p.franchise_id) === String(franchiseData && franchiseData.franchise_id);
+    });
+  });
+  return byListOrder ? String(byListOrder.franchise_id) : String(present[0].franchise_id);
 }
 
-function formatSlotLabel(slotIndex) {
-  const n = Number(slotIndex) || 1;
-  return String(n).padStart(2, '0');
-}
-
-function buildSlotShellOpen(slotIndex, franchiseId) {
-  const slotAttr = ' data-slot-index="' + slotIndex + '"';
-  const fidAttr = franchiseId
-    ? ' data-franchise-id="' + escapeHtml(String(franchiseId)) + '"'
-    : '';
-  return (
-    '<div class="franchise-home-slot-cell"' + slotAttr + fidAttr + '>' +
-      '<div class="franchise-slot-label">' +
-        '<span class="franchise-slot-num">' + escapeHtml(formatSlotLabel(slotIndex)) + '</span>' +
-        '<span class="franchise-slot-rule" aria-hidden="true"></span>' +
-      '</div>'
-  );
-}
-
-function buildEmptySlotHtml(slotIndex) {
-  const title = franchisesList.length > 0
-    ? 'Start Another Franchise'
-    : 'Start Your Coaching Journey';
-  const cta = 'Find Your Program';
-  return (
-    buildSlotShellOpen(slotIndex, null) +
-      '<div class="franchise-home-card franchise-home-card-empty">' +
-        '<div class="franchise-empty-state">' +
-          '<div class="franchise-empty-icon" aria-hidden="true">' +
-            '<img src="/images/buttons/whiteball.svg" alt="">' +
-          '</div>' +
-          '<h2 class="franchise-empty-title">' + escapeHtml(title) + '</h2>' +
-          '<button type="button" class="franchise-empty-cta" data-action="start-franchise" data-home-slot="' + slotIndex + '">' +
-            escapeHtml(cta) +
-          '</button>' +
-        '</div>' +
-      '</div>' +
-    '</div>'
-  );
-}
-
-function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIndex) {
+/** One occupied slot -> one .door. Records the runtime the click handlers read. */
+function hbDoorModel(franchiseData, teamDoc, commandCenterData, greenId) {
   const franchiseId = String(franchiseData.franchise_id || '');
   const teamName = safeText(franchiseData.user_team_id, 'Program');
-  const bannerUrl = resolveFranchiseSlotBanner(franchiseData);
-  const seasonProgress = deriveSeasonProgress(commandCenterData, franchiseData);
-  const record = deriveRecord(commandCenterData, teamName, franchiseData);
-  const nextOpponent = deriveNextOpponent(commandCenterData, teamName, franchiseData);
 
   const activeGameResume = commandCenterData && commandCenterData.active_game_resume
     && commandCenterData.active_game_resume.status === 'stoppage_anchor'
@@ -1283,79 +830,32 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
     cpuSimResume: cpuSimResume,
   };
 
-  let resumeHtml = '';
-  let enterLabel = 'Enter Franchise →';
+  const week = safeNumber(franchiseData.week, 1);
+  const nextOpponent = deriveNextOpponent(commandCenterData, teamName, franchiseData);
+  let nextLabel = nextOpponent === 'TBD' ? '' : nextOpponent;
   if (activeGameResume) {
-    enterLabel = 'Resume Game →';
-    const resumeIsAway = String(activeGameResume.user_team_side || 'home').toLowerCase() === 'away';
-    // Payload keeps core *_team_name for URL/score keys; chrome uses *_display_name.
-    const resumeOpponent = resumeIsAway
-      ? (activeGameResume.home_display_name || activeGameResume.home_team_name || 'Opponent')
-      : (activeGameResume.away_display_name || activeGameResume.away_team_name || 'Opponent');
-    resumeHtml =
-      '<div class="franchise-resume-card">' +
-        '<div>' +
-          '<div class="franchise-resume-kicker">Game In Progress</div>' +
-          '<div class="franchise-resume-matchup">' +
-            escapeHtml((resumeIsAway ? '@ ' : 'vs ') + resumeOpponent) +
-          '</div>' +
-          '<div class="franchise-resume-detail">' +
-            escapeHtml(formatResumePeriod(activeGameResume) + ' · ' + formatResumeClockForModeSelect(activeGameResume)) +
-          '</div>' +
-        '</div>' +
-        '<div class="franchise-resume-score">' +
-          escapeHtml(String(activeGameResume.away_score ?? 0) + ' - ' + String(activeGameResume.home_score ?? 0)) +
-        '</div>' +
-      '</div>';
-  } else if (cpuSimResume) {
-    enterLabel = 'Finish Week →';
-    const completed = Number(cpuSimResume.completed_matchups) || 0;
-    const expected = Number(cpuSimResume.expected_matchups) || 0;
-    resumeHtml =
-      '<div class="franchise-resume-card franchise-resume-card-cpu">' +
-        '<div>' +
-          '<div class="franchise-resume-kicker">Finishing Week</div>' +
-          '<div class="franchise-resume-matchup">Finishing Computer Games</div>' +
-          '<div class="franchise-resume-detail">' +
-            escapeHtml(formatCpuSimProgress(cpuSimResume, franchiseData)) +
-          '</div>' +
-        '</div>' +
-        '<div class="franchise-resume-score">' +
-          escapeHtml(expected > 0 ? (completed + '/' + expected) : '...') +
-        '</div>' +
-      '</div>';
+    const away = String(activeGameResume.user_team_side || 'home').toLowerCase() === 'away';
+    // Core *_team_name stays for URL keys; chrome uses *_display_name.
+    nextLabel = (away ? '@ ' : 'vs ')
+      + (away
+        ? (activeGameResume.home_display_name || activeGameResume.home_team_name || 'Opponent')
+        : (activeGameResume.away_display_name || activeGameResume.away_team_name || 'Opponent'));
   }
 
-  return (
-    buildSlotShellOpen(slotIndex, franchiseId) +
-      '<div class="franchise-home-card franchise-home-card-active" role="link" tabindex="0" data-action="enter-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '" style="background-image:url(\'' + escapeHtml(bannerUrl) + '\');background-size:cover;background-position:center;">' +
-        '<div class="franchise-slot-menu" data-franchise-id="' + escapeHtml(franchiseId) + '">' +
-          '<button type="button" class="franchise-slot-menu-btn" data-action="slot-menu" aria-expanded="false" aria-controls="franchise-slot-menu-pop-' + slotIndex + '" aria-label="Options for ' + escapeHtml(teamName) + '">···</button>' +
-          '<div class="franchise-slot-menu-pop" id="franchise-slot-menu-pop-' + slotIndex + '">' +
-            '<button type="button" class="franchise-slot-delete-btn" data-action="delete-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">Delete Franchise</button>' +
-          '</div>' +
-        '</div>' +
-        '<img class="franchise-card-banner" src="' + escapeHtml(bannerUrl) + '" alt="' + escapeHtml(teamName) + '" style="display:none;">' +
-        '<div class="franchise-card-content">' +
-          '<div>' +
-            '<div class="franchise-card-name-row">' +
-              '<div class="franchise-card-team-name">' + escapeHtml(teamName) + '</div>' +
-              '<div class="franchise-card-tier-emblem" aria-hidden="true"></div>' +
-            '</div>' +
-            '<div class="franchise-card-season-line">' + escapeHtml(seasonProgress) + '</div>' +
-          '</div>' +
-          '<div class="franchise-card-grid">' +
-            '<div class="franchise-chip"><div class="franchise-chip-label">Record</div><div class="franchise-chip-value">' + escapeHtml(record) + '</div></div>' +
-            '<div class="franchise-chip"><div class="franchise-chip-label">Next Opponent</div><div class="franchise-chip-value franchise-chip-value-small">' + escapeHtml(nextOpponent) + '</div></div>' +
-          '</div>' +
-          resumeHtml +
-          '<div class="franchise-card-actions">' +
-            '<button type="button" class="franchise-enter-btn" data-action="enter-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">' + escapeHtml(enterLabel) + '</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-    '</div>'
-  );
+  const rank = deriveRank(teamDoc, commandCenterData);
+  return {
+    franchiseId: franchiseId,
+    name: teamName,
+    bannerUrl: resolveFranchiseSlotBanner(franchiseData),
+    season: deriveCurrentSeason(commandCenterData),
+    week: week,
+    nextOpponent: nextLabel,
+    record: deriveRecord(commandCenterData, teamName, franchiseData),
+    rank: rank && rank !== '-' ? '#' + rank : '',
+    gameInProgress: !!activeGameResume,
+    isGreen: franchiseId === greenId,
+    isLastPlayed: franchiseId === greenId,
+  };
 }
 
 function assignFranchisesToSlots(franchises) {
@@ -1385,46 +885,48 @@ function assignFranchisesToSlots(franchises) {
 }
 
 function renderFranchiseSlots(franchises, teamsById, teamsByName, commandCenterById) {
-  if (!franchiseHomeSlots) return;
-  closeAllSlotMenus();
   Object.keys(slotRuntimeById).forEach(function (k) { delete slotRuntimeById[k]; });
 
   const bySlot = assignFranchisesToSlots(franchises);
-  let html = '';
-  for (let slot = 1; slot <= maxFranchiseSlots; slot++) {
-    const franchiseData = bySlot[slot];
-    if (franchiseData) {
-      // Join by ObjectId first (Team Builder: user_team_id is display name, not core).
-      const objectId = franchiseData.user_team_object_id
-        ? String(franchiseData.user_team_object_id)
-        : '';
-      const teamName = safeText(franchiseData.user_team_id, '');
-      const replacedName = safeText(franchiseData.team_builder_replaced_name, '');
-      const teamDoc = (objectId && teamsById[objectId])
-        || teamsByName[replacedName]
-        || teamsByName[teamName]
-        || null;
-      const commandCenterData = commandCenterById[String(franchiseData.franchise_id)] || null;
-      html += buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slot);
-    } else {
-      html += buildEmptySlotHtml(slot);
-    }
-  }
-  franchiseHomeSlots.innerHTML = html;
 
+  // Two passes: the doors need every runtime recorded before the green rule can
+  // ask which program has a game in progress.
+  const doorInputs = {};
   for (let slot = 1; slot <= maxFranchiseSlots; slot++) {
     const franchiseData = bySlot[slot];
     if (!franchiseData) continue;
-    const cell = Array.prototype.find.call(
-      franchiseHomeSlots.querySelectorAll('.franchise-home-slot-cell[data-franchise-id]'),
-      function (el) {
-        return String(el.getAttribute('data-franchise-id')) === String(franchiseData.franchise_id);
-      }
-    );
-    if (!cell) continue;
-    const commandCenterData = commandCenterById[String(franchiseData.franchise_id)] || null;
-    renderModeSelectTierEmblem(cell, franchiseData, commandCenterData);
+    // Join by ObjectId first (Team Builder: user_team_id is display name, not core).
+    const objectId = franchiseData.user_team_object_id ? String(franchiseData.user_team_object_id) : '';
+    const teamName = safeText(franchiseData.user_team_id, '');
+    const replacedName = safeText(franchiseData.team_builder_replaced_name, '');
+    doorInputs[slot] = {
+      franchiseData: franchiseData,
+      teamDoc: (objectId && teamsById[objectId]) || teamsByName[replacedName] || teamsByName[teamName] || null,
+      commandCenterData: commandCenterById[String(franchiseData.franchise_id)] || null,
+    };
+    hbDoorModel(franchiseData, doorInputs[slot].teamDoc, doorInputs[slot].commandCenterData, '');
   }
+
+  const greenId = hbGreenFranchiseId(bySlot);
+  const slots = [];
+  for (let slot = 1; slot <= maxFranchiseSlots; slot++) {
+    const input = doorInputs[slot];
+    slots.push(input
+      ? hbDoorModel(input.franchiseData, input.teamDoc, input.commandCenterData, greenId)
+      : null);
+  }
+
+  hbView = {
+    online: !msCommunityOffline(),
+    accountName: hbUsername || 'Coach',
+    slots: slots,
+    career: hbCareer,
+    trophyCaseHref: HB_TROPHY_CASE_HREF,
+    around: (hbView && hbView.around) || [],
+    newCount: (hbView && hbView.newCount) || 0,
+    leaderboard: (hbView && hbView.leaderboard) || { rows: [], view: currentLeaderboardView, unit: 'GP' },
+  };
+  if (window.GOBHomeBase) window.GOBHomeBase.render(hbView);
 }
 
 function goToFranchiseCommandCenter(franchiseId) {
@@ -1496,58 +998,48 @@ function getFranchiseCommandCenterUrlForLater() {
 window.GOBModeSelect = window.GOBModeSelect || {};
 window.GOBModeSelect.getFranchiseCommandCenterUrlForLater = getFranchiseCommandCenterUrlForLater;
 
-const deleteFranchiseModal = document.getElementById('delete-franchise-modal');
-const deleteFranchiseModalText = document.getElementById('delete-franchise-modal-text');
-const deleteFranchiseModalCancel = document.getElementById('delete-franchise-modal-cancel');
-const deleteFranchiseModalConfirm = document.getElementById('delete-franchise-modal-confirm');
-const slotsFullModal = document.getElementById('slots-full-modal');
-const slotsFullModalOk = document.getElementById('slots-full-modal-ok');
-
 function closeAllSlotMenus() {
-  document.querySelectorAll('.franchise-slot-menu.is-open').forEach(function (menu) {
-    menu.classList.remove('is-open');
-    const button = menu.querySelector('.franchise-slot-menu-btn');
-    if (button) button.setAttribute('aria-expanded', 'false');
-  });
+  if (window.GOBHomeBase) window.GOBHomeBase.closeConfirm();
 }
 
+/**
+ * Ch7 decision 7: delete is a red-outline confirm, never a red button in the
+ * slot. The copy is explicit that trophies and season history survive.
+ */
 function openDeleteFranchiseModal(franchiseData) {
-  closeAllSlotMenus();
   pendingDeleteFranchise = franchiseData || null;
-  if (!pendingDeleteFranchise) return;
-  const teamName = safeText(pendingDeleteFranchise.user_team_id, 'this franchise');
+  if (!pendingDeleteFranchise || !window.GOBHomeBase) return;
+  const teamName = safeText(pendingDeleteFranchise.user_team_id, 'this program');
+  const slot = safeNumber(pendingDeleteFranchise.home_slot, 1);
   const week = pendingDeleteFranchise.week != null ? pendingDeleteFranchise.week : '?';
   const season = pendingDeleteFranchise.current_season != null ? pendingDeleteFranchise.current_season : '?';
-  if (deleteFranchiseModalText) {
-    deleteFranchiseModalText.textContent =
-      'Delete ' + teamName + ' (Season ' + season + ' · Week ' + week + ')? This cannot be undone.';
-  }
-  if (deleteFranchiseModal) {
-    deleteFranchiseModal.style.display = 'flex';
-    deleteFranchiseModal.setAttribute('aria-hidden', 'false');
-  }
+  window.GOBHomeBase.openConfirm({
+    title: 'Delete ' + teamName + '?',
+    bodyHtml: 'Slot ' + escapeHtml(String(slot).padStart(2, '0'))
+      + ' <em>· Season ' + escapeHtml(season) + ', Week ' + escapeHtml(week) + '</em>. '
+      + 'This deletes the program and every save in this slot, and cannot be undone. '
+      + 'Your trophies and season history stay in your Trophy Case.',
+    cancelLabel: 'Cancel',
+    confirmLabel: 'Delete Program',
+  });
 }
 
 function closeDeleteFranchiseModal() {
   pendingDeleteFranchise = null;
-  if (deleteFranchiseModal) {
-    deleteFranchiseModal.style.display = 'none';
-    deleteFranchiseModal.setAttribute('aria-hidden', 'true');
-  }
+  if (window.GOBHomeBase) window.GOBHomeBase.closeConfirm();
 }
 
 function openSlotsFullModal() {
-  if (slotsFullModal) {
-    slotsFullModal.style.display = 'flex';
-    slotsFullModal.setAttribute('aria-hidden', 'false');
-  }
+  if (!window.GOBHomeBase) return;
+  window.GOBHomeBase.openConfirm({
+    title: 'Both slots are full',
+    bodyHtml: 'You already coach two programs. Delete one to start another.',
+    cancelLabel: 'OK',
+  });
 }
 
 function closeSlotsFullModal() {
-  if (slotsFullModal) {
-    slotsFullModal.style.display = 'none';
-    slotsFullModal.setAttribute('aria-hidden', 'true');
-  }
+  if (window.GOBHomeBase) window.GOBHomeBase.closeConfirm();
 }
 
 function goToNewFranchise(homeSlot) {
@@ -1575,7 +1067,6 @@ async function confirmDeleteFranchise() {
   const franchiseId = String(target.franchise_id);
   // Same click as the slot "Delete Franchise" control.
   playSound('click-beep.wav');
-  if (deleteFranchiseModalConfirm) deleteFranchiseModalConfirm.disabled = true;
   closeDeleteFranchiseModal();
   if (window.PageLoadOverlay && typeof window.PageLoadOverlay.show === 'function') {
     window.PageLoadOverlay.show('Deleting franchise…');
@@ -1612,89 +1103,57 @@ async function confirmDeleteFranchise() {
     console.warn('[mode-select] delete franchise error:', e);
     alert('That delete did not confirm. Reloading — if the franchise is still listed, try again.');
     window.location.reload();
-  } finally {
-    if (deleteFranchiseModalConfirm) deleteFranchiseModalConfirm.disabled = false;
   }
 }
 
-if (franchiseHomeSlots) {
-  franchiseHomeSlots.addEventListener('click', function (event) {
-    const actionEl = event.target.closest('[data-action]');
-    if (!actionEl || !franchiseHomeSlots.contains(actionEl)) return;
-    const action = actionEl.getAttribute('data-action');
-    const franchiseId = actionEl.getAttribute('data-franchise-id');
-
-    if (action === 'start-franchise') {
-      event.preventDefault();
-      startNewFranchiseFlow(actionEl.getAttribute('data-home-slot'));
-      return;
-    }
-    if (action === 'slot-menu') {
-      event.preventDefault();
-      event.stopPropagation();
-      const menu = actionEl.closest('.franchise-slot-menu');
-      if (!menu) return;
-      const willOpen = !menu.classList.contains('is-open');
-      closeAllSlotMenus();
-      menu.classList.toggle('is-open', willOpen);
-      actionEl.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-      return;
-    }
-    if (action === 'delete-franchise') {
-      event.preventDefault();
-      event.stopPropagation();
-      playSound('click-beep.wav');
-      const runtime = franchiseId ? slotRuntimeById[String(franchiseId)] : null;
-      if (runtime && runtime.franchise) openDeleteFranchiseModal(runtime.franchise);
-      return;
-    }
-    if (action === 'enter-franchise') {
-      event.preventDefault();
-      event.stopPropagation();
+/** homeBase.js owns the DOM and the keyboard; these are the data-side answers. */
+function wireHomeBase() {
+  if (!window.GOBHomeBase || !homeBaseRoot) return;
+  window.GOBHomeBase.init(homeBaseRoot, {
+    onEnter: function (franchiseId) {
       playSound('click-strong.wav');
       goToFranchiseCommandCenter(franchiseId);
-    }
+    },
+    onNewFranchise: function (slotIndex) {
+      startNewFranchiseFlow(slotIndex);
+    },
+    onRequestDelete: function (slotIndex) {
+      playSound('click-beep.wav');
+      const slot = hbView && hbView.slots ? hbView.slots[Number(slotIndex) - 1] : null;
+      const runtime = slot ? slotRuntimeById[String(slot.franchiseId)] : null;
+      if (runtime && runtime.franchise) openDeleteFranchiseModal(runtime.franchise);
+    },
+    onConfirmDelete: confirmDeleteFranchise,
+    onTabChange: function (tab) {
+      // Opening Around GOB clears the badge: the results have now been seen.
+      if (tab === 'ag') atlPersistLastVisit();
+    },
+    onLeaderboardView: function (view) {
+      setLeaderboardView(view);
+      renderCommunityLeaderboard(currentLeaderboardData, hbUsername);
+    },
+    onLeadersByTeam: openLeadersByTeamModal,
+    onSettings: function () {
+      import('/js/shared/gobSettings.js')
+        .then(function (mod) { mod.toggle(); })
+        .catch(function () {});
+    },
+    onLogout: logOutOfGob,
   });
-
-  franchiseHomeSlots.addEventListener('keydown', function (event) {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    if (event.target.closest('.franchise-slot-menu')) return;
-    const card = event.target.closest('[data-action="enter-franchise"].franchise-home-card-active');
-    if (!card || !franchiseHomeSlots.contains(card)) return;
-    event.preventDefault();
-    playSound('click-strong.wav');
-    goToFranchiseCommandCenter(card.getAttribute('data-franchise-id'));
-  });
 }
 
-document.addEventListener('click', function (event) {
-  if (!event.target.closest('.franchise-slot-menu')) closeAllSlotMenus();
-});
-
-document.addEventListener('keydown', function (event) {
-  if (event.key !== 'Escape') return;
-  const openMenu = document.querySelector('.franchise-slot-menu.is-open');
-  if (!openMenu) return;
-  const trigger = openMenu.querySelector('.franchise-slot-menu-btn');
-  closeAllSlotMenus();
-  if (trigger) trigger.focus();
-});
-
-if (deleteFranchiseModalCancel) {
-  deleteFranchiseModalCancel.addEventListener('click', closeDeleteFranchiseModal);
-}
-if (deleteFranchiseModalConfirm) {
-  deleteFranchiseModalConfirm.addEventListener('click', confirmDeleteFranchise);
-}
-if (slotsFullModalOk) {
-  slotsFullModalOk.addEventListener('click', closeSlotsFullModal);
+async function logOutOfGob() {
+  try {
+    await fetch(API_CONFIG.buildUrl('/api/auth/logout'), { method: 'POST' });
+  } catch (e) {}
+  try {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+  } catch (e) {}
+  navigateFromModeSelect('/login.html');
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
-  const authLoggedOut = document.getElementById('auth-logged-out');
-  const authLoggedIn = document.getElementById('auth-logged-in');
-  const authUserEmail = document.getElementById('auth-user-email');
-  const logoutBtn = document.getElementById('logout-btn');
   const isDesktop = typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop';
   const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null;
   const authUser = typeof localStorage !== 'undefined' ? localStorage.getItem('auth_user') : null;
@@ -1709,15 +1168,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (isDesktop) {
       currentUsername = 'Coach';
       atlCurrentUserId = 'local-desktop-user';
-      if (authLoggedOut) authLoggedOut.style.display = 'none';
-      if (authLoggedIn) authLoggedIn.style.display = 'flex';
-      if (authUserEmail) authUserEmail.textContent = 'Coach';
     } else {
       const user = JSON.parse(authUser);
       currentUsername = user.username || user.email || '';
-      if (authLoggedOut) authLoggedOut.style.display = 'none';
-      if (authLoggedIn) authLoggedIn.style.display = 'flex';
-      if (authUserEmail) authUserEmail.textContent = user.username || user.email;
 
       const meRes = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: getAuthHeaders() });
       if (!meRes.ok) {
@@ -1734,7 +1187,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
       if (meData.username && meData.username.trim()) {
         currentUsername = meData.username;
-        if (authUserEmail) authUserEmail.textContent = meData.username;
         const stored = JSON.parse(authUser);
         stored.username = meData.username;
         localStorage.setItem('auth_user', JSON.stringify(stored));
@@ -1749,7 +1201,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     return;
   }
 
+  hbUsername = currentUsername;
   wireAlphaBanner();
+  wireHomeBase();
+  // Nothing is on screen yet; paint the frame so the two zones exist before the
+  // slot and community payloads land.
+  renderFranchiseSlots([], {}, {}, {});
 
   try {
     modeSelectMusic = new Audio('/sounds/Championship_Gridlock.mp4');
@@ -1781,38 +1238,26 @@ document.addEventListener('DOMContentLoaded', async function () {
     console.error('[ALPHA] Failed to load app config:', error);
   }
 
-  if (msCommunityOffline()) {
-    hideCommunityPanels();
-  } else {
+  // Desktop has no community backend: no requests, and the right zone stays
+  // empty until "Your Career" fills it. The left zone works either way.
+  // The loader waits on the first community view only, never on the 20 s poll.
+  let rightZoneFirstView = Promise.resolve();
+  if (!msCommunityOffline()) {
     setLeaderboardView('geek_points');
-    wireLeaderboardViewToggles(currentUsername);
-    // Community cards must not hold the session panel. A stalled highlights
-    // manifest (or any other community fetch) used to leave the page on
-    // "Checking your session…" for the whole navigation, including a Back
-    // onto this document.
-    loadCommunityLeaderboard(currentUsername);
-    loadCommunityHighlights();
-    loadAroundTheLeague();
+    rightZoneFirstView = Promise.all([
+      loadCommunityLeaderboard(currentUsername),
+      loadAroundTheLeague(),
+      loadCoachCareer(),
+    ]);
     wireAroundTheLeaguePolling();
     wireLeadersByTeamModal();
-  }
-
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', async function () {
-      try {
-        await fetch(API_CONFIG.buildUrl('/api/auth/logout'), { method: 'POST' });
-      } catch (e) {}
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
-      if (authLoggedOut) authLoggedOut.style.display = 'flex';
-      if (authLoggedIn) authLoggedIn.style.display = 'none';
-    });
   }
 
   const headers = getAuthHeaders();
   const listData = await safeJsonFetch(API_CONFIG.buildUrl('/franchise/list'), { headers: headers });
   franchisesList = (listData && Array.isArray(listData.franchises)) ? listData.franchises : [];
   maxFranchiseSlots = (listData && listData.max) ? Number(listData.max) || 2 : 2;
+  mostRecentFranchiseId = safeText(listData && listData.most_recent_franchise_id, '');
 
   const teamsData = await safeJsonFetch(API_CONFIG.buildUrl('/teams'), { headers: headers }) || [];
   const teamsByName = {};
@@ -1841,11 +1286,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   }));
 
   renderFranchiseSlots(franchisesList, teamsById, teamsByName, commandCenterById);
+  await settledOrAfter(rightZoneFirstView, COMMUNITY_FIRST_VIEW_TIMEOUT_MS);
   revealModeSelect();
 });
 
 window.addEventListener('pageshow', function (event) {
-  if (!event.persisted) return;
-  if (!document.body || !document.body.classList.contains('mode-select-loading')) return;
-  revealModeSelect();
+  // A bfcache restore re-runs no script, so nothing would ever drop the loader.
+  if (event.persisted) revealModeSelect();
 });

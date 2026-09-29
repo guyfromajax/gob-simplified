@@ -8,7 +8,7 @@ Version 1. How to build franchise screens. The look lives in [Styleguide.md](Sty
 - One green Advance per screen. It is the only control that uses the advance color. A blocking task becomes the Advance button (same id, same `updatePlayButton` state machine, same labels and routes). There is no disabled-with-lock state and no hint link.
 - No spinners. A click that leaves the page switches Advance to the loading look immediately (`is-loading`, label `STARTING…`) and ignores repeat clicks.
 - Blue belongs to RT. Do not use the rating blue for chrome, links, or navigation.
-- Reward gold (`--reward-gold`) is only for milestone and season-peak reward tiers and exceptional stat gains. It is never for buttons, Advance (green), "yours" (navy), choice controls, or everyday / weekly reward tiers. `--reward-gold-12` / `--reward-gold-24` and `--shadow-reward` sit next to it. The hex is a placeholder until the Chapter 7 Claude Design handoff; do not paint screens with it until that handoff lands.
+- Reward gold (`--reward-gold`) is only for milestone and season-peak reward tiers and exceptional stat gains. It is never for buttons, Advance (green), "yours" (navy), choice controls, everyday / weekly chrome, or Home Base chrome. It is the one reward token: tints are `color-mix()` at the point of use, so there are no gold tint or shadow tokens.
 - Live gameplay has no shell. The court never mounts `.app`, `.top`, or `.rail`.
 - Navigation is two levels: a rail section, then a sub-tab. Do not add a third level.
 - Attribute digits stay on the first-digit scale (`attributeDisplay.js`). Player RT stays a letter grade (`rtBucket.js`).
