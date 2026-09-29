@@ -377,7 +377,8 @@
       params.set('session_type', sessionType);
       params.set('return_url', env.getCurrentRelativeUrl ? env.getCurrentRelativeUrl() : currentRelativeUrl());
       if (userTeamId) params.set('team_id', userTeamId);
-      var trainingReturnUrl = '/training.html?' + params.toString();
+      params.set('tab', 'training-view');
+      var trainingReturnUrl = '/franchise-command-center.html?' + params.toString();
       var navigateToTraining = async function () {
         await confirmSfxReady;
         try {

@@ -67,7 +67,7 @@ On a browse page that does not already paint `#fcc-record-label`, Record comes f
 
 Tier weeks: when `GOBTierEmblem.tierForWeek(data.week)` returns a tier and `TIER_TOKENS` has `metal` and `metalHi`, `.top` gets `is-tier` and those two custom properties. The existing `#fcc-header-emblem` is the emblem. If the tier is not available, the bar stays plain.
 
-Rail order: Office, Team, Prep, League, Recruiting, News, then the utility group: Tutorials (`/tutorial.html`), Feedback, Settings, a quieter divider, Exit Franchise. Exit calls the existing `#exit-franchise` handler (same sound, same `/mode-select.html` destination). Feedback is the existing `#feedback-btn` modal and is omitted when `window.GOB_BUILD_PROFILE === 'desktop'`. Settings calls `GOBSettings.toggle()`.
+Rail order: Office, Team, Prep, League, Recruiting, News, then the utility group: Tutorials (`/tutorial.html`), Feedback, Settings, a quieter divider, Exit Franchise. Exit calls the existing `#exit-franchise` handler (same sound, same `/mode-select.html` destination). Feedback is the existing `#feedback-btn` modal and is omitted when `window.GOB_BUILD_PROFILE === 'desktop'`. On a browse page the rail Feedback appears once the auth bar has added `#feedback-btn`, which can be after the shell mounts. Settings calls `GOBSettings.toggle()`.
 
 `.gob-1280`: the grid column stays `--rail-w`. Labels are hidden. `title` tooltips remain. Hover or keyboard focus (`:focus-visible`) waits 400ms, then the overlay face widens from `--rail-w` to 200px in one `--dur-rail` (180ms) `--ease-out` transition. Labels fade in on that same timing. They do not change the face width. Collapse is one motion as well: 120ms after the pointer leaves (or focus clears), the face narrows with `--dur-rail`. The overlay must not change `.main`'s rectangle. `prefers-reduced-motion` makes the change instant. `.gob-1920`: the rail is `--rail-w` with labels visible.
 
@@ -119,10 +119,10 @@ The shared tab module also serves any other command center that calls `initComma
 | Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
 | Team | Schedule | `team-schedule-view` (in-page module view). `?tab=schedule-tab` opens this view. Four week columns (1–7, 8–14, 15–21, 22–26), with the three tournament labels under 22–26 and the user's EOS games listed under each label when present. Two columns below 1100px. The bracket stays on League › Tournament. |
 | Team | Practice Squad | `practice-squad-view` (in-page module view). The regional practice-squad league. `practice-squad-standings.html` and `practice-squad-bracket.html` redirect here. |
-| Prep | Training | `training.html`. The underline tab replaces. `?tab=training-tab` redirects here. The FCC summary panel stays in the page and is no longer opened by the shell. |
-| Prep | Game Plan | `game-plan.html`. `?tab=game-plan-tab` redirects here. `resume_from_timeout=true` and `mode=tutorial` stay focus, with no rail and no underline row. |
-| Prep | Playbooks | `playbooks.html`. `?tab=playbooks-tab` redirects here. The FCC summary panel stays in the page and is no longer opened by the shell. |
-| Prep | Scouting Report | `coaches-tab` on the franchise command center. The underline tab replaces there. |
+| Prep | Training | `training-view` (embed-bridge view: `training.html?embed=1` mounted in the command center; `training.html` redirects here). The underline tab replaces. `?tab=training-tab` opens this view. The Training Report is `training-report-view`, the same way (`training-report.html` redirects). The FCC summary panel stays in the page and is no longer opened by the shell. |
+| Prep | Game Plan | `game-plan-view` (embed-bridge view; `game-plan.html` redirects here). `?tab=game-plan-tab` opens this view. `game-plan.html` with `resume_from_timeout=true` or `mode=tutorial` does not redirect and stays focus, with no rail and no underline row. |
+| Prep | Playbooks | `playbooks-view` (embed-bridge view; `playbooks.html` redirects here). `?tab=playbooks-tab` opens this view. The FCC summary panel stays in the page and is no longer opened by the shell. |
+| Prep | Scouting Report | `scouting-view` (in-page module view). The underline tab replaces. |
 | League | Standings | `standings-view` (in-page module view; `standings.html` redirects here and keeps `franchise_id`, `team_id`, and return params). `?tab=standings-tab` still opens the old panel. |
 | League | Rankings | `rankings-view` (in-page module view; `rankings.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
 | League | Leaders | `leaders-view` (in-page module view; `leaders.html` redirects here). `?tab=awards-tab` still opens the old panel. |
@@ -181,9 +181,9 @@ env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HO
 | recruiting.html | browse, or focus while that week's invites, Signing Day orders, or `action=run` are the task | Recruiting | Pool, Leans, or Visits (`hub`). The row is hidden on Signing Day and Results, and while focus hides the head. |
 | rankings.html | redirect to `franchise-command-center.html?tab=rankings-view` | League | Rankings |
 | schedule.html | redirect to `franchise-command-center.html?tab=league-schedule-view` | League | Schedule |
-| practice-squad-standings.html | browse | League | Practice Squad |
-| practice-squad-bracket.html | browse | League | Practice Squad |
-| brackets.html | browse | League | Tournament (`tournament-view`) |
+| practice-squad-standings.html | browse | Team | Practice Squad (`practice-squad-view`; the file redirects) |
+| practice-squad-bracket.html | browse | Team | Practice Squad (`practice-squad-view`; the file redirects) |
+| brackets.html | browse | League | Tournament (`tournament-view`; the file redirects) |
 | awards.html | redirect to `franchise-command-center.html?tab=awards-view` | News | Awards |
 | news.html | redirect to `franchise-command-center.html?tab=news-view` (`story` is kept) | News | News |
 | leaders.html | browse | League | Leaders (`leaders-view`; the file redirects) |
@@ -193,10 +193,10 @@ env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HO
 | player-detail.html | redirect to `?tab=player-view` unless `recruit_id` or `mode=recruit` | return context | none |
 | team-roster-view.html | redirect to `roster-view`, or `team-view` when `roster_team_id` is set | Team or League | Roster or the team drill-in |
 | box-score.html | browse when `return_url` is set; otherwise focus | League when browse | none |
-| training.html | browse | Prep | Training |
-| training-report.html | browse | Prep | Training |
-| game-plan.html | browse, or focus when `resume_from_timeout=true` or `mode=tutorial` | Prep | Game Plan |
-| playbooks.html | browse | Prep | Playbooks |
+| training.html | browse | Prep | Training (`training-view`; the file redirects unless `embed=1` or `mode=tutorial`) |
+| training-report.html | browse | Prep | Training (`training-report-view`; the file redirects unless `embed=1`) |
+| game-plan.html | browse, or focus when `resume_from_timeout=true` or `mode=tutorial` | Prep | Game Plan (`game-plan-view`; the file redirects except in focus) |
+| playbooks.html | browse | Prep | Playbooks (`playbooks-view`; the file redirects unless `embed=1` or `mode=tutorial`) |
 | set-lineup.html, training-squad-report.html, training-playbooks.html, cut-players.html, playbook-report.html | focus | — | — |
 
 The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` reuses a response the page already requested. Otherwise it fetches that URL once. Record on a browse page uses that same payload: `team_record` when present, otherwise the user team's `W`-`L` in `rankings`.
@@ -395,7 +395,11 @@ An unknown module, or an import that fails, paints a quiet error card with Retry
 
 Opening a player from Roster writes `gob-view-roster-order` in `sessionStorage`: a JSON array of the player ids in the order on screen at that click. The Leaders full list (and each Leaders board card) writes `gob-view-leaders-order`, the same shape. Player Stats writes `gob-view-player-stats-order`, the same shape, and the detail URL carries `pager=player-stats` with `origin=team` and `return_tab=player-stats-view`. Standings writes `gob-view-standings-order` as `{ ids, label }`, the visible team ids in that conference card and the card label (for example `A2`). The detail URL carries `pager=roster`, `pager=leaders`, `pager=player-stats`, or `pager=standings`. No `pager` param means no pager, even if a key is sitting in the session. Paging replaces the history entry and stops at the ends. The Roster Varsity / Practice Squad segment is `gob-view-roster-scope` (`varsity` or `practice`).
 
-`player-view` and `team-view` are drill-ins, not sub-tabs. A list opens them with a push. The rail highlights `origin` (`team`, `league`, `office`, or `prep`). The page's `team_id` stays the user's team. The team being read is `view_team_id`.
+`player-view` and `team-view` are drill-ins, not sub-tabs. A list opens them in the command center with `GOBViews.open(url, 'push')`: no document load, and Back pops to the list. Team links are built by `GOBTables.rosterHref` as `?tab=team-view&view_team_id=…`. An old `team-roster-view.html?roster_team_id=…` or `player-detail.html?id=…` link clicked inside the command center opens the same drill-in in place; loaded directly, the file still redirects. A drill-in URL starts from the current query minus the last drill's keys (`player_id`, `view_team_id`, `pager`, `up`, `origin`, `return_tab`, `return_url`), so `return_url` never nests. The rail highlights `origin` (`team`, `league`, `office`, or `prep`); with no `origin`, no section is highlighted. Every rail button, Office included, works from a drill-in. The page's `team_id` stays the user's team. The team being read is `view_team_id`.
+
+On desktop, same-document URL changes (push, replace, Back) are written into the session context as they happen, so the next tab switch keeps the drill-in's params.
+
+A desktop resume (the command center opened without `?tab=`) onto a locked tab (Tournament before week 27) opens Office instead, with a replace. An explicit `?tab=tournament-view` link, or `brackets.html`, still shows the locked Tournament screen. Web has no resume, so the rule never fires there.
 
 ## 15. Detail data
 

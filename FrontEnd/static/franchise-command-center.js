@@ -391,6 +391,7 @@ function invalidateHomeWeekSensitiveCaches() {
 }
 
 function buildPlayerDetailUrl(playerId) {
+  if (window.GOBTables) return window.GOBTables.viewHref({ tab: 'player-view', player_id: playerId });
   const qs = emptyParams();
   qs.set('id', playerId);
   if (franchiseId) qs.set('mode', 'franchise');
@@ -784,6 +785,7 @@ function standingsTeamLabel(t) {
 }
 
 function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
+  if (window.GOBTables) return window.GOBTables.rosterHref(franchiseId, teamId, teamName, returnTab);
   const owner = new URLSearchParams(window.location.search).get('team_id') || teamId;
   const params = new URLSearchParams();
   params.set('mode', 'franchise');

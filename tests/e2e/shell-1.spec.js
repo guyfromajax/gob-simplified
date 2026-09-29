@@ -284,7 +284,9 @@ test('advance labels match the three week states and repeat clicks are ignored',
   await page.waitForTimeout(400);
   const navCount = await page.evaluate(() => (window.__shellNav || []).length);
   expect(navCount).toBe(1);
-  expect(await page.evaluate(() => window.__shellNav[0])).toContain('/training.html');
+  const trainingUrl = new URL(await page.evaluate(() => window.__shellNav[0]), 'http://local');
+  expect(trainingUrl.pathname).toBe('/franchise-command-center.html');
+  expect(trainingUrl.searchParams.get('tab')).toBe('training-view');
 
   await openFcc(page, cc({ week: 8, training_completed: true }));
   await expect(page.locator('#play-now')).toHaveText('Play Next Game');

@@ -442,7 +442,15 @@
       copy.gobIdx = next;
       writeIdx(next);
       if (win.history && win.history.pushState) win.history.pushState(copy, '', url);
+      absorbIntoContext();
       noteHere();
+    }
+
+    // The desktop session store only reads the URL on load. Same-document
+    // URL changes have to reach it, or the next rebuild from session drops them.
+    function absorbIntoContext() {
+      var ctx = win.FranchiseContext;
+      if (ctx && typeof ctx.absorbLocation === 'function') ctx.absorbLocation();
     }
 
     function replace(url) {
@@ -596,6 +604,7 @@
     }
 
     function syncCurrent() {
+      absorbIntoContext();
       var stack = readStack();
       var here = entry(currentUrl());
       if (!stack.length) stack.push(here);
@@ -695,6 +704,7 @@
     }
 
     function onPopState(event) {
+      absorbIntoContext();
       var idx = event && event.state && typeof event.state.gobIdx === 'number' ? event.state.gobIdx : null;
       if (idx === null) {
         var state = stateObj();

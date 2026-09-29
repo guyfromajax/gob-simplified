@@ -348,6 +348,85 @@
     module: viewModule('scoutingView.js')
   });
 
+  var FCC_RE = /\/franchise-command-center\.html$/i;
+  var TEAM_RETURN_TABS = {
+    'roster-view': 1, 'schedule-tab': 1, 'team-schedule-view': 1, 'player-stats-tab': 1,
+    'player-stats-view': 1, 'team-attributes-view': 1
+  };
+  var DRILL_KEYS = ['player_id', 'view_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
+    'return_url', 'origin', 'return_tab', 'id'];
+
+  function originFor(returnTab) {
+    if (returnTab === 'home-tab') return 'office';
+    return TEAM_RETURN_TABS[returnTab] ? 'team' : 'league';
+  }
+
+  // The in-app URL a link stands for, or '' when the link is a real page.
+  // Old team-roster-view / player-detail links are read the way their
+  // redirect stubs read them, so they open in place instead of reloading.
+  function drillUrl(link) {
+    var href = link.getAttribute('href') || '';
+    if (!href || href.charAt(0) === '#') return '';
+    var url;
+    try { url = new URL(href, global.location.origin); }
+    catch (err) { return ''; }
+    if (url.origin !== global.location.origin) return '';
+    var incoming = url.searchParams;
+    var path = url.pathname;
+    if (/\/team-roster-view\.html$/i.test(path)) {
+      if (incoming.get('mode') === 'practice_squad' && incoming.get('ps_team_id')) return '';
+      var viewed = incoming.get('roster_team_id') || '';
+      if (!viewed) return '';
+      incoming.set('tab', 'team-view');
+      incoming.set('view_team_id', viewed);
+      if (!incoming.get('origin')) incoming.set('origin', originFor(incoming.get('return_tab') || ''));
+      incoming.delete('roster_team_id');
+      incoming.delete('team_name');
+    } else if (/\/player-detail\.html$/i.test(path)) {
+      if (incoming.get('mode') === 'recruit' || incoming.get('recruit_id')) return '';
+      var pid = incoming.get('player_id') || incoming.get('id') || '';
+      if (!pid) return '';
+      incoming.delete('id');
+      incoming.set('player_id', pid);
+      incoming.set('tab', 'player-view');
+      if (!incoming.get('origin')) incoming.set('origin', originFor(incoming.get('return_tab') || ''));
+    } else if (!FCC_RE.test(path)) {
+      return '';
+    }
+    if (!has(incoming.get('tab') || '')) return '';
+    var q;
+    try { q = new URLSearchParams(global.location.search); }
+    catch (err) { q = new URLSearchParams(); }
+    DRILL_KEYS.forEach(function (key) { q.delete(key); });
+    incoming.forEach(function (value, key) {
+      if (key === 'return_url') return;
+      q.set(key, value);
+    });
+    var text = q.toString();
+    return '/franchise-command-center.html' + (text ? '?' + text : '');
+  }
+
+  // Bubble phase on document: after a view's own link handler (which calls
+  // preventDefault) and before GOBNav's window handler (which would stamp
+  // return_url and let the browser load a new document).
+  function onDrillClick(event) {
+    if (!event || event.defaultPrevented) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button) return;
+    if (!FCC_RE.test(global.location.pathname || '')) return;
+    var target = event.target;
+    var link = target && target.closest ? target.closest('a[href]') : null;
+    if (!link || (link.target && link.target !== '_self')) return;
+    if (link.hasAttribute('data-gob-up') || link.hasAttribute('data-gob-replace')) return;
+    var url = drillUrl(link);
+    if (!url) return;
+    event.preventDefault();
+    open(url, 'push');
+  }
+
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('click', onDrillClick, false);
+  }
+
   global.GOBViews = {
     register: register,
     has: has,
