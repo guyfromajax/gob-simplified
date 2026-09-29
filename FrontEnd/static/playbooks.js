@@ -19,7 +19,30 @@ function cloneParams(params) {
   return out;
 }
 
-(function () {
+
+let root = null;
+let page = null;
+function byId(id) {
+  if (root) {
+    if (root.id === id) return root;
+    const found = root.querySelector('#' + CSS.escape(id));
+    if (found) return found;
+  }
+  return document.getElementById(id);
+}
+
+function qsa(sel) {
+  return root ? root.querySelectorAll(sel) : document.querySelectorAll(sel);
+}
+
+function rootQuery(sel) {
+  return root ? root.querySelector(sel) : document.querySelector(sel);
+}
+
+function inAppShell() {
+  return !!(root && (root.id === 'playbooks-view' || (root.closest && root.closest('#playbooks-view'))));
+}
+
   const MOTION_FOCUS_OPTIONS = [
     { value: "balanced", label: "Balanced" },
     { value: "inside", label: "Inside" },
@@ -316,16 +339,17 @@ function cloneParams(params) {
   }
 
   class PlaybooksPage {
-    constructor() {
+    constructor(host, options) {
+      options = options || {};
       this.params = liveParams();
       this.context = {
         params: this.params,
-        mode: this.params.get("mode") || "single",
-        teamId: this.params.get("team_id") || "",
-        franchiseId: this.params.get("franchise_id") || "",
-        gameId: this.params.get("game_id") || "",
-        from: this.params.get("from") || "",
-        isGameplayContext: Boolean(this.params.get("game_id") || ""),
+        mode: options.mode || this.params.get("mode") || "single",
+        teamId: options.teamId || this.params.get("team_id") || "",
+        franchiseId: options.franchiseId || this.params.get("franchise_id") || "",
+        gameId: options.game_id || this.params.get("game_id") || "",
+        from: options.from || this.params.get("from") || "",
+        isGameplayContext: Boolean(options.game_id || this.params.get("game_id") || ""),
       };
 
       this.state = {
@@ -354,33 +378,33 @@ function cloneParams(params) {
       this.draftRestoreFlagKey = this.buildDraftRestoreFlagKey();
 
       this.elements = {
-        saveBtn: document.getElementById("save-btn"),
-        backBtn: document.getElementById("back-btn"),
-        sectionsReadyIndicator: document.getElementById("sections-ready-indicator"),
-        toast: document.getElementById("toast"),
-        editColumn: document.getElementById("playbooks-edit-column"),
-        shotWeightsLive: document.getElementById("shot-weights-live"),
-        motionGrid: document.getElementById("motion-grid"),
-        setPlaysGrid: document.getElementById("set-plays-grid"),
-        manDefenseGrid: document.getElementById("man-defense-grid"),
-        zoneDefenseGrid: document.getElementById("zone-defense-grid"),
-        fastBreaksChips: document.getElementById("fast-breaks-chips"),
-        hcTrapsChips: document.getElementById("hc-traps-chips"),
-        motionTotal: document.getElementById("motion-total"),
-        setPlaysTotal: document.getElementById("set-plays-total"),
-        fastBreakTotal: document.getElementById("fast-breaks-total"),
-        hcTrapTotal: document.getElementById("hc-traps-total"),
-        manDefenseTotal: document.getElementById("man-defense-total"),
-        zoneDefenseTotal: document.getElementById("zone-defense-total"),
-        fastBreaksNormalize: document.getElementById("fast-breaks-normalize"),
-        hcTrapsNormalize: document.getElementById("hc-traps-normalize"),
-        pcOffense: document.getElementById("pc-order-offense"),
-        pcDefense: document.getElementById("pc-order-defense"),
-        pcCapOffense: document.getElementById("pc-cap-offense"),
-        pcCapDefense: document.getElementById("pc-cap-defense"),
-        pcErrorOffense: document.getElementById("pc-error-offense"),
-        pcErrorDefense: document.getElementById("pc-error-defense"),
-        gameplayLockout: document.getElementById("gameplay-lockout"),
+        saveBtn: byId("save-btn"),
+        backBtn: byId("back-btn"),
+        sectionsReadyIndicator: byId("sections-ready-indicator"),
+        toast: byId("toast"),
+        editColumn: byId("playbooks-edit-column"),
+        shotWeightsLive: byId("shot-weights-live"),
+        motionGrid: byId("motion-grid"),
+        setPlaysGrid: byId("set-plays-grid"),
+        manDefenseGrid: byId("man-defense-grid"),
+        zoneDefenseGrid: byId("zone-defense-grid"),
+        fastBreaksChips: byId("fast-breaks-chips"),
+        hcTrapsChips: byId("hc-traps-chips"),
+        motionTotal: byId("motion-total"),
+        setPlaysTotal: byId("set-plays-total"),
+        fastBreakTotal: byId("fast-breaks-total"),
+        hcTrapTotal: byId("hc-traps-total"),
+        manDefenseTotal: byId("man-defense-total"),
+        zoneDefenseTotal: byId("zone-defense-total"),
+        fastBreaksNormalize: byId("fast-breaks-normalize"),
+        hcTrapsNormalize: byId("hc-traps-normalize"),
+        pcOffense: byId("pc-order-offense"),
+        pcDefense: byId("pc-order-defense"),
+        pcCapOffense: byId("pc-cap-offense"),
+        pcCapDefense: byId("pc-cap-defense"),
+        pcErrorOffense: byId("pc-error-offense"),
+        pcErrorDefense: byId("pc-error-defense"),
+        gameplayLockout: byId("gameplay-lockout"),
       };
     }
 
@@ -400,7 +424,7 @@ function cloneParams(params) {
     }
 
     isHosted() {
-      return Boolean(document.getElementById("playbooks-view"));
+      return inAppShell();
     }
 
     editSnapshot() {
@@ -449,8 +473,8 @@ function cloneParams(params) {
     }
 
     syncStickyOffsets() {
-      const body = document.querySelector(".playbooks-page-card-body");
-      const header = document.querySelector(".playbooks-page-card-header");
+      const body = rootQuery(".playbooks-page-card-body");
+      const header = rootQuery(".playbooks-page-card-header");
       if (!body || !header) return;
       const stickyTop = parseFloat(window.getComputedStyle(header).top) || 10;
       const gap = 12;
@@ -561,7 +585,7 @@ function cloneParams(params) {
           node.hidden = true;
         });
       }
-      document.querySelector(".pc-card")?.setAttribute("hidden", "");
+      rootQuery(".pc-card")?.setAttribute("hidden", "");
       if (this.elements.saveBtn) this.elements.saveBtn.hidden = true;
       if (this.elements.sectionsReadyIndicator) this.elements.sectionsReadyIndicator.hidden = true;
     }
@@ -573,7 +597,7 @@ function cloneParams(params) {
       });
       this.elements.saveBtn?.addEventListener("click", () => this.handleSave());
 
-      document.querySelectorAll(".playbooks-tab").forEach((tab) => {
+      qsa(".playbooks-tab").forEach((tab) => {
         tab.addEventListener("click", () => {
           this.state.activeTab = tab.dataset.tab === "defense" ? "defense" : "offense";
           this.applyTab();
@@ -588,17 +612,18 @@ function cloneParams(params) {
         playSound("click-tiny.wav");
         this.normalizeSection("hcTraps");
       });
-      window.addEventListener("resize", () => this.syncStickyOffsets());
+      this._onResize = () => this.syncStickyOffsets();
+      window.addEventListener("resize", this._onResize);
     }
 
     applyTab() {
       const tab = this.state.activeTab === "defense" ? "defense" : "offense";
-      document.querySelectorAll(".playbooks-tab").forEach((button) => {
+      qsa(".playbooks-tab").forEach((button) => {
         const on = button.dataset.tab === tab;
         button.classList.toggle("on", on);
         button.setAttribute("aria-selected", on ? "true" : "false");
       });
-      document.querySelectorAll(".playbooks-tabpane").forEach((pane) => {
+      qsa(".playbooks-tabpane").forEach((pane) => {
         const on = pane.dataset.pane === tab;
         pane.classList.toggle("on", on);
         pane.hidden = !on;
@@ -776,7 +801,7 @@ function cloneParams(params) {
 
     updateSectionCounts() {
       const set = (id, text) => {
-        const el = document.getElementById(id);
+        const el = byId(id);
         if (el) el.textContent = text;
       };
       const describe = (arr, flexible) => {
@@ -1018,7 +1043,7 @@ function cloneParams(params) {
         ensureEnforcedBalance(arr);
         this.render();
         this.scheduleShotWeightsPreview();
-        document.querySelector(`.play[data-id="${CSS.escape(item.id)}"] [data-lock]`)?.focus();
+        rootQuery(`.play[data-id="${CSS.escape(item.id)}"] [data-lock]`)?.focus();
       });
 
       if (tile.classList.contains("is-computed") || item.locked) {
@@ -1106,7 +1131,7 @@ function cloneParams(params) {
       const arr = this.state[sectionKey];
       arr.forEach((item) => {
         if (item.isActive === false) return;
-        const tile = document.querySelector(`.play[data-id="${CSS.escape(item.id)}"]`);
+        const tile = rootQuery(`.play[data-id="${CSS.escape(item.id)}"]`);
         if (!tile) return;
         const fill = tile.querySelector(".wb i");
         if (fill) fill.style.width = `${item.percentage}%`;
@@ -1235,7 +1260,7 @@ function cloneParams(params) {
     }
 
     paintChip(item) {
-      document.querySelectorAll(`.play[data-id="${CSS.escape(item.id)}"]`).forEach((chip) => {
+      qsa(`.play[data-id="${CSS.escape(item.id)}"]`).forEach((chip) => {
         const fill = chip.querySelector(".wb i");
         if (fill) fill.style.width = `${item.percentage}%`;
         const slider = chip.querySelector(".chip-slider");
@@ -1360,7 +1385,7 @@ function cloneParams(params) {
     }
 
     handleDragEnd() {
-      document.querySelectorAll(".csr.dragging").forEach((node) => node.classList.remove("dragging"));
+      qsa(".csr.dragging").forEach((node) => node.classList.remove("dragging"));
       this.clearDropHints();
       this.dragContext = null;
     }
@@ -1399,7 +1424,7 @@ function cloneParams(params) {
     }
 
     clearDropHints() {
-      document.querySelectorAll(".csr.drop-target").forEach((node) => {
+      qsa(".csr.drop-target").forEach((node) => {
         node.classList.remove("drop-target");
       });
     }
@@ -1704,55 +1729,232 @@ function cloneParams(params) {
     }
   }
 
-  async function initPlaybooks() {
-    if (window.__playbooksPage) return window.__playbooksPage;
-    const page = new PlaybooksPage();
-    window.__playbooksPage = page;
-    try {
-      await page.init();
-      if (window.GOBNav && typeof window.GOBNav.warnOnLeave === "function") {
-        window.GOBNav.warnOnLeave(
-          () => page.hasEdits(),
-          page.isHosted() ? { view: "playbooks-view", confirm: (proceed) => page.confirmLeave(proceed) } : null
-        );
-      }
-    } catch (error) {
-      window.__playbooksPage = null;
-      console.error("Failed to initialize playbooks page:", error);
-      const toast = document.getElementById("toast");
-      if (toast) {
-        toast.innerHTML = `
-          <div class="toast-icon" style="--toast-accent: #F79420;">
-            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <path d="M5.1 10.4 8.3 13.6 14.9 7" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path>
-            </svg>
-          </div>
-          <div class="toast-copy">
-            <div class="toast-title">Failed to load playbooks</div>
-          </div>
-          <button class="toast-dismiss" type="button" aria-label="Dismiss notification">×</button>
-        `;
-        toast.style.setProperty("--toast-accent", "#F79420");
-        toast.hidden = false;
-        toast.querySelector(".toast-dismiss")?.addEventListener("click", () => {
-          toast.classList.remove("visible");
-          window.setTimeout(() => { toast.hidden = true; }, 220);
-        }, { once: true });
-        requestAnimationFrame(() => toast.classList.add("visible"));
-        window.setTimeout(() => {
-          toast.classList.remove("visible");
-          window.setTimeout(() => { toast.hidden = true; }, 220);
-        }, 3000);
-      }
-      throw error;
-    }
-    return page;
-  }
 
-  window.initPlaybooks = initPlaybooks;
-  if (document.readyState === "loading") {
-    window.addEventListener("DOMContentLoaded", () => {
-      initPlaybooks().catch(() => {});
-    });
+function teardown() {
+  if (page) {
+    if (page.toastTimer) { window.clearTimeout(page.toastTimer); page.toastTimer = null; }
+    if (page.toastHideTimer) { window.clearTimeout(page.toastHideTimer); page.toastHideTimer = null; }
+    if (page.previewTimer) { window.clearTimeout(page.previewTimer); page.previewTimer = null; }
+    if (page.previewAbort) { try { page.previewAbort.abort(); } catch (err) { /* ignore */ } }
+    if (page._onResize) window.removeEventListener('resize', page._onResize);
   }
-})();
+  if (window.GOBNav && typeof window.GOBNav.warnOnLeave === 'function') {
+    try { window.GOBNav.warnOnLeave(null); } catch (err) { /* leave hook optional */ }
+  }
+}
+
+function revalidate(options) {
+  if (!page) return init(root, options);
+  page.params = liveParams();
+  if (options) {
+    if (options.mode) page.context.mode = options.mode;
+    if (options.teamId) page.context.teamId = options.teamId;
+    if (options.franchiseId) page.context.franchiseId = options.franchiseId;
+    if (options.game_id) page.context.gameId = options.game_id;
+    if (options.from) page.context.from = options.from;
+  }
+  return page.loadData().then(function () {
+    page.markSaved();
+    page.render();
+    page.scheduleShotWeightsPreview(true);
+    return { revalidate: revalidate, unmount: teardown };
+  });
+}
+
+async function init(host, options) {
+  root = host || document.body;
+  const hadShell = !!(root.querySelector('.pbc') || root.querySelector('.playbooks-layout'));
+  if (!hadShell) {
+    root.insertAdjacentHTML('beforeend', shellHtml());
+  }
+  if (hadShell && page) return revalidate(options);
+  page = new PlaybooksPage(root, options);
+  window.__playbooksPage = page;
+  try {
+    await page.init();
+    if (window.GOBNav && typeof window.GOBNav.warnOnLeave === 'function') {
+      window.GOBNav.warnOnLeave(
+        () => page.hasEdits(),
+        page.isHosted() ? { view: 'playbooks-view', confirm: (proceed) => page.confirmLeave(proceed) } : null
+      );
+    }
+  } catch (error) {
+    console.error('Failed to initialize playbooks page:', error);
+    if (inAppShell() && window.GOBToast) {
+      window.GOBToast.show('Failed to load playbooks');
+    } else {
+      const toast = byId('toast');
+      if (toast) {
+        toast.textContent = 'Failed to load playbooks';
+        toast.hidden = false;
+      }
+    }
+    window.__playbooksPage = null;
+    page = null;
+    throw error;
+  }
+  return { revalidate: revalidate, unmount: teardown };
+}
+
+function shellHtml() {
+  return `<div class="resource-page-container fcc-brand-page-shell playbooks-resource-shell">
+    <div class="playbooks-page-header-wrap">
+      <a id="back-btn" class="back-to-locker-room brand-back-link playbooks-back-link" href="#">Back to Locker Room</a>
+    </div>
+
+    <div class="playbooks-page">
+      <main class="playbooks-main">
+        <section class="fcc-data-card playbooks-page-card">
+          <div class="fcc-data-card-body playbooks-page-card-body">
+            <header class="playbooks-page-card-header">
+              <div class="playbooks-page-title">
+                <h1>Playbook Settings</h1>
+                <p>Configure usage, focus, and Playcall Center order.</p>
+              </div>
+              <div id="playbooks-tools-row" class="playbooks-tools-row">
+                <div id="sections-ready-indicator" class="playbooks-sections-ready warn" aria-live="polite">
+                  <span class="ck" aria-hidden="true"></span>
+                  <span class="ready-copy bal"><b>0 of 2</b> flexible sections balanced</span>
+                </div>
+                <button id="save-btn" class="btn-o playbooks-save-btn playbooks-save-btn-header" type="button" disabled>Save Playbooks</button>
+              </div>
+            </header>
+
+            <div class="pbc playbooks-layout">
+              <div class="playbooks-left-column" id="playbooks-edit-column">
+                <section class="settings-card gameplay-lockout-card" id="gameplay-lockout" hidden>
+                  <div class="section-block">
+                    <div class="section-heading">
+                      <h2>Playbooks Unavailable In Game</h2>
+                    </div>
+                    <p class="empty-state-copy">
+                      Playbooks can only be edited from the Franchise Command Center right now. In-game access will return later as a halftime-only adjustment flow.
+                    </p>
+                  </div>
+                </section>
+
+                <div id="shot-weights-live" class="psw playbooks-shot-weights-strip" aria-live="polite">
+                  <div class="psw-strip-label">Expected shot distribution</div>
+                  <p class="psw-unavailable">Loading shot weights…</p>
+                </div>
+
+                <div class="playbooks-side-row">
+                  <div class="seg playbooks-tabs" id="playbooks-side-seg" role="tablist" aria-label="Playbook side">
+                    <button class="playbooks-tab on" type="button" role="tab" data-tab="offense" aria-selected="true" aria-controls="pane-offense">Offense</button>
+                    <button class="playbooks-tab" type="button" role="tab" data-tab="defense" aria-selected="false" aria-controls="pane-defense">Defense</button>
+                  </div>
+                </div>
+
+                <div class="playbooks-tabpane on" data-pane="offense" id="pane-offense" role="tabpanel">
+                  <section class="pbs pb-sec" data-section="motion">
+                    <div class="sh pb-sec-head">
+                      <div class="pb-sec-title">
+                        <h2>Motion</h2>
+                        <span class="m cnt" id="motion-count"></span>
+                      </div>
+                      <div class="section-total tot" id="motion-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
+                    </div>
+                    <div class="et-grid" id="motion-grid"></div>
+                  </section>
+
+                  <section class="pbs pb-sec" data-section="setPlays">
+                    <div class="sh pb-sec-head">
+                      <div class="pb-sec-title">
+                        <h2>Set Plays</h2>
+                        <span class="m cnt" id="set-plays-count"></span>
+                      </div>
+                      <div class="section-total tot" id="set-plays-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
+                    </div>
+                    <div class="et-grid" id="set-plays-grid"></div>
+                  </section>
+
+                  <section class="pbs pb-sec" data-section="fastBreaks" data-norm="1">
+                    <div class="sh pb-sec-head">
+                      <div class="pb-sec-title">
+                        <h2>Fast Breaks</h2>
+                        <span class="m cnt" id="fast-breaks-count"></span>
+                        <button class="norm-btn btn-q" id="fast-breaks-normalize" type="button" hidden>Normalize → 100</button>
+                      </div>
+                      <div class="section-total tot" id="fast-breaks-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
+                    </div>
+                    <div class="chips et-grid" id="fast-breaks-chips"></div>
+                  </section>
+                </div>
+
+                <div class="playbooks-tabpane" data-pane="defense" id="pane-defense" role="tabpanel" hidden>
+                  <section class="pbs pb-sec def-sec" data-section="manDefense">
+                    <div class="sh pb-sec-head">
+                      <div class="pb-sec-title">
+                        <h2>Man Defense</h2>
+                        <span class="m cnt" id="man-defense-count"></span>
+                      </div>
+                      <div class="section-total tot" id="man-defense-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
+                    </div>
+                    <div class="et-grid" id="man-defense-grid"></div>
+                  </section>
+
+                  <section class="pbs pb-sec def-sec" data-section="zoneDefense">
+                    <div class="sh pb-sec-head">
+                      <div class="pb-sec-title">
+                        <h2>Zone Defense</h2>
+                        <span class="m cnt" id="zone-defense-count"></span>
+                      </div>
+                      <div class="section-total tot" id="zone-defense-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
+                    </div>
+                    <div class="et-grid" id="zone-defense-grid"></div>
+                  </section>
+
+                  <section class="pbs pb-sec def-sec" data-section="hcTraps" data-norm="1">
+                    <div class="sh pb-sec-head">
+                      <div class="pb-sec-title">
+                        <h2>HC Traps</h2>
+                        <span class="m cnt" id="hc-traps-count"></span>
+                        <button class="norm-btn btn-q" id="hc-traps-normalize" type="button" hidden>Normalize → 100</button>
+                      </div>
+                      <div class="section-total tot" id="hc-traps-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
+                    </div>
+                    <div class="chips et-grid" id="hc-traps-chips"></div>
+                  </section>
+                </div>
+              </div>
+
+              <aside class="pcs pc-card">
+                <div class="pcs-h">
+                  <div class="sh"><h2>Playcall Center</h2></div>
+                  <p>Up to 8 offense and 8 defense plays. Drag to reorder.</p>
+                </div>
+                <div class="pcs-g">
+                  <b>Offense</b>
+                  <span class="pc-cap" id="pc-cap-offense"></span>
+                </div>
+                <div id="pc-order-offense" class="csr-l pc-list" data-list-type="offense"></div>
+                <div id="pc-error-offense" class="pc-inline-error" aria-live="polite"></div>
+                <div class="pcs-g">
+                  <b>Defense</b>
+                  <span class="pc-cap" id="pc-cap-defense"></span>
+                </div>
+                <div id="pc-order-defense" class="csr-l pc-list" data-list-type="defense"></div>
+                <div id="pc-error-defense" class="pc-inline-error" aria-live="polite"></div>
+              </aside>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>`;
+}
+
+export { init, teardown, revalidate, shellHtml };
+window.initPlaybooks = function (host, options) { return init(host || document.body, options); };
