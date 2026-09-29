@@ -8,6 +8,12 @@ from BackEnd.utils.franchise_last_played import (
     most_recent_franchise_id,
 )
 from BackEnd.utils.local_coach import coach_career_payload, is_local_owner, local_coach_doc
+from BackEnd.utils.trophy_log import (
+    TROPHIES_FIELD,
+    record_all_american_trophies,
+    record_season_record_trophy,
+    trophies_newest_first,
+)
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from starlette.responses import Response
 from fastapi.encoders import jsonable_encoder
@@ -9849,11 +9855,18 @@ def get_coach_career(user: dict = Depends(get_current_user)):
         try:
             doc = _store.users_collection.find_one(
                 {"_id": ObjectId(uid)},
-                {"username": 1, "record": 1, "archetypes": 1, "lead_archetype": 1, "championships_total": 1},
+                {
+                    "username": 1,
+                    "record": 1,
+                    "archetypes": 1,
+                    "lead_archetype": 1,
+                    "championships_total": 1,
+                    TROPHIES_FIELD: 1,
+                },
             ) or {}
         except Exception:
             doc = {}
-    return coach_career_payload(doc, user)
+    return {**coach_career_payload(doc, user), "trophies": trophies_newest_first(doc.get(TROPHIES_FIELD))}
 
 
 @router.get("/franchise/current")
@@ -14676,14 +14689,17 @@ def _compute_all_american_teams(franchise_doc: dict[str, Any]) -> dict[str, Any]
 
 def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str, Any]:
     awards = franchise_doc.get(AWARDS_FIELD) or {}
-    if awards.get("all_american_teams"):
-        return awards
-    awards = _compute_all_american_teams(franchise_doc)
-    db.franchises.update_one(
-        {"_id": franchise_doc["_id"]},
-        fold_browse_rev({"$set": {AWARDS_FIELD: awards}}),
-    )
-    franchise_doc[AWARDS_FIELD] = awards
+    if not awards.get("all_american_teams"):
+        awards = _compute_all_american_teams(franchise_doc)
+        db.franchises.update_one(
+            {"_id": franchise_doc["_id"]},
+            fold_browse_rev({"$set": {AWARDS_FIELD: awards}}),
+        )
+        franchise_doc[AWARDS_FIELD] = awards
+    try:
+        record_all_american_trophies(franchise_doc, awards)
+    except Exception:
+        logger.exception("[TROPHY] All-American entries failed franchise_id=%s", franchise_doc.get("_id"))
     return awards
 
 
@@ -19480,6 +19496,11 @@ def finish_season(req: FinishSeasonRequest):
     )
     if consume_result.modified_count == 0:
         raise HTTPException(status_code=409, detail="Season transition has already been processed")
+
+    try:
+        record_season_record_trophy(franchise_doc)
+    except Exception:
+        logger.exception("[TROPHY] season_record failed franchise_id=%s", str(franchise_id))
 
     try:
         from BackEnd.utils.franchise_championship_moments import (

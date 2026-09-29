@@ -222,7 +222,8 @@ def test_coach_career_route_serves_the_local_coach_in_me_shape(store, monkeypatc
     body = http.get("/franchise/coach-career").json()
     assert (body["record"]["wins"], body["record"]["losses"]) == (12, 5)
     assert body["championships_total"]["national"] == 3
-    assert set(body) <= set(UserResponse.model_fields)
+    assert body["trophies"] == []
+    assert set(body) - {"trophies"} <= set(UserResponse.model_fields)
 
 
 def test_coach_career_route_reads_users_online(as_user):

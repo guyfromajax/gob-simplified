@@ -110,6 +110,12 @@ def _inc_championship(
                 coach_collection().update_one({"_id": oid}, {"$inc": inc_fields}, upsert=True)
             else:
                 users_collection.update_one({"_id": oid}, {"$inc": inc_fields})
+            try:
+                from BackEnd.utils.trophy_log import record_title_trophy
+
+                record_title_trophy(owner_user_id=owner_user_id, kind=kind, franchise_id=franchise_id)
+            except Exception:
+                logger.exception("[TROPHY] title entry failed kind=%s franchise_id=%s", kind, franchise_id)
     _inc_player_titles(
         franchise_id=franchise_id,
         user_team_id_str=user_team_id_str,
