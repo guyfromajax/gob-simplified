@@ -1,20 +1,22 @@
-* {
-  margin: 0;
-  padding: 0;
+/* Standalone page chrome only. Do not reset the command center. */
+body.game-plan-page,
+body.game-plan-page * {
   box-sizing: border-box;
 }
 
-body {
+body.game-plan-page {
+  margin: 0;
+  padding: 0;
   font-family: 'Inter', sans-serif;
   background: #0b0d14;
   color: #ffffff;
   min-height: 100vh;
 }
 
-button,
-input[type="button"],
-input[type="submit"],
-input[type="reset"] {
+body.game-plan-page button,
+body.game-plan-page input[type="button"],
+body.game-plan-page input[type="submit"],
+body.game-plan-page input[type="reset"] {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
@@ -90,7 +92,7 @@ input[type="reset"] {
 .sliders-container.tutorial-readonly {
   opacity: 0.62;
 }
-.sliders-container.tutorial-readonly input[type="range"] {
+.sliders-container.tutorial-readonly body.game-plan-page input[type="range"] {
   cursor: not-allowed;
 }
 .sliders-container.tutorial-readonly .strategy-slider-node {
@@ -172,7 +174,7 @@ input[type="reset"] {
   margin: 0;
 }
 
-input[type="range"] {
+body.game-plan-page input[type="range"] {
   position: relative;
   z-index: 3;
   width: 100%;
@@ -185,12 +187,12 @@ input[type="range"] {
   cursor: pointer;
 }
 
-input[type="range"]::-webkit-slider-runnable-track {
+body.game-plan-page input[type="range"]::-webkit-slider-runnable-track {
   height: 54px;
   background: transparent;
 }
 
-input[type="range"]::-webkit-slider-thumb {
+body.game-plan-page input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 40px;
@@ -202,17 +204,17 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: pointer;
 }
 
-input[type="range"]::-webkit-slider-thumb:hover {
+body.game-plan-page input[type="range"]::-webkit-slider-thumb:hover {
   filter: none;
 }
 
-input[type="range"]::-moz-range-track {
+body.game-plan-page input[type="range"]::-moz-range-track {
   height: 54px;
   background: transparent;
   border: 0;
 }
 
-input[type="range"]::-moz-range-thumb {
+body.game-plan-page input[type="range"]::-moz-range-thumb {
   width: 40px;
   height: 40px;
   border: 0;

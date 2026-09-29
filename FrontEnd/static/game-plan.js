@@ -19,66 +19,112 @@ function cloneParams(params) {
   return out;
 }
 
-// Parse URL parameters
-const urlParams = liveParams();
 
 function playSound(filename) {
   import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
 }
 
-// ✅ PHASE 1.3: Set telemetry context
-if (window.StateTelemetry) {
-  window.StateTelemetry.setContext('game-plan');
+let root = null;
+let slidersWired = false;
+let tutorialWired = false;
+let controlsWired = false;
+let urlParams = null;
+let homeTeam = null;
+let awayTeam = null;
+let homeId = null;
+let awayId = null;
+let myTeamSide = null;
+let userTeamIdParam = null;
+let franchiseId = null;
+let weekParam = null;
+let modeParam = null;
+let quarter = 1;
+let periodLabel = 'Q1';
+let gameId = null;
+let resumeFromTimeout = false;
+let isGameIdRequired = false;
+let DEBUG = false;
+let pgId = null;
+let sgId = null;
+let sfId = null;
+let pfId = null;
+let cId = null;
+let teamName = null;
+let teamId = null;
+
+function byId(id) {
+  if (root) {
+    if (root.id === id) return root;
+    const found = root.querySelector('#' + CSS.escape(id));
+    if (found) return found;
+  }
+  return document.getElementById(id);
 }
 
-// ✅ DEBUG: Log URL params when game-plan page loads
-const pageLoadParams = {
-  fullUrl: window.location.href,
-  game_id: urlParams.get('game_id'),
-  resume_from_timeout: urlParams.get('resume_from_timeout'),
-  quarter: urlParams.get('quarter'),
-  allParams: Object.fromEntries(urlParams.entries())
-};
-console.log('🔍 [GAME-PLAN] PAGE LOAD - URL params:', pageLoadParams);
-console.warn('⚠️ [GAME-PLAN] PAGE LOAD CHECK - game_id:', pageLoadParams.game_id, 'resume_from_timeout:', pageLoadParams.resume_from_timeout);
-
-// A live game, a timeout, or the tutorial needs game_id. Franchise browse does not.
-const pageNeedsGameId = pageLoadParams.resume_from_timeout === 'true'
-  || pageLoadParams.allParams.mode === 'single'
-  || pageLoadParams.allParams.mode === 'tutorial';
-if (pageNeedsGameId && !pageLoadParams.game_id) {
-  console.error('❌ [GAME-PLAN] CRITICAL: game_id or resume_from_timeout is MISSING on page load!', pageLoadParams);
+function qsa(sel) {
+  return root ? root.querySelectorAll(sel) : document.querySelectorAll(sel);
 }
 
-const homeTeam = urlParams.get('home');
-const awayTeam = urlParams.get('away');
-const homeId = urlParams.get('home_id');
-const awayId = urlParams.get('away_id');
-const myTeamSide = urlParams.get('my_team');
-const userTeamIdParam = urlParams.get('user_team_id');
-const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', urlParams.get('franchise_id')) : urlParams.get('franchise_id');
-const weekParam = urlParams.get('week');
-const modeParam = urlParams.get('mode');
-const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
-const periodLabel = urlParams.get('period') || `Q${quarter}`;
-// ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
-// game_id is required for Q2+ or timeout resume, optional for Q1 (will be created by init-game)
-// ✅ PHASE 1.3: Instrument state read
-// `let`, not `const`: FTE v3 can recover a missing game_id from tutorial_state and
-// must be able to write it back here — every downstream read (loadSettings, the
-// save on PLAY NOW, the forwarded query string) goes through this binding.
-let gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
-const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+function inAppShell() {
+  return !!(root && (root.id === 'game-plan-view' || (root.closest && root.closest('#game-plan-view'))));
+}
 
-// ✅ PHASE 1.1: Fail loudly if game_id is required but missing
-// For single mode, game_id is required for ALL quarters (Q1 must be created by init-game)
-// For franchise mode, game_id is optional (may not exist yet)
-const isGameIdRequired = (modeParam === 'single') || (quarter > 1) || resumeFromTimeout;
-if (isGameIdRequired && !gameId) {
+function readOptions(options) {
+  options = options || {};
+  urlParams = liveParams();
+  function pick(name, alt) {
+    if (options[name] != null && options[name] !== '') return String(options[name]);
+    return urlParams.get(name) || (alt ? urlParams.get(alt) : '') || '';
+  }
+  homeTeam = pick('home');
+  awayTeam = pick('away');
+  homeId = pick('home_id');
+  awayId = pick('away_id');
+  myTeamSide = pick('my_team');
+  userTeamIdParam = pick('user_team_id');
+  franchiseId = window.StateTelemetry
+    ? window.StateTelemetry.logUrlRead('franchise_id', pick('franchiseId', 'franchise_id') || null)
+    : (pick('franchiseId', 'franchise_id') || null);
+  weekParam = pick('week');
+  modeParam = pick('mode');
+  quarter = parseInt(pick('quarter'), 10) || 1;
+  periodLabel = pick('period') || ('Q' + quarter);
+  gameId = window.StateTelemetry
+    ? window.StateTelemetry.logUrlRead('game_id', pick('game_id') || null)
+    : (pick('game_id') || null);
+  resumeFromTimeout = pick('resume_from_timeout') === 'true';
+  isGameIdRequired = (modeParam === 'single') || (quarter > 1) || resumeFromTimeout;
+  DEBUG = urlParams.has('debug');
+  pgId = myTeamSide ? urlParams.get(myTeamSide + '_pg') : null;
+  sgId = myTeamSide ? urlParams.get(myTeamSide + '_sg') : null;
+  sfId = myTeamSide ? urlParams.get(myTeamSide + '_sf') : null;
+  pfId = myTeamSide ? urlParams.get(myTeamSide + '_pf') : null;
+  cId = myTeamSide ? urlParams.get(myTeamSide + '_c') : null;
+  teamName = myTeamSide === 'home' ? homeTeam : awayTeam;
+  teamId = myTeamSide === 'home' ? homeId : awayId;
+  if (modeParam && (modeParam === 'tournament' || modeParam === 'franchise')) {
+    const teamIdParam = pick('teamId', 'team_id');
+    if (teamIdParam) {
+      teamId = teamIdParam;
+      teamName = teamIdParam;
+    } else if (userTeamIdParam) {
+      teamId = userTeamIdParam;
+      teamName = userTeamIdParam;
+    }
+  }
+  if (modeParam === 'single' || modeParam === 'tutorial') {
+    const teamIdParam = pick('teamId', 'team_id');
+    if (teamIdParam) {
+      teamId = teamIdParam;
+      teamName = teamIdParam;
+    }
+  }
+}
+
+function maybeMissingGameId() {
+  if (!(isGameIdRequired && !gameId)) return;
   const errorMsg = `game_id is required but missing from URL. Mode: ${modeParam}, Quarter: ${quarter}, Resume from timeout: ${resumeFromTimeout}. Please navigate from the lineup screen with a valid game_id (created by init-game).`;
   console.error(`❌ [GAME-PLAN] ${errorMsg}`);
-  
-  // Show error screen if errorHandler is available
   if (typeof window !== 'undefined' && window.ErrorHandler) {
     window.ErrorHandler.showMissingPointerError({
       missingPointer: 'game_id',
@@ -100,9 +146,7 @@ if (isGameIdRequired && !gameId) {
       }
     });
   } else {
-    // Fallback if errorHandler not loaded
     alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
-    // Redirect to lineup screen if possible
     if (homeTeam && awayTeam) {
       let lineupUrl = `/set-lineup.html?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}&home_id=${encodeURIComponent(homeId || '')}&away_id=${encodeURIComponent(awayId || '')}&my_team=${encodeURIComponent(myTeamSide || 'home')}&mode=${encodeURIComponent(modeParam || 'single')}`;
       const homeDisplayParam = urlParams.get('home_display');
@@ -116,152 +160,66 @@ if (isGameIdRequired && !gameId) {
   }
 }
 
-const DEBUG = urlParams.has('debug');
 
-// Lineup params (passed from set-lineup)
-// Only read if myTeamSide is set
-const pgId = myTeamSide ? urlParams.get(`${myTeamSide}_pg`) : null;
-const sgId = myTeamSide ? urlParams.get(`${myTeamSide}_sg`) : null;
-const sfId = myTeamSide ? urlParams.get(`${myTeamSide}_sf`) : null;
-const pfId = myTeamSide ? urlParams.get(`${myTeamSide}_pf`) : null;
-const cId = myTeamSide ? urlParams.get(`${myTeamSide}_c`) : null;
-
-// Determine team name and ID
-// When coming from command center, use user_team_id; otherwise use lineup-based logic
-let teamName = myTeamSide === 'home' ? homeTeam : awayTeam;
-let teamId = myTeamSide === 'home' ? homeId : awayId;
-
-// If coming from command center, use team_id or user_team_id parameter (Tournament/Franchise modes)
-if (modeParam && (modeParam === 'tournament' || modeParam === 'franchise')) {
-  // Check for team_id first (standardized format), then fallback to user_team_id (legacy)
-  const teamIdParam = urlParams.get('team_id');
-  if (teamIdParam) {
-    teamId = teamIdParam;
-    teamName = teamIdParam; // Will be resolved by backend if needed
-  } else if (userTeamIdParam) {
-    teamId = userTeamIdParam;
-    teamName = userTeamIdParam; // Will be resolved by backend if needed
+function applyTutorialMode() {
+  if (modeParam !== 'tutorial' || tutorialWired) return;
+  tutorialWired = true;
+  const subhead = byId('tutorial-readonly-subhead');
+  if (subhead) subhead.hidden = true;
+  const backLink = byId('game-plan-back-link');
+  if (backLink) backLink.hidden = true;
+  const backToLineup = byId('btn-back-to-lineup');
+  if (backToLineup) backToLineup.style.display = 'none';
+  const cancelBtn = byId('btn-cancel');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  const saveBtn = byId('btn-save-game-plan');
+  if (saveBtn) saveBtn.style.display = 'none';
+  const btnRow = (root && root.querySelector('.button-container')) || (root && root.querySelector('.button-container')) || document.querySelector('.button-container');
+  if (btnRow) {
+    btnRow.style.justifyContent = 'center';
+    btnRow.style.display = 'flex';
   }
-}
-
-// ✅ FIX: For Single Game mode, check for team_id parameter (team name format)
-if (modeParam === 'single') {
-  const teamIdParam = urlParams.get('team_id');
-  if (teamIdParam) {
-    teamId = teamIdParam;
-    teamName = teamIdParam; // In single mode, team_id is the team name
-  }
-}
-
-// FTE v2 tutorial: team_id is passed as the user team name (matches the
-// single-mode handling — backend resolves via gm.<team>.name == team_id).
-// Page is read-only: sliders disabled, Save hidden, subhead shown.
-if (modeParam === 'tutorial') {
-  const teamIdParam = urlParams.get('team_id');
-  if (teamIdParam) {
-    teamId = teamIdParam;
-    teamName = teamIdParam;
-  }
-  // game-plan.js is loaded dynamically by the HTML AFTER DOMContentLoaded
-  // already fired (see game-plan.html: script.onload manually calls init()
-  // when document.readyState !== 'loading'). So we can't wait for that
-  // event — it'll never re-fire. Use readyState to branch.
-  // FTE v3: the tutorial Game Plan is WRITABLE. v2 disabled every slider and hid
-  // Save because the tutorial game was a canned Q4 situation the user could not
-  // influence. v3 sims a full game from 0-0 off the user's own strategy, so the
-  // whole point of the step is that these choices reach the sim.
-  //
-  // Save is still hidden — but replaced, not removed: the CONTINUE CTA persists
-  // through the same `saveSettingsQuietly()` path and then advances the funnel, so
-  // the user cannot walk away from the step with unsaved sliders.
-  const applyTutorialMode = () => {
-    // FTE v3 chrome: the tutorial has ONE way forward. Anything that offers a way
-    // back or sideways is removed, so the only affordance is the orange CTA.
-    // Scoped to mode=tutorial — the franchise/single Game Plan screen is untouched.
-    const subhead = document.getElementById('tutorial-readonly-subhead');
-    if (subhead) subhead.hidden = true;                       // no sub-copy
-    const backLink = document.getElementById('game-plan-back-link');
-    if (backLink) backLink.hidden = true;                     // no "Back to Locker Room"
-    const backToLineup = document.getElementById('btn-back-to-lineup');
-    if (backToLineup) backToLineup.style.display = 'none';    // no "Back To Lineup"
-    const cancelBtn = document.getElementById('btn-cancel');
-    if (cancelBtn) cancelBtn.style.display = 'none';
-    const saveBtn = document.getElementById('btn-save-game-plan');
-    if (saveBtn) saveBtn.style.display = 'none';
-    // With every sibling hidden the CTA is the row's only child — centre it.
-    const btnRow = document.querySelector('.button-container');
-    if (btnRow) {
-      btnRow.style.justifyContent = 'center';
-      btnRow.style.display = 'flex';
+  import('/js/shared/sammyModal.js')
+    .then((m) => m.showSammyModal({
+      body: 'Set your strategy. Sliders have real tradeoffs.',
+      ctaLabel: 'GOT IT',
+    }))
+    .catch(() => { /* non-fatal */ });
+  const actions = saveBtn ? saveBtn.parentElement : (root && root.querySelector('.sliders-container'));
+  if (!actions || byId('btn-tutorial-gameplan-continue')) return;
+  let tutorialSaveFailures = 0;
+  const cta = document.createElement('button');
+  cta.id = 'btn-tutorial-gameplan-continue';
+  cta.type = 'button';
+  cta.className = 'gob-btn gob-btn--action gob-btn--lg';
+  cta.textContent = 'PLAY NOW';
+  cta.addEventListener('click', async () => {
+    import('/js/shared/uiSfx.js').then((m) => m.playAdvance()).catch(() => {});
+    cta.disabled = true;
+    let saved = false;
+    try {
+      saved = await saveSettingsQuietly();
+      await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
+        method: 'POST',
+        headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: 'situation' }),
+      });
+    } catch (e) {
+      console.warn('[tutorial] game plan save/advance failed:', e);
     }
-
-    // Progress thread + Sammy. Dynamic import: game-plan.js is injected as a
-    // CLASSIC script (game-plan.html sets script.onload), so static ESM import
-    // syntax is unavailable here.
-    import('/js/shared/sammyModal.js')
-      .then((m) => m.showSammyModal({
-        body: 'Set your strategy. Sliders have real tradeoffs.',
-        ctaLabel: 'GOT IT',
-      }))
-      .catch(() => { /* non-fatal */ });
-
-    const actions = saveBtn ? saveBtn.parentElement : document.querySelector('.sliders-container');
-    if (!actions || document.getElementById('btn-tutorial-gameplan-continue')) return;
-    // A failed save is silent to the engine — the sim just falls back to the seeded
-    // defaults (every slider 2). Count failures so the first one is surfaced and
-    // retryable, while a second never strands the user mid-funnel.
-    let tutorialSaveFailures = 0;
-    const cta = document.createElement('button');
-    cta.id = 'btn-tutorial-gameplan-continue';
-    cta.type = 'button';
-    cta.className = 'gob-btn gob-btn--action gob-btn--lg';
-    // FTE v3: Game Plan is now the LAST decision before the tip (lineup moved
-    // ahead of it), so this button leaves the setup flow entirely.
-    cta.textContent = 'PLAY NOW';
-    cta.addEventListener('click', async () => {
-      // Same advance sound as every other funnel CTA. game-plan.js is a classic
-      // script, so uiSfx comes in by dynamic import like the modals above.
-      import('/js/shared/uiSfx.js').then((m) => m.playAdvance()).catch(() => {});
-      cta.disabled = true;
-      // saveSettingsQuietly() swallows its own errors and returns false — the try/catch
-      // alone would miss the common failure (a non-OK PUT), so branch on the return value.
-      let saved = false;
-      try {
-        saved = await saveSettingsQuietly();
-        await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
-          method: 'POST',
-          headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ step: 'situation' }),
-        });
-      } catch (e) {
-        // A failed save must not strand the user mid-funnel; the sim falls back to
-        // the seeded defaults, which is a worse game but not a broken one.
-        console.warn('[tutorial] game plan save/advance failed:', e);
+    if (!saved) {
+      tutorialSaveFailures += 1;
+      if (tutorialSaveFailures === 1) {
+        showModal("Your game plan couldn't be saved. Press PLAY NOW to try again — otherwise this game uses the default plan.");
+        cta.disabled = false;
+        return;
       }
-      if (!saved) {
-        tutorialSaveFailures += 1;
-        if (tutorialSaveFailures === 1) {
-          // Say it out loud rather than playing a game that ignores the plan the user
-          // just set. PLAY NOW stays live, so the press is the retry.
-          showModal("Your game plan couldn't be saved. Press PLAY NOW to try again — otherwise this game uses the default plan.");
-          cta.disabled = false;
-          return;
-        }
-        console.warn('[tutorial] game plan save failed twice — continuing on the default plan');
-      }
-      // Forward the query string VERBATIM. It carries the chosen five as
-      // home_pg / home_sg / … — rebuilding it here would drop the lineup and leave
-      // the pre-game card empty.
-      const fwd = liveParams();
-      window.location.href = '/tutorial-situation.html?' + fwd.toString();
-    });
-    actions.appendChild(cta);
-  };
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applyTutorialMode);
-  } else {
-    applyTutorialMode();
-  }
+      console.warn('[tutorial] game plan save failed twice — continuing on the default plan');
+    }
+    const fwd = liveParams();
+    window.location.href = '/tutorial-situation.html?' + fwd.toString();
+  });
+  actions.appendChild(cta);
 }
 
 // State
@@ -295,6 +253,8 @@ function isGamePlanFromCommandCenter() {
 function navigateAfterSaveGamePlanFromToast() {
   if (isGamePlanFromCommandCenter()) {
     executeNavigateToCommandCenter();
+  } else if (resumeFromTimeout) {
+    executeNavigateToCourt();
   } else {
     executeNavigateBack();
   }
@@ -332,7 +292,7 @@ const EFFECT_LINES = {
 };
 
 function applyEffectLines() {
-  document.querySelectorAll('[data-effect]').forEach((el) => {
+  qsa('[data-effect]').forEach((el) => {
     const key = el.getAttribute('data-effect');
     if (EFFECT_LINES[key]) el.textContent = EFFECT_LINES[key];
   });
@@ -431,8 +391,8 @@ function installTrack(slider) {
 
 function placeGamePlanTools() {
   if (document.documentElement.classList.contains('gob-focus')) return;
-  const row = document.querySelector('.button-container');
-  const host = document.getElementById('gob-subtabs');
+  const row = (root && root.querySelector('.button-container')) || document.querySelector('.button-container');
+  const host = byId('gob-subtabs');
   if (!row || !host) return;
   if (!row.getAttribute('data-tool-home')) row.setAttribute('data-tool-home', '#game-plan-tools-home');
   let tools = host.querySelector('.pg-tools');
@@ -448,7 +408,7 @@ function placeGamePlanTools() {
 }
 
 function dismissToast() {
-  const toast = document.getElementById('toast');
+  const toast = byId('toast');
   if (!toast) return;
   if (toastTimer) {
     clearTimeout(toastTimer);
@@ -465,7 +425,7 @@ function dismissToast() {
 }
 
 function showToast(title, subtitle = '', options = {}) {
-  const toast = document.getElementById('toast');
+  const toast = byId('toast');
   if (!toast) return;
   const accent = options.accentColor || '#34EC27';
   const subline = subtitle ? `<div class="toast-subline">${subtitle}</div>` : '';
@@ -514,20 +474,20 @@ function showToast(title, subtitle = '', options = {}) {
 }
 
 function showModal(message) {
-  const modal = document.getElementById('validation-modal');
-  const modalMessage = document.getElementById('modal-message');
+  const modal = byId('validation-modal');
+  const modalMessage = byId('modal-message');
   if (modalMessage) modalMessage.textContent = message;
   if (modal) modal.hidden = false;
 }
 
 function hideModal() {
-  const modal = document.getElementById('validation-modal');
+  const modal = byId('validation-modal');
   if (modal) modal.hidden = true;
 }
 
 function setHeader() {
-  const title = document.getElementById('page-title');
-  const subtitle = document.getElementById('team-subtitle');
+  const title = byId('page-title');
+  const subtitle = byId('team-subtitle');
   if (title) {
     title.textContent = 'Set Your Game Plan';
   }
@@ -575,10 +535,12 @@ function updateSliderVisual(slider, rawValue) {
 
 function setupSliders() {
   applyEffectLines();
+  if (slidersWired) return;
+  slidersWired = true;
   // Setup all sliders (all save to strategy_settings)
   for (const [key, sliderId] of Object.entries(strategySliders)) {
-    const slider = document.getElementById(sliderId);
-    const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
+    const slider = byId(sliderId);
+    const valueDisplay = byId(`value-${sliderId.replace('slider-', '')}`);
 
     if (slider && slider.classList.contains('gt')) installTrack(slider);
     if (slider && valueDisplay) {
@@ -598,8 +560,8 @@ function setupSliders() {
 }
 
 function wireShotDietTip() {
-  const btn = document.querySelector('#shot-diet-nest .slider-nest__info');
-  const copy = document.getElementById('shot-diet-tip');
+  const btn = (root && root.querySelector('#shot-diet-nest .slider-nest__info')) || document.querySelector('#shot-diet-nest .slider-nest__info');
+  const copy = byId('shot-diet-tip');
   if (!btn || !copy || btn.dataset.tipReady === '1') return;
   if (typeof addTextTooltip !== 'function') return;
   btn.dataset.tipReady = '1';
@@ -626,8 +588,8 @@ function revertGamePlan() {
   if (!lastSavedSettings) return;
   currentSettings = JSON.parse(JSON.stringify(lastSavedSettings));
   for (const [key, sliderId] of Object.entries(strategySliders)) {
-    const slider = document.getElementById(sliderId);
-    const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
+    const slider = byId(sliderId);
+    const valueDisplay = byId(`value-${sliderId.replace('slider-', '')}`);
     const value = currentSettings.strategy_settings[key] ?? 2;
     if (slider) slider.value = value;
     if (valueDisplay) valueDisplay.textContent = value;
@@ -829,8 +791,8 @@ async function loadSettings() {
     
     // Update UI with loaded values AND ensure currentSettings is fully populated
     for (const [key, sliderId] of Object.entries(strategySliders)) {
-      const slider = document.getElementById(sliderId);
-      const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
+      const slider = byId(sliderId);
+      const valueDisplay = byId(`value-${sliderId.replace('slider-', '')}`);
       // ✅ FIX: Use nullish coalescing to preserve 0 values (|| treats 0 as falsy)
       const value = currentSettings.strategy_settings[key] ?? 2;
       
@@ -930,6 +892,10 @@ async function saveGamePlan() {
     lastSavedSettings = JSON.parse(JSON.stringify(currentSettings));
     hasUnsavedChanges = false;
 
+    if (resumeFromTimeout) {
+      executeNavigateToCourt();
+      return;
+    }
     if (gamePlanHosted && window.GOBToast) {
       window.GOBToast.show('Game plan saved');
       return;
@@ -940,7 +906,7 @@ async function saveGamePlan() {
       autoDismissMs: 0,
     });
 
-    const saveBtn = document.getElementById('btn-save-game-plan');
+    const saveBtn = byId('btn-save-game-plan');
     if (saveBtn) saveBtn.disabled = true;
   } catch (err) {
     console.error('Error saving settings:', err);
@@ -976,7 +942,13 @@ function executeNavigateToCourt() {
   // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
   const helper = window.TimeoutNavigationHelper;
   if (!helper) {
-    console.error('❌ [GAME-PLAN] TimeoutNavigationHelper not loaded!');
+    const fallback = '/court.html?' + currentUrlParams.toString();
+    if (window.GOBNav) {
+      window.GOBNav.allowNextLeave();
+      window.GOBNav.replace(fallback);
+    } else {
+      window.location.replace(fallback);
+    }
     return;
   }
   
@@ -1284,116 +1256,131 @@ function showUnsavedChangesWarning(onContinue) {
   document.body.appendChild(overlay);
 }
 
-async function initGamePlan() {
-  if (window.__gobGamePlanInit) return;
-  window.__gobGamePlanInit = true;
-  const planHost = document.getElementById('game-plan-view');
-  const hostedInView = !!(planHost && planHost.contains(document.querySelector('.gpc')));
-  gamePlanHosted = hostedInView;
+
+function teardown() {
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  if (toastHideTimer) {
+    clearTimeout(toastHideTimer);
+    toastHideTimer = null;
+  }
+  if (window.GOBNav && typeof window.GOBNav.warnOnLeave === 'function') {
+    try { window.GOBNav.warnOnLeave(null); } catch (err) { /* leave hook optional */ }
+  }
+}
+
+function revalidate(options) {
+  readOptions(options);
+  return loadSettings().then(function () {
+    placeGamePlanTools();
+    return { revalidate: revalidate, unmount: teardown };
+  });
+}
+
+async function init(host, options) {
+  root = host || document.body;
+  readOptions(options);
+  if (window.StateTelemetry) window.StateTelemetry.setContext('game-plan');
+  maybeMissingGameId();
+  const hadShell = !!root.querySelector('.gpc');
+  if (!hadShell) {
+    root.insertAdjacentHTML('beforeend', shellHtml());
+    slidersWired = false;
+    tutorialWired = false;
+    controlsWired = false;
+  }
+  if (hadShell && slidersWired) return revalidate(options);
+  gamePlanHosted = inAppShell();
   if (window.GOBNav) {
-    window.GOBNav.warnOnLeave(gamePlanHasEdits, hostedInView
+    window.GOBNav.warnOnLeave(gamePlanHasEdits, gamePlanHosted
       ? { view: 'game-plan-view', confirm: confirmGamePlanLeave }
       : null);
   }
   setHeader();
   setupSliders();
   wireShotDietTip();
-  await loadSettings();
-  
-  // Check where user came from (command_center vs lineup)
-  const urlParams = liveParams();
-  const from = urlParams.get('from') || 'lineup';  // Default to lineup for backwards compatibility
-  
-  // Button event listeners
-  // ✅ TASK 0: Updated button IDs
-  const btnSaveGamePlan = document.getElementById('btn-save-game-plan');
-  const btnCancel = document.getElementById('btn-cancel');
-  const btnBackToLineup = document.getElementById('btn-back-to-lineup');
-  const pageBackLink = document.getElementById('game-plan-back-link');
-  const modalClose = document.getElementById('modal-close');
-  
-  // Show/hide buttons based on where user came from
-  // ✅ FIX: Check for all command center variations (command_center, tournament-command-center, franchise-command-center)
+  applyTutorialMode();
+
+  const from = (urlParams && urlParams.get('from')) || 'lineup';
+  const btnSaveGamePlan = byId('btn-save-game-plan');
+  const btnCancel = byId('btn-cancel');
+  const btnBackToLineup = byId('btn-back-to-lineup');
+  const pageBackLink = byId('game-plan-back-link');
+  const modalClose = byId('modal-close');
   const isFromCommandCenter = from === 'command_center' ||
                                from === 'tournament-command-center' ||
                                from === 'franchise-command-center';
 
-  if (hostedInView) {
-    if (pageBackLink) pageBackLink.hidden = true;
-    if (btnBackToLineup) btnBackToLineup.style.display = 'none';
-    if (btnCancel) btnCancel.style.display = 'none';
-  } else if (isFromCommandCenter) {
-    // From command center (FCC/TCC): use page-level ghost back link, hide footer navigation buttons
-    if (pageBackLink) {
-      pageBackLink.hidden = false;
-      pageBackLink.addEventListener('click', (event) => {
-        event.preventDefault();
-        playSound('x-back.mp3');
-        navigateToCommandCenter();
-      });
+  if (!controlsWired) {
+    controlsWired = true;
+    if (gamePlanHosted) {
+      if (pageBackLink) pageBackLink.hidden = true;
+      if (btnBackToLineup) btnBackToLineup.style.display = 'none';
+      if (btnCancel) btnCancel.style.display = 'none';
+    } else if (isFromCommandCenter) {
+      if (pageBackLink) {
+        pageBackLink.hidden = false;
+        pageBackLink.addEventListener('click', (event) => {
+          event.preventDefault();
+          playSound('x-back.mp3');
+          navigateToCommandCenter();
+        });
+      }
+      if (btnBackToLineup) btnBackToLineup.style.display = 'none';
+      if (btnCancel) btnCancel.style.display = 'none';
+    } else {
+      if (pageBackLink) pageBackLink.hidden = true;
+      if (btnBackToLineup) {
+        btnBackToLineup.style.display = 'inline-block';
+        btnBackToLineup.addEventListener('click', () => {
+          navigateBack();
+        });
+      }
+      if (btnCancel) btnCancel.style.display = 'none';
     }
-    if (btnBackToLineup) btnBackToLineup.style.display = 'none';
-    if (btnCancel) btnCancel.style.display = 'none';
-  } else {
-    if (pageBackLink) pageBackLink.hidden = true;
-    // From lineup: "Back To Lineup" only (Play Game is on set-lineup)
-    if (btnBackToLineup) {
-      btnBackToLineup.style.display = 'inline-block';
-      btnBackToLineup.addEventListener('click', () => {
-        console.log('🚀 [GAME-PLAN] btnBackToLineup CLICKED! About to call navigateBack()');
-        navigateBack();
-      });
-    }
-    if (btnCancel) btnCancel.style.display = 'none';
-  }
 
-  // FTE v3 tutorial: LAST WORD on the back controls.
-  //
-  // This runs AFTER the isFromCommandCenter branch above, deliberately. The earlier
-  // pass in applyTutorialMode() hid these, but that fires at DOM-ready while this
-  // block runs later in init() and re-showed them — the buttons came back.
-  // Overriding here, downstream of every branch, is the only placement that sticks.
-  //
-  // The tutorial has exactly one way forward: no locker room, no going back to the
-  // lineup. Scoped to mode=tutorial; franchise/single/tournament keep their nav.
-  if (modeParam === 'tutorial') {
-    if (pageBackLink) {
-      pageBackLink.hidden = true;
-      pageBackLink.style.display = 'none';
+    if (modeParam === 'tutorial') {
+      if (pageBackLink) {
+        pageBackLink.hidden = true;
+        pageBackLink.style.display = 'none';
+      }
+      if (btnBackToLineup) btnBackToLineup.style.display = 'none';
+      if (btnCancel) btnCancel.style.display = 'none';
+      if (btnSaveGamePlan) btnSaveGamePlan.style.display = 'none';
+      const btnRow = (root && root.querySelector('.button-container')) || document.querySelector('.button-container');
+      if (btnRow) {
+        btnRow.style.display = 'flex';
+        btnRow.style.justifyContent = 'center';
+      }
     }
-    if (btnBackToLineup) btnBackToLineup.style.display = 'none';
-    if (btnCancel) btnCancel.style.display = 'none';
-    if (btnSaveGamePlan) btnSaveGamePlan.style.display = 'none';
-    // PLAY NOW is now the row's only child — centre it.
-    const btnRow = document.querySelector('.button-container');
-    if (btnRow) {
-      btnRow.style.display = 'flex';
-      btnRow.style.justifyContent = 'center';
-    }
-  }
 
-  // ✅ TASK 0: Save Game Plan button (only button that saves to DB)
-  if (btnSaveGamePlan) {
-    console.log('🔍 [GAME-PLAN] init() - btnSaveGamePlan found, adding click listener');
-    btnSaveGamePlan.addEventListener('click', () => {
-      console.log('🚀 [GAME-PLAN] btnSaveGamePlan CLICKED! About to call saveGamePlan()');
-      playSound('confirm-2-lowervol.wav');
-      saveGamePlan();
-    });
-  } else {
-    console.error('❌ [GAME-PLAN] init() - btnSaveGamePlan NOT FOUND!');
-  }
-  
-  if (btnCancel) {
-    btnCancel.addEventListener('click', navigateToCommandCenter);
-  }
-  
-  if (modalClose) {
-    modalClose.addEventListener('click', hideModal);
+    if (btnSaveGamePlan) {
+      btnSaveGamePlan.addEventListener('click', () => {
+        playSound('confirm-2-lowervol.wav');
+        saveGamePlan();
+      });
+      btnSaveGamePlan.setAttribute('data-wired', '1');
+    }
+    if (btnCancel) {
+      btnCancel.addEventListener('click', navigateToCommandCenter);
+    }
+    if (modalClose) {
+      modalClose.addEventListener('click', hideModal);
+    }
   }
 
   placeGamePlanTools();
+  await loadSettings();
+  return { revalidate: revalidate, unmount: teardown };
 }
 
-window.initGamePlan = initGamePlan;
-document.addEventListener('DOMContentLoaded', initGamePlan);
+function shellHtml() {
+  return (
+    '<div class="resource-page-container fcc-brand-page-shell">\n    <div class="game-plan-page-header-wrap">\n      <a id="game-plan-back-link" class="back-to-locker-room brand-back-link game-plan-back-link" href="#" hidden>Back to Locker Room</a>\n    </div>\n\n    <section class="fcc-data-card game-plan-card">\n      <div class="fcc-data-card-body game-plan-card-body">\n        <header class="game-plan-page-header">\n          <h1 id="page-title">Set Your Game Plan</h1>\n          <p id="tutorial-readonly-subhead" class="tutorial-readonly-subhead" hidden>Read-only for onboarding game.</p>\n        </header>\n        <div class="button-container">\n          <button type="button" id="btn-back-to-lineup" class="btn btn-secondary" style="display: none;">Back To Lineup</button>\n          <button type="button" id="btn-cancel" class="btn btn-secondary" style="display: none;">Cancel</button>\n          <button type="button" id="btn-save-game-plan" class="btn btn-o btn-save-game-plan">Save Game Plan</button>\n        </div>\n        <div class="gpc cols2">\n          <section aria-label="Offense">\n            <div class="gpr">\n              <div class="gpr-n"><b>Offense</b><span data-effect="offense"></span></div>\n              <div class="gt strategy-slider" id="slider-offense" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Offense">\n                <i class="gt-r"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <span class="gt-l a">100% Motion</span>\n                <span class="gt-l b on">50/50</span>\n                <span class="gt-l c">100% Set Plays</span>\n                <span class="slider-value" id="value-offense" hidden>2</span>\n              </div>\n            </div>\n            <!-- Shot diet: Inside / Attack / Outside share touches. The tip and the\n                 offense-not-all-Never modal are unchanged. -->\n            <div class="nest" id="shot-diet-nest">\n              <div class="nest-h">\n                <span class="eb">Shot diet</span>\n                <button type="button" class="slider-nest__info"\n                        aria-label="About the shot diet sliders"\n                        aria-describedby="shot-diet-tip">i</button>\n                <span id="shot-diet-tip" hidden>These three share touches — raise one, the others compete.</span>\n              </div>\n              <div class="gpr">\n                <div class="gpr-n"><b>Inside Offense</b><span data-effect="inside"></span></div>\n                <div class="gt strategy-slider" id="slider-inside" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Inside Offense">\n                  <i class="gt-r"></i>\n                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                  <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                  <span class="gt-l a">Never</span>\n                  <span class="gt-l b on">Normal</span>\n                  <span class="gt-l c">Most</span>\n                  <span class="slider-value" id="value-inside" hidden>2</span>\n                </div>\n              </div>\n              <div class="gpr">\n                <div class="gpr-n"><b>Attack Offense</b><span data-effect="attack"></span></div>\n                <div class="gt strategy-slider" id="slider-attack" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Attack Offense">\n                  <i class="gt-r"></i>\n                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                  <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                  <span class="gt-l a">Never</span>\n                  <span class="gt-l b on">Normal</span>\n                  <span class="gt-l c">Most</span>\n                  <span class="slider-value" id="value-attack" hidden>2</span>\n                </div>\n              </div>\n              <div class="gpr">\n                <div class="gpr-n"><b>Outside Offense</b><span data-effect="outside"></span></div>\n                <div class="gt strategy-slider" id="slider-outside" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Outside Offense">\n                  <i class="gt-r"></i>\n                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                  <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                  <span class="gt-l a">Never</span>\n                  <span class="gt-l b on">Normal</span>\n                  <span class="gt-l c">Most</span>\n                  <span class="slider-value" id="value-outside" hidden>2</span>\n                </div>\n              </div>\n            </div>\n            <span class="eb grp-h">Execution</span>\n            <div class="gpr">\n              <div class="gpr-n"><b>Offense Tempo</b><span data-effect="tempo"></span></div>\n              <div class="gt strategy-slider" id="slider-tempo" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Offense Tempo">\n                <i class="gt-r"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <span class="gt-l a">Slow</span>\n                <span class="gt-l b on">Normal</span>\n                <span class="gt-l c">Fast</span>\n                <span class="slider-value" id="value-tempo" hidden>2</span>\n              </div>\n            </div>\n            <div class="gpr">\n              <div class="gpr-n"><b>Play Alteration</b><span data-effect="alterations"></span></div>\n              <div class="gt strategy-slider" id="slider-alterations" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Play Alteration">\n                <i class="gt-r"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <span class="gt-l a">Least</span>\n                <span class="gt-l b on">Normal</span>\n                <span class="gt-l c">Most</span>\n                <span class="slider-value" id="value-alterations" hidden>2</span>\n              </div>\n            </div>\n          </section>\n          <section aria-label="Defense">\n            <div class="gpr">\n              <div class="gpr-n"><b>Defense</b><span data-effect="defense"></span></div>\n              <div class="gt strategy-slider" id="slider-defense" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Defense">\n                <i class="gt-r"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <span class="gt-l a">100% Man</span>\n                <span class="gt-l b on">50/50</span>\n                <span class="gt-l c">100% Zone</span>\n                <span class="slider-value" id="value-defense" hidden>2</span>\n              </div>\n            </div>\n            <div class="gpr">\n              <div class="gpr-n"><b>Aggression</b><span data-effect="aggression"></span></div>\n              <div class="gt strategy-slider" id="slider-aggression" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Aggression">\n                <i class="gt-r"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <span class="gt-l a">Passive</span>\n                <span class="gt-l b on">Normal</span>\n                <span class="gt-l c">Aggressive</span>\n                <span class="slider-value" id="value-aggression" hidden>2</span>\n              </div>\n            </div>\n            <div class="gpr">\n              <div class="gpr-n"><b>Half-Court Trap</b><span data-effect="hc_trap"></span></div>\n              <div class="gt strategy-slider" id="slider-hc-trap" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Half-Court Trap">\n                <i class="gt-r"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <span class="gt-l a">Never</span>\n                <span class="gt-l b on">Normal</span>\n                <span class="gt-l c">Most</span>\n                <span class="slider-value" id="value-hc-trap" hidden>2</span>\n              </div>\n            </div>\n            <div class="gpr">\n              <div class="gpr-n"><b>Full-Court Press</b><span data-effect="fc_press"></span></div>\n              <div class="gt strategy-slider" id="slider-fc-press" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Full-Court Press">\n                <i class="gt-r"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <span class="gt-l a">Never</span>\n                <span class="gt-l b on">Normal</span>\n                <span class="gt-l c">Most</span>\n                <span class="slider-value" id="value-fc-press" hidden>2</span>\n              </div>\n            </div>\n            <span class="eb grp-h grp-h-trans">Transition</span>\n            <div class="gpr">\n              <div class="gpr-n"><b>Fast Break</b><span data-effect="fast_breaks"></span></div>\n              <div class="gt strategy-slider" id="slider-fast_breaks" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Fast Break">\n                <i class="gt-r"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <span class="gt-l a">100% Half-Court Sets</span>\n                <span class="gt-l b on">50/50</span>\n                <span class="gt-l c">100% Fast Breaks</span>\n                <span class="slider-value" id="value-fast_breaks" hidden>2</span>\n              </div>\n            </div>\n            <div class="gpr">\n              <div class="gpr-n"><b>Offensive Rebounding</b><span data-effect="rebounding"></span></div>\n              <div class="gt strategy-slider" id="slider-rebounding" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Offensive Rebounding">\n                <i class="gt-r"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>\n                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>\n                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>\n                <span class="gt-l a">100% Crash the Boards</span>\n                <span class="gt-l b on">50/50</span>\n                <span class="gt-l c">100% Get Back on D</span>\n                <span class="slider-value" id="value-rebounding" hidden>2</span>\n              </div>\n            </div>\n          </section>\n        </div>\n      </div>\n    </section>\n  </div>\n\n  <!-- Validation Modal -->\n  <div id="validation-modal" class="modal" hidden>\n    <div class="modal-content">\n      <h2>Invalid Game Plan</h2>\n      <p id="modal-message">At least one Offense setting must be above \'Never\'. Please increase any Offense slider.</p>\n      <button id="modal-close" class="btn btn-primary">OK</button>\n    </div>\n  </div>'
+  );
+}
+
+export { init, teardown, revalidate, shellHtml };
+window.initGamePlan = function (host, options) { return init(host || document.body, options); };
