@@ -16,6 +16,7 @@ const {
   defaultAudioState,
   normalizeAudioState,
   outputVolume,
+  playSfx,
   resetAudioStateForTests,
   setChannelLevel,
   setChannelMuted,
@@ -96,4 +97,53 @@ test('setters persist under one key and round-trip', () => {
   assert.equal(again.master.level, 100);
   delete global.localStorage;
   resetAudioStateForTests(null);
+});
+
+function installFakeAudio() {
+  const plays = [];
+  global.Audio = class FakeAudio {
+    constructor(src) {
+      this.src = src || '';
+      this.volume = 1;
+      this.currentTime = 0;
+    }
+    play() {
+      plays.push(this.src);
+      return Promise.resolve();
+    }
+    pause() {}
+    addEventListener() {}
+    removeEventListener() {}
+  };
+  return plays;
+}
+
+test('playSfx does not construct a player when sfx is muted or master is 0', () => {
+  const plays = installFakeAudio();
+  resetAudioStateForTests({
+    master: { level: 100, muted: false },
+    music: { level: 100, muted: false },
+    sfx: { level: 100, muted: true },
+    ambience: { level: 100, muted: false },
+  });
+  playSfx('SFX_SELECT');
+  assert.equal(plays.length, 0);
+  resetAudioStateForTests({
+    master: { level: 0, muted: false },
+    music: { level: 100, muted: false },
+    sfx: { level: 100, muted: false },
+    ambience: { level: 100, muted: false },
+  });
+  playSfx('SFX_ADVANCE');
+  assert.equal(plays.length, 0);
+  delete global.Audio;
+  resetAudioStateForTests(null);
+});
+
+test('playSfx ignores an unknown name and does not throw', () => {
+  const plays = installFakeAudio();
+  resetAudioStateForTests(null);
+  assert.doesNotThrow(() => playSfx('NOT_A_SOUND'));
+  assert.equal(plays.length, 0);
+  delete global.Audio;
 });

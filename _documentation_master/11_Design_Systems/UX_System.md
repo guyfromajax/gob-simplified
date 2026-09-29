@@ -8,6 +8,7 @@ Version 1. How to build franchise screens. The look lives in [Styleguide.md](Sty
 - One green Advance per screen. It is the only control that uses the advance color. A blocking task becomes the Advance button (same id, same `updatePlayButton` state machine, same labels and routes). There is no disabled-with-lock state and no hint link.
 - No spinners. A click that leaves the page switches Advance to the loading look immediately (`is-loading`, label `STARTING…`) and ignores repeat clicks.
 - Blue belongs to RT. Do not use the rating blue for chrome, links, or navigation.
+- Reward gold (`--reward-gold`) is only for milestone and season-peak reward tiers and exceptional stat gains. It is never for buttons, Advance (green), "yours" (navy), choice controls, or everyday / weekly reward tiers. `--reward-gold-12` / `--reward-gold-24` and `--shadow-reward` sit next to it. The hex is a placeholder until the Chapter 7 Claude Design handoff; do not paint screens with it until that handoff lands.
 - Live gameplay has no shell. The court never mounts `.app`, `.top`, or `.rail`.
 - Navigation is two levels: a rail section, then a sub-tab. Do not add a third level.
 - Attribute digits stay on the first-digit scale (`attributeDisplay.js`). Player RT stays a letter grade (`rtBucket.js`).
@@ -32,9 +33,11 @@ Shell rules that must not restyle existing franchise cards live in `FrontEnd/sta
 
 Persisted in `localStorage` under `gob_audio_v1` (`AUDIO_STORAGE_KEY`). The same record works online and in the offline desktop build.
 
-`playSfx(filename, baseVolume)` plays one file on the `sfx` channel. `baseVolume` defaults to `0.7`. Named files: `SFX_SELECT` (`click-tiny.wav`), `SFX_ADVANCE` (`confirm-1-lowervol.wav`), `SFX_COMMIT` (`click-beep.wav`).
+`playSfx(name, baseVolume)` plays one named sound on the `sfx` channel. `baseVolume` defaults to `0.7`. It still accepts a raw filename so existing callers keep working. Named catalog: `SFX_SELECT` (`click-tiny.wav`), `SFX_ADVANCE` (`confirm-1-lowervol.wav`), `SFX_COMMIT` (`click-beep.wav`), `STING_WIN` (`sting-win.mp3`), `STING_MILESTONE` (`sting-milestone.mp3`), `STING_SEASON_PEAK` (`sting-season-peak.mp3`). Short UI sounds may overlap. A new sting stops the previous sting. A missing file fails silently (one `console.debug` per name) and must not throw or block a modal or navigation.
 
-Routed today: `playSfx` callers (rail, sub-tabs, the shared tab strip) and the court sound control (`courtAudio.js`), which mirrors master / music / sfx into this bus. Advance on the franchise page keeps its existing confirm sound in the page click handler.
+One delegated click listener per document plays `data-sfx="<name>"` on buttons, links, and `[role="tab"]`. Unknown names are ignored. The top-bar Advance (`#play-now`) uses `data-sfx="SFX_ADVANCE"` and must not also call `playSfx` from its click handler.
+
+Routed today: `playSfx` callers (rail, sub-tabs, the shared tab strip), `data-sfx` on Advance, the championship-moment season-peak sting, and the court sound control (`courtAudio.js`), which mirrors master / music / sfx into this bus.
 
 Not routed: any player that constructs `Audio()` itself and never calls `playSfx` or the court bus. Leave those until that caller is moved onto the bus. Do not add a second volume store.
 
