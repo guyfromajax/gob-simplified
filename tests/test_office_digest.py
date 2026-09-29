@@ -1,6 +1,7 @@
 """Office digest: week snapshot, read-time sections, and the last-game query."""
 
 from bson import ObjectId
+import pytest
 
 from BackEnd.utils.office_digest import (
     LAST_GAME_PROJECTION,
@@ -362,6 +363,23 @@ def test_result_win_uses_potg_and_loss_uses_team_leader():
     assert lost["result"]["leader"]["name"] == "Star"
     assert lost["result"]["leader"]["stats"]["pts"] == 28
     assert lost["result"]["headline"] == "Chapel Hill falls"
+
+
+def test_result_carries_a_stable_key_per_result():
+    """The client plays the weekly entrance once per result; the id is the game's."""
+    digest = build_office_digest(_ctx())
+    assert digest["result"]["result_key"] == "g-18"
+    assert digest["result"]["result_key"] == digest["result"]["box_score"]["params"]["game_id"]
+
+    no_id = dict(_ctx()["last_game"])
+    no_id.pop("game_id")
+    assert build_office_digest(_ctx(last_game=no_id))["result"]["result_key"] is None
+
+
+def test_the_folded_moment_slots_are_present_and_empty_by_default():
+    digest = build_office_digest(_ctx())
+    assert digest["also"] is None
+    assert digest["weekly_card_items"] == []
 
 
 def test_streak_attribute_changes_and_next_game_absences():
@@ -753,3 +771,46 @@ def test_conference_standings_and_opponent_place_match_standings_api(monkeypatch
     }))
     assert missing["next_game"]["conference_position"] is None
     assert missing["next_game"]["conference_size"] is None
+
+
+def _store_env_for(kind, tmp_path):
+    from tests.test_persistence_adapter import _mongomock_env
+
+    if kind == "mongo":
+        return _mongomock_env(tmp_path)
+    return _mongomock_env(
+        tmp_path,
+        GOB_PERSISTENCE="sqlite",
+        GOB_SQLITE_PATH=str(tmp_path / "office-digest.sqlite"),
+    )
+
+
+@pytest.mark.parametrize("kind", ["mongo", "sqlite"])
+def test_exceptional_flag_and_result_key_survive_both_stores(kind, tmp_path):
+    """The training report round-trips through the store before the flag is derived."""
+    from BackEnd.persistence import create_store
+
+    store = create_store(_store_env_for(kind, tmp_path))
+    franchise_id = ObjectId()
+    store.franchises_collection.insert_one({
+        **_franchise(_id=franchise_id),
+        "latest_training": {
+            "week": 14,
+            "player_logs": {"Ada Hall": {"SC": 6.5, "SH": 1.0}},
+            "player_attribute_display_movements": {
+                "p1": {"name": "Ada Hall", "SC": {"from": 6, "to": 7}, "SH": {"from": 5, "to": 6}},
+            },
+        },
+    })
+
+    stored = store.franchises_collection.find_one({"_id": franchise_id})
+    digest = build_office_digest(_ctx(
+        franchise_doc=stored,
+        training_report=stored.get("latest_training"),
+    ))
+
+    changes = digest["what_moved"]["attribute_changes"]
+    assert [(row["attribute"], row.get("exceptional")) for row in changes] == [
+        ("SC", True), ("SH", None),
+    ]
+    assert digest["result"]["result_key"] == "g-18"

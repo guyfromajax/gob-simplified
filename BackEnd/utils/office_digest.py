@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping, Optional
 
 from bson import ObjectId
 
+from BackEnd.utils.attribute_gain import exceptional_attributes
 from BackEnd.utils.franchise_standings import (
     calculate_franchise_standings,
     standings_display_sort_key,
@@ -564,12 +565,18 @@ def record_and_streak(results: Mapping[str, Any], user_team_id: str, standings: 
 
 
 def attribute_changes_from_report(report: Mapping[str, Any] | None) -> list[dict[str, Any]]:
-    """Display-scale from/to rows. Legacy name-keyed direction maps have no from/to and are skipped."""
+    """Display-scale from/to rows. Legacy name-keyed direction maps have no from/to and are skipped.
+
+    ``exceptional`` is added only on the rows that clear the report week's raw gain
+    threshold (``attribute_gain``), so the weekly card's one gold marker comes from
+    the server. The key is absent rather than false.
+    """
     if not isinstance(report, dict):
         return []
     movements = report.get("player_attribute_display_movements")
     if not isinstance(movements, dict):
         return []
+    exceptional = exceptional_attributes(report)
     rows: list[dict[str, Any]] = []
     for key, entry in movements.items():
         if not isinstance(entry, dict):
@@ -584,13 +591,16 @@ def attribute_changes_from_report(report: Mapping[str, Any] | None) -> list[dict
                 continue
             if "from" not in cell or "to" not in cell:
                 continue
-            rows.append({
+            row: dict[str, Any] = {
                 "player_id": player_id,
                 "name": name if isinstance(name, str) else None,
                 "attribute": str(attr),
                 "from": cell.get("from"),
                 "to": cell.get("to"),
-            })
+            }
+            if (str(name or ""), str(attr)) in exceptional:
+                row["exceptional"] = True
+            rows.append(row)
     rows.sort(key=lambda row: (str(row.get("name") or ""), str(row.get("player_id")), str(row.get("attribute"))))
     return rows
 
@@ -1168,6 +1178,10 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
             role = "team_leader"
         game_id = last.get("game_id")
         result = {
+            # Stable per result, so the client can play the weekly entrance once and
+            # then show the final state. "Seen" is the client's own local state; the
+            # server stores none.
+            "result_key": str(game_id) if game_id else None,
             "week": last.get("week"),
             "home_team_id": home_id or None,
             "away_team_id": away_id or None,
@@ -1294,6 +1308,10 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
         "recruiting_wire": wire,
         "signing_day": signing,
         "season_preview": season_preview,
+        # The folded moment. The command-center load fills both from the moment
+        # queue; the shape stays stable for every other caller.
+        "also": None,
+        "weekly_card_items": [],
     }
 
 
