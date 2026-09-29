@@ -673,6 +673,16 @@
   }
 
   function showMoment(moment, options) {
+    if (window.SeasonPeak && typeof window.SeasonPeak.showTitle === 'function' && moment) {
+      return window.SeasonPeak.showTitle({
+        moments: [moment],
+        item: options && options.item,
+        queue: options && options.queue,
+        nextKind: options && options.nextKind,
+        boxScoreUrlBuilder: options && options.boxScoreUrlBuilder,
+        boxScoreUrl: options && options.boxScoreUrl,
+      });
+    }
     return new Promise((resolve) => {
       if (!moment || !moment.type) {
         resolve();
@@ -783,6 +793,22 @@
 
   async function processPendingMoments(franchiseId, moments, options) {
     if (!Array.isArray(moments) || !moments.length) return;
+    // Several championships in one visit → one .pk takeover, then consume each id.
+    if (window.SeasonPeak && typeof window.SeasonPeak.showTitle === 'function') {
+      await window.SeasonPeak.showTitle({
+        moments: moments,
+        item: options && options.item,
+        queue: options && options.queue,
+        nextKind: options && options.nextKind,
+        boxScoreUrlBuilder: options && options.boxScoreUrlBuilder,
+        boxScoreUrl: options && options.boxScoreUrl,
+      });
+      for (const moment of moments) {
+        // eslint-disable-next-line no-await-in-loop
+        await dismissOnServer(franchiseId, moment.id);
+      }
+      return;
+    }
     for (const moment of moments) {
       // Each call awaits user dismissal before showing the next.
       // For "primary" action we navigate away; navigation kills the loop naturally.

@@ -322,9 +322,11 @@ test.describe('career strip', () => {
     await expectNothingBelowTheFold(page);
   });
 
-  test('the Trophy Case entry stays behind its flag', async ({ page }) => {
+  test('the Trophy Case entry routes to the standalone page', async ({ page }) => {
     await openHomeBase(page, { programs: 2 });
-    await expect(page.locator('[data-hb-trophy-case]')).toHaveCount(0);
+    const link = page.locator('[data-hb-trophy-case]');
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute('href', '/trophy-case.html');
   });
 
   test('desktop shows the offline career zone in place of the left-zone strip', async ({ page }) => {

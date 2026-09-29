@@ -1,7 +1,8 @@
 /**
  * Client player for the server-owned Office moment queue (UX_System §10).
- * MILESTONE kinds use MilestoneModal. Championship stays on ChampionshipMoments.
- * season_review waits for the season-peak PR. WEEKLY kinds stay cards.
+ * MILESTONE kinds use MilestoneModal. Championship + season_review use SeasonPeak
+ * (one title takeover for every championship in the visit, then the review).
+ * WEEKLY kinds stay cards.
  */
 (function (global) {
   'use strict';
@@ -104,14 +105,53 @@
     if (!Array.isArray(list) || !list.length || !global.ChampionshipMoments) {
       return Promise.resolve();
     }
+    var listAll = ctx.list || [];
+    var next = listAll[(ctx.queue && ctx.queue.index) || 1];
     return global.ChampionshipMoments.processPendingMoments(
-      global.franchiseId,
+      (topData && topData.franchise_id) || global.franchiseId,
       list,
       {
         boxScoreUrlBuilder: ctx.boxScoreUrlBuilder,
-        queueLabel: queueLabel(ctx.queue, 'Championship'),
+        queue: ctx.queue,
+        item: moment,
+        nextKind: next && next.kind,
       }
     );
+  }
+
+  function championshipsFromVisit(topData, list) {
+    var out = [];
+    (list || []).forEach(function (m) {
+      if (!m || m.kind !== 'championship') return;
+      var p = payload(topData, m);
+      if (Array.isArray(p)) out = out.concat(p);
+    });
+    return out;
+  }
+
+  function openSeasonReview(topData, moment, ctx) {
+    if (!global.SeasonPeak || typeof global.SeasonPeak.showReview !== 'function') {
+      return Promise.resolve();
+    }
+    var data = payload(topData, moment);
+    if (!data || data.eligible === false) return Promise.resolve();
+    var fid = (topData && topData.franchise_id) || global.franchiseId || '';
+    var champs = championshipsFromVisit(topData, ctx.list);
+    var color = '';
+    champs.forEach(function (m) {
+      if (!color && m && m.winner_primary_color) color = m.winner_primary_color;
+    });
+    return global.SeasonPeak.showReview({
+      payload: data,
+      titleMoments: champs,
+      item: moment,
+      queue: ctx.queue,
+      teamName: (topData && (topData.team || topData.user_team_name)) || '',
+      teamColor: color,
+      season: data.season || (topData && (topData.season || topData.current_season))
+    }).then(function () {
+      return Promise.resolve(markMilestoneSeen('season_review', fid, data));
+    });
   }
 
   function openBigNews(kind, topData, moment, ctx) {
@@ -176,7 +216,7 @@
   function openOne(topData, moment, ctx) {
     var kind = moment && moment.kind;
     if (kind === 'championship') return openChampionship(topData, moment, ctx);
-    if (kind === 'season_review') return Promise.resolve();
+    if (kind === 'season_review') return openSeasonReview(topData, moment, ctx);
     if (MILESTONE_KINDS[kind]) return openMilestone(topData, moment, ctx);
     if (kind === 'bracket_update') return openBigNews(kind, topData, moment, ctx);
     if (kind === 'archetype_evolution') return openArchetype(topData, moment, ctx);
