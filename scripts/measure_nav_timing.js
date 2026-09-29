@@ -679,6 +679,29 @@ async function timingSequence(browser, profile, capture) {
       }
     }
   }
+  if (want('training-report-view')) {
+    const reportDone = '#training-report-view .training-notes-brief, #training-report-view .notes-placeholder';
+    for (const phase of ['cold', 'warm']) {
+      try {
+        await railTo(page, 'office', OFFICE_DONE);
+        const href = fccUrl(f, {
+          tab: 'training-report-view', week: '1', from: 'office', origin: 'office', mode: 'franchise',
+        });
+        await page.evaluate((url) => {
+          let a = document.getElementById('__time-training-report');
+          if (!a) {
+            a = document.createElement('a');
+            a.id = '__time-training-report';
+            document.body.appendChild(a);
+          }
+          a.href = url;
+        }, href);
+        put('training-report-view', phase, await shot('training-report-view', phase, () => (
+          timeInPage(page, '#__time-training-report', reportDone, 'training-report-view')
+        )));
+      } catch (err) { await recover('training-report-view', phase, err); }
+    }
+  }
   if (want('home-tab')) try {
     await railTo(page, 'team', SECTIONS[0].views[0].done);
     put('home-tab', 'warm', await shot('home-tab', 'warm', () => timeInPage(page, officeClick, OFFICE_DONE, 'home-tab')));

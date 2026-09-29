@@ -254,7 +254,7 @@ def test_dispatches_interleave_into_the_week_cards():
 def test_a_shared_report_link_still_has_its_back_button():
     """Links already out in the wild carry from=inbox; the tab they named is gone, but the
     Back button must still work and must now return to News."""
-    assert "_reportFromRaw === 'news' || _reportFromRaw === 'inbox'" in REPORT_JS
+    assert "fromRaw === 'news' || fromRaw === 'inbox'" in REPORT_JS
     assert "tab: 'news-view'" in REPORT_JS
     assert "tutorials-tab" not in REPORT_JS
 
