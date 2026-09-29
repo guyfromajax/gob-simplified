@@ -14,9 +14,13 @@ from typing import Any, Callable
 from bson import ObjectId
 from fastapi import HTTPException
 
-from BackEnd.db import db, franchise_team_data_collection
+from BackEnd.persistence import get_store
 from BackEnd.utils.franchise_standings import calculate_franchise_standings
 from BackEnd.utils.franchise_team_display import get_team_builder_overlay, resolve_team_display
+
+_store = get_store()
+db = _store.db
+franchise_team_data_collection = _store.franchise_team_data_collection
 
 _WEEK_MIN = 1
 _WEEK_MAX = 34

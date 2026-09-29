@@ -19,9 +19,9 @@ LAST_PLAYED_FIELD = "last_played_at"
 
 
 def franchise_collection():
-    from BackEnd.db import db
+    from BackEnd.persistence import get_store
 
-    return db.franchises
+    return get_store().franchises_collection
 
 
 def _key(franchise_id: Any) -> Any:
