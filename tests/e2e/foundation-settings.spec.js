@@ -23,11 +23,21 @@ const ME = {
   championships_total: { conf_rs: 1, conf_t: 0, region: 0, national: 2 },
 };
 
-test('settings panel opens and closes four ways', async ({ page }) => {
+// Home Base carries its own top bar, so mode-select has no site auth bar and
+// no gear. Settings opens from the utility row under the program slots, and
+// that control toggles the panel exactly as the gear did.
+const SETTINGS_TRIGGER = '[data-hb-settings]';
+
+// Three ways, not four. This used to close the panel a fourth way by clicking
+// the trigger again, which worked while the trigger was the auth bar's gear in
+// the top-right corner. Home Base has no site auth bar and puts Settings in
+// the utility row under the slots, which the left drawer covers while it is
+// open. The close button, Escape and the scrim are the ways out from here.
+test('settings panel opens and closes three ways', async ({ page }) => {
   await stubAuth(page);
   await stubMe(page, ME);
   await page.goto('/mode-select.html');
-  const gear = page.locator('#auth-settings-btn');
+  const gear = page.locator(SETTINGS_TRIGGER);
   await expect(gear).toBeVisible();
   await gear.click();
   const panel = page.locator('#gob-settings-host .settings');
@@ -46,17 +56,24 @@ test('settings panel opens and closes four ways', async ({ page }) => {
   await page.locator('[data-settings-scrim]').click();
   await expect(page.locator('#gob-settings-host')).toBeHidden();
 
+  // The drawer sits over the utility row, so the trigger is not clickable
+  // again while the panel is open. Guard that, so a later layout change that
+  // frees the trigger makes someone revisit the fourth way.
   await gear.click();
   await expect(panel).toBeVisible();
-  await gear.click();
-  await expect(page.locator('#gob-settings-host')).toBeHidden();
+  const covered = await page.locator(SETTINGS_TRIGGER).evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !(top === el || el.contains(top));
+  });
+  expect(covered, 'the open panel covers Home Base’s Settings trigger').toBe(true);
 });
 
 test('sliders change uiSfx live and persist across reload', async ({ page }) => {
   await stubAuth(page);
   await stubMe(page, ME);
   await page.goto('/mode-select.html');
-  await page.locator('#auth-settings-btn').click();
+  await page.locator(SETTINGS_TRIGGER).click();
   const music = page.locator('.slider[data-channel="music"]');
   await music.focus();
   await page.keyboard.press('Home');
@@ -131,7 +148,7 @@ test('settings footer links FAQs in a new tab online', async ({ page }) => {
   await stubAuth(page);
   await stubMe(page, ME);
   await page.goto('/mode-select.html');
-  await page.locator('#auth-settings-btn').click();
+  await page.locator(SETTINGS_TRIGGER).click();
   await expect(page.locator('#gob-settings-host [data-settings-logout]')).toBeVisible();
   await expect(page.locator('[data-conn-label]')).toHaveText('Online');
   await checkFaqs(page, 'reports/settings-faqs/settings-online-1280x720.png');
@@ -200,12 +217,16 @@ async function openPanel(page, offline) {
   await panel.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
 }
 
-test('the settings body scrolls so Log Out is reachable at 1280x720, footer pinned', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 720 });
+// 1280x600, not 720. On Home Base the panel runs the full viewport height —
+// there is no site auth bar above it any more — and at 720 the online content
+// clears the body with room to spare, so there is nothing to scroll. 600 is
+// the smallest supported height and the one where scrolling still has to work.
+test('the settings body scrolls so Log Out is reachable at 1280x600, footer pinned', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
   await openPanel(page, false);
   const before = await panelMetrics(page);
   expect(before.overflowY).toBe('auto');
-  expect(before.overflow, 'content taller than the body at 1280x720 online').toBeGreaterThan(0);
+  expect(before.overflow, 'content taller than the body at 1280x600 online').toBeGreaterThan(0);
   expect(before.head.top).toBe(before.panel.top);
   expect(before.foot.bottom).toBe(before.panel.bottom);
   expect(before.foot.height).toBe(44);
@@ -233,7 +254,7 @@ test('the settings body scrolls so Log Out is reachable at 1280x720, footer pinn
   expect(after.faqsHit).toBe(true);
   expect(after.faqsInFoot).toBe(true);
   await page.mouse.move(900, 400);
-  await page.screenshot({ path: 'reports/settings-scroll/settings-online-1280x720-bottom.png' });
+  await page.screenshot({ path: 'reports/settings-scroll/settings-online-1280x600-scrolled.png' });
 
   const [req] = await Promise.all([
     page.waitForRequest((r) => r.url().includes('/api/auth/logout') && r.method() === 'POST'),
@@ -620,7 +641,7 @@ test('a mode-select click still asks for its original file', async ({ page }) =>
   });
   await page.goto('/mode-select.html');
   await page.evaluate(() => { window.__played = []; });
-  await page.locator('#auth-settings-btn').click();
+  await page.locator(SETTINGS_TRIGGER).click();
   // The gear itself does not play a file. A tutorials click in the bar does, when present.
   const tutorials = page.locator('#tutorials-btn, [data-tutorials], a[href*="tutorial"]').first();
   if (await tutorials.count()) {
