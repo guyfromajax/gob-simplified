@@ -314,9 +314,17 @@ test.describe('milestone modal variants', () => {
     await expect(modal.getByText(/Oak Hollow/)).toBeVisible();
     await expect(modal.locator('.mm-go')).toContainText('Done');
     await expect(modal.locator('.mm-go kbd')).toHaveText('Enter');
+    await expect(modal.locator('.mq')).toHaveCount(0);
     await expect(page.locator('[class*="confetti"]')).toHaveCount(0);
+    const bracketLink = modal.locator('.mm-nx a.lnk');
+    await expect(bracketLink).toContainText('Full bracket');
+    const linkStyle = await bracketLink.evaluate((el) => getComputedStyle(el).textDecorationLine);
+    expect(linkStyle).toBe('none');
     await page.waitForTimeout(450);
     await page.screenshot({ path: path.join(SHOTS, 'bracket-reveal.png') });
+    const reviewShots = path.join(__dirname, '../../reports/review-record');
+    fs.mkdirSync(reviewShots, { recursive: true });
+    await page.screenshot({ path: path.join(reviewShots, 'bracket-reveal-single.png') });
   });
 
   test('walk_on_welcome renders the walk-ons', async ({ page }) => {
@@ -494,6 +502,25 @@ test('focus is trapped and returns to the page on close', async ({ page }) => {
   await expect(page.locator('.mm-x')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.locator('.mm-go')).toBeFocused();
+  const ring = await page.locator('.mm-go').evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { width: s.outlineWidth, style: s.outlineStyle, offset: s.outlineOffset };
+  });
+  expect(ring.width).toBe('2px');
+  expect(ring.style).toBe('solid');
+  expect(ring.offset).toBe('2px');
+  const reviewShots = path.join(__dirname, '../../reports/review-record');
+  fs.mkdirSync(reviewShots, { recursive: true });
+  const box = await page.locator('.mm-go').boundingBox();
+  await page.screenshot({
+    path: path.join(reviewShots, 'milestone-focus.png'),
+    clip: {
+      x: Math.max(0, box.x - 10),
+      y: Math.max(0, box.y - 10),
+      width: box.width + 20,
+      height: box.height + 20,
+    },
+  });
   await page.keyboard.press('Escape');
   await expect(page.locator('.mm-scrim.is-open')).toHaveCount(0);
   const back = await page.evaluate(() => {

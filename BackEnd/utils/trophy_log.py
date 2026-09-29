@@ -446,6 +446,45 @@ def record_first_archetype_milestone(franchise_doc: dict, archetype: str) -> boo
     )
 
 
+def title_trophies_for_season(franchise_doc: dict) -> list[dict]:
+    """Title trophies already on the coach for this franchise + current season.
+
+    Same source the Trophy Case review filters client-side from coach-career.
+    """
+    owner = franchise_doc.get("user_id") if isinstance(franchise_doc, dict) else None
+    fid = str((franchise_doc or {}).get("_id") or "")
+    try:
+        season_n = int((franchise_doc or {}).get("current_season") or 1)
+    except (TypeError, ValueError):
+        season_n = 1
+    if not owner or not fid:
+        return []
+    target = _coach_target(owner)
+    if target is None:
+        return []
+    coll, doc_id, _local = target
+    try:
+        doc = coll.find_one({"_id": doc_id}, {TROPHIES_FIELD: 1}) or {}
+    except Exception:
+        logger.exception("[TROPHY] title trophies read failed franchise_id=%s", fid)
+        return []
+    rows = []
+    for trophy in doc.get(TROPHIES_FIELD) or []:
+        if not isinstance(trophy, dict):
+            continue
+        if trophy.get("kind") not in TITLE_TROPHY_KINDS:
+            continue
+        if str(trophy.get("franchise_id") or "") != fid:
+            continue
+        try:
+            if int(trophy.get("season") or 0) != season_n:
+                continue
+        except (TypeError, ValueError):
+            continue
+        rows.append(trophy)
+    return trophies_newest_first(rows)
+
+
 def trophies_newest_first(raw: Any) -> list[dict]:
     """Season desc, then ``at`` desc; ``at`` serialised as ISO-8601 UTC."""
     epoch = datetime.min.replace(tzinfo=timezone.utc)

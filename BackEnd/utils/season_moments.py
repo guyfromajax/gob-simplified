@@ -206,10 +206,12 @@ def season_review_payload(
 ) -> Optional[dict[str, Any]]:
     """The end-of-season review, once the season's games are all played.
 
-    Reads the same snapshot ``finish_season`` stores on the ``season_record``
-    trophy, so the review a coach sees is the review that gets saved.
+    Reads the same ``season_record_detail`` ``finish_season`` stores on the
+    ``season_record`` trophy (wins/losses/conf_finish plus the snapshot), so
+    the live review and the stored review always match. Titles come from the
+    season's title trophies — the same list the Trophy Case review uses.
     """
-    from BackEnd.utils.career_data import season_review_snapshot
+    from BackEnd.utils.trophy_log import season_record_detail, title_trophies_for_season
 
     if not season_over or not isinstance(franchise_doc, Mapping):
         return None
@@ -217,11 +219,15 @@ def season_review_payload(
     if _int(seen_season) == season_n:
         return None
     try:
-        snapshot = season_review_snapshot(franchise_doc, team_id)
+        snapshot = season_record_detail(franchise_doc, team_id)
     except Exception:
         logger.exception("[MOMENTS] season review snapshot failed")
         return None
-    return {"eligible": True, "season": season_n, **snapshot}
+    payload = {"eligible": True, "season": season_n, **snapshot}
+    titles = title_trophies_for_season(franchise_doc)
+    if titles:
+        payload["titles"] = titles
+    return payload
 
 
 def signed_class_payload(

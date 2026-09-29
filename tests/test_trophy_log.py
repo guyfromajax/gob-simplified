@@ -370,6 +370,26 @@ def test_season_record_omits_fields_it_cannot_read(store, owner):
     assert _coach_doc(store, owner)["trophies"][0]["detail"] == {"wins": 0, "losses": 0}
 
 
+def test_live_review_matches_stored_season_record(store, owner):
+    """Live season_review and the stored season_record share one detail helper."""
+    from BackEnd.utils.season_moments import season_review_payload
+
+    doc, user_tid, cpu_tid = _seed(store, owner)
+    doc.update(_season_brackets(user_tid, cpu_tid))
+    tl.record_title_trophy(owner_user_id=owner, kind="national", franchise_id=doc["_id"])
+
+    live = season_review_payload(doc, user_tid, season_over=True)
+    assert live and live["eligible"] is True
+    tl.record_season_record_trophy(doc)
+    stored = next(
+        t for t in _coach_doc(store, owner)["trophies"] if t["kind"] == "season_record"
+    )["detail"]
+    assert live["wins"] == stored["wins"] == 2
+    assert live["losses"] == stored["losses"] == 1
+    assert live["conf_finish"] == stored["conf_finish"] == 2
+    assert [t["kind"] for t in live.get("titles") or []] == ["national"]
+
+
 def test_finish_season_writes_season_record_before_the_reset():
     src = inspect.getsource(franchise_routes.finish_season)
     write = src.index("record_season_record_trophy(franchise_doc)")

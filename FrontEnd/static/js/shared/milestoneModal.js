@@ -507,9 +507,13 @@
     if (kind === 'bracket_reveal' && payload && payload.eyebrow) {
       kick = String(payload.eyebrow).split('·')[0].trim() || meta.eyebrow;
     }
-    var dots = '';
-    for (var i = 1; i <= total; i++) {
-      dots += '<i' + (i === index ? ' class="on"' : '') + '></i>';
+    var mq = '';
+    if (total > 1) {
+      var dots = '';
+      for (var i = 1; i <= total; i++) {
+        dots += '<i' + (i === index ? ' class="on"' : '') + '></i>';
+      }
+      mq = '<div class="mq" aria-label="Moment ' + index + ' of ' + total + '">' + dots + '<span>' + index + ' of ' + total + '</span></div>';
     }
     var up = isLast
       ? (kind === 'first_archetype'
@@ -527,7 +531,7 @@
       '<div class="mm ' + (isGold ? 'is-gold' : 'is-quiet') + '" role="dialog" aria-modal="true" aria-labelledby="mm-t">'
       + '<div class="mm-h">'
       + '<div class="mm-k">' + esc(kick) + '</div>'
-      + '<div class="mq" aria-label="Moment ' + index + ' of ' + total + '">' + dots + '<span>' + index + ' of ' + total + '</span></div>'
+      + mq
       + '<button type="button" class="mm-x" aria-label="Close. Remaining moments wait for your next visit.">×</button>'
       + '</div>'
       + '<div class="mm-c"><div><h2 class="mm-t" id="mm-t">' + esc(titles.title) + '</h2><p class="mm-d">' + esc(titles.dek) + '</p></div>'

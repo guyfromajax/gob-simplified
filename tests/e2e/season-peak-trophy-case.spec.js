@@ -89,6 +89,12 @@ function championships() {
 function seasonReviewPayload() {
   return {
     eligible: true, season: 2, national_rank: 1, season_gp: 1860,
+    wins: 31, losses: 5, conf_finish: 1,
+    titles: [
+      { kind: 'national', season: 2, team_name: 'Lancaster' },
+      { kind: 'region', season: 2, team_name: 'Lancaster' },
+      { kind: 'conf_t', season: 2, team_name: 'Lancaster' },
+    ],
     best_players: [
       { name: 'Devin Park', position: 'PG', class_year: 'JR', all_american: 'all_american_1', stats: { ppg: 18.9, apg: 6.1, rpg: 4.4 } },
       { name: 'Isaiah Monroe', position: 'SF', class_year: 'SO', all_american: 'all_american_3', stats: { ppg: 15.2, rpg: 7.0, spg: 1.3 } },
@@ -421,9 +427,11 @@ test.describe('season peak review', () => {
     await page.locator('.pk-go').click();
     await expect(page.locator('.rv.is-open')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.rv .mq')).toContainText('2 of 2');
-    await expect(page.locator('.rv-rec')).toHaveCount(0);
+    await expect(page.locator('.rv-rec')).toContainText('31–5');
     await expect(page.locator('.rv-fin')).toContainText('#1');
+    await expect(page.locator('.rv-fin')).toContainText('1st');
     await expect(page.getByText('1 seed')).toHaveCount(0);
+    await expect(page.locator('.rv-t .tro')).toHaveCount(3);
     await expect(page.locator('.bp')).toHaveCount(3);
     await expect(page.locator('.aw')).toHaveCount(2);
     await expect(page.locator('.rv .rc')).toHaveCount(2);
@@ -431,6 +439,9 @@ test.describe('season peak review', () => {
     await expect.poll(() => page.evaluate(() => (window.__gobSeasonPeakSfx || []).filter((n) => n === 'STING_SEASON_PEAK').length)).toBe(1);
     await page.waitForTimeout(600);
     await page.screenshot({ path: path.join(SHOTS, 'peak-review-1280.png') });
+    const reviewShots = path.join(__dirname, '../../reports/review-record');
+    fs.mkdirSync(reviewShots, { recursive: true });
+    await page.screenshot({ path: path.join(reviewShots, 'peak-review-1280.png') });
     await page.locator('.rv-go').click();
     await expect(page.locator('.rv.is-open')).toHaveCount(0);
     expect(seen.some((s) => s.path.indexOf('season-review-seen') !== -1)).toBe(true);
@@ -455,8 +466,25 @@ test.describe('season peak review', () => {
     await expect(page.locator('.pk')).toHaveCount(0);
     await expect(page.locator('.rv.is-open')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.rv .mq')).toHaveCount(0);
+    await expect(page.locator('.rv-rec')).toContainText('31–5');
+    await expect(page.locator('.rv-fin')).toContainText('1st');
+    await expect(page.locator('.rv-t .tro')).toHaveCount(3);
     await page.locator('.rv-go').click();
     expect(seen.some((s) => s.path.indexOf('season-review-seen') !== -1)).toBe(true);
+  });
+
+  test('live review titles come from season trophies, not visit championships', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const data = visitTitleAndReview();
+    const payload = Object.assign({}, data.season_review);
+    delete payload.titles;
+    data.season_review = payload;
+    await openOffice(page, data);
+    await expect(page.locator('.pk.is-open')).toBeVisible({ timeout: 15000 });
+    await page.locator('.pk-go').click();
+    await expect(page.locator('.rv.is-open')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.rv-t .tro')).toHaveCount(0);
+    await expect(page.locator('.rv-rec')).toContainText('31–5');
   });
 });
 
