@@ -41,20 +41,34 @@ ALL_AMERICAN_KIND_BY_TEAM = {
     "third_team": "all_american_3",
 }
 SEASON_RECORD_KIND = "season_record"
+# Once per COACH, so the key carries neither franchise nor season.
+MILESTONE_KINDS = (
+    "milestone_first_signing_class",
+    "milestone_first_bracket",
+    "milestone_first_archetype",
+)
 TROPHY_KINDS = (
     *TITLE_TROPHY_KINDS,
     *ALL_AMERICAN_KIND_BY_TEAM.values(),
     SEASON_RECORD_KIND,
+    *MILESTONE_KINDS,
 )
 
 
 def trophy_key(
     franchise_id: Any, season: Any, kind: str, team_id: Any, player_id: Any = None
 ) -> str:
+    if kind in MILESTONE_KINDS:
+        return milestone_key(kind)
     parts = [str(franchise_id), str(int(season)), kind, str(team_id)]
     if player_id is not None and str(player_id):
         parts.append(str(player_id))
     return ":".join(parts)
+
+
+def milestone_key(kind: str) -> str:
+    """A milestone is a career first, so its key names neither program nor season."""
+    return f"coach:{kind}"
 
 
 def _storage_key(key: str) -> str:
@@ -330,6 +344,14 @@ def conference_finish(franchise_doc: dict, team_id: Any) -> Optional[int]:
 
 
 def season_record_detail(franchise_doc: dict, team_id: Any) -> dict:
+    """The season the review reads, snapshotted off the franchise before the reset.
+
+    Record, conference finish and furthest round come from the stored results and
+    brackets; the rest (final national rank, region seed, season Geek Points, best
+    players, signed class) from ``career_data``. Any field whose source is not on
+    this save is omitted.
+    """
+    from BackEnd.utils.career_data import season_review_snapshot
     from BackEnd.utils.franchise_standings import calculate_franchise_standings
 
     tid = str(team_id or "")
@@ -344,6 +366,12 @@ def season_record_detail(franchise_doc: dict, team_id: Any) -> dict:
     furthest = furthest_round_reached(franchise_doc, tid)
     if furthest is not None:
         detail["furthest_round"] = furthest
+    try:
+        detail.update(season_review_snapshot(franchise_doc, tid))
+    except Exception:
+        logger.exception(
+            "[TROPHY] season review snapshot failed franchise_id=%s", str(franchise_doc.get("_id"))
+        )
     return detail
 
 
@@ -360,6 +388,62 @@ def record_season_record_trophy(franchise_doc: dict) -> bool:
         detail=season_record_detail(franchise_doc, user_tid),
     )
     return append_trophy(owner, entry)
+
+
+def record_milestone(franchise_doc: dict, kind: str, detail: Optional[dict] = None) -> bool:
+    """Append a career-first milestone once per coach, through the same key guard."""
+    if kind not in MILESTONE_KINDS:
+        return False
+    owner = franchise_doc.get("user_id")
+    user_tid = franchise_doc.get("user_team_object_id")
+    if not owner or not user_tid:
+        return False
+    entry = build_trophy_entry(franchise_doc, kind=kind, team_id=user_tid, detail=detail)
+    return append_trophy(owner, entry)
+
+
+def record_first_signing_class_milestone(franchise_doc: dict, signed_players: Any) -> bool:
+    """First class signed — the user team's non-walk-on signings at week 35."""
+    user_tid = str(franchise_doc.get("user_team_object_id") or "")
+    signed = [
+        player
+        for player in (signed_players or [])
+        if isinstance(player, dict)
+        and not player.get("walk_on")
+        and str(player.get("team_id") or "") == user_tid
+    ]
+    if not signed:
+        return False
+    return record_milestone(
+        franchise_doc, "milestone_first_signing_class", detail={"signed": len(signed)}
+    )
+
+
+def record_first_bracket_milestone(franchise_doc: dict, conference_tournaments: Any) -> bool:
+    """First bracket — the user team appears in a conference bracket for the first time."""
+    tid = str(franchise_doc.get("user_team_object_id") or "")
+    if not tid:
+        return False
+    for conf in (conference_tournaments or {}).values():
+        bracket = (conf or {}).get("bracket") if isinstance(conf, dict) else None
+        if not isinstance(bracket, dict):
+            continue
+        for round_name in ("round1", "round2", "final"):
+            if _team_in_round(bracket.get(round_name), tid):
+                seed = conference_finish({"conference_tournaments": conference_tournaments}, tid)
+                detail = {"seed": seed} if seed is not None else None
+                return record_milestone(franchise_doc, "milestone_first_bracket", detail=detail)
+    return False
+
+
+def record_first_archetype_milestone(franchise_doc: dict, archetype: str) -> bool:
+    """First archetype — the coach's lead archetype is established for the first time."""
+    key = str(archetype or "").strip()
+    if not key:
+        return False
+    return record_milestone(
+        franchise_doc, "milestone_first_archetype", detail={"archetype": key}
+    )
 
 
 def trophies_newest_first(raw: Any) -> list[dict]:

@@ -7,10 +7,19 @@ from BackEnd.utils.franchise_last_played import (
     marks_last_played,
     most_recent_franchise_id,
 )
-from BackEnd.utils.local_coach import coach_career_payload, is_local_owner, local_coach_doc
+from BackEnd.utils.local_coach import (
+    coach_career_payload,
+    coach_fields,
+    is_local_owner,
+    local_coach_doc,
+)
+from BackEnd.utils.career_data import coach_career_extras
+from BackEnd.utils.franchise_geek_points import SEASON_GP_FIELD
 from BackEnd.utils.trophy_log import (
     TROPHIES_FIELD,
     record_all_american_trophies_if_missing,
+    record_first_bracket_milestone,
+    record_first_signing_class_milestone,
     record_season_record_trophy,
     trophies_newest_first,
 )
@@ -7299,6 +7308,8 @@ def _complete_week_process_user_game_block(
         week=req.week,
         eos_game_meta=eos_matchup_for_user,
         bulk_sim_used=bulk_sim_used,
+        franchise_id=franchise_doc.get("_id"),
+        season=franchise_doc.get("current_season"),
     )
     maybe_award_franchise_loss_geek_points(
         owner_user_id=franchise_doc.get("user_id"),
@@ -7308,6 +7319,8 @@ def _complete_week_process_user_game_block(
         week=req.week,
         eos_game_meta=eos_matchup_for_user,
         bulk_sim_used=bulk_sim_used,
+        franchise_id=franchise_doc.get("_id"),
+        season=franchise_doc.get("current_season"),
     )
     maybe_award_franchise_eos_title_championship(
         owner_user_id=franchise_doc.get("user_id"),
@@ -7972,6 +7985,12 @@ def _finalize_franchise_week_after_cpu_games(
             conference_tournaments=conference_tournaments,
             franchise_id=franchise_id,
         )
+        try:
+            record_first_bracket_milestone(franchise_doc, conference_tournaments)
+        except Exception:
+            logger.exception(
+                "[TROPHY] first-bracket milestone failed franchise_id=%s", franchise_id_str
+            )
         try:
             from BackEnd.utils.franchise_championship_moments import (
                 enqueue_trophy_spotlight_for_user_conference,
@@ -9847,6 +9866,11 @@ def get_coach_career(user: dict = Depends(get_current_user)):
 
     Loopback serves this for the local desktop coach (no /api/auth there); online it
     reads the same users fields /api/auth/me does.
+
+    Everything Home Base and the Trophy Case show is computed here: ``record.win_rate``,
+    career ``geek_points``, ``seasons_completed``, ``programs`` and ``top_seasons``
+    (which ranks in-progress seasons alongside finished ones). The client formats
+    them; it derives none of them.
     """
     uid = user.get("user_id")
     if is_local_owner(uid):
@@ -9861,12 +9885,33 @@ def get_coach_career(user: dict = Depends(get_current_user)):
                     "archetypes": 1,
                     "lead_archetype": 1,
                     "championships_total": 1,
+                    "geek_points": 1,
+                    SEASON_GP_FIELD: 1,
                     TROPHIES_FIELD: 1,
                 },
             ) or {}
         except Exception:
             doc = {}
-    return {**coach_career_payload(doc, user), "trophies": trophies_newest_first(doc.get(TROPHIES_FIELD))}
+    # Trophies survive a deleted program, so a live franchise only adds the
+    # in-progress season and its own program to the counts.
+    franchises = list(
+        db.franchises.find(
+            {"user_id": uid},
+            {
+                "user_team_id": 1,
+                "user_team_object_id": 1,
+                "current_season": 1,
+                "week": 1,
+                "results": 1,
+                "team_builder": 1,
+            },
+        )
+    )
+    return {
+        **coach_career_payload(doc, user),
+        **coach_career_extras(doc, franchises),
+        "trophies": trophies_newest_first(doc.get(TROPHIES_FIELD)),
+    }
 
 
 @router.get("/franchise/current")
@@ -10159,6 +10204,33 @@ def _build_office_digest_for_command_center(
         "roster_spots": roster_spots,
         "newcomers": newcomers,
     })
+
+
+def _coach_archetype_signals(user: dict | None) -> dict[str, Any]:
+    """Archetype fields the Office reads: pending evolution, lead key, reveal gate.
+
+    Online these ride the authenticated principal (they come from /api/auth/me).
+    The desktop principal has no users doc and loopback serves no /api/auth, so the
+    same three keys are read off the save's local_coach doc — where
+    ``commit_user_game_record`` writes ``lead_archetype`` and
+    ``record_archetype_change_if_any`` writes ``archetype_evolution_pending``.
+    That desktop read is projected to these three fields, so an Office load does
+    not pull the coach's whole career back.
+    """
+    user = user or {}
+    doc = user
+    if is_local_owner(user.get("user_id")):
+        doc = coach_fields(
+            user["user_id"],
+            "archetype_evolution_pending",
+            "lead_archetype",
+            "archetype_reveal_seen",
+        )
+    return {
+        "archetype_evolution_pending": str(doc.get("archetype_evolution_pending") or ""),
+        "lead_archetype": str(doc.get("lead_archetype") or ""),
+        "archetype_reveal_seen": bool(doc.get("archetype_reveal_seen")),
+    }
 
 
 @router.get("/franchise/command-center/data")
@@ -10791,6 +10863,11 @@ def command_center_data(
         )
         from BackEnd.utils.moment_queue import build_moment_queue
 
+        # /api/auth/me is not served on loopback, so the desktop coach's archetype
+        # signals come off the local_coach doc here. Online keeps reading the
+        # principal. Same three keys either way, so the moment queue and the
+        # first-archetype reveal read one shape.
+        archetype_signals = _coach_archetype_signals(user)
         queue = build_moment_queue(
             championship_moments=response.get("pending_championship_moments"),
             conference_rs_region_modal=response.get("conference_rs_region_modal"),
@@ -10799,14 +10876,12 @@ def command_center_data(
             recruit_visit_modal=response.get("recruit_visit_modal"),
             bracket_reveal_modal=response.get("bracket_reveal_modal"),
             bracket_update_modal=response.get("bracket_update_modal"),
-            archetype_evolution_pending=(user or {}).get("archetype_evolution_pending"),
+            archetype_evolution_pending=archetype_signals["archetype_evolution_pending"],
         )
         response["moments"] = queue["moments"]
         response["moments_for_this_visit"] = queue["moments_for_this_visit"]
         response["weekly_card_items"] = queue["weekly_card_items"]
-        response["archetype_evolution_pending"] = str(
-            (user or {}).get("archetype_evolution_pending") or ""
-        )
+        response.update(archetype_signals)
         response["recruiting_wire"] = _build_recruiting_wire_payload(
             franchise_doc, str(team_id) if team_id else None
         )
@@ -15938,6 +16013,11 @@ def run_week_35_recruiting(
         fold_browse_rev({"$set": update_fields}),
     )
 
+    try:
+        record_first_signing_class_milestone(franchise_doc, results.get("signed_players"))
+    except Exception:
+        logger.exception("[TROPHY] first-signing-class milestone failed franchise_id=%s", str(fid))
+
     # Warm the user's REGION portraits for the Signing Day reveal, off the request
     # thread. The reveal holds ~5s per card and a paint costs ~1.2s of CPU, so this
     # gets ahead of the playhead on the first card and stays ahead — while painting
@@ -18891,6 +18971,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                     winner_team_id=winner_id,
                     week=week,
                     eos_game_meta=g,
+                    franchise_id=franchise_doc.get("_id"),
+                    season=franchise_doc.get("current_season"),
                 )
                 maybe_award_franchise_loss_geek_points(
                     owner_user_id=franchise_doc.get("user_id"),
@@ -18899,6 +18981,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                     participant_team_ids=(aid, hid),
                     week=week,
                     eos_game_meta=g,
+                    franchise_id=franchise_doc.get("_id"),
+                    season=franchise_doc.get("current_season"),
                 )
                 maybe_award_franchise_eos_title_championship(
                     owner_user_id=franchise_doc.get("user_id"),
@@ -19082,6 +19166,8 @@ def sim_championship(req: SimChampionshipRequest):
             winner_team_id=winner_id,
             week=week,
             eos_game_meta={"phase": "national", "round": 3},
+            franchise_id=franchise_doc.get("_id"),
+            season=franchise_doc.get("current_season"),
         )
         maybe_award_franchise_loss_geek_points(
             owner_user_id=franchise_doc.get("user_id"),
@@ -19090,6 +19176,8 @@ def sim_championship(req: SimChampionshipRequest):
             participant_team_ids=(away_id, home_id),
             week=week,
             eos_game_meta={"phase": "national", "round": 3},
+            franchise_id=franchise_doc.get("_id"),
+            season=franchise_doc.get("current_season"),
         )
         maybe_award_franchise_eos_title_championship(
             owner_user_id=franchise_doc.get("user_id"),
