@@ -311,9 +311,16 @@ async function installApi(page, ccData, options) {
   });
 }
 
+// Home Base holds its branded loader over the page until the session check and
+// the slots are done, so the Enter button is only clickable once it lifts.
+async function enterFirstProgram(page) {
+  await expect(page.locator('#page-load-overlay')).toBeHidden({ timeout: 30000 });
+  await page.locator('[data-hb-enter]').first().click();
+}
+
 async function openLockerRoom(page) {
   await page.goto('/mode-select.html');
-  await page.locator('[data-action="enter-franchise"]').first().click();
+  await enterFirstProgram(page);
   await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
   await expect(page.locator('#play-now')).toBeEnabled({ timeout: 20000 });
 }
@@ -509,7 +516,7 @@ test('Enter Franchise gives the locker room its own step, and one Back returns t
     const state = history.state;
     return state && typeof state.gobIdx === 'number' ? state.gobIdx : null;
   });
-  await page.locator('[data-action="enter-franchise"]').first().click();
+  await enterFirstProgram(page);
   await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
   await page.waitForFunction(() => {
     const state = history.state;
@@ -577,7 +584,7 @@ test('recruiting and cut-players exits return to the locker room they started fr
     cut_count: 1,
   }));
   await page.goto('/mode-select.html');
-  await page.locator('[data-action="enter-franchise"]').first().click();
+  await enterFirstProgram(page);
   await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
   await expect(page.locator('#fcc-cut-required-close')).toBeVisible({ timeout: 20000 });
   await page.locator('#fcc-cut-required-close').click();
