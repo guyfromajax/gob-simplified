@@ -4,6 +4,7 @@ var CSS = [
   '/franchise-command-center.css',
   '/resource-pages.css',
   '/css/gob-buttons.css',
+  '/css/gob-toast.css',
   '/game-plan.css'
 ];
 
@@ -47,6 +48,10 @@ export function mount(host) {
     return loadScript('/js/shared/playbookTeamId.js');
   }).then(function () {
     return loadScript('/js/shared/timeoutNavigationHelper.js');
+  }).then(function () {
+    return loadScript('/js/shared/gobToast.js');
+  }).then(function () {
+    return loadScript('/js/shared/gobLeaveConfirm.js');
   }).then(function () {
     return loadIsolated('/game-plan.js');
   }).then(function () {

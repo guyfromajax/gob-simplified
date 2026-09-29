@@ -48,11 +48,6 @@
                 <p>Configure usage, focus, and Playcall Center order.</p>
               </div>
               <div id="playbooks-tools-row" class="playbooks-tools-row">
-                <div class="seg playbooks-tabs" id="playbooks-side-seg" role="tablist" aria-label="Playbook side">
-                  <button class="playbooks-tab on" type="button" role="tab" data-tab="offense" aria-selected="true">Offense</button>
-                  <button class="playbooks-tab" type="button" role="tab" data-tab="defense" aria-selected="false">Defense</button>
-                </div>
-                <span class="tl-div" aria-hidden="true"></span>
                 <div id="sections-ready-indicator" class="playbooks-sections-ready warn" aria-live="polite">
                   <span class="ck" aria-hidden="true"></span>
                   <span class="ready-copy bal"><b>0 of 2</b> flexible sections balanced</span>
@@ -75,8 +70,15 @@
                 </section>
 
                 <div id="shot-weights-live" class="psw playbooks-shot-weights-strip" aria-live="polite">
-                  <div class="psw-strip-label">Expected shot distribution <span class="psw-live-pill">LIVE</span></div>
+                  <div class="psw-strip-label">Expected shot distribution</div>
                   <p class="psw-unavailable">Loading shot weights…</p>
+                </div>
+
+                <div class="playbooks-side-row">
+                  <div class="seg playbooks-tabs" id="playbooks-side-seg" role="tablist" aria-label="Playbook side">
+                    <button class="playbooks-tab on" type="button" role="tab" data-tab="offense" aria-selected="true" aria-controls="pane-offense">Offense</button>
+                    <button class="playbooks-tab" type="button" role="tab" data-tab="defense" aria-selected="false" aria-controls="pane-defense">Defense</button>
+                  </div>
                 </div>
 
                 <div class="playbooks-tabpane on" data-pane="offense" id="pane-offense" role="tabpanel">

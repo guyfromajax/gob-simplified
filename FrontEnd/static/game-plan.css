@@ -878,3 +878,40 @@ html.gob-shell .nest .slider-nest__info:focus-visible {
 #game-plan-view .game-plan-page-header {
   display: none;
 }
+
+/* One track geometry for all twelve sliders. The title column is one density
+   width; the shot-diet nest gives back exactly its own inset, so every track
+   starts and ends at the same x in its column and both columns match. */
+html.gob-shell .gpc {
+  --gp-name-w: calc(var(--dsz-118) * 2 + var(--dsz-50));
+}
+
+html.gob-shell .gpc .gpr {
+  grid-template-columns: var(--gp-name-w) minmax(0, 1fr);
+  column-gap: var(--dsp-24);
+}
+
+html.gob-shell .gpc .nest .gpr {
+  grid-template-columns: calc(var(--gp-name-w) - var(--dsp-14)) minmax(0, 1fr);
+}
+
+/* Fixed height, so Transition can drop by exactly this much and line up with
+   Execution across the gutter. */
+html.gob-shell .gpc .nest-h {
+  box-sizing: border-box;
+  height: var(--dsz-30);
+  padding: var(--space-8) 0 0;
+}
+
+html.gob-shell .gpc .grp-h {
+  padding: var(--dsp-24) 0 var(--space-2);
+}
+
+html.gob-shell .gpc .grp-h-trans {
+  padding-top: calc(var(--dsp-24) + var(--dsz-30));
+}
+
+html.gob-shell .gpc .slider-nest__info:hover {
+  border-color: var(--white-50);
+  color: var(--text-100);
+}

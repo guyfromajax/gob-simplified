@@ -6,6 +6,7 @@ var CSS = [
   '/css/gob-buttons.css',
   '/css/playbook-cmd.css',
   '/css/playbook-tiles.css',
+  '/css/gob-toast.css',
   '/playbooks.css'
 ];
 
@@ -47,6 +48,10 @@ export function mount(host) {
     return loadScript('/js/shared/playbookTeamId.js');
   }).then(function () {
     return loadScript('/js/shared/timeoutNavigationHelper.js');
+  }).then(function () {
+    return loadScript('/js/shared/gobToast.js');
+  }).then(function () {
+    return loadScript('/js/shared/gobLeaveConfirm.js');
   }).then(function () {
     return loadIsolated('/playbooks.js');
   }).then(function () {
