@@ -1,4 +1,6 @@
-:root {
+/* Standalone page chrome only. In-app tokens live under #playbooks-view. */
+#playbooks-view,
+body.playbooks-page {
   --line: rgba(255, 214, 78, 0.18);
   --line-strong: rgba(255, 214, 78, 0.4);
   --text: #f4f2ec;
@@ -7,37 +9,34 @@
   --danger: #ff6767;
   --success: #34EC27;
   --shadow: 0 14px 38px rgba(0, 0, 0, 0.28);
-  /* CMD bands: see css/playbook-cmd.css (--cmd-*) */
   --eff-low: var(--cmd-low, #FFD700);
   --eff-mid: var(--cmd-mid, #34EC27);
   --eff-good: var(--cmd-good, #4A90D9);
 }
 
-* {
+body.playbooks-page,
+body.playbooks-page * {
   box-sizing: border-box;
 }
 
-html, body {
+body.playbooks-page {
   margin: 0;
   min-height: 100%;
-}
-
-body {
   font-family: 'Inter', sans-serif;
   background: #0b0d14;
   color: var(--text);
 }
 
-button,
-input,
-select {
+body.playbooks-page button,
+body.playbooks-page input,
+body.playbooks-page select {
   font: inherit;
 }
 
-button,
-input[type="button"],
-input[type="submit"],
-input[type="reset"] {
+body.playbooks-page button,
+body.playbooks-page input[type="button"],
+body.playbooks-page input[type="submit"],
+body.playbooks-page input[type="reset"] {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
@@ -761,7 +760,7 @@ input[type="reset"] {
   line-height: 1.3;
 }
 
-.toast {
+body.playbooks-page .toast {
   --toast-accent: #34EC27;
   position: fixed;
   right: 22px;
@@ -785,17 +784,17 @@ input[type="reset"] {
   transition: transform 220ms ease, opacity 220ms ease;
 }
 
-.toast.visible {
+body.playbooks-page .toast.visible {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(0);
 }
 
-.toast[hidden] {
+body.playbooks-page .toast[hidden] {
   display: none;
 }
 
-.toast-icon {
+body.playbooks-page .toast-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -807,16 +806,16 @@ input[type="reset"] {
   background: color-mix(in srgb, var(--toast-accent) 15%, transparent);
 }
 
-.toast-icon svg {
+body.playbooks-page .toast-icon svg {
   width: 11px;
   height: 11px;
 }
 
-.toast-copy {
+body.playbooks-page .toast-copy {
   min-width: 0;
 }
 
-.toast-title {
+body.playbooks-page .toast-title {
   color: #ffffff;
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
@@ -824,14 +823,14 @@ input[type="reset"] {
   line-height: 1;
 }
 
-.toast-subline {
+body.playbooks-page .toast-subline {
   margin-top: 4px;
   color: rgba(255, 255, 255, 0.54);
   font-size: 12px;
   line-height: 1.35;
 }
 
-.toast-dismiss {
+body.playbooks-page .toast-dismiss {
   appearance: none;
   border: 0;
   background: none;
@@ -844,7 +843,7 @@ input[type="reset"] {
   transition: color 0.18s ease;
 }
 
-.toast-dismiss:hover {
+body.playbooks-page .toast-dismiss:hover {
   color: #ffffff;
 }
 

@@ -262,6 +262,10 @@ test.describe('seed notice', () => {
   test('disappears once the player reorders', async ({ page }) => {
     await mount(page, SEEDED);
     expect(await page.evaluate(() => !!document.querySelector('#board-seed-notice'))).toBe(true);
+    // The seed Sammy ("Got It") sits over the first row. force:true still clicks
+    // whatever is on top, so dismiss it before the × is the real target.
+    const gotIt = page.getByRole('button', { name: /got it/i });
+    await gotIt.click({ timeout: 5000 }).catch(() => {});
     // Removing a row is an edit: the order is the player's now.
     await page.click('#hub-board .brow[data-index="0"] .bx', { force: true });
     await page.waitForFunction(() => !document.querySelector('#board-seed-notice'));
