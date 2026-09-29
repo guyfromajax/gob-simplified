@@ -807,7 +807,10 @@ try:
         away_rim_runner_player_id: str | None = None
     
     
-    ongoing_games: dict[str, GameManager] = {}
+    # Bounded (idle TTL + LRU cap) and evicted at final; see live_game_cache.
+    from BackEnd.utils.live_game_cache import LiveGameCache, evict_game as _evict_ongoing_game
+
+    ongoing_games: dict[str, GameManager] = LiveGameCache()
 
     BULK_SIM_ADVANCE_METHODS = {"sim_full_game", "sim_rest_of_game"}
     VALID_ADVANCE_METHODS = BULK_SIM_ADVANCE_METHODS | {"play_quarter", "sim_quarter"}
@@ -5258,6 +5261,7 @@ try:
         
         # Save to database (WITHOUT animations to reduce document size)
         db_save_start = time.time()
+        final_saved = False
         try:
             db_summary = summarize_game_state(
                 gm,
@@ -5344,6 +5348,7 @@ try:
                     body.consume_resume_anchor,
                 )
             games_collection.update_one({"_id": game_id_oid}, save_update, upsert=True)
+            final_saved = bool(is_final)
 
             # Stash the user's coaching archetype for this period (franchise only).
             # Diagnosis via DB breadcrumbs (Railway drops logs). `archetype_hook`
@@ -5502,6 +5507,10 @@ try:
         )
         if profile_summary_sim is not None:
             frontend_summary["profile_summary"] = profile_summary_sim
+        if final_saved and game_id:
+            # Final is saved (and returned as final_game_document); every post-final
+            # reader (GET /api/game/{id}, resume-state, complete-week) reads the doc.
+            _evict_ongoing_game(ongoing_games, "final", *_candidate_game_ids())
         return JSONResponse(content=frontend_summary, status_code=200)
     
     
@@ -5728,6 +5737,7 @@ try:
                 gm.game_state.get("shot_clock_remaining"),
                 pending_terminal_ft,
             )
+            final_saved = False
             if game_id:
                 try:
                     quarter_save_id = resolve_game_write_id(games_collection, game_id)
@@ -5767,6 +5777,7 @@ try:
                     else:
                         save_update["$unset"] = {"resume_anchor": ""}
                     games_collection.update_one({"_id": quarter_save_id}, save_update, upsert=True)
+                    final_saved = is_final
                 except Exception as e:
                     logging.error("⚠️ [RESUME-ANCHOR-SAVE] phase=quarter_complete_early_return failed: %s", e)
             early_return = {
@@ -5786,6 +5797,8 @@ try:
             #     f"⏱️ [PERF] /api/simulate-turn - EARLY RETURN (quarter complete), "
             #     f"quarter={gm.quarter}, total: {total_time:.2f}ms"
             # )
+            if final_saved:
+                _evict_ongoing_game(ongoing_games, "final", game_id)
             return JSONResponse(content=early_return, status_code=200)
         elif gm.game_state["time_remaining"] <= 0 and pending_terminal_ft:
             logging.warning(
@@ -6164,6 +6177,7 @@ try:
             # user-facing resume target. Quarter completion is a stable stoppage
             # point, so non-final quarter breaks create the durable resume anchor.
             db_save_time = 0
+            final_saved = False
             if game_id and quarter_complete:
                 db_save_start = time.time()
                 try:
@@ -6200,6 +6214,7 @@ try:
                     else:
                         save_update["$unset"] = {"resume_anchor": ""}
                     games_collection.update_one({"_id": quarter_save_id}, save_update, upsert=True)
+                    final_saved = is_final
                     logging.info(f"💾 Saved quarter-break state at turn {len(gm.turns)}, quarter={gm.quarter}")
                 except Exception as e:
                     logging.error(f"Failed to save game state: {e}")
@@ -6284,6 +6299,9 @@ try:
             #     f"response_size: {response_size} bytes, total: {total_time:.2f}ms, "
             #     f"quarter_complete={quarter_complete}"
             # )
+            if final_saved:
+                # Final save ran above; post-final readers fall back to the game doc.
+                _evict_ongoing_game(ongoing_games, "final", game_id)
             
             return JSONResponse(content=response_data, status_code=200)
             
