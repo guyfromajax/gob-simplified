@@ -46,6 +46,7 @@ from BackEnd.utils.auth import (
     get_current_user,
     get_user_by_email
 )
+from BackEnd.utils.franchise_team_display import resolve_geek_points_teams
 from BackEnd.utils.otp_validator import (
     inspect_code,
     is_alpha_mode,
@@ -165,6 +166,13 @@ class TutorialAdvanceRequest(BaseModel):
     game_id: Optional[str] = None         # FTE v3 — see TutorialState
 
 
+class GeekPointsTeamRow(BaseModel):
+    """One Account Geek Points row. ``display_name`` is chrome (TB-aware)."""
+    team_id: str
+    display_name: str
+    points: int
+
+
 class UserResponse(BaseModel):
     """User info response."""
     user_id: str
@@ -191,6 +199,8 @@ class UserResponse(BaseModel):
     subscription: Optional[str] = None  # e.g. "alpha" — drives the account-page Status field
     geek_points: Optional[int] = None  # total geek points
     geek_points_by_team: Optional[dict] = None  # canonical team_id -> int (lazy; {} when none)
+    # Additive chrome: stored / Team Builder display names for the Account list.
+    geek_points_teams: Optional[list[GeekPointsTeamRow]] = None
     championships_total: Optional[dict] = None  # { conf_rs, conf_t, region, national } -> int counts
 
 
@@ -1135,6 +1145,7 @@ async def get_me(user: dict = Depends(get_current_user)):
     subscription = (db_user.get("subscription") if db_user else None) or "alpha"
     geek_points = int(db_user.get("geek_points", 0) or 0) if db_user else 0
     geek_points_by_team = (db_user.get("geek_points_by_team") if db_user else None) or {}
+    geek_points_teams = resolve_geek_points_teams(geek_points_by_team, user.get("user_id"))
     raw_champs = (db_user.get("championships_total") if db_user else None) or {}
     championships_total = {k: int(raw_champs.get(k, 0) or 0) for k in ("conf_rs", "conf_t", "region", "national")}
 
@@ -1163,6 +1174,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         subscription=subscription,
         geek_points=geek_points,
         geek_points_by_team=geek_points_by_team,
+        geek_points_teams=geek_points_teams,
         championships_total=championships_total
     )
 
