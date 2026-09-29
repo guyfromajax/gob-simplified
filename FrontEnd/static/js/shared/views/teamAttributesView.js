@@ -11,16 +11,18 @@
 /**
  * PRESENTATION-ONLY layout. Four columns of paired measures, then the four that
  * have no pair. Emitted row-major, so a CSS grid of four columns puts each pair in
- * one column: Offense/Defense, the two Press/Trap measures, the two Fast Break
+ * one column: Offense/Defense, the two P/T measures, the two Fast Break
  * measures, Shooting/Rebounding.
  *
  * Deliberately separate from the server's family order, which groups by where a
  * measure comes from rather than by how it reads on the page.
  */
+/* Eleven measures in a four-column grid, so the bottom row's fourth cell is empty.
+   It stays empty: a placeholder there would read as a measure with no reading. */
 var GRID_ROWS = [
   ['offensive_efficiency', 'pt_opp_modifier', 'fb_efficiency', 'shot_threshold'],
   ['defensive_efficiency', 'pt_efficiency', 'fb_opp_modifier', 'rebound_modifier'],
-  ['team_chemistry', 'fight', 'discipline', 'momentum_score']
+  ['team_chemistry', 'fight', 'discipline']
 ];
 
 function showNum(value) {

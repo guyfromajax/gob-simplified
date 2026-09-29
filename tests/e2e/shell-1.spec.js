@@ -209,7 +209,7 @@ test('sections and sub-tabs open the matching panel', async ({ page }) => {
     ['team-player-stats', 'player-stats-view', 'Player Stats'],
     ['team-attributes', 'team-attributes-view', 'Team Attributes'],
     ['team-schedule', 'team-schedule-view', 'Schedule'],
-    ['prep', 'training-view', 'Training'],
+    ['prep', 'training-view', 'Player Training'],
     ['prep-plan', 'game-plan-view', 'Game Plan'],
     ['prep-playbooks', 'playbooks-view', 'Playbooks'],
     ['prep-scouting', 'scouting-view', 'Scouting Report'],

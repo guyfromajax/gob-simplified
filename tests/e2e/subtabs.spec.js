@@ -256,7 +256,7 @@ test('switching, ink, overflow, keyboard, lock, and search', async ({ page }) =>
 test('section shots, locked tooltip, more menu, and a detail view', async ({ page }) => {
   const sections = [
     ['team', 'Roster', 'team-roster'],
-    ['prep', 'Training', 'prep-training'],
+    ['prep', 'Player Training', 'prep-training'],
     ['league', 'Standings', 'league-standings'],
     ['league', 'Team Stats', 'league-team-stats'],
     ['news', 'News', 'news'],

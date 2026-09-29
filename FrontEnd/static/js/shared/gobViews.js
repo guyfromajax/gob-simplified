@@ -318,9 +318,11 @@
 
   register({
     id: 'training-report-view',
+    // A drill-in, like player-view: no sub-tab of its own. gobShell used to collapse
+    // this onto training-view and light Player Training while you read a report.
     section: 'prep',
-    subtab: 'training-view',
-    title: 'Training',
+    subtab: '',
+    title: 'Training Report',
     module: viewModule('trainingReportView.js')
   });
 
@@ -390,6 +392,13 @@
       incoming.set('player_id', pid);
       incoming.set('tab', 'player-view');
       if (!incoming.get('origin')) incoming.set('origin', originFor(incoming.get('return_tab') || ''));
+    } else if (/\/training-report\.html$/i.test(path)) {
+      incoming.set('tab', 'training-report-view');
+      if (!incoming.get('origin')) {
+        var from = incoming.get('from') || '';
+        incoming.set('origin', from === 'news' || from === 'inbox' ? 'news'
+          : from === 'office' ? 'office' : 'prep');
+      }
     } else if (!FCC_RE.test(path)) {
       return '';
     }

@@ -59,6 +59,9 @@ let customFocusDraft = {};
 /** @type {Record<string, string[]>} committed picks after Assign */
 let customFocusCommitted = {};
 let trainingDirty = false;
+// True after applyTrainingWeekState hides the weekly allocation (submitted week or
+// tournament). syncTrainingAdvance must not put Submit Training back on the top bar.
+let trainingAllocationClosed = false;
 
 /** Session keys for Custom Training Playbook → training-playbooks.html */
 const STORAGE_PLAYBOOK_FOCUS = 'gob_training_playbook_focus';
@@ -410,34 +413,113 @@ async function fetchFranchiseCommandCenterData(franchiseId) {
   return response.json();
 }
 
-async function redirectIfTrainingAlreadyCommitted() {
+/**
+ * Player Training is always the settings page. It used to bounce to the training report
+ * whenever the week was already submitted, which is what made one sub-tab show two
+ * unrelated screens. Now it stays put and says which state the week is in; the report is a
+ * drill-in you open deliberately, from here, the Office card or News.
+ *
+ * Returns true when there is no weekly allocation to make, so the caller can skip the
+ * point-budget setup. Player Development is unaffected either way — it saves per change
+ * and applies to the next training that runs.
+ */
+async function applyTrainingWeekState() {
   const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
   const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
   if (mode !== 'franchise' || !franchiseId) return false;
 
+  let data = null;
   try {
-    const data = await fetchFranchiseCommandCenterData(franchiseId);
-    if (!data || !data.training_completed) return false;
-    const params = emptyParams();
-    params.set('mode', 'franchise');
-    params.set('franchise_id', franchiseId);
-    if (teamId) params.set('team_id', teamId);
-    params.set('week', String(Number(data.week || 1)));
-    params.set('from', 'training');
-    const returnUrl = urlParams.get('return_url');
-    const safeReturnUrl = typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(returnUrl) : null;
-    if (safeReturnUrl) params.set('return_url', safeReturnUrl);
-    params.set('tab', 'training-report-view');
-    const reportUrl = `/franchise-command-center.html?${params.toString()}`;
-    if (window.GOBNav) window.GOBNav.replace(reportUrl);
-    else window.location.replace(reportUrl);
-    return true;
+    data = await fetchFranchiseCommandCenterData(franchiseId);
   } catch (error) {
     console.warn('⚠️ [TRAINING] Unable to verify committed training state:', error);
     return false;
   }
+  if (!data) return false;
+
+  const week = Number(data.week || 1);
+  const noTrainingWeek = !!data.training_disabled_for_postseason
+    || !!data.training_disabled_for_eos;
+
+  if (noTrainingWeek) {
+    // /franchise/training-points now returns 200 with training_unavailable (and the
+    // roster) after week 26, so the grid still loads. There is still no weekly budget
+    // and nothing to submit.
+    showTrainingStateNote({
+      head: 'No team training during the tournament',
+      body: 'Weekly training runs through week 26. Player development focus below still '
+        + 'saves, and applies from next season\u2019s Training Camp.',
+    });
+    trainingAllocationClosed = true;
+    return true;
+  }
+
+  if (data.training_completed) {
+    showTrainingStateNote({
+      head: 'Training submitted for this week',
+      body: 'Player development focus below still saves, and applies to next week\u2019s '
+        + 'training.',
+      linkText: 'View training report \u2192',
+      linkHref: trainingReportHref(franchiseId, teamId, week),
+    });
+    trainingAllocationClosed = true;
+    return true;
+  }
+
+  trainingAllocationClosed = false;
+  return false;
+}
+
+function trainingReportHref(franchiseId, teamId, week) {
+  const params = emptyParams();
+  params.set('mode', 'franchise');
+  params.set('franchise_id', franchiseId);
+  if (teamId) params.set('team_id', teamId);
+  params.set('week', String(week));
+  params.set('from', 'training');
+  // Lights the Prep rail while the report is open without marking a sub-tab; see
+  // gobShell.js detailOrigin / detailMark.
+  params.set('origin', 'prep');
+  params.set('tab', 'training-report-view');
+  return `/franchise-command-center.html?${params.toString()}`;
+}
+
+/**
+ * Swap the weekly allocation for a one-line explanation. Player Development is deliberately
+ * left visible — it is the part that still does something on these weeks.
+ */
+function showTrainingStateNote(opts) {
+  const note = document.getElementById('training-state-note');
+  if (!note) return;
+  const head = document.getElementById('training-state-note-head');
+  const body = document.getElementById('training-state-note-body');
+  const link = document.getElementById('training-state-note-link');
+  if (head) head.textContent = opts.head || '';
+  if (body) body.textContent = opts.body || '';
+  if (link) {
+    if (opts.linkHref) {
+      link.textContent = opts.linkText || 'Open';
+      link.href = opts.linkHref;
+      link.hidden = false;
+    } else {
+      link.hidden = true;
+    }
+  }
+  note.hidden = false;
+
+  ['.main-content-grid', '.coaching-section'].forEach(function (sel) {
+    const el = document.querySelector(sel);
+    if (el) el.hidden = true;
+  });
+  ['requirements-bar', 'auto-train-btn', 'submit-btn'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.hidden = true;
+  });
+  document.body.classList.add('training-no-allocation');
+  // The top-bar Advance must not offer Submit Training for a week that cannot take it.
+  if (window.GOBAdvance && window.GOBAdvance.clearOverride) window.GOBAdvance.clearOverride();
 }
 
 // Track previous slider values to prevent over-allocation
@@ -808,6 +890,10 @@ function syncTrainingAdvance(ready) {
     onView = false;
   }
   if (!onView || !window.GOBAdvance || typeof window.GOBAdvance.setOverride !== 'function') return;
+  if (trainingAllocationClosed) {
+    if (window.GOBAdvance.clearOverride) window.GOBAdvance.clearOverride();
+    return;
+  }
   window.GOBAdvance.setOverride({
     label: 'Submit Training',
     enabled: !!ready,
@@ -1347,6 +1433,10 @@ function rewriteReportRedirect(redirectUrl) {
       const bag = franchiseCtx().parseSearch(redirect.search);
       bag.delete('embed');
       bag.set('tab', 'training-report-view');
+      // A drill-in: light the Prep rail without marking a sub-tab. See gobShell
+      // detailOrigin / detailMark.
+      if (!bag.get('origin')) bag.set('origin', 'prep');
+      if (!bag.get('from')) bag.set('from', 'training');
       const qs = bag.toString();
       return '/franchise-command-center.html' + (qs ? '?' + qs : '');
     }
@@ -1654,7 +1744,13 @@ async function initializeTrainingPoints() {
           customFocusRoster = data.custom_focus_roster;
           // Same 12 rows, already RT-descending, already carrying training_position /
           // training_focus through training_position_projection — no second fetch.
+          // After week 26 the payload still carries this roster so the grid stays
+          // editable even though there is no weekly allocation to make.
           renderPlayerDevelopment();
+        }
+        if (data.training_unavailable) {
+          updatePointsRemaining();
+          return;
         }
         if (Array.isArray(data.player_maximizer_ranking_attrs)) {
           customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
@@ -1708,7 +1804,7 @@ window.addEventListener('pageshow', (event) => {
     if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
     return;
   }
-  redirectIfTrainingAlreadyCommitted();
+  applyTrainingWeekState();
 });
 
 function syncPlaybookModeToggleUi() {
@@ -2131,11 +2227,12 @@ updateRequirementsBar();
 // Initialize training points on page load
 (async function initTrainingPage() {
   if (window.GOBNav) window.GOBNav.warnOnLeave(function () { return trainingDirty; });
-  const redirected = await redirectIfTrainingAlreadyCommitted();
-  if (redirected) return;
+  const noAllocation = await applyTrainingWeekState();
   wireTrainingTutorialButton();
+  // Player Development still needs its data on a no-allocation week. It rides along on
+  // the training-points payload, which now returns 200 + training_unavailable after week 26.
   await initializeTrainingPoints();
-  wireCustomTrainingPlaybook();
+  if (!noAllocation) wireCustomTrainingPlaybook();
   if (window.GOBNav) window.GOBNav.restoreScroll();
 })();
 

@@ -244,8 +244,9 @@ def test_the_training_grid_binds_its_controls():
 
 def test_fcc_mappers_carry_the_development_fields():
     """The projection trap, front-end edition: every FCC mapper cherry-picks fields —
-    varsity rows, practice-squad rows, and the Training tab's grid rows."""
-    assert FCC_JS.count("resolved_training_focus: p.resolved_training_focus") == 3
+    varsity rows and practice-squad rows. The legacy Training-tab mapper is gone;
+    Player Training binds the shared grid, which already carries these fields."""
+    assert FCC_JS.count("resolved_training_focus: p.resolved_training_focus") == 2
 
 
 def test_practice_scope_renders_no_controls():

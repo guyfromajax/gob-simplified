@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/training.css">
   <link rel="stylesheet" href="/css/training-newswire.css">
   <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/gob-toast.css">
   <link rel="stylesheet" href="/css/development-focus.css">
   <link rel="stylesheet" href="/css/player-development-grid.css">
 </head>
@@ -79,6 +80,15 @@
     </header>
 
     <!-- Three equal columns: Player Drills · Scheme Installs · General -->
+    <!-- Shown instead of the weekly point allocation when this week has no allocation to
+         make: training already submitted, or a tournament week where the server refuses
+         training outright. Player Development below stays put in both cases. -->
+    <div class="training-state-note" id="training-state-note" hidden>
+      <p class="training-state-note-head" id="training-state-note-head"></p>
+      <p class="training-state-note-body" id="training-state-note-body"></p>
+      <a class="gob-btn gob-btn--ghost training-state-note-link" id="training-state-note-link" hidden></a>
+    </div>
+
     <div class="main-content-grid">
       <div class="content-section player-drills-section">
         <h2 class="section-header">Player Drills</h2>
@@ -162,15 +172,15 @@
             </div>
 
             <div class="drill-group">
-              <h3 class="drill-title">Fast Breaks</h3>
+              <h3 class="drill-title">Fast Break</h3>
               <label class="slider-label">
-                <span class="label-text">FB Offense Install</span>
+                <span class="label-text">Fast Break Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="fast-break-offense-install" data-category="team-drills">
                 </div>
               </label>
               <label class="slider-label">
-                <span class="label-text">FB Defense Install</span>
+                <span class="label-text">Fast Break Defense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="fast-break-defense-install" data-category="team-drills">
                 </div>
@@ -178,7 +188,7 @@
             </div>
 
             <div class="drill-group">
-              <h3 class="drill-title">Press / Trap</h3>
+              <h3 class="drill-title">P/T</h3>
               <label class="slider-label">
                 <span class="label-text">P/T Offense Install</span>
                 <div class="slider-container">
@@ -327,11 +337,11 @@
             </label>
             <label class="archetype-option">
               <input type="radio" name="coaching-focus" value="systems-coach-fast-breaks" class="archetype-radio">
-              <span>Fast Breaks</span>
+              <span>Fast Break</span>
             </label>
             <label class="archetype-option">
               <input type="radio" name="coaching-focus" value="systems-coach-press-trap" class="archetype-radio">
-              <span>Press / Trap</span>
+              <span>P/T</span>
       </label>
     </div>
   </div>
@@ -457,6 +467,8 @@
   <script src="/common.js"></script>
   <script src="/js/shared/trainingNewswire.js"></script>
   <script src="/js/shared/gobTutorialAlertResume.js"></script>
+  <!-- Development Focus saves on change and confirms with the shared toast. -->
+  <script src="/js/shared/gobToast.js"></script>
   <script src="/js/shared/developmentFocus.js"></script>
   <script src="/js/generated/trainingMatrix.js"></script>
   <script src="/js/utils/attributeDisplay.js"></script>

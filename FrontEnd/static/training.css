@@ -355,6 +355,35 @@ input[type="reset"] {
 .drill-group--solo .slider-label { gap: 0; }
 
 /* Coaching Section */
+/* Stands in for the weekly allocation on a week that has none. Neutral surface: this is
+   information, not a save and not a warning, so it takes no accent colour. */
+.training-state-note {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-8);
+  padding: var(--dsp-20) var(--dsp-24);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface-2);
+}
+
+.training-state-note-head {
+  margin: 0;
+  font: var(--fw-bold) var(--fs-18) / var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+
+.training-state-note-body {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--fs-13);
+  line-height: var(--lh-body);
+  color: var(--text-60);
+}
+
 .coaching-section {
   grid-column: 1 / -1;
   margin-top: var(--spacing-md);
@@ -2137,6 +2166,14 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   gap: 0 calc(var(--col-gap) * 2);
   align-items: start;
 }
+
+/* A later `display:` here outranks the UA rule for [hidden]. */
+#training-view .training-state-note[hidden],
+#training-view .training-state-note-link[hidden],
+#training-view .main-content-grid[hidden],
+#training-view .coaching-section[hidden] {
+  display: none;
+}
 #training-view .content-section,
 #training-view .general-section,
 #training-view .section-container,
@@ -2553,4 +2590,12 @@ html.gob-shell body.training-page .pg-tools #training-tutorial-btn {
   font-size: var(--fs-12);
   font-weight: var(--fw-semibold);
   color: var(--text-60);
+}
+
+/* display:flex on #requirements-bar above beats the UA [hidden] rule. */
+html.gob-shell body.training-page .pg-tools #requirements-bar[hidden],
+html.gob-shell body.training-page .pg-tools #auto-train-btn[hidden],
+html.gob-shell body.training-page.training-no-allocation .pg-tools #requirements-bar,
+html.gob-shell body.training-page.training-no-allocation .pg-tools #auto-train-btn {
+  display: none;
 }

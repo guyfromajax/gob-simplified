@@ -1405,10 +1405,11 @@
       flex: 1;
     }
 
+    /* Square, like every player headshot. */
     .sim-quarter-player-image {
       width: 40px;
       height: 40px;
-      border-radius: 50%;
+      border-radius: 6px;
       object-fit: cover;
       flex-shrink: 0;
       margin-left: 12px;
@@ -2342,11 +2343,13 @@
       animation: hudReveal 2.5s ease-out forwards;
     }
 
+    /* Square, like every player headshot. 10px is the same corner weight at 70px
+       that the 28px table badges get from 6px. */
     .hud-headshot-container {
       position: relative;
       width: 70px;
       height: 70px;
-      border-radius: 50%;
+      border-radius: 10px;
       overflow: hidden;
       border: 3px solid #FFD700;
       background: #1a1a1a;
@@ -6535,10 +6538,10 @@
       const order = [
         { label: 'Shooting', key: 'shot_threshold' },
         { label: 'Rebounding', key: 'rebound_modifier' },
-        { label: 'Offense Efficiency', key: 'offensive_efficiency' },
-        { label: 'Defense Efficiency', key: 'defensive_efficiency' },
-        { label: 'Fast Break Efficiency', key: 'fb_efficiency' },
-        { label: 'Press/Trap Efficiency', key: 'pt_efficiency' },
+        { label: 'Offense', key: 'offensive_efficiency' },
+        { label: 'Defense', key: 'defensive_efficiency' },
+        { label: 'Fast Break', key: 'fb_efficiency' },
+        { label: 'P/T Defense', key: 'pt_efficiency' },
         { label: 'Discipline', key: 'discipline' },
         { label: 'Fight', key: 'fight' },
         { label: 'Momentum', key: 'momentum_score' },
