@@ -214,36 +214,46 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 | `what_moved.conference_standing` | Same shape. Place is the Standings order: wins, then point differential. |
 | `what_moved.record` | `{wins, losses}` from standings already on the response. |
 | `what_moved.streak` | `W4` or `L1`, from results. Null when the user has no decided game. |
-| `what_moved.attribute_changes` | `{player_id, name, attribute, from, to}`. `from` and `to` are the first-digit display scale (`value // 10`). Keyed by player id. Legacy name-keyed direction maps are omitted. |
+| `what_moved.attribute_changes` | `{player_id, name, attribute, from, to}`. `from` and `to` are the first-digit display scale (`value // 10`). Keyed by player id. Legacy name-keyed direction maps are omitted. `exceptional: true` is added on a row whose **raw** gain clears the report week's threshold (10 at camp, 5 in season — `BackEnd/utils/attribute_gain.py`, ported from `training-report.js::getExceptionalGainThreshold`). The key is absent rather than false, and the client never recomputes it. The same pairs are on the training-report route as `exceptional_gains`. |
 | `team_snapshot.state` | `set_after_camp` until a snapshot exists for a week before the current week. Otherwise `ready`. |
 | `team_snapshot.chemistry` | `{value, max: 25}` from stored team chemistry. |
 | `team_snapshot.attitude` | Counts in the EM buckets 0–19, 20–39, 40–59, 60–79, 80+. |
 | `team_snapshot.moved_most` | Up to two `{measure, value, delta}` rows. Delta is this week's stored measure minus the previous snapshot. Empty until a prior snapshot exists. |
-| `result` | Last completed user game, or null. Scores, site (`home` / `away`), `neutral` (always null; no stored neutral site), opponent rank, round name for weeks 27–34, POTG on a win or the user's highest-PTS player on a loss, box-score path and params. `headline` only when a `season_news` story stores this game's id. |
+| `result` | Last completed user game, or null. Scores, site (`home` / `away`), `neutral` (always null; no stored neutral site), opponent rank, round name for weeks 27–34, POTG on a win or the user's highest-PTS player on a loss, box-score path and params. `headline` only when a `season_news` story stores this game's id. `result_key` is the game id: a stable id per result so the weekly entrance plays once. "Seen" is the client's own local state; the server stores none. |
 | `next_game` | Opponent, rank, record, conference, site, week, top scorer, top rebounder. `conference_position` and `conference_size` are the opponent's 1-based place in its own conference and the number of teams there, using the Standings order. Both are null when the opponent cannot be placed. `date`, `neutral`, `projected_starting_five`, `seeds`, `stakes`, and `team_rt` are null. |
 | `conference_standings` | The user's conference in Standings order. `conference` is the conference number, `region` is the stored region or the letter derived from that number (1–2 = A … 15–16 = H), and `rows` are `{team_id, team_name, wins, losses, differential, position, is_user}`. Ties follow `standings_display_sort_key` (wins, then point differential) and match `GET /franchise/standings` for the same results. Null when the user has no conference. |
 | `todos` | `{id, label_key, required, done, gates_advance, is_advance_action, route}` from the same flags as `gobAdvance.js`. A blocking task is the Advance action. |
 | `recruiting_wire` | Status line, events (`recruit`, `position`, `stars` and `filmed_grade` always null, `event_type`, `event_text` from the stored lean-event sentence, `event_detail`, `list_position`, `direction`), `pending_count`, `urgent`, `unseen_count`. |
 | `signing_day` | Week 35 only. Points remaining out of 50, playing-time promises, open roster spots, up to three targets. Otherwise null. |
 | `season_preview` | `first_week` only. Preseason rank is the current national rank. Conference projection, team RT, returning starters, and top returner are null. Newcomers only when `pending_walk_on_welcome` is stored. Opener is `next_game`. |
-| `weekly_card_items` | WEEKLY-tier moments from the server moment queue (bracket update, recruit visit). Each item includes `href`: tournament-view for bracket update, the recruiting hub for a recruit visit. The Office paints them with the existing card helper as links. They are not pop-ups. |
+| `weekly_card_items` | WEEKLY-tier moments from the server moment queue, in order. Every item includes an `href` (the archetype row's is omitted on desktop, where the coaching-archetypes page is not served). The Office paints them with the existing card helper as links. They are not pop-ups. |
+| `also` | The highest-priority weekly item as `{kind, title, line, href}`, or null. The weekly card's one folded-moment row. `weekly_card_items` stays the full list. |
 
-`GET /franchise/command-center/data` also returns `moments`, `moments_for_this_visit`, and `weekly_card_items`. The browser does not rank, cap, or pick which moment opens. `BackEnd/utils/moment_queue.py` builds the list from the existing eligibility flags (`pending_championship_moments`, `conference_rs_region_modal`, `region_bye_modal_eligible`, `walk_on_welcome_modal`, `recruit_visit_modal`, `bracket_reveal_modal`, `bracket_update_modal`, `user.archetype_evolution_pending`). `recruiting_results_modal` is not queued; the signing celebration is the week-35 hub reveal.
+`GET /franchise/command-center/data` also returns `moments`, `moments_for_this_visit`, and `weekly_card_items`. The browser does not rank, cap, or pick which moment opens, and it does not decide a moment's style or sound. `BackEnd/utils/moment_queue.py` builds the list from existing eligibility flags; `BackEnd/utils/season_moments.py` derives the three newer payloads at route level from the brackets, the season snapshot reader and the week-35 signings.
+
+Each row carries `kind`, `tier`, `priority`, `payload_ref` (the response key holding the payload), `seen_key`, `title`, `line`, `style`, `sting`, and `duration` on pop-up tiers.
 
 Priority (lower number first):
 
-| Priority | Kind | Tier | Duration | Pop-up? |
-|---|---|---|---|---|
-| 10 | championship | SEASON PEAK | long | Yes |
-| 20 | bracket_reveal | MILESTONE | long | Yes |
-| 30 | walk_on_welcome | MILESTONE | long | Yes |
-| 40 | conference_rs_region | MILESTONE | short | Yes |
-| 50 | region_bye | MILESTONE | short | Yes |
-| 60 | archetype_evolution | MILESTONE | short | Yes |
-| 70 | bracket_update | WEEKLY | — | Office card |
-| 80 | recruit_visit | WEEKLY | — | Office card |
+| Priority | Kind | Tier | Duration | Style | Sting | Payload source |
+|---|---|---|---|---|---|---|
+| 10 | championship | SEASON PEAK | long | gold | `STING_SEASON_PEAK` | `pending_championship_moments` |
+| 15 | season_review | SEASON PEAK | long | gold | `STING_SEASON_PEAK` | `season_review` — `career_data.season_review_snapshot`, once the season's games are played |
+| 20 | elimination | MILESTONE | short | quiet | — | `elimination` — the season-ending tournament loss, read off the brackets |
+| 30 | bracket_reveal | MILESTONE | long | gold | `STING_MILESTONE` | `bracket_reveal_modal`, when the user's team is in the revealed bracket |
+| 40 | signed_class | MILESTONE | long | gold | `STING_MILESTONE` | `signed_class` — eligible only after the week-35 hub reveal has been seen |
+| 50 | walk_on_welcome | MILESTONE | long | gold | `STING_MILESTONE` | `walk_on_welcome_modal` |
+| 60 | region_bye | MILESTONE | short | gold | `STING_MILESTONE` | `region_bye_modal_eligible` |
+| 65 | conference_rs_region | MILESTONE | short | gold | `STING_MILESTONE` | `conference_rs_region_modal` |
+| 70 | first_archetype | MILESTONE | short | gold | `STING_MILESTONE` | `first_archetype` — lead archetype set and its reveal not yet seen |
+| 80 | bracket_update | WEEKLY | — | — | — | `bracket_update_modal` |
+| 90 | recruit_visit | WEEKLY | — | — | — | `recruit_visit_modal` |
+| 100 | archetype_evolution | WEEKLY | — | — | — | `archetype_evolution_pending` (an evolution, not a first establish) |
+| 110 | bracket_reveal | WEEKLY | — | — | — | `bracket_reveal_modal`, when the user's team is **not** in it |
 
-Cap: `moments_for_this_visit` is the first pop-up-tier item. A second item is included only when the first is `duration=short` and the second is MILESTONE or SEASON PEAK. Remaining pop-up-tier items stay in `moments` (still eligible next visit; seen keys are not marked until shown). WEEKLY items go to `weekly_card_items` and never take a pop-up slot.
+Cap: a season peak shows alone. When one is eligible the visit is the season-peak items only, and a championship plus its review are the one pair that shows together — exactly `[championship, season_review]`, as "1 of 2 / 2 of 2". Otherwise `moments_for_this_visit` is the first pop-up-tier item, plus a second only when the first is `duration=short` and the second is MILESTONE or SEASON PEAK. Remaining pop-up-tier items stay in `moments` (still eligible next visit; seen keys are not marked until shown). WEEKLY items go to `weekly_card_items` and never take a pop-up slot.
+
+`recruiting_results_modal` is not queued as itself: the live Signing Day beat stays the week-35 hub reveal, and the Office's one-time summary is `signed_class`, which reuses that modal's `recruiting_results_modal_seen_season` stamp. Elimination and the review add the only new stored fields, `elimination_seen_season` and `season_review_seen_season`, written by `PATCH /franchise/elimination-seen` and `PATCH /franchise/season-review-seen` in the same season-stamped style as the existing modal flags.
 
 Cut-players (blocking) and tutorial return alerts stay outside the queue. Tutorial alerts settle first. The queue plays next. The cut modal waits for both.
 
