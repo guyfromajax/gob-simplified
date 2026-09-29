@@ -5,13 +5,26 @@
  * Levels are 0–100. Persisted in localStorage under AUDIO_STORAGE_KEY so the
  * same settings work online and in the offline desktop build.
  *
- * Named constants stay the call-site vocabulary. This module changes volume,
- * not which file a caller asked for.
+ * Named constants stay the call-site vocabulary. playSfx(name) maps those
+ * names (and legacy filenames) onto files, respects the sfx channel, and
+ * installs one data-sfx click hook per document.
  */
 
-export const SFX_ADVANCE = 'confirm-1-lowervol.wav';
-export const SFX_SELECT = 'click-tiny.wav';
-export const SFX_COMMIT = 'click-beep.wav';
+const SFX_FILES = {
+  SFX_ADVANCE: 'confirm-1-lowervol.wav',
+  SFX_SELECT: 'click-tiny.wav',
+  SFX_COMMIT: 'click-beep.wav',
+  STING_WIN: 'sting-win.mp3',
+  STING_MILESTONE: 'sting-milestone.mp3',
+  STING_SEASON_PEAK: 'sting-season-peak.mp3',
+};
+
+export const SFX_ADVANCE = SFX_FILES.SFX_ADVANCE;
+export const SFX_SELECT = SFX_FILES.SFX_SELECT;
+export const SFX_COMMIT = SFX_FILES.SFX_COMMIT;
+export const STING_WIN = SFX_FILES.STING_WIN;
+export const STING_MILESTONE = SFX_FILES.STING_MILESTONE;
+export const STING_SEASON_PEAK = SFX_FILES.STING_SEASON_PEAK;
 
 export const AUDIO_STORAGE_KEY = 'gob_audio_v1';
 export const LEGACY_AMBIENCE_KEY = 'gob_scouting_ambience_enabled';
@@ -166,14 +179,133 @@ export function outputVolume(baseVolume, channel) {
   return Math.max(0, Math.min(1, base * gain));
 }
 
-export function playSfx(filename, baseVolume = 0.7) {
+const missingLogged = new Set();
+const knownMissing = new Set();
+const preloadCache = Object.create(null);
+let activeSting = null;
+const hookedDocs = typeof WeakSet === 'function' ? new WeakSet() : null;
+let hookedFallback = false;
+
+function resolveNamed(name) {
+  if (!name || typeof name !== 'string') return null;
+  const key = name.trim();
+  if (!key) return null;
+  if (SFX_FILES[key]) {
+    return { key, file: SFX_FILES[key], sting: key.indexOf('STING_') === 0 };
+  }
+  const keys = Object.keys(SFX_FILES);
+  for (let i = 0; i < keys.length; i += 1) {
+    const k = keys[i];
+    if (SFX_FILES[k] === key) {
+      return { key: k, file: key, sting: k.indexOf('STING_') === 0 };
+    }
+  }
+  if (key.indexOf('.') !== -1) {
+    return { key, file: key, sting: false };
+  }
+  return null;
+}
+
+function logMissingOnce(key) {
+  if (missingLogged.has(key)) return;
+  missingLogged.add(key);
+  if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+    console.debug('[uiSfx] missing sound', key);
+  }
+}
+
+function stopActiveSting() {
+  if (!activeSting) return;
   try {
-    if (!filename || typeof Audio === 'undefined') return;
-    const a = new Audio(soundBase() + encodeURIComponent(filename));
-    a.volume = outputVolume(baseVolume, 'sfx');
-    const played = a.play();
-    if (played && typeof played.catch === 'function') played.catch(() => {});
+    activeSting.pause();
+    activeSting.currentTime = 0;
   } catch (_err) { /* non-fatal */ }
+  activeSting = null;
+}
+
+function markMissing(file, key, audio) {
+  knownMissing.add(file);
+  preloadCache[file] = false;
+  logMissingOnce(key);
+  if (activeSting === audio) activeSting = null;
+}
+
+function preloadFile(file, key) {
+  if (typeof Audio === 'undefined') return;
+  if (preloadCache[file] || knownMissing.has(file)) return;
+  try {
+    const probe = new Audio();
+    probe.preload = 'auto';
+    probe.addEventListener('canplaythrough', function () {
+      preloadCache[file] = probe;
+    }, { once: true });
+    probe.addEventListener('error', function () {
+      markMissing(file, key, probe);
+    }, { once: true });
+    probe.src = soundBase() + encodeURIComponent(file);
+    preloadCache[file] = probe;
+  } catch (_err) { /* non-fatal */ }
+}
+
+export function playSfx(name, baseVolume = 0.7) {
+  try {
+    const resolved = resolveNamed(name);
+    if (!resolved || typeof Audio === 'undefined') return;
+    if (knownMissing.has(resolved.file) || preloadCache[resolved.file] === false) return;
+    const vol = outputVolume(baseVolume, 'sfx');
+    if (vol <= 0) return;
+
+    preloadFile(resolved.file, resolved.key);
+
+    const a = new Audio(soundBase() + encodeURIComponent(resolved.file));
+    a.volume = vol;
+    a.addEventListener('error', function onErr() {
+      a.removeEventListener('error', onErr);
+      markMissing(resolved.file, resolved.key, a);
+    }, { once: true });
+
+    if (resolved.sting) {
+      stopActiveSting();
+      activeSting = a;
+      a.addEventListener('ended', function () {
+        if (activeSting === a) activeSting = null;
+      }, { once: true });
+    }
+
+    const played = a.play();
+    if (played && typeof played.catch === 'function') {
+      played.catch(function () {
+        if (activeSting === a) activeSting = null;
+      });
+    }
+  } catch (_err) { /* non-fatal */ }
+}
+
+function onSfxClick(ev) {
+  const t = ev && ev.target;
+  if (!t || typeof t.closest !== 'function') return;
+  const el = t.closest('[data-sfx]');
+  if (!el || typeof el.matches !== 'function') return;
+  if (!el.matches('button, a, [role="tab"]')) return;
+  const hookName = el.getAttribute('data-sfx');
+  if (!hookName || !SFX_FILES[hookName.trim()]) return;
+  playSfx(hookName.trim());
+}
+
+export function installSfxHooks(doc) {
+  const root = doc || (typeof document !== 'undefined' ? document : null);
+  if (!root || typeof root.addEventListener !== 'function') return;
+  if (hookedDocs) {
+    if (hookedDocs.has(root)) return;
+    hookedDocs.add(root);
+  } else {
+    if (hookedFallback) return;
+    hookedFallback = true;
+  }
+  root.addEventListener('click', onSfxClick);
+  preloadFile(SFX_FILES.SFX_ADVANCE, 'SFX_ADVANCE');
+  preloadFile(SFX_FILES.SFX_SELECT, 'SFX_SELECT');
+  preloadFile(SFX_FILES.SFX_COMMIT, 'SFX_COMMIT');
 }
 
 export function playAdvance() { playSfx(SFX_ADVANCE, 0.7); }
@@ -185,6 +317,13 @@ const api = {
   playAdvance,
   playSelect,
   playCommit,
+  installSfxHooks,
+  SFX_ADVANCE,
+  SFX_SELECT,
+  SFX_COMMIT,
+  STING_WIN,
+  STING_MILESTONE,
+  STING_SEASON_PEAK,
   getAudioState,
   setChannelLevel,
   setChannelMuted,
@@ -196,3 +335,4 @@ const api = {
 };
 
 if (typeof window !== 'undefined') window.GOBUiSfx = api;
+if (typeof document !== 'undefined') installSfxHooks(document);

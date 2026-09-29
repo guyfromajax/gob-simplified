@@ -6,6 +6,7 @@
   'use strict';
   if (window.__gobAdvanceStarted) return;
   window.__gobAdvanceStarted = true;
+  import('/js/shared/uiSfx.js').catch(function () {});
 
   var INVITE_FIRST_WEEK = 20;
   var INVITE_LAST_WEEK = 26;
@@ -318,6 +319,8 @@
   function bind(button, envFn) {
     if (!button || button.dataset.gobAdvanceBound === '1') return;
     button.dataset.gobAdvanceBound = '1';
+    button.setAttribute('data-sfx', 'SFX_ADVANCE');
+    import('/js/shared/uiSfx.js').catch(function () {});
     button.addEventListener('click', function () {
       var env = typeof envFn === 'function' ? envFn() : (envFn || {});
       onAdvanceClick(button, env);
@@ -339,7 +342,6 @@
       playNowBtn.classList.remove('is-loading');
       if (playNowBtn.textContent === 'STARTING…') playNowBtn.textContent = advanceLabel;
     };
-    playSound('confirm-1-lowervol.wav');
     var confirmSfxReady = waitForConfirmSfx();
     var mode = playNowBtn.dataset.mode || 'play';
     var franchiseId = env.franchiseId;

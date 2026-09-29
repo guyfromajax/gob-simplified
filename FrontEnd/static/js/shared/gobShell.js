@@ -673,6 +673,7 @@
     if (ghost) adv.appendChild(ghost);
     if (play) {
       play.classList.add('advance');
+      play.setAttribute('data-sfx', 'SFX_ADVANCE');
       adv.appendChild(play);
     }
 
@@ -1050,6 +1051,7 @@
         play.disabled = true;
       }
       play.classList.add('advance');
+      play.setAttribute('data-sfx', 'SFX_ADVANCE');
       adv.appendChild(ghost);
       adv.appendChild(play);
       top.appendChild(adv);
