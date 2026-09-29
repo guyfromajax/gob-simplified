@@ -120,7 +120,7 @@ Server sets `href` on each WEEKLY item:
 - `bracket_update` → `/franchise-command-center.html?tab=tournament-view`
 - `recruit_visit` → `/recruiting.html`
 
-The Office row is an `<a class="sn-row">` with that href (franchise/team ids appended from the current URL). Existing Office link style (`color: inherit`). Text unchanged.
+The Office row is an `<a class="ow-row">` with that href (franchise/team ids appended from the current URL). Existing Office link style (`color: inherit`). Label is a small uppercase line above the sentence; a → sits on the right.
 
 ### Weekly-card lifetime (eligibility window; no browser seen-mark)
 
@@ -133,20 +133,22 @@ WEEKLY items no longer go through a modal, so they do not PATCH seen. The card l
 
 No extra server-flag change: both builders are already week-keyed. The old modal seen-stamp only hid the card mid-week after a pop-up; the week window already ended it.
 
+### Cut modal on top
+
+The earlier shot caught `fcc-modal-enter` (box opacity 0→1 over 200ms), so Office cards showed through the text. The spec now waits until the box’s computed opacity is 1, then `elementFromPoint` at the title centre and the button centre must land inside `.fcc-cut-required-modal`. That passed without a stacking-CSS change. Screenshot is taken after the opacity wait.
+
+### Weekly card copy/layout
+
+Dropped the inner “This week” header. Each row is label over line, left-aligned, full width (`.ow-row`, not `.sn-row`). Label is small uppercase, no wrap. Whole row is the link; hover uses the existing Office row wash (`--white-5`). A muted → sits on the right, same idea as Box Score →. CSS scoped to `.office-weekly`.
+
 ### Self-check (1280)
 
-- `reports/moment-queue/office-weekly-card.png` — Office, three columns. Top of This Week is the existing dark card titled “This week” with two rows: Tournament update / “The tournament bracket moved this week.” and Recruit visit / “Ellis Clemons is visiting this week.” Neutral text, no gold. Next game and Team snapshot sit under it. Advance is the only green button (Play Next Game).
-- `reports/moment-queue/popup-1-of-2.png` — One Sammy modal over the Office. Eyebrow reads “1 OF 2 · REGION TOURNAMENT QUALIFIED”. Body is the conference-title qualification copy. One orange “Go To Locker Room” (existing Sammy chrome). Nothing else stacked.
-- `reports/moment-queue/cut-after-popup.png` — Cut modal only: “Trim Your Roster to Size”, copy about assigning 2 players, green “Assign Practice Squad”. No Sammy / Big News overlay behind it. Advance label is also Assign Practice Squad (existing cut mode).
+- `reports/moment-queue/office-weekly-card.png` — Column 02 is titled This Week only (no second header on the card). Top card has two stacked rows: **TOURNAMENT UPDATE** over “The tournament bracket moved this week.” with → on the right; **RECRUIT VISIT** over “Ellis Clemons is visiting this week.” with → on the right. Next game (AT 21. Morristown) and Team snapshot sit **below** that card, not over it. No overlapping text. Neutral chrome, no gold. Green only on Advance (Play Next Game).
+- `reports/moment-queue/popup-1-of-2.png` — One Sammy modal over the Office. Eyebrow reads “1 OF 2 · REGION TOURNAMENT QUALIFIED”. Nothing else stacked.
+- `reports/moment-queue/cut-after-popup.png` — The cut modal is **on top** and fully opaque. Title “Trim Your Roster to Size”, body about assigning 2 players, and the green “Assign Practice Squad” button are all readable. Office cards (result, What moved, next game) sit **behind** the dimmed page; none of their text is drawn over the modal title or button. No Sammy overlay. Advance label is Assign Practice Squad.
 
-### Gates (fix pass)
+### Gates (small fix pass)
 
-Related tests: `tests/test_moment_queue.py` + sibling modal tests, 25 passed; `tests/e2e/moment-queue.spec.js` 3 passed.
-
-`pytest --ignore=tests/e2e`: **3890 passed**, 0 failed, 14 skipped, 109 xfailed, 1 xpassed.
-
-Full Playwright (`env -u CI`, port 8088, workers=1): **547 passed, 3 skipped** (8.0m).
-
-Servers stopped; regenerated tracked `reports/` images restored. New shots kept under `reports/moment-queue/`.
+`tests/test_moment_queue.py`: 8 passed. `tests/e2e/moment-queue.spec.js` + `tests/e2e/office-frontend.spec.js`: 13 passed, 1 skipped. Did not re-run the full suites (no cut-modal stacking CSS; changes stayed in officeHome, `.office-weekly` CSS, the spec, and the report).
 
 STATUS: COMPLETE

@@ -251,10 +251,33 @@ test('the weekly card shows a recruit visit and a bracket update', async ({ page
   await expect(card.getByText('Ellis Clemons is visiting this week.')).toBeVisible();
   await expect(card.getByText('Tournament update')).toBeVisible();
   await expect(card.getByText('The tournament bracket moved this week.')).toBeVisible();
-  await expect(card.locator('a.sn-row[href*="recruiting.html"]')).toHaveCount(1);
-  await expect(card.locator('a.sn-row[href*="tab=tournament-view"]')).toHaveCount(1);
+  await expect(card.locator('a.ow-row[href*="recruiting.html"]')).toHaveCount(1);
+  await expect(card.locator('a.ow-row[href*="tab=tournament-view"]')).toHaveCount(1);
+  await expect(card.locator('.card-h')).toHaveCount(0);
   await page.screenshot({ path: path.join(SHOTS, 'office-weekly-card.png') });
 });
+
+async function assertCutModalOnTop(page) {
+  await page.waitForFunction(() => {
+    const box = document.querySelector('.fcc-cut-required-modal .gob-modal-box');
+    return !!(box && parseFloat(getComputedStyle(box).opacity) === 1);
+  }, null, { timeout: 5000 });
+  const hits = await page.evaluate(() => {
+    function insideModal(el) {
+      const modal = document.querySelector('.fcc-cut-required-modal');
+      if (!el || !modal) return false;
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!(hit && modal.contains(hit));
+    }
+    return {
+      title: insideModal(document.getElementById('fcc-cut-required-title')),
+      button: insideModal(document.getElementById('fcc-cut-required-close')),
+    };
+  });
+  expect(hits.title, 'title centre should hit the cut modal').toBe(true);
+  expect(hits.button, 'button centre should hit the cut modal').toBe(true);
+}
 
 test('cut modal opens once after the pop-up closes', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -264,6 +287,7 @@ test('cut modal opens once after the pop-up closes', async ({ page }) => {
   await dismissSammy(page);
   await expect(page.locator('.fcc-cut-required-modal.is-visible')).toHaveCount(1);
   await expect(page.locator('.sammy-modal-backdrop.open')).toHaveCount(0);
+  await assertCutModalOnTop(page);
   await page.screenshot({ path: path.join(SHOTS, 'cut-after-popup.png') });
   await page.waitForTimeout(8500);
   await expect(page.locator('.fcc-cut-required-modal')).toHaveCount(1);

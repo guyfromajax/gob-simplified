@@ -839,22 +839,23 @@
   function weeklyCard(items, index) {
     if (!Array.isArray(items) || !items.length) return null;
     var node = card('office-weekly', index);
-    var head = el('div', 'card-h');
-    head.appendChild(el('h3', '', 'This week'));
-    node.appendChild(head);
     items.forEach(function (item) {
       if (!item) return;
       var url = weeklyHref(item);
-      var row = el(url ? 'a' : 'div', 'sn-row');
+      var row = el(url ? 'a' : 'div', 'ow-row');
       if (url) {
         row.href = url;
         bindGo(row, url);
       }
-      if (present(item.title)) row.appendChild(el('span', 'sn-l', item.title));
-      if (present(item.line)) row.appendChild(el('span', '', item.line));
-      if (row.childNodes.length) node.appendChild(row);
+      var body = el('span', 'ow-b');
+      if (present(item.title)) body.appendChild(el('span', 'ow-k', item.title));
+      if (present(item.line)) body.appendChild(el('span', 'ow-v', item.line));
+      if (!body.childNodes.length) return;
+      row.appendChild(body);
+      row.appendChild(el('span', 'ow-go', '→'));
+      node.appendChild(row);
     });
-    return node.childNodes.length > 1 ? node : null;
+    return node.childNodes.length ? node : null;
   }
 
   function nextCard(game, digest, index) {
