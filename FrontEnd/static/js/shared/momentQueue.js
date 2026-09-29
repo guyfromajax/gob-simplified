@@ -143,7 +143,7 @@
     });
     return global.SeasonPeak.showReview({
       payload: data,
-      titleMoments: champs,
+      titleTrophies: data.titles || [],
       item: moment,
       queue: ctx.queue,
       teamName: (topData && (topData.team || topData.user_team_name)) || '',

@@ -10290,9 +10290,9 @@ def _build_moment_queue_for_command_center(
     """The Office moment queue, plus the three payloads the new kinds point at.
 
     Every payload is derived here, at route level, from data the load already has:
-    the tournament brackets, the season snapshot reader in ``career_data`` and the
-    week-35 signing results. No sim hook and no new stored field beyond the two
-    season "seen" stamps.
+    the tournament brackets, the season-record detail helper (same path as the
+    stored trophy), and the week-35 signing results. No sim hook and no new
+    stored field beyond the two season "seen" stamps.
     """
     from BackEnd.utils.moment_queue import ARCHETYPES_HREF, build_moment_queue
     from BackEnd.utils.office_digest import ROUND_NAME_BY_WEEK
