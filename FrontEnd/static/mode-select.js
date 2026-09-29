@@ -91,8 +91,10 @@ let mostRecentFranchiseId = '';
 /** The last view model handed to homeBase.js, so partial updates can reuse it. */
 let hbView = null;
 let hbUsername = '';
-/** Career numerals from GET /franchise/coach-career (online only). */
+/** Career numerals from GET /franchise/coach-career (the left-zone strip, online). */
 let hbCareer = null;
+/** The offline "Your Career" right zone, from the same coach-career payload. */
+let hbCareerZone = null;
 /** PR 5 owns the Trophy Case route; the entry stays off until it lands. */
 const HB_TROPHY_CASE_HREF = '';
 /** How long the loader will wait on the right zone's first view before giving up. */
@@ -375,9 +377,9 @@ function renderCommunityLeaderboard(leaderboardData, currentUsername) {
  * number here: win % arrives pre-formatted as `win_pct_display` (never derived
  * from record.win_rate), and a field the payload omits drops its cell.
  *
- * Titles is the one exception and the only arithmetic on this page: the payload
- * carries `championships_total` broken out by kind with no total, so the four
- * counts are added. Called out in reports/home-base-online-2026-09-29.md.
+ * The client does no arithmetic: `titles_total` arrives pre-summed from the
+ * server (Ch7 PR2), win % arrives as `win_pct_display`, and a field the payload
+ * omits drops its cell.
  */
 function hbCareerModel(data) {
   if (!data) return null;
@@ -391,12 +393,7 @@ function hbCareerModel(data) {
     // Shown only when the server sends it; the client does not compute a rate.
     if (data.win_pct_display) model.winPct = String(data.win_pct_display);
   }
-  const titles = data.championships_total;
-  if (titles && typeof titles === 'object') {
-    model.titles = Object.keys(titles).reduce(function (total, kind) {
-      return total + (safeNumber(titles[kind], 0));
-    }, 0);
-  }
+  if (data.titles_total != null) model.titles = safeNumber(data.titles_total, 0);
   if (data.seasons_completed != null) model.seasons = safeNumber(data.seasons_completed, 0);
   if (data.geek_points != null) {
     const gp = safeNumber(data.geek_points, 0);
@@ -406,15 +403,129 @@ function hbCareerModel(data) {
   return Object.keys(model).length ? model : null;
 }
 
+/**
+ * A program's own banner art from a slug (+ optional generated visual), the same
+ * name→slug producer the doors use. Team Builder / custom programs render their
+ * generated art when the caller carries `assetStrategy: 'generated'` (and colours);
+ * core programs resolve `<slug>_banner_card.webp`.
+ */
+function hbResolveBanner(spec) {
+  spec = spec || {};
+  if (typeof getTeamAssetPath !== 'function') return '';
+  const nameOrSlug = spec.slug || spec.name || '';
+  if (!nameOrSlug) return '';
+  if (spec.assetStrategy === 'generated' || spec.isCustom) {
+    return getTeamAssetPath(spec.name || spec.slug, 'banner_card', {
+      name: spec.name,
+      abbreviation: spec.abbreviation,
+      mascot: spec.mascot,
+      primary_color: spec.primaryColor,
+      secondary_color: spec.secondaryColor,
+      jersey_preset: spec.jerseyPreset,
+      asset_strategy: 'generated',
+      is_custom: true,
+      replaced_name: spec.replacedName,
+    });
+  }
+  return getTeamAssetPath(spec.slug || spec.name, 'banner_card');
+}
+
+// Trophy kinds → medallion (server owns the counts; the client only maps a kind
+// to its letter, gold flag and display label, the way the frame does).
+const HB_TITLE_MEDALLIONS = {
+  national: { letter: 'N', label: 'National champions' },
+  region: { letter: 'R', label: 'Region champions' },
+  conf_t: { letter: 'C', label: 'Conference champions' },
+  conf_rs: { letter: 'C', label: 'Conference regular-season #1' },
+};
+const HB_MILESTONE_MEDALLIONS = {
+  milestone_first_signing_class: { letter: 'S', label: 'First signing class' },
+  milestone_first_bracket: { letter: 'B', label: 'First bracket' },
+  milestone_first_archetype: { letter: 'A', label: 'First coach archetype' },
+};
+
+function hbTrophyMedallion(trophy) {
+  const kind = String((trophy && trophy.kind) || '');
+  const title = HB_TITLE_MEDALLIONS[kind];
+  const milestone = HB_MILESTONE_MEDALLIONS[kind];
+  const spec = title || milestone;
+  if (!spec) return null; // All-Americans and season records are not shelf medallions.
+  const team = safeText(trophy.team_name, '');
+  const season = trophy.season != null ? 'Season ' + trophy.season : '';
+  const sub = [team, season].filter(Boolean).join(' · ');
+  return { gold: !!title, letter: spec.letter, title: spec.label, sub: sub };
+}
+
+/** One server top_seasons row -> one .tsn row. Server order is preserved. */
+function hbTopSeasonRow(row) {
+  const wins = safeNumber(row.wins, 0);
+  const losses = safeNumber(row.losses, 0);
+  const gp = safeNumber(row.season_gp, 0);
+  return {
+    bannerUrl: hbResolveBanner({ slug: row.team_slug, name: row.team_name }),
+    name: safeText(row.team_name, 'Program'),
+    season: row.season != null ? row.season : '',
+    record: wins + '–' + losses,
+    finish: safeText(row.finish, ''),
+    finishIsTitle: !!row.finish_is_title,
+    inProgress: !!row.in_progress,
+    week: row.week != null ? row.week : '',
+    geekPoints: gp.toLocaleString('en-US'),
+  };
+}
+
+/**
+ * The offline "Your Career" zone (Ch7 PR2). Every numeral is a server value; the
+ * trophies and Top Seasons come pre-ranked. Titles are grouped before milestones
+ * on the shelf so the count line ("3 titles · 2 milestones") reads in the same
+ * order. Nothing here derives a number or a ranking.
+ */
+function hbCareerZoneModel(data) {
+  if (!data) return null;
+  const record = data.record || {};
+  const wins = safeNumber(record.wins, 0);
+  const losses = safeNumber(record.losses, 0);
+  const titles = safeNumber(data.titles_total, 0);
+  const seasons = safeNumber(data.seasons_completed, 0);
+  const gp = safeNumber(data.geek_points, 0);
+  const recordHollow = (wins + losses) === 0;
+
+  const rawTrophies = Array.isArray(data.trophies) ? data.trophies : [];
+  const medallions = rawTrophies.map(hbTrophyMedallion).filter(Boolean);
+  const titleMeds = medallions.filter(function (m) { return m.gold; });
+  const milestoneMeds = medallions.filter(function (m) { return !m.gold; });
+
+  const topSeasons = (Array.isArray(data.top_seasons) ? data.top_seasons : []).map(hbTopSeasonRow);
+
+  return {
+    record: wins + '–' + losses,
+    recordHollow: recordHollow,
+    winPct: data.win_pct_display ? String(data.win_pct_display) : '',
+    titles: String(titles),
+    titlesHollow: titles === 0,
+    seasons: String(seasons),
+    seasonsHollow: seasons === 0,
+    geekPoints: gp.toLocaleString('en-US'),
+    geekPointsHollow: gp === 0,
+    // The caption reads as an invitation; it only fits a truly fresh coach.
+    zeroState: recordHollow && titles === 0 && seasons === 0 && gp === 0,
+    trophies: titleMeds.concat(milestoneMeds),
+    trophyCounts: { titles: titleMeds.length, milestones: milestoneMeds.length },
+    topSeasons: topSeasons,
+  };
+}
+
 async function loadCoachCareer() {
-  // Online only: PR 2 owns the offline "Your Career" zone.
-  if (msCommunityOffline()) return;
+  // Loopback serves this on desktop (a /franchise route, never a community host),
+  // so it runs offline too and feeds the "Your Career" zone. No remote call.
   const data = await safeJsonFetch(API_CONFIG.buildUrl('/franchise/coach-career'), {
     headers: getAuthHeaders(),
   });
   hbCareer = hbCareerModel(data);
+  hbCareerZone = hbCareerZoneModel(data);
   if (hbView) {
     hbView.career = hbCareer;
+    hbView.careerZone = hbCareerZone;
     if (window.GOBHomeBase) window.GOBHomeBase.render(hbView);
   }
 }
@@ -494,11 +605,16 @@ function hbAroundCard(entry, showNew) {
     coach: safeText(entry.username, 'Coach'),
     isMe: !!(atlCurrentUserId && String(entry.user_id || '') === String(atlCurrentUserId)),
     isNew: !!showNew,
-    // The board carries no team slug, so art resolves off the display name with
-    // the same name->slug helper the door art uses.
-    bannerUrl: teamName && typeof getTeamAssetPath === 'function'
-      ? getTeamAssetPath(teamName, 'banner_card')
-      : '',
+    // The slot now carries team_slug + asset_strategy, so a program (including a
+    // Team Builder / custom one) loads its own banner art instead of falling back
+    // to general art off the display name.
+    bannerUrl: hbResolveBanner({
+      slug: entry.team_slug,
+      name: teamName,
+      assetStrategy: entry.asset_strategy,
+      primaryColor: entry.primary_color,
+      secondaryColor: entry.secondary_color,
+    }),
     team: teamName,
     record: wins + '-' + losses,
     rank: (entry.national_rank != null && entry.national_rank !== '') ? '#' + entry.national_rank : '',
@@ -921,6 +1037,7 @@ function renderFranchiseSlots(franchises, teamsById, teamsByName, commandCenterB
     accountName: hbUsername || 'Coach',
     slots: slots,
     career: hbCareer,
+    careerZone: hbCareerZone,
     trophyCaseHref: HB_TROPHY_CASE_HREF,
     around: (hbView && hbView.around) || [],
     newCount: (hbView && hbView.newCount) || 0,
@@ -1238,11 +1355,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     console.error('[ALPHA] Failed to load app config:', error);
   }
 
-  // Desktop has no community backend: no requests, and the right zone stays
-  // empty until "Your Career" fills it. The left zone works either way.
-  // The loader waits on the first community view only, never on the 20 s poll.
-  let rightZoneFirstView = Promise.resolve();
-  if (!msCommunityOffline()) {
+  // Desktop has no community backend: no community requests. The right zone is
+  // "Your Career", fed only by GET /franchise/coach-career over loopback, and the
+  // loader waits on it. Online, the loader waits on the first community view (never
+  // on the 20 s poll) plus the career strip.
+  let rightZoneFirstView;
+  if (msCommunityOffline()) {
+    rightZoneFirstView = loadCoachCareer();
+  } else {
     setLeaderboardView('geek_points');
     rightZoneFirstView = Promise.all([
       loadCommunityLeaderboard(currentUsername),

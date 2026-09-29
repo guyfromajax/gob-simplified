@@ -92,6 +92,8 @@ function coachCareer(earned) {
     championships_total: earned
       ? { conf_rs: 1, conf_t: 1, region: 1, national: 0 }
       : { conf_rs: 0, conf_t: 0, region: 0, national: 0 },
+    // Pre-summed by the server (Ch7 PR2): the client shows this verbatim.
+    titles_total: earned ? 3 : 0,
     win_pct_display: earned ? '.768' : null,
     geek_points: earned ? 4060 : 0,
     seasons_completed: earned ? 4 : 0,
@@ -325,14 +327,18 @@ test.describe('career strip', () => {
     await expect(page.locator('[data-hb-trophy-case]')).toHaveCount(0);
   });
 
-  test('desktop gets no career strip and no career request', async ({ page }) => {
+  test('desktop shows the offline career zone in place of the left-zone strip', async ({ page }) => {
+    // PR2: the coach-career payload feeds the offline "Your Career" right zone
+    // over loopback (a /franchise route, never a community host), so desktop DOES
+    // request it now — but the left-zone strip stays absent (the zone replaces it).
     const seen = [];
     page.on('request', (req) => {
       if (req.url().includes('/franchise/coach-career')) seen.push(req.url());
     });
     await openHomeBase(page, { programs: 2, desktop: true });
     await expect(page.locator('[data-hb-career]')).toHaveCount(0);
-    expect(seen).toEqual([]);
+    await expect(page.locator('[data-hb-right-offline]')).toBeVisible();
+    expect(seen.length).toBeGreaterThan(0);
   });
 });
 
@@ -483,7 +489,7 @@ test.describe('keyboard', () => {
   });
 });
 
-test('desktop keeps the offline guard: no community requests, right zone empty', async ({ page }) => {
+test('desktop keeps the offline guard: no community requests, "Your Career" right zone', async ({ page }) => {
   const community = await openHomeBase(page, { programs: 2, desktop: true });
   await page.clock.install();
   await page.clock.runFor(65000);
@@ -491,7 +497,10 @@ test('desktop keeps the offline guard: no community requests, right zone empty',
   await page.clock.runFor(1000);
   expect(community, JSON.stringify(community)).toEqual([]);
 
+  // PR2 fills the offline right zone with "Your Career" (from loopback only); the
+  // online tab panel and Find A Game placard never appear.
   await expect(page.locator('[data-hb-right-offline]')).toBeVisible();
+  await expect(page.locator('.cr .cr-n')).toBeVisible();
   await expect(page.locator('.hbt')).toHaveCount(0);
   await expect(page.locator('.fag')).toHaveCount(0);
   // The left zone and the green rule still work with no network.

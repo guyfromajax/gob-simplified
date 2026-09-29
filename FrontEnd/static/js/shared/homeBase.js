@@ -145,6 +145,9 @@
    * A zero renders hollow: potential, not an achievement.
    */
   function careerStripHtml(view) {
+    // Desktop has no left-zone strip: the offline "Your Career" right zone
+    // carries the numerals instead.
+    if (!view.online) return '';
     var career = view.career;
     if (!career) return '';
     var cells = '';
@@ -330,16 +333,124 @@
       + '</section>';
   }
 
-  /** Desktop: the zone stays empty until "Your Career" lands. No remote calls. */
-  function rightOfflineHtml() {
-    return '<section class="hb-r" data-hb-right-offline></section>';
+  // ── Right zone: offline · "Your Career" ──────────────────
+  // Fed only by GET /franchise/coach-career (loopback on desktop). No remote
+  // calls. Reward gold appears only on title medallions and title finishes.
+  var TROPHY_EMPTY_SLOTS = [
+    { letter: 'C', title: 'Conference', sub: 'Champions' },
+    { letter: 'R', title: 'Region', sub: 'Champions' },
+    { letter: 'N', title: 'National', sub: 'Champions' },
+    { letter: 'S', title: 'First signing class', sub: 'Milestone' },
+  ];
+
+  function careerNumeralsHtml(zone) {
+    function cell(value, label, hollow) {
+      return '<div><b' + (hollow ? ' class="hollow"' : '') + '>' + esc(value) + '</b>'
+        + '<span>' + esc(label) + '</span></div>';
+    }
+    var recordLabel = 'Career record' + (zone.winPct ? ' · ' + zone.winPct : '');
+    return '<div class="cr-n">'
+      + cell(zone.record, recordLabel, !!zone.recordHollow)
+      + cell(zone.titles, 'Titles', !!zone.titlesHollow)
+      + cell(zone.seasons, 'Seasons', !!zone.seasonsHollow)
+      + cell(zone.geekPoints, 'Geek Points', !!zone.geekPointsHollow)
+      + '</div>';
+  }
+
+  function trophyShelfHtml(zone) {
+    var trophies = zone.trophies || [];
+    if (trophies.length) {
+      var meds = trophies.map(function (t) {
+        return '<div class="tro"><span class="med ' + (t.gold ? 'gold' : 'ms') + '">' + esc(t.letter) + '</span>'
+          + '<div><b>' + esc(t.title) + '</b><span>' + esc(t.sub) + '</span></div></div>';
+      }).join('');
+      return '<div class="shelf">' + meds + '</div>';
+    }
+    // Nothing earned: labelled dashed slots for what can be won.
+    var slots = TROPHY_EMPTY_SLOTS.map(function (s) {
+      return '<div class="tro slot-e"><span class="med">' + esc(s.letter) + '</span>'
+        + '<div><b>' + esc(s.title) + '</b><span>' + esc(s.sub) + '</span></div></div>';
+    }).join('');
+    return '<div class="shelf">' + slots + '</div>';
+  }
+
+  function topSeasonRowHtml(row, rank) {
+    var art = row.bannerUrl ? '<img src="' + esc(row.bannerUrl) + '" alt="">' : '';
+    var finish = row.inProgress
+      ? '<span class="ip">In progress · Week ' + esc(row.week) + '</span>'
+      : esc(row.finish || '');
+    var finishClass = (!row.inProgress && row.finishIsTitle) ? ' gold-t' : '';
+    return '<div class="tsn"><i>' + rank + '</i>'
+      + '<span class="tsn-a">' + art + '</span>'
+      + '<div class="tsn-n"><b>' + esc(row.name) + '</b><span>Season ' + esc(row.season) + '</span></div>'
+      + '<span class="tsn-r">' + esc(row.record) + '</span>'
+      + '<span class="tsn-f' + finishClass + '">' + finish + '</span>'
+      + '<span class="tsn-g">' + esc(row.geekPoints) + '<small>GP</small></span></div>';
+  }
+
+  function topSeasonsHtml(zone) {
+    var rows = zone.topSeasons || [];
+    var html = '';
+    for (var i = 0; i < rows.length && i < 5; i += 1) {
+      html += topSeasonRowHtml(rows[i], i + 1);
+    }
+    for (var j = rows.length; j < 5; j += 1) {
+      var copy = '';
+      if (j === rows.length) {
+        copy = rows.length
+          ? 'Your next season can land here'
+          : 'Coach your first game and your season ranks here';
+      }
+      html += '<div class="tsn is-e"><i>' + (j + 1) + '</i><span>' + esc(copy) + '</span></div>';
+    }
+    return '<div class="tsn-l">' + html + '</div>';
+  }
+
+  function rightOfflineHtml(view) {
+    var zone = view.careerZone;
+    // No payload yet (first paint / loopback still resolving): keep the empty
+    // frame so the loader has a zone to reveal, and never emit a fetch.
+    if (!zone) return '<section class="hb-r cr" data-hb-right-offline></section>';
+
+    var caption = zone.zeroState
+      ? '<p class="cr-cap">Every game you coach, in any program, adds to these.</p>'
+      : '';
+
+    var counts = zone.trophyCounts || { titles: 0, milestones: 0 };
+    var subLine = (zone.trophies && zone.trophies.length)
+      ? counts.titles + ' ' + (counts.titles === 1 ? 'title' : 'titles')
+        + ' · ' + counts.milestones + ' ' + (counts.milestones === 1 ? 'milestone' : 'milestones')
+      : 'Still to win';
+    // PR 5 owns the Trophy Case page; the link stays off behind the same flag as
+    // the online strip until then.
+    var trophyLink = view.trophyCaseHref
+      ? '<div class="r"><a class="lnk" href="' + esc(view.trophyCaseHref) + '"'
+        + ' data-hb-trophy-case data-sfx="SFX_SELECT">'
+        + ((zone.trophies && zone.trophies.length) ? 'View all' : 'Open') + '</a></div>'
+      : '';
+
+    return '<section class="hb-r cr" data-hb-right-offline>'
+      + '<div>'
+      + '<div class="hb-h"><h2>Your Career</h2><span>All programs · this computer</span></div>'
+      + careerNumeralsHtml(zone)
+      + '</div>'
+      + caption
+      + '<div class="tcase">'
+      + '<div class="sec-h"><h3>Trophy Case</h3><span>' + esc(subLine) + '</span>' + trophyLink + '</div>'
+      + trophyShelfHtml(zone)
+      + '</div>'
+      + '<div class="sec">'
+      + '<div class="sec-h"><h3>Top Seasons</h3><span>Ranked by season Geek Points</span></div>'
+      + topSeasonsHtml(zone)
+      + '</div>'
+      + '</section>';
   }
 
   // ── Render ───────────────────────────────────────────────
   function render(view) {
     if (!surface) return;
     lastView = view || {};
-    var right = lastView.online ? rightOnlineHtml(lastView) : rightOfflineHtml();
+    var right = lastView.online ? rightOnlineHtml(lastView) : rightOfflineHtml(lastView);
     surface.innerHTML = '<div class="hb">' + topBarHtml(lastView) + '<main class="hb-body">'
       + leftHtml(lastView) + right + '</main></div>';
     openMenuSlot = null;
