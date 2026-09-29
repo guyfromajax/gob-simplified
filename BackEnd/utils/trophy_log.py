@@ -57,9 +57,17 @@ def trophy_key(
     return ":".join(parts)
 
 
-def _key_path(key: str) -> str:
+def _storage_key(key: str) -> str:
     # Mongo field names cannot contain "." or start with "$".
-    return f"{TROPHY_KEYS_FIELD}." + key.replace(".", "_").replace("$", "_")
+    return key.replace(".", "_").replace("$", "_")
+
+
+def _key_path(key: str) -> str:
+    return f"{TROPHY_KEYS_FIELD}.{_storage_key(key)}"
+
+
+# ``_id: 0`` so the read is the map alone, not the rest of the coach doc.
+TROPHY_KEYS_PROJECTION = {TROPHY_KEYS_FIELD: 1, "_id": 0}
 
 
 def _utc(value: Any) -> Optional[datetime]:
@@ -177,30 +185,85 @@ def record_title_trophy(*, owner_user_id: Any, kind: str, franchise_id: Any) -> 
     return append_trophy(owner_user_id, entry)
 
 
-def record_all_american_trophies(franchise_doc: dict, awards: dict) -> int:
-    """One entry per USER-team player on the first/second/third All-American teams."""
+def _user_all_american_picks(franchise_doc: dict, awards: dict) -> list[tuple[str, dict]]:
+    """``(kind, pick)`` for USER-team players on the three All-American teams."""
     user_tid = str(franchise_doc.get("user_team_object_id") or "")
     owner = franchise_doc.get("user_id")
     teams = (awards or {}).get("all_american_teams") or {}
     if not user_tid or not owner or not isinstance(teams, dict):
-        return 0
-    added = 0
+        return []
+    picks: list[tuple[str, dict]] = []
     for team_key, kind in ALL_AMERICAN_KIND_BY_TEAM.items():
         for pick in teams.get(team_key) or []:
             if not isinstance(pick, dict) or str(pick.get("team_id") or "") != user_tid:
                 continue
-            player_id = str(pick.get("player_id") or "")
-            if not player_id:
-                continue
-            entry = build_trophy_entry(
-                franchise_doc,
-                kind=kind,
-                team_id=user_tid,
-                player_id=player_id,
-                detail={"player_id": player_id, "player_name": pick.get("name") or ""},
-            )
-            added += int(append_trophy(owner, entry))
+            if str(pick.get("player_id") or ""):
+                picks.append((kind, pick))
+    return picks
+
+
+def expected_all_american_storage_keys(franchise_doc: dict, awards: dict) -> set[str]:
+    """``trophy_keys`` map keys for the user-team All-Americans on ``awards``."""
+    user_tid = str(franchise_doc.get("user_team_object_id") or "")
+    if not user_tid:
+        return set()
+    fid = str(franchise_doc.get("_id"))
+    season = int(franchise_doc.get("current_season", 1) or 1)
+    return {
+        _storage_key(trophy_key(fid, season, kind, user_tid, str(pick.get("player_id"))))
+        for kind, pick in _user_all_american_picks(franchise_doc, awards)
+    }
+
+
+def read_trophy_keys(owner_user_id: Any) -> set[str]:
+    """One projected read of ``trophy_keys``. Empty when the coach doc or field is absent."""
+    target = _coach_target(owner_user_id)
+    if target is None:
+        return set()
+    coll, doc_id, _local = target
+    doc = coll.find_one({"_id": doc_id}, TROPHY_KEYS_PROJECTION) or {}
+    raw = doc.get(TROPHY_KEYS_FIELD) or {}
+    if not isinstance(raw, dict):
+        return set()
+    return {str(key) for key in raw}
+
+
+def record_all_american_trophies(franchise_doc: dict, awards: dict) -> int:
+    """One entry per USER-team player on the first/second/third All-American teams."""
+    user_tid = str(franchise_doc.get("user_team_object_id") or "")
+    owner = franchise_doc.get("user_id")
+    picks = _user_all_american_picks(franchise_doc, awards)
+    if not user_tid or not owner or not picks:
+        return 0
+    added = 0
+    for kind, pick in picks:
+        player_id = str(pick.get("player_id") or "")
+        entry = build_trophy_entry(
+            franchise_doc,
+            kind=kind,
+            team_id=user_tid,
+            player_id=player_id,
+            detail={"player_id": player_id, "player_name": pick.get("name") or ""},
+        )
+        added += int(append_trophy(owner, entry))
     return added
+
+
+def record_all_american_trophies_if_missing(franchise_doc: dict, awards: dict) -> int:
+    """Append user-team All-Americans only when a key is missing.
+
+    One projected ``trophy_keys`` read. When every expected key is already in that
+    map the guarded updates are skipped, so a week-35 Office load does not write.
+    A save whose awards were stored before the trophy log still catches up: the
+    keys are absent, so this records once. The map is the same guard ``append_trophy``
+    uses, so a replay cannot duplicate an entry.
+    """
+    expected = expected_all_american_storage_keys(franchise_doc, awards)
+    if not expected:
+        return 0
+    if expected <= read_trophy_keys(franchise_doc.get("user_id")):
+        return 0
+    return record_all_american_trophies(franchise_doc, awards)
 
 
 def _round_matchups(bracket_round: Any) -> Iterable[dict]:

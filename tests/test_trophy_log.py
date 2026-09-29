@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 import BackEnd.utils.franchise_championships as fc
 import BackEnd.utils.franchise_team_display as ftdisp
 import BackEnd.utils.local_coach as lc
+import BackEnd.utils.ownership as ownership
 import BackEnd.utils.trophy_log as tl
 from BackEnd.api import franchise_routes
 from BackEnd.api.api import app
@@ -180,6 +181,132 @@ def test_all_americans_user_team_only_and_replay_safe(store, owner):
     assert by_kind["all_american_3"]["detail"] == {"player_id": "p3", "player_name": "Bo Wing"}
     assert by_kind["all_american_1"]["key"] == f"{doc['_id']}:2:all_american_1:{user_tid}:p1"
     assert all(t["team_name"] == DISPLAY_NAME for t in trophies)
+
+
+_CC_READS = 5
+_TROPHY_KEYS_PROJECTION = {"trophy_keys": 1, "_id": 0}
+
+
+def _bind_command_center(monkeypatch, store):
+    """Point the Office read at this test store (mongomock or SQLite)."""
+    monkeypatch.setattr(ownership, "franchises_collection", store.franchises_collection)
+    monkeypatch.setattr(franchise_routes, "db", store.db)
+    for name in (
+        "franchise_state_collection",
+        "franchise_team_data_collection",
+        "franchise_players_data_collection",
+        "franchise_recruits_data_collection",
+        "games_collection",
+        "press_conference_sessions_collection",
+        "tournaments_collection",
+        "teams_collection",
+        "players_collection",
+    ):
+        monkeypatch.setattr(franchise_routes, name, getattr(store, name))
+
+
+class _CoachWriteSpy:
+    """Count coach-doc writes. The assertion uses this log, not a later read."""
+
+    def __init__(self, coll, coach_id):
+        self.coll = coll
+        self.coach_id = coach_id
+        self.updates = []
+        self.projections = []
+        self._update = coll.update_one
+        self._find = coll.find_one
+
+    def update_one(self, filt, update, upsert=False, **kwargs):
+        self.updates.append(update)
+        return self._update(filt, update, upsert=upsert, **kwargs)
+
+    def find_one(self, filt=None, *args, **kwargs):
+        projection = args[0] if args else kwargs.get("projection")
+        if isinstance(filt, dict) and filt.get("_id") == self.coach_id:
+            self.projections.append(projection)
+        return self._find(filt, *args, **kwargs)
+
+    @property
+    def key_writes(self) -> int:
+        total = 0
+        for update in self.updates:
+            fields = (update or {}).get("$set") or {}
+            total += sum(1 for key in fields if str(key).startswith("trophy_keys."))
+        return total
+
+    def install(self, monkeypatch):
+        monkeypatch.setattr(self.coll, "update_one", self.update_one)
+        monkeypatch.setattr(self.coll, "find_one", self.find_one)
+
+
+def _coach_collection(store, owner):
+    if owner == LOCAL_USER_ID:
+        return store.db["save_meta"], lc.LOCAL_COACH_ID
+    return store.users_collection, ObjectId(owner)
+
+
+def test_command_center_week_35_reads_write_each_all_american_once(store, owner, monkeypatch):
+    """N Office loads at week 35 write each pre-existing All-American once.
+
+    Awards are already on the franchise (a save from before the trophy log).
+    Writes are counted from a spy on the coach collection and, for the desktop
+    coach on SQLite, from the connection's query trace. Not from reading the
+    trophy list back.
+    """
+    doc, user_tid, cpu_tid = _seed(store, owner, week=35)
+    awards = {
+        "computed_at": "before-trophy-log",
+        "all_american_teams": {
+            "first_team": [_pick("p1", "Ada Guard", user_tid), _pick("c1", "Cpu One", cpu_tid)],
+            "second_team": [_pick("p2", "Bea Post", user_tid)],
+            "third_team": [_pick("c3", "Cpu Three", cpu_tid)],
+        },
+    }
+    store.franchises_collection.update_one({"_id": doc["_id"]}, {"$set": {"awards": awards}})
+    doc["awards"] = awards
+    n_aas = 2
+    _bind_command_center(monkeypatch, store)
+    coll, coach_id = _coach_collection(store, owner)
+    spy = _CoachWriteSpy(coll, coach_id)
+    spy.install(monkeypatch)
+
+    sql_writes: list[str] = []
+    trace_sql = owner == LOCAL_USER_ID and hasattr(store, "_conn")
+    if trace_sql:
+        def _trace(statement: str):
+            head = statement.lstrip().split(" ", 1)[0].upper() if statement.strip() else ""
+            if head in {"INSERT", "UPDATE", "REPLACE", "DELETE"} and "save_meta" in statement:
+                sql_writes.append(statement)
+
+        store._conn.set_trace_callback(_trace)
+
+    per_read_keys: list[int] = []
+    per_read_sql: list[int] = []
+    try:
+        for _ in range(_CC_READS):
+            keys_before = spy.key_writes
+            sql_before = len(sql_writes)
+            body = franchise_routes.command_center_data(
+                franchise_id=str(doc["_id"]),
+                user={"user_id": owner},
+            )
+            assert body["awards_ready"] is True
+            assert body["week"] == 35
+            per_read_keys.append(spy.key_writes - keys_before)
+            per_read_sql.append(len(sql_writes) - sql_before)
+    finally:
+        if trace_sql:
+            store._conn.set_trace_callback(None)
+
+    assert per_read_keys == [n_aas, *([0] * (_CC_READS - 1))]
+    assert spy.key_writes == n_aas
+    assert spy.projections == [_TROPHY_KEYS_PROJECTION] * _CC_READS
+    if trace_sql:
+        # The catch-up is real SQL. Later Office loads do not write the coach table.
+        assert per_read_sql[0] >= n_aas
+        assert per_read_sql[1:] == [0] * (_CC_READS - 1)
+    stored = store.franchises_collection.find_one({"_id": doc["_id"]})
+    assert stored["awards"]["computed_at"] == "before-trophy-log"
 
 
 # --- season_record --------------------------------------------------------------------------
