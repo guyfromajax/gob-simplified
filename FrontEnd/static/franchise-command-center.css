@@ -3549,8 +3549,11 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   stroke-width: 1;
 }
 
+/* The radar is neutral. Blue is reserved for RT A, attribute 9+ and elite glyphs,
+   so the shape reads in white tints — which also lets the tier colours in the
+   surrounding grid be the only hue on the page. */
 #franchise-container .tm-radar-ring-zero {
-  stroke: rgba(215, 231, 255, 0.34);
+  stroke: var(--white-28);
   stroke-width: 1.75;
 }
 
@@ -3560,15 +3563,15 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 }
 
 #franchise-container .tm-radar-shape-fill {
-  fill: rgba(64, 101, 175, 0.3);
+  fill: var(--white-12);
 }
 
 #franchise-container .tm-radar-shape-outline {
   fill: none;
-  stroke: rgba(215, 231, 255, 0.92);
+  stroke: rgba(255, 255, 255, 0.92);
   stroke-width: 2.25;
   filter: url(#tm-radar-outline-glow);
-  filter: drop-shadow(0 0 10px rgba(64, 101, 175, 0.38));
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.24));
 }
 
 #franchise-container .tm-radar-shape-outline.is-pulsing {
@@ -3740,11 +3743,11 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 @keyframes tmRadarOutlinePulse {
   0%, 100% {
     opacity: 0.82;
-    filter: drop-shadow(0 0 10px rgba(64, 101, 175, 0.34));
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.22));
   }
   50% {
     opacity: 1;
-    filter: drop-shadow(0 0 14px rgba(64, 101, 175, 0.48));
+    filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.32));
   }
 }
 

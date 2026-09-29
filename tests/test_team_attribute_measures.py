@@ -6,9 +6,9 @@ from BackEnd.utils.office_digest import (
     team_attribute_measures,
 )
 
-# Every stored team measure is a row, in family order.
+# The eleven displayed measures, in family order. Momentum is stored but not shown.
 ALL_KEYS = [
-    "team_chemistry", "fight", "discipline", "momentum_score",
+    "team_chemistry", "fight", "discipline",
     "offensive_efficiency", "defensive_efficiency",
     "pt_opp_modifier", "pt_efficiency",
     "fb_efficiency", "fb_opp_modifier",
@@ -67,7 +67,13 @@ def test_the_four_paired_labels_the_grid_needs():
     assert labels["pt_efficiency"] == "P/T Defense"
     assert labels["fb_efficiency"] == "Fast Break"
     assert labels["fb_opp_modifier"] == "Fast Break Defense"
-    assert labels["momentum_score"] == "Momentum"
+
+
+def test_momentum_is_stored_but_not_a_displayed_row():
+    """It swings game to game, so a league place and an arrow would read as noise."""
+    payload = team_attribute_measures({"momentum_score": 6}, None, None)
+    assert "momentum_score" not in {row["key"] for row in payload["measures"]}
+    assert len(payload["measures"]) == 11
 
 
 def test_only_the_eight_minus_twenty_to_twenty_measures_carry_a_signed_scale():
@@ -80,11 +86,10 @@ def test_only_the_eight_minus_twenty_to_twenty_measures_carry_a_signed_scale():
     for row in payload["measures"]:
         if row["key"] in SIGNED_KEYS:
             assert row["signed_scale"] == SIGNED_MEASURE_SCALE
-    # Chemistry has a scale but it is not signed; Momentum is ±10, not ±20.
+    # Chemistry has a scale but it is not signed.
     rows = {row["key"]: row for row in payload["measures"]}
     assert rows["team_chemistry"]["scale_max"] == 25
     assert rows["team_chemistry"]["signed_scale"] is None
-    assert rows["momentum_score"]["signed_scale"] is None
 
 
 def test_missing_attribute_stays_on_the_row_with_a_null_value():

@@ -798,19 +798,20 @@ html.gob-shell #team-attributes-view .mgrid {
   padding: var(--dsp-8) var(--dsp-12);
 }
 
-/* The bottom row's rule would float just above the card's own edge. */
-html.gob-shell #team-attributes-view .mcell:nth-last-child(-n+4) {
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-
 html.gob-shell #team-attributes-view .mcell {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
   min-width: 0;
-  padding-bottom: var(--dsp-8);
-  border-bottom: 1px solid var(--line);
+}
+
+/* The rule separates rows, so it sits on top of every cell below the first row.
+   Drawn on the bottom instead it would trail under the last row, floating just
+   above the card's own edge — and the last row is short, so counting back from the
+   end would take the rule off a cell in the row above it. */
+html.gob-shell #team-attributes-view .mcell:nth-child(n+5) {
+  padding-top: var(--dsp-8);
+  border-top: 1px solid var(--line);
 }
 
 html.gob-shell #team-attributes-view .mtop {

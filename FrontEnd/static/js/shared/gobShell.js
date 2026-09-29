@@ -31,10 +31,12 @@
       { id: 'practice-squad-view', label: 'Practice Squad' }
     ]},
     { id: 'prep', label: 'Prep', title: 'Prep', icon: 'prep', tabs: [
-      { id: 'training-view', label: 'Training' },
       { id: 'game-plan-view', label: 'Game Plan' },
       { id: 'playbooks-view', label: 'Playbooks' },
-      { id: 'scouting-view', label: 'Scouting Report' }
+      { id: 'scouting-view', label: 'Scouting Report' },
+      // Last, and named for what it is. The id is unchanged so the Advance week-flow
+      // target (gobAdvance.js) and the /training.html browse route still land here.
+      { id: 'training-view', label: 'Player Training' }
     ]},
     { id: 'league', label: 'League', title: 'League', icon: 'league', tabs: [
       { id: 'standings-view', label: 'Standings' },

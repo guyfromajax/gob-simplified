@@ -249,7 +249,7 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     ['team', 'Player Stats', 'player-stats-view'],
     ['team', 'Team Attributes', 'team-attributes-view'],
     ['team', 'Schedule', 'team-schedule-view'],
-    ['prep', 'Training', 'training-view'],
+    ['prep', 'Player Training', 'training-view'],
     ['prep', 'Game Plan', 'game-plan-view'],
     ['prep', 'Playbooks', 'playbooks-view'],
     ['prep', 'Scouting Report', 'scouting-view'],

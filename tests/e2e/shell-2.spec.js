@@ -689,7 +689,7 @@ test('flow pages keep their own exit and the court has no shell', async ({ page 
   await expect(page.locator('.rail')).toHaveCount(0);
   await openPage(page, 'training.html', cc({ training_completed: false }));
   await expect(page.locator('nav.rail')).toHaveCount(1);
-  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"] .tb-l')).toHaveText('Training');
+  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"] .tb-l')).toHaveText('Player Training');
   await expect(page.locator('#play-now.advance')).toHaveCount(1);
   await openPage(page, 'recruiting.html', cc(), '&action=run');
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
