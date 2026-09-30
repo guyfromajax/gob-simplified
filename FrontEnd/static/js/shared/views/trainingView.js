@@ -44,17 +44,20 @@ function placeTrainingTools(slot) {
   });
 }
 
+function contextValue(key) {
+  var fc = window.FranchiseContext;
+  if (!fc || typeof fc.get !== 'function') return '';
+  try { return fc.get(key) || ''; }
+  catch (err) { return ''; }
+}
+
 function optionsFrom(ctx) {
-  var door = window.FranchiseContext;
-  function read(name) {
-    return door && typeof door.get === 'function' ? (door.get(name) || '') : '';
-  }
   return {
-    mode: read('mode') || 'franchise',
-    franchiseId: (ctx && ctx.franchiseId) || read('franchise_id') || '',
-    teamId: (ctx && ctx.teamId) || read('team_id') || '',
-    week: read('week') || '',
-    from: read('from') || 'command_center'
+    mode: contextValue('mode') || 'franchise',
+    franchiseId: (ctx && ctx.franchiseId) || contextValue('franchise_id') || '',
+    teamId: (ctx && ctx.teamId) || contextValue('team_id') || '',
+    week: contextValue('week') || '',
+    from: contextValue('from') || 'command_center'
   };
 }
 
