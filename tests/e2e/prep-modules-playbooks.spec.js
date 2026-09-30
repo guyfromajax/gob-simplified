@@ -9,9 +9,33 @@ const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/prep-p
 const FID = FIXTURE.franchise_id;
 const TEAM = 'Lancaster';
 const OUT = path.join(__dirname, '../../reports/prep-modules-playbooks');
+const TOKENS_OUT = path.join(__dirname, '../../reports/playbooks-tokens');
 const BEFORE_PATH = path.join(OUT, 'before-metrics.json');
 const FIXTURE_BEFORE_PATH = path.join(__dirname, 'fixtures/playbooks-before-metrics.json');
 const CAPTURE_BEFORE = process.env.PLAYBOOKS_BEFORE === '1';
+const PREFIX = CAPTURE_BEFORE ? 'before' : 'after';
+
+function alsoTokenShot(srcName, destName) {
+  fs.mkdirSync(TOKENS_OUT, { recursive: true });
+  const src = path.join(OUT, srcName);
+  if (fs.existsSync(src)) fs.copyFileSync(src, path.join(TOKENS_OUT, destName || srcName));
+}
+
+async function resetPlaybooksScroll(page) {
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    const view = document.getElementById('playbooks-view');
+    if (view) view.scrollTop = 0;
+    const main = document.getElementById('gob-main');
+    if (main) main.scrollTop = 0;
+    document.querySelectorAll('.main, .main.scroll').forEach((el) => { el.scrollTop = 0; });
+  });
+}
+
+async function capturePage(page, dest) {
+  await resetPlaybooksScroll(page);
+  await page.screenshot({ path: dest });
+}
 function loadBeforeMetrics() {
   if (CAPTURE_BEFORE) return null;
   if (fs.existsSync(FIXTURE_BEFORE_PATH)) {
@@ -187,12 +211,14 @@ test('in-app 1280 / 1920 shots and geometry', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openInApp(page);
   const metrics1280 = await measurePlaybooks(page, '#playbooks-view');
-  const prefix = CAPTURE_BEFORE ? 'before' : 'after';
-  await page.screenshot({ path: path.join(OUT, `${prefix}-in-app-1280.png`) });
+  await capturePage(page, path.join(OUT, `${PREFIX}-in-app-1280.png`));
+  alsoTokenShot(`${PREFIX}-in-app-1280.png`, `${PREFIX}-main-1280.png`);
+  alsoTokenShot(`${PREFIX}-in-app-1280.png`, `${PREFIX}-pcc-1280.png`);
   await page.setViewportSize({ width: 1920, height: 1080 });
   await expect(page.locator('#playbooks-view .play').first()).toBeVisible();
   const metrics1920 = await measurePlaybooks(page, '#playbooks-view');
-  await page.screenshot({ path: path.join(OUT, `${prefix}-in-app-1920.png`) });
+  await capturePage(page, path.join(OUT, `${PREFIX}-in-app-1920.png`));
+  alsoTokenShot(`${PREFIX}-in-app-1920.png`, `${PREFIX}-main-1920.png`);
   if (CAPTURE_BEFORE) {
     fs.writeFileSync(BEFORE_PATH, JSON.stringify({ inApp1280: metrics1280, inApp1920: metrics1920 }, null, 2));
     return;
@@ -211,13 +237,42 @@ test('in-app 1280 / 1920 shots and geometry', async ({ page }) => {
   expect(samePaint(metrics1280.save.bg, BEFORE.inApp1280.save.bg)).toBe(true);
   expect(samePaint(metrics1280.save.color, BEFORE.inApp1280.save.color)).toBe(true);
   expect(metrics1920.tracks.length).toBe(BEFORE.inApp1920.tracks.length);
+
+  const paints = await page.evaluate(() => {
+    const host = document.getElementById('playbooks-view');
+    const orange = (v) => /rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(v);
+    const green = (v) => /rgb\(\s*52\s*,\s*236\s*,\s*39/i.test(v);
+    const navy = (v) => /rgb\(\s*39\s*,\s*64\s*,\s*142/i.test(v);
+    const paint = (el) => {
+      if (!el) return { bg: '', color: '' };
+      const s = getComputedStyle(el);
+      return { bg: s.backgroundColor, color: s.color };
+    };
+    const tabs = [...host.querySelectorAll('.playbooks-tab')].map((el) => {
+      const p = paint(el);
+      return orange(p.bg) || green(p.bg) || orange(p.color);
+    });
+    const selected = paint(host.querySelector('.play.on'));
+    const sliders = [...host.querySelectorAll('.wb i')].slice(0, 6).map((el) => {
+      const p = paint(el);
+      return orange(p.bg) || green(p.bg);
+    });
+    return {
+      tabChoicePaint: tabs.some(Boolean),
+      selectedNavy: navy(selected.bg),
+      sliderChoicePaint: sliders.some(Boolean),
+    };
+  });
+  expect(paints.tabChoicePaint).toBe(false);
+  expect(paints.selectedNavy).toBe(false);
+  expect(paints.sliderChoicePaint).toBe(false);
 });
 
 test('tutorial 1280 shot', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openStandalone(page, { mode: 'tutorial' });
-  const prefix = CAPTURE_BEFORE ? 'before' : 'after';
-  await page.screenshot({ path: path.join(OUT, `${prefix}-tutorial-1280.png`) });
+  await capturePage(page, path.join(OUT, `${PREFIX}-tutorial-1280.png`));
+  alsoTokenShot(`${PREFIX}-tutorial-1280.png`);
   if (!CAPTURE_BEFORE) {
     expect(page.url()).toContain('mode=tutorial');
     expect(page.url()).toContain('playbooks.html');
@@ -278,11 +333,15 @@ test('save shows the shared toast and stays on the view', async ({ page }) => {
   await openInApp(page, { _saves: saves });
   await page.locator('#playbooks-view .et-slider[data-sl]').first().focus();
   await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#save-btn')).toBeEnabled();
+  await capturePage(page, path.join(OUT, `${PREFIX}-unsaved-1280.png`));
+  alsoTokenShot(`${PREFIX}-unsaved-1280.png`);
   await page.locator('#save-btn').click();
   const toast = page.locator('.gob-save-toast');
   await expect(toast).toHaveText('Playbooks saved');
   await expect(toast).toBeVisible();
-  await page.screenshot({ path: path.join(OUT, 'playbooks-toast.png') });
+  await capturePage(page, path.join(OUT, 'playbooks-toast.png'));
+  alsoTokenShot('playbooks-toast.png', `${PREFIX}-saved-toast-1280.png`);
   await expect(page.locator('#playbooks-view .play').first()).toBeVisible();
   expect(saves).toEqual(['playbooks']);
 });
@@ -309,4 +368,39 @@ test('standalone save leaves for the playbook report', async ({ page }) => {
   await page.locator('#save-btn').click();
   await page.waitForURL(/playbook-report\.html|franchise-command-center\.html/, { timeout: 20000 });
   expect(saves).toEqual(['playbooks']);
+});
+
+test('unsaved Save button 1280', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openInApp(page);
+  await page.locator('#playbooks-view .et-slider[data-sl]').first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#save-btn')).toBeEnabled();
+  await capturePage(page, path.join(OUT, `${PREFIX}-unsaved-1280.png`));
+  alsoTokenShot(`${PREFIX}-unsaved-1280.png`);
+  const savePaint = await page.evaluate(() => {
+    const s = getComputedStyle(document.getElementById('save-btn'));
+    return s.backgroundColor;
+  });
+  expect(/rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(savePaint)).toBe(true);
+});
+
+test('play-details standalone 1280', async ({ page }) => {
+  await stubAuth(page);
+  await installApi(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/play-details.html?mode=franchise&play_name=Horns&play_id=horn');
+  await capturePage(page, path.join(TOKENS_OUT, `${PREFIX}-play-details-1280.png`));
+});
+
+test('handoff frames 1280', async ({ page }) => {
+  const base = process.env.FRAMES_BASE;
+  test.skip(!base, 'FRAMES_BASE not set');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(base + '/design_handoff_prep/frames/prep-playbooks-1280.html');
+  await page.waitForSelector('.pbc, .play', { timeout: 15000 });
+  await capturePage(page, path.join(TOKENS_OUT, 'frame-v1-playbooks-1280.png'));
+  await page.goto(base + '/design_handoff_prep_v2/frames/prep-playbooks-1280.html');
+  await page.waitForSelector('.pbc, .play', { timeout: 15000 });
+  await capturePage(page, path.join(TOKENS_OUT, 'frame-v2-playbooks-1280.png'));
 });
