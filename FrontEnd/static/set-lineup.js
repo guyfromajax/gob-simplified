@@ -1190,26 +1190,29 @@ function getRosterDefPct(stats) {
   return defa > 0 ? Math.round((defs / defa) * 100) : 0;
 }
 
+// Four value-only cells (PTS / REB / AST / DEF%). The labels live in the header
+// row (like the Attributes and Stats views), so each stat has its own column with
+// a real gap from ENG% on the left and RT on the right — no inline-label overlap.
 function buildProductionCell(player) {
-  const td = document.createElement('td');
-  td.className = 'prod-cell';
-  if (!player) {
-    td.innerHTML = '<div class="prod"></div>';
-    return td;
+  const frag = document.createDocumentFragment();
+  let values = ['—', '—', '—', '—'];
+  if (player) {
+    const stats = getGameStatsForRoster(player);
+    const reb = (Number(stats.DREB) || 0) + (Number(stats.OREB) || 0);
+    values = [
+      String(Number(stats.PTS) || 0),
+      String(reb),
+      String(Number(stats.AST) || 0),
+      String(getRosterDefPct(stats)),
+    ];
   }
-  const stats = getGameStatsForRoster(player);
-  const reb = (Number(stats.DREB) || 0) + (Number(stats.OREB) || 0);
-  const pts = Number(stats.PTS) || 0;
-  const ast = Number(stats.AST) || 0;
-  const defPct = getRosterDefPct(stats);
-  td.innerHTML = `
-    <div class="prod">
-      <span><b class="pv">${pts}</b><i class="pk">PTS</i></span>
-      <span><b class="pv">${reb}</b><i class="pk">REB</i></span>
-      <span><b class="pv">${ast}</b><i class="pk">AST</i></span>
-      <span><b class="pv">${defPct}</b><i class="pk">DEF%</i></span>
-    </div>`;
-  return td;
+  ['pts', 'reb', 'ast', 'def'].forEach((key, i) => {
+    const td = document.createElement('td');
+    td.className = `prod-cell prod-${key}`;
+    td.textContent = values[i];
+    frag.appendChild(td);
+  });
+  return frag;
 }
 
 function buildMoPipsCell(moValue) {
@@ -1566,7 +1569,7 @@ function renderRosterGame() {
   const tbody = document.getElementById('roster-body-game');
   if (!tbody) return;
   tbody.innerHTML = '';
-  const colSpan = 10;
+  const colSpan = 13; // POS, hs, PLAYER, ENG, PTS, REB, AST, DEF%, RT, F, MIN, MO, rm
   const decorated = roster.map(decoratePlayerForRoster);
   const byId = new Map(decorated.map((p) => [String(p._playerId), p]));
   const bench = sortPlayerList(

@@ -1445,9 +1445,21 @@ a.player-name-link {
   max-width: 152px;
 }
 
-.roster-game-table th.prod-col,
+/* Production stats are four narrow value columns (PTS/REB/AST/DEF%); the labels
+   are in the header row. Centred, tabular, subordinate luminance — brighter on the
+   court rows. Each has a real gap from ENG% and RT. */
+.roster-game-table th.prod-head {
+  text-align: center;
+  padding: 0 2px;
+}
 .roster-game-table td.prod-cell {
-  width: auto;
+  text-align: center;
+  padding: 0 2px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.55);
+}
+.roster-game-table tbody tr.on-court td.prod-cell {
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .eng-cell {
@@ -1472,12 +1484,13 @@ a.player-name-link {
   max-width: 150px;
 }
 
-/* Game view: bar stays fixed — surplus goes into production gaps, not ENG length */
+/* Game view: fixed bar. Narrowed so the four production columns (PTS/REB/AST/DEF%)
+   plus RT/F/MIN/MO all fit the panel at 1280 without clipping MO. */
 .roster-game-table .engbar {
-  flex: 0 0 104px;
-  width: 104px;
-  min-width: 104px;
-  max-width: 104px;
+  flex: 0 0 46px;
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
 }
 
 .engbar i {
@@ -1498,49 +1511,6 @@ a.player-name-link {
 
 .engnum.medium { color: rgba(255,255,255,0.70); }
 .engnum.critical { color: #ffffff; }
-
-/* Production cluster — subordinate luminance, no hue. Columns size to their
-   content (value + label) so nothing clips or overlaps; the cluster centres in
-   whatever width the auto prod column has. minmax(0,1fr) let the four columns
-   shrink below their text at 1280, which is what ran PTS/REB/AST together. */
-.prod {
-  display: grid;
-  grid-template-columns: repeat(4, max-content);
-  align-items: baseline;
-  justify-content: center;
-  gap: 0 18px;
-  padding: 0 10px;
-  margin: 0 auto;
-}
-
-.prod span {
-  display: inline-flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.prod .pv {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 12.5px;
-  line-height: 1;
-  font-style: normal;
-  font-weight: 400;
-  color: rgba(255,255,255,0.55);
-}
-
-.roster-table tbody tr.on-court .prod .pv {
-  color: rgba(255,255,255,0.70);
-}
-
-.prod .pk {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 9px;
-  letter-spacing: 0.09em;
-  font-style: normal;
-  color: rgba(255,255,255,0.22);
-}
 
 .roster-table tbody tr.on-court .player-name-link {
   color: #fff;

@@ -17,7 +17,7 @@ Replaced the note with an accurate line stating `formatTeamName` is a no-op and 
 
 **Merge.** `git merge origin/develop`. One conflict, in `scripts/check_ui_tokens.py`: kept **every** `NEW_DESIGN_CSS` entry from both sides — develop's `playbooks.css` / `css/playbook-tiles.css` and the training files, plus my `set-lineup.css`; merged the docstring's new-surface list and kept develop's FCC-freeze ceiling text. `UX_System.md` auto-merged (develop's Playbooks + FCC-freeze text and my Set Lineup section + §16 correction all present). Gates re-run green after the merge.
 
-**2a. Bench-row stat overlap (fixed).** The production cluster (PTS/REB/AST/DEF%) used `grid-template-columns: repeat(4, minmax(0, 1fr))`, which let the four columns shrink below their text at 1280 and ran the values/labels together ("0 P0 R0 0 DEF%"). Changed to `repeat(4, max-content)` centred, with tighter padding/gap, so each `value + label` sizes to content and never overlaps — at 1280 and 1920. Attributes and Stats views use different tables (no prod cluster) and were already clean. Guard added (bounding boxes).
+**2a. Bench-row stat overlap (fixed — second pass).** The Game view crammed PTS/REB/AST/DEF% into one column with inline labels. A first pass (`max-content` grid) stopped the four stats overlapping each other but the cluster still overflowed its narrow column into its **neighbours** at 1280 (ENG "100%" ↔ "PTS", "DEF%" ↔ the RT grade). Fixed properly by moving the four stats into **four real table columns** with the labels in the **header row** (PTS/REB/AST/DEF%, value-only body cells — the same shape as the Attributes/Stats views), so each stat has its own column and a real gap from ENG% and RT. `buildProductionCell` now returns four value cells; the header gained four `prod-head` th's; `colSpan` 10 → 13. That widened the table past the 843px panel at 1280 (MO clipped), so I reclaimed the width — narrowed the Game ENG bar (104 → 46px, per the review's hint), the four stat columns, PLAYER (172 → 142), and MIN (48 → 44) — until the table fits the panel exactly at 1280 **and** 1920 (no clip). No type shrunk below the scale; player names do not truncate. Verified by measuring the scroll container (`scrollWidth === clientWidth`) and every row's cell-text boxes.
 
 **2b. Empty right-hand panel (seed data, not broken).** The panel above Autoset is `#lineup-shot-weights`, driven by the playbook's `position_shot_weights` (per the v3 Fits frame: Playbook + Play Call Center bars per position). Verified against the backend: the test seed carries **no** `position_shot_weights` — not in single mode (the `/api/playbooks` fetch has no franchise context, the render is skipped) and not in the seeded franchise (`/api/playbooks?...&franchise_id=…` returns it absent, `hasSW:false`). So the panel is empty purely from seed data; in production it fills from the franchise's shot-weight settings. Not a regression (the develop before shot is identically empty). Could not re-shoot it filled — no seed populates it. Added a small `.psw-unavailable` style so the "Shot weight data unavailable" message reads cleanly where the fetch completes without data.
 
@@ -25,7 +25,9 @@ Replaced the note with an accurate line stating `formatTeamName` is a no-op and 
 
 **3. Navy HOLD.** Per the review, the on-court / selected-row **navy** (and the drag-target navy tint) is left **as-is pending Jamie's decision** on whether selected items count as "yours" (navy) or neutral across Set Lineup and Playbooks. Not changed in this revision. If the call is "neutral", it is a one-line swap of `--navy` → a neutral white on the on-court/selected rules.
 
-**Guards added.** The e2e guard now also asserts (computed): Play Game background = `--green` and its border = `--white-28` (the shell Advance paint), and the four production stat cells do not overlap (each span's left ≥ the previous span's right).
+**3 (paint). Play Game dim in after-default is the disabled state.** `#play-now` ships with the `disabled` class while the lineup is incomplete (`.lineup-btn.disabled { opacity: 0.48 }`), which is why it reads dim in the empty-lineup default shot. Its paint is already the shell Advance (bg `--green`, border `--white-28`) at both states — only opacity differs. The new `after-filled-1280.png` (Autoset → five on court → Play Game **enabled**, opacity 1) shows the full-strength green matching `#play-now` in the shell.
+
+**Guards.** The e2e guard asserts (computed): Play Game bg = `--green` and border = `--white-28` (shell Advance paint, both densities); Autoset and the view toggle are neither green nor orange; the headshot radius is square; and — the new coverage — in **every bench row, across the Game, Attributes and Stats views, at 1280 and 1920**, no two adjacent cells' **text** overlap (measured with a `Range` per cell, so it catches content spilling out of a cell, not just cell-box edges).
 
 ## 1–4. Set Lineup migration
 
@@ -37,7 +39,7 @@ Replaced the note with an accurate line stating `formatTeamName` is a no-op and 
 |---|---|---|---|---|
 | `set-lineup.css` | **29 → 0** | 179 → 138 | 115 → 113 | now in `NEW_DESIGN_CSS`; `--strict` passes |
 | `set-lineup.html` | 0 → 0 | — | — | already new-design (`gobShell.js` PAGES); added `class="gob"` + `gob-tokens.css` link so `var(--token)` resolves |
-| `set-lineup.js` | 0 → 0 | — | — | logic file (legacy); only button class names changed in HTML |
+| `set-lineup.js` | 0 → 0 | — | — | `buildProductionCell` now emits four value cells (labels moved to the header); `colSpan` 10 → 13. No colour literals. |
 
 `--strict --no-write` exits **0** with `set-lineup.css` reclassified. I kept every existing `NEW_DESIGN_CSS` entry (another branch added the Prep training files) and appended `set-lineup.css`.
 
@@ -81,14 +83,14 @@ Green survives only on the Advance button and the annotated positive-data ramps;
 
 ## e2e guard
 
-`tests/e2e/set-lineup-tokens.spec.js` (computed styles / bounding boxes): Advance (`#play-now`) background **is** `--green` and its border **is** `--white-28` (the shell Advance paint); Autoset and the view toggle are **neither** green nor orange; the injected `.roster-headshot` radius is under a quarter of its side (square, not a circle); the four production stat cells (PTS/REB/AST/DEF%) **do not overlap**. Passes. Also updated `game-start-sequence.spec.js:96` from `/lineup-btn-green/` → `/lineup-btn-advance/` (the rename).
+`tests/e2e/set-lineup-tokens.spec.js` (computed styles / text bounding boxes): Advance (`#play-now`) background **is** `--green` and its border **is** `--white-28` (the shell Advance paint), at 1280 and 1920; Autoset and the view toggle are **neither** green nor orange; the injected `.roster-headshot` radius is under a quarter of its side (square, not a circle); and, in **every bench row across the Game, Attributes and Stats views at both densities**, no two adjacent cells' text overlap. Passes. Also updated `game-start-sequence.spec.js:96` from `/lineup-btn-green/` → `/lineup-btn-advance/` (the rename).
 
 ## Gates (real numbers)
 
 - **pytest** `--ignore=tests/e2e -q`: **4231 passed, 14 skipped, 109 xfailed, 1 xpassed, 0 failed** (240s, post-merge).
 - **check_ui_tokens.py** `--strict --no-write`: **exit 0**.
 - **check_migration_gates.py**: **passed** (Gate A 0/0; Gate B 136 lines/44 files — unchanged; no franchise-identity `URLSearchParams` added).
-- **Full Playwright** (workers=1, port 8000, CI unset, no other run): **777 passed, 5 skipped, 0 failed** (12.5m, post-merge re-run).
+- **Full Playwright** (workers=1, port 8000, CI unset, no other run): **777 passed, 5 skipped, 0 failed** (11.7m, second review pass).
 
 ## Screenshots (`reports/set-lineup-tokens/`)
 
@@ -99,7 +101,7 @@ Full page at 1280 (scrolled to top), before (develop) vs after; default also at 
 | Default lineup @1280 | `before-default-1280.png` (orange Pre-Game + orange Autoset) | `after-default-1280.png` (neutral Pre-Game + neutral Autoset; green Play Game) |
 | Fit / ratings (Attributes) @1280 | `before-ratings-1280.png` | `after-ratings-1280.png` |
 | Stats view @1280 | `before-stats-1280.png` | `after-stats-1280.png` |
-| Changed (post-Autoset) @1280 | `before-changed-1280.png` | `after-changed-1280.png` |
+| Filled (Autoset → Play Game enabled) @1280 | `before-filled-1280.png` | `after-filled-1280.png` (full-strength green Advance) |
 | Default @1920 | `before-default-1920.png` | `after-default-1920.png` |
 
 Re-shot post-review: `before-*` are develop's set-lineup; `after-*` include the layout fixes above. The before-default shows the run-together stat text and orange Autoset; the after shows readable `0 PTS  0 REB  0 AST  0 DEF%` and a brighter Advance. "Changed-but-unsaved" and "saved" are not distinct visual states — this page has no save action; the lineup is live-editable and persists through the flow. (No Timeout Read shot: the seed has no live mid-game, so the resume URL only reproduces the pre-game default; that state shares set-lineup's own CSS.)
