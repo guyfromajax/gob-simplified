@@ -45,9 +45,11 @@
       "FrontEnd/static/schedule.html": 1,
       "FrontEnd/static/set-lineup.js": 2,
       "FrontEnd/static/standings.html": 1,
+      "FrontEnd/static/stats.html": 1,
       "FrontEnd/static/team-roster-view.html": 1,
       "FrontEnd/static/team-roster-view.js": 1,
       "FrontEnd/static/team-stats.html": 1,
+      "FrontEnd/static/team-traits.html": 1,
       "FrontEnd/static/training-report.html": 1,
       "FrontEnd/static/training.html": 1
     }

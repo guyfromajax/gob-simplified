@@ -82,8 +82,8 @@ redirect,player-attributes.html,-> tutorial-player-attributes.html,none,stub,RED
 redirect,scouting.html,-> tutorial-scouting.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,0 inbound links
 redirect,team-attributes.html,-> tutorial-team-attributes.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,0 inbound links
 redirect,index.html,-> homepage.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,Netlify serves / as homepage.html directly
-unreached,stats.html,/stats.html,league (PAGES),none live (only #resources-stats anchor in franchise-command-center.js:1796; no element has that id),FULL PAGE (new design),page,n/a,works (loads),works (loads),R (loads) / C (no entry),yes,shell-2,,,,,Orphan; Feedback rail button missing online
-unreached,team-traits.html,/team-traits.html,none,none live (only #resources-team-traits anchor in franchise-command-center.js:1802),LEGACY PAGE,page,n/a,works (loads),works (loads),R (loads) / C (no entry),no,none,,,,,Orphan
+redirect,stats.html,-> FCC ?tab=team-stats-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"shell-2",,,,,Jamie Q7 A; copies franchise_id/team_id/week
+redirect,team-traits.html,-> FCC ?tab=team-attributes-view,team,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,Jamie Q7 A; copies franchise_id/team_id/week
 unreached,maintenance.html,/maintenance.html,none,Netlify wildcard (commented out),LEGACY PAGE,n/a,n/a,loads (empty text),loads (empty text),R,no,none,,,,,Ops switch only
 unreached,trailer.html,/trailer,none,Netlify /trailer (reviewer link),LEGACY PAGE,n/a,n/a,works,works,R,no,none,,,,,Not linked in app
 unreached,homepage-v3.html,/homepage-v3.html,none,authGuard public list only,LEGACY PAGE,n/a,n/a,works,works,R,no,homepage-v3-auth,,,,,Same content as homepage.html

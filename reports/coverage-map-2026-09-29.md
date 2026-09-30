@@ -150,7 +150,7 @@ Back, verified by running in both profiles:
 | Play details | `/play-details.html` | — | Playbooks play row | LEGACY PAGE | page | C | loads | loads | R | no | none found |
 
 Design system at runtime (smoke pass, `html.gob` + gob tokens stylesheet):
-- **Yes:** the Command Center and everything inside it, `recruiting.html`, `box-score.html`, `stats.html`, and the gob focus pages (`set-lineup`, `cut-players`, `playbook-report`, `training-squad-report`).
+- **Yes:** the Command Center and everything inside it, `recruiting.html`, `box-score.html`, and the gob focus pages (`set-lineup`, `cut-players`, `playbook-report`, `training-squad-report`). `stats.html` is a redirect stub to League › Team Stats.
 - **No:** every other page. Static HTML alone under-reports this: only the Command Center and `recruiting.html` carry the tokens link statically, and the class is added at runtime.
 
 ### Redirect stubs still linked directly
@@ -168,7 +168,9 @@ Every stub loads and forwards correctly in both profiles (R). The live links bel
 | `standings.html` | FCC `?tab=standings-view` | `franchise-command-center.js:1777`, `1779`, `1794` |
 | `rankings.html` | FCC `?tab=rankings-view` | `franchise-command-center.js:1804`, `1806` |
 | `leaders.html` | FCC `?tab=leaders-view` | `franchise-command-center.js:1792`, `1818` |
-| `team-stats.html` | FCC `?tab=team-stats-view` | `franchise-command-center.js:1790` |
+| `team-stats.html` | FCC `?tab=team-stats-view` | `franchise-command-center.js` leftover `#team-stats-full-link` |
+| `stats.html` | FCC `?tab=team-stats-view` | bookmarks / old links (Jamie Q7 A) |
+| `team-traits.html` | FCC `?tab=team-attributes-view` | bookmarks / old links (Jamie Q7 A) |
 | `brackets.html` | FCC `?tab=tournament-view` | `franchise-command-center.js:5349` |
 | `practice-squad-standings.html` / `practice-squad-bracket.html` | FCC `?tab=practice-squad-view` | `practice-squad-standings.js:62`, `:216`, `practice-squad-bracket.js:56` (the stubs' own legacy scripts) |
 | `news.html` | FCC `?tab=news-view` | `news.js:62` (the stub's own legacy script) |
@@ -178,9 +180,7 @@ Every stub loads and forwards correctly in both profiles (R). The live links bel
 
 ### Dead, orphaned and internal pages
 
-- **Orphans** (the page works but nothing live links to it):
-  - `stats.html`: new design; only the `#resources-stats` anchor at `franchise-command-center.js:1796`, and no HTML has that id.
-  - `team-traits.html`: only `#resources-team-traits` at `franchise-command-center.js:1802`.
+- **Orphans** (the page works but nothing live links to it): none remaining from the 2026-09-29 pass. `stats.html` and `team-traits.html` are now redirect stubs (Jamie Q7 A).
 - **Dead** (0 inbound links): `Playcall Center POC.html`, `Tournament Tab.html`, `_preview-training-phase5.html`, `coaching-grid.html`, `homepage-backup.html`, `homepage-v2-legacy.html`, `homepage-v3-source.html`, `scrimmage-select.html`, `tb-band-placement-qa.html`.
 - **Ops / reviewer only:** `maintenance.html` (the Netlify wildcard, currently commented out), `trailer.html` (Netlify `/trailer`), `homepage-v3.html` (authGuard public list only; same content as the homepage).
 - **Admin only** (`adminGuard`): `fcp-skeletons.html`, `hct-skeletons.html` (`skeleton_routes`), `play-builder.html`, `play-builder-v2.html` (`play_routes`), `plays-builder.html`.

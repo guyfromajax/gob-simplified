@@ -134,63 +134,11 @@
       <div id="team-attributes-view" class="tab-content"></div>
       <div id="player-view" class="tab-content"></div>
       <div id="team-view" class="tab-content"></div>
-      <div id="roster-tab" class="tab-content">
-        <!-- Scope toggle replaces the old stacked practice-squad table: one table, two
-             scopes. aria-pressed carries the state, so it isn't conveyed by colour alone. -->
-        <div class="attr-toolbar">
-          <button type="button" class="scope-btn" data-roster-scope="varsity" aria-pressed="true">Varsity<span class="n" data-scope-count="varsity">0</span></button>
-          <button type="button" class="scope-btn" data-roster-scope="practice" aria-pressed="false">Practice Squad<span class="n" data-scope-count="practice">0</span></button>
-          <span class="attr-rowcount" id="roster-rowcount"></span>
-        </div>
-        <section class="fcc-data-card">
-          <div class="fcc-data-card-body scroll-x">
-            <table class="roster-table">
-              <thead>
-                <tr>
-                  <th class="c-ident" data-sort-col="Name">Player</th>
-                  <th class="c-rt" data-sort-col="RT">RT<span class="rt-caption">cur &rarr; pot</span></th>
-                  <!-- POS is the TRAINING position, editable in place: one column, in the
-                       slot POS has always occupied, paired with the focus it decides. -->
-                  <th class="c-devpos" data-sort-col="POS">POS</th>
-                  <th data-sort-col="Year">YR</th>
-                  <th data-sort-col="Height">HT</th>
-                  <th data-sort-col="Weight">WT</th>
-                  <!-- Grouped 2-row header (pair labels + per-attribute sort controls) is a
-                       CSS grid inside this one cell, so it sticks as a single unit. -->
-                  <th class="attr-tiles-head" id="fcc-roster-attr-head"></th>
-                  <!-- DEV FOCUS trails the attributes: the evidence, then the coaching call. -->
-                  <th class="c-devfocus" data-sort-col="Focus">DEV FOCUS</th>
-                </tr>
-              </thead>
-              <tbody id="team-body"></tbody>
-            </table>
-          </div>
-        </section>
-      </div>
       <div id="player-stats-view" class="tab-content"></div>
       <div id="team-schedule-view" class="tab-content"></div>
       <div id="practice-squad-view" class="tab-content"></div>
       <div id="league-schedule-view" class="tab-content"></div>
       <div id="tournament-view" class="tab-content"></div>
-      <div id="game-plan-tab" class="tab-content">
-        <section class="fcc-data-card fcc-game-plan-card">
-          <div class="fcc-data-card-body fcc-game-plan-card-body">
-            <div id="fcc-game-plan-grid" class="fcc-game-plan-grid"></div>
-            <div class="fcc-game-plan-cta-wrap">
-              <button id="fcc-edit-game-plan-btn" class="fcc-game-plan-edit-btn" type="button">Edit Game Plan</button>
-            </div>
-          </div>
-        </section>
-      </div>
-      <div id="playbooks-tab" class="tab-content">
-        <section class="fcc-data-card fcc-playbooks-card">
-          <div class="fcc-data-card-body fcc-playbooks-card-body">
-            <div id="fcc-playbooks-sections" class="fcc-playbooks-sections">
-              <div class="fcc-playbooks-empty">Loading playbook settings...</div>
-            </div>
-          </div>
-        </section>
-      </div>
       <div id="scouting-view" class="tab-content"></div>
       <div id="news-view" class="tab-content"></div>
       <div id="awards-view" class="tab-content"></div>
@@ -198,81 +146,6 @@
       <div id="training-report-view" class="tab-content"></div>
       <div id="game-plan-view" class="tab-content"></div>
       <div id="playbooks-view" class="tab-content"></div>
-      <div id="recruits-tab" class="tab-content">
-        <div id="fcc-recruits-invite" hidden></div>
-        <h3>Recruits Leaning Your Way</h3>
-        <section class="fcc-data-card">
-          <div class="fcc-data-card-body scroll-x">
-            <table id="fcc-recruits-table" class="roster-table recruiting-table">
-              <thead>
-                <tr>
-                  <!-- Column order mirrors the Roster tab so the two read the same way.
-                       Region and Archetype live in the identity cell as a sub-line under
-                       the name; they are no longer sortable. -->
-                  <th class="c-ident" data-sort-key="name">Recruit</th>
-                  <th class="c-rt" data-sort-key="rt">RT<span class="rt-caption">cur &rarr; pot</span></th>
-                  <th data-sort-key="pos">POS</th>
-                  <th data-sort-key="year">YR</th>
-                  <th data-sort-key="height">HT</th>
-                  <th data-sort-key="weight">WT</th>
-                  <th class="attr-tiles-head" id="fcc-recruits-attr-head"></th>
-                  <th id="fcc-recruits-last-col" data-sort-key="lean">Current Lean</th>
-                </tr>
-              </thead>
-              <tbody id="fcc-recruits-body"></tbody>
-            </table>
-          </div>
-        </section>
-        <div class="fcc-standings-footer-link-wrap">
-          <a id="fcc-recruits-full-link" class="fcc-standings-full-link" href="#">See all recruits here</a>
-          <a id="fcc-ps-season-link" class="fcc-standings-full-link" href="#" style="margin-left:16px;">Practice Squad Season</a>
-        </div>
-        <footer class="fcc-recruiting-footnote fcc-recruiting-footnote--embed" aria-label="Recruiting season status">
-          <p id="fcc-recruiting-live-copy-tab" class="fcc-recruiting-footnote__text"></p>
-          <button type="button" id="fcc-recruiting-btn-tab" class="fcc-recruiting-footnote__btn" style="display: none;">Week — Recruiting Visits</button>
-        </footer>
-      </div>
-      <div id="team-stats-tab" class="tab-content">
-        <div class="training-report-styled fcc-team-measures-layout">
-          <section class="fcc-data-card fcc-team-measures-radar-panel">
-            <div class="fcc-data-card-body fcc-team-measures-panel-body">
-              <div id="team-measures-radar"></div>
-            </div>
-          </section>
-          <div class="fcc-team-measures-side">
-            <section class="fcc-data-card fcc-team-measures-side-card">
-              <div class="fcc-data-card-body fcc-team-measures-panel-body" id="team-measure-shooting"></div>
-            </section>
-            <section class="fcc-data-card fcc-team-measures-side-card">
-              <div class="fcc-data-card-body fcc-team-measures-panel-body" id="team-measure-rebounding"></div>
-            </section>
-            <section class="fcc-data-card fcc-team-measures-side-card fcc-team-measures-side-card-chemistry">
-              <div class="fcc-data-card-body fcc-team-measures-panel-body" id="team-measure-chemistry"></div>
-            </section>
-          </div>
-        </div>
-      </div>
-      <div id="schedule-tab" class="tab-content">
-        <div class="fcc-schedule-tab-inner">
-          <section class="fcc-data-card fcc-schedule-card" id="fcc-regular-schedule-view">
-            <div class="fcc-data-card-body fcc-schedule-card-body">
-              <div id="fcc-schedule-grid" class="fcc-schedule-grid"></div>
-            </div>
-          </section>
-          <div class="fcc-standings-footer-link-wrap" id="fcc-regular-schedule-footer">
-            <a id="schedule-full-link" class="fcc-standings-full-link" href="#">View Full National Schedule</a>
-          </div>
-
-          <section class="fcc-data-card fcc-tournament-card" id="fcc-tournament-view" style="display: none;">
-            <div class="fcc-data-card-body fcc-tournament-card-body">
-              <div id="fcc-tournament-bracket" class="fcc-tournament-bracket"></div>
-            </div>
-          </section>
-          <div class="fcc-tournament-footer-links" id="fcc-tournament-footer" style="display: none;">
-            <a id="tournament-schedule-link" class="fcc-standings-full-link" href="#">View Season Schedule</a>
-          </div>
-        </div>
-      </div>
       <div id="fcc-team-stats-summary-tab" class="tab-content">
         <section class="fcc-data-card">
           <div class="fcc-data-card-body scroll-x">
