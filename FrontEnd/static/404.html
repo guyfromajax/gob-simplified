@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html class="gob" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Page not found — Geeked-Out Basketball</title>
+  <link rel="stylesheet" href="/fonts/app-fonts.css">
+  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/gob-tokens.css">
+  <link rel="stylesheet" href="/css/ops-pages.css">
+</head>
+<body class="ops">
+  <main class="ops-wrap">
+    <img class="ops-mark" src="/images/geekedout_logo.png" alt="Geeked-Out Basketball">
+    <h1>This page doesn't exist</h1>
+    <p>The link may be old, or the address was mistyped.</p>
+    <div class="ops-actions">
+      <a id="ops-home" href="/homepage.html">Homepage</a>
+    </div>
+  </main>
+  <script>
+    (function () {
+      var authed = false;
+      try { authed = !!(window.localStorage && localStorage.getItem('auth_token')); } catch (e) {}
+      var link = document.getElementById('ops-home');
+      if (!link) return;
+      if (authed) {
+        link.href = '/mode-select.html';
+        link.textContent = 'Home Base';
+      }
+    })();
+  </script>
+</body>
+</html>
