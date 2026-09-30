@@ -50,7 +50,7 @@ Native menu was not captured (Electron not driven headless). Structure is as abo
 
 ### App icon + name
 
-`package.json` `productName` and packager `--productName` / app name are **Geeked-Out Basketball** (matches Steam/docs). Pack is wired `--icon=build/icon`.
+`package.json` `productName` and packager `--productName` / app name are **Geeked-Out Basketball** (matches Steam/docs). `desktop/pack.js` passes `--icon=build/icon` only when `desktop/build/icon.icns` (mac) / `icon.ico` (win) exists.
 
 **No ≥512px square brand source exists.** Candidates:
 
@@ -69,7 +69,18 @@ Did not invent a square icon. Jamie must drop into `desktop/build/`:
 - `icon.ico` — Windows (256, 48, 32, 16)
 - `icon.png` — 512×512 (optionally 1024)
 
-Until those files exist, `npm run pack` will fail on the missing icon. That is intentional. See `desktop/build/README.md`.
+Until those files exist, `npm run pack` uses Electron's default icon and prints a one-line warning. See `desktop/build/README.md`.
+
+`npm run pack` from `desktop/` (no icon files) succeeded:
+
+```
+> gob-desktop@0.1.0 pack
+> env -u ELECTRON_RUN_AS_NODE node pack.js
+
+No app icon in desktop/build/; using the default. See desktop/build/README.md
+Packaging app for platform darwin arm64 using electron v34.5.8
+Wrote new app to: out/Geeked-Out Basketball-darwin-arm64
+```
 
 ### Custom 404 (`FrontEnd/static/404.html`)
 
@@ -115,6 +126,6 @@ Desktop pages opened as `file://` in Playwright (Electron not driven headless). 
 
 ## Unsure
 
-Pack will fail until Jamie adds the icon files. That is the requested stop for the icon.
+Pack builds without the icon files (default Electron icon + warning). Jamie still needs to drop the square icon sources into `desktop/build/` for a branded pack.
 
 `desktop/error.html` still reads `?message=` from the query Electron already passes. That is not franchise identity.

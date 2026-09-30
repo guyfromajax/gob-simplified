@@ -7,7 +7,7 @@
   "main": "main.js",
   "scripts": {
     "start": "env -u ELECTRON_RUN_AS_NODE electron .",
-    "pack": "env -u ELECTRON_RUN_AS_NODE electron-packager . \"Geeked-Out Basketball\" --platform=darwin --out=out --overwrite --prune --icon=build/icon --productName=\"Geeked-Out Basketball\""
+    "pack": "env -u ELECTRON_RUN_AS_NODE node pack.js"
   },
   "engines": {
     "node": ">=18"

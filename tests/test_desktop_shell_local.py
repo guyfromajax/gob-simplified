@@ -32,3 +32,16 @@ def test_splash_html_has_no_remote_urls():
 def test_error_html_has_no_remote_urls():
     _assert_local(DESKTOP / "error.html")
     assert "The game engine stopped" in (DESKTOP / "error.html").read_text(encoding="utf-8")
+
+
+def test_pack_icon_flag_is_conditional():
+    pack = (DESKTOP / "pack.js").read_text(encoding="utf-8")
+    pkg = (DESKTOP / "package.json").read_text(encoding="utf-8")
+    assert "--icon=build/icon" not in pkg
+    assert "node pack.js" in pkg
+    assert "productName=Geeked-Out Basketball" in pack
+    assert "if (hasIcon)" in pack
+    assert "args.push('--icon=build/icon')" in pack
+    assert "No app icon in desktop/build/; using the default. See desktop/build/README.md" in pack
+    assert not (DESKTOP / "build" / "icon.icns").exists()
+    assert not (DESKTOP / "build" / "icon.ico").exists()
