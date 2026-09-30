@@ -258,25 +258,25 @@ const NOTES_HERO_CONFIG = [
     key: 'practice',
     titles: ['Practice Player Of The Week', 'Practice Players Of The Week'],
     label: 'Practice Player Of The Week',
-    accent: '#34EC27',
-    accentBorder: 'rgba(52,236,39,0.3)',
-    accentTint: 'rgba(52,236,39,0.1)',
+    accent: 'var(--text-100)',
+    accentBorder: 'var(--line-strong)',
+    accentTint: 'var(--white-6)',
   },
   {
     key: 'regression',
     titles: ['Biggest Regression'],
     label: 'Biggest Regression',
-    accent: '#ff6d6d',
-    accentBorder: 'rgba(255,109,109,0.35)',
-    accentTint: 'rgba(255,109,109,0.12)',
+    accent: 'var(--red)',
+    accentBorder: 'color-mix(in srgb, var(--red) 35%, transparent)',
+    accentTint: 'color-mix(in srgb, var(--red) 12%, transparent)',
   },
   {
     key: 'locker',
     titles: ['Most Positive Locker Room Influence'],
     label: 'Most Positive Locker Room Influence',
-    accent: '#F79420',
-    accentBorder: 'rgba(247,148,32,0.4)',
-    accentTint: 'rgba(247,148,32,0.12)',
+    accent: 'var(--text-100)',
+    accentBorder: 'var(--line-strong)',
+    accentTint: 'var(--white-6)',
   }
 ];
 
@@ -1223,7 +1223,7 @@ function createAttributeCell(attr, value, change, displayMovement = 0) {
     // Display with emoji
     const emoji = getEmotionEmoji(value);
     td.innerHTML = emoji;
-    td.style.fontSize = '1.5rem';
+    td.style.fontSize = 'var(--fs-24)';
     td.style.textAlign = 'center';
     attachChangeTooltip();
   } else if (attr === 'MO') {
@@ -1274,8 +1274,8 @@ function createMomentumPill(mo) {
   container.style.position = 'relative';
   container.style.width = '100%';
   container.style.height = '30px';
-  container.style.background = 'rgba(0, 0, 0, 0.3)';
-  container.style.borderRadius = '15px';
+  container.style.background = 'var(--black-25)';
+  container.style.borderRadius = 'var(--radius-14)';
   container.style.overflow = 'hidden';
   
   // Center line
@@ -1285,7 +1285,7 @@ function createMomentumPill(mo) {
   centerLine.style.top = '0';
   centerLine.style.bottom = '0';
   centerLine.style.width = '2px';
-  centerLine.style.background = 'var(--color-warning)';
+  centerLine.style.background = 'var(--text-60)';
   centerLine.style.transform = 'translateX(-50%)';
   centerLine.style.zIndex = '2';
   container.appendChild(centerLine);
@@ -1300,7 +1300,7 @@ function createMomentumPill(mo) {
     fill.style.left = '50%';
     fill.style.top = '0';
     fill.style.bottom = '0';
-    fill.style.background = 'var(--color-success)';
+    fill.style.background = 'var(--green)'; /* colour-law: positive-data */
     fill.style.transition = 'width 0.3s ease';
     fill.style.zIndex = '1';
     const percentage = Math.min((moValue / maxValue) * 50, 50); // Max 50% to the right
@@ -1312,7 +1312,7 @@ function createMomentumPill(mo) {
     fill.style.right = '50%';
     fill.style.top = '0';
     fill.style.bottom = '0';
-    fill.style.background = 'var(--color-error)';
+    fill.style.background = 'var(--red)';
     fill.style.transition = 'width 0.3s ease';
     fill.style.zIndex = '1';
     const absValue = Math.abs(moValue);
@@ -1348,7 +1348,7 @@ function describeTrainingChange(change) {
   }
   const up = (count) => ({
     text: '▲'.repeat(count),
-    className: count === 3 ? 'change-elite' : 'change-positive',
+    className: 'change-delta',
   });
   const down = (count) => ({ text: '▼'.repeat(count), className: 'change-negative' });
 
@@ -1974,9 +1974,9 @@ function createPlayCard(playName, playData, change) {
 
   const bars = document.createElement('div');
   bars.className = 'playbook-card-bars';
-  bars.appendChild(createPlaybookMetricCard('Command', effectiveness, 100, '#4065AF'));
-  bars.appendChild(createPlaybookMetricCard('Momentum', momentum, 10, '#F79420'));
-  bars.appendChild(createPlaybookMetricCard('Cloaking', cloaking, 10, '#7B5EA7'));
+  bars.appendChild(createPlaybookMetricCard('Command', effectiveness, 100, ''));
+  bars.appendChild(createPlaybookMetricCard('Momentum', momentum, 10, ''));
+  bars.appendChild(createPlaybookMetricCard('Cloaking', cloaking, 10, ''));
   row.appendChild(bars);
 
   return row;
@@ -1996,7 +1996,6 @@ function createPlaybookMetricCard(title, value, maxValue, color) {
 
   const progressFill = document.createElement('div');
   progressFill.className = 'playbook-progress-fill';
-  progressFill.style.backgroundColor = color;
   const percentage = Math.min(100, (value / maxValue) * 100);
   progressFill.style.width = `${percentage}%`;
 
@@ -2023,7 +2022,7 @@ function renderTrainingNotes() {
     placeholder.className = 'notes-placeholder';
     placeholder.textContent = 'No training notes for this session.';
     if (!inAppShell()) {
-      placeholder.style.color = '#9a9a9a';
+      placeholder.style.color = 'var(--text-38)';
       placeholder.style.fontStyle = 'italic';
     }
     container.appendChild(placeholder);

@@ -1964,12 +1964,6 @@ function wireCustomTrainingPlaybook() {
    Training polish: tooltips, attribute chips, requirements bar
    ============================================================ */
 
-const ARCH_COLORS = {
-  'authoritarian': '#C0392B',
-  'systems-coach': '#D4A017',
-  'player-maximizer': '#3A8C4A',
-  'culture-builder': '#7B5EA7'
-};
 const ARCH_NAMES = {
   'authoritarian': 'Authoritarian',
   'systems-coach': 'Systems Coach',
@@ -1994,18 +1988,18 @@ function archKeyFromValue(value) {
 
 /* --- Tooltip copy registries (source of truth: training tutorial) --- */
 const DRILL_TOOLTIPS = {
-  'offense-inside':      { code: 'SC', color: '#f79420', attr: 'Inside Scoring',   desc: "Sharpens scoring around the rim and in the post." },
-  'offense-outside':     { code: 'SH', color: '#f79420', attr: 'Outside Shooting', desc: "Develops perimeter and mid-range shooting touch." },
-  'defense-inside':      { code: 'ID', color: '#4a90d9', attr: 'Inside Defense',   desc: "Builds post defense, rim protection and interior toughness." },
-  'defense-outside':     { code: 'OD', color: '#4a90d9', attr: 'Outside Defense',  desc: "Hones on-ball perimeter defense and closeouts." },
-  'technical-passing':   { code: 'PS', color: '#7b5ea7', attr: 'Passing',          desc: "Improves court vision, timing and passing accuracy." },
-  'technical-ball-handling': { code: 'BH', color: '#7b5ea7', attr: 'Ball Handling', desc: "Tightens handle and ball security under pressure." },
-  'technical-rebounding':{ code: 'RB', color: '#7b5ea7', attr: 'Rebounding',       desc: "Drills boxing out and finishing on the glass." },
-  'weight-strength':     { code: 'ST', color: '#aeb8cc', attr: 'Strength',         desc: "Adds physical strength for finishing and holding position." },
-  'weight-agility':      { code: 'AG', color: '#aeb8cc', attr: 'Agility',          desc: "Builds quickness, lateral speed and body control." },
-  'general-conditioning':{ code: 'ND', color: '#aeb8cc', attr: 'Conditioning',     desc: "Builds team-wide stamina so legs stay fresh deep into games." },
-  'general-free-throws': { code: 'FT', color: '#d4a017', attr: 'Free Throws',      desc: "Reps from the line to convert when it matters most." },
-  'general-film-study':  { code: 'IQ', color: '#d4a017', attr: 'Basketball IQ',    desc: "Film Study gives coaches better insight into upcoming opponents — especially tendencies from their most recent game." },
+  'offense-inside':      { code: 'SC', attr: 'Inside Scoring',   desc: "Sharpens scoring around the rim and in the post." },
+  'offense-outside':     { code: 'SH', attr: 'Outside Shooting', desc: "Develops perimeter and mid-range shooting touch." },
+  'defense-inside':      { code: 'ID', attr: 'Inside Defense',   desc: "Builds post defense, rim protection and interior toughness." },
+  'defense-outside':     { code: 'OD', attr: 'Outside Defense',  desc: "Hones on-ball perimeter defense and closeouts." },
+  'technical-passing':   { code: 'PS', attr: 'Passing',          desc: "Improves court vision, timing and passing accuracy." },
+  'technical-ball-handling': { code: 'BH', attr: 'Ball Handling', desc: "Tightens handle and ball security under pressure." },
+  'technical-rebounding':{ code: 'RB', attr: 'Rebounding',       desc: "Drills boxing out and finishing on the glass." },
+  'weight-strength':     { code: 'ST', attr: 'Strength',         desc: "Adds physical strength for finishing and holding position." },
+  'weight-agility':      { code: 'AG', attr: 'Agility',          desc: "Builds quickness, lateral speed and body control." },
+  'general-conditioning':{ code: 'ND', attr: 'Conditioning',     desc: "Builds team-wide stamina so legs stay fresh deep into games." },
+  'general-free-throws': { code: 'FT', attr: 'Free Throws',      desc: "Reps from the line to convert when it matters most." },
+  'general-film-study':  { code: 'IQ', attr: 'Basketball IQ',    desc: "Film Study gives coaches better insight into upcoming opponents — especially tendencies from their most recent game." },
   'general-breaks':      { desc: "Breaks boost the effectiveness of all drills and reduce fatigue heading into the next game. But too many run the risk of straining team chemistry and weakening your team's Fight and Discipline attributes. Strong-chemistry teams absorb more downtime with less risk." },
   'team-offense-install':       { desc: "Walk through new or existing offensive plays — no active defense. Pairs well with Film Study to tailor your sets to an opponent's defensive tendencies." },
   'team-defense-install':       { desc: "Walk through new or existing defensive schemes — no active offense. Pairs well with Film Study to tailor your coverage to an opponent's offensive tendencies." },
@@ -2135,7 +2129,7 @@ document.addEventListener('click', function (e) {
 function buildDrillTooltipHtml(d) {
   let head = '';
   if (d.code) {
-    head = '<div class="tt-head"><span class="attr-chip" style="background:' + d.color + '">' + d.code +
+    head = '<div class="tt-head"><span class="attr-chip">' + d.code +
       '</span><span class="tt-attr">' + d.attr + '</span></div>';
   }
   return head + '<div class="tt-desc">' + d.desc + '</div>';
@@ -2143,7 +2137,6 @@ function buildDrillTooltipHtml(d) {
 
 function buildFocusTooltipHtml(value, f) {
   const archKey = archKeyFromValue(value);
-  const archColor = ARCH_COLORS[archKey] || '#f79420';
   const archName = ARCH_NAMES[archKey] || '';
   let modes = '';
   if (f.modes) {
@@ -2151,7 +2144,7 @@ function buildFocusTooltipHtml(value, f) {
       return '<li class="tt-mode"><b>' + m[0] + '</b> — ' + m[1] + '</li>';
     }).join('') + '</ul>';
   }
-  return '<div class="tt-eyebrow" style="color:' + archColor + '">' + archName + '</div>' +
+  return '<div class="tt-eyebrow">' + archName + '</div>' +
     '<div class="tt-name">' + f.name + '</div>' +
     '<div class="tt-desc">' + f.desc + '</div>' + modes;
 }
@@ -2169,7 +2162,6 @@ function injectAttributeChip(slider, d) {
   if (!lt || lt.querySelector('.attr-chip')) return;
   const chip = document.createElement('span');
   chip.className = 'attr-chip';
-  if (!byId('training-view')) chip.style.background = d.color;
   chip.textContent = d.code;
   chip.setAttribute('aria-hidden', 'true');
   lt.appendChild(chip);
@@ -2238,11 +2230,10 @@ function updateRequirementsBar() {
 
   if (focusSelected) {
     const archKey = archKeyFromValue(checked.value);
-    const archColor = ARCH_COLORS[archKey] || '#f79420';
     const archName = ARCH_NAMES[archKey] || '';
     const focusName = friendlyFocusName(checked);
     if (reqFocusValueEl) reqFocusValueEl.textContent = archName ? (focusName + ' · ' + archName) : focusName;
-    if (reqFocusChip) reqFocusChip.style.setProperty('--arch', archColor);
+    if (reqFocusChip) reqFocusChip.style.setProperty('--arch', 'var(--text-38)');
   } else {
     if (reqFocusValueEl) reqFocusValueEl.textContent = 'Not selected';
     if (reqFocusChip) reqFocusChip.style.removeProperty('--arch');

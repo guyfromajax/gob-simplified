@@ -227,6 +227,11 @@ NEW_DESIGN_CSS = frozenset({
     "css/milestone-modal.css",
     "css/season-peak.css",
     "css/trophy-case.css",
+    "training.css",
+    "training-report.css",
+    "css/training-newswire.css",
+    "css/development-focus.css",
+    "css/player-development-grid.css",
 })
 REWARD_SELECTOR_RE = re.compile(
     r"med\.gold|"

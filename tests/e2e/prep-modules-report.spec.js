@@ -8,6 +8,13 @@ test.describe.configure({ timeout: 120000 });
 const FID = 'f-e2e-prep-modules-report';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/prep-modules-report');
+const TOKENS_OUT = path.join(__dirname, '../../reports/prep-training-tokens');
+
+function alsoTokenShot(srcName, destName) {
+  fs.mkdirSync(TOKENS_OUT, { recursive: true });
+  const src = path.join(OUT, srcName);
+  if (fs.existsSync(src)) fs.copyFileSync(src, path.join(TOKENS_OUT, destName || srcName));
+}
 const HEADSHOT = fs.readFileSync(path.join(__dirname, '../../FrontEnd/static/images/players/generic_headshot.png'));
 const BEFORE = JSON.parse(fs.readFileSync(path.join(OUT, 'before-metrics.json'), 'utf8'));
 
@@ -209,6 +216,25 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
   await expect(page.locator('#training-report-view')).toContainText('Roger Henrich');
   await expect(page.locator('#training-report-view')).toContainText('P/T Defense Readiness');
   await expect(page.locator('#training-report-view #team-attributes-grid')).not.toContainText('Momentum');
+  const tokenLook = await page.evaluate(() => {
+    const host = document.getElementById('training-report-view');
+    const green = (v) => /rgb\(\s*52\s*,\s*236\s*,\s*39/i.test(v);
+    const orange = (v) => /rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(v);
+    const bad = [];
+    host.querySelectorAll('.toggle-btn, .seg button, [role="radio"]').forEach((el) => {
+      const s = getComputedStyle(el);
+      if (green(s.backgroundColor) || green(s.color) || orange(s.backgroundColor) || orange(s.color)) {
+        bad.push({ cls: el.className, bg: s.backgroundColor, color: s.color });
+      }
+    });
+    const shot = host.querySelector('.training-notes-hero-portrait-img, .pdg-av img, .av img, .player-portrait img');
+    return { bad, radius: shot ? getComputedStyle(shot).borderRadius : '' };
+  });
+  expect(tokenLook.bad).toEqual([]);
+  if (tokenLook.radius) {
+    expect(tokenLook.radius.includes('%')).toBe(false);
+    expect(parseFloat(tokenLook.radius)).toBeLessThanOrEqual(8);
+  }
   const nitShots = path.join(__dirname, '../../reports/training-report-no-momentum');
   fs.mkdirSync(nitShots, { recursive: true });
   await page.locator('#training-report-view .team-section').screenshot({
@@ -219,11 +245,21 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
   await expect(page.locator('html')).not.toHaveClass(/gob-office/);
   await page.screenshot({ path: path.join(OUT, 'training-report-office-1280.png') });
   await page.screenshot({ path: path.join(OUT, 'training-report-after-1280.png') });
+  alsoTokenShot('training-report-after-1280.png', 'after-report-1280.png');
+  const notes = page.locator('#training-report-view .training-notes-section');
+  if (await notes.count()) {
+    await notes.first().screenshot({ path: path.join(TOKENS_OUT, 'after-report-notes-1280.png') });
+  }
+  const team = page.locator('#training-report-view .team-section, #training-report-view #team-attributes-grid');
+  if (await team.count()) {
+    await team.first().screenshot({ path: path.join(TOKENS_OUT, 'after-report-team-1280.png') });
+  }
 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await expect(page.locator('#training-report-view #week-number')).toHaveText('12');
   await page.screenshot({ path: path.join(OUT, 'training-report-office-1920.png') });
   await page.screenshot({ path: path.join(OUT, 'training-report-after-1920.png') });
+  alsoTokenShot('training-report-after-1920.png', 'after-report-1920.png');
 });
 
 test('News drill-in keeps ← News', async ({ page }) => {
