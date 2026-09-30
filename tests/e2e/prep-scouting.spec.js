@@ -95,6 +95,12 @@ function cc(overrides) {
     session_type: 'in-season',
     cut_required: false,
     rankings: [{ team_id: OPP, natl_rank: 6, W: 18, L: 4, name: 'Four Corners' }],
+    next_game_summary: {
+      week: 12,
+      matchup_label: 'vs',
+      opponent_team_id: OPP,
+      opponent_team_name: 'Four Corners',
+    },
   }, overrides || {});
 }
 
@@ -385,6 +391,46 @@ test('scouting report screenshots for the polish batch', async ({ page }) => {
       fullPage: true,
     });
   }
+});
+
+test('scouting does not fetch play-next-game before the report', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  fetches.scouting = 0;
+  await stubAuth(page);
+  await installApi(page, { locked: false });
+  await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=training-view');
+  await page.waitForFunction(() => {
+    const overlay = document.getElementById('page-load-overlay');
+    return !overlay || getComputedStyle(overlay).display === 'none';
+  });
+  await page.waitForSelector('#training-view .training-container, #training-view .slider, #training-view .ps', {
+    timeout: 15000,
+  });
+
+  const timeline = [];
+  page.on('request', (req) => {
+    let pathname = '';
+    try { pathname = new URL(req.url()).pathname; } catch (err) { return; }
+    if (
+      pathname.endsWith('/franchise/play-next-game')
+      || pathname.endsWith('/franchise/team-data')
+      || pathname.endsWith('/franchise/scouting-report')
+    ) {
+      timeline.push({ t: Date.now(), method: req.method(), path: pathname });
+    }
+  });
+
+  await page.getByRole('tab', { name: 'Scouting Report', exact: true }).click();
+  await page.waitForSelector('#scouting-view .opp-n', { timeout: 15000 });
+
+  const opponentPosts = timeline.filter((row) => row.path.endsWith('/franchise/play-next-game'));
+  const report = timeline.find((row) => row.path.endsWith('/franchise/scouting-report'));
+  const teamData = timeline.find((row) => row.path.endsWith('/franchise/team-data'));
+  expect(opponentPosts).toEqual([]);
+  if (report && teamData) {
+    expect(Math.abs(report.t - teamData.t)).toBeLessThan(80);
+  }
+  await expect(page.locator('#scouting-view .opp-n')).toHaveText('Four Corners');
 });
 
 test('prep sub-tabs: Player Training is named and ordered last', async ({ page }) => {

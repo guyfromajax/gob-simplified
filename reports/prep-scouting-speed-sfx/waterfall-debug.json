@@ -1,0 +1,53 @@
+{
+  "label": "debug",
+  "seed": {
+    "fid": "6abced6d234a6b1afadddef4",
+    "tid": ""
+  },
+  "runs": {
+    "desktop": [
+      {
+        "painted": 864,
+        "breakdown": {
+          "clicked": 27,
+          "attached": 861,
+          "painted": 864
+        },
+        "waterfall": [
+          {
+            "t": 57,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 58,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      }
+    ],
+    "online": [
+      {
+        "painted": 840,
+        "breakdown": {
+          "clicked": 23,
+          "attached": 833,
+          "painted": 840
+        },
+        "waterfall": [
+          {
+            "t": 46,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 46,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      }
+    ]
+  }
+}

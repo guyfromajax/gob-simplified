@@ -20,8 +20,8 @@ function cloneParams(params) {
 }
 
 
-function playSound(filename) {
-  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
+function playSound(name) {
+  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(name, 0.7); }).catch(function () {});
 }
 
 let root = null;
@@ -192,9 +192,9 @@ function applyTutorialMode() {
   cta.id = 'btn-tutorial-gameplan-continue';
   cta.type = 'button';
   cta.className = 'gob-btn gob-btn--action gob-btn--lg';
+  cta.setAttribute('data-sfx', 'SFX_COMMIT');
   cta.textContent = 'PLAY NOW';
   cta.addEventListener('click', async () => {
-    import('/js/shared/uiSfx.js').then((m) => m.playAdvance()).catch(() => {});
     cta.disabled = true;
     let saved = false;
     try {
@@ -553,7 +553,7 @@ function setupSliders() {
         markUnsavedChanges();
       });
       slider.addEventListener('change', () => {
-        playSound('click-tiny.wav');
+        playSound('SFX_SELECT');
       });
     }
   }
@@ -1217,7 +1217,7 @@ function showUnsavedChangesWarning(onContinue) {
       sessionStorage.setItem('gameplan_suppress_warning', 'true');
     }
     overlay.remove();
-    playSound('confirm-2-lowervol.wav');
+    playSound('SFX_COMMIT');
     await saveGamePlan();
     // After successful save, continue with navigation
     if (!gamePlanHasEdits()) {
@@ -1324,7 +1324,7 @@ async function init(host, options) {
         pageBackLink.hidden = false;
         pageBackLink.addEventListener('click', (event) => {
           event.preventDefault();
-          playSound('x-back.mp3');
+          playSound('SFX_SELECT');
           navigateToCommandCenter();
         });
       }
@@ -1358,7 +1358,7 @@ async function init(host, options) {
 
     if (btnSaveGamePlan) {
       btnSaveGamePlan.addEventListener('click', () => {
-        playSound('confirm-2-lowervol.wav');
+        playSound('SFX_COMMIT');
         saveGamePlan();
       });
       btnSaveGamePlan.setAttribute('data-wired', '1');
