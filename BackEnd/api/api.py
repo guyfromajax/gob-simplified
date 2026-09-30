@@ -68,6 +68,57 @@ def _player_on_user_team(franchise_doc, player_meta) -> bool:
     return bool(team_name) and str(meta.get("team") or "") == team_name
 
 
+def _normalize_roster_lookup_name(value: str) -> str:
+    """Query-side name: strip, hyphen→space, unidecode, lower. Same as Strategy 3."""
+    from unidecode import unidecode
+
+    return unidecode((value or "").strip().replace("-", " ")).lower()
+
+
+def _normalize_stored_team_name(name: str) -> str:
+    """Document-side name: hyphen→space + lower. Matches the $replaceAll+$toLower pipeline."""
+    return str(name or "").replace("-", " ").lower()
+
+
+def lookup_team_doc_by_normalized_name(teams_collection, lookup_value: str):
+    """Strategy 3 team-name lookup. Aggregate on Mongo/SQLite; Python fallback on mongomock.
+
+    Real Mongo and SQLite support ``$replaceAll``. mongomock raises
+    ``OperationFailure: Unrecognized expression '$replaceAll'``. Catch that and
+    walk a cheap prefiltered ``find()`` with the same hyphen/lower rules so the
+    first match is the same team the aggregate would have returned.
+    """
+    from pymongo.errors import OperationFailure
+
+    normalized_name = _normalize_roster_lookup_name(lookup_value)
+    pipeline = [
+        {
+            "$addFields": {
+                "normalized_name": {
+                    "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
+                }
+            }
+        },
+        {"$match": {"normalized_name": normalized_name}},
+        {"$limit": 1},
+    ]
+    try:
+        team_result = list(teams_collection.aggregate(pipeline))
+        return team_result[0] if team_result else None
+    except OperationFailure:
+        token = (normalized_name.split() or [""])[0]
+        query = {"name": {"$exists": True, "$ne": ""}}
+        if token:
+            query = {"name": {"$regex": re.escape(token), "$options": "i"}}
+        for cand in teams_collection.find(query):
+            stored = cand.get("name")
+            if stored is None:
+                continue
+            if _normalize_stored_team_name(stored) == normalized_name:
+                return cand
+        return None
+
+
 def _saved_player_pts_by_side(saved: dict | None) -> tuple[int, int]:
     """Sum ``players[].stats.PTS`` for home / away sides."""
     home_pts = 0
@@ -144,7 +195,7 @@ try:
     from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
     import uuid
     import math
-    from BackEnd.main import run_simulation, simulate_quarter
+    from BackEnd.main import simulate_quarter
     from BackEnd.models.game_manager import GameManager
     # ✅ PERFORMANCE: Removed debug print statements
     from BackEnd.persistence import get_store
@@ -217,7 +268,6 @@ try:
     import time
     from datetime import datetime
     from pathlib import Path
-    from BackEnd.models.player import Player
     
     logger = logging.getLogger(__name__)
 
@@ -477,6 +527,14 @@ try:
     )
     
     print(f"🌐 [CORS] Configured with origins: {cors_origins}")
+
+    # Request body cap (413), GOB_MAX_REQUEST_BYTES, default 1 MiB. Appended, not
+    # add_middleware, so it sits INSIDE CORSMiddleware and a 413 carries CORS headers.
+    # Same cap on desktop: no desktop path posts more than the hosted client does.
+    from starlette.middleware import Middleware as _Middleware
+    from BackEnd.utils.request_limits import RequestSizeLimitMiddleware
+
+    app.user_middleware.append(_Middleware(RequestSizeLimitMiddleware))
     logging.info(f"🌐 CORS configured with origins: {cors_origins}")
 
     # Team Builder replaced-name leak detector (dev/staging). Scans franchise-scoped
@@ -714,6 +772,14 @@ try:
     # ✅ PERFORMANCE: Removed debug print statements
     
     # ✅ Add global exception handler to catch all unhandled exceptions
+    # 422s keep loc / msg / type; FastAPI's default also echoed the submitted input.
+    from fastapi.exceptions import RequestValidationError
+    from BackEnd.utils.request_limits import validation_error_payload
+
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+        return JSONResponse(status_code=422, content=validation_error_payload(exc.errors()))
+
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         # The client gets only an opaque id; the exception text stays in the logs,
@@ -837,13 +903,6 @@ try:
 
         from BackEnd.api._bootstrap import mark_startup_complete
         mark_startup_complete(_ready_ping)
-    
-    class SimulationRequest(BaseModel):
-        home_team: str
-        away_team: str
-        home_lineup: dict[str, str] | None = None
-        away_lineup: dict[str, str] | None = None
-    
     
     class QuarterSimulationRequest(BaseModel):
         game_id: str | None = None
@@ -2201,85 +2260,6 @@ try:
         _assign_rank_bands(rows, "height_total", "height_band")
         _assign_rank_bands(rows, "class_total", "class_band")
         return sorted(rows, key=lambda t: (t["name"] or ""))
-    
-    
-    @app.post("/api/simulate")
-    @app.post("/simulate")
-    @_rate_limit_sim
-    def simulate_game(request: Request, body: SimulationRequest):
-        """Rate limited: 30/minute per IP."""
-        home_team = body.home_team
-        away_team = body.away_team
-    
-        known_teams = [team["name"] for team in teams_collection.find({}, {"name": 1})]
-    
-        if home_team not in known_teams:
-            raise HTTPException(status_code=400, detail=f"Unknown home_team: '{home_team}'")
-        if away_team not in known_teams:
-            raise HTTPException(status_code=400, detail=f"Unknown away_team: '{away_team}'")
-        
-        print("🔥 Simulate endpoint hit - BOOM!!")
-        print(f"Home: {body.home_team}, Away: {body.away_team}")
-    
-        # ✅ Add this line to print the full request body
-        # print("🔍 Full request body:", body)
-    
-    
-        game = run_simulation(home_team, away_team, body.home_lineup, body.away_lineup)
-        # print("Right before summarize_game_state")
-        # print("🧪 Turns sample:", game.turns[:3])
-
-        # Consolidated end-of-game shot diagnostics (one master report).
-        from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
-        if calibration_diagnostics_enabled(game):
-            from BackEnd.utils.shot_split_tracker import format_master_eog_report
-            logger.warning(format_master_eog_report(game))
-
-        summary = summarize_game_state(game)
-    
-        # Build a consolidated score map from available sources
-        score_map = summary.get("final_score") or summary.get("score") or {}
-    
-        # Ensure team objects exist for the frontend and populate scores
-        summary["homeTeam"] = summary.get("homeTeam") or {
-            "name": summary.get("home_team", home_team),
-        }
-        summary["homeTeam"]["score"] = score_map.get(summary["homeTeam"]["name"], 0)
-    
-        summary["awayTeam"] = summary.get("awayTeam") or {
-            "name": summary.get("away_team", away_team),
-        }
-        summary["awayTeam"]["score"] = score_map.get(summary["awayTeam"]["name"], 0)
-    
-        # Expose the score map under a consistent key
-        summary["score"] = score_map
-    
-        # ✅ Minimal debug visibility
-        # print(f"✅ Game finished: {home_team} vs. {away_team}")
-        # print(f"🏀 Final Score: {game.score}")
-        # print(f"📊 Team Totals: {game.team_totals}")# show first few entries
-    
-        # ✅ PERFORMANCE: Removed verbose debug print
-    
-        # Log keys and ensure no Player objects remain at the top level
-        print("Summary top-level keys:", list(summary.keys()))
-        for k, v in summary.items():
-            if isinstance(v, Player):
-                raise TypeError(f"Summary key '{k}' contains a Player instance")
-    
-        try:
-            print("🔍 About to insert summary into Mongo...")
-            inserted_id = games_collection.insert_one(summary).inserted_id
-            summary["_id"] = str(inserted_id)
-            # games_collection.insert_one(summary)
-            # summary.pop("_id", None)
-        except Exception as e:
-            print("🚨 Mongo insert failed:", e)
-            traceback.print_exc()
-        
-        print("Inside simulate_game()\nReturning summary keys:", summary.keys())
-    
-        return JSONResponse(content=summary, status_code=200)
     
     
     @app.get("/api/game/{game_id}")
@@ -7097,26 +7077,7 @@ try:
         
         # Strategy 3: If not found, try team_name lookup (backward compatibility)
         if not team_doc:
-            normalized_name = unidecode(lookup_value.strip().replace("-", " ")).lower()
-            pipeline = [
-                {
-                    "$addFields": {
-                        "normalized_name": {
-                            "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
-                        }
-                    }
-                },
-                {
-                    "$match": {
-                        "normalized_name": normalized_name
-                    }
-                },
-                {
-                    "$limit": 1
-                }
-            ]
-            team_result = list(teams_collection.aggregate(pipeline))
-            team_doc = team_result[0] if team_result else None
+            team_doc = lookup_team_doc_by_normalized_name(teams_collection, lookup_value)
         
         query_time = (time.time() - query_start) * 1000
         
@@ -8066,17 +8027,6 @@ try:
         return response_data
     
     
-    @app.get("/games")
-    def get_games():
-        # Fetch the 10 most recent games (you can adjust this)
-        games = list(games_collection.find().sort("_id", -1).limit(10))
-    
-        # Convert ObjectId to string for JSON serialization
-        for game in games:
-            game["_id"] = str(game["_id"])
-    
-        return JSONResponse(content=games)
-
     class DeleteCompletedSingleGameRequest(BaseModel):
         game_id: str
 
