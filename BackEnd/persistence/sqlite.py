@@ -521,6 +521,13 @@ class SqliteStore:
     def ensure_users_username_index(self) -> None:
         return None
 
+    # users / alpha_otps are REMOTE collections on desktop (hosted Mongo owns them).
+    def ensure_users_email_index(self) -> bool:
+        return False
+
+    def ensure_alpha_otps_code_index(self) -> bool:
+        return False
+
     def ensure_tutorial_game_ttl_index(self) -> None:
         return None
 

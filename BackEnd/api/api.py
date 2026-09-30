@@ -158,6 +158,8 @@ try:
     franchise_team_data_collection = _store.franchise_team_data_collection
     franchise_recruits_data_collection = _store.franchise_recruits_data_collection
     ensure_users_username_index = _store.ensure_users_username_index
+    ensure_users_email_index = _store.ensure_users_email_index
+    ensure_alpha_otps_code_index = _store.ensure_alpha_otps_code_index
     ensure_alpha_access_requests_email_index = _store.ensure_alpha_access_requests_email_index
     ensure_ftd_index = _store.ensure_ftd_index
     ensure_fpd_index = _store.ensure_fpd_index
@@ -488,7 +490,8 @@ try:
     # RATE LIMITING (Step 6)
     # ============================================================================
     # Protects against brute force, DoS, and resource exhaustion
-    # Limits: auth=10/min, simulation=30/min, general=100/min (per IP)
+    # Limits: auth=10/min, simulation=30/min, general default=300/min (per IP),
+    # heavy franchise routes per user (see BackEnd/utils/rate_limiter.py)
     # Optional: if slowapi/rate_limiter fails to import, app still starts (deploy resilience)
     limiter = None
     SIM_RATE_LIMIT = "30/minute"
@@ -509,6 +512,13 @@ try:
             SIM_TURN_RATE_LIMIT = _SIM_TURN_RATE_LIMIT
             app.state.limiter = limiter
             app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+            from BackEnd.utils.rate_limiter import install_default_rate_limit
+            from BackEnd.api import _bootstrap as _liveness
+
+            install_default_rate_limit(
+                app,
+                exempt=(_liveness.health_check, _liveness.health_check_head),
+            )
             print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
         except Exception as e:
             print(f"⚠️ [RATE LIMIT] Failed to enable rate limiting: {e}", file=sys.stderr, flush=True)
@@ -724,6 +734,14 @@ try:
         except Exception as e:
             print(f"⚠️ [WARNING] startup: RNG draw guard not installed: {e}",
                   file=sys.stderr, flush=True)
+
+        # Auth uniqueness indexes, each on its own: duplicate data logs a WARNING and
+        # must not skip the other indexes (scripts/ops/check_auth_dupes.py).
+        for _ensure_auth_index in (ensure_users_email_index, ensure_alpha_otps_code_index):
+            try:
+                _ensure_auth_index()
+            except Exception as e:
+                logging.warning("startup: %s failed: %s", _ensure_auth_index.__name__, e)
 
         # Ensure indexes exist (idempotent; safe on every deploy)
         try:

@@ -8,6 +8,10 @@ import pytest
 os.environ.setdefault("GOB_DB_MODE", "mongomock")
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("MONGO_DB_NAME", "gob-test")
+# Every TestClient request without a forwarding header shares the key "testclient",
+# so the app-wide default limit (300/minute in prod) would trip mid-suite. Tests that
+# exercise the default limit swap in a low one explicitly.
+os.environ.setdefault("RATE_LIMIT_GENERAL", "1000000/minute")
 
 # GOB_STRICT_EXCEPTIONS — ON for the whole suite (2026-09-24).
 #
