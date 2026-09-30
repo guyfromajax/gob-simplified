@@ -88,7 +88,7 @@ export function openUsernameModal(opts = {}) {
   const onSuccess = typeof opts.onSuccess === 'function' ? opts.onSuccess : null;
   const mascotText = (opts.mascot || '').trim();
   const titleText = mascotText
-    ? `YOU'RE COACHING THE ${mascotText.toUpperCase()}`
+    ? `YOU'RE COACHING THE ${mascotText}`
     : 'CHOOSE A USERNAME';
   const sammySrc = getTeamSammyImage(opts.teamName);
   // String() guard so a stray null/undefined doesn't end up rendered as

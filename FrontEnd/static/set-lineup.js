@@ -2340,8 +2340,8 @@ async function setHeader() {
 
   const isPregame = !(gameId && (resumeFromTimeout || currentQuarter > 1 || userTeamScore > 0 || opponentTeamScore > 0));
   scoreboardEl?.classList.toggle('is-pregame', isPregame);
-  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamLabel || 'Home') : (userTeamLabel || 'Home')).toUpperCase();
-  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamLabel || 'Away') : (opponentTeamLabel || 'Away')).toUpperCase();
+  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamLabel || 'Home') : (userTeamLabel || 'Home'));
+  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamLabel || 'Away') : (opponentTeamLabel || 'Away'));
   if (scoreHomeTeamEl) scoreHomeTeamEl.textContent = displayUserTeamName;
   if (scoreAwayTeamEl) scoreAwayTeamEl.textContent = displayOpponentTeamName;
   if (scoreHomeValueEl) scoreHomeValueEl.textContent = `${userTeamScore}`;

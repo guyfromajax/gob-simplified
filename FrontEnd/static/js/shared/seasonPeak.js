@@ -393,7 +393,73 @@
     });
   }
 
-  function finishBits(payload) {
+  function namedBit(value) {
+    if (!present(value)) return '';
+    var s = String(value).trim();
+    if (/^\d+$/.test(s)) return '';
+    return s;
+  }
+
+  function pickNamed(key, payload, extras) {
+    var list = [payload].concat(extras || []);
+    var i;
+    var v;
+    for (i = 0; i < list.length; i++) {
+      if (!list[i]) continue;
+      v = namedBit(list[i][key]);
+      if (v) return v;
+    }
+    return '';
+  }
+
+  function conferenceLabel(name) {
+    var n = namedBit(name);
+    if (!n) return 'Conference';
+    if (/^conference\b/i.test(n)) return n;
+    return 'Conference ' + n;
+  }
+
+  function regionLabel(name) {
+    var n = namedBit(name);
+    if (!n) return 'Region';
+    if (/^region\b/i.test(n)) return n;
+    return 'Region ' + n;
+  }
+
+  function reviewContext(opts, payload) {
+    var extras = [].concat(opts.titleMoments || [], opts.titleTrophies || []);
+    return {
+      conference: pickNamed('conference_name', payload, extras) || pickNamed('conference', payload, extras),
+      region: pickNamed('region', payload, extras)
+    };
+  }
+
+  function reviewMedallions(opts, payload) {
+    var ctx = reviewContext(opts, payload);
+    var raw;
+    if (opts.titleMedallions && opts.titleMedallions.length) {
+      raw = opts.titleMedallions;
+    } else {
+      raw = medallionsFromTrophies(opts.titleTrophies);
+    }
+    return (raw || []).map(function (m, i) {
+      var label = m.label;
+      if (m.letter === 'C' && String(label || '').indexOf('Regular-Season') === -1) {
+        label = conferenceLabel(ctx.conference) + ' Champions';
+      } else if (m.letter === 'R') {
+        label = regionLabel(ctx.region) + ' Champions';
+      }
+      return {
+        letter: m.letter,
+        label: label,
+        sub: '',
+        lg: false,
+        j: m.j != null ? m.j : i
+      };
+    });
+  }
+
+  function finishBits(payload, ctx) {
     var bits = [];
     if (!payload) return bits;
     if (present(payload.national_rank)) {
@@ -401,7 +467,7 @@
     }
     if (present(payload.conf_finish) || present(payload.conference_place)) {
       var place = payload.conf_finish != null ? payload.conf_finish : payload.conference_place;
-      bits.push({ v: ordinal(place), k: 'Conference' });
+      bits.push({ v: ordinal(place), k: conferenceLabel(ctx && ctx.conference) });
     }
     return bits;
   }
@@ -475,12 +541,8 @@
       var q = opts.queue || {};
       var team = payload.program || payload.team_name || opts.teamName || '';
       var season = payload.season != null ? payload.season : opts.season;
-      var meds = opts.titleMedallions && opts.titleMedallions.length
-        ? opts.titleMedallions
-        : (opts.titleMoments && opts.titleMoments.length
-          ? medallionsFromMoments(opts.titleMoments)
-          : medallionsFromTrophies(opts.titleTrophies));
-      var finish = finishBits(payload);
+      var meds = reviewMedallions(opts, payload);
+      var finish = finishBits(payload, reviewContext(opts, payload));
       var rec = recordHtml(payload);
       var players = payload.best_players || [];
       var cols = bestPlayersHtml(players) + awardsHtml(players) + classHtml(payload.class_signed);

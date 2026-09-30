@@ -71,7 +71,7 @@
 /* --- Role variants ----------------------------------------------------- */
 
 /* Non-gating primary — orange. Default for almost every primary CTA. */
-.gob-btn--action {
+.gob-btn--action { /* colour-law: committed */
   background: #F79420;
   border-color: rgba(247, 148, 32, 0.55);
   color: #15181f;
@@ -84,7 +84,7 @@
 /* Gating primary — green. Reserved for actions that advance game state.
  * Per styleguide: must remain scarce. In the FTE flow, this appears on
  * exactly one button (Tip-off → SET LINEUP). */
-.gob-btn--gate {
+.gob-btn--gate { /* colour-law: positive-data — gating Advance */
   background: #34EC27;
   border-color: rgba(52, 236, 39, 0.55);
   color: #15181f;

@@ -806,7 +806,7 @@ html.gob-1920 .gob-apan { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .gob-chg { display: flex; align-items: baseline; gap: 8px; min-height: 28px; }
 .gob-chg b { font-weight: 600; }
 .gob-chg i { font-style: normal; }
-.gob-chg .is-up i { color: #8fd18f; }
+.gob-chg .is-up i { color: var(--delta-up); } /* colour-law: positive-data */
 .gob-chg .is-down i { color: #e07a7a; }
 .gob-chg em { margin-left: auto; color: var(--text-38); font-style: normal; font-size: var(--fs-11); }
 .gob-focus-read, .gob-focus-edit { display: flex; align-items: stretch; gap: 12px; }

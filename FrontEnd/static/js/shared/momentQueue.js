@@ -144,6 +144,7 @@
     return global.SeasonPeak.showReview({
       payload: data,
       titleTrophies: data.titles || [],
+      titleMoments: champs,
       item: moment,
       queue: ctx.queue,
       teamName: (topData && (topData.team || topData.user_team_name)) || '',
