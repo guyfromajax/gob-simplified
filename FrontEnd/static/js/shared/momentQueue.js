@@ -62,6 +62,7 @@
       method: 'PATCH',
       headers: headers,
       credentials: 'include',
+      keepalive: true,
       body: JSON.stringify(body || {})
     }).catch(function () {});
   }
@@ -141,6 +142,7 @@
     champs.forEach(function (m) {
       if (!color && m && m.winner_primary_color) color = m.winner_primary_color;
     });
+    var seen = markMilestoneSeen('season_review', fid, data);
     return global.SeasonPeak.showReview({
       payload: data,
       titleTrophies: data.titles || [],
@@ -151,7 +153,7 @@
       teamColor: color,
       season: data.season || (topData && (topData.season || topData.current_season))
     }).then(function () {
-      return Promise.resolve(markMilestoneSeen('season_review', fid, data));
+      return Promise.resolve(seen);
     });
   }
 
@@ -197,6 +199,8 @@
     var list = ctx.list || [];
     var index = queue.index || 1;
     var next = list[index];
+    var fid = (topData && topData.franchise_id) || global.franchiseId || '';
+    var seen = markMilestoneSeen(moment.kind, fid, data);
     return global.MilestoneModal.show({
       item: moment,
       payload: data,
@@ -207,8 +211,7 @@
       nextTitle: next && (next.title || next.kind),
       isLast: index >= (queue.total || list.length)
     }).then(function (reason) {
-      var fid = (topData && topData.franchise_id) || global.franchiseId || '';
-      return Promise.resolve(markMilestoneSeen(moment.kind, fid, data)).then(function () {
+      return Promise.resolve(seen).then(function () {
         return reason;
       });
     });
