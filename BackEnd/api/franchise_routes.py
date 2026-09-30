@@ -158,6 +158,21 @@ from BackEnd.utils.franchise_rank_prestige import (
 )
 
 router = APIRouter()
+
+# Per-user limits on the heavy week/season routes (rate_limiter.user_rate_limit).
+# If the limiter can't import, the routes stay unlimited rather than failing.
+try:
+    from BackEnd.utils.rate_limiter import (
+        CPU_SIMS_RATE_LIMIT,
+        FINISH_SEASON_RATE_LIMIT,
+        WEEK_ADVANCE_RATE_LIMIT,
+        user_rate_limit as _heavy_route_limit,
+    )
+except Exception:  # pragma: no cover - deploy resilience, mirrors api.py
+    CPU_SIMS_RATE_LIMIT = FINISH_SEASON_RATE_LIMIT = WEEK_ADVANCE_RATE_LIMIT = ""
+
+    def _heavy_route_limit(_limit, _scope):
+        return lambda: None
 logger = logging.getLogger(__name__)
 
 from BackEnd.runtime_paths import bundle_path, bundle_root
@@ -9279,7 +9294,10 @@ def _complete_week_finish_cpu_and_persist(
 
     return finalized
 
-@router.post("/franchise/complete-week")
+@router.post(
+    "/franchise/complete-week",
+    dependencies=[Depends(_heavy_route_limit(WEEK_ADVANCE_RATE_LIMIT, "complete-week"))],
+)
 @marks_last_played
 def complete_week(req: CompleteWeekRequest):
     logger.warning(
@@ -9385,7 +9403,10 @@ def complete_week(req: CompleteWeekRequest):
 
 
 
-@router.post("/franchise/complete-week/phase-a")
+@router.post(
+    "/franchise/complete-week/phase-a",
+    dependencies=[Depends(_heavy_route_limit(WEEK_ADVANCE_RATE_LIMIT, "complete-week-phase-a"))],
+)
 @marks_last_played
 def complete_week_phase_a(req: CompleteWeekRequest):
     logger.warning(
@@ -9488,7 +9509,10 @@ def complete_week_phase_a(req: CompleteWeekRequest):
     }
 
 
-@router.post("/franchise/complete-week/start-cpu-sims")
+@router.post(
+    "/franchise/complete-week/start-cpu-sims",
+    dependencies=[Depends(_heavy_route_limit(CPU_SIMS_RATE_LIMIT, "start-cpu-sims"))],
+)
 def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
     """
     Run full CPU sims for all **non-user** week matchups and persist ``results.{week}``
@@ -9590,7 +9614,10 @@ def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
     return out
 
 
-@router.post("/franchise/complete-week/phase-b")
+@router.post(
+    "/franchise/complete-week/phase-b",
+    dependencies=[Depends(_heavy_route_limit(WEEK_ADVANCE_RATE_LIMIT, "complete-week-phase-b"))],
+)
 @marks_last_played
 def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
     logger.warning(
@@ -19766,7 +19793,10 @@ def get_senior_tribute(
     )
 
 
-@router.post("/franchise/finish-season")
+@router.post(
+    "/franchise/finish-season",
+    dependencies=[Depends(_heavy_route_limit(FINISH_SEASON_RATE_LIMIT, "finish-season"))],
+)
 @marks_last_played
 def finish_season(req: FinishSeasonRequest):
     """Finish current season and start new season."""

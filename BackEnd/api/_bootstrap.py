@@ -8,6 +8,12 @@ from fastapi import FastAPI, Response
 from BackEnd.env_config import resolve_runtime_db_access
 from BackEnd.loopback_env import is_loopback
 from BackEnd.runtime_paths import bundle_path, bundle_root
+from BackEnd.utils.jwt_config import resolve_jwt_secret
+
+# Refuse to start with the public dev JWT secret outside local dev/test. This runs
+# before api.py's guarded import block, so it stops the process instead of leaving
+# a half-started app behind /health.
+resolve_jwt_secret()
 
 
 def _docs_kwargs(environ=os.environ) -> dict:

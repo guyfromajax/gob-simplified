@@ -294,6 +294,18 @@ class MongoStore:
             users_collection=self.users_collection,
         )
 
+    def ensure_users_email_index(self) -> bool:
+        return indexes.ensure_users_email_index(
+            client=self.client,
+            users_collection=self.users_collection,
+        )
+
+    def ensure_alpha_otps_code_index(self) -> bool:
+        return indexes.ensure_alpha_otps_code_index(
+            client=self.client,
+            alpha_otps_collection=self.alpha_otps_collection,
+        )
+
     def ensure_tutorial_game_ttl_index(self) -> None:
         indexes.ensure_tutorial_game_ttl_index(
             client=self.client,

@@ -145,6 +145,22 @@ def ensure_users_username_index():
     )
 
 
+def ensure_users_email_index():
+    """Unique index on users.email. Logs a WARNING (never raises) if duplicates exist."""
+    return _indexes.ensure_users_email_index(
+        client=client,
+        users_collection=users_collection,
+    )
+
+
+def ensure_alpha_otps_code_index():
+    """Unique index on alpha_otps.otp_code. Logs a WARNING (never raises) if duplicates exist."""
+    return _indexes.ensure_alpha_otps_code_index(
+        client=client,
+        alpha_otps_collection=alpha_otps_collection,
+    )
+
+
 def ensure_tutorial_game_ttl_index():
     """TTL sweep for abandoned FTE tutorial games. Idempotent; safe on startup.
 

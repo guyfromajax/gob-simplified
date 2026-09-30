@@ -21,6 +21,9 @@ os.environ.setdefault("GOB_DB_MODE", "mongomock")
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("MONGO_DB_NAME", "gob-test")
 os.environ.setdefault("PYTHONHASHSEED", "0")
+# Parallel Playwright workers all come from 127.0.0.1; don't let the app-wide
+# default rate limit (300/minute per IP in prod) turn page loads into 429s.
+os.environ.setdefault("RATE_LIMIT_GENERAL", "1000000/minute")
 
 _FORBIDDEN_DB_NAMES = frozenset({"gob", "gob-staging"})
 
