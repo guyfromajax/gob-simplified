@@ -1,0 +1,246 @@
+{
+  "run_id": "20260930T115527Z-breakdown-n1",
+  "label": "breakdown",
+  "users": 1,
+  "t_start": 1790769327.208,
+  "t_end": 1790769530.907,
+  "t_start_iso": "2026-09-30T11:55:27.207527+00:00",
+  "t_end_iso": "2026-09-30T11:58:50.907546+00:00",
+  "weeks": 3,
+  "weeks_ok": 3,
+  "week_wall_s": {
+    "p50": 70.49,
+    "p95": 72.72,
+    "max": 72.72
+  },
+  "by_week_type": {
+    "sim": {
+      "n": 3,
+      "p50": 70.49,
+      "max": 72.72
+    }
+  },
+  "status_codes": {
+    "200": 168
+  },
+  "n429": 0,
+  "n5xx": 0,
+  "rate_5xx": 0.0,
+  "n_transport_errors": 0,
+  "max_request_s": 47.852,
+  "endpoints": {
+    "POST /franchise/complete-week/start-cpu-sims": {
+      "n": 3,
+      "p50": 47.008,
+      "p95": 47.852,
+      "max": 47.852,
+      "sum": 141.06
+    },
+    "POST /franchise/complete-week/phase-b": {
+      "n": 3,
+      "p50": 32.13,
+      "p95": 32.4,
+      "max": 32.4,
+      "sum": 96.31
+    },
+    "POST /api/simulate-quarter": {
+      "n": 12,
+      "p50": 3.898,
+      "p95": 4.733,
+      "max": 4.733,
+      "sum": 47.26
+    },
+    "POST /franchise/run-training/cpu-train": {
+      "n": 3,
+      "p50": 17.483,
+      "p95": 18.538,
+      "max": 18.538,
+      "sum": 41.52
+    },
+    "GET /teams": {
+      "n": 10,
+      "p50": 0.208,
+      "p95": 0.274,
+      "max": 0.274,
+      "sum": 2.21
+    },
+    "GET /franchise/command-center/data": {
+      "n": 16,
+      "p50": 0.088,
+      "p95": 0.206,
+      "max": 0.206,
+      "sum": 1.54
+    },
+    "POST /api/autoset-lineup": {
+      "n": 21,
+      "p50": 0.046,
+      "p95": 0.111,
+      "max": 0.183,
+      "sum": 1.38
+    },
+    "GET /roster/{team_id}": {
+      "n": 14,
+      "p50": 0.07,
+      "p95": 0.183,
+      "max": 0.183,
+      "sum": 1.13
+    },
+    "GET /api/game/{id}": {
+      "n": 6,
+      "p50": 0.081,
+      "p95": 0.569,
+      "max": 0.569,
+      "sum": 1.02
+    },
+    "POST /franchise/complete-week/phase-a": {
+      "n": 3,
+      "p50": 0.322,
+      "p95": 0.371,
+      "max": 0.371,
+      "sum": 1.01
+    },
+    "POST /franchise/run-training/user": {
+      "n": 3,
+      "p50": 0.37,
+      "p95": 0.399,
+      "max": 0.399,
+      "sum": 0.96
+    },
+    "GET /roster/{name}": {
+      "n": 6,
+      "p50": 0.127,
+      "p95": 0.235,
+      "max": 0.235,
+      "sum": 0.92
+    },
+    "GET /api/gameplan": {
+      "n": 13,
+      "p50": 0.043,
+      "p95": 0.161,
+      "max": 0.161,
+      "sum": 0.88
+    },
+    "GET /api/playbooks": {
+      "n": 6,
+      "p50": 0.091,
+      "p95": 0.296,
+      "max": 0.296,
+      "sum": 0.86
+    },
+    "POST /api/init-game": {
+      "n": 3,
+      "p50": 0.195,
+      "p95": 0.284,
+      "max": 0.284,
+      "sum": 0.66
+    },
+    "GET /franchise/team-data": {
+      "n": 10,
+      "p50": 0.049,
+      "p95": 0.138,
+      "max": 0.138,
+      "sum": 0.65
+    },
+    "POST /player-image/warm-teams": {
+      "n": 3,
+      "p50": 0.225,
+      "p95": 0.237,
+      "max": 0.237,
+      "sum": 0.61
+    },
+    "GET /franchise/standings": {
+      "n": 10,
+      "p50": 0.042,
+      "p95": 0.124,
+      "max": 0.124,
+      "sum": 0.51
+    },
+    "POST /franchise/cut-players": {
+      "n": 1,
+      "p50": 0.418,
+      "p95": 0.418,
+      "max": 0.418,
+      "sum": 0.42
+    },
+    "GET /app-config": {
+      "n": 10,
+      "p50": 0.031,
+      "p95": 0.09,
+      "max": 0.09,
+      "sum": 0.39
+    },
+    "GET /api/game/{id}/resume-state": {
+      "n": 3,
+      "p50": 0.146,
+      "p95": 0.173,
+      "max": 0.173,
+      "sum": 0.37
+    },
+    "GET /franchise/training-points": {
+      "n": 3,
+      "p50": 0.112,
+      "p95": 0.119,
+      "max": 0.119,
+      "sum": 0.32
+    },
+    "GET /franchise/championship-moments/context": {
+      "n": 3,
+      "p50": 0.046,
+      "p95": 0.133,
+      "max": 0.133,
+      "sum": 0.23
+    },
+    "POST /franchise/play-next-game": {
+      "n": 3,
+      "p50": 0.054,
+      "p95": 0.054,
+      "max": 0.054,
+      "sum": 0.16
+    }
+  },
+  "week_rows": [
+    {
+      "run": "20260930T115527Z-breakdown-n1",
+      "user": 1,
+      "franchise_id": "6abcf8ac0d74476715acd103",
+      "week_type": "sim",
+      "week": 1,
+      "ok": true,
+      "training_s": 6.27,
+      "cut_s": 1.01,
+      "game_s": 19.2,
+      "advance_s": 32.31,
+      "t_start": 1790769327.265,
+      "t_end": 1790769387.437,
+      "wall_s": 60.17
+    },
+    {
+      "run": "20260930T115527Z-breakdown-n1",
+      "user": 1,
+      "franchise_id": "6abcf8ac0d74476715acd103",
+      "week_type": "sim",
+      "week": 2,
+      "ok": true,
+      "training_s": 18.46,
+      "game_s": 18.0,
+      "advance_s": 32.88,
+      "t_start": 1790769387.543,
+      "t_end": 1790769458.032,
+      "wall_s": 70.49
+    },
+    {
+      "run": "20260930T115527Z-breakdown-n1",
+      "user": 1,
+      "franchise_id": "6abcf8ac0d74476715acd103",
+      "week_type": "sim",
+      "week": 3,
+      "ok": true,
+      "training_s": 19.75,
+      "game_s": 18.71,
+      "advance_s": 33.16,
+      "t_start": 1790769458.114,
+      "t_end": 1790769530.838,
+      "wall_s": 72.72
+    }
+  ]
+}
