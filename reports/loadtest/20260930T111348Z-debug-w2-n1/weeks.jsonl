@@ -1,0 +1,1 @@
+{"run": "20260930T111348Z-debug-w2-n1", "user": 1, "franchise_id": "6abcee1a0a009e153948265a", "week_type": "sim", "week": 1, "ok": false, "error": "phase-b-resume: 503 {\"detail\":\"CPU sims for this week are still in progress; please retry.\"}", "t_start": 1790766828.277, "t_end": 1790766980.246, "wall_s": 151.97}
