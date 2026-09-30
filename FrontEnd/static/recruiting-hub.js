@@ -1017,7 +1017,8 @@
     if (!el) { el = document.createElement('div'); el.id = 'hub-toast'; el.className = 'hub-toast'; document.body.appendChild(el); }
     el.innerHTML = '<span class="ti">' + CHECK + '</span><div><div class="tt1">' + Common.escapeHtml(title || 'Invites Submitted') +
       '</div><div class="tt2">' + Common.escapeHtml(sub || 'Your ranked board runs each week (Wks 20–26).') + '</div></div>';
-    el.style.borderLeftColor = ok === false ? 'var(--red)' : 'var(--green)';
+    el.classList.toggle('is-ok', ok !== false);
+    el.classList.toggle('is-err', ok === false);
     void el.offsetWidth; el.classList.add('show');
     clearTimeout(showToast._t); showToast._t = setTimeout(function () { el.classList.remove('show'); }, 3200);
   }
