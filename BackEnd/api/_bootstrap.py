@@ -106,3 +106,42 @@ def health_check():
 @app.head("/health")
 def health_check_head():
     return Response(status_code=200)
+
+
+# --- readiness ------------------------------------------------------------------
+# /health stays a dependency-free liveness check (Railway's healthcheck). /health/ready
+# is for uptime monitors: 200 only once app startup finished AND the database answers
+# a ping within READY_PING_TIMEOUT_S. No internal details in either body.
+READY_PING_TIMEOUT_S = 2.0
+_readiness = {"startup_complete": False, "ping": None}
+
+
+def mark_startup_complete(ping) -> None:
+    """Called at the end of api.py's startup with a zero-arg DB ping callable."""
+    _readiness["ping"] = ping
+    _readiness["startup_complete"] = True
+
+
+def _db_answers() -> bool:
+    ping = _readiness.get("ping")
+    if ping is None:
+        return False
+    import concurrent.futures
+
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        ex.submit(ping).result(timeout=READY_PING_TIMEOUT_S)
+        return True
+    except Exception:
+        return False
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
+
+
+@app.get("/health/ready")
+def health_ready():
+    from fastapi.responses import JSONResponse
+
+    if _readiness.get("startup_complete") and _db_answers():
+        return JSONResponse({"status": "ready"}, status_code=200)
+    return JSONResponse({"status": "not_ready"}, status_code=503)

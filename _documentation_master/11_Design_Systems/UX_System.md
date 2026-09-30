@@ -146,7 +146,7 @@ The shared tab module also serves any other command center that calls `initComma
 | Office | (none) | `home-tab` |
 | Team | Roster | `roster-view` (in-page module view; `team-roster-view.html` redirects here and keeps `franchise_id`, `team_id`, `roster_team_id`, and return params). `?tab=roster-tab` opens this view. |
 | Team | Player Stats | `player-stats-view` (in-page module view). `?tab=player-stats-tab` opens this view. |
-| Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
+| Team | Team Attributes | `team-attributes-view` (in-page module view; `team-traits.html` redirects here and keeps `franchise_id`, `team_id`, and `week`). `?tab=team-stats-tab` opens this view. |
 | Team | Schedule | `team-schedule-view` (in-page module view). `?tab=schedule-tab` opens this view. Four week columns (1–7, 8–14, 15–21, 22–26), with the three tournament labels under 22–26 and the user's EOS games listed under each label when present. Two columns below 1100px. The bracket stays on League › Tournament. |
 | Team | Practice Squad | `practice-squad-view` (in-page module view). The regional practice-squad league. `practice-squad-standings.html` and `practice-squad-bracket.html` redirect here. |
 | Prep | Player Training | `training-view` (real module: `training.js` `init(root, { sections: 'player-dev' })`). Per-player development settings only — each player's position and development focus (the Player Development grid and its editors). No allocation sliders, Coaching Focus, or Submit. One neutral line: "Weekly training is set when you advance." The underline tab replaces. `?tab=training-tab` opens this view. Weekly training is not this tab: Advance ("Run Training" / "Run Training Camp") opens `/training.html` in focus (`init(root, { sections: 'weekly' })`, the same module). That page holds Player Drills / Scheme Installs / Full Team Sessions, points + requirements, Auto-Train, Playbook Training, Coaching Focus, and Submit Training. Submit lands on `/training-report.html` in focus (same chrome as Set Lineup / weekly training), then Office. After week 26 Advance is the tournament game and skips `/training.html`. Tutorial (`training.html?mode=tutorial`) stays on the file in focus and shows the weekly sections. The Training Report is not an FCC tab: `/training-report.html` hosts `training-report.js` `init(root)` in focus. Old `?tab=training-report-view` and the redirect stub remap to that page. The FCC summary panel stays in the page and is no longer opened by the shell. |
@@ -156,7 +156,7 @@ The shared tab module also serves any other command center that calls `initComma
 | League | Standings | `standings-view` (in-page module view; `standings.html` redirects here and keeps `franchise_id`, `team_id`, and return params). `?tab=standings-tab` still opens the old panel. |
 | League | Rankings | `rankings-view` (in-page module view; `rankings.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
 | League | Leaders | `leaders-view` (in-page module view; `leaders.html` redirects here). `?tab=awards-tab` still opens the old panel. |
-| League | Team Stats | `team-stats-view` (in-page module view; `team-stats.html` redirects here). `?tab=fcc-team-stats-summary-tab` still opens the old panel. |
+| League | Team Stats | `team-stats-view` (in-page module view; `team-stats.html` and `stats.html` redirect here and keep `franchise_id`, `team_id`, and `week`). `?tab=fcc-team-stats-summary-tab` still opens the old panel. |
 | League | Schedule | `league-schedule-view` (in-page module view; `schedule.html` redirects here and keeps `franchise_id`, `team_id`, `week`, and return params). |
 | League | Tournament | `tournament-view` (in-page module view). `brackets.html` redirects here. Before week 27 the control is disabled: same shape, `--text-38`, `not-allowed`, not focusable, title `Opens Week N`. |
 | Recruiting | Pool, Leans, Visits | `recruiting.html?hub=pool\|leans\|visits` via `openRecruitingSurface` / `GOBNav.go` from the rail (`franchise_id`, `team_id`, `from=fcc`, `return_url`). The sub-tab replaces `hub` on that same document. The name search sits in `.pg-tools` as `.gob-search` ("Search name…", `/` to focus). Weeks 20–26 hide Pool, Leans, and Visits: the invite stack (calendar, board, then the pool) is the page, with a neutral "Recruit pool below" callout that scrolls to `#hub-pool`. Weeks 1–19 and 27–34 keep the three tabs. Weeks 35 and 36 hide the row; the sign board or the results list is the page. Focus mode hides the head, including the row. An old `?tab=recruits-tab` deep link opens `home-tab`. |
@@ -226,8 +226,14 @@ env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HO
 | news.html | redirect to `franchise-command-center.html?tab=news-view` (`story` is kept) | News | News |
 | leaders.html | browse | League | Leaders (`leaders-view`; the file redirects) |
 | standings.html | browse | League | Standings (`standings-view`; the file redirects) |
-| team-stats.html | browse | League | Team Stats (`team-stats-view`; the file redirects) |
-| stats.html | browse | League | none |
+| team-stats.html | redirect to `franchise-command-center.html?tab=team-stats-view` | League | Team Stats |
+| stats.html | redirect to `franchise-command-center.html?tab=team-stats-view` | League | Team Stats |
+| team-traits.html | redirect to `franchise-command-center.html?tab=team-attributes-view` | Team | Team Attributes |
+| game-plans.html | redirect to `tutorial-game-plans.html` | — | — |
+| scouting.html | redirect to `tutorial-scouting.html` | — | — |
+| player-attributes.html | redirect to `tutorial-player-attributes.html` | — | — |
+| team-attributes.html | redirect to `tutorial-team-attributes.html` | — | — |
+| index.html | redirect to `homepage.html` | — | — |
 | player-detail.html | redirect to `?tab=player-view` unless `recruit_id` or `mode=recruit` | return context | none |
 | team-roster-view.html | redirect to `roster-view`, or `team-view` when `roster_team_id` is set | Team or League | Roster or the team drill-in |
 | box-score.html | browse when `return_url` is set; otherwise focus | League when browse | none |
@@ -550,9 +556,9 @@ Training, Game Plan, Playbooks, and Scouting are in-app module views: each is an
 
 Some player-facing surfaces are not franchise web pages and are **not yet on the design system**: the Electron shell (window background `#0b1020`, default icon and menu, `desktop/splash.html`, `desktop/error.html`, native error dialogs), the live-game Phaser/court overlays (DON'T restyle without a sim-safe pass), and error/ops pages — there is no branded 404, and `maintenance.html` is off-system. Inventory and screenshots: `reports/coverage-gap-check-2026-09-30.md`.
 
-### franchise-command-center.css freeze — pending
+### franchise-command-center.css freeze — live
 
-The plan to freeze `FrontEnd/static/franchise-command-center.css` (peel dead `tab-content` rules; new views never add to it) is on branch `chore/fcc-css-peel` and has **not merged to develop** as of this sync. Treat it as pending; this note becomes a rule once that branch lands. **(Jamie: confirm when to flip.)**
+`FrontEnd/static/franchise-command-center.css` is frozen. No new rules. Put new styles in the view's own CSS. `scripts/check_ui_tokens.py --strict --no-write` fails if the file grows past `FCC_CSS_MAX_LINES` / `FCC_CSS_MAX_RULES` (live ceilings: 2261 lines, 293 style rules). Ceilings may shrink; they must not grow.
 
 ### Lessons
 
