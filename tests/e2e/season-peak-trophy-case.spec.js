@@ -432,6 +432,13 @@ test.describe('season peak review', () => {
     await expect(page.locator('.rv-fin')).toContainText('1st');
     await expect(page.getByText('1 seed')).toHaveCount(0);
     await expect(page.locator('.rv-t .tro')).toHaveCount(3);
+    await expect(page.locator('.rv-t .tro b')).toHaveText([
+      'National Champions', 'Region B Champions', 'Conference A2 Champions',
+    ]);
+    await expect(page.locator('.rv-t .tro div span')).toHaveCount(0);
+    await expect(page.locator('.rv-fin')).toContainText('Conference A2');
+    const medWidths = await page.locator('.rv .med').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().width)));
+    expect(new Set(medWidths).size).toBe(1);
     await expect(page.locator('.bp')).toHaveCount(3);
     await expect(page.locator('.aw')).toHaveCount(2);
     await expect(page.locator('.rv .rc')).toHaveCount(2);
@@ -442,6 +449,9 @@ test.describe('season peak review', () => {
     const reviewShots = path.join(__dirname, '../../reports/review-record');
     fs.mkdirSync(reviewShots, { recursive: true });
     await page.screenshot({ path: path.join(reviewShots, 'peak-review-1280.png') });
+    const ch8Shots = path.join(__dirname, '../../reports/ch8-cleanup-1');
+    fs.mkdirSync(ch8Shots, { recursive: true });
+    await page.screenshot({ path: path.join(ch8Shots, 'review-1280.png') });
     await page.locator('.rv-go').click();
     await expect(page.locator('.rv.is-open')).toHaveCount(0);
     expect(seen.some((s) => s.path.indexOf('season-review-seen') !== -1)).toBe(true);

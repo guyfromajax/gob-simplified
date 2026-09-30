@@ -37,6 +37,10 @@
   text-align: center;
 }
 
+.username-modal-body .gob-modal-title {
+  text-transform: uppercase;
+}
+
 .username-modal-body .gob-modal-subtitle {
   margin-top: 6px;
 }

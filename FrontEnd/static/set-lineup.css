@@ -132,6 +132,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   line-height: 1;
   letter-spacing: 0;
   white-space: nowrap;
+  text-transform: uppercase;
 }
 
 .context-score-separator {

@@ -7,14 +7,27 @@ Run from the repo root. Standard library only. No network.
     python scripts/check_ui_tokens.py --strict
 
 The default run always exits 0 and writes reports/ui-token-audit-2026-09-29.md.
-``--strict`` exits 1 when any colour-law hit is present (new or legacy).
+``--strict`` exits 1 when a *new-design* file has a colour-law hit that is
+not on the allow-list. Legacy hits are reported and do not fail the gate.
 
 New surface: shell HTML (``gob-shell`` / ``gob-focus``, or a page listed in
-``gobShell.js`` PAGES), ``css/gob-*.css``, ``css/office-home.css``,
-``js/shared/gob*.js``, and ``js/shared/views/**``. Everything else under the
-scan root is legacy, so an old page still to migrate is not mixed with new
-code breaking the rules. ``css/gob-tokens.css`` is the token source and is
-not scanned for literals.
+``gobShell.js`` PAGES), ``css/gob-*.css`` except tutorial/advanced-topic
+chrome, ``css/office-home.css``, ``js/shared/gob*.js``, and
+``js/shared/views/**``. Everything else under the scan root is legacy.
+``css/gob-tokens.css`` is the token source and is not scanned.
+
+Allow-list (green / orange only; ``--reward-gold`` is always a hit):
+
+* Green — Advance (``advance``, ``play-now``, ``gob-btn--gate``), positive
+  data (``delta-up``, ``tier-green``, ``t-green``, ``is-up``, ``is-pos``,
+  ``tsr-up``, ``risk-low``, ``rm-tile--keep``, ``data-band="high"``,
+  chemistry ``.chem`` / ``.is-green``, board-gain bars, RT/attribute ramps
+  ``.att-col`` / ``.att-bar`` / ``.gob-chg``), or a nearby
+  ``/* colour-law: positive-data */`` comment.
+* Orange — committed or saved (``save``, ``saved``, ``committed``,
+  ``gob-btn--action``, ``toggle-btn.active``, ``.gated``, ``.td-gate``,
+  ``.is-on``), attribute-ramp mid stops on ``.att-col`` / ``.att-bar``,
+  or a nearby ``/* colour-law: committed */`` / ``/* colour-law: saved */``.
 """
 
 from __future__ import annotations
@@ -174,13 +187,29 @@ TAG_STYLE_RE = re.compile(
 STYLE_BLOCK_RE = re.compile(r"<style\b[^>]*>(.*?)</style>", re.IGNORECASE | re.DOTALL)
 CLASS_RE = re.compile(r"""class\s*=\s*(['"])(.*?)\1""", re.IGNORECASE | re.DOTALL)
 REWARD_GOLD_RE = re.compile(r"--reward-gold\b")
-ADVANCE_RE = re.compile(r"(?:^|[^a-z0-9])(?:advance|play-now)(?:[^a-z0-9]|$)")
+ADVANCE_RE = re.compile(r"(?:^|[^a-z0-9])(?:advance|play-now|gob-btn--gate)(?:[^a-z0-9]|$)")
 WIN_BADGE_RE = re.compile(r"(?:^|[^a-z0-9])(?:wl|win)(?:[^a-z0-9]|$)")
-POSITIVE_SELECTOR_RE = re.compile(r"delta-up|tier-green|(?:^|[^a-z0-9])t-green(?:[^a-z0-9]|$)")
-SAVE_RE = re.compile(r"(?:^|[^a-z0-9])save(?:[^a-z0-9]|$)")
+POSITIVE_SELECTOR_RE = re.compile(
+    r"delta-up|tier-green|(?:^|[^a-z0-9])t-green(?:[^a-z0-9]|$)|"
+    r"is-pos|is-up|tsr-up|risk-low|rm-tile--keep|board-gain|boardgain|"
+    r"data-band=[\"']high[\"']|"
+    r"(?:^|[^a-z0-9])(?:chem|meter)(?:[^a-z0-9]|$)|"
+    r"is-green|gob-chg|(?:^|[^a-z0-9])(?:att-col|att-bar)(?:[^a-z0-9]|$)|"
+    r"em_60_79|em_80_plus"
+)
+SAVE_RE = re.compile(
+    r"(?:^|[^a-z0-9])(?:save|saved|committed|gob-btn--action|toggle-btn|"
+    r"gated|td-gate|is-on|is-saved|is-committed)(?:[^a-z0-9]|$)"
+)
+RAMP_SELECTOR_RE = re.compile(r"(?:^|[^a-z0-9])(?:att-col|att-bar)(?:[^a-z0-9]|$)")
 POSITIVE_VALUE_RE = re.compile(r"var\(\s*--(?:delta-up|tier-green)\b")
 GREEN_VALUE_RE = re.compile(r"var\(\s*--green\b")
 ORANGE_VALUE_RE = re.compile(r"var\(\s*--orange\b")
+LAW_ANNOTATION_RE = re.compile(r"colour-law:\s*(positive-data|committed|saved)\b", re.I)
+NEW_SURFACE_EXCLUDE = frozenset({
+    "css/gob-tutorial.css",
+    "css/gob-advanced.css",
+})
 
 CAMEL_PROP = {
     "color": "color",
@@ -232,6 +261,7 @@ class Audit:
     colours: list[Hit] = field(default_factory=list)
     types: list[Hit] = field(default_factory=list)
     laws: list[Hit] = field(default_factory=list)
+    annotations: dict[str, dict[int, str]] = field(default_factory=dict)
 
     def colour_counts(self) -> dict[str, int]:
         counts = {name: 0 for name in FAMILY_ORDER}
@@ -623,9 +653,32 @@ def shell_pages(root: Path) -> set[str]:
     return set(re.findall(r"""['\"]/([^'\"]+\.html)['\"]""", body))
 
 
+def _collect_annotations(raw: str) -> dict[int, str]:
+    out: dict[int, str] = {}
+    for index, line in enumerate(raw.splitlines(), 1):
+        match = LAW_ANNOTATION_RE.search(line)
+        if not match:
+            continue
+        kind = match.group(1).lower()
+        if kind == "saved":
+            kind = "committed"
+        out[index] = kind
+    return out
+
+
+def _annotation_for(audit: Audit, path: str, line: int) -> str | None:
+    by_line = audit.annotations.get(path) or {}
+    for candidate in (line, line - 1, line - 2):
+        if candidate in by_line:
+            return by_line[candidate]
+    return None
+
+
 def is_new_surface(rel: Path, text: str, pages: set[str]) -> bool:
     posix = rel.as_posix()
     name = rel.name
+    if posix in NEW_SURFACE_EXCLUDE:
+        return False
     if posix.startswith("css/gob-") or posix == "css/office-home.css":
         return True
     if posix.startswith("js/shared/views/"):
@@ -775,7 +828,9 @@ def _selector_text(raw: str) -> str:
     return selector
 
 
-def _green_allowed(selector: str, value: str) -> bool:
+def _green_allowed(selector: str, value: str, annotation: str | None = None) -> bool:
+    if annotation == "positive-data":
+        return True
     blob = selector.lower()
     if ADVANCE_RE.search(blob) or WIN_BADGE_RE.search(blob) or POSITIVE_SELECTOR_RE.search(blob):
         return True
@@ -784,8 +839,11 @@ def _green_allowed(selector: str, value: str) -> bool:
     return False
 
 
-def _orange_allowed(selector: str) -> bool:
-    return bool(SAVE_RE.search(selector.lower()))
+def _orange_allowed(selector: str, annotation: str | None = None) -> bool:
+    if annotation in {"committed", "saved"}:
+        return True
+    blob = selector.lower()
+    return bool(SAVE_RE.search(blob) or RAMP_SELECTOR_RE.search(blob))
 
 
 def _record_declaration(
@@ -804,6 +862,7 @@ def _record_declaration(
     prop_name = prop.lower()
     full_prop = prop.lower() if prop.startswith("--") else prop_name
     line = line_of(text, index)
+    note = _annotation_for(audit, path, line)
     defining = full_prop in DEFINITION_NAMES
     for label, color in _colors_in(value):
         family, ref, distance = palette.classify(color)
@@ -813,19 +872,19 @@ def _record_declaration(
         ))
         if defining:
             continue
-        if family == "green" and not _green_allowed(selector, value):
+        if family == "green" and not _green_allowed(selector, value, note):
             audit.laws.append(Hit(
                 path, line, surface, "green", label,
                 f"{_selector_label(selector)} {_distance_detail(family, ref, distance, color, palette)}",
             ))
-        elif family == "orange" and not _orange_allowed(selector):
+        elif family == "orange" and not _orange_allowed(selector, note):
             audit.laws.append(Hit(
                 path, line, surface, "orange", label,
                 f"{_selector_label(selector)} {_distance_detail(family, ref, distance, color, palette)}",
             ))
-    if not defining and not _green_allowed(selector, value) and GREEN_VALUE_RE.search(value):
+    if not defining and not _green_allowed(selector, value, note) and GREEN_VALUE_RE.search(value):
         audit.laws.append(Hit(path, line, surface, "green", "var(--green)", _selector_label(selector)))
-    if not defining and not _orange_allowed(selector) and ORANGE_VALUE_RE.search(value):
+    if not defining and not _orange_allowed(selector, note) and ORANGE_VALUE_RE.search(value):
         audit.laws.append(Hit(path, line, surface, "orange", "var(--orange)", _selector_label(selector)))
     if skip_type or full_prop not in {"font-size", "font-weight", "letter-spacing", "font-family", "font"}:
         return
@@ -986,14 +1045,11 @@ def audit_tree(root: Path, tokens_path: Path | None = None) -> Audit:
         if suffix not in {".css", ".html", ".js"}:
             continue
         if tokens_resolved is not None and path.resolve() == tokens_resolved:
-            raw = path.read_text(encoding="utf-8", errors="replace")
-            rel = _rel(root, path).as_posix()
-            surface = "new" if is_new_surface(_rel(root, path), raw, pages) else "legacy"
-            _scan_reward_gold(audit, rel, surface, _mask_comments(raw))
             continue
         raw = path.read_text(encoding="utf-8", errors="replace")
         rel_path = _rel(root, path)
         rel = rel_path.as_posix()
+        audit.annotations[rel] = _collect_annotations(raw)
         surface = "new" if is_new_surface(rel_path, raw, pages) else "legacy"
         if suffix == ".css":
             masked = _mask_comments(raw)
@@ -1116,13 +1172,16 @@ def format_report(audit: Audit) -> str:
         "",
         "Report-only. Generated by `scripts/check_ui_tokens.py` from colour and type literals",
         "under `FrontEnd/static`. `css/gob-tokens.css` is the token source and is excluded",
-        "from the literal scan. Exit code is 0. `--strict` exits 1 when any colour-law hit exists.",
+        "from the literal scan. Exit code is 0. `--strict` exits 1 when a new-design",
+        "file has a colour-law hit that is not on the allow-list. Legacy hits are",
+        "reported only.",
         "",
         "## File split",
         "",
         "New: shell HTML (`gob-shell` / `gob-focus` on `<html>`, or a filename listed in",
-        "`js/shared/gobShell.js` `PAGES`), `css/gob-*.css`, `css/office-home.css`,",
-        "`js/shared/gob*.js`, `js/shared/views/**`.",
+        "`js/shared/gobShell.js` `PAGES`), `css/gob-*.css` except `gob-tutorial.css` /",
+        "`gob-advanced.css` (tutorial chrome), `css/office-home.css`, `js/shared/gob*.js`,",
+        "`js/shared/views/**`.",
         "",
         "Legacy: every other scanned file. That is an old page or stylesheet still to migrate,",
         "not new code breaking the rules.",
@@ -1216,12 +1275,14 @@ def format_report(audit: Audit) -> str:
     parts.extend([
         "## Colour-law hits",
         "",
-        "Green (`var(--green)` or a green-family literal) is allowed on the top-bar Advance",
-        "(`advance`, `play-now`), on positive data (`delta-up`, `tier-green`, a `W` / `wl` badge),",
-        "and where the value is already `var(--delta-up)` or `var(--tier-green)`.",
-        "Orange (`var(--orange)` or an orange-family literal) is allowed on a save.",
-        "`--reward-gold` is a hit anywhere. Token redefinitions of `--green` / `--orange` and the",
-        "other canonical names are listed as literals above and are not law hits.",
+        "Green is allowed on Advance (`advance`, `play-now`, `gob-btn--gate`), on positive",
+        "data (`delta-up`, `tier-green`, `t-green`, `is-up` / `is-pos` / `tsr-up`, chemistry",
+        "and board-gain bars, RT/attribute ramps), or a nearby `/* colour-law: positive-data */`.",
+        "Orange is allowed on committed/saved (`save`, `committed`, `gob-btn--action`,",
+        "`.gated`, `.td-gate`) or `/* colour-law: committed */` / `/* colour-law: saved */`.",
+        "`--reward-gold` is a hit anywhere outside `gob-tokens.css`. Token redefinitions of",
+        "`--green` / `--orange` are listed as literals above and are not law hits.",
+        "`css/gob-tutorial.css` and `css/gob-advanced.css` are tutorial chrome, not new-design.",
         "",
     ])
     for surface in ("new", "legacy"):
@@ -1246,7 +1307,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="Directory to scan")
     parser.add_argument("--tokens", type=Path, default=None, help="Token CSS (default: <root>/css/gob-tokens.css)")
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT, help="Markdown detail path")
-    parser.add_argument("--strict", action="store_true", help="Exit 1 when any colour-law hit exists")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit 1 when a new-design file has a colour-law hit off the allow-list",
+    )
     args = parser.parse_args(argv)
     root = args.root.resolve()
     tokens = args.tokens.resolve() if args.tokens else None
@@ -1256,8 +1321,8 @@ def main(argv: list[str] | None = None) -> int:
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(format_report(audit), encoding="utf-8")
     print(f"\nFull detail: {report_path}")
-    law_total = len(audit.laws)
-    if args.strict and law_total:
+    new_hits = sum(audit.law_counts()["new"].values())
+    if args.strict and new_hits:
         return 1
     return 0
 

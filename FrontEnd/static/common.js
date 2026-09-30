@@ -20,7 +20,11 @@ function cloneParams(params) {
 }
 
 function formatTeamName(name) {
-  return (name || '')
+  return name == null ? '' : String(name);
+}
+
+function titleCaseTeamName(name) {
+  return String(name || '')
     .toLowerCase()
     .replace(/_/g, ' ')
     .split(' ')
@@ -1073,7 +1077,7 @@ function getTeamCoachAssetPath(teamName, coach, visualOverride) {
   if (teamBuilderVisualMatchesName(visual, teamName) && visual.replaced_name) {
     lookupName = visual.replaced_name;
   }
-  var formatted = typeof formatTeamName === 'function' ? formatTeamName(lookupName) : lookupName;
+  var formatted = titleCaseTeamName(lookupName);
   var abbr = TEAM_COACH_ABBR[formatted] || TEAM_COACH_ABBR[lookupName];
   if (!abbr) {
     return which === 'Duke' ? '' : GENERIC_TEAM_SAMMY;

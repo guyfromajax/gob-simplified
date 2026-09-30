@@ -182,6 +182,12 @@ From the repo root, run both gates before merge. Leave `CI` unset so Playwright 
 env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright" PYTHON_PATH=".venv/bin/python" ./node_modules/.bin/playwright test tests/e2e --workers=1 --reporter=line
 ```
 
+**UI tokens (required):** colour-law `--strict` on new-design files. Legacy pages are reported and do not fail the gate. Allowed: green on Advance and positive data (delta-up, tier-green, W badges, chemistry / board-gain bars, RT/attribute ramps); orange on committed/saved. Annotate an exception with `/* colour-law: positive-data */` or `/* colour-law: committed */`.
+
+```
+.venv/bin/python scripts/check_ui_tokens.py --strict
+```
+
 ## 9. Browse and focus pages
 
 | Page | Mode | Section | Sub-tab |
