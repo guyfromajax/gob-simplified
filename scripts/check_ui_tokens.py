@@ -18,8 +18,9 @@ chrome, Chapter 7 chrome (``css/office-home.css``, ``css/home-base.css``,
 ``css/milestone-modal.css``, ``css/season-peak.css``,
 ``css/trophy-case.css``), recruiting hub CSS (``recruiting-spine.css``,
 ``recruiting-dock.css``, ``recruiting-signing.css``,
-``recruiting-results-hub.css``), ``js/shared/gob*.js``, and
-``js/shared/views/**``. Everything else under the scan root is legacy.
+``recruiting-results-hub.css``), the migrated focus/module CSS in
+``NEW_DESIGN_CSS`` (Prep training, ``set-lineup.css``), ``js/shared/gob*.js``,
+and ``js/shared/views/**``. Everything else under the scan root is legacy.
 ``css/gob-tokens.css`` is the token source and is not scanned.
 
 Allow-list (green / orange / reward-gold):
@@ -238,6 +239,7 @@ NEW_DESIGN_CSS = frozenset({
     "css/training-newswire.css",
     "css/development-focus.css",
     "css/player-development-grid.css",
+    "set-lineup.css",
 })
 REWARD_SELECTOR_RE = re.compile(
     r"med\.gold|"

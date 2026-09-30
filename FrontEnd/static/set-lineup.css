@@ -151,9 +151,8 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   white-space: nowrap;
 }
 
-.context-inline-value-quarter,
-.context-stat-value.is-accent {
-  color: #F79420;
+.context-inline-value-quarter {
+  color: var(--text-100);
 }
 
 .context-inline-separator {
@@ -195,16 +194,20 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   color: rgba(255, 255, 255, 0.8);
 }
 
-.lineup-btn-orange {
-  background: #F79420;
-  color: #15181f;
-  border-color: rgba(247, 148, 32, 0.45);
+/* Autoset is a non-advancing action, not a save/commit, so colour law keeps it
+   neutral (was orange). See report: frame/token-comment vs colour-law conflict. */
+.lineup-btn-neutral {
+  background: var(--white-6);
+  color: var(--text-87);
+  border-color: var(--line-strong);
 }
 
-.lineup-btn-green {
-  background: #34EC27;
-  color: #15181f;
-  border-color: rgba(52, 236, 39, 0.5);
+/* The one Advance on this screen: Play Game. Green is Advance-only. The selector
+   carries `advance` so the token checker allows the green here. */
+.lineup-btn-advance {
+  background: var(--green);
+  color: #07101f;
+  border-color: color-mix(in srgb, var(--green) 50%, transparent);
 }
 
 .lineup-btn.disabled {
@@ -236,42 +239,6 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   min-height: 0;
 }
 
-.momentum-bar-container {
-  position: relative;
-  width: 100%;
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  overflow: hidden;
-}
-
-.momentum-bar-left,
-.momentum-bar-right {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-}
-
-.momentum-bar-left {
-  right: 50%;
-  background: rgba(255, 109, 109, 0.82);
-}
-
-.momentum-bar-right {
-  left: 50%;
-  background: rgba(52, 236, 39, 0.82);
-}
-
-.momentum-bar-center {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(255,255,255,0.25);
-  transform: translateX(-50%);
-}
-
 .player-energy.high,
 .player-energy.medium,
 .player-energy.low,
@@ -279,10 +246,13 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   font-weight: 700;
 }
 
-.player-energy.high { color: #34EC27; }
+/* Energy is a stamina ramp (data): high is positive data (green, annotated),
+   then yellow, amber, red as it drops. Amber is a token mix so it is not a raw
+   orange literal. */
+.player-energy.high { color: var(--green); /* colour-law: positive-data */ }
 .player-energy.medium { color: #F5C518; }
-.player-energy.low { color: #ff9f43; }
-.player-energy.critical { color: #ff6d6d; }
+.player-energy.low { color: color-mix(in srgb, var(--yellow) 45%, var(--red)); }
+.player-energy.critical { color: var(--red); }
 
 .player-fouls {
   order: 10;
@@ -355,24 +325,27 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   transition: border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
 }
 
+/* A filled position slot is a choice, not a save, so its state is neutral. */
 .slot.filled {
   border-style: solid;
-  border-color: rgba(247,148,32,0.22);
-  background: rgba(247,148,32,0.04);
+  border-color: var(--line-strong);
+  background: var(--white-3);
 }
 
+/* Active drop target: navy is the structural "here" highlight (was orange). */
 .slot.drag-over {
   border-style: solid;
-  border-color: #F79420;
-  background: rgba(247,148,32,0.1);
+  border-color: var(--navy);
+  background: color-mix(in srgb, var(--navy) 16%, transparent);
 }
 
 /* FT shooter lock: player owed free throws can't be removed (reorder still ok).
-   See Timeout_System.md § Designated Free Throw Shooter Lock. */
+   See Timeout_System.md § Designated Free Throw Shooter Lock. Neutral lock state,
+   not orange — it is an informational status, not a save. */
 .slot.ft-shooter-locked {
   position: relative;
   border-style: solid;
-  border-color: rgba(247,148,32,0.6);
+  border-color: var(--white-28);
 }
 .slot.ft-shooter-locked .remove {
   display: none !important;
@@ -387,9 +360,9 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #07101f;
-  background: linear-gradient(180deg, #F7B500, #F79420);
-  border-radius: 4px;
+  color: var(--text-100);
+  background: var(--white-18);
+  border-radius: var(--radius-4);
   padding: 2px 7px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.35);
 }
@@ -432,10 +405,10 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   width: 56px;
   height: 56px;
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   overflow: hidden;
-  background: rgba(255,255,255,0.04);
-  border: 2px solid rgba(247,148,32,0.4);
+  background: var(--white-4);
+  border: 2px solid var(--line-strong);
 }
 
 .player-image {
@@ -539,12 +512,6 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   text-align: left;
 }
 
-.player-rating {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 16px;
-  color: #F79420;
-  flex-shrink: 0;
-}
 
 .player-fouls {
   font-family: 'Inter', sans-serif;
@@ -839,9 +806,9 @@ a.player-name-link {
 
 /*
  * RT color buckets — canonical scale lives in /css/rt-buckets.css.
- * That stylesheet is loaded on this page in set-lineup.html, so both
- * .rt and .player-rating inherit the bucket colors via the
- * `rt-low / rt-mid / rt-high / rt-elite` class the JS applies.
+ * That stylesheet is loaded on this page in set-lineup.html, so .rt inherits
+ * the bucket colors via the `rt-low / rt-mid / rt-high / rt-elite` class the JS
+ * applies (RT blue is the sanctioned A-grade / 9+ / elite colour).
  */
 
 .roster-table tr.selected td,
@@ -851,10 +818,12 @@ a.player-name-link {
 }
 
 /* On-court rows use full contrast; do not inherit the old dimmed "selected" treatment. */
+/* On-court is a selection state → navy (the "selected row" structure colour),
+   not orange. */
 .roster-table tbody tr.on-court td,
 .roster-stats-table tbody tr.on-court td {
   color: rgba(255,255,255,0.70);
-  background: rgba(247,148,32,0.05) !important;
+  background: color-mix(in srgb, var(--navy) 14%, transparent) !important;
 }
 
 .roster-table tbody tr.on-court td::after,
@@ -888,7 +857,7 @@ a.player-name-link {
 
 .roster-table tr.selected td:first-child,
 .roster-stats-table tr.selected td:first-child {
-  box-shadow: inset 3px 0 0 rgba(247,148,32,0.8);
+  box-shadow: inset 3px 0 0 var(--navy);
 }
 
 .roster-table tr.selected,
@@ -941,19 +910,19 @@ a.player-name-link {
   text-decoration: underline;
 }
 
-.engbar i.high { background: #34EC27; }
+.engbar i.high { background: var(--green); /* colour-law: positive-data */ }
 .engbar i.medium { background: #F5C518; }
-.engbar i.critical { background: #ff6d6d; }
+.engbar i.critical { background: var(--red); }
 
 .roster-table td.ng {
   font-weight: 700;
   text-align: center;
 }
 
-.roster-table td.ng.high { color: #34EC27; }
+.roster-table td.ng.high { color: var(--green); /* colour-law: positive-data */ }
 .roster-table td.ng.medium { color: #F5C518; }
-.roster-table td.ng.low { color: #ff9f43; }
-.roster-table td.ng.critical { color: #ff6d6d; }
+.roster-table td.ng.low { color: color-mix(in srgb, var(--yellow) 45%, var(--red)); }
+.roster-table td.ng.critical { color: var(--red); }
 
 .pos-note {
   margin: 2px 0 0;
@@ -1131,8 +1100,8 @@ a.player-name-link {
   display: inline-flex;
   width: fit-content;
   padding-bottom: 5px;
-  border-bottom: 1px solid rgba(247,148,32,0.8);
-  color: #F79420;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--text-87);
   font-size: 15px;
   font-weight: 600;
 }
@@ -1388,12 +1357,12 @@ a.player-name-link {
 
 .roster-table tbody tr.on-court td,
 .roster-stats-table tbody tr.on-court td {
-  background: rgba(247,148,32,0.05);
+  background: color-mix(in srgb, var(--navy) 14%, transparent);
 }
 
 .roster-table tbody tr.on-court:hover td,
 .roster-stats-table tbody tr.on-court:hover td {
-  background: rgba(247,148,32,0.09);
+  background: color-mix(in srgb, var(--navy) 22%, transparent);
 }
 
 .roster-table tbody tr.on-court td.slot-cell {
@@ -1402,7 +1371,7 @@ a.player-name-link {
 
 .roster-table tbody tr.drag-over td,
 .roster-stats-table tbody tr.drag-over td {
-  background: rgba(247,148,32,0.14) !important;
+  background: color-mix(in srgb, var(--navy) 26%, transparent) !important;
 }
 
 .slot-cell {
@@ -1574,7 +1543,7 @@ a.player-name-link {
 
 .roster-table tbody tr.on-court.selected td:first-child,
 .roster-stats-table tbody tr.on-court.selected td:first-child {
-  box-shadow: inset 3px 0 0 #F79420;
+  box-shadow: inset 3px 0 0 var(--navy);
 }
 
 .foul-cell.warn {
@@ -1658,9 +1627,9 @@ a.player-name-link {
   font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #07101f;
-  background: linear-gradient(180deg, #F7B500, #F79420);
-  border-radius: 4px;
+  color: var(--text-100);
+  background: var(--white-18);
+  border-radius: var(--radius-4);
   padding: 1px 6px;
   vertical-align: middle;
 }
@@ -1681,5 +1650,5 @@ a.player-name-link {
 
 .roster-table tbody tr.ft-shooter-locked td.slot-cell,
 .roster-stats-table tbody tr.ft-shooter-locked td.slot-cell {
-  box-shadow: inset 3px 0 0 rgba(247,148,32,0.85);
+  box-shadow: inset 3px 0 0 var(--white-40);
 }
