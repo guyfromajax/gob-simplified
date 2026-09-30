@@ -5,7 +5,6 @@
   --surf:var(--white-3); --surf-2:var(--white-5);
   --border:var(--white-9); --border-soft:var(--white-6); --hair:var(--white-7);
   --text:var(--text-100); --muted:var(--white-62); --muted-2:var(--white-40); --muted-3:var(--white-25);
-  --lblue:var(--blue);
   --you:var(--navy);
   --you-soft:color-mix(in srgb,var(--navy) 28%,transparent);
   --you-line:color-mix(in srgb,var(--navy) 55%,transparent);
