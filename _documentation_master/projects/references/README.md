@@ -6,6 +6,12 @@ seeds 8000–8039, both arms, and (from `..._merged` onward) both footings in on
 **Use the newest non-superseded reference.** A superseded file is kept, never deleted —
 it is what the matching kill switch reproduces, which is how a rollback is verified.
 
+**The current reference is the file named in `scripts/sim_verify/CURRENT_REFERENCE`.** CI
+(`engine-equiv`) checks a 16-game smoke against it on every push; the full 160-game check
+is `PYTHONHASHSEED=0 python -m scripts.sim_verify.equiv --check`. Any file here can be
+checked with `--reference <file>` (the loose baselines run at `EQUIV_MAN_POSTURE=loose`
+automatically).
+
 ## Footing (every reference)
 
 equiv-v3 `scratch_equiv3_fbdedupe.py`, Lancaster vs Bentley-Truman, sliders 2 / traps 5,
@@ -55,6 +61,12 @@ measured against.
 | `equiv_v3_sim_reference_4f856721a.json` | `4f856721a` | `9910cd6fd` | **no longer reachable.** `GOB_SIM_CRASH_APPLY=0 GOB_SIM_CRASH_CLOCK=0` still disables the crash work, but zone placement changed underneath it, so the flags-off path is a switch, not a time machine. |
 
 ## When you cut a new one
+
+`python -m scripts.sim_verify.equiv --recut --reason "<why>" --slug <name>` does steps 2 and
+the pointer move for you: it runs the full set twice, refuses if the passes differ or
+`BackEnd/` is dirty, writes `equiv_v3_reference_<sha>_<slug>.json`, and updates
+`scripts/sim_verify/CURRENT_REFERENCE`. Step 1 and step 3 stay manual. Commit it as
+`equiv re-cut: <reason>`, and only with Jamie's approval.
 
 1. Verify the kill switch first: the previous reference must still reproduce **40/40 on
    all four cells** with the new flag off. If it does not, the change is not

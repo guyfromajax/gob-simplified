@@ -72,7 +72,15 @@ Code must work on both Mongo (hosted) and SQLite (desktop).
 
 - Engine randomness goes through `BackEnd/utils/sim_random` (`sim_rng`), **never the global `random` module** (pymongo consumes global RNG; a guard logs stray draws).
 - Other subsystems use their own streams (e.g. training uses `BackEnd/utils/training_random`).
-- The **equiv-v3 reference fingerprints must stay byte-identical** unless the task says the change is meant to move them. The runner is `scratch_equiv3_fbdedupe.py`; references live under `_documentation_master/projects/references/`.
+- The **equiv-v3 reference fingerprints must stay byte-identical** unless the task says the change is meant to move them. The tooling is `scripts/sim_verify/` (`scratch_equiv3_fbdedupe.py` is now a wrapper around its worker); references live under `_documentation_master/projects/references/`.
+
+## Engine regression check
+
+- `scripts/sim_verify/CURRENT_REFERENCE` names the one reference the engine must match today.
+- **CI job `engine-equiv`** runs `python -m scripts.sim_verify.equiv --check --smoke`: 16 games (seeds 8000-8003 on both footings and both arms), fails on any fingerprint difference, and prints which metric moved by how much. It is a smoke, so it can miss a rare-branch change.
+- **Engine work:** run the full check locally before you finish, `PYTHONHASHSEED=0 python -m scripts.sim_verify.equiv --check` (160 games, ~2.5 min on 14 cores). `--reference <file>` checks a superseded reference, e.g. to prove a kill switch reproduces it.
+- **Intentional change:** `python -m scripts.sim_verify.equiv --recut --reason "<why>" --slug <name>`. It needs a clean `BackEnd/`, runs the full set twice (double re-baseline), writes a new reference and moves the pointer. Then update `flags` and the references README (old file to Superseded, with the switch that reproduces it), and commit as `equiv re-cut: <reason>`.
+- **Never re-cut to make CI green** without Jamie's approval (same rule as `--write-allowlist`). A red `engine-equiv` on a change that was not meant to move the engine is a regression to fix, not a reference to replace.
 
 ## CI migration gates
 
