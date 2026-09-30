@@ -203,11 +203,15 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 }
 
 /* The one Advance on this screen: Play Game. Green is Advance-only. The selector
-   carries `advance` so the token checker allows the green here. */
+   carries `advance` so the token checker allows the green here. Same paint as the
+   shell Advance (`.gob .advance` in gob-components.css): --green fill, --bg ink,
+   --white-28 border, --shadow-advance glow — so it reads identically to #play-now
+   in the franchise shell rather than as a darker green. */
 .lineup-btn-advance {
   background: var(--green);
-  color: #07101f;
-  border-color: color-mix(in srgb, var(--green) 50%, transparent);
+  color: var(--bg);
+  border-color: var(--white-28);
+  box-shadow: var(--shadow-advance);
 }
 
 .lineup-btn.disabled {
@@ -431,6 +435,15 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   margin: 10px 0 4px;
   padding: 10px 0 0;
   border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Shown when the playbook carries no position_shot_weights (e.g. a franchise that
+   has not set them). The bars render when the data exists. */
+.psw-unavailable {
+  margin: 4px 0 0;
+  color: var(--text-38);
+  font-size: 12px;
+  font-style: italic;
 }
 
 .lineup-shot-weights .psw-group-label {
@@ -1486,22 +1499,25 @@ a.player-name-link {
 .engnum.medium { color: rgba(255,255,255,0.70); }
 .engnum.critical { color: #ffffff; }
 
-/* Production cluster — subordinate luminance, no hue; gaps absorb surplus */
+/* Production cluster — subordinate luminance, no hue. Columns size to their
+   content (value + label) so nothing clips or overlaps; the cluster centres in
+   whatever width the auto prod column has. minmax(0,1fr) let the four columns
+   shrink below their text at 1280, which is what ran PTS/REB/AST together. */
 .prod {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, max-content);
   align-items: baseline;
-  gap: 0 15px;
-  padding: 0 26px;
-  max-width: 420px;
+  justify-content: center;
+  gap: 0 18px;
+  padding: 0 10px;
   margin: 0 auto;
 }
 
 .prod span {
-  display: flex;
+  display: inline-flex;
   align-items: baseline;
   justify-content: flex-end;
-  gap: 3px;
+  gap: 4px;
   white-space: nowrap;
 }
 
