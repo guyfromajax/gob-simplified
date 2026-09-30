@@ -57,9 +57,10 @@ def main() -> None:
     seed_universal_rosters(teams_collection, players_collection)
     seed_universal_plays(plays_collection)
     seed_universal_defenses(defenses_collection)
-    # mongomock has no $replaceAll, so the roster name-normalization aggregate
-    # 500s. Strategy 1 is find_one({"team_id": lookup_value}); alias the court
-    # URL identifiers so /roster/Lancaster and /roster/Four-Corners succeed.
+    # Strategy 1 is find_one({"team_id": lookup_value}). Alias court URL
+    # identifiers so /roster/Lancaster and /roster/Four-Corners hit that path.
+    # Strategy 3 (name + $replaceAll) now falls back to a Python match on
+    # mongomock; these aliases keep the court URLs on the cheap id lookup.
     for url_id, name in (("Lancaster", "Lancaster"), ("Four-Corners", "Four Corners")):
         teams_collection.update_one(
             {"team_id": url_id},
@@ -68,15 +69,30 @@ def main() -> None:
         )
     print("seed_and_serve: canonical rosters seeded (Lancaster, Four Corners, Bentley-Truman, Morristown)")
 
+    import contextlib
+    import signal
+
     import uvicorn
     from BackEnd.api.api import app
 
-    uvicorn.run(
+    # Playwright's webServer (and this Cursor runner) deliver SIGTERM to the
+    # child. uvicorn 0.54 treats that as a graceful process exit — one signal
+    # and the whole suite loses the server (500s should not do that; they
+    # don't; SIGTERM does). Ignore SIGTERM here so a mid-suite signal cannot
+    # tear the harness down. Playwright still SIGKILLs this process at the end.
+    class _E2EServer(uvicorn.Server):
+        @contextlib.contextmanager
+        def capture_signals(self):
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
+            yield
+
+    config = uvicorn.Config(
         app,
         host="0.0.0.0",
         port=int(os.environ.get("PORT", "8000")),
         reload=False,
     )
+    _E2EServer(config).run()
 
 
 if __name__ == "__main__":

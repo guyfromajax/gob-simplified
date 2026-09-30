@@ -68,6 +68,57 @@ def _player_on_user_team(franchise_doc, player_meta) -> bool:
     return bool(team_name) and str(meta.get("team") or "") == team_name
 
 
+def _normalize_roster_lookup_name(value: str) -> str:
+    """Query-side name: strip, hyphen→space, unidecode, lower. Same as Strategy 3."""
+    from unidecode import unidecode
+
+    return unidecode((value or "").strip().replace("-", " ")).lower()
+
+
+def _normalize_stored_team_name(name: str) -> str:
+    """Document-side name: hyphen→space + lower. Matches the $replaceAll+$toLower pipeline."""
+    return str(name or "").replace("-", " ").lower()
+
+
+def lookup_team_doc_by_normalized_name(teams_collection, lookup_value: str):
+    """Strategy 3 team-name lookup. Aggregate on Mongo/SQLite; Python fallback on mongomock.
+
+    Real Mongo and SQLite support ``$replaceAll``. mongomock raises
+    ``OperationFailure: Unrecognized expression '$replaceAll'``. Catch that and
+    walk a cheap prefiltered ``find()`` with the same hyphen/lower rules so the
+    first match is the same team the aggregate would have returned.
+    """
+    from pymongo.errors import OperationFailure
+
+    normalized_name = _normalize_roster_lookup_name(lookup_value)
+    pipeline = [
+        {
+            "$addFields": {
+                "normalized_name": {
+                    "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
+                }
+            }
+        },
+        {"$match": {"normalized_name": normalized_name}},
+        {"$limit": 1},
+    ]
+    try:
+        team_result = list(teams_collection.aggregate(pipeline))
+        return team_result[0] if team_result else None
+    except OperationFailure:
+        token = (normalized_name.split() or [""])[0]
+        query = {"name": {"$exists": True, "$ne": ""}}
+        if token:
+            query = {"name": {"$regex": re.escape(token), "$options": "i"}}
+        for cand in teams_collection.find(query):
+            stored = cand.get("name")
+            if stored is None:
+                continue
+            if _normalize_stored_team_name(stored) == normalized_name:
+                return cand
+        return None
+
+
 def _saved_player_pts_by_side(saved: dict | None) -> tuple[int, int]:
     """Sum ``players[].stats.PTS`` for home / away sides."""
     home_pts = 0
@@ -7026,26 +7077,7 @@ try:
         
         # Strategy 3: If not found, try team_name lookup (backward compatibility)
         if not team_doc:
-            normalized_name = unidecode(lookup_value.strip().replace("-", " ")).lower()
-            pipeline = [
-                {
-                    "$addFields": {
-                        "normalized_name": {
-                            "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
-                        }
-                    }
-                },
-                {
-                    "$match": {
-                        "normalized_name": normalized_name
-                    }
-                },
-                {
-                    "$limit": 1
-                }
-            ]
-            team_result = list(teams_collection.aggregate(pipeline))
-            team_doc = team_result[0] if team_result else None
+            team_doc = lookup_team_doc_by_normalized_name(teams_collection, lookup_value)
         
         query_time = (time.time() - query_start) * 1000
         
