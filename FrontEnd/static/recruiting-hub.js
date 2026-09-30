@@ -1126,9 +1126,9 @@
       '<span class="prow-rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
       standingCellHtml(r) +
       leanCellHtml(r) +
-      '<div><div class="stepper"><button data-step="-1" data-id="' + r.recruitId + '"' + (a.points === 0 ? ' disabled' : '') + '>−</button>' +
+      '<div class="stepper-wrap"><div class="stepper"><button data-step="-1" data-id="' + r.recruitId + '"' + (a.points === 0 ? ' disabled' : '') + '>−</button>' +
         '<span class="val' + (a.points === 0 ? ' zero' : '') + '">' + a.points + '</span>' +
-        '<button data-step="1" data-id="' + r.recruitId + '"' + (canPlus ? '' : ' disabled') + '>+</button><span class="stepper-pts">pts</span></div></div>' +
+        '<button data-step="1" data-id="' + r.recruitId + '"' + (canPlus ? '' : ' disabled') + '>+</button></div><span class="stepper-pts">pts</span></div>' +
       '<div class="promise-cell' + (a.promise ? ' set' : '') + '"><button class="promise-toggle" data-promise="' + r.recruitId + '" title="Promise playing time">' +
         '<span class="box">' + CHECK + '</span>' + (a.promise ? 'Binding' : 'Promise') + '</button></div>' +
       '</div>';
@@ -1250,7 +1250,7 @@
       '<div class="budget-bar"><div class="budget-fill' + (rem < 0 ? ' over' : '') + '" style="width:' + pct + '%"></div></div>' +
       // Capacity is the header number, straight from the payload.
       '<div class="cap-row"><span class="cap-item"><b>' + cap.spots + '</b>/' + cap.cap + ' roster spots</span>' +
-        '</div>' +
+        '</div></div>' +
       list + preflight +
       '<div class="rail-foot">' + note +
         '<button class="rail-submit" id="sign-submit"' + (disabled ? ' disabled' : '') + '>' + (state.week35Ran ? 'Signings Run' : 'Submit Orders') + '</button></div>';
@@ -1275,7 +1275,7 @@
         '<div class="spool-colhdr"><span>Recruit</span><span class="c-num">Pos</span><span class="c-num">Region</span><span class="c-num">RT</span>' +
           '<span class="c-num">Standing</span><span>Lean</span><span>Points</span><span>Playing Time</span></div>' +
         '<div class="spool-rows" id="sign-rows">' + signFiltered().map(prowHtml).join('') + '</div></div>' +
-      '<aside class="rail" id="sign-rail">' + railHtml() + '</aside>';
+      '<aside class="srail" id="sign-rail">' + railHtml() + '</aside>';
   }
 
   /**

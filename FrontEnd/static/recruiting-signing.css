@@ -19,7 +19,7 @@
 .spool-region{height:32px;padding:0 26px 0 11px;border-radius:var(--radius-8);border:1px solid var(--border);background:var(--black-25);color:var(--text);font:var(--fw-semibold) var(--fs-11)/var(--lh-1) var(--font-body);cursor:pointer;appearance:none}
 .spool-region:focus{outline:none;border-color:var(--muted-3)}
 
-.spool-colhdr,.prow{display:grid;grid-template-columns:minmax(140px,1fr) 42px 56px 58px 68px minmax(120px,186px) minmax(108px,132px) minmax(108px,138px);align-items:center;gap:10px}
+.spool-colhdr,.prow{display:grid;grid-template-columns:minmax(140px,1fr) 42px 52px 52px 76px minmax(120px,170px) minmax(148px,168px) minmax(120px,148px);align-items:center;gap:12px}
 .spool-colhdr{padding:9px 18px;font:var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-8);text-transform:uppercase;color:var(--muted-2);border-bottom:1px solid var(--border);background:var(--white-2);position:sticky;top:0;z-index:2}
 .spool-colhdr .c-num{text-align:center}
 .spool-rows{max-height:600px;overflow-y:auto}
@@ -47,14 +47,15 @@
 .prow-leans i{width:7px;height:7px;border-radius:var(--radius-round);background:var(--white-12)}
 .prow-leans i.on{background:var(--white-62)}
 
-/* points stepper */
-.stepper{display:flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius-9);overflow:hidden;width:fit-content;background:var(--black-18)}
+/* points stepper — label sits outside overflow:hidden so it cannot clip into Promise */
+.stepper-wrap{display:flex;align-items:center;gap:8px;min-width:0}
+.stepper{display:flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius-9);overflow:hidden;width:fit-content;flex:0 0 auto;background:var(--black-18)}
 .stepper button{appearance:none;width:30px;height:30px;border:0;background:transparent;color:var(--muted);font-size:var(--fs-17);line-height:1;cursor:pointer;transition:.12s}
 .stepper button:hover:not(:disabled){background:var(--white-10);color:var(--text-100)}
 .stepper button:disabled{color:var(--muted-3);cursor:default}
 .stepper .val{min-width:40px;text-align:center;font:var(--fw-regular) var(--fs-18)/var(--lh-1) var(--font-display);color:var(--text-100);letter-spacing:var(--tracking-2);border-left:1px solid var(--border);border-right:1px solid var(--border)}
 .stepper .val.zero{color:var(--muted-3)}
-.stepper-pts{font:var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-10);text-transform:uppercase;color:var(--muted-3);margin-left:8px}
+.stepper-pts{font:var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-10);text-transform:uppercase;color:var(--muted-3);flex:0 0 auto}
 
 /* playing-time promise toggle */
 .promise-cell{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
@@ -83,8 +84,9 @@
 .o-long .odds-lab,.o-long .odds-pct{color:var(--red)}.o-long .odds-fill{background:var(--red)}
 
 /* ---------- rail: budget + committed list ---------- */
-.rail{position:sticky;top:14px;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--radius-card);background:linear-gradient(180deg,var(--white-3),transparent 34%),var(--panel);box-shadow:0 14px 36px var(--black-35);max-height:calc(100vh - 40px)}
-.rail-head{padding:16px 16px 14px;border-bottom:1px solid var(--hair)}
+/* srail, not .rail — gob-shell's nav is .rail and would hide/reset this panel. */
+.srail{position:sticky;top:14px;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--radius-card);background:linear-gradient(180deg,var(--white-3),transparent 34%),var(--panel);box-shadow:0 14px 36px var(--black-35);max-height:calc(100vh - 40px);min-width:0}
+.rail-head{padding:var(--space-16) var(--space-16) var(--space-14);border-bottom:1px solid var(--hair)}
 .rail-title{font:var(--fw-regular) var(--fs-22)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-3)}
 .rail-title small{display:block;font:var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-12);text-transform:uppercase;color:var(--muted-2);margin-bottom:5px}
 .budget-nums{display:flex;align-items:baseline;gap:5px;font-family:var(--font-display);line-height:1;margin-top:14px}
@@ -102,7 +104,7 @@
 .rail-stat b{color:var(--text-100);font-family:var(--font-display);font-weight:var(--fw-regular);font-size:var(--fs-15);letter-spacing:var(--tracking-2)}
 .rail-stat .sep{width:1px;height:14px;background:var(--white-12)}
 
-.rail-list{flex:1;overflow-y:auto;padding:12px 10px 10px;display:flex;flex-direction:column;gap:5px;min-height:80px}
+.rail-list{flex:1;overflow-y:auto;padding:var(--space-12) var(--space-16) var(--space-10);display:flex;flex-direction:column;gap:5px;min-height:80px}
 .rail-list::-webkit-scrollbar{width:8px}.rail-list::-webkit-scrollbar-thumb{background:var(--white-12);border-radius:var(--radius-5);border:2px solid var(--panel)}
 /* colour-law: committed */
 .citem{position:relative;display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:8px 9px;border-radius:var(--radius-9);background:color-mix(in srgb,var(--orange) 6%,transparent);border:1px solid color-mix(in srgb,var(--orange) 22%,transparent);cursor:pointer;transition:background .12s}
@@ -116,23 +118,23 @@
 .citem-odds{font:var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-2);text-transform:none}
 .citem-x{width:22px;height:22px;border-radius:var(--radius-6);background:transparent;color:var(--muted-3);border:1px solid transparent;font-size:var(--fs-14);line-height:1;cursor:pointer;transition:.12s}
 .citem-x:hover{color:var(--red-ink);border-color:color-mix(in srgb,var(--red) 40%,transparent);background:color-mix(in srgb,var(--red) 12%,transparent)}
-.rail-empty{padding:22px 14px;text-align:center;border:1px dashed var(--muted-3);border-radius:var(--radius-10);margin:6px 10px}
+.rail-empty{padding:22px 14px;text-align:center;border:1px dashed var(--muted-3);border-radius:var(--radius-10);margin:6px 0}
 .rail-empty .t1{font:var(--fw-regular) var(--fs-18)/var(--lh-1) var(--font-display);color:var(--muted);letter-spacing:var(--tracking-2)}
 .rail-empty .t2{font-size:var(--fs-11);color:var(--muted-3);margin-top:6px;line-height:1.5}
 
-.rail-foot{padding:12px;border-top:1px solid var(--hair)}
+.rail-foot{padding:var(--space-12) var(--space-16);border-top:1px solid var(--hair)}
 .rail-note{font-size:var(--fs-11);color:var(--muted-2);line-height:1.45;margin-bottom:10px;display:flex;align-items:flex-start;gap:7px}
 .rail-note svg{width:13px;height:13px;flex-shrink:0;color:var(--red-ink);margin-top:1px}
 .rail-note b{color:var(--muted);font-weight:var(--fw-semibold)}
-/* colour-law: saved */
-.rail-submit{width:100%;height:46px;border-radius:var(--radius-10);border:1px solid var(--white-28);background:var(--orange);color:var(--bg);font:var(--fw-regular) var(--fs-20)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-6);cursor:pointer;box-shadow:inset 0 1px 0 var(--white-25);transition:filter .12s,transform .1s}
-.rail-submit:hover:not(:disabled){filter:brightness(1.06)}.rail-submit:active:not(:disabled){transform:translateY(1px)}
-.rail-submit:disabled{background:var(--white-9);color:var(--muted-3);border-color:var(--border);cursor:default;box-shadow:none}
+/* colour-law: saved — committed/primary. Height matches other primary actions. */
+#sign-rail .rail-submit{width:100%;height:max(46px,var(--dsz-40));border-radius:var(--radius-10);border:1px solid var(--white-28);background:var(--orange);color:var(--bg);font:var(--fw-regular) var(--fs-20)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-6);cursor:pointer;box-shadow:inset 0 1px 0 var(--white-25);transition:filter .12s,transform .1s;text-align:center}
+#sign-rail .rail-submit:hover:not(:disabled){filter:brightness(1.06)}#sign-rail .rail-submit:active:not(:disabled){transform:translateY(1px)}
+#sign-rail .rail-submit:disabled{background:var(--white-9);color:var(--muted-3);border-color:var(--border);cursor:default;box-shadow:none}
 
 @media (max-width:1180px){
   .hub-body-sign{grid-template-columns:1fr}
-  .rail{position:static;max-height:none;order:2}
-  .spool-colhdr,.prow{grid-template-columns:minmax(110px,1fr) 36px 48px 50px 60px minmax(120px,172px) minmax(108px,110px) minmax(108px,118px);gap:8px}
+  .srail{position:static;max-height:none;order:2}
+  .spool-colhdr,.prow{grid-template-columns:minmax(110px,1fr) 36px 44px 48px 72px minmax(120px,160px) minmax(148px,160px) minmax(120px,140px);gap:10px}
 }
 
 /* ============================================================
@@ -150,11 +152,9 @@
 /* Standing — lean position and its multiplier, the mechanic the tutorial claims matters */
 .stand-cell{display:flex;align-items:baseline;gap:6px;justify-content:center}
 .stand-pos{font:var(--fw-regular) var(--fs-18)/var(--lh-1) var(--font-display);color:var(--muted-2);letter-spacing:var(--tracking-2)}
-.stand-mult{font:var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-4);color:var(--muted-3)}
+.stand-mult{font:var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-4);color:var(--text-60)}
 .stand-cell.s-you1 .stand-pos{color:var(--you-ink)}
-.stand-cell.s-you1 .stand-mult{color:var(--you)}
 .stand-cell.s-list .stand-pos{color:var(--you-ink)}
-.stand-cell.s-list .stand-mult{color:var(--list)}
 
 /* Lean — same ranked ladder as the invite pool / visit cards (Spine.Lean.ladderHtml) */
 .prow-lean{min-width:0;justify-self:start}
