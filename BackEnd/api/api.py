@@ -656,6 +656,10 @@ try:
                 served = _file_at(path)
                 if served is not None:
                     return served
+                if path.endswith(".html"):
+                    not_found = static_root / "404.html"
+                    if not_found.is_file():
+                        return FileResponse(not_found, status_code=404)
                 query = request.url.query
                 target = f"/static{path}"
                 if query:
@@ -665,6 +669,28 @@ try:
 
         app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
         print("✅ Static files mounted (development/test mode)")
+
+    def _html_404_page():
+        page = Path(bundle_path("FrontEnd", "static")) / "404.html"
+        if page.is_file():
+            return FileResponse(page, status_code=404)
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+    def _wants_html_404(request: Request) -> bool:
+        path = request.url.path or ""
+        if path.startswith(("/api/", "/franchise/", "/roster/", "/player/", "/recruit/", "/health")):
+            return False
+        if path in {"/teams", "/app-config"}:
+            return False
+        accept = (request.headers.get("accept") or "").lower()
+        return "text/html" in accept
+
+    @app.exception_handler(404)
+    async def html_not_found_handler(request: Request, exc):
+        if _wants_html_404(request):
+            return _html_404_page()
+        detail = getattr(exc, "detail", "Not Found")
+        return JSONResponse(status_code=404, content={"detail": detail})
     
     # ✅ PERFORMANCE: Removed debug print statements
     
