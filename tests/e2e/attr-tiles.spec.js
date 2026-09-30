@@ -177,7 +177,11 @@ test.describe('the in-scope surfaces all use the shared builder', () => {
   });
 
   test('FCC Roster + Recruits tabs calls GOB_AttrTiles', async () => {
-    expect(read('franchise-command-center.js')).toMatch(/GOB_AttrTiles\.groupedTilesHtml/);
+    // Leftover #roster-tab / #recruits-tab are gone. Live Roster is roster-view;
+    // Recruiting pool is recruiting-hub.js (asserted above).
+    const view = read('js/shared/views/rosterView.js');
+    expect(view).toContain('GOB_AttrTiles');
+    expect(view).toContain('tileHtml');
   });
 
   test('the roster module paints each attribute with the shared tile', async () => {
@@ -211,12 +215,11 @@ test.describe('the in-scope surfaces all use the shared builder', () => {
 
   test('every surface routes its attribute header through the grouped builder', async () => {
     // The header markup is rendered, not authored, so assert on the caller.
-    // The FCC renders both of its tabs' headers (Roster and Recruiting).
-    // The roster module view renders one tile per cell. recruiting-common.js
-    // supplies rows, never the header.
-    const fcc = read('franchise-command-center.js').split('GOB_AttrTiles.groupedHeaderHtml').length - 1;
-    expect(fcc).toBe(2);
+    // Leftover FCC roster/recruits grouped headers are gone. Live roster-view
+    // paints one tile per cell; recruiting-hub uses tileHtml without a label.
+    expect(read('franchise-command-center.js')).not.toContain('GOB_AttrTiles.groupedHeaderHtml');
     expect(read('js/shared/views/rosterView.js')).toContain('tileHtml');
+    expect(read('recruiting-hub.js')).toContain('tileHtml');
   });
 
   test('out-of-scope surfaces are untouched', async () => {

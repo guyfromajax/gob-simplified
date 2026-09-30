@@ -245,8 +245,8 @@ NEW_DESIGN_CSS = frozenset({
 # Frozen leftover sheet. New rules belong in the view's own CSS.
 # These ceilings may shrink; they must not grow.
 FCC_CSS_REL = "franchise-command-center.css"
-FCC_CSS_MAX_LINES = 3234
-FCC_CSS_MAX_RULES = 448
+FCC_CSS_MAX_LINES = 2261
+FCC_CSS_MAX_RULES = 293
 REWARD_SELECTOR_RE = re.compile(
     r"med\.gold|"
     r"\.pk\b|\.pk-|"

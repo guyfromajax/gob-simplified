@@ -93,6 +93,7 @@ function cloneParams(params) {
         "/standings.html": 1,
         "/team-stats.html": 1,
         "/stats.html": 1,
+        "/team-traits.html": 1,
         "/player-detail.html": 1,
         "/team-roster-view.html": 1,
         "/set-lineup.html": 1,

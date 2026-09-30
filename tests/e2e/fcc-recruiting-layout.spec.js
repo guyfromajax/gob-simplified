@@ -91,46 +91,10 @@ test.describe('Coach\'s Office grid', () => {
   });
 });
 
-test.describe('wire card: drops as visible as gains', () => {
-  test('drop row and gain row have equal geometry and distinct accents', async ({ page }) => {
-    await mount(page, `
-      <div id="home-tab" class="tab-content active"><div class="fcc-home-grid">
-        <section class="fcc-home-card fcc-home-card--recruiting">
-          <div id="probe">
-            <div class="fcc-newlean-row" id="gain">
-              <div class="fcc-wire-line"><span>Marcus Bell moved you to #1</span></div>
-              <div class="fcc-newlean-tag"><span class="fcc-newlean-badge">Gain</span></div>
-            </div>
-            <div class="fcc-drop-row" id="drop">
-              <div class="fcc-wire-line"><span>DeAndre Pope dropped you</span></div>
-              <div class="fcc-newlean-tag"><span class="fcc-drop-badge">Drop</span></div>
-            </div>
-          </div>
-        </section>
-      </div></div>
-    `);
-    const m = await page.evaluate(() => {
-      const box = (sel) => document.querySelector(sel).getBoundingClientRect();
-      const cs = (sel) => getComputedStyle(document.querySelector(sel));
-      return {
-        gain: box('#gain'), drop: box('#drop'),
-        gainBadge: box('.fcc-newlean-badge'), dropBadge: box('.fcc-drop-badge'),
-        gainShadow: cs('#gain').boxShadow, dropShadow: cs('#drop').boxShadow,
-        gainBadgeBg: cs('.fcc-newlean-badge').backgroundColor,
-        dropBadgeBg: cs('.fcc-drop-badge').backgroundColor,
-      };
-    });
-    // Same footprint — a drop is never quieter than a gain.
-    expect(Math.abs(m.drop.height - m.gain.height)).toBeLessThan(1);
-    expect(Math.abs(m.drop.width - m.gain.width)).toBeLessThan(1);
-    expect(Math.abs(m.dropBadge.height - m.gainBadge.height)).toBeLessThan(1);
-    expect(m.dropBadge.width).toBeGreaterThan(0);
-    // Both carry an accent rail, in different colours.
-    expect(m.gainShadow).not.toBe('none');
-    expect(m.dropShadow).not.toBe('none');
-    expect(m.dropBadgeBg).not.toBe(m.gainBadgeBg);
-  });
-});
+// RETIRED: leftover Office wire-card geometry.
+// Those rows lived on the remapped #recruits-tab / old home recruiting card.
+// Live Office is GOBOffice; the FCC.css rules for .fcc-newlean-* / .fcc-drop-*
+// were peeled with the leftover HTML/JS. Tab-badge coverage below still runs.
 
 test.describe('tab badge', () => {
   test('.inbox-badge renders on the Recruiting tab and the tab is renamed', async ({ page }) => {

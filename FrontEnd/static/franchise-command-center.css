@@ -412,46 +412,13 @@ body.has-auth-bar #franchise-container {
   text-align: center;
 }
 
-.fcc-recruiting-footnote__text {
-  margin: 0;
-  max-width: 56rem;
-}
-
-.fcc-recruiting-footnote__btn {
-  margin: 0;
-  padding: 4px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #e8eeff;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.fcc-recruiting-footnote__btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.fcc-recruiting-footnote__btn:disabled,
-.fcc-recruiting-footnote__btn.is-dead {
+.fcc-recruiting-footnote__btn.is-dead{
   opacity: 0.45;
   cursor: default;
   text-decoration: none;
 }
 
 /* Embedded footnotes: Coach's Office Recruiting card + Recruits tab */
-.fcc-recruiting-footnote--embed {
-  margin-top: 12px;
-  margin-bottom: 0;
-  padding: 10px 0 2px;
-}
 
 #franchise-container #home-tab .fcc-home-card-recruiting .fcc-recruiting-footnote--embed {
   margin-top: 10px;
@@ -686,142 +653,7 @@ body.has-auth-bar #franchise-container {
   text-decoration: underline;
 }
 
-.fcc-home-news-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 7px 2px;
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fcc-home-news-row:hover .fcc-home-news-headline {
-  color: #ffffff;
-  text-decoration: underline;
-}
-
-.fcc-home-news-headline {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-weight: 700;
-}
-
 /* News tab: full-season list of stories grouped by week */
-.fcc-news-tab-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.fcc-home-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100%;
-  text-align: center;
-  font-size: 16px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.66);
-}
-
-.fcc-home-list-scroll {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  max-height: 126px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 6px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
-}
-
-.fcc-home-list-scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.fcc-home-list-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
-}
-
-.fcc-home-list-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.28);
-  border-radius: 999px;
-}
-
-.fcc-home-list-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.fcc-home-list-row,
-.fcc-home-team-stats-row{
-  display: grid;
-  align-items: center;
-  gap: 8px;
-  min-height: 24px;
-  padding: 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fcc-home-list-row:last-child,
-.fcc-home-team-stats-row:last-child{
-  border-bottom: none;
-}
-
-.fcc-home-list-row {
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-}
-
-.fcc-home-list-rank,
-.fcc-home-list-meta {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.fcc-home-list-main {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: rgba(255, 255, 255, 0.94);
-}
-
-.fcc-home-matchup-card {
-  display: grid;
-  grid-template-rows: 33% 1fr;
-  height: 100%;
-}
-
-.fcc-home-matchup-top {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fcc-home-matchup-label {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
-  font-size: 28px;
-  letter-spacing: 0.06em;
-  color: #ffffff;
-}
-
-.fcc-home-matchup-logo {
-  width: min(88%, 284px);
-  max-width: 100%;
-  max-height: 50px;
-  object-fit: contain;
-  justify-self: end;
-}
 
 #franchise-container .team-tooltip-host {
   position: relative;
@@ -883,112 +715,8 @@ body.has-auth-bar #franchise-container {
   justify-self: end;
 }
 
-.fcc-home-matchup-bottom {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  padding-top: 10px;
-}
-
-.fcc-home-detail-line {
-  font-size: 12px;
-  line-height: 1.3;
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.fcc-home-opponent-name {
-  font-size: 13px;
-  line-height: 1.25;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.94);
-}
-
-.fcc-home-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.fcc-home-potg-line {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.fcc-home-final-score {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.fcc-home-final-score-at {
-  color: rgba(255, 255, 255, 0.56);
-}
-
-.fcc-home-score-strong {
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.fcc-home-team-stats {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
 #franchise-container #home-tab .fcc-home-leaders-head {
   align-items: center;
-}
-
-.fcc-home-team-stats-header,
-.fcc-home-team-stats-row {
-  grid-template-columns: minmax(0, 1fr) 44px;
-}
-
-.fcc-home-team-stats-header {
-  display: grid;
-  gap: 8px;
-  align-items: center;
-  min-height: 22px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.64);
-}
-
-.fcc-home-team-stats-header span:last-child,
-.fcc-home-team-stats-value {
-  text-align: right;
-}
-
-.fcc-home-team-stats-name {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.fcc-home-team-stats-value {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.fcc-home-recruiting {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  gap: 10px;
 }
 
 /* FCC Tournament tab: bracket mount (styles in .fcc-tb-* below) */
@@ -1000,9 +728,8 @@ body.has-auth-bar #franchise-container {
   min-height: 500px;
 }
 
-#tournament-bracket-container,
 #fcc-tournament-bracket.fcc-tournament-bracket,
-#all-brackets-root.fcc-tournament-bracket {
+#all-brackets-root.fcc-tournament-bracket{
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -1619,28 +1346,13 @@ body.has-auth-bar #franchise-container {
   background: #4065af;
   color: #fff;
 }
-.rankings-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.rankings-list li {
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  font-family: 'Inter', sans-serif;
-}
 
 .rankings-list li .rankings-team.conference-1 {
   font-weight: bold;
 }
 
 /* Standings tab: region toggles and conference sections */
-.standings-region-toggle-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
+
 .standings-region-btn {
   padding: 8px 14px;
   border-radius: 999px;
@@ -1774,15 +1486,6 @@ body.has-auth-bar #franchise-container {
 }
 
 /* Tournament tab (week 27+): bracket mount + footer links (inherits .fcc-standings-full-link) */
-.fcc-tournament-footer-links {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  margin-top: 10px;
-  padding: 0 4px;
-}
 
 .fcc-data-card {
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -2009,222 +1712,8 @@ body.has-auth-bar #franchise-container {
   font-weight: 600;
 }
 
-#franchise-container .fcc-playbooks-card-body {
-  min-height: 0;
-  padding: 12px 16px 14px;
-}
-
-#franchise-container .fcc-playbooks-card {
-  flex: 0 0 auto;
-  overflow: visible;
-}
-
-#franchise-container .fcc-playbooks-sections {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 18px;
-}
-
-#franchise-container .fcc-playbooks-section {
-  min-width: 0;
-}
-
-#franchise-container .fcc-playbooks-section-head-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-#franchise-container .fcc-playbooks-section-head {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 0 8px;
-  color: #F79420;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.2;
-  border-bottom: 1px solid rgba(247, 148, 32, 0.7);
-}
-
-#franchise-container .fcc-playbooks-inline-link {
-  appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.76);
-  border-radius: 10px;
-  padding: 0 12px;
-  min-height: 30px;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-}
-
-#franchise-container .fcc-playbooks-inline-link:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-}
-
-#franchise-container .fcc-playbooks-section-body {
-  padding: 12px 0 0;
-}
-
-#franchise-container .fcc-playbooks-items {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px 14px;
-}
-
-#franchise-container .fcc-playbooks-item-card {
-  min-width: 0;
-  min-height: 0;
-  padding: 8px 12px 7px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
-    rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-#franchise-container .fcc-playbooks-item-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-#franchise-container .fcc-playbooks-item-name {
-  color: rgba(255, 255, 255, 0.92);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#franchise-container .fcc-playbooks-item-percent {
-  flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.92);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-#franchise-container .fcc-playbooks-item-eff {
-  color: rgba(255, 255, 255, 0.62);
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.2;
-}
-
-#franchise-container .fcc-playbooks-item-meta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 5px;
-}
-
-
-
-#franchise-container .fcc-playbooks-item-top-scorer {
-  flex: 0 0 auto;
-  color: #9e9d9d;
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.2;
-  text-align: right;
-}
-
-#franchise-container .fcc-playbooks-empty {
-  grid-column: 1 / -1;
-  padding: 16px 0 10px;
-  text-align: left;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-#franchise-container .fcc-playcall-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 18px;
-}
-
-#franchise-container .fcc-playcall-column {
-  min-width: 0;
-}
-
-#franchise-container .fcc-playcall-column-head {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 0 10px;
-  padding-bottom: 6px;
-  color: #F79420;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.2;
-  border-bottom: 1px solid rgba(247, 148, 32, 0.7);
-}
-
-#franchise-container .fcc-psw-strip {
-  margin: 0 0 14px;
-}
-
 #franchise-container .fcc-psw-strip .psw-group-label {
   color: rgba(255,255,255,0.35);
-}
-
-#franchise-container .fcc-playcall-slots {
-  display: grid;
-  gap: 8px;
-}
-
-#franchise-container .fcc-playcall-slot-card {
-  min-width: 0;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
-    rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-#franchise-container .fcc-playcall-slot-line {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.25;
-}
-
-#franchise-container .fcc-playcall-slot-number,
-#franchise-container .fcc-playcall-slot-detail,
-#franchise-container .fcc-playcall-slot-empty {
-  color: #9e9d9d;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
-}
-
-#franchise-container .fcc-playcall-slot-name {
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
 }
 
 @media (max-width: 1280px) {
@@ -2234,34 +1723,11 @@ body.has-auth-bar #franchise-container {
     min-height: 420px;
   }
 
-  #franchise-container .fcc-playbooks-sections {
-    grid-template-columns: 1fr;
-  }
+  
 
-  #franchise-container .fcc-playbooks-items {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+  
 
-  #franchise-container .fcc-playcall-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 980px) {
-  #franchise-container .fcc-playbooks-items {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 680px) {
-  #franchise-container .fcc-playbooks-section-head-wrap {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  #franchise-container .fcc-playbooks-items {
-    grid-template-columns: 1fr;
-  }
+  
 }
 
 #franchise-container .fcc-leaders-card-body {
@@ -2369,221 +1835,11 @@ body.has-auth-bar #franchise-container {
   text-align: center;
 }
 
-#franchise-container .fcc-game-plan-card-body {
-  padding: 12px 16px 14px;
-}
-
-#franchise-container .fcc-game-plan-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0 18px;
-}
-
-#franchise-container .fcc-game-plan-item {
-  display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-#franchise-container .fcc-game-plan-item:nth-last-child(-n + 2) {
-  border-bottom: 0;
-}
-
-#franchise-container .fcc-game-plan-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.68);
-}
-
-#franchise-container .fcc-game-plan-value {
-  min-width: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.94);
-  line-height: 1.35;
-}
-
-#franchise-container .fcc-game-plan-empty {
-  grid-column: 1 / -1;
-  padding: 24px 0 20px;
-  text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-#franchise-container .fcc-game-plan-cta-wrap {
-  display: flex;
-  justify-content: center;
-  padding-top: 14px;
-}
-
-#franchise-container .fcc-game-plan-edit-btn {
-  min-width: 164px;
-  height: 42px;
-  padding: 0 18px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: linear-gradient(180deg, #ffab40 0%, #F79420 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.14s ease, filter 0.14s ease;
-}
-
-#franchise-container .fcc-game-plan-edit-btn:hover {
-  filter: brightness(1.04);
-  transform: translateY(-1px);
-}
-
-#franchise-container .fcc-game-plan-edit-btn:active {
-  transform: translateY(0);
-}
-
-#franchise-container .fcc-schedule-card-body {
-  padding: 12px 14px 14px;
-}
-
-#franchise-container .fcc-schedule-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-#franchise-container .fcc-schedule-column {
-  min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
-    rgba(255, 255, 255, 0.02);
-  overflow: hidden;
-}
-
-#franchise-container .fcc-schedule-column-head {
-  padding: 10px 12px 8px;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 20px;
-  letter-spacing: 0.03em;
-  color: #f7f9ff;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
-}
-
-#franchise-container .fcc-schedule-column-body {
-  padding: 2px 10px 4px;
-}
-
-#franchise-container .fcc-schedule-row {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  min-height: 34px;
-  padding: 5px 2px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container .fcc-schedule-row:last-child {
-  border-bottom: 0;
-}
-
-#franchise-container .fcc-schedule-week {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.62);
-}
-
-#franchise-container .fcc-schedule-detail {
-  min-width: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#franchise-container .fcc-schedule-detail.is-complete-win {
-  color: #34EC27;
-}
-
-#franchise-container .fcc-schedule-detail.is-complete-loss {
-  color: #ff6d6d;
-}
-
-#franchise-container .fcc-schedule-detail.is-complete-tie {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-#franchise-container .fcc-schedule-detail.is-pending {
-  color: rgba(255, 255, 255, 0.86);
-}
-
-#franchise-container .fcc-schedule-detail.is-tournament {
-  color: rgba(255, 255, 255, 0.8);
-}
-
 /* Stats and Team Traits scope toggles (Conference / Region / National) */
-.stats-scope-toggle-wrap,
-.traits-scope-toggle-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.stats-scope-btn,
-.traits-scope-btn {
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.8);
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-weight: 600;
-  cursor: pointer;
-}
-.stats-scope-btn:hover,
-.traits-scope-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-.stats-scope-btn.active,
-.traits-scope-btn.active {
-  background: #4065af;
-  color: #fff;
-}
 
 /* Schedule tab: 16 conference toggles (2 rows of 8) */
-.schedule-conference-toggle-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
 
 /* Standings tab: note linking to Resources */
-.standings-fcc-note {
-  margin-bottom: 16px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.74);
-}
 
 body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x {
   overflow-x: auto;
@@ -2703,13 +1959,6 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 }
 
 /* Resources tab: 3-column grid, buttons like Game Plan (blue fill, white bold) */
-.resources-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  max-width: 720px;
-  margin-top: 20px;
-}
 
 .resources-btn.is-dead{
   opacity: 0.45;
@@ -2835,74 +2084,14 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 }
 
 /* ───────── Weekly Invite block (Recruiting surfaces) ───────── */
-.fcc-invite {
-  --fcc-invite-accent: #f3a73c;
-  position: relative;
-  margin-bottom: 12px;
-  padding: 9px 13px 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--fcc-invite-accent) 36%, transparent);
-  border-left: 3px solid var(--fcc-invite-accent);
-  border-radius: 11px;
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--fcc-invite-accent) 17%, transparent),
-    color-mix(in srgb, var(--fcc-invite-accent) 4%, transparent));
-  font-family: 'Inter', sans-serif;
-}
-.fcc-invite__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
-.fcc-invite__eyebrow {
-  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700;
-  letter-spacing: 0.15em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--fcc-invite-accent) 65%, #ffffff);
-}
-.fcc-invite__status {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-  color: rgba(255,255,255,0.66); white-space: nowrap;
-}
-.fcc-invite__dot {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--fcc-invite-accent);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--fcc-invite-accent) 70%, transparent);
-  animation: fcc-invite-pulse 1.9s ease-out infinite;
-}
-.fcc-invite__body { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.fcc-invite__id { min-width: 0; }
-.fcc-invite__name {
-  display: block; font-size: 15px; font-weight: 700; color: #fff; line-height: 1.15;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.fcc-invite__meta {
-  display: block; margin-top: 2px; font-size: 11.5px; font-weight: 600;
-  color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.fcc-invite__rt {
-  flex-shrink: 0; display: flex; flex-direction: column; align-items: center; line-height: 1;
-  padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.12);
-}
-.fcc-invite__rtnum { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; }
-.fcc-invite__rtlabel {
-  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
-  letter-spacing: 0.14em; color: rgba(255,255,255,0.42); margin-top: 3px;
-}
+
 /* Wide variant — Recruits tab */
-.fcc-invite--wide {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 22px;
-  margin-bottom: 18px; padding: 14px 20px; border-radius: 14px; border-left-width: 4px;
-}
-.fcc-invite--wide .fcc-invite__top {
-  flex-direction: column; align-items: flex-start; gap: 5px; margin: 0;
-  padding-right: 22px; border-right: 1px solid rgba(255,255,255,0.12); min-width: max-content;
-}
-.fcc-invite--wide .fcc-invite__eyebrow { font-size: 10.5px; white-space: nowrap; }
-.fcc-invite--wide .fcc-invite__name { font-size: 19px; }
-.fcc-invite--wide .fcc-invite__meta { font-size: 13px; margin-top: 3px; }
-.fcc-invite--wide .fcc-invite__rtnum { font-size: 24px; }
-.fcc-invite--wide .fcc-invite__rtlabel { font-size: 9px; }
+
 @keyframes fcc-invite-pulse {
   0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--fcc-invite-accent) 55%, transparent); }
   70%  { box-shadow: 0 0 0 6px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
-@media (prefers-reduced-motion: reduce) { .fcc-invite__dot { animation: none; } }
 
 /* ───────── Recruit name -> player page links (Recruiting surfaces) ─────────
    Lives here, not recruiting.css: recruiting.html and the FCC don't load that
@@ -2937,15 +2126,6 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   padding:2px 6px; border-radius:5px; line-height:1;
 }
 /* Coach's Office card: highlighted row pinned to the top of the leans list */
-.fcc-newlean-row {
-  position:relative; border-radius:8px; margin-bottom:3px; padding:3px 8px 5px;
-  background:linear-gradient(90deg,
-    color-mix(in srgb, var(--fcc-newlean-accent) 15%, transparent),
-    color-mix(in srgb, var(--fcc-newlean-accent) 4%, transparent));
-  box-shadow:inset 3px 0 0 var(--fcc-newlean-accent);
-}
-.fcc-newlean-row .fcc-home-recruit-row { border-bottom:none; }
-.fcc-newlean-tag { display:flex; align-items:center; gap:8px; padding-left:2px; margin-top:1px; }
 
 /* ───────── Wire card: drops, as visible as gains ─────────
    Same geometry as .fcc-newlean-badge / .fcc-newlean-row on purpose — only the
@@ -2953,58 +2133,12 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
    the gain treatment would bury them. */
 :root { --fcc-drop-accent: #ff6d6d; }
 
-.fcc-drop-badge {
-  display:inline-flex; align-items:center;
-  font-family:'JetBrains Mono', monospace; font-size:8.5px; font-weight:700;
-  letter-spacing:0.12em; text-transform:uppercase;
-  color:#1d0707; background:var(--fcc-drop-accent);
-  padding:2px 6px; border-radius:5px; line-height:1;
-}
-
-.fcc-drop-row {
-  position:relative; border-radius:8px; margin-bottom:3px; padding:3px 8px 5px;
-  background:linear-gradient(90deg,
-    color-mix(in srgb, var(--fcc-drop-accent) 15%, transparent),
-    color-mix(in srgb, var(--fcc-drop-accent) 4%, transparent));
-  box-shadow:inset 3px 0 0 var(--fcc-drop-accent);
-}
-
 /* Neutral movement (rival churn on a ladder you're on) — quieter than either. */
-.fcc-wire-row {
-  position:relative; border-radius:8px; margin-bottom:3px; padding:3px 8px 5px;
-  background:rgba(255,255,255,0.03);
-  box-shadow:inset 3px 0 0 rgba(255,255,255,0.14);
-}
 
 /* Your own signings, once week 35 has run. Same row shape as the wire it replaces —
    green rail because these are yours, which is the app-wide meaning of that colour. */
-.fcc-signed-row {
-  box-shadow:inset 3px 0 0 rgba(52,236,39,0.55);
-  background:rgba(52,236,39,0.05);
-}
-.fcc-signed-row .fcc-wire-line__wk { color:rgba(169,255,156,0.72); }
-
-.fcc-wire-line {
-  display:flex; align-items:baseline; gap:8px; justify-content:space-between;
-  font-family:'Inter', sans-serif; font-size:12px; line-height:1.45;
-  color:rgba(255,255,255,0.9);
-}
-
-.fcc-wire-line__wk {
-  font-family:'JetBrains Mono', monospace; font-size:9px;
-  color:rgba(255,255,255,0.45); white-space:nowrap; flex:0 0 auto;
-}
-
-.fcc-wire-status {
-  margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);
-  font-family:'Inter', sans-serif; font-size:11px; color:rgba(255,255,255,0.55);
-  /* Reserved even when the line is empty, so the card's height does not depend on
-     whether there is anything to say this week. */
-  min-height:15px;
-}
 
 /* Recruiting card spans two columns (Standings retired to keep rows of 4). */
-#franchise-container .fcc-home-card--recruiting { grid-column: span 2; }
 
 /* The wire grows without bound — every week adds events — and a grid row is sized to
    its items' MAX-content, so an uncapped list drags row 2 off the fold as a season
@@ -3017,29 +2151,6 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
      - Signing Day centres its call to action in it.
    One number, not one per state — the list height follows the box rather than being
    a second constant to keep in sync. */
-#franchise-container .fcc-home-card--recruiting .fcc-home-card-body {
-  /* Fills whatever the row leaves and scrolls inside it, so a season's worth of wire
-     cannot change the card's height. Replaces a fixed 242px body, which was itself
-     what made row 1 taller than row 2. */
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-#franchise-container .fcc-home-card--recruiting .fcc-home-recruiting {
-  flex: 1;
-  min-height: 0;
-}
-#franchise-container .fcc-home-card--recruiting .fcc-home-list-scroll {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-  height: auto;
-}
-#franchise-container .fcc-home-card--recruiting .fcc-home-empty {
-  flex: 1;
-  min-height: 0;
-}
 
 /* Signing Day (week 35): one call to action, centred in the card.
    The event feed is gone, so nothing competes with the button — the copy sits directly
@@ -3047,25 +2158,7 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
    left alignment are dropped here; both exist to divide it from a list that isn't
    there. The card keeps the same height as every other week (see the fixed-height
    block above), so row 2 does not move when the season reaches Signing Day. */
-#franchise-container .fcc-home-card--recruiting.is-signing-day .fcc-home-card-body {
-  align-items: center;
-  justify-content: center;
-}
-#franchise-container .fcc-home-card--recruiting.is-signing-day .fcc-wire-signing {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  text-align: center;
-}
-#franchise-container .fcc-home-card--recruiting.is-signing-day .fcc-wire-signing__copy {
-  margin: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.82);
-}
+
 /* Two IDs, to outrank `#franchise-container #home-tab .fcc-home-card-recruiting
    .fcc-recruiting-footnote--embed` above — its margin-top/padding-top otherwise survive
    here and push the button below the optical centre of the stack. */
@@ -3082,54 +2175,9 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
    The banding sits on the <tr>, so a transparent sticky cell would show rows
    sliding underneath it. Each row state needs a SOLID equivalent.
    ============================================================ */
-#franchise-container #roster-tab table.roster-table th.c-ident,
-#franchise-container #roster-tab table.roster-table td.c-ident,
-#franchise-container #recruits-tab table.roster-table th.c-ident,
-#franchise-container #recruits-tab table.roster-table td.c-ident {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  text-align: left;
-  background: #191d27;               /* solid base — matches the card fill */
-}
-
-#franchise-container #roster-tab table.roster-table thead th.c-ident,
-#franchise-container #recruits-tab table.roster-table thead th.c-ident {
-  z-index: 4;                        /* above both the sticky header and body cells */
-  background: #22262f;
-}
-
-#franchise-container #roster-tab table.roster-table tbody tr:nth-child(even) td.c-ident,
-#franchise-container #recruits-tab table.roster-table tbody tr:nth-child(even) td.c-ident {
-  background: #1c202a;               /* solid equivalent of the banded row */
-}
-
-#franchise-container #roster-tab table.roster-table tbody tr:hover td.c-ident,
-#franchise-container #recruits-tab table.roster-table tbody tr:hover td.c-ident {
-  background: #232833;               /* solid equivalent of the hover row */
-}
 
 /* The grouped attribute header is a 2-row grid inside one cell, so it sticks as a unit.
    It still needs opaque backing or rows bleed through on scroll. */
-#franchise-container #roster-tab table.roster-table thead th.attr-tiles-head,
-#franchise-container #recruits-tab table.roster-table thead th.attr-tiles-head {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: #22262f;
-}
-
-#franchise-container #recruits-tab table.roster-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: #22262f;
-}
-
-#franchise-container #recruits-tab .fcc-data-card-body.scroll-x {
-  max-height: calc(100vh - 260px);
-  overflow: auto;
-}
 
 /* ============================================================
    Advancing To Season N — full-screen rollover cover.
@@ -3205,30 +2253,9 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 
 /* Your team's own dispatches inside News (the retired Inbox tab's contents). Marked apart
    from league headlines so "my team" and "the league" don't read as one list. */
-#franchise-container .fcc-news-mine {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 7px 10px;
-  margin-bottom: 6px;
-  border-left: 2px solid rgba(247, 148, 32, .65);
-  border-radius: 0 7px 7px 0;
-  background: rgba(247, 148, 32, .07);
-  font: 600 13px/1.35 'Inter', sans-serif;
-  color: rgba(255, 255, 255, .88);
-}
 
 /* The Training tab is a full-width working surface, not a data table. */
 #franchise-container #fcc-training-dev .fcc-data-card-body { padding: 16px 18px 18px; }
 
 /* Training tab header: title left, the tutorial link right — the same pairing the
    training page's Player Development section uses. */
-#franchise-container .fcc-training-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
