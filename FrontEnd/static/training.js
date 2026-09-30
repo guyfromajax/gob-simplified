@@ -132,8 +132,11 @@ let customFocusDraft = {};
 let customFocusCommitted = {};
 let trainingDirty = false;
 // True after applyTrainingWeekState hides the weekly allocation (submitted week or
-// tournament). syncTrainingAdvance must not put Submit Training back on the top bar.
+// tournament). The focus page must not enable Submit Training on those weeks.
 let trainingAllocationClosed = false;
+/** 'weekly' (Advance focus page) or 'player-dev' (Prep › Player Training). */
+let trainingSections = 'weekly';
+let trainingFormSnapshot = null;
 
 /** Session keys for Custom Training Playbook → training-playbooks.html */
 const STORAGE_PLAYBOOK_FOCUS = 'gob_training_playbook_focus';
@@ -170,12 +173,114 @@ function saveTrainingFormDraft() {
   };
   try {
     sessionStorage.setItem(key, JSON.stringify(payload));
-    trainingDirty = false;
   } catch (_e) {}
 }
 
-// A franchise edit is kept as the session draft that initializeTrainingPoints
-// restores, so leaving the view or reloading loses nothing and nothing warns.
+function isWeekly() {
+  return trainingSections === 'weekly';
+}
+
+function resolveSections(options) {
+  if (options && (options.sections === 'weekly' || options.sections === 'player-dev')) {
+    return options.sections;
+  }
+  return inAppShell() ? 'player-dev' : 'weekly';
+}
+
+function captureTrainingFormSnapshot() {
+  const sliders = {};
+  qsa('.slider').forEach(function (el) {
+    if (el.id) sliders[el.id] = parseInt(el.value, 10) || 0;
+  });
+  const checked = rootQuery('input[name="coaching-focus"]:checked');
+  trainingFormSnapshot = {
+    sliders: sliders,
+    coaching_radio: checked ? checked.value : null,
+    player_maximizer_resolved: playerMaximizerResolvedFocus,
+    custom_focus_committed: JSON.parse(JSON.stringify(customFocusCommitted || {})),
+  };
+}
+
+function applyTrainingFormState(o) {
+  if (!o) return;
+  if (o.sliders && typeof o.sliders === 'object') {
+    Object.keys(o.sliders).forEach(function (id) {
+      const el = byId(id);
+      if (el && el.classList && el.classList.contains('slider')) {
+        const v = Math.max(0, Math.min(5, parseInt(o.sliders[id], 10) || 0));
+        setSliderValue(el, v);
+      }
+    });
+  }
+  playerMaximizerResolvedFocus = o.player_maximizer_resolved || null;
+  customFocusCommitted =
+    o.custom_focus_committed && typeof o.custom_focus_committed === 'object'
+      ? Object.assign({}, o.custom_focus_committed)
+      : {};
+  const radioVal = o.coaching_radio;
+  qsa('input[name="coaching-focus"]').forEach(function (inp) {
+    inp.checked = !!(radioVal && inp.value === radioVal);
+  });
+  if (radioVal) applyCoachingFocusArchetypeUi(radioVal);
+  else qsa('.archetype-block').forEach(function (block) {
+    block.classList.remove('active', 'header-selected', 'sub-option-selected');
+  });
+  updatePointsRemaining();
+}
+
+function restoreTrainingFormSnapshot() {
+  applyTrainingFormState(trainingFormSnapshot);
+}
+
+function confirmTrainingLeave(proceed) {
+  if (!window.GOBLeaveConfirm) {
+    proceed();
+    return;
+  }
+  window.GOBLeaveConfirm.open({
+    title: 'Unsaved Training',
+    copy: 'Leave without submitting this week\'s allocation? Your draft is kept until you submit.',
+    saveLabel: 'Keep Draft',
+    onSave: function () {
+      trainingDirty = false;
+      return true;
+    },
+    onDiscard: function () {
+      restoreTrainingFormSnapshot();
+      clearTrainingFormDraftForCurrentContext();
+      trainingDirty = false;
+    },
+    proceed: proceed,
+  });
+}
+
+function applySections() {
+  const weekly = isWeekly();
+  ['.main-content-grid', '.coaching-section'].forEach(function (sel) {
+    const el = rootQuery(sel);
+    if (el) el.hidden = !weekly;
+  });
+  ['requirements-bar', 'auto-train-btn', 'submit-btn', 'training-tutorial-btn'].forEach(function (id) {
+    const el = byId(id);
+    if (el) el.hidden = !weekly;
+  });
+  const header = rootQuery('.training-header');
+  if (header) header.hidden = !weekly;
+  const note = byId('training-state-note');
+  if (note && !weekly) note.hidden = true;
+  if (playerDevSection) playerDevSection.hidden = weekly;
+  const pointer = byId('training-advance-pointer');
+  if (pointer) pointer.hidden = weekly;
+  if (backBtn) {
+    backBtn.textContent = 'Back to Locker Room';
+    backBtn.hidden = !weekly;
+  }
+  if (root) root.setAttribute('data-training-sections', trainingSections);
+  document.body.classList.toggle('training-weekly', weekly);
+  document.body.classList.toggle('training-player-dev', !weekly);
+}
+
+// Draft persists; dirty stays true so leave-confirm can fire on the focus page.
 function noteTrainingEdit() {
   trainingDirty = true;
   saveTrainingFormDraft();
@@ -269,12 +374,18 @@ function playerDevRows() {
 function renderPlayerDevelopment() {
   const grid = window.GOBPlayerDevelopmentGrid;
   if (!playerDevSection || !grid) return;
+  if (isWeekly()) {
+    playerDevSection.hidden = true;
+    return;
+  }
   const rows = playerDevRows();
   if (!rows.length) {
     playerDevSection.hidden = true;
     return;
   }
   playerDevSection.hidden = false;
+  const pointer = byId('training-advance-pointer');
+  if (pointer) pointer.hidden = false;
   grid.render(playerDevSection, rows, {
     layout: 'table',
     tallies: (positionTallies && focusTallies)
@@ -494,6 +605,7 @@ async function fetchFranchiseCommandCenterData(franchiseId) {
  * and applies to the next training that runs.
  */
 async function applyTrainingWeekState() {
+  if (!isWeekly()) return false;
   const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
@@ -950,29 +1062,18 @@ function updatePointsRemaining() {
 }
 
 function syncTrainingAdvance(ready) {
+  if (!isWeekly() || trainingAllocationClosed) {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.hidden = true;
+    }
+    return;
+  }
   if (submitBtn) {
+    submitBtn.hidden = false;
     submitBtn.disabled = !ready;
     submitBtn.style.opacity = ready ? '1' : '0.4';
   }
-  let onView = false;
-  try {
-    onView = (window.FranchiseContext && window.FranchiseContext.get('tab') === 'training-view')
-      || inAppShell();
-  } catch (_err) {
-    onView = false;
-  }
-  if (!onView || !window.GOBAdvance || typeof window.GOBAdvance.setOverride !== 'function') return;
-  if (trainingAllocationClosed) {
-    if (window.GOBAdvance.clearOverride) window.GOBAdvance.clearOverride();
-    return;
-  }
-  window.GOBAdvance.setOverride({
-    label: 'Submit Training',
-    enabled: !!ready,
-    onClick: function () {
-      submitTraining(byId('play-now'));
-    },
-  });
 }
 
 /**
@@ -1226,30 +1327,7 @@ function restoreTrainingFormDraft() {
   if (Number(o.week) !== Number(currentWeek)) return;
   if (Number(o.total_points_budget) !== Number(TOTAL_POINTS)) return;
 
-  if (o.sliders && typeof o.sliders === 'object') {
-    Object.keys(o.sliders).forEach(function (id) {
-      const el = byId(id);
-      if (el && el.classList && el.classList.contains('slider')) {
-        const v = Math.max(0, Math.min(5, parseInt(o.sliders[id], 10) || 0));
-        setSliderValue(el, v);
-      }
-    });
-  }
-
-  playerMaximizerResolvedFocus = o.player_maximizer_resolved || null;
-  customFocusCommitted =
-    o.custom_focus_committed && typeof o.custom_focus_committed === 'object'
-      ? Object.assign({}, o.custom_focus_committed)
-      : {};
-
-  const radioVal = o.coaching_radio;
-  if (radioVal) {
-    const inp = findCoachingFocusRadioByValue(radioVal);
-    if (inp) {
-      inp.checked = true;
-      applyCoachingFocusArchetypeUi(radioVal);
-    }
-  }
+  applyTrainingFormState(o);
   trainingDirty = false;
 }
 
@@ -1861,6 +1939,7 @@ async function initializeTrainingPoints() {
           recruitingInvitesBtn.onclick = null;
         }
         restoreTrainingFormDraft();
+        if (isWeekly()) captureTrainingFormSnapshot();
         console.log(`🎯 [TRAINING] Training points set to ${TOTAL_POINTS} (first training: ${data.is_first_training})`);
       } else {
         console.warn('⚠️ [TRAINING] Failed to fetch training points, using default 24');
@@ -1881,7 +1960,7 @@ _onPageShow = (event) => {
     if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
     return;
   }
-  applyTrainingWeekState();
+  if (isWeekly()) applyTrainingWeekState();
 };
 window.addEventListener('pageshow', _onPageShow);
 }
@@ -2309,11 +2388,18 @@ function wireTrainingUi() {
 }
 
 async function startTrainingPage() {
-  if (window.GOBNav) window.GOBNav.warnOnLeave(function () { return trainingDirty; });
+  applySections();
+  if (isWeekly() && window.GOBNav) {
+    window.GOBNav.warnOnLeave(
+      function () { return trainingDirty; },
+      { confirm: confirmTrainingLeave }
+    );
+  }
   const noAllocation = await applyTrainingWeekState();
   wireTrainingTutorialButton();
   await initializeTrainingPoints();
-  if (!noAllocation) wireCustomTrainingPlaybook();
+  applySections();
+  if (isWeekly() && !noAllocation) wireCustomTrainingPlaybook();
   if (window.GOBNav) window.GOBNav.restoreScroll();
 }
 
@@ -2332,24 +2418,28 @@ function teardown() {
   started = false;
 }
 
-function revalidate() {
-  if (!started) return init(root);
+function revalidate(options) {
+  if (options && options.sections) trainingSections = resolveSections(options);
+  if (!started) return init(root, { sections: trainingSections });
   bindDom();
-  if (inAppShell() && window.GOBTraining) window.GOBTraining.syncAdvance();
+  applySections();
   return applyTrainingWeekState().then(function () {
     return initializeTrainingPoints();
   }).then(function () {
+    applySections();
     if (window.GOBTables && window.GOBTables.placeTools) window.GOBTables.placeTools();
     return { revalidate: revalidate, unmount: teardown };
   });
 }
 
-async function init(host) {
+async function init(host, options) {
   root = host || document.body;
+  trainingSections = resolveSections(options);
   const hadShell = !!root.querySelector('.training-container');
   if (!hadShell) root.insertAdjacentHTML('beforeend', shellHtml());
   bindDom();
-  if (hadShell && started) return revalidate();
+  applySections();
+  if (hadShell && started) return revalidate(options);
   wireTrainingUi();
   try {
     await startTrainingPage();

@@ -162,7 +162,7 @@ Every stub loads and forwards correctly in both profiles (R). The live links bel
 | `player-detail.html` | FCC `?tab=player-view` | `officeHome.js:147`, `team-roster-view.js:98`, `franchise-command-center.js:398` |
 | `team-roster-view.html` | FCC `?tab=team-view` (stays a page for `mode=practice_squad&ps_team_id`) | `officeHome.js:158`, `gobTables.js:237`, `rankingsView.js:84`, `franchise-select-team.js:657`, `franchise-command-center.js:796`. `practiceSquadView.js:79` is the legitimate PS page |
 | `training-report.html` | FCC `?tab=training-report-view` | `officeHome.js:421` |
-| `training.html` | FCC `?tab=training-view` | `gobAdvance.js:378`, `training-playbooks.js:81` |
+| `training.html` | focus weekly allocation (no FCC redirect) | `gobAdvance.js` Advance (`mode=training`), `training-playbooks.js` return |
 | `game-plan.html` | FCC `?tab=game-plan-view` | `training.js:1196`, `training.js:1545`, `box-score.js:2182`, `franchise-command-center.js:4387` |
 | `playbooks.html` | FCC `?tab=playbooks-view` | `playbook-report.js:353`, `play-details.html:527`, `franchise-command-center.js:2260`, `2274` |
 | `standings.html` | FCC `?tab=standings-view` | `franchise-command-center.js:1777`, `1779`, `1794` |

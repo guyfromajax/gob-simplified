@@ -403,7 +403,7 @@ test('scouting does not fetch play-next-game before the report', async ({ page }
     const overlay = document.getElementById('page-load-overlay');
     return !overlay || getComputedStyle(overlay).display === 'none';
   });
-  await page.waitForSelector('#training-view .training-container, #training-view .slider, #training-view .ps', {
+  await page.waitForSelector('#training-view .training-container, #training-view .pdg-grid, #training-view .devfocus-select', {
     timeout: 15000,
   });
 

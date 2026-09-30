@@ -144,8 +144,10 @@ test('Player Training tab always shows the settings, even after a submitted week
   await page.setViewportSize({ width: 1280, height: 720 });
   await openFcc(page, 'training-view', null, { cc: { training_completed: true, week: 12 } });
   await expect(page.locator('#training-view.tab-content.active')).toBeVisible({ timeout: 20000 });
-  await expect(page.locator('#training-view')).toContainText('Training submitted for this week');
   await expect(page.locator('#training-view #player-dev-section')).toBeVisible();
+  await expect(page.locator('#training-view .devfocus-select').first()).toBeVisible();
+  await expect(page.locator('#training-view .main-content-grid')).toBeHidden();
+  await expect(page.locator('#training-view')).toContainText('Weekly training is set when you advance.');
   await expect(page.getByRole('tab', { name: 'Player Training', exact: true })).toHaveAttribute('aria-selected', 'true');
 });
 
@@ -212,11 +214,11 @@ test('after week 26 the settings stay, with no weekly allocation', async ({ page
     cc: { week: 28, training_disabled_for_postseason: true, training_completed: true },
     points: { week: 28, training_points: 0, training_unavailable: true },
   });
-  await expect(page.locator('#training-view')).toContainText('No team training during the tournament', { timeout: 20000 });
-  await expect(page.locator('#training-view #player-dev-section')).toBeVisible();
+  await expect(page.locator('#training-view #player-dev-section')).toBeVisible({ timeout: 20000 });
   await expect(page.locator('#training-view .devfocus-select').first()).toBeVisible();
   await expect(page.locator('#training-view .main-content-grid')).toBeHidden();
   await expect(page.locator('#requirements-bar')).toBeHidden();
+  await expect(page.locator('#training-view')).not.toContainText('No team training during the tournament');
   await expect(page.locator('#play-now')).not.toHaveText(/Submit Training|Run Training Camp/);
 
   await page.screenshot({ path: path.join(OUT, 'post-week-26-1280.png') });

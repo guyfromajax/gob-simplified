@@ -238,7 +238,7 @@ test('in-app Training after', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/franchise-command-center.html?' + fcc('training-view'));
   await waitOverlay(page);
-  await expect(page.locator('#training-view .slider, #training-view .ps').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#training-view .devfocus-select, #training-view .pdg-grid').first()).toBeVisible({ timeout: 30000 });
   await page.screenshot({ path: path.join(OUT, 'after-training-1280.png') });
 });
 

@@ -25,7 +25,6 @@ const BROWSE = [
   'standings.html',
   'team-stats.html',
   'stats.html',
-  'training.html',
   'training-report.html',
   'game-plan.html',
   'playbooks.html',
@@ -33,6 +32,7 @@ const BROWSE = [
 
 const FOCUS = [
   'set-lineup.html',
+  'training.html',
   'training-squad-report.html',
   'training-playbooks.html',
   'cut-players.html',
@@ -695,9 +695,12 @@ test('flow pages keep their own exit and the court has no shell', async ({ page 
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await expect(page.locator('.rail')).toHaveCount(0);
   await openPage(page, 'training.html', cc({ training_completed: false }));
-  await expect(page.locator('nav.rail')).toHaveCount(1);
-  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"] .tb-l')).toHaveText('Player Training');
-  await expect(page.locator('#play-now.advance')).toHaveCount(1);
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('nav.rail')).toHaveCount(0);
+  await expect(page.locator('#gob-subtabs')).toHaveCount(0);
+  await expect(page.locator('#play-now.advance')).toHaveCount(0);
+  await expect(page.locator('#submit-btn')).toBeVisible();
+  await expect(page.locator('#back-btn')).toHaveText('Back to Locker Room');
   await openPage(page, 'recruiting.html', cc(), '&action=run');
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await stubAuth(page);
@@ -777,13 +780,13 @@ test('game plan tick labels do not overlap at 1280 or 1920', async ({ page }) =>
   await assertNoOverlap();
 });
 
-test('training tab-row tools do not overlap at 1280 or 1920', async ({ page }) => {
+test('training focus header tools do not overlap at 1280 or 1920', async ({ page }) => {
   async function assertNoOverlap() {
-    await page.waitForSelector('html.gob-shell .pg-head .pg-tools #requirements-bar');
+    await page.waitForSelector('.training-header #requirements-bar');
     const overlaps = await page.evaluate(() => {
-      const slot = document.querySelector('html.gob-shell .pg-head .pg-tools');
-      if (!slot) return ['no-slot'];
-      const els = [...slot.querySelectorAll(':scope > *, #requirements-bar > *')].filter((el) => {
+      const slot = document.querySelector('.training-header');
+      if (!slot) return ['no-header'];
+      const els = [...slot.querySelectorAll('#back-btn, #training-tutorial-btn, #requirements-bar, #auto-train-btn, #submit-btn')].filter((el) => {
         const r = el.getBoundingClientRect();
         const cs = getComputedStyle(el);
         return r.width > 1 && r.height > 1 && cs.display !== 'none' && cs.visibility !== 'hidden';

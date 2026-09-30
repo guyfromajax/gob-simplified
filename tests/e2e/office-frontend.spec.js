@@ -794,7 +794,7 @@ test('advance mirror matches the top bar', async ({ page }) => {
         { id: 'run_training', label_key: 'run_training', required: true, done: false, gates_advance: true, is_advance_action: true, route: '/training.html' },
         { id: 'play_next_game', label_key: 'play_next_game', required: true, done: false, gates_advance: false, is_advance_action: false, route: '/set-lineup.html' },
       ],
-    }), { week: 10, training_completed: false }), '/franchise-command-center.html'],
+    }), { week: 10, training_completed: false }), '/training.html'],
     ['game', commandCenter(digest('win'), { week: 12, training_completed: true }), '/set-lineup.html'],
     ['cut', commandCenter(digest('regular', {
       todos: [

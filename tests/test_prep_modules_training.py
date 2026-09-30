@@ -1,4 +1,4 @@
-"""Player Training is a real module — no embed-bridge path."""
+"""Player Training is a real module — weekly focus on training.html, player-dev in Prep."""
 from __future__ import annotations
 
 import pathlib
@@ -8,6 +8,8 @@ VIEW = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "views" / "trainingView
 JS = (ROOT / "FrontEnd" / "static" / "training.js").read_text()
 HTML = (ROOT / "FrontEnd" / "static" / "training.html").read_text()
 CSS = (ROOT / "FrontEnd" / "static" / "training.css").read_text()
+ADVANCE = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "gobAdvance.js").read_text()
+SHELL = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "gobShell.js").read_text()
 
 
 def test_view_does_not_embed_the_old_page():
@@ -17,6 +19,7 @@ def test_view_does_not_embed_the_old_page():
     assert "DOMParser" not in VIEW
     assert "loadIsolated" not in VIEW
     assert "init as initTraining" in VIEW
+    assert "sections: 'player-dev'" in VIEW
 
 
 def test_page_script_exports_init():
@@ -26,17 +29,24 @@ def test_page_script_exports_init():
     assert "export { init, teardown, revalidate, shellHtml };" in JS
     assert "document.addEventListener('DOMContentLoaded'" not in JS
     assert 'window.addEventListener("DOMContentLoaded"' not in JS
+    assert "sections: 'weekly'" in JS or "options.sections" in JS
 
 
-def test_html_keeps_tutorial_and_redirects_browse():
-    assert "tab', 'training-view'" in HTML or 'tab", "training-view"' in HTML
-    assert "mode') === 'tutorial'" in HTML or 'mode") === "tutorial"' in HTML
-    assert "embed') === '1'" not in HTML
-    assert "location.replace('/franchise-command-center.html?" in HTML
+def test_html_is_weekly_focus_host():
+    assert "location.replace('/franchise-command-center.html?" not in HTML
+    assert "sections: 'weekly'" in HTML
     assert "import { init } from '/training.js'" in HTML
+    assert "gobLeaveConfirm.js" in HTML
+    assert "embed') === '1'" not in HTML
 
 
-def test_view_toggles_the_page_class_for_parked_tools():
+def test_advance_opens_training_html_focus():
+    assert "'/training.html?'" in ADVANCE or '"/training.html?"' in ADVANCE
+    assert "tab', 'training-view'" not in ADVANCE
+    assert "'/training.html': { kind: 'focus' }" in SHELL
+
+
+def test_view_toggles_the_page_class():
     assert "document.body.classList.toggle('training-page'" in VIEW
     assert "root.classList.add('training-page')" not in JS
 

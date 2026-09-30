@@ -240,8 +240,15 @@ test('playbooks tab, save, and leave-confirm are one catalog sound', async ({ pa
 
 test('training, training report, and scouting toggles use SFX_SELECT', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openTab(page, 'training-view', '#training-view .slider, #training-view .ps');
-  const slider = page.locator('#training-view input[type="range"], #training-view .slider').first();
+  await stubAuth(page);
+  await installApi(page, []);
+  await page.goto('/training.html?franchise_id=' + FID + '&team_id=' + TEAM + '&mode=franchise&session_type=in-season');
+  await page.waitForFunction(() => {
+    const overlay = document.getElementById('page-load-overlay');
+    return !overlay || getComputedStyle(overlay).display === 'none';
+  });
+  await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
+  const slider = page.locator('input[type="range"].slider').first();
   await expect(slider).toBeVisible();
   await armSpy(page);
   await slider.evaluate((el) => {

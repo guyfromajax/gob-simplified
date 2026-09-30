@@ -34,8 +34,8 @@
       { id: 'game-plan-view', label: 'Game Plan' },
       { id: 'playbooks-view', label: 'Playbooks' },
       { id: 'scouting-view', label: 'Scouting Report' },
-      // Last, and named for what it is. The id is unchanged so the Advance week-flow
-      // target (gobAdvance.js) and the /training.html browse route still land here.
+      // Per-player development only. Weekly allocation is /training.html (focus),
+      // opened by Advance — same pattern as Set Lineup.
       { id: 'training-view', label: 'Player Training' }
     ]},
     { id: 'league', label: 'League', title: 'League', icon: 'league', tabs: [
@@ -124,7 +124,7 @@
     '/player-detail.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/team-roster-view.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/set-lineup.html': { kind: 'focus' },
-    '/training.html': { kind: 'browse', section: 'prep', sub: 'training-view' },
+    '/training.html': { kind: 'focus' },
     // A drill-in, like /player-detail.html: 'context' resolves to whichever section you
     // came from (sectionFromReturn), and keepBack preserves the return trail.
     '/training-report.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },

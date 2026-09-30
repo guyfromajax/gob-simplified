@@ -2079,6 +2079,15 @@ body.training-page .drill-group--solo {
 body.training-page .drill-group--solo .drill-title { margin-bottom: 0; }
 body.training-page .drill-group--solo .slider-label { flex: 0 0 auto; }
 
+body.training-page .training-advance-pointer,
+#training-view .training-advance-pointer {
+  margin: 0 0 var(--dsp-12, 12px);
+  color: var(--text-60);
+  font-size: var(--fs-14, 14px);
+}
+body.training-page .training-advance-pointer[hidden],
+#training-view .training-advance-pointer[hidden] { display: none; }
+
 /* --- Player Development --------------------------------------------------- */
 body.training-page .player-dev-section {
   grid-column: 1 / -1;
@@ -2177,7 +2186,13 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
 #training-view .training-state-note[hidden],
 #training-view .training-state-note-link[hidden],
 #training-view .main-content-grid[hidden],
-#training-view .coaching-section[hidden] {
+#training-view .coaching-section[hidden],
+#training-view[data-training-sections="player-dev"] .main-content-grid,
+#training-view[data-training-sections="player-dev"] .coaching-section,
+#training-view[data-training-sections="player-dev"] .training-header,
+#training-view[data-training-sections="player-dev"] #requirements-bar,
+#training-view[data-training-sections="player-dev"] #auto-train-btn,
+#training-view[data-training-sections="player-dev"] #submit-btn {
   display: none;
 }
 #training-view .content-section,

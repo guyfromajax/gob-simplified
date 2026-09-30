@@ -377,19 +377,18 @@
       params.set('session_type', sessionType);
       params.set('return_url', env.getCurrentRelativeUrl ? env.getCurrentRelativeUrl() : currentRelativeUrl());
       if (userTeamId) params.set('team_id', userTeamId);
-      params.set('tab', 'training-view');
-      var trainingReturnUrl = '/franchise-command-center.html?' + params.toString();
+      var trainingUrl = '/training.html?' + params.toString();
       var navigateToTraining = async function () {
         await confirmSfxReady;
         try {
           var music = await import('/js/musicController.js');
           music.clearFranchiseMusicState();
         } catch (err) {}
-        if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(trainingReturnUrl);
-        else window.location.assign(trainingReturnUrl);
+        if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(trainingUrl);
+        else window.location.assign(trainingUrl);
       };
       if (window.GOBTutorialAlerts) {
-        var blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining, trainingReturnUrl);
+        var blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining, trainingUrl);
         if (blocked) {
           settleAdvance();
           return;
