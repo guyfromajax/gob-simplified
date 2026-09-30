@@ -13,6 +13,23 @@ Version 1. How to build franchise screens. The look lives in [Styleguide.md](Sty
 - Navigation is two levels: a rail section, then a sub-tab. Do not add a third level.
 - Attribute digits stay on the first-digit scale (`attributeDisplay.js`). Player RT stays a letter grade (`rtBucket.js`).
 
+## Colour law
+
+The full law. `scripts/check_ui_tokens.py --strict` enforces it on new-design files (see §8); the clauses below are the design intent behind the checker's allow-list.
+
+- **Green** (`--green`) — the top-bar Advance (`advance`, `play-now`, `gob-btn--gate`) and positive data only: delta-up (`delta-up`, `is-up`, `is-pos`), tier/band green (`tier-green`, `t-green`, `data-band="high"`, `risk-low`, `rm-tile--keep`), W badges (`wl`), chemistry `.chem`/`.is-green`, board-gain bars and up-arrows, and the RT/attribute ramps (`.att-col`, `.att-bar`, `.gob-chg`). Never on a card, a WIN/LOSS tag, a badge, a score, a delta, or a choice control.
+- **Orange** (`--orange`) — saved or committed only: Submit Invites / Submit Orders / any save (`save`, `saved`, `committed`, `gob-btn--action`), the promise toggle, the committed-order rail, the funded row, the save toast, and attribute-ramp mid stops on `.att-col`/`.att-bar`.
+- **Navy** (`--you` / `--you-soft` / `--you-line` / `--you-ink`, `#27408E`) — "yours" only: your row, your lean, your region, your signing, your `#1`/`#n`, on-your-list. Navy is never green; on-your-list is navy, not gold.
+- **Blue** — RT only: an A grade / 9+ / elite rating (the shared RT ramp; A blue, B green). Never for chrome, links, or navigation.
+- **Reward gold** (`--reward-gold`, `#F0C560`) — reward tiers only, at these surfaces and nowhere else: title medallions (`.med.gold`); season-peak glow / rule / confetti (`.pk`, `.pk-*`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`, the 2px top rule, the `.mm-k::before` diamond); the exceptional-gain marker (`.xg`, `.xg-key`, `xgSweep` — diamond, ring, delta and the "Exceptional gain" key); and the words "Trophy Case" (`.gold-t`, `.pk-f`/`.rv-f` emphasis, `trophy-case`). Never on buttons, Advance (green), "yours" (navy), choice controls, everyday/weekly chrome, or Home Base chrome. Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens.
+- **Choice controls are neutral** — tabs (Pool/Orders), the watch star, filter chips, phase labels, week tiles, invite counts, and status labels carry no green/orange/gold. Muted text, not colour.
+- **W/L plates** — the WIN plate is white; the LOSS tag is an outline. The result carries the colour, not a wash.
+- **Deltas are neutral** — ▲ at `--text-100`, ▼ at `--text-60`. No green up / red down.
+- **No colour wash on the weekly card** — the Since-last-week card background is the neutral surface on both win and loss; the seeded team colour never tints it.
+- **Information codes are neutral** — the Player Development Grid's "develops" / "adds" markers (`playerDevelopmentGrid.js`, `.is-develops`) and other read-only status codes stay neutral, not green or gold.
+
+Annotate a legal exception in the CSS/JS with `/* colour-law: positive-data | committed | saved | reward */`. `positive-data` allows green on a data element, `committed`/`saved` allow orange on a save, `reward` allows `--reward-gold` on a reward surface. The annotation is only for the exceptions above — it does not license a colour the law forbids.
+
 ## 2. Tokens and density
 
 Root element: `html.gob` plus one density class.
@@ -43,7 +60,11 @@ Persisted in `localStorage` under `gob_audio_v1` (`AUDIO_STORAGE_KEY`). The same
 
 `playSfx(name, baseVolume)` plays one named sound on the `sfx` channel. `baseVolume` defaults to `0.7`. It still accepts a raw filename so existing callers keep working. Named catalog: `SFX_SELECT` (`click-tiny.wav`), `SFX_ADVANCE` (`confirm-1-lowervol.wav`), `SFX_COMMIT` (`click-beep.wav`), `STING_WIN` (`sting-win.wav`), `STING_MILESTONE` (`sting-milestone.wav`), `STING_SEASON_PEAK` (`sting-season-peak.wav`). Short UI sounds may overlap. A new sting stops the previous sting. A missing file fails silently (one `console.debug` per name) and must not throw or block a modal or navigation.
 
-One delegated click listener per document plays `data-sfx="<name>"` on buttons, links, and `[role="tab"]`. Unknown names are ignored. The top-bar Advance (`#play-now`) uses `data-sfx="SFX_ADVANCE"` and must not also call `playSfx` from its click handler.
+One delegated click listener per document (`installSfxHooks(document)`) plays `data-sfx="<name>"` on buttons, links, and `[role="tab"]`. Unknown names are ignored. The top-bar Advance (`#play-now`) uses `data-sfx="SFX_ADVANCE"` and must not also call `playSfx` from its click handler.
+
+One sound per action. A control that has a `data-sfx` hook must not also call `playSfx` in its own handler, and vice versa — pick one path (proved in tests with the `window.__gobSfxCalls` spy). `SFX_ADVANCE` is reserved for `#play-now`; a page's own primary action (Submit Training, a tutorial PLAY NOW) uses `SFX_COMMIT`, not Advance. Everything goes through `playSfx` + the settings channels — a caller that constructs `new Audio()` itself bypasses the mute/level settings and is a bug to fix, not a pattern to copy.
+
+Losses are silent. `STING_WIN` plays only on a win's first showing (the office weekly card, at the score cue); a loss and a milestone elimination make no sound. A gold milestone or season-peak open plays its server-named sting (`playSfx(item.sting)`); a new sting stops the previous one. Stings follow the audio settings even under `prefers-reduced-motion`, and closing a modal early does not cancel or replay the sting. The client never picks a moment's sound — the server names it.
 
 Routed today: `playSfx` callers (rail, sub-tabs, the shared tab strip), `data-sfx` on Advance, the championship-moment season-peak sting, and the court sound control (`courtAudio.js`), which mirrors master / music / sfx into this bus.
 
@@ -182,10 +203,12 @@ From the repo root, run both gates before merge. Leave `CI` unset so Playwright 
 env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright" PYTHON_PATH=".venv/bin/python" ./node_modules/.bin/playwright test tests/e2e --workers=1 --reporter=line
 ```
 
-**UI tokens (required):** colour-law `--strict` on new-design files. Legacy pages are reported and do not fail the gate. Allowed: green on Advance and positive data (delta-up, tier-green, W badges, chemistry / board-gain bars, RT/attribute ramps); orange on committed/saved. Annotate an exception with `/* colour-law: positive-data */` or `/* colour-law: committed */`.
+**UI tokens (required):** colour-law `--strict` on new-design files (see the Colour law section for the full clauses). Legacy pages are reported and do not fail the gate. New-design surface is: shell HTML (`gob-shell` / `gob-focus`, or a page in `gobShell.js` PAGES), `css/gob-*.css` except the tutorial / advanced-topic chrome, the Chapter 7 chrome (`css/office-home.css`, `home-base.css`, `milestone-modal.css`, `season-peak.css`, `trophy-case.css`), the recruiting-hub CSS (`recruiting-spine.css`, `recruiting-dock.css`, `recruiting-signing.css`, `recruiting-results-hub.css`), `js/shared/gob*.js`, and `js/shared/views/**`. `css/gob-tokens.css` is the token source and is not scanned; everything else is legacy. Annotate a legal exception with `/* colour-law: positive-data | committed | saved | reward */`.
+
+`--strict --no-write` (summary only, no `reports/ui-token-audit-*.md`) is a **CI gate** — a sibling job to the migration gates in `.github/workflows/test.yml`. Run it before merge:
 
 ```
-.venv/bin/python scripts/check_ui_tokens.py --strict
+.venv/bin/python scripts/check_ui_tokens.py --strict --no-write
 ```
 
 ## 9. Browse and focus pages
@@ -233,7 +256,7 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 | `team_snapshot.state` | `set_after_camp` until a snapshot exists for a week before the current week. Otherwise `ready`. |
 | `team_snapshot.chemistry` | `{value, max: 25}` from stored team chemistry. |
 | `team_snapshot.attitude` | Counts in the EM buckets 0–19, 20–39, 40–59, 60–79, 80+. |
-| `team_snapshot.moved_most` | Up to two `{measure, value, delta}` rows. Delta is this week's stored measure minus the previous snapshot. Empty until a prior snapshot exists. |
+| `team_snapshot.moved_most` | Up to two `{measure, value, delta}` rows. Delta is this week's stored measure minus the previous snapshot. Empty until a prior snapshot exists. The server ranks over all stored measures, so a `momentum_score` row can appear here; the Office drops it in `officeHome.js` before the top-two render, so Momentum is never shown (matching Team Attributes and the Training Report Team Report). |
 | `result` | Last completed user game, or null. Scores, site (`home` / `away`), `neutral` (always null; no stored neutral site), opponent rank, round name for weeks 27–34, POTG on a win or the user's highest-PTS player on a loss, box-score path and params. `headline` only when a `season_news` story stores this game's id. `result_key` is the game id: a stable id per result so the weekly entrance plays once. "Seen" is the client's own local state; the server stores none. |
 | `next_game` | Opponent, rank, record, conference, site, week, top scorer, top rebounder. `conference_position` and `conference_size` are the opponent's 1-based place in its own conference and the number of teams there, using the Standings order. Both are null when the opponent cannot be placed. `date`, `neutral`, `projected_starting_five`, `seeds`, `stakes`, and `team_rt` are null. |
 | `conference_standings` | The user's conference in Standings order. `conference` is the conference number, `region` is the stored region or the letter derived from that number (1–2 = A … 15–16 = H), and `rows` are `{team_id, team_name, wins, losses, differential, position, is_user}`. Ties follow `standings_display_sort_key` (wins, then point differential) and match `GET /franchise/standings` for the same results. Null when the user has no conference. |
@@ -471,21 +494,21 @@ No stored tip time, neutral site, or hometown. Those stay off the page.
 
 `updated_after_week` is the closed week of the latest earlier office snapshot, or null. The line "Updated after Week N" renders only when it is set.
 
-There are always twelve rows — every stored team measure — in family order. Character: Chemistry, Fight, Discipline, Momentum (`momentum_score`). On the floor: Offense (`offensive_efficiency`), Defense (`defensive_efficiency`), P/T Offense (`pt_opp_modifier`), P/T Defense (`pt_efficiency`), Fast Break (`fb_efficiency`), Fast Break Defense (`fb_opp_modifier`), Shooting (`shot_threshold`), Rebounding (`rebound_modifier`). A missing stored value is still a row, with `value` null.
+There are eleven rows in family order. Character: Chemistry, Fight, Discipline. On the floor: Offense (`offensive_efficiency`), Defense (`defensive_efficiency`), P/T Offense (`pt_opp_modifier`), P/T Defense (`pt_efficiency`), Fast Break (`fb_efficiency`), Fast Break Defense (`fb_opp_modifier`), Shooting (`shot_threshold`), Rebounding (`rebound_modifier`). Momentum (`momentum_score`) is deliberately not one of them: the API `measures[]` list omits it (`_MEASURE_FAMILIES` in `BackEnd/utils/office_digest.py`; `test_team_attribute_measures.py`), and it swings game to game rather than accumulating, so a league place and a week-on-week arrow would read as noise. It stays in the stored weekly snapshot only. A missing stored value is still a row, with `value` null.
 
 `pt_efficiency` is your own press and trap execution, so it reads as P/T Defense. `pt_opp_modifier` is working through the opponent's press, so it reads as P/T Offense. The radar's axis labels use the same words.
 
 | Field | Meaning |
 |---|---|
 | `family`, `family_label` | `character` / Character, or `floor` / On the floor. |
-| `key`, `label` | The twelve measures and the labels above. |
+| `key`, `label` | The eleven measures and the labels above. |
 | `value` | The stored number for this week. Null when the team has no stored value. The zero-fill on `team_attributes` does not apply here. The page shows it for Chemistry as `19/25`, and as a signed number on the eight measures that carry `signed_scale`. |
 | `scale_max` | 25 for Chemistry. Null for the others. |
-| `signed_scale` | 20 on the eight trained and compounding measures that `Team_Attribute_System.md` documents at −20…+20: Fight, Discipline, Offense, Defense, P/T Offense, P/T Defense, Fast Break, Fast Break Defense. Null on the other four. Only a row with `signed_scale` may be drawn as a ± pill, because only those have a meaningful zero. Chemistry (7…25), Momentum (−10…+10), Shooting (~85…95) and Rebounding (~0.5) stay on the league percentile bar. |
-| `meter_pct` | Chemistry only: `value / 25 × 100`, clamped 0–100. Null when Chemistry has no value, and null on the other eleven. The bar does not read this. |
+| `signed_scale` | 20 on the eight trained and compounding measures that `Team_Attribute_System.md` documents at −20…+20: Fight, Discipline, Offense, Defense, P/T Offense, P/T Defense, Fast Break, Fast Break Defense. Null on the other three. Only a row with `signed_scale` may be drawn as a ± pill, because only those have a meaningful zero. Chemistry (7…25), Shooting (~85…95) and Rebounding (~0.5) stay on the league percentile bar. |
+| `meter_pct` | Chemistry only: `value / 25 × 100`, clamped 0–100. Null when Chemistry has no value, and null on the other ten. The bar does not read this. |
 | `delta` | Change in the stored value since the user team's snapshot. Null when there is no prior value. The page does not show this chip. |
 | `description` | Null until a sentence is stored. |
-| `direction` | `higher_better` for all eleven others. `lower_better` for Shooting only: a make is `shot_score >= shot_threshold`. |
+| `direction` | `higher_better` for all ten others. `lower_better` for Shooting only: a make is `shot_score >= shot_threshold`. |
 | `rank` | 1 is the best end of `direction`. Ties share a place and the next place skips (`1, 2, 2, 4`). Null when `value` is null. |
 | `rank_of` | How many teams in the franchise have a stored value. A missing value is not counted. |
 | `percentile` | 0–100. 100 is the best end, including a tie for best. 0 is the worst end, including a tie for worst. The bar fills to this. `100 × (teams strictly worse) / (teams strictly better + teams strictly worse)`. One team, or a measure where every stored value is equal, is 100. |
@@ -494,6 +517,45 @@ There are always twelve rows — every stored team measure — in family order. 
 
 The place reads `34th of 128`. A null rank reads an em dash and the bar is empty. The bar fill is the neutral DIFF white, not navy.
 
-The view is the radar over a grid of four columns by three rows. The radar is `franchise-command-center.js::buildTeamMeasuresRadarMarkup` at its ±20 scale — call it, never write a second one. The grid pairs a measure with its opposite down each column: Offense/Defense, P/T Offense/P/T Defense, Fast Break/Fast Break Defense, Shooting/Rebounding, with the four character measures on the bottom row. Each cell is the name, the place, the gauge, the value and the movement.
+The view is the radar over a grid of four columns by three rows. The radar is `franchise-command-center.js::buildTeamMeasuresRadarMarkup` at its ±20 scale — call it, never write a second one. The grid pairs a measure with its opposite down each column: Offense/Defense, P/T Offense/P/T Defense, Fast Break/Fast Break Defense, Shooting/Rebounding, with the three character measures (Chemistry, Fight, Discipline) on the bottom row. Each cell is the name, the place, the gauge, the value and the movement.
 
 The ± pill is the shared `.gob .dv` atom in `gob-components.css`, the same one Prep › Scouting uses: zero in the centre, filling right for positive and left for negative, with `--v` as the magnitude 0–1 and `.neg` flipping the fill.
+
+## 16. Cross-cutting rules
+
+Durable rules that span sections, current on `develop`.
+
+### One measure vocabulary; no Momentum in team-measure surfaces
+
+The franchise team-measure surfaces show the same eleven measures and the same labels: Team Attributes (`team-attributes-view`), the Training Report Team Report (`training-report.js`), and the Office "Moved most" card. Momentum (`momentum_score`) is not one of them — the API `measures[]` list omits it, the Training Report dropped it from `attrOrder`, and the Office filters it out of `moved_most`. `momentum_score` is still stored, still on the weekly snapshot, and still a live in-game player/box-score metric; it is only kept off these three team-measure displays. `pt_efficiency` reads as P/T Defense and `pt_opp_modifier` as P/T Offense everywhere, including the radar axes.
+
+### Team names are shown as stored
+
+The display string is `teams.name` as stored. The stored key shows unchanged when no team document exists. Nothing is title-cased, hyphen-stripped, or exception-listed (e.g. `IDA`, `Bentley-Truman`, `Seattle AAA` render as stored). Do not reintroduce a `TEAM_NAMES` map or a `titleCaseName` helper. (A few legacy call sites — `common.js` `formatTeamName`, `set-lineup.js`, `playbook-report.js` — still reformat and are pending cleanup.)
+
+### Client API helpers: logout and rate-limited week routes
+
+- **Logout** goes through `API_CONFIG.logout()` (`js/config/api-config.js`). It reads the auth header first, POSTs `/api/auth/logout` with the bearer token and `keepalive: true` (so the server revokes the session), then clears `auth_token` / `auth_user`, and never throws. The three callers (`mode-select.js`, `gobSettings.js`, `authBarInit.js`) call it and keep their own redirect. Desktop/offline: `/api/auth` is always-remote, so with no server the fetch rejects and the local clear still runs — no crash. Do not send a bare `POST /api/auth/logout`.
+- **Rate-limited week routes** go through `API_CONFIG.fetchWithRateLimitRetry`. On a 429 it reads `Retry-After` (seconds; default 6), waits, and re-sends the same request up to 5 times, then returns the last 429 to the caller's existing `if (!res.ok)` path. A retried 429 surfaces no error UI; a busy/disabled Advance button just stays put during the wait. The four call sites are `complete-week/phase-a`, `complete-week/phase-b`, `complete-week/start-cpu-sims`, and `finish-season`. Desktop loopback is exempt from the limiter (`user_rate_limit` early-returns on `is_loopback()`), so a single desktop player cannot hit it.
+
+### Scouting reads the opponent from FCC data
+
+Prep › Scouting resolves the upcoming opponent from the already-loaded FCC payload (`commandCenterTopDataCache.next_game_summary`, else `office_digest.next_game`; via `GOBFccPrep.peekUpcomingOpponent`, cached per `franchiseId:week`). It must **never** call `POST /franchise/play-next-game` as a lookup: that route is not side-effect free — in EOS weeks 27–34 it runs `_maybe_reconcile_region_for_eos`, which can write `franchise_doc["region_tournaments"]`. The backend handler is intentionally unchanged; the fix is to not call it for reads.
+
+### Prep views are in-app modules; the embed bridge is retired
+
+Training, Training Report, Game Plan, Playbooks, and Scouting are in-app module views: each is an ES module with `init(root, options)` / `teardown` / `revalidate` / `shellHtml()`, mounted by `gobViews.js`, with no `DOMContentLoaded` auto-start. There is no `?embed=1` fetch, no `DOMParser`, and no IIFE. `prepEmbed.js` is deleted; its shared helpers (`ensureCss`, `loadScript`, `ensureFranchiseMode`) live in `js/shared/views/viewLoader.js`, and `ensureFranchiseMode` reads `FranchiseContext` only (no `URLSearchParams` fallback). The standalone files still redirect except `mode=tutorial` (and `game-plan.html` `resume_from_timeout=true`, which stays focus).
+
+### Surfaces outside `FrontEnd/static`
+
+Some player-facing surfaces are not franchise web pages and are **not yet on the design system**: the Electron shell (window background `#0b1020`, default icon and menu, `desktop/splash.html`, `desktop/error.html`, native error dialogs), the live-game Phaser/court overlays (DON'T restyle without a sim-safe pass), and error/ops pages — there is no branded 404, and `maintenance.html` is off-system. Inventory and screenshots: `reports/coverage-gap-check-2026-09-30.md`.
+
+### franchise-command-center.css freeze — pending
+
+The plan to freeze `FrontEnd/static/franchise-command-center.css` (peel dead `tab-content` rules; new views never add to it) is on branch `chore/fcc-css-peel` and has **not merged to develop** as of this sync. Treat it as pending; this note becomes a rule once that branch lands. **(Jamie: confirm when to flip.)**
+
+### Lessons
+
+- **Never reuse a shell class name in page markup.** Once a page is `html.gob-shell`, shell rules for `.rail`, `.top`, `.main`, `.card`, `.nm`, `.lnk`, etc. apply to any element that borrows the name (e.g. a Your-Orders aside on `class="rail"` got hidden by `.gob-shell.gob-focus .rail { display:none }`). Give page components their own class (`.srail`, not `.rail`).
+- **Guards assert computed styles, not class names.** Colour/law and before/after guards read the computed `backgroundColor` / `borderColor` / `borderRadius` off the element, so a rename or a token swap can't fake a pass.
+- **Capture BEFORE screenshots from develop or a served frame.** Take the before shot from the develop build (behind the feature's `*_BEFORE=1` flag or the old embed bridge restored just for the shot) or from the handoff frame served so its CSS loads — never from the half-migrated working tree. Restore any regenerated tracked `reports/*` images with `git checkout -- reports/` before committing.

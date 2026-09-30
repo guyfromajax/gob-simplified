@@ -88,12 +88,14 @@ Code must work on both Mongo (hosted) and SQLite (desktop).
 - `scratch_*.py`: never commit new ones, and never delete existing ones (some are live tools, e.g. the equiv-v3 runner).
 - Logs (`*.log`), `tmp/`, `.arm/`, `.DS_Store`, local DB files (`*.sqlite` other than the `base_league`/`catalog` bundles), large binaries, `.env*` (except `.env.example`).
 - Reports under `reports/`.
+- **Commit by explicit path (`git add <path>`), never `git add .` / `-A` / `-u`.** In particular, never stage `FrontEnd/static/sounds/` — the audio files show as modified (Git-LFS content vs pointers) in a normal tree and must not be committed.
 
 ## Frontend
 
 - UI, colour and live-gameplay screen rules: [_documentation_master/00_Agent_Docs/CLAUDE.md](_documentation_master/00_Agent_Docs/CLAUDE.md). Follow it; don't restate or re-map the RT/energy/momentum ramps.
 - Shell, navigation and settings construction: [UX_System.md](_documentation_master/11_Design_Systems/UX_System.md).
 - Don't touch frontend/UX files unless the task says so.
+- **If you change or rely on a UI rule that isn't in [UX_System.md](_documentation_master/11_Design_Systems/UX_System.md), update UX_System in the same commit.** Colour law, SFX routing, the token-checker new-design surface, and the shell/nav/section map all live there.
 
 ## Further reading
 
