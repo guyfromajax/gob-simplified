@@ -52,6 +52,14 @@ REF_NAME_RE = re.compile(r"^(equiv_v3_(?:reference|loose_baseline))_([0-9a-f]{7,
 # reference selection
 # ---------------------------------------------------------------------------
 
+def _rel(path: Path) -> str:
+    """Repo-relative when inside the repo (the pointer's normal form), else absolute."""
+    try:
+        return str(Path(path).resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        return str(Path(path).resolve())
+
+
 def current_reference_path() -> Path:
     for line in POINTER.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -221,7 +229,7 @@ def cmd_check(args) -> int:
         print("nothing to run (check --seeds / --cells / --arms)")
         return 64
     seeds = sorted({t[2] for t in tasks})
-    print(f"equiv-v3 check against {ref_path.relative_to(REPO_ROOT)} (tree {reference.get('sha')})")
+    print(f"equiv-v3 check against {_rel(ref_path)} (tree {reference.get('sha')})")
     print(f"  {'full' if full else 'subset'}: {len(tasks)} games = cells "
           f"{sorted({A.cell_name(t[0]) for t in tasks}, reverse=True)} x arms "
           f"{[a for a in A.ARM_ORDER if any(t[1] == a for t in tasks)]} x seeds {A.format_seeds(seeds)}"
@@ -304,11 +312,11 @@ def cmd_recut(args) -> int:
                 for seed, row in rows.items()
                 if A.cells_to_per_seed(old["cells"]).get(key, {}).get(seed) != row)
     if old_path == current_reference_path():
-        POINTER.write_text(str(new_path.relative_to(REPO_ROOT)) + "\n")
-        print(f"pointer updated: {POINTER.relative_to(REPO_ROOT)} -> {new_path.name}")
-    print(f"wrote {new_path.relative_to(REPO_ROOT)} ({moved} of {len(tasks)} rows differ from {old_path.name})")
+        POINTER.write_text(_rel(new_path) + "\n")
+        print(f"pointer updated: {_rel(POINTER)} -> {new_path.name}")
+    print(f"wrote {_rel(new_path)} ({moved} of {len(tasks)} rows differ from {old_path.name})")
     print("next: update 'flags' in the new file if a flag flipped, move the old file to 'Superseded' in")
-    print(f"      {(REFERENCES_DIR / 'README.md').relative_to(REPO_ROOT)} with the switch that reproduces it, then commit:")
+    print(f"      {_rel(REFERENCES_DIR / 'README.md')} with the switch that reproduces it, then commit:")
     print(f'      git commit -m "equiv re-cut: {args.reason.strip()}"')
     return 0
 
