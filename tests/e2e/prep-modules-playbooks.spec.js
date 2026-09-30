@@ -227,12 +227,19 @@ test('tutorial 1280 shot', async ({ page }) => {
 test('the view does not fetch the old embed HTML', async ({ page }) => {
   test.skip(CAPTURE_BEFORE, 'before capture only');
   const embeds = [];
+  const loaders = [];
+  const bridges = [];
   page.on('request', (req) => {
-    if (req.url().includes('playbooks.html')) embeds.push(req.url());
+    const url = req.url();
+    if (url.includes('playbooks.html')) embeds.push(url);
+    if (url.includes('viewLoader.js')) loaders.push(url);
+    if (url.includes('prepEmbed.js')) bridges.push(url);
   });
   await page.setViewportSize({ width: 1280, height: 720 });
   await openInApp(page);
   expect(embeds).toEqual([]);
+  expect(bridges).toEqual([]);
+  expect(loaders.length).toBeGreaterThan(0);
   const clash = await page.evaluate(() => {
     const host = document.getElementById('playbooks-view');
     const dupes = [];

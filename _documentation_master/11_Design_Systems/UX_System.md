@@ -128,9 +128,9 @@ The shared tab module also serves any other command center that calls `initComma
 | Team | Team Attributes | `team-attributes-view` (in-page module view). `?tab=team-stats-tab` opens this view. The old Team Measures panel stays in the page and is no longer opened by the shell. |
 | Team | Schedule | `team-schedule-view` (in-page module view). `?tab=schedule-tab` opens this view. Four week columns (1–7, 8–14, 15–21, 22–26), with the three tournament labels under 22–26 and the user's EOS games listed under each label when present. Two columns below 1100px. The bracket stays on League › Tournament. |
 | Team | Practice Squad | `practice-squad-view` (in-page module view). The regional practice-squad league. `practice-squad-standings.html` and `practice-squad-bracket.html` redirect here. |
-| Prep | Training | `training-view` (real module: `training.js` `init(root)`; `training.html` redirects here). The underline tab replaces. `?tab=training-tab` opens this view. `training.html` with `mode=tutorial` or leftover `embed=1` does not redirect and stays on the file. The Training Report is `training-report-view`, a real module (`training-report.js` `init(root)`; `training-report.html` redirects). The FCC summary panel stays in the page and is no longer opened by the shell. |
+| Prep | Training | `training-view` (real module: `training.js` `init(root)`; `training.html` redirects here). The underline tab replaces. `?tab=training-tab` opens this view. `training.html` with `mode=tutorial` does not redirect and stays on the file. The Training Report is `training-report-view`, a real module (`training-report.js` `init(root)`; `training-report.html` redirects). The FCC summary panel stays in the page and is no longer opened by the shell. |
 | Prep | Game Plan | `game-plan-view` (real module: `game-plan.js` `init(root)`; `game-plan.html` redirects here). `?tab=game-plan-tab` opens this view. `game-plan.html` with `resume_from_timeout=true` or `mode=tutorial` does not redirect and stays focus, with no rail and no underline row. |
-| Prep | Playbooks | `playbooks-view` (real module: `playbooks.js` `init(root)`; `playbooks.html` redirects here). `?tab=playbooks-tab` opens this view. `playbooks.html` with `mode=tutorial` does not redirect and stays on the file (browse chrome). `embed=1` is leftover only. |
+| Prep | Playbooks | `playbooks-view` (real module: `playbooks.js` `init(root)`; `playbooks.html` redirects here). `?tab=playbooks-tab` opens this view. `playbooks.html` with `mode=tutorial` does not redirect and stays on the file (browse chrome). |
 | Prep | Scouting Report | `scouting-view` (in-page module view). The underline tab replaces. |
 | League | Standings | `standings-view` (in-page module view; `standings.html` redirects here and keeps `franchise_id`, `team_id`, and return params). `?tab=standings-tab` still opens the old panel. |
 | League | Rankings | `rankings-view` (in-page module view; `rankings.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
@@ -208,10 +208,10 @@ env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HO
 | player-detail.html | redirect to `?tab=player-view` unless `recruit_id` or `mode=recruit` | return context | none |
 | team-roster-view.html | redirect to `roster-view`, or `team-view` when `roster_team_id` is set | Team or League | Roster or the team drill-in |
 | box-score.html | browse when `return_url` is set; otherwise focus | League when browse | none |
-| training.html | browse | Prep | Training (`training-view`; the file redirects except `mode=tutorial`; same `init(root)` as the in-app module; `embed=1` is leftover) |
-| training-report.html | browse | Prep | Training Report (`training-report-view`; the file redirects; `embed=1` is leftover and calls the same `init`) |
+| training.html | browse | Prep | Training (`training-view`; the file redirects except `mode=tutorial`; same `init(root)` as the in-app module) |
+| training-report.html | browse | Prep | Training Report (`training-report-view`; the file redirects) |
 | game-plan.html | browse, or focus when `resume_from_timeout=true` or `mode=tutorial` | Prep | Game Plan (`game-plan-view`; the file redirects except in focus; same `init(root)` as the in-app module) |
-| playbooks.html | browse | Prep | Playbooks (`playbooks-view`; the file redirects except `mode=tutorial`; same `init(root)` as the in-app module; `embed=1` is leftover) |
+| playbooks.html | browse | Prep | Playbooks (`playbooks-view`; the file redirects except `mode=tutorial`; same `init(root)` as the in-app module) |
 | set-lineup.html, training-squad-report.html, training-playbooks.html, cut-players.html, playbook-report.html | focus | — | — |
 
 The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` reuses a response the page already requested. Otherwise it fetches that URL once. Record on a browse page uses that same payload: `team_record` when present, otherwise the user team's `W`-`L` in `rankings`.

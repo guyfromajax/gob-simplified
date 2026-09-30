@@ -5,9 +5,7 @@
     (function () {
       try {
         var q = new URLSearchParams(location.search);
-        if (q.get('embed') === '1') return;
         if (q.get('resume_from_timeout') === 'true' || q.get('mode') === 'tutorial') return;
-        q.delete('embed');
         q.set('tab', 'game-plan-view');
         if (!q.get('from')) q.set('from', 'command_center');
         location.replace('/franchise-command-center.html?' + q.toString());
@@ -302,7 +300,7 @@
       // FranchiseContext (loaded in <head>), not the URL: correct on web and desktop.
       const fc = window.FranchiseContext;
       const ctx = (key) => (fc && typeof fc.get === 'function' ? fc.get(key) : null);
-      if (ctx('resume_from_timeout') === 'true' || ctx('mode') === 'tutorial' || ctx('embed') === '1') {
+      if (ctx('resume_from_timeout') === 'true' || ctx('mode') === 'tutorial') {
         init(document.body);
       }
     } catch (err) { /* redirect already left */ }

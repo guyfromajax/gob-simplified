@@ -95,11 +95,11 @@ Columns follow the brief. "Back" means browser Back returns to where you came fr
 | Team Attributes | `team-attributes-view` | team | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | shell-1, t2-roster (+3) |
 | Team Schedule | `team-schedule-view` | team | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | schedule-views, shell-1 (+3) |
 | Practice Squad | `practice-squad-view` | team | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | practice-squad-view, shell-1b |
-| Training | `training-view` | prep | rail | EMBED BRIDGE (`/training.html?embed=1`) | push | yes | works | works | R | yes | shell-1, shell-1b |
-| Game Plan | `game-plan-view` | prep | sub-tab | EMBED BRIDGE | replace | yes | works | works | R | yes | shell-1, shell-2 (+2) |
-| Playbooks | `playbooks-view` | prep | sub-tab | EMBED BRIDGE | replace | yes | works (jump) | works (jump) | R | yes | shell-1, store-client (+1) |
+| Training | `training-view` | prep | rail | IN-APP VIEW | push | yes | works | works | R | yes | shell-1, shell-1b |
+| Game Plan | `game-plan-view` | prep | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | shell-1, shell-2 (+2) |
+| Playbooks | `playbooks-view` | prep | sub-tab | IN-APP VIEW | replace | yes | works (jump) | works (jump) | R | yes | shell-1, store-client (+1) |
 | Scouting Report | `scouting-view` | prep | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | prep-scouting, shell-1 (+1) |
-| Training Report | `training-report-view` | prep | Office card / after training (via stub) | EMBED BRIDGE | push (stub load) | yes (C) | works | works | R load / C entry | yes | shell-1b |
+| Training Report | `training-report-view` | prep | Office card / after training (via stub) | IN-APP VIEW | push (stub load) | yes (C) | works | works | R load / C entry | yes | shell-1b |
 | Standings | `standings-view` | league | rail | IN-APP VIEW | push | yes | works | works | R | yes | app-router, t1-tables (+5) |
 | Rankings | `rankings-view` | league | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | subtabs, app-router (+3) |
 | Leaders | `leaders-view` | league | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | t1-tables, t3-detail (+2) |
@@ -252,7 +252,7 @@ The desktop screenshots are shown. The online frames have identical shift scores
 | Screen(s) | Today | Warm / cold median | Recommendation |
 |---|---|---|---|
 | Team, Prep, League and News module views | IN-APP VIEW | 3–43 / 12–154 ms | Keep in-app. Nothing is near budget. |
-| Training, Game Plan, Playbooks, Training Report | EMBED BRIDGE | 5–12 / 22–100 ms | Keep the embeds. Porting them to native views isn't justified by the numbers. Fix the Playbooks skeleton shape. |
+| Training, Game Plan, Playbooks, Training Report | IN-APP VIEW | 5–12 / 22–100 ms (embed-era numbers; modules since 2026-09-29) | Keep in-app. Fix the Playbooks skeleton shape. |
 | Scouting Report | IN-APP VIEW | 39–43 / 152–154 ms | Keep in-app. Render from cache on reopen instead of clearing the panel. |
 | Player view | IN-APP VIEW (push) | 5 / 170 ms online | Keep in-app. Fix desktop (broken). |
 | Team view | IN-APP VIEW behind a page reload | **91–92** / 130–132 ms | Convert to an in-app push (`GOBViews.open`), like the player view. Expect about 5 ms warm. |
