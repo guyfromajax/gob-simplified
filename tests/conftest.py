@@ -65,6 +65,17 @@ async def _test_user():
 
 
 @pytest.fixture(autouse=True)
+def reset_cpu_pool_shutdown_flag():
+    """The app's shutdown hook sets a process-global 'shutting down' flag (so a
+    deploy stops CPU-week work). A test that enters `with TestClient(app)` runs that
+    hook; later tests using a module-level client never re-run startup, so clear it."""
+    from BackEnd.utils.cpu_week_pool import reset_shutdown_state
+
+    reset_shutdown_state()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def override_auth_for_tests():
     """Provide a fake authenticated user so tests can call protected endpoints."""
     from BackEnd.api.api import app
