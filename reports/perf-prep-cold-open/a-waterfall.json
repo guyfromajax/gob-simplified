@@ -1,0 +1,426 @@
+{
+  "painted": 875,
+  "ctxDump": {
+    "urlFid": "6abce9d34dfe8b47d56c034e",
+    "fcFid": "6abce9d34dfe8b47d56c034e",
+    "fcReady": true
+  },
+  "events": [
+    {
+      "t": 29,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/js/shared/views/scoutingView.js"
+    },
+    {
+      "t": 48,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/js/shared/views/scoutingView.js"
+    },
+    {
+      "t": 49,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/css/prep-v2-scouting.css"
+    },
+    {
+      "t": 49,
+      "kind": "req",
+      "method": "POST",
+      "url": "http://127.0.0.1:8222/franchise/play-next-game"
+    },
+    {
+      "t": 56,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/css/prep-v2-scouting.css"
+    },
+    {
+      "t": 241,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/franchise/training-points?franchise_id=6abce9d34dfe8b47d56c034e"
+    },
+    {
+      "t": 243,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/franchise/league-news?franchise_id=6abce9d34dfe8b47d56c034e"
+    },
+    {
+      "t": 244,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/26e15606-2eca-4616-840a-d14b87174395.png"
+    },
+    {
+      "t": 244,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/6d7625c6-89d1-4d30-98be-367b3e5b26b8.png"
+    },
+    {
+      "t": 244,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/778e8352-eecb-4870-a280-a0eb90222551.png"
+    },
+    {
+      "t": 244,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/da0cf556-b8b9-47d1-91f9-a80595359f4e.png"
+    },
+    {
+      "t": 244,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/131abe35-8f84-41ce-ba4c-154556289954.png"
+    },
+    {
+      "t": 244,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/83608be4-5065-4df6-9276-5e69376c15aa.png"
+    },
+    {
+      "t": 244,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/a699d851-8d4e-4987-936d-293b04a7b1f8.png"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/7acb9670-0995-45e3-8ca8-1c7f8a601f92.png"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/7c10c995-0d1a-4c1b-b4eb-7198ad81c9b2.png"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/0df15c02-a4d1-437b-b102-45f42b25e50b.png"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/af22a37d-79b0-487c-9c1b-270408e3b632.png"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/44096202-0525-4b71-88ec-da475b7cd65a.png"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/d9449124-4ca6-4437-b192-554be3a5d00a.png"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/b17a21bc-790e-4893-82d5-362dd8ec19a2.png"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/560d1d61-4ddb-4ac8-b68b-00181e488c48.png"
+    },
+    {
+      "t": 245,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/franchise/play-next-game"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/franchise/team-data?franchise_id=6abce9d34dfe8b47d56c034e&team_id=69a6fcb68d2c56aa82e48a56"
+    },
+    {
+      "t": 245,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/franchise/scouting-report?franchise_id=6abce9d34dfe8b47d56c034e&team_name=Morristown"
+    },
+    {
+      "t": 274,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/da0cf556-b8b9-47d1-91f9-a80595359f4e.png"
+    },
+    {
+      "t": 274,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/26e15606-2eca-4616-840a-d14b87174395.png"
+    },
+    {
+      "t": 275,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/778e8352-eecb-4870-a280-a0eb90222551.png"
+    },
+    {
+      "t": 275,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/131abe35-8f84-41ce-ba4c-154556289954.png"
+    },
+    {
+      "t": 276,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8222/static/images/players/6d7625c6-89d1-4d30-98be-367b3e5b26b8.png"
+    },
+    {
+      "t": 343,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/franchise/league-news?franchise_id=6abce9d34dfe8b47d56c034e"
+    },
+    {
+      "t": 349,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/franchise/team-data?franchise_id=6abce9d34dfe8b47d56c034e&team_id=69a6fcb68d2c56aa82e48a56"
+    },
+    {
+      "t": 373,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/83608be4-5065-4df6-9276-5e69376c15aa.png"
+    },
+    {
+      "t": 384,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/a699d851-8d4e-4987-936d-293b04a7b1f8.png"
+    },
+    {
+      "t": 387,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/7acb9670-0995-45e3-8ca8-1c7f8a601f92.png"
+    },
+    {
+      "t": 399,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/7c10c995-0d1a-4c1b-b4eb-7198ad81c9b2.png"
+    },
+    {
+      "t": 412,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/0df15c02-a4d1-437b-b102-45f42b25e50b.png"
+    },
+    {
+      "t": 529,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/franchise/scouting-report?franchise_id=6abce9d34dfe8b47d56c034e&team_name=Morristown"
+    },
+    {
+      "t": 544,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/images/teams/morristown/morristown_logo_square.png"
+    },
+    {
+      "t": 544,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8222/static/images/players/af22a37d-79b0-487c-9c1b-270408e3b632.png"
+    },
+    {
+      "t": 548,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/0ebe584c-1baf-41aa-b270-f48549527ecf.png"
+    },
+    {
+      "t": 548,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/3a910b40-f05c-4624-9555-aeb13faf56e6.png"
+    },
+    {
+      "t": 548,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/17694da1-cf52-4934-8755-aaddb23e7cd0.png"
+    },
+    {
+      "t": 548,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/2e0089ee-a3e6-4c2d-8822-170fbbd335ac.png"
+    },
+    {
+      "t": 548,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8222/static/images/players/b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad.png"
+    },
+    {
+      "t": 548,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8222/static/images/players/44096202-0525-4b71-88ec-da475b7cd65a.png"
+    },
+    {
+      "t": 555,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/images/teams/morristown/morristown_logo_square.png"
+    },
+    {
+      "t": 562,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/3a910b40-f05c-4624-9555-aeb13faf56e6.png"
+    },
+    {
+      "t": 563,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/b3fab5a0-9a2e-41f8-89d4-271eaaceb6ad.png"
+    },
+    {
+      "t": 564,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/2e0089ee-a3e6-4c2d-8822-170fbbd335ac.png"
+    },
+    {
+      "t": 564,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/17694da1-cf52-4934-8755-aaddb23e7cd0.png"
+    },
+    {
+      "t": 571,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/0ebe584c-1baf-41aa-b270-f48549527ecf.png"
+    },
+    {
+      "t": 677,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/d9449124-4ca6-4437-b192-554be3a5d00a.png"
+    },
+    {
+      "t": 699,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/b17a21bc-790e-4893-82d5-362dd8ec19a2.png"
+    },
+    {
+      "t": 699,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8222/static/images/players/560d1d61-4ddb-4ac8-b68b-00181e488c48.png"
+    }
+  ],
+  "resources": [
+    {
+      "name": "/scouting-report.css",
+      "start": 4,
+      "dur": 10,
+      "transfer": 8416,
+      "initiator": "link"
+    },
+    {
+      "name": "/css/rt-buckets.css",
+      "start": 4,
+      "dur": 11,
+      "transfer": 989,
+      "initiator": "link"
+    },
+    {
+      "name": "/js/utils/attributeDisplay.js",
+      "start": 5,
+      "dur": 39,
+      "transfer": 2030,
+      "initiator": "script"
+    },
+    {
+      "name": "/js/shared/scoutingReport.js",
+      "start": 5,
+      "dur": 53,
+      "transfer": 20059,
+      "initiator": "script"
+    },
+    {
+      "name": "/js/shared/playerYear.js",
+      "start": 5,
+      "dur": 53,
+      "transfer": 1932,
+      "initiator": "script"
+    },
+    {
+      "name": "/franchise/team-data?franchise_id=6abce9d34dfe8b47d56c034e&team_id=69a6fcb68d2c56aa82e48a54",
+      "start": 193,
+      "dur": 16,
+      "transfer": 21444,
+      "initiator": "fetch"
+    },
+    {
+      "name": "/js/shared/views/prepEmbed.js",
+      "start": 483,
+      "dur": 3,
+      "transfer": 3336,
+      "initiator": "script"
+    },
+    {
+      "name": "/js/shared/views/scoutingView.js",
+      "start": 536,
+      "dur": 20,
+      "transfer": 22924,
+      "initiator": "script"
+    },
+    {
+      "name": "/css/prep-v2-scouting.css",
+      "start": 558,
+      "dur": 11,
+      "transfer": 13459,
+      "initiator": "link"
+    },
+    {
+      "name": "/franchise/play-next-game",
+      "start": 558,
+      "dur": 193,
+      "transfer": 478,
+      "initiator": "fetch"
+    },
+    {
+      "name": "/franchise/team-data?franchise_id=6abce9d34dfe8b47d56c034e&team_id=69a6fcb68d2c56aa82e48a56",
+      "start": 755,
+      "dur": 104,
+      "transfer": 21444,
+      "initiator": "fetch"
+    },
+    {
+      "name": "/franchise/scouting-report?franchise_id=6abce9d34dfe8b47d56c034e&team_name=Morristown",
+      "start": 755,
+      "dur": 284,
+      "transfer": 9755,
+      "initiator": "fetch"
+    }
+  ]
+}
