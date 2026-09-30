@@ -60,7 +60,7 @@ Persisted in `localStorage` under `gob_audio_v1` (`AUDIO_STORAGE_KEY`). The same
 
 `playSfx(name, baseVolume)` plays one named sound on the `sfx` channel. `baseVolume` defaults to `0.7`. It still accepts a raw filename so existing callers keep working. Named catalog: `SFX_SELECT` (`click-tiny.wav`), `SFX_ADVANCE` (`confirm-1-lowervol.wav`), `SFX_COMMIT` (`click-beep.wav`), `STING_WIN` (`sting-win.wav`), `STING_MILESTONE` (`sting-milestone.wav`), `STING_SEASON_PEAK` (`sting-season-peak.wav`). Short UI sounds may overlap. A new sting stops the previous sting. A missing file fails silently (one `console.debug` per name) and must not throw or block a modal or navigation.
 
-One delegated click listener per document (`installSfxHooks(document)`) plays `data-sfx="<name>"` on buttons, links, and `[role="tab"]`. Unknown names are ignored. The top-bar Advance (`#play-now`) uses `data-sfx="SFX_ADVANCE"` and must not also call `playSfx` from its click handler.
+One delegated click listener per document (`installSfxHooks(document)`) plays `data-sfx="<name>"` on buttons, links, and `[role="tab"]`. Unknown names are ignored. The hook skips a disabled control (`disabled`, `aria-disabled="true"`, `.is-disabled`, `.is-dead`) so a dead button never plays a sound. The top-bar Advance (`#play-now`) uses `data-sfx="SFX_ADVANCE"` and must not also call `playSfx` from its click handler.
 
 One sound per action. A control that has a `data-sfx` hook must not also call `playSfx` in its own handler, and vice versa — pick one path (proved in tests with the `window.__gobSfxCalls` spy). `SFX_ADVANCE` is reserved for `#play-now`; a page's own primary action (Submit Training, a tutorial PLAY NOW) uses `SFX_COMMIT`, not Advance. Everything goes through `playSfx` + the settings channels — a caller that constructs `new Audio()` itself bypasses the mute/level settings and is a bug to fix, not a pattern to copy.
 
@@ -242,6 +242,8 @@ env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HO
 | game-plan.html | browse, or focus when `resume_from_timeout=true` or `mode=tutorial` | Prep | Game Plan (`game-plan-view`; the file redirects except in focus; same `init(root)` as the in-app module) |
 | playbooks.html | browse | Prep | Playbooks (`playbooks-view`; the file redirects except `mode=tutorial`; same `init(root)` as the in-app module) |
 | set-lineup.html, training.html, training-report.html, training-squad-report.html, training-playbooks.html, cut-players.html, playbook-report.html | focus | — | — |
+
+A `.gob-modal-overlay` on a focus page stays a viewport layer (`position: fixed`, `--z-modal`) above the focus top bar. `adoptMain` does not move overlays into `#gob-main` — `.gob .main>*` would otherwise drop them to `position: relative` and they would render under the chrome. Week-1 `/cut-players.html` (no `mode=cut`) is practice-squad assignment: the primary button is "Assign Practice Squad". It is disabled until the selected count equals `cut_count`; a disabled control uses the dead treatment (`--text-38`, `not-allowed`) and shows the reason next to it ("Assign N more to the practice squad" / "Remove N"). `mode=cut` (week-35 cuts) is sunset and listed for the dead-code sweep.
 
 The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` reuses a response the page already requested. Otherwise it fetches that URL once. Record on a browse page uses that same payload: `team_record` when present, otherwise the user team's `W`-`L` in `rankings`.
 

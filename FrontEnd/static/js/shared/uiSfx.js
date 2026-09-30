@@ -284,12 +284,21 @@ export function playSfx(name, baseVolume = 0.7) {
   } catch (_err) { /* non-fatal */ }
 }
 
+function isSfxDisabled(el) {
+  if (!el) return true;
+  if (el.disabled) return true;
+  if (el.getAttribute('aria-disabled') === 'true') return true;
+  if (el.classList.contains('is-disabled') || el.classList.contains('is-dead')) return true;
+  return false;
+}
+
 function onSfxClick(ev) {
   const t = ev && ev.target;
   if (!t || typeof t.closest !== 'function') return;
   const el = t.closest('[data-sfx]');
   if (!el || typeof el.matches !== 'function') return;
   if (!el.matches('button, a, [role="tab"]')) return;
+  if (isSfxDisabled(el)) return;
   const hookName = el.getAttribute('data-sfx');
   if (!hookName || !SFX_FILES[hookName.trim()]) return;
   playSfx(hookName.trim());
@@ -305,7 +314,10 @@ export function installSfxHooks(doc) {
     if (hookedFallback) return;
     hookedFallback = true;
   }
-  root.addEventListener('click', onSfxClick);
+  // Capture so a handler that disables the control on the same click
+  // (leave-confirm Save) does not swallow the sound. A button that was
+  // already disabled never dispatches click.
+  root.addEventListener('click', onSfxClick, true);
   preloadFile(SFX_FILES.SFX_ADVANCE, 'SFX_ADVANCE');
   preloadFile(SFX_FILES.SFX_SELECT, 'SFX_SELECT');
   preloadFile(SFX_FILES.SFX_COMMIT, 'SFX_COMMIT');
