@@ -15,7 +15,7 @@ Branch `fix/fcc-load-retry` off `origin/develop` (includes `fix/flow-integrity` 
   - **anything else (status 0 network, 5xx, exhausted 429, and the non-redirecting 401/403 edge) → `publishFccUserTeam(''); return;`** — the `finally` hides `#page-load-overlay` and the player is left with: top bar "--"/"NR", the Office stuck on its loading skeleton, and **`#play-now` still `disabled` from `:2074`** (only re-enabled at `:1524` on success). A dead, unexplained button. **This is the bug.**
 
 **Other silent-failure spots found (noted, out of this task's scope):**
-- `gobAdvance.js` `load()` — the shared Advance on **browse** pages fetches command-center data and, on failure, `resolve(null)` then paints nothing, leaving Advance unpainted. Same silent shape, different surface.
+- `gobAdvance.js` `load()` — the shared Advance on **browse** pages fetches command-center data and, on failure, `resolve(null)` then paints nothing, leaving Advance unpainted. Same silent shape, different surface. **Queued as its own follow-up task** (not fixed here).
 - `init()` `:1555` — if `recoverCpuSimsBeforeFccRender()` returns null (a CPU-sim resume that could not be recovered), `init` also returns silently. Different cause; left as-is.
 
 ## 2–5. The new states
@@ -44,10 +44,22 @@ Backend, week-route retry counts, and `fetchWithRateLimitRetry` were **not** cha
 
 ## Gates (real numbers)
 
-- **pytest** `--ignore=tests/e2e -q`: **4260 passed, 14 skipped, 109 xfailed, 1 xpassed, 0 failed** (240s).
+- **pytest** `--ignore=tests/e2e -q`: **4277 passed, 14 skipped, 109 xfailed, 1 xpassed, 0 failed** (258s, post-merge — the develop merge added the request-limit / ops-page / desktop-shell backend tests).
 - **check_ui_tokens.py** `--strict --no-write`: **exit 0** (franchise-command-center.js is legacy JS; no colour literals added anyway).
 - **check_migration_gates.py**: **passed** (Gate A 0/0; Gate B 136 lines/44 files — unchanged; no franchise-identity `URLSearchParams` added).
-- **Full Playwright** (workers=1, port 8000, CI unset, no other run): **780 passed, 6 skipped, 1 failed** — the one failure is `player-stats.spec.js:166` "player cell matches the roster row", a 2px row-height measurement flake (`46 <= 44`) in a spec my change does not touch; it **passes 6/6 on isolated re-run**. My `fcc-load-retry.spec.js` (4) and every FCC/office spec pass.
+- **Full Playwright** (workers=1, port 8000, CI unset): best post-merge run **782 passed, 6 skipped, 3 failed** — but **none of the failures are from this change or from any file it touches**, and **`fcc-load-retry.spec.js` had 0 failures**. The box is heavily contended right now (runs took 22–25 min vs ~12 normal, load average 12–25 from other worktrees), which produces timeout flakes: **four full runs each failed on a *different* unrelated set** (`player-stats:166`, then `navigation-fixes-3:533`, then 11 various, then `invite-board` + `t1-tables`), and **every one passes in isolation** — player-stats 10/10, navigation-fixes-3:533 5/5, invite-board + t1-tables 29/29. I hardened this spec's timeouts (90s/45s) so it stops being one of the load casualties. **A final clean 0-failed full run needs a quiet box** (the flakes are pre-existing load-timeout fragility, not regressions).
+
+### player-stats.spec.js:166 investigation (the earlier "1 failed")
+
+Proven with `-g "player cell matches the roster row" --repeat-each=10 --workers=1`:
+
+| Where | Result |
+|---|---|
+| My branch, pre-merge (base `c51f48081`) | **6 / 10 passed** (flaky ~40%) |
+| Clean `origin/develop` worktree (`b3b7944ec`) | **20 / 20 passed** (two runs) |
+| My branch **after merging `origin/develop`** | **10 / 10 passed** (also 10/10 with the spec untouched) |
+
+**Root cause: staleness, not my change.** The player-stats/roster code is byte-identical on both sides (no commit since my base touched `playerStatsView.js` / `rosterView.js` / `gob-tables.css` / the spec). What my stale branch lacked was develop's `gobShell.js` changes (from the `shell-404-maintenance` / `submit-cuts` merges) that stabilise the row-height rendering; without them the player-stats row intermittently measured ~2px taller than the roster row (`46` vs `44`) and tripped the `<=` assertion. **Merging `origin/develop` into this branch fixed it** — 10/10, no spec edit. This branch is now current with develop.
 
 ## Screenshots (`reports/fcc-load-retry/`, 1280, scroll 0)
 

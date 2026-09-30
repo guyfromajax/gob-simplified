@@ -70,13 +70,13 @@ async function gotoFcc(page) {
 
 test.describe('FCC season-load failure + retry', () => {
   test('every attempt fails → card, disabled Advance with reason, no sound', async ({ page }) => {
-    test.setTimeout(45000);
+    test.setTimeout(90000);
     await stubAuth(page);
     await installFcc(page, (route) => fail(route, 500));
     await gotoFcc(page);
 
     const card = page.locator('#office-root .gob-view-error');
-    await expect(card).toBeVisible({ timeout: 20000 });
+    await expect(card).toBeVisible({ timeout: 45000 });
     await expect(card).toContainText("Couldn't load your season");
     await expect(card).toContainText('Server error.');
     await expect(page.locator('#office-root .gob-view-retry')).toBeVisible();
@@ -97,20 +97,20 @@ test.describe('FCC season-load failure + retry', () => {
   });
 
   test('Retry after failure re-loads: Office renders, Advance enables', async ({ page }) => {
-    test.setTimeout(45000);
+    test.setTimeout(90000);
     await stubAuth(page);
     let failing = true;
     await installFcc(page, (route) => (failing ? fail(route, 0) : ok(route)));
     await gotoFcc(page);
 
-    await expect(page.locator('#office-root .gob-view-error')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('#office-root .gob-view-error')).toBeVisible({ timeout: 45000 });
     // "Connection lost." for a network-style failure (status 0).
     await expect(page.locator('#office-root .gob-view-error')).toContainText('Connection lost.');
 
     failing = false;
     await page.locator('#office-root .gob-view-retry').click();
 
-    await expect(page.locator('#office-root .gob-view-error')).toHaveCount(0, { timeout: 15000 });
+    await expect(page.locator('#office-root .gob-view-error')).toHaveCount(0, { timeout: 45000 });
     await expect(page.locator('#office-root')).not.toHaveAttribute('data-office-state', 'error');
     const advance = page.locator('#play-now');
     await expect(advance).toBeEnabled();
@@ -118,23 +118,23 @@ test.describe('FCC season-load failure + retry', () => {
   });
 
   test('429 then 200 loads normally, no error card', async ({ page }) => {
-    test.setTimeout(45000);
+    test.setTimeout(90000);
     await stubAuth(page);
     await installFcc(page, (route, n) => (n === 1 ? fail(route, 429) : ok(route)));
     await gotoFcc(page);
 
-    await expect(page.locator('#play-now')).toBeEnabled({ timeout: 20000 });
+    await expect(page.locator('#play-now')).toBeEnabled({ timeout: 45000 });
     await expect(page.locator('#office-root .gob-view-error')).toHaveCount(0);
   });
 
   test('desktop profile: engine down shows the same card', async ({ page }) => {
-    test.setTimeout(45000);
+    test.setTimeout(90000);
     await stubAuth(page);
     await page.addInitScript(() => { window.GOB_BUILD_PROFILE = 'desktop'; });
     await installFcc(page, (route) => fail(route, 0)); // engine unreachable → network error
     await gotoFcc(page);
 
-    await expect(page.locator('#office-root .gob-view-error')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('#office-root .gob-view-error')).toBeVisible({ timeout: 45000 });
     await expect(page.locator('#office-root .gob-view-error')).toContainText("Couldn't load your season");
     await expect(page.locator('#play-now')).toBeDisabled();
   });
