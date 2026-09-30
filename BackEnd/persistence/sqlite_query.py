@@ -256,6 +256,17 @@ def _match_field(doc: dict[str, Any], path: str, condition: Any) -> bool:
     return values_equal(actual, condition)
 
 
+def _pull_matches(item: Any, value: Any) -> bool:
+    """Mongo $pull: a dict spec is a query on the element, not exact equality."""
+    if isinstance(value, dict):
+        if any(str(key).startswith("$") for key in value):
+            return _match_field({"_": item}, "_", value)
+        if isinstance(item, dict):
+            return match_query(item, value)
+        return False
+    return values_equal(item, value)
+
+
 def apply_update(doc: dict[str, Any], update: dict[str, Any], *, inserting: bool = False) -> dict[str, Any]:
     if not update:
         return doc
@@ -304,7 +315,11 @@ def apply_update(doc: dict[str, Any], update: dict[str, Any], *, inserting: bool
                 current = get_path(doc, path) if has_path(doc, path) else None
                 if not isinstance(current, list):
                     continue
-                set_path(doc, path, [item for item in current if not values_equal(item, value)])
+                set_path(
+                    doc,
+                    path,
+                    [item for item in current if not _pull_matches(item, value)],
+                )
         else:
             raise SqliteUnsupportedOperator(f"Unsupported update operator {op!r}")
     return doc

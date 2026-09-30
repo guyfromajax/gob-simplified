@@ -13,8 +13,10 @@
  *                              that have a Box Score button)
  *
  *   processPendingMoments(franchiseId, moments, options) -> Promise<void>
- *     Show each moment in sequence; clears each one server-side after the user
- *     dismisses via the action button. Backdrop click + ESC do NOT dismiss.
+ *     Show each moment in sequence; consume each id on the server as soon as
+ *     the takeover mounts (keepalive fetch) so Box score / rail / reload /
+ *     tab close cannot re-queue the same moment. Backdrop click + ESC do NOT
+ *     dismiss the overlay.
  */
 (function () {
   'use strict';
@@ -773,27 +775,43 @@
     });
   }
 
-  async function dismissOnServer(franchiseId, momentId) {
-    if (!franchiseId || !momentId) return;
-    if (typeof window === 'undefined' || typeof fetch !== 'function') return;
-    if (typeof window.API_CONFIG === 'undefined' || !window.API_CONFIG.buildUrl) return;
-    try {
-      await fetch(window.API_CONFIG.buildUrl('/franchise/championship-moments/dismiss'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(window.API_CONFIG.getAuthHeaders ? window.API_CONFIG.getAuthHeaders() : {}),
-        },
-        body: JSON.stringify({ franchise_id: franchiseId, moment_id: momentId }),
-      });
-    } catch (err) {
-      console.warn('[ChampionshipMoments] dismiss request failed:', err);
+  function dismissOnServer(franchiseId, momentId) {
+    if (!franchiseId || !momentId) return Promise.resolve();
+    if (typeof window === 'undefined' || typeof fetch !== 'function') {
+      return Promise.resolve();
     }
+    var url = '/franchise/championship-moments/dismiss';
+    var headers = { 'Content-Type': 'application/json' };
+    try {
+      if (window.API_CONFIG && typeof window.API_CONFIG.buildUrl === 'function') {
+        url = window.API_CONFIG.buildUrl('/franchise/championship-moments/dismiss');
+      }
+      if (window.API_CONFIG && typeof window.API_CONFIG.getAuthHeaders === 'function') {
+        Object.assign(headers, window.API_CONFIG.getAuthHeaders());
+      }
+    } catch (e) { /* same-origin fallback */ }
+    return fetch(url, {
+      method: 'POST',
+      headers: headers,
+      credentials: 'include',
+      keepalive: true,
+      body: JSON.stringify({ franchise_id: franchiseId, moment_id: momentId }),
+    }).catch(function (err) {
+      console.warn('[ChampionshipMoments] dismiss request failed:', err);
+    });
+  }
+
+  function consumeMoments(franchiseId, moments) {
+    if (!Array.isArray(moments) || !moments.length) return Promise.resolve();
+    return Promise.all(moments.map(function (moment) {
+      return dismissOnServer(franchiseId, moment && moment.id);
+    }));
   }
 
   async function processPendingMoments(franchiseId, moments, options) {
     if (!Array.isArray(moments) || !moments.length) return;
-    // Several championships in one visit → one .pk takeover, then consume each id.
+    // Consume on mount so Box score / rail / reload cannot re-show the same ids.
+    var consume = consumeMoments(franchiseId, moments);
     if (window.SeasonPeak && typeof window.SeasonPeak.showTitle === 'function') {
       await window.SeasonPeak.showTitle({
         moments: moments,
@@ -803,10 +821,7 @@
         boxScoreUrlBuilder: options && options.boxScoreUrlBuilder,
         boxScoreUrl: options && options.boxScoreUrl,
       });
-      for (const moment of moments) {
-        // eslint-disable-next-line no-await-in-loop
-        await dismissOnServer(franchiseId, moment.id);
-      }
+      await consume;
       return;
     }
     for (const moment of moments) {
@@ -814,9 +829,8 @@
       // For "primary" action we navigate away; navigation kills the loop naturally.
       // eslint-disable-next-line no-await-in-loop
       await showMoment(moment, options);
-      // eslint-disable-next-line no-await-in-loop
-      await dismissOnServer(franchiseId, moment.id);
     }
+    await consume;
   }
 
   window.ChampionshipMoments = {
