@@ -1,0 +1,183 @@
+{
+  "status": 200,
+  "body": {
+    "player_id": "26e15606-2eca-4616-840a-d14b87174395",
+    "name": "Roger Henrich",
+    "team_id": "69a6fcb68d2c56aa82e48a54",
+    "team_name": "Lancaster",
+    "team_primary_color": "#d24a1b",
+    "position": "C",
+    "year": "SR",
+    "height_in": 84,
+    "weight": 268,
+    "jersey": 50,
+    "is_user_team": true,
+    "rt": 99,
+    "potential": 113,
+    "attributes": [
+      {
+        "id": "offense",
+        "label": "Offense",
+        "attrs": [
+          {
+            "attr": "SC",
+            "raw": 96,
+            "display": 9
+          },
+          {
+            "attr": "SH",
+            "raw": 11,
+            "display": 1
+          }
+        ]
+      },
+      {
+        "id": "defense",
+        "label": "Defense",
+        "attrs": [
+          {
+            "attr": "ID",
+            "raw": 120,
+            "display": 12
+          },
+          {
+            "attr": "OD",
+            "raw": 38,
+            "display": 3
+          }
+        ]
+      },
+      {
+        "id": "skills",
+        "label": "Skills",
+        "attrs": [
+          {
+            "attr": "PS",
+            "raw": 69,
+            "display": 6
+          },
+          {
+            "attr": "BH",
+            "raw": 54,
+            "display": 5
+          }
+        ]
+      },
+      {
+        "id": "grit",
+        "label": "Grit",
+        "attrs": [
+          {
+            "attr": "RB",
+            "raw": 99,
+            "display": 9
+          },
+          {
+            "attr": "ST",
+            "raw": 106,
+            "display": 10
+          }
+        ]
+      },
+      {
+        "id": "body",
+        "label": "Body",
+        "attrs": [
+          {
+            "attr": "AG",
+            "raw": 52,
+            "display": 5
+          },
+          {
+            "attr": "ND",
+            "raw": 57,
+            "display": 5
+          }
+        ]
+      },
+      {
+        "id": "mind",
+        "label": "Mind",
+        "attrs": [
+          {
+            "attr": "IQ",
+            "raw": 60,
+            "display": 6
+          },
+          {
+            "attr": "FT",
+            "raw": 64,
+            "display": 6
+          }
+        ]
+      }
+    ],
+    "season": {
+      "gp": 0,
+      "min_per_game": null,
+      "pts_per_game": null,
+      "reb_per_game": null,
+      "ast_per_game": null,
+      "stl_per_game": null,
+      "blk_per_game": null,
+      "fg_pct": null,
+      "tp_pct": null,
+      "ft_pct": null,
+      "def_pct": null,
+      "totals": {
+        "GP": 0,
+        "MIN": 0,
+        "PTS": 0,
+        "REB": 0,
+        "AST": 0,
+        "STL": 0,
+        "BLK": 0,
+        "FGM": 0,
+        "FGA": 0,
+        "3PTM": 0,
+        "3PTA": 0,
+        "FTM": 0,
+        "FTA": 0,
+        "DEF_S": 0,
+        "DEF_A": 0
+      }
+    },
+    "career": {
+      "gp": 0,
+      "min_per_game": null,
+      "pts_per_game": null,
+      "reb_per_game": null,
+      "ast_per_game": null,
+      "stl_per_game": null,
+      "blk_per_game": null,
+      "fg_pct": null,
+      "tp_pct": null,
+      "ft_pct": null,
+      "def_pct": null,
+      "totals": {
+        "GP": 0,
+        "MIN": 0,
+        "PTS": 0,
+        "REB": 0,
+        "AST": 0,
+        "STL": 0,
+        "BLK": 0,
+        "FGM": 0,
+        "FGA": 0,
+        "3PTM": 0,
+        "3PTA": 0,
+        "FTM": 0,
+        "FTA": 0,
+        "DEF_S": 0,
+        "DEF_A": 0
+      }
+    },
+    "recent_changes": [],
+    "development": {
+      "focus": "standard",
+      "focus_label": "Standard",
+      "emphasises": [],
+      "editable": true
+    }
+  }
+}

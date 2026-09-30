@@ -1,0 +1,31 @@
+{
+  "status": 200,
+  "playerCount": 15,
+  "firstKeys": [
+    "_id",
+    "first_name",
+    "last_name",
+    "name",
+    "year",
+    "height",
+    "weight",
+    "jersey",
+    "position_ratings",
+    "potential_rt_ratcheted",
+    "attributes",
+    "has_playing_time_promise",
+    "is_graduating",
+    "walk_on",
+    "training_position",
+    "training_focus",
+    "resolved_training_position",
+    "resolved_training_focus",
+    "position",
+    "rt",
+    "starter",
+    "lineup_order",
+    "stats"
+  ],
+  "pid": "26e15606-2eca-4616-840a-d14b87174395",
+  "name": "Roger Henrich"
+}

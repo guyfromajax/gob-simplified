@@ -109,6 +109,9 @@ function initCommandCenterTabs(options) {
   }
 
   function updateUrl(tabName) {
+    if (window.FranchiseContext && typeof window.FranchiseContext.absorbLocation === 'function') {
+      window.FranchiseContext.absorbLocation();
+    }
     var bag = liveParams();
     bag.set('tab', tabName);
     var qs = bag.toString();
