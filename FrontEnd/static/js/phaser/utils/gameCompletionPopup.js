@@ -497,7 +497,9 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
 
   // Create popup
   const popup = document.createElement('div');
-  popup.className = 'game-completion-popup';
+  // `gob` so the design tokens (gob-tokens.css, now linked on court.html) resolve
+  // for this overlay's var(--token) references. Court itself is not `.gob`.
+  popup.className = 'game-completion-popup gob';
   popup.innerHTML = `
     <div class="game-completion-content" style="background-image: linear-gradient(
       to bottom,
@@ -579,7 +581,7 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
         background-color: rgba(13, 17, 36, 0.97);
         background-size: cover;
         background-position: center;
-        border: 1px solid rgba(255,255,255,0.12);
+        border: 1px solid var(--white-12);
         border-radius: 16px;
         padding: 22px 24px 28px;
         display: flex;
@@ -601,7 +603,7 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
       .gc-eyebrow {
         font-family: 'Bebas Neue', sans-serif;
         font-size: 18px;
-        color: rgba(255,255,255,0.5);
+        color: var(--text-60);
         letter-spacing: 0.1em;
         text-transform: uppercase;
         line-height: 1;
@@ -619,26 +621,28 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
         letter-spacing: 0.08em;
       }
 
+      /* Colour law: W/L plates are white fill / outline, never win-green or
+         loss-red. WIN reads as a filled white plate, LOSS as an outline. */
       .gc-outcome-badge.is-win {
-        background: rgba(52,236,39,0.15);
-        border-color: rgba(52,236,39,0.4);
-        color: #34EC27;
+        background: var(--white-12);
+        border-color: var(--white-28);
+        color: var(--text-100);
       }
 
       .gc-outcome-badge.is-loss {
-        background: rgba(255,109,109,0.15);
-        border-color: rgba(255,109,109,0.4);
-        color: #ff6d6d;
+        background: transparent;
+        border-color: var(--white-20);
+        color: var(--text-60);
       }
 
       .gc-outcome-badge.is-final {
-        background: rgba(255,255,255,0.08);
-        border-color: rgba(255,255,255,0.2);
-        color: rgba(255,255,255,0.75);
+        background: var(--white-6);
+        border-color: var(--white-20);
+        color: var(--text-60);
       }
 
       .gc-section {
-        border-top: 1px solid rgba(255,255,255,0.08);
+        border-top: 1px solid var(--line);
         padding-top: 16px;
       }
 
@@ -657,7 +661,7 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
         font-size: 1.05rem;
         font-weight: 600;
         line-height: 1.4;
-        color: rgba(255, 255, 255, 0.92);
+        color: var(--text-87);
         text-align: center;
         margin: 0;
       }
@@ -685,11 +689,11 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
       }
 
       .team-score-winner {
-        color: #ffffff;
+        color: var(--text-100);
       }
 
       .team-score-loser {
-        color: rgba(255,255,255,0.4);
+        color: var(--text-38);
       }
 
       .score-line .team-name {
@@ -701,7 +705,7 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
       .score-divider {
         font-family: 'Inter', sans-serif;
         font-size: 13px;
-        color: rgba(255,255,255,0.35);
+        color: var(--text-38);
         text-transform: lowercase;
       }
 
@@ -727,25 +731,27 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
       .potg-image {
         width: 72px;
         height: 72px;
-        border-radius: 8px;
-        border: 2px solid rgba(247,148,32,0.4);
+        border-radius: var(--radius-8);
+        border: 2px solid var(--line-strong);
         object-fit: cover;
         object-position: center top;
-        background: rgba(255,255,255,0.08);
+        background: var(--white-6);
       }
 
+      /* POTG accent was orange; colour law reserves orange for saves, so the card
+         edge and label are neutral. */
       .potg-card {
         background: rgba(0,0,0,0.72);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-left: 3px solid #F79420;
-        border-radius: 12px;
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--white-28);
+        border-radius: var(--radius-12);
         padding: 16px 20px;
       }
 
       .potg-label {
         font-family: 'Bebas Neue', sans-serif;
         font-size: 13px;
-        color: #F79420;
+        color: var(--text-60);
         text-transform: uppercase;
         letter-spacing: 0.1em;
         line-height: 1;
@@ -769,14 +775,14 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
       .potg-player-name {
         font-family: 'Bebas Neue', sans-serif;
         font-size: 22px;
-        color: #ffffff;
+        color: var(--text-100);
         line-height: 1;
       }
 
       .potg-stats-line {
         font-family: 'Inter', sans-serif;
         font-size: 13px;
-        color: rgba(255,255,255,0.6);
+        color: var(--text-60);
         line-height: 1.45;
       }
 
@@ -799,14 +805,14 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
 
       .box-score-button {
         flex: 1;
-        background: rgba(255,255,255,0.06);
-        color: rgba(255,255,255,0.8);
-        border-color: rgba(255,255,255,0.14);
+        background: var(--white-6);
+        color: var(--text-87);
+        border-color: var(--line-strong);
       }
 
       .box-score-button:hover {
-        background: rgba(255,255,255,0.1);
-        border-color: rgba(255,255,255,0.2);
+        background: var(--white-10);
+        border-color: var(--white-20);
         transform: translateY(-1px);
       }
 
@@ -814,11 +820,15 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
         margin: 0;
       }
 
+      /* Green is legal here: this is the one forward/Advance action on the popup —
+         Go To Locker Room / Post-Game Press Conference / Sim this game — whose
+         handlers start phase-b and move the season on. Same paint as the shell
+         Advance (--green fill, --bg ink, --white-28 border). */
       .locker-room-button {
         flex: 2;
-        background: #34EC27;
-        color: #15181f;
-        border-color: rgba(52, 236, 39, 0.5);
+        background: var(--green);
+        color: var(--bg);
+        border-color: var(--white-28);
       }
 
       .locker-room-button:hover {
