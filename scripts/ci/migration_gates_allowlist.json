@@ -7,7 +7,6 @@
     "description": "WS-3: FrontEnd/static lines matching URLSearchParams, location.search, or .searchParams. Count may fall, never rise.",
     "files": {
       "FrontEnd/static/awards.html": 1,
-      "FrontEnd/static/brackets-page.js": 1,
       "FrontEnd/static/brackets.html": 1,
       "FrontEnd/static/common.js": 1,
       "FrontEnd/static/court.html": 1,
