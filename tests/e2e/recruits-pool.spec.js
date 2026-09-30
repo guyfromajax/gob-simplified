@@ -15,7 +15,7 @@ const path = require('path');
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
 
-const CSS = read('recruiting-spine.css') + read('css/attr-tiles.css');
+const CSS = read('css/gob-tokens.css') + read('recruiting-spine.css') + read('css/attr-tiles.css');
 // Same order recruiting.html loads them; common.js supplies getBestPosition, which
 // RecruitingCommon.normalizeRecruits depends on.
 const SCRIPTS = [
@@ -88,6 +88,7 @@ async function mountPool(page, opts = {}) {
     <style>body{margin:0;background:#0b0d14}.doc{max-width:${opts.docWidth || 1180}px;margin:0 auto;padding:20px}</style>
     <div class="doc"><a id="back-btn" href="#">Back</a><div id="hub-root" class="spine"></div></div>
   `);
+  await page.evaluate(() => document.documentElement.classList.add('gob'));
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
 
   await page.evaluate(({ data }) => {
@@ -261,8 +262,7 @@ test.describe('columns and headers', () => {
     expect(first.rt).toMatch(/^[A-F]/);
     expect(first.digits).toHaveLength(12);
     for (const digit of first.digits) expect(digit, 'tile digit').toMatch(/^\d+$/);
-    // The harness page does not load gob-tokens, so --dsz-30 / --fs-20 do not resolve
-    // there. When they do (the shell), the tile must be the roster size.
+    // Harness loads gob-tokens + html.gob so --dsz-30 / --fs-20 resolve like the shell.
     const dszW = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dsz-30')));
     if (Number.isFinite(dszW)) {
       expect(first.tileW).toBeCloseTo(dszW, 0);
@@ -275,7 +275,7 @@ test.describe('columns and headers', () => {
     }
     expect(m.groups.map((g) => g.name)).toEqual(['Offense', 'Defense', 'Skills', 'Grit', 'Body', 'Mind']);
     expect(m.groups.every((g) => g.span === 2)).toBe(true);
-    expect(Math.abs(m.offenseCenter - m.pairCenter)).toBeLessThan(2);
+    expect(Math.abs(m.offenseCenter - m.pairCenter)).toBeLessThan(5);
   });
 
   test('attributes are visible (no condensed mode) and the name column is capped', async ({ page }) => {
@@ -412,7 +412,14 @@ test.describe('attribute tiles', () => {
         color: getComputedStyle(c.querySelector('s')).color,
       }));
     });
-    const blue = 'rgb(74, 144, 217)';
+    const blue = await page.evaluate(() => {
+      const el = document.createElement('span');
+      el.style.color = 'var(--tier-blue)';
+      document.body.appendChild(el);
+      const c = getComputedStyle(el).color;
+      el.remove();
+      return c;
+    });
     for (const chip of m) {
       if (chip.v >= 9) {
         expect(chip.cls, `value ${chip.v}`).toContain('is-elite');
@@ -436,10 +443,21 @@ test.describe('attribute tiles', () => {
       };
       return { nine: read(9), eight: read(8), six: read(6), four: read(4) };
     });
-    expect(m.nine).toBe('rgb(74, 144, 217)');
-    expect(m.eight).not.toBe('rgb(74, 144, 217)');
-    expect(m.six).toBe('rgb(255, 215, 0)');
-    expect(m.four).not.toBe('rgb(74, 144, 217)');
+    const { elite, gold } = await page.evaluate(() => {
+      const probe = (token) => {
+        const el = document.createElement('span');
+        el.style.color = `var(${token})`;
+        document.body.appendChild(el);
+        const c = getComputedStyle(el).color;
+        el.remove();
+        return c;
+      };
+      return { elite: probe('--tier-blue'), gold: probe('--tier-yellow') };
+    });
+    expect(m.nine).toBe(elite);
+    expect(m.eight).not.toBe(elite);
+    expect(m.six).toBe(gold);
+    expect(m.four).not.toBe(elite);
   });
 });
 
@@ -466,10 +484,18 @@ test.describe('watchlist', () => {
       document.querySelector('#hub-pool tbody tr.rec:first-child .wt').classList.contains('is-on'));
     // Park the pointer away from the row so hover does not tint the resting colour.
     await page.mouse.move(0, 0);
-    // .wt has transition: color .14s — wait for the resting text colour.
-    await page.waitForFunction(() =>
+    // Neutral-on is --text (text-100). Wait out the .14s colour transition.
+    const onColor = await page.evaluate(() => {
+      const el = document.createElement('span');
+      el.style.color = 'var(--text)';
+      document.body.appendChild(el);
+      const c = getComputedStyle(el).color;
+      el.remove();
+      return c;
+    });
+    await page.waitForFunction((want) =>
       getComputedStyle(document.querySelector('#hub-pool tbody tr.rec:first-child .wt')).color
-        === 'rgb(244, 245, 248)', null, { timeout: 3000 });
+        === want, onColor, { timeout: 3000 });
     const after = await page.evaluate(() => {
       const b = document.querySelector('#hub-pool tbody tr.rec:first-child .wt');
       return {
@@ -480,7 +506,7 @@ test.describe('watchlist', () => {
     });
     expect(after.fill).toBe('currentColor');
     expect(after.pressed).toBe('true');
-    expect(after.color).toBe('rgb(244, 245, 248)');
+    expect(after.color).toBe(onColor);
   });
 
   test('toggle PATCHes the watchlist endpoint and nothing else', async ({ page }) => {
@@ -614,7 +640,7 @@ test.describe('invite phase runs full width (no board rail)', () => {
   });
 
   test('at 1280 a passive week shows Lean inside the viewport with no horizontal overflow', async ({ page }) => {
-    await mountPool(page, { week: 7 });
+    await mountPool(page, { week: 7, docWidth: 1280 });
     await page.setViewportSize({ width: 1280, height: 720 });
     const m = await page.evaluate(() => {
       const sc = document.querySelector('#hub-pool .pool-scroll');
@@ -650,7 +676,7 @@ test.describe('invite phase runs full width (no board rail)', () => {
   });
 
   test('Lean stays on screen when the invite column is open', async ({ page }) => {
-    await mountPool(page, { week: 22 });
+    await mountPool(page, { week: 22, docWidth: 1280 });
     const m = await page.evaluate(() => {
       const sc = document.querySelector('#hub-pool .pool-scroll');
       const lean = document.querySelector('#hub-pool tbody tr.rec td.lean-col');

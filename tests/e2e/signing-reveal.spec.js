@@ -122,6 +122,7 @@ async function mountPool(page, opts = {}) {
     <style>body{margin:0;background:#0b0d14}.doc{max-width:1180px;margin:0 auto;padding:20px}</style>
     <div class="doc"><a id="back-btn" href="#">Back</a><div id="hub-root" class="spine"></div></div>
   `);
+  await page.evaluate(() => document.documentElement.classList.add('gob'));
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
 
   await page.evaluate(({ data, runResults }) => {

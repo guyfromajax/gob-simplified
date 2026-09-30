@@ -29,7 +29,7 @@
 
 #hub-signings .gob-rec-empty {
   margin: 0;
-  font: var(--fw-medium) var(--fs-13)/var(--lh-1-4) var(--font-body);
+  font: var(--fw-medium) var(--fs-13)/var(--lh-body) var(--font-body);
   color: var(--text-38);
 }
 
@@ -93,7 +93,7 @@
 
 #hub-signings .gob-rec-team-h {
   margin: 0 0 var(--space-6);
-  font: var(--fw-bold) var(--fs-12)/var(--lh-1-2) var(--font-body);
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1p25) var(--font-body);
   color: var(--text-87);
 }
 

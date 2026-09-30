@@ -16,7 +16,9 @@ New surface: shell HTML (``gob-shell`` / ``gob-focus``, or a page listed in
 ``gobShell.js`` PAGES), ``css/gob-*.css`` except tutorial/advanced-topic
 chrome, Chapter 7 chrome (``css/office-home.css``, ``css/home-base.css``,
 ``css/milestone-modal.css``, ``css/season-peak.css``,
-``css/trophy-case.css``), ``js/shared/gob*.js``, and
+``css/trophy-case.css``), recruiting hub CSS (``recruiting-spine.css``,
+``recruiting-dock.css``, ``recruiting-signing.css``,
+``recruiting-results-hub.css``), ``js/shared/gob*.js``, and
 ``js/shared/views/**``. Everything else under the scan root is legacy.
 ``css/gob-tokens.css`` is the token source and is not scanned.
 
@@ -227,6 +229,10 @@ NEW_DESIGN_CSS = frozenset({
     "css/milestone-modal.css",
     "css/season-peak.css",
     "css/trophy-case.css",
+    "recruiting-spine.css",
+    "recruiting-dock.css",
+    "recruiting-signing.css",
+    "recruiting-results-hub.css",
 })
 REWARD_SELECTOR_RE = re.compile(
     r"med\.gold|"
@@ -1252,7 +1258,9 @@ def format_report(audit: Audit) -> str:
         "New: shell HTML (`gob-shell` / `gob-focus` on `<html>`, or a filename listed in",
         "`js/shared/gobShell.js` `PAGES`), `css/gob-*.css` except `gob-tutorial.css` /",
         "`gob-advanced.css` (tutorial chrome), Chapter 7 chrome (`office-home`,",
-        "`home-base`, `milestone-modal`, `season-peak`, `trophy-case`), `js/shared/gob*.js`,",
+        "`home-base`, `milestone-modal`, `season-peak`, `trophy-case`), recruiting hub CSS",
+        "(`recruiting-spine.css`, `recruiting-dock.css`, `recruiting-signing.css`,",
+        "`recruiting-results-hub.css`), `js/shared/gob*.js`,",
         "`js/shared/views/**`.",
         "",
         "Legacy: every other scanned file. That is an old page or stylesheet still to migrate,",

@@ -14,7 +14,7 @@ const path = require('path');
 
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
-const CSS = read('recruiting-spine.css') + read('recruiting-signing.css') + read('css/attr-tiles.css');
+const CSS = read('css/gob-tokens.css') + read('recruiting-spine.css') + read('recruiting-signing.css') + read('css/attr-tiles.css');
 const SCRIPTS = ['js/shared/franchiseContext.js', 'common.js', 'js/utils/attributeDisplay.js', 'js/shared/attrTiles.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js',
   'recruiting-common.js', 'recruiting-spine.js'].map(read);
 const HUB = read('recruiting-hub.js');
@@ -69,6 +69,7 @@ async function mount(page, o = {}) {
   await page.setContent(`
     <style>${CSS}</style><style>body{margin:0}.doc{max-width:1440px;margin:0 auto;padding:16px}</style>
     <div class="doc"><a id="back-btn" href="#"></a><div id="hub-root" class="spine"></div></div>`);
+  await page.evaluate(() => document.documentElement.classList.add('gob'));
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
   await page.evaluate(({ data }) => {
     window.__writes = [];
