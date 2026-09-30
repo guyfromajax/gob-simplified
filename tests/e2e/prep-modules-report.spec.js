@@ -26,6 +26,53 @@ async function resetReportScroll(page) {
     document.querySelectorAll('.main, .main.scroll').forEach((el) => { el.scrollTop = 0; });
   });
 }
+
+function measureReportChrome() {
+  const view = document.getElementById('training-report-view');
+  const main = document.getElementById('gob-main');
+  const title = document.querySelector('.pg-title h1');
+  const meta = view && view.querySelector('.header-meta-line');
+  const back = view && (view.querySelector('#locker-room-btn') || view.querySelector('#back-button'));
+  const box = (el) => {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      top: +r.top.toFixed(1),
+      bottom: +r.bottom.toFixed(1),
+      left: +r.left.toFixed(1),
+      right: +r.right.toFixed(1),
+    };
+  };
+  const tb = title && title.getBoundingClientRect();
+  const mb = meta && meta.getBoundingClientRect();
+  const bb = back && back.getBoundingClientRect();
+  const vb = view && view.getBoundingClientRect();
+  const intersects = (a, b) => !!(a && b
+    && a.left < b.right && a.right > b.left
+    && a.top < b.bottom && a.bottom > b.top);
+  return {
+    windowScrollY: window.scrollY,
+    gobMainScrollTop: main ? main.scrollTop : null,
+    viewScrollTop: view ? view.scrollTop : null,
+    title: box(title),
+    meta: box(meta),
+    back: box(back),
+    view: box(view),
+    intersectTitleMeta: intersects(tb, mb),
+    backTopGeViewTop: !!(bb && vb && bb.top + 0.5 >= vb.top),
+  };
+}
+
+async function captureReportPage(page, dest) {
+  await resetReportScroll(page);
+  const geom = await page.evaluate(measureReportChrome);
+  expect(geom.windowScrollY, JSON.stringify(geom)).toBe(0);
+  expect(geom.gobMainScrollTop, JSON.stringify(geom)).toBe(0);
+  expect(geom.viewScrollTop, JSON.stringify(geom)).toBe(0);
+  expect(geom.intersectTitleMeta, JSON.stringify(geom)).toBe(false);
+  expect(geom.backTopGeViewTop, JSON.stringify(geom)).toBe(true);
+  await page.screenshot({ path: dest });
+}
 const HEADSHOT = fs.readFileSync(path.join(__dirname, '../../FrontEnd/static/images/players/generic_headshot.png'));
 const BEFORE = JSON.parse(fs.readFileSync(path.join(OUT, 'before-metrics.json'), 'utf8'));
 
@@ -251,9 +298,10 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
   await expect(page.getByRole('button', { name: '← Back', exact: true })).toBeVisible();
   await expect(page.locator('#gob-subtabs .tb[data-tab="training-view"][aria-selected="true"]')).toHaveCount(0);
   await expect(page.locator('html')).not.toHaveClass(/gob-office/);
-  await resetReportScroll(page);
-  await page.screenshot({ path: path.join(OUT, 'training-report-office-1280.png') });
-  await page.screenshot({ path: path.join(OUT, 'training-report-after-1280.png') });
+  // Full-page shots first. locator.screenshot() on .team-section calls
+  // scrollIntoViewIfNeeded and slides the sticky report-header under .pg-head.
+  await captureReportPage(page, path.join(OUT, 'training-report-office-1280.png'));
+  await captureReportPage(page, path.join(OUT, 'training-report-after-1280.png'));
   alsoTokenShot('training-report-after-1280.png', 'after-report-1280.png');
   const notes = page.locator('#training-report-view .training-notes-section');
   if (await notes.count()) {
@@ -269,9 +317,8 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await expect(page.locator('#training-report-view #week-number')).toHaveText('12');
-  await resetReportScroll(page);
-  await page.screenshot({ path: path.join(OUT, 'training-report-office-1920.png') });
-  await page.screenshot({ path: path.join(OUT, 'training-report-after-1920.png') });
+  await captureReportPage(page, path.join(OUT, 'training-report-office-1920.png'));
+  await captureReportPage(page, path.join(OUT, 'training-report-after-1920.png'));
   alsoTokenShot('training-report-after-1920.png', 'after-report-1920.png');
 });
 

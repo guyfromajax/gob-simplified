@@ -68,7 +68,45 @@ Served from `_documentation_master/projects` so frame CSS loaded. Jamie: law win
 
 ## Follow-up (2026-09-30, pre-merge)
 
-**1. Report header overlap.** Not a layout regression. At `window.scrollY === 0` and `#training-report-view` / `#gob-main` scrolled to top, title, meta line, and Back do not overlap (measured in the office drill-in). The first `after-report-1280.png` was taken after Playwright scrolled `.team-section` into view for a crop; `.training-report-page .report-header` is sticky, so the meta line and Back slid under the shell title. Retook `after-report-1280.png` and `after-report-1920.png` at scroll 0. The office test now resets `.main` / view scroll before those full-page shots.
+**1. Report header overlap.** Capture helper, not a product scroll. Live office drill-in and Training-submit landing are byte-identical on this branch and `origin/develop` at the moment of capture: all three scroll values are 0, `document.activeElement` is `BODY`, title and meta do not intersect, Back top equals the view top.
+
+Office → drill-in (the flow that writes `after-report-*.png`):
+
+| | branch | develop |
+|---|---|---|
+| window.scrollY | 0 | 0 |
+| #gob-main.scrollTop | 0 | 0 |
+| #training-report-view.scrollTop | 0 | 0 |
+| activeElement | BODY | BODY |
+| title | top 74 / bottom 106 | top 74 / bottom 106 |
+| meta | top 124.9 / bottom 141.1 | top 124.9 / bottom 141.1 |
+| Back | top 106 / bottom 148 | top 106 / bottom 148 |
+| view top | 106 | 106 |
+| title ∩ meta | false | false |
+
+Training submit → report (`from=training`, `origin=prep`; Prep subtabs keep `.pg-head` at 114px):
+
+| | branch | develop |
+|---|---|---|
+| window.scrollY | 0 | 0 |
+| #gob-main.scrollTop | 0 | 0 |
+| #training-report-view.scrollTop | 0 | 0 |
+| activeElement | BODY | BODY |
+| title | top 74 / bottom 106 | top 74 / bottom 106 |
+| meta | top 188.9 / bottom 205.1 | top 188.9 / bottom 205.1 |
+| Back | top 170 / bottom 212 | top 170 / bottom 212 |
+| view top | 170 | 170 |
+| title ∩ meta | false | false |
+
+The first `after-report-1280.png` (commit `5c42806a6`) was taken after this line in `tests/e2e/prep-modules-report.spec.js` (Office drill-in), which used to run *before* the full-page shot:
+
+```
+await page.locator('#training-report-view .team-section').screenshot({
+  path: path.join(nitShots, 'team-report-after-1280.png'),
+});
+```
+
+Playwright's `locator.screenshot()` calls `scrollIntoViewIfNeeded`. That scrolled `#gob-main`. `.training-report-page .report-header` is `position: sticky; top: 10px`, so the meta line and Back slid under sticky `.pg-head` (~31px — Back's 42px height clipped to its bottom curve). `b6aea347f` already moved that crop after the full-page shots; the retake there matches `before-report-1280.png` in the header band (pixel energy identical y=60–200). Capture now asserts the three scroll values, no title/meta intersection, and Back top ≥ view top *immediately before* `page.screenshot()`, and only then takes element crops.
 
 **2. Player Development “develops” codes.** Information, not a committed control. The hover card copy is `{position} · {focusLabel} develops {codes}` (or `adds {codes}` when the focus is not Standard). That names which attributes the training-matrix profile raises for that position + focus. The focus itself is a roster choice; the orange was on the derived codes, which are a read-out. Neutralized to `--text-87`. `tests/test_player_development_grid.py` now asserts that token and no `colour-law: committed`.
 
@@ -100,7 +138,7 @@ All under `reports/prep-training-tokens/`. After shots taken at the listed viewp
 ## Gates
 
 - `.venv` via `../gob-simplified/.venv/bin/python -m pytest --ignore=tests/e2e -q`: **4180 passed**, 14 skipped, 109 xfailed, **1 xpassed** (`test_leaders_view_scope_filters_to_user_conference` — known; list not edited). **0 failed.** (A sandbox rerun without `PLAYWRIGHT_BROWSERS_PATH` failed 3 screenshot/loopback tests; those 3 pass with the cache path set.)
-- Targeted Playwright (training + report specs, workers=1, PORT=8177): **18 passed**.
+- Targeted Playwright (training + report specs, workers=1, PORT=8183): **18 passed** (includes capture-time header guard).
 - Full Playwright (`env -u CI PORT=8178 BASE_URL=http://localhost:8178 … --workers=1`): **755 passed**, 4 skipped, **0 failed** (11.1m).
 - `scripts/check_ui_tokens.py --strict --no-write`: **exit 0**, new-design law **0**.
 - `scripts/ci/check_migration_gates.py`: **pass**. Gate A 0/0, Gate B 136/44. `--write-allowlist` not used.
