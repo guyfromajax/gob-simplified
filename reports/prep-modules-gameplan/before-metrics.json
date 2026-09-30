@@ -1,0 +1,200 @@
+{
+  "inApp1280": {
+    "tracks": [
+      {
+        "id": "slider-offense",
+        "x": 394,
+        "w": 260,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-inside",
+        "x": 394,
+        "w": 260,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-attack",
+        "x": 394,
+        "w": 260,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-outside",
+        "x": 394,
+        "w": 260,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-tempo",
+        "x": 394,
+        "w": 260,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-alterations",
+        "x": 394,
+        "w": 260,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-defense",
+        "x": 1000,
+        "w": 260,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-aggression",
+        "x": 1000,
+        "w": 260,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-hc-trap",
+        "x": 1000,
+        "w": 260,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-fc-press",
+        "x": 1000,
+        "w": 260,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-fast_breaks",
+        "x": 1000,
+        "w": 260,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-rebounding",
+        "x": 1000,
+        "w": 260,
+        "side": "Defense"
+      }
+    ],
+    "execution": {
+      "text": "Execution",
+      "color": "rgba(255, 255, 255, 0.6)",
+      "font": "",
+      "y": 460,
+      "h": 40
+    },
+    "transition": {
+      "text": "Transition",
+      "color": "rgba(255, 255, 255, 0.6)",
+      "font": "",
+      "y": 430,
+      "h": 70
+    },
+    "save": {
+      "bg": "rgb(247, 148, 32)",
+      "color": "rgb(26, 18, 6)",
+      "border": "rgb(26, 18, 6)",
+      "w": 132,
+      "h": 30,
+      "text": "Save Game Plan"
+    },
+    "toastHost": true
+  },
+  "inApp1920": {
+    "tracks": [
+      {
+        "id": "slider-offense",
+        "x": 596,
+        "w": 439,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-inside",
+        "x": 596,
+        "w": 439,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-attack",
+        "x": 596,
+        "w": 439,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-outside",
+        "x": 596,
+        "w": 439,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-tempo",
+        "x": 596,
+        "w": 439,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-alterations",
+        "x": 596,
+        "w": 439,
+        "side": "Offense"
+      },
+      {
+        "id": "slider-defense",
+        "x": 1452,
+        "w": 439,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-aggression",
+        "x": 1452,
+        "w": 439,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-hc-trap",
+        "x": 1452,
+        "w": 439,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-fc-press",
+        "x": 1452,
+        "w": 439,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-fast_breaks",
+        "x": 1452,
+        "w": 439,
+        "side": "Defense"
+      },
+      {
+        "id": "slider-rebounding",
+        "x": 1452,
+        "w": 439,
+        "side": "Defense"
+      }
+    ],
+    "execution": {
+      "text": "Execution",
+      "color": "rgba(255, 255, 255, 0.6)",
+      "font": "",
+      "y": 523,
+      "h": 47
+    },
+    "transition": {
+      "text": "Transition",
+      "color": "rgba(255, 255, 255, 0.6)",
+      "font": "",
+      "y": 488,
+      "h": 82
+    },
+    "save": {
+      "bg": "rgb(247, 148, 32)",
+      "color": "rgb(26, 18, 6)",
+      "border": "rgb(26, 18, 6)",
+      "w": 132,
+      "h": 36,
+      "text": "Save Game Plan"
+    },
+    "toastHost": true
+  }
+}

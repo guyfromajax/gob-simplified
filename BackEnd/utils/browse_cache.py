@@ -28,9 +28,9 @@ _browse_rev_touched: ContextVar[bool] = ContextVar("browse_rev_touched", default
 
 
 def franchise_collection():
-    from BackEnd.db import db
+    from BackEnd.persistence import get_store
 
-    return db.franchises
+    return get_store().franchises_collection
 
 
 def franchise_key(franchise_id: Any) -> Any:

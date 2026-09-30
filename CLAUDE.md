@@ -74,6 +74,13 @@ Code must work on both Mongo (hosted) and SQLite (desktop).
 - Other subsystems use their own streams (e.g. training uses `BackEnd/utils/training_random`).
 - The **equiv-v3 reference fingerprints must stay byte-identical** unless the task says the change is meant to move them. The runner is `scratch_equiv3_fbdedupe.py`; references live under `_documentation_master/projects/references/`.
 
+## CI migration gates
+
+`scripts/ci/check_migration_gates.py` runs in CI and freezes the desktop-migration pile; it may only shrink ([scripts/ci/README.md](scripts/ci/README.md)).
+- **Gate A:** don't add `from BackEnd.db import ...`. Use the persistence adapter (`from BackEnd.persistence import get_store`; `_store = get_store()`).
+- **Gate B:** don't add `URLSearchParams` / `location.search` / `.searchParams` reads for franchise identity (`franchise_id`, `team_id`, `runtime`, `game_id`, ...) outside `FrontEnd/static/js/shared/franchiseContext.js`. Read `window.FranchiseContext`, which is also correct on desktop.
+- **Never run `--write-allowlist` to paper over a new violation** without Jamie's approval. It is only for tightening after a real removal.
+
 ## Don't commit
 
 - `scratch_*.py`: never commit new ones, and never delete existing ones (some are live tools, e.g. the equiv-v3 runner).

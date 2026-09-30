@@ -27,10 +27,12 @@
   <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/css/playbook-cmd.css">
   <link rel="stylesheet" href="/css/playbook-tiles.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/gob-toast.css">
   <link rel="stylesheet" href="/playbooks.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
-<body>
+<body class="playbooks-page">
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
   <div class="resource-page-container fcc-brand-page-shell playbooks-resource-shell">
@@ -198,10 +200,21 @@
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
   <script src="/js/shared/errorHandler.js"></script>
   <script src="/js/shared/stateTelemetry.js"></script>
-  <script type="module">
-    import '/js/state/gameStore.js';
-  </script>
   <script src="/js/shared/pointerValidation.js"></script>
-  <script src="/playbooks.js"></script>
+  <script src="/js/shared/gobToast.js"></script>
+  <script src="/js/shared/gobLeaveConfirm.js"></script>
+  <script type="module">
+    import { init } from '/playbooks.js';
+    import '/js/state/gameStore.js';
+    window.__gameStoreLoaded = true;
+    try {
+      // FranchiseContext (loaded in <head>), not the URL: correct on web and desktop.
+      const fc = window.FranchiseContext;
+      const ctx = (key) => (fc && typeof fc.get === 'function' ? fc.get(key) : null);
+      if (ctx('mode') === 'tutorial' || ctx('embed') === '1') {
+        init(document.body);
+      }
+    } catch (err) { /* redirect already left */ }
+  </script>
 </body>
 </html>
