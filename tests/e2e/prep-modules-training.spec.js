@@ -430,8 +430,8 @@ test('submit lands on the Training Report drill-in', async ({ page }) => {
   });
   await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
   await page.locator('#submit-btn').click();
-  await page.waitForURL(/tab=training-report-view/, { timeout: 20000 });
-  await expect(page.getByRole('button', { name: 'Back to Office', exact: true })).toBeVisible({ timeout: 20000 });
+  await page.waitForURL(/\/training-report\.html/, { timeout: 20000 });
+  await expect(page.getByRole('button', { name: 'Continue to Office', exact: true })).toBeVisible({ timeout: 20000 });
   expect(new URL(page.url()).searchParams.get('tut_alert') || '').toBe('');
   expect(submits).toContain('user');
   expect(submits).toContain('cpu');

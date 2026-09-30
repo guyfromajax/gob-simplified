@@ -476,9 +476,7 @@
 
   function trainingReportHref(digest) {
     var current = new URLSearchParams(global.location.search);
-    // `origin` lights the Office rail while the report is open, the same way playerHref
-    // does for a player drill-in. `from` is what training-report.js reads to pick its
-    // return affordance ("Back to Office" rather than "← News").
+    // Standalone focus page. `from` picks Continue to Office vs Back to Locker Room.
     var params = { mode: 'franchise', from: 'office', origin: 'office' };
     if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
     var teamId = current.get('team_id') || current.get('user_team_id');
@@ -486,7 +484,7 @@
     var week = digest && digest.result && digest.result.week;
     if (!present(week) && digest && digest.next_game) week = digest.next_game.week;
     if (present(week)) params.week = week;
-    return viewHref(Object.assign({ tab: 'training-report-view' }, params), '/training-report.html', params);
+    return href('/training-report.html', params);
   }
 
   function weekStrip(digest) {

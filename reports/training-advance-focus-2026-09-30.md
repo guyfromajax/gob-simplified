@@ -67,8 +67,14 @@ Passed in Playwright.
 - `FrontEnd/static/js/shared/gobAdvance.js` — `mode=training` → `/training.html`
 - `FrontEnd/static/js/shared/gobShell.js` — `training.html` `kind: 'focus'`
 - `FrontEnd/static/js/shared/views/trainingView.js` — `sections: 'player-dev'`; no Advance override
-- `FrontEnd/static/training.js` — sections flag, applySections, leave-confirm, no `#play-now` override
+- `FrontEnd/static/training.js` — sections flag, applySections, leave-confirm, no `#play-now` override; submit → `/training-report.html`
 - `FrontEnd/static/training.html` — drop FCC redirect; always weekly init + gobLeaveConfirm
+- `FrontEnd/static/training-report.html` — focus host; drop FCC redirect
+- `FrontEnd/static/training-report.js` — Continue to Office / Back to Locker Room
+- `FrontEnd/static/js/shared/gobViews.js` — retire `training-report-view`; `/training-report.html` is a real page
+- `FrontEnd/static/js/shared/commandCenterTabs.js` — remap old tab to standalone
+- `FrontEnd/static/js/shared/officeHome.js` — All changes → `/training-report.html`
+- `FrontEnd/static/franchise-command-center.html` — remove `#training-report-view`
 - `FrontEnd/static/training-shell.js` — submit button + pointer (hidden in player-dev)
 - `FrontEnd/static/training.css` — pointer + player-dev hide rules
 - `_documentation_master/11_Design_Systems/UX_System.md` — Prep + Advance + coverage table
@@ -77,10 +83,25 @@ Passed in Playwright.
 
 ## Gates
 
-- `../gob-simplified/.venv/bin/python -m pytest --ignore=tests/e2e -q`: **4203 passed**, 14 skipped, 109 xfailed, **1 xpassed**, **0 failed** (221.38s). The xpass is pre-existing (not this branch).
-- Playwright (`env -u CI PORT=8250 BASE_URL=http://localhost:8250`, workers=1): **784 passed**, 6 skipped, **0 failed** (11.1m). Includes training-advance-focus a–g.
+- `../gob-simplified/.venv/bin/python -m pytest --ignore=tests/e2e -q`: **4203 passed**, 14 skipped, 109 xfailed, **1 xpassed**, **0 failed** (226.20s). The xpass is pre-existing (not this branch).
+- Playwright (`env -u CI PORT=8260 BASE_URL=http://localhost:8260`, workers=1): **787 passed**, 6 skipped, **0 failed** (12.0m). Includes training-advance-focus a–j (report add-on).
 - `scripts/check_ui_tokens.py --strict --no-write`: **exit 0**. New colour-law 0 / 0 / 0. Legacy 210 green / 610 orange / 0 reward-gold (820).
-- `scripts/ci/check_migration_gates.py`: **passed**. Gate A: 0 imports in 0 files. Gate B: 135 lines in 43 files. Note: `training.html` is now clean (0, was 1). Did **not** `--write-allowlist`.
+- `scripts/ci/check_migration_gates.py`: **passed**. Gate A: 0 imports in 0 files. Gate B: 134 lines in 42 files. Notes: `training.html` and `training-report.html` are now clean (0, was 1 each). Did **not** `--write-allowlist`.
+
+## Add-on: Training Report is a standalone focus page
+
+**Today (this branch, before the add-on):** Submit Training rewrote the server `/training-report.html` redirect to FCC `?tab=training-report-view`. Office "All changes →" used `viewHref` to the same tab. `training-report.html` itself redirected into FCC. The report sat in the Command Center with rail/origin chrome; Back was "Back to Office" / "← Back" / "← News".
+
+**Now:** `/training-report.html` is `kind: 'focus'` (same chrome as weekly training and Set Lineup: top bar, no rail, no Prep sub-tabs, no shell `#play-now`). One implementation: `training-report.js` `init` / `teardown` / `revalidate` / `shellHtml` on that file. After Submit Training, land here with "Continue to Office" (`tut_alert=training_return` unchanged). Office "All changes →", News dispatches, and the old `/training-report.html` URL open the same page. Old `?tab=training-report-view` remaps (`gobShell` boot + `commandCenterTabs.leaveForStandaloneReport`) carrying `franchise_id` / `team_id` / `week`. From Office or News the exit is "Back to Locker Room" and `GOBNav.back` returns to wherever the player came from. The in-FCC `training-report-view` tab is unregistered and the empty panel is gone. Report body tokens are unchanged (`inAppShell()` treats `html.gob-focus` as the token path so hero accents stay CSS-only).
+
+| File | What |
+|---|---|
+| `before-report-fcc-1280.png` | In-FCC report after Submit (this branch, before the add-on) |
+| `after-submit-report-1280.png` | Submit → standalone focus report |
+| `after-report-from-office-1280.png` | Office All changes → standalone |
+| `after-report-standalone-1280.png` | Direct `/training-report.html` |
+| `after-report-standalone-1920.png` | Same at 1920 |
+| `after-set-lineup-chrome-1280.png` | Set Lineup focus chrome (unchanged compare) |
 
 ## Unsure
 

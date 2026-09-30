@@ -25,7 +25,6 @@ const BROWSE = [
   'standings.html',
   'team-stats.html',
   'stats.html',
-  'training-report.html',
   'game-plan.html',
   'playbooks.html',
 ];
@@ -33,6 +32,7 @@ const BROWSE = [
 const FOCUS = [
   'set-lineup.html',
   'training.html',
+  'training-report.html',
   'training-squad-report.html',
   'training-playbooks.html',
   'cut-players.html',
@@ -304,6 +304,21 @@ async function installApi(page, data, rich) {
       await fulfillJson(route, rich.teamStats);
       return;
     }
+    if (pathname.startsWith('/franchise/training-report')) {
+      await fulfillJson(route, {
+        week: 12,
+        upcoming_opponent: 'Four Corners',
+        coaching_focus: {},
+        players: [],
+        player_changes: {},
+        team_attributes: {},
+        team_changes: {},
+        plays_data: {},
+        scouting_data: {},
+        training_notes: [],
+      });
+      return;
+    }
     if (rich && pathname.startsWith('/roster/')) {
       await fulfillJson(route, {
         players: rich.players,
@@ -467,6 +482,9 @@ test('browse and focus pages, screenshots, and one vertical scroll', async ({ pa
     }
     if (file === 'set-lineup.html') {
       extra = '&home=Lancaster&away=Four%20Corners&home_display=Lancaster&away_display=Four%20Corners&my_team=home&game_id=g-mid&week=12';
+    }
+    if (file === 'training-report.html') {
+      extra = '&week=12&from=office&mode=franchise';
     }
     await openPage(page, file, season.data, extra, season);
     const focus = FOCUS.indexOf(file) !== -1;

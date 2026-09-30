@@ -262,15 +262,15 @@ test('training, training report, and scouting toggles use SFX_SELECT', async ({ 
   });
   expect(await sfxCalls(page)).toEqual([]);
 
-  await page.goto('/franchise-command-center.html?' + fccQuery('training-report-view'));
-  await page.waitForSelector('#training-report-view .toggle-btn, #training-report-view .players-section', { timeout: 30000 });
-  const reportToggle = page.locator('#training-report-view .toggle-btn').first();
+  await page.goto('/training-report.html?franchise_id=' + FID + '&team_id=' + TEAM + '&mode=franchise&week=12&from=office');
+  await page.waitForSelector('.players-section .toggle-btn, .players-section', { timeout: 30000 });
+  const reportToggle = page.locator('.players-section .toggle-btn').first();
   if (await reportToggle.count()) {
     await armSpy(page);
     await reportToggle.click();
     expect(await sfxCalls(page)).toEqual(['SFX_SELECT']);
     await muteSfx(page);
-    await page.locator('#training-report-view .toggle-btn').nth(1).click().catch(async () => {
+    await page.locator('.players-section .toggle-btn').nth(1).click().catch(async () => {
       await reportToggle.click();
     });
     expect(await sfxCalls(page)).toEqual([]);

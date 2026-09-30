@@ -25,11 +25,11 @@ def test_page_script_exports_init():
     assert "export { init, teardown, revalidate, shellHtml };" in JS
 
 
-def test_html_still_redirects_into_the_app():
-    assert "tab', 'training-report-view'" in HTML or 'tab", "training-report-view"' in HTML
-    assert "location.replace('/franchise-command-center.html?" in HTML
+def test_html_is_the_focus_host():
+    assert "import { init } from '/training-report.js'" in HTML
+    assert "location.replace('/franchise-command-center.html?" not in HTML
+    assert "URLSearchParams" not in HTML
     assert "embed') === '1'" not in HTML
-    assert "import { init } from '/training-report.js'" not in HTML
 
 
 def test_page_class_is_on_the_view_root_not_document_body():

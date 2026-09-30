@@ -974,8 +974,8 @@ test('attribute chips group, order, and cap', async ({ page }) => {
   // The card always carries "All changes -> " (Ch7 decision 18).
   await expect(page.locator('#office-root .wkc-f .lnk')).toHaveText(/All changes/);
   const href = await page.locator('#office-root .wkc-f .lnk').getAttribute('href');
-  expect(href).toContain('/franchise-command-center.html');
-  expect(href).toContain('tab=training-report-view');
+  expect(href).toContain('/training-report.html');
+  expect(href).not.toContain('tab=training-report-view');
   expect(href).toContain('origin=office');
   expect(href).toContain('week=21');
   const nameHref = await page.locator('#office-root .wkc .gn[data-player-id="p-amy"] .nm').getAttribute('href');

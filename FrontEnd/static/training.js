@@ -661,11 +661,8 @@ function trainingReportHref(franchiseId, teamId, week) {
   if (teamId) params.set('team_id', teamId);
   params.set('week', String(week));
   params.set('from', 'training');
-  // Lights the Prep rail while the report is open without marking a sub-tab; see
-  // gobShell.js detailOrigin / detailMark.
   params.set('origin', 'prep');
-  params.set('tab', 'training-report-view');
-  return `/franchise-command-center.html?${params.toString()}`;
+  return `/training-report.html?${params.toString()}`;
 }
 
 /**
@@ -1585,13 +1582,23 @@ function rewriteReportRedirect(redirectUrl) {
     if (redirect.pathname === '/training-report.html' || redirect.pathname === '/static/training-report.html') {
       const bag = franchiseCtx().parseSearch(redirect.search);
       bag.delete('embed');
-      bag.set('tab', 'training-report-view');
-      // A drill-in: light the Prep rail without marking a sub-tab. See gobShell
-      // detailOrigin / detailMark.
+      bag.delete('tab');
       if (!bag.get('origin')) bag.set('origin', 'prep');
       if (!bag.get('from')) bag.set('from', 'training');
+      if (!bag.get('franchise_id')) {
+        const fid = franchiseCtx().get('franchise_id');
+        if (fid) bag.set('franchise_id', fid);
+      }
+      if (!bag.get('team_id')) {
+        const tid = franchiseCtx().get('team_id');
+        if (tid) bag.set('team_id', tid);
+      }
+      if (!bag.get('week')) {
+        const w = franchiseCtx().get('week');
+        if (w) bag.set('week', String(w));
+      }
       const qs = bag.toString();
-      return '/franchise-command-center.html' + (qs ? '?' + qs : '');
+      return '/training-report.html' + (qs ? '?' + qs : '');
     }
   } catch (_err) {}
   return redirectUrl;

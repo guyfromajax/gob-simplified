@@ -363,7 +363,7 @@ test('training submit lands on the report, then one Back reaches mode-select', a
   await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
   await expect(page.locator('#submit-btn')).toHaveText('Submit Training');
   await page.locator('#submit-btn').click();
-  await expect(page).toHaveURL(/tab=training-report-view/, { timeout: 20000 });
+  await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
   await page.waitForFunction(() => window.GOBNav);
   await leaveTrainingReport(page);
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
@@ -504,7 +504,7 @@ test('custom playbooks adds one step and Back removes it, then training still re
   await page.locator('label.archetype-option', { hasText: 'Discipline' }).click();
   await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
   await page.locator('#submit-btn').click();
-  await expect(page).toHaveURL(/tab=training-report-view/, { timeout: 20000 });
+  await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
   await page.waitForFunction(() => window.GOBNav);
   await leaveTrainingReport(page);
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');

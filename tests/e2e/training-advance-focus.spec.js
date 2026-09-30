@@ -43,6 +43,35 @@ function campPoints() {
   return clone(FIXTURE.trainingPoints);
 }
 
+function officeWithChangesCc() {
+  const cc = inSeasonCc();
+  cc.training_completed = true;
+  cc.office_digest = {
+    state: 'ready',
+    result: { week: 12, user_won: true, site: 'home', home_score: 70, away_score: 60 },
+    next_game: { week: 13, opponent: 'Four Corners' },
+    what_moved: {
+      national_rank: { now: 36, prev: 40, delta: 4 },
+      conference_standing: { now: 3, prev: 5, delta: 2 },
+      record: { wins: 8, losses: 4 },
+      streak: 'W2',
+      attribute_changes: ['Amy', 'Bea', 'Cal', 'Dee', 'Eve', 'Fay'].map((name, i) => ({
+        player_id: 'p-' + i,
+        name: name,
+        attribute: 'ball_handling',
+        from: 4,
+        to: 6,
+        delta: 2,
+      })),
+    },
+    team_snapshot: { state: 'ready', chemistry: { value: 12, max: 25 }, attitude: { player_count: 12, buckets: [] }, moved_most: [] },
+    conference_standings: { conference: 1, region: 'A', rows: [] },
+    recruiting_wire: { events: [] },
+    todos: [],
+  };
+  return cc;
+}
+
 function postWeek26Cc() {
   const cc = clone(FIXTURE.cc);
   cc.week = 28;
@@ -142,6 +171,33 @@ async function resetScroll(page) {
     if (main) main.scrollTop = 0;
     document.querySelectorAll('.main, .main.scroll').forEach((el) => { el.scrollTop = 0; });
   });
+}
+
+async function expectHeaderVisible(page) {
+  const geom = await page.evaluate(() => {
+    const main = document.getElementById('gob-main');
+    const meta = document.querySelector('.header-meta-line');
+    const back = document.querySelector('#locker-room-btn');
+    const box = (el) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, height: r.height };
+    };
+    const mb = box(meta);
+    const bb = box(back);
+    return {
+      windowScrollY: window.scrollY,
+      gobMainScrollTop: main ? main.scrollTop : null,
+      meta: mb,
+      back: bb,
+      metaFullyVisible: !!(mb && mb.top >= 0 && mb.bottom <= window.innerHeight && mb.height > 4),
+      backFullyVisible: !!(bb && bb.top >= 0 && bb.bottom <= window.innerHeight && bb.height > 4),
+    };
+  });
+  expect(geom.windowScrollY, JSON.stringify(geom)).toBe(0);
+  expect(geom.gobMainScrollTop, JSON.stringify(geom)).toBe(0);
+  expect(geom.metaFullyVisible, JSON.stringify(geom)).toBe(true);
+  expect(geom.backFullyVisible, JSON.stringify(geom)).toBe(true);
 }
 
 async function capturePage(page, dest) {
@@ -253,10 +309,14 @@ test('a) training week Advance → focus → allocate → Submit → Report → 
   await capturePage(page, path.join(OUT, 'after-focus-allocated-unsaved-1280.png'));
 
   await page.locator('#submit-btn').click();
-  await page.waitForURL(/tab=training-report-view/, { timeout: 20000 });
-  await expect(page.getByRole('button', { name: 'Back to Office', exact: true })).toBeVisible({ timeout: 20000 });
+  await page.waitForURL(/\/training-report\.html/, { timeout: 20000 });
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('nav.rail')).toHaveCount(0);
+  await expect(page.locator('#gob-subtabs')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue to Office', exact: true })).toBeVisible({ timeout: 20000 });
+  await expectHeaderVisible(page);
   await capturePage(page, path.join(OUT, 'after-submit-report-1280.png'));
-  await page.getByRole('button', { name: 'Back to Office', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue to Office', exact: true }).click();
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
 
   const user = submits.find((row) => row.kind === 'user');
@@ -412,4 +472,86 @@ test('g) desktop profile uses the same Advance → focus path', async ({ page })
   await expect(page).toHaveURL(/\/training\.html/, { timeout: 20000 });
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await expect(page.locator('#submit-btn')).toHaveText('Submit Training');
+});
+
+test('h) Office All changes → standalone report → Back → Office', async ({ page }) => {
+  test.skip(CAPTURE_BEFORE, 'after only');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openOffice(page, { cc: officeWithChangesCc() });
+  const link = page.locator('#office-root .wkc-f .lnk');
+  await expect(link).toHaveText(/All changes/);
+  const href = await link.getAttribute('href');
+  expect(href).toContain('/training-report.html');
+  expect(href).not.toContain('tab=training-report-view');
+  expect(href).toContain('from=office');
+  expect(href).toContain('week=12');
+  await link.click();
+  await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('nav.rail')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Back to Locker Room', exact: true })).toBeVisible({ timeout: 20000 });
+  await expectHeaderVisible(page);
+  await capturePage(page, path.join(OUT, 'after-report-from-office-1280.png'));
+  await page.getByRole('button', { name: 'Back to Locker Room', exact: true }).click();
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
+  await expect(page.locator('#office-root')).toBeVisible({ timeout: 15000 });
+});
+
+test('i) old /training-report.html and ?tab=training-report-view land on the standalone page', async ({ page }) => {
+  test.skip(CAPTURE_BEFORE, 'after only');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await stubAuth(page);
+  await installApi(page);
+  await page.goto('/training-report.html?franchise_id=' + FID + '&team_id=' + TEAM
+    + '&mode=franchise&week=12&from=office');
+  await expect(page).toHaveURL(/\/training-report\.html/);
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('#week-number')).toHaveText('12', { timeout: 20000 });
+  await expect(page.getByRole('button', { name: 'Back to Locker Room', exact: true })).toBeVisible();
+  await expectHeaderVisible(page);
+  await capturePage(page, path.join(OUT, 'after-report-standalone-1280.png'));
+
+  await page.goto('/franchise-command-center.html?' + fccQuery('training-report-view') + '&week=12&from=office');
+  await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
+  expect(page.url()).not.toContain('tab=training-report-view');
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('#week-number')).toHaveText('12', { timeout: 20000 });
+});
+
+test('j) report focus at 1920 and desktop profile', async ({ page }) => {
+  test.skip(CAPTURE_BEFORE, 'after only');
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await stubAuth(page);
+  await installApi(page);
+  await page.goto('/training-report.html?franchise_id=' + FID + '&team_id=' + TEAM
+    + '&mode=franchise&week=12&from=training');
+  await expect(page.locator('#week-number')).toHaveText('12', { timeout: 20000 });
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Continue to Office', exact: true })).toBeVisible();
+  await expectHeaderVisible(page);
+  await capturePage(page, path.join(OUT, 'after-report-standalone-1920.png'));
+
+  await page.addInitScript(() => {
+    window.GOB_BUILD_PROFILE = 'desktop';
+    if (window.location && window.location.port) {
+      window.GOB_LOOPBACK_PORT = Number(window.location.port);
+    }
+    window.__gobAuthMeData = {
+      user_id: 'e2e-user',
+      username: 'e2e',
+      email: 'e2e@example.com',
+      tutorial_alerts_franchise_id: 'other-franchise',
+      tutorial_alerts_dismissed: [
+        'player-attributes', 'training', 'team-attributes', 'game-plans',
+        'playbooks', 'scouting', 'recruiting',
+      ],
+    };
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await stubAuth(page);
+  await installApi(page);
+  await page.goto('/training-report.html?franchise_id=' + FID + '&team_id=' + TEAM
+    + '&mode=franchise&week=12&from=office');
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Back to Locker Room', exact: true })).toBeVisible({ timeout: 20000 });
 });

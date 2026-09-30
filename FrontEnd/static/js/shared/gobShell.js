@@ -92,11 +92,7 @@
     // Drill-ins belong to no rail section, so every rail button leaves them.
     // The highlight follows ?origin= (detailOrigin); without it, nothing is on.
     'player-view': 'detail',
-    'team-view': 'detail',
-    // The training report is a drill-in too. It used to sit in 'prep' and be collapsed
-    // onto training-view for highlighting, which lit Player Training while you were
-    // reading a report — two unrelated screens behind one sub-tab.
-    'training-report-view': 'detail'
+    'team-view': 'detail'
   };
   var DETAIL_SECTION = { id: 'detail', label: '', title: '', tabs: [] };
 
@@ -125,9 +121,7 @@
     '/team-roster-view.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
     '/set-lineup.html': { kind: 'focus' },
     '/training.html': { kind: 'focus' },
-    // A drill-in, like /player-detail.html: 'context' resolves to whichever section you
-    // came from (sectionFromReturn), and keepBack preserves the return trail.
-    '/training-report.html': { kind: 'browse', section: 'context', sub: '', keepBack: true },
+    '/training-report.html': { kind: 'focus' },
     '/training-squad-report.html': { kind: 'focus' },
     '/training-playbooks.html': { kind: 'focus' },
     '/cut-players.html': { kind: 'focus' },
@@ -434,7 +428,7 @@
   }
 
   function detailOrigin(tab) {
-    if (tab !== 'player-view' && tab !== 'team-view' && tab !== 'training-report-view') return '';
+    if (tab !== 'player-view' && tab !== 'team-view') return '';
     var origin = '';
     try { origin = new URLSearchParams(window.location.search).get('origin') || ''; }
     catch (err) { origin = ''; }
@@ -444,9 +438,6 @@
   }
 
   function detailMark(tab) {
-    // The report marks nothing, even when ?origin=prep lights the Prep rail. Marking the
-    // sub-tab you came from would put the underline back under Player Training.
-    if (tab === 'training-report-view') return '';
     if (tab !== 'player-view' && tab !== 'team-view') return tab;
     try { return new URLSearchParams(window.location.search).get('return_tab') || ''; }
     catch (err) { return ''; }
@@ -469,7 +460,6 @@
     var officeHome = tab === 'home-tab';
     if (titleEl) {
       if (officeHome) titleEl.textContent = '';
-      else if (tab === 'training-report-view') titleEl.textContent = 'Training Report';
       else titleEl.textContent = sectionId === 'office' ? '' : section.title;
     }
     document.documentElement.classList.toggle('gob-office', officeHome);
@@ -1428,6 +1418,23 @@
       var prepTab = '';
       try { prepTab = new URLSearchParams(window.location.search).get('tab') || ''; }
       catch (err) { prepTab = ''; }
+      var tab = '';
+      try {
+        tab = window.FranchiseContext && typeof window.FranchiseContext.get === 'function'
+          ? (window.FranchiseContext.get('tab') || '') : prepTab;
+      } catch (err) { tab = prepTab; }
+      if (tab === 'training-report-view') {
+        var bag = null;
+        try {
+          if (window.FranchiseContext && typeof window.FranchiseContext.toSearchParams === 'function') {
+            bag = window.FranchiseContext.toSearchParams();
+          }
+        } catch (err) { bag = null; }
+        if (bag) bag.delete('tab');
+        var qs = bag ? bag.toString() : '';
+        window.location.replace('/training-report.html' + (qs ? '?' + qs : ''));
+        return;
+      }
       mount();
       return;
     }

@@ -52,6 +52,7 @@ function qsa(sel) {
 }
 
 function inAppShell() {
+  if (document.documentElement.classList.contains('gob-focus')) return true;
   return !!(root && (root.id === 'training-report-view' || (root.closest && root.closest('#training-report-view'))));
 }
 
@@ -564,20 +565,12 @@ function paintBack() {
   const btn = byId('locker-room-btn');
   if (!btn) return;
 
-  if (reportFrom === 'news' && mode === 'franchise') {
-    btn.hidden = true;
-    btn.style.display = 'none';
-    ensureNewsUpLink();
-  } else {
-    const news = byId('back-button');
-    if (news) news.hidden = true;
-    btn.hidden = false;
-    btn.style.display = '';
-    // Post-submit still uses the named "Back to Office" + tut_alert one-shot.
-    // A drill-in from Office (or anywhere else) just goes back.
-    btn.textContent = reportFrom === 'training' ? 'Back to Office' : '← Back';
-    btn.className = 'gob-btn gob-btn--ghost';
-  }
+  const news = byId('back-button');
+  if (news) news.hidden = true;
+  btn.hidden = false;
+  btn.style.display = '';
+  btn.textContent = reportFrom === 'training' ? 'Continue to Office' : 'Back to Locker Room';
+  btn.className = 'gob-btn gob-btn--ghost';
 
   btn.dataset.exitWired = '1';
   if (backClickWired) return;

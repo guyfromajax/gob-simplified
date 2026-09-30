@@ -153,28 +153,27 @@ test('Player Training tab always shows the settings, even after a submitted week
 
 test('the report is a drill-in: no Player Training highlight, Back returns', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openFcc(page, 'training-report-view', { from: 'office', origin: 'office' });
-  await page.waitForSelector('#training-report-view.tab-content.active', { timeout: 20000 });
-
-  const selected = page.locator('#gob-subtabs .tb[aria-selected="true"]');
-  if (await selected.count()) {
-    await expect(selected).not.toHaveAttribute('data-tab', 'training-view');
-  }
-  await expect(page.getByRole('button', { name: '← Back', exact: true })).toBeVisible();
-  // Office rail can be on (origin=office). The Player Training underline must not.
-  await expect(page.locator('#gob-subtabs .tb[data-tab="training-view"][aria-selected="true"]')).toHaveCount(0);
-  // origin=office must not turn on the Office-home layout (week cards under the report).
+  await stubAuth(page);
+  await installApi(page);
+  await page.goto('/training-report.html?franchise_id=' + FID + '&team_id=' + TID
+    + '&mode=franchise&week=12&from=office&origin=office');
+  await expect(page).toHaveURL(/\/training-report\.html/);
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('nav.rail')).toHaveCount(0);
+  await expect(page.locator('#gob-subtabs')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Back to Locker Room', exact: true })).toBeVisible();
   await expect(page.locator('html')).not.toHaveClass(/gob-office/);
-  await expect(page.locator('#home-tab')).not.toBeVisible();
 
   await page.screenshot({ path: path.join(OUT, 'training-report-drillin-1280.png') });
 });
 
-test('post-submit Back to Office keeps tut_alert=training_return', async ({ page }) => {
+test('post-submit Continue to Office keeps tut_alert=training_return', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openFcc(page, 'training-report-view', { from: 'training', origin: 'prep' });
-  await page.waitForSelector('#training-report-view.tab-content.active', { timeout: 20000 });
-  const btn = page.getByRole('button', { name: 'Back to Office', exact: true });
+  await stubAuth(page);
+  await installApi(page);
+  await page.goto('/training-report.html?franchise_id=' + FID + '&team_id=' + TID
+    + '&mode=franchise&week=12&from=training&origin=prep');
+  const btn = page.getByRole('button', { name: 'Continue to Office', exact: true });
   await expect(btn).toBeVisible();
 
   const waitNav = page.waitForURL(/tut_alert=training_return/, { timeout: 15000 });

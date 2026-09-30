@@ -1,15 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
-  <script>
-    (function () {
-      try {
-        var q = new URLSearchParams(location.search);
-        q.set('tab', 'training-report-view');
-        location.replace('/franchise-command-center.html?' + q.toString());
-      } catch (err) {}
-    })();
-  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
@@ -19,11 +10,14 @@
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Training Report - GOB</title>
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
 <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/css/gob-tokens.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/css/rt-buckets.css">
   <link rel="stylesheet" href="/training-report.css">
   <link rel="stylesheet" href="/css/fonts.css">
@@ -125,7 +119,11 @@
   <script src="/js/utils/attributeDisplay.js"></script>
   <script type="module">
     import { resumeFranchiseTrack } from '/js/musicController.js';
+    import { init } from '/training-report.js';
     resumeFranchiseTrack();
+    try {
+      init(document.body);
+    } catch (err) { /* init logs */ }
   </script>
 </body>
 </html>
