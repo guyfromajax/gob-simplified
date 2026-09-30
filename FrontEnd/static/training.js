@@ -1,3 +1,5 @@
+import { TRAINING_SHELL } from '/training-shell.js';
+
 function franchiseCtx() {
   return typeof window !== 'undefined' ? window.FranchiseContext : null;
 }
@@ -19,28 +21,98 @@ function cloneParams(params) {
   return out;
 }
 
+let root = null;
+let started = false;
+let _onPageShow = null;
+let _onResizeSliders = null;
+let _onResizeReq = null;
+let _onScrollTip = null;
+let _reqObserver = null;
+let _tabShown = null;
+
+function byId(id) {
+  if (id === 'play-now') return document.getElementById(id);
+  if (root) {
+    if (root.id === id) return root;
+    const found = root.querySelector('#' + CSS.escape(id));
+    if (found) return found;
+  }
+  return document.getElementById(id);
+}
+
+function qsa(sel) {
+  return root ? root.querySelectorAll(sel) : document.querySelectorAll(sel);
+}
+
+function rootQuery(sel) {
+  return root ? root.querySelector(sel) : document.querySelector(sel);
+}
+
+function inAppShell() {
+  return !!(root && (root.id === 'training-view' || (root.closest && root.closest('#training-view'))));
+}
+
+function bindDom() {
+  pointsRemainingEl = byId('points-remaining');
+  submitBtn = byId('submit-btn');
+  autoTrainBtn = byId('auto-train-btn');
+  recruitingInvitesBtn = byId('recruiting-invites-btn');
+  backBtn = byId('back-btn');
+  allSliders = qsa('.slider');
+  coachingRadios = qsa('input[name="coaching-focus"]');
+  offensePlaysRadios = qsa('input[name="offense-plays"]');
+  defensePlaysRadios = qsa('input[name="defense-plays"]');
+  autoTrainModal = byId('auto-train-modal');
+  autoTrainModalTitle = byId('auto-train-modal-title');
+  autoTrainModalFocus = byId('auto-train-modal-focus');
+  autoTrainModalClose = byId('auto-train-modal-close');
+  customFocusModal = byId('custom-focus-modal');
+  customFocusThead = byId('custom-focus-thead');
+  customFocusTbody = byId('custom-focus-tbody');
+  customFocusAssignBtn = byId('custom-focus-assign-btn');
+  customFocusCancelBtn = byId('custom-focus-cancel-btn');
+  reqBarEl = byId('requirements-bar');
+  reqPointsChip = byId('req-points');
+  reqPointsUsedEl = byId('req-points-used');
+  reqPointsTotalEl = byId('req-points-total');
+  reqPointsMeterEl = byId('req-points-meter');
+  reqFocusChip = byId('req-focus');
+  reqFocusValueEl = byId('req-focus-value');
+  reqFocusNudgeBtn = byId('req-focus-nudge');
+  playerDevSection = byId('player-dev-section');
+}
+
 // Training Page JavaScript
 let TOTAL_POINTS = 24; // Will be updated from API for franchise mode
 
-// DOM Elements
-const pointsRemainingEl = document.getElementById('points-remaining');
-const submitBtn = document.getElementById('submit-btn');
-const autoTrainBtn = document.getElementById('auto-train-btn');
-const recruitingInvitesBtn = document.getElementById('recruiting-invites-btn');
-const backBtn = document.getElementById('back-btn');
-const allSliders = document.querySelectorAll('.slider');
-const coachingRadios = document.querySelectorAll('input[name="coaching-focus"]');
-const offensePlaysRadios = document.querySelectorAll('input[name="offense-plays"]');
-const defensePlaysRadios = document.querySelectorAll('input[name="defense-plays"]');
-const autoTrainModal = document.getElementById('auto-train-modal');
-const autoTrainModalTitle = document.getElementById('auto-train-modal-title');
-const autoTrainModalFocus = document.getElementById('auto-train-modal-focus');
-const autoTrainModalClose = document.getElementById('auto-train-modal-close');
-const customFocusModal = document.getElementById('custom-focus-modal');
-const customFocusThead = document.getElementById('custom-focus-thead');
-const customFocusTbody = document.getElementById('custom-focus-tbody');
-const customFocusAssignBtn = document.getElementById('custom-focus-assign-btn');
-const customFocusCancelBtn = document.getElementById('custom-focus-cancel-btn');
+// DOM Elements — bound in bindDom() after the shell is in `root`.
+let pointsRemainingEl = null;
+let submitBtn = null;
+let autoTrainBtn = null;
+let recruitingInvitesBtn = null;
+let backBtn = null;
+let allSliders = [];
+let coachingRadios = [];
+let offensePlaysRadios = [];
+let defensePlaysRadios = [];
+let autoTrainModal = null;
+let autoTrainModalTitle = null;
+let autoTrainModalFocus = null;
+let autoTrainModalClose = null;
+let customFocusModal = null;
+let customFocusThead = null;
+let customFocusTbody = null;
+let customFocusAssignBtn = null;
+let customFocusCancelBtn = null;
+let reqBarEl = null;
+let reqPointsChip = null;
+let reqPointsUsedEl = null;
+let reqPointsTotalEl = null;
+let reqPointsMeterEl = null;
+let reqFocusChip = null;
+let reqFocusValueEl = null;
+let reqFocusNudgeBtn = null;
+let playerDevSection = null;
 let currentWeek = 1;
 let currentTeamName = '';
 let currentSeason = 1;
@@ -83,10 +155,10 @@ function saveTrainingFormDraft() {
   const key = trainingFormDraftStorageKey(urlParams);
   if (!key) return;
   const sliders = {};
-  document.querySelectorAll('.slider').forEach(function (el) {
+  qsa('.slider').forEach(function (el) {
     if (el.id) sliders[el.id] = parseInt(el.value, 10) || 0;
   });
-  const checked = document.querySelector('input[name="coaching-focus"]:checked');
+  const checked = rootQuery('input[name="coaching-focus"]:checked');
   const payload = {
     v: 1,
     week: currentWeek,
@@ -152,7 +224,7 @@ function navigateToTrainingTutorial() {
 }
 
 function wireTrainingTutorialButton() {
-  const btn = document.getElementById('training-tutorial-btn');
+  const btn = byId('training-tutorial-btn');
   if (!btn) return;
   btn.addEventListener('click', navigateToTrainingTutorial);
 }
@@ -165,8 +237,6 @@ function wireTrainingTutorialButton() {
  * `custom_focus_roster` (already RT-descending, already carrying both fields, year, all 12
  * attributes, height/weight and every position rating) into that module's shape.
  */
-const playerDevSection = document.getElementById('player-dev-section');
-
 function playerDevFranchiseId() {
   return liveParams().get('franchise_id') || '';
 }
@@ -228,7 +298,7 @@ function renderPlayerDevelopment() {
  * uses. A coach who reads the chart comes back to the points he had already spent.
  */
 function wirePlayerDevelopmentTutorialButton() {
-  const btn = document.getElementById('player-dev-tutorial-btn');
+  const btn = byId('player-dev-tutorial-btn');
   if (!btn) return;
   btn.addEventListener('click', function () {
     playSound('click-tiny.wav');
@@ -302,7 +372,7 @@ function sortedAttrCodesByValue(row) {
 }
 
 function getPmModalMode() {
-  const r = document.querySelector('input[name="pm-modal-mode"]:checked');
+  const r = rootQuery('input[name="pm-modal-mode"]:checked');
   return r ? r.value : 'top-3';
 }
 
@@ -322,7 +392,7 @@ function modalModeToCoachingLeaf(mode) {
 }
 
 function syncPmModalCustomHint() {
-  const el = document.getElementById('pm-modal-custom-hint');
+  const el = byId('pm-modal-custom-hint');
   if (!el) return;
   el.hidden = getPmModalMode() !== 'custom';
 }
@@ -491,11 +561,11 @@ function trainingReportHref(franchiseId, teamId, week) {
  * left visible — it is the part that still does something on these weeks.
  */
 function showTrainingStateNote(opts) {
-  const note = document.getElementById('training-state-note');
+  const note = byId('training-state-note');
   if (!note) return;
-  const head = document.getElementById('training-state-note-head');
-  const body = document.getElementById('training-state-note-body');
-  const link = document.getElementById('training-state-note-link');
+  const head = byId('training-state-note-head');
+  const body = byId('training-state-note-body');
+  const link = byId('training-state-note-link');
   if (head) head.textContent = opts.head || '';
   if (body) body.textContent = opts.body || '';
   if (link) {
@@ -510,11 +580,11 @@ function showTrainingStateNote(opts) {
   note.hidden = false;
 
   ['.main-content-grid', '.coaching-section'].forEach(function (sel) {
-    const el = document.querySelector(sel);
+    const el = rootQuery(sel);
     if (el) el.hidden = true;
   });
   ['requirements-bar', 'auto-train-btn', 'submit-btn'].forEach(function (id) {
-    const el = document.getElementById(id);
+    const el = byId(id);
     if (el) el.hidden = true;
   });
   document.body.classList.add('training-no-allocation');
@@ -522,10 +592,11 @@ function showTrainingStateNote(opts) {
   if (window.GOBAdvance && window.GOBAdvance.clearOverride) window.GOBAdvance.clearOverride();
 }
 
-// Track previous slider values to prevent over-allocation
-allSliders.forEach(slider => {
-  slider.dataset.prev = '0';
-});
+function primeSliderPrev() {
+  allSliders.forEach(slider => {
+    slider.dataset.prev = '0';
+  });
+}
 
 /**
  * Build the 6-pip stepper for one drill.
@@ -642,7 +713,7 @@ function formatPointsDisplay(n) {
  * Check if coaching focus is selected
  */
 function isCoachingFocusSelected() {
-  const selectedFocus = document.querySelector('input[name="coaching-focus"]:checked');
+  const selectedFocus = rootQuery('input[name="coaching-focus"]:checked');
   return selectedFocus !== null;
 }
 
@@ -661,7 +732,7 @@ function isCustomFocusComplete() {
 
 /** Submit enabled when PM hidden leaf is selected, or Choose Attributes + resolved leaf (custom → committed complete). */
 function isPlayerMaximizerSubmitReady() {
-  const sel = document.querySelector('input[name="coaching-focus"]:checked');
+  const sel = rootQuery('input[name="coaching-focus"]:checked');
   if (!sel || !sel.value.startsWith('player-maximizer')) return true;
   if (sel.value === CHOOSE_ATTRIBUTES_VALUE) {
     if (!playerMaximizerResolvedFocus) return false;
@@ -690,7 +761,7 @@ function openCustomFocusModal() {
     return;
   }
   const mode = resolvedFocusToModalMode(playerMaximizerResolvedFocus);
-  const modeInput = document.querySelector(`input[name="pm-modal-mode"][value="${mode}"]`);
+  const modeInput = rootQuery(`input[name="pm-modal-mode"][value="${mode}"]`);
   if (modeInput) modeInput.checked = true;
 
   customFocusDraft = {};
@@ -885,7 +956,8 @@ function syncTrainingAdvance(ready) {
   }
   let onView = false;
   try {
-    onView = new URLSearchParams(window.location.search).get('tab') === 'training-view';
+    onView = (window.FranchiseContext && window.FranchiseContext.get('tab') === 'training-view')
+      || inAppShell();
   } catch (_err) {
     onView = false;
   }
@@ -898,7 +970,7 @@ function syncTrainingAdvance(ready) {
     label: 'Submit Training',
     enabled: !!ready,
     onClick: function () {
-      submitTraining(document.getElementById('play-now'));
+      submitTraining(byId('play-now'));
     },
   });
 }
@@ -906,6 +978,7 @@ function syncTrainingAdvance(ready) {
 /**
  * Handle slider input - prevent over-allocation
  */
+function wireSliders() {
 allSliders.forEach(slider => {
   ensureTrainingSliderVisual(slider);
   updateTrainingSliderVisual(slider, slider.value);
@@ -947,12 +1020,16 @@ allSliders.forEach(slider => {
   }
   updateTrainingSliderValuePosition(slider);
 });
+}
 
-window.addEventListener('resize', function () {
+function wireSliderResize() {
+_onResizeSliders = function () {
   allSliders.forEach(function (slider) {
     updateTrainingSliderValuePosition(slider);
   });
-});
+};
+window.addEventListener('resize', _onResizeSliders);
+}
 
 /**
  * Auto-Train: assign whole points under the flat budget and pick a random focus
@@ -1090,6 +1167,7 @@ function autoAssignTraining() {
   }
 }
 
+function wireAutoTrain() {
 if (autoTrainBtn) {
   autoTrainBtn.addEventListener('click', autoAssignTraining);
 }
@@ -1098,6 +1176,7 @@ if (autoTrainModalClose && autoTrainModal) {
     playSound('click-tiny.wav');
     autoTrainModal.classList.remove('is-visible');
   });
+}
 }
 
 function findCoachingFocusRadioByValue(value) {
@@ -1110,7 +1189,7 @@ function findCoachingFocusRadioByValue(value) {
 
 /** Archetype block highlight only (no sound, no PM modal). */
 function applyCoachingFocusArchetypeUi(value) {
-  document.querySelectorAll('.archetype-block').forEach(function (block) {
+  qsa('.archetype-block').forEach(function (block) {
     block.classList.remove('active', 'header-selected', 'sub-option-selected');
   });
   let archetype = null;
@@ -1119,7 +1198,7 @@ function applyCoachingFocusArchetypeUi(value) {
   else if (value.startsWith('player-maximizer')) archetype = 'player-maximizer';
   else if (value.startsWith('culture-builder')) archetype = 'culture-builder';
   if (!archetype) return;
-  const archetypeBlock = document.querySelector(`[data-archetype="${archetype}"]`);
+  const archetypeBlock = rootQuery(`[data-archetype="${archetype}"]`);
   if (!archetypeBlock) return;
   const isHeaderRadio = value === archetype;
   if (isHeaderRadio) archetypeBlock.classList.add('active', 'header-selected');
@@ -1149,7 +1228,7 @@ function restoreTrainingFormDraft() {
 
   if (o.sliders && typeof o.sliders === 'object') {
     Object.keys(o.sliders).forEach(function (id) {
-      const el = document.getElementById(id);
+      const el = byId(id);
       if (el && el.classList && el.classList.contains('slider')) {
         const v = Math.max(0, Math.min(5, parseInt(o.sliders[id], 10) || 0));
         setSliderValue(el, v);
@@ -1178,6 +1257,7 @@ function restoreTrainingFormDraft() {
  * Handle coaching focus radio button selection
  * All radios in this section are part of ONE global radio group
  */
+function wireCoachingRadios() {
 coachingRadios.forEach(radio => {
   radio.addEventListener('change', function() {
     if (!this.checked) return;
@@ -1218,7 +1298,7 @@ coachingRadios.forEach(radio => {
   });
 });
 
-document.querySelectorAll('input[name="pm-modal-mode"]').forEach(function (radio) {
+qsa('input[name="pm-modal-mode"]').forEach(function (radio) {
   radio.addEventListener('change', function () {
     if (!this.checked) return;
     playSound('click-tiny.wav');
@@ -1241,7 +1321,7 @@ document.querySelectorAll('input[name="pm-modal-mode"]').forEach(function (radio
   });
 });
 
-const chooseAttrsRadio = document.querySelector(
+const chooseAttrsRadio = rootQuery(
   `input[name="coaching-focus"][value="${CHOOSE_ATTRIBUTES_VALUE}"]`
 );
 if (chooseAttrsRadio) {
@@ -1262,11 +1342,13 @@ if (customFocusCancelBtn) {
     closeCustomFocusModal();
   });
 }
+}
 
 /**
  * Handle back button click
  */
-backBtn.addEventListener('click', function() {
+function wireBackButton() {
+if (backBtn) backBtn.addEventListener('click', function() {
   clearTutorialResumeContext();
   // Get URL parameters to determine where to navigate back
   const urlParams = liveParams();
@@ -1298,6 +1380,7 @@ backBtn.addEventListener('click', function() {
     else window.location.replace(planUrl);
   }
 });
+}
 
 /**
  * Collect all training data for submission
@@ -1308,54 +1391,54 @@ function collectTrainingData() {
     // Player Drills
     player_drills: {
       offense: {
-        inside: parseInt(document.getElementById('offense-inside').value) || 0,
-        outside: parseInt(document.getElementById('offense-outside').value) || 0
+        inside: parseInt(byId('offense-inside').value) || 0,
+        outside: parseInt(byId('offense-outside').value) || 0
       },
       defense: {
-        inside: parseInt(document.getElementById('defense-inside').value) || 0,
-        outside: parseInt(document.getElementById('defense-outside').value) || 0
+        inside: parseInt(byId('defense-inside').value) || 0,
+        outside: parseInt(byId('defense-outside').value) || 0
       },
       technical: {
-        passing: parseInt(document.getElementById('technical-passing').value) || 0,
-        ball_handling: parseInt(document.getElementById('technical-ball-handling').value) || 0,
-        rebounding: parseInt(document.getElementById('technical-rebounding').value) || 0
+        passing: parseInt(byId('technical-passing').value) || 0,
+        ball_handling: parseInt(byId('technical-ball-handling').value) || 0,
+        rebounding: parseInt(byId('technical-rebounding').value) || 0
       },
       weight_room: {
-        strength: parseInt(document.getElementById('weight-strength').value) || 0,
-        agility: parseInt(document.getElementById('weight-agility').value) || 0
+        strength: parseInt(byId('weight-strength').value) || 0,
+        agility: parseInt(byId('weight-agility').value) || 0
       }
     },
     
     // Team Drills
     team_drills: {
       team_offense: {
-        install: parseInt(document.getElementById('team-offense-install').value) || 0
+        install: parseInt(byId('team-offense-install').value) || 0
       },
       team_defense: {
-        install: parseInt(document.getElementById('team-defense-install').value) || 0
+        install: parseInt(byId('team-defense-install').value) || 0
       },
       fast_breaks: {
-        offense_install: parseInt(document.getElementById('fast-break-offense-install').value) || 0,
-        defense_install: parseInt(document.getElementById('fast-break-defense-install').value) || 0
+        offense_install: parseInt(byId('fast-break-offense-install').value) || 0,
+        defense_install: parseInt(byId('fast-break-defense-install').value) || 0
       },
-      scrimmages: parseInt(document.getElementById('team-scrimmages').value) || 0,
+      scrimmages: parseInt(byId('team-scrimmages').value) || 0,
       presses_traps: {
-        defense_install: parseInt(document.getElementById('press-defense-install').value) || 0,
-        offense_install: parseInt(document.getElementById('press-offense-install').value) || 0
+        defense_install: parseInt(byId('press-defense-install').value) || 0,
+        offense_install: parseInt(byId('press-offense-install').value) || 0
       }
     },
     
     // General
     general: {
-      conditioning: parseInt(document.getElementById('general-conditioning').value) || 0,
-      free_throws: parseInt(document.getElementById('general-free-throws').value) || 0,
-      film_study: parseInt(document.getElementById('general-film-study').value) || 0,
-      breaks: parseInt(document.getElementById('general-breaks').value) || 0
+      conditioning: parseInt(byId('general-conditioning').value) || 0,
+      free_throws: parseInt(byId('general-free-throws').value) || 0,
+      film_study: parseInt(byId('general-film-study').value) || 0,
+      breaks: parseInt(byId('general-breaks').value) || 0
     },
     
     // Coaching Focus (Choose Attributes → concrete leaf from modal Assign)
     coaching_focus: (function () {
-      let cf = document.querySelector('input[name="coaching-focus"]:checked')?.value || null;
+      let cf = rootQuery('input[name="coaching-focus"]:checked')?.value || null;
       if (cf === CHOOSE_ATTRIBUTES_VALUE) {
         cf = playerMaximizerResolvedFocus;
       }
@@ -1371,7 +1454,7 @@ function collectTrainingData() {
         }
         return 'current-playbooks';
       }
-      return document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks';
+      return rootQuery('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks';
     })(),
     training_playbook_focus: (function () {
       if (pageParams.get('mode') !== 'franchise') return null;
@@ -1404,7 +1487,7 @@ function collectTrainingData() {
     console.log('🔋 [FRONTEND] scrimmages value:', data.team_drills.scrimmages);
   } else {
     console.error('🔋 [FRONTEND] ERROR: scrimmages NOT in team_drills!');
-    console.log('🔋 [FRONTEND] Checking element again:', document.getElementById('team-scrimmages'));
+    console.log('🔋 [FRONTEND] Checking element again:', byId('team-scrimmages'));
   }
   
   return data;
@@ -1466,7 +1549,7 @@ async function submitTraining(button) {
     return;
   }
 
-  const cfRadio = document.querySelector('input[name="coaching-focus"]:checked')?.value;
+  const cfRadio = rootQuery('input[name="coaching-focus"]:checked')?.value;
   if (cfRadio === CHOOSE_ATTRIBUTES_VALUE && !isPlayerMaximizerSubmitReady()) {
     alert('Player Maximizer: open Choose Attributes, pick a mode, and tap Assign Focus Attributes (for Custom, pick three distinct attributes per player).');
     return;
@@ -1662,10 +1745,12 @@ async function submitTraining(button) {
   }
 }
 
+function wireSubmit() {
 if (submitBtn) {
   submitBtn.addEventListener('click', function () {
     submitTraining(submitBtn);
   });
+}
 }
 
 async function resumeCpuTraining(franchiseId) {
@@ -1799,13 +1884,16 @@ async function initializeTrainingPoints() {
 }
 
 
-window.addEventListener('pageshow', (event) => {
+function wirePageShow() {
+_onPageShow = (event) => {
   if (event.persisted) {
     if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
     return;
   }
   applyTrainingWeekState();
-});
+};
+window.addEventListener('pageshow', _onPageShow);
+}
 
 function syncPlaybookModeToggleUi() {
   try {
@@ -1816,9 +1904,9 @@ function syncPlaybookModeToggleUi() {
       sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
     }
   } catch (_e) {}
-  const banner = document.getElementById('custom-playbook-banner');
-  const btnCurrent = document.getElementById('playbook-mode-current-btn');
-  const btnCustom = document.getElementById('playbook-mode-custom-btn');
+  const banner = byId('custom-playbook-banner');
+  const btnCurrent = byId('playbook-mode-current-btn');
+  const btnCustom = byId('playbook-mode-custom-btn');
   const customOn =
     sessionStorage.getItem(STORAGE_PLAYBOOK_MODE) === 'custom' &&
     sessionStorage.getItem(STORAGE_PLAYBOOK_FOCUS);
@@ -1836,12 +1924,12 @@ function syncPlaybookModeToggleUi() {
 function wireCustomTrainingPlaybook() {
   const pageParams = liveParams();
   if (pageParams.get('mode') !== 'franchise') {
-    const wrap = document.querySelector('.playbook-mode-selection');
+    const wrap = rootQuery('.playbook-mode-selection');
     if (wrap) wrap.style.display = 'none';
     return;
   }
-  const btnCurrent = document.getElementById('playbook-mode-current-btn');
-  const btnCustom = document.getElementById('playbook-mode-custom-btn');
+  const btnCurrent = byId('playbook-mode-current-btn');
+  const btnCustom = byId('playbook-mode-custom-btn');
   if (btnCurrent) {
     btnCurrent.addEventListener('click', function () {
       playSound('click-tiny.wav');
@@ -2043,7 +2131,10 @@ function registerTrainingTooltip(trigger, html, focusEl) {
 }
 
 // Dismiss on scroll and on outside tap
-window.addEventListener('scroll', hideTrainingTooltip, true);
+function wireTooltipScroll() {
+_onScrollTip = hideTrainingTooltip;
+window.addEventListener('scroll', _onScrollTip, true);
+}
 document.addEventListener('click', function (e) {
   if (lastPointerType === 'touch' && trainingTooltipTrigger && !trainingTooltipTrigger.contains(e.target)) {
     hideTrainingTooltip();
@@ -2087,7 +2178,7 @@ function injectAttributeChip(slider, d) {
   if (!lt || lt.querySelector('.attr-chip')) return;
   const chip = document.createElement('span');
   chip.className = 'attr-chip';
-  if (!document.getElementById('training-view')) chip.style.background = d.color;
+  if (!byId('training-view')) chip.style.background = d.color;
   chip.textContent = d.code;
   chip.setAttribute('aria-hidden', 'true');
   lt.appendChild(chip);
@@ -2105,7 +2196,7 @@ function triggerForSlider(slider) {
 
 function setupTrainingTooltips() {
   Object.keys(DRILL_TOOLTIPS).forEach(function (id) {
-    const slider = document.getElementById(id);
+    const slider = byId(id);
     if (!slider) return;
     const d = DRILL_TOOLTIPS[id];
     injectAttributeChip(slider, d);
@@ -2113,7 +2204,7 @@ function setupTrainingTooltips() {
     if (trigger) registerTrainingTooltip(trigger, buildDrillTooltipHtml(d), slider);
   });
 
-  document.querySelectorAll('.archetype-option').forEach(function (opt) {
+  qsa('.archetype-option').forEach(function (opt) {
     const radio = opt.querySelector('input[name="coaching-focus"]');
     if (!radio) return;
     const f = FOCUS_TOOLTIPS[radio.value];
@@ -2123,15 +2214,6 @@ function setupTrainingTooltips() {
 }
 
 /* --- Requirements bar --- */
-const reqBarEl = document.getElementById('requirements-bar');
-const reqPointsChip = document.getElementById('req-points');
-const reqPointsUsedEl = document.getElementById('req-points-used');
-const reqPointsTotalEl = document.getElementById('req-points-total');
-const reqPointsMeterEl = document.getElementById('req-points-meter');
-const reqFocusChip = document.getElementById('req-focus');
-const reqFocusValueEl = document.getElementById('req-focus-value');
-const reqFocusNudgeBtn = document.getElementById('req-focus-nudge');
-
 function friendlyFocusName(radio) {
   const v = radio.value;
   if (v === CHOOSE_ATTRIBUTES_VALUE) {
@@ -2159,7 +2241,7 @@ function updateRequirementsBar() {
   }
   if (reqPointsChip) reqPointsChip.classList.toggle('is-complete', pointsComplete);
 
-  const checked = document.querySelector('input[name="coaching-focus"]:checked');
+  const checked = rootQuery('input[name="coaching-focus"]:checked');
   const focusSelected = !!checked;
   const focusComplete = focusSelected && isPlayerMaximizerSubmitReady();
 
@@ -2186,7 +2268,7 @@ function updateRequirementsBar() {
 }
 
 function scrollToCoachingFocus() {
-  const sec = document.querySelector('.coaching-section');
+  const sec = rootQuery('.coaching-section');
   if (!sec) return;
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   sec.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
@@ -2196,64 +2278,116 @@ function scrollToCoachingFocus() {
   window.setTimeout(function () { sec.classList.remove('coaching-flash'); }, 1600);
 }
 
+function wireReqNudge() {
 if (reqFocusNudgeBtn) {
   reqFocusNudgeBtn.addEventListener('click', function () {
     playSound('click-tiny.wav');
     scrollToCoachingFocus();
   });
 }
+}
 
 /* Keep the requirements bar docked just below the sticky header. */
 function positionRequirementsBar() {
-  const header = document.querySelector('.training-header');
+  const header = rootQuery('.training-header');
   if (!reqBarEl || !header) return;
   const headerTop = parseFloat(getComputedStyle(header).top) || 0;
   reqBarEl.style.top = Math.round(headerTop + header.offsetHeight + 8) + 'px';
 }
 
-window.addEventListener('resize', positionRequirementsBar);
+function wireReqBarChrome() {
+_onResizeReq = positionRequirementsBar;
+window.addEventListener('resize', _onResizeReq);
 if (typeof ResizeObserver !== 'undefined') {
-  const headerForObserve = document.querySelector('.training-header');
+  const headerForObserve = rootQuery('.training-header');
   if (headerForObserve) {
-    new ResizeObserver(positionRequirementsBar).observe(headerForObserve);
+    _reqObserver = new ResizeObserver(positionRequirementsBar);
+    _reqObserver.observe(headerForObserve);
   }
 }
+}
 
-// Wire up tooltips/chips and prime the requirements bar
-setupTrainingTooltips();
-positionRequirementsBar();
-updateRequirementsBar();
+function wireTrainingUi() {
+  if (root && root.dataset.trainingWired === '1') return;
+  if (root) root.dataset.trainingWired = '1';
+  primeSliderPrev();
+  wireSliders();
+  wireSliderResize();
+  wireAutoTrain();
+  wireCoachingRadios();
+  wireBackButton();
+  wireSubmit();
+  wirePageShow();
+  wireTooltipScroll();
+  wireReqNudge();
+  wireReqBarChrome();
+  setupTrainingTooltips();
+  positionRequirementsBar();
+  updateRequirementsBar();
+}
 
-// Initialize training points on page load
-(async function initTrainingPage() {
+async function startTrainingPage() {
   if (window.GOBNav) window.GOBNav.warnOnLeave(function () { return trainingDirty; });
   const noAllocation = await applyTrainingWeekState();
   wireTrainingTutorialButton();
-  // Player Development still needs its data on a no-allocation week. It rides along on
-  // the training-points payload, which now returns 200 + training_unavailable after week 26.
   await initializeTrainingPoints();
   if (!noAllocation) wireCustomTrainingPlaybook();
   if (window.GOBNav) window.GOBNav.restoreScroll();
-})();
+}
 
-// Debug: Verify scrimmages element exists on page load
-(function() {
-  const scrimmagesElem = document.getElementById('team-scrimmages');
-  console.log('🔋 [PAGE LOAD] team-scrimmages element:', scrimmagesElem);
-  if (scrimmagesElem) {
-    console.log('🔋 [PAGE LOAD] team-scrimmages value:', scrimmagesElem.value);
-    console.log('🔋 [PAGE LOAD] team-scrimmages type:', scrimmagesElem.type);
-    console.log('🔋 [PAGE LOAD] team-scrimmages id:', scrimmagesElem.id);
-  } else {
-    console.error('🔋 [PAGE LOAD] ERROR: team-scrimmages element NOT FOUND!');
-    // Try to find it with different methods
-    console.log('🔋 [PAGE LOAD] All elements with "scrimmages" in id:', document.querySelectorAll('[id*="scrimmages"]'));
-    console.log('🔋 [PAGE LOAD] All sliders:', document.querySelectorAll('.slider[data-category="team-drills"]'));
+function teardown() {
+  if (_onPageShow) window.removeEventListener('pageshow', _onPageShow);
+  if (_onResizeSliders) window.removeEventListener('resize', _onResizeSliders);
+  if (_onResizeReq) window.removeEventListener('resize', _onResizeReq);
+  if (_onScrollTip) window.removeEventListener('scroll', _onScrollTip, true);
+  if (_tabShown) window.removeEventListener('gob-tab-shown', _tabShown);
+  _onPageShow = _onResizeSliders = _onResizeReq = _onScrollTip = _tabShown = null;
+  if (_reqObserver) { try { _reqObserver.disconnect(); } catch (err) {} _reqObserver = null; }
+  if (window.GOBAdvance && window.GOBAdvance.clearOverride) window.GOBAdvance.clearOverride();
+  if (window.GOBNav && typeof window.GOBNav.warnOnLeave === 'function') {
+    try { window.GOBNav.warnOnLeave(null); } catch (err) {}
   }
-})();
+  started = false;
+}
+
+function revalidate() {
+  if (!started) return init(root);
+  bindDom();
+  if (inAppShell() && window.GOBTraining) window.GOBTraining.syncAdvance();
+  return applyTrainingWeekState().then(function () {
+    return initializeTrainingPoints();
+  }).then(function () {
+    if (window.GOBTables && window.GOBTables.placeTools) window.GOBTables.placeTools();
+    return { revalidate: revalidate, unmount: teardown };
+  });
+}
+
+async function init(host) {
+  root = host || document.body;
+  const hadShell = !!root.querySelector('.training-container');
+  if (!hadShell) root.insertAdjacentHTML('beforeend', shellHtml());
+  bindDom();
+  if (hadShell && started) return revalidate();
+  wireTrainingUi();
+  try {
+    await startTrainingPage();
+    started = true;
+  } catch (error) {
+    console.error('Failed to initialize training page:', error);
+    throw error;
+  }
+  return { revalidate: revalidate, unmount: teardown };
+}
+
+function shellHtml() {
+  return TRAINING_SHELL;
+}
+
+export { init, teardown, revalidate, shellHtml };
+window.initTraining = function (host, options) { return init(host || document.body, options); };
 
 window.GOBTraining = {
-  submit: function () { return submitTraining(document.getElementById('play-now')); },
+  submit: function () { return submitTraining(byId('play-now')); },
   syncAdvance: function () {
     const remaining = TOTAL_POINTS - calculateTotalPoints();
     syncTrainingAdvance(remaining === 0 && isCoachingFocusSelected() && isPlayerMaximizerSubmitReady());

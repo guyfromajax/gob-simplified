@@ -299,8 +299,8 @@
     window.__gameStoreLoaded = true;
     resumeMusicForGamePlan();
     try {
-      const q = new URLSearchParams(location.search);
-      if (q.get('resume_from_timeout') === 'true' || q.get('mode') === 'tutorial' || q.get('embed') === '1') {
+      const ctx = window.FranchiseContext;
+      if (ctx && (ctx.get('resume_from_timeout') === 'true' || ctx.get('mode') === 'tutorial' || ctx.get('embed') === '1')) {
         init(document.body);
       }
     } catch (err) { /* redirect already left */ }

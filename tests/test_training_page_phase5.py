@@ -44,7 +44,7 @@ def test_every_drill_id_is_still_on_the_page(drill_id):
 
 @pytest.mark.parametrize("drill_id", DRILL_IDS)
 def test_collect_training_data_still_reads_it(drill_id):
-    assert f"getElementById('{drill_id}')" in JS
+    assert f"byId('{drill_id}')" in JS or f"getElementById('{drill_id}')" in JS
 
 
 def test_there_are_exactly_twenty_drills():

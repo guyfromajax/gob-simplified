@@ -19,16 +19,17 @@ var DEPS = [
 ];
 
 function optionsFrom(ctx) {
-  var bag;
-  try { bag = new URLSearchParams(window.location.search); }
-  catch (err) { bag = new URLSearchParams(); }
+  var door = window.FranchiseContext;
+  function read(name) {
+    return door && typeof door.get === 'function' ? (door.get(name) || '') : '';
+  }
   return {
-    mode: bag.get('mode') || 'franchise',
-    franchiseId: (ctx && ctx.franchiseId) || bag.get('franchise_id') || '',
-    teamId: (ctx && ctx.teamId) || bag.get('team_id') || '',
-    week: bag.get('week') || '',
-    from: bag.get('from') || '',
-    origin: bag.get('origin') || ''
+    mode: read('mode') || 'franchise',
+    franchiseId: (ctx && ctx.franchiseId) || read('franchise_id') || '',
+    teamId: (ctx && ctx.teamId) || read('team_id') || '',
+    week: read('week') || '',
+    from: read('from') || '',
+    origin: read('origin') || ''
   };
 }
 

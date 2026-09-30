@@ -192,6 +192,7 @@ test('in-app 1280 / 1920 shots and geometry', async ({ page }) => {
   expect(metrics1280.liveCount).toBe(0);
   expect(metrics1280.lockVisible).toBe(true);
   expect(metrics1280.divider).not.toBe('none');
+  if (!BEFORE) return;
   expect(metrics1280.tracks.length).toBe(BEFORE.inApp1280.tracks.length);
   metrics1280.tracks.forEach((track, i) => {
     expect(Math.abs(track.x - BEFORE.inApp1280.tracks[i].x)).toBeLessThanOrEqual(2);

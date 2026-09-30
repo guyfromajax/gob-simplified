@@ -37,7 +37,6 @@
       "FrontEnd/static/js/shared/views/scoutingView.js": 1,
       "FrontEnd/static/js/shared/views/teamScheduleView.js": 1,
       "FrontEnd/static/js/shared/views/tournamentView.js": 2,
-      "FrontEnd/static/js/shared/views/trainingReportView.js": 2,
       "FrontEnd/static/leaders.html": 1,
       "FrontEnd/static/news.html": 1,
       "FrontEnd/static/playbooks.html": 1,
@@ -52,10 +51,8 @@
       "FrontEnd/static/team-roster-view.html": 1,
       "FrontEnd/static/team-roster-view.js": 1,
       "FrontEnd/static/team-stats.html": 1,
-      "FrontEnd/static/training-report.html": 2,
-      "FrontEnd/static/training-report.js": 1,
-      "FrontEnd/static/training.html": 1,
-      "FrontEnd/static/training.js": 1
+      "FrontEnd/static/training-report.html": 1,
+      "FrontEnd/static/training.html": 1
     }
   }
 }

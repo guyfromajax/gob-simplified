@@ -208,8 +208,8 @@
     import '/js/state/gameStore.js';
     window.__gameStoreLoaded = true;
     try {
-      const q = new URLSearchParams(location.search);
-      if (q.get('mode') === 'tutorial' || q.get('embed') === '1') {
+      const ctx = window.FranchiseContext;
+      if (ctx && (ctx.get('mode') === 'tutorial' || ctx.get('embed') === '1')) {
         init(document.body);
       }
     } catch (err) { /* redirect already left */ }

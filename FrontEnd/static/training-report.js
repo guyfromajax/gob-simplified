@@ -59,7 +59,7 @@ function readOptions(options) {
   options = options || {};
   let bag;
   try { bag = liveParams(); }
-  catch (err) { bag = new URLSearchParams(); }
+  catch (err) { bag = window.FranchiseContext && window.FranchiseContext.createParams ? window.FranchiseContext.createParams() : { get: function () { return ''; } }; }
   function pick(name, alt) {
     if (options[name] != null && options[name] !== '') return String(options[name]);
     return bag.get(name) || bag.get(alt) || '';
