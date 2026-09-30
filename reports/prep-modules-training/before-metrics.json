@@ -1,0 +1,302 @@
+{
+  "inSeason1280": {
+    "tracks": [
+      {
+        "x": 328,
+        "w": 126,
+        "y": 217
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 247
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 299
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 329
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 381
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 411
+      }
+    ],
+    "pill": {
+      "x": 596,
+      "y": 125,
+      "w": 412,
+      "h": 30,
+      "bg": "rgba(0, 0, 0, 0)",
+      "display": "flex"
+    },
+    "tools": {
+      "x": 596,
+      "y": 125,
+      "w": 666
+    },
+    "advance": {
+      "text": "Submit Training",
+      "bg": "rgb(52, 236, 39)",
+      "color": "rgb(11, 13, 20)"
+    },
+    "modal": {
+      "display": "none",
+      "x": 0,
+      "y": 0,
+      "w": 0
+    },
+    "submitInView": false,
+    "noteHidden": true
+  },
+  "inSeason1920": {
+    "tracks": [
+      {
+        "x": 625,
+        "w": 126,
+        "y": 259
+      },
+      {
+        "x": 625,
+        "w": 126,
+        "y": 294
+      },
+      {
+        "x": 625,
+        "w": 126,
+        "y": 356
+      },
+      {
+        "x": 625,
+        "w": 126,
+        "y": 391
+      },
+      {
+        "x": 625,
+        "w": 126,
+        "y": 453
+      },
+      {
+        "x": 625,
+        "w": 126,
+        "y": 488
+      }
+    ],
+    "pill": {
+      "x": 1181,
+      "y": 150,
+      "w": 457,
+      "h": 36,
+      "bg": "rgba(0, 0, 0, 0)",
+      "display": "flex"
+    },
+    "tools": {
+      "x": 1181,
+      "y": 150,
+      "w": 711
+    },
+    "advance": {
+      "text": "Submit Training",
+      "bg": "rgb(52, 236, 39)",
+      "color": "rgb(11, 13, 20)"
+    },
+    "modal": {
+      "display": "none",
+      "x": 0,
+      "y": 0,
+      "w": 0
+    },
+    "submitInView": false,
+    "noteHidden": true
+  },
+  "camp1280": {
+    "tracks": [
+      {
+        "x": 328,
+        "w": 126,
+        "y": 217
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 247
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 299
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 329
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 381
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 411
+      }
+    ],
+    "pill": {
+      "x": 596,
+      "y": 125,
+      "w": 412,
+      "h": 30,
+      "bg": "rgba(0, 0, 0, 0)",
+      "display": "flex"
+    },
+    "tools": {
+      "x": 596,
+      "y": 125,
+      "w": 666
+    },
+    "advance": {
+      "text": "Submit Training",
+      "bg": "rgb(52, 236, 39)",
+      "color": "rgb(11, 13, 20)"
+    },
+    "modal": {
+      "display": "none",
+      "x": 0,
+      "y": 0,
+      "w": 0
+    },
+    "submitInView": false,
+    "noteHidden": true
+  },
+  "postWeek26": {
+    "tracks": [
+      {
+        "x": 0,
+        "w": 0,
+        "y": 0
+      },
+      {
+        "x": 0,
+        "w": 0,
+        "y": 0
+      },
+      {
+        "x": 0,
+        "w": 0,
+        "y": 0
+      },
+      {
+        "x": 0,
+        "w": 0,
+        "y": 0
+      },
+      {
+        "x": 0,
+        "w": 0,
+        "y": 0
+      },
+      {
+        "x": 0,
+        "w": 0,
+        "y": 0
+      }
+    ],
+    "pill": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0,
+      "bg": "rgba(0, 0, 0, 0)",
+      "display": "none"
+    },
+    "tools": {
+      "x": 1130,
+      "y": 128,
+      "w": 132
+    },
+    "advance": {
+      "text": "Play Conference Tourney Semifinals",
+      "bg": "rgb(52, 236, 39)",
+      "color": "rgb(11, 13, 20)"
+    },
+    "modal": {
+      "display": "none",
+      "x": 0,
+      "y": 0,
+      "w": 0
+    },
+    "submitInView": false,
+    "noteHidden": false
+  },
+  "customFocus": {
+    "tracks": [
+      {
+        "x": 328,
+        "w": 126,
+        "y": 217
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 247
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 299
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 329
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 381
+      },
+      {
+        "x": 328,
+        "w": 126,
+        "y": 411
+      }
+    ],
+    "pill": {
+      "x": 512,
+      "y": 125,
+      "w": 571,
+      "h": 30,
+      "bg": "rgba(0, 0, 0, 0)",
+      "display": "flex"
+    },
+    "tools": {
+      "x": 512,
+      "y": 125,
+      "w": 750
+    },
+    "advance": {
+      "text": "Submit Training",
+      "bg": "rgb(52, 236, 39)",
+      "color": "rgb(11, 13, 20)"
+    },
+    "modal": {
+      "display": "flex",
+      "x": 0,
+      "y": 0,
+      "w": 1280
+    },
+    "submitInView": false,
+    "noteHidden": true
+  }
+}

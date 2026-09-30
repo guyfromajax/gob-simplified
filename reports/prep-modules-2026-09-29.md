@@ -1,4 +1,4 @@
-# Chapter 8 — Prep modules: plan + Training Report + Game Plan + Playbooks
+# Chapter 8 — Prep modules: plan + Training Report + Game Plan + Playbooks + Player Training
 
 Convert the four Prep embed-bridge views into real modules. Training Report shipped first, then Game Plan. This section adds Playbooks. Player Training follows as its own PR.
 
@@ -283,5 +283,108 @@ Differences: in-app after has no duplicate `#toast` in the view (`toastHost` fal
 
 ---
 
+## Player Training
+
+Branch: `app/prep-modules-training` from `origin/develop` (Playbooks already merged).
+
+### Gate B re-check (already-converted modules)
+
+`scripts/ci/check_migration_gates.py` was run on this branch. The three earlier modules had been reading `window.location.search` from their view `optionsFrom` helpers and from the standalone HTML module-init blocks. That is a Gate B fail (new hits, or an allowlisted count going up).
+
+Fixed in this same commit:
+
+- `gamePlanView.js` / `playbooksView.js` / `trainingReportView.js` `optionsFrom` now reads `window.FranchiseContext.get`.
+- `game-plan.html` / `playbooks.html` module init and `training-report.html` embed check use `FranchiseContext.get`.
+- `training-report.js` `readOptions` catch uses `FranchiseContext.createParams()`.
+- Allowlist: removed `trainingReportView.js` and `training-report.js`; `training-report.html` stayed at 1 (redirect IIFE). `training.js` dropped off the list (0 hits).
+
+The redirect IIFEs on `training.html` / `training-report.html` / `game-plan.html` / `playbooks.html` still construct `URLSearchParams(location.search)` before `franchiseContext.js` loads. Those four files stay allowlisted at 1. `game-plan.js` and `playbooks.js` had no Gate B hits.
+
+Gates after the merge: **passed** (Gate A 0; Gate B 139 lines / 47 files). `origin/develop` already had `fix/gameplan-gate-b` (`contextValue` with try/catch). Conflicts in `game-plan.html` / `gamePlanView.js` / `playbooks.html` / `playbooksView.js` kept develop’s helper — it is the same FranchiseContext read plus a try/catch and a desktop-session note. The local `read()` copies were dropped. Training and Training Report views now use that same `contextValue` shape.
+
+### What changed
+
+- One implementation: `training.js` is an ES module with `init(root)`, `teardown`, `revalidate`, `shellHtml()`. Queries are scoped to `root` (`byId` / `rootQuery` / `qsa`). `#play-now` stays document-global. `window.GOBTraining` and `window.initTraining` remain. No `DOMContentLoaded` auto-start.
+- `shellHtml()` returns the hosted markup (no `#submit-btn`) from `training-shell.js`. First in-app mount paints that shell; standalone `training.html` already has the markup (and keeps `#submit-btn`).
+- `trainingView.js` imports `init` and the same dependency scripts. No `embed('/training.html?embed=1')`, no `DOMParser`, no `loadIsolated` IIFE, no `#submit-btn` strip. Tools park `#requirements-bar` / `#auto-train-btn` / `#training-tutorial-btn` into `.pg-tools`. `GOBTraining.syncAdvance` still overrides Advance to Submit Training while the tab is showing.
+- `/training.html` still redirects into `?tab=training-view` for regular browse. `mode=tutorial` stays on the standalone file (browse chrome). `embed=1` is leftover skip + `init(document.body)` only.
+- CSS: global `:root` / `*` / `body` reset is now `#training-view, body.training-page` tokens + `body.training-page` chrome only. Tools chrome is `html.gob-shell .pg-tools:has(#requirements-bar)`. The view still toggles `body.training-page` so parked tools keep the same pill rules as the develop embed (`:is(#training-view, …)` was tried and reverted — it raised standalone specificity and beat the in-app `#training-view` overrides).
+- Weekly allocation draft, per-player Saved toast, Auto-Train, custom-focus modal, coaching focus, Playbook Training toggle, Training by Position, post-week-26 note + hidden allocation, submit → Training Report drill-in with Back to Office: unchanged contracts.
+
+### Standalone paths verified
+
+- `training.html?mode=tutorial`: stays on the file. `#submit-btn` is visible. Browse chrome + rail.
+- Regular `/training.html` still `location.replace`s into `?tab=training-view`.
+- `embed=1`: leftover skip-redirect + `init(document.body)` only. No in-app caller.
+
+### First-open timing
+
+`scripts/measure_nav_timing.js --only=training-view --pass=timing` (PORT 8179, 5 runs × desktop + online). Coverage-map embed-era Training was 22/25 ms desktop cold. After:
+
+| screen | profile | cold med/worst | warm med/worst | flags cold \| warm | timeouts |
+|---|---|---|---|---|---|
+| training-view | desktop | 27/32 | 15/15 | skeleton5 jump5 \| — | 0 |
+| training-view | online | 25/25 | 10/12 | skeleton5 jump5 \| — | 0 |
+
+Cold is the module import + first fill. Warm 10–15 ms is the kept panel (`revalidate`, no rebuild). `jump5` on cold is CLS from the shell filling the sliders — same class of first-fill flag as Playbooks / the Training Report. No timeouts. Raw: `reports/prep-modules-training/timings.json`.
+
+### Screenshots (opened)
+
+Same fixture (`tests/e2e/fixtures/prep-plan.json`, franchise `6abbd5c3042952060db8726e`, Lancaster). Befores captured from develop embed-bridge with `TRAINING_BEFORE=1` before any conversion.
+
+| File | Check |
+|---|---|
+| `before-in-season-1280.png` / `1920.png` | Develop embed. Rail + Prep underline, points pill in `.pg-tools`, Advance Submit Training, three drill columns, compact coaching row, no `#submit-btn` in the view. |
+| `after-in-season-1280.png` / `1920.png` | Same layout, tracks, pill, Advance. No `#submit-btn` in `#training-view`. |
+| `before-camp-1280.png` / `after-camp-1280.png` | Week 1, 30 points. Advance still Submit Training (override). |
+| `before-post-week-26-1280.png` / `after-post-week-26-1280.png` | Tournament note, allocation hidden, Player Development stays, Advance is the tournament game. |
+| `before-tutorial-1280.png` / `after-tutorial-1280.png` | Standalone browse chrome on `training.html?mode=tutorial`. `#submit-btn` visible. |
+| `before-custom-focus-1280.png` / `after-custom-focus-1280.png` | Choose Attributes modal over the view. |
+
+### Before / after (same fixture)
+
+Geometry guard vs `before-metrics.json`: in-season 1280 tracks x=328 w=126; pill x=596 w=412; tools x matches ±2. Advance text and paint match. Camp pill width ±4. Custom-focus modal x/w ±4. After matches. Visual pairs: no extra rail on the in-app view, no `#submit-btn` in-app, tutorial stays on the file.
+
+### Tests
+
+- `tests/e2e/prep-modules-training.spec.js`: after shots + geometry, no `training.html` fetch, no duplicate ids, reopen keeps the panel, submit → report, camp label, draft, toast, tutorial.
+- `tests/test_prep_modules_training.py`: no embed/DOMParser/IIFE; `init` export; HTML keeps tutorial + browse redirect; view toggles `body.training-page` for parked tools only; no global `*` / `body` / `:root` reset.
+- Existing: player-training-followup **7 passed**; training-report-no-recruiting **5 passed**; shell-1b **5 passed**; training-page-phase5 / development-focus / player-development-grid / training-playbook-focus **passed**.
+
+### Cleanup (left for the audit batch — do not delete)
+
+- `js/shared/views/prepEmbed.js` — `ensureCss` / `loadScript` still used by the four Prep views + Scouting. `embed()` and `loadIsolated()` have no remaining callers.
+- `?embed=1` leftover skip + `init(document.body)` on `training.html`, `training-report.html`, `game-plan.html`, `playbooks.html`.
+- `_preview-training-phase5.html` — dead preview; its own inline script, not the module.
+- Scouting is still a separate view (`scoutingView.js`); it imports `ensureCss`/`loadScript` from `prepEmbed.js` and still reads `location.search` (allowlisted).
+
+---
+
+## Bridge retired
+
+All four Prep views are modules. Nothing in the app fetches `training.html?embed=1`, `training-report.html?embed=1`, `game-plan.html?embed=1`, or `playbooks.html?embed=1`.
+
+Grep (`rg -n "embed\\(|loadIsolated\\(|html\\?embed" FrontEnd/static --glob '*.js' --glob '*.html'`):
+
+| Path | Hits |
+|---|---|
+| `js/shared/views/prepEmbed.js:39` | `export function loadIsolated(src)` — definition only |
+| `js/shared/views/prepEmbed.js:72` | `export function embed(url, host, selectors)` — definition only |
+
+Zero callers. `trainingView.js`, `trainingReportView.js`, `gamePlanView.js`, and `playbooksView.js` import `ensureCss` / `loadScript` / `ensureFranchiseMode` only.
+
+`embed=1` leftover (skip-redirect + `init(document.body)` on the standalone files, not an in-app fetch): `training.html`, `training-report.html`, `game-plan.html`, `playbooks.html` redirect IIFEs still skip when `embed=1`. Module init on those pages still calls `init(document.body)` for that leftover. The bridge file stays until the cleanup batch because `ensureCss` / `loadScript` / `ensureFranchiseMode` are still the shared loader. `embed()` and `loadIsolated()` can go in that batch.
+
+---
+
+### UX_System §8 merge gate
+
+- pytest `-q` (default config), after `origin/develop` merge: **4131 passed**, 16 skipped, 109 xfailed, 1 xpassed (`test_leaders_view_scope_filters_to_user_conference`), **0 failed**.
+- Full Playwright, workers=1, port 8157, CI unset: **728 passed**, 3 skipped, **0 failed**.
+- This-work Playwright: **12 passed** (`prep-modules-training.spec.js`).
+
+---
+
 STATUS: COMPLETE
+
 
