@@ -208,8 +208,10 @@
     import '/js/state/gameStore.js';
     window.__gameStoreLoaded = true;
     try {
-      const q = new URLSearchParams(location.search);
-      if (q.get('mode') === 'tutorial' || q.get('embed') === '1') {
+      // FranchiseContext (loaded in <head>), not the URL: correct on web and desktop.
+      const fc = window.FranchiseContext;
+      const ctx = (key) => (fc && typeof fc.get === 'function' ? fc.get(key) : null);
+      if (ctx('mode') === 'tutorial' || ctx('embed') === '1') {
         init(document.body);
       }
     } catch (err) { /* redirect already left */ }

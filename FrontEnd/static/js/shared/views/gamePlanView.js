@@ -34,17 +34,22 @@ function loadGameStore() {
   });
 }
 
+// FranchiseContext, not the URL: on desktop ids like game_id can live only in the session.
+function contextValue(key) {
+  var fc = window.FranchiseContext;
+  if (!fc || typeof fc.get !== 'function') return '';
+  try { return fc.get(key) || ''; }
+  catch (err) { return ''; }
+}
+
 function optionsFrom(ctx) {
-  var bag;
-  try { bag = new URLSearchParams(window.location.search); }
-  catch (err) { bag = new URLSearchParams(); }
   return {
-    mode: bag.get('mode') || 'franchise',
-    franchiseId: (ctx && ctx.franchiseId) || bag.get('franchise_id') || '',
-    teamId: (ctx && ctx.teamId) || bag.get('team_id') || '',
-    week: bag.get('week') || '',
-    from: bag.get('from') || 'command_center',
-    game_id: bag.get('game_id') || ''
+    mode: contextValue('mode') || 'franchise',
+    franchiseId: (ctx && ctx.franchiseId) || contextValue('franchise_id') || '',
+    teamId: (ctx && ctx.teamId) || contextValue('team_id') || '',
+    week: contextValue('week') || '',
+    from: contextValue('from') || 'command_center',
+    game_id: contextValue('game_id') || ''
   };
 }
 
