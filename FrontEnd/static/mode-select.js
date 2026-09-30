@@ -1260,13 +1260,9 @@ function wireHomeBase() {
 }
 
 async function logOutOfGob() {
-  try {
-    await fetch(API_CONFIG.buildUrl('/api/auth/logout'), { method: 'POST' });
-  } catch (e) {}
-  try {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-  } catch (e) {}
+  // Shared helper attaches the bearer token before clearing it, so the server
+  // actually revokes the session. It clears the local token and never throws.
+  try { await API_CONFIG.logout(); } catch (e) {}
   navigateFromModeSelect('/login.html');
 }
 

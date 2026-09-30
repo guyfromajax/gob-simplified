@@ -116,7 +116,7 @@ function retryPhaseAWithBoxDocument(requestBody, playedDocument, postedGameId) {
 }
 
 async function postPhaseA(requestBody) {
-  return fetch(API_CONFIG.buildUrl('/franchise/complete-week/phase-a'), {
+  return API_CONFIG.fetchWithRateLimitRetry(API_CONFIG.buildUrl('/franchise/complete-week/phase-a'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(requestBody),
