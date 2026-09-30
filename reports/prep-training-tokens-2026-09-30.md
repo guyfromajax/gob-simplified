@@ -7,7 +7,7 @@ Visual-only. Colour law wins over frames (Jamie).
 
 Player Training and Training Report now sit on `gob-tokens` / UX_System colour law.
 
-- Raw green / orange / reward-gold chrome is gone except the allow-list: Advance green (`#play-now` / `#submit-btn.advance`), positive-data pill fills, committed orange (Assign + “develops” codes).
+- Raw green / orange / reward-gold chrome is gone except the allow-list: Advance green (`#play-now` / `#submit-btn.advance`), positive-data pill fills, committed orange (custom-focus Assign only).
 - Choice controls (sliders, radios, playbook segment, focus chips) are neutral.
 - `▲` glyphs are white (Jamie). Only data bands may be green.
 - Player headshots are square (`--radius-6`).
@@ -66,6 +66,12 @@ Served from `_documentation_master/projects` so frame CSS loaded. Jamie: law win
 - `training.js`: dropped unused drill `color` hex; no inline gold/orange; `--arch` stays `var(--text-38)`.
 - `training-report.js`: notes hero accents → tokens; ups use `change-delta`; momentum/playbook fills use tokens; placeholder `--text-38`.
 
+## Follow-up (2026-09-30, pre-merge)
+
+**1. Report header overlap.** Not a layout regression. At `window.scrollY === 0` and `#training-report-view` / `#gob-main` scrolled to top, title, meta line, and Back do not overlap (measured in the office drill-in). The first `after-report-1280.png` was taken after Playwright scrolled `.team-section` into view for a crop; `.training-report-page .report-header` is sticky, so the meta line and Back slid under the shell title. Retook `after-report-1280.png` and `after-report-1920.png` at scroll 0. The office test now resets `.main` / view scroll before those full-page shots.
+
+**2. Player Development “develops” codes.** Information, not a committed control. The hover card copy is `{position} · {focusLabel} develops {codes}` (or `adds {codes}` when the focus is not Standard). That names which attributes the training-matrix profile raises for that position + focus. The focus itself is a roster choice; the orange was on the derived codes, which are a read-out. Neutralized to `--text-87`. `tests/test_player_development_grid.py` now asserts that token and no `colour-law: committed`.
+
 ## e2e
 
 Computed-style guards (not class names):
@@ -93,9 +99,9 @@ All under `reports/prep-training-tokens/`. After shots taken at the listed viewp
 
 ## Gates
 
-- `.venv` via `../gob-simplified/.venv/bin/python -m pytest --ignore=tests/e2e -q`: **4180 passed**, 14 skipped, 109 xfailed, **1 xpassed** (`test_leaders_view_scope_filters_to_user_conference` — known; list not edited). **0 failed.**
-- Targeted Playwright (training + report specs, workers=1) after the Back-colour fixture restore: geometry + new computed-style guards **green**.
-- Full Playwright (`env -u CI PORT=8175 BASE_URL=http://localhost:8175 … --workers=1`): **755 passed**, 4 skipped, **0 failed** (10.8m). Earlier 8173 run was 753/2 on the headshot harness (no `.gob`); `var(--radius-6, 6px)` fallback fixed it.
+- `.venv` via `../gob-simplified/.venv/bin/python -m pytest --ignore=tests/e2e -q`: **4180 passed**, 14 skipped, 109 xfailed, **1 xpassed** (`test_leaders_view_scope_filters_to_user_conference` — known; list not edited). **0 failed.** (A sandbox rerun without `PLAYWRIGHT_BROWSERS_PATH` failed 3 screenshot/loopback tests; those 3 pass with the cache path set.)
+- Targeted Playwright (training + report specs, workers=1, PORT=8177): **18 passed**.
+- Full Playwright (`env -u CI PORT=8178 BASE_URL=http://localhost:8178 … --workers=1`): **755 passed**, 4 skipped, **0 failed** (11.1m).
 - `scripts/check_ui_tokens.py --strict --no-write`: **exit 0**, new-design law **0**.
 - `scripts/ci/check_migration_gates.py`: **pass**. Gate A 0/0, Gate B 136/44. `--write-allowlist` not used.
 
@@ -112,7 +118,7 @@ All under `reports/prep-training-tokens/`. After shots taken at the listed viewp
 - `scripts/check_ui_tokens.py`
 - `tests/e2e/prep-modules-training.spec.js`
 - `tests/e2e/prep-modules-report.spec.js`
-- `tests/test_player_development_grid.py` (asserts `--orange` + colour-law comment instead of raw `#F79420`)
+- `tests/test_player_development_grid.py` (develops codes are `--text-87`, not committed orange)
 - `reports/prep-training-tokens-2026-09-30.md`
 - `reports/prep-training-tokens/*`
 

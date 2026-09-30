@@ -15,6 +15,17 @@ function alsoTokenShot(srcName, destName) {
   const src = path.join(OUT, srcName);
   if (fs.existsSync(src)) fs.copyFileSync(src, path.join(TOKENS_OUT, destName || srcName));
 }
+
+async function resetReportScroll(page) {
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    const view = document.getElementById('training-report-view');
+    if (view) view.scrollTop = 0;
+    const main = document.getElementById('gob-main');
+    if (main) main.scrollTop = 0;
+    document.querySelectorAll('.main, .main.scroll').forEach((el) => { el.scrollTop = 0; });
+  });
+}
 const HEADSHOT = fs.readFileSync(path.join(__dirname, '../../FrontEnd/static/images/players/generic_headshot.png'));
 const BEFORE = JSON.parse(fs.readFileSync(path.join(OUT, 'before-metrics.json'), 'utf8'));
 
@@ -237,12 +248,10 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
   }
   const nitShots = path.join(__dirname, '../../reports/training-report-no-momentum');
   fs.mkdirSync(nitShots, { recursive: true });
-  await page.locator('#training-report-view .team-section').screenshot({
-    path: path.join(nitShots, 'team-report-after-1280.png'),
-  });
   await expect(page.getByRole('button', { name: '← Back', exact: true })).toBeVisible();
   await expect(page.locator('#gob-subtabs .tb[data-tab="training-view"][aria-selected="true"]')).toHaveCount(0);
   await expect(page.locator('html')).not.toHaveClass(/gob-office/);
+  await resetReportScroll(page);
   await page.screenshot({ path: path.join(OUT, 'training-report-office-1280.png') });
   await page.screenshot({ path: path.join(OUT, 'training-report-after-1280.png') });
   alsoTokenShot('training-report-after-1280.png', 'after-report-1280.png');
@@ -254,9 +263,13 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
   if (await team.count()) {
     await team.first().screenshot({ path: path.join(TOKENS_OUT, 'after-report-team-1280.png') });
   }
+  await page.locator('#training-report-view .team-section').screenshot({
+    path: path.join(nitShots, 'team-report-after-1280.png'),
+  });
 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await expect(page.locator('#training-report-view #week-number')).toHaveText('12');
+  await resetReportScroll(page);
   await page.screenshot({ path: path.join(OUT, 'training-report-office-1920.png') });
   await page.screenshot({ path: path.join(OUT, 'training-report-after-1920.png') });
   alsoTokenShot('training-report-after-1920.png', 'after-report-1920.png');

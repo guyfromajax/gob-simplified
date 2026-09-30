@@ -164,7 +164,7 @@
 /* One accent, on the CODE only. The value stays white: colour on a rating already means
    how good he is (red / yellow / green / blue by displayed tier), and reusing those hues
    for training efficiency would make the same colour mean two things on the same attribute. */
-.pdg-hc-attr.is-develops b { color: var(--orange); } /* colour-law: committed */
+.pdg-hc-attr.is-develops b { color: var(--text-87); }
 .pdg-hc-attr i {
   font: 700 12px/1 'Inter', sans-serif;
   font-style: normal;
