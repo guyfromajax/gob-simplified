@@ -201,6 +201,11 @@ function isGreenish(color) {
   return g > 180 && g > r + 40 && g > b + 40;
 }
 
+function parsePxRadius(value) {
+  const m = String(value || '').match(/^([\d.]+)px$/);
+  return m ? parseFloat(m[1]) : NaN;
+}
+
 test.describe('box score + practice squad token guards', () => {
   test('box score browse and focus: W/L plate, no illegal green, square POTG', async ({ page }) => {
     await stubAuth(page);
@@ -244,10 +249,17 @@ test.describe('box score + practice squad token guards', () => {
           greenRgb,
         };
       }, GREEN_RGB);
-      expect(styles.potgRadius).toBe('0px');
+      expect(String(styles.potgRadius)).not.toMatch(/%/);
+      const potgR = parsePxRadius(styles.potgRadius);
+      expect(potgR).toBeGreaterThan(0);
+      expect(potgR).toBeLessThanOrEqual(10);
+      expect(potgR).toBe(10);
       expect(styles.nameColor).not.toBe(GREEN_RGB);
 
       await shot(page, 'after-box-score-browse-' + size[2] + '.png');
+      if (size[2] === '1280') {
+        await shot(page, 'after-box-score-potg-1280.png');
+      }
     }
 
     const focusQs =
@@ -291,5 +303,53 @@ test.describe('box score + practice squad token guards', () => {
 
     await page.setViewportSize({ width: 1920, height: 1080 });
     await shot(page, 'after-cut-confirm-modal-1920.png');
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.unroute('**/*');
+    await stubAuth(page);
+    await page.route('**/*', async (route) => {
+      const pathname = await routeApiOnly(route);
+      if (!pathname) return;
+      if (pathname === '/api/auth/me') {
+        await fulfillJson(route, { user_id: 'e2e-user', username: 'e2e', email: 'e2e@example.com' });
+        return;
+      }
+      if (pathname === '/app-config') {
+        await fulfillJson(route, { isAlpha: false, alphaDisclaimer: null, version: '1.0' });
+        return;
+      }
+      if (pathname.startsWith('/franchise/command-center/data')) {
+        await fulfillJson(route, ccData());
+        return;
+      }
+      if (pathname.startsWith('/roster/')) {
+        await fulfillJson(route, { players: ROSTER, conference: 1, region: 'A', team_chemistry: 15 });
+        return;
+      }
+      if (pathname === '/franchise/cut-players' && route.request().method() === 'POST') {
+        await new Promise(function (resolve) { setTimeout(resolve, 2500); });
+        await fulfillJson(route, { ok: true, assigned: [] });
+        return;
+      }
+      await fulfillJson(route, {});
+    });
+    await page.goto('/cut-players.html?franchise_id=' + FID + '&team_id=' + TID + '&from=fcc');
+    await page.waitForSelector('#cut-players-table .cut-player-checkbox', { timeout: 30000 });
+    await page.locator('#cut-players-table .cut-player-checkbox').nth(0).check();
+    await page.locator('#cut-players-table .cut-player-checkbox').nth(1).check();
+    await page.locator('#submit-btn').click();
+    await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+    await expect(page.locator('#cut-modal-title')).toHaveText('Assigning Practice Squad', { timeout: 10000 });
+    const assigningAccent = await page.evaluate(() => {
+      const accent = document.getElementById('cut-modal-accent');
+      const s = accent ? getComputedStyle(accent) : null;
+      return {
+        classes: accent ? accent.className : '',
+        bg: s ? s.backgroundColor : '',
+      };
+    });
+    expect(assigningAccent.classes).toContain('is-neutral');
+    expect(isGreenish(assigningAccent.bg)).toBe(false);
+    await shot(page, 'after-cut-assigning-modal-1280.png');
   });
 });

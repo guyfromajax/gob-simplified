@@ -196,7 +196,7 @@ html.gob-focus body.box-score-page #box-score-view {
 .potg-portrait {
   width: 72px;
   height: 72px;
-  border-radius: 0;
+  border-radius: var(--radius-10);
   object-fit: cover;
   object-position: center top;
   border: 2px solid var(--line-strong);

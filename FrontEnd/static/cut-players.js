@@ -71,8 +71,12 @@ function cloneParams(params) {
     message.textContent = config.message || '';
     message.hidden = !config.message;
     if (accent) {
-      accent.className = 'gob-modal-accent';
-      accent.classList.add(config.accent || 'is-red');
+      if (config.accent === false || config.accent === 'neutral') {
+        accent.className = 'gob-modal-accent is-neutral';
+      } else {
+        accent.className = 'gob-modal-accent';
+        accent.classList.add(config.accent || 'is-red');
+      }
     }
     if (pulse) {
       var showPulse = !!config.pulse;
@@ -300,7 +304,7 @@ function cloneParams(params) {
             showModal({
               title: 'Assigning Practice Squad',
               centerTitle: true,
-              accent: 'is-red',
+              accent: 'neutral',
               pulse: true,
               actions: []
             });

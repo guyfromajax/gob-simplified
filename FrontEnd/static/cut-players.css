@@ -109,6 +109,10 @@ html.gob-focus #cut-players-view .cut-players-shell {
   display: none;
 }
 
+#cut-players-view .gob-modal-accent.is-neutral {
+  background: var(--line);
+}
+
 #cut-players-view .cut-modal-pulse {
   display: flex;
   justify-content: center;

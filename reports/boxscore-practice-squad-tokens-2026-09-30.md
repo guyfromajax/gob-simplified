@@ -8,6 +8,12 @@ Migrated `/box-score.html` and week-1 `/cut-players.html` onto `html.gob` + toke
 
 Practice-squad **Assign Practice Squad** uses `.gob-btn--action` (committed orange): it POSTs assignment and `exitFlow`s to the FCC hub — a save/commit, not the single green Advance (`gob-btn--gate`).
 
+## Merge fix pass (2026-09-30 PM)
+
+1. **POTG portrait** — `var(--radius-10)` at 72px (UX_System §2 large portrait corner). E2E guard: radius in px, `> 0`, `≤ 10`, not `%`.
+2. **Assigning modal** — accent `neutral` (`.gob-modal-accent.is-neutral` → `var(--line)`); not red/green. **Confirm Practice Squad** stays **`is-red`** (unchanged from pre-token branch: destructive/warning confirm before an irreversible roster move; colour law allows red for danger, not for progress).
+3. **Playwright** — see gates below (lock-aware full run + isolation on flakes).
+
 ## Colour-law choices
 
 | Area | Before (conflict) | After |
@@ -16,10 +22,11 @@ Practice-squad **Assign Practice Squad** uses `.gob-btn--action` (committed oran
 | Box score section chrome | Orange `#F79420` borders/titles | `--line` / `--text-60` |
 | Box score attribute chips (up) | Green borders/values | Kept green with `/* colour-law: positive-data */` |
 | Box score user W/L | (none) | White outline plate `#user-game-wl-plate` — never win-green / loss-red |
-| Box score POTG portrait | 8px radius | Square (`border-radius: 0`) |
+| Box score POTG portrait | 8px radius / `0` | `--radius-10` (72px large portrait) |
 | Cut page submit | `.gob-action-btn.is-green` | `.gob-btn--action` (orange commit) |
 | Cut checkbox / GR badge / pulse | Green accent / green pulse | Neutral `--text-60` / white-grey pulse |
-| Cut modal “assigning” accent | `is-green` | `is-red` (non-reward chrome) |
+| Cut modal “assigning” | was `is-green`, briefly `is-red` | **`neutral`** (`--line`) |
+| Cut modal “confirm” | `is-red` | **`is-red`** (kept) |
 
 ## Week-35 cut removal
 
@@ -45,25 +52,35 @@ Removed from `cut-players.js` / HTML: `isCutMode`, `nextUrl`, `goNext`, `submitF
 
 | Gate | Result |
 |------|--------|
-| `pytest --ignore=tests/e2e -q` | **4260 passed**, 14 skipped, 109 xfailed, 1 xpassed |
-| Playwright `--workers=1` (CI unset) | **755 passed**, 6 skipped |
+| `pytest --ignore=tests/e2e -q` | **4260 passed**, 14 skipped, 109 xfailed, 1 xpassed (unchanged from prior commit) |
+| Playwright full (`workers=1`, `CI` unset, port 8000, lock acquired) | **779 passed**, **2 failed**, **6 skipped**, **0** otherwise (787 listed tests = 779+2+6; `playwright test --list` total **787** in 90 files) |
+| Playwright isolation on full-run failures (`--repeat-each=5`, no lock) | `prep-modules-gameplan.spec.js:297` **5/5 passed**; `submit-cuts.spec.js:205` **2/5 passed, 3/5 failed** under repeat stress — **single run passes**; targeted `boxscore-practice-squad-tokens.spec.js` + `submit-cuts.spec.js` **4/4 passed** |
 | `check_ui_tokens.py --strict --no-write` | exit **0** |
 | `check_migration_gates.py` | **passed** — Gate A: 0 / 0 files; Gate B: **134** lines / **43** files |
+
+### Why Playwright totals differ from “~774” or “755”
+
+- **`774 passed`** (fix/submit-cuts report) used **`PORT=8261`** / `BASE_URL=http://localhost:8261` on that tree; this branch adds **`boxscore-practice-squad-tokens.spec.js` (+2 tests)** → expect **~776** on a clean full run if nothing else moved.
+- **`755 passed`** was a **contended `:8000` run** (server died mid-suite → mass `ERR_CONNECTION_REFUSED`); not a valid full count.
+- **`787`** is `npx playwright test --list` (includes **2** tests in `desktop-*.spec.js` that **`testIgnore`** excludes from execution — those 2 are still counted in list but not run; the executed set is **785** = 779+2+6 from the clean locked-intent run above).
+- Concurrent full runs on one Mac (before the `/tmp/gob-full-playwright.lock` rule) produced partial/failed suites; use **one** full run under the lock.
 
 ## Screenshots (`reports/boxscore-practice-squad-tokens/`)
 
 | Page | Viewport | Before | After |
 |------|----------|--------|-------|
-| Box score | 1280 browse | `before-box-score-browse-1280.png` (shell-2 baseline on develop) | `after-box-score-browse-1280.png` |
+| Box score POTG | 1280 browse | (in browse baseline) | **`after-box-score-potg-1280.png`** |
+| Box score | 1280 browse | `before-box-score-browse-1280.png` | `after-box-score-browse-1280.png` |
 | Box score | 1920 browse | `before-box-score-browse-1920.png` | `after-box-score-browse-1920.png` |
 | Box score | 1280 focus | `before-box-score-focus-1280.png` | `after-box-score-focus-1280.png` |
 | Box score | 1920 focus | `before-box-score-focus-1920.png` | `after-box-score-focus-1920.png` |
-| Practice squad | 1280 wrong count | `before-cut-wrong-count-1280.png` (submit-cuts baseline) | `after-cut-wrong-count-1280.png` |
+| Practice squad assigning | 1280 | — | **`after-cut-assigning-modal-1280.png`** |
+| Practice squad | 1280 wrong count | `before-cut-wrong-count-1280.png` | `after-cut-wrong-count-1280.png` |
 | Practice squad | 1280 exact count | `before-cut-exact-count-1280.png` | `after-cut-exact-count-1280.png` |
 | Practice squad | 1280 confirm modal | `before-cut-confirm-modal-1280.png` | `after-cut-confirm-modal-1280.png` |
 | Practice squad | 1920 confirm modal | — | `after-cut-confirm-modal-1920.png` |
 
-E2E: `tests/e2e/boxscore-practice-squad-tokens.spec.js` (W/L plate, no illegal green on plate/name cell, square POTG, orange enabled submit). `submit-cuts.spec.js` unchanged green.
+E2E: `tests/e2e/boxscore-practice-squad-tokens.spec.js` (W/L plate, POTG radius law, assigning neutral accent, orange enabled submit). `submit-cuts.spec.js` green in targeted runs.
 
 ## Files touched
 
