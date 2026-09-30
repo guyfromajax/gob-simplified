@@ -71,8 +71,8 @@ function inAppShell() {
   const CHK_SVG = '<svg viewBox="0 0 12 12" fill="none" stroke="#0b0d14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5L5 9L9.5 3.5"/></svg>';
   const NOSLACK_COPY = "No room — the slack is locked. Unlock a play to make space.";
 
-  function playSound(filename) {
-    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
+  function playSound(name) {
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(name, 0.7); }).catch(function () {});
   }
 
   function parseInteger(value, fallback = 0) {
@@ -595,21 +595,25 @@ function inAppShell() {
         event.preventDefault();
         this.handleBack();
       });
-      this.elements.saveBtn?.addEventListener("click", () => this.handleSave());
+      this.elements.saveBtn?.addEventListener("click", () => {
+        playSound("SFX_COMMIT");
+        this.handleSave();
+      });
 
       qsa(".playbooks-tab").forEach((tab) => {
         tab.addEventListener("click", () => {
+          playSound("SFX_SELECT");
           this.state.activeTab = tab.dataset.tab === "defense" ? "defense" : "offense";
           this.applyTab();
         });
       });
 
       this.elements.fastBreaksNormalize?.addEventListener("click", () => {
-        playSound("click-tiny.wav");
+        playSound("SFX_SELECT");
         this.normalizeSection("fastBreaks");
       });
       this.elements.hcTrapsNormalize?.addEventListener("click", () => {
-        playSound("click-tiny.wav");
+        playSound("SFX_SELECT");
         this.normalizeSection("hcTraps");
       });
       this._onResize = () => this.syncStickyOffsets();
@@ -1003,7 +1007,7 @@ function inAppShell() {
       const select = detail.querySelector(".motion-focus-select, .target-shooter-select");
       if (select) {
         select.addEventListener("change", () => {
-          playSound("click-tiny.wav");
+          playSound("SFX_SELECT");
           if (options.kind === "motion") {
             item.motion_focus = normalizeMotionFocus(select.value);
           } else if (options.kind === "set") {
@@ -1023,7 +1027,7 @@ function inAppShell() {
 
       tile.addEventListener("click", (event) => {
         if (event.target.closest("[data-pcc-toggle], [data-lock], .et-pct-input, .et-slider, select")) return;
-        playSound("click-tiny.wav");
+        playSound("SFX_SELECT");
         this.toggleOpenPlay(item.id);
       });
 
@@ -1031,13 +1035,13 @@ function inAppShell() {
         event.stopPropagation();
         const button = event.currentTarget;
         if (button.disabled) return;
-        playSound("click-tiny.wav");
+        playSound("SFX_SELECT");
         this.togglePcc(item.id, side);
       });
 
       tile.querySelector("[data-lock]")?.addEventListener("click", (event) => {
         event.stopPropagation();
-        playSound("click-tiny.wav");
+        playSound("SFX_SELECT");
         item.locked = !item.locked;
         this.state.evenDistributionAll = false;
         ensureEnforcedBalance(arr);
@@ -1089,7 +1093,7 @@ function inAppShell() {
           dragging = false;
           this.sliderDragging = false;
           this.elements.editColumn?.classList.remove("no-anim");
-          playSound("click-tiny.wav");
+          playSound("SFX_SELECT");
           this.state.evenDistributionAll = false;
           this.render();
           this.scheduleShotWeightsPreview();
@@ -1111,7 +1115,7 @@ function inAppShell() {
             input.classList.toggle("threed", item.percentage >= 100);
             return;
           }
-          playSound("click-tiny.wav");
+          playSound("SFX_SELECT");
           setEnforced(arr, idx, next);
           this.state.evenDistributionAll = false;
           this.render();
@@ -1183,7 +1187,7 @@ function inAppShell() {
     bindChip(chip, sectionKey, item) {
       chip.addEventListener("click", (event) => {
         if (event.target.closest("[data-cpct], .chip-slider")) return;
-        playSound("click-tiny.wav");
+        playSound("SFX_SELECT");
         this.toggleOpenPlay(item.id);
       });
 
@@ -1222,7 +1226,7 @@ function inAppShell() {
           if (!dragging) return;
           dragging = false;
           this.elements.editColumn?.classList.remove("no-anim");
-          playSound("click-tiny.wav");
+          playSound("SFX_SELECT");
           this.state.evenDistributionAll = false;
           this.render();
           this.scheduleShotWeightsPreview();
@@ -1243,7 +1247,7 @@ function inAppShell() {
             input.value = String(item.percentage);
             return;
           }
-          playSound("click-tiny.wav");
+          playSound("SFX_SELECT");
           item.percentage = next;
           this.state.evenDistributionAll = false;
           this.render();
@@ -1358,7 +1362,7 @@ function inAppShell() {
         row.addEventListener("dragstart", (event) => this.handleDragStart(event, listType, id));
         row.addEventListener("dragend", () => this.handleDragEnd());
         row.querySelector(".pc-remove-btn").addEventListener("click", () => {
-          playSound("click-tiny.wav");
+          playSound("SFX_SELECT");
           this.state.pcOrder[listType] = this.state.pcOrder[listType].filter((entry) => entry !== id);
           this.state.pcErrors[listType] = "";
           this.render();
@@ -1406,7 +1410,7 @@ function inAppShell() {
       if (!this.dragContext || this.dragContext.listType !== listType) {
         return;
       }
-      playSound("click-tiny.wav");
+      playSound("SFX_SELECT");
 
       const order = this.state.pcOrder[listType];
       const sourceIndex = order.indexOf(this.dragContext.id);
@@ -1595,8 +1599,6 @@ function inAppShell() {
       if (this.elements.saveBtn?.disabled) {
         return;
       }
-      playSound("confirm-2-lowervol.wav");
-
       const payload = this.buildPreviewPayload();
 
       if (window.StateTelemetry) {

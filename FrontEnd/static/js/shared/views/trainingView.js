@@ -61,6 +61,28 @@ function optionsFrom(ctx) {
   };
 }
 
+function prefetchScoutingOpen(ctx) {
+  ensureCss('/css/prep-v2-scouting.css');
+  ensureCss('/css/rt-buckets.css');
+  loadScript('/js/utils/attributeDisplay.js');
+  loadScript('/js/shared/scoutingReport.js');
+  loadScript('/js/shared/playerYear.js');
+  var fid = (ctx && ctx.franchiseId) || contextValue('franchise_id');
+  var prep = window.GOBFccPrep || {};
+  var ready = prep.whenReady ? Promise.resolve(prep.whenReady()) : Promise.resolve();
+  import('/js/shared/views/scoutingView.js').then(function (mod) {
+    return ready.then(function () {
+      var opp = prep.peekUpcomingOpponent && prep.peekUpcomingOpponent();
+      if (opp && opp.name) return opp;
+      if (prep.resolveUpcomingOpponent) return prep.resolveUpcomingOpponent();
+      return null;
+    }).then(function (opp) {
+      if (!mod.prefetchOpponentReport) return;
+      return mod.prefetchOpponentReport(fid, opp);
+    });
+  }).catch(function () {});
+}
+
 function loadDeps() {
   return DEPS.reduce(function (chain, src) {
     return chain.then(function () { return loadScript(src); });
@@ -70,6 +92,7 @@ function loadDeps() {
 export function mount(host, ctx) {
   CSS.forEach(ensureCss);
   ensureFranchiseMode();
+  prefetchScoutingOpen(ctx);
   if (!host.querySelector('#training-tools-home')) {
     var park = document.createElement('div');
     park.id = 'training-tools-home';

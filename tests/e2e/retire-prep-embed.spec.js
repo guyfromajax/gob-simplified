@@ -151,6 +151,12 @@ async function installScoutApi(page) {
         session_type: 'in-season',
         cut_required: false,
         rankings: [{ team_id: SCOUT_OPP, natl_rank: 6, W: 18, L: 4, name: 'Four Corners' }],
+        next_game_summary: {
+          week: 12,
+          matchup_label: 'vs',
+          opponent_team_id: SCOUT_OPP,
+          opponent_team_name: 'Four Corners',
+        },
       });
     }
     if (pathname.endsWith('/franchise/play-next-game')) {

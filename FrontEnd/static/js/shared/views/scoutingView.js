@@ -128,6 +128,47 @@ function rtLockupHtml(rt, potentialRt) {
   return html + '</span>';
 }
 
+function reportStore() {
+  if (!window.__gobScoutingReportCache) window.__gobScoutingReportCache = Object.create(null);
+  if (!window.__gobScoutingReportInflight) window.__gobScoutingReportInflight = Object.create(null);
+  return {
+    cache: window.__gobScoutingReportCache,
+    inflight: window.__gobScoutingReportInflight
+  };
+}
+
+function reportCacheKey(franchiseId, opponent) {
+  return [franchiseId || '', (opponent && opponent.id) || '', (opponent && opponent.name) || ''].join(':');
+}
+
+export function prefetchOpponentReport(franchiseId, opponent) {
+  if (!opponent || !opponent.name || !franchiseId || !window.API_CONFIG) {
+    return Promise.resolve(null);
+  }
+  var store = reportStore();
+  var key = reportCacheKey(franchiseId, opponent);
+  if (store.cache[key]) return Promise.resolve(store.cache[key]);
+  if (store.inflight[key]) return store.inflight[key];
+  var authHeaders = window.API_CONFIG.getAuthHeaders ? window.API_CONFIG.getAuthHeaders() : {};
+  var teamQ = 'franchise_id=' + encodeURIComponent(franchiseId);
+  if (opponent.id) teamQ += '&team_id=' + encodeURIComponent(opponent.id);
+  else teamQ += '&team_name=' + encodeURIComponent(opponent.name);
+  store.inflight[key] = Promise.all([
+    fetch(window.API_CONFIG.buildUrl('/franchise/team-data') + '?' + teamQ, { headers: authHeaders }),
+    fetch(window.API_CONFIG.buildUrl('/franchise/scouting-report') + '?franchise_id='
+      + encodeURIComponent(franchiseId) + '&team_name=' + encodeURIComponent(opponent.name), { headers: authHeaders })
+  ]).then(function (resPair) {
+    if (!resPair[0].ok || !resPair[1].ok) throw new Error('load failed');
+    return Promise.all([resPair[0].json(), resPair[1].json()]);
+  }).then(function (payloads) {
+    store.cache[key] = payloads;
+    return payloads;
+  }).finally(function () {
+    delete store.inflight[key];
+  });
+  return store.inflight[key];
+}
+
 function yearLabel(year) {
   if (window.GOB_PlayerYear && typeof window.GOB_PlayerYear.formatDisplay === 'function') {
     return window.GOB_PlayerYear.formatDisplay(year);
@@ -347,8 +388,22 @@ export function mount(container, ctx) {
 
   function resolveOpponent() {
     var prep = fcc();
+    if (prep.peekUpcomingOpponent) {
+      var peek = prep.peekUpcomingOpponent();
+      if (peek && peek.name) return Promise.resolve(peek);
+    }
     if (prep.resolveUpcomingOpponent) return prep.resolveUpcomingOpponent();
     return Promise.resolve(null);
+  }
+
+  function playSelect() {
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx('SFX_SELECT', 0.7); }).catch(function () {});
+  }
+
+  function fetchReport(opponent) {
+    return prefetchOpponentReport(franchiseId, opponent).then(function (payloads) {
+      return { opponent: opponent, payloads: payloads };
+    });
   }
 
   function rankingEntry(teamId) {
@@ -399,6 +454,7 @@ export function mount(container, ctx) {
     seg.__wired = true;
     seg.querySelectorAll('button').forEach(function (btn) {
       btn.addEventListener('click', function () {
+        playSelect();
         projectedMode = btn.getAttribute('data-mode') || 'attributes';
         seg.querySelectorAll('button').forEach(function (b) {
           var on = b === btn;
@@ -495,40 +551,30 @@ export function mount(container, ctx) {
     // Once something is painted it stays up, and the data is swapped in place below only
     // if it actually changed.
     if (!painted) setStatus('Loading scouting report…');
-    return loadScript('/js/utils/attributeDisplay.js')
-      .then(function () { return loadScript('/js/shared/scoutingReport.js'); })
-      .then(function () { return loadScript('/js/shared/playerYear.js'); })
-      .then(waitFcc)
-      .then(resolveOpponent)
-      .then(function (opponent) {
+    var scriptsP = Promise.all([
+      loadScript('/js/utils/attributeDisplay.js'),
+      loadScript('/js/shared/scoutingReport.js'),
+      loadScript('/js/shared/playerYear.js')
+    ]);
+    var dataP = waitFcc().then(resolveOpponent).then(fetchReport);
+    return Promise.all([scriptsP, dataP])
+      .then(function (pair) {
+        var data = pair[1] || {};
+        var opponent = data.opponent;
+        var payloads = data.payloads;
         if (!opponent || !opponent.name) {
           if (!painted) setStatus('No upcoming opponent available for scouting.');
           return;
         }
-        if (!franchiseId) {
+        if (!franchiseId || !payloads) {
           if (!painted) setStatus('Unable to open scouting report.');
           return;
         }
-        var authHeaders = window.API_CONFIG && window.API_CONFIG.getAuthHeaders
-          ? window.API_CONFIG.getAuthHeaders()
-          : {};
-        var teamQ = 'franchise_id=' + encodeURIComponent(franchiseId);
-        if (opponent.id) teamQ += '&team_id=' + encodeURIComponent(opponent.id);
-        else teamQ += '&team_name=' + encodeURIComponent(opponent.name);
-        return Promise.all([
-          fetch(window.API_CONFIG.buildUrl('/franchise/team-data') + '?' + teamQ, { headers: authHeaders }),
-          fetch(window.API_CONFIG.buildUrl('/franchise/scouting-report') + '?franchise_id='
-            + encodeURIComponent(franchiseId) + '&team_name=' + encodeURIComponent(opponent.name), { headers: authHeaders })
-        ]).then(function (resPair) {
-          if (!resPair[0].ok || !resPair[1].ok) throw new Error('load failed');
-          return Promise.all([resPair[0].json(), resPair[1].json()]).then(function (payloads) {
-            var next = signatureOf(opponent, payloads[0], payloads[1]);
-            if (painted && next !== null && next === signature) return;
-            signature = next;
-            paintReady(opponent, payloads[0], payloads[1]);
-            painted = true;
-          });
-        });
+        var next = signatureOf(opponent, payloads[0], payloads[1]);
+        if (painted && next !== null && next === signature) return;
+        signature = next;
+        paintReady(opponent, payloads[0], payloads[1]);
+        painted = true;
       })
       .catch(function () {
         // A failed refresh behind an already-good panel is not worth throwing the panel

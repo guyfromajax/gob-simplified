@@ -205,7 +205,7 @@ function currentTrainingReturnUrl() {
 }
 
 function navigateToTrainingTutorial() {
-  playSound('click-tiny.wav');
+  playSound('SFX_SELECT');
   saveTrainingFormDraft();
   const returnUrl = currentTrainingReturnUrl();
   if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
@@ -301,7 +301,7 @@ function wirePlayerDevelopmentTutorialButton() {
   const btn = byId('player-dev-tutorial-btn');
   if (!btn) return;
   btn.addEventListener('click', function () {
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
     saveTrainingFormDraft();
     const returnUrl = currentTrainingReturnUrl();
     if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
@@ -853,7 +853,7 @@ function renderCustomFocusTable() {
 
 function onCustomFocusCellClick(playerId, attrCode) {
   if (getPmModalMode() !== 'custom') return;
-  playSound('click-tiny.wav');
+  playSound('SFX_SELECT');
   if (!customFocusDraft[playerId]) customFocusDraft[playerId] = [];
   const sel = customFocusDraft[playerId];
   const idx = sel.indexOf(attrCode);
@@ -983,7 +983,7 @@ allSliders.forEach(slider => {
   ensureTrainingSliderVisual(slider);
   updateTrainingSliderVisual(slider, slider.value);
   slider.addEventListener('change', function() {
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
   });
   slider.addEventListener('input', function() {
     const currentValue = parseInt(this.value);
@@ -1035,7 +1035,7 @@ window.addEventListener('resize', _onResizeSliders);
  * Auto-Train: assign whole points under the flat budget and pick a random focus
  */
 function autoAssignTraining() {
-  playSound('chaotic-choice.wav');
+  playSound('SFX_SELECT');
   const sliders = Array.from(allSliders);
   if (sliders.length === 0) return;
 
@@ -1173,7 +1173,7 @@ if (autoTrainBtn) {
 }
 if (autoTrainModalClose && autoTrainModal) {
   autoTrainModalClose.addEventListener('click', () => {
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
     autoTrainModal.classList.remove('is-visible');
   });
 }
@@ -1263,20 +1263,12 @@ coachingRadios.forEach(radio => {
     if (!this.checked) return;
     trainingDirty = true;
     
-    // SFX per coaching style — skip when Auto-Train triggered this change (avoid double sound with chaotic-choice)
+    // Skip when Auto-Train triggered this change (one SFX_SELECT already).
     const value = this.value;
     const skipSound = typeof window !== 'undefined' && window.__trainingAutoAssigning;
     if (typeof window !== 'undefined') window.__trainingAutoAssigning = false;
     if (!skipSound) {
-      if (value.startsWith('authoritarian')) {
-        playSound('whistle-3.mp3');
-      } else if (value.startsWith('systems-coach')) {
-        playSound('positive-slide.wav');
-      } else if (value.startsWith('player-maximizer')) {
-        playSound('positive-plop.wav');
-      } else if (value.startsWith('culture-builder')) {
-        playSound('positive-beep.wav');
-      }
+      playSound('SFX_SELECT');
     }
     
     applyCoachingFocusArchetypeUi(value);
@@ -1301,7 +1293,7 @@ coachingRadios.forEach(radio => {
 qsa('input[name="pm-modal-mode"]').forEach(function (radio) {
   radio.addEventListener('change', function () {
     if (!this.checked) return;
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
     syncPmModalCustomHint();
     const mode = getPmModalMode();
     if (mode !== 'custom') {
@@ -1332,13 +1324,13 @@ if (chooseAttrsRadio) {
 
 if (customFocusAssignBtn) {
   customFocusAssignBtn.addEventListener('click', function () {
-    playSound('confirm-1-lowervol.wav');
+    playSound('SFX_COMMIT');
     commitCustomFocusFromModal();
   });
 }
 if (customFocusCancelBtn) {
   customFocusCancelBtn.addEventListener('click', function () {
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
     closeCustomFocusModal();
   });
 }
@@ -1493,8 +1485,8 @@ function collectTrainingData() {
   return data;
 }
 
-function playSound(filename) {
-  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
+function playSound(name) {
+  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(name, 0.7); }).catch(function () {});
 }
 
 function showMessageModal(message, buttonLabel = 'Close') {
@@ -1532,8 +1524,7 @@ function rewriteReportRedirect(redirectUrl) {
  */
 async function submitTraining(button) {
   if (button && button.disabled) return;
-  playSound('confirm-2-lowervol.wav');
-  
+
   const trainingData = collectTrainingData();
   
   // Flat integer budget: every slider notch costs exactly one point.
@@ -1932,7 +1923,7 @@ function wireCustomTrainingPlaybook() {
   const btnCustom = byId('playbook-mode-custom-btn');
   if (btnCurrent) {
     btnCurrent.addEventListener('click', function () {
-      playSound('click-tiny.wav');
+      playSound('SFX_SELECT');
       try {
         sessionStorage.removeItem(STORAGE_PLAYBOOK_FOCUS);
         sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
@@ -1942,7 +1933,7 @@ function wireCustomTrainingPlaybook() {
   }
   if (btnCustom) {
     btnCustom.addEventListener('click', function () {
-      playSound('click-tiny.wav');
+      playSound('SFX_SELECT');
       saveTrainingFormDraft();
       const snap = collectTrainingData();
       try {
@@ -2281,7 +2272,7 @@ function scrollToCoachingFocus() {
 function wireReqNudge() {
 if (reqFocusNudgeBtn) {
   reqFocusNudgeBtn.addEventListener('click', function () {
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
     scrollToCoachingFocus();
   });
 }

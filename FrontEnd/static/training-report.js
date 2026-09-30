@@ -392,7 +392,7 @@ function setupProjectedLineupToggle() {
   });
   buttons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      playSound('click-tiny.wav');
+      playSound('SFX_SELECT');
       buttons.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       projectedLineupView = btn.getAttribute('data-projected-view') || 'attributes';
@@ -521,7 +521,7 @@ function setupViewToggle() {
   toggleButtons[0].dataset.wired = '1';
   toggleButtons.forEach(btn => {
     btn.addEventListener('click', () => {
-      playSound('click-tiny.wav');
+      playSound('SFX_SELECT');
       toggleButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentView = btn.dataset.view;
@@ -584,7 +584,7 @@ function paintBack() {
   backClickWired = true;
   btn.addEventListener('click', (ev) => {
     if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
-    playSound('click-strong.wav');
+    playSound('SFX_SELECT');
     if (mode === 'franchise') {
       if (reportFrom === 'news') {
         const lockerRoomUrl = (typeof buildFranchiseLockerRoomUrl === 'function')

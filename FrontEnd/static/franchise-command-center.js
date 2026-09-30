@@ -5274,6 +5274,40 @@ async function renderTournamentBracket() {
 // Scouting Report functionality
 let upcomingOpponent = null;
 let upcomingOpponentId = null;
+const upcomingOpponentByKey = Object.create(null);
+
+function upcomingOpponentCacheKey(data) {
+  const week = data?.week || data?.training_status?.current_week || 0;
+  return String(franchiseId || '') + ':' + String(week);
+}
+
+function opponentFromLoadedFcc(data) {
+  if (!data) return null;
+  const summary = data.next_game_summary;
+  if (summary && (summary.opponent_team_name || summary.opponent_team_id)) {
+    return {
+      name: summary.opponent_team_name || '',
+      id: summary.opponent_team_id != null ? String(summary.opponent_team_id) : '',
+    };
+  }
+  const digestGame = data.office_digest && data.office_digest.next_game;
+  if (digestGame && (digestGame.opponent || digestGame.opponent_team_name || digestGame.opponent_team_id)) {
+    return {
+      name: digestGame.opponent || digestGame.opponent_team_name || '',
+      id: digestGame.opponent_team_id != null ? String(digestGame.opponent_team_id) : '',
+    };
+  }
+  return null;
+}
+
+function rememberUpcomingOpponent(key, resolved) {
+  if (!key || !resolved || !resolved.name) return null;
+  upcomingOpponentByKey[key] = resolved;
+  upcomingOpponent = resolved.name;
+  upcomingOpponentId = resolved.id || null;
+  return resolved;
+}
+
 function disableLegacyFccScoutingModal() {
   const legacyModal = document.getElementById('scouting-report-modal');
   if (legacyModal) legacyModal.remove();
@@ -5288,7 +5322,6 @@ function disableLegacyFccScoutingModal() {
 disableLegacyFccScoutingModal();
 
 async function resolveUpcomingOpponentFromMatchup(data) {
-  const resolvedUserTeamName = data?.team || userTeamNameForLeaders || userTeamName || '';
   const week = data?.week || data?.training_status?.current_week || 0;
   const eosTournamentActive = data?.eos_tournament_active || false;
   const eosTournament = data?.eos_tournament;
@@ -5309,46 +5342,25 @@ async function resolveUpcomingOpponentFromMatchup(data) {
     return null;
   }
 
-  try {
-    const res = await fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
-      method: 'POST',
-      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ franchise_id: franchiseId })
-    });
-    if (!res.ok) throw new Error('Failed to resolve next game');
-    const matchup = await res.json();
-    upcomingOpponent = null;
-    upcomingOpponentId = null;
-    if (matchup && matchup.home && matchup.away) {
-      const awayLabel = matchup.away_display || matchup.away;
-      const homeLabel = matchup.home_display || matchup.home;
-      // Prefer ObjectId (display name ≠ core name under Team Builder).
-      if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
-        if (String(userTeamId) === String(matchup.home_id)) {
-          upcomingOpponent = awayLabel;
-          upcomingOpponentId = matchup.away_id;
-        } else if (String(userTeamId) === String(matchup.away_id)) {
-          upcomingOpponent = homeLabel;
-          upcomingOpponentId = matchup.home_id;
-        }
-      }
-      if (!upcomingOpponent) {
-        if (resolvedUserTeamName === matchup.home || resolvedUserTeamName === homeLabel) {
-          upcomingOpponent = awayLabel;
-          upcomingOpponentId = matchup.away_id;
-        } else if (resolvedUserTeamName === matchup.away || resolvedUserTeamName === awayLabel) {
-          upcomingOpponent = homeLabel;
-          upcomingOpponentId = matchup.home_id;
-        }
-      }
-    }
-    return upcomingOpponent ? { name: upcomingOpponent, id: upcomingOpponentId } : null;
-  } catch (err) {
-    console.warn('Could not determine upcoming opponent:', err);
-    upcomingOpponent = null;
-    upcomingOpponentId = null;
-    return null;
+  const key = upcomingOpponentCacheKey(data);
+  const hit = upcomingOpponentByKey[key];
+  if (hit && hit.name) {
+    upcomingOpponent = hit.name;
+    upcomingOpponentId = hit.id || null;
+    return hit;
   }
+
+  // play-next-game can persist region_tournaments on EOS weeks
+  // (_maybe_reconcile_region_for_eos). Scouting reads the opponent already
+  // sitting on the FCC payload / Office digest instead of that POST.
+  const fromLoaded = opponentFromLoadedFcc(data);
+  if (fromLoaded && fromLoaded.name) {
+    return rememberUpcomingOpponent(key, fromLoaded);
+  }
+
+  upcomingOpponent = null;
+  upcomingOpponentId = null;
+  return null;
 }
 
 function updateScoutingButton(data) {
@@ -5362,6 +5374,10 @@ function updateScoutingButton(data) {
 window.GOBFccPrep = {
   whenReady: () => fccInitializationPromise,
   resolveUpcomingOpponent: () => resolveUpcomingOpponentFromMatchup(commandCenterTopDataCache),
+  peekUpcomingOpponent: () => {
+    const key = upcomingOpponentCacheKey(commandCenterTopDataCache);
+    return upcomingOpponentByKey[key] || opponentFromLoadedFcc(commandCenterTopDataCache);
+  },
   rankingEntry: getTeamRankingEntry,
   standingsEntry: getStandingsTeamEntry,
   teamPageUrl: buildFranchiseTeamPageUrl,
