@@ -144,35 +144,36 @@ test('Player Training tab always shows the settings, even after a submitted week
   await page.setViewportSize({ width: 1280, height: 720 });
   await openFcc(page, 'training-view', null, { cc: { training_completed: true, week: 12 } });
   await expect(page.locator('#training-view.tab-content.active')).toBeVisible({ timeout: 20000 });
-  await expect(page.locator('#training-view')).toContainText('Training submitted for this week');
   await expect(page.locator('#training-view #player-dev-section')).toBeVisible();
+  await expect(page.locator('#training-view .devfocus-select').first()).toBeVisible();
+  await expect(page.locator('#training-view .main-content-grid')).toBeHidden();
+  await expect(page.locator('#training-view')).toContainText('Weekly training is set when you advance.');
   await expect(page.getByRole('tab', { name: 'Player Training', exact: true })).toHaveAttribute('aria-selected', 'true');
 });
 
 test('the report is a drill-in: no Player Training highlight, Back returns', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openFcc(page, 'training-report-view', { from: 'office', origin: 'office' });
-  await page.waitForSelector('#training-report-view.tab-content.active', { timeout: 20000 });
-
-  const selected = page.locator('#gob-subtabs .tb[aria-selected="true"]');
-  if (await selected.count()) {
-    await expect(selected).not.toHaveAttribute('data-tab', 'training-view');
-  }
-  await expect(page.getByRole('button', { name: '← Back', exact: true })).toBeVisible();
-  // Office rail can be on (origin=office). The Player Training underline must not.
-  await expect(page.locator('#gob-subtabs .tb[data-tab="training-view"][aria-selected="true"]')).toHaveCount(0);
-  // origin=office must not turn on the Office-home layout (week cards under the report).
+  await stubAuth(page);
+  await installApi(page);
+  await page.goto('/training-report.html?franchise_id=' + FID + '&team_id=' + TID
+    + '&mode=franchise&week=12&from=office&origin=office');
+  await expect(page).toHaveURL(/\/training-report\.html/);
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('nav.rail')).toHaveCount(0);
+  await expect(page.locator('#gob-subtabs')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Back to Locker Room', exact: true })).toBeVisible();
   await expect(page.locator('html')).not.toHaveClass(/gob-office/);
-  await expect(page.locator('#home-tab')).not.toBeVisible();
 
   await page.screenshot({ path: path.join(OUT, 'training-report-drillin-1280.png') });
 });
 
-test('post-submit Back to Office keeps tut_alert=training_return', async ({ page }) => {
+test('post-submit Continue to Office keeps tut_alert=training_return', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openFcc(page, 'training-report-view', { from: 'training', origin: 'prep' });
-  await page.waitForSelector('#training-report-view.tab-content.active', { timeout: 20000 });
-  const btn = page.getByRole('button', { name: 'Back to Office', exact: true });
+  await stubAuth(page);
+  await installApi(page);
+  await page.goto('/training-report.html?franchise_id=' + FID + '&team_id=' + TID
+    + '&mode=franchise&week=12&from=training&origin=prep');
+  const btn = page.getByRole('button', { name: 'Continue to Office', exact: true });
   await expect(btn).toBeVisible();
 
   const waitNav = page.waitForURL(/tut_alert=training_return/, { timeout: 15000 });
@@ -212,11 +213,11 @@ test('after week 26 the settings stay, with no weekly allocation', async ({ page
     cc: { week: 28, training_disabled_for_postseason: true, training_completed: true },
     points: { week: 28, training_points: 0, training_unavailable: true },
   });
-  await expect(page.locator('#training-view')).toContainText('No team training during the tournament', { timeout: 20000 });
-  await expect(page.locator('#training-view #player-dev-section')).toBeVisible();
+  await expect(page.locator('#training-view #player-dev-section')).toBeVisible({ timeout: 20000 });
   await expect(page.locator('#training-view .devfocus-select').first()).toBeVisible();
   await expect(page.locator('#training-view .main-content-grid')).toBeHidden();
   await expect(page.locator('#requirements-bar')).toBeHidden();
+  await expect(page.locator('#training-view')).not.toContainText('No team training during the tournament');
   await expect(page.locator('#play-now')).not.toHaveText(/Submit Training|Run Training Camp/);
 
   await page.screenshot({ path: path.join(OUT, 'post-week-26-1280.png') });

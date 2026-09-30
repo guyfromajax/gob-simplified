@@ -1,16 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" class="gob">
 <head>
-  <script>
-    (function () {
-      try {
-        var q = new URLSearchParams(location.search);
-        if (q.get('mode') === 'tutorial') return;
-        q.set('tab', 'training-view');
-        location.replace('/franchise-command-center.html?' + q.toString());
-      } catch (err) {}
-    })();
-  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
@@ -35,17 +25,18 @@
   <link rel="stylesheet" href="/css/development-focus.css">
   <link rel="stylesheet" href="/css/player-development-grid.css">
 </head>
-<body class="training-page">
+<body>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
+  <div id="training-view">
   <div class="training-container resource-page-container fcc-brand-page-shell training-resource-shell">
     <!-- Header -->
     <header class="training-header">
       <div class="training-header-left">
-        <button id="back-btn" class="back-button" type="button">Back</button>
+        <button id="back-btn" class="back-button" type="button">Back to Locker Room</button>
         <button id="training-tutorial-btn" type="button" class="gob-btn gob-btn--ghost training-tutorial-btn">Training Tutorial</button>
       </div>
       <div class="header-center">
@@ -73,7 +64,7 @@
       <div class="header-actions">
         <button id="auto-train-btn" class="gob-btn gob-btn--ghost auto-train-button" type="button">Auto-Train</button>
         <div class="submit-stack">
-          <button id="submit-btn" class="submit-button advance" disabled>Submit Training</button>
+          <button id="submit-btn" class="submit-button advance" data-sfx="SFX_COMMIT" disabled>Submit Training</button>
           <button id="recruiting-invites-btn" class="recruiting-invites-button" type="button" style="display:none;">Recruiting Invites</button>
         </div>
       </div>
@@ -396,6 +387,7 @@
          players. Read and written through the shared Development Focus module, the same
          one the roster surfaces use, so the six values cannot drift between screens. -->
     <section class="player-dev-section" id="player-dev-section" hidden>
+      <p class="training-advance-pointer" id="training-advance-pointer" hidden>Weekly training is set when you advance.</p>
       <div class="player-dev-head">
         <h2 class="coaching-title player-dev-title">Player Development</h2>
         <button type="button" class="gob-btn gob-btn--ghost player-dev-tutorial-btn" id="player-dev-tutorial-btn">
@@ -411,6 +403,7 @@
       </div>
       <div class="pdg-grid"></div>
     </section>
+  </div>
   </div>
 
   <!-- Player Maximizer: Choose Attributes modal -->
@@ -468,6 +461,7 @@
   <script src="/js/shared/trainingNewswire.js"></script>
   <script src="/js/shared/gobTutorialAlertResume.js"></script>
   <!-- Development Focus saves on change and confirms with the shared toast. -->
+  <script src="/js/shared/gobLeaveConfirm.js"></script>
   <script src="/js/shared/gobToast.js"></script>
   <script src="/js/shared/developmentFocus.js"></script>
   <script src="/js/generated/trainingMatrix.js"></script>
@@ -477,13 +471,8 @@
   <script type="module">
     import { init } from '/training.js';
     try {
-      // FranchiseContext (loaded in <head>), not the URL: correct on web and desktop.
-      const fc = window.FranchiseContext;
-      const ctx = (key) => (fc && typeof fc.get === 'function' ? fc.get(key) : null);
-      if (ctx('mode') === 'tutorial') {
-        init(document.body);
-      }
-    } catch (err) { /* redirect already left */ }
+      init(document.getElementById('training-view'), { sections: 'weekly' });
+    } catch (err) { /* init logs */ }
   </script>
 </body>
 </html>

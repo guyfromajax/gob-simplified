@@ -2,7 +2,7 @@ export const TRAINING_SHELL = `<div class="training-container resource-page-cont
     <!-- Header -->
     <header class="training-header">
       <div class="training-header-left">
-        <button id="back-btn" class="back-button" type="button">Back</button>
+        <button id="back-btn" class="back-button" type="button">Back to Locker Room</button>
         <button id="training-tutorial-btn" type="button" class="gob-btn gob-btn--ghost training-tutorial-btn">Training Tutorial</button>
       </div>
       <div class="header-center">
@@ -30,6 +30,7 @@ export const TRAINING_SHELL = `<div class="training-container resource-page-cont
       <div class="header-actions">
         <button id="auto-train-btn" class="gob-btn gob-btn--ghost auto-train-button" type="button">Auto-Train</button>
         <div class="submit-stack">
+          <button id="submit-btn" class="submit-button advance" data-sfx="SFX_COMMIT" disabled>Submit Training</button>
           <button id="recruiting-invites-btn" class="recruiting-invites-button" type="button" style="display:none;">Recruiting Invites</button>
         </div>
       </div>
@@ -352,6 +353,7 @@ export const TRAINING_SHELL = `<div class="training-container resource-page-cont
          players. Read and written through the shared Development Focus module, the same
          one the roster surfaces use, so the six values cannot drift between screens. -->
     <section class="player-dev-section" id="player-dev-section" hidden>
+      <p class="training-advance-pointer" id="training-advance-pointer" hidden>Weekly training is set when you advance.</p>
       <div class="player-dev-head">
         <h2 class="coaching-title player-dev-title">Player Development</h2>
         <button type="button" class="gob-btn gob-btn--ghost player-dev-tutorial-btn" id="player-dev-tutorial-btn">

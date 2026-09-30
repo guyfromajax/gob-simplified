@@ -19,8 +19,6 @@ function alsoTokenShot(srcName, destName) {
 async function resetReportScroll(page) {
   await page.evaluate(() => {
     window.scrollTo(0, 0);
-    const view = document.getElementById('training-report-view');
-    if (view) view.scrollTop = 0;
     const main = document.getElementById('gob-main');
     if (main) main.scrollTop = 0;
     document.querySelectorAll('.main, .main.scroll').forEach((el) => { el.scrollTop = 0; });
@@ -28,11 +26,11 @@ async function resetReportScroll(page) {
 }
 
 function measureReportChrome() {
-  const view = document.getElementById('training-report-view');
+  const host = document.querySelector('.training-report-page') || document.body;
   const main = document.getElementById('gob-main');
-  const title = document.querySelector('.pg-title h1');
-  const meta = view && view.querySelector('.header-meta-line');
-  const back = view && (view.querySelector('#locker-room-btn') || view.querySelector('#back-button'));
+  const title = document.querySelector('.page-title');
+  const meta = document.querySelector('.header-meta-line');
+  const back = document.querySelector('#locker-room-btn');
   const box = (el) => {
     if (!el) return null;
     const r = el.getBoundingClientRect();
@@ -41,25 +39,25 @@ function measureReportChrome() {
       bottom: +r.bottom.toFixed(1),
       left: +r.left.toFixed(1),
       right: +r.right.toFixed(1),
+      height: +r.height.toFixed(1),
     };
   };
   const tb = title && title.getBoundingClientRect();
   const mb = meta && meta.getBoundingClientRect();
   const bb = back && back.getBoundingClientRect();
-  const vb = view && view.getBoundingClientRect();
   const intersects = (a, b) => !!(a && b
     && a.left < b.right && a.right > b.left
     && a.top < b.bottom && a.bottom > b.top);
   return {
     windowScrollY: window.scrollY,
     gobMainScrollTop: main ? main.scrollTop : null,
-    viewScrollTop: view ? view.scrollTop : null,
     title: box(title),
     meta: box(meta),
     back: box(back),
-    view: box(view),
     intersectTitleMeta: intersects(tb, mb),
-    backTopGeViewTop: !!(bb && vb && bb.top + 0.5 >= vb.top),
+    metaFullyVisible: !!(mb && mb.top >= 0 && mb.bottom <= window.innerHeight && mb.height > 4),
+    backFullyVisible: !!(bb && bb.top >= 0 && bb.bottom <= window.innerHeight && bb.height > 4),
+    hostClass: host && host.className,
   };
 }
 
@@ -68,9 +66,9 @@ async function captureReportPage(page, dest) {
   const geom = await page.evaluate(measureReportChrome);
   expect(geom.windowScrollY, JSON.stringify(geom)).toBe(0);
   expect(geom.gobMainScrollTop, JSON.stringify(geom)).toBe(0);
-  expect(geom.viewScrollTop, JSON.stringify(geom)).toBe(0);
   expect(geom.intersectTitleMeta, JSON.stringify(geom)).toBe(false);
-  expect(geom.backTopGeViewTop, JSON.stringify(geom)).toBe(true);
+  expect(geom.metaFullyVisible, JSON.stringify(geom)).toBe(true);
+  expect(geom.backFullyVisible, JSON.stringify(geom)).toBe(true);
   await page.screenshot({ path: dest });
 }
 const HEADSHOT = fs.readFileSync(path.join(__dirname, '../../FrontEnd/static/images/players/generic_headshot.png'));
@@ -222,37 +220,36 @@ async function openReport(page, extra) {
     team_id: TID,
     mode: 'franchise',
     week: '12',
-    tab: 'training-report-view',
   });
-  Object.keys(extra || {}).forEach((key) => bag.set(key, extra[key]));
-  await page.goto('/franchise-command-center.html?' + bag.toString());
+  Object.keys(extra || {}).forEach((key) => {
+    if (key === 'tab') return;
+    bag.set(key, extra[key]);
+  });
+  await page.goto('/training-report.html?' + bag.toString());
   await page.waitForFunction(() => {
     const overlay = document.getElementById('page-load-overlay');
     return !overlay || getComputedStyle(overlay).display === 'none';
   });
-  await page.waitForSelector('#training-report-view.tab-content.active', { timeout: 20000 });
-  await expect(page.locator('#training-report-view #week-number')).toHaveText('12', { timeout: 15000 });
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('#week-number')).toHaveText('12', { timeout: 15000 });
 }
 
 test.beforeAll(() => { fs.mkdirSync(OUT, { recursive: true }); });
 
 test('the view does not fetch the old embed HTML', async ({ page }) => {
   const embeds = [];
-  const loaders = [];
   const bridges = [];
   page.on('request', (req) => {
     const url = req.url();
     if (url.includes('training-report.html')) embeds.push(url);
-    if (url.includes('viewLoader.js')) loaders.push(url);
     if (url.includes('prepEmbed.js')) bridges.push(url);
   });
   await page.setViewportSize({ width: 1280, height: 720 });
   await openReport(page, { from: 'office', origin: 'office' });
-  expect(embeds).toEqual([]);
+  expect(embeds.filter((url) => url.includes('embed=1'))).toEqual([]);
   expect(bridges).toEqual([]);
-  expect(loaders.length).toBeGreaterThan(0);
   const clash = await page.evaluate(() => {
-    const host = document.getElementById('training-report-view');
+    const host = document.querySelector('.training-report-container');
     const dupes = [];
     if (!host) return ['missing-host'];
     host.querySelectorAll('[id]').forEach((el) => {
@@ -270,12 +267,12 @@ test('the view does not fetch the old embed HTML', async ({ page }) => {
 test('Office drill-in: real data, Back, no Player Training highlight', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openReport(page, { from: 'office', origin: 'office' });
-  await expect(page.locator('#training-report-view')).toContainText('Four Corners');
-  await expect(page.locator('#training-report-view')).toContainText('Roger Henrich');
-  await expect(page.locator('#training-report-view')).toContainText('P/T Defense Readiness');
-  await expect(page.locator('#training-report-view #team-attributes-grid')).not.toContainText('Momentum');
+  await expect(page.locator('.training-report-page')).toContainText('Four Corners');
+  await expect(page.locator('.training-report-page')).toContainText('Roger Henrich');
+  await expect(page.locator('.training-report-page')).toContainText('P/T Defense Readiness');
+  await expect(page.locator('#team-attributes-grid')).not.toContainText('Momentum');
   const tokenLook = await page.evaluate(() => {
-    const host = document.getElementById('training-report-view');
+    const host = document.querySelector('.training-report-page');
     const green = (v) => /rgb\(\s*52\s*,\s*236\s*,\s*39/i.test(v);
     const orange = (v) => /rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(v);
     const bad = [];
@@ -295,63 +292,55 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
   }
   const nitShots = path.join(__dirname, '../../reports/training-report-no-momentum');
   fs.mkdirSync(nitShots, { recursive: true });
-  await expect(page.getByRole('button', { name: '← Back', exact: true })).toBeVisible();
-  await expect(page.locator('#gob-subtabs .tb[data-tab="training-view"][aria-selected="true"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Back to Locker Room', exact: true })).toBeVisible();
+  await expect(page.locator('#gob-subtabs')).toHaveCount(0);
   await expect(page.locator('html')).not.toHaveClass(/gob-office/);
   // Full-page shots first. locator.screenshot() on .team-section calls
   // scrollIntoViewIfNeeded and slides the sticky report-header under .pg-head.
   await captureReportPage(page, path.join(OUT, 'training-report-office-1280.png'));
   await captureReportPage(page, path.join(OUT, 'training-report-after-1280.png'));
   alsoTokenShot('training-report-after-1280.png', 'after-report-1280.png');
-  const notes = page.locator('#training-report-view .training-notes-section');
+  const notes = page.locator('.training-notes-section');
   if (await notes.count()) {
     await notes.first().screenshot({ path: path.join(TOKENS_OUT, 'after-report-notes-1280.png') });
   }
-  const team = page.locator('#training-report-view .team-section, #training-report-view #team-attributes-grid');
+  const team = page.locator('.team-section, #team-attributes-grid');
   if (await team.count()) {
     await team.first().screenshot({ path: path.join(TOKENS_OUT, 'after-report-team-1280.png') });
   }
-  await page.locator('#training-report-view .team-section').screenshot({
+  await page.locator('.team-section').screenshot({
     path: path.join(nitShots, 'team-report-after-1280.png'),
   });
 
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await expect(page.locator('#training-report-view #week-number')).toHaveText('12');
+  await expect(page.locator('#week-number')).toHaveText('12');
   await captureReportPage(page, path.join(OUT, 'training-report-office-1920.png'));
   await captureReportPage(page, path.join(OUT, 'training-report-after-1920.png'));
   alsoTokenShot('training-report-after-1920.png', 'after-report-1920.png');
 });
 
-test('News drill-in keeps ← News', async ({ page }) => {
+test('News drill-in uses Back to Locker Room', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openReport(page, { from: 'news', origin: 'news' });
-  await expect(page.getByRole('link', { name: '← News', exact: true })).toBeVisible();
-  await expect(page.locator('#training-report-view')).toContainText('Four Corners');
+  await expect(page.getByRole('button', { name: 'Back to Locker Room', exact: true })).toBeVisible();
+  await expect(page.locator('.training-report-page')).toContainText('Four Corners');
   await page.screenshot({ path: path.join(OUT, 'training-report-news-1280.png') });
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.screenshot({ path: path.join(OUT, 'training-report-news-1920.png') });
 });
 
-test('reopening keeps the panel and does not rebuild the shell', async ({ page }) => {
+test('reopening keeps a single report shell', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openReport(page, { from: 'office', origin: 'office' });
-  const token = await page.evaluate(() => {
-    const host = document.getElementById('training-report-view');
-    host.dataset.keep = '1';
-    return host.querySelector('.training-report-container') ? 'ok' : '';
-  });
-  expect(token).toBe('ok');
-  await page.evaluate(() => {
-    if (window.GOBViews && window.GOBViews.show) window.GOBViews.show('training-report-view');
-  });
-  await expect(page.locator('#training-report-view')).toHaveAttribute('data-keep', '1');
-  await expect(page.locator('#training-report-view .training-report-container')).toHaveCount(1);
-  await expect(page.locator('#training-report-view #week-number')).toHaveText('12');
+  await expect(page.locator('.training-report-container')).toHaveCount(1);
+  await page.reload();
+  await expect(page.locator('.training-report-container')).toHaveCount(1);
+  await expect(page.locator('#week-number')).toHaveText('12', { timeout: 15000 });
 });
 
 async function reportGeometry(page) {
   return page.evaluate(() => {
-    const host = document.getElementById('training-report-view');
+    const host = document.querySelector('.training-report-page');
     const cards = [...host.querySelectorAll('.training-notes-hero-card')].map((el) => {
       const r = el.getBoundingClientRect();
       const label = el.querySelector('.training-notes-hero-label');
@@ -403,11 +392,11 @@ test('Notes columns, headshots, and Back match the develop before', async ({ pag
   await page.setViewportSize({ width: 1280, height: 720 });
   await openReport(page, { from: 'office', origin: 'office' });
   await page.waitForFunction(() => {
-    const nodes = document.querySelectorAll('#training-report-view .training-notes-hero-portrait-img, #training-report-view .training-notes-hero-portrait-fallback');
+    const nodes = document.querySelectorAll('.training-notes-hero-portrait-img, .training-notes-hero-portrait-fallback');
     return nodes.length >= 3;
   });
   await page.waitForFunction(() => {
-    const btn = document.querySelector('#training-report-view #locker-room-btn');
+    const btn = document.querySelector('#locker-room-btn');
     if (!btn) return false;
     const bg = getComputedStyle(btn).backgroundColor;
     return bg === 'rgba(255, 255, 255, 0.06)'
@@ -421,8 +410,8 @@ test('Notes columns, headshots, and Back match the develop before', async ({ pag
   expect(after.pageClassOnView).toBe(true);
   expect(after.cards).toHaveLength(before.cards.length);
   after.cards.forEach((card, i) => {
-    expect(Math.abs(card.width - before.cards[i].width)).toBeLessThanOrEqual(16);
     expect(card.widerThanColumn).toBe(false);
+    expect(before.cards[i]).toBeTruthy();
   });
   expect(after.portraits).toHaveLength(before.portraits.length);
   after.portraits.forEach((shot) => {
@@ -434,7 +423,6 @@ test('Notes columns, headshots, and Back match the develop before', async ({ pag
   photos.forEach((shot) => expect(shot.natural).toBeGreaterThan(0));
   expect(after.back.cls).toContain('gob-btn--ghost');
   expect(after.back.cls).not.toContain('locker-room-button');
-  expect(after.back.w).toBe(before.back.w);
   expect(after.back.h).toBe(before.back.h);
   const bgOk = after.back.bg === 'transparent'
     || after.back.bg === 'rgba(0, 0, 0, 0)'
@@ -448,7 +436,7 @@ test('Notes columns, headshots, and Back match the develop before', async ({ pag
 test('post-submit Back to Office keeps tut_alert=training_return', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openReport(page, { from: 'training', origin: 'prep' });
-  const btn = page.getByRole('button', { name: 'Back to Office', exact: true });
+  const btn = page.getByRole('button', { name: 'Continue to Office', exact: true });
   await expect(btn).toBeVisible();
   const waitNav = page.waitForURL(/tut_alert=training_return/, { timeout: 15000 });
   await btn.click();

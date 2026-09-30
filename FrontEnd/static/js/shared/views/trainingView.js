@@ -26,22 +26,12 @@ var mounted = false;
 
 function syncChrome(tab) {
   var on = tab === 'training-view';
-  // Tools park in .pg-tools, outside #training-view. The parked pill still
-  // needs the standalone page class so its rules match the develop embed.
   document.body.classList.toggle('training-page', on);
-  if (!window.GOBTraining) return;
-  if (on) window.GOBTraining.syncAdvance();
-  else if (window.GOBAdvance && window.GOBAdvance.clearOverride) window.GOBAdvance.clearOverride();
 }
 
-function placeTrainingTools(slot) {
-  var home = '#training-tools-home';
-  ['requirements-bar', 'auto-train-btn', 'training-tutorial-btn'].forEach(function (id) {
-    var node = document.getElementById(id);
-    if (!node) return;
-    node.setAttribute('data-tool-home', home);
-    slot.appendChild(node);
-  });
+function placeTrainingTools() {
+  // Player-dev tab has no weekly tools to park. Weekly allocation lives on
+  // /training.html (focus), which owns its own header.
 }
 
 function contextValue(key) {
@@ -53,6 +43,7 @@ function contextValue(key) {
 
 function optionsFrom(ctx) {
   return {
+    sections: 'player-dev',
     mode: contextValue('mode') || 'franchise',
     franchiseId: (ctx && ctx.franchiseId) || contextValue('franchise_id') || '',
     teamId: (ctx && ctx.teamId) || contextValue('team_id') || '',

@@ -794,7 +794,7 @@ test('advance mirror matches the top bar', async ({ page }) => {
         { id: 'run_training', label_key: 'run_training', required: true, done: false, gates_advance: true, is_advance_action: true, route: '/training.html' },
         { id: 'play_next_game', label_key: 'play_next_game', required: true, done: false, gates_advance: false, is_advance_action: false, route: '/set-lineup.html' },
       ],
-    }), { week: 10, training_completed: false }), '/franchise-command-center.html'],
+    }), { week: 10, training_completed: false }), '/training.html'],
     ['game', commandCenter(digest('win'), { week: 12, training_completed: true }), '/set-lineup.html'],
     ['cut', commandCenter(digest('regular', {
       todos: [
@@ -974,8 +974,8 @@ test('attribute chips group, order, and cap', async ({ page }) => {
   // The card always carries "All changes -> " (Ch7 decision 18).
   await expect(page.locator('#office-root .wkc-f .lnk')).toHaveText(/All changes/);
   const href = await page.locator('#office-root .wkc-f .lnk').getAttribute('href');
-  expect(href).toContain('/franchise-command-center.html');
-  expect(href).toContain('tab=training-report-view');
+  expect(href).toContain('/training-report.html');
+  expect(href).not.toContain('tab=training-report-view');
   expect(href).toContain('origin=office');
   expect(href).toContain('week=21');
   const nameHref = await page.locator('#office-root .wkc .gn[data-player-id="p-amy"] .nm').getAttribute('href');

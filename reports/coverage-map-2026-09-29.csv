@@ -5,11 +5,11 @@ screen,Player Stats,player-stats-view,team,sub-tab,IN-APP VIEW,replace,yes (retu
 screen,Team Attributes,team-attributes-view,team,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"shell-1, shell-1b, store-client, t2-roster (+1)",14/15,4/5,12/17,3/8,
 screen,Team Schedule,team-schedule-view,team,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"schedule-views, shell-1, store-client (+2)",52/69,5/6,51/82,5/9,
 screen,Practice Squad,practice-squad-view,team,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"practice-squad-view, shell-1b",33/35,4/6,34/37,3/7,practice-squad-standings/bracket.html redirect here
-screen,Training,training-view (embeds /training.html?embed=1),prep,rail,EMBED BRIDGE,push (rail),yes,works,works,R,yes,"shell-1, shell-1b",22/25,12/14,24/32,12/14,
+screen,Player Training,training-view (player-dev only),prep,rail,IN-APP VIEW,replace,yes,works,works,R,yes,"training-advance-focus, prep-modules-training",,,,,Weekly allocation is /training.html focus via Advance
 screen,Game Plan,game-plan-view (embeds /game-plan.html?embed=1),prep,sub-tab,EMBED BRIDGE,replace,yes,works,works,R,yes,"shell-1, shell-1b, shell-2, store-client",24/25,5/7,24/24,5/8,
 screen,Playbooks,playbooks-view (embeds /playbooks.html?embed=1),prep,sub-tab,EMBED BRIDGE,replace,yes,works,works,R,yes,"shell-1, shell-1b, store-client",100/127,6/8,98/133,6/7,Layout jump on first open (CLS 0.354 in 10/10 runs per profile)
 screen,Scouting Report,scouting-view,prep,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"prep-scouting, shell-1, shell-1b",154/180,39/72,152/188,43/64,Panel empty for 4-5 frames on every reopen (DOM); slowest warm module view
-screen,Training Report,training-report-view (embeds /training-report.html?embed=1),prep,Office card / post-training (officeHome.js:421 links the redirect stub),EMBED BRIDGE,push (via stub page load),yes (C),works,works,R (loads via stub) / C (entry),yes,shell-1b,,,,,Not timed (needs a submitted training week)
+screen,Training Report,/training-report.html,focus,Submit / Office card / News / old tab remap,FOCUS PAGE,go (standalone),yes,works,works,R,yes,training-advance-focus,,,,,Same module as the retired FCC tab; no rail
 screen,Standings,standings-view,league,rail,IN-APP VIEW,push (rail),yes,works,works,R,yes,"app-router, shell-1, shell-1b, shell-2 (+3)",29/30,7/9,29/30,7/10,
 screen,Rankings,rankings-view,league,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"app-router, shell-1b, shell-2, subtabs (+1)",75/108,7/8,75/84,6/7,
 screen,Leaders,leaders-view,league,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"shell-1, shell-1b, t1-tables, t3-detail",82/88,4/6,83/85,4/5,
@@ -75,8 +75,8 @@ redirect,schedule.html,-> FCC ?tab=league-schedule-view,league,stub,REDIRECT STU
 redirect,standings.html,-> FCC ?tab=standings-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"foundation-settings, shell-2, t1-tables (+3)",,,,,"Linked at franchise-command-center.js:1777, 1779, 1794"
 redirect,team-roster-view.html,-> FCC ?tab=team-view (stays a page for mode=practice_squad),context,stub,REDIRECT STUB,location.href,n/a,works,works,R,n/a,"app-router, standalone-roster, t2-roster, t3-detail (+2)",,,,,"Linked at officeHome.js:158, gobTables.js:237, rankingsView.js:84, franchise-select-team.js:657, franchise-command-center.js:796 (practiceSquadView.js:79 is the legit PS page)"
 redirect,team-stats.html,-> FCC ?tab=team-stats-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"shell-2, store-client, t1-tables",,,,,Linked at franchise-command-center.js:1790
-redirect,training.html,-> FCC ?tab=training-view (embed guard),prep,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"office-frontend, shell-1, shell-2, store-client",,,,,"Linked at gobAdvance.js:378, training-playbooks.js:81"
-redirect,training-report.html,-> FCC ?tab=training-report-view (embed guard),prep,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"navigation-fixes-3, news-awards, office-frontend, shell-2 (+1)",,,,,Linked at officeHome.js:421
+screen,Weekly Training,/training.html,none,Advance (mode=training),FOCUS PAGE,go,yes,works,works,R,yes,"training-advance-focus, navigation-fixes-3, shell-2",,,,,"gobAdvance.js → /training.html; training-playbooks.js returns here"
+page,training-report.html,focus weekly report (same module),focus,Submit / Office / News / old tab,FOCUS PAGE,go,yes,works,works,R,yes,"training-advance-focus, shell-2",,,,,Old FCC tab remaps here
 redirect,game-plans.html,-> tutorial-game-plans.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,0 inbound links
 redirect,player-attributes.html,-> tutorial-player-attributes.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,0 inbound links
 redirect,scouting.html,-> tutorial-scouting.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,0 inbound links

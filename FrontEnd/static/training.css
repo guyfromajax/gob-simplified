@@ -2079,6 +2079,15 @@ body.training-page .drill-group--solo {
 body.training-page .drill-group--solo .drill-title { margin-bottom: 0; }
 body.training-page .drill-group--solo .slider-label { flex: 0 0 auto; }
 
+body.training-page .training-advance-pointer,
+#training-view .training-advance-pointer {
+  margin: 0 0 var(--dsp-12, 12px);
+  color: var(--text-60);
+  font-size: var(--fs-14, 14px);
+}
+body.training-page .training-advance-pointer[hidden],
+#training-view .training-advance-pointer[hidden] { display: none; }
+
 /* --- Player Development --------------------------------------------------- */
 body.training-page .player-dev-section {
   grid-column: 1 / -1;
@@ -2146,7 +2155,7 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   background: transparent;
   box-shadow: none;
 }
-#training-view .training-header { display: none; }
+#franchise-container #training-view .training-header { display: none; }
 #training-view .training-container,
 #training-view .resource-page-container,
 #training-view .fcc-brand-page-shell,
@@ -2177,7 +2186,13 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
 #training-view .training-state-note[hidden],
 #training-view .training-state-note-link[hidden],
 #training-view .main-content-grid[hidden],
-#training-view .coaching-section[hidden] {
+#training-view .coaching-section[hidden],
+#training-view[data-training-sections="player-dev"] .main-content-grid,
+#training-view[data-training-sections="player-dev"] .coaching-section,
+#training-view[data-training-sections="player-dev"] .training-header,
+#training-view[data-training-sections="player-dev"] #requirements-bar,
+#training-view[data-training-sections="player-dev"] #auto-train-btn,
+#training-view[data-training-sections="player-dev"] #submit-btn {
   display: none;
 }
 #training-view .content-section,
@@ -2197,6 +2212,9 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   backdrop-filter: none;
 }
 
+#training-view h2.section-header,
+#training-view h2.coaching-title,
+#training-view h2.player-dev-title,
 #franchise-container #training-view h2.section-header,
 #franchise-container #training-view h2.coaching-title,
 #franchise-container #training-view h2.player-dev-title {
@@ -2207,12 +2225,16 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   color: var(--text-100);
   white-space: nowrap;
 }
+#training-view h2.section-header::after,
+#training-view h2.coaching-title::after,
+#training-view h2.player-dev-title::after,
 #franchise-container #training-view h2.section-header::after,
 #franchise-container #training-view h2.coaching-title::after,
 #franchise-container #training-view h2.player-dev-title::after {
   display: none;
 }
 
+#training-view h3.drill-title,
 #franchise-container #training-view h3.drill-title {
   display: block;
   margin: var(--dsp-10) 0 var(--space-2);
@@ -2224,6 +2246,7 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   white-space: nowrap;
   min-height: 0;
 }
+#training-view h3.drill-title--spacer,
 #franchise-container #training-view h3.drill-title--spacer {
   visibility: hidden;
 }
@@ -2233,7 +2256,7 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-12);
-  height: var(--dsz-30);
+  height: auto;
   min-height: var(--dsz-30);
   margin: 0;
   padding: 0;
@@ -2247,8 +2270,8 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   font-size: var(--fs-13);
   font-weight: var(--fw-regular);
   color: var(--text-87);
-  white-space: nowrap;
-  overflow: hidden;
+  white-space: normal;
+  overflow: visible;
 }
 #training-view .attr-chip {
   display: inline;
@@ -2269,6 +2292,49 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   gap: var(--space-12);
   margin: 0;
   background: transparent;
+}
+/* Same clip as body.training-page: the range stays the model, pips are the only control. */
+#training-view .slider-container .slider {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+#training-view .ps {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+#training-view .ps button {
+  display: block;
+  width: 18px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-3);
+  background: var(--white-6);
+}
+#training-view .ps button:first-of-type {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+#training-view .ps button.f { background: var(--white-45); }
+#training-view .ps button.c { background: var(--white-90); }
+#training-view .ps button.x {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--white-6);
+}
+#training-view .ps button:disabled { cursor: not-allowed; }
+#training-view .slider-container .slider:focus-visible ~ .ps {
+  outline: 2px solid var(--text-100);
+  outline-offset: 3px;
+  border-radius: var(--radius-3);
 }
 #training-view .slider-value,
 #training-view .ps-n {
@@ -2317,12 +2383,16 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
 }
 
 #training-view .coaching-section {
-  margin-top: var(--dsp-24);
+  margin-top: var(--dsp-16);
+}
+#training-view h2.coaching-title {
+  text-align: left;
 }
 #training-view .coaching-subtitle {
-  margin: calc(-1 * var(--dsp-6)) 0 var(--dsp-6);
+  margin: 0 0 var(--dsp-6);
   font-size: var(--fs-12);
   color: var(--text-60);
+  text-align: left;
 }
 #training-view .archetypes-grid {
   display: grid;
@@ -2355,12 +2425,14 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   color: var(--text-38);
 }
 #training-view .archetype-block:has(input:checked) .archetype-name { color: var(--text-87); }
+#training-view .archetype-options,
 #franchise-container #training-view .archetype-options {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   gap: var(--space-6);
 }
+#training-view .archetype-option,
 #franchise-container #training-view .archetype-option {
   display: inline-flex;
   align-items: center;
@@ -2603,5 +2675,173 @@ html.gob-shell .pg-tools:has(#requirements-bar) #requirements-bar[hidden],
 html.gob-shell .pg-tools:has(#requirements-bar) #auto-train-btn[hidden],
 html.gob-shell body.training-no-allocation .pg-tools:has(#requirements-bar) #requirements-bar,
 html.gob-shell body.training-no-allocation .pg-tools:has(#requirements-bar) #auto-train-btn {
+  display: none;
+}
+
+/* Weekly focus host: same tokenised tools as the old in-app pg-tools row.
+   The FCC tab still hides .training-header (tools park in the sub-tab row). */
+html.gob-focus #training-view .training-header {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-12);
+  margin: 0 0 var(--dsp-16);
+  padding: 0 0 var(--dsp-16);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  position: static;
+  top: auto;
+  z-index: auto;
+}
+html.gob-focus #training-view .page-title { display: none; }
+html.gob-focus #training-view .training-header-left,
+html.gob-focus #training-view .header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+}
+html.gob-focus #training-view .header-center {
+  justify-self: center;
+  align-items: center;
+  text-align: center;
+}
+html.gob-focus #training-view #recruiting-invites-btn,
+html.gob-focus #training-view .recruiting-invites-button {
+  display: none !important;
+}
+html.gob-focus #training-view #requirements-bar,
+html.gob-focus #training-view .req-pill,
+html.gob-focus #training-view .bud {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-10);
+  height: var(--dsz-30);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+}
+html.gob-focus #training-view .req-pill-seg,
+html.gob-focus #training-view .req-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  height: var(--dsz-30);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html.gob-focus #training-view .req-pill .points-display,
+html.gob-focus #training-view .points-display {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  margin: 0;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  font-family: var(--font-body);
+  letter-spacing: 0;
+  color: var(--text-87);
+  white-space: nowrap;
+}
+html.gob-focus #training-view .req-chip-check {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--white-25);
+  background: transparent;
+}
+html.gob-focus #training-view .req-chip-check::after { content: none; }
+html.gob-focus #training-view .req-chip.is-complete .req-chip-check,
+html.gob-focus #training-view .req-chip.is-selected .req-chip-check {
+  background: var(--white-90);
+  box-shadow: none;
+}
+html.gob-focus #training-view .req-pill-label {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+html.gob-focus #training-view .req-chip-value {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  font-family: var(--font-body);
+  color: var(--text-87);
+}
+html.gob-focus #training-view .req-meter {
+  width: 46px;
+  height: 4px;
+  margin: 0;
+  background: var(--white-6);
+  border-radius: var(--radius-3);
+}
+html.gob-focus #training-view .req-meter-fill { background: var(--white-45); }
+html.gob-focus #training-view .req-chip.is-complete .req-meter-fill { background: var(--white-90); }
+html.gob-focus #training-view .req-pill-div {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+}
+html.gob-focus #training-view .req-focus-nudge { display: none; }
+html.gob-focus #training-view #auto-train-btn,
+html.gob-focus #training-view #training-tutorial-btn,
+html.gob-focus #training-view #back-btn {
+  height: var(--dsz-30);
+  min-height: var(--dsz-30);
+  min-width: 0;
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-8);
+  border: 0;
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font: var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-87);
+}
+html.gob-focus #training-view #training-tutorial-btn {
+  height: var(--dsz-24);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  font-family: var(--font-body);
+  letter-spacing: 0;
+  color: var(--text-60);
+  background: transparent;
+  box-shadow: none;
+}
+html.gob-focus #training-view #submit-btn.submit-button.advance {
+  height: var(--dsz-30);
+  min-height: var(--dsz-30);
+  padding: 0 var(--space-12);
+  border: 0;
+  border-radius: var(--radius-8);
+  background: var(--green);
+  color: var(--bg);
+  box-shadow: none;
+  font: var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+}
+html.gob-focus #training-view #requirements-bar[hidden],
+html.gob-focus #training-view #auto-train-btn[hidden],
+html.gob-focus #training-view #submit-btn[hidden],
+html.gob-focus #training-view .training-state-note[hidden],
+html.gob-focus #training-view .training-state-note-link[hidden] {
   display: none;
 }

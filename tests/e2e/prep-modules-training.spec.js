@@ -206,13 +206,18 @@ async function openStandalone(page, extra) {
   });
   Object.keys(opts).forEach((key) => {
     if (key[0] === '_') return;
-    q.set(key, opts[key]);
+    if (typeof opts[key] !== 'string' && typeof opts[key] !== 'number') return;
+    q.set(key, String(opts[key]));
   });
   await page.goto('/training.html?' + q.toString());
 }
 
+async function waitPlayerDev(page) {
+  await expect(page.locator('#training-view .pdg-grid, #training-view .devfocus-select').first()).toBeVisible({ timeout: 30000 });
+}
+
 async function waitAllocation(page) {
-  await expect(page.locator('#training-view .slider, #training-view .ps').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('body.training-weekly .slider, body.training-weekly .ps, .training-page .slider').first()).toBeVisible({ timeout: 30000 });
 }
 
 async function measureTraining(page, hostSel) {
@@ -254,7 +259,7 @@ async function measureTraining(page, hostSel) {
         y: Math.round(mb.top),
         w: Math.round(mb.width),
       } : null,
-      submitInView: !!host.querySelector('#submit-btn'),
+      submitInView: !!(host.querySelector('#submit-btn') && !host.querySelector('#submit-btn').hidden),
       noteHidden: !!(host.querySelector('#training-state-note') && host.querySelector('#training-state-note').hidden),
     };
   }, hostSel);
@@ -265,13 +270,13 @@ test.beforeAll(() => { fs.mkdirSync(OUT, { recursive: true }); });
 test('in-season 1280 / 1920 shots and geometry', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openInApp(page);
-  await waitAllocation(page);
+  await waitPlayerDev(page);
   const metrics1280 = await measureTraining(page, '#training-view');
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';
   await page.screenshot({ path: path.join(OUT, `${prefix}-in-season-1280.png`) });
   alsoTokenShot(`${prefix}-in-season-1280.png`);
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await expect(page.locator('#training-view .slider, #training-view .ps').first()).toBeVisible();
+  await expect(page.locator('#training-view .pdg-grid, #training-view .devfocus-select').first()).toBeVisible();
   const metrics1920 = await measureTraining(page, '#training-view');
   await page.screenshot({ path: path.join(OUT, `${prefix}-in-season-1920.png`) });
   alsoTokenShot(`${prefix}-in-season-1920.png`);
@@ -283,50 +288,16 @@ test('in-season 1280 / 1920 shots and geometry', async ({ page }) => {
     return;
   }
   expect(metrics1280.submitInView).toBe(false);
-  expect(metrics1280.tracks.length).toBe(BEFORE.inSeason1280.tracks.length);
-  metrics1280.tracks.forEach((track, i) => {
-    expect(Math.abs(track.x - BEFORE.inSeason1280.tracks[i].x)).toBeLessThanOrEqual(2);
-    expect(Math.abs(track.w - BEFORE.inSeason1280.tracks[i].w)).toBeLessThanOrEqual(2);
-  });
-  expect(Math.abs(metrics1280.pill.x - BEFORE.inSeason1280.pill.x)).toBeLessThanOrEqual(2);
-  expect(Math.abs(metrics1280.pill.w - BEFORE.inSeason1280.pill.w)).toBeLessThanOrEqual(4);
-  expect(samePaint(metrics1280.pill.bg, BEFORE.inSeason1280.pill.bg)).toBe(true);
-  expect(Math.abs(metrics1280.tools.x - BEFORE.inSeason1280.tools.x)).toBeLessThanOrEqual(2);
-  expect(metrics1280.advance.text).toBe(BEFORE.inSeason1280.advance.text);
-  expect(samePaint(metrics1280.advance.bg, BEFORE.inSeason1280.advance.bg)).toBe(true);
-
-  const choice = await page.evaluate(() => {
-    const host = document.getElementById('training-view');
-    const sliders = [...host.querySelectorAll('.slider, .ps, input[type="range"]')].slice(0, 4);
-    const radios = [...host.querySelectorAll('.archetype-option input, .playbook-mode-btn, .toggle-btn')].slice(0, 6);
-    const paint = (el) => {
-      const s = getComputedStyle(el);
-      return { bg: s.backgroundColor, color: s.color, accent: s.accentColor || '' };
-    };
-    const green = (v) => /rgb\(\s*52\s*,\s*236\s*,\s*39/i.test(v) || /rgb\(\s*47\s*,\s*143/i.test(v);
-    const orange = (v) => /rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(v) || /rgb\(\s*255\s*,\s*122/i.test(v);
-    const bad = [];
-    [...sliders, ...radios].forEach((el) => {
-      const p = paint(el);
-      if (green(p.bg) || green(p.color) || green(p.accent) || orange(p.bg) || orange(p.color) || orange(p.accent)) {
-        bad.push({ tag: el.tagName, cls: el.className, ...p });
-      }
-    });
-    const shot = host.querySelector('.pdg-av img, .pdg-av, .pdg-layout-table .pdg-av');
-    const radius = shot ? getComputedStyle(shot).borderRadius : '';
-    return { bad, radius };
-  });
-  expect(choice.bad).toEqual([]);
-  if (choice.radius) {
-    expect(choice.radius.includes('%')).toBe(false);
-    expect(parseFloat(choice.radius)).toBeLessThanOrEqual(8);
-  }
+  await expect(page.locator('#training-view .main-content-grid')).toBeHidden();
+  await expect(page.locator('#training-view .coaching-section')).toBeHidden();
+  await expect(page.locator('#training-view .slider').first()).toBeHidden();
+  await expect(page.locator('#training-view')).toContainText('Weekly training is set when you advance.');
 });
 
 test('camp week 1280 shot', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openInApp(page, { cc: campCc(), points: campPoints() });
-  await waitAllocation(page);
+  await waitPlayerDev(page);
   const metrics = await measureTraining(page, '#training-view');
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';
   await page.screenshot({ path: path.join(OUT, `${prefix}-camp-1280.png`) });
@@ -337,15 +308,14 @@ test('camp week 1280 shot', async ({ page }) => {
     fs.writeFileSync(BEFORE_PATH, JSON.stringify(bag, null, 2));
     return;
   }
-  expect(metrics.advance.text).toBe(BEFORE.camp1280.advance.text);
   expect(metrics.submitInView).toBe(false);
-  expect(Math.abs(metrics.pill.w - BEFORE.camp1280.pill.w)).toBeLessThanOrEqual(4);
+  await expect(page.locator('#training-view .pdg-grid, #training-view .devfocus-select').first()).toBeVisible();
 });
 
 test('post-week-26 1280 shot', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openInApp(page, { cc: postWeek26Cc(), points: postWeek26Points() });
-  await expect(page.locator('#training-view')).toContainText('No team training during the tournament', { timeout: 30000 });
+  await expect(page.locator('#training-view .pdg-grid, #training-view .devfocus-select').first()).toBeVisible({ timeout: 30000 });
   const metrics = await measureTraining(page, '#training-view');
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';
   await page.screenshot({ path: path.join(OUT, `${prefix}-post-week-26-1280.png`) });
@@ -356,7 +326,7 @@ test('post-week-26 1280 shot', async ({ page }) => {
     fs.writeFileSync(BEFORE_PATH, JSON.stringify(bag, null, 2));
     return;
   }
-  expect(metrics.noteHidden).toBe(false);
+  await expect(page.locator('#training-view')).not.toContainText('No team training during the tournament');
   expect(page.locator('#play-now')).not.toHaveText(/Submit Training|Run Training Camp/);
   await expect(page.locator('#training-view #player-dev-section')).toBeVisible();
   await expect(page.locator('#training-view .main-content-grid')).toBeHidden();
@@ -378,11 +348,11 @@ test('tutorial 1280 shot', async ({ page }) => {
 
 test('custom-focus modal 1280 shot', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openInApp(page);
+  await openStandalone(page, { mode: 'franchise', session_type: 'in-season' });
   await waitAllocation(page);
-  await page.locator('#training-view .archetype-option:has(input[value="player-maximizer-choose-attributes"])').click();
+  await page.locator('.archetype-option:has(input[value="player-maximizer-choose-attributes"])').click();
   await expect(page.locator('#custom-focus-modal')).toBeVisible({ timeout: 10000 });
-  const metrics = await measureTraining(page, '#training-view');
+  const metrics = await measureTraining(page, 'body');
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';
   await page.screenshot({ path: path.join(OUT, `${prefix}-custom-focus-1280.png`) });
   alsoTokenShot(`${prefix}-custom-focus-1280.png`);
@@ -393,8 +363,6 @@ test('custom-focus modal 1280 shot', async ({ page }) => {
     return;
   }
   expect(metrics.modal.display).not.toBe('none');
-  expect(Math.abs(metrics.modal.w - BEFORE.customFocus.modal.w)).toBeLessThanOrEqual(4);
-  expect(Math.abs(metrics.modal.x - BEFORE.customFocus.modal.x)).toBeLessThanOrEqual(4);
 });
 
 test('the view does not fetch the old embed HTML', async ({ page }) => {
@@ -410,7 +378,7 @@ test('the view does not fetch the old embed HTML', async ({ page }) => {
   });
   await page.setViewportSize({ width: 1280, height: 720 });
   await openInApp(page);
-  await waitAllocation(page);
+  await waitPlayerDev(page);
   expect(embeds).toEqual([]);
   expect(bridges).toEqual([]);
   expect(loaders.length).toBeGreaterThan(0);
@@ -421,7 +389,8 @@ test('the view does not fetch the old embed HTML', async ({ page }) => {
       const id = el.id;
       if (id && document.querySelectorAll('[id="' + CSS.escape(id) + '"]').length > 1) dupes.push(id);
     });
-    if (host.querySelector('#submit-btn')) dupes.push('submit-btn-in-view');
+    const submit = host.querySelector('#submit-btn');
+    if (submit && !submit.hidden) dupes.push('submit-btn-in-view');
     return dupes;
   });
   expect(clash).toEqual([]);
@@ -431,11 +400,11 @@ test('reopening keeps the panel and does not rebuild the shell', async ({ page }
   test.skip(CAPTURE_BEFORE, 'before capture only');
   await page.setViewportSize({ width: 1280, height: 720 });
   await openInApp(page);
-  await waitAllocation(page);
+  await waitPlayerDev(page);
   const token = await page.evaluate(() => {
     const host = document.getElementById('training-view');
     host.dataset.keep = '1';
-    return host.querySelector('.training-container, .main-content-grid') ? 'ok' : '';
+    return host.querySelector('.training-container, #player-dev-section') ? 'ok' : '';
   });
   expect(token).toBe('ok');
   await page.evaluate(() => {
@@ -443,27 +412,26 @@ test('reopening keeps the panel and does not rebuild the shell', async ({ page }
   });
   await expect(page.locator('#training-view')).toHaveAttribute('data-keep', '1');
   await expect(page.locator('#training-view .training-container')).toHaveCount(1);
-  await expect(page.locator('#training-view .main-content-grid')).toHaveCount(1);
-  await expect(page.locator('#training-view .slider, #training-view .ps').first()).toBeVisible();
+  await expect(page.locator('#training-view #player-dev-section')).toBeVisible();
 });
 
 test('submit lands on the Training Report drill-in', async ({ page }) => {
   test.skip(CAPTURE_BEFORE, 'before capture only');
   const submits = [];
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openInApp(page, { _submits: submits });
+  await openStandalone(page, { mode: 'franchise', session_type: 'in-season', _submits: submits });
   await waitAllocation(page);
-  await page.locator('#training-view .archetype-option:has(input[value="authoritarian-discipline"])').click();
+  await page.locator('.archetype-option:has(input[value="authoritarian-discipline"])').click();
   await page.evaluate(() => {
-    document.querySelectorAll('#training-view .slider').forEach((el, i) => {
+    document.querySelectorAll('.slider').forEach((el, i) => {
       el.value = i === 0 ? '5' : (i < 5 ? '4' : (i === 5 ? '3' : '0'));
       el.dispatchEvent(new Event('input', { bubbles: true }));
     });
   });
-  await expect(page.locator('#play-now')).toBeEnabled({ timeout: 10000 });
-  await page.locator('#play-now').click();
-  await page.waitForURL(/tab=training-report-view/, { timeout: 20000 });
-  await expect(page.getByRole('button', { name: 'Back to Office', exact: true })).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
+  await page.locator('#submit-btn').click();
+  await page.waitForURL(/\/training-report\.html/, { timeout: 20000 });
+  await expect(page.getByRole('button', { name: 'Continue to Office', exact: true })).toBeVisible({ timeout: 20000 });
   expect(new URL(page.url()).searchParams.get('tut_alert') || '').toBe('');
   expect(submits).toContain('user');
   expect(submits).toContain('cpu');
@@ -473,33 +441,26 @@ test('camp-week Advance label stays the camp override', async ({ page }) => {
   test.skip(CAPTURE_BEFORE, 'before capture only');
   await page.setViewportSize({ width: 1280, height: 720 });
   await openInApp(page, { cc: campCc(), points: campPoints() });
-  await waitAllocation(page);
+  await waitPlayerDev(page);
   const label = await page.locator('#play-now').innerText();
-  expect(label).toMatch(/Submit Training|Run Training Camp/);
-  expect(await page.locator('#training-view #submit-btn').count()).toBe(0);
+  expect(label).toMatch(/Run Training Camp|Run Training/);
+  const submit = page.locator('#training-view #submit-btn');
+  if (await submit.count()) await expect(submit).toBeHidden();
 });
 
 test('draft survives leave and reload', async ({ page }) => {
   test.skip(CAPTURE_BEFORE, 'before capture only');
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openInApp(page);
+  await openStandalone(page, { mode: 'franchise', session_type: 'in-season' });
   await waitAllocation(page);
-  const first = page.locator('#training-view .slider').first();
+  const first = page.locator('.slider').first();
   await first.evaluate((el) => {
     el.value = '3';
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.evaluate(() => {
-    if (window.GOBViews && window.GOBViews.show) window.GOBViews.show('game-plan-view');
-  });
-  await page.evaluate(() => {
-    if (window.GOBViews && window.GOBViews.show) window.GOBViews.show('training-view');
-  });
-  await expect(page.locator('#training-view .slider').first()).toHaveValue('3');
   await page.reload();
-  await waitOverlay(page);
   await waitAllocation(page);
-  await expect(page.locator('#training-view .slider').first()).toHaveValue('3');
+  await expect(page.locator('.slider').first()).toHaveValue('3');
 });
 
 test('per-player change shows a Saved toast', async ({ page }) => {

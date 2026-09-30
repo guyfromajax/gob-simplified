@@ -52,6 +52,7 @@ function qsa(sel) {
 }
 
 function inAppShell() {
+  if (document.documentElement.classList.contains('gob-focus')) return true;
   return !!(root && (root.id === 'training-report-view' || (root.closest && root.closest('#training-report-view'))));
 }
 
@@ -69,6 +70,12 @@ function readOptions(options) {
   teamId = pick('teamId', 'team_id');
   const weekRaw = pick('week');
   week = parseInt(weekRaw, 10);
+  if (!Number.isFinite(week)) {
+    try {
+      const fromCtx = parseInt(franchiseCtx().get('week') || '', 10);
+      if (Number.isFinite(fromCtx)) week = fromCtx;
+    } catch (err) { /* keep NaN */ }
+  }
   const fromRaw = pick('from');
   const originRaw = pick('origin');
   reportFrom = (fromRaw === 'news' || fromRaw === 'inbox')
@@ -564,20 +571,12 @@ function paintBack() {
   const btn = byId('locker-room-btn');
   if (!btn) return;
 
-  if (reportFrom === 'news' && mode === 'franchise') {
-    btn.hidden = true;
-    btn.style.display = 'none';
-    ensureNewsUpLink();
-  } else {
-    const news = byId('back-button');
-    if (news) news.hidden = true;
-    btn.hidden = false;
-    btn.style.display = '';
-    // Post-submit still uses the named "Back to Office" + tut_alert one-shot.
-    // A drill-in from Office (or anywhere else) just goes back.
-    btn.textContent = reportFrom === 'training' ? 'Back to Office' : '← Back';
-    btn.className = 'gob-btn gob-btn--ghost';
-  }
+  const news = byId('back-button');
+  if (news) news.hidden = true;
+  btn.hidden = false;
+  btn.style.display = '';
+  btn.textContent = reportFrom === 'training' ? 'Continue to Office' : 'Back to Locker Room';
+  btn.className = 'gob-btn gob-btn--ghost';
 
   btn.dataset.exitWired = '1';
   if (backClickWired) return;
@@ -622,7 +621,9 @@ async function loadTrainingReport() {
     
     if (franchiseId) {
       params.set('franchise_id', franchiseId);
-      params.set('week', week);
+    }
+    if (Number.isFinite(week)) {
+      params.set('week', String(week));
     }
     
     const response = await fetch(`${API_CONFIG.buildUrl('/franchise/training-report')}?${params.toString()}`);
@@ -1510,6 +1511,8 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   label.appendChild(nameSpan);
   label.appendChild(changeSpan);
   item.appendChild(label);
+
+  if (inAppShell()) return item;
   
   // Special handling for different attribute types
   if (attrKey === 'team_chemistry') {

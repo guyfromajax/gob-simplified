@@ -66,6 +66,10 @@ async function installApi(page, saves) {
     if (pathname === '/franchise/standings') return fulfillJson(route, FIXTURE.standings);
     if (pathname === '/teams') return fulfillJson(route, FIXTURE.teams);
     if (pathname.startsWith('/roster/')) return fulfillJson(route, FIXTURE.roster);
+    if (pathname === '/franchise/player/development-focus' && method === 'POST') {
+      const body = request.postDataJSON() || {};
+      return fulfillJson(route, { ok: true, training_position: body.training_position, training_focus: body.training_focus });
+    }
     if (pathname === '/api/gameplan') {
       if (method === 'PUT') {
         saves.push('gameplan');
@@ -96,7 +100,7 @@ async function openFcc(page, tab, saves) {
 }
 
 const READY = {
-  'training-view': '#training-view .ps button[data-value]',
+  'training-view': '#training-view .devfocus-select, #training-view .pdg-grid',
   'game-plan-view': '#game-plan-view #slider-offense',
   'playbooks-view': '#playbooks-view .play',
 };
@@ -207,11 +211,12 @@ test.describe('leave prompt', () => {
     expect(dialogs).toEqual([]);
   });
 
-  test('training: edits are kept as a draft, so no prompt', async ({ page }) => {
+  test('training: player-dev saves on change, so no leave prompt', async ({ page }) => {
     const dialogs = watchDialogs(page);
     await openFcc(page, 'training-view');
     await waitReady(page, 'training-view');
-    await page.locator('#training-view .ps button[data-value]').nth(1).click({ force: true });
+    const focus = page.locator('#training-view .devfocus-select[data-devfocus-field="training_focus"]').first();
+    await focus.selectOption('offensive');
     expect(await wouldPrompt(page)).toBe(false);
     await goToSchedule(page);
     await page.waitForTimeout(400);

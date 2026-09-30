@@ -238,7 +238,7 @@ test('in-app Training after', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/franchise-command-center.html?' + fcc('training-view'));
   await waitOverlay(page);
-  await expect(page.locator('#training-view .slider, #training-view .ps').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#training-view .devfocus-select, #training-view .pdg-grid').first()).toBeVisible({ timeout: 30000 });
   await page.screenshot({ path: path.join(OUT, 'after-training-1280.png') });
 });
 
@@ -247,9 +247,11 @@ test('in-app Training Report after', async ({ page }) => {
   await stubAuth(page);
   await installPlanApi(page);
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto('/franchise-command-center.html?' + fcc('training-report-view', { week: '12', from: 'office', origin: 'office' }));
+  await page.goto('/training-report.html?franchise_id=' + FID + '&team_id=' + TEAM
+    + '&mode=franchise&week=12&from=office&origin=office');
   await waitOverlay(page);
-  await expect(page.locator('#training-report-view')).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('#week-number, .training-notes-section').first()).toBeVisible({ timeout: 30000 });
   await page.screenshot({ path: path.join(OUT, 'after-training-report-1280.png') });
 });
 

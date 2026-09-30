@@ -99,7 +99,7 @@ Columns follow the brief. "Back" means browser Back returns to where you came fr
 | Game Plan | `game-plan-view` | prep | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | shell-1, shell-2 (+2) |
 | Playbooks | `playbooks-view` | prep | sub-tab | IN-APP VIEW | replace | yes | works (jump) | works (jump) | R | yes | shell-1, store-client (+1) |
 | Scouting Report | `scouting-view` | prep | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | prep-scouting, shell-1 (+1) |
-| Training Report | `training-report-view` | prep | Office card / after training (via stub) | IN-APP VIEW | push (stub load) | yes (C) | works | works | R load / C entry | yes | shell-1b |
+| Training Report | `/training-report.html` | — | Submit / Office card / News / old tab remap | FOCUS PAGE | go (standalone) | yes | works | works | R | yes | training-advance-focus |
 | Standings | `standings-view` | league | rail | IN-APP VIEW | push | yes | works | works | R | yes | app-router, t1-tables (+5) |
 | Rankings | `rankings-view` | league | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | subtabs, app-router (+3) |
 | Leaders | `leaders-view` | league | sub-tab | IN-APP VIEW | replace | yes | works | works | R | yes | t1-tables, t3-detail (+2) |
@@ -161,8 +161,8 @@ Every stub loads and forwards correctly in both profiles (R). The live links bel
 |---|---|---|
 | `player-detail.html` | FCC `?tab=player-view` | `officeHome.js:147`, `team-roster-view.js:98`, `franchise-command-center.js:398` |
 | `team-roster-view.html` | FCC `?tab=team-view` (stays a page for `mode=practice_squad&ps_team_id`) | `officeHome.js:158`, `gobTables.js:237`, `rankingsView.js:84`, `franchise-select-team.js:657`, `franchise-command-center.js:796`. `practiceSquadView.js:79` is the legitimate PS page |
-| `training-report.html` | FCC `?tab=training-report-view` | `officeHome.js:421` |
-| `training.html` | FCC `?tab=training-view` | `gobAdvance.js:378`, `training-playbooks.js:81` |
+| `training-report.html` | focus Training Report (no FCC tab) | `gobAdvance` submit, `officeHome.js` All changes, News dispatch, old `?tab=training-report-view` remap |
+| `training.html` | focus weekly allocation (no FCC redirect) | `gobAdvance.js` Advance (`mode=training`), `training-playbooks.js` return |
 | `game-plan.html` | FCC `?tab=game-plan-view` | `training.js:1196`, `training.js:1545`, `box-score.js:2182`, `franchise-command-center.js:4387` |
 | `playbooks.html` | FCC `?tab=playbooks-view` | `playbook-report.js:353`, `play-details.html:527`, `franchise-command-center.js:2260`, `2274` |
 | `standings.html` | FCC `?tab=standings-view` | `franchise-command-center.js:1777`, `1779`, `1794` |

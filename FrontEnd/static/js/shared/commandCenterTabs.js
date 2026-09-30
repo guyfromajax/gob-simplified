@@ -37,6 +37,7 @@ function initCommandCenterTabs(options) {
 
   var urlParams = liveParams();
   var activeTab = canonicalTab(urlParams.get('tab') || defaultTab);
+  if (leaveForStandaloneReport(activeTab)) return;
   var shownTab = '';
 
   function isKnown(tabName) {
@@ -65,6 +66,21 @@ function initCommandCenterTabs(options) {
     } catch (err) { /* ignore */ }
   }
 
+  function standaloneReportHref() {
+    var bag = liveParams();
+    bag.delete('tab');
+    var qs = bag.toString();
+    return '/training-report.html' + (qs ? '?' + qs : '');
+  }
+
+  function leaveForStandaloneReport(tabName) {
+    if (tabName !== 'training-report-view') return false;
+    var next = standaloneReportHref();
+    if (window.GOBNav && typeof window.GOBNav.replace === 'function') window.GOBNav.replace(next);
+    else window.location.replace(next);
+    return true;
+  }
+
   function canonicalTab(tabName) {
     if (tabName === 'roster-tab') return 'roster-view';
     if (tabName === 'recruits-tab') return 'home-tab';
@@ -81,6 +97,7 @@ function initCommandCenterTabs(options) {
 
   function show(tabName, historyMode) {
     tabName = canonicalTab(tabName);
+    if (leaveForStandaloneReport(tabName)) return;
     if (!isKnown(tabName)) tabName = defaultTab;
     var nav = window.GOBNav;
     if (shownTab && shownTab !== tabName && nav && typeof nav.confirmLeave === 'function') {

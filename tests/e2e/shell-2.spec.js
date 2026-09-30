@@ -25,14 +25,14 @@ const BROWSE = [
   'standings.html',
   'team-stats.html',
   'stats.html',
-  'training.html',
-  'training-report.html',
   'game-plan.html',
   'playbooks.html',
 ];
 
 const FOCUS = [
   'set-lineup.html',
+  'training.html',
+  'training-report.html',
   'training-squad-report.html',
   'training-playbooks.html',
   'cut-players.html',
@@ -304,6 +304,21 @@ async function installApi(page, data, rich) {
       await fulfillJson(route, rich.teamStats);
       return;
     }
+    if (pathname.startsWith('/franchise/training-report')) {
+      await fulfillJson(route, {
+        week: 12,
+        upcoming_opponent: 'Four Corners',
+        coaching_focus: {},
+        players: [],
+        player_changes: {},
+        team_attributes: {},
+        team_changes: {},
+        plays_data: {},
+        scouting_data: {},
+        training_notes: [],
+      });
+      return;
+    }
     if (rich && pathname.startsWith('/roster/')) {
       await fulfillJson(route, {
         players: rich.players,
@@ -467,6 +482,9 @@ test('browse and focus pages, screenshots, and one vertical scroll', async ({ pa
     }
     if (file === 'set-lineup.html') {
       extra = '&home=Lancaster&away=Four%20Corners&home_display=Lancaster&away_display=Four%20Corners&my_team=home&game_id=g-mid&week=12';
+    }
+    if (file === 'training-report.html') {
+      extra = '&week=12&from=office&mode=franchise';
     }
     await openPage(page, file, season.data, extra, season);
     const focus = FOCUS.indexOf(file) !== -1;
@@ -695,9 +713,12 @@ test('flow pages keep their own exit and the court has no shell', async ({ page 
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await expect(page.locator('.rail')).toHaveCount(0);
   await openPage(page, 'training.html', cc({ training_completed: false }));
-  await expect(page.locator('nav.rail')).toHaveCount(1);
-  await expect(page.locator('#gob-subtabs .tb[aria-selected="true"] .tb-l')).toHaveText('Player Training');
-  await expect(page.locator('#play-now.advance')).toHaveCount(1);
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('nav.rail')).toHaveCount(0);
+  await expect(page.locator('#gob-subtabs')).toHaveCount(0);
+  await expect(page.locator('#play-now.advance')).toHaveCount(0);
+  await expect(page.locator('#submit-btn')).toBeVisible();
+  await expect(page.locator('#back-btn')).toHaveText('Back to Locker Room');
   await openPage(page, 'recruiting.html', cc(), '&action=run');
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await stubAuth(page);
@@ -777,13 +798,13 @@ test('game plan tick labels do not overlap at 1280 or 1920', async ({ page }) =>
   await assertNoOverlap();
 });
 
-test('training tab-row tools do not overlap at 1280 or 1920', async ({ page }) => {
+test('training focus header tools do not overlap at 1280 or 1920', async ({ page }) => {
   async function assertNoOverlap() {
-    await page.waitForSelector('html.gob-shell .pg-head .pg-tools #requirements-bar');
+    await page.waitForSelector('.training-header #requirements-bar');
     const overlaps = await page.evaluate(() => {
-      const slot = document.querySelector('html.gob-shell .pg-head .pg-tools');
-      if (!slot) return ['no-slot'];
-      const els = [...slot.querySelectorAll(':scope > *, #requirements-bar > *')].filter((el) => {
+      const slot = document.querySelector('.training-header');
+      if (!slot) return ['no-header'];
+      const els = [...slot.querySelectorAll('#back-btn, #training-tutorial-btn, #requirements-bar, #auto-train-btn, #submit-btn')].filter((el) => {
         const r = el.getBoundingClientRect();
         const cs = getComputedStyle(el);
         return r.width > 1 && r.height > 1 && cs.display !== 'none' && cs.visibility !== 'hidden';
