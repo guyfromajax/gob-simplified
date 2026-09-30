@@ -48,6 +48,20 @@ async function fetchJSON(url) {
   return (await fetchJSONWithStatus(url)).data;
 }
 
+// The read right after a week advance lands on a busy server (or a deploy
+// cutover). Advance stays off until it succeeds, so ride out a transient miss.
+const FCC_DATA_RETRY_DELAYS_MS = [1000, 2000, 4000];
+
+async function fetchCommandCenterData() {
+  let result = await fetchJSONWithStatus(fccCommandCenterDataUrl(franchiseId));
+  for (const delay of FCC_DATA_RETRY_DELAYS_MS) {
+    if (result.data || [401, 403, 404].includes(result.status)) break;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    result = await fetchJSONWithStatus(fccCommandCenterDataUrl(franchiseId));
+  }
+  return result;
+}
+
 // Profiling stays available as ?cc_profile=1. The Office load itself does not request it.
 function fccProfileSuffix() {
   try {
@@ -262,9 +276,48 @@ function hideFccLoadingOverlay() {
   if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
 }
 
-window.addEventListener('pageshow', () => {
+window.addEventListener('pageshow', (event) => {
   maybeRefreshPlaybooksButtonState();
+  if (event && event.persisted) void revalidateRestoredFcc();
 });
+
+// The fields the Advance step and the week header are computed from.
+function fccAdvanceKey(data) {
+  if (!data) return '';
+  const wire = data.recruiting_wire || {};
+  const resume = data.cpu_sim_resume || {};
+  return JSON.stringify([
+    data.current_season, data.week, data.session_type, !!data.training_completed,
+    !!data.cut_required, wire.board_saved_week, !!wire.week_35_orders_submitted,
+    resume.status || null, !!data.season_complete,
+  ]);
+}
+
+// A back-forward-cache restore is the old document. gobNav reloads the returns it
+// has markers for; any other restore checks the server before Advance is live, so
+// the FCC never offers a step from a week that has already moved on.
+async function revalidateRestoredFcc() {
+  if (window.GOBNav && typeof window.GOBNav.isReloading === 'function' && window.GOBNav.isReloading()) return;
+  const shown = window.__gobCommandCenterData;
+  if (!franchiseId || !shown) return;
+  const wasDisabled = playNowBtn.disabled;
+  playNowBtn.disabled = true;
+  const url = fccCommandCenterDataUrl(franchiseId);
+  let fresh = null;
+  try {
+    fresh = window.GOBStore && typeof window.GOBStore.revalidate === 'function'
+      ? await window.GOBStore.revalidate(url, { headers: API_CONFIG.getAuthHeaders() })
+      : await fetchJSON(url);
+  } catch (err) {
+    fresh = null;
+  }
+  if (!fresh || fccAdvanceKey(fresh) !== fccAdvanceKey(shown)) {
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+    window.location.replace(window.location.href);
+    return;
+  }
+  playNowBtn.disabled = wasDisabled;
+}
 
 window.addEventListener('focus', () => {
   maybeRefreshPlaybooksButtonState();
@@ -513,7 +566,10 @@ function resolveFccTeamBanner(data) {
   return '/images/teams/general/general_banner_primary.jpg';
 }
 
-function populateTop(data) {
+// `warm` is the session-cache paint behind the overlay. That copy can be from an
+// older week (a late write after the week advanced), so it never reaches the
+// shared command-center data or the shell's week: Advance reads those.
+function populateTop(data, { warm = false } = {}) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
   const logoEl = document.getElementById('team-logo');
@@ -551,8 +607,10 @@ function populateTop(data) {
     rankLabelEl.textContent = `National Rank: ${data.rank || '--'}`;
   }
   updateTopRecordLabel();
-  window.__gobCommandCenterData = data;
-  if (window.GOBShell && typeof window.GOBShell.syncTop === 'function') window.GOBShell.syncTop(data);
+  if (!warm) {
+    window.__gobCommandCenterData = data;
+    if (window.GOBShell && typeof window.GOBShell.syncTop === 'function') window.GOBShell.syncTop(data);
+  }
   console.log('Team logo URL:', logoSrc);
 
   const abbr = teamMap[formattedTeam];
@@ -3715,7 +3773,7 @@ async function init() {
     persistFranchiseDisplayColorContext(commandCenterTopDataCache);
     emitDisplayContextUpdate();
     adoptAuthoritativeFccTeamId(commandCenterTopDataCache);
-    populateTop(commandCenterTopDataCache);
+    populateTop(commandCenterTopDataCache, { warm: true });
     void hydrateFccDisplayColorPreference();
     initFccRecruits(commandCenterTopDataCache);
     if (commandCenterTopDataCache.team) {
@@ -3724,10 +3782,10 @@ async function init() {
     userConference = commandCenterTopDataCache.user_conference != null ? commandCenterTopDataCache.user_conference : null;
     userRegion = commandCenterTopDataCache.user_region != null && commandCenterTopDataCache.user_region !== '' ? commandCenterTopDataCache.user_region : null;
     void initializeTeamColorCache();
-    updatePlayButton(commandCenterTopDataCache);
+    // Advance and its ghost wait for the authoritative read below: the cached week
+    // can be the one the player just finished.
     updateScoutingButton(commandCenterTopDataCache);
     updateRecruitingButton(commandCenterTopDataCache);
-    updateEditRecruitingButton(commandCenterTopDataCache);
     updateAwardsButton(commandCenterTopDataCache);
     void updatePlaybooksButtonState(commandCenterTopDataCache);
     bindResourcesLinks();
@@ -3739,7 +3797,7 @@ async function init() {
     // showing it directly causes a stale-data flash on FCC entry.
   }
   const topDataStartTime = performance.now();
-  const topDataResult = await fetchJSONWithStatus(fccCommandCenterDataUrl(franchiseId));
+  const topDataResult = await fetchCommandCenterData();
   let topData = topDataResult.data;
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
@@ -3809,6 +3867,7 @@ async function init() {
   
   // Update button based on training status
   updatePlayButton(topData);
+  playNowBtn.disabled = false;
   updateScoutingButton(topData);
   updateRecruitingButton(topData);
   updateEditRecruitingButton(topData);
@@ -4429,9 +4488,8 @@ window.addEventListener('DOMContentLoaded', () => {
     window.location.href = '/franchise-select-team.html';
     return;
   }
-  if (franchiseId) {
-    playNowBtn.disabled = false;
-  }
+  // #play-now stays disabled until authoritative command-center data sets it
+  // (init below, or GOBAdvance.load). The static label is not a real step.
 
   const exitFranchiseBtn = document.getElementById('exit-franchise');
   if (exitFranchiseBtn) {
