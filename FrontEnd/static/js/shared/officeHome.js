@@ -45,6 +45,10 @@
   };
 
   var ARRIVAL_KEY = 'gob-office-arrival';
+  // Per page load: whether each result key is a first showing, and whether its win
+  // sting has already fired — so repeated renders don't replay either.
+  var arrivalDecided = {};
+  var stingPlayed = {};
 
   function el(tag, className, text) {
     var node = document.createElement(tag);
@@ -195,22 +199,30 @@
   function portrait(playerId, name, className) {
     var box = el('span', className || 'portrait');
     var letters = initials(name);
-    var url = '';
-    if (present(playerId) && global.API_CONFIG && typeof global.API_CONFIG.getPlayerImageUrl === 'function') {
-      url = global.API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' });
+    var api = global.API_CONFIG;
+    var hasApi = api && typeof api.getPlayerImageUrl === 'function';
+    var url = (present(playerId) && hasApi) ? api.getPlayerImageUrl(playerId, { size: 'card' }) : '';
+    function showInitials() {
+      box.textContent = '';
+      if (letters) box.appendChild(el('span', 'office-initials', letters));
     }
-    if (url) {
-      var img = el('img');
-      img.alt = '';
-      img.src = url;
-      img.addEventListener('error', function () {
-        img.remove();
-        if (letters) box.appendChild(el('span', 'office-initials', letters));
-      });
-      box.appendChild(img);
-    } else if (letters) {
-      box.appendChild(el('span', 'office-initials', letters));
-    }
+    if (!url) { showInitials(); return box; }
+    // The painted headshot, then the shared silhouette on a miss, then centred
+    // initials only if even the silhouette is unavailable.
+    var img = el('img');
+    img.alt = '';
+    var triedSilhouette = false;
+    img.addEventListener('error', function onErr() {
+      if (!triedSilhouette && hasApi && typeof api.getGenericHeadshotUrl === 'function') {
+        triedSilhouette = true;
+        img.src = api.getGenericHeadshotUrl({ size: 'card' });
+        return;
+      }
+      img.removeEventListener('error', onErr);
+      showInitials();
+    });
+    img.src = url;
+    box.appendChild(img);
     return box;
   }
 
@@ -318,16 +330,41 @@
     });
   }
 
+  function arrivalKey(digest) {
+    var result = digest && digest.result;
+    if (!result) return '';
+    // Falls back to a composite when the game has no id.
+    return present(result.result_key)
+      ? String(result.result_key)
+      : [digest.state, result.week, result.home_score, result.away_score, result.opponent_team_id].join(':');
+  }
+
   function arrivalFor(digest) {
     var result = digest && digest.result;
-    if (!result || reducedMotion()) return { arriving: false, calm: false };
-    var key = [digest.state, result.week, result.home_score, result.away_score, result.opponent_team_id].join(':');
-    var seen = '';
-    try { seen = sessionStorage.getItem(ARRIVAL_KEY) || ''; } catch (err) {}
-    if (seen === key) return { arriving: false, calm: false };
-    try { sessionStorage.setItem(ARRIVAL_KEY, key); } catch (err) {}
+    if (!result) return { firstShowing: false, arriving: false, calm: false };
+    // The entrance plays once per result. "Seen" is the client's own state: the
+    // last-shown result_key in localStorage. The decision is cached per key for the
+    // page's lifetime so a second render in the same load does not flip it (the FCC
+    // renders the office more than once). If storage fails, treat it as already
+    // seen — show the final state rather than replaying on every load.
+    var key = arrivalKey(digest);
+    var firstShowing;
+    if (Object.prototype.hasOwnProperty.call(arrivalDecided, key)) {
+      firstShowing = arrivalDecided[key];
+    } else {
+      try {
+        var seen = localStorage.getItem(ARRIVAL_KEY) || '';
+        firstShowing = seen !== key;
+        if (firstShowing) localStorage.setItem(ARRIVAL_KEY, key);
+      } catch (err) {
+        firstShowing = false;
+      }
+      arrivalDecided[key] = firstShowing;
+    }
     var lost = result.user_won === false || digest.state === 'loss';
-    return { arriving: true, calm: lost };
+    // Motion is first-showing only and honours reduced motion; the sting follows
+    // the audio settings, so it stays keyed to firstShowing alone.
+    return { firstShowing: firstShowing, arriving: firstShowing && !reducedMotion(), calm: lost };
   }
 
   function column(index, title, aside, linkUrl) {
@@ -397,7 +434,9 @@
       row.chips.push({
         attribute: change.attribute,
         to: change.to,
-        delta: delta
+        delta: delta,
+        // Server-owned flag; the client never recomputes the gain threshold.
+        exceptional: change.exceptional === true
       });
     });
     var rows = order.map(function (id) { return map[id]; });
@@ -415,11 +454,15 @@
     return rows;
   }
 
-  function attrChip(change) {
+  // A training chip (.gc): attribute code, the app's tier-coloured value tile, and
+  // a NEUTRAL ▲/▼ delta. `exceptional` (server flag only) turns it into the one
+  // weekly gold marker; the client never recomputes the gain threshold.
+  function gainChip(change) {
     var parts = attrParts(change.attribute);
-    var node = el('span', 'attr-chip');
+    var down = change.delta < 0;
+    var node = el('span', 'gc' + (change.exceptional ? ' xg' : '') + (down ? ' dn' : ''));
     node.title = parts.title;
-    node.appendChild(el('b', 'attr-code', parts.code));
+    node.appendChild(el('b', '', parts.code));
     var tiles = global.GOB_AttrTiles;
     if (tiles && typeof tiles.tileHtml === 'function') {
       var holder = el('span');
@@ -428,7 +471,7 @@
     } else {
       node.appendChild(el('b', 'tdig ' + digitClass(change.to), String(change.to)));
     }
-    node.appendChild(el('i', 'arr ' + (change.delta > 0 ? 'up' : 'down'), change.delta > 0 ? '▲' : '▼'));
+    node.appendChild(el('i', '', (down ? '▼' : '▲') + Math.abs(change.delta)));
     return node;
   }
 
@@ -543,193 +586,230 @@
     return node;
   }
 
-  function resultCard(result, countScores, index, userRank) {
-    if (!result) return null;
-    var mine = userSide(result);
-    var theirs = otherSide(result);
-    var loss = result.user_won === false;
-    var node = card('office-res' + (loss ? ' is-loss' : ''), index);
-    var kicker = el('div', 'res-k');
-    var when = [];
-    if (present(result.week)) when.push('Week ' + result.week);
-    if (present(result.round_name)) when.push(result.round_name);
-    if (result.site === 'home') when.push('Home');
-    else if (result.site === 'away') when.push('Away');
-    if (when.length) kicker.appendChild(el('span', 'res-when', when.join(' · ')));
-    if (result.user_won === true) kicker.appendChild(el('span', 'wl win', 'WIN'));
-    else if (result.user_won === false) kicker.appendChild(el('span', 'wl loss', 'LOSS'));
-    if (kicker.childNodes.length) node.appendChild(kicker);
-
-    var score = el('div', 'res-score');
-    if (mine && present(mine.name)) {
-      var left = el('a', 'rs-team');
-      var leftUrl = teamHref(mine.id);
-      if (leftUrl) {
-        left.href = leftUrl;
-        bindGo(left, leftUrl);
-      }
-      var userName = el('span', 'rs-n');
-      if (present(userRank)) userName.appendChild(el('em', '', '#' + userRank));
-      userName.appendChild(document.createTextNode(mine.name));
-      left.appendChild(userName);
-      score.appendChild(left);
+  function ordinal(n) {
+    var num = Number(n);
+    if (!isFinite(num)) return String(n);
+    var mod100 = num % 100;
+    if (mod100 >= 11 && mod100 <= 13) return num + 'th';
+    switch (num % 10) {
+      case 1: return num + 'st';
+      case 2: return num + 'nd';
+      case 3: return num + 'rd';
+      default: return num + 'th';
     }
-    if (mine && present(mine.score)) score.appendChild(scoreNode(mine.score, 'rs-pts', countScores));
-    if (mine && theirs && present(mine.score) && present(theirs.score)) score.appendChild(el('span', 'rs-dash', '–'));
-    if (theirs && present(theirs.score)) score.appendChild(scoreNode(theirs.score, 'rs-pts them', countScores));
-    if (theirs && present(theirs.name)) {
-      var right = el('a', 'rs-team r');
-      var rightUrl = teamHref(theirs.id || result.opponent_team_id);
-      if (rightUrl) {
-        right.href = rightUrl;
-        bindGo(right, rightUrl);
-      }
-      var name = el('span', 'rs-n');
-      if (present(result.opponent_rank)) name.appendChild(el('em', '', '#' + result.opponent_rank));
-      name.appendChild(document.createTextNode(theirs.name));
-      right.appendChild(name);
-      score.appendChild(right);
-    }
-    if (score.childNodes.length) node.appendChild(score);
-
-    if (present(result.headline)) {
-      var headline = el('p', 'res-hl', result.headline);
-      node.appendChild(headline);
-    }
-
-    var leader = result.leader;
-    if (leader && (present(leader.name) || leader.stats)) {
-      var potg = el('div', 'potg');
-      potg.appendChild(portrait(leader.player_id, leader.name));
-      var id = el('div', 'pg-id');
-      var role = result.leader_role;
-      if (role === 'potg') id.appendChild(el('span', 'eyebrow', 'Player of the game'));
-      else if (role === 'team_leader' && mine && present(mine.name)) {
-        id.appendChild(el('span', 'eyebrow', mine.name + ' leader'));
-      }
-      var playerUrl = playerHref(leader.player_id);
-      var player = linkName('nm pg-n', leader.name, playerUrl);
-      if (player) id.appendChild(player);
-      potg.appendChild(id);
-      var stats = leader.stats || {};
-      var line = el('div', 'pg-line');
-      [['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST']].forEach(function (pair) {
-        if (!present(stats[pair[0]])) return;
-        var cell = el('div');
-        cell.appendChild(el('b', '', String(stats[pair[0]])));
-        cell.appendChild(el('span', '', pair[1]));
-        line.appendChild(cell);
-      });
-      if (line.childNodes.length) potg.appendChild(line);
-      node.appendChild(potg);
-      var extra = el('div', 'pg-extra');
-      if (present(stats.fgm) && present(stats.fga)) {
-        var fg = el('div');
-        fg.appendChild(el('b', '', stats.fgm + '-' + stats.fga));
-        fg.appendChild(el('span', '', 'FG'));
-        extra.appendChild(fg);
-      }
-      if (present(stats.fg3m) && present(stats.fg3a)) {
-        var threes = el('div');
-        threes.appendChild(el('b', '', stats.fg3m + '-' + stats.fg3a));
-        threes.appendChild(el('span', '', '3PT'));
-        extra.appendChild(threes);
-      }
-      if (present(stats.min)) {
-        var minutes = wholeMinutes(stats.min);
-        if (minutes) {
-          var min = el('div');
-          min.appendChild(el('b', '', minutes));
-          min.appendChild(el('span', '', 'MIN'));
-          extra.appendChild(min);
-        }
-      }
-      if (extra.childNodes.length) node.appendChild(extra);
-    }
-
-    if (result.box_score && present(result.box_score.path)) {
-      var foot = el('div', 'card-f');
-      var boxUrl = href(result.box_score.path, result.box_score.params);
-      var box = el('a', 'lnk', 'Box Score');
-      box.href = boxUrl;
-      bindGo(box, boxUrl);
-      foot.appendChild(box);
-      node.appendChild(foot);
-    }
-    return node.childNodes.length ? node : null;
   }
 
-  function movedCell(label, value, delta, index) {
+  function weeklyPlayerCap() {
+    return document.documentElement.classList.contains('gob-1920') ? 5 : 3;
+  }
+
+  // One scoreboard row. `winRow` carries the emphasis; on a loss the card drops
+  // every row to t87 in CSS, so the loser is never dimmed on the coach's own page.
+  function scoreRow(name, rank, score, winRow, countScore) {
+    var row = el('div', 'sb2-r' + (winRow ? ' w' : ''));
+    var who = el('span', 'sb2-n');
+    if (present(rank)) who.appendChild(el('em', '', '#' + rank));
+    who.appendChild(el('span', '', present(name) ? String(name) : ''));
+    row.appendChild(who);
+    var pts = el('span', 'sb2-p');
+    if (countScore && present(score)) {
+      pts.textContent = '0';
+      pts.dataset.cuFrom = '0';
+      pts.dataset.cuTo = String(score);
+    } else {
+      pts.textContent = present(score) ? String(score) : '';
+    }
+    row.appendChild(pts);
+    return row;
+  }
+
+  function weeklyBadge(label, value, delta) {
     if (!present(value)) return null;
-    var cell = el('div', 'mv-cell ar-item');
-    cell.style.setProperty('--i', String(index));
-    cell.appendChild(el('span', 'mv-l', label));
-    var row = el('span', 'mv-v');
-    row.appendChild(el('b', '', String(value)));
-    var deltaChip = chip(delta, index);
-    if (deltaChip) row.appendChild(deltaChip);
-    cell.appendChild(row);
+    var cell = el('div', 'bdg');
+    cell.appendChild(el('span', '', label));
+    var v = el('div', 'bdg-v');
+    v.appendChild(el('b', '', String(value)));
+    var n = Number(delta);
+    if (present(delta) && isFinite(n) && n !== 0) {
+      // Neutral by law: ▲ t87 / ▼ t60. Never green or red.
+      v.appendChild(el('em', n < 0 ? 'dn' : '', (n < 0 ? '▼' : '▲') + Math.abs(n)));
+    }
+    cell.appendChild(v);
     return cell;
   }
 
-  function whatMovedCard(moved, digest, index) {
-    if (!moved) return null;
-    var node = card('office-mv', index);
-    var head = el('div', 'card-h');
-    head.appendChild(el('h3', '', 'What moved'));
-    node.appendChild(head);
-    var strip = el('div', 'mv-strip');
-    var rank = moved.national_rank || {};
-    var conf = moved.conference_standing || {};
-    var record = moved.record || {};
-    var rankCell = movedCell('National rank', present(rank.now) ? '#' + rank.now : null, rank.delta, 0);
-    var confCell = movedCell('Conference', present(conf.now) ? conf.now : null, conf.delta, 1);
-    var recordText = winsLosses(record) || null;
-    var recordCell = movedCell('Record', recordText, null, 2);
-    if (recordCell && present(moved.streak)) {
-      var streak = streakChip(moved.streak);
-      if (streak) recordCell.querySelector('.mv-v').appendChild(streak);
-    }
-    [rankCell, confCell, recordCell].forEach(function (cell) {
-      if (cell) strip.appendChild(cell);
-    });
-    if (strip.childNodes.length) node.appendChild(strip);
+  // The folded moment(s): the Also row from digest.also, plus an inline "+N more"
+  // that reveals the rest of weekly_card_items in place.
+  function weeklyAlso(digest) {
+    var also = digest && digest.also;
+    if (!also || (!present(also.title) && !present(also.line))) return null;
+    var items = Array.isArray(digest.weekly_card_items) ? digest.weekly_card_items.filter(Boolean) : [];
+    var wrap = el('div', 'wkc-more-wrap ar-item');
 
-    var rows = groupAttributes(moved.attribute_changes);
-    var cap = playerCap();
-    var shown = rows.slice(0, cap);
-    if (shown.length) {
-      node.appendChild(el('div', 'sub-h', 'Attributes'));
-      var list = el('div', 'mv-list');
-      shown.forEach(function (player, changeIndex) {
-        var row = el('div', 'mv-p ar-item');
-        row.style.setProperty('--i', String(changeIndex + 3));
-        row.dataset.playerId = player.id;
-        var url = playerHref(player.id);
-        var who = el(url ? 'a' : 'span', 'nm');
-        who.textContent = player.name;
-        if (url) {
-          who.href = url;
-          bindGo(who, url);
-        }
-        row.appendChild(who);
-        var run = el('span', 'attr-run');
-        player.chips.forEach(function (change) {
-          run.appendChild(attrChip(change));
-        });
-        row.appendChild(run);
-        list.appendChild(row);
+    function alsoRow(item) {
+      var er = el('div', 'wkc-also');
+      er.appendChild(el('span', '', 'Also'));
+      er.appendChild(el('b', '', present(item.title) ? item.title : item.line));
+      var url = weeklyHref(item);
+      if (url) {
+        var link = el('a', 'lnk', 'View');
+        link.href = url;
+        bindGo(link, url);
+        er.appendChild(link);
+      }
+      return er;
+    }
+
+    wrap.appendChild(alsoRow(also));
+
+    var rest = items.slice(1);
+    if (rest.length) {
+      var extra = el('div', 'wkc-extra');
+      extra.hidden = true;
+      rest.forEach(function (item) { if (item) extra.appendChild(alsoRow(item)); });
+      var toggle = el('button', 'wkc-more', '+' + rest.length + ' more');
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.addEventListener('click', function () {
+        var open = extra.hidden;
+        extra.hidden = !open;
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.textContent = open ? 'Show less' : '+' + rest.length + ' more';
       });
-      node.appendChild(list);
-      if (rows.length > cap) {
-        var moreUrl = trainingReportHref(digest);
-        var more = el('a', 'lnk', 'All changes');
-        more.href = moreUrl;
-        bindGo(more, moreUrl);
-        node.appendChild(more);
+      wrap.appendChild(extra);
+      wrap.appendChild(toggle);
+    }
+    return wrap;
+  }
+
+  // The weekly "Since last week" card. Replaces the Result + What moved cards in
+  // Office column 1. No team wash (the WIN tag carries the result); neutral
+  // deltas; reward gold only on the exceptional-gain marker.
+  function sinceLastWeekCard(digest, index, countScores, userRank) {
+    var result = digest && digest.result;
+    var won = result ? result.user_won : null;
+    var loss = won === false;
+    var node = el('section', 'wkc ar-card' + (won === true ? ' is-win' : '') + (loss ? ' is-loss' : ''));
+    node.style.setProperty('--i', String(index));
+    var itemIndex = 0;
+    function markItem(el0) { el0.classList.add('ar-item'); el0.style.setProperty('--i', String(itemIndex)); itemIndex += 1; return el0; }
+
+    // The result-specific top of the card. A week with training but no last game
+    // (result null) still shows what moved below, so training is never lost.
+    if (result) {
+      // Kicker: WIN/LOSS tag, week · round · site, Box score.
+      var kick = el('div', 'wkc-k');
+      if (won === true) kick.appendChild(el('span', 'wtag', 'WIN'));
+      else if (loss) kick.appendChild(el('span', 'wtag', 'LOSS'));
+      var when = [];
+      if (present(result.week)) when.push('Week ' + result.week);
+      if (present(result.round_name)) when.push(result.round_name);
+      if (result.site === 'home') when.push('Home');
+      else if (result.site === 'away') when.push('Away');
+      kick.appendChild(el('span', 'wkc-when', when.join(' · ')));
+      var boxUrl = (result.box_score && present(result.box_score.path))
+        ? href(result.box_score.path, result.box_score.params) : '';
+      if (boxUrl) {
+        var box = el('a', 'lnk', 'Box score');
+        box.href = boxUrl;
+        bindGo(box, boxUrl);
+        kick.appendChild(box);
+      }
+      node.appendChild(kick);
+
+      // Scoreboard: your team always on top.
+      var mine = userSide(result);
+      var theirs = otherSide(result);
+      var sb = el('div', 'sb2');
+      sb.appendChild(scoreRow(mine && mine.name, userRank, mine && mine.score, won === true, countScores));
+      sb.appendChild(scoreRow(theirs && theirs.name, result.opponent_rank, theirs && theirs.score, loss, countScores));
+      node.appendChild(sb);
+
+      // Headline (only when the server carries one).
+      if (present(result.headline)) {
+        var hl = el('a', 'wkc-hl', result.headline);
+        if (boxUrl) { hl.href = boxUrl; bindGo(hl, boxUrl); }
+        node.appendChild(markItem(hl));
+      }
+
+      // Player of the Game (win) / Team leader (loss).
+      var leader = result.leader;
+      if (leader && (present(leader.name) || leader.stats)) {
+        var pg = el('div', 'pg2');
+        pg.appendChild(portrait(leader.player_id, leader.name));
+        var idb = el('div', 'pg2-id');
+        if (result.leader_role === 'potg') idb.appendChild(el('span', 'eyebrow', 'Player of the Game'));
+        else if (result.leader_role === 'team_leader') idb.appendChild(el('span', 'eyebrow', 'Team leader'));
+        var nameEl = linkName('nm', leader.name, playerHref(leader.player_id));
+        if (nameEl) idb.appendChild(nameEl);
+        var stats = leader.stats || {};
+        var line = el('div', 'pg2-l');
+        [['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST']].forEach(function (pair) {
+          if (!present(stats[pair[0]])) return;
+          var cell = el('div');
+          cell.appendChild(el('b', '', String(stats[pair[0]])));
+          cell.appendChild(el('span', '', pair[1]));
+          line.appendChild(cell);
+        });
+        if (line.childNodes.length) idb.appendChild(line);
+        pg.appendChild(idb);
+        node.appendChild(markItem(pg));
       }
     }
-    return node;
+
+    // Four badges: National, Conference, Record, Streak.
+    var moved = digest.what_moved || {};
+    var rank = moved.national_rank || {};
+    var conf = moved.conference_standing || {};
+    var badges = el('div', 'bdgs');
+    [
+      weeklyBadge('National', present(rank.now) ? '#' + rank.now : null, rank.delta),
+      weeklyBadge('Conference', present(conf.now) ? ordinal(conf.now) : null, conf.delta),
+      weeklyBadge('Record', winsLosses(moved.record) || null, null),
+      weeklyBadge('Streak', present(moved.streak) ? String(moved.streak) : null, null)
+    ].forEach(function (b) { if (b) badges.appendChild(b); });
+    if (badges.childNodes.length) node.appendChild(markItem(badges));
+
+    // Training: capped players; the gold key shows only when the server flagged an
+    // exceptional gain on a shown chip.
+    var rows = groupAttributes(moved.attribute_changes);
+    var shown = rows.slice(0, weeklyPlayerCap());
+    if (shown.length) {
+      var tr = el('div', 'wkc-tr');
+      var trh = el('div', 'wkc-tr-h');
+      trh.appendChild(el('span', 'sub-h', 'Training · this week'));
+      var anyXg = shown.some(function (p) { return p.chips.some(function (c) { return c.exceptional; }); });
+      if (anyXg) trh.appendChild(el('span', 'xg-key', 'Exceptional gain'));
+      tr.appendChild(trh);
+      shown.forEach(function (player) {
+        var gn = el('div', 'gn');
+        if (present(player.id)) gn.dataset.playerId = player.id;
+        var who = linkName('nm', player.name, playerHref(player.id));
+        gn.appendChild(who || el('span', 'nm', player.name));
+        var chips = el('div', 'gn-c');
+        player.chips.forEach(function (change) { chips.appendChild(gainChip(change)); });
+        gn.appendChild(chips);
+        tr.appendChild(gn);
+      });
+      node.appendChild(markItem(tr));
+    }
+
+    // Folded moment(s).
+    var also = weeklyAlso(digest);
+    if (also) { markItem(also); node.appendChild(also); }
+
+    // All changes → training report.
+    if (rows.length) {
+      var foot = el('div', 'wkc-f');
+      var allUrl = trainingReportHref(digest);
+      var all = el('a', 'lnk', 'All changes');
+      all.href = allUrl;
+      bindGo(all, allUrl);
+      foot.appendChild(all);
+      node.appendChild(foot);
+    }
+
+    return node.childNodes.length ? node : null;
   }
 
   function wireDetail(event) {
@@ -860,28 +940,6 @@
     var teamId = current.get('team_id') || current.get('user_team_id');
     if (teamId && !url.searchParams.get('team_id')) url.searchParams.set('team_id', teamId);
     return url.pathname + (url.search || '');
-  }
-
-  function weeklyCard(items, index) {
-    if (!Array.isArray(items) || !items.length) return null;
-    var node = card('office-weekly', index);
-    items.forEach(function (item) {
-      if (!item) return;
-      var url = weeklyHref(item);
-      var row = el(url ? 'a' : 'div', 'ow-row');
-      if (url) {
-        row.href = url;
-        bindGo(row, url);
-      }
-      var body = el('span', 'ow-b');
-      if (present(item.title)) body.appendChild(el('span', 'ow-k', item.title));
-      if (present(item.line)) body.appendChild(el('span', 'ow-v', item.line));
-      if (!body.childNodes.length) return;
-      row.appendChild(body);
-      row.appendChild(el('span', 'ow-go', '→'));
-      node.appendChild(row);
-    });
-    return node.childNodes.length ? node : null;
   }
 
   function nextCard(game, digest, index) {
@@ -1287,17 +1345,14 @@
       ];
       third = [wireCard(digest.recruiting_wire, true, 5)];
     } else if (digest.state === 'signing_day') {
-      first = [resultCard(digest.result, false, 1, userRank), whatMovedCard(digest.what_moved, digest, 2)];
+      first = [sinceLastWeekCard(digest, 1, false, userRank)];
       second = [
         snapshotCard(digest.team_snapshot, 3),
         standingsCard(digest.conference_standings, 4)
       ];
       third = [signingCard(digest.signing_day, 5)];
     } else {
-      first = [
-        resultCard(digest.result, countScores, 1, userRank),
-        whatMovedCard(digest.what_moved, digest, 2)
-      ];
+      first = [sinceLastWeekCard(digest, 1, countScores, userRank)];
       second = [
         nextCard(digest.next_game, digest, 3),
         snapshotCard(digest.team_snapshot, 4),
@@ -1305,8 +1360,8 @@
       ];
       third = [wireCard(digest.recruiting_wire, false, 6)];
     }
-    var weekly = weeklyCard(digest.weekly_card_items, 2);
-    if (weekly) second.unshift(weekly);
+    // The moment-queue weekly items now fold into the card's Also row / "+N more",
+    // so column 2 no longer carries a separate "This week" card.
     first.forEach(function (node) { if (node) col1.appendChild(node); });
     second.forEach(function (node) { if (node) col2.appendChild(node); });
     third.forEach(function (node) { if (node) col3.appendChild(node); });
@@ -1327,6 +1382,25 @@
       });
     }
     if (countScores) countUp(root);
+    // The win sting plays once per result (first showing), at the cue time when the
+    // score lands. It follows the audio settings, so it fires under reduced motion
+    // too; a loss is silent. Guarded per key so a re-render doesn't replay it.
+    if (motion.firstShowing && digest.result && digest.result.user_won === true) {
+      var stingKey = arrivalKey(digest);
+      if (!stingPlayed[stingKey]) {
+        stingPlayed[stingKey] = true;
+        playWinSting();
+      }
+    }
+  }
+
+  function playWinSting() {
+    var CUE_MS = 720; // --delay-cue: the score lands
+    global.setTimeout(function () {
+      import('/js/shared/uiSfx.js').then(function (mod) {
+        if (mod && typeof mod.playSfx === 'function') mod.playSfx(mod.STING_WIN);
+      }).catch(function () {});
+    }, CUE_MS);
   }
 
   global.GOBOffice = {
