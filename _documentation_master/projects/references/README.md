@@ -6,8 +6,9 @@ seeds 8000–8039, both arms, and (from `..._merged` onward) both footings in on
 **Use the newest non-superseded reference.** A superseded file is kept, never deleted —
 it is what the matching kill switch reproduces, which is how a rollback is verified.
 
-**The current reference is the file named in `scripts/sim_verify/CURRENT_REFERENCE`.** CI
-(`engine-equiv`) checks a 16-game smoke against it on every push; the full 160-game check
+**The current reference is the file named in `scripts/sim_verify/CURRENT_REFERENCE`**, and the
+current loose baseline is named in `scripts/sim_verify/CURRENT_LOOSE_BASELINE`. CI
+(`engine-equiv`) checks a 60-game smoke against both on every push; the full 160-game check
 is `PYTHONHASHSEED=0 python -m scripts.sim_verify.equiv --check`. Any file here can be
 checked with `--reference <file>` (the loose baselines run at `EQUIV_MAN_POSTURE=loose`
 automatically).

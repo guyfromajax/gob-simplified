@@ -1,12 +1,13 @@
 """Engine regression check (equiv-v3) against the CURRENT reference.
 
   python -m scripts.sim_verify.equiv --check            # full: every cell, arm, seed (~2 min on 14 cores)
-  python -m scripts.sim_verify.equiv --check --smoke    # CI subset (SMOKE_SEEDS on all four cells)
+  python -m scripts.sim_verify.equiv --check --smoke    # CI subset: main + loose smoke seeds
   python -m scripts.sim_verify.equiv --check --seeds 8000-8009 --cells 1 --arms sim
   python -m scripts.sim_verify.equiv --check --reference <file>   # e.g. verify a kill switch
   python -m scripts.sim_verify.equiv --recut --reason "..."       # DELIBERATE re-cut, see CLAUDE.md
 
-The current reference is the file named in scripts/sim_verify/CURRENT_REFERENCE. Each
+The current reference is the file named in scripts/sim_verify/CURRENT_REFERENCE; the
+current loose-posture baseline is named in CURRENT_LOOSE_BASELINE (smoke only). Each
 seed runs in its own process (scripts/sim_verify/worker.py) with PYTHONHASHSEED=0 on
 mongomock, so every row is independent of every other and of the job count.
 
@@ -33,10 +34,20 @@ from scripts.sim_verify import aggregate as A
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 POINTER = HERE / "CURRENT_REFERENCE"
+LOOSE_POINTER = HERE / "CURRENT_LOOSE_BASELINE"
 REFERENCES_DIR = REPO_ROOT / "_documentation_master" / "projects" / "references"
 
-# CI smoke: these seeds on all four cells (2 footings x 2 arms) = 16 games.
-SMOKE_SEEDS = (8000, 8001, 8002, 8003)
+# CI smoke. Main reference: these seeds on all four cells (2 footings x 2 arms) = 56
+# games. Chosen 2026-09-30 by a greedy cover over the reference games' path features
+# (fast breaks, FTs, steals, blocks, timeouts, charges, OREB/putbacks, run-out-clock,
+# SIP, HCT/FCP, per-shell zone calls, zone calls with no placement, untagged placements,
+# final-turn announces, points, close finishes): every top- or bottom-fifth extreme of
+# every feature on both footings is hit by at least two of these seeds (the old
+# 8000-8003 hit 48 of the 76 once). Eight of them are close finishes (margin <= 3).
+SMOKE_SEEDS = (8000, 8005, 8006, 8007, 8008, 8019, 8020, 8021, 8022, 8028, 8029, 8031, 8032, 8038)
+# Loose-posture baseline (EQUIV_MAN_POSTURE=loose, SEED_DEFENSES=1): these seeds on both
+# arms = 4 games; the two that cover the most loose-footing extremes.
+SMOKE_LOOSE_SEEDS = (8005, 8036)
 
 # Harness knobs the worker reads. They define the footing, so the runner sets them and
 # never inherits a stray value from the caller's shell.
@@ -60,12 +71,20 @@ def _rel(path: Path) -> str:
         return str(Path(path).resolve())
 
 
-def current_reference_path() -> Path:
-    for line in POINTER.read_text(encoding="utf-8").splitlines():
+def _pointer_target(pointer: Path) -> Path:
+    for line in pointer.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if line and not line.startswith("#"):
             return (REPO_ROOT / line).resolve()
-    raise SystemExit(f"{POINTER} names no reference")
+    raise SystemExit(f"{pointer} names no reference")
+
+
+def current_reference_path() -> Path:
+    return _pointer_target(POINTER)
+
+
+def current_loose_baseline_path() -> Path:
+    return _pointer_target(LOOSE_POINTER)
 
 
 def load_reference(path: Path) -> dict[str, Any]:
@@ -115,8 +134,9 @@ def engine_flag_overrides() -> dict[str, str]:
 
 def run_one(task: tuple[int, str, int], workdir: Path, posture: str) -> tuple[tuple[int, str, int], dict | None, str | None]:
     seed_defenses, arm, seed = task
-    out = workdir / f"d{seed_defenses}_{arm}_{seed}.json"
-    log = workdir / f"d{seed_defenses}_{arm}_{seed}.log"
+    stem = f"{posture or 'base'}_d{seed_defenses}_{arm}_{seed}"
+    out = workdir / f"{stem}.json"
+    log = workdir / f"{stem}.log"
     with open(log, "wb") as fh:
         proc = subprocess.run(
             [sys.executable, "-m", "scripts.sim_verify.worker"],
@@ -134,18 +154,26 @@ def run_one(task: tuple[int, str, int], workdir: Path, posture: str) -> tuple[tu
     return task, A.reference_row(row), None
 
 
-def run_matrix(tasks: list[tuple[int, str, int]], jobs: int, posture: str):
-    results: dict[tuple[int, str], dict[int, dict]] = {}
-    failures: list[str] = []
+def run_suites(suites: list[tuple[str, str, list[tuple[int, str, int]]]], jobs: int):
+    """Run several (label, posture, tasks) suites in ONE worker pool.
+    Returns {label: (results, failures)}."""
+    out: dict[str, tuple[dict, list]] = {label: ({}, []) for label, _, _ in suites}
+    flat = [(label, posture, task) for label, posture, tasks in suites for task in tasks]
     with tempfile.TemporaryDirectory(prefix="equiv-") as tmp:
         workdir = Path(tmp)
         with ThreadPoolExecutor(max_workers=jobs) as pool:
-            for (sd, arm, seed), row, err in pool.map(lambda t: run_one(t, workdir, posture), tasks):
+            done = pool.map(lambda item: (item[0], run_one(item[2], workdir, item[1])), flat)
+            for label, ((sd, arm, seed), row, err) in done:
+                results, failures = out[label]
                 if err:
                     failures.append(f"{A.cell_name(sd)} {arm} seed {seed}: {err}")
                 else:
                     results.setdefault((sd, arm), {})[seed] = row
-    return results, failures
+    return out
+
+
+def run_matrix(tasks: list[tuple[int, str, int]], jobs: int, posture: str):
+    return run_suites([("run", posture, tasks)], jobs)["run"]
 
 
 # ---------------------------------------------------------------------------
@@ -201,11 +229,11 @@ def compare(expected: dict, actual: dict, *, full: bool, ref_cells: dict, run_ce
 # ---------------------------------------------------------------------------
 
 def plan(reference: dict, *, smoke: bool, seeds_spec: str | None, cells_spec: str | None,
-         arms_spec: str | None) -> tuple[list[tuple[int, str, int]], bool]:
+         arms_spec: str | None, smoke_seeds: tuple[int, ...] = SMOKE_SEEDS) -> tuple[list[tuple[int, str, int]], bool]:
     per_seed = A.cells_to_per_seed(reference["cells"])
     ref_seeds = A.seeds_in(per_seed)
     if smoke:
-        seeds = list(SMOKE_SEEDS)
+        seeds = list(smoke_seeds)
     elif seeds_spec:
         seeds = A.parse_seed_spec(seeds_spec)
     else:
@@ -219,45 +247,71 @@ def plan(reference: dict, *, smoke: bool, seeds_spec: str | None, cells_spec: st
     return tasks, full
 
 
-def cmd_check(args) -> int:
-    ref_path = Path(args.reference).resolve() if args.reference else current_reference_path()
+def _suite(ref_path: Path, args, *, smoke_seeds: tuple[int, ...] = SMOKE_SEEDS):
     reference = load_reference(ref_path)
     posture = args.posture if args.posture is not None else footing_posture(reference, ref_path)
-    tasks, full = plan(reference, smoke=args.smoke, seeds_spec=args.seeds,
-                       cells_spec=args.cells, arms_spec=args.arms)
-    if not tasks:
+    tasks, full = plan(reference, smoke=args.smoke, seeds_spec=args.seeds, cells_spec=args.cells,
+                       arms_spec=args.arms, smoke_seeds=smoke_seeds)
+    return {"path": ref_path, "reference": reference, "posture": posture, "tasks": tasks, "full": full}
+
+
+def cmd_check(args) -> int:
+    if args.reference:
+        suites = [_suite(Path(args.reference).resolve(), args)]
+    else:
+        suites = [_suite(current_reference_path(), args)]
+        if args.smoke:
+            # The loose-posture baseline rides along in the smoke (its own pointer).
+            suites.append(_suite(current_loose_baseline_path(), args, smoke_seeds=SMOKE_LOOSE_SEEDS))
+    suites = [s for s in suites if s["tasks"]]
+    if not suites:
         print("nothing to run (check --seeds / --cells / --arms)")
         return 64
-    seeds = sorted({t[2] for t in tasks})
-    print(f"equiv-v3 check against {_rel(ref_path)} (tree {reference.get('sha')})")
-    print(f"  {'full' if full else 'subset'}: {len(tasks)} games = cells "
-          f"{sorted({A.cell_name(t[0]) for t in tasks}, reverse=True)} x arms "
-          f"{[a for a in A.ARM_ORDER if any(t[1] == a for t in tasks)]} x seeds {A.format_seeds(seeds)}"
-          f"{' (posture ' + posture + ')' if posture else ''}, {args.jobs} jobs")
+    total = sum(len(s["tasks"]) for s in suites)
+    for s in suites:
+        tasks = s["tasks"]
+        print(f"equiv-v3 check against {_rel(s['path'])} (tree {s['reference'].get('sha')})")
+        print(f"  {'full' if s['full'] else 'subset'}: {len(tasks)} games = cells "
+              f"{sorted({A.cell_name(t[0]) for t in tasks}, reverse=True)} x arms "
+              f"{[a for a in A.ARM_ORDER if any(t[1] == a for t in tasks)]} x seeds "
+              f"{A.format_seeds(sorted({t[2] for t in tasks}))}"
+              f"{' (posture ' + s['posture'] + ')' if s['posture'] else ''}")
+    print(f"  {total} games, {args.jobs} jobs")
     overrides = engine_flag_overrides()
     if overrides:
         print(f"  engine flag overrides from the environment: {overrides}")
     started = time.perf_counter()
-    actual, failures = run_matrix(tasks, args.jobs, posture)
+    ran = run_suites([(str(i), s["posture"], s["tasks"]) for i, s in enumerate(suites)], args.jobs)
     elapsed = time.perf_counter() - started
+    failures = [f"{s['path'].name}: {line}" for i, s in enumerate(suites) for line in ran[str(i)][1]]
     if failures:
         print(f"WORKER FAILURE ({len(failures)}) after {elapsed:.1f}s:")
         for line in failures:
             print("  " + line)
         return 2
-    expected = A.cells_to_per_seed(reference["cells"])
-    run_cells = A.build_cells(actual)
-    drift = compare(expected, actual, full=full, ref_cells=reference["cells"], run_cells=run_cells)
-    if args.save_run:
-        Path(args.save_run).write_text(A.dumps(A.build_reference(reference, run_cells)))
-    if drift:
-        print(f"FINGERPRINT DRIFT against {ref_path.name} ({elapsed:.1f}s):")
-        for line in drift:
-            print(line)
-        print("If this change is intended, re-cut deliberately (CLAUDE.md, 'Engine regression check').")
+    drifted = False
+    for i, s in enumerate(suites):
+        actual = ran[str(i)][0]
+        reference = s["reference"]
+        run_cells = A.build_cells(actual)
+        drift = compare(A.cells_to_per_seed(reference["cells"]), actual, full=s["full"],
+                        ref_cells=reference["cells"], run_cells=run_cells)
+        if args.save_run and i == 0:
+            Path(args.save_run).write_text(A.dumps(A.build_reference(reference, run_cells)))
+        n = len(s["tasks"])
+        if drift:
+            drifted = True
+            print(f"FINGERPRINT DRIFT against {s['path'].name}:")
+            for line in drift:
+                print(line)
+        else:
+            print(f"MATCH {s['path'].name}: {n}/{n} games identical on fp, draws, points, turns, "
+                  f"possessions{' and both arm gaps' if s['full'] else ''}")
+    if drifted:
+        print(f"({elapsed:.1f}s) If this change is intended, re-cut deliberately "
+              "(CLAUDE.md, 'Engine regression check').")
         return 1
-    print(f"MATCH: {len(tasks)}/{len(tasks)} games identical on fp, draws, points, turns, possessions"
-          f"{' and both arm gaps' if full else ''} ({elapsed:.1f}s)")
+    print(f"MATCH: {total}/{total} games ({elapsed:.1f}s)")
     return 0
 
 
@@ -311,9 +365,10 @@ def cmd_recut(args) -> int:
     moved = sum(1 for key, rows in A.cells_to_per_seed(passes[0]).items()
                 for seed, row in rows.items()
                 if A.cells_to_per_seed(old["cells"]).get(key, {}).get(seed) != row)
-    if old_path == current_reference_path():
-        POINTER.write_text(_rel(new_path) + "\n")
-        print(f"pointer updated: {_rel(POINTER)} -> {new_path.name}")
+    for pointer in (POINTER, LOOSE_POINTER):
+        if pointer.exists() and old_path == _pointer_target(pointer):
+            pointer.write_text(_rel(new_path) + "\n")
+            print(f"pointer updated: {_rel(pointer)} -> {new_path.name}")
     print(f"wrote {_rel(new_path)} ({moved} of {len(tasks)} rows differ from {old_path.name})")
     print("next: update 'flags' in the new file if a flag flipped, move the old file to 'Superseded' in")
     print(f"      {_rel(REFERENCES_DIR / 'README.md')} with the switch that reproduces it, then commit:")
@@ -327,7 +382,9 @@ def main(argv: list[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true", help="compare the engine against the reference")
     mode.add_argument("--recut", action="store_true", help="write a new reference (deliberate; see CLAUDE.md)")
-    parser.add_argument("--smoke", action="store_true", help=f"CI subset: seeds {SMOKE_SEEDS} on every cell and arm")
+    parser.add_argument("--smoke", action="store_true",
+                        help=f"CI subset: seeds {SMOKE_SEEDS} on every cell and arm of the current reference, "
+                             f"plus seeds {SMOKE_LOOSE_SEEDS} on the current loose baseline")
     parser.add_argument("--seeds", help="seed spec, e.g. 8000-8039 or 8000,8005")
     parser.add_argument("--cells", help="SEED_DEFENSES values, e.g. 1 or 1,0")
     parser.add_argument("--arms", help="sim, played or sim,played")

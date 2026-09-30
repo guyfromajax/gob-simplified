@@ -26,9 +26,10 @@ jobs:
         run: python scripts/check_ui_tokens.py --strict --no-write
 
   engine-equiv:
-    # Engine regression smoke: 16 games (seeds 8000-8003 x both footings x both arms)
-    # compared field-for-field against the reference named in
-    # scripts/sim_verify/CURRENT_REFERENCE. Fails on any fingerprint difference and
+    # Engine regression smoke: 60 games (14 path-coverage seeds x both footings x both
+    # arms against scripts/sim_verify/CURRENT_REFERENCE, plus 2 seeds x both arms against
+    # the loose-posture baseline in CURRENT_LOOSE_BASELINE), compared field-for-field.
+    # ~3.5 min; runs alongside the longer test job. Fails on any fingerprint difference and
     # prints which metric moved. Never re-cut to make this green without Jamie
     # (CLAUDE.md, "Engine regression check").
     runs-on: ubuntu-latest

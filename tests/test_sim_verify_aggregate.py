@@ -80,3 +80,17 @@ def test_compare_reports_which_metric_moved():
     lines = E.compare(want, got, full=False, ref_cells={}, run_cells={})
     assert "SEED_DEFENSES=1 sim seed 8000: fp a -> b; draws 10 -> 12 (+2); points_per_team 80.0 -> 81.5 (+1.5)" in lines[0]
     assert not E.compare(want, want, full=False, ref_cells={}, run_cells={})
+
+
+def test_loose_pointer_names_the_current_loose_baseline():
+    path = E.current_loose_baseline_path()
+    assert path.is_file() and path.name.startswith("equiv_v3_loose_baseline_")
+    readme = (REFS / "README.md").read_text(encoding="utf-8")
+    assert f"**`{path.name}`**" in readme
+    ref = E.load_reference(path)
+    assert E.footing_posture(ref, path) == "loose"
+    tasks, full = E.plan(ref, smoke=True, seeds_spec=None, cells_spec=None, arms_spec=None,
+                         smoke_seeds=E.SMOKE_LOOSE_SEEDS)
+    assert not full
+    assert {(t[0], t[1]) for t in tasks} == {(1, "sim"), (1, "played")}
+    assert sorted({t[2] for t in tasks}) == sorted(E.SMOKE_LOOSE_SEEDS)
