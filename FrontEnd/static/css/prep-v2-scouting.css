@@ -290,11 +290,11 @@ html.gob-shell #scouting-view .tbl th {
 }
 
 html.gob-shell #scouting-view .tbl thead tr:first-child th:first-child {
-  border-top-left-radius: 11px;
+  border-top-left-radius: var(--radius-10);
 }
 
 html.gob-shell #scouting-view .tbl thead tr:first-child th:last-child {
-  border-top-right-radius: 11px;
+  border-top-right-radius: var(--radius-10);
 }
 
 html.gob-shell #scouting-view .tbl td {
@@ -367,7 +367,7 @@ html.gob-shell #scouting-view .tbl.grp thead tr:nth-child(2) th {
 html.gob-shell #scouting-view .tbl th .cap {
   display: block;
   margin-top: var(--space-3);
-  font-size: 9px;
+  font-size: var(--fs-10);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-6);
   color: var(--text-38);

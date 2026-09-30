@@ -427,7 +427,7 @@ function dismissToast() {
 function showToast(title, subtitle = '', options = {}) {
   const toast = byId('toast');
   if (!toast) return;
-  const accent = options.accentColor || '#34EC27';
+  const accent = options.accentColor || 'var(--text-60)';
   const subline = subtitle ? `<div class="toast-subline">${subtitle}</div>` : '';
   toast.innerHTML = `
     <div class="toast-icon" style="--toast-accent: ${accent};">
@@ -1140,78 +1140,34 @@ function showUnsavedChangesWarning(onContinue) {
   // Create modal overlay
   const overlay = document.createElement('div');
   overlay.className = 'gameplan-warning-overlay';
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-  `;
-  
-  // Create modal
+
   const modal = document.createElement('div');
   modal.className = 'gameplan-warning-modal';
-  modal.style.cssText = `
-    background: #1a1a1a;
-    border: 2px solid #ff7a00;
-    border-radius: 8px;
-    padding: 24px;
-    max-width: 500px;
-    width: 90%;
-    color: #fff;
-  `;
-  
-  // Message
+
   const message = document.createElement('p');
   message.textContent = "You haven't saved game plan changes.";
-  message.style.cssText = `
-    font-size: 1.125rem;
-    margin-bottom: 20px;
-    font-weight: 600;
-  `;
-  
-  // Checkbox
+
   const checkboxContainer = document.createElement('div');
-  checkboxContainer.style.cssText = 'margin-bottom: 20px;';
-  
+  checkboxContainer.style.marginBottom = '20px';
+
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   checkbox.id = 'gameplan-suppress-warning';
-  checkbox.style.cssText = 'margin-right: 8px;';
-  
+  checkbox.style.marginRight = '8px';
+
   const checkboxLabel = document.createElement('label');
   checkboxLabel.htmlFor = 'gameplan-suppress-warning';
   checkboxLabel.textContent = "Don't show this message again";
-  checkboxLabel.style.cssText = 'color: #fff; cursor: pointer;';
-  
+
   checkboxContainer.appendChild(checkbox);
   checkboxContainer.appendChild(checkboxLabel);
-  
-  // Buttons container
+
   const buttonsContainer = document.createElement('div');
-  buttonsContainer.style.cssText = `
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-  `;
-  
-  // Save Game Plan button
+  buttonsContainer.className = 'gameplan-warning-actions';
+
   const saveBtn = document.createElement('button');
   saveBtn.textContent = 'Save Game Plan';
-  saveBtn.style.cssText = `
-    padding: 10px 20px;
-    background: #ff7a00;
-    color: #000;
-    border: none;
-    border-radius: 4px;
-    font-weight: 600;
-    cursor: pointer;
-  `;
+  saveBtn.className = 'gameplan-warning-save';
   saveBtn.addEventListener('click', async () => {
     if (checkbox.checked) {
       sessionStorage.setItem('gameplan_suppress_warning', 'true');
@@ -1228,15 +1184,7 @@ function showUnsavedChangesWarning(onContinue) {
   // Leave Without Saving button
   const leaveBtn = document.createElement('button');
   leaveBtn.textContent = 'Leave Without Saving';
-  leaveBtn.style.cssText = `
-    padding: 10px 20px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-    font-weight: 600;
-    cursor: pointer;
-  `;
+  leaveBtn.className = 'gameplan-warning-leave';
   leaveBtn.addEventListener('click', () => {
     if (checkbox.checked) {
       sessionStorage.setItem('gameplan_suppress_warning', 'true');
