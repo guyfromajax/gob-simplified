@@ -406,7 +406,7 @@ test('Notes columns, headshots, and Back match the develop before', async ({ pag
   const after = await reportGeometry(page);
   const before = BEFORE.office;
 
-  expect(after.pageClassOnBody).toBe(true);
+  expect(after.pageClassOnBody).toBe(false);
   expect(after.pageClassOnView).toBe(true);
   expect(after.cards).toHaveLength(before.cards.length);
   after.cards.forEach((card, i) => {

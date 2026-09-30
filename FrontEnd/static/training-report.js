@@ -70,6 +70,12 @@ function readOptions(options) {
   teamId = pick('teamId', 'team_id');
   const weekRaw = pick('week');
   week = parseInt(weekRaw, 10);
+  if (!Number.isFinite(week)) {
+    try {
+      const fromCtx = parseInt(franchiseCtx().get('week') || '', 10);
+      if (Number.isFinite(fromCtx)) week = fromCtx;
+    } catch (err) { /* keep NaN */ }
+  }
   const fromRaw = pick('from');
   const originRaw = pick('origin');
   reportFrom = (fromRaw === 'news' || fromRaw === 'inbox')
@@ -615,7 +621,9 @@ async function loadTrainingReport() {
     
     if (franchiseId) {
       params.set('franchise_id', franchiseId);
-      params.set('week', week);
+    }
+    if (Number.isFinite(week)) {
+      params.set('week', String(week));
     }
     
     const response = await fetch(`${API_CONFIG.buildUrl('/franchise/training-report')}?${params.toString()}`);
@@ -1503,6 +1511,8 @@ function createTeamAttrItem(attrKey, currentValue, change) {
   label.appendChild(nameSpan);
   label.appendChild(changeSpan);
   item.appendChild(label);
+
+  if (inAppShell()) return item;
   
   // Special handling for different attribute types
   if (attrKey === 'team_chemistry') {

@@ -81,6 +81,56 @@ function postWeek26Cc() {
   return cc;
 }
 
+function tokenisedReport(cc, lastSubmit) {
+  const leaf = lastSubmit && lastSubmit.training_data && lastSubmit.training_data.coaching_focus;
+  const coaching_focus = leaf === 'authoritarian-discipline'
+    ? {
+      archetype: 'authoritarian',
+      sub_option: 'authoritarian-discipline',
+      leaf_display_name: 'Discipline',
+    }
+    : {
+      archetype: 'systems-coach',
+      sub_option: 'systems-coach-offense',
+      leaf_display_name: 'Offense',
+    };
+  return {
+    week: cc.week || 12,
+    upcoming_opponent: 'Four Corners',
+    coaching_focus,
+    players: [],
+    player_changes: {},
+    team_attributes: {
+      shot_threshold: 0,
+      rebound_modifier: 1,
+      offensive_efficiency: 4,
+      defensive_efficiency: 2,
+      fb_efficiency: 1,
+      pt_efficiency: 6,
+      fight: 2,
+      discipline: 3,
+      team_chemistry: 8,
+      fb_opp_modifier: -2,
+      pt_opp_modifier: -1,
+    },
+    team_changes: { offensive_efficiency: 1, pt_efficiency: 2 },
+    plays_data: {},
+    scouting_data: {},
+    training_notes: [
+      { title: 'Practice Player Of The Week', body: 'Roger Henrich' },
+      { title: 'Biggest Regression', body: 'No Significant Updates' },
+      { title: 'Most Positive Locker Room Influence', body: 'Roger Henrich' },
+      { title: 'Strong Cumulative Increase', body: 'Inside Defense' },
+      { title: 'Strongest Defensive Set', body: 'Man' },
+      { title: 'Strongest Offensive Plays', body: 'Horn' },
+      { title: 'Fast Break Readiness', body: 'Ready' },
+      { title: 'Press/Trap Readiness', body: 'Improving' },
+      { title: 'Player Energy Levels', body: 'No Significant Updates' },
+    ],
+  };
+}
+
+
 async function fulfillJson(route, body, status) {
   await route.fulfill({ status: status || 200, contentType: 'application/json', body: JSON.stringify(body) });
 }
@@ -128,6 +178,10 @@ async function installApi(page, extra) {
     }
     if (pathname === '/franchise/run-training/user') {
       if (submits) submits.push({ kind: 'user', body: request.postData() });
+      if (opts.lastSubmit) {
+        try { Object.assign(opts.lastSubmit, request.postDataJSON() || {}); }
+        catch (err) { /* keep prior */ }
+      }
       return fulfillJson(route, { status: 'success' });
     }
     if (pathname === '/franchise/run-training/cpu-train') {
@@ -147,18 +201,13 @@ async function installApi(page, extra) {
       });
     }
     if (pathname === '/franchise/training-report') {
-      return fulfillJson(route, {
-        week: cc.week || 12,
-        upcoming_opponent: 'Four Corners',
-        coaching_focus: {},
-        players: [],
-        player_changes: {},
-        team_attributes: {},
-        team_changes: {},
-        plays_data: {},
-        scouting_data: {},
-        training_notes: [],
-      });
+      if (opts.reportGets) {
+        let week = '';
+        try { week = new URL(request.url()).searchParams.get('week') || ''; }
+        catch (err) { week = ''; }
+        opts.reportGets.push({ week, url: request.url() });
+      }
+      return fulfillJson(route, tokenisedReport(cc, opts.lastSubmit));
     }
     return fulfillJson(route, {});
   });
@@ -289,8 +338,10 @@ test('today or new flow shots 1280 / 1920', async ({ page }) => {
 test('a) training week Advance → focus → allocate → Submit → Report → Office', async ({ page }) => {
   test.skip(CAPTURE_BEFORE, 'after only');
   const submits = [];
+  const lastSubmit = {};
+  const reportGets = [];
   await page.setViewportSize({ width: 1280, height: 720 });
-  await openOffice(page, { _submits: submits });
+  await openOffice(page, { _submits: submits, lastSubmit, reportGets });
   await expect(page.locator('#play-now')).toHaveText('Run Training');
   await page.locator('#play-now').click();
   await expect(page).toHaveURL(/\/training\.html/, { timeout: 20000 });
@@ -298,15 +349,44 @@ test('a) training week Advance → focus → allocate → Submit → Report → 
   await expect(page.locator('nav.rail')).toHaveCount(0);
   await expect(page.locator('#gob-subtabs')).toHaveCount(0);
   await expect(page.locator('#play-now.advance')).toHaveCount(0);
+  await expect(page.locator('#play-now')).toHaveCount(0);
+  await waitOverlay(page);
   await expect(page.locator('#back-btn')).toHaveText('Back to Locker Room');
   await expect(page.locator('#submit-btn')).toHaveText('Submit Training');
   await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
   await expect(page.locator('#player-dev-section')).toBeHidden();
+  const focusLook = await page.evaluate(() => {
+    const header = document.querySelector('#training-view .training-header');
+    const hs = header ? getComputedStyle(header) : null;
+    const note = document.getElementById('training-state-note');
+    const ns = note ? getComputedStyle(note) : null;
+    const empty = [...document.querySelectorAll('button, a.gob-btn, a[role="button"]')].filter((el) => {
+      if (el.closest('.ps') || el.closest('.slider-container')) return false;
+      const s = getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden' || el.hidden) return false;
+      if (!el.getClientRects().length) return false;
+      const name = (el.getAttribute('aria-label') || el.title || el.textContent || '').replace(/\s+/g, '');
+      return !name.length;
+    }).map((el) => el.id || el.className);
+    return {
+      host: !!document.getElementById('training-view'),
+      headerBgImage: hs ? hs.backgroundImage : '',
+      noteDisplay: ns ? ns.display : '',
+      emptyButtons: empty,
+    };
+  });
+  expect(focusLook.host, JSON.stringify(focusLook)).toBe(true);
+  expect(focusLook.headerBgImage, JSON.stringify(focusLook)).toBe('none');
+  expect(focusLook.noteDisplay, JSON.stringify(focusLook)).toBe('none');
+  expect(focusLook.emptyButtons, JSON.stringify(focusLook)).toEqual([]);
   await capturePage(page, path.join(OUT, 'after-focus-default-1280.png'));
 
   await allocateClassic24(page);
   await expect(page.locator('#submit-btn')).toBeEnabled({ timeout: 10000 });
   await capturePage(page, path.join(OUT, 'after-focus-allocated-unsaved-1280.png'));
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await capturePage(page, path.join(OUT, 'after-focus-allocated-unsaved-1920.png'));
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await page.locator('#submit-btn').click();
   await page.waitForURL(/\/training-report\.html/, { timeout: 20000 });
@@ -315,7 +395,46 @@ test('a) training week Advance → focus → allocate → Submit → Report → 
   await expect(page.locator('#gob-subtabs')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Continue to Office', exact: true })).toBeVisible({ timeout: 20000 });
   await expectHeaderVisible(page);
+  await expect(page.locator('#training-focus')).toHaveText('Discipline (Authoritarian)');
+  await expect(page.locator('#training-notes-container')).toContainText('Roger Henrich');
+  await expect(page.locator('#training-notes-container')).not.toContainText('No training notes');
+  const reportLook = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#training-report-view .team-attr-item')];
+    const pills = [...document.querySelectorAll('#training-report-view .attr-pill, #training-report-view .chemistry-bar-container')].filter((el) => {
+      const s = getComputedStyle(el);
+      return s.display !== 'none' && s.visibility !== 'hidden' && el.getClientRects().length > 0;
+    });
+    const first = rows[0];
+    const fs = first ? getComputedStyle(first) : null;
+    const empty = [...document.querySelectorAll('button, a.gob-btn, a[role="button"]')].filter((el) => {
+      if (el.closest('.ps') || el.closest('.slider-container')) return false;
+      const s = getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden' || el.hidden) return false;
+      if (!el.getClientRects().length) return false;
+      const name = (el.getAttribute('aria-label') || el.title || el.textContent || '').replace(/\s+/g, '');
+      return !name.length;
+    }).map((el) => el.id || el.className);
+    return {
+      host: !!document.getElementById('training-report-view'),
+      rowCount: rows.length,
+      visiblePills: pills.length,
+      rowDisplay: fs ? fs.display : '',
+      rowBgImage: fs ? fs.backgroundImage : '',
+      emptyButtons: empty,
+    };
+  });
+  expect(reportLook.host, JSON.stringify(reportLook)).toBe(true);
+  expect(reportLook.rowCount, JSON.stringify(reportLook)).toBe(11);
+  expect(reportLook.visiblePills, JSON.stringify(reportLook)).toBe(0);
+  expect(reportLook.rowDisplay, JSON.stringify(reportLook)).toBe('grid');
+  expect(reportLook.rowBgImage, JSON.stringify(reportLook)).toBe('none');
+  expect(reportLook.emptyButtons, JSON.stringify(reportLook)).toEqual([]);
+  expect(reportGets.some((row) => String(row.week) === '12'), JSON.stringify(reportGets)).toBe(true);
   await capturePage(page, path.join(OUT, 'after-submit-report-1280.png'));
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expectHeaderVisible(page);
+  await capturePage(page, path.join(OUT, 'after-submit-report-1920.png'));
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole('button', { name: 'Continue to Office', exact: true }).click();
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
 
@@ -375,6 +494,8 @@ test('b) Prep › Player Training is player-dev only and edits save', async ({ p
   await focus.selectOption('offensive');
   await expect(page.locator('.gob-save-toast.is-on')).toHaveText('Saved', { timeout: 5000 });
   await capturePage(page, path.join(OUT, 'after-prep-player-training-1280.png'));
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await capturePage(page, path.join(OUT, 'after-prep-player-training-1920.png'));
 });
 
 test('c) post-week-26 Advance skips the training page', async ({ page }) => {
@@ -413,6 +534,8 @@ test('e) tutorial path stays weekly focus on training.html', async ({ page }) =>
   await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
   await expect(page.locator('#player-dev-section')).toBeHidden();
   await capturePage(page, path.join(OUT, 'after-tutorial-1280.png'));
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await capturePage(page, path.join(OUT, 'after-tutorial-1920.png'));
 });
 
 test('f) leave-confirm on unsaved allocation; clean Back just leaves', async ({ page }) => {
@@ -492,6 +615,10 @@ test('h) Office All changes → standalone report → Back → Office', async ({
   await expect(page.getByRole('button', { name: 'Back to Locker Room', exact: true })).toBeVisible({ timeout: 20000 });
   await expectHeaderVisible(page);
   await capturePage(page, path.join(OUT, 'after-report-from-office-1280.png'));
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expectHeaderVisible(page);
+  await capturePage(page, path.join(OUT, 'after-report-from-office-1920.png'));
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByRole('button', { name: 'Back to Locker Room', exact: true }).click();
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
   await expect(page.locator('#office-root')).toBeVisible({ timeout: 15000 });

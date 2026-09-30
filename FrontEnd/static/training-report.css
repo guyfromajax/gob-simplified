@@ -1836,6 +1836,13 @@ body.training-report-page {
   color: var(--text-38);
   font-style: normal;
 }
+#training-report-view .attr-pill,
+#training-report-view .chemistry-bar-container,
+#training-report-view .pill-center-line,
+#training-report-view .pill-fill-positive,
+#training-report-view .pill-fill-negative {
+  display: none;
+}
 
 #training-report-view .training-report-container {
   display: grid;

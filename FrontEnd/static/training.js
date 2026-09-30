@@ -1594,7 +1594,7 @@ function rewriteReportRedirect(redirectUrl) {
         if (tid) bag.set('team_id', tid);
       }
       if (!bag.get('week')) {
-        const w = franchiseCtx().get('week');
+        const w = franchiseCtx().get('week') || currentWeek;
         if (w) bag.set('week', String(w));
       }
       const qs = bag.toString();

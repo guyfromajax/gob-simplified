@@ -25,12 +25,13 @@
   <link rel="stylesheet" href="/css/development-focus.css">
   <link rel="stylesheet" href="/css/player-development-grid.css">
 </head>
-<body class="training-page">
+<body>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
+  <div id="training-view">
   <div class="training-container resource-page-container fcc-brand-page-shell training-resource-shell">
     <!-- Header -->
     <header class="training-header">
@@ -403,6 +404,7 @@
       <div class="pdg-grid"></div>
     </section>
   </div>
+  </div>
 
   <!-- Player Maximizer: Choose Attributes modal -->
   <div id="custom-focus-modal" class="custom-focus-modal" style="display: none;" aria-hidden="true">
@@ -469,7 +471,7 @@
   <script type="module">
     import { init } from '/training.js';
     try {
-      init(document.body, { sections: 'weekly' });
+      init(document.getElementById('training-view'), { sections: 'weekly' });
     } catch (err) { /* init logs */ }
   </script>
 </body>
