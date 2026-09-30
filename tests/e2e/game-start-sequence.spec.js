@@ -93,7 +93,7 @@ test('set lineup offers Play and Sim with the locked labels', async ({ page }) =
   await expect(page.locator('#play-now')).toHaveText('Play Game', { timeout: 15000 });
   await expect(page.locator('#sim-now')).toHaveText('Sim Game');
   await expect(page.locator('#sim-now')).toHaveClass(/lineup-btn-ghost/);
-  await expect(page.locator('#play-now')).toHaveClass(/lineup-btn-green/);
+  await expect(page.locator('#play-now')).toHaveClass(/lineup-btn-advance/);
 
   await page.goto('/static/set-lineup.html?home=Lancaster&away=Four-Corners&my_team=home&mode=single&game_id=g-q2&quarter=2');
   await expect(page.locator('#play-now')).toHaveText('Play Quarter', { timeout: 15000 });

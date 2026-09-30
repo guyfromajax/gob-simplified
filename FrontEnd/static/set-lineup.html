@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
@@ -12,7 +12,8 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Set Lineup</title>
-<link rel="stylesheet" href="/resource-pages.css" />
+<link rel="stylesheet" href="/css/gob-tokens.css" />
+  <link rel="stylesheet" href="/resource-pages.css" />
   <link rel="stylesheet" href="/set-lineup.css" />
   <link rel="stylesheet" href="/css/rt-buckets.css" />
   <link rel="stylesheet" href="/css/playbook-cmd.css" />
@@ -57,7 +58,7 @@
 
       <div class="context-actions">
         <button id="sim-now" class="lineup-btn lineup-btn-ghost disabled" type="button">Sim Game</button>
-        <button id="play-now" class="lineup-btn lineup-btn-green disabled" type="button">Play Game</button>
+        <button id="play-now" class="lineup-btn lineup-btn-advance disabled" type="button">Play Game</button>
       </div>
     </section>
 
@@ -81,12 +82,15 @@
                     <tr>
                       <th data-sort="POS" style="width:42px">POS</th>
                       <th class="hs-col" style="width:32px"></th>
-                      <th class="l" data-sort="PLAYER" style="width:172px">PLAYER</th>
+                      <th class="l" data-sort="PLAYER" style="width:142px">PLAYER</th>
                       <th class="l eng-col" data-sort="ENG">ENG</th>
-                      <th class="prod-col" aria-label="Production"></th>
+                      <th class="prod-head" style="width:28px">PTS</th>
+                      <th class="prod-head" style="width:28px">REB</th>
+                      <th class="prod-head" style="width:28px">AST</th>
+                      <th class="prod-head" style="width:34px">DEF%</th>
                       <th class="attr-label" data-attr="RT" data-sort="RT" style="width:46px">RT</th>
                       <th data-sort="F" style="width:36px">F</th>
-                      <th data-sort="MIN" style="width:48px">MIN</th>
+                      <th data-sort="MIN" style="width:44px">MIN</th>
                       <th data-sort="MO" style="width:74px">MO</th>
                       <th class="rm-col" style="width:30px"></th>
                     </tr>
@@ -165,7 +169,7 @@
         <section class="lineup-weights-section">
           <div id="lineup-shot-weights" class="lineup-shot-weights"></div>
           <div class="lineup-rail-actions">
-            <button id="autoset-lineup" class="lineup-btn lineup-btn-orange autoset-lineup-btn" type="button">Autoset Lineup</button>
+            <button id="autoset-lineup" class="lineup-btn lineup-btn-neutral autoset-lineup-btn" type="button">Autoset Lineup</button>
             <div class="roster-panel-actions">
               <button id="gameplan-optional" class="lineup-btn lineup-btn-ghost" type="button">Game Plan</button>
               <button id="playbooks-button" class="lineup-btn lineup-btn-ghost" type="button">Playbooks</button>
@@ -199,7 +203,7 @@
       <div class="lineup-modal-body exhausted-lineup-body">
         <h2 id="exhausted-lineup-title">Lineup Set</h2>
         <p>You have 8 or more players fouled out. A legal lineup will be randomly set for you.</p>
-        <button id="exhausted-lineup-got-it" class="lineup-btn lineup-btn-green" type="button">Got It</button>
+        <button id="exhausted-lineup-got-it" class="lineup-btn lineup-btn-neutral" type="button">Got It</button>
       </div>
     </div>
   </div>

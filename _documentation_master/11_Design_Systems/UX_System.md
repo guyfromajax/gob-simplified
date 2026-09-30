@@ -537,7 +537,7 @@ The franchise team-measure surfaces show the same eleven measures and the same l
 
 ### Team names are shown as stored
 
-The display string is `teams.name` as stored. The stored key shows unchanged when no team document exists. Nothing is title-cased, hyphen-stripped, or exception-listed (e.g. `IDA`, `Bentley-Truman`, `Seattle AAA` render as stored). Do not reintroduce a `TEAM_NAMES` map or a `titleCaseName` helper. (A few legacy call sites — `common.js` `formatTeamName`, `set-lineup.js`, `playbook-report.js` — still reformat and are pending cleanup.)
+The display string is `teams.name` as stored. The stored key shows unchanged when no team document exists. Nothing is title-cased, hyphen-stripped, or exception-listed (e.g. `IDA`, `Bentley-Truman`, `Seattle AAA` render as stored). Do not reintroduce a `TEAM_NAMES` map or a `titleCaseName` helper. `common.js` `formatTeamName` returns the name unchanged (`String(name)`), and its callers (`set-lineup.js`, `playbook-report.js`, `pgpcSammyReminderModal.js`, FCC) display it as-is. `titleCaseTeamName` still exists but is only a lookup key for coach-asset abbreviations (`getTeamCoachAssetPath`), never a display string.
 
 ### Client API helpers: logout and rate-limited week routes
 
@@ -565,3 +565,16 @@ Some player-facing surfaces are not franchise web pages and are **not yet on the
 - **Never reuse a shell class name in page markup.** Once a page is `html.gob-shell`, shell rules for `.rail`, `.top`, `.main`, `.card`, `.nm`, `.lnk`, etc. apply to any element that borrows the name (e.g. a Your-Orders aside on `class="rail"` got hidden by `.gob-shell.gob-focus .rail { display:none }`). Give page components their own class (`.srail`, not `.rail`).
 - **Guards assert computed styles, not class names.** Colour/law and before/after guards read the computed `backgroundColor` / `borderColor` / `borderRadius` off the element, so a rename or a token swap can't fake a pass.
 - **Capture BEFORE screenshots from develop or a served frame.** Take the before shot from the develop build (behind the feature's `*_BEFORE=1` flag or the old embed bridge restored just for the shot) or from the handoff frame served so its CSS loads — never from the half-migrated working tree. Restore any regenerated tracked `reports/*` images with `git checkout -- reports/` before committing.
+- **A page that uses `var(--token)` must carry `.gob` and load `css/gob-tokens.css`.** The tokens are scoped to `.gob`, so a standalone page (`set-lineup.html`) needs `<html class="gob">` + the `gob-tokens.css` link (as `training.html` does). `.gob` alone only defines the custom properties — it does not restyle the page (the shell layout lives in `gob-shell.css`, which a focus page does not load).
+
+### Set Lineup
+
+`set-lineup.html` is a `.gob` focus page that opens from Advance (Play Game) and hands off to `court.html`. It loads `gob-tokens.css` but not the shell, so it keeps its own layout. Colour law on it:
+
+- **Play Game (`#play-now`, `.lineup-btn-advance`) is the one Advance — green.** Nothing else on the page is green except positive-data ramps.
+- **Choice controls are neutral.** The Game / Attributes / Stats view toggle, Autoset Lineup (a non-advancing action, *not* a save — this overrides the token comment's "non-advancing actions" orange allowance per the colour law), position slots, and the FT-shooter lock badge carry no green or orange.
+- **Selection is navy.** On-court rows and the selected-row left edge use `--navy` (the "selected row" structure colour), not orange. The active drop target (`.slot.drag-over`, `tr.drag-over`) is a navy tint.
+- **Energy / next-game readiness is a data ramp.** High is positive data (`--green`, annotated), then yellow, then an amber `color-mix`, then `--red` — the ramp never uses raw orange.
+- **RT stays blue** via `rt-buckets.css` (`.rt-*`), the sanctioned A-grade / 9+ / elite colour.
+- There is **no save state** on this page (the lineup persists through the flow, confirmed by a neutral toast), so orange has no home here.
+- `set-lineup.css` is on the design system (`NEW_DESIGN_CSS` in `check_ui_tokens.py`); `set-lineup.html` is already new-design via `gobShell.js` PAGES.
