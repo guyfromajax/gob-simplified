@@ -1,51 +1,67 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body.box-score-page {
+/* Box score — new-design host. Tokens from html.gob (see box-score.html). */
+html.gob body.box-score-page {
   margin: 0;
   min-height: 100vh;
-  padding: 24px 24px 48px;
-  font-family: 'Inter', sans-serif;
-  color: #f7f9ff;
-  background: #0b0d14;
+  padding: 0;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-100);
 }
 
-.box-score-shell {
+html.gob body.box-score-page #box-score-view {
+  padding: var(--space-24) var(--space-24) var(--dsp-48);
+}
+
+html.gob-shell body.box-score-page #box-score-view,
+html.gob-focus body.box-score-page #box-score-view {
+  padding: 0;
+}
+
+#box-score-view .box-score-shell {
   max-width: 1200px;
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
-.locker-room-top-button {
-  appearance: none;
-  background: transparent;
-  border: 0;
-  padding: 0 0 16px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.45);
-  cursor: pointer;
+#box-score-view .box-score-wl-plate {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  transition: color 0.14s ease;
-  letter-spacing: 0.02em;
-  align-self: flex-start;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--text-100);
+  border-radius: var(--radius-4);
+  color: var(--text-100);
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: var(--fs-16);
+  letter-spacing: var(--tracking-6);
+  line-height: 1;
 }
 
-.locker-room-top-button::before {
-  content: '←';
-  font-size: 14px;
+#box-score-view .box-score-wl-plate[hidden] {
+  display: none !important;
 }
 
-.locker-room-top-button:hover {
-  color: rgba(255, 255, 255, 0.85);
+#box-score-view .table-container {
+  overflow-x: auto;
+}
+
+#box-score-view .player-stats-table th:first-child,
+#box-score-view .player-stats-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface-th-bottom);
+  box-shadow: 1px 0 0 var(--line);
+}
+
+#box-score-view .player-stats-table tbody tr:nth-child(even) td:first-child {
+  background: var(--surface-1);
+}
+
+#box-score-view .player-stats-table tbody tr:hover td:first-child {
+  background: var(--white-5);
 }
 
 #box-score-container {
@@ -56,10 +72,10 @@ body.box-score-page {
 }
 
 #box-score-header {
-  background-color: rgba(13, 17, 36, 0.97);
+  background-color: var(--surface-scoreboard);
   background-size: cover;
   background-position: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line-strong);
   border-radius: 14px;
   padding: 24px 28px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
@@ -77,14 +93,14 @@ body.box-score-page {
 #header-content .team-name {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-60);
   letter-spacing: 0.04em;
 }
 
 #header-content .score {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 48px;
-  color: #ffffff;
+  color: var(--text-100);
   line-height: 1;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
@@ -92,14 +108,14 @@ body.box-score-page {
 #header-content .at-symbol {
   font-family: 'Inter', sans-serif;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-38);
 }
 
 #quarter-scoring-section,
 #potg-section,
 .stats-section {
-  background: rgba(42, 48, 58, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
   border-radius: 14px;
   padding: 20px 24px;
   overflow: hidden;
@@ -109,12 +125,12 @@ body.box-score-page {
 .stats-section h2 {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-60);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin: 0 0 14px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(247, 148, 32, 0.5);
+  border-bottom: 1px solid var(--line-strong);
   width: fit-content;
 }
 
@@ -129,19 +145,19 @@ body.box-score-page {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-38);
   padding: 8px 12px;
   text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 
 #quarter-scoring-table td {
   font-size: 15px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-87);
   padding: 10px 12px;
   text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--white-4);
 }
 
 #quarter-scoring-table td:first-child {
@@ -149,23 +165,23 @@ body.box-score-page {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
   letter-spacing: 0.04em;
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 #quarter-scoring-table .final-score {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 #potg-section {
-  border-left: 3px solid #F79420;
+  border-left: 3px solid var(--text-60);
 }
 
 #potg-section h2 {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 13px;
-  color: #F79420;
+  color: var(--text-60);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin: 0 0 12px;
@@ -180,12 +196,12 @@ body.box-score-page {
 .potg-portrait {
   width: 72px;
   height: 72px;
-  border-radius: 8px;
+  border-radius: 0;
   object-fit: cover;
   object-position: center top;
-  border: 2px solid rgba(247, 148, 32, 0.4);
+  border: 2px solid var(--line-strong);
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--line);
 }
 
 .potg-portrait[src=""],
@@ -196,14 +212,14 @@ body.box-score-page {
 .potg-player-line {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
-  color: #ffffff;
+  color: var(--text-100);
   line-height: 1;
 }
 
 .potg-stats-line {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-60);
   margin-top: 4px;
   line-height: 1.4;
 }
@@ -224,7 +240,7 @@ body.box-score-page {
   border: 0;
   border-bottom: 3px solid transparent;
   background: rgba(var(--tab-color-rgb, 42, 48, 58), 0.35);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-60);
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
   letter-spacing: 0.06em;
@@ -234,18 +250,18 @@ body.box-score-page {
 }
 
 .tab-button:first-child {
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid var(--line);
 }
 
 .tab-button.active {
   background: rgba(var(--tab-color-rgb, 42, 48, 58), 0.85);
-  color: #ffffff;
-  border-bottom-color: var(--tab-color, #F79420);
+  color: var(--text-100);
+  border-bottom-color: var(--tab-color, var(--text-60));
 }
 
 .tab-button:hover:not(.active) {
   background: rgba(var(--tab-color-rgb, 42, 48, 58), 0.5);
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-87);
 }
 
 .team-content {
@@ -273,11 +289,11 @@ body.box-score-page {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-38);
   padding: 8px 8px;
   text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--line);
+  background: var(--white-3);
   white-space: nowrap;
   position: sticky;
   top: 0;
@@ -300,32 +316,32 @@ body.box-score-page {
 .player-stats-table td,
 .team-stats-table td {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-87);
   padding: 9px 8px;
   text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--white-4);
 }
 
 .player-stats-table td:first-child {
   text-align: left;
   padding-left: 12px;
-  color: #ffffff;
+  color: var(--text-100);
   font-weight: 600;
 }
 
 .player-stats-table tbody tr:nth-child(odd) td {
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--white-1p2);
 }
 
 .player-stats-table tbody tr:hover td,
 .team-stats-table tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--white-4);
 }
 
 .table-container {
   overflow-x: auto;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
 }
 
 .special-stats {
@@ -333,7 +349,7 @@ body.box-score-page {
   gap: 24px;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--line);
   flex-wrap: wrap;
 }
 
@@ -346,7 +362,7 @@ body.box-score-page {
 .special-stat-label {
   font-family: 'Inter', sans-serif;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-38);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -354,7 +370,7 @@ body.box-score-page {
 .special-stat-value {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 .scouting-content {
@@ -374,12 +390,12 @@ body.box-score-page {
 .scouting-section-header {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 15px;
-  color: #F79420;
+  color: var(--text-60);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin: 0 0 12px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(247, 148, 32, 0.25);
+  border-bottom: 1px solid var(--line);
 }
 
 .scouting-play-type {
@@ -390,7 +406,7 @@ body.box-score-page {
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-100);
   margin-bottom: 6px;
   display: flex;
   align-items: baseline;
@@ -408,7 +424,7 @@ body.box-score-page {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--text-87);
   margin-bottom: 3px;
   display: flex;
   align-items: baseline;
@@ -427,7 +443,7 @@ body.box-score-page {
   font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-38);
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -439,9 +455,9 @@ body.box-score-page {
   flex-shrink: 0;
 }
 
-.ev-positive { color: #34EC27; font-weight: 700; }
-.ev-negative { color: #ff6d6d; font-weight: 700; }
-.ev-neutral  { color: rgba(255, 255, 255, 0.4); font-weight: 400; }
+.ev-positive { color: var(--text-87); font-weight: 600; }
+.ev-negative { color: var(--text-60); font-weight: 600; }
+.ev-neutral  { color: var(--text-38); font-weight: 400; }
 
 .attr-changes-lead {
   font-family: 'Inter', sans-serif;
@@ -449,7 +465,7 @@ body.box-score-page {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-38);
   margin-bottom: 12px;
 }
 
@@ -468,13 +484,14 @@ body.box-score-page {
   gap: 10px;
   padding: 11px 15px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line-strong);
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* colour-law: positive-data */
 .attr-chip.up {
-  border-color: rgba(52, 236, 39, 0.3);
-  background: rgba(52, 236, 39, 0.06);
+  border-color: color-mix(in srgb, var(--green) 30%, transparent);
+  background: color-mix(in srgb, var(--green) 6%, transparent);
 }
 
 .attr-chip.down {
@@ -486,7 +503,7 @@ body.box-score-page {
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--text-87);
 }
 
 .attr-chip-val {
@@ -495,12 +512,13 @@ body.box-score-page {
   line-height: 1;
 }
 
+/* colour-law: positive-data */
 .attr-chip-val.up {
-  color: #34EC27;
+  color: var(--delta-up);
 }
 
 .attr-chip-val.down {
-  color: #ff6d6d;
+  color: var(--delta-down);
 }
 
 .attr-flat {
@@ -514,7 +532,7 @@ body.box-score-page {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-38);
   margin-bottom: 9px;
 }
 
@@ -527,10 +545,10 @@ body.box-score-page {
 .attr-flat-item {
   font-family: 'Inter', sans-serif;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-38);
   padding: 4px 10px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--white-3);
 }
 
 .player-name-link {
@@ -538,7 +556,7 @@ body.box-score-page {
 }
 
 .player-name-link:hover {
-  color: #F79420;
+  color: var(--text-60);
 }
 
 /* Special Stats Popup */
@@ -560,8 +578,8 @@ body.box-score-page {
 
 .special-stats-popup-content {
   position: relative;
-  background: rgba(22, 26, 36, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--surface-popover);
+  border: 1px solid var(--line-strong);
   border-radius: 14px;
   padding: 24px;
   max-width: 900px;
@@ -570,7 +588,7 @@ body.box-score-page {
   overflow-y: auto;
   z-index: 2002;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
-  color: #f7f9ff;
+  color: var(--text-100);
 }
 
 .special-stats-popup-header {
@@ -579,14 +597,14 @@ body.box-score-page {
   align-items: center;
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--line);
   position: relative;
 }
 
 .special-stats-popup-title {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 28px;
-  color: #ffffff;
+  color: var(--text-100);
   margin: 0;
   text-align: center;
   flex: 1;
@@ -609,7 +627,7 @@ body.box-score-page {
 }
 
 .special-stats-popup-close:hover {
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 .special-stats-popup-body {
@@ -636,7 +654,7 @@ body.box-score-page {
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line);
 }
 
 .special-stats-row.empty-row {
@@ -647,14 +665,14 @@ body.box-score-page {
 .special-stats-row h3 {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 22px;
-  color: #ffffff;
+  color: var(--text-100);
   margin: 0;
   width: 100%;
 }
 
 .special-stats-hint-row {
   padding: 4px 0 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line);
   justify-content: flex-start;
 }
 
@@ -672,7 +690,7 @@ body.box-score-page {
 }
 
 .special-stats-value {
-  color: #ffffff;
+  color: var(--text-100);
   font-size: 16px;
   font-weight: 500;
 }
@@ -693,30 +711,30 @@ body.box-score-page {
 
 .box-score-shell .play-usage-table thead {
   background: rgba(0, 0, 0, 0.35);
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-87);
 }
 
 .box-score-shell .play-usage-table th {
   padding: 10px 12px;
   text-align: left;
   font-weight: 600;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid var(--line-strong);
   white-space: nowrap;
 }
 
 .box-score-shell .play-usage-table td {
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line);
   color: rgba(247, 249, 255, 0.92);
 }
 
 .box-score-shell .play-usage-table tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--white-4);
 }
 
 @media (max-width: 900px) {
-  body.box-score-page {
-    padding: 20px 16px 36px;
+  html.gob body.box-score-page #box-score-view {
+    padding: var(--space-20) var(--space-16) var(--dsp-36);
   }
 
   #header-content {

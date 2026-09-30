@@ -1,123 +1,145 @@
-body {
-  background: #0b0d14;
-  color: #f7f9ff;
+/* Practice-squad assignment focus page — tokens via html.gob (#cut-players-view host). */
+html.gob body.cut-players-page {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text-100);
+  font-family: var(--font-body);
 }
 
-.cut-players-header {
+#cut-players-view .cut-players-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-24);
+}
+
+html.gob-focus #cut-players-view .cut-players-shell {
+  padding: 0 var(--space-24) var(--space-24);
+}
+
+#cut-players-view .cut-players-header {
   align-items: center;
   position: sticky;
   top: 0;
-  z-index: 20;
-  padding: 0 0 12px;
+  z-index: var(--z-sticky);
+  padding: 0 0 var(--space-12);
   backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
 }
 
-.cut-submit-reason {
+#cut-players-view .cut-submit-reason {
   margin: 0;
+  color: var(--text-60);
 }
 
-#submit-btn:disabled,
-#submit-btn.is-dead {
+#cut-players-view #submit-btn.is-dead,
+#cut-players-view #submit-btn:disabled {
+  opacity: 0.42;
   cursor: not-allowed;
+  filter: none;
+  transform: none;
+  background: var(--white-5);
+  border-color: var(--line);
   color: var(--text-38);
 }
 
-.cut-players-section {
-  margin-bottom: 18px;
+#cut-players-view .cut-players-section {
+  margin-bottom: var(--space-18);
 }
 
-#cut-players-table {
+#cut-players-view #cut-players-table {
   --gob-data-grid-min-width: 1120px;
 }
 
-.cut-player-name-link {
-  color: #ffffff;
+#cut-players-view .cut-player-name-link {
+  color: var(--text-100);
   text-decoration: none;
 }
 
-.cut-player-name-link:hover {
+#cut-players-view .cut-player-name-link:hover {
   text-decoration: underline;
+  color: var(--text-100);
 }
 
-.cut-player-checkbox-cell {
+#cut-players-view .cut-player-checkbox-cell {
   text-align: center;
 }
 
-.cut-player-checkbox {
-  accent-color: #34EC27;
+#cut-players-view .cut-player-checkbox {
+  accent-color: var(--text-60);
   cursor: pointer;
   height: 18px;
   width: 18px;
 }
 
-.cut-player-badge {
+#cut-players-view .cut-player-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 6px;
+  margin-left: var(--space-6);
   padding: 2px 5px;
-  border-radius: 6px;
-  font-family: 'Inter', sans-serif;
-  font-size: 10px;
+  border-radius: var(--radius-4);
+  font-family: var(--font-body);
+  font-size: var(--fs-10);
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-4);
   line-height: 1;
 }
 
-.cut-player-badge.is-ptp {
-  background: rgba(255, 109, 109, 0.18);
-  color: #ff9a9a;
+#cut-players-view .cut-player-badge.is-ptp {
+  background: color-mix(in srgb, var(--red) 18%, transparent);
+  color: color-mix(in srgb, var(--red) 70%, var(--text-100));
 }
 
-.cut-player-badge.is-graduating {
-  background: rgba(52, 236, 39, 0.14);
-  color: #d9ffd6;
+#cut-players-view .cut-player-badge.is-graduating {
+  background: var(--white-5);
+  color: var(--text-60);
+  border: 1px solid var(--line);
 }
 
-.gob-modal-actions[hidden] {
+#cut-players-view .gob-modal-actions[hidden] {
   display: none;
 }
 
-.gob-modal-title.is-centered {
+#cut-players-view .gob-modal-title.is-centered {
   text-align: center;
 }
 
-.gob-modal-subtitle[hidden] {
+#cut-players-view .gob-modal-subtitle[hidden] {
   display: none;
 }
 
-/* Same green pulse bar as page-load overlays (pageLoadOverlay.js). */
-.cut-modal-pulse {
+#cut-players-view .cut-modal-pulse {
   display: flex;
   justify-content: center;
-  padding: 0 28px 24px;
+  padding: 0 var(--space-28) var(--space-24);
 }
 
-.cut-modal-pulse[hidden] {
+#cut-players-view .cut-modal-pulse[hidden] {
   display: none;
 }
 
-.cut-modal-pulse-indicator {
+#cut-players-view .cut-modal-pulse-indicator {
   width: min(220px, 100%);
   height: 8px;
   margin: 0 auto;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: var(--white-8);
+  box-shadow: inset 0 1px 0 var(--white-5);
 }
 
-.cut-modal-pulse-indicator span {
+#cut-players-view .cut-modal-pulse-indicator span {
   display: block;
   width: 100%;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(52, 236, 39, 0.35), #34EC27 48%, rgba(52, 236, 39, 0.45));
+  background: linear-gradient(90deg, var(--white-10), var(--text-60) 48%, var(--white-10));
   transform-origin: left center;
   animation: cutModalPulseBar 1.2s ease-in-out infinite;
 }
 
 @keyframes cutModalPulseBar {
-  0%, 100% { opacity: 0.5; transform: scaleX(0.35); }
-  50% { opacity: 1; transform: scaleX(1); }
+  0%, 100% { transform: scaleX(0.35); opacity: 0.55; }
+  50% { transform: scaleX(1); opacity: 1; }
 }

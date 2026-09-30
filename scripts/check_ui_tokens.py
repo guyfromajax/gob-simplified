@@ -245,6 +245,8 @@ NEW_DESIGN_CSS = frozenset({
     "set-lineup.css",
     "playbooks.css",
     "css/playbook-tiles.css",
+    "box-score.css",
+    "cut-players.css",
 })
 
 # Frozen leftover sheet. New rules belong in the view's own CSS.

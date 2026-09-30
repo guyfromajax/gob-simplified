@@ -29,9 +29,6 @@ function cloneParams(params) {
   var players = [];
   var cutCount = 0;
   var allowLeave = false;
-  // mode 'cut' = week-35 real cuts (any number, FPD deleted). Default = training-squad assignment.
-  var isCutMode = urlParams.get('mode') === 'cut';
-  var nextUrl = urlParams.get('next_url');
 
   function playSound(filename) {
     import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
@@ -94,9 +91,6 @@ function cloneParams(params) {
       btn.textContent = action.label;
       btn.disabled = !!action.disabled;
       btn.addEventListener('click', function () {
-        // Dismiss-only actions close here. Actions with onClick own the next
-        // step (replace modal, navigate, etc.) so Confirm is not dumped back
-        // onto the assign table while the POST is in flight.
         if (action.onClick) {
           action.onClick();
           return;
@@ -161,12 +155,6 @@ function cloneParams(params) {
     var reason = document.getElementById('cut-submit-reason');
     var submitBtn = document.getElementById('submit-btn');
     if (!reason) return;
-    if (isCutMode) {
-      reason.textContent = '';
-      reason.hidden = true;
-      if (submitBtn) submitBtn.removeAttribute('title');
-      return;
-    }
     var delta = cutCount - selectedCount;
     var copy = '';
     if (delta > 0) copy = 'Assign ' + delta + ' more to the practice squad';
@@ -183,14 +171,6 @@ function cloneParams(params) {
     var status = document.getElementById('cut-status');
     var selectedCount = selectedIds.size;
     var submitBtn = document.getElementById('submit-btn');
-    if (isCutMode) {
-      // Any number (including 0) may be cut; submit is always enabled.
-      status.textContent = 'Select any players to cut — they will be lost forever. Selected: ' + selectedCount + '.';
-      submitBtn.disabled = false;
-      submitBtn.classList.remove('is-dead');
-      updateSubmitReason(selectedCount);
-      return;
-    }
     status.textContent = 'You need to assign ' + cutCount + ' player' + (cutCount === 1 ? '' : 's') + ' to the practice squad. Selected: ' + selectedCount + '.';
     var active = selectedCount === cutCount;
     submitBtn.disabled = !active;
@@ -299,17 +279,7 @@ function cloneParams(params) {
     });
   }
 
-  function goNext() {
-    allowLeave = true;
-    var url = nextUrl || buildFccUrl();
-    if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(url)) {
-      window.GOBNav.exitFlow(url);
-    } else if (window.GOBNav) window.GOBNav.replace(url);
-    else window.location.replace(url);
-  }
-
   function submitCuts() {
-    if (isCutMode) { submitFinalCuts(); return; }
     if (selectedIds.size !== cutCount) return;
     var namesInOrder = players.filter(function (player) {
       return selectedIds.has(player._id);
@@ -330,7 +300,7 @@ function cloneParams(params) {
             showModal({
               title: 'Assigning Practice Squad',
               centerTitle: true,
-              accent: 'is-green',
+              accent: 'is-red',
               pulse: true,
               actions: []
             });
@@ -371,63 +341,12 @@ function cloneParams(params) {
     });
   }
 
-  function submitFinalCuts() {
-    var namesInOrder = players.filter(function (player) {
-      return selectedIds.has(player._id);
-    }).map(function (player) { return player.name; });
-
-    if (!namesInOrder.length) {
-      // No cuts selected — proceed straight to recruiting.
-      goNext();
-      return;
-    }
-    showModal({
-      title: 'Confirm Cuts',
-      message: 'You are going to cut ' + formatNames(namesInOrder) + '. These players will be lost forever. Proceed?',
-      accent: 'is-red',
-      actions: [
-        { label: 'Cancel', variant: 'gob-modal-btn-secondary' },
-        {
-          label: 'Cut Players',
-          variant: 'gob-modal-btn-primary',
-          onClick: function () {
-            fetch(API_CONFIG.buildUrl('/franchise/cut-players-final'), {
-              method: 'POST',
-              headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-              body: JSON.stringify({ franchise_id: franchiseId, player_ids: Array.from(selectedIds) })
-            })
-              .then(function (res) {
-                if (!res.ok) throw new Error('Failed to cut players');
-                return res.json();
-              })
-              .then(function (data) {
-                playSound('confirm-1-lowervol.wav');
-                showModal({
-                  title: 'Players Cut',
-                  message: formatNames(data.cut_names || namesInOrder) + ' have been cut. Continuing to recruiting.',
-                  accent: 'is-green',
-                  actions: [{ label: 'Continue to Recruiting', variant: 'gob-modal-btn-primary', onClick: goNext }]
-                });
-              })
-              .catch(function (err) {
-                console.error(err);
-                showModal({
-                  title: 'Cut Failed',
-                  message: 'Unable to cut players.',
-                  actions: [{ label: 'Close', variant: 'gob-modal-btn-secondary' }]
-                });
-              });
-          }
-        }
-      ]
-    });
-  }
-
   function loadData() {
+    var profileQ = urlParams.get('cc_profile') === '1' ? '&profile=1' : '';
     Promise.all([
-      fetch(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId) + (new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : ''), { headers: API_CONFIG.getAuthHeaders() })
+      fetch(API_CONFIG.buildUrl('/franchise/command-center/data') + '?franchise_id=' + encodeURIComponent(franchiseId) + profileQ, { headers: API_CONFIG.getAuthHeaders() })
         .then(function (res) { return res.ok ? res.json() : null; }),
-      fetch(API_CONFIG.buildUrl('/roster/' + encodeURIComponent(teamId)) + '?franchise_id=' + encodeURIComponent(franchiseId) + (new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : ''), { headers: API_CONFIG.getAuthHeaders() })
+      fetch(API_CONFIG.buildUrl('/roster/' + encodeURIComponent(teamId)) + '?franchise_id=' + encodeURIComponent(franchiseId) + profileQ, { headers: API_CONFIG.getAuthHeaders() })
         .then(function (res) {
           if (!res.ok) throw new Error('Failed to load roster');
           return res.json();
@@ -435,16 +354,8 @@ function cloneParams(params) {
     ]).then(function (results) {
       var topData = results[0] || {};
       var roster = results[1] || {};
-      if (isCutMode && topData.week_35_recruiting_ran) {
-        navigateBack();
-        return;
-      }
       cutCount = Number(topData.cut_count || 0);
-      // Week-35 cut mode: cut from active roster AND training squad. Assignment mode: active only.
       var pool = (roster.players || []).slice();
-      if (isCutMode && Array.isArray(roster.training_squad)) {
-        pool = pool.concat(roster.training_squad);
-      }
       players = pool.map(function (player) {
         var positionRatings = player.position_ratings || {};
         var best = getBestPosition(positionRatings);
@@ -469,11 +380,11 @@ function cloneParams(params) {
         return Number(b.highestRT || -1) - Number(a.highestRT || -1);
       });
       renderTable();
-      if (!isCutMode && (!topData.cut_required || cutCount <= 0)) {
+      if (!topData.cut_required || cutCount <= 0) {
         showModal({
           title: 'No Cuts Required',
           message: 'Your roster is already at the legal 12-player limit.',
-          accent: 'is-green',
+          accent: 'is-red',
           actions: [{
             label: 'Back To Locker Room',
             variant: 'gob-modal-btn-primary',
@@ -484,8 +395,8 @@ function cloneParams(params) {
     }).catch(function (err) {
       console.error(err);
       showModal({
-        title: 'Cut Players',
-        message: 'Unable to load cut players data.',
+        title: 'Assign Practice Squad',
+        message: 'Unable to load practice squad assignment data.',
         accent: 'is-red',
         actions: [{ label: 'Back To Locker Room', variant: 'gob-modal-btn-primary', onClick: navigateBack }]
       });
@@ -493,16 +404,6 @@ function cloneParams(params) {
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    if (isCutMode) {
-      // Relabel the page for real cuts (page chrome defaults to training-squad assignment).
-      document.title = 'Cut Players';
-      var h1 = document.querySelector('.cut-players-header h1');
-      if (h1) h1.textContent = 'Cut Players';
-      var submitLabel = document.getElementById('submit-btn');
-      if (submitLabel) submitLabel.textContent = 'Submit Cuts';
-      var lastTh = document.querySelector('#cut-players-table thead th:last-child');
-      if (lastTh) lastTh.textContent = 'Cut';
-    }
     document.getElementById('back-btn').addEventListener('click', attemptLeave);
     document.getElementById('submit-btn').addEventListener('click', function (event) {
       var btn = event.currentTarget;
