@@ -2,14 +2,46 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GOB</title>
+  <title>Geeked-Out Basketball</title>
   <style>
+    /* Electron loadFile cannot reach FrontEnd/static before the engine is up.
+       Tokens copied from css/gob-tokens.css. Fonts and the wordmark are local
+       copies in desktop/assets/ (Bebas Neue Pro Bold, Barlow latin, homepage
+       lockup of geekedout_logo). No network. */
+    @font-face {
+      font-family: 'Bebas Neue Pro';
+      src: url('assets/BebasNeuePro-Bold.otf') format('opentype');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Barlow';
+      src: url('assets/Barlow-latin.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    :root {
+      --bg: #0b0d14;
+      --text-100: #ffffff;
+      --text-60: rgba(255,255,255,.60);
+      --navy-hi: #4A6ED2;
+      --font-display: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+      --font-body: 'Barlow', sans-serif;
+      --fs-13: 13px;
+      --fs-40: 40px;
+      --lh-body: 1.35;
+      --lh-85: .85;
+      --tracking-1: .01em;
+      --dur-pulse: 1.6s;
+    }
     html, body {
       margin: 0;
       height: 100%;
-      background: #0b1020;
-      color: #f4f1ea;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text-100);
+      font-family: var(--font-body);
     }
     .wrap {
       min-height: 100%;
@@ -17,38 +49,45 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 18px;
+      gap: 20px;
+      padding: 24px;
+    }
+    .mark {
+      width: min(340px, 64vw);
+      height: auto;
     }
     h1 {
       margin: 0;
-      letter-spacing: 0.12em;
-      font-weight: 600;
+      font: 700 var(--fs-40)/var(--lh-85) var(--font-display);
+      letter-spacing: var(--tracking-1);
     }
     p {
       margin: 0;
-      opacity: 0.75;
       max-width: 28rem;
       text-align: center;
-      line-height: 1.4;
+      font-size: var(--fs-13);
+      line-height: var(--lh-body);
+      color: var(--text-60);
     }
     .pulse {
-      width: 14px;
-      height: 14px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
-      background: #e24a1b;
-      animation: pulse 1.2s ease-in-out infinite;
+      background: var(--navy-hi);
+      animation: pulse var(--dur-pulse) ease-in-out infinite;
     }
     @keyframes pulse {
-      0%, 100% { opacity: 0.3; transform: scale(0.85); }
+      0%, 100% { opacity: 0.28; transform: scale(0.85); }
       50% { opacity: 1; transform: scale(1); }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <img class="mark" src="assets/geekedout_logo.png" alt="Geeked-Out Basketball">
+    <h1>Starting the local engine…</h1>
+    <p>The first launch can take a minute while scientific libraries load.</p>
     <div class="pulse" aria-hidden="true"></div>
-    <h1>GOB</h1>
-    <p>Starting the local engine. The first launch can take a minute while scientific libraries load.</p>
   </div>
 </body>
 </html>
