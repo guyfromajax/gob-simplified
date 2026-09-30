@@ -28,7 +28,6 @@
     pt_efficiency: 'P/T Defense',
     fight: 'Fight',
     discipline: 'Discipline',
-    momentum_score: 'Momentum',
     team_chemistry: 'Team Chemistry',
     fb_opp_modifier: 'Fast Break Defense',
     pt_opp_modifier: 'P/T Offense'
@@ -670,6 +669,10 @@
       var toggle = el('button', 'wkc-more', '+' + rest.length + ' more');
       toggle.type = 'button';
       toggle.setAttribute('aria-expanded', 'false');
+      // Reveal/hide is not a navigation, so it never routes through go()/clickTiny.
+      // Give it the same tiny select tick every other office control has, via the
+      // delegated data-sfx hook (one sound per click — the toggle handler is silent).
+      toggle.setAttribute('data-sfx', 'SFX_SELECT');
       toggle.addEventListener('click', function () {
         var open = extra.hidden;
         extra.hidden = !open;
@@ -1059,7 +1062,13 @@
       });
       node.appendChild(spread);
     }
-    var moved = Array.isArray(snap.moved_most) ? snap.moved_most : [];
+    // Momentum was pulled from Team Attributes and the Training Report's Team
+    // Report; keep the Office "Moved most" consistent and never surface it here.
+    // The digest still carries momentum_score (office_digest keeps it in
+    // TEAM_MEASURE_KEYS so the weekly snapshot stores it) — this is display-only.
+    var moved = (Array.isArray(snap.moved_most) ? snap.moved_most : []).filter(function (row) {
+      return row && row.measure !== 'momentum_score';
+    });
     if (snap.state === 'set_after_camp') {
       node.appendChild(el('div', 'sub-h', 'Moved most'));
       [0, 1].forEach(function () {

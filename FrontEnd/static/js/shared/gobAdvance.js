@@ -505,7 +505,7 @@
           else window.location.replace(nextUrl);
         };
         var startFinishSeason = function () {
-          return fetch(window.API_CONFIG.buildUrl('/franchise/finish-season'), {
+          return window.API_CONFIG.fetchWithRateLimitRetry(window.API_CONFIG.buildUrl('/franchise/finish-season'), {
             method: 'POST',
             headers: Object.assign({ 'Content-Type': 'application/json' }, window.API_CONFIG.getAuthHeaders()),
             body: JSON.stringify({ franchise_id: franchiseId }),

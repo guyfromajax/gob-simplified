@@ -1000,12 +1000,11 @@ function cloneParams(params) {
 
     if (logoutBtn) {
       logoutBtn.addEventListener('click', function () {
-        try {
-          if (typeof API_CONFIG !== 'undefined') {
-            fetch(API_CONFIG.buildUrl('/api/auth/logout'), { method: 'POST' }).catch(function () {});
-          }
-        } catch (e) {}
-        if (typeof localStorage !== 'undefined') {
+        // Shared helper attaches the bearer token before clearing it (so the server
+        // revokes the session), clears the local token, and never throws.
+        if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.logout === 'function') {
+          API_CONFIG.logout();
+        } else if (typeof localStorage !== 'undefined') {
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
         }

@@ -32,7 +32,7 @@ export function getOrStartFranchisePhaseB(pending) {
     typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {}
   );
 
-  const promise = fetch(API_CONFIG.buildUrl('/franchise/complete-week/phase-b'), {
+  const promise = API_CONFIG.fetchWithRateLimitRetry(API_CONFIG.buildUrl('/franchise/complete-week/phase-b'), {
     method: 'POST',
     headers,
     body: JSON.stringify({

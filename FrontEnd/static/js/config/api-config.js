@@ -458,6 +458,81 @@ const API_CONFIG = {
   },
 
   /**
+   * Sign out. POSTs /api/auth/logout WITH the bearer token attached, THEN clears
+   * the local token. Since fix/auth-hardening the server only revokes the session
+   * (bumps token_version — signs the user out everywhere) when it receives a bearer
+   * token, so the header MUST be read before the token is wiped, or the revoke is a
+   * silent no-op. `keepalive` lets the POST finish even though the caller navigates
+   * away immediately after. Desktop/offline: /api/auth is always-remote; with no
+   * reachable server the fetch just rejects and we swallow it, so the local clear
+   * still happens and nothing crashes. Callers do their own redirect afterward,
+   * exactly as before.
+   * @returns {Promise<void>} resolves once the request settles and the token is cleared
+   */
+  logout() {
+    const headers = this.getAuthHeaders();
+    let request;
+    try {
+      request = fetch(this.buildUrl('/api/auth/logout'), {
+        method: 'POST',
+        headers: headers,
+        keepalive: true,
+      }).catch(function () {});
+    } catch (err) {
+      request = Promise.resolve();
+    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      }
+    } catch (err) { /* ignore */ }
+    return Promise.resolve(request).then(function () {});
+  },
+
+  // Rate-limit retry knobs for the heavy week routes (see fetchWithRateLimitRetry).
+  RATE_LIMIT_DEFAULT_RETRY_SECONDS: 6,
+  RATE_LIMIT_MAX_RETRIES: 5,
+
+  /**
+   * fetch() that transparently rides out HTTP 429s on the rate-limited week routes
+   * (complete-week/phase-a/phase-b 10/min, start-cpu-sims 6/min, finish-season
+   * 3/min — see BackEnd/utils/rate_limiter.py). On a 429 it reads Retry-After
+   * (seconds; default RATE_LIMIT_DEFAULT_RETRY_SECONDS when the header is absent or
+   * unparseable), waits, and re-sends the SAME request, up to RATE_LIMIT_MAX_RETRIES
+   * times. It resolves with the final Response either way — a non-429 response, or
+   * the last 429 once retries are spent — so each caller's existing `if (!res.ok)`
+   * path handles the give-up case unchanged. Nothing here surfaces UI: a retried 429
+   * shows no toast/modal, and any busy/disabled button the caller set simply stays
+   * put for the duration of the await. Desktop/offline never rate-limits (loopback
+   * is exempt in the limiter), so this is a plain fetch there.
+   * @param {string} url
+   * @param {Object} [options] fetch init (reused verbatim on each retry)
+   * @param {Object} [cfg] { maxRetries, defaultRetrySeconds }
+   * @returns {Promise<Response>}
+   */
+  fetchWithRateLimitRetry(url, options, cfg) {
+    const max = (cfg && cfg.maxRetries != null) ? cfg.maxRetries : this.RATE_LIMIT_MAX_RETRIES;
+    const fallback = (cfg && cfg.defaultRetrySeconds != null)
+      ? cfg.defaultRetrySeconds
+      : this.RATE_LIMIT_DEFAULT_RETRY_SECONDS;
+    function attempt(n) {
+      return fetch(url, options).then(function (res) {
+        if (res.status !== 429 || n >= max) return res;
+        const header = (res.headers && typeof res.headers.get === 'function')
+          ? res.headers.get('Retry-After')
+          : null;
+        let secs = parseFloat(header);
+        if (!isFinite(secs) || secs < 0) secs = fallback;
+        return new Promise(function (resolve) {
+          setTimeout(function () { resolve(attempt(n + 1)); }, secs * 1000);
+        });
+      });
+    }
+    return attempt(0);
+  },
+
+  /**
    * Staging-only screen capture tool gate.
    * True for localhost + Netlify/Railway staging hosts; false for production.
    */

@@ -211,15 +211,17 @@ function onClick(event) {
 }
 
 function logOut() {
-  try {
-    if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.buildUrl === 'function') {
-      fetch(API_CONFIG.buildUrl('/api/auth/logout'), { method: 'POST' }).catch(function () {});
-    }
-  } catch (_err) { /* ignore */ }
-  try {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-  } catch (_err) { /* ignore */ }
+  // Shared helper attaches the bearer token before clearing it (so the server
+  // revokes the session), clears the local token, and never throws. keepalive on
+  // the POST lets it complete despite the immediate redirect below.
+  if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.logout === 'function') {
+    API_CONFIG.logout();
+  } else {
+    try {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+    } catch (_err) { /* ignore */ }
+  }
   window.location.href = '/mode-select.html';
 }
 
