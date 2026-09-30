@@ -272,7 +272,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 .gob-action-btn.is-dead,
 .gob-action-btn:disabled {
   opacity: 0.42;
-  cursor: default;
+  cursor: not-allowed;
   filter: none;
   transform: none;
 }

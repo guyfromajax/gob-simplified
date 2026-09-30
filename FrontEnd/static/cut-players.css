@@ -12,6 +12,16 @@ body {
   backdrop-filter: blur(8px);
 }
 
+.cut-submit-reason {
+  margin: 0;
+}
+
+#submit-btn:disabled,
+#submit-btn.is-dead {
+  cursor: not-allowed;
+  color: var(--text-38);
+}
+
 .cut-players-section {
   margin-bottom: 18px;
 }

@@ -1157,6 +1157,7 @@
       if (node === app) return;
       if (node.nodeType === 1 && node.tagName === 'SCRIPT') return;
       if (node.nodeType === 1 && node.id === 'site-footer') return;
+      if (node.nodeType === 1 && node.classList && node.classList.contains('gob-modal-overlay')) return;
       main.appendChild(node);
     });
   }

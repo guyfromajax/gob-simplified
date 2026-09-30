@@ -245,6 +245,15 @@ html.gob-shell .main {
   z-index: 1;
 }
 
+/* Legacy .gob-modal-overlay must stay a viewport layer. `.gob .main>*`
+   sets position:relative + --z-raised, which pins the dialog under the
+   focus top bar if adoptMain ever takes it. */
+html.gob.gob-shell .main .gob-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+}
+
 html.gob-shell .rail-face {
   display: flex;
   flex-direction: column;

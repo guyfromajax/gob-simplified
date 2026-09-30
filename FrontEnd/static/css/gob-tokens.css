@@ -207,6 +207,7 @@
 --z-popover:4;       /* gameplay sound popover */
 --z-scrim:5;
 --z-panel:6;         /* settings panel */
+--z-modal:10020;     /* gob-modal-overlay above focus chrome / auth bar */
 
 /* ── Motion ─────────────────────────────────────────────── */
 --dur-press:80ms;

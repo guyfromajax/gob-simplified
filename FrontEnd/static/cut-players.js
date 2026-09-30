@@ -61,6 +61,9 @@ function cloneParams(params) {
 
   function showModal(config) {
     var backdrop = document.getElementById('cut-modal-backdrop');
+    if (backdrop && backdrop.parentNode !== document.body) {
+      document.body.appendChild(backdrop);
+    }
     var accent = document.getElementById('cut-modal-accent');
     var title = document.getElementById('cut-modal-title');
     var message = document.getElementById('cut-modal-message');
@@ -154,6 +157,28 @@ function cloneParams(params) {
     return feet + "'" + inches + '"';
   }
 
+  function updateSubmitReason(selectedCount) {
+    var reason = document.getElementById('cut-submit-reason');
+    var submitBtn = document.getElementById('submit-btn');
+    if (!reason) return;
+    if (isCutMode) {
+      reason.textContent = '';
+      reason.hidden = true;
+      if (submitBtn) submitBtn.removeAttribute('title');
+      return;
+    }
+    var delta = cutCount - selectedCount;
+    var copy = '';
+    if (delta > 0) copy = 'Assign ' + delta + ' more to the practice squad';
+    else if (delta < 0) copy = 'Remove ' + (-delta);
+    reason.textContent = copy;
+    reason.hidden = !copy;
+    if (submitBtn) {
+      if (copy) submitBtn.setAttribute('title', copy);
+      else submitBtn.removeAttribute('title');
+    }
+  }
+
   function updateStatus() {
     var status = document.getElementById('cut-status');
     var selectedCount = selectedIds.size;
@@ -163,12 +188,14 @@ function cloneParams(params) {
       status.textContent = 'Select any players to cut — they will be lost forever. Selected: ' + selectedCount + '.';
       submitBtn.disabled = false;
       submitBtn.classList.remove('is-dead');
+      updateSubmitReason(selectedCount);
       return;
     }
     status.textContent = 'You need to assign ' + cutCount + ' player' + (cutCount === 1 ? '' : 's') + ' to the practice squad. Selected: ' + selectedCount + '.';
     var active = selectedCount === cutCount;
     submitBtn.disabled = !active;
     submitBtn.classList.toggle('is-dead', !active);
+    updateSubmitReason(selectedCount);
   }
 
   function renderTable() {
@@ -477,8 +504,9 @@ function cloneParams(params) {
       if (lastTh) lastTh.textContent = 'Cut';
     }
     document.getElementById('back-btn').addEventListener('click', attemptLeave);
-    document.getElementById('submit-btn').addEventListener('click', function () {
-      playSound('confirm-2-lowervol.wav');
+    document.getElementById('submit-btn').addEventListener('click', function (event) {
+      var btn = event.currentTarget;
+      if (!btn || btn.disabled || btn.classList.contains('is-dead')) return;
       submitCuts();
     });
     window.addEventListener('beforeunload', function (e) {
