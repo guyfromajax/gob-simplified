@@ -9,6 +9,14 @@ const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/prep-p
 const FID = FIXTURE.franchise_id;
 const TEAM = 'Lancaster';
 const OUT = path.join(__dirname, '../../reports/prep-modules-training');
+const TOKENS_OUT = path.join(__dirname, '../../reports/prep-training-tokens');
+
+function alsoTokenShot(name) {
+  if (CAPTURE_BEFORE) return;
+  fs.mkdirSync(TOKENS_OUT, { recursive: true });
+  const src = path.join(OUT, name);
+  if (fs.existsSync(src)) fs.copyFileSync(src, path.join(TOKENS_OUT, name));
+}
 const BEFORE_PATH = path.join(OUT, 'before-metrics.json');
 const CAPTURE_BEFORE = process.env.TRAINING_BEFORE === '1';
 const BEFORE = CAPTURE_BEFORE || !fs.existsSync(BEFORE_PATH)
@@ -261,10 +269,12 @@ test('in-season 1280 / 1920 shots and geometry', async ({ page }) => {
   const metrics1280 = await measureTraining(page, '#training-view');
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';
   await page.screenshot({ path: path.join(OUT, `${prefix}-in-season-1280.png`) });
+  alsoTokenShot(`${prefix}-in-season-1280.png`);
   await page.setViewportSize({ width: 1920, height: 1080 });
   await expect(page.locator('#training-view .slider, #training-view .ps').first()).toBeVisible();
   const metrics1920 = await measureTraining(page, '#training-view');
   await page.screenshot({ path: path.join(OUT, `${prefix}-in-season-1920.png`) });
+  alsoTokenShot(`${prefix}-in-season-1920.png`);
   if (CAPTURE_BEFORE) {
     const bag = fs.existsSync(BEFORE_PATH) ? JSON.parse(fs.readFileSync(BEFORE_PATH, 'utf8')) : {};
     bag.inSeason1280 = metrics1280;
@@ -284,6 +294,33 @@ test('in-season 1280 / 1920 shots and geometry', async ({ page }) => {
   expect(Math.abs(metrics1280.tools.x - BEFORE.inSeason1280.tools.x)).toBeLessThanOrEqual(2);
   expect(metrics1280.advance.text).toBe(BEFORE.inSeason1280.advance.text);
   expect(samePaint(metrics1280.advance.bg, BEFORE.inSeason1280.advance.bg)).toBe(true);
+
+  const choice = await page.evaluate(() => {
+    const host = document.getElementById('training-view');
+    const sliders = [...host.querySelectorAll('.slider, .ps, input[type="range"]')].slice(0, 4);
+    const radios = [...host.querySelectorAll('.archetype-option input, .playbook-mode-btn, .toggle-btn')].slice(0, 6);
+    const paint = (el) => {
+      const s = getComputedStyle(el);
+      return { bg: s.backgroundColor, color: s.color, accent: s.accentColor || '' };
+    };
+    const green = (v) => /rgb\(\s*52\s*,\s*236\s*,\s*39/i.test(v) || /rgb\(\s*47\s*,\s*143/i.test(v);
+    const orange = (v) => /rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(v) || /rgb\(\s*255\s*,\s*122/i.test(v);
+    const bad = [];
+    [...sliders, ...radios].forEach((el) => {
+      const p = paint(el);
+      if (green(p.bg) || green(p.color) || green(p.accent) || orange(p.bg) || orange(p.color) || orange(p.accent)) {
+        bad.push({ tag: el.tagName, cls: el.className, ...p });
+      }
+    });
+    const shot = host.querySelector('.pdg-av img, .pdg-av, .pdg-layout-table .pdg-av');
+    const radius = shot ? getComputedStyle(shot).borderRadius : '';
+    return { bad, radius };
+  });
+  expect(choice.bad).toEqual([]);
+  if (choice.radius) {
+    expect(choice.radius.includes('%')).toBe(false);
+    expect(parseFloat(choice.radius)).toBeLessThanOrEqual(8);
+  }
 });
 
 test('camp week 1280 shot', async ({ page }) => {
@@ -293,6 +330,7 @@ test('camp week 1280 shot', async ({ page }) => {
   const metrics = await measureTraining(page, '#training-view');
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';
   await page.screenshot({ path: path.join(OUT, `${prefix}-camp-1280.png`) });
+  alsoTokenShot(`${prefix}-camp-1280.png`);
   if (CAPTURE_BEFORE) {
     const bag = fs.existsSync(BEFORE_PATH) ? JSON.parse(fs.readFileSync(BEFORE_PATH, 'utf8')) : {};
     bag.camp1280 = metrics;
@@ -311,6 +349,7 @@ test('post-week-26 1280 shot', async ({ page }) => {
   const metrics = await measureTraining(page, '#training-view');
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';
   await page.screenshot({ path: path.join(OUT, `${prefix}-post-week-26-1280.png`) });
+  alsoTokenShot(`${prefix}-post-week-26-1280.png`);
   if (CAPTURE_BEFORE) {
     const bag = fs.existsSync(BEFORE_PATH) ? JSON.parse(fs.readFileSync(BEFORE_PATH, 'utf8')) : {};
     bag.postWeek26 = metrics;
@@ -329,6 +368,7 @@ test('tutorial 1280 shot', async ({ page }) => {
   await expect(page.locator('.slider, .ps').first()).toBeVisible({ timeout: 30000 });
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';
   await page.screenshot({ path: path.join(OUT, `${prefix}-tutorial-1280.png`) });
+  alsoTokenShot(`${prefix}-tutorial-1280.png`);
   if (!CAPTURE_BEFORE) {
     expect(page.url()).toContain('training.html');
     expect(page.url()).toContain('mode=tutorial');
@@ -345,6 +385,7 @@ test('custom-focus modal 1280 shot', async ({ page }) => {
   const metrics = await measureTraining(page, '#training-view');
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';
   await page.screenshot({ path: path.join(OUT, `${prefix}-custom-focus-1280.png`) });
+  alsoTokenShot(`${prefix}-custom-focus-1280.png`);
   if (CAPTURE_BEFORE) {
     const bag = fs.existsSync(BEFORE_PATH) ? JSON.parse(fs.readFileSync(BEFORE_PATH, 'utf8')) : {};
     bag.customFocus = metrics;

@@ -8,6 +8,71 @@ test.describe.configure({ timeout: 120000 });
 const FID = 'f-e2e-prep-modules-report';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OUT = path.join(__dirname, '../../reports/prep-modules-report');
+const TOKENS_OUT = path.join(__dirname, '../../reports/prep-training-tokens');
+
+function alsoTokenShot(srcName, destName) {
+  fs.mkdirSync(TOKENS_OUT, { recursive: true });
+  const src = path.join(OUT, srcName);
+  if (fs.existsSync(src)) fs.copyFileSync(src, path.join(TOKENS_OUT, destName || srcName));
+}
+
+async function resetReportScroll(page) {
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    const view = document.getElementById('training-report-view');
+    if (view) view.scrollTop = 0;
+    const main = document.getElementById('gob-main');
+    if (main) main.scrollTop = 0;
+    document.querySelectorAll('.main, .main.scroll').forEach((el) => { el.scrollTop = 0; });
+  });
+}
+
+function measureReportChrome() {
+  const view = document.getElementById('training-report-view');
+  const main = document.getElementById('gob-main');
+  const title = document.querySelector('.pg-title h1');
+  const meta = view && view.querySelector('.header-meta-line');
+  const back = view && (view.querySelector('#locker-room-btn') || view.querySelector('#back-button'));
+  const box = (el) => {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      top: +r.top.toFixed(1),
+      bottom: +r.bottom.toFixed(1),
+      left: +r.left.toFixed(1),
+      right: +r.right.toFixed(1),
+    };
+  };
+  const tb = title && title.getBoundingClientRect();
+  const mb = meta && meta.getBoundingClientRect();
+  const bb = back && back.getBoundingClientRect();
+  const vb = view && view.getBoundingClientRect();
+  const intersects = (a, b) => !!(a && b
+    && a.left < b.right && a.right > b.left
+    && a.top < b.bottom && a.bottom > b.top);
+  return {
+    windowScrollY: window.scrollY,
+    gobMainScrollTop: main ? main.scrollTop : null,
+    viewScrollTop: view ? view.scrollTop : null,
+    title: box(title),
+    meta: box(meta),
+    back: box(back),
+    view: box(view),
+    intersectTitleMeta: intersects(tb, mb),
+    backTopGeViewTop: !!(bb && vb && bb.top + 0.5 >= vb.top),
+  };
+}
+
+async function captureReportPage(page, dest) {
+  await resetReportScroll(page);
+  const geom = await page.evaluate(measureReportChrome);
+  expect(geom.windowScrollY, JSON.stringify(geom)).toBe(0);
+  expect(geom.gobMainScrollTop, JSON.stringify(geom)).toBe(0);
+  expect(geom.viewScrollTop, JSON.stringify(geom)).toBe(0);
+  expect(geom.intersectTitleMeta, JSON.stringify(geom)).toBe(false);
+  expect(geom.backTopGeViewTop, JSON.stringify(geom)).toBe(true);
+  await page.screenshot({ path: dest });
+}
 const HEADSHOT = fs.readFileSync(path.join(__dirname, '../../FrontEnd/static/images/players/generic_headshot.png'));
 const BEFORE = JSON.parse(fs.readFileSync(path.join(OUT, 'before-metrics.json'), 'utf8'));
 
@@ -209,21 +274,52 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
   await expect(page.locator('#training-report-view')).toContainText('Roger Henrich');
   await expect(page.locator('#training-report-view')).toContainText('P/T Defense Readiness');
   await expect(page.locator('#training-report-view #team-attributes-grid')).not.toContainText('Momentum');
+  const tokenLook = await page.evaluate(() => {
+    const host = document.getElementById('training-report-view');
+    const green = (v) => /rgb\(\s*52\s*,\s*236\s*,\s*39/i.test(v);
+    const orange = (v) => /rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(v);
+    const bad = [];
+    host.querySelectorAll('.toggle-btn, .seg button, [role="radio"]').forEach((el) => {
+      const s = getComputedStyle(el);
+      if (green(s.backgroundColor) || green(s.color) || orange(s.backgroundColor) || orange(s.color)) {
+        bad.push({ cls: el.className, bg: s.backgroundColor, color: s.color });
+      }
+    });
+    const shot = host.querySelector('.training-notes-hero-portrait-img, .pdg-av img, .av img, .player-portrait img');
+    return { bad, radius: shot ? getComputedStyle(shot).borderRadius : '' };
+  });
+  expect(tokenLook.bad).toEqual([]);
+  if (tokenLook.radius) {
+    expect(tokenLook.radius.includes('%')).toBe(false);
+    expect(parseFloat(tokenLook.radius)).toBeLessThanOrEqual(8);
+  }
   const nitShots = path.join(__dirname, '../../reports/training-report-no-momentum');
   fs.mkdirSync(nitShots, { recursive: true });
-  await page.locator('#training-report-view .team-section').screenshot({
-    path: path.join(nitShots, 'team-report-after-1280.png'),
-  });
   await expect(page.getByRole('button', { name: '← Back', exact: true })).toBeVisible();
   await expect(page.locator('#gob-subtabs .tb[data-tab="training-view"][aria-selected="true"]')).toHaveCount(0);
   await expect(page.locator('html')).not.toHaveClass(/gob-office/);
-  await page.screenshot({ path: path.join(OUT, 'training-report-office-1280.png') });
-  await page.screenshot({ path: path.join(OUT, 'training-report-after-1280.png') });
+  // Full-page shots first. locator.screenshot() on .team-section calls
+  // scrollIntoViewIfNeeded and slides the sticky report-header under .pg-head.
+  await captureReportPage(page, path.join(OUT, 'training-report-office-1280.png'));
+  await captureReportPage(page, path.join(OUT, 'training-report-after-1280.png'));
+  alsoTokenShot('training-report-after-1280.png', 'after-report-1280.png');
+  const notes = page.locator('#training-report-view .training-notes-section');
+  if (await notes.count()) {
+    await notes.first().screenshot({ path: path.join(TOKENS_OUT, 'after-report-notes-1280.png') });
+  }
+  const team = page.locator('#training-report-view .team-section, #training-report-view #team-attributes-grid');
+  if (await team.count()) {
+    await team.first().screenshot({ path: path.join(TOKENS_OUT, 'after-report-team-1280.png') });
+  }
+  await page.locator('#training-report-view .team-section').screenshot({
+    path: path.join(nitShots, 'team-report-after-1280.png'),
+  });
 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await expect(page.locator('#training-report-view #week-number')).toHaveText('12');
-  await page.screenshot({ path: path.join(OUT, 'training-report-office-1920.png') });
-  await page.screenshot({ path: path.join(OUT, 'training-report-after-1920.png') });
+  await captureReportPage(page, path.join(OUT, 'training-report-office-1920.png'));
+  await captureReportPage(page, path.join(OUT, 'training-report-after-1920.png'));
+  alsoTokenShot('training-report-after-1920.png', 'after-report-1920.png');
 });
 
 test('News drill-in keeps ← News', async ({ page }) => {

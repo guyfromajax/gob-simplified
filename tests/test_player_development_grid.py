@@ -327,10 +327,13 @@ def test_the_accent_is_on_the_code_and_never_the_value():
     displayed tier (attrTiles.js). Tinting the values here would make one colour mean
     two things on the same attribute, one click apart."""
     css = (S / "css" / "player-development-grid.css").read_text()
-    assert ".pdg-hc-attr.is-develops b { color: #F79420; }" in css
+    develops = css[css.index(".pdg-hc-attr.is-develops b"):]
+    assert "var(--text-87)" in develops[:develops.index("}")]
+    assert "var(--orange)" not in develops[:develops.index("}")]
+    assert "colour-law:" not in develops[:develops.index("}") + 40]
     assert ".pdg-hc-attr.is-develops i" not in css
     block = css[css.index(".pdg-hc-attr i {"):]
-    assert "color: #fff" in block[:block.index("}")]
+    assert "var(--text-100)" in block[:block.index("}")]
 
 
 def test_the_threshold_is_published_not_hardcoded_in_the_view():

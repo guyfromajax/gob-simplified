@@ -13,9 +13,9 @@
   flex-wrap: wrap;
   margin: 10px 0 12px;
   padding: 8px 14px;
-  border: 1px solid rgba(255, 255, 255, .1);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .03);
+  border: 1px solid var(--white-10);
+  border-radius: var(--radius-10);
+  background: var(--white-3);
 }
 .pdg-tally-group { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .pdg-tally-focuses { justify-content: flex-end; }
@@ -23,17 +23,17 @@
   display: inline-flex;
   align-items: baseline;
   gap: 5px;
-  font: 600 11px/1 'Inter', sans-serif;
-  letter-spacing: .06em;
+  font: var(--fw-semibold) var(--fs-11)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-6);
   text-transform: uppercase;
-  color: rgba(255, 255, 255, .5);
+  color: var(--white-50);
   white-space: nowrap;
 }
 .pdg-tally-item b {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 17px;
-  letter-spacing: .02em;
-  color: #fff;
+  font-family: var(--font-display);
+  font-size: var(--fs-17);
+  letter-spacing: var(--tracking-2);
+  color: var(--text-100);
   font-variant-numeric: tabular-nums;
 }
 .pdg-tally-item.is-zero { opacity: .4; }
@@ -56,9 +56,9 @@
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, .1);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--white-10);
+  border-radius: var(--radius-10);
+  background: var(--white-4);
 }
 
 /* The name is the hover target, so it gets a focus ring and keyboard access — a card that
@@ -69,15 +69,15 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   font: 600 13px/1.2 'Inter', sans-serif;
-  color: #fff;
+  color: var(--text-100);
   cursor: help;
   outline-offset: 3px;
 }
-.pdg-name:focus-visible { outline: 2px solid #F79420; border-radius: 4px; }
+.pdg-name:focus-visible { outline: 2px solid var(--text-60); border-radius: var(--radius-4); }
 
 .pdg-rt {
   font: 700 12px/1 'Inter', sans-serif;
-  color: rgba(255, 255, 255, .62);
+  color: var(--white-62);
   font-variant-numeric: tabular-nums;
   transition: color .16s ease;
 }
@@ -88,7 +88,7 @@
   grid-column: 1 / -1;
   padding: 18px;
   text-align: center;
-  color: rgba(255, 255, 255, .4);
+  color: var(--white-40);
   font: 500 13px/1.4 'Inter', sans-serif;
 }
 
@@ -104,10 +104,10 @@
   z-index: 9999;
   width: 252px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-10);
   border: 1px solid rgba(255, 255, 255, .16);
   background: #161920;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .5);
+  box-shadow: 0 14px 34px var(--black-50);
   opacity: 0;
   pointer-events: none;
   white-space: normal;
@@ -119,27 +119,27 @@
 .pdg-hc-head {
   display: block;
   font: 700 13px/1.2 'Inter', sans-serif;
-  color: #fff;
+  color: var(--text-100);
 }
 .pdg-hc-vitals {
   display: block;
   margin-top: 2px;
   font: 500 11px/1.3 'Inter', sans-serif;
-  color: rgba(255, 255, 255, .55);
+  color: var(--white-55);
 }
 /* Names what the accent means, so the mark never has to be decoded to be understood. */
 .pdg-hc-develops {
   display: block;
   margin-top: 7px;
   font: 500 11px/1.35 'Inter', sans-serif;
-  color: rgba(255, 255, 255, .5);
+  color: var(--white-50);
 }
 .pdg-hc-develops b {
   display: inline-block;
   margin-left: 3px;
   font: 700 11px/1 'Inter', sans-serif;
   letter-spacing: .06em;
-  color: #F79420;
+  color: var(--text-60);
 }
 
 .pdg-hc-attrs {
@@ -148,7 +148,7 @@
   gap: 4px 18px;
   margin-top: 9px;
   padding-top: 9px;
-  border-top: 1px solid rgba(255, 255, 255, .1);
+  border-top: 1px solid var(--white-10);
 }
 .pdg-hc-attr {
   display: flex;
@@ -164,11 +164,11 @@
 /* One accent, on the CODE only. The value stays white: colour on a rating already means
    how good he is (red / yellow / green / blue by displayed tier), and reusing those hues
    for training efficiency would make the same colour mean two things on the same attribute. */
-.pdg-hc-attr.is-develops b { color: #F79420; }
+.pdg-hc-attr.is-develops b { color: var(--text-87); }
 .pdg-hc-attr i {
   font: 700 12px/1 'Inter', sans-serif;
   font-style: normal;
-  color: #fff;
+  color: var(--text-100);
   font-variant-numeric: tabular-nums;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -186,7 +186,7 @@
 .pdg-layout-table .pdg-av {
   width: 28px;
   height: 28px;
-  border-radius: var(--radius-6);
+  border-radius: var(--radius-6, 6px);
   object-fit: cover;
   text-align: center;
   line-height: 28px;
