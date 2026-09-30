@@ -517,9 +517,9 @@
     }
     var up = isLast
       ? (kind === 'first_archetype'
-        ? '<a class="lnk" href="/coaching-archetypes.html">Explore archetypes</a>'
+        ? '<a class="lnk" href="/coaching-archetypes.html" data-sfx="SFX_SELECT">Explore archetypes</a>'
         : (kind === 'bracket_reveal'
-          ? '<a class="lnk" href="/franchise-command-center.html?tab=tournament-view">Full bracket</a>'
+          ? '<a class="lnk" href="/franchise-command-center.html?tab=tournament-view" data-sfx="SFX_SELECT">Full bracket</a>'
           : ''))
       : 'Up next <b>· ' + esc(LABEL[nextKind] || nextTitle || nextKind || 'Moment') + '</b>';
     var btnLabel = isLast ? 'Done' : 'Next';
@@ -532,13 +532,13 @@
       + '<div class="mm-h">'
       + '<div class="mm-k">' + esc(kick) + '</div>'
       + mq
-      + '<button type="button" class="mm-x" aria-label="Close. Remaining moments wait for your next visit.">×</button>'
+      + '<button type="button" class="mm-x" data-sfx="SFX_SELECT" aria-label="Close. Remaining moments wait for your next visit.">×</button>'
       + '</div>'
       + '<div class="mm-c"><div><h2 class="mm-t" id="mm-t">' + esc(titles.title) + '</h2><p class="mm-d">' + esc(titles.dek) + '</p></div>'
       + bodyFor(kind, payload, opts.maps)
       + '</div>'
       + '<div class="mm-f"><div class="mm-nx">' + up + '</div>'
-      + '<button type="button" class="btn-ghost mm-go">' + esc(btnLabel) + ' <kbd>Enter</kbd></button>'
+      + '<button type="button" class="btn-ghost mm-go" data-sfx="SFX_SELECT">' + esc(btnLabel) + ' <kbd>Enter</kbd></button>'
       + '</div></div>';
 
     document.body.appendChild(wrap);
