@@ -355,6 +355,36 @@ function main() {
     );
   }
 
+  // Desktop: a same-document player drill must land in session before the next
+  // URL rebuild, or CommandCenterTabs.show drops player_id.
+  {
+    const { lib, loc, history, storage } = loadLib({
+      GOB_BUILD_PROFILE: 'desktop',
+      search: '?franchise_id=f1&tab=roster-view',
+    });
+    const ctx = lib.createFranchiseContext({
+      buildProfile: 'desktop',
+      location: loc,
+      history,
+      storage,
+    });
+    assertEqual(ctx.get('player_id'), null, 'no player_id on roster');
+    history.replaceState(null, '', '/franchise-command-center.html?franchise_id=f1&tab=player-view&player_id=p3');
+    assertEqual(ctx.get('player_id'), null, 'session does not see pushState until absorb');
+    ctx.absorbLocation();
+    assertEqual(ctx.get('player_id'), 'p3', 'absorbLocation copies player_id');
+    ctx.setMany({
+      tab: 'player-view',
+      player_id: 'p3',
+      origin: 'team',
+      pager: '',
+    });
+    const bag = ctx.toSearchParams();
+    bag.set('tab', 'player-view');
+    assertEqual(bag.get('player_id'), 'p3', 'rebuild from session keeps player_id');
+    assertEqual(bag.get('pager'), null, 'empty drill keys are dropped');
+  }
+
   console.log(JSON.stringify({ ok: true, resumeKeys: RESUME_KEYS.length }));
 }
 

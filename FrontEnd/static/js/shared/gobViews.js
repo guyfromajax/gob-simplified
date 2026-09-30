@@ -107,8 +107,28 @@
     if (button) button.addEventListener('click', onRetry);
   }
 
+  // Desktop session state is the store. Same-document opens must write drill
+  // keys into it *before* CommandCenterTabs.show rebuilds the URL from session,
+  // or player_id / view_team_id never leave the href.
+  function persistIncoming(url) {
+    if (global.GOB_BUILD_PROFILE !== 'desktop') return;
+    var ctx = global.FranchiseContext;
+    if (!ctx || typeof ctx.parseSearch !== 'function' || typeof ctx.setMany !== 'function') return;
+    var href = String(url || '');
+    var q = href.indexOf('?');
+    var incoming = ctx.parseSearch(q >= 0 ? href.slice(q) : '');
+    var patch = {};
+    var tab = incoming.get('tab');
+    if (tab) patch.tab = tab;
+    DRILL_KEYS.forEach(function (key) {
+      patch[key] = incoming.get(key) || '';
+    });
+    ctx.setMany(patch);
+  }
+
   function open(url, mode) {
     if (!url) return;
+    persistIncoming(url);
     if (mode === 'push' && global.GOBNav && typeof global.GOBNav.pushSection === 'function') {
       global.GOBNav.pushSection(url);
     } else if (global.history && global.history.replaceState) {

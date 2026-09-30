@@ -126,7 +126,13 @@ export function mount(container, ctx) {
   var requestId = 0;
 
   function playerId() {
-    return query().get('player_id') || '';
+    var fromCtx = '';
+    try {
+      if (window.FranchiseContext && typeof window.FranchiseContext.get === 'function') {
+        fromCtx = window.FranchiseContext.get('player_id') || '';
+      }
+    } catch (err) { fromCtx = ''; }
+    return fromCtx || query().get('player_id') || '';
   }
 
   function detailUrl() {
@@ -312,7 +318,7 @@ export function mount(container, ctx) {
     var next = payload || {};
     if (stampOrigin(!!next.is_user_team, 'player-view')) return;
     var stamp = JSON.stringify(next);
-    if (loaded && stamp === signature && query().get('player_id') === String(next.player_id || '')) return;
+    if (loaded && stamp === signature && playerId() === String(next.player_id || '')) return;
     signature = stamp;
     player = next;
     loaded = true;
