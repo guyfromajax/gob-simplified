@@ -380,7 +380,35 @@ async function openOffice(page, data) {
     const root = document.documentElement;
     return root.classList.contains('gob-1280') || root.classList.contains('gob-1920');
   });
-  await page.waitForTimeout(900);
+  // The display font (Bebas Neue Pro) loads async and its metrics change card
+  // heights; the office re-runs its standings fit on document.fonts.ready. Wait on
+  // that real signal (not a guessed timeout) and then until the fit has CONVERGED —
+  // the standings row count stable across several frames — so nothing is measured
+  // mid-reflow. This replaces the old fixed 900ms sleep.
+  await page.evaluate(async () => {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    // A layout signature that captures the async font reflow AND the standings
+    // re-fit: the standings row count plus every column's card edges. Wait until it
+    // holds steady across several frames — the office is then genuinely at rest.
+    const signature = () => {
+      const parts = [];
+      const st = document.querySelector('#office-root .office-st');
+      parts.push(st ? String(st.dataset.standingsShown || '') : 'none');
+      document.querySelectorAll('#office-root .office-col > *').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        parts.push(Math.round(r.top) + ':' + Math.round(r.bottom));
+      });
+      return parts.join('|');
+    };
+    let prev = signature();
+    let stable = 0;
+    for (let i = 0; i < 120 && stable < 5; i += 1) {
+      await frame();
+      const now = signature();
+      if (now === prev) stable += 1; else { stable = 0; prev = now; }
+    }
+  });
 }
 
 const OFFICE_BAD_TEXT = /\[object Object\]|\bNaN\b|\bnull\b|\bundefined\b|N\/A|\{["']?\w+["']?\s*:/;
@@ -707,12 +735,12 @@ test('standings show every conference team by tightening rows before windowing',
       fit.clip.forEach((px) => expect(px, label).toBeLessThanOrEqual(1));
     } else {
       // gob-1280 below 1440x900: the middle column has no room for eight rows, so windowing is the last resort.
-      // Ch7: the single "Since last week" card replaced column 1's two cards; the
-      // 1280x720 window lands at 3 rows (was 4) at the smallest supported size.
-      // Columns still measure identical to before (570px); standings shows all 8 at >= 1440.
+      // Ch8: the middle column's inter-card gap and main padding-bottom were tightened
+      // at 1280 so the fit lands on 4 rows (it had regressed to 3 with the Ch7 weekly
+      // card). Standings still shows all 8 at >= 1440.
       expect(fit.standings.mode, label).toBe('window');
       expect(fit.density, label).toBe('tight');
-      expect(fit.standings.shown, label).toBeGreaterThanOrEqual(size[0] === 1280 ? 3 : 2);
+      expect(fit.standings.shown, label).toBeGreaterThanOrEqual(size[0] === 1280 ? 4 : 2);
       if (size[0] === 1280) expect(fit.mainScroll, label).toBeLessThanOrEqual(1);
     }
   }

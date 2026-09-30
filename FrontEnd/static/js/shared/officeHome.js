@@ -1381,6 +1381,15 @@
         global.requestAnimationFrame(settle);
       });
     }
+    // The display font (Bebas Neue Pro) loads async and its metrics change card
+    // heights, so a settle() during first paint can window the standings one row
+    // short. Re-fit once the font is actually ready (the real signal, not a timeout).
+    var fonts = global.document && global.document.fonts;
+    if (fonts && fonts.ready && typeof fonts.ready.then === 'function') {
+      fonts.ready.then(function () {
+        if (global.document && global.document.contains(root)) settle();
+      });
+    }
     if (countScores) countUp(root);
     // The win sting plays once per result (first showing), at the cue time when the
     // score lands. It follows the audio settings, so it fires under reduced motion

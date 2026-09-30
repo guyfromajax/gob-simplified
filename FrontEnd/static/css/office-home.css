@@ -62,6 +62,12 @@
 
 .gob.gob-1280 .office { gap: 2px; }
 html.gob-shell.gob-office .office-col { gap: var(--dsp-12); }
+/* At 1280 the middle column has to hold This Week + Team snapshot + at least four
+   standings rows. Tighten the Team snapshot card's padding (it has the most slack)
+   so the middle column's content fits four rows within the existing grid-row height
+   — without growing the grid (which would stretch the other columns) or shrinking
+   any type. This buys back the row the Ch7 weekly card cost. */
+html.gob-shell.gob-office.gob-1280 .office-snap { padding-top: var(--dsp-4); padding-bottom: var(--dsp-2); }
 .gob.gob-1280 .office .card { padding-top: 8px; padding-bottom: 8px; }
 .gob.gob-1280 .office-res { gap: 6px; }
 .gob.gob-1280 .office .rs-pts { font-size: var(--fs-28); }

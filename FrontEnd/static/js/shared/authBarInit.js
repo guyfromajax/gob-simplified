@@ -455,6 +455,12 @@ function cloneParams(params) {
       document.body.classList.add('has-auth-bar');
       return;
     }
+    // The auth bar carries its own #alpha-badge. If another init (alphaBanner.js on
+    // the franchise shell) already inserted a standalone badge before this async
+    // script ran, remove it first so the bar's badge is the only one — two
+    // #alpha-badge elements is a duplicate id and breaks getElementById.
+    var strayBadge = document.getElementById('alpha-badge');
+    if (strayBadge && strayBadge.parentNode) strayBadge.parentNode.removeChild(strayBadge);
     var bar = createAuthBarHTML();
     document.body.insertBefore(bar, document.body.firstChild);
     document.body.classList.add('has-auth-bar');
