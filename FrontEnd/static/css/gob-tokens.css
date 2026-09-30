@@ -219,9 +219,11 @@
 --dur-arrive-item:300ms;
 --dur-pop:280ms;
 --dur-count:600ms;
+--dur-gain-sweep:700ms;   /* weekly exceptional-gain marker, once */
 --dur-pulse:1.6s;
 --dur-skeleton:1.4s;
 --delay-arrive-items:320ms;
+--delay-cue:720ms;        /* weekly sound cue = score lands */
 --delay-chips:920ms;
 --delay-chips-calm:560ms;
 --delay-rail-expand:400ms;

@@ -135,7 +135,8 @@ function visitWeekly() {
     moments: items,
     moments_for_this_visit: [],
     weekly_card_items: items,
-    office_digest: Object.assign(digest(), { weekly_card_items: items }),
+    // The card folds the top weekly item into its Also row; the rest expand inline.
+    office_digest: Object.assign(digest(), { weekly_card_items: items, also: items[0] }),
   });
 }
 
@@ -274,18 +275,24 @@ test('three eligible moments show at most two pop-ups; the rest wait for the nex
   await expect.poll(async () => page.evaluate(overlayCount)).toBe(0);
 });
 
-test('the weekly card shows a recruit visit and a bracket update', async ({ page }) => {
+test('the weekly items fold into the card Also row and expand inline', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openOffice(page, visitWeekly());
-  const card = page.locator('#office-root .office-weekly');
+  // The folded moments now live inside the "Since last week" (.wkc) card, not a
+  // separate column-2 card.
+  await expect(page.locator('#office-root .office-weekly')).toHaveCount(0);
+  const card = page.locator('#office-root .wkc');
   await expect(card).toBeVisible();
+  // Top weekly item shows as the Also row; the second expands behind "+1 more".
+  await expect(card.locator('.wkc-also').first()).toContainText('Tournament update');
+  await expect(card.locator('.wkc-also a[href*="tab=tournament-view"]')).toHaveCount(1);
+  const more = card.locator('.wkc-more');
+  await expect(more).toHaveText('+1 more');
+  await expect(card.locator('.wkc-extra')).toBeHidden();
+  await more.click();
+  await expect(card.locator('.wkc-extra')).toBeVisible();
   await expect(card.getByText('Recruit visit')).toBeVisible();
-  await expect(card.getByText('Ellis Clemons is visiting this week.')).toBeVisible();
-  await expect(card.getByText('Tournament update')).toBeVisible();
-  await expect(card.getByText('The tournament bracket moved this week.')).toBeVisible();
-  await expect(card.locator('a.ow-row[href*="recruiting.html"]')).toHaveCount(1);
-  await expect(card.locator('a.ow-row[href*="tab=tournament-view"]')).toHaveCount(1);
-  await expect(card.locator('.card-h')).toHaveCount(0);
+  await expect(card.locator('.wkc-extra a[href*="recruiting.html"]')).toHaveCount(1);
   await page.screenshot({ path: path.join(SHOTS, 'office-weekly-card.png') });
 });
 

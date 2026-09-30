@@ -328,7 +328,7 @@ test('office first load skips state, duplicates, and the 300 KB budget', async (
   }
   expect(bytes).toBeLessThan(300 * 1024);
   console.log('STORE_OFFICE ' + JSON.stringify({ bytes: bytes, requests: keys.length, ms: bootInfo.ms, urls: keys }));
-  await expect(page.locator('#office-root .res-hl')).toHaveText('Week three headline');
+  await expect(page.locator('#office-root .wkc-hl')).toHaveText('Week three headline');
 });
 
 test('session walk revalidates with 304 on the second visit', async ({ page }) => {
@@ -396,7 +396,7 @@ test('session walk revalidates with 304 on the second visit', async ({ page }) =
 async function writeThenOffice(page, url, method, assertText) {
   const state = freshState();
   await boot(page, state);
-  await expect(page.locator('#office-root .res-hl')).toHaveText('Week three headline');
+  await expect(page.locator('#office-root .wkc-hl')).toHaveText('Week three headline');
   const status = await page.evaluate(async function (args) {
     const res = await fetch(args.url, {
       method: args.method,
@@ -416,7 +416,7 @@ async function writeThenOffice(page, url, method, assertText) {
 
 test('training submit shows the new office', async ({ page }) => {
   await writeThenOffice(page, '/franchise/run-training/user', 'POST', {
-    selector: '#office-root .res-hl',
+    selector: '#office-root .wkc-hl',
     text: 'Training filed',
   });
 });
@@ -530,7 +530,7 @@ test('week advance shows the new week', async ({ page }) => {
     return root && root.getAttribute('aria-busy') === 'false';
   });
   await expect(page.locator('#gob-week-value')).toHaveText('Week 4');
-  await expect(page.locator('#office-root .res-hl')).toHaveText('Week advanced');
+  await expect(page.locator('#office-root .wkc-hl')).toHaveText('Week advanced');
 });
 
 test('seen-flag dismiss shows the new wire', async ({ page }) => {
@@ -589,7 +589,7 @@ test('sessionStorage throwing still paints the office', async ({ page }) => {
   const requests = await installStoreServer(page, state);
   await openOffice(page);
   expect(requests.length).toBeGreaterThan(0);
-  await expect(page.locator('#office-root .res-hl')).toHaveText('Week three headline');
+  await expect(page.locator('#office-root .wkc-hl')).toHaveText('Week three headline');
 });
 
 test('two callers share one in-flight request', async ({ page }) => {

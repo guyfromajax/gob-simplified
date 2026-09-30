@@ -571,12 +571,16 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
     await park(page);
     await page.screenshot({ path: path.join(OUT, 'team-attributes-' + size[2] + '.png') });
     await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=home-tab');
-    await page.waitForSelector('#office-root .attr-tile');
-    const chip = await page.locator('#office-root .attr-chip').first().locator('.attr-tile');
+    await page.waitForSelector('#office-root .wkc .gc .attr-tile');
+    // Wait for the density class so the --fs-* tokens the chip font uses are resolved
+    // (without it the font shorthand falls back and the sizes read as browser defaults).
+    await page.waitForFunction(() => /gob-1280|gob-1920/.test(document.documentElement.className));
+    // Ch7 weekly card: training chips are .gc (code in <b>, value in the shared .attr-tile).
+    const chip = await page.locator('#office-root .wkc .gn .gc').first().locator('.attr-tile');
     await expect(chip).toHaveClass(/is-mid/);
     await expect(chip.locator('s')).toHaveText('5');
-    const chipType = await page.locator('#office-root .attr-chip').first().evaluate((node) => {
-      const code = getComputedStyle(node.querySelector('.attr-code'));
+    const chipType = await page.locator('#office-root .wkc .gn .gc').first().evaluate((node) => {
+      const code = getComputedStyle(node.querySelector('b'));
       const digit = getComputedStyle(node.querySelector('.attr-tile s'));
       return {
         code: parseFloat(code.fontSize),

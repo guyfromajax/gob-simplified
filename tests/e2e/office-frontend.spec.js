@@ -436,12 +436,12 @@ async function assertWireRows(page) {
 }
 
 async function assertMonograms(page) {
-  expect(await page.locator('#office-root .office-res .logo, #office-root .office-next .logo').count()).toBe(0);
+  expect(await page.locator('#office-root .wkc .logo, #office-root .office-next .logo').count()).toBe(0);
 }
 
 async function assertLabelsFit(page) {
   const clipped = await page.evaluate(() => {
-    return [...document.querySelectorAll('#office-root .rs-n, #office-root .wk-step .td-l')]
+    return [...document.querySelectorAll('#office-root .sb2-n span, #office-root .wk-step .td-l')]
       .filter((node) => node.scrollWidth > node.clientWidth + 1)
       .map((node) => node.textContent.trim());
   });
@@ -450,10 +450,10 @@ async function assertLabelsFit(page) {
 
 async function assertChipSize(page) {
   const sizes = await page.evaluate(() => {
-    const row = document.querySelector('#office-root .mv-p');
+    const row = document.querySelector('#office-root .wkc .gn');
     if (!row) return null;
     const name = row.querySelector('.nm');
-    const code = row.querySelector('.attr-code');
+    const code = row.querySelector('.gc b');
     if (!name || !code) return null;
     return {
       name: parseFloat(getComputedStyle(name).fontSize),
@@ -483,7 +483,7 @@ async function assertHeadersClear(page) {
   const overlap = await page.evaluate(() => {
     return [...document.querySelectorAll('#office-root .office-col')].map((col) => {
       const head = col.querySelector('.office-h');
-      const card = col.querySelector('.card');
+      const card = col.querySelector('.card, .wkc');
       if (!head || !card) return null;
       const gap = card.getBoundingClientRect().top - head.getBoundingClientRect().bottom;
       return Math.round(gap * 10) / 10;
@@ -570,11 +570,11 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         expect(await page.locator('#office-root').getByText('stars', { exact: false }).count()).toBe(0);
       }
       if (name === 'loss') {
-        expect(await page.locator('#office-root .office-res.is-loss').count()).toBe(1);
-        expect(await page.locator('#office-root .res-hl').count()).toBe(0);
+        expect(await page.locator('#office-root .wkc.is-loss').count()).toBe(1);
+        expect(await page.locator('#office-root .wkc-hl').count()).toBe(0);
       }
       if (name === 'win') {
-        expect(await page.locator('#office-root .res-hl').count()).toBe(1);
+        expect(await page.locator('#office-root .wkc-hl').count()).toBe(1);
         expect(await page.locator('#office-root').getByText('Team RT').count()).toBe(0);
         expect(await page.locator('#office-root .five').count()).toBe(0);
       }
@@ -587,11 +587,12 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         await expect(page.locator('#office-root .wr-empty')).toHaveText('Opens with the invite period');
       }
       if (name !== 'first_week') {
-        await expect(page.locator('#office-root .rs-n').first()).toContainText('Amariabi International');
-        await expect(page.locator('#office-root .rs-n').nth(1)).toContainText('Long Island Methodist');
+        await expect(page.locator('#office-root .sb2-n span').first()).toContainText('Amariabi International');
+        await expect(page.locator('#office-root .sb2-n span').nth(1)).toContainText('Long Island Methodist');
       }
       if (name === 'regular') {
-        expect(await page.locator('#office-root .mv-cell .chip').count()).toBe(0);
+        // The weekly card's deltas are neutral: no green/red delta chips.
+        expect(await page.locator('#office-root .wkc .chip').count()).toBe(0);
       }
       await assertHeadingGap(page);
       if (name !== 'signing_day' && name !== 'first_week') await assertWireRows(page);
@@ -706,9 +707,12 @@ test('standings show every conference team by tightening rows before windowing',
       fit.clip.forEach((px) => expect(px, label).toBeLessThanOrEqual(1));
     } else {
       // gob-1280 below 1440x900: the middle column has no room for eight rows, so windowing is the last resort.
+      // Ch7: the single "Since last week" card replaced column 1's two cards; the
+      // 1280x720 window lands at 3 rows (was 4) at the smallest supported size.
+      // Columns still measure identical to before (570px); standings shows all 8 at >= 1440.
       expect(fit.standings.mode, label).toBe('window');
       expect(fit.density, label).toBe('tight');
-      expect(fit.standings.shown, label).toBeGreaterThanOrEqual(size[0] === 1280 ? 4 : 2);
+      expect(fit.standings.shown, label).toBeGreaterThanOrEqual(size[0] === 1280 ? 3 : 2);
       if (size[0] === 1280) expect(fit.mainScroll, label).toBeLessThanOrEqual(1);
     }
   }
@@ -837,8 +841,9 @@ test('live mid-season digest', async ({ page }) => {
       ((await page.locator('#play-now').textContent()) || '').trim()
     );
     if (size[2] === '1920') {
-      await expect(page.locator('#office-root .pg-extra')).toContainText('20');
-      await expect(page.locator('#office-root .pg-extra')).not.toContainText('1237');
+      // The weekly card shows PTS/REB/AST only (Ch7 decision 18); no FG/3PT/MIN line.
+      await expect(page.locator('#office-root .wkc .pg2-l')).toBeVisible();
+      await expect(page.locator('#office-root .pg-extra')).toHaveCount(0);
     }
     const numbers = await measure(page);
     expect(numbers.mainScroll, 'live ' + size[2] + ' vertical').toBeLessThanOrEqual(1);
@@ -918,43 +923,45 @@ test('attribute chips group, order, and cap', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openOffice(page, data);
   await assertOfficeText(page);
-  expect(await page.locator('#office-root .mv-cell .chip').count()).toBe(0);
-  const rows = await page.locator('#office-root .mv-p').evaluateAll((nodes) => nodes.map((node) => ({
+  // Training rows are .gn; the weekly card caps them at 3 (1280) / 5 (1920).
+  const rows = await page.locator('#office-root .wkc .gn').evaluateAll((nodes) => nodes.map((node) => ({
     id: node.dataset.playerId,
-    chips: [...node.querySelectorAll('.attr-chip')].map((chip) => ({
-      code: chip.querySelector('.attr-code').textContent,
+    chips: [...node.querySelectorAll('.gc')].map((chip) => ({
+      code: chip.querySelector('b').textContent,
       value: chip.querySelector('.attr-tile s').textContent,
       tier: chip.querySelector('.attr-tile').className,
       title: chip.getAttribute('title'),
-      dir: chip.querySelector('.arr').classList.contains('up') ? 'up' : 'down',
+      dir: chip.classList.contains('dn') ? 'down' : 'up',
       text: chip.textContent,
     })),
   })));
-  expect(rows.map((row) => row.id)).toEqual(['p-amy', 'p-eve', 'p-cal', 'p-bob', 'p-dee']);
+  // 6 players changed; the three biggest movers show, ordered by total then name.
+  expect(rows.map((row) => row.id)).toEqual(['p-amy', 'p-eve', 'p-cal']);
   expect(rows[0].chips.map((chip) => chip.code + chip.dir + chip.value)).toEqual(['BHup5', 'NDdown7']);
   expect(rows[0].chips[0].title).toBe('Ball Handling');
   expect(rows[0].chips[0].tier).toContain('is-mid');
   expect(rows[0].chips[1].tier).toContain('is-hi');
   expect(rows[0].chips[0].text).not.toContain('3');
   expect(rows[1].chips.map((chip) => chip.dir)).toEqual(['up', 'down']);
-  await expect(page.locator('#office-root .office-mv .lnk')).toHaveText(/All changes/);
-  const href = await page.locator('#office-root .office-mv .lnk').getAttribute('href');
+  // The card always carries "All changes -> " (Ch7 decision 18).
+  await expect(page.locator('#office-root .wkc-f .lnk')).toHaveText(/All changes/);
+  const href = await page.locator('#office-root .wkc-f .lnk').getAttribute('href');
   expect(href).toContain('/franchise-command-center.html');
   expect(href).toContain('tab=training-report-view');
   expect(href).toContain('origin=office');
   expect(href).toContain('week=21');
-  const nameHref = await page.locator('#office-root .mv-p[data-player-id="p-amy"] .nm').getAttribute('href');
+  const nameHref = await page.locator('#office-root .wkc .gn[data-player-id="p-amy"] .nm').getAttribute('href');
   expect(nameHref).toContain('/franchise-command-center.html');
   expect(nameHref).toContain('tab=player-view');
   expect(nameHref).toContain('player_id=p-amy');
   await page.setViewportSize({ width: 1920, height: 1080 });
   await openOffice(page, data);
-  expect(await page.locator('#office-root .mv-p').count()).toBe(6);
-  expect(await page.locator('#office-root .office-mv .lnk').count()).toBe(0);
+  expect(await page.locator('#office-root .wkc .gn').count()).toBe(5);
+  await expect(page.locator('#office-root .wkc-f .lnk')).toHaveText(/All changes/);
   const edge = await page.evaluate(() => {
-    const row = document.querySelector('#office-root .mv-p');
-    const card = row.closest('.card');
-    const chips = row.querySelectorAll('.attr-chip');
+    const row = document.querySelector('#office-root .wkc .gn');
+    const card = row.closest('.wkc');
+    const chips = row.querySelectorAll('.gc');
     const chip = chips[chips.length - 1];
     const style = getComputedStyle(card);
     const contentRight = card.getBoundingClientRect().right - parseFloat(style.paddingRight);
@@ -998,7 +1005,7 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   expect(rankStyle.text).toBe('21. Crickstown');
   await expect(page.locator('#office-root .nx-sub')).toContainText('Conference A2 (2 of 8)');
   await expect(page.locator('#office-root .nx-sub')).not.toContainText('Week');
-  await expect(page.locator('#office-root .rs-n').first()).toContainText('#18');
+  await expect(page.locator('#office-root .sb2-n').first()).toContainText('#18');
   await expect(page.locator('#office-root .office-h').nth(1)).toHaveText(/This Week/);
   const heading = page.locator('#office-root .office-col').nth(2).locator('.col-link');
   await expect(heading).toHaveAttribute('href', /recruiting\.html/);
@@ -1118,7 +1125,7 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   expect(count1440).toBe(8);
   expect(await page.locator('#office-root .office-st .card-h .st-more').count()).toBe(mode1440 === 'compact' ? 1 : 0);
   const typeStep = await page.evaluate(() => {
-    const title = document.querySelector('#office-root .office-mv h3');
+    const title = document.querySelector('#office-root .card-h h3');
     const body = document.querySelector('#office-root .sn-l');
     const heading = document.querySelector('#office-root .office-h h2');
     const emoji = document.querySelector('#office-root .att-emoji');
