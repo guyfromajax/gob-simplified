@@ -9,16 +9,16 @@ import logging
 from BackEnd.loopback_env import is_loopback
 from BackEnd.runtime_paths import bundle_path
 
-# Sentry - init before FastAPI (captures unhandled exceptions)
-_sentry_dsn = os.getenv("SENTRY_DSN")
-if _sentry_dsn and not is_loopback():
-    import sentry_sdk
-    sentry_sdk.init(
-        dsn=_sentry_dsn,
-        traces_sample_rate=0.1,
-        send_default_pii=True,
-        environment=os.getenv("RAILWAY_ENVIRONMENT", os.getenv("ENV", "development")),
-    )
+# Sentry - init before FastAPI (captures unhandled exceptions). Private (no PII,
+# scrubbed), tagged with environment + release, desktop off unless opted in.
+# See BackEnd/utils/observability.py.
+from BackEnd.utils.observability import (
+    init_sentry as _init_sentry,
+    sentry_environment as _sentry_environment,
+    sentry_release as _sentry_release,
+)
+
+if _init_sentry():
     print("🔶 [SENTRY] Backend error tracking enabled", file=sys.stderr, flush=True)
 
 
@@ -428,6 +428,9 @@ try:
             "alphaDisclaimer": "This is an alpha release. Data may be wiped without notice. Gameplay balance and features may change." if IS_ALPHA else None,
             "version": "alpha-1.0" if IS_ALPHA else "1.0",
             "sentryDsn": os.getenv("SENTRY_DSN_FRONTEND") or None,
+            # For the browser SDK to tag events like the backend does.
+            "sentryEnvironment": _sentry_environment(),
+            "release": _sentry_release(),
             # Authoring only — existing TB overlays still resolve when false.
             "teamBuilderEnabled": team_builder_enabled(),
         }
@@ -517,7 +520,7 @@ try:
 
             install_default_rate_limit(
                 app,
-                exempt=(_liveness.health_check, _liveness.health_check_head),
+                exempt=(_liveness.health_check, _liveness.health_check_head, _liveness.health_ready),
             )
             print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
         except Exception as e:
@@ -796,6 +799,18 @@ try:
         except Exception as e:
             print(f"⚠️ [WARNING] startup_event: Could not check MongoDB config: {e}", file=sys.stderr, flush=True)
             # Don't crash startup - MongoDB might connect later
+
+        # Readiness (/health/ready): startup finished; the endpoint pings the DB per request.
+        def _ready_ping():
+            conn = getattr(_store, "_conn", None)
+            if conn is not None:  # desktop SQLite store
+                with _store._lock:
+                    conn.execute("SELECT 1").fetchone()
+                return
+            _store.client.admin.command("ping")
+
+        from BackEnd.api._bootstrap import mark_startup_complete
+        mark_startup_complete(_ready_ping)
     
     class SimulationRequest(BaseModel):
         home_team: str

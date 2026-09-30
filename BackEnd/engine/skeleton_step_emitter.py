@@ -1818,7 +1818,10 @@ def build_skeleton_animation_steps(
                         _last_step_next = _last_step_end.get("next")
                         if isinstance(_last_step_ball, dict):
                             _last_step_ball_owner = _last_step_ball.get("owner_player_id")
-                _hco_entry_log.error(
+                # WARNING, not ERROR: fires ~10x per HEALTHY game (119 in 12 healthy
+                # games, reports/observability-2026-09-30.md). At ERROR the Sentry logging
+                # integration turned each one into an event. The HCO entry recovers below.
+                _hco_entry_log.warning(
                     "❌❌❌ [HCO ENTRY BUG] current_bh_id is None — prior turn "
                     "failed to stamp a final ball handler. step0_bh=%s "
                     "prior_turn.result_type=%s prior_turn.current_turn=%s "
