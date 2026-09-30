@@ -202,6 +202,12 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
   await expect(page.locator('#training-report-view')).toContainText('Four Corners');
   await expect(page.locator('#training-report-view')).toContainText('Roger Henrich');
   await expect(page.locator('#training-report-view')).toContainText('P/T Defense Readiness');
+  await expect(page.locator('#training-report-view #team-attributes-grid')).not.toContainText('Momentum');
+  const nitShots = path.join(__dirname, '../../reports/training-report-no-momentum');
+  fs.mkdirSync(nitShots, { recursive: true });
+  await page.locator('#training-report-view .team-section').screenshot({
+    path: path.join(nitShots, 'team-report-after-1280.png'),
+  });
   await expect(page.getByRole('button', { name: '← Back', exact: true })).toBeVisible();
   await expect(page.locator('#gob-subtabs .tb[data-tab="training-view"][aria-selected="true"]')).toHaveCount(0);
   await expect(page.locator('html')).not.toHaveClass(/gob-office/);

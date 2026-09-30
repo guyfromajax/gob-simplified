@@ -10,10 +10,19 @@ const FID = FIXTURE.franchise_id;
 const TEAM = 'Lancaster';
 const OUT = path.join(__dirname, '../../reports/prep-modules-playbooks');
 const BEFORE_PATH = path.join(OUT, 'before-metrics.json');
+const FIXTURE_BEFORE_PATH = path.join(__dirname, 'fixtures/playbooks-before-metrics.json');
 const CAPTURE_BEFORE = process.env.PLAYBOOKS_BEFORE === '1';
-const BEFORE = CAPTURE_BEFORE || !fs.existsSync(BEFORE_PATH)
-  ? null
-  : JSON.parse(fs.readFileSync(BEFORE_PATH, 'utf8'));
+function loadBeforeMetrics() {
+  if (CAPTURE_BEFORE) return null;
+  if (fs.existsSync(FIXTURE_BEFORE_PATH)) {
+    return JSON.parse(fs.readFileSync(FIXTURE_BEFORE_PATH, 'utf8'));
+  }
+  if (fs.existsSync(BEFORE_PATH)) {
+    return JSON.parse(fs.readFileSync(BEFORE_PATH, 'utf8'));
+  }
+  return null;
+}
+const BEFORE = loadBeforeMetrics();
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -192,7 +201,6 @@ test('in-app 1280 / 1920 shots and geometry', async ({ page }) => {
   expect(metrics1280.liveCount).toBe(0);
   expect(metrics1280.lockVisible).toBe(true);
   expect(metrics1280.divider).not.toBe('none');
-  if (!BEFORE) return;
   expect(metrics1280.tracks.length).toBe(BEFORE.inApp1280.tracks.length);
   metrics1280.tracks.forEach((track, i) => {
     expect(Math.abs(track.x - BEFORE.inApp1280.tracks[i].x)).toBeLessThanOrEqual(2);
