@@ -81,7 +81,7 @@ Code must work on both Mongo (hosted) and SQLite (desktop).
 - **Gate B:** don't add `URLSearchParams` / `location.search` / `.searchParams` reads for franchise identity (`franchise_id`, `team_id`, `runtime`, `game_id`, ...) outside `FrontEnd/static/js/shared/franchiseContext.js`. Read `window.FranchiseContext`, which is also correct on desktop.
 - **Never run `--write-allowlist` to paper over a new violation** without Jamie's approval. It is only for tightening after a real removal.
 
-`scripts/check_ui_tokens.py --strict --no-write` runs in the same workflow as a sibling job. It fails when a **new-design** file has a colour-law hit off the allow-list. Legacy hits are reported and do not fail the gate. CI must not write or commit `reports/ui-token-audit-*.md` (`--no-write`).
+`scripts/check_ui_tokens.py --strict --no-write` runs in the same workflow as a sibling job. It fails when a **new-design** file has a colour-law hit off the allow-list. Legacy hits are reported and do not fail the gate. CI must not write or commit `reports/ui-token-audit-*.md` (`--no-write`). The same script freezes `franchise-command-center.css`: no new rules (put new styles in the view's own CSS). It fails if that file's style-rule count or line count grows past `FCC_CSS_MAX_RULES` / `FCC_CSS_MAX_LINES`.
 
 ## Don't commit
 
