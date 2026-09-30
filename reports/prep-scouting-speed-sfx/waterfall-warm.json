@@ -1,0 +1,663 @@
+{
+  "label": "warm",
+  "seed": {
+    "fid": "6abcf566b088ab970518af75",
+    "tid": ""
+  },
+  "runs": {
+    "desktop": [
+      {
+        "painted": 20,
+        "breakdown": {
+          "painted": 20,
+          "pwAttached": 15,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 898.0999999642372,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 4
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 17,
+        "breakdown": {
+          "painted": 17,
+          "pwAttached": 8,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 870.8000000119209,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 4
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 17,
+        "breakdown": {
+          "painted": 17,
+          "pwAttached": 7,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 861.1000000238419,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 4
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 17,
+        "breakdown": {
+          "painted": 17,
+          "pwAttached": 5,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 875.7999999523163,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 4
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 17,
+        "breakdown": {
+          "painted": 17,
+          "pwAttached": 6,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 889.5,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 4
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      }
+    ],
+    "online": [
+      {
+        "painted": 17,
+        "breakdown": {
+          "painted": 17,
+          "pwAttached": 10,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 866.3999999761581,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 4
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 4
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 17,
+        "breakdown": {
+          "painted": 17,
+          "pwAttached": 8,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 918,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 4
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 4
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 17,
+        "breakdown": {
+          "painted": 17,
+          "pwAttached": 12,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 919.0999999642372,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 4
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 4
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 16,
+        "breakdown": {
+          "painted": 16,
+          "pwAttached": 9,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 856.8999999761581,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 4
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 18,
+        "breakdown": {
+          "painted": 18,
+          "pwAttached": 11,
+          "warm": true,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 910.1000000238419,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-cache-hit",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 3
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 4
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 5
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      }
+    ]
+  }
+}

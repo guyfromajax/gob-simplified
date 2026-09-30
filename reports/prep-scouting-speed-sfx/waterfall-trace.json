@@ -1,0 +1,103 @@
+{
+  "label": "trace",
+  "seed": {
+    "fid": "6abcf4da99f0f53fb6d7d6ae",
+    "tid": ""
+  },
+  "runs": {
+    "desktop": [
+      {
+        "painted": 821,
+        "breakdown": {
+          "clicked": 27,
+          "attached": 817,
+          "painted": 821,
+          "trace": {
+            "page": {
+              "t0": 662.1000000238419,
+              "marks": [
+                {
+                  "t": 25,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 29,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ],
+              "oppN": 396
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 29
+              },
+              {
+                "name": "scouting-load",
+                "t": 29
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 385
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 386
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      }
+    ],
+    "online": [
+      {
+        "painted": 821,
+        "breakdown": {
+          "clicked": 23,
+          "attached": 815,
+          "painted": 821,
+          "trace": {
+            "page": {
+              "t0": 604,
+              "marks": [
+                {
+                  "t": 22,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 28,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ],
+              "oppN": 452
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 28
+              },
+              {
+                "name": "scouting-load",
+                "t": 28
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 441
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 442
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      }
+    ]
+  }
+}

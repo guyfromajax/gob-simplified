@@ -339,7 +339,16 @@ function renderUsageTable(tbodyId, plays, emptyMessage) {
   tbody.innerHTML = '<tr><td colspan="4" class="empty-td">' + esc(emptyMessage) + '</td></tr>';
 }
 
+function mark(name) {
+  try {
+    if (typeof performance !== 'undefined' && performance.mark) {
+      performance.mark(name);
+    }
+  } catch (err) { /* mark optional */ }
+}
+
 export function mount(container, ctx) {
+  mark('scouting-mount');
   CSS.forEach(ensureCss);
   var franchiseId = franchiseIdFrom(ctx);
   var userTeamId = userTeamIdFrom(ctx);
@@ -467,6 +476,7 @@ export function mount(container, ctx) {
   }
 
   function paintReady(opponent, teamData, playUsage) {
+    mark('scouting-paint-start');
     cache.teamAttrs = (teamData && teamData.team_attributes) || {};
     cache.measures = (teamData && teamData.measures) || [];
     cache.projected = (playUsage && playUsage.projected_starting_five) || [];
@@ -543,6 +553,7 @@ export function mount(container, ctx) {
     statusEl.hidden = true;
     readyEl.hidden = false;
     container.querySelector('.pv').setAttribute('data-state', 'ready');
+    mark('scouting-paint-done');
   }
 
   function load() {
@@ -550,13 +561,23 @@ export function mount(container, ctx) {
     // script loads and both fetches resolve left the panel empty for several frames.
     // Once something is painted it stays up, and the data is swapped in place below only
     // if it actually changed.
+    mark('scouting-load');
     if (!painted) setStatus('Loading scouting report…');
     var scriptsP = Promise.all([
       loadScript('/js/utils/attributeDisplay.js'),
       loadScript('/js/shared/scoutingReport.js'),
       loadScript('/js/shared/playerYear.js')
-    ]);
-    var dataP = waitFcc().then(resolveOpponent).then(fetchReport);
+    ]).then(function (v) { mark('scouting-scripts'); return v; });
+    var dataP = waitFcc().then(function (v) { mark('scouting-fcc'); return v; })
+      .then(resolveOpponent).then(function (opp) { mark('scouting-opp'); return opp; })
+      .then(function (opponent) {
+        var store = reportStore();
+        var key = reportCacheKey(franchiseId, opponent);
+        if (store.cache[key]) mark('scouting-cache-hit');
+        else if (store.inflight[key]) mark('scouting-inflight-join');
+        else mark('scouting-fetch-start');
+        return fetchReport(opponent);
+      }).then(function (v) { mark('scouting-data'); return v; });
     return Promise.all([scriptsP, dataP])
       .then(function (pair) {
         var data = pair[1] || {};

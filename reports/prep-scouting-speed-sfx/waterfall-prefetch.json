@@ -1,0 +1,663 @@
+{
+  "label": "prefetch",
+  "seed": {
+    "fid": "6abcf5779e86174a35e9d515",
+    "tid": ""
+  },
+  "runs": {
+    "desktop": [
+      {
+        "painted": 278,
+        "breakdown": {
+          "painted": 278,
+          "pwAttached": 5,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 589.6999999880791,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 2,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 2
+              },
+              {
+                "name": "scouting-load",
+                "t": 2
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 2
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 2
+              },
+              {
+                "name": "scouting-opp",
+                "t": 2
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 2
+              },
+              {
+                "name": "scouting-data",
+                "t": 266
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 267
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 267
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 357,
+        "breakdown": {
+          "painted": 357,
+          "pwAttached": 5,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 509.80000001192093,
+              "marks": [
+                {
+                  "t": 0,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 2,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 2
+              },
+              {
+                "name": "scouting-load",
+                "t": 2
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 2
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 2
+              },
+              {
+                "name": "scouting-opp",
+                "t": 2
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 2
+              },
+              {
+                "name": "scouting-data",
+                "t": 344
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 344
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 345
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 311,
+        "breakdown": {
+          "painted": 311,
+          "pwAttached": 5,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 603.8999999761581,
+              "marks": [
+                {
+                  "t": 0,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 2,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 2
+              },
+              {
+                "name": "scouting-load",
+                "t": 2
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 2
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 2
+              },
+              {
+                "name": "scouting-opp",
+                "t": 2
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 2
+              },
+              {
+                "name": "scouting-data",
+                "t": 299
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 299
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 300
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 313,
+        "breakdown": {
+          "painted": 313,
+          "pwAttached": 5,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 560.0999999642372,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 2,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 1
+              },
+              {
+                "name": "scouting-load",
+                "t": 2
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 2
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 2
+              },
+              {
+                "name": "scouting-opp",
+                "t": 2
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 2
+              },
+              {
+                "name": "scouting-data",
+                "t": 301
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 301
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 302
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 335,
+        "breakdown": {
+          "painted": 335,
+          "pwAttached": 7,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 560,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 2,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 2
+              },
+              {
+                "name": "scouting-load",
+                "t": 2
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 2
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 2
+              },
+              {
+                "name": "scouting-opp",
+                "t": 2
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 2
+              },
+              {
+                "name": "scouting-data",
+                "t": 322
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 322
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 323
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      }
+    ],
+    "online": [
+      {
+        "painted": 287,
+        "breakdown": {
+          "painted": 287,
+          "pwAttached": 5,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 603.1999999880791,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 2,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 2
+              },
+              {
+                "name": "scouting-load",
+                "t": 2
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 2
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 2
+              },
+              {
+                "name": "scouting-opp",
+                "t": 2
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 2
+              },
+              {
+                "name": "scouting-data",
+                "t": 275
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 275
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 276
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 389,
+        "breakdown": {
+          "painted": 389,
+          "pwAttached": 9,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 545.5,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 2,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 2
+              },
+              {
+                "name": "scouting-load",
+                "t": 2
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 2
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 2
+              },
+              {
+                "name": "scouting-opp",
+                "t": 2
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 2
+              },
+              {
+                "name": "scouting-data",
+                "t": 376
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 376
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 377
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 338,
+        "breakdown": {
+          "painted": 338,
+          "pwAttached": 6,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 548.3000000119209,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 3,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 3
+              },
+              {
+                "name": "scouting-load",
+                "t": 3
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 3
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 3
+              },
+              {
+                "name": "scouting-opp",
+                "t": 3
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 3
+              },
+              {
+                "name": "scouting-data",
+                "t": 325
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 325
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 326
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 328,
+        "breakdown": {
+          "painted": 328,
+          "pwAttached": 4,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 552.6999999880791,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 2,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 2
+              },
+              {
+                "name": "scouting-load",
+                "t": 2
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 2
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 2
+              },
+              {
+                "name": "scouting-opp",
+                "t": 2
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 2
+              },
+              {
+                "name": "scouting-data",
+                "t": 316
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 317
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 317
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      },
+      {
+        "painted": 371,
+        "breakdown": {
+          "painted": 371,
+          "pwAttached": 5,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 553,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 2,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 2
+              },
+              {
+                "name": "scouting-load",
+                "t": 2
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 2
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 2
+              },
+              {
+                "name": "scouting-opp",
+                "t": 2
+              },
+              {
+                "name": "scouting-inflight-join",
+                "t": 2
+              },
+              {
+                "name": "scouting-data",
+                "t": 358
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 359
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 360
+              }
+            ]
+          }
+        },
+        "waterfall": []
+      }
+    ]
+  }
+}
