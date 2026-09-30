@@ -370,9 +370,13 @@ def reconcile_region_tournaments_with_canonical(
     for r in REGION_LETTERS:
         ex_orig = existing.get(r)
         fr = fresh.get(r) or {}
+        # A replacement counts as a change only when it differs from what is saved:
+        # a canonical bracket can itself carry placeholder slots, so "incomplete"
+        # alone would rewrite the same blob on every call.
         if not ex_orig:
             out[r] = deepcopy(fr)
-            changed = True
+            if ex_orig != fr:
+                changed = True
             continue
         ex = deepcopy(ex_orig)
         if _region_tournament_fully_unplayed(ex):
@@ -382,7 +386,8 @@ def reconcile_region_tournaments_with_canonical(
             len_mismatch = len(ex.get("round1") or []) != len(fr.get("round1") or [])
             if r1_inc or fin_inc or len_mismatch:
                 out[r] = deepcopy(fr)
-                changed = True
+                if ex != fr:
+                    changed = True
                 continue
         merged, slot_changed = _merge_region_slots_from_canonical(ex, fr)
         out[r] = merged

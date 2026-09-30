@@ -62,7 +62,7 @@ The franchise EOG flow for the user's game (driven by `FrontEnd/static/js/phaser
 Notes on the other paths and modes:
 
 - **Scrimmages:** the game doc (with box score) is saved normally, but `finalize_game(mode="scrimmage")` is an explicit no-op — no season/career aggregation.
-- **`/franchise/save-result`** is an alternate endpoint (tournament-pattern) that performs the same steps as phase A's user-game handling — result row, box_score verification, `finalize_game`, archetype check, team attributes. The current frontend flow uses phase A.
+- **`/franchise/save-result`** (a legacy alternate to phase A with no caller) was removed 2026-09-30. Phase A is the only user-game save path.
 
 ## 5. Season/Career Rollup — `stat_updater.finalize_game` (franchise branch)
 
