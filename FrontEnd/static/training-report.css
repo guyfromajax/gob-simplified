@@ -1706,12 +1706,19 @@ body.training-report-page {
 }
 
 #training-report-view .report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-12);
   padding: 0 0 var(--dsp-16);
   background: transparent;
   box-shadow: none;
   border: 0;
 }
-#training-report-view .page-title {
+#training-report-view .page-title,
+#training-report-view .report-header .page-title {
+  display: block;
+  margin: 0 0 var(--dsp-6);
   font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
   color: var(--text-100);
 }
@@ -1862,7 +1869,10 @@ body.training-report-page {
   height: var(--dsz-30);
   margin: 0 0 var(--dsp-10);
 }
-#training-report-view .report-header .page-title { display: none; }
+#training-report-view #locker-room-btn {
+  align-self: flex-start;
+  flex: none;
+}
 #training-report-view .toggle-btn,
 #training-report-view .toggle-btn.active {
   min-height: var(--dsz-28);

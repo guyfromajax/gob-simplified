@@ -247,9 +247,9 @@ test('training, training report, and scouting toggles use SFX_SELECT', async ({ 
     const overlay = document.getElementById('page-load-overlay');
     return !overlay || getComputedStyle(overlay).display === 'none';
   });
-  await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#training-view .ps').first()).toBeVisible({ timeout: 30000 });
   const slider = page.locator('input[type="range"].slider').first();
-  await expect(slider).toBeVisible();
+  await expect(slider).toBeAttached();
   await armSpy(page);
   await slider.evaluate((el) => {
     el.value = String(Math.min(Number(el.max || 4), Number(el.value) + 1));

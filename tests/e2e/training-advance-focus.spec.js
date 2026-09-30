@@ -251,7 +251,21 @@ async function expectHeaderVisible(page) {
 
 async function capturePage(page, dest) {
   await resetScroll(page);
-  await page.screenshot({ path: dest });
+  const host = new URL(page.url()).pathname;
+  if (host === '/training.html' || host === '/training-report.html') {
+    await page.waitForFunction(() => {
+      if (!document.documentElement.classList.contains('gob-focus')) return false;
+      if (document.querySelector('nav.rail')) return false;
+      if (document.getElementById('play-now')) return false;
+      if ((document.body.innerText || '').includes('STARTING')) return false;
+      return true;
+    });
+  }
+  await page.evaluate(() => document.fonts && document.fonts.ready);
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+  await page.screenshot({ path: dest, animations: 'disabled' });
 }
 
 function fccQuery(tab) {
@@ -353,7 +367,7 @@ test('a) training week Advance → focus → allocate → Submit → Report → 
   await waitOverlay(page);
   await expect(page.locator('#back-btn')).toHaveText('Back to Locker Room');
   await expect(page.locator('#submit-btn')).toHaveText('Submit Training');
-  await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#training-view .ps').first()).toBeVisible({ timeout: 30000 });
   await expect(page.locator('#player-dev-section')).toBeHidden();
   const focusLook = await page.evaluate(() => {
     const header = document.querySelector('#training-view .training-header');
@@ -368,17 +382,52 @@ test('a) training week Advance → focus → allocate → Submit → Report → 
       const name = (el.getAttribute('aria-label') || el.title || el.textContent || '').replace(/\s+/g, '');
       return !name.length;
     }).map((el) => el.id || el.className);
+    const rows = [...document.querySelectorAll('#training-view .slider-label')];
+    const rowControls = rows.map((row) => {
+      const range = row.querySelector('input[type=range]');
+      const pips = row.querySelector('.ps');
+      const box = (el) => {
+        if (!el) return { visible: false, w: 0 };
+        const s = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        const clipped = s.clipPath && s.clipPath !== 'none';
+        const tiny = r.width <= 2 && r.height <= 2;
+        return {
+          visible: s.display !== 'none' && s.visibility !== 'hidden' && r.width > 8 && r.height > 4 && !clipped && !tiny,
+          w: r.width,
+        };
+      };
+      return { range: box(range), pips: box(pips) };
+    });
+    const fb = [...document.querySelectorAll('#training-view .label-text')].find((el) =>
+      (el.textContent || '').includes('Fast Break Defense'));
+    const coaching = document.querySelector('#training-view h2.coaching-title');
+    const cs = coaching ? getComputedStyle(coaching) : null;
     return {
       host: !!document.getElementById('training-view'),
       headerBgImage: hs ? hs.backgroundImage : '',
       noteDisplay: ns ? ns.display : '',
       emptyButtons: empty,
+      rowControls,
+      fbLabel: fb ? (fb.textContent || '').replace(/\s+/g, ' ').trim() : '',
+      fbOverflow: fb ? getComputedStyle(fb).overflow : '',
+      coachingAlign: cs ? cs.textAlign : '',
     };
   });
   expect(focusLook.host, JSON.stringify(focusLook)).toBe(true);
   expect(focusLook.headerBgImage, JSON.stringify(focusLook)).toBe('none');
   expect(focusLook.noteDisplay, JSON.stringify(focusLook)).toBe('none');
   expect(focusLook.emptyButtons, JSON.stringify(focusLook)).toEqual([]);
+  expect(focusLook.rowControls.length, JSON.stringify(focusLook)).toBeGreaterThan(0);
+  focusLook.rowControls.forEach((row) => {
+    expect(row.range.visible, JSON.stringify(row)).toBe(false);
+    expect(row.pips.visible, JSON.stringify(row)).toBe(true);
+  });
+  expect(focusLook.fbLabel, JSON.stringify(focusLook)).toBe('Fast Break Defense Install');
+  expect(focusLook.coachingAlign, JSON.stringify(focusLook)).toBe('left');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html.gob-focus')).toHaveCount(1);
+  await expect(page.locator('#training-view .ps').first()).toBeVisible({ timeout: 30000 });
   await capturePage(page, path.join(OUT, 'after-focus-default-1280.png'));
 
   await allocateClassic24(page);
@@ -395,6 +444,8 @@ test('a) training week Advance → focus → allocate → Submit → Report → 
   await expect(page.locator('#gob-subtabs')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Continue to Office', exact: true })).toBeVisible({ timeout: 20000 });
   await expectHeaderVisible(page);
+  await expect(page.locator('#training-report-view h1.page-title')).toBeVisible();
+  await expect(page.locator('#training-report-view h1.page-title')).toHaveText('Training Report');
   await expect(page.locator('#training-focus')).toHaveText('Discipline (Authoritarian)');
   await expect(page.locator('#training-notes-container')).toContainText('Roger Henrich');
   await expect(page.locator('#training-notes-container')).not.toContainText('No training notes');
@@ -449,7 +500,7 @@ test('a) focus page at 1920 and Set Lineup chrome compare', async ({ page }) => 
   await stubAuth(page);
   await installApi(page);
   await page.goto('/training.html?franchise_id=' + FID + '&team_id=' + TEAM + '&mode=franchise&session_type=in-season');
-  await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#training-view .ps').first()).toBeVisible({ timeout: 30000 });
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await capturePage(page, path.join(OUT, 'after-focus-default-1920.png'));
 
@@ -517,7 +568,7 @@ test('d) camp week 1 Advance opens the focus page', async ({ page }) => {
   await page.locator('#play-now').click();
   await expect(page).toHaveURL(/\/training\.html/, { timeout: 20000 });
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
-  await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#training-view .ps').first()).toBeVisible({ timeout: 30000 });
   await expect(page.url()).toContain('session_type=preseason');
 });
 
@@ -531,7 +582,7 @@ test('e) tutorial path stays weekly focus on training.html', async ({ page }) =>
   await expect(page).toHaveURL(/mode=tutorial/);
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await expect(page.locator('#submit-btn')).toBeVisible();
-  await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#training-view .ps').first()).toBeVisible({ timeout: 30000 });
   await expect(page.locator('#player-dev-section')).toBeHidden();
   await capturePage(page, path.join(OUT, 'after-tutorial-1280.png'));
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -544,13 +595,13 @@ test('f) leave-confirm on unsaved allocation; clean Back just leaves', async ({ 
   await stubAuth(page);
   await installApi(page);
   await page.goto('/training.html?franchise_id=' + FID + '&team_id=' + TEAM + '&mode=franchise&session_type=in-season');
-  await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#training-view .ps').first()).toBeVisible({ timeout: 30000 });
   await page.locator('#back-btn').click();
   await expect(page.locator('.gob-leave-confirm')).toHaveCount(0);
   await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
 
   await page.goto('/training.html?franchise_id=' + FID + '&team_id=' + TEAM + '&mode=franchise&session_type=in-season');
-  await expect(page.locator('.slider').first()).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#training-view .ps').first()).toBeVisible({ timeout: 30000 });
   await page.locator('.slider').first().evaluate((el) => {
     el.value = '2';
     el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -601,6 +652,8 @@ test('h) Office All changes → standalone report → Back → Office', async ({
   test.skip(CAPTURE_BEFORE, 'after only');
   await page.setViewportSize({ width: 1280, height: 720 });
   await openOffice(page, { cc: officeWithChangesCc() });
+  await expect(page.locator('#play-now')).toHaveText('Play Next Game');
+  await expect(page.locator('#play-now')).not.toHaveText(/Run Training|Run Training Camp|Submit Training/);
   const link = page.locator('#office-root .wkc-f .lnk');
   await expect(link).toHaveText(/All changes/);
   const href = await link.getAttribute('href');
@@ -634,6 +687,7 @@ test('i) old /training-report.html and ?tab=training-report-view land on the sta
   await expect(page).toHaveURL(/\/training-report\.html/);
   await expect(page.locator('html.gob-focus')).toHaveCount(1);
   await expect(page.locator('#week-number')).toHaveText('12', { timeout: 20000 });
+  await expect(page.locator('#training-report-view h1.page-title')).toHaveText('Training Report');
   await expect(page.getByRole('button', { name: 'Back to Locker Room', exact: true })).toBeVisible();
   await expectHeaderVisible(page);
   await capturePage(page, path.join(OUT, 'after-report-standalone-1280.png'));

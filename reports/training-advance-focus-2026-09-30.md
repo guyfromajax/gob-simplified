@@ -54,13 +54,13 @@ Passed in Playwright.
 | `before-flow-in-app-1280.png` | Develop: weekly allocation on Prep › Player Training; Advance overridden to Submit Training |
 | `before-prep-player-training-1280.png` | Same develop Prep tab at 1280 |
 | `before-prep-player-training-1920.png` | Develop Prep tab at 1920 |
-| `after-focus-default-1280.png` | New weekly focus page, empty allocation |
-| `after-focus-allocated-unsaved-1280.png` | 24/24 + Discipline, Submit enabled |
-| `after-submit-report-1280.png` | Training Report drill-in after Submit |
-| `after-prep-player-training-1280.png` | Prep tab: PDG + pointer only; Advance still "Run Training" |
-| `after-focus-default-1920.png` | Focus page at 1920 |
-| `after-set-lineup-chrome-1280.png` | Set Lineup focus chrome for comparison (no rail, no shell Advance) |
-| `after-tutorial-1280.png` | Tutorial weekly focus |
+| `after-focus-default-1280.png` / `1920` | Tokenised weekly focus, empty allocation |
+| `after-focus-allocated-unsaved-1280.png` / `1920` | 24/24 + Discipline, Submit enabled |
+| `after-submit-report-1280.png` / `1920` | Standalone tokenised report after Submit (Discipline · Authoritarian) |
+| `after-prep-player-training-1280.png` / `1920` | Prep tab: PDG + pointer only |
+| `after-set-lineup-chrome-1280.png` | Set Lineup focus chrome for comparison |
+| `after-tutorial-1280.png` / `1920` | Tutorial weekly focus |
+| `after-report-from-office-1280.png` / `1920` | Office All changes → standalone report |
 
 ## Files
 
@@ -83,10 +83,10 @@ Passed in Playwright.
 
 ## Gates
 
-- `../gob-simplified/.venv/bin/python -m pytest --ignore=tests/e2e -q`: **4203 passed**, 14 skipped, 109 xfailed, **1 xpassed**, **0 failed** (226.20s). The xpass is pre-existing (not this branch).
-- Playwright (`env -u CI PORT=8260 BASE_URL=http://localhost:8260`, workers=1): **787 passed**, 6 skipped, **0 failed** (12.0m). Includes training-advance-focus a–j (report add-on).
-- `scripts/check_ui_tokens.py --strict --no-write`: **exit 0**. New colour-law 0 / 0 / 0. Legacy 210 green / 610 orange / 0 reward-gold (820).
-- `scripts/ci/check_migration_gates.py`: **passed**. Gate A: 0 imports in 0 files. Gate B: 134 lines in 42 files. Notes: `training.html` and `training-report.html` are now clean (0, was 1 each). Did **not** `--write-allowlist`.
+- `../gob-simplified/.venv/bin/python -m pytest -q`: **4232 passed**, 14 skipped, 109 xfailed, **1 xpassed**, **0 failed** (236.16s). The xpass is pre-existing (not this branch).
+- Playwright (`env -u CI PORT=8260 BASE_URL=http://localhost:8260`, workers=1, once): **772 passed**, 6 skipped, **0 failed** (11.8m).
+- `scripts/check_ui_tokens.py --strict --no-write`: **exit 0**. New colour-law 0 / 0 / 0. Legacy 204 green / 589 orange / 0 reward-gold (793).
+- `scripts/ci/check_migration_gates.py`: **passed**. Gate A: 0 imports in 0 files. Gate B: 136 lines in 44 files. Notes: `training.html` and `training-report.html` are now clean (0, was 1 each). Did **not** `--write-allowlist`.
 
 ## Add-on: Training Report is a standalone focus page
 
@@ -103,7 +103,45 @@ Passed in Playwright.
 | `after-report-standalone-1920.png` | Same at 1920 |
 | `after-set-lineup-chrome-1280.png` | Set Lineup focus chrome (unchanged compare) |
 
+## Look pass (not ready to merge)
+
+Merged `origin/develop` (ort, no conflict markers). Kept both sides: this branch’s training/report focus hosts, and develop’s `chore/redirects-fcc-leftovers` (FCC peel, stats/team-traits stubs, freeze ceilings). Did not add rules to `franchise-command-center.css`.
+
+### Why the standalones looked legacy
+
+Tokenised CSS is scoped to `#training-view` / `#training-report-view`. The standalone pages inited on `document.body` with `body.training-page` / `body.training-report-page`, so they painted the old resource-page gradient cards and red/green pill bars.
+
+The empty panel under the Team Training header was `#training-state-note`. Its `display: flex` outranked the UA `[hidden]` rule. The empty button was `#training-state-note-link` (a `gob-btn` with no text). `#training-view .training-state-note[hidden] { display: none }` already existed for the in-app host; standalone never hit it.
+
+### What changed
+
+- `/training.html` mounts `init(#training-view, { sections: 'weekly' })`. No `body.training-page`. Weekly tools stay in a flat tokenised toolbar (Back, Points/Focus, Auto-Train, Submit). The FCC tab still hides `.training-header` (tools park in the sub-tab row).
+- `/training-report.html` mounts `init(#training-report-view)`. Tokenised notes columns + 11-row Team Report list. Pill bars are not created on the token host and are `display: none` if anything still emits them.
+- Submit redirect fills `week` from FranchiseContext or the loaded training-points week. `gobAdvance` also writes `week` onto `/training.html`. The report GET is the same `/franchise/training-report?…&week=` as the old drill-in.
+
+### Data proof (same submit: Discipline · Authoritarian)
+
+After the same 24-point + Discipline submit, the standalone report shows **Training Focus: Discipline (Authoritarian)** and the same notes the tokenised in-FCC report used (Roger Henrich / No Significant Updates / Inside Defense / Man / Horn / Ready / Improving). GET includes `week=12`. Team Report is 11 list rows, white ▲, no pill bars.
+
+### Polish (this pass)
+
+Merged `origin/develop` again (`fix/fcc-stale-return`). Kept both: training-week Advance still goes to `/training.html`; after a return, a finished week's Advance is never offered (`gobNav.reloadIfStale` + `fcc-fresh-after-game.spec.js`). A completed training week on Office is `Play Next Game`, not Run Training (`training-advance-focus` test h).
+
+Focus rows clip the range input (same as in-app) so only the pip bar is the control. Scheme Install labels wrap so "Fast Break Defense Install" is complete at 1280. Coaching Focus is a left-aligned section heading with normal spacing. The standalone report shows `h1` "Training Report" above the week meta, with Continue to Office aligned to that title.
+
+### Next to `reports/prep-training-tokens/`
+
+| This pass | Tokenised reference |
+|---|---|
+| `after-focus-default-1280.png` / `1920` | `after-in-season-1280.png` / `after-camp-1280.png` (3-col sliders + coaching chips; focus chrome instead of rail/sub-tabs) |
+| `after-submit-report-1280.png` / `1920` | `after-report-1280.png` (notes columns + 11-row Team Report, white ▲) |
+
+### Guards
+
+Computed-style: focus header `background-image: none`; state-note `display: none`; no visible unnamed chrome buttons (slider pips and the settings gear use aria-label). Report: `#training-report-view` host, 11 `.team-attr-item` grid rows, 0 visible `.attr-pill`, Training Focus text equals the submitted leaf.
+
 ## Unsure
 
 - Desktop tutorial intercept still fires on first Advance if `__gobAuthMeData` has no dismissals; the later-advance path is the same as today.
 - `team_id` on the submit body is FranchiseContext's resolved id (ObjectId), not the display name in the FCC query. Same as today's `liveParams()`.
+- `after-in-season-1280.png` in prep-training-tokens is now the Prep player-dev grid on current develop; the weekly token look is the older camp/in-season frames from when allocation still lived in-app.
