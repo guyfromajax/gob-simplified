@@ -1,0 +1,236 @@
+{
+  "run_id": "20260930T113548Z-dryrun-n1",
+  "label": "dryrun",
+  "users": 1,
+  "t_start": 1790768148.452,
+  "t_end": 1790768512.063,
+  "t_start_iso": "2026-09-30T11:35:48.451779+00:00",
+  "t_end_iso": "2026-09-30T11:41:52.063342+00:00",
+  "weeks": 2,
+  "weeks_ok": 2,
+  "week_wall_s": {
+    "p50": 181.33,
+    "p95": 182.16,
+    "max": 182.16
+  },
+  "by_week_type": {
+    "sim": {
+      "n": 1,
+      "p50": 181.33,
+      "max": 181.33
+    },
+    "played": {
+      "n": 1,
+      "p50": 182.16,
+      "max": 182.16
+    }
+  },
+  "status_codes": {
+    "200": 324
+  },
+  "n429": 0,
+  "n5xx": 0,
+  "rate_5xx": 0.0,
+  "n_transport_errors": 0,
+  "max_request_s": 124.648,
+  "endpoints": {
+    "POST /franchise/complete-week/start-cpu-sims": {
+      "n": 5,
+      "p50": 0.541,
+      "p95": 124.648,
+      "max": 124.648,
+      "sum": 245.59
+    },
+    "POST /franchise/complete-week/phase-b": {
+      "n": 2,
+      "p50": 68.264,
+      "p95": 86.705,
+      "max": 86.705,
+      "sum": 154.97
+    },
+    "POST /franchise/run-training/cpu-train": {
+      "n": 2,
+      "p50": 44.002,
+      "p95": 47.504,
+      "max": 47.504,
+      "sum": 91.51
+    },
+    "POST /api/simulate-turn": {
+      "n": 187,
+      "p50": 0.264,
+      "p95": 0.496,
+      "max": 0.818,
+      "sum": 50.54
+    },
+    "POST /api/simulate-quarter": {
+      "n": 8,
+      "p50": 0.372,
+      "p95": 10.329,
+      "max": 10.329,
+      "sum": 37.95
+    },
+    "GET /franchise/command-center/data": {
+      "n": 16,
+      "p50": 0.247,
+      "p95": 0.329,
+      "max": 0.329,
+      "sum": 4.21
+    },
+    "GET /teams": {
+      "n": 6,
+      "p50": 0.656,
+      "p95": 0.691,
+      "max": 0.691,
+      "sum": 3.95
+    },
+    "GET /api/playbooks": {
+      "n": 10,
+      "p50": 0.257,
+      "p95": 0.84,
+      "max": 0.84,
+      "sum": 3.81
+    },
+    "GET /roster/{name}": {
+      "n": 10,
+      "p50": 0.337,
+      "p95": 0.39,
+      "max": 0.39,
+      "sum": 3.2
+    },
+    "GET /api/game/{id}": {
+      "n": 8,
+      "p50": 0.231,
+      "p95": 0.612,
+      "max": 0.612,
+      "sum": 2.34
+    },
+    "GET /roster/{team_id}": {
+      "n": 11,
+      "p50": 0.172,
+      "p95": 0.244,
+      "max": 0.244,
+      "sum": 1.95
+    },
+    "POST /franchise/complete-week/phase-a": {
+      "n": 2,
+      "p50": 0.779,
+      "p95": 0.949,
+      "max": 0.949,
+      "sum": 1.73
+    },
+    "POST /api/autoset-lineup": {
+      "n": 11,
+      "p50": 0.126,
+      "p95": 0.273,
+      "max": 0.273,
+      "sum": 1.41
+    },
+    "POST /franchise/run-training/user": {
+      "n": 2,
+      "p50": 0.562,
+      "p95": 0.581,
+      "max": 0.581,
+      "sum": 1.14
+    },
+    "GET /api/gameplan": {
+      "n": 11,
+      "p50": 0.063,
+      "p95": 0.28,
+      "max": 0.28,
+      "sum": 0.97
+    },
+    "GET /api/game/{id}/resume-state": {
+      "n": 5,
+      "p50": 0.149,
+      "p95": 0.193,
+      "max": 0.193,
+      "sum": 0.77
+    },
+    "GET /franchise/team-data": {
+      "n": 6,
+      "p50": 0.09,
+      "p95": 0.249,
+      "max": 0.249,
+      "sum": 0.71
+    },
+    "GET /franchise/standings": {
+      "n": 6,
+      "p50": 0.07,
+      "p95": 0.146,
+      "max": 0.146,
+      "sum": 0.54
+    },
+    "POST /api/init-game": {
+      "n": 2,
+      "p50": 0.217,
+      "p95": 0.228,
+      "max": 0.228,
+      "sum": 0.45
+    },
+    "GET /franchise/training-points": {
+      "n": 2,
+      "p50": 0.211,
+      "p95": 0.216,
+      "max": 0.216,
+      "sum": 0.43
+    },
+    "POST /player-image/warm-teams": {
+      "n": 2,
+      "p50": 0.143,
+      "p95": 0.253,
+      "max": 0.253,
+      "sum": 0.4
+    },
+    "GET /app-config": {
+      "n": 6,
+      "p50": 0.033,
+      "p95": 0.191,
+      "max": 0.191,
+      "sum": 0.35
+    },
+    "POST /franchise/play-next-game": {
+      "n": 2,
+      "p50": 0.08,
+      "p95": 0.107,
+      "max": 0.107,
+      "sum": 0.19
+    },
+    "GET /franchise/championship-moments/context": {
+      "n": 2,
+      "p50": 0.082,
+      "p95": 0.099,
+      "max": 0.099,
+      "sum": 0.18
+    }
+  },
+  "week_rows": [
+    {
+      "run": "20260930T113548Z-dryrun-n1",
+      "user": 1,
+      "franchise_id": "6abcee1a0a009e153948265a",
+      "week_type": "sim",
+      "week": 7,
+      "ok": true,
+      "training_s": 49.53,
+      "game_s": 40.92,
+      "advance_s": 87.81,
+      "t_start": 1790768148.512,
+      "t_end": 1790768329.845,
+      "wall_s": 181.33
+    },
+    {
+      "run": "20260930T113548Z-dryrun-n1",
+      "user": 1,
+      "franchise_id": "6abcee1a0a009e153948265a",
+      "week_type": "played",
+      "week": 8,
+      "ok": true,
+      "training_s": 46.16,
+      "game_s": 63.64,
+      "advance_s": 69.56,
+      "t_start": 1790768329.904,
+      "t_end": 1790768512.061,
+      "wall_s": 182.16
+    }
+  ]
+}

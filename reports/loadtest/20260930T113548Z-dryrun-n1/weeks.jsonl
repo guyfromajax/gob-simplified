@@ -1,0 +1,2 @@
+{"run": "20260930T113548Z-dryrun-n1", "user": 1, "franchise_id": "6abcee1a0a009e153948265a", "week_type": "sim", "week": 7, "ok": true, "training_s": 49.53, "game_s": 40.92, "advance_s": 87.81, "t_start": 1790768148.512, "t_end": 1790768329.845, "wall_s": 181.33}
+{"run": "20260930T113548Z-dryrun-n1", "user": 1, "franchise_id": "6abcee1a0a009e153948265a", "week_type": "played", "week": 8, "ok": true, "training_s": 46.16, "game_s": 63.64, "advance_s": 69.56, "t_start": 1790768329.904, "t_end": 1790768512.061, "wall_s": 182.16}
