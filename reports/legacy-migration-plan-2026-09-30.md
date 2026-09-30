@@ -186,4 +186,4 @@ Do not re-list as work: Playcall Center POC, Tournament Tab, `_preview-training-
 - Online and offline if the row says both; skip desktop-hidden pages on desktop.
 - Redirect stubs: re-point callers, don’t restyle the stub.
 
-`scripts/ci/check_migration_gates.py` on this docs branch: pass (nothing changed). Gate A 0/0, Gate B 138/46.
+`scripts/ci/check_migration_gates.py` on this docs branch: pass (nothing changed). Gate A 0/0, Gate B 136/44.
