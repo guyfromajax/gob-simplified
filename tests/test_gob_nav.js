@@ -53,6 +53,12 @@ function fakeWindow(start, seed) {
     },
     document: {
       referrer: '',
+      // A real page is fully loaded when the user clicks an exit, so exitFlow's
+      // history.go runs synchronously (goWhenSettled only defers while loading —
+      // see commit c20fcbd13, which added that deferral for the training report
+      // button that lives in the first HTML chunk). Tests that want the deferred
+      // path set readyState = 'loading' explicitly.
+      readyState: 'complete',
       addEventListener(type, fn, capture) { listeners['document:' + type] = fn; },
       querySelector() { return null; },
       querySelectorAll() { return []; },
