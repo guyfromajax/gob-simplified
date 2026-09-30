@@ -184,7 +184,7 @@
       + rows.map(function (r, i) {
         var rec = (r.wins != null && r.losses != null) ? (r.wins + '–' + r.losses) : '';
         var action = r.reviewable
-          ? '<button type="button" class="lnk" data-tc-review="' + i + '">Review</button>'
+          ? '<button type="button" class="lnk" data-tc-review="' + i + '" data-sfx="SFX_SELECT">Review</button>'
           : '<span class="qt">—</span>';
         return '<tr><td class="l b">' + (r.season != null ? 'Season ' + esc(r.season) : '') + '</td>'
           + '<td class="l w">' + esc(r.program) + '</td>'

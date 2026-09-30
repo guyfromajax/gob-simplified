@@ -14,6 +14,17 @@ jobs:
       - name: Check desktop-migration ratchets
         run: python scripts/ci/check_migration_gates.py
 
+  ui-tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Check UI token colour law
+        run: python scripts/check_ui_tokens.py --strict --no-write
+
   test:
     runs-on: ubuntu-latest
     steps:

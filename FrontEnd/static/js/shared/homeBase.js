@@ -129,7 +129,7 @@
       var n = '0' + (i + 1);
       var more = slot
         ? '<button type="button" class="slot-more" data-hb-more data-slot="' + (i + 1) + '"'
-          + ' aria-label="Program options, slot ' + n + '" aria-haspopup="menu" aria-expanded="false">···</button>'
+          + ' aria-label="Program options, slot ' + n + '" aria-haspopup="menu" aria-expanded="false" data-sfx="SFX_SELECT">···</button>'
         : '';
       html += '<div class="slot" data-hb-slot="' + (i + 1) + '">'
         + '<div class="slot-h"><b>' + n + '</b><i></i>' + more + '</div>'
@@ -509,7 +509,7 @@
     pop.className = 'pop';
     pop.setAttribute('role', 'menu');
     pop.innerHTML = '<button type="button" class="pop-i danger" role="menuitem"'
-      + ' data-hb-delete data-slot="' + esc(slotIndex) + '">Delete program…</button>';
+      + ' data-hb-delete data-slot="' + esc(slotIndex) + '" data-sfx="SFX_SELECT">Delete program…</button>';
     slot.appendChild(pop);
     btn.classList.add('open');
     btn.setAttribute('aria-expanded', 'true');
@@ -536,7 +536,7 @@
       + '<button type="button" class="btn-ghost sm" data-hb-cancel data-sfx="SFX_SELECT">'
       + esc(spec.cancelLabel || 'Cancel') + '</button>'
       + (spec.confirmLabel
-        ? '<button type="button" class="btn-del" data-hb-confirm-delete>' + esc(spec.confirmLabel) + '</button>'
+        ? '<button type="button" class="btn-del" data-hb-confirm-delete data-sfx="SFX_COMMIT">' + esc(spec.confirmLabel) + '</button>'
         : '')
       + '</div></div></div>';
     host.hidden = false;

@@ -813,7 +813,6 @@
     feedback.addEventListener('click', function () {
       var existing = document.getElementById('feedback-btn');
       if (!existing) return;
-      playClick();
       existing.click();
     });
     if (window.GOB_BUILD_PROFILE === 'desktop') setShown(feedback, false);
@@ -1355,7 +1354,6 @@
     feedback.addEventListener('click', function () {
       var existing = document.getElementById('feedback-btn');
       if (!existing) return;
-      playClick();
       existing.click();
     });
     revealFeedbackWhenReady(feedback);

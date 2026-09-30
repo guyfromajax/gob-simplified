@@ -508,8 +508,8 @@
           </div>
         </div>
         <div class="cm-va-actions">
-          <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
-          ${hasBoxScore ? `<button type="button" class="cm-btn ghost" data-cm-action="boxscore">Box Score</button>` : ''}
+          <button type="button" class="cm-btn" data-cm-action="primary" data-sfx="SFX_SELECT">Back to Locker Room</button>
+          ${hasBoxScore ? `<button type="button" class="cm-btn ghost" data-cm-action="boxscore" data-sfx="SFX_SELECT">Box Score</button>` : ''}
         </div>
       </div>
     `;
@@ -547,8 +547,8 @@
             </div>
           </div>
           <div class="cm-vb-actions">
-            <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
-            ${hasBoxScore ? `<button type="button" class="cm-btn dark" data-cm-action="boxscore">Box Score</button>` : ''}
+            <button type="button" class="cm-btn" data-cm-action="primary" data-sfx="SFX_SELECT">Back to Locker Room</button>
+            ${hasBoxScore ? `<button type="button" class="cm-btn dark" data-cm-action="boxscore" data-sfx="SFX_SELECT">Box Score</button>` : ''}
           </div>
         </div>
       </div>
@@ -603,7 +603,7 @@
           </div>
         </div>
         <div class="cm-vc-actions">
-          <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
+          <button type="button" class="cm-btn" data-cm-action="primary" data-sfx="SFX_SELECT">Back to Locker Room</button>
         </div>
       </div>
     `;
@@ -628,7 +628,7 @@
           </div>
         </div>
         <div class="cm-vd-actions" data-cm-actions>
-          <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
+          <button type="button" class="cm-btn" data-cm-action="primary" data-sfx="SFX_SELECT">Back to Locker Room</button>
         </div>
       </div>
     `;

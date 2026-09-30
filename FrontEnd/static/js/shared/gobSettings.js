@@ -107,7 +107,7 @@ function build() {
   host.hidden = true;
   const rows = ROWS.map(([id, label]) => {
     return '<div class="aud" data-aud="' + id + '">'
-      + '<button type="button" class="mute" data-mute="' + id + '" aria-pressed="false" title="Mute ' + label + '">' + SPEAKER + '</button>'
+      + '<button type="button" class="mute" data-mute="' + id + '" data-sfx="SFX_SELECT" aria-pressed="false" title="Mute ' + label + '">' + SPEAKER + '</button>'
       + '<span class="aud-l">' + label + '</span>'
       + sliderHtml(id)
       + '<span class="aud-v" data-val="' + id + '">100</span>'
@@ -116,13 +116,13 @@ function build() {
   host.innerHTML = ''
     + '<div class="set-scrim" data-settings-scrim></div>'
     + '<aside class="settings" role="dialog" aria-modal="true" aria-labelledby="gob-settings-title">'
-    + '  <div class="set-h"><h2 id="gob-settings-title">Settings</h2><button type="button" class="set-x" data-settings-close title="Close (Esc)" aria-label="Close">×</button></div>'
+    + '  <div class="set-h"><h2 id="gob-settings-title">Settings</h2><button type="button" class="set-x" data-settings-close data-sfx="SFX_SELECT" title="Close (Esc)" aria-label="Close">×</button></div>'
     + '  <div class="set-b">'
     + '    <section class="set-s"><h3>Audio <span>Changes apply instantly</span></h3>' + rows + '</section>'
     + '    <section class="set-s" data-coach hidden><h3>Coach stats</h3><div class="cs-grid" data-coach-grid></div></section>'
     + '    <section class="set-s" data-account></section>'
     + '  </div>'
-    + '  <div class="set-f"><span class="set-f-l"><a class="lnk" href="/faqs.html" target="_blank" rel="noopener" data-settings-faqs>FAQs</a><span data-build></span></span><span class="conn" data-conn><i></i><span data-conn-label>Online</span></span></div>'
+    + '  <div class="set-f"><span class="set-f-l"><a class="lnk" href="/faqs.html" target="_blank" rel="noopener" data-settings-faqs data-sfx="SFX_SELECT">FAQs</a><span data-build></span></span><span class="conn" data-conn><i></i><span data-conn-label>Online</span></span></div>'
     + '</aside>';
   document.body.appendChild(host);
   bindGobDensity(host);
@@ -271,8 +271,8 @@ function paintAccount(me) {
   const email = (me && me.email) || '';
   section.innerHTML = '<h3>Account</h3>'
     + '<div class="acct"><span>Username</span><b>' + escapeText(username) + '</b><span>Email</span><b>' + escapeText(email) + '</b></div>'
-    + '<a class="lnk" href="/account.html">Account details</a>'
-    + '<button type="button" class="btn-ghost" data-settings-logout style="margin-top:6px">Log Out</button>';
+    + '<a class="lnk" href="/account.html" data-sfx="SFX_SELECT">Account details</a>'
+    + '<button type="button" class="btn-ghost" data-settings-logout data-sfx="SFX_SELECT" style="margin-top:6px">Log Out</button>';
 }
 
 function escapeText(value) {

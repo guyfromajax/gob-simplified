@@ -25,10 +25,6 @@
       .replace(/"/g, '&quot;');
   }
 
-  function playSfx(name) {
-    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(name, 0.7); }).catch(function () {});
-  }
-
   function openConfirm(opts) {
     opts = opts || {};
     if (open) open.close();
@@ -43,9 +39,9 @@
       + '<p id="gob-leave-copy" class="gob-modal-subtitle">' + esc(opts.copy || '') + '</p>'
       + '</div>'
       + '<div class="gob-modal-actions">'
-      + '<button type="button" class="gob-modal-btn-dismiss" data-leave="stay">Keep Editing</button>'
-      + '<button type="button" class="gob-modal-btn-secondary" data-leave="discard">Discard</button>'
-      + '<button type="button" class="gob-modal-btn-primary" data-leave="save">' + esc(opts.saveLabel || 'Save') + '</button>'
+      + '<button type="button" class="gob-modal-btn-dismiss" data-leave="stay" data-sfx="SFX_SELECT">Keep Editing</button>'
+      + '<button type="button" class="gob-modal-btn-secondary" data-leave="discard" data-sfx="SFX_SELECT">Discard</button>'
+      + '<button type="button" class="gob-modal-btn-primary" data-leave="save" data-sfx="SFX_COMMIT">' + esc(opts.saveLabel || 'Save') + '</button>'
       + '</div></div>';
 
     var busy = false;
@@ -73,12 +69,10 @@
       if (!btn) return;
       var action = btn.getAttribute('data-leave');
       if (action === 'stay') {
-        playSfx('click-tiny.wav');
         close();
         return;
       }
       if (action === 'discard') {
-        playSfx('click-tiny.wav');
         close();
         if (typeof opts.onDiscard === 'function') opts.onDiscard();
         if (typeof opts.proceed === 'function') opts.proceed();

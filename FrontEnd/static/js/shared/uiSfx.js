@@ -254,6 +254,9 @@ export function playSfx(name, baseVolume = 0.7) {
     if (knownMissing.has(resolved.file) || preloadCache[resolved.file] === false) return;
     const vol = outputVolume(baseVolume, 'sfx');
     if (vol <= 0) return;
+    if (typeof window !== 'undefined' && Array.isArray(window.__gobSfxCalls)) {
+      try { window.__gobSfxCalls.push(resolved.key); } catch (_err) { /* spy */ }
+    }
 
     preloadFile(resolved.file, resolved.key);
 

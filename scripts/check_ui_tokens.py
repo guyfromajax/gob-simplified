@@ -5,8 +5,10 @@ Run from the repo root. Standard library only. No network.
 
     python scripts/check_ui_tokens.py
     python scripts/check_ui_tokens.py --strict
+    python scripts/check_ui_tokens.py --strict --no-write
 
 The default run always exits 0 and writes reports/ui-token-audit-2026-09-29.md.
+``--no-write`` prints the summary and skips the report file (CI).
 ``--strict`` exits 1 when a *new-design* file has a colour-law hit that is
 not on the allow-list. Legacy hits are reported and do not fail the gate.
 
@@ -1386,15 +1388,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Exit 1 when a new-design file has a colour-law hit off the allow-list",
     )
+    parser.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Print the summary only; do not write the audit report",
+    )
     args = parser.parse_args(argv)
     root = args.root.resolve()
     tokens = args.tokens.resolve() if args.tokens else None
     audit = audit_tree(root, tokens)
     print(format_summary(audit))
-    report_path = args.report
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(format_report(audit), encoding="utf-8")
-    print(f"\nFull detail: {report_path}")
+    if not args.no_write:
+        report_path = args.report
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(format_report(audit), encoding="utf-8")
+        print(f"\nFull detail: {report_path}")
     new_hits = sum(audit.law_counts()["new"].values())
     if args.strict and new_hits:
         return 1

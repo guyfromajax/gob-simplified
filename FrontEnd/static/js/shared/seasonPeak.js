@@ -375,8 +375,8 @@
         + medHtml(meds)
         + '<div class="pk-f"><p>Added to your <em>Trophy Case</em>.' + nextHint + '</p>'
         + mqHtml(index, total)
-        + (box ? '<a class="lnk" href="' + esc(box) + '">Box score</a>' : '')
-        + '<button type="button" class="btn-ghost lg pk-go">Continue</button></div></section>';
+        + (box ? '<a class="lnk" href="' + esc(box) + '" data-sfx="SFX_SELECT">Box score</a>' : '')
+        + '<button type="button" class="btn-ghost lg pk-go" data-sfx="SFX_SELECT">Continue</button></div></section>';
 
       var host = rootEl();
       host.innerHTML = html;
@@ -566,7 +566,7 @@
         + '<div class="rv-cols">' + cols + '</div>'
         + '<div class="rv-f"><p>Saved to your <em>Trophy Case</em>'
         + (opts.readonly ? '.' : '. Open it any time from Home Base.')
-        + '</p><button type="button" class="btn-ghost lg rv-go">Continue</button></div></section>';
+        + '</p><button type="button" class="btn-ghost lg rv-go" data-sfx="SFX_SELECT">Continue</button></div></section>';
 
       var host = rootEl();
       host.innerHTML = html;

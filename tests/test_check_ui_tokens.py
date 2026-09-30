@@ -306,6 +306,27 @@ def test_allow_list_selectors_and_comments(tmp_path):
     assert tutorial_new == []
 
 
+def test_no_write_skips_report(tmp_path):
+    root = tmp_path / "nowrite"
+    _write(root, "css/gob-tokens.css", TOKENS_CSS)
+    _write(root, "css/gob-components.css", CLEAN_CSS)
+    report = tmp_path / "must-not-exist.md"
+    run = subprocess.run(
+        [
+            sys.executable, str(SCRIPT),
+            "--root", str(root),
+            "--report", str(report),
+            "--strict",
+            "--no-write",
+        ],
+        check=False, capture_output=True, text=True,
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "Colour-law hits" in run.stdout
+    assert not report.exists()
+    assert "Full detail:" not in run.stdout
+
+
 def test_reward_gold_xg_allowed_and_random_selector_fails(tmp_path):
     root = tmp_path / "reward"
     _write(root, "css/gob-tokens.css", TOKENS_CSS)
