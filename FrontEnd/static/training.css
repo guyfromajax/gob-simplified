@@ -1,4 +1,6 @@
-:root {
+/* Standalone page chrome only. In-app tokens live under #training-view. */
+#training-view,
+body.training-page {
   --color-bg: #0b0d14;
   --color-surface: rgba(255, 255, 255, 0.05);
   --color-border: rgba(255, 215, 0, 0.2);
@@ -16,33 +18,31 @@
   --radius: 12px;
   --radius-sm: 4px;
   --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  
-  /* Archetype colors (brief / tutorial canonical) */
   --color-authoritarian: #C0392B;
   --color-systems-coach: #D4A017;
   --color-player-maximizer: #3A8C4A;
   --color-culture-builder: #7B5EA7;
 }
 
-* {
-  margin: 0;
-  padding: 0;
+body.training-page,
+body.training-page * {
   box-sizing: border-box;
 }
 
-body {
-  font-family: var(--font-family);
-  background: var(--color-bg);
-  color: var(--color-text);
+body.training-page {
+  margin: 0;
   min-height: 100vh;
-  padding: var(--spacing-md);
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  background: #0b0d14;
+  color: #f4f6ff;
   line-height: 1.6;
 }
 
-button,
-input[type="button"],
-input[type="submit"],
-input[type="reset"] {
+body.training-page button,
+body.training-page input[type="button"],
+body.training-page input[type="submit"],
+body.training-page input[type="reset"] {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
 }
 
@@ -2434,12 +2434,12 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
 }
 #training-view .pdg-name:focus-visible { outline-color: var(--text-100); }
 
-html.gob-shell body.training-page .pg-tools {
+html.gob-shell .pg-tools:has(#requirements-bar) {
   gap: var(--space-12);
 }
-html.gob-shell body.training-page .pg-tools #requirements-bar,
-html.gob-shell body.training-page .pg-tools .req-pill,
-html.gob-shell body.training-page .pg-tools .bud {
+html.gob-shell .pg-tools:has(#requirements-bar) #requirements-bar,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-pill,
+html.gob-shell .pg-tools:has(#requirements-bar) .bud {
   display: flex;
   align-items: center;
   flex: none;
@@ -2454,12 +2454,12 @@ html.gob-shell body.training-page .pg-tools .bud {
   border: 0;
   border-radius: 0;
 }
-html.gob-shell body.training-page .pg-tools .req-pill-seg,
-html.gob-shell body.training-page .pg-tools .req-chip,
-html.gob-shell body.training-page .pg-tools .req-chip--points,
-html.gob-shell body.training-page .pg-tools .req-chip--points.is-complete,
-html.gob-shell body.training-page .pg-tools .req-chip--focus,
-html.gob-shell body.training-page .pg-tools .req-chip--focus.is-selected {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-pill-seg,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip--points,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip--points.is-complete,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip--focus,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip--focus.is-selected {
   display: flex;
   align-items: center;
   flex: none;
@@ -2473,8 +2473,8 @@ html.gob-shell body.training-page .pg-tools .req-chip--focus.is-selected {
   background: transparent;
   box-shadow: none;
 }
-html.gob-shell body.training-page .pg-tools .req-pill .points-display,
-html.gob-shell body.training-page .pg-tools .points-display {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-pill .points-display,
+html.gob-shell .pg-tools:has(#requirements-bar) .points-display {
   position: static;
   width: auto;
   height: auto;
@@ -2489,7 +2489,7 @@ html.gob-shell body.training-page .pg-tools .points-display {
   color: var(--text-87);
   white-space: nowrap;
 }
-html.gob-shell body.training-page .pg-tools .req-chip-check {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip-check {
   position: relative;
   width: 14px;
   height: 14px;
@@ -2499,16 +2499,16 @@ html.gob-shell body.training-page .pg-tools .req-chip-check {
   box-shadow: inset 0 0 0 1.5px var(--white-25);
   background: transparent;
 }
-html.gob-shell body.training-page .pg-tools .req-chip-check::after {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip-check::after {
   content: none;
 }
-html.gob-shell body.training-page .pg-tools .req-chip.is-complete .req-chip-check,
-html.gob-shell body.training-page .pg-tools .req-chip.is-selected .req-chip-check {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip.is-complete .req-chip-check,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip.is-selected .req-chip-check {
   background: var(--white-90);
   box-shadow: none;
 }
-html.gob-shell body.training-page .pg-tools .req-pill-label,
-html.gob-shell body.training-page .pg-tools .req-chip--focus .req-pill-label {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-pill-label,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip--focus .req-pill-label {
   font-size: var(--fs-10);
   font-weight: var(--fw-bold);
   letter-spacing: var(--tracking-8);
@@ -2516,8 +2516,8 @@ html.gob-shell body.training-page .pg-tools .req-chip--focus .req-pill-label {
   color: var(--text-38);
   white-space: nowrap;
 }
-html.gob-shell body.training-page .pg-tools .req-chip-value,
-html.gob-shell body.training-page .pg-tools .req-pill .req-chip-value {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip-value,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-pill .req-chip-value {
   font: var(--fw-bold) var(--fs-24)/var(--lh-1) var(--font-display);
   letter-spacing: var(--tracking-2);
   color: var(--text-100);
@@ -2526,12 +2526,12 @@ html.gob-shell body.training-page .pg-tools .req-pill .req-chip-value {
   overflow: visible;
   text-overflow: clip;
 }
-html.gob-shell body.training-page .pg-tools #req-points-total {
+html.gob-shell .pg-tools:has(#requirements-bar) #req-points-total {
   font-size: var(--fs-17);
   color: var(--text-38);
 }
-html.gob-shell body.training-page .pg-tools .req-meter,
-html.gob-shell body.training-page .pg-tools .req-pill .req-meter {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-meter,
+html.gob-shell .pg-tools:has(#requirements-bar) .req-pill .req-meter {
   width: 72px;
   height: 4px;
   margin: 0;
@@ -2540,35 +2540,35 @@ html.gob-shell body.training-page .pg-tools .req-pill .req-meter {
   background: var(--white-6);
   overflow: hidden;
 }
-html.gob-shell body.training-page .pg-tools .req-meter-fill {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-meter-fill {
   display: block;
   height: 100%;
   background: var(--white-55);
 }
-html.gob-shell body.training-page .pg-tools .req-chip.is-complete .req-meter-fill {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-chip.is-complete .req-meter-fill {
   background: var(--white-90);
 }
-html.gob-shell body.training-page .pg-tools .req-pill-div {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-pill-div {
   width: 1px;
   height: 22px;
   flex: none;
   align-self: center;
   background: var(--line-strong);
 }
-html.gob-shell body.training-page .pg-tools #req-focus {
+html.gob-shell .pg-tools:has(#requirements-bar) #req-focus {
   gap: var(--space-8);
 }
-html.gob-shell body.training-page .pg-tools #req-focus-value {
+html.gob-shell .pg-tools:has(#requirements-bar) #req-focus-value {
   font-size: var(--fs-13);
   font-weight: var(--fw-semibold);
   font-family: var(--font-body);
   color: var(--text-87);
 }
-html.gob-shell body.training-page .pg-tools .req-focus-nudge {
+html.gob-shell .pg-tools:has(#requirements-bar) .req-focus-nudge {
   display: none;
 }
-html.gob-shell body.training-page .pg-tools #auto-train-btn.gob-btn,
-html.gob-shell body.training-page .pg-tools #auto-train-btn.gob-btn--ghost {
+html.gob-shell .pg-tools:has(#requirements-bar) #auto-train-btn.gob-btn,
+html.gob-shell .pg-tools:has(#requirements-bar) #auto-train-btn.gob-btn--ghost {
   height: var(--dsz-30);
   min-height: var(--dsz-30);
   min-width: 0;
@@ -2581,7 +2581,7 @@ html.gob-shell body.training-page .pg-tools #auto-train-btn.gob-btn--ghost {
   letter-spacing: var(--tracking-4);
   color: var(--text-87);
 }
-html.gob-shell body.training-page .pg-tools #training-tutorial-btn {
+html.gob-shell .pg-tools:has(#requirements-bar) #training-tutorial-btn {
   height: var(--dsz-24);
   padding: 0 var(--space-8);
   background: transparent;
@@ -2593,9 +2593,9 @@ html.gob-shell body.training-page .pg-tools #training-tutorial-btn {
 }
 
 /* display:flex on #requirements-bar above beats the UA [hidden] rule. */
-html.gob-shell body.training-page .pg-tools #requirements-bar[hidden],
-html.gob-shell body.training-page .pg-tools #auto-train-btn[hidden],
-html.gob-shell body.training-page.training-no-allocation .pg-tools #requirements-bar,
-html.gob-shell body.training-page.training-no-allocation .pg-tools #auto-train-btn {
+html.gob-shell .pg-tools:has(#requirements-bar) #requirements-bar[hidden],
+html.gob-shell .pg-tools:has(#requirements-bar) #auto-train-btn[hidden],
+html.gob-shell body.training-no-allocation .pg-tools:has(#requirements-bar) #requirements-bar,
+html.gob-shell body.training-no-allocation .pg-tools:has(#requirements-bar) #auto-train-btn {
   display: none;
 }

@@ -1,47 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <script>
-    (function () {
-      try {
-        var q = new URLSearchParams(location.search);
-        if (q.get('embed') === '1' || q.get('mode') === 'tutorial') return;
-        q.delete('embed');
-        q.set('tab', 'training-view');
-        location.replace('/franchise-command-center.html?' + q.toString());
-      } catch (err) {}
-    })();
-  </script>
-  <link rel="stylesheet" href="/fonts/app-fonts.css">
-  <!-- Google Tag Manager (production only) -->
-  <script src="/js/shared/gtm-loader.js"></script>
-  <!-- End Google Tag Manager -->
-  <script src="/js/shared/franchiseContext.js"></script>
-  <script src="/js/shared/gobNav.js"></script>
-  <script src="/js/config/api-config.js"></script>
-  <script src="/js/shared/authGuard.js"></script>
-  <script src="/js/shared/sentryInit.js"></script>
-  <script src="/js/shared/pageLoadOverlay.js"></script>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Team Training - GOB</title>
-  <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
-<link rel="stylesheet" href="/resource-pages.css">
-  <link rel="stylesheet" href="/css/gob-buttons.css">
-  <link rel="stylesheet" href="/training.css">
-  <link rel="stylesheet" href="/css/training-newswire.css">
-  <link rel="stylesheet" href="/css/fonts.css">
-  <link rel="stylesheet" href="/css/gob-toast.css">
-  <link rel="stylesheet" href="/css/development-focus.css">
-  <link rel="stylesheet" href="/css/player-development-grid.css">
-</head>
-<body class="training-page">
-  <!-- Google Tag Manager (noscript) -->
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <!-- End Google Tag Manager (noscript) -->
-
-  <div class="training-container resource-page-container fcc-brand-page-shell training-resource-shell">
+export const TRAINING_SHELL = `<div class="training-container resource-page-container fcc-brand-page-shell training-resource-shell">
     <!-- Header -->
     <header class="training-header">
       <div class="training-header-left">
@@ -73,7 +30,6 @@
       <div class="header-actions">
         <button id="auto-train-btn" class="gob-btn gob-btn--ghost auto-train-button" type="button">Auto-Train</button>
         <div class="submit-stack">
-          <button id="submit-btn" class="submit-button" disabled>Submit Training</button>
           <button id="recruiting-invites-btn" class="recruiting-invites-button" type="button" style="display:none;">Recruiting Invites</button>
         </div>
       </div>
@@ -462,28 +418,4 @@
         <button id="auto-train-modal-close" class="gob-modal-btn-dismiss">Close</button>
       </div>
     </div>
-  </div>
-
-  <script src="/common.js"></script>
-  <script src="/js/shared/trainingNewswire.js"></script>
-  <script src="/js/shared/gobTutorialAlertResume.js"></script>
-  <!-- Development Focus saves on change and confirms with the shared toast. -->
-  <script src="/js/shared/gobToast.js"></script>
-  <script src="/js/shared/developmentFocus.js"></script>
-  <script src="/js/generated/trainingMatrix.js"></script>
-  <script src="/js/utils/attributeDisplay.js"></script>
-  <script src="/js/shared/rtBucket.js"></script>
-  <script src="/js/shared/playerDevelopmentGrid.js"></script>
-  <script type="module">
-    import { init } from '/training.js';
-    try {
-      // FranchiseContext (loaded in <head>), not the URL: correct on web and desktop.
-      const fc = window.FranchiseContext;
-      const ctx = (key) => (fc && typeof fc.get === 'function' ? fc.get(key) : null);
-      if (ctx('mode') === 'tutorial' || ctx('embed') === '1') {
-        init(document.body);
-      }
-    } catch (err) { /* redirect already left */ }
-  </script>
-</body>
-</html>
+  </div>`;

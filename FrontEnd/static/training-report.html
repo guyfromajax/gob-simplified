@@ -132,7 +132,9 @@
     // The page redirects into the app unless ?embed=1. That leftover path
     // calls the same init() the in-app view uses.
     try {
-      if (new URLSearchParams(location.search).get('embed') === '1') {
+      const fc = window.FranchiseContext;
+      const ctx = (key) => (fc && typeof fc.get === 'function' ? fc.get(key) : null);
+      if (ctx('embed') === '1') {
         init(document.body);
       }
     } catch (err) { /* redirect already left */ }

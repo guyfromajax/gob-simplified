@@ -18,17 +18,21 @@ var DEPS = [
   '/js/utils/attributeDisplay.js'
 ];
 
+function contextValue(key) {
+  var fc = window.FranchiseContext;
+  if (!fc || typeof fc.get !== 'function') return '';
+  try { return fc.get(key) || ''; }
+  catch (err) { return ''; }
+}
+
 function optionsFrom(ctx) {
-  var bag;
-  try { bag = new URLSearchParams(window.location.search); }
-  catch (err) { bag = new URLSearchParams(); }
   return {
-    mode: bag.get('mode') || 'franchise',
-    franchiseId: (ctx && ctx.franchiseId) || bag.get('franchise_id') || '',
-    teamId: (ctx && ctx.teamId) || bag.get('team_id') || '',
-    week: bag.get('week') || '',
-    from: bag.get('from') || '',
-    origin: bag.get('origin') || ''
+    mode: contextValue('mode') || 'franchise',
+    franchiseId: (ctx && ctx.franchiseId) || contextValue('franchise_id') || '',
+    teamId: (ctx && ctx.teamId) || contextValue('team_id') || '',
+    week: contextValue('week') || '',
+    from: contextValue('from') || '',
+    origin: contextValue('origin') || ''
   };
 }
 
