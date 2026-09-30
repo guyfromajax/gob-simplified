@@ -1,4 +1,4 @@
-import { ensureCss, loadScript } from './prepEmbed.js';
+import { ensureCss, loadScript } from './viewLoader.js';
 import { init as initReport } from '/training-report.js';
 
 var CSS = [

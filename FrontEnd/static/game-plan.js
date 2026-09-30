@@ -230,7 +230,7 @@ let currentSettings = {
 // Track unsaved changes
 let hasUnsavedChanges = false;
 let lastSavedSettings = null;
-// True when mounted as the command center's game-plan-view (embed bridge).
+// True when mounted as the command center's game-plan-view.
 let gamePlanHosted = false;
 let toastTimer = null;
 let toastHideTimer = null;

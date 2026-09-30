@@ -1,0 +1,561 @@
+{
+ "meta": {
+  "port": 8192,
+  "runs": 5,
+  "passes": [
+   "timing"
+  ],
+  "viewport": {
+   "width": 1280,
+   "height": 800
+  },
+  "startedAt": "2026-09-30T10:12:25.730Z",
+  "seconds": 89
+ },
+ "timing": {
+  "table": {
+   "franchise-command-center.html": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       313,
+       272,
+       310,
+       279,
+       257
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.008704379308223724,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=home-tab",
+      "median": 279,
+      "worst": 313
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       298,
+       331,
+       324,
+       282,
+       341
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.009978771150112153,
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=home-tab",
+      "median": 324,
+      "worst": 341
+     }
+    }
+   },
+   "training-view": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       36,
+       38,
+       30,
+       29,
+       27
+      ],
+      "flags": {
+       "skeleton": 5,
+       "jump": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       31,
+       36,
+       26,
+       26,
+       23
+      ],
+      "cls": 0.17837506198883057,
+      "shiftSrc": [
+       "0.178 div.coaching-section + div.adv-wrap + div.playbook-mode-toggle + h3.drill-title + div.slider-container"
+      ],
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=training-view",
+      "median": 30,
+      "worst": 38,
+      "skelMedian": 26
+     },
+     "warm": {
+      "ms": [
+       14,
+       13,
+       13,
+       22,
+       17
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=training-view&mode=franchise",
+      "median": 14,
+      "worst": 22
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       24,
+       31,
+       39,
+       26,
+       27
+      ],
+      "flags": {
+       "skeleton": 5,
+       "jump": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       19,
+       27,
+       35,
+       23,
+       22
+      ],
+      "cls": 0.17837506198883057,
+      "shiftSrc": [
+       "0.178 div.coaching-section + div.adv-wrap + div.playbook-mode-toggle + h3.drill-title + div.slider-container"
+      ],
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=training-view&mode=franchise",
+      "median": 27,
+      "worst": 39,
+      "skelMedian": 23
+     },
+     "warm": {
+      "ms": [
+       15,
+       12,
+       15,
+       15,
+       16
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=training-view&mode=franchise",
+      "median": 15,
+      "worst": 16
+     }
+    }
+   },
+   "game-plan-view": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       33,
+       46,
+       115,
+       30,
+       31
+      ],
+      "flags": {
+       "skeleton": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       30,
+       42,
+       110,
+       25,
+       25
+      ],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=game-plan-view&mode=franchise",
+      "median": 33,
+      "worst": 115,
+      "skelMedian": 30
+     },
+     "warm": {
+      "ms": [
+       6,
+       5,
+       6,
+       5,
+       5
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=game-plan-view&mode=franchise",
+      "median": 5,
+      "worst": 6
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       32,
+       32,
+       38,
+       37,
+       38
+      ],
+      "flags": {
+       "skeleton": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       28,
+       26,
+       35,
+       32,
+       33
+      ],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=game-plan-view&mode=franchise",
+      "median": 37,
+      "worst": 38,
+      "skelMedian": 32
+     },
+     "warm": {
+      "ms": [
+       6,
+       5,
+       5,
+       8,
+       5
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=game-plan-view&mode=franchise",
+      "median": 5,
+      "worst": 8
+     }
+    }
+   },
+   "playbooks-view": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       402,
+       393,
+       419,
+       341,
+       330
+      ],
+      "flags": {
+       "skeleton": 5,
+       "jump": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       394,
+       385,
+       416,
+       338,
+       327
+      ],
+      "cls": 0.7793779233455658,
+      "shiftSrc": [
+       "0.435 div.playbooks-page",
+       "0.344 div#pane-offense.playbooks-tabpane.on + div.playbooks-side-row + section.pbs.pb-sec + div.pcs-g",
+       "0.000 div.adv-wrap"
+      ],
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=playbooks-view&mode=franchise",
+      "median": 393,
+      "worst": 419,
+      "skelMedian": 385
+     },
+     "warm": {
+      "ms": [
+       7,
+       9,
+       9,
+       8,
+       7
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=playbooks-view&mode=franchise",
+      "median": 8,
+      "worst": 9
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       378,
+       414,
+       389,
+       378,
+       355
+      ],
+      "flags": {
+       "skeleton": 5,
+       "jump": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       373,
+       411,
+       381,
+       370,
+       351
+      ],
+      "cls": 0.7830025876522064,
+      "shiftSrc": [
+       "0.435 div.playbooks-page",
+       "0.344 div#pane-offense.playbooks-tabpane.on + div.playbooks-side-row + section.pbs.pb-sec + div.pcs-g",
+       "0.004 section.pbs.pb-sec + section.pbs.pb-sec"
+      ],
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=playbooks-view&mode=franchise",
+      "median": 378,
+      "worst": 414,
+      "skelMedian": 373
+     },
+     "warm": {
+      "ms": [
+       9,
+       8,
+       8,
+       7,
+       9
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=playbooks-view&mode=franchise",
+      "median": 8,
+      "worst": 9
+     }
+    }
+   },
+   "scouting-view": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       474,
+       532,
+       554,
+       403,
+       427
+      ],
+      "flags": {
+       "skeleton": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       471,
+       526,
+       549,
+       400,
+       422
+      ],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=scouting-view&mode=franchise",
+      "median": 474,
+      "worst": 554,
+      "skelMedian": 471
+     },
+     "warm": {
+      "ms": [
+       10,
+       8,
+       8,
+       8,
+       9
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=scouting-view&mode=franchise",
+      "median": 8,
+      "worst": 10
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       465,
+       440,
+       440,
+       427,
+       415
+      ],
+      "flags": {
+       "skeleton": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       459,
+       433,
+       432,
+       420,
+       412
+      ],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=scouting-view&mode=franchise",
+      "median": 440,
+      "worst": 465,
+      "skelMedian": 432
+     },
+     "warm": {
+      "ms": [
+       8,
+       8,
+       10,
+       9,
+       9
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0.0002430514812469482,
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=scouting-view&mode=franchise",
+      "median": 9,
+      "worst": 10
+     }
+    }
+   },
+   "training-report-view": {
+    "desktop": {
+     "cold": {
+      "ms": [
+       12,
+       11,
+       26,
+       10,
+       11
+      ],
+      "flags": {
+       "skeleton": 5,
+       "jump": 5
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       9,
+       8,
+       24,
+       7,
+       8
+      ],
+      "cls": 0.5820116561889648,
+      "shiftSrc": [
+       "0.532 div.training-report-container.resource-page-container",
+       "0.050 div#gob-main.main.scroll"
+      ],
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=training-report-view&mode=franchise&week=1&from=office&origin=office",
+      "median": 11,
+      "worst": 26,
+      "skelMedian": 8
+     },
+     "warm": {
+      "ms": [
+       3,
+       4,
+       6,
+       3,
+       3
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0,
+      "landed": "/franchise-command-center.html?runtime=local&franchise_id=6abce0afba6ebe21aaf4a203&tab=training-report-view&mode=franchise&week=1&from=office&origin=office",
+      "median": 3,
+      "worst": 6
+     }
+    },
+    "online": {
+     "cold": {
+      "ms": [
+       15,
+       10,
+       10,
+       18,
+       11
+      ],
+      "flags": {
+       "skeleton": 5,
+       "jump": 4
+      },
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "skelMs": [
+       9,
+       7,
+       7,
+       14,
+       7
+      ],
+      "cls": 0.5820116561889648,
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=training-report-view&mode=franchise&week=1&from=office&origin=office",
+      "shiftSrc": [
+       "0.532 div.training-report-container.resource-page-container",
+       "0.050 div#gob-main.main.scroll"
+      ],
+      "median": 11,
+      "worst": 18,
+      "skelMedian": 7
+     },
+     "warm": {
+      "ms": [
+       4,
+       5,
+       4,
+       3,
+       2
+      ],
+      "flags": {},
+      "skipped": "",
+      "timeouts": 0,
+      "errors": [],
+      "cls": 0,
+      "landed": "/franchise-command-center.html?franchise_id=6abce0d9ba6ebe21aaf4d2d2&tab=training-report-view&mode=franchise&week=1&from=office&origin=office",
+      "median": 4,
+      "worst": 5
+     }
+    }
+   }
+  },
+  "shots": {},
+  "runs": 5
+ }
+}

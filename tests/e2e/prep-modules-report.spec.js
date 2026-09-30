@@ -173,13 +173,19 @@ test.beforeAll(() => { fs.mkdirSync(OUT, { recursive: true }); });
 
 test('the view does not fetch the old embed HTML', async ({ page }) => {
   const embeds = [];
+  const loaders = [];
+  const bridges = [];
   page.on('request', (req) => {
     const url = req.url();
     if (url.includes('training-report.html')) embeds.push(url);
+    if (url.includes('viewLoader.js')) loaders.push(url);
+    if (url.includes('prepEmbed.js')) bridges.push(url);
   });
   await page.setViewportSize({ width: 1280, height: 720 });
   await openReport(page, { from: 'office', origin: 'office' });
   expect(embeds).toEqual([]);
+  expect(bridges).toEqual([]);
+  expect(loaders.length).toBeGreaterThan(0);
   const clash = await page.evaluate(() => {
     const host = document.getElementById('training-report-view');
     const dupes = [];

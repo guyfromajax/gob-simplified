@@ -1,4 +1,4 @@
-import { ensureCss, loadScript, ensureFranchiseMode } from './prepEmbed.js';
+import { ensureCss, loadScript, ensureFranchiseMode } from './viewLoader.js';
 import { init as initPlan } from '/game-plan.js';
 
 var CSS = [

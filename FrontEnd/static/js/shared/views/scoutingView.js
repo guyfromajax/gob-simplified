@@ -1,4 +1,4 @@
-import { ensureCss, loadScript } from './prepEmbed.js';
+import { ensureCss, loadScript } from './viewLoader.js';
 
 var CSS = [
   '/css/prep-v2-scouting.css',
@@ -37,14 +37,22 @@ function esc(v) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+function contextValue(key) {
+  var fc = window.FranchiseContext;
+  if (!fc || typeof fc.get !== 'function') return '';
+  try { return fc.get(key) || ''; }
+  catch (err) { return ''; }
+}
+
 function franchiseIdFrom(ctx) {
   if (ctx && ctx.franchiseId) return ctx.franchiseId;
-  try { return new URLSearchParams(window.location.search).get('franchise_id') || ''; }
-  catch (err) { return ''; }
+  return contextValue('franchise_id');
 }
 
 function userTeamIdFrom(ctx) {
   if (ctx && ctx.teamId) return ctx.teamId;
+  var fromContext = contextValue('team_id');
+  if (fromContext) return fromContext;
   if (window.GOBViews && typeof window.GOBViews.userTeamId === 'function') {
     return window.GOBViews.userTeamId() || '';
   }

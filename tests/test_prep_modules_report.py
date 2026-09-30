@@ -10,6 +10,8 @@ HTML = (ROOT / "FrontEnd" / "static" / "training-report.html").read_text()
 
 
 def test_view_does_not_embed_the_old_page():
+    assert "from './viewLoader.js'" in VIEW
+    assert "prepEmbed" not in VIEW
     assert "embed('/training-report.html" not in VIEW
     assert "DOMParser" not in VIEW
     assert "loadIsolated" not in VIEW
@@ -26,6 +28,8 @@ def test_page_script_exports_init():
 def test_html_still_redirects_into_the_app():
     assert "tab', 'training-report-view'" in HTML or 'tab", "training-report-view"' in HTML
     assert "location.replace('/franchise-command-center.html?" in HTML
+    assert "embed') === '1'" not in HTML
+    assert "import { init } from '/training-report.js'" not in HTML
 
 
 def test_page_class_is_on_the_view_root_not_document_body():

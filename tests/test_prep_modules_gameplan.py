@@ -11,6 +11,8 @@ CSS = (ROOT / "FrontEnd" / "static" / "game-plan.css").read_text()
 
 
 def test_view_does_not_embed_the_old_page():
+    assert "from './viewLoader.js'" in VIEW
+    assert "prepEmbed" not in VIEW
     assert "embed('/game-plan.html" not in VIEW
     assert "DOMParser" not in VIEW
     assert "loadIsolated" not in VIEW
@@ -30,6 +32,7 @@ def test_html_keeps_focus_paths_and_redirects_browse():
     assert "resume_from_timeout" in HTML
     assert "mode') === 'tutorial'" in HTML or 'mode") === "tutorial"' in HTML
     assert "location.replace('/franchise-command-center.html?" in HTML
+    assert "embed') === '1'" not in HTML
     assert "import { init } from '/game-plan.js'" in HTML
 
 

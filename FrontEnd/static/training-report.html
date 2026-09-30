@@ -5,8 +5,6 @@
     (function () {
       try {
         var q = new URLSearchParams(location.search);
-        if (q.get('embed') === '1') return;
-        q.delete('embed');
         q.set('tab', 'training-report-view');
         location.replace('/franchise-command-center.html?' + q.toString());
       } catch (err) {}
@@ -126,18 +124,8 @@
   <script src="/js/shared/teamShotThresholdScale.js"></script>
   <script src="/js/utils/attributeDisplay.js"></script>
   <script type="module">
-    import { init } from '/training-report.js';
     import { resumeFranchiseTrack } from '/js/musicController.js';
     resumeFranchiseTrack();
-    // The page redirects into the app unless ?embed=1. That leftover path
-    // calls the same init() the in-app view uses.
-    try {
-      const fc = window.FranchiseContext;
-      const ctx = (key) => (fc && typeof fc.get === 'function' ? fc.get(key) : null);
-      if (ctx('embed') === '1') {
-        init(document.body);
-      }
-    } catch (err) { /* redirect already left */ }
   </script>
 </body>
 </html>
