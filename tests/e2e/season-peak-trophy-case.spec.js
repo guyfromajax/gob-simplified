@@ -442,6 +442,12 @@ test.describe('season peak review', () => {
     await expect(page.locator('.bp')).toHaveCount(3);
     await expect(page.locator('.aw')).toHaveCount(2);
     await expect(page.locator('.rv .rc')).toHaveCount(2);
+    const classRow = await page.locator('.rv .rc').first().evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { borderLeftWidth: s.borderLeftWidth, backgroundColor: s.backgroundColor };
+    });
+    expect(parseFloat(classRow.borderLeftWidth)).toBe(0);
+    expect(classRow.backgroundColor === 'transparent' || classRow.backgroundColor === 'rgba(0, 0, 0, 0)').toBe(true);
     await expect(page.locator('.rv-f em')).toHaveText('Trophy Case');
     await expect.poll(() => page.evaluate(() => (window.__gobSeasonPeakSfx || []).filter((n) => n === 'STING_SEASON_PEAK').length)).toBe(1);
     await page.waitForTimeout(600);
@@ -452,6 +458,9 @@ test.describe('season peak review', () => {
     const ch8Shots = path.join(__dirname, '../../reports/ch8-cleanup-1');
     fs.mkdirSync(ch8Shots, { recursive: true });
     await page.screenshot({ path: path.join(ch8Shots, 'review-1280.png') });
+    const nitShots = path.join(__dirname, '../../reports/training-report-no-momentum');
+    fs.mkdirSync(nitShots, { recursive: true });
+    await page.screenshot({ path: path.join(nitShots, 'review-1280.png') });
     await page.locator('.rv-go').click();
     await expect(page.locator('.rv.is-open')).toHaveCount(0);
     expect(seen.some((s) => s.path.indexOf('season-review-seen') !== -1)).toBe(true);

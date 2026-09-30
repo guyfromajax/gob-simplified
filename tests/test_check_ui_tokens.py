@@ -304,3 +304,32 @@ def test_allow_list_selectors_and_comments(tmp_path):
         if hit.path.endswith("gob-tutorial.css") and hit.surface == "new"
     ]
     assert tutorial_new == []
+
+
+def test_reward_gold_xg_allowed_and_random_selector_fails(tmp_path):
+    root = tmp_path / "reward"
+    _write(root, "css/gob-tokens.css", TOKENS_CSS)
+    _write(
+        root,
+        "css/office-home.css",
+        """
+.wkc .gc.xg { color: var(--reward-gold); }
+.xg-key { border-color: var(--reward-gold); }
+@keyframes xgSweep { to { box-shadow: 0 0 8px var(--reward-gold); } }
+""",
+    )
+    audit = _audit(root)
+    assert audit.law_counts()["new"]["reward-gold"] == 0
+
+    _write(root, "css/gob-components.css", ".random-card { color: var(--reward-gold); }\n")
+    dirty = _audit(root)
+    assert any(
+        hit.kind == "reward-gold" and hit.surface == "new" and hit.path == "css/gob-components.css"
+        for hit in dirty.laws
+    )
+    report = tmp_path / "reward.md"
+    run = subprocess.run(
+        [sys.executable, str(SCRIPT), "--root", str(root), "--report", str(report), "--strict"],
+        check=False, capture_output=True, text=True,
+    )
+    assert run.returncode == 1, run.stdout + run.stderr

@@ -414,7 +414,6 @@ function renderScoutingTeamReport(teamAttrs, createTeamAttrItem, gridId) {
     'pt_efficiency',
     'fight',
     'discipline',
-    'momentum_score',
     'team_chemistry',
     'fb_opp_modifier',
     'pt_opp_modifier'

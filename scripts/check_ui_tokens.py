@@ -12,11 +12,13 @@ not on the allow-list. Legacy hits are reported and do not fail the gate.
 
 New surface: shell HTML (``gob-shell`` / ``gob-focus``, or a page listed in
 ``gobShell.js`` PAGES), ``css/gob-*.css`` except tutorial/advanced-topic
-chrome, ``css/office-home.css``, ``js/shared/gob*.js``, and
+chrome, Chapter 7 chrome (``css/office-home.css``, ``css/home-base.css``,
+``css/milestone-modal.css``, ``css/season-peak.css``,
+``css/trophy-case.css``), ``js/shared/gob*.js``, and
 ``js/shared/views/**``. Everything else under the scan root is legacy.
 ``css/gob-tokens.css`` is the token source and is not scanned.
 
-Allow-list (green / orange only; ``--reward-gold`` is always a hit):
+Allow-list (green / orange / reward-gold):
 
 * Green — Advance (``advance``, ``play-now``, ``gob-btn--gate``), positive
   data (``delta-up``, ``tier-green``, ``t-green``, ``is-up``, ``is-pos``,
@@ -28,6 +30,11 @@ Allow-list (green / orange only; ``--reward-gold`` is always a hit):
   ``gob-btn--action``, ``toggle-btn.active``, ``.gated``, ``.td-gate``,
   ``.is-on``), attribute-ramp mid stops on ``.att-col`` / ``.att-bar``,
   or a nearby ``/* colour-law: committed */`` / ``/* colour-law: saved */``.
+* Reward-gold — title medallions (``.med.gold``), season-peak glow / rule /
+  confetti (``.pk``, ``.cf``), milestone accents (``.mm.is-gold``,
+  ``.mm .med``), the exceptional-gain marker (``.xg``, ``.xg-key``,
+  ``xgSweep``), Trophy Case words (``.gold-t``, ``.pk-f`` / ``.rv-f``
+  emphasis), or a nearby ``/* colour-law: reward */``.
 """
 
 from __future__ import annotations
@@ -205,11 +212,31 @@ RAMP_SELECTOR_RE = re.compile(r"(?:^|[^a-z0-9])(?:att-col|att-bar)(?:[^a-z0-9]|$
 POSITIVE_VALUE_RE = re.compile(r"var\(\s*--(?:delta-up|tier-green)\b")
 GREEN_VALUE_RE = re.compile(r"var\(\s*--green\b")
 ORANGE_VALUE_RE = re.compile(r"var\(\s*--orange\b")
-LAW_ANNOTATION_RE = re.compile(r"colour-law:\s*(positive-data|committed|saved)\b", re.I)
+LAW_ANNOTATION_RE = re.compile(
+    r"colour-law:\s*(positive-data|committed|saved|reward)\b", re.I
+)
 NEW_SURFACE_EXCLUDE = frozenset({
     "css/gob-tutorial.css",
     "css/gob-advanced.css",
 })
+NEW_DESIGN_CSS = frozenset({
+    "css/office-home.css",
+    "css/home-base.css",
+    "css/milestone-modal.css",
+    "css/season-peak.css",
+    "css/trophy-case.css",
+})
+REWARD_SELECTOR_RE = re.compile(
+    r"med\.gold|"
+    r"\.pk\b|\.pk-|"
+    r"\.cf\b|"
+    r"\.mm\.is-gold|\.mm\s+\.med|"
+    r"(?:^|[^a-z0-9-])(?:xg|xg-key|xgsweep)(?:[^a-z0-9-]|$)|"
+    r"gold-t|"
+    r"\.pk-f|\.rv-f|"
+    r"trophy-case",
+    re.I,
+)
 
 CAMEL_PROP = {
     "color": "color",
@@ -679,7 +706,7 @@ def is_new_surface(rel: Path, text: str, pages: set[str]) -> bool:
     name = rel.name
     if posix in NEW_SURFACE_EXCLUDE:
         return False
-    if posix.startswith("css/gob-") or posix == "css/office-home.css":
+    if posix.startswith("css/gob-") or posix in NEW_DESIGN_CSS:
         return True
     if posix.startswith("js/shared/views/"):
         return True
@@ -844,6 +871,42 @@ def _orange_allowed(selector: str, annotation: str | None = None) -> bool:
         return True
     blob = selector.lower()
     return bool(SAVE_RE.search(blob) or RAMP_SELECTOR_RE.search(blob))
+
+
+def _reward_gold_allowed(selector: str, annotation: str | None = None) -> bool:
+    if annotation == "reward":
+        return True
+    return bool(REWARD_SELECTOR_RE.search(selector or ""))
+
+
+def _iter_blocks_inclusive(text: str, lo: int, hi: int):
+    """Every CSS block, including ancestors (so @keyframes wraps `to`)."""
+    i = lo
+    while i < hi:
+        start = text.find("{", i, hi)
+        if start < 0:
+            break
+        depth = 1
+        j = start + 1
+        while j < hi and depth:
+            if text[j] == "{":
+                depth += 1
+            elif text[j] == "}":
+                depth -= 1
+            j += 1
+        body_hi = j - 1
+        yield text[i:start], start + 1, body_hi
+        if "{" in text[start + 1:body_hi]:
+            yield from _iter_blocks_inclusive(text, start + 1, body_hi)
+        i = j
+
+
+def _selector_covering(text: str, index: int) -> str:
+    covering: list[str] = []
+    for selector_raw, body_lo, body_hi in _iter_blocks_inclusive(text, 0, len(text)):
+        if body_lo <= index <= body_hi:
+            covering.append(_selector_text(selector_raw))
+    return " ".join(covering)
 
 
 def _record_declaration(
@@ -1013,9 +1076,15 @@ def _scan_js_line(
 
 def _scan_reward_gold(audit: Audit, path: str, surface: str, text: str) -> None:
     for match in REWARD_GOLD_RE.finditer(text):
+        line = line_of(text, match.start())
+        note = _annotation_for(audit, path, line)
+        selector = _selector_covering(text, match.start())
+        context = selector or text[max(0, match.start() - 80):match.start() + 80]
+        if _reward_gold_allowed(context, note):
+            continue
         audit.laws.append(Hit(
-            path, line_of(text, match.start()), surface, "reward-gold", "--reward-gold",
-            "token should be unused",
+            path, line, surface, "reward-gold", "--reward-gold",
+            _selector_label(selector) if selector else "token should be unused",
         ))
 
 
@@ -1180,7 +1249,8 @@ def format_report(audit: Audit) -> str:
         "",
         "New: shell HTML (`gob-shell` / `gob-focus` on `<html>`, or a filename listed in",
         "`js/shared/gobShell.js` `PAGES`), `css/gob-*.css` except `gob-tutorial.css` /",
-        "`gob-advanced.css` (tutorial chrome), `css/office-home.css`, `js/shared/gob*.js`,",
+        "`gob-advanced.css` (tutorial chrome), Chapter 7 chrome (`office-home`,",
+        "`home-base`, `milestone-modal`, `season-peak`, `trophy-case`), `js/shared/gob*.js`,",
         "`js/shared/views/**`.",
         "",
         "Legacy: every other scanned file. That is an old page or stylesheet still to migrate,",
@@ -1280,9 +1350,13 @@ def format_report(audit: Audit) -> str:
         "and board-gain bars, RT/attribute ramps), or a nearby `/* colour-law: positive-data */`.",
         "Orange is allowed on committed/saved (`save`, `committed`, `gob-btn--action`,",
         "`.gated`, `.td-gate`) or `/* colour-law: committed */` / `/* colour-law: saved */`.",
-        "`--reward-gold` is a hit anywhere outside `gob-tokens.css`. Token redefinitions of",
-        "`--green` / `--orange` are listed as literals above and are not law hits.",
-        "`css/gob-tutorial.css` and `css/gob-advanced.css` are tutorial chrome, not new-design.",
+        "`--reward-gold` is allowed on title medallions (`.med.gold`), season-peak glow /",
+        "rule / confetti (`.pk`, `.cf`), milestone accents (`.mm.is-gold`, `.mm .med`),",
+        "the exceptional-gain marker (`.xg`, `.xg-key`, `xgSweep`), Trophy Case words",
+        "(`.gold-t`, `.pk-f` / `.rv-f`), or a nearby `/* colour-law: reward */`.",
+        "Token redefinitions of `--green` / `--orange` are listed as literals above and",
+        "are not law hits. `css/gob-tutorial.css` and `css/gob-advanced.css` are tutorial",
+        "chrome, not new-design.",
         "",
     ])
     for surface in ("new", "legacy"):

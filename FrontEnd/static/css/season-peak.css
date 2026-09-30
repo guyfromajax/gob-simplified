@@ -153,7 +153,8 @@ html.gob-1920 .rv,.gob-1920 .rv{--rv-px:64px;--rv-pt:40px}
 .rv .sec-h{display:flex;align-items:baseline;gap:var(--space-10);padding-bottom:var(--dsp-8);border-bottom:1px solid var(--line-strong)}
 .rv .sec-h h3{font:var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-7);color:var(--text-87);white-space:nowrap;margin:0}
 .rv .sec-h span{font-size:var(--fs-11);color:var(--text-38);white-space:nowrap}
-.rv-cols .aw{min-height:var(--dsz-50)}
+.rv-cols .rc,.rv-cols .aw{min-height:var(--dsz-50)}
+.rv .rc-l{border-top:0}
 .bp{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--dsp-12);align-items:center;padding:var(--dsp-12) 0;border-bottom:1px solid var(--line)}
 .bp .av{
   width:var(--dsz-44,44px);height:var(--dsz-44,44px);overflow:hidden;
@@ -175,7 +176,11 @@ html.gob-1920 .rv,.gob-1920 .rv{--rv-px:64px;--rv-pt:40px}
 .aw span{font-size:var(--fs-11);color:var(--text-60)}
 .tg{display:inline-flex;align-items:center;height:var(--dsz-20,20px);padding:0 var(--space-6);border-radius:var(--radius-6);font:var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-1);white-space:nowrap;background:var(--white-5);box-shadow:inset 0 0 0 1px var(--line-strong);color:var(--text-87)}
 .aw .tg{font-size:var(--fs-11)}
-.rv .rc{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--space-10);min-height:var(--dsz-40);border-bottom:1px solid var(--line);padding:0;background:transparent;box-shadow:none;border-radius:0}
+.rv .rc{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:var(--space-10);
+  min-height:var(--dsz-40);padding:0;border-radius:0;box-shadow:none;
+  border:none;border-bottom:1px solid var(--line);background:transparent;
+}
 .rv .rc .av{width:28px;height:28px;overflow:hidden;font-size:var(--fs-10);border-radius:var(--radius-6);background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--line-strong);display:inline-grid;place-items:center;color:var(--text-60)}
 .rv .rc .av img{width:100%;height:100%;object-fit:cover;object-position:50% 20%;display:block}
 .rv .rc-n{display:flex;flex-direction:column;gap:var(--space-2);min-width:0}

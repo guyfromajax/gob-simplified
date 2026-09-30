@@ -1448,7 +1448,7 @@ function renderTeamAttributes() {
   const teamAttrs = reportData.team_attributes || {};
   const teamChanges = reportData.team_changes || {};
   
-  // Define order of attributes
+  // Team Report display list. Momentum is omitted (Jamie: same 11 as Team Attributes).
   const attrOrder = [
     'shot_threshold',
     'rebound_modifier',
@@ -1458,7 +1458,6 @@ function renderTeamAttributes() {
     'pt_efficiency',
     'fight',
     'discipline',
-    'momentum_score',
     'team_chemistry',
     'fb_opp_modifier',
     'pt_opp_modifier'
