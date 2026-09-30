@@ -71,6 +71,7 @@ from BackEnd.utils.shared import format_height, summarize_game_state
 from BackEnd.utils.rt_display import format_rt_display
 from BackEnd.utils.player_year import format_player_year_display
 from BackEnd.utils import stat_updater
+from BackEnd.utils import cpu_week_pool as _cpu_week_pool_mod
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
 from BackEnd.models.franchise_manager import FranchiseManager, ScheduleManager
 from BackEnd.tournament.bracket_engine import get_round_name
@@ -6080,10 +6081,35 @@ def _cpu_sim_job_path(week: int) -> str:
 # start a second full sim — that was the observed double-sim. start-cpu-sims
 # persists results.{week} on completion, so once it releases the claim a waiting
 # phase-b finds the results, skips every CPU game, and just finalizes.
-_CPU_SIM_CLAIM_STALE_SECONDS = 300   # crash backstop; > worst-case uncontended sim
 _CPU_SIM_CLAIM_WAIT_SECONDS = 150    # phase-b bounded wait for an in-flight claim
 _CPU_SIM_CLAIM_POLL_SECONDS = 0.5
 _CPU_SIM_CLAIM_HEARTBEAT_SECONDS = 30  # owner refresh interval; well under the stale window
+
+
+def _cpu_sim_claim_stale_seconds() -> int:
+    """Crash backstop: a claim whose heartbeat is older than this is re-claimable.
+
+    A live owner refreshes every _CPU_SIM_CLAIM_HEARTBEAT_SECONDS (30 s), so 90 s is
+    three missed beats. It was 300 s before the heartbeat existed (the only signal
+    was acquire time, so it had to exceed a whole slow sim); that left a player
+    locked out of phase-b for ~5 min after a deploy killed the owner. Env override
+    GOB_CPU_SIM_CLAIM_STALE_SECONDS; never below 3 heartbeats.
+    """
+    floor = 3 * _CPU_SIM_CLAIM_HEARTBEAT_SECONDS
+    raw = os.environ.get("GOB_CPU_SIM_CLAIM_STALE_SECONDS", "").strip()
+    try:
+        value = int(raw) if raw else 90
+    except ValueError:
+        value = 90
+    return max(value, floor)
+
+
+_CPU_SIM_CLAIM_STALE_SECONDS = _cpu_sim_claim_stale_seconds()
+
+# Claims this process currently owns: (franchise_id str, week, owner) -> heartbeat.
+# Lets the shutdown hook release exactly this process's claims (never another's).
+_owned_claims_lock = threading.Lock()
+_owned_claims: dict[tuple[str, int, str], Any] = {}
 
 
 def _cpu_sim_claim_path(week: int) -> str:
@@ -6114,16 +6140,56 @@ def _acquire_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> boo
             "acquired_at": now_iso, "heartbeat": now_iso,
         }}},
     )
+    if matched is not None:
+        with _owned_claims_lock:
+            _owned_claims.setdefault((str(franchise_id), int(week), owner), None)
     return matched is not None
 
 
 def _release_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> None:
     """Release the claim iff this request still owns it (never steal a re-claim)."""
+    _release_cpu_sim_claim_as(franchise_id, week, owner, reason=None)
+
+
+def _release_cpu_sim_claim_as(franchise_id: ObjectId, week: int, owner: str, *, reason: str | None) -> bool:
     path = _cpu_sim_claim_path(week)
-    db.franchises.update_one(
+    fields = {f"{path}.active": False, f"{path}.released_at": _utc_now_iso()}
+    if reason:
+        fields[f"{path}.released_reason"] = reason
+    res = db.franchises.update_one(
         {"_id": franchise_id, f"{path}.owner": owner, f"{path}.active": True},
-        fold_browse_rev({"$set": {f"{path}.active": False, f"{path}.released_at": _utc_now_iso()}}),
+        fold_browse_rev({"$set": fields}),
     )
+    with _owned_claims_lock:
+        _owned_claims.pop((str(franchise_id), int(week), owner), None)
+    return bool(getattr(res, "modified_count", 0))
+
+
+def release_owned_cpu_sim_claims(reason: str = "shutdown") -> int:
+    """Release every CPU-sim claim THIS process owns (shutdown hook). Idempotent.
+
+    Stops each claim's heartbeat, then marks the claim inactive with an owner-token
+    filter, so a claim another process has since taken is never touched. The next
+    start-cpu-sims / phase-b (on the new deployment) re-claims immediately instead of
+    waiting out the stale window. Returns the number of claims released.
+    """
+    with _owned_claims_lock:
+        owned = list(_owned_claims.items())
+    released = 0
+    for (fid, week, owner), heartbeat in owned:
+        if heartbeat is not None:
+            try:
+                heartbeat.stop()
+            except Exception:
+                logger.exception("[CPU-SIM-CLAIM] heartbeat stop failed on %s", reason)
+        try:
+            if _release_cpu_sim_claim_as(ObjectId(fid), week, owner, reason=reason):
+                released += 1
+        except Exception:
+            logger.exception("[CPU-SIM-CLAIM] release failed on %s franchise_id=%s week=%s", reason, fid, week)
+    if owned:
+        logger.warning("[CPU-SIM-CLAIM] %s: released %s/%s owned claim(s)", reason, released, len(owned))
+    return released
 
 
 def _refresh_cpu_sim_claim_heartbeat(franchise_id: ObjectId, week: int, owner: str) -> bool:
@@ -6159,12 +6225,16 @@ class _CpuSimClaimHeartbeat:
 
     def start(self) -> "_CpuSimClaimHeartbeat":
         self._interval = _CPU_SIM_CLAIM_HEARTBEAT_SECONDS
+        with _owned_claims_lock:
+            key = (str(self.franchise_id), int(self.week), self.owner)
+            if key in _owned_claims:
+                _owned_claims[key] = self
         self._thread.start()
         return self
 
     def stop(self) -> None:
         self._stop.set()
-        if self._thread.is_alive():
+        if self._thread.is_alive() and self._thread is not threading.current_thread():
             self._thread.join(timeout=5)
 
     def _run(self) -> None:
@@ -8916,6 +8986,9 @@ def _complete_week_finish_cpu_and_persist(
         stat_updater.reset_finalize_subtiming()  # [FINALIZE-SUBTIMING] split finalize_game internals
         with stat_updater.franchise_team_maps_scope():
           for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+            # Deploy/shutdown: stop before the next game's writes. The claim is released
+            # by the shutdown hook; the next claimant re-sims only games without results.
+            _cpu_week_pool_mod.raise_if_shutting_down()
             if job_idx in sim_err:
                 logger.error(
                     "❌ [COMPLETE-WEEK] Parallel full-sim core failed; random fallback + bracket sync. franchise_id=%s week=%s idx=%s",
@@ -19147,6 +19220,9 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         stat_updater.reset_finalize_subtiming()
         with stat_updater.franchise_team_maps_scope():
           for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+            # Deploy/shutdown: stop before the next game's writes. The claim is released
+            # by the shutdown hook; the next claimant re-sims only games without results.
+            _cpu_week_pool_mod.raise_if_shutting_down()
             g = week_games_meta[job_idx] if job_idx < len(week_games_meta) else None
             if job_idx in sim_err:
                 logger.error(

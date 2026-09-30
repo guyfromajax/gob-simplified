@@ -33,4 +33,12 @@ export MALLOC_ARENA_MAX=2
 GCC_LIBS="$(echo /nix/store/*gcc*-lib/lib | tr ' ' ':')"
 export LD_LIBRARY_PATH="${GCC_LIBS}:${LD_LIBRARY_PATH}"
 
-exec /opt/venv/bin/uvicorn BackEnd.api.api:app --host 0.0.0.0 --port "${PORT:-8000}"
+# Graceful deploy: on SIGTERM uvicorn stops accepting, lets in-flight requests (a week
+# advance is ~50-130 s) finish for up to this long, then runs the app's shutdown hook
+# (terminate CPU pools, release this process's CPU-sim claims). Keep it BELOW Railway's
+# RAILWAY_DEPLOYMENT_DRAINING_SECONDS so the hook runs before SIGKILL.
+# See reports/graceful-deploy-2026-09-30.md.
+GRACEFUL_SHUTDOWN_SECONDS="${GOB_GRACEFUL_SHUTDOWN_SECONDS:-150}"
+
+exec /opt/venv/bin/uvicorn BackEnd.api.api:app --host 0.0.0.0 --port "${PORT:-8000}" \
+  --timeout-graceful-shutdown "${GRACEFUL_SHUTDOWN_SECONDS}"

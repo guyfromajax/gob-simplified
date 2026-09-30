@@ -53,6 +53,71 @@ logger = logging.getLogger(__name__)
 DEFAULT_POOL_WORKERS = 8
 
 # ---------------------------------------------------------------------------
+# Shutdown (deploy) support
+#
+# Every executor this process creates is tracked so the app's shutdown hook can
+# cancel pending games and terminate worker processes instead of leaving them to
+# SIGKILL. Once shutting down, the failure ladder does NOT rebuild the pool or fall
+# back to in-process sims (that would keep simming on a dying process) — it raises
+# ShutdownInProgress, and the persist loops stop before their next game.
+# ---------------------------------------------------------------------------
+_shutdown_event = threading.Event()
+_live_executors_lock = threading.Lock()
+_live_executors: set = set()
+
+
+class ShutdownInProgress(RuntimeError):
+    """The process is shutting down; the next claimant resumes this work."""
+
+
+def reset_shutdown_state() -> None:
+    """App startup: a starting process is not shutting down (lifespan can re-run in tests)."""
+    _shutdown_event.clear()
+
+
+def shutting_down() -> bool:
+    return _shutdown_event.is_set()
+
+
+def raise_if_shutting_down() -> None:
+    if _shutdown_event.is_set():
+        raise ShutdownInProgress("process shutting down; CPU-week work will resume on the next request")
+
+
+@contextmanager
+def _tracked_executor(max_workers: int, ctx):
+    raise_if_shutting_down()
+    ex = ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx)
+    with _live_executors_lock:
+        _live_executors.add(ex)
+    try:
+        with ex:
+            yield ex
+    finally:
+        with _live_executors_lock:
+            _live_executors.discard(ex)
+
+
+def shutdown_all_pools() -> int:
+    """Shutdown hook: cancel pending games and terminate every live worker. Idempotent."""
+    _shutdown_event.set()
+    with _live_executors_lock:
+        executors = list(_live_executors)
+    for ex in executors:
+        try:
+            ex.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            logger.exception("[CPU-POOL] executor shutdown failed")
+        for proc in list((getattr(ex, "_processes", None) or {}).values()):
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+    if executors:
+        logger.warning("[CPU-POOL] shutdown: terminated %s live pool(s)", len(executors))
+    return len(executors)
+
+# ---------------------------------------------------------------------------
 # Concurrency + efficiency observability
 #
 # Three pooled paths live in this module — CPU week, autotrain, Practice Squad —
@@ -186,7 +251,7 @@ def _run_one_pool(jobs, seed_base, max_workers, collect_guard, results, leaks):
     max_workers = max(1, min(max_workers, len(jobs))) if jobs else 1
     ctx = mp.get_context("spawn")
     try:
-        with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as ex:
+        with _tracked_executor(max_workers, ctx) as ex:
             fut_to_idx = {ex.submit(_worker, _task_of(j, seed_base, collect_guard)): j[0]
                           for j in jobs}
             for fut in as_completed(fut_to_idx):
@@ -201,8 +266,10 @@ def _run_one_pool(jobs, seed_base, max_workers, collect_guard, results, leaks):
                 except Exception as ex_:  # noqa: BLE001 — a game-level failure
                     per_game_errors[idx] = ex_
     except BrokenProcessPool as bpp:
+        raise_if_shutting_down()  # we terminated it: don't treat as a worker crash
         logger.error("[CPU-POOL] BrokenProcessPool (worker died): %s", bpp)
         return per_game_errors, True
+    raise_if_shutting_down()  # cancelled games are missing from results: never report success
     return per_game_errors, False
 
 
@@ -286,6 +353,7 @@ def simulate_cpu_week_pooled(
 
         # Tier 2 — rebuild the pool once for whatever did not complete
         if broke:
+            raise_if_shutting_down()
             remaining = _remaining()
             logger.warning("[CPU-POOL] rebuilding pool once for %d incomplete game(s)",
                            len(remaining))
@@ -294,6 +362,7 @@ def simulate_cpu_week_pooled(
 
         # Tier 3 — sequential in-process for the remainder
         if broke:
+            raise_if_shutting_down()
             remaining = _remaining()
             logger.warning("[CPU-POOL] pool unusable; running %d game(s) sequentially "
                            "in-process (correct + seeded, slower)", len(remaining))
@@ -376,7 +445,7 @@ def simulate_autotrain_pooled(
         ctx = mp.get_context("spawn")
         workers = max(1, min(max_workers, len(js)))
         try:
-            with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as ex:
+            with _tracked_executor(workers, ctx) as ex:
                 fut_to_idx = {ex.submit(_autotrain_worker, t): t[0] for t in _tasks(js)}
                 for fut in as_completed(fut_to_idx):
                     idx = fut_to_idx[fut]
@@ -390,8 +459,10 @@ def simulate_autotrain_pooled(
                     except Exception as ex_:  # noqa: BLE001 — a team-level failure
                         errors[idx] = ex_
         except BrokenProcessPool as bpp:
+            raise_if_shutting_down()  # we terminated it: don't treat as a worker crash
             logger.error("[AUTOTRAIN-POOL] BrokenProcessPool (worker died): %s", bpp)
             return True
+        raise_if_shutting_down()  # cancelled work is missing: never report success
         return False
 
     with _pool_span("autotrain", min(max_workers, len(jobs)), len(jobs)):
@@ -512,7 +583,7 @@ def simulate_ps_games_pooled(
         ctx = mp.get_context("spawn")
         workers = max(1, min(max_workers, len(js)))
         try:
-            with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as ex:
+            with _tracked_executor(workers, ctx) as ex:
                 fut_to_idx = {ex.submit(_ps_sim_worker, t): t[0] for t in _tasks(js)}
                 for fut in as_completed(fut_to_idx):
                     idx = fut_to_idx[fut]
@@ -526,8 +597,10 @@ def simulate_ps_games_pooled(
                     except Exception as ex_:  # noqa: BLE001 — a game-level failure
                         errors[idx] = ex_
         except BrokenProcessPool as bpp:
+            raise_if_shutting_down()  # we terminated it: don't treat as a worker crash
             logger.error("[PS-POOL] BrokenProcessPool (worker died): %s", bpp)
             return True
+        raise_if_shutting_down()  # cancelled work is missing: never report success
         return False
 
     with _pool_span("practice_squad", min(max_workers, len(jobs)), len(jobs)):

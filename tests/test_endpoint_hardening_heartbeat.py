@@ -276,5 +276,5 @@ def test_stale_claim_without_heartbeat_is_still_reclaimable(claim_db):
     franchise_routes.db.franchises.update_one(
         {"_id": fid}, {"$set": {f"{path}.heartbeat": "2000-01-01T00:00:00Z"}}
     )
-    assert franchise_routes._CPU_SIM_CLAIM_STALE_SECONDS == 300
+    assert franchise_routes._CPU_SIM_CLAIM_STALE_SECONDS == 90
     assert franchise_routes._acquire_cpu_sim_claim(fid, 3, "owner-b") is True

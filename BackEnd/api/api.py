@@ -719,9 +719,32 @@ try:
             response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
     
+    # Deploy/SIGTERM: uvicorn drains in-flight requests (--timeout-graceful-shutdown in
+    # start.sh), then runs this. Anything still mid week-advance is stopped cleanly:
+    # pools terminated (flag set first, so persist loops stop before their next game),
+    # then THIS process's CPU-sim claims released so the new deployment re-claims at
+    # once instead of waiting out the stale window. See reports/graceful-deploy-*.md.
+    @app.on_event("shutdown")
+    def release_cpu_week_work_on_shutdown():
+        try:
+            from BackEnd.utils.cpu_week_pool import shutdown_all_pools
+            shutdown_all_pools()
+        except Exception:
+            logging.exception("[SHUTDOWN] pool shutdown failed")
+        try:
+            from BackEnd.api.franchise_routes import release_owned_cpu_sim_claims
+            release_owned_cpu_sim_claims("shutdown")
+        except Exception:
+            logging.exception("[SHUTDOWN] CPU-sim claim release failed")
+
     # ✅ Add startup event to verify app is ready
     @app.on_event("startup")
     async def startup_event():
+        try:
+            from BackEnd.utils.cpu_week_pool import reset_shutdown_state
+            reset_shutdown_state()
+        except Exception as e:
+            print(f"⚠️ [WARNING] startup: cpu pool shutdown flag not reset: {e}", file=sys.stderr, flush=True)
         # RNG isolation watchdog (LOG-ONLY in production). The engine must draw only
         # from sim_rng; a site still bound to the global module is not isolated from
         # third-party RNG (pymongo consumes it) and breaks seeded reproducibility.
