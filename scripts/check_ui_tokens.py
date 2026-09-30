@@ -20,7 +20,8 @@ chrome, Chapter 7 chrome (``css/office-home.css``, ``css/home-base.css``,
 ``css/milestone-modal.css``, ``css/season-peak.css``,
 ``css/trophy-case.css``), recruiting hub CSS (``recruiting-spine.css``,
 ``recruiting-dock.css``, ``recruiting-signing.css``,
-``recruiting-results-hub.css``), ``js/shared/gob*.js``, and
+``recruiting-results-hub.css``), training/report CSS, Playbooks
+(``playbooks.css``, ``css/playbook-tiles.css``), ``js/shared/gob*.js``, and
 ``js/shared/views/**``. Everything else under the scan root is legacy.
 ``css/gob-tokens.css`` is the token source and is not scanned.
 
@@ -240,6 +241,8 @@ NEW_DESIGN_CSS = frozenset({
     "css/training-newswire.css",
     "css/development-focus.css",
     "css/player-development-grid.css",
+    "playbooks.css",
+    "css/playbook-tiles.css",
 })
 
 # Frozen leftover sheet. New rules belong in the view's own CSS.
@@ -1274,7 +1277,8 @@ def format_report(audit: Audit) -> str:
         "`home-base`, `milestone-modal`, `season-peak`, `trophy-case`), recruiting hub CSS",
         "(`recruiting-spine.css`, `recruiting-dock.css`, `recruiting-signing.css`,",
         "`recruiting-results-hub.css`), `js/shared/gob*.js`,",
-        "`js/shared/views/**`.",
+        "`js/shared/views/**`, training/report CSS, and Playbooks (`playbooks.css`,",
+        "`css/playbook-tiles.css`).",
         "",
         "Legacy: every other scanned file. That is an old page or stylesheet still to migrate,",
         "not new code breaking the rules.",

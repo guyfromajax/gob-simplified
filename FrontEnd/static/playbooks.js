@@ -68,7 +68,6 @@ function inAppShell() {
   };
 
   const LOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>';
-  const CHK_SVG = '<svg viewBox="0 0 12 12" fill="none" stroke="#0b0d14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5L5 9L9.5 3.5"/></svg>';
   const NOSLACK_COPY = "No room — the slack is locked. Unlock a play to make space.";
 
   function playSound(name) {
@@ -309,11 +308,15 @@ function inAppShell() {
       return;
     }
     const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
+    function tokenPaint(name, fallback) {
+      const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return value || fallback;
+    }
     function getPswColor(pct) {
-      if (pct > 35) return "#4A90D9";
-      if (pct >= 21) return "#34EC27";
-      if (pct >= 11) return "#FFD700";
-      return "#ff6d6d";
+      if (pct > 35) return tokenPaint("--blue", "#4A90D9");
+      if (pct >= 21) return tokenPaint("--green", "#34EC27");
+      if (pct >= 11) return tokenPaint("--yellow", "#FFD700");
+      return tokenPaint("--red", "#ff6d6d");
     }
     function renderGroup(label, data) {
       if (!data) return "";
@@ -323,7 +326,7 @@ function inAppShell() {
         const color = getPswColor(pct);
         const isDominant = pct === maxPct;
         return `
-          <div class="psw-pill" style="border: 1px solid rgba(255,255,255,0.08);">
+          <div class="psw-pill" style="border: 1px solid var(--line);">
             <div class="psw-pill-pos">${pos}</div>
             <div class="psw-pill-val" style="color: ${color};">${pct}%</div>
             <div class="psw-pill-accent" style="${isDominant ? `background: ${color}; opacity: 1;` : "opacity: 0;"}"></div>
@@ -1644,7 +1647,7 @@ function inAppShell() {
           window.GOBToast.show("Playbooks saved");
           this.updateTotals();
         } else {
-          this.showToast("Playbooks Saved", "", { accentColor: "#34EC27" });
+          this.showToast("Playbooks Saved", "");
           window.setTimeout(() => this.handleBack(), SAVE_NAV_DELAY_MS);
         }
       } catch (error) {
@@ -1652,7 +1655,7 @@ function inAppShell() {
         if (this.isHosted() && window.GOBToast) {
           window.GOBToast.show("Playbooks not saved. Try again.");
         } else {
-          this.showToast("Failed to save playbooks", "", { accentColor: "#F79420" });
+          this.showToast("Failed to save playbooks", "");
         }
         this.updateTotals();
       }
@@ -1704,7 +1707,7 @@ function inAppShell() {
     showToast(title, subtitle = "", options = {}) {
       const toast = this.elements.toast;
       if (!toast) return;
-      const accent = options.accentColor || "#34EC27";
+      const accent = options.accentColor || "var(--text-60)";
       const subline = subtitle ? `<div class="toast-subline">${subtitle}</div>` : "";
       toast.innerHTML = `
         <div class="toast-icon" style="--toast-accent: ${accent};">
