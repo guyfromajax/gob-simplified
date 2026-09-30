@@ -1,0 +1,11 @@
+# Test / development dependencies on top of production. requirements-dev.txt is
+# GENERATED from this file (pip-compile, Python 3.11); never hand-edit it.
+# CI installs requirements-dev.txt.
+-r requirements.txt
+
+pytest
+# In-memory MongoDB for the test suite (GOB_DB_MODE=mongomock), mongomock-mode
+# scripts (ENVIRONMENT=test only) and the desktop SQLite store's opt-in EOG band log
+# (GOB_EOG_BAND_ENABLED=1). Imported lazily in each place, so production and the
+# default desktop build never need it.
+mongomock

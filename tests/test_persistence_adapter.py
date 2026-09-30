@@ -946,3 +946,38 @@ def test_or_equality_skips_unmatched_game_decode(tmp_path: Path, monkeypatch):
     )
     assert [doc["_id"] for doc in hits] == ["hit"]
     assert decoded == [1]
+
+
+def _desktop_sqlite_env(tmp_path: Path, **extra):
+    """A non-test SQLite env: remote collections unavailable, like the desktop build."""
+    import dataclasses
+
+    return dataclasses.replace(_sqlite_env(tmp_path, **extra), environment="development")
+
+
+def test_desktop_eog_band_uses_mongomock_when_installed(tmp_path: Path):
+    store = SqliteStore(_desktop_sqlite_env(tmp_path, GOB_EOG_BAND_ENABLED="1"))
+    assert not isinstance(store.eog_band_log_collection, NullCollection)
+    store.eog_band_log_collection.insert_one({"week": 3})
+    assert store.eog_band_log_collection.find_one({"week": 3})["week"] == 3
+
+
+def test_desktop_eog_band_without_mongomock_disables_logging_instead_of_crashing(
+    tmp_path: Path, monkeypatch, caplog
+):
+    """mongomock is a dev dependency: an opted-in desktop build without it must still start."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "mongomock", None)  # `import mongomock` -> ImportError
+    with caplog.at_level("WARNING"):
+        store = SqliteStore(_desktop_sqlite_env(tmp_path, GOB_EOG_BAND_ENABLED="1"))
+    assert isinstance(store.eog_band_log_collection, NullCollection)
+    assert any("mongomock is not installed" in r.getMessage() for r in caplog.records)
+
+
+def test_desktop_default_never_imports_mongomock(tmp_path: Path, monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "mongomock", None)
+    store = SqliteStore(_desktop_sqlite_env(tmp_path))  # EOG flag unset (the default)
+    assert isinstance(store.eog_band_log_collection, NullCollection)

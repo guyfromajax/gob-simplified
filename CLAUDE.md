@@ -83,6 +83,16 @@ Code must work on both Mongo (hosted) and SQLite (desktop).
 
 `scripts/check_ui_tokens.py --strict --no-write` runs in the same workflow as a sibling job. It fails when a **new-design** file has a colour-law hit off the allow-list. Legacy hits are reported and do not fail the gate. CI must not write or commit `reports/ui-token-audit-*.md` (`--no-write`). The same script freezes `franchise-command-center.css`: no new rules (put new styles in the view's own CSS). It fails if that file's style-rule count or line count grows past `FCC_CSS_MAX_RULES` / `FCC_CSS_MAX_LINES`.
 
+## Dependencies
+
+- `requirements.txt` and `requirements-dev.txt` are **generated and fully pinned**. **Never hand-edit them.**
+- To change a dependency:
+  1. Edit `requirements.in` (prod) or `requirements-dev.in` (test-only).
+  2. Run `pip-compile --no-strip-extras --output-file=requirements.txt requirements.in` (and the same for `-dev`) **under Python 3.11**, which is what Railway and CI run.
+  3. Commit the `.in` and `.txt` together.
+- **Upgrades are deliberate PRs:** one package, or one coherent group, at a time, with the full suite run. Never a side effect of another task.
+- **Local runs:** a local venv on another Python (3.13) can resolve different versions, e.g. numpy/scipy. For results that match CI, test in a 3.11 venv built from `requirements-dev.txt`.
+
 ## Don't commit
 
 - `scratch_*.py`: never commit new ones, and never delete existing ones (some are live tools, e.g. the equiv-v3 runner).
