@@ -7651,6 +7651,16 @@ try:
         if not home_team or not away_team:
             raise HTTPException(status_code=400, detail="home_team and away_team required")
 
+        # Week-step guard (GOB_ENFORCE_WEEK_STEPS, default report). init-game is the one
+        # point every new franchise user game passes through; resumes never call it.
+        # Runs before anything below writes (community engagement, the game doc).
+        if mode == "franchise" and franchise_id:
+            from BackEnd.api.franchise_routes import check_week_steps_before_game_start
+
+            blocked = check_week_steps_before_game_start(franchise_id, context="init_game")
+            if blocked is not None:
+                return blocked
+
         # home_team/away_team must be core names (identity). Never rewrite via display resolver.
         # home_id/away_id (ObjectIds) are preferred for FTD load when present.
         

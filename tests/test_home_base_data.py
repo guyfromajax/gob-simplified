@@ -35,7 +35,6 @@ SIM_MODULES = (
     "BackEnd/eog_attr_rules.py",
 )
 PLAY_ROUTES = (
-    "save_result",
     "complete_week",
     "complete_week_phase_a",
     "complete_week_phase_b",

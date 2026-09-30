@@ -24,7 +24,7 @@ from BackEnd.utils.trophy_log import (
     record_season_record_trophy,
     trophies_newest_first,
 )
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.responses import Response
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
@@ -3473,12 +3473,6 @@ class PlayGameRequest(BaseModel):
     franchise_id: str
 
 
-class FranchiseResultRequest(BaseModel):
-    franchise_id: str
-    game_id: str
-    winner: str
-
-
 class GameResult(BaseModel):
     team1_id: str
     team2_id: str
@@ -5685,46 +5679,163 @@ def get_animation_page():
     return FileResponse(STATIC_DIR / "court.html")
 
 
-@router.post("/franchise/play-next-game")
-def play_next_game(
-    req: PlayGameRequest,
-    user: dict = Depends(get_current_user),
-):
-    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
-    # Get user team info (with backward compatibility)
+# ---------------------------------------------------------------------------
+# Week-step guard: the server does not trust the page to have walked the
+# Advance ladder before a user game starts (Sep 30: a stale FCC started the
+# week-26 game with invites and training still due).
+# ---------------------------------------------------------------------------
+
+WEEK_STEPS_ENV = "GOB_ENFORCE_WEEK_STEPS"
+WEEK_STEPS_MODES = ("off", "report", "enforce")
+WEEK_STEPS_DEFAULT_MODE = "report"
+# Fields pending_week_step reads; the guard's one franchise read projects to these.
+_WEEK_STEP_PROJECTION = {
+    "week": 1,
+    "training_status": 1,
+    "cpu_sim_jobs": 1,
+    "post_game_status": 1,
+    RECRUITING_BOARD_SAVED_WEEK_FIELD: 1,
+    "user_team_id": 1,
+    "user_team_object_id": 1,
+}
+
+
+def week_steps_mode(environ: Mapping[str, str] | None = None) -> str:
+    """off | report | enforce. Unset or unknown is report, on every build (desktop too)."""
+    env = os.environ if environ is None else environ
+    raw = str(env.get(WEEK_STEPS_ENV) or "").strip().lower()
+    return raw if raw in WEEK_STEPS_MODES else WEEK_STEPS_DEFAULT_MODE
+
+
+def pending_week_step(franchise_doc: dict | None) -> str | None:
+    """First step the FCC Advance ladder requires before this week's user game, or None.
+
+    Same server state and order as ``GOBAdvance.updatePlayButton`` (the ``data-mode``
+    names are reused): finish-cpu-sims, cut-players, recruit-invites, training.
+    Weeks 27+ have no invite or training step, so EOS games pass unless the
+    previous game's computer games are still unfinished.
+    """
+    if not isinstance(franchise_doc, dict):
+        return None
+    try:
+        week = int(franchise_doc.get("week", 1) or 1)
+    except (TypeError, ValueError):
+        return None
+
+    cpu_sims = _cpu_sim_job_public_summary(franchise_doc, week)
+    if cpu_sims and cpu_sims.get("phase_b_required"):
+        return "finish-cpu-sims"
+
+    _team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    cut_state = _week_1_cut_requirement(franchise_doc, franchise_doc.get("_id"), user_team_object_id)
+    if cut_state.get("cut_required"):
+        return "cut-players"
+
+    if INVITE_FIRST_WEEK <= week <= INVITE_LAST_WEEK:
+        try:
+            board_saved_week = int(franchise_doc.get(RECRUITING_BOARD_SAVED_WEEK_FIELD, 0) or 0)
+        except (TypeError, ValueError):
+            board_saved_week = 0
+        if board_saved_week != week:
+            return "recruit-invites"
+
+    if not _postseason_training_disabled_for_week(week):
+        if not franchise_training_fully_complete_for_week(franchise_doc.get("training_status") or {}, week):
+            return "training"
+    return None
+
+
+def _report_week_step_violation(franchise_id: str, week: Any, step: str, *, context: str, mode: str) -> None:
+    logger.warning(
+        "[WEEK-STEP-GUARD] violation franchise_id=%s week=%s pending_step=%s context=%s mode=%s",
+        franchise_id,
+        week,
+        step,
+        context,
+        mode,
+    )
+    try:
+        import sentry_sdk
+
+        with sentry_sdk.push_scope() as scope:
+            scope.set_tag("gob.area", "week_step_guard")
+            scope.set_tag("franchise_id", franchise_id)
+            scope.set_tag("week", str(week))
+            scope.set_tag("pending_step", step)
+            scope.set_tag("gob.week_step_mode", mode)
+            scope.set_context(
+                "week_step_guard",
+                {"franchise_id": franchise_id, "week": week, "pending_step": step, "context": context, "mode": mode},
+            )
+            sentry_sdk.capture_message("User game started with a week step pending", level="warning")
+    except Exception as exc:
+        logger.debug("[WEEK-STEP-GUARD] sentry report failed: %s", exc)
+
+
+def check_week_steps_before_game_start(franchise_id: Any, *, context: str) -> JSONResponse | None:
+    """Run the week-step guard for a new franchise user game.
+
+    report (default): log + Sentry, return None so the game starts. enforce: return
+    the 409 the caller must send, before anything is created or modified. off: skip.
+    One projected franchise read (plus one FTD read in the camp-cut week only).
+    """
+    mode = week_steps_mode()
+    if mode == "off" or not franchise_id:
+        return None
+    try:
+        fid = franchise_id if isinstance(franchise_id, ObjectId) else ObjectId(str(franchise_id))
+    except Exception:
+        return None
+    try:
+        franchise_doc = db.franchises.find_one({"_id": fid}, _WEEK_STEP_PROJECTION)
+        step = pending_week_step(franchise_doc)
+    except Exception as exc:
+        # The guard never breaks a game start on its own failure.
+        logger.warning("[WEEK-STEP-GUARD] check failed franchise_id=%s: %s", str(fid), exc)
+        return None
+    if not step:
+        return None
+    week = (franchise_doc or {}).get("week")
+    _report_week_step_violation(str(fid), week, step, context=context, mode=mode)
+    if mode != "enforce":
+        return None
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": f"Week {week} step '{step}' must be completed before this week's game.",
+            "next_required_step": step,
+        },
+    )
+
+
+def _resolve_user_team_object_id(franchise_doc: dict) -> ObjectId:
+    """User team ObjectId for the next-game lookup (404 / 400 like the original POST)."""
     user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     if not user_team_name or not user_team_object_id:
         raise HTTPException(status_code=404, detail="User team not found in franchise")
-
-    # Resolve user_team_object_id to ObjectId for matching
     try:
-        user_team_id = ObjectId(user_team_object_id)
+        return ObjectId(user_team_object_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user team ObjectId")
 
-    manager = FranchiseManager(db)
-    manager.schedule = franchise_doc.get("schedule", [])
-    manager.week = franchise_doc.get("week", 1)
-    manager.franchise_id = franchise_doc.get("_id")
 
-    # ✅ EOS: Conference / Region / National (weeks 27–34)
-    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+def _eos_next_game_week(franchise_doc: dict) -> bool:
+    week = franchise_doc.get("week", 1)
     eos_has_state = bool(
         franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament")
     )
+    return bool(franchise_doc.get("eos_tournament_active", False) and eos_has_state and week in ft.EOS_WEEKS)
+
+
+def _lookup_user_next_game(franchise_doc: dict, user_team_id: ObjectId) -> dict | None:
+    """The user's matchup for the franchise's current week. Reads only; never writes."""
+    week = franchise_doc.get("week", 1)
+    schedule = franchise_doc.get("schedule", [])
     matchup = None
 
-    if eos_tournament_active and eos_has_state and manager.week in ft.EOS_WEEKS:
-        # Reconcile region brackets before reading the slate so a user who clicks
-        # Play without first hitting /franchise/command-center/data does not land on
-        # a half-built region bracket with placeholder TBD slots.
-        _maybe_reconcile_region_for_eos(
-            franchise_doc,
-            franchise_doc.get("_id"),
-            week=int(manager.week),
-            context_label="play_next_game",
-        )
-        week_games_meta = ft.get_eos_week_games(franchise_doc, manager.week)
+    # ✅ EOS: Conference / Region / National (weeks 27–34)
+    if _eos_next_game_week(franchise_doc):
+        week_games_meta = ft.get_eos_week_games(franchise_doc, week)
         found = ft.find_user_game_in_eos_week(week_games_meta, str(user_team_id))
         if found:
             _, g = found
@@ -5761,13 +5872,13 @@ def play_next_game(
                 "away_display": away_disp.get("name") or away_core,
                 "home_id": str(home_id),
                 "away_id": str(away_id),
-                "week": manager.week,
+                "week": week,
                 "eos_meta": eos_meta,
             }
-    if matchup is None and manager.week <= ScheduleManager.REGULAR_SEASON_WEEKS:
+    if matchup is None and week <= ScheduleManager.REGULAR_SEASON_WEEKS:
         # Regular season (weeks 1–26)
-        if manager.week - 1 < len(manager.schedule):
-            for away_id, home_id in manager.schedule[manager.week - 1]:
+        if week - 1 < len(schedule):
+            for away_id, home_id in schedule[week - 1]:
                 # Compare ObjectIds (schedule uses ObjectIds, user_team_id is now ObjectId)
                 if away_id == user_team_id or home_id == user_team_id:
                     away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
@@ -5785,166 +5896,52 @@ def play_next_game(
                         "away_display": away_disp.get("name") or away_core,
                         "home_id": str(home_id),
                         "away_id": str(away_id),
-                        "week": manager.week,
+                        "week": week,
                     }
                     break
+    return matchup
 
+
+@router.post("/franchise/play-next-game")
+def play_next_game(
+    req: PlayGameRequest,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    user_team_id = _resolve_user_team_object_id(franchise_doc)
+
+    if _eos_next_game_week(franchise_doc):
+        # Reconcile region brackets before reading the slate so a user who clicks
+        # Play without first hitting /franchise/command-center/data does not land on
+        # a half-built region bracket with placeholder TBD slots. Idempotent: a
+        # second call with nothing changed writes nothing.
+        _maybe_reconcile_region_for_eos(
+            franchise_doc,
+            franchise_doc.get("_id"),
+            week=int(franchise_doc.get("week", 1)),
+            context_label="play_next_game",
+        )
+
+    matchup = _lookup_user_next_game(franchise_doc, user_team_id)
     if not matchup:
         raise HTTPException(status_code=404, detail="User matchup not found")
     return matchup
 
 
-@router.post("/franchise/save-result")
-@marks_last_played
-def save_result(req: FranchiseResultRequest):
-    logger.info(f"🔍 [SAVE-RESULT] ENDPOINT CALLED - franchise_id={req.franchise_id}, game_id={req.game_id}")
-    logger.info(f"🔍 [SAVE-RESULT] Request object: {req}")
-    try:
-        franchise_id = ObjectId(req.franchise_id)
-        game_id = ObjectId(req.game_id)
-        logger.info(f"🔍 [SAVE-RESULT] IDs converted successfully - franchise_id={franchise_id}, game_id={game_id}")
-    except Exception as e:
-        logger.error(f"❌ [SAVE-RESULT] ID conversion failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid ID format")
-
-    logger.info(f"🔍 [SAVE-RESULT] Looking up franchise and game documents")
-    franchise_doc = db.franchises.find_one({"_id": franchise_id})
-    if not franchise_doc:
-        logger.error(f"❌ [SAVE-RESULT] Franchise not found: {franchise_id}")
-        raise HTTPException(status_code=404, detail="Franchise not found")
-
-    game_doc = db.games.find_one({"_id": game_id})
-    if not game_doc:
-        logger.error(f"❌ [SAVE-RESULT] Game not found: {game_id}")
-        raise HTTPException(status_code=404, detail="Game not found")
-
-    # Snapshot the user's lead coaching archetype before finalize_game commits this
-    # game's archetype counts; compared after to flag a first-time/changed archetype
-    # for the community-highlights feed (consumed by the phase-B flush).
-    archetype_owner_user_id = franchise_doc.get("user_id")
-    lead_archetype_before = lead_archetype_for_user(archetype_owner_user_id)
-
-    logger.info(f"🔍 [SAVE-RESULT] Documents found, extracting team info")
-    home = game_doc.get("homeTeam", {}) or {}
-    away = game_doc.get("awayTeam", {}) or {}
-    home_name = home.get("name") or game_doc.get("home_team")
-    away_name = away.get("name") or game_doc.get("away_team")
-    home_id_raw = home.get("team_id") or game_doc.get("home_team_id")
-    away_id_raw = away.get("team_id") or game_doc.get("away_team_id")
-    
-    # ✅ NORMALIZE: Convert ObjectIds/ObjectId strings to team_id strings (e.g. "LANCASTER") for SS&S
-    # This ensures team_attribute_changes keys match box score expectations (home_team_id/away_team_id are team_id strings)
-    home_id = _normalize_team_id_to_string(home_id_raw)
-    away_id = _normalize_team_id_to_string(away_id_raw)
-    
-    if not home_id:
-        logger.error(f"❌ [SAVE-RESULT] Could not normalize home_id: {home_id_raw} (type: {type(home_id_raw)})")
-    if not away_id:
-        logger.error(f"❌ [SAVE-RESULT] Could not normalize away_id: {away_id_raw} (type: {type(away_id_raw)})")
-    
-    logger.info(f"🔍 [SAVE-RESULT] Team IDs extracted and normalized - home_id={home_id} (was {home_id_raw}, type: {type(home_id)}), away_id={away_id} (was {away_id_raw}, type: {type(away_id)})")
-    logger.info(f"🔍 [SAVE-RESULT] Team names - home_name={home_name}, away_name={away_name}")
-    score_map = game_doc.get("score") or game_doc.get("final_score") or {}
-    home_score = home.get("score", score_map.get(home_name, 0))
-    away_score = away.get("score", score_map.get(away_name, 0))
-
-    if req.winner == home_name:
-        winner_id, loser_id = home_id, away_id
-        winner_score, loser_score = home_score, away_score
-    else:
-        winner_id, loser_id = away_id, home_id
-        winner_score, loser_score = away_score, home_score
-
-    # ✅ FIX: Removed updates to universal teams collection.
-    # Franchise mode stores W/L and PF/PA in franchise.results (set in complete-week endpoint),
-    # and team stats are calculated from franchise.results when displayed.
-    # This ensures franchise stats are isolated from other game modes and franchise instances.
-
-    week = franchise_doc.get("week", 1) - 1
-    if week < 1:
-        week = 1
-
-    db.games.delete_many(
-        {
-            "week": week,
-            "$or": [
-                {"team1_id": away_id, "team2_id": home_id},
-                {"team1_id": home_id, "team2_id": away_id},
-            ],
-            "_id": {"$ne": game_id},
-        }
-    )
-
-    db.games.update_one(
-        {"_id": game_id},
-        {
-            "$set": {
-                "franchise_id": str(franchise_id),
-                "team1_id": away_id,
-                "team2_id": home_id,
-                "team1_score": away_score,
-                "team2_score": home_score,
-                "week": week,
-            }
-        },
-        upsert=True,
-    )
-    
-    # ✅ FIX: Verify box_score exists before finalize_game()
-    # box_score should already exist from summarize_game_state() which calls game.get_box_score()
-    # (includes all players: lineup + bench). If it's missing/incomplete, log error but don't rebuild
-    # from players array (which only has final 5 players per team).
-    game_doc_updated = db.games.find_one({"_id": game_id})
-    if game_doc_updated:
-        box_score = game_doc_updated.get("box_score", {})
-        home_team_obj = game_doc_updated.get("home_team", {})
-        away_team_obj = game_doc_updated.get("away_team", {})
-        
-        # Check if box_score exists in nested structure (where summarize_game_state stores it)
-        if not box_score:
-            if isinstance(home_team_obj, dict) and "box_score" in home_team_obj:
-                home_team_name = home_team_obj.get("name")
-                if home_team_name:
-                    box_score[home_team_name] = home_team_obj.get("box_score", {})
-            if isinstance(away_team_obj, dict) and "box_score" in away_team_obj:
-                away_team_name = away_team_obj.get("name")
-                if away_team_name:
-                    box_score[away_team_name] = away_team_obj.get("box_score", {})
-        
-        # Verify box_score is complete (has reasonable number of players per team)
-        # Expected: ~12 players per team (5 starters + 7 bench), minimum 5 (just starters)
-        if box_score:
-            for team_name, team_box in box_score.items():
-                player_count = len(team_box) if isinstance(team_box, dict) else 0
-                if player_count < 5:
-                    logger.warning(f"⚠️ [SAVE-RESULT] box_score for {team_name} has only {player_count} players (expected 12). Game_id={game_id}")
-        else:
-            logger.error(f"❌ [SAVE-RESULT] No box_score found in game document (game_id={game_id}). finalize_game() may fail or produce incomplete stats.")
-    
-    logger.info(f"🔍 [SAVE-RESULT] Calling finalize_game()")
-    stat_updater.finalize_game(
-        req.game_id, mode="franchise", franchise_id=req.franchise_id
-    )
-    logger.info(f"🔍 [SAVE-RESULT] finalize_game() completed")
-
-    # Flag a coaching-archetype change (established for the first time, or evolved)
-    # for the community-highlights feed. No-op when unchanged.
-    record_archetype_change_if_any(franchise_id, archetype_owner_user_id, lead_archetype_before)
-
-    # Run team attribute update once and set team_attribute_changes on game doc for box score display
-    _finalize_team_attributes_for_game(
-        game_id=game_id,
-        franchise_id=franchise_id,
-        home_team_id=home_id,
-        away_team_id=away_id,
-        winner_id=winner_id,
-        loser_id=loser_id,
-        winner_score=winner_score,
-        loser_score=loser_score,
-        week=req.week,
-    )
-
-    return {"status": "success"}
+@router.get("/franchise/next-game")
+def get_next_game(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Read-only twin of POST /franchise/play-next-game's lookup: same response shape,
+    never reconciles or writes. In region weeks it reads the bracket as saved, so a
+    half-built bracket (not yet reconciled by command-center/data or play) can 404."""
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    user_team_id = _resolve_user_team_object_id(franchise_doc)
+    matchup = _lookup_user_next_game(franchise_doc, user_team_id)
+    if not matchup:
+        raise HTTPException(status_code=404, detail="User matchup not found")
+    return matchup
 
 
 def _phase_a_user_week_done(franchise_doc: dict, week: int) -> bool:
@@ -10113,7 +10110,6 @@ def get_current_franchise(user: dict = Depends(get_current_user)):
     }
 
 
-@router.post("/franchise/delete-current")
 @router.delete("/franchise/current")
 def delete_current_franchise(user: dict = Depends(get_current_user)):
     """
@@ -16319,29 +16315,6 @@ def run_week_35_recruiting(
         logger.exception("[IMG-WARM] could not start region warm franchise_id=%s", str(fid))
 
     return {"status": "success", "week": 36, "results": results}
-
-
-@router.get("/franchise/latest-training")
-def get_latest_training(franchise_id: str):
-    """
-    Get the latest training session results for display on Training tab.
-    """
-    try:
-        fid = ObjectId(franchise_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid franchise ID")
-    
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"latest_training": 1})
-    if not franchise_doc:
-        raise HTTPException(status_code=404, detail="Franchise not found")
-    
-    latest_training = franchise_doc.get("latest_training", {})
-    return latest_training if latest_training else {
-        "player_logs": {},
-        "team_log": {},
-        "session_type": "in-season",
-        "week": 0
-    }
 
 
 @router.get("/franchise/state")
