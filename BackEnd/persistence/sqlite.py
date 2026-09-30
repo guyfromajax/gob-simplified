@@ -7,6 +7,7 @@ singleton. The adapter never imports or draws from ``random``.
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 import sys
@@ -42,6 +43,8 @@ from BackEnd.persistence.sqlite_schema import (
     store_transaction,
 )
 
+
+logger = logging.getLogger(__name__)
 
 LOCAL_COLLECTIONS: tuple[str, ...] = (
     "players",
@@ -282,8 +285,18 @@ class SqliteStore:
             if remote_db is not None:
                 eog = remote_db["eog_band_log"]
             else:
-                import mongomock
-                eog = mongomock.MongoClient()["gob-eog-memory"]["eog_band_log"]
+                # mongomock is a dev dependency (requirements-dev.txt). An opted-in
+                # desktop build without it keeps running and simply doesn't log.
+                try:
+                    import mongomock
+                except ImportError:
+                    logger.warning(
+                        "[EOG-BAND] GOB_EOG_BAND_ENABLED is set but mongomock is not installed "
+                        "(dev dependency); EOG band logging is disabled for this session."
+                    )
+                    eog = NullCollection("eog_band_log")
+                else:
+                    eog = mongomock.MongoClient()["gob-eog-memory"]["eog_band_log"]
         else:
             eog = NullCollection("eog_band_log")
 

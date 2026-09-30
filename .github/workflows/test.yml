@@ -38,9 +38,9 @@ jobs:
         with:
           node-version: 20
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest
+        # Fully pinned (pip-compile). requirements-dev.txt = requirements.txt + pytest,
+        # mongomock. See requirements.in / requirements-dev.in.
+        run: pip install -r requirements-dev.txt
       - name: Run tests
         # Select in-memory Mongo explicitly. Missing or failed real Mongo config never
         # falls back to mongomock.

@@ -11,6 +11,8 @@ The default run always exits 0 and writes reports/ui-token-audit-2026-09-29.md.
 ``--no-write`` prints the summary and skips the report file (CI).
 ``--strict`` exits 1 when a *new-design* file has a colour-law hit that is
 not on the allow-list. Legacy hits are reported and do not fail the gate.
+Always exits 1 when ``franchise-command-center.css`` grows past the frozen
+line / style-rule ceilings.
 
 New surface: shell HTML (``gob-shell`` / ``gob-focus``, or a page listed in
 ``gobShell.js`` PAGES), ``css/gob-*.css`` except tutorial/advanced-topic
@@ -19,8 +21,9 @@ chrome, Chapter 7 chrome (``css/office-home.css``, ``css/home-base.css``,
 ``css/trophy-case.css``), recruiting hub CSS (``recruiting-spine.css``,
 ``recruiting-dock.css``, ``recruiting-signing.css``,
 ``recruiting-results-hub.css``), the migrated focus/module CSS in
-``NEW_DESIGN_CSS`` (Prep training, ``set-lineup.css``), ``js/shared/gob*.js``,
-and ``js/shared/views/**``. Everything else under the scan root is legacy.
+``NEW_DESIGN_CSS`` (Prep training/report, Playbooks ``playbooks.css`` /
+``css/playbook-tiles.css``, ``set-lineup.css``), ``js/shared/gob*.js``, and
+``js/shared/views/**``. Everything else under the scan root is legacy.
 ``css/gob-tokens.css`` is the token source and is not scanned.
 
 Allow-list (green / orange / reward-gold):
@@ -240,7 +243,15 @@ NEW_DESIGN_CSS = frozenset({
     "css/development-focus.css",
     "css/player-development-grid.css",
     "set-lineup.css",
+    "playbooks.css",
+    "css/playbook-tiles.css",
 })
+
+# Frozen leftover sheet. New rules belong in the view's own CSS.
+# These ceilings may shrink; they must not grow.
+FCC_CSS_REL = "franchise-command-center.css"
+FCC_CSS_MAX_LINES = 3234
+FCC_CSS_MAX_RULES = 448
 REWARD_SELECTOR_RE = re.compile(
     r"med\.gold|"
     r"\.pk\b|\.pk-|"
@@ -1268,7 +1279,8 @@ def format_report(audit: Audit) -> str:
         "`home-base`, `milestone-modal`, `season-peak`, `trophy-case`), recruiting hub CSS",
         "(`recruiting-spine.css`, `recruiting-dock.css`, `recruiting-signing.css`,",
         "`recruiting-results-hub.css`), `js/shared/gob*.js`,",
-        "`js/shared/views/**`.",
+        "`js/shared/views/**`, training/report CSS, and Playbooks (`playbooks.css`,",
+        "`css/playbook-tiles.css`).",
         "",
         "Legacy: every other scanned file. That is an old page or stylesheet still to migrate,",
         "not new code breaking the rules.",
@@ -1393,6 +1405,67 @@ def format_report(audit: Audit) -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
+def _iter_css_preludes(text: str, lo: int, hi: int):
+    i = lo
+    while i < hi:
+        while i < hi and text[i].isspace():
+            i += 1
+        if i >= hi:
+            break
+        start = text.find("{", i, hi)
+        if start < 0:
+            break
+        depth = 1
+        j = start + 1
+        while j < hi and depth:
+            if text[j] == "{":
+                depth += 1
+            elif text[j] == "}":
+                depth -= 1
+            j += 1
+        yield text[i:start].strip(), start + 1, j - 1
+        i = j
+
+
+def count_css_style_rules(text: str) -> int:
+    stripped = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    at_re = re.compile(r"^@(\w+)")
+
+    def walk(lo: int, hi: int) -> int:
+        n = 0
+        for prelude, body_lo, body_hi in _iter_css_preludes(stripped, lo, hi):
+            match = at_re.match(prelude)
+            if match and match.group(1).lower() in {"media", "supports"}:
+                n += walk(body_lo, body_hi)
+            elif match:
+                continue
+            else:
+                n += 1
+        return n
+
+    return walk(0, len(stripped))
+
+
+def check_fcc_css_freeze(root: Path) -> str | None:
+    path = root / FCC_CSS_REL
+    if not path.is_file():
+        return None
+    text = path.read_text(encoding="utf-8")
+    lines = text.count("\n") + (0 if text.endswith("\n") else 1)
+    rules = count_css_style_rules(text)
+    grew = []
+    if lines > FCC_CSS_MAX_LINES:
+        grew.append(f"lines {lines} > {FCC_CSS_MAX_LINES}")
+    if rules > FCC_CSS_MAX_RULES:
+        grew.append(f"style rules {rules} > {FCC_CSS_MAX_RULES}")
+    if not grew:
+        return None
+    return (
+        f"{FCC_CSS_REL} is frozen (no new rules; put new styles in the view's own CSS): "
+        + "; ".join(grew)
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Report UI colour and type token drift.")
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="Directory to scan")
@@ -1418,7 +1491,12 @@ def main(argv: list[str] | None = None) -> int:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(format_report(audit), encoding="utf-8")
         print(f"\nFull detail: {report_path}")
+    freeze = check_fcc_css_freeze(root)
+    if freeze:
+        print(freeze)
     new_hits = sum(audit.law_counts()["new"].values())
+    if freeze:
+        return 1
     if args.strict and new_hits:
         return 1
     return 0

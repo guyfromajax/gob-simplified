@@ -1,0 +1,54 @@
+# Production dependencies: the human-edited intent. requirements.txt is GENERATED
+# from this file; never hand-edit it. To change a dependency:
+#
+#   1. edit this file (add/remove/relax/tighten a line)
+#   2. pip-compile --no-strip-extras --output-file=requirements.txt requirements.in   (under Python 3.11)
+#   3. commit BOTH files, as a deliberate PR (upgrades are never incidental)
+#
+# Installed by Railway (nixpacks.toml), CI (via requirements-dev.txt) and the desktop
+# build (desktop/README.md). Test-only packages live in requirements-dev.in.
+
+# --- web app ---------------------------------------------------------------
+fastapi
+# ASGI server. start.sh relies on --timeout-graceful-shutdown (uvicorn >= 0.24).
+uvicorn>=0.24
+# The code is written against the pydantic v2 API (field_validator, model_dump).
+pydantic>=2,<3
+# Rate limiting (BackEnd/utils/rate_limiter.py); the middleware API used is 0.1.x.
+slowapi>=0.1.9,<0.2
+Jinja2
+# EmailStr in the auth request models.
+email-validator
+python-dotenv==1.1.0
+# Error reporting, with the FastAPI integration.
+sentry-sdk[fastapi]
+
+# --- data ------------------------------------------------------------------
+# Held at 4.6.1: the persistence adapter and script_db are verified against it.
+# [srv] pulls dnspython for mongodb+srv:// Atlas URIs.
+pymongo[srv]==4.6.1
+
+# --- auth ------------------------------------------------------------------
+# bcrypt 5.x raises on passwords > 72 bytes; BackEnd/utils/auth.py truncates at login
+# and rejects at signup/reset for exactly that reason. Don't drop below 5 without
+# revisiting that code.
+bcrypt>=5
+PyJWT
+
+# --- outbound HTTP ---------------------------------------------------------
+requests
+httpx
+
+# --- text ------------------------------------------------------------------
+# ASCII-folding for team/player slugs.
+Unidecode
+
+# --- recruit image paint service (lazy generate-on-miss recolor + R2 read/write)
+Pillow
+numpy
+scipy
+# R2 (S3-compatible) client.
+boto3
+
+# --- billing (Managed Payments / merchant of record). See BackEnd/services/stripe_client.py
+stripe
