@@ -9,6 +9,11 @@
 (function (root) {
   'use strict';
 
+  // authGuard injects this file from <head> before the page's own tag is parsed,
+  // so it can run twice. A second copy would capture the first copy's wrapper as
+  // its "native" fetch, and its revalidate would answer from memory, never the server.
+  if (root.__gobStoreInstalled && root.GOBStore) return;
+
   var nativeFetch = typeof root.fetch === 'function' ? root.fetch.bind(root) : null;
   var memory = new Map();
   var inflight = new Map();

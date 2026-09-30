@@ -26,6 +26,9 @@
     var leaveChecks = [];
     var allowLeaveOnce = false;
     var guardInflight = null;
+    // True once this document has scheduled its own replacement. A page's own
+    // pageshow check skips its refresh then: the new document loads fresh anyway.
+    var reloading = false;
 
     function storage() {
       try { return win.sessionStorage; } catch (e) { return null; }
@@ -395,6 +398,7 @@
       // commits. That replace, not a reload, drops every entry in front so
       // Forward cannot walk back into the finished flow.
       holdAdvanceUntilReload();
+      reloading = true;
       var url = currentUrl();
       // Only the exit landing defers. A replace inside that pageshow is stored
       // as a second locker-room entry, so one Back stays on the locker room.
@@ -591,6 +595,7 @@
       if (!landing || !landing.fresh || !isFcc()) return false;
       applyExitTab(landing.tab || 'home-tab');
       if (event && event.persisted) {
+        reloading = true;
         win.location.reload();
         return true;
       }
@@ -628,6 +633,10 @@
       }
       syncCurrent();
       return true;
+    }
+
+    function isReloading() {
+      return reloading;
     }
 
     function allowNextLeave() {
@@ -849,6 +858,7 @@
       exitFlow: exitFlow,
       isHubUrl: isHubUrl,
       reloadIfStale: reloadIfStale,
+      isReloading: isReloading,
       restoreScroll: restoreScroll,
       syncCurrent: syncCurrent,
       stripParam: stripParam,

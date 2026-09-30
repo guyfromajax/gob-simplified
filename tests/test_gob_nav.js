@@ -298,6 +298,17 @@ test('bfcache locker room with a pending exit reloads instead of showing stale d
   assert.ok(win.navigations.some((row) => row[0] === 'replaceState' && /home-tab/.test(row[1])));
 });
 
+test('isReloading is set only when the restore schedules its own replacement', () => {
+  const peek = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1' });
+  peek.listeners.pageshow({ persisted: true });
+  assert.equal(peek.GOBNav.isReloading(), false);
+
+  const exit = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1' });
+  exit.sessionStorage.setItem('gob_nav_exit', JSON.stringify({ tab: 'home-tab', fresh: true }));
+  exit.listeners.pageshow({ persisted: true });
+  assert.equal(exit.GOBNav.isReloading(), true);
+});
+
 test('push advances gobIdx and replace keeps it', () => {
   const win = fakeWindow({ pathname: '/franchise-command-center.html', search: '?franchise_id=f1' });
   assert.equal(win.history.state.gobIdx, 0);
