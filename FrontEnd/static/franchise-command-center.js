@@ -131,6 +131,93 @@ function showFranchiseGoneNotice() {
   }
 }
 
+// --- Season-load failure state -------------------------------------------------
+// When fetchCommandCenterData() exhausts its retries on a transient failure
+// (network/offline -> status 0, a 5xx, or a 429 that never cleared) the Office
+// used to be left blank with a dead, disabled Advance and no explanation. Instead
+// we render the shared design-system error card (.gob-view-error / .gob-view-retry
+// in css/gob-views.css — no new styling, nothing added to the frozen
+// franchise-command-center.css) in the Office main area, and tell Advance why it
+// is disabled. Retry re-runs the full load (init) with the same retry policy.
+let fccSeasonRetrying = false;
+const FCC_ADVANCE_LOAD_FAILED_LABEL = "Season didn't load: retry above";
+
+function seasonLoadCauseLine(status) {
+  if (status === 0) return 'Connection lost.';
+  if (status === 429) return 'The server is busy.';
+  if (typeof status === 'number' && status >= 500) return 'Server error.';
+  return '';
+}
+
+// Advance stays disabled, LOOKS disabled (inline opacity/cursor — .hero-btn has no
+// :disabled rule and its stylesheet is frozen), plays no sound (a disabled button
+// never dispatches click, so its data-sfx hook can't fire), and says why.
+function markAdvanceSeasonLoadFailed() {
+  const btn = document.getElementById('play-now');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.setAttribute('aria-disabled', 'true');
+  btn.setAttribute('aria-label', FCC_ADVANCE_LOAD_FAILED_LABEL);
+  btn.setAttribute('title', FCC_ADVANCE_LOAD_FAILED_LABEL);
+  btn.style.opacity = '0.4';
+  btn.style.cursor = 'not-allowed';
+}
+
+function clearAdvanceSeasonLoadFailed() {
+  const btn = document.getElementById('play-now');
+  if (!btn) return;
+  btn.removeAttribute('aria-disabled');
+  btn.removeAttribute('aria-label');
+  btn.removeAttribute('title');
+  btn.style.opacity = '';
+  btn.style.cursor = '';
+}
+
+function showSeasonLoadError(status) {
+  markAdvanceSeasonLoadFailed();
+  const host = document.getElementById('office-root');
+  if (!host) return;
+  host.setAttribute('data-office-state', 'error');
+  host.setAttribute('aria-busy', 'false');
+
+  const card = document.createElement('div');
+  card.className = 'gob-view-error';
+  card.setAttribute('role', 'alert');
+
+  const title = document.createElement('p');
+  const strong = document.createElement('strong');
+  strong.textContent = "Couldn't load your season";
+  title.appendChild(strong);
+  card.appendChild(title);
+
+  const cause = seasonLoadCauseLine(status);
+  if (cause) {
+    const line = document.createElement('p');
+    line.textContent = cause;
+    card.appendChild(line);
+  }
+
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.className = 'gob-view-retry';
+  retry.textContent = 'Retry';
+  retry.setAttribute('data-sfx', 'SFX_SELECT'); // neutral select tick; not Advance
+  retry.addEventListener('click', () => {
+    if (fccSeasonRetrying) return; // no double-submit
+    fccSeasonRetrying = true;
+    retry.disabled = true;
+    retry.textContent = 'Retrying…';
+    host.setAttribute('aria-busy', 'true');
+    Promise.resolve()
+      .then(() => init()) // re-run the full load; same retry policy
+      .catch((err) => { console.error('[fcc] season retry failed', err); })
+      .finally(() => { fccSeasonRetrying = false; });
+  });
+  card.appendChild(retry);
+
+  host.replaceChildren(card);
+}
+
 function fccCpuSimNeedsRecovery(data) {
   const resume = data && data.cpu_sim_resume;
   return !!(resume && resume.phase_b_required && resume.can_resume_phase_b);
@@ -1462,7 +1549,14 @@ async function init() {
   }
   if (!topData) {
     publishFccUserTeam('');
-    return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
+    // 404 (franchise gone) handled above; 401/403 already triggered an AccessDenied
+    // redirect. Anything else — network (status 0), 5xx, or a 429 that never cleared
+    // after the retry loop — is a real load failure. Show the retryable error card
+    // instead of a silent dead page (Advance stuck disabled with no reason).
+    if (topDataResult.status !== 401 && topDataResult.status !== 403) {
+      showSeasonLoadError(topDataResult.status);
+    }
+    return; // finally block hides page-load-overlay, revealing the card
   }
   topData = await recoverCpuSimsBeforeFccRender(topData);
   if (!topData) {
@@ -1522,6 +1616,7 @@ async function init() {
   // Update button based on training status
   updatePlayButton(topData);
   playNowBtn.disabled = false;
+  clearAdvanceSeasonLoadFailed(); // a prior failed load may have marked it; the load succeeded
   updateScoutingButton(topData);
   updateRecruitingButton(topData);
   updateEditRecruitingButton(topData);
