@@ -59,7 +59,14 @@ async function installApi(page, state) {
     try { path = new URL(request.url()).pathname; } catch (e) { await route.continue(); return; }
     const api = path.startsWith('/api/') || path.startsWith('/franchise/') || path.startsWith('/roster/')
       || path.startsWith('/player/') || path.startsWith('/recruit/') || path === '/teams' || path === '/app-config';
-    if (!api) { await route.continue(); return; }
+    if (!api) {
+      // Load-repro knob (inert by default): FCC_E2E_NET_DELAY_MS delays serving the
+      // page / JS / assets to simulate a slow, contended webServer. Set e.g. 2500 to
+      // reproduce the slow-court-load flake this test's helper was hardened against.
+      const netDelay = Number(process.env.FCC_E2E_NET_DELAY_MS || 0);
+      if (netDelay) await new Promise((r) => setTimeout(r, netDelay));
+      await route.continue(); return;
+    }
     if (path === '/api/auth/me') return fulfillJson(route, { user_id: 'e2e-user', username: 'e2e', email: 'e2e@example.com' });
     if (path === '/app-config') return fulfillJson(route, { isAlpha: false, alphaDisclaimer: null, version: '1.0' });
     if (path === '/franchise/list') {
@@ -195,12 +202,25 @@ async function simGameToLockerRoom(page, beforeLocker) {
   await expect(page.locator('#sim-now')).not.toHaveClass(/disabled/, { timeout: 15000 });
   await page.locator('#sim-now').click();
   await expect(page).toHaveURL(/court\.html/, { timeout: 20000 });
-  const tipOff = page.getByRole('button', { name: /Submit & Tip Off|Submit Defense Matchups/ });
-  try {
-    await tipOff.waitFor({ state: 'visible', timeout: 15000 });
-    await tipOff.click();
-  } catch (e) { /* matchups are skipped when the gate is off */ }
+  // The franchise Sim Full Game plays a pre-game experience whose CTA is first
+  // "Submit & Tip Off" (matchups) and then, if that is not pressed, the display-only
+  // "Tip Off" (tip-off-ready); when the matchups gate is off it goes straight to the
+  // completion popup. The old code only matched "Submit & Tip Off" / "Submit Defense
+  // Matchups" with a 15s wait, so under a slow court load the CTA appeared after the
+  // wait (or had already rolled over to "Tip Off", which never matched): it was never
+  // clicked, the game stalled at tip-off-ready, and the locker button timed out.
+  // Click whichever advance CTA is up — including "Tip Off" — until the completion
+  // popup appears, so the step is robust to a slow reveal under load.
+  const advanceCta = page.getByRole('button', { name: /^(Submit & Tip Off|Submit Defense Matchups|Tip Off)$/ });
   const locker = page.locator('a.completion-button.locker-room-button');
+  const deadline = Date.now() + 90000;
+  while ((await locker.count()) === 0 && Date.now() < deadline) {
+    if (await advanceCta.count()) {
+      // Click the first visible advance CTA; harmless if it detaches mid-click.
+      await advanceCta.first().click({ timeout: 2000 }).catch(() => {});
+    }
+    await page.waitForTimeout(400);
+  }
   await expect(locker).toBeVisible({ timeout: 45000 });
   if (beforeLocker) await beforeLocker();
   await watchReturn(page);
