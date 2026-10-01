@@ -266,8 +266,41 @@ test('deliverable signing frame', async ({ page }) => {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
   try {
+    // This deliverable pulls React/ReactDOM/Babel from unpkg via classic, render-blocking
+    // <script src> tags, plus fonts from Google — all live internet. goto('load') blocked
+    // on them, and even after switching to 'commit' a request that outlives the test (a
+    // CDN stalled under full-suite contention) stays pending and hangs the fullPage
+    // screenshot. The flake is that live-internet latency can exceed the test budget.
+    //
+    // Fix: bound every external request. Serve it if the CDN answers within a few seconds
+    // (so the frame renders faithfully), otherwise abort it — an aborted request is no
+    // longer pending, so nothing can stall goto or the screenshot. The page then degrades
+    // to fallback fonts / an unrendered root, which is fine: this frame is a report
+    // artifact with no assertions. Max added latency is one budget window, never the whole
+    // test timeout.
+    const CDN = /unpkg\.com|fonts\.(googleapis|gstatic)\.com/;
+    const CDN_BUDGET_MS = 15000;
+    // Repro harness (inert by default): force the external fetch to stall, simulating the
+    // contended CDN that blew goto('load'). The budget below then aborts it.
+    const cdnStallMs = Number(process.env.SIGN_E2E_CDN_DELAY_MS || 0);
+    await page.route(CDN, async (route) => {
+      try {
+        const served = await Promise.race([
+          (async () => {
+            if (cdnStallMs) await new Promise((r) => setTimeout(r, cdnStallMs));
+            return await route.fetch();
+          })(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('cdn-budget')), CDN_BUDGET_MS)),
+        ]);
+        await route.fulfill({ response: served });
+      } catch {
+        await route.abort().catch(() => {});
+      }
+    });
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto('http://127.0.0.1:' + port + '/' + rel.split('/').map(encodeURIComponent).join('/'));
+    await page.goto('http://127.0.0.1:' + port + '/' + rel.split('/').map(encodeURIComponent).join('/'), { waitUntil: 'commit' });
+    await page.waitForSelector('#root > *', { timeout: 20000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(1200);
     await page.screenshot({ path: path.join(OUT, 'frame-signing.png'), fullPage: true });
   } finally {
