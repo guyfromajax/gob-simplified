@@ -10,9 +10,9 @@ One colour, one meaning. Everything not listed is neutral: white text at `--text
 |---|---|---|---|
 | Green | `--green` (ink on green: `--bg`) | The one Advance per screen (top-bar `#play-now` / `.advance`, `.gob-btn--gate`, the one forward action in a live-game overlay). Positive data: delta-up, tier green, chemistry high, board-gain bars, the RT / attribute ramps. | Cards, WIN/LOSS plates, badges, scores, choice controls, a second button on the same screen, any button that only navigates or only saves. |
 | Orange | `--orange` | Saved or committed only: Submit Invites, Submit Orders, Save Game Plan / Playbooks, Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row. | Brand accent, "warning / low" data, navigation, choice controls, checkboxes, hovers, toasts, a loader. |
-| Navy | `--navy`, `--navy-hi` (edge / halo only) | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. |
+| Navy | `--navy`, `--navy-hi` (edge / halo only) | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list, your team in a bracket. **What you picked for your team or plan** (settled 2026-10-01): Set Lineup on-court and selected rows, plays in your Playcall Center, your leaderboard and lean-ladder slot. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. A generic "selected" state on a choice control: tabs, toggles, radios, sliders and filter chips stay neutral. |
 | Blue | `--tier-blue` | RT only: an A grade, a 9+ attribute, elite. | Chrome, links, navigation, "good / above average". |
-| Reward gold | `--reward-gold` | Only: title medallions (`.med.gold`); season-peak glow, rule and confetti (`.pk`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`); the exceptional-gain marker (`.xg`, `.xg-key`); the words "Trophy Case" (`.gold-t`). Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens. | Buttons, Advance, "yours", choice controls, everyday or weekly chrome, Home Base chrome. |
+| Reward gold | `--reward-gold` | Only: title medallions (`.med.gold`); season-peak glow, rule and confetti (`.pk`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`); the exceptional-gain marker (`.xg`, `.xg-key`); the words "Trophy Case" (`.gold-t`); senior-tribute title marks (`.st-titles s`, `.st-cti s`; settled 2026-10-01). Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens. | Buttons (the big-news modal CTA is a neutral plate; settled 2026-10-01), Advance, "yours", choice controls, everyday or weekly chrome, Home Base chrome. |
 | Red / yellow | `--tier-red`, `--tier-yellow` | Data ramps only (rating tiers, chemistry, energy, delta-down where a ramp is used). | Buttons, chrome, warnings, destructive-action styling (see Open questions). |
 | Team colour | `--team-primary` (set per team) | Identification: logos, name bars, favour arrows, team badges. | A wash or tint on a card, panel, tab, header or the weekly card, win or loss. |
 | Tier metal | `--tier-metal`, `--tier-metal-hi` (set per tournament tier) | Tournament-tier top bar and the tier next-game card. | Anything outside tournament weeks. |
@@ -145,7 +145,7 @@ Player headshot: square with a small corner, photo, monogram or placeholder alik
 
 ### Chips, pills and badges
 
-`.chip` (`--radius-6`, `--dsz-20` high, micro type). Data chips may carry a tier or delta token; choice and filter chips are neutral (default `--white-6`, selected `--white-9` with `--text-100`). The rail count badge uses `--badge` / `--badge-ink`; the recruiting presence dot is a dot, not a count, and does not pulse. Meters (`.meter`) are neutral unless they show a data ramp.
+`.chip` (`--radius-6`, `--dsz-20` high, micro type). Data chips may carry a tier or delta token; choice and filter chips are neutral (default `--white-6`, selected `--white-9` with `--text-100`). The rail count badge uses `--badge` / `--badge-ink`; the recruiting presence dot is a dot, not a count, does not pulse, and is neutral (`--text-100`; settled 2026-10-01). Meters (`.meter`) are neutral unless they show a data ramp.
 
 ### W/L plates
 
@@ -156,7 +156,7 @@ Player headshot: square with a small corner, photo, monogram or placeholder alik
 - A hex, `rgb()` or `rgba()` value in a page, component or doc. Name the token.
 - A second green control on a screen, or green on anything that is not Advance or positive data.
 - Orange on anything that is not a save or commit.
-- Gold outside the five reward surfaces.
+- Gold outside the six reward surfaces.
 - Blue on chrome, links or navigation; navy as a data colour or page background.
 - A team-colour wash or tint on a card, panel, tab or header.
 - A circular player headshot.
@@ -167,7 +167,7 @@ Player headshot: square with a small corner, photo, monogram or placeholder alik
 
 ## Open questions
 
-1. **Navy for selected items.** Navy is "yours". Set Lineup selection, the standings user row and some active states already use navy as a selected-row colour. Is navy also the generic "selected" colour, or only "yours"? (Jamie)
+1. **Navy for selected items. SETTLED 2026-10-01:** navy (with a `--navy-hi` edge) marks what you picked for your team or plan, as well as "yours". It is not the generic "selected" colour: choice controls stay neutral. See the Navy row above.
 2. **Delta chips.** The law says ▲/▼ are neutral, but the Office attribute-change chips (UX_System §12) and `.chip.up` / `.chip.down` use `--delta-up` green / `--delta-down` red, and the checker allows `delta-up` as positive data. Which surfaces must be neutral?
 3. **W/L plates.** The law says white plate / outline; `gob-components.css` `.wl.win` / `.wl.loss` still use `--delta-up` / `--delta-down`, and League › Rankings "Last Week" uses the `.gob-wl` data colours. Neutralise everywhere, or keep W/L as data in tables?
 4. **Orange beyond saves.** The token comment says orange is also "non-advancing actions, gated-task tag"; the checker allows `.gated`, `.td-gate`, `.is-on`; the Office blocking step draws an orange outline; the attitude bars run red, orange, neutral, green; the rail `--badge` is orange; the functional-modal accent defaults to orange; the tutorial alert uses orange. The law says saved / committed only. Which of these stay?

@@ -678,6 +678,19 @@ try:
                     target = f"{target}?{query}"
                 return RedirectResponse(url=target, status_code=307)
 
+            # Retired pages: the file is gone, the path still lands somewhere. The
+            # router's own redirect never runs here, because a missing .html is
+            # answered below with the 404 page.
+            retired_pages = {
+                "/play-builder.html": "/play-builder-v2.html",
+            }
+            retired_target = retired_pages.get(path)
+            if retired_target:
+                query = request.url.query
+                if query:
+                    retired_target = f"{retired_target}?{query}"
+                return RedirectResponse(url=retired_target, status_code=301)
+
             static_dirs = (
                 "/js/",
                 "/images/",

@@ -31,6 +31,25 @@
   status = 302
   force = true
 
+# Retired twins (2026-10-01): Play Builder V1 lands on V2; the v3 homepage copy lands on the homepage.
+[[redirects]]
+  from = "/play-builder.html"
+  to = "/play-builder-v2.html"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/homepage-v3.html"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/homepage-v3"
+  to = "/"
+  status = 301
+  force = true
+
 [[redirects]]
   from = "/privacy"
   to = "/privacy.html"
