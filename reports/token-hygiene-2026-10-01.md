@@ -41,10 +41,12 @@ Shots in `reports/token-hygiene/`, 1280, `page.screenshot` at scroll 0. `before-
 | Shot | Changed pixels | Where |
 |---|---|---|
 | `set-lineup-1280` | 0 | |
-| `hub-pool-1280`, `hub-leans-1280` | 7 each (max channel delta 5) | one recruit avatar corner; the same spot differs by 4 between two shots of identical code |
+| `hub-leans-1280` (`hub-pool-1280` is the same image, see note) | 7 (max channel delta 5) | one recruit avatar corner; the same spot differs by 4 between two shots of identical code |
 | `roster-1280` | 75 in the top bar and rail; **0 in the page content** | logo edge, rail icons |
 | `buttons-token-page-1280`, `buttons-hover-ghost-1280` | 75 in the top bar and rail; **0 in the button panel** | logo edge, rail icons |
 | `buttons-no-tokens-1280` (fallbacks only) | 0 | |
+
+Note: the two hub files are byte-identical. In this fixture week the hub opens on the view with the lean ladder, so clicking Leans changed nothing and I captured one hub view, not two. The roster, Set Lineup and both button surfaces are distinct.
 
 The FCC top-bar logo edge and rail icons flicker between identical runs (up to 80 pixels, max channel delta 15; measured by shooting the same code twice). Inside the page content and inside the button panel the difference is 0.
 
@@ -78,7 +80,7 @@ The Playwright run was one tracked job that took and released the lock itself wh
 
 Merge: develop moved by 14 commits during the Playwright run (audit's logo fallback and Save-until-dirty, a signing-orders test fix, QA docs). One conflict, in `Styleguide.md`: three adjacent colour-law rows. **Kept both sides:** audit's Orange row (Save only while there is an unsaved edit) and this branch's Navy and Blue rows. `UX_System.md` merged cleanly. Audit's branch had already removed the "Pending audit" notes.
 
-After the merge I re-ran pytest, the token gate, the migration gates and four specs (`token-hygiene`, `prep-modules-gameplan`, `prep-modules-playbooks`, `jamie-rulings-batch`: 28 passed, 1 skipped). **The full Playwright suite was not run a second time**; its result above is from before the merge. None of the merged files is one this branch changes, apart from the two docs. The before/after shots are also from before the merge.
+After the merge I re-ran pytest, the token gate, the migration gates and four specs (`token-hygiene`, `prep-modules-gameplan`, `prep-modules-playbooks`, `jamie-rulings-batch`: 28 passed, 1 skipped). **The full Playwright suite was not run a second time**; its result above is from before the merge. None of the merged files is one this branch changes, apart from the two docs. The before/after shots are also from before the merge. Develop then moved twice more with reports only (`docs/jamie-decisions-2`); merged, nothing to re-run.
 
 ## Docs
 
