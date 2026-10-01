@@ -191,7 +191,7 @@ function applyTutorialMode() {
   const cta = document.createElement('button');
   cta.id = 'btn-tutorial-gameplan-continue';
   cta.type = 'button';
-  cta.className = 'gob-btn gob-btn--action gob-btn--lg';
+  cta.className = 'gob-btn gob-btn--neutral gob-btn--lg';
   cta.setAttribute('data-sfx', 'SFX_COMMIT');
   cta.textContent = 'PLAY NOW';
   cta.addEventListener('click', async () => {
