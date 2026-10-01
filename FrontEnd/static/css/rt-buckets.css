@@ -4,7 +4,9 @@
  *
  *   getRtBucketClass(rt) — all player and recruit RT displays
  *
- * Colors: <40 red, 40–59 yellow, 60–79 green, 80+ blue.
+ * Colors: <40 red, 40–59 yellow, 60–79 green, 80+ blue. rtBucket.js points each
+ * --rt-*-color at a gob token (--tier-red / --tier-yellow / --tier-green / --blue),
+ * with the same value as a fallback for pages that do not load gob-tokens.css.
  *
  * !important is deliberate — page-local table td { color: ... } rules must not
  * override the canonical scale on elements bearing these classes.
@@ -14,4 +16,4 @@
 .rt-mid      { color: var(--rt-mid-color) !important; }
 .rt-high     { color: var(--rt-high-color) !important; }
 .rt-elite    { color: var(--rt-elite-color) !important; }
-.rt-unknown  { color: rgba(255, 255, 255, 0.4) !important; }
+.rt-unknown  { color: var(--white-40, rgba(255, 255, 255, 0.4)) !important; }

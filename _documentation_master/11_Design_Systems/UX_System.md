@@ -78,6 +78,13 @@ Root element: `html.gob` plus one density class.
 
 Consume a token with `var(--token-name)` inside a `.gob` subtree. Do not redeclare the value.
 
+Rules for values that scripts or shared sheets also need (token hygiene, 2026-10-01):
+
+- **A sheet that can be injected into a page without `.gob`** (`css/gob-buttons.css`, `css/rt-buckets.css`) writes `var(--token, same-value)`. The fallback must equal the token; `tests/test_token_mirrors.py` checks it.
+- **A script that needs a concrete colour** (canvas, colour maths) keeps the literal next to the token name (`rtBucket.js` `color` / `token`, `POSITION_COLORS` in `matchupsUiShared.js`). The same test keeps the literal equal to the token. For a DOM style, write `var(--token, same-value)` instead (`simGamePresentation.js` `POSC`).
+- **`--fs-*`, `--dsp-*` and `--dsz-*` scale with density.** Do not swap a fixed pixel size for one of them on a component that must not grow at 1920.
+- The "yours" aliases `--you`, `--you-soft`, `--you-line`, `--you-ink` and the position colours `--pos-*` are tokens. Do not redeclare them in a page sheet.
+
 Fonts are self-hosted. Display face: `/css/fonts.css` (Bebas Neue Pro). Body face: `/fonts/app-fonts.css` (Inter). Do not add a Google Fonts link.
 
 Shell rules that must not restyle existing franchise cards live in `FrontEnd/static/css/gob-shell.css`, scoped under `html.gob-shell`. `gob-components.css` is scoped under `.gob`. If a component class (`.logo`, `.nm`, `.lnk`, `.card`) would change existing franchise markup, tighten the shell selector. Do not edit the old content CSS to accommodate the shell.
