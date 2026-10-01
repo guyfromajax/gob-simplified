@@ -1191,7 +1191,7 @@
     if (ids.length > cap.spots) {
       out.push({
         level: 'warn',
-        text: ids.length + ' recruits funded but only ' + cap.spots + ' roster spot' +
+        text: ids.length + ' recruit' + (ids.length === 1 ? '' : 's') + ' funded but only ' + cap.spots + ' roster spot' +
           (cap.spots === 1 ? '' : 's') + ' — signings beyond that cannot be taken.',
       });
     }

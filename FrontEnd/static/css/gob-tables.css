@@ -167,6 +167,15 @@ html.gob-shell.gob-1920 .gob-tgrid {
   text-decoration: none;
 }
 
+/* One row height whatever the avatar holds. On the text baseline an image-only avatar
+   has no baseline of its own, so it lifted the line by 2px: headshot rows were 46px and
+   monogram rows 44px, and a row jumped when its headshot failed late. Only the avatar
+   link (.gob-team.gob-player): a text-only .gob-player (Leaders, Awards) stays on the
+   baseline, where middle would nudge it by a fraction of a pixel. */
+a.gob-team.gob-player {
+  vertical-align: middle;
+}
+
 .gob-team img,
 .gob-next img,
 .gob-mark {

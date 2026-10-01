@@ -352,6 +352,16 @@ test.describe('pre-flight warnings', () => {
     expect(txt).toContain('2 recruits funded but only 1 roster spot');
   });
 
+  test('one funded recruit with no roster spot reads in the singular', async ({ page }) => {
+    await mount(page, {
+      capacity: { roster_spots: 0, scholarships: 0, roster_cap: 15, roster_used: 15 },
+      savedEntries: [{ id: 'r-0', points: 3, playing_time: false }],
+    });
+    const txt = await railText(page);
+    expect(txt).toContain('1 recruit funded but only 0 roster spots');
+    expect(txt).not.toContain('1 recruits');
+  });
+
   test('a clean board says so rather than showing an empty panel', async ({ page }) => {
     await mount(page, {
       capacity: { roster_spots: 0, scholarships: 0, roster_cap: 15, roster_used: 15 },
