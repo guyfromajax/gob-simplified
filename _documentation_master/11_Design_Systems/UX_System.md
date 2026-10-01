@@ -15,20 +15,9 @@ Version 1. How to build franchise screens. The look lives in [Styleguide.md](Sty
 
 ## Colour law
 
-The full law. `scripts/check_ui_tokens.py --strict` enforces it on new-design files (see §8); the clauses below are the design intent behind the checker's allow-list.
-
-- **Green** (`--green`) — the top-bar Advance (`advance`, `play-now`, `gob-btn--gate`) and positive data only: delta-up (`delta-up`, `is-up`, `is-pos`), tier/band green (`tier-green`, `t-green`, `data-band="high"`, `risk-low`, `rm-tile--keep`), W badges (`wl`), chemistry `.chem`/`.is-green`, board-gain bars and up-arrows, and the RT/attribute ramps (`.att-col`, `.att-bar`, `.gob-chg`). Never on a card, a WIN/LOSS tag, a badge, a score, a delta, or a choice control.
-- **Orange** (`--orange`) — saved or committed only: Submit Invites / Submit Orders / any save (`save`, `saved`, `committed`, `gob-btn--action`), the promise toggle, the committed-order rail, the funded row, the save toast, and attribute-ramp mid stops on `.att-col`/`.att-bar`.
-- **Navy** (`--you` / `--you-soft` / `--you-line` / `--you-ink`, `#27408E`) — "yours" only: your row, your lean, your region, your signing, your `#1`/`#n`, on-your-list. Navy is never green; on-your-list is navy, not gold.
-- **Blue** — RT only: an A grade / 9+ / elite rating (the shared RT ramp; A blue, B green). Never for chrome, links, or navigation.
-- **Reward gold** (`--reward-gold`, `#F0C560`) — reward tiers only, at these surfaces and nowhere else: title medallions (`.med.gold`); season-peak glow / rule / confetti (`.pk`, `.pk-*`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`, the 2px top rule, the `.mm-k::before` diamond); the exceptional-gain marker (`.xg`, `.xg-key`, `xgSweep` — diamond, ring, delta and the "Exceptional gain" key); and the words "Trophy Case" (`.gold-t`, `.pk-f`/`.rv-f` emphasis, `trophy-case`). Never on buttons, Advance (green), "yours" (navy), choice controls, everyday/weekly chrome, or Home Base chrome. Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens.
-- **Choice controls are neutral** — tabs (Pool/Orders), the watch star, filter chips, phase labels, week tiles, invite counts, and status labels carry no green/orange/gold. Muted text, not colour.
-- **W/L plates** — the WIN plate is white; the LOSS tag is an outline. The result carries the colour, not a wash.
-- **Deltas are neutral** — ▲ at `--text-100`, ▼ at `--text-60`. No green up / red down.
-- **No colour wash on the weekly card** — the Since-last-week card background is the neutral surface on both win and loss; the seeded team colour never tints it.
-- **Information codes are neutral** — the Player Development Grid's "develops" / "adds" markers (`playerDevelopmentGrid.js`, `.is-develops`) and other read-only status codes stay neutral, not green or gold.
-
-Annotate a legal exception in the CSS/JS with `/* colour-law: positive-data | committed | saved | reward */`. `positive-data` allows green on a data element, `committed`/`saved` allow orange on a save, `reward` allows `--reward-gold` on a reward surface. The annotation is only for the exceptions above — it does not license a colour the law forbids.
+The canonical law is [Styleguide.md#colour-law](Styleguide.md#colour-law); read it before touching colour.
+In short: green is the one Advance plus positive data; orange is saved/committed only; navy is "yours"; blue is RT A / 9+ / elite only; `--reward-gold` is the five reward surfaces only. Choice controls, status codes, W/L plates and ▲/▼ deltas stay neutral, and team colour never washes a card.
+`scripts/check_ui_tokens.py --strict` enforces it on new-design files (§8). Annotate a legal exception with `/* colour-law: positive-data | committed | saved | reward */`.
 
 ### Live-game overlays (court.html DOM)
 
