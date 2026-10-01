@@ -163,10 +163,8 @@ async function mainOverflow(page) {
   });
 }
 
-// A row whose avatar holds a headshot <img> is 46px; a monogram row is 44px (the avatar
-// link is baseline-aligned, so an image-only avatar lifts the line by 2px). The fixture's
-// headshots 404 and fall back to the monogram, so a measurement taken while one is still
-// in flight compares a 46px row with a 44px one. Measure only when every avatar has
+// Player rows are 44px whatever the avatar holds (`a.gob-team.gob-player { vertical-align: middle }`;
+// the full guard is player-row-44.spec.js). Still measure only when every avatar has
 // settled: loaded, or already swapped for its monogram.
 async function avatarsSettled(page, view) {
   await page.waitForFunction((id) => {
@@ -204,9 +202,7 @@ test('player cell matches the roster row', async ({ page }) => {
   expect(got.stats.deco).toBe('none');
 });
 
-// The same comparison with the headshot answering late, which is what a busy machine
-// does. Before avatarsSettled this measured the stats row with its image still in
-// flight (46px) against a settled roster row (44px).
+// The same comparison with the headshot answering late, which is what a busy machine does.
 test('player cell matches the roster row when headshots answer late', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await installApi(page, 'ok');
@@ -222,7 +218,7 @@ test('player cell matches the roster row when headshots answer late', async ({ p
   expect(Math.round(got.stats.height)).toBe(44);
 });
 
-// With headshots that load, both rows carry an image and still match each other.
+// With headshots that load, both rows carry an image and are still 44px.
 test('player cell matches the roster row when headshots load', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await installApi(page, 'ok');
@@ -231,6 +227,8 @@ test('player cell matches the roster row when headshots load', async ({ page }) 
   await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=roster-view');
   const got = await playerRowHeights(page);
   expect(Math.round(got.stats.height)).toBeLessThanOrEqual(Math.round(got.rosterH));
+  expect(Math.round(got.rosterH)).toBe(44);
+  expect(Math.round(got.stats.height)).toBe(44);
 });
 
 test('team sub-tab opens player stats and the old id maps', async ({ page }) => {
