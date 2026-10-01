@@ -38,6 +38,9 @@
   function logo(name) {
     if (!name) return '';
     try {
+      // A core program with no logo art at all: the letter tile up front, no
+      // request (common.js keeps the known-asset list).
+      if (typeof global.teamLogoArtKind === 'function' && global.teamLogoArtKind(name) === 'none') return '';
       if (typeof global.getTeamAssetPath === 'function') {
         return global.getTeamAssetPath(name, 'logo_square') || '';
       }

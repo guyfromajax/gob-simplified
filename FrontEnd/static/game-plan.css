@@ -973,3 +973,16 @@ html.gob-shell .gpc .slider-nest__info:hover {
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
+
+/* Colour law: orange = there is something to save. Save Game Plan is neutral at
+   rest and after a save; .is-dirty (game-plan.js, real edits only) restores the
+   orange from the rules above. */
+.btn-save-game-plan:not(.is-dirty),
+html.gob-shell .pg-head .pg-tools .btn-save-game-plan:not(.is-dirty),
+html.gob-shell .button-container .btn-save-game-plan:not(.is-dirty) {
+  background: var(--white-6);
+  color: var(--text-60);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  filter: none;
+}
+

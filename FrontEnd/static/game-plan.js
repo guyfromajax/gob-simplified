@@ -570,6 +570,14 @@ function wireShotDietTip() {
 
 function markUnsavedChanges() {
   hasUnsavedChanges = true;
+  syncSaveDirtyState();
+}
+
+// Colour law: Save Game Plan is orange only while there is something to save
+// (a real edit per gamePlanHasEdits). Neutral at rest and after a save.
+function syncSaveDirtyState() {
+  const btn = byId('btn-save-game-plan');
+  if (btn) btn.classList.toggle('is-dirty', gamePlanHasEdits());
 }
 
 function sliderSnapshot(settings) {
@@ -596,6 +604,7 @@ function revertGamePlan() {
     if (slider) updateSliderVisual(slider, value);
   }
   hasUnsavedChanges = false;
+  syncSaveDirtyState();
 }
 
 function confirmGamePlanLeave(proceed) {
@@ -807,6 +816,7 @@ async function loadSettings() {
     // Store last saved settings for comparison
     lastSavedSettings = JSON.parse(JSON.stringify(currentSettings));
     hasUnsavedChanges = false;
+    syncSaveDirtyState();
     
     console.log('✅ Loaded game plan settings:', currentSettings);
   } catch (err) {
@@ -891,6 +901,7 @@ async function saveGamePlan() {
     // ✅ FIX: Reset unsaved changes flag after successful save
     lastSavedSettings = JSON.parse(JSON.stringify(currentSettings));
     hasUnsavedChanges = false;
+    syncSaveDirtyState();
 
     if (resumeFromTimeout) {
       executeNavigateToCourt();
@@ -1191,6 +1202,7 @@ function showUnsavedChangesWarning(onContinue) {
     }
     overlay.remove();
     hasUnsavedChanges = false;
+    syncSaveDirtyState();
     onContinue();
   });
   
