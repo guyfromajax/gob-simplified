@@ -27,7 +27,7 @@ diagram sheet ``css/gob-advanced.css``, Chapter 7 chrome (``css/office-home.css`
 ``scouting-report.css`` / ``css/prep-v2-scouting.css``, Team Builder
 ``team-builder.css``, tutorial / FTE modals and screens: Sammy, username,
 walk-on, attribute tour, lineup modal, persona intro, pick opponent, tip-off,
-``css/fte.css``), ``js/shared/gob*.js``, and
+``css/fte.css``, auth pages ``auth.css``), ``js/shared/gob*.js``, and
 ``js/shared/views/**``. Everything else under the scan root is legacy.
 ``css/gob-tokens.css`` is the token source and is not scanned.
 
@@ -264,6 +264,7 @@ NEW_DESIGN_CSS = frozenset({
     "css/tutorial-pick-opponent.css",
     "css/tutorial-tipoff.css",
     "css/fte.css",
+    "auth.css",
 })
 
 # Frozen leftover sheet. New rules belong in the view's own CSS.
