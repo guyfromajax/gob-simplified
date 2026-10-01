@@ -372,7 +372,8 @@ test.describe('tutorials / FTE tokens', () => {
     expect(hasOrange(tipoff.eyebrow), `tipoff eyebrow ${tipoff.eyebrow}`).toBe(false);
     expect(hasGreen(tipoff.cta), `SIM GAME stays green ${tipoff.cta}`).toBe(true);
 
-    // Username: ring + focus neutral; CONTINUE saves the username, so orange is legal.
+    // Username: ring + focus neutral; CONTINUE is the neutral plate (Jamie, 2026-10-01:
+    // orange only for unsaved changes).
     await open(page, '/tutorial.html', size);
     await page.evaluate(async () => {
       const m = await import('/js/shared/usernameModal.js');
@@ -387,7 +388,7 @@ test.describe('tutorials / FTE tokens', () => {
     }));
     expect(hasOrange(user.ring), `username ring ${user.ring}`).toBe(false);
     expect(hasOrange(user.focus), `username focus ${user.focus}`).toBe(false);
-    expect(hasOrange(user.cta), `username save stays orange ${user.cta}`).toBe(true);
+    expect(hasOrange(user.cta), `username CONTINUE is not orange ${user.cta}`).toBe(false);
 
     // Lineup intro: GOT IT neutral, ring neutral.
     await open(page, '/tutorial.html', size);
