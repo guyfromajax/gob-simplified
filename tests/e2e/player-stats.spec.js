@@ -163,17 +163,28 @@ async function mainOverflow(page) {
   });
 }
 
-test('player cell matches the roster row', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await installApi(page, 'ok');
-  await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=roster-view');
+// A row whose avatar holds a headshot <img> is 46px; a monogram row is 44px (the avatar
+// link is baseline-aligned, so an image-only avatar lifts the line by 2px). The fixture's
+// headshots 404 and fall back to the monogram, so a measurement taken while one is still
+// in flight compares a 46px row with a 44px one. Measure only when every avatar has
+// settled: loaded, or already swapped for its monogram.
+async function avatarsSettled(page, view) {
+  await page.waitForFunction((id) => {
+    const imgs = Array.from(document.querySelectorAll('#' + id + ' .av img'));
+    return imgs.every((img) => img.complete && img.naturalWidth > 0);
+  }, view);
+}
+
+async function playerRowHeights(page) {
   await page.waitForSelector('#roster-view a.gob-player');
+  await avatarsSettled(page, 'roster-view');
   const rosterH = await page.locator('#roster-view a.gob-player').first().evaluate((el) => {
     return el.closest('tr').getBoundingClientRect().height;
   });
   await page.mouse.move(980, 420);
   await page.locator('#gob-subtabs [data-tab="player-stats-view"]').evaluate((el) => el.click());
   await page.waitForSelector('#player-stats-view a.gob-player');
+  await avatarsSettled(page, 'player-stats-view');
   const stats = await page.locator('#player-stats-view a.gob-player').first().evaluate((el) => {
     const name = el.querySelector('.gob-id > span:first-child');
     return {
@@ -181,8 +192,45 @@ test('player cell matches the roster row', async ({ page }) => {
       deco: getComputedStyle(name).textDecorationLine,
     };
   });
-  expect(Math.round(stats.height)).toBeLessThanOrEqual(Math.round(rosterH));
-  expect(stats.deco).toBe('none');
+  return { rosterH: rosterH, stats: stats };
+}
+
+test('player cell matches the roster row', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await installApi(page, 'ok');
+  await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=roster-view');
+  const got = await playerRowHeights(page);
+  expect(Math.round(got.stats.height)).toBeLessThanOrEqual(Math.round(got.rosterH));
+  expect(got.stats.deco).toBe('none');
+});
+
+// The same comparison with the headshot answering late, which is what a busy machine
+// does. Before avatarsSettled this measured the stats row with its image still in
+// flight (46px) against a settled roster row (44px).
+test('player cell matches the roster row when headshots answer late', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await installApi(page, 'ok');
+  // Registered after installApi, so it answers the headshot requests.
+  await page.route(/\/images\/players\//, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.fulfill({ status: 404, body: '' });
+  });
+  await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=roster-view');
+  const got = await playerRowHeights(page);
+  expect(Math.round(got.stats.height)).toBeLessThanOrEqual(Math.round(got.rosterH));
+  expect(Math.round(got.rosterH)).toBe(44);
+  expect(Math.round(got.stats.height)).toBe(44);
+});
+
+// With headshots that load, both rows carry an image and still match each other.
+test('player cell matches the roster row when headshots load', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await installApi(page, 'ok');
+  const png = require('fs').readFileSync(require('path').join(__dirname, '../../FrontEnd/static/images/geekedout_logo.png'));
+  await page.route(/\/images\/players\//, (route) => route.fulfill({ status: 200, contentType: 'image/png', body: png }));
+  await openFcc(page, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=roster-view');
+  const got = await playerRowHeights(page);
+  expect(Math.round(got.stats.height)).toBeLessThanOrEqual(Math.round(got.rosterH));
 });
 
 test('team sub-tab opens player stats and the old id maps', async ({ page }) => {
