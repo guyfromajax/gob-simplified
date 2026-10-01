@@ -591,3 +591,25 @@ The Electron shell and the ops pages are on the design system. `desktop/splash.h
 - **RT stays blue** via `rt-buckets.css` (`.rt-*`), the sanctioned A-grade / 9+ / elite colour.
 - There is **no save state** on this page (the lineup persists through the flow, confirmed by a neutral toast), so orange has no home here.
 - `set-lineup.css` is on the design system (`NEW_DESIGN_CSS` in `check_ui_tokens.py`); `set-lineup.html` is already new-design via `gobShell.js` PAGES.
+
+### Team Builder
+
+`team-builder.html` is a pre-franchise flow (Identity → Gate → Roster → Review → Establish). It carries `<html class="gob">` and loads `gob-tokens.css`, but not the shell and not `gobDensity.js`, so it keeps its own layout and the 1280 token sizes at every width. `team-builder.css` is in `NEW_DESIGN_CSS`. Colour law on it:
+
+| Element | Colour | Why |
+|---|---|---|
+| Continue, Continue to Review, Enter Franchise (`.btn.tb-advance`) | green, shell Advance paint | The one Advance per chapter. Disabled is the dead neutral. |
+| Establish <program> (`.btn.sb-commit`) | orange, annotated `committed` | It writes the program into the league and cannot be undone. The only orange. |
+| Attribute fills, signature bars, grid cells (`scaleColor`) | `--tier-red` / `-yellow` / `-green` / `-blue` | The rating ramp on the raw scale: ≤40, ≤60, ≤80, 81+. Blue appears nowhere else. |
+| Selected roster row (`.bd-row.sel`, `.gr tr.sel`) | navy | Selection, as on Set Lineup. |
+| Your seat in the Establish table (`.sw-t tr.slot.now`) | navy | "Yours". |
+| Valid / legal / eligible / exact (`.ok`, `.d-ok`, `.verdict.ok`, `.meter.exact`, `.tally.ok`, `.pool.ok`, `.elig`, `.m-elig.ok`) | `--text-100`, neutral border | Status labels carry no green. Invalid stays `--red`. |
+| Changed from inherited (`.cls.chg`, `.bd-ht.chg`, `.mk.edit`, `.dlt`) | `--text-100` | A diff marker, not a save. |
+| Chapter cell, style buttons, palette ring, chips, year and view toggles, tone filters, input focus | neutral | Choice controls. |
+| Position chips (`.pos`, `.gp`, `.pos-b`), attribute category headings and legend codes | neutral | Information codes. No per-position or per-category colour. |
+| Wait pulse, pending sweep, picker accent, links | neutral | Not Advance, not a save. |
+
+- Headshots are square: `--radius-6` on the 26px board badge and the 38px Review badge, `--radius-10` on the 104px inspector portrait and the picker tile.
+- Team colours stay data: palette and swatch fills, court and banner art, skin-tone filter chips, and the Review "your program" row tint (`--me`, the program's primary).
+- Raw attribute values run 5–99 here and nowhere else (`ATTR_MIN` / `ATTR_MAX` in `js/team-builder/constants.js`). The ramp thresholds are on that raw scale.
+- Team names render as stored (Replacing cell, conference tables).

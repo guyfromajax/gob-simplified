@@ -25,12 +25,13 @@
     return Math.floor(n / 12) + "'" + (n % 12) + '"';
   }
 
+  /** The canonical rating ramp on the raw 5–99 scale: red, yellow, green, blue. */
   function scaleColor(v) {
     var n = Number(v) || 0;
-    if (n <= 40) return '#ff6d6d';
-    if (n <= 60) return '#FFD700';
-    if (n <= 80) return '#34EC27';
-    return '#4A90D9';
+    if (n <= 40) return 'var(--tier-red)';
+    if (n <= 60) return 'var(--tier-yellow)';
+    if (n <= 80) return 'var(--tier-green)'; /* colour-law: positive-data */
+    return 'var(--tier-blue)';
   }
 
   function coreTotal(attrs) {
@@ -713,7 +714,7 @@
         var dlt = row.querySelector('.dlt');
         if (dlt) {
           dlt.textContent = moved ? (d > 0 ? '+' + d : String(d)) : '—';
-          dlt.style.color = moved ? 'var(--org)' : 'var(--tx3)';
+          dlt.style.color = moved ? 'var(--text-100)' : 'var(--text-38)';
         }
         var input = row.querySelector('input[data-attr]');
         if (input && Number(input.value) !== v) input.value = String(v);
@@ -738,7 +739,7 @@
           poolEl.classList.toggle('bad', pool !== 0);
           if (nEl) {
             nEl.textContent = pool === 0 ? '0' : pool > 0 ? '+' + pool : String(pool);
-            nEl.style.color = pool === 0 ? 'var(--grn)' : 'var(--red)';
+            nEl.style.color = pool === 0 ? 'var(--text-100)' : 'var(--red)';
           }
           if (cEl) {
             cEl.textContent =
@@ -748,7 +749,7 @@
           var vs = tot - p.budget;
           if (nEl) {
             nEl.textContent = vs === 0 ? '—' : vs > 0 ? '+' + vs : String(vs);
-            nEl.style.color = vs === 0 ? 'var(--tx2)' : 'var(--org)';
+            nEl.style.color = vs === 0 ? 'var(--text-60)' : 'var(--text-100)';
           }
         }
       }
@@ -968,14 +969,14 @@
           ' inherited</span></div>' +
           '<div class="mt-track"><div class="mt-fill" style="width:' +
           pct +
-          '%;background:rgba(255,255,255,.4)"></div></div>' +
+          '%;background:var(--white-40)"></div></div>' +
           '<div class="mt-note mute">' +
           (diff === 0 ? 'unchanged' : (diff > 0 ? '+' + diff : diff) + (unit || '') + ' vs inherited') +
           ' — no cap</div></div>'
         );
       }
       var over = exact ? used !== cap : used > cap;
-      var color = over ? '#ff6d6d' : diff === 0 ? '#34EC27' : 'rgba(255,255,255,.42)';
+      var color = over ? 'var(--red)' : diff === 0 ? 'var(--text-100)' : 'var(--white-40)';
       var note;
       if (exact) {
         note =
@@ -1126,17 +1127,15 @@
             '</td><td>' +
             feetInches(p.ht) +
             '</td>' +
-            '<td><span class="pos" style="background:' +
-            (C.POS_COLOR[p.pos] || '#888') +
-            '">' +
+            '<td><span class="pos">' +
             escapeHtml(p.pos) +
             '</span></td>' +
-            '<td style="font-family:var(--disp);font-size:15px;color:#fff">' +
+            '<td style="font-family:var(--font-display);font-size:var(--fs-15);color:var(--text-100)">' +
             escapeHtml(rt) +
             '</td>' +
             cells +
-            '<td style="font-family:var(--disp);font-size:15px;color:' +
-            (pool === 0 || !capped ? '#fff' : '#ff6d6d') +
+            '<td style="font-family:var(--font-display);font-size:var(--fs-15);color:' +
+            (pool === 0 || !capped ? 'var(--text-100)' : 'var(--red)') +
             '">' +
             coreTotal(p.attrs) +
             '</td></tr>'
@@ -1197,9 +1196,7 @@
           '">' +
           feetInches(p.ht) +
           '</div>' +
-          '<div><span class="pos" style="background:' +
-          (C.POS_COLOR[p.pos] || '#888') +
-          '">' +
+          '<div><span class="pos">' +
           escapeHtml(p.pos) +
           '</span></div>' +
           '<div class="bd-grade' +
@@ -1221,7 +1218,7 @@
       }
 
       function portraitThumb(p) {
-        var bg = 'rgba(255,255,255,.08)';
+        var bg = 'var(--line)';
         var img = '';
         if (p.image_id && API_CONFIG.getRecruitImageUrl) {
           img =
@@ -1251,7 +1248,7 @@
         sch +
         '<div class="bd-split">Walk-ons — 3</div>' +
         wo +
-        '<div class="bd-foot"><span><i style="background:#F79420"></i>Changed from inherited</span></div>';
+        '<div class="bd-foot"><span><i style="background:var(--text-100)"></i>Changed from inherited</span></div>';
     }
 
     host.querySelectorAll('[data-view]').forEach(function (btn) {
@@ -1300,9 +1297,7 @@
       return (
         '<div class="gcard' +
         (pending ? ' pending' : '') +
-        '"><span class="gp" style="background:' +
-        (C.POS_COLOR[pos] || '#888') +
-        '">' +
+        '"><span class="gp">' +
         pos +
         '</span><span class="gv">' +
         escapeHtml(v) +
@@ -1313,7 +1308,7 @@
     var weightHtml;
     if (p.ht === p.base.ht && p.base.wt != null && !isNaN(p.base.wt)) {
       weightHtml =
-        '<div class="wt">Weight <b style="color:var(--tx2)">' +
+        '<div class="wt">Weight <b style="color:var(--text-60)">' +
         Math.round(p.base.wt) +
         ' lb</b> · inherited until height changes</div>';
     } else {
@@ -1332,7 +1327,7 @@
         p.budget +
         '</span></div></div>' +
         '<div class="pool-r"><div class="n" style="color:' +
-        (pool === 0 ? 'var(--grn)' : 'var(--red)') +
+        (pool === 0 ? 'var(--text-100)' : 'var(--red)') +
         '">' +
         (pool === 0 ? '0' : pool > 0 ? '+' + pool : pool) +
         '</div><div class="c">' +
@@ -1348,7 +1343,7 @@
         p.budget +
         ' inherited</span></div></div>' +
         '<div class="pool-r"><div class="n" style="color:' +
-        (vs === 0 ? 'var(--tx2)' : 'var(--org)') +
+        (vs === 0 ? 'var(--text-60)' : 'var(--text-100)') +
         '">' +
         (vs === 0 ? '—' : vs > 0 ? '+' + vs : vs) +
         '</div><div class="c">vs inherited</div></div></div>';
@@ -1407,7 +1402,7 @@
         value +
         '</div>' +
         '<div class="dlt" style="color:' +
-        (moved ? 'var(--org)' : 'var(--tx3)') +
+        (moved ? 'var(--text-100)' : 'var(--text-38)') +
         '">' +
         (moved ? (d > 0 ? '+' + d : d) : '—') +
         '</div></div>'
@@ -1419,14 +1414,12 @@
     function colHtml(col) {
       return col
         .map(function (group) {
-          var cat = C.ATTR_CATS[group.cat] || { label: group.cat, color: '#aaa' };
+          var cat = C.ATTR_CATS[group.cat] || { label: group.cat };
           return (
             '<div class="' +
             (group.cat === 'endurance' ? 'attr-group-nd' : '') +
             '">' +
-            '<div class="catrow"><span style="color:' +
-            cat.color +
-            '">' +
+            '<div class="catrow"><span>' +
             escapeHtml(cat.label) +
             '</span><i></i></div>' +
             group.items.map(attrRow).join('') +
@@ -1437,11 +1430,8 @@
     }
 
     var legend = C.CORE_12_ATTRS.map(function (t) {
-      var cat = C.ATTR_CATS[t.cat] || { color: '#aaa' };
       return (
-        '<span><b style="color:' +
-        cat.color +
-        '">' +
+        '<span><b>' +
         t.code +
         '</b><i>' +
         escapeHtml(t.name) +
@@ -1459,7 +1449,7 @@
 
     host.innerHTML =
       '<div class="insp-hd">' +
-      '<div><div class="pt-lg" data-open-picker style="background:rgba(255,255,255,.08)">' +
+      '<div><div class="pt-lg" data-open-picker style="background:var(--line)">' +
       img +
       '<b>' +
       escapeHtml(initials(p.name)) +
@@ -1536,10 +1526,10 @@
       (p.ht >= C.HEIGHT_MAX_IN ? ' disabled' : '') +
       '>+</button></div>' +
       (capped
-        ? '<div class="htbar"><div style="height:100%;border-radius:2px;width:' +
+        ? '<div class="htbar"><div style="height:100%;border-radius:var(--radius-2);width:' +
           Math.min(100, (leg.heightUsed / leg.heightBudget) * 100) +
           '%;background:' +
-          (htDiff > 0 ? '#ff6d6d' : htDiff === 0 ? '#34EC27' : 'rgba(255,255,255,.42)') +
+          (htDiff > 0 ? 'var(--red)' : htDiff === 0 ? 'var(--text-100)' : 'var(--white-40)') +
           '"></div></div>' +
           '<div class="tally' +
           (htDiff > 0 ? ' bad' : htDiff === 0 ? ' ok' : '') +

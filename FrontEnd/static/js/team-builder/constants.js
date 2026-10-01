@@ -100,23 +100,17 @@
     'ST',
   ];
 
+  /** Category headings are neutral labels (colour law: information codes carry no colour). */
   var ATTR_CATS = {
-    offense: { label: 'Offense', color: '#f79420' },
-    defense: { label: 'Defense', color: '#4a90d9' },
-    technical: { label: 'Technical', color: '#7b5ea7' },
-    physical: { label: 'Physical', color: '#aeb8cc' },
-    endurance: { label: 'Endurance', color: '#34ec27' },
-    intangibles: { label: 'Intangibles', color: '#d4a017' },
+    offense: { label: 'Offense' },
+    defense: { label: 'Defense' },
+    technical: { label: 'Technical' },
+    physical: { label: 'Physical' },
+    endurance: { label: 'Endurance' },
+    intangibles: { label: 'Intangibles' },
   };
 
   var POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
-  var POS_COLOR = {
-    PG: '#4A90D9',
-    SG: '#7B5EA7',
-    SF: '#3A8C4A',
-    PF: '#C0392B',
-    C: '#D4A017',
-  };
   var CLASSES = ['FR', 'SO', 'JR', 'SR'];
 
   var ATTR_MIN = 5;
@@ -259,7 +253,6 @@
     RT_ATTR_KEYS: RT_ATTR_KEYS,
     ATTR_CATS: ATTR_CATS,
     POSITIONS: POSITIONS,
-    POS_COLOR: POS_COLOR,
     CLASSES: CLASSES,
     ATTR_MIN: ATTR_MIN,
     ATTR_MAX: ATTR_MAX,
