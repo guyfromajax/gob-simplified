@@ -84,7 +84,7 @@
   color: #15181f;
 }
 
-.gob-btn--action:hover:not(:disabled):not(.is-disabled) {
+.gob-btn--action:hover:not(:disabled):not(.is-disabled) { /* colour-law: committed */
   background: #ffa84a;
 }
 

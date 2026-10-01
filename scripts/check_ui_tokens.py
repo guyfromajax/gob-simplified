@@ -41,10 +41,11 @@ Allow-list (green / orange / reward-gold):
   chemistry ``.chem`` / ``.is-green``, board-gain bars, RT/attribute ramps
   ``.att-col`` / ``.att-bar`` / ``.gob-chg``), or a nearby
   ``/* colour-law: positive-data */`` comment.
-* Orange — committed or saved (``save``, ``saved``, ``committed``,
-  ``gob-btn--action``, ``toggle-btn.active``, ``.gated``, ``.td-gate``,
-  ``.is-on``), attribute-ramp mid stops on ``.att-col`` / ``.att-bar``,
-  or a nearby ``/* colour-law: committed */`` / ``/* colour-law: saved */``.
+* Orange — "there are unsaved changes" and nothing else (Jamie, 2026-10-01):
+  save / commit selectors only (``save``, ``saved``, ``committed``,
+  ``is-saved``, ``is-committed``), or a nearby ``/* colour-law: committed */``
+  / ``/* colour-law: saved */``. Gated tags, ``.is-on`` selections, toggles,
+  attitude ramps and generic action buttons are no longer allowed by name.
 * Reward-gold — title medallions (``.med.gold``), season-peak glow / rule /
   confetti (``.pk``, ``.cf``), milestone accents (``.mm.is-gold``,
   ``.mm .med``), the exceptional-gain marker (``.xg``, ``.xg-key``,
@@ -220,8 +221,7 @@ POSITIVE_SELECTOR_RE = re.compile(
     r"em_60_79|em_80_plus"
 )
 SAVE_RE = re.compile(
-    r"(?:^|[^a-z0-9])(?:save|saved|committed|gob-btn--action|toggle-btn|"
-    r"gated|td-gate|is-on|is-saved|is-committed)(?:[^a-z0-9]|$)"
+    r"(?:^|[^a-z0-9])(?:save|saved|committed|is-saved|is-committed)(?:[^a-z0-9]|$)"
 )
 RAMP_SELECTOR_RE = re.compile(r"(?:^|[^a-z0-9])(?:att-col|att-bar)(?:[^a-z0-9]|$)")
 POSITIVE_VALUE_RE = re.compile(r"var\(\s*--(?:delta-up|tier-green)\b")
@@ -926,7 +926,7 @@ def _orange_allowed(selector: str, annotation: str | None = None) -> bool:
     if annotation in {"committed", "saved"}:
         return True
     blob = selector.lower()
-    return bool(SAVE_RE.search(blob) or RAMP_SELECTOR_RE.search(blob))
+    return bool(SAVE_RE.search(blob))
 
 
 def _reward_gold_allowed(selector: str, annotation: str | None = None) -> bool:
@@ -1407,8 +1407,9 @@ def format_report(audit: Audit) -> str:
         "Green is allowed on Advance (`advance`, `play-now`, `gob-btn--gate`), on positive",
         "data (`delta-up`, `tier-green`, `t-green`, `is-up` / `is-pos` / `tsr-up`, chemistry",
         "and board-gain bars, RT/attribute ramps), or a nearby `/* colour-law: positive-data */`.",
-        "Orange is allowed on committed/saved (`save`, `committed`, `gob-btn--action`,",
-        "`.gated`, `.td-gate`) or `/* colour-law: committed */` / `/* colour-law: saved */`.",
+        "Orange means unsaved changes only: save/commit selectors (`save`, `saved`,",
+        "`committed`, `is-saved`, `is-committed`) or `/* colour-law: committed */` /",
+        "`/* colour-law: saved */`.",
         "`--reward-gold` is allowed on title medallions (`.med.gold`), season-peak glow /",
         "rule / confetti (`.pk`, `.cf`), milestone accents (`.mm.is-gold`, `.mm .med`),",
         "the exceptional-gain marker (`.xg`, `.xg-key`, `xgSweep`), Trophy Case words",

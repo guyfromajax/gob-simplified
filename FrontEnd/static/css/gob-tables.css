@@ -813,7 +813,7 @@ html.gob-1920 .gob-apan { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .gob-chg b { font-weight: 600; }
 .gob-chg i { font-style: normal; }
 .gob-chg .is-up i { color: var(--delta-up); } /* colour-law: positive-data */
-.gob-chg .is-down i { color: #e07a7a; }
+.gob-chg .is-down i { color: var(--text-87); } /* ▼ is neutral */
 .gob-chg em { margin-left: auto; color: var(--text-38); font-style: normal; font-size: var(--fs-11); }
 .gob-focus-read, .gob-focus-edit { display: flex; align-items: stretch; gap: 12px; }
 .gob-focus-read, .gob-focus-edit { flex-direction: column; align-items: flex-start; }
@@ -918,8 +918,19 @@ html.gob-shell .main #player-stats-view .gob-xs thead th.pin {
   z-index: 2;
   background-color: var(--surface-1);
 }
-.gob-wl.up { color: var(--delta-up); }
-.gob-wl.dn { color: var(--delta-down); }
+/* W/L letters: white WIN plate, outlined LOSS, never green/red (Jamie, 2026-10-01). */
+.gob-wl {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  border-radius: 5px;
+  font-weight: 700;
+  line-height: 1;
+}
+.gob-wl.up { background: var(--white-90); color: var(--bg); }
+.gob-wl.dn { color: var(--text-87); box-shadow: inset 0 0 0 1.5px var(--white-40); }
 .gob-sch-round {
   margin: 0 0 8px;
   color: var(--text-60);

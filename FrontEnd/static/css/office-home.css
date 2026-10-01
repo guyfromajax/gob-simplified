@@ -69,7 +69,6 @@ html.gob-shell.gob-office .office-col { gap: var(--dsp-12); }
    any type. This buys back the row the Ch7 weekly card cost. */
 html.gob-shell.gob-office.gob-1280 .office-snap { padding-top: var(--dsp-4); padding-bottom: var(--dsp-2); }
 .gob.gob-1280 .office .card { padding-top: 8px; padding-bottom: 8px; }
-.gob.gob-1280 .office-res { gap: 6px; }
 .gob.gob-1280 .office .rs-pts { font-size: var(--fs-28); }
 .gob.gob-1280 .office .rs-dash { font-size: var(--fs-20); }
 .gob.gob-1280 .office .rs-n { font-size: var(--fs-16); }
@@ -210,9 +209,11 @@ html.gob-shell.gob-office .office {
   box-shadow: inset 0 0 0 1.5px var(--text-100);
   background: var(--white-7);
 }
+/* Blocking step: neutral strong outline; "BLOCKS ADVANCE" carries the meaning
+   (orange = unsaved changes only, Jamie 2026-10-01). */
 .gob .wk-step.gated {
-  box-shadow: inset 0 0 0 1.5px var(--orange);
-  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--white-62);
+  background: var(--white-6);
 }
 .gob .wk-step .td-adv,
 .gob .wk-step .td-gate {
@@ -301,13 +302,6 @@ html.gob-shell.gob-office .office-wire .wr-2 {
   font: var(--fw-bold) var(--fs-22)/1 var(--font-display);
   padding-top: var(--space-1);
 }
-.gob .attr-chip .arr {
-  font-style: normal;
-  font-size: var(--fs-13);
-  line-height: 1;
-}
-.gob .attr-chip .arr.up { color: var(--delta-up); }
-.gob .attr-chip .arr.down { color: var(--delta-down); }
 .gob .office-mv .lnk { align-self: flex-end; }
 .gob .nx-rank {
   font-family: var(--font-display);
@@ -354,7 +348,7 @@ html.gob-shell.gob-office .office-wire .wr-2 {
 }
 .gob .att-bar i { display: block; height: 100%; }
 .gob .att-col[data-bucket="em_0_19"] .att-bar i { background: var(--red); }
-.gob .att-col[data-bucket="em_20_39"] .att-bar i { background: var(--orange); }
+.gob .att-col[data-bucket="em_20_39"] .att-bar i { background: color-mix(in srgb, var(--red) 55%, var(--white-18)); } /* no orange stop */
 .gob .att-col[data-bucket="em_40_59"] .att-bar i { background: var(--white-45); }
 .gob .att-col[data-bucket="em_60_79"] .att-bar i { background: color-mix(in srgb, var(--green) 58%, var(--white-18)); }
 .gob .att-col[data-bucket="em_80_plus"] .att-bar i {

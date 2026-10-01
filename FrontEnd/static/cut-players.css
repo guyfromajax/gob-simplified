@@ -162,3 +162,10 @@ html.gob-focus #cut-players-view .cut-players-shell {
 body.cut-players-page .gob-modal-accent.is-neutral {
   background: var(--line);
 }
+
+/* "Stay" saves nothing, so it is a neutral primary, not orange (Jamie, 2026-10-01). */
+body.cut-players-page .gob-modal-btn-primary.is-neutral {
+  background: var(--white-90);
+  border-color: transparent;
+  color: var(--bg);
+}

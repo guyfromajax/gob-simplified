@@ -80,8 +80,10 @@
 .gob .portrait{flex:none;border-radius:var(--radius-10);overflow:hidden;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--line-strong)}
 .gob .portrait img{width:100%;height:100%;object-fit:cover;object-position:50% 22%;display:block}
 .gob .chip{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-width:var(--dsz-34);height:var(--dsz-20);padding:0 var(--space-6);border-radius:var(--radius-6);font:var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-1);white-space:nowrap}
+/* colour-law: positive-data */
 .gob .chip.up{color:var(--delta-up);background:color-mix(in srgb,var(--delta-up) 11%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--delta-up) 32%,transparent)}
-.gob .chip.down{color:var(--delta-down);background:color-mix(in srgb,var(--delta-down) 12%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--delta-down) 36%,transparent)}
+/* ▼ is neutral, never red (Jamie, 2026-10-01). */
+.gob .chip.down{color:var(--text-87);background:var(--white-6);box-shadow:inset 0 0 0 1px var(--line)}
 .gob .chip.flat{color:var(--text-60);background:var(--white-5);box-shadow:inset 0 0 0 1px var(--line-strong)}
 .gob .t-red{color:var(--tier-red)}.gob .t-yellow{color:var(--tier-yellow)}.gob .t-green{color:var(--tier-green)}.gob .t-blue{color:var(--tier-blue)}
 .gob .tdig{font:var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display)}
@@ -89,8 +91,6 @@
 .gob .stars{letter-spacing:var(--tracking-1px);color:var(--text-87);font-size:.92em}
 .gob .stars i{font-style:normal;color:var(--white-18)}
 .gob .wl{display:inline-flex;align-items:center;height:var(--dsz-22);padding:0 var(--space-9);border-radius:var(--radius-6);font:var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-10);padding-top:var(--space-2)}
-.gob .wl.win{color:var(--delta-up);background:color-mix(in srgb,var(--delta-up) 12%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--delta-up) 40%,transparent)}
-.gob .wl.loss{color:var(--delta-down);background:color-mix(in srgb,var(--delta-down) 12%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--delta-down) 40%,transparent)}
 .gob .meter{height:var(--dsz-6);border-radius:var(--radius-4);background:var(--white-7);overflow:hidden}
 .gob .meter i{display:block;height:100%;background:var(--white-62);border-radius:var(--radius-4)}
 /* Diverging pill: zero in the centre, filling right for positive and left for
@@ -154,8 +154,6 @@
 .gob .note:hover .lnk{color:var(--text-100)}
 .gob .more{margin-top:var(--space-2)}
 /* result */
-.gob .office-res{position:relative;overflow:hidden;background:linear-gradient(112deg,color-mix(in srgb,var(--team-primary) 46%,transparent) 0%,color-mix(in srgb,var(--team-primary) 16%,transparent) 42%,transparent 72%),linear-gradient(180deg,var(--white-4p5),var(--white-2));border-color:color-mix(in srgb,var(--team-primary) 45%,transparent);gap:var(--dsp-12)}
-.gob .office-res::before{content:'';position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--team-primary),transparent 80%)}
 .gob .res-k{display:flex;align-items:center;gap:var(--dsp-10)}
 .gob .res-k .res-when{font-size:var(--fs-11);color:var(--text-60);font-weight:var(--fw-semibold);letter-spacing:var(--tracking-6);text-transform:uppercase;flex:1}
 .gob .res-score{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto minmax(0,1fr);align-items:center;gap:var(--dsp-12)}
@@ -207,7 +205,6 @@
 .gob .wr.dn .wr-2{color:var(--text-87)}
 .gob .wr-tag{font:var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-4);color:var(--text-87)}
 .gob .wr.up .wr-tag{color:var(--delta-up)}
-.gob .wr.dn .wr-tag{color:var(--delta-down)}
 /* next */
 .gob .nx-top{display:flex;justify-content:space-between;gap:var(--space-10)}
 .gob .nx-m{display:flex;align-items:center;gap:var(--dsp-12)}
@@ -286,7 +283,6 @@
 .gob.gob-1280 .mv-v>b{font-size:var(--fs-24)}
 .gob.gob-1280 .mv-p{padding:var(--space-5) var(--space-2)}
 .gob.gob-1280 .wr{padding:var(--space-5) var(--space-2)}
-.gob.gob-1280 .office-res{gap:var(--space-9)}
 .gob .office-wire .card-h .lnk{margin-left:auto}
 .gob .office-wire .card-h .meta{margin-left:auto}
 .gob.gob-1920 .f5{padding:var(--dsz-4) var(--space-2)}
@@ -327,21 +323,13 @@
 .gob .adv-lock{display:inline-flex;width:15px;height:15px}
 .gob .adv-lock svg{width:100%;height:100%}
 /* to-do gated/locked */
-.gob .td-gate{display:inline-flex;align-items:center;gap:var(--space-5);font:var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-10);color:var(--orange);padding:var(--space-4) var(--space-7) var(--space-3);border-radius:var(--radius-4);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--orange) 45%,transparent);background:color-mix(in srgb,var(--orange) 8%,transparent);white-space:nowrap;align-self:flex-start}
+.gob .td-gate{display:inline-flex;align-items:center;gap:var(--space-5);font:var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-10);color:var(--text-87);padding:var(--space-4) var(--space-7) var(--space-3);border-radius:var(--radius-4);box-shadow:inset 0 0 0 1px var(--white-40);background:transparent;white-space:nowrap;align-self:flex-start}
 .gob .td-gate svg{width:11px;height:11px;margin-top:-1px}
-.gob .todo.gated{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--orange) 30%,transparent)}
-.gob .todo.gated .cbox{box-shadow:inset 0 0 0 1.5px var(--orange)}
+.gob .todo.gated{box-shadow:inset 0 0 0 1px var(--white-40)}
+.gob .todo.gated .cbox{box-shadow:inset 0 0 0 1.5px var(--white-62)}
 .gob .todo.locked .td-l{color:var(--text-60)}
 .gob .todo.locked .cbox{box-shadow:inset 0 0 0 1.5px var(--white-20)}
 .gob .todo.locked .td-adv{opacity:.5}
-/* result: loss */
-.gob .office-res.is-loss{background:linear-gradient(180deg,var(--white-4),var(--white-1p8));border-color:var(--line)}
-.gob .office-res.is-loss::before{display:none}
-.gob .office-res.is-loss .rs-pts{color:var(--text-87)}
-.gob .office-res.is-loss .rs-pts.them{color:var(--text-60)}
-.gob .office-res.is-loss .rs-team.won .rs-n{color:var(--text-87)}
-.gob .office-res.is-loss .wl.loss{font-size:var(--fs-14);color:color-mix(in srgb,var(--red) 90%,transparent);background:transparent;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--red) 35%,transparent)}
-.gob .office-res.is-loss .rs-n{color:var(--text-87)}
 .gob .res-season{font:var(--fw-bold) var(--fs-14)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-8);color:var(--text-87);padding-bottom:var(--dsp-8);border-bottom:1px solid var(--line)}
 .gob .res-next{display:flex;align-items:center;gap:var(--space-8);padding:var(--dsp-8) var(--dsp-10);border-radius:var(--radius-8);background:var(--white-3p5);box-shadow:inset 0 0 0 1px var(--line);font-size:var(--fs-12)}
 .gob .res-next>span{font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--tracking-10);text-transform:uppercase;color:var(--text-60)}

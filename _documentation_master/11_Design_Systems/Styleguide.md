@@ -9,20 +9,25 @@ One colour, one meaning. Everything not listed is neutral: white text at `--text
 | Colour | Token(s) | Allowed | Banned |
 |---|---|---|---|
 | Green | `--green` (ink on green: `--bg`) | The one Advance per screen (top-bar `#play-now` / `.advance`, `.gob-btn--gate`, the one forward action in a live-game overlay, Submit Training on the weekly training page). Positive data: delta-up, tier green, chemistry high, board-gain bars, the RT / attribute ramps. | Cards, WIN/LOSS plates, badges, scores, choice controls, a second button on the same screen, any button that only navigates or only saves. |
-| Orange | `--orange` | Saved or committed only: Submit Invites, Submit Orders, Save Game Plan / Playbooks (only while there is an unsaved edit: neutral at rest and after a save), Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row. | Brand accent, "warning / low" data, navigation, choice controls, checkboxes, hovers, toasts, a loader. |
+| Orange | `--orange` | **"There are unsaved changes" and nothing else**: the save or commit of something you changed. Submit Invites, Submit Orders, Save Game Plan / Playbooks (only while there is an unsaved edit: neutral at rest and after a save), Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row. | Brand accent, "warning / low" data, navigation, choice controls and their selected state (`.is-on`), checkboxes, hovers, toasts, a loader, the rail count badge, gated / "Blocks Advance" tags and blocking-step outlines, data ramps (attitude), modal accents, a "Stay" / keep-editing button. |
 | Navy | `--navy`, `--navy-hi` (edge / halo only); aliases `--you`, `--you-soft`, `--you-line`, `--you-ink` | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list, your team in a bracket. What you picked for your team or plan: Set Lineup on-court and selected rows, plays in your Playcall Center, your leaderboard and lean-ladder slot. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. A generic "selected" state on a choice control: tabs, toggles, radios, sliders and filter chips stay neutral. |
 | Blue | `--tier-blue` (attribute tiles), `--blue` (RT letters) | RT only: an A grade, a 9+ attribute, elite. One exception: the top band of the shot-share ramp (see [Data scales](#data-scales)). | Chrome, links, navigation, "good / above average". |
 | Reward gold | `--reward-gold` | Only: title medallions (`.med.gold`); season-peak glow, rule and confetti (`.pk`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`); the exceptional-gain marker (`.xg`, `.xg-key`); the words "Trophy Case" (`.gold-t`); senior-tribute title marks (`.st-titles s`, `.st-cti s`). Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens. | Any button, including the button on a reward modal (the big-news CTA is a neutral plate). Advance, "yours", choice controls, everyday or weekly chrome, Home Base chrome. |
-| Red / yellow | `--tier-red`, `--tier-yellow` | Data ramps only (rating tiers, chemistry, energy, delta-down where a ramp is used). | Buttons, chrome, warnings, destructive-action styling (see Open questions). |
-| Team colour | `--team-primary` (set per team) | Identification: logos, name bars, favour arrows, team badges, the edge border and side tint that say which team a live-game side panel belongs to. | A wash or tint on a card, panel, tab, header or the weekly card, win or loss. The selected state of a choice control. |
+| Red / yellow | `--tier-red`, `--tier-yellow`; `--red` for the one destructive style | Data ramps (rating tiers, chemistry, energy, the attitude bars' low buckets). **Irreversible deletes only**: the red-outline confirm button and the red menu item for deleting a program on Home Base (`.btn-del`, `.pop-i.danger`). | ▼ deltas, LOSS plates or letters, buttons, chrome, warnings, modal accents, and destructive styling on anything reversible (removing a queued invite, assigning the practice squad, leaving with selections). |
+| Team colour | `--team-primary` (set per team) | Identification: logos, name bars, favour arrows, team badges, the edge border and side tint that say which team a live-game side panel belongs to. | A wash or tint on a card, panel, tab, header or the weekly / result card, win or loss. The selected state of a choice control. |
 | Tier metal | `--tier-metal`, `--tier-metal-hi` (set per tournament tier) | Tournament-tier top bar and the tier next-game card. | Anything outside tournament weeks. |
 
 Neutral by rule (no green, orange, gold or navy):
 
 - **Choice controls**: tabs, segments, filter chips, sliders, the watch star, checkboxes, view toggles, the live-game side-panel stat toggles, Autoset Lineup, a Retry button. Selected is a brighter neutral, never navy, team colour or orange.
 - **Status and information codes**: phase labels, week tiles, invite counts, status labels, Player Development Grid "develops" / "adds" markers. Muted text, not colour.
-- **W/L plates**: WIN is a white plate, LOSS is an outline. The result carries the meaning, not a colour.
-- **▲ / ▼ deltas** on result and weekly surfaces: ▲ at `--text-100`, ▼ at `--text-60`. No green up, red down (see Open questions for chips).
+- **W/L plates**: WIN is a white plate, LOSS is an outline, everywhere, tables included (Rankings "Last Week", Team › Schedule). The result carries the meaning, not a colour.
+- **▼ deltas** everywhere: neutral (`--delta-down` is `--text-87`). Never red.
+- **▲ deltas** on result and weekly surfaces: ▲ at `--text-100`, ▼ at `--text-60`. On data chips (Office "Moved most", box-score attribute chips, Player › attribute changes, the Office recruiting wire) ▲ is green as positive data (`--delta-up`).
+- **The rail count badge**: a white plate (`--badge`) with dark ink (`--badge-ink`); the urgent pulse stays.
+- **Blocking to-dos**: the Office blocking step and its "Blocks Advance" tag are a neutral strong outline (`--white-62`) and an outlined tag; the words carry the meaning.
+- **Modal accents**: a functional modal's accent is neutral by default (`--white-14` hairline). A modal opts in to a colour with a modifier.
+- **"Stay" / keep editing** in a leave-confirm: a neutral primary (white plate), never orange: it saves nothing.
 - **Navigation-only buttons** (Sub Players, Back, Continue to Office, Full standings).
 - **The recruiting presence dot** and the button on a reward modal.
 
@@ -64,7 +69,8 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 - Energy / readiness: high `--green` (annotated), then `--yellow`, then an amber `color-mix()`, then `--red`. Never raw `--orange`.
 - Team measures (−20…+20): the diverging pill `.dv`, neutral white fills, zero in the centre. Place bars are neutral white, not navy.
 - Shot share (Expected Shot Distribution, shot weights; `getPswColor()` in `common.js`): four bands by share of shots. Above 35% blue, 21–35% green, 11–20% gold, 10% and below red. A self-contained data ramp, and the one place blue is not RT. Its values live in the helper, not in tokens. The playbook CMD bands (`css/playbook-cmd.css`: blue, green, yellow) were kept by the same ruling.
-- Deltas: `--delta-up`, `--delta-down`, `--delta-flat` exist for data chips; see Open questions for where they still apply.
+- Deltas: `--delta-up` (green) marks ▲ on data chips; `--delta-down` is neutral (`--text-87`), so ▼ is never red; `--delta-flat` is `--text-60`.
+- Attitude (Office Team snapshot, buckets 0–19 … 80+): red, muted red, neutral, green-mix, green. No orange stop.
 
 **Display text.** Class year is always a two-letter uppercase abbreviation (`FR`, `SO`, `JR`, `SR`, `GR`, `JH`; unknown `--`) via `playerYear.js` / `BackEnd/utils/player_year.py`. Team names show exactly as stored in `teams.name`: no title-casing, no hyphen stripping, no exception map. Team measures use one vocabulary of eleven measures; Momentum is never shown on Team Attributes, the Training Report Team Report or Office "Moved most". `pt_efficiency` is P/T Defense and `pt_opp_modifier` is P/T Offense everywhere.
 
@@ -141,10 +147,10 @@ One modal at a time, toggled with `.is-visible`, above everything at `--z-modal`
 
 | Type | Use | Rule |
 |---|---|---|
-| Functional | Confirmations, warnings, settings, leave-with-edits, destructive actions | Max 420px. Esc and backdrop dismiss. Two actions: primary `flex: 2`, secondary `flex: 1`. One action: full-width ghost. Action-only variant (no title, stacked equal buttons) must be answered; no backdrop dismiss. |
+| Functional | Confirmations, warnings, settings, leave-with-edits, destructive actions | Max 420px. Esc and backdrop dismiss. Two actions: primary `flex: 2`, secondary `flex: 1`. One action: full-width ghost. Action-only variant (no title, stacked equal buttons) must be answered; no backdrop dismiss. Accent neutral by default. A "Stay" primary is a neutral white plate. Red only on an irreversible delete (red-outline confirm; Cancel takes focus). |
 | Moment | Milestones and season peaks (`.mm`, season-peak template), big news, results | Max 560px (720px only for tabular content). Requires a button, and the button is neutral (ghost or a neutral plate), never gold. Outcome is the hero. Gold only on reward tiers, as art: emblem, eyebrow, rule, title glow. Elimination is quiet (fade, no gold, no sound). The server names the style and sting. |
 | Strategic | In-game decision points (defense matchups, timeouts, foul-outs) | Wide (up to 1160px). Requires an explicit submit. Data is the hero; muted title. Team colour only as identification on panel headers. The one forward action is green; skip is a low-weight checkbox or ghost link. |
-| Tutorial | Coach Sammy lesson alerts (`gob-tutorial.css`) | Full-screen takeover card. Tutorial chrome is outside the token gate today (see Open questions). |
+| Tutorial | Coach Sammy lesson alerts (`gob-tutorial.css`) | Full-screen takeover card, neutral: white "Start lesson" primary, no orange. |
 
 ### Toasts
 
@@ -156,7 +162,7 @@ Player headshot: square with a small corner, photo, monogram or placeholder alik
 
 ### Chips, pills and badges
 
-`.chip` (`--radius-6`, `--dsz-20` high, micro type). Data chips may carry a tier or delta token; choice and filter chips are neutral (default `--white-6`, selected `--white-9` with `--text-100`). The rail count badge uses `--badge` / `--badge-ink`; the recruiting presence dot is a dot, not a count, does not pulse, and is neutral (`--text-100`, never orange or green). Meters (`.meter`) are neutral unless they show a data ramp.
+`.chip` (`--radius-6`, `--dsz-20` high, micro type). Data chips may carry a tier or delta token; choice and filter chips are neutral (default `--white-6`, selected `--white-9` with `--text-100`). The rail count badge is a neutral white plate (`--badge` / `--badge-ink`); the recruiting presence dot is a dot, not a count, does not pulse, and is neutral (`--text-100`, never orange or green). Meters (`.meter`) are neutral unless they show a data ramp.
 
 ### Empty states
 
@@ -164,16 +170,17 @@ Player headshot: square with a small corner, photo, monogram or placeholder alik
 
 ### W/L plates
 
-`.wl`: display face, `--radius-6`, `--dsz-22` high. WIN is a white plate; LOSS is an outline with no fill. Never green or red (see Open questions for current CSS drift).
+`.wl`: display face, `--radius-6`, `--dsz-22` high. WIN is a white plate; LOSS is an outline with no fill. Never green or red. Table letters (`.gob-wl.up` / `.dn`, Rankings and Team › Schedule) use the same plate and outline.
 
 ## Never do
 
 - A hex, `rgb()` or `rgba()` value in a page, component or doc. Name the token.
 - A second green control on a screen, or green on anything that is not Advance or positive data.
-- Orange on anything that is not a save or commit.
+- Orange on anything that is not an unsaved change (a save or commit).
 - Gold outside the six reward surfaces, or on any button.
 - Blue on chrome, links or navigation; navy as a data colour or page background.
 - A team-colour wash or tint on a card, panel, tab or header, or team colour as a control's selected state.
+- Red on a ▼, a LOSS, a modal accent, or any button except the irreversible-delete confirm.
 - A grey surface. Surfaces are the blue-black `--surface-*` steps, on the court too.
 - A circular player headshot.
 - A spinner, a disabled-with-lock Advance, or a hint link.
@@ -216,11 +223,31 @@ Done since (ux/logo-fallback-save-state):
 | Tier digit ceiling | The rule is `floor(raw / 10)` with no upper cap. The code was right; the token comment said 0–16 and is fixed. |
 | Repo `CLAUDE.md` pointed the colour law at UX_System | Points here. |
 
+## Settled 2026-10-01 (batch 2)
+
+Jamie approved every recommendation in `reports/jamie-decisions-2-2026-10-01.md`. Net rule: **orange = "there are unsaved changes" and nothing else.** Built on `ux/jamie-rulings-batch-2`; the checker's orange selector allow-list is now save / commit only.
+
+| Ruling | Settled as | Lives in |
+|---|---|---|
+| Delta chips | ▲ green on data chips (positive data); ▼ neutral everywhere. No red. | [Colour law](#colour-law), Neutral by rule; [Data scales](#data-scales) |
+| W/L in tables | White WIN plate, outlined LOSS, everywhere. | [W/L plates](#wl-plates) |
+| Rail count badge | Neutral white plate. | [Chips, pills and badges](#chips-pills-and-badges) |
+| `.td-gate` tag, `.is-on` selections | Neutral; off the checker's orange allow-list. | [Colour law](#colour-law), Orange row |
+| Office blocking-step outline | Neutral strong outline. | [Colour law](#colour-law), Neutral by rule |
+| Attitude bars | No orange stop: red, muted red, neutral, green. | [Data scales](#data-scales) |
+| Functional-modal accent default | Neutral. | [Modals](#modals) |
+| Tutorial alert | Neutral (confirmed). | [Modals](#modals) |
+| Leave-confirm "Stay" | Neutral primary. | [Modals](#modals) |
+| Weekly / result card wash | None; the dead `.office-res` styling is deleted. | [Colour law](#colour-law), Team colour row |
+| Destructive actions | Red outline only for irreversible deletes (Home Base delete program); everything else neutral. | [Colour law](#colour-law), Red row; [Modals](#modals) |
+
 ## Open questions
 
-1. **Delta chips.** The law says ▲/▼ are neutral, but the Office attribute-change chips (UX_System §12) and `.chip.up` / `.chip.down` use `--delta-up` green / `--delta-down` red, and the checker allows `delta-up` as positive data. Which surfaces must be neutral?
-2. **W/L plates.** The law says white plate / outline; `gob-components.css` `.wl.win` / `.wl.loss` still use `--delta-up` / `--delta-down`, and League › Rankings "Last Week" uses the `.gob-wl` data colours. Neutralise everywhere, or keep W/L as data in tables?
-3. **Orange beyond saves.** The token comment says orange is also "non-advancing actions, gated-task tag"; the checker allows `.gated`, `.td-gate`, `.is-on`; the Office blocking step draws an orange outline; the attitude bars run red, orange, neutral, green; the rail count badge (`--badge`) is orange; the functional-modal accent defaults to orange; the tutorial alert uses orange; the leave-confirm "Stay" is the orange modal primary. The law says saved / committed only. Which of these stay? (The presence dot is settled: neutral. Save-at-rest is pending audit, above.)
-4. **Weekly / result card wash.** The law forbids a team-colour wash on the weekly card, but `.office-res` paints a `--team-primary` gradient. Is the result card in scope?
-5. **Destructive actions.** The old guide gave destructive modals a red accent; the law gives red no button or chrome role. Neutral, or a sanctioned red?
-6. **One blue or two for ratings.** RT letters paint `--blue`; a 9+ attribute tile paints the brighter `--tier-blue`, which exists for contrast on the tile. Moving RT A to `--tier-blue` is a visible change. Keep two, or make it one?
+1. **One blue or two for ratings.** RT letters paint `--blue`; a 9+ attribute tile paints the brighter `--tier-blue`, which exists for contrast on the tile. Moving RT A to `--tier-blue` is a visible change. Keep two, or make it one?
+2. **Annotated orange that may not be a save.** Since batch 2 the checker allows orange by selector only on save / commit names. These still pass through a `/* colour-law: committed */` annotation and may not mean "there are unsaved changes":
+   - toasts (`.hub-toast` in `recruiting-dock.css`, `.toast` in `training-playbooks.css`), which the Orange row bans;
+   - a choice control (`.tsr-toggle .toggle-btn.active`, `training-squad-report.html`);
+   - recruiting board and signing marks (`.pool tbody tr.rec.on-board`, `.pool-rankbadge`, `.citem`, `.hub-anchor--orders .ic`, `.prow.flash`, `.ssum-lr`, `.ssum-nm b`);
+   - `.gob-btn--action` used as a CONTINUE (the username modal, which saves the username, and the Game Plan tutorial CTA).
+
+   Audit each, keep or neutralise?

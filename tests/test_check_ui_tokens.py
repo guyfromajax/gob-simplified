@@ -287,10 +287,9 @@ def test_allow_list_selectors_and_comments(tmp_path):
         """
 .col-card.is-pos { color: var(--green); }
 .meter.chem.is-green { color: var(--green); }
-.att-col .att-bar { color: var(--green); background: var(--orange); }
+.att-col .att-bar { color: var(--green); }
 .gob-btn--gate { background: #34EC27; }
-.gob-btn--action { background: #F79420; }
-.todo.gated { color: var(--orange); }
+.btn-save.is-dirty { background: #F79420; }
 .tsr-up { color: #34ec27; } /* colour-law: positive-data */
 .toggle-btn.active { background: #f79420; } /* colour-law: committed */
 """,
@@ -304,6 +303,33 @@ def test_allow_list_selectors_and_comments(tmp_path):
         if hit.path.endswith("gob-advanced.css") and hit.surface == "new"
     ]
     assert advanced_new == []
+
+
+def test_orange_allow_list_is_save_commit_only(tmp_path):
+    """Jamie 2026-10-01: orange = unsaved changes only. Gated tags, .is-on
+    selections, toggles, attitude ramps and generic action buttons are no longer
+    allowed by selector name; only save/commit selectors or an annotation."""
+    root = tmp_path / "orange"
+    _write(root, "css/gob-tokens.css", TOKENS_CSS)
+    _write(
+        root,
+        "css/gob-components.css",
+        """
+.todo.gated { color: var(--orange); }
+.td-gate { color: var(--orange); }
+.hub-anchor.is-on { background: var(--orange); }
+.att-col .att-bar i { background: var(--orange); }
+.gob-btn--action { background: #F79420; }
+.toggle-btn.active { background: #f79420; }
+.btn-save { background: var(--orange); }
+.is-committed { color: var(--orange); }
+""",
+    )
+    audit = _audit(root)
+    blocked = {hit.detail.split(" ")[0] for hit in audit.laws if hit.surface == "new" and hit.kind == "orange"}
+    assert {".todo.gated", ".td-gate", ".hub-anchor.is-on", ".att-col", ".gob-btn--action", ".toggle-btn.active"} <= blocked
+    assert ".btn-save" not in blocked
+    assert ".is-committed" not in blocked
 
 
 def test_tutorial_chrome_is_new_design(tmp_path):
