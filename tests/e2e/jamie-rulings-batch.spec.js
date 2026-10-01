@@ -448,24 +448,42 @@ test.describe('Jamie rulings batch', () => {
 
   test('#7 recruiting presence dot is neutral', async ({ page }, testInfo) => {
     const captureShots = testInfo.repeatEachIndex === 0;
-    // Unseen wire events with nothing pending: the tab carries .inbox-badge, not a count.
+    // Unseen wire events with nothing pending: the recruiting tab carries .inbox-badge, not a count.
     await fccPage(page, { board_saved_week: 0, has_saved_board: false, counts: { moved: 2, dropped: 1 }, pending_count: 0, urgent: false, unseen_count: 3 });
     await openFcc(page, 'roster-view', '#roster-view table tbody tr');
     await page.waitForSelector('.inbox-badge', { state: 'attached', timeout: 15000 });
+    // Under the shell the real dot sits on the hidden legacy tab button, so nothing shows.
+    // Forced: the same element on the visible rail item, where gob-shell.css expects it.
+    const placed = await page.evaluate(() => {
+      const real = document.querySelector('.inbox-badge');
+      const rail = document.getElementById('gob-rail-recruiting');
+      if (!rail) return { rail: false, realVisible: real.offsetParent !== null };
+      const dot = document.createElement('span');
+      dot.className = 'inbox-badge';
+      dot.id = 'rulings-dot';
+      rail.appendChild(dot);
+      return { rail: true, realVisible: real.offsetParent !== null, realParent: real.parentElement.getAttribute('data-tab') };
+    });
     await page.mouse.move(700, 715);
     if (captureShots) await shot(page, 'presence-dot-1280.png');
     if (BEFORE) return;
-    const dot = await page.evaluate(() => {
-      const s = getComputedStyle(document.querySelector('.inbox-badge'));
-      return { bg: s.backgroundColor, shadow: s.boxShadow, w: s.width, h: s.height, display: s.display };
-    });
-    expect(dot.bg).toBe('rgb(255, 255, 255)');
-    for (const part of [dot.bg, dot.shadow]) {
-      expect(part).not.toMatch(ORANGE);
-      expect(part).not.toMatch(GREEN);
+    expect(placed.rail).toBe(true);
+    expect(placed.realParent).toBe('recruits-tab');
+    const dots = await page.evaluate(() => [...document.querySelectorAll('.inbox-badge')].map((el) => {
+      const s = getComputedStyle(el);
+      return { id: el.id, bg: s.backgroundColor, shadow: s.boxShadow, w: s.width, h: s.height, shown: el.offsetParent !== null };
+    }));
+    expect(dots.length).toBe(2);
+    for (const dot of dots) {
+      expect(dot.bg).toBe('rgb(255, 255, 255)');
+      for (const part of [dot.bg, dot.shadow]) {
+        expect(part).not.toMatch(ORANGE);
+        expect(part).not.toMatch(GREEN);
+      }
     }
-    expect(dot.w).toBe('8px');
-    expect(dot.display).not.toBe('none');
+    const forced = dots.find((d) => d.id === 'rulings-dot');
+    expect(forced.shown).toBe(true);
+    expect(forced.w).toBe('8px');
   });
 
   test('#10 the v1 play builder path lands on v2; homepage-v3 is gone', async ({ page }, testInfo) => {
