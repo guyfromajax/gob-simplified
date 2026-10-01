@@ -3,15 +3,16 @@
  * Implemented as a canonical Moment modal per Styleguide.md §Modal
  * System / Moment Modals: full-bleed team banner background, darkening
  * gradient, outcome (matchup/score) as the visual hero, portrait spotlight,
- * subtle scale-in. The only green CTA in the entire FTE flow lives here.
+ * subtle scale-in. SIM GAME is the FTE Advance, so it is the green CTA here;
+ * the Sammy ring and eyebrow are neutral (colour law).
  */
 
 body.tutorial-tipoff-page {
-  background: #0b0d14;
+  background: var(--bg);
   margin: 0;
   min-height: 100vh;
-  font-family: 'Inter', sans-serif;
-  color: #ffffff;
+  font-family: var(--font-body);
+  color: var(--text-100);
   overflow: hidden;
 }
 
@@ -28,7 +29,7 @@ body.tutorial-tipoff-page {
 .tipoff-stage__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--scrim);
   z-index: 0;
 }
 
@@ -47,10 +48,10 @@ body.tutorial-tipoff-page {
   position: relative;
   z-index: 1;
   width: min(560px, calc(100vw - 32px));
-  background-color: rgba(13, 17, 36, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: var(--surface-popover);
+  border: 1px solid var(--white-12);
   border-radius: 16px;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 48px var(--black-50);
   overflow: hidden;
   animation: tipoff-modal-in 200ms ease both;
   --moment-logo-opacity: 0.15;
@@ -79,8 +80,8 @@ body.tutorial-tipoff-page {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 80% at 50% 42%, rgba(13, 17, 36, 0.78) 0%, rgba(13, 17, 36, 0.40) 45%, transparent 75%),
-    linear-gradient(180deg, rgba(13, 17, 36, 0.55) 0%, rgba(13, 17, 36, 0.30) 30%, rgba(13, 17, 36, 0.72) 78%, rgba(13, 17, 36, 0.96) 100%);
+    radial-gradient(120% 80% at 50% 42%, color-mix(in srgb, var(--surface-1) 78%, transparent) 0%, color-mix(in srgb, var(--surface-1) 40%, transparent) 45%, transparent 75%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-1) 55%, transparent) 0%, color-mix(in srgb, var(--surface-1) 30%, transparent) 30%, color-mix(in srgb, var(--surface-1) 72%, transparent) 78%, color-mix(in srgb, var(--surface-1) 96%, transparent) 100%);
   pointer-events: none;
   z-index: 1;
 }
@@ -98,18 +99,18 @@ body.tutorial-tipoff-page {
   border-radius: 50%;
   object-fit: cover;
   object-position: center top;
-  background: rgba(0, 0, 0, 0.5);
-  border: 3px solid #F79420;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  background: var(--black-50);
+  border: 3px solid var(--white-28);
+  box-shadow: 0 10px 24px var(--black-50);
   margin: 0 auto 14px;
   display: block;
 }
 
 .tipoff-moment__eyebrow {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 14px;
   letter-spacing: 0.18em;
-  color: #F79420;
+  color: var(--text-60);
   text-transform: uppercase;
   margin-bottom: 12px;
   line-height: 1;
@@ -125,46 +126,46 @@ body.tutorial-tipoff-page {
 }
 
 .tipoff-moment__team {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 18px;
   letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--white-75);
   line-height: 1;
 }
 
 .tipoff-moment__num {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 56px;
   line-height: 0.95;
-  color: #ffffff;
+  color: var(--text-100);
   /* Coach: give the score its own contrast against the watermark. */
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 2px 14px var(--black-50);
 }
 
 .tipoff-moment__dash {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 22px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--white-35);
   margin: 0 4px;
 }
 
 .tipoff-moment__context {
   margin: 0 0 18px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.5;
   /* Coach: bump one step + subtle shadow for legibility over the
    * watermark + scrim composition. */
-  color: rgba(255, 255, 255, 0.85);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+  color: var(--text-87);
+  text-shadow: 0 1px 6px var(--black-45);
 }
 
 .tipoff-moment__rally {
   margin-bottom: 22px;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 30px;
   letter-spacing: 0.04em;
-  color: #ffffff;
+  color: var(--text-100);
   line-height: 1.05;
 }
 
@@ -204,7 +205,7 @@ body.tutorial-tipoff-page {
 .tipoff-moment__score--matchup .tipoff-moment__team {
   font-size: 34px;
   letter-spacing: 0.02em;
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 /* "vs" is a connector, not a scoreline dash — smaller, lowercase, receded. */
@@ -212,7 +213,7 @@ body.tutorial-tipoff-page {
   font-size: 15px;
   text-transform: lowercase;
   letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--white-40);
   margin: 0 2px;
   position: relative;
   top: 1px;

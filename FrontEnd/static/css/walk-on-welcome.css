@@ -8,21 +8,21 @@
  */
 
 .wow-headline {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   font-size: 30px;
   line-height: 1.02;
   letter-spacing: 0.02em;
   margin: 0 0 8px;
-  color: #fff;
+  color: var(--text-100);
   text-wrap: balance;
 }
 
 .wow-sub {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--white-62);
   margin: 0;
 }
 
@@ -31,36 +31,36 @@
   width: 100%;
   margin-top: 16px;
   overflow-x: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.10);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  border-top: 1px solid var(--white-10);
+  border-bottom: 1px solid var(--white-10);
 }
 
 table.wow-roster {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
 }
 
 table.wow-roster th {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-weight: 400;
   font-size: 13px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--white-45);
   padding: 9px 5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  border-bottom: 1px solid var(--white-10);
   white-space: nowrap;
 }
 
 table.wow-roster td {
   padding: 9px 5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--white-5);
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.86);
+  color: var(--text-87);
 }
 
 table.wow-roster tr:last-child td { border-bottom: 0; }
@@ -71,7 +71,7 @@ table.wow-roster td.wow-num { text-align: right; }
 table.wow-roster th.wow-name { text-align: left; }
 table.wow-roster td.wow-name {
   font-weight: 600;
-  color: #fff;
+  color: var(--text-100);
   text-align: left;
   padding-right: 12px;
 }

@@ -10,7 +10,7 @@
 .sammy-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: var(--scrim, rgba(5, 6, 10, 0.62));
   display: none;
   align-items: center;
   justify-content: center;
@@ -39,8 +39,8 @@
 }
 
 .sammy-modal {
-  background-color: rgba(13, 17, 36, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: var(--surface-popover, rgba(20, 24, 34, 0.98));
+  border: 1px solid var(--white-12, rgba(255, 255, 255, 0.12));
   border-radius: 16px;
   padding: 26px 28px 28px;
   display: flex;
@@ -50,8 +50,8 @@
   width: min(520px, 100%);
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
-  color: #fff;
+  box-shadow: 0 24px 48px var(--black-50, rgba(0, 0, 0, 0.5));
+  color: var(--text-100, #ffffff);
   text-align: center;
 }
 
@@ -62,9 +62,9 @@
 }
 
 .sammy-modal-eyebrow {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display, 'Bebas Neue Pro', 'Bebas Neue', sans-serif);
   font-size: 18px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--white-50, rgba(255, 255, 255, 0.5));
   letter-spacing: 0.1em;
   text-transform: uppercase;
   line-height: 1;
@@ -76,17 +76,17 @@
   height: 96px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--white-18, rgba(255, 255, 255, 0.18));
+  box-shadow: 0 4px 12px var(--black-35, rgba(0, 0, 0, 0.35));
   flex-shrink: 0;
 }
 
 .sammy-modal-body {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body, 'Inter', sans-serif);
   font-size: 1rem;
   font-weight: 500;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--white-90, rgba(255, 255, 255, 0.9));
   margin: 0;
   max-width: 100%;
 }
@@ -108,34 +108,34 @@
 .sammy-modal-input {
   width: 100%;
   padding: 11px 14px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body, 'Inter', sans-serif);
   font-size: 1rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--white-6, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--white-18, rgba(255, 255, 255, 0.18));
   border-radius: 8px;
-  color: #fff;
+  color: var(--text-100, #ffffff);
   box-sizing: border-box;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .sammy-modal-input:focus {
   outline: none;
-  border-color: rgba(52, 236, 39, 0.6);
-  box-shadow: 0 0 0 2px rgba(52, 236, 39, 0.2);
+  border-color: var(--white-45, rgba(255, 255, 255, 0.45));
+  box-shadow: 0 0 0 2px var(--white-12, rgba(255, 255, 255, 0.12));
 }
 .sammy-modal-input::placeholder {
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--white-35, rgba(255, 255, 255, 0.35));
 }
 .sammy-modal-hint {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body, 'Inter', sans-serif);
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--white-50, rgba(255, 255, 255, 0.5));
   margin: 0;
 }
 .sammy-modal-error {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body, 'Inter', sans-serif);
   font-size: 0.85rem;
   font-weight: 600;
-  color: #ff6d6d;
+  color: var(--red, #ff6d6d);
   margin: 0;
   min-height: 1em;
 }
@@ -149,7 +149,7 @@
 }
 
 .sammy-modal-btn {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display, 'Bebas Neue Pro', 'Bebas Neue', sans-serif);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -171,24 +171,25 @@
   filter: none;
 }
 
+/* Colour law: a Sammy CTA acknowledges or navigates, so the primary is the
+   neutral white plate (.gob-btn--neutral). `is-orange` is kept as a no-op for
+   old callers ("Go To Locker Room" is not a save). Only a CTA that advances
+   game state passes primaryClass 'is-advance' and gets green. */
 .sammy-modal-btn-primary {
-  background: #34EC27;
-  color: #15181f;
-  border-color: rgba(52, 236, 39, 0.5);
+  background: var(--white-90, rgba(255, 255, 255, 0.9));
+  color: var(--bg, #0b0d14);
+  border-color: var(--white-90, rgba(255, 255, 255, 0.9));
 }
 .sammy-modal-btn-secondary {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.85);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--white-6, rgba(255, 255, 255, 0.06));
+  color: var(--text-87, rgba(255, 255, 255, 0.87));
+  border-color: var(--white-18, rgba(255, 255, 255, 0.18));
 }
 
-/* Orange primary — Styleguide "primary non-gating action". The green above is
-   reserved for GATING actions (advancing state); modals whose CTA merely
-   navigates must use this modifier instead of overriding the green locally. */
-.sammy-modal-btn-primary.is-orange {
-  background: #F79420;
-  color: #15181f;
-  border-color: rgba(247, 148, 32, 0.5);
+.sammy-modal-btn-primary.is-advance {
+  background: var(--green, #34EC27);
+  color: var(--bg, #0b0d14);
+  border-color: color-mix(in srgb, var(--green, #34EC27) 50%, transparent);
 }
 
 @media (max-width: 760px) {

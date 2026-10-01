@@ -34,7 +34,7 @@
 .info-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .info-list > li { position: relative; padding: 13px 4px 13px 26px; font-size: 14.5px; line-height: 1.6; color: var(--muted); border-bottom: 1px solid var(--hair); text-wrap: pretty; }
 .info-list > li:last-child { border-bottom: none; }
-.info-list > li::before { content: ""; position: absolute; left: 6px; top: 21px; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
+.info-list > li::before { content: ""; position: absolute; left: 6px; top: 21px; width: 7px; height: 7px; border-radius: 50%; background: var(--white-45); }
 .info-list > li strong { color: var(--text); font-weight: 600; }
 .info-list--inset > li { padding-left: 26px; }
 .info-list .sub { display: block; margin-top: 6px; font-size: 13px; color: var(--muted-2); }
@@ -57,10 +57,10 @@
 
 /* ---------- coach callout (key tip / heads-up) ---------- */
 .adv-callout { position: relative; display: flex; gap: 16px; align-items: flex-start; padding: 20px 24px 20px 26px; overflow: hidden; }
-.adv-callout::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--orange); }
-.adv-callout .ac-ico { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: rgba(247,148,32,.14); border: 1px solid rgba(247,148,32,.34); color: var(--orange); }
+.adv-callout::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--white-28); }
+.adv-callout .ac-ico { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--white-6); border: 1px solid var(--white-18); color: var(--text-87); }
 .adv-callout .ac-ico svg { width: 18px; height: 18px; }
-.adv-callout .ac-eyebrow { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
+.adv-callout .ac-eyebrow { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--text-60); }
 .adv-callout p { margin: 6px 0 0; font-size: 14px; line-height: 1.62; color: var(--muted); text-wrap: pretty; }
 .adv-callout p strong { color: var(--text); font-weight: 600; }
 
@@ -132,7 +132,7 @@
 
 /* ---------- handoff footer ---------- */
 .handoff { margin-top: 46px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 26px; }
-.handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
+.handoff .h-l .lbl { font-family: var(--body); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--text-60); }
 .handoff .h-l .nx { font-family: var(--display); font-size: 28px; letter-spacing: .02em; color: var(--text); margin-top: 3px; }
 .handoff .h-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
@@ -190,7 +190,7 @@
 }
 .fg-mode:hover { color: var(--text); }
 .fg-mode.is-on { background: rgba(255,255,255,.11); color: var(--text); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
-.fg-mode:focus-visible, .fg-pick:focus-visible { outline: 2px solid #F79420; outline-offset: 2px; }
+.fg-mode:focus-visible, .fg-pick:focus-visible { outline: 2px solid var(--white-70); outline-offset: 2px; }
 
 .fg-picks { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .fg-pick {
