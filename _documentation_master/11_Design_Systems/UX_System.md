@@ -50,8 +50,13 @@ The live-game DOM overlays built with `createElement` in `js/phaser/utils/` are 
 - **Pre-game start prompt** (`.pre-game-*`): "Play Quarter" / "Resume Game" (`.play-button`) is the **green Advance** (it starts the game); "Sim Full Game" is a neutral secondary; the top accent is neutral (was orange).
 - **Scoreboard top bar** (`#scoreboard`): `--black` bar, `--text-*` neutrals. Kept as team-identity (annotated `/* colour-law: team-identity */`): the score underlines, the away→home divider gradient endpoints, and the logo-container framing tint. The strategy-gauge marker (`--mk-color`, neutral `#8A94A6` fallback) is read-only data.
 - **Game controls** (pause / skip / game-speed, in base + `.pcc-*` cockpit + `#game-controls-strip` layers): choice controls → **neutral** (muted white tokens), differentiated by label, not hue. Were purple / orange / blue (off-law).
-- Verified by `tests/e2e/court-chrome-tokens.spec.js` (computed-style guards) + the same five equivalence specs (55).
-- **Open rulings / remaining (flagged):** the timeout button (`#game-controls-strip #timeout-btn`, `.pcc-timeout`) is **green** — possibly "timeouts available" data; left as-is. The on-scoreboard **active-player HUD** (gold "has ball" / defender ring, `#4caf50` "AUDIBLE!" text, circular headshot — HUD is exempt from the square rule) is game-presentation data, left as-is. Not yet tokenised (listed for follow-up): the Playcall Center cockpit (strategy dials, armed offense/defense + color-coded active-button states), player-stats side panels, announcements / reveal HUD / lower-third, the sim-quarter popup, play-by-play, the momentum bar, and on-canvas Phaser text/labels.
+- **Part 2 (safe pass):** decorative off-law colours neutralised — the sim-quarter popup divider + scrollbar (`#ff6200` → neutral `#6b7280`, a legacy **light** popup so no gob dark tokens) and the player/play tooltip borders (`#ff6200` → `--white-28`); value-identical neutrals tokenised (`#main-container` `#000` → `--black`, side-panel `.momentum-bar-wrap` divider → `--white-6`, box-score `h3` + `.momentum-bar-value` `#fff` → `--text-100`).
+- Verified by `tests/e2e/court-chrome-tokens.spec.js` + `court-chrome-2-tokens.spec.js` (computed-style guards) + the same five equivalence specs (55).
+- **Kept as data / team-identity (not recoloured):** the side-panel stat-view toggles (`.toggle-btn.active`, S1/S2/S3) use the panel's **team colour** for the selected state; both momentum bars (`.momentum-fill-*` / `.momentum-bar-left|center|right`) use red / green / yellow / white for **momentum direction**; the scoreboard **quarter + shot-clock** read gold; the timeout **pips** read orange.
+- **Deliberately NOT done (flagged for a dedicated review — these are not neutral chrome):**
+  - **Game-state colour-coding** — the Playcall Center cockpit (strategy dials, armed offense/defense states, the "COLOR-CODED ACTIVE BUTTON STATES" block), the **playcall reveal HUD**, the **lower-third** and **secondary-announcement** ribbons (team + state colours), and the **active-player HUD** (gold has-ball/defender, `#4caf50` AUDIBLE). These encode game state via colour and are ramp/spec-adjacent; recolouring is a data/design ruling, not a token swap.
+  - **Opaque-grey surface migration** — the panels use opaque greys (`#1a1a1a`, `#333`, `#444`, `#555`, `#aaa`) with **no 1:1 gob token** (gob uses navy surfaces + translucent whites). Migrating grey → navy is a visual redesign (not "paints identically"), so it was left as-is.
+  - **On-canvas Phaser text** (fonts/colours in the Phaser scene JS) — equivalence-locked (`sim-broadcast-fit`, `sim-team-callouts`) and ramp-governed; needs its own pass.
 
 ## 2. Tokens and density
 
@@ -663,6 +668,17 @@ Tutorial pages (`tutorial*.html`) are `html.gob` and load `gob-tokens.css`; no s
 - **No navy/blue atmosphere** (navy is "yours", blue is RT): a neutral `--white-4` lift and the faint diagonal banding.
 - Headings and buttons `--font-display` (Bebas Neue Pro); body `--font-body` (Inter).
 - Logout lands on `/mode-select.html`, not an auth page.
+
+### Community pages
+
+`coaching-archetypes-leaderboard.html`, `coaching-archetypes.html` and `account.html` (geek points, titles, archetype board) are `html.gob` with `gob-tokens.css`; one sheet, `css/community.css` (`NEW_DESIGN_CSS`). The old inline `<style>` blocks are gone. The Home Base leaderboard is `home-base.css` (already new-design).
+
+- **Navy is "yours" only:** your leaderboard row (`.alb-row.is-current`, the `.ldb-r.me` recipe) and your lead archetype card (`.ca-card.is-lead`, the `.agc.is-me` ring).
+- **Data is neutral:** archetype share % (`.alb-pct`, `.arch-pct`), the geek points total, title counts. Points are a count, not a reward surface (no `--reward-gold`).
+- **Neutral:** the plan/status pill (`.acct-status`), the In-Game Display segment on-state (a choice control), the tooltip focus ring, the avatar (surface tokens, no navy gradient).
+- **No page wash:** a neutral `--white-4` top lift on `--bg-chrome` (was a navy radial).
+- `body.has-auth-bar` (auth-bar.css) owns `padding-top`; `css/community.css` sets only sides and bottom.
+- **Team Colors Mode** (the old Styleguide community-row fade) is not live in code; it stays retired.
 
 ### Shared chrome (auth bar, overlay, error screens, FAQ / legal)
 
