@@ -1,0 +1,90 @@
+{
+  "box": {
+    "bg": "rgb(239, 239, 239)",
+    "border": "outset rgb(0, 0, 0)",
+    "color": "rgb(0, 0, 0)",
+    "font": "\"Bebas Neue Pro\", \"Bebas Neue\", sans-serif",
+    "className": "locker-room-top-button",
+    "overlapsCard": false
+  },
+  "cut": {
+    "back": "rgba(255, 255, 255, 0.76) rgba(0, 0, 0, 0)",
+    "submitDisabled": false,
+    "submitBg": "rgb(247, 148, 32)",
+    "h1Font": "Inter, sans-serif",
+    "modalOpen": true,
+    "modalBtnText": "Back To Locker Room",
+    "modalBtnBg": "rgb(247, 148, 32)",
+    "accentBg": "rgb(255, 109, 109)"
+  },
+  "playerStats": {
+    "scrollW": 1178,
+    "clientW": 1178,
+    "overflowX": "visible",
+    "tableRight": 1261,
+    "mainRight": 1280,
+    "cueClass": "gob-scroll",
+    "cueShadow": "none",
+    "lastHeaderRight": 1261,
+    "viewport": 1280
+  },
+  "lineup1280": {
+    "img": true,
+    "fit": "cover",
+    "natural": [
+      1920,
+      679
+    ],
+    "box": [
+      1244,
+      80
+    ]
+  },
+  "lineup1920": {
+    "img": true,
+    "fit": "cover",
+    "natural": [
+      1920,
+      679
+    ],
+    "box": [
+      1864,
+      80
+    ]
+  },
+  "rosterToggle": [
+    {
+      "label": "Varsity15",
+      "gap": 0
+    },
+    {
+      "label": "Practice Squad0",
+      "gap": 0
+    }
+  ],
+  "officeSetAfterCamp": 2,
+  "empty-practice-squad": {
+    "count": 0,
+    "bg": "",
+    "border": "",
+    "radius": "",
+    "color": "",
+    "text": ""
+  },
+  "empty-awards": {
+    "count": 0,
+    "bg": "",
+    "border": "",
+    "radius": "",
+    "color": "",
+    "text": ""
+  },
+  "empty-leaders": {
+    "count": 0,
+    "bg": "",
+    "border": "",
+    "radius": "",
+    "color": "",
+    "text": ""
+  }
+}
