@@ -1,7 +1,15 @@
 /* GOB design tokens, scoped to .gob so legacy page :root blocks are untouched.
    Display face: /css/fonts.css (Bebas Neue Pro OTFs in /fonts/).
-   Body face: /fonts/app-fonts.css (self-hosted Inter). No Google Fonts. */
-.gob{
+   Body face: /fonts/app-fonts.css (self-hosted Inter). No Google Fonts.
+
+   .gob-scope carries the same custom properties and nothing else. It is for
+   chrome that is injected into pages which are not .gob (page-load overlay,
+   error screen, the account toast): .gob itself would also pull in the
+   component rules in gob-components.css. .auth-bar and .site-footer are named
+   because both sit in static markup on non-.gob pages (homepage, community)
+   and must have their tokens at first paint. Density (.gob.gob-1280/-1920)
+   still needs .gob. */
+.gob,.gob-scope,.auth-bar,.site-footer{
 /* ── Brand ─────────────────────────────────────────────── */
 --navy:#27408E;          /* structure: active rail item, selected rows, switch on */
 --navy-hi:#4A6ED2;       /* edge/halo tint for navy selections only */

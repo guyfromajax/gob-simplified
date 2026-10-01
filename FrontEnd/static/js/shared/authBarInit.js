@@ -185,14 +185,14 @@ function cloneParams(params) {
     if (document.getElementById('account-settings-overlay')) return;
     var overlay = document.createElement('div');
     overlay.id = 'account-settings-overlay';
-    overlay.className = 'gob-modal-overlay account-modal-overlay';
+    overlay.className = 'gob-modal-overlay account-modal-overlay gob-scope';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'account-settings-title');
     overlay.innerHTML = [
       '<div class="gob-modal-backdrop" data-account-dismiss></div>',
       '<div class="gob-modal-box account-modal-box">',
-      // Orange accent — Account Settings is a non-gating settings surface.
+      // Neutral accent — a settings surface saves nothing by itself (colour law).
       '  <div class="gob-modal-accent"></div>',
       '  <div class="account-modal-header">',
       '    <h3 id="account-settings-title" class="gob-modal-title">Username</h3>',
@@ -739,14 +739,14 @@ function cloneParams(params) {
     if (existing) return existing;
     var toast = document.createElement('div');
     toast.id = 'account-toast';
-    toast.className = 'account-toast';
+    toast.className = 'account-toast gob-scope';
     toast.setAttribute('role', 'status');
     toast.setAttribute('aria-live', 'polite');
     toast.hidden = true;
     toast.innerHTML = [
       '<span class="account-toast-icon" aria-hidden="true">',
       '  <svg viewBox="0 0 20 20" width="11" height="11" fill="none">',
-      '    <path d="M5.1 10.4 8.3 13.6 14.9 7" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>',
+      '    <path d="M5.1 10.4 8.3 13.6 14.9 7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>',
       '  </svg>',
       '</span>',
       '<div class="account-toast-copy">',
