@@ -30,7 +30,7 @@ Source: `reports/jamie-decisions-2026-10-01.md`. Guarded by `tests/e2e/jamie-rul
 | 8 | Big-news modal button | **Neutral CTA.** Reward gold is never on a button. The trophy emblem, eyebrow and title glow keep the gold. | `.bn-cta` in `css/big-news-modals.css`. |
 | 10 | Twin pages | **Deleted:** `homepage-v3.html` (`homepage.html` is canonical and is the `sync:homepage` input) and `play-builder.html` (V1). `/play-builder.html` redirects to `/play-builder-v2.html`; `/homepage-v3(.html)` redirects to `/`. | `netlify.toml`, `FrontEnd/static/_redirects`, `BackEnd/api/play_routes.py`, the local static middleware in `BackEnd/api/api.py`. |
 
-Kept as they are by the same reply: #2 shot-share ramp, #9 Submit Training green / Save orange. With the court pass: #3, #4, #5. Waiting on a source file: #11.
+Kept as they are by the same reply: #2 shot-share ramp, #9 Submit Training green / Save orange. Settled by the court pass and recorded under "Live-game screen chrome": #3 game-state colours (kept as data), #4 side panels on navy surfaces, #5 stat toggles neutral. #11 desktop icon: `desktop/build/`.
 `scripts/check_ui_tokens.py --strict` enforces it on new-design files (§8). Annotate a legal exception with `/* colour-law: positive-data | committed | saved | reward */`.
 
 ### Live-game overlays (court.html DOM)
