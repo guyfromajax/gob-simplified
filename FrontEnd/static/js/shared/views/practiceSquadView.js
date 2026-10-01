@@ -311,7 +311,7 @@ export function mount(container, ctx) {
 
   function render() {
     if (!standings || !standings.initialized) {
-      container.innerHTML = '<p class="gob-ps-empty">Practice Squad has not started yet (available after Week 1 Training Camp).</p>';
+      container.innerHTML = '<p class="gob-ps-empty gob-empty">Practice Squad has not started yet (available after Week 1 Training Camp).</p>';
       ownTools();
       return;
     }

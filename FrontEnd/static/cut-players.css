@@ -147,3 +147,18 @@ html.gob-focus #cut-players-view .cut-players-shell {
   0%, 100% { transform: scaleX(0.35); opacity: 0.55; }
   50% { transform: scaleX(1); opacity: 1; }
 }
+
+/* Page title in the display face, like the other focus pages. */
+#cut-players-view .cut-players-header h1 {
+  font-family: var(--font-display);
+  font-size: var(--fs-28);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-2);
+  line-height: var(--lh-1);
+}
+
+/* showModal() moves the modal to <body>, outside #cut-players-view, so the
+   neutral accent is scoped to the page body too. */
+body.cut-players-page .gob-modal-accent.is-neutral {
+  background: var(--line);
+}
