@@ -32,7 +32,7 @@ Annotate a legal exception in the CSS/JS with `/* colour-law: positive-data | co
 
 ### Live-game overlays (court.html DOM)
 
-The live-game DOM overlays built with `createElement` in `js/phaser/utils/` are on the design system. (This covers the DOM overlays only — the Phaser **canvas** HUD, announcements, and `court.html` inline chrome are game presentation, out of scope.)
+The live-game DOM overlays built with `createElement` in `js/phaser/utils/` are on the design system. (This covers the `js/phaser/utils/` overlays; the `court.html` inline **chrome** has its own section below, and the Phaser **canvas** HUD / announcements remain game presentation, out of scope.)
 
 - `court.html` links `gob-tokens.css` (after `app-fonts`), and each overlay's root carries `.gob`, so `var(--token)` resolves. The `<link>` is the only allowed `court.html` change; it adds only `.gob`-scoped custom props, so the court paints identically.
 - Colour, type, radii use gob tokens. The **one forward action** per overlay is green (`--green`/`--bg`): the EOG locker-room button, "Submit Defense Matchups", PGPC "Go To Locker Room", pregame "Submit & Tip Off". A button that only **navigates** (foul-out "Sub Players" → set-lineup) is neutral, not green.
@@ -41,6 +41,17 @@ The live-game DOM overlays built with `createElement` in `js/phaser/utils/` are 
 - **Sim-safety:** visual-only; the five equivalence specs (`game-winner`, `sim-broadcast-fit`, `court-layout`, `game-start-sequence`, `sim-team-callouts` = 55) must stay byte-identical before/after.
 - These are **legacy JS**, not on the `check_ui_tokens` new-design surface (do not add them to it — it would newly gate legacy files).
 - **Open rulings (flagged, left as-is):** the Sim broadcast's spotlight/"POSS"/"SPOT" **orange**, "FOUL TROUBLE" **gold**, and highlights-toggle-on **green** are data/state indicators that are both spec-locked and ramp-governed; and the pregame **tip-off veil** green glow was neutralised pending a call on whether the "GO" flourish counts as the advance beat. `pgpcSammyReminderModal.js` is the legacy **FTE light shell** (loads `/css/fte.css`, which is **absent from the repo** — pre-existing) and was not re-themed to gob.
+
+### Live-game screen chrome (court.html)
+
+`court.html`'s own inline chrome (top scoreboard bar, pre-game start prompt, game-controls) is on gob tokens + the colour law. It is **legacy** (not on the `check_ui_tokens` new-design surface), so no top nav renders while a game is live.
+
+- `court.html` `<body>` carries `class="gob"`, so gob-tokens.css custom properties resolve for the whole court DOM. gob-tokens.css is custom-properties-only (no element rules), so the court paints identically except where chrome now references tokens.
+- **Pre-game start prompt** (`.pre-game-*`): "Play Quarter" / "Resume Game" (`.play-button`) is the **green Advance** (it starts the game); "Sim Full Game" is a neutral secondary; the top accent is neutral (was orange).
+- **Scoreboard top bar** (`#scoreboard`): `--black` bar, `--text-*` neutrals. Kept as team-identity (annotated `/* colour-law: team-identity */`): the score underlines, the away→home divider gradient endpoints, and the logo-container framing tint. The strategy-gauge marker (`--mk-color`, neutral `#8A94A6` fallback) is read-only data.
+- **Game controls** (pause / skip / game-speed, in base + `.pcc-*` cockpit + `#game-controls-strip` layers): choice controls → **neutral** (muted white tokens), differentiated by label, not hue. Were purple / orange / blue (off-law).
+- Verified by `tests/e2e/court-chrome-tokens.spec.js` (computed-style guards) + the same five equivalence specs (55).
+- **Open rulings / remaining (flagged):** the timeout button (`#game-controls-strip #timeout-btn`, `.pcc-timeout`) is **green** — possibly "timeouts available" data; left as-is. The on-scoreboard **active-player HUD** (gold "has ball" / defender ring, `#4caf50` "AUDIBLE!" text, circular headshot — HUD is exempt from the square rule) is game-presentation data, left as-is. Not yet tokenised (listed for follow-up): the Playcall Center cockpit (strategy dials, armed offense/defense + color-coded active-button states), player-stats side panels, announcements / reveal HUD / lower-third, the sim-quarter popup, play-by-play, the momentum bar, and on-canvas Phaser text/labels.
 
 ## 2. Tokens and density
 
