@@ -1,639 +1,181 @@
 # Style Guide
 
-How to build the shell, navigation, and settings is in [UX_System.md](UX_System.md). This document is the look.
+The look of GOB and the canonical colour law. This document says what things look like and which colour may go where. [UX_System.md](UX_System.md) says how to build (shell, navigation, data, the page checklist). `FrontEnd/static/css/gob-tokens.css` holds every value, scoped under `.gob`. `scripts/check_ui_tokens.py --strict` enforces the colour law on new-design files. Name a token; never copy its value into a page, a component or this document. Where this document and the token file disagree, the token file wins and this document is the bug.
 
-## Purpose
-This document defines the core visual and interaction standards for Geeked-Out Basketball. It is intended to establish one shared design language across command centers and, over time, the full product.
+## Colour law
 
-> **⚠️ Scoped exception — Resource Pages (flagged 2026-06-13).** The **Resource Pages** family (Stats, Standings, Rankings, Leaders, Awards, etc. — see `07_Design_Systems/Resource_Page_Design_System.md`) currently runs a **divergent token set** from this Styleguide: it uses **Barlow / Barlow Condensed** (not Bebas Neue Pro / Inter) and different accent hexes (orange `#e8903a`, blue `#4a9eff`, green `#34d399`, yellow `#f5c542`) plus its own table/leader-card system rather than the **Table / Data Grid System** below. The reference implementation is `stats.css`. This divergence is **unresolved** and needs a design-level decision (intentional sub-brand vs. bring in line with this Styleguide). Until then, the two token sets are kept in separate docs and must not be silently merged.
+One colour, one meaning. Everything not listed is neutral: white text at `--text-100` / `--text-87` / `--text-60` / `--text-38`, white alpha fills (`--white-*`), lines (`--line`, `--line-strong`) and the blue-black surfaces (`--bg`, `--surface-*`).
 
-## Color System
+| Colour | Token(s) | Allowed | Banned |
+|---|---|---|---|
+| Green | `--green` (ink on green: `--bg`) | The one Advance per screen (top-bar `#play-now` / `.advance`, `.gob-btn--gate`, the one forward action in a live-game overlay). Positive data: delta-up, tier green, chemistry high, board-gain bars, the RT / attribute ramps. | Cards, WIN/LOSS plates, badges, scores, choice controls, a second button on the same screen, any button that only navigates or only saves. |
+| Orange | `--orange` | Saved or committed only: Submit Invites, Submit Orders, Save Game Plan / Playbooks, Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row. | Brand accent, "warning / low" data, navigation, choice controls, checkboxes, hovers, toasts, a loader. |
+| Navy | `--navy`, `--navy-hi` (edge / halo only) | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. |
+| Blue | `--tier-blue` | RT only: an A grade, a 9+ attribute, elite. | Chrome, links, navigation, "good / above average". |
+| Reward gold | `--reward-gold` | Only: title medallions (`.med.gold`); season-peak glow, rule and confetti (`.pk`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`); the exceptional-gain marker (`.xg`, `.xg-key`); the words "Trophy Case" (`.gold-t`). Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens. | Buttons, Advance, "yours", choice controls, everyday or weekly chrome, Home Base chrome. |
+| Red / yellow | `--tier-red`, `--tier-yellow` | Data ramps only (rating tiers, chemistry, energy, delta-down where a ramp is used). | Buttons, chrome, warnings, destructive-action styling (see Open questions). |
+| Team colour | `--team-primary` (set per team) | Identification: logos, name bars, favour arrows, team badges. | A wash or tint on a card, panel, tab, header or the weekly card, win or loss. |
+| Tier metal | `--tier-metal`, `--tier-metal-hi` (set per tournament tier) | Tournament-tier top bar and the tier next-game card. | Anything outside tournament weeks. |
 
-### Brand Colors
-Core identity colors that define GOB's visual personality. Used for accent moments, interactive surfaces, and brand expression. The shell background is no longer navy — see Page Background System.
+Neutral by rule (no green, orange, gold or navy):
 
-- **Dark Blue:** `#27408E` — primary brand anchor. Used for accent gradients, team-color atmosphere moments, and community/leaderboard section backgrounds. No longer used as the default page shell background.
-- **Light Blue:** `#4A90D9` — secondary brand accent
-- **Orange:** `#F79420` — key action color (see also Action Colors)
-- **Yellow:** `#FFD700` — brand accent
+- **Choice controls**: tabs, segments, filter chips, sliders, the watch star, checkboxes, view toggles, Autoset Lineup, a Retry button.
+- **Status and information codes**: phase labels, week tiles, invite counts, status labels, Player Development Grid "develops" / "adds" markers. Muted text, not colour.
+- **W/L plates**: WIN is a white plate, LOSS is an outline. The result carries the meaning, not a colour.
+- **▲ / ▼ deltas** on result and weekly surfaces: ▲ at `--text-100`, ▼ at `--text-60`. No green up, red down (see Open questions for chips).
+- **Navigation-only buttons** (Sub Players, Back, Continue to Office, Full standings).
 
-Note: Green (`#34EC27`) is intentionally excluded from Brand Colors. Its impact as the primary gating action color depends on its scarcity — it should never appear as a decorative or atmospheric color.
+**Annotation.** In a new-design file, a legal green, orange or gold that the checker's selector allow-list does not already cover needs `/* colour-law: positive-data */`, `/* colour-law: committed */`, `/* colour-law: saved */` or `/* colour-law: reward */` on the same line or one of the two lines above. `saved` and `committed` mean the same. The annotation records an exception the table already allows; it never licenses a banned use. Legacy files are reported, not failed; the new-design surface is listed in UX_System §8.
 
-### Neutral Colors
-Used for surfaces, overlays, text, and structural UI elements.
+## Data scales
 
-- **White:** `#FFFFFF`
-- **Dark neutral:** `#747474`
-- **Mid neutral:** `#999999`
-- **Black at 50% opacity:** `rgba(0, 0, 0, 0.50)`
-- **Black at 35% opacity:** `rgba(0, 0, 0, 0.35)`
-- **Black at 15% opacity:** `rgba(0, 0, 0, 0.15)`
+**Attributes** show the first digit: `floor(raw / 10)` via `js/utils/attributeDisplay.js`. Raw has a minimum of 1 and no upper cap in game (105 shows 10, 160 shows 16). Team Builder caps raw at 99. A missing value shows `--`, never 0.
 
-### Action Colors
-Behavioral rules — these govern interactive meaning across all buttons and CTAs. Color must be applied consistently and never used decoratively.
+| Display digit | Tier | Token |
+|---|---|---|
+| 0–4 | low | `--tier-red` |
+| 5–6 | mid | `--tier-yellow` |
+| 7–8 | high | `--tier-green` |
+| 9+ | elite | `--tier-blue` |
 
-- **Primary gating action** (advances game state — Play Next Game, Run Training Camp, Sim Next Round, Enter Franchise, Return to Game): `#34EC27` (green)
-- **Primary non-gating action** (saves settings, configures preferences, performs non-state-advancing actions): `#F79420` (orange)
+Tiles (`js/shared/attrTiles.js` + `css/attr-tiles.css`), bars and chips all use this one scale. No surface builds its own tile or its own bands.
 
-Note: Orange appears in both Brand Colors and Action Colors. This is intentional — it is the key action color of the product and serves both roles simultaneously.
+**RT** is a letter grade at the display boundary only (`formatRtDisplay()` in `js/shared/rtBucket.js`; backend prose `BackEnd/utils/rt_display.py`). Storage, sorting, filters and the sim stay numeric. Same scale for players and recruits of every year.
 
-### Semantic / Data Colors
-Used exclusively for data visualization, stat bars, status indicators, pill fills, and performance feedback. Never use these for buttons or interactive elements.
+| RT | Grade | Tier | Class |
+|---|---|---|---|
+| 80+ | A, A+ (90+), A++ (100+) | `--tier-blue` | `.rt-elite` |
+| 60–79 | B, B+ (70+) | `--tier-green` | `.rt-high` |
+| 40–59 | C, C+ (50+) | `--tier-yellow` | `.rt-mid` |
+| below 40 | D (30+), F | `--tier-red` | `.rt-low` |
 
-- **Positive / high performance:** `#34EC27` — green
-- **Good / above average:** `#4A90D9` — light blue
-- **Caution / mid range:** `#FFD700` — yellow
-- **Warning / low:** `#F79420` — orange (shared with action orange)
-- **Negative / critical:** `#ff6d6d` — red
+Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold and grade together (`75 (B+)`).
 
-Note: `#27408E` (Dark Blue) is a Brand Color used only for accent/atmosphere contexts. It is not used as a data or semantic color anywhere in the product.
+**Other ramps** (data, so tier colours are allowed):
 
-### Attribute Bar Scale
-The canonical color scale for player attribute bar fills throughout the product. Applied consistently wherever individual player attribute values are displayed as filled bars or pills. All values above 80 — including values above 100 — render in light blue.
+- Chemistry: 0–8 `--tier-red`, 9–16 `--tier-yellow`, 17–25 `--tier-green`. Track stays neutral.
+- Energy / readiness: high `--green` (annotated), then `--yellow`, then an amber `color-mix()`, then `--red`. Never raw `--orange`.
+- Team measures (−20…+20): the diverging pill `.dv`, neutral white fills, zero in the centre. Place bars are neutral white, not navy.
+- Deltas: `--delta-up`, `--delta-down`, `--delta-flat` exist for data chips; see Open questions for where they still apply.
 
-- **0–40:** `#ff6d6d` — red (below average)
-- **41–60:** `#FFD700` — yellow (developing)
-- **61–80:** `#34EC27` — green (solid)
-- **81+:** `#4A90D9` — light blue (elite, including 100+)
-
-### Attribute Tiles
-
-Four surfaces render the 12 roster attributes as **tiles** rather than numeric columns: the Recruits screen (Recruiting Hub pool), the FCC **Roster** tab (including the Practice Squad table inside it), the FCC **Recruiting** tab, and `team-roster-view.html`. Every other attribute surface — Set Lineup's card back, Player Detail, Scouting Report — is deliberately unchanged.
-
-Single implementation: **`/js/shared/attrTiles.js`** (markup) + **`/css/attr-tiles.css`** (visual). No surface may build its own tile.
-
-| Rule | Value |
-|---|---|
-| Scale | 0–10, preferring `anchor_<KEY>` |
-| Missing value | `--`, never `0` |
-| Tiers | **10+** `#4A90D9` brand blue · **7–9** `#34EC27` green · **≤3** `#ff6d6d` red · else neutral |
-| Hover | Full attribute name + 10-scale value — `Rebounding: 6` |
-| Header | The 12 abbreviation columns collapse to one centered **Attributes** header |
-
-Hover copy is delivered as `data-tooltip`, which `attributeTooltips.js` honours verbatim; a surface only needs `initAttributeTooltips(container, ['.attr-tile'])` after rendering.
-
-**Note on the tier bands.** These differ from the Attribute Bar Scale above (which puts light blue at 81+, i.e. 8+ on the 0–10 display). The tile tiers are 10+/7–9/≤3 by explicit design decision. Unresolved whether the two should converge.
-
-**Collapsing the header removed per-attribute sorting** on the FCC Recruiting tab, which previously carried `data-sort-key` on each of the 12 columns. Sorting by RT, position, year and name is unaffected.
-
-### RT Letter-Grade Scale
-
-All overall/best RT and individual PG/SG/SF/PF/C position ratings display as
-letter grades. This scale is identical for active players and recruits of every
-year; there is no JH-specific display scale.
-
-| Numeric RT | Display | Color | Class |
-|---:|:---:|---|---|
-| 100+ | **A++** | `#4A90D9` light blue | `.rt-elite` |
-| 90–99 | **A+** | `#4A90D9` light blue | `.rt-elite` |
-| 80–89 | **A** | `#4A90D9` light blue | `.rt-elite` |
-| 70–79 | **B+** | `#34EC27` green | `.rt-high` |
-| 60–69 | **B** | `#34EC27` green | `.rt-high` |
-| 50–59 | **C+** | `#FFD700` yellow | `.rt-mid` |
-| 40–49 | **C** | `#FFD700` yellow | `.rt-mid` |
-| 30–39 | **D** | `#ff6d6d` red | `.rt-low` |
-| Below 30 | **F** | `#ff6d6d` red | `.rt-low` |
-
-RT remains numeric in persistence, API fields, calculations, sorting, filters,
-and simulation. Convert it only at the final display boundary with
-`formatRtDisplay()` from `/js/shared/rtBucket.js`; backend-authored copy uses
-`BackEnd/utils/rt_display.py`. Numeric development deltas such as `+6 RT`
-remain numeric. Recruiting minimum-RT controls show the exact threshold and its
-grade together (for example `75 (B+)`).
-
-The frontend experiment is globally reversible: change `RT_DISPLAY_MODE` from
-`letter` to `number` in `/js/shared/rtBucket.js`. Backend-authored prose has the matching
-`RT_DISPLAY_MODE` in `BackEnd/utils/rt_display.py`. Do not implement page-local
-bands.
-
-### Class Year Display
-Player class year is **always shown as a two-letter abbreviation** in UI/UX — never spelled out (e.g. never "Senior" or "Freshman" in tables, cards, modals, or detail views).
-
-| Stored value | Display |
-|---|---|
-| JH (junior high / recruit) | **JH** |
-| Freshman | **FR** |
-| Sophomore | **SO** |
-| Junior | **JR** |
-| Senior | **SR** |
-| Graduate (when applicable) | **GR** |
-
-- Use uppercase abbreviations only.
-- Empty or unknown year → **`--`**.
-- Canonical formatters: backend `format_player_year_display()` / `format_player_year_abbrev()` in `BackEnd/utils/player_year.py`; frontend `GOB_PlayerYear.formatDisplay()` in `/js/shared/playerYear.js`.
-- Internal data may store full words or abbreviations; display code must normalize through these helpers — do not hand-format year strings in individual screens.
-
-### Color Usage Rules
-- `#0b0d14` is the default page background for all in-game screens (near-black with faint cool undertone). See Page Background System.
-- `#27408E` is the brand accent color — used for atmospheric moments (community section, leaderboard backgrounds, franchise card atmosphere). It is no longer the default shell background.
-- Neutral graphite and steel tones should carry most UI structure, especially tabs, panels, and content surfaces.
-- Green (`#34EC27`) is reserved exclusively for gating actions and positive semantic data states. It must never appear as a decorative, atmospheric, or brand color.
-- Orange is the key action color of the product and the standard for all non-gating primary actions.
-- Team-color theming should affect franchise card atmosphere and community highlight rows only — not core readability surfaces, tabs, or panels.
-- The Attribute Bar Scale applies to actual player attributes; RT values use the
-  unified RT Letter-Grade Scale.
-- Player and recruit RT use the same grade and color bands regardless of year.
-- Semantic colors must never be used for buttons, navigation, or interactive controls.
-- Dark Blue (`#27408E`) must never be used as a stat fill, attribute bar color, pill color, or any data visualization color.
+**Display text.** Class year is always a two-letter uppercase abbreviation (`FR`, `SO`, `JR`, `SR`, `GR`, `JH`; unknown `--`) via `playerYear.js` / `BackEnd/utils/player_year.py`. Team names show exactly as stored in `teams.name`: no title-casing, no hyphen stripping, no exception map. Team measures use one vocabulary of eleven measures; Momentum is never shown on Team Attributes, the Training Report Team Report or Office "Moved most". `pt_efficiency` is P/T Defense and `pt_opp_modifier` is P/T Offense everywhere.
 
 ## Typography
 
-### Display Typeface
-- `Bebas Neue Pro` (preferred) / `Bebas Neue` (fallback)
-
-### Supporting Typeface
-- `Inter`
-
-### Typography Usage Rules
-- `Bebas Neue Pro` is used for display text, tab labels, major section headers, and command-center headlines.
-- `Inter` is used for body copy, metadata, labels, tables, helper text, and supporting UI language.
-- `Bebas Neue Pro` is the universal font for all buttons across the product.
-- Universal button typography uses a larger `Bebas Neue Pro` treatment with positive tracking so the copy feels intentional and premium.
-- Display typography should feel bold, condensed, and game-native.
-- Supporting typography should remain clean, readable, and dense enough for management-sim interfaces.
-
-## Buttons
-
-### Universal Button Shape
-- Standard button footprint: minimum `138px` width and fixed `42px` height
-- Standard internal horizontal padding: `18px`
-- Standard corner radius: `10px`
-- Standard border: `1px solid rgba(255, 255, 255, 0.28)`
-- Standard top highlight: `inset 0 1px 0 rgba(255, 255, 255, 0.18)`
-- Standard motion: slight upward lift on hover and slight compression on press
-- This is the shared base shape for FCC navigation-adjacent buttons, action buttons, and standalone page return buttons
-- Color may change by button role, but the structural shape should remain consistent unless there is a clear reason to break the system
-
-### Behavior
-- Buttons should feel responsive, deliberate, and restrained.
-- All button copy uses `Bebas Neue Pro` Bold (`font-weight: 700`).
-- Button font size should satisfy both rules at once:
-- Horizontal: button text should fill approximately `60–70%` of the button's total width with comfortable equal padding on each side.
-- Vertical: cap height should sit at approximately `45–55%` of the button's total height with breathing room above and below.
-- If those two sizing rules are in tension, prioritize the vertical rule.
-- All button copy uses positive tracking between `1px` and `2px`.
-- Hover states should use modest adjustments in brightness, border emphasis, and elevation.
-- Press states should feel tactile through slight vertical compression or reduced lift.
-- Primary action buttons must be visually distinct from navigation buttons.
-- Disabled and dead states must remain legible while clearly unavailable.
-
-### Usage Rules
-- Primary action buttons that advance game state use action green (`#34EC27`).
-- Primary action buttons that save settings, configure preferences, or perform non-gating actions use orange (`#F79420`).
-- These two button types must remain visually distinct and semantically consistent across the entire product.
-- Any page with a primary action or save button must keep that button visible on screen at all times.
-- If page content is long enough to require vertical scrolling, the button's containing header or action bar must remain present on screen while the user scrolls.
-- Navigation buttons should not compete visually with primary action buttons.
-- Button treatments should support information-dense screens without becoming noisy.
-
-### Back / Return Link Treatment
-- The standard `Back` / `Back to Locker Room` treatment should be a low-weight ghost or text link, not a filled button.
-- It should use a small left arrow followed by the label.
-- It should be left justified above the primary content container.
-- Copy should use subdued white or light grey in resting state and brighten modestly on hover.
-- It should remain clearly functional without competing with the page title or primary CTA.
-
-## Tabs
-
-### Behavior
-- Tabs should use one universal visual language across FCC and future command-center screens.
-- Tab copy must remain centered horizontally and vertically.
-- Tabs should use system-driven sizing when presented in structured rows.
-- Only one tab container should render at a time.
-
-### Visual Rules
-- Tabs use a parallelogram shape: `clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%)`.
-- Tab height: `40px`. Font: `Bebas Neue Pro` at `16px`, letter-spacing `0.04em`.
-- Resting tabs: `background: rgba(255,255,255,0.06)`, `border: 1px solid rgba(255,255,255,0.10)`, color `rgba(255,255,255,0.55)`.
-- Hover tabs: `background: rgba(255,255,255,0.11)`, color `rgba(255,255,255,0.90)`.
-- Active/selected tab: `background: rgba(255,255,255,0.09)`, `border-color: rgba(255,255,255,0.18)`, color `#ffffff`, with a `2px solid rgba(255,255,255,0.70)` top edge rendered via `::before` pseudo-element. No blue fill.
-- Tab styling must remain stable and neutral regardless of team color.
-
-### Special Tab States
-- The **Inbox tab** renders as a neutral resting tab by default (same as all other tabs).
-- When the inbox contains unread messages, a small pulsing orange dot badge (`8px`, `#F79420`) appears in the top-right corner of the tab. The tab background does not change — only the badge appears.
-- The badge uses a subtle pulse animation to draw attention without being distracting.
-
-### Architectural Direction
-- Tabs may visually present as tabs while functioning as route-driven page links where appropriate.
-
-## Surfaces
-
-### Containers And Panels
-- Primary content containers should use neutral dark surfaces.
-- Panel styling should emphasize clarity, structure, and hierarchy over decoration.
-- Team-color influence inside containers should remain subtle.
-- Borders, shadows, and highlights should support depth without reducing readability.
-
-### Surface Rules
-- Background atmosphere may shift with team-color mode on the Mode Select franchise card only.
-- Core data surfaces must remain neutral and readable across all team colors.
-- For FCC data-heavy containers, if the data surface naturally occupies more than 50% of the available horizontal space, it should fill to the right edge of the container rather than leaving unused dead space.
-
-## Page Background System
-
-### Page Types
-GOB has two distinct page background types. Every screen must be classified as one of these before implementation.
-
-#### Type 1 — Shell Pages (Command Centers and Resource Pages)
-Applies to: `franchise-command-center.html`, `set-lineup.html`, `standings.html`, `leaders.html`, `recruiting.html`, `game-plan.html`, `set-lineup.html`, and all other in-game management screens except Mode Select.
-
-Does NOT apply to: `homepage-v3.html`, `court.html`, `mode-select.html`.
-
-**Body background:**
-```css
-body {
-  background: #0b0d14;
-}
-```
-A near-black with the faintest cool undertone. No gradient. No navy. This is the new default for all shell pages.
-
-**Shell container** (the rounded panel that wraps all page content):
-```css
-.fcc-brand-page-shell {
-  position: relative;
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background:
-    linear-gradient(160deg, rgba(255,255,255,0.028) 0%, rgba(255,255,255,0.014) 18%, transparent 40%),
-    rgba(14, 16, 24, 0.96);
-  box-shadow: 0 20px 48px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07);
-}
-```
-
-**Diagonal banding** (applied via `::after` pseudo-element on the shell):
-```css
-background: repeating-linear-gradient(
-  132deg,
-  transparent 0 102px,
-  rgba(255, 255, 255, 0.012) 102px 103px,
-  transparent 103px 208px
-);
-```
-One line every 104px at 1.2% opacity. Purely architectural. No ellipse or circular texture layer.
-
-**Rules:**
-- The shell must use a 24px border radius, soft white border, and restrained shadow.
-- No decorative texture layers (the SVG ellipse/circular texture used previously is removed entirely).
-- No navy gradient on the body or shell background.
-- Foreground content must sit above shell layers at all times (z-index: 1 on all direct children).
-- The diagonal banding is the only background pattern permitted inside the shell.
-
-#### Type 2 — Hub Pages (Mode Select)
-Applies to: `mode-select.html` only.
-
-**Body background:**
-```css
-body.mode-select-page {
-  background: #0b0d14;
-}
-```
-
-**No shell container.** Mode Select uses a full-bleed dark body with individual cards. There is no rounded container wrapping the page content.
-
-**Franchise card** (the hero card showing the active franchise):
-- Uses the team's banner image as a `background-image` with `background-size: cover` and `background-position: center center` — the image is cropped, never letterboxed.
-- A heavy gradient overlay is applied on top: `linear-gradient(to bottom, rgba(11,13,20,0.15) 0%, rgba(11,13,20,0.55) 50%, rgba(11,13,20,0.95) 80%, rgba(11,13,20,0.99) 100%)`.
-- The overlay ensures text always reads cleanly regardless of banner image content.
-- When no franchise exists (empty state), the card uses a flat dark surface: `rgba(22, 26, 36, 0.97)`.
-
-**Community/leaderboard card:**
-- Dark card surface: `rgba(22, 26, 36, 0.97)`, border `1px solid rgba(255,255,255,0.10)`, border-radius `16px`.
-
-**Community highlights rows:**
-- Each row uses the team's primary color as a left-to-right gradient fade: `linear-gradient(125deg, {teamPrimaryColor} 0%, #0b0d14 100%)`.
-- A dark inner overlay (`rgba(11,13,20,0.60)`) is applied inside each row for text legibility.
-
-### Set Lineup — Banner Strip
-The Set Lineup page uses a team banner strip at the top of the shell:
-- Height: `76px`
-- `object-fit: cover`, `object-position: center 35%` — image is cropped, not letterboxed
-- A gradient overlay darkens the bottom of the strip: `linear-gradient(to bottom, rgba(11,13,20,0.20) 0%, rgba(11,13,20,0.65) 100%)`
-- The banner sits inside the shell's rounded top corners (`border-radius: 24px 24px 0 0`)
-
-### Split Panel Pages (Set Lineup)
-Pages with a left/right split panel layout use differentiated panel backgrounds:
-- Left panel (data/roster): `rgba(13, 16, 24, 0.97)` — slightly darker
-- Right panel (action/slots): `rgba(16, 19, 30, 0.98)` — slightly lighter
-- Panel separator: `border-left: 1px solid rgba(255,255,255,0.08)`
-
-### Removed Treatments
-The following treatments from the previous design system are deprecated and must not be reintroduced:
-- Navy gradient body background (`linear-gradient(180deg, #263d7a, #1E3068, #141f4a)`)
-- SVG ellipse/circular repeating texture layer (the `::after` data:image/svg+xml pattern)
-- Any use of `#27408E` or navy tones as a shell or page background fill
-
-## Theme Behavior
-
-### Default Mode
-- All in-game screens use the near-black body background (`#0b0d14`) and neutral dark shell.
-- `#27408E` (Dark Blue) appears only in accent contexts: community section backgrounds, leaderboard panels, and franchise card atmosphere gradients.
-
-### Team Colors Mode
-- Team color influence is scoped to two specific contexts only:
-  1. **Franchise card background** (Mode Select) — the team banner image provides the atmosphere, supplemented by a subtle team-color radial gradient if needed.
-  2. **Community highlight rows** (Mode Select) — each row uses the team's primary color as a left-to-right fade.
-- Structural UI — tabs, panels, data surfaces, headers, context bars — must remain neutral and never inherit team color.
-- If no active franchise team context exists, the system falls back to the default near-black treatment.
-
-## Interaction States
-- Every reusable interactive component should define: default, hover, active, selected, disabled, and dead states.
-- State changes should be readable immediately but should not feel exaggerated or toy-like.
-
-## Modal System
-
-### Modal Types
-
-GOB uses three core modal types — Functional, Moment, Strategic — plus the Action-Only sub-pattern and the Tutorial Alert takeover. Every modal must be classified as one before implementation.
-
-#### Functional Modals
-Used for confirmations, warnings, settings changes, and destructive actions. Goal is clarity and speed — get the user to a decision and out.
-
-**Canonical examples:**
-- Auto-Train confirmation (training.html) — first canonical implementation
-- In-game timeout confirmation
-- In-game player foul-out gate (`foulOutPopup.js`) — same shell as timeout; adds player headshot + name
-- End of quarter confirmation
-- Delete Franchise confirmation
-- Unsaved changes warning
-
-**Shared CSS classes:** `.gob-modal-overlay`, `.gob-modal-backdrop`, `.gob-modal-box`, `.gob-modal-accent`, `.gob-modal-body`, `.gob-modal-title`, `.gob-modal-subtitle`, `.gob-modal-actions`, `.gob-modal-btn-primary`, `.gob-modal-btn-secondary`, `.gob-modal-btn-dismiss`
-
-**Design rules:**
-- Surface: `rgba(22, 26, 36, 0.98)`
-- Backdrop: `rgba(0, 0, 0, 0.72)`
-- Accent bar: 3px top bar in `#F79420` (orange default), `#34EC27` (green for gating confirms), `#ff6d6d` (red for destructive)
-- Max width: `420px`
-- Border: `1px solid rgba(255,255,255,0.12)`
-- Border radius: `14px`
-- Title: Bebas Neue Pro 28px white
-- Subtitle/copy: Inter 14px `rgba(255,255,255,0.55)`
-- Single dismiss action: full-width ghost button
-- Two actions: primary `flex: 2` + secondary/cancel `flex: 1`
-- Two-action rows use `flex-direction: row` with primary `flex: 2`, secondary `flex: 1`
-- Single dismiss action uses `width: 100%` (full width is appropriate when there is only one button)
-- Buttons are full-width stacked only in Action-Only Modals where all choices are equal weight
-- No background imagery
-- No decorative elements
-
-##### Action-Only Modal (Functional Modal sub-pattern)
-A stripped-down Functional Modal with no title and no copy — the entire content is a button group. Used when the decision is self-evident from context and copy would be redundant.
-
-**Canonical example:**
-- Pre-game quarter modal (`court.html`) — Play Quarter vs Sim Full Game choice at quarter start
-
-**Design rules:**
-- Same surface, backdrop, border, border-radius as Functional Modal
-- Orange accent bar at top (`3px`, `#F79420`) — provides brand moment in absence of a title
-- No title element, no subtitle element
-- Button group: `display: flex; flex-direction: column; gap: 10px; padding: 24px 28px 28px`
-- Each button: full width (`width: 100%`), `height: 46px`, Bebas Neue Pro 18px
-- Primary action: orange `#F79420`, `color: #15181f`
-- Secondary action(s): ghost treatment — `rgba(255,255,255,0.06)` background, `rgba(255,255,255,0.14)` border
-- No dismiss/cancel button — backdrop click or ESC does not dismiss (player must make a choice)
-- Max width: `420px`
-
-#### Moment Modals
-Used for emotionally significant events — game results, training report reveals, season milestones, recruiting outcomes. Goal is payoff — the user should feel the weight of the moment.
-
-**Canonical examples:**
-- End of Game result
-- Training Camp complete
-- Season complete
-- Major recruiting commit
-
-**Design rules:**
-- Surface: `rgba(13, 17, 36, 0.97)`
-- Backdrop: `rgba(0, 0, 0, 0.72)`
-- Team banner or contextually relevant image as full-bleed background with darkening gradient overlay
-- Outcome is the visual hero — largest most prominent element
-- W/L or success/failure badge top-right using semantic color (green for positive, red for negative)
-- Subject of the moment gets portrait spotlight section
-- Max width: `560px`
-- Border: `1px solid rgba(255,255,255,0.12)`
-- Border radius: `16px`
-- Button row: `display: flex; flex-direction: row; gap: 12px` — primary action `flex: 2`, secondary action `flex: 1`
-- Buttons are never stacked full-width in Moment Modals — side-by-side with flex ratio communicates action hierarchy
-- Primary button height: `44px`. Secondary button height: `44px`.
-- Entrance: subtle scale from `0.96` to `1.0` over `200ms ease`
-
-##### Documented width exception — Walk-On Welcome
-The Walk-On Welcome modal (`walkOnWelcomeModal.js`, season-start walk-on reveal) is a Moment Modal that runs at **`720px`** via `.sammy-modal.is-wide`, not the 560px cap. Its content is a roster-format table — name, position, year, height, weight, 12 attributes, RT — which is unreadable at 560px. The table scrolls inside its own `overflow-x: auto` container so the modal itself never scrolls sideways. Widen a Moment Modal only for genuinely tabular content, and record the exception here.
-
-Its CTA ("Go To Locker Room") uses `.sammy-modal-btn-primary.is-orange` — navigation is a **non-gating** action, so orange applies, not the green used by gating confirms. The base `.sammy-modal-btn-primary` is green; use the modifier rather than a page-local override.
-
-#### Strategic Modals
-Used during active gameplay at decision points — quarter breaks, timeouts, foul-outs, any moment where the coach must make a tactical adjustment before play resumes. Goal is fast, confident decision-making under mild pressure. Data-dense but not celebratory.
-
-**Canonical example:**
-- Defense Matchups popup (`defenseMatchupsPopup.js`) — shown at Q1 start, quarter breaks, timeouts, and foul-outs
-
-**Design rules:**
-- Surface: `rgba(18, 22, 32, 0.98)` — slightly lighter than Functional to support data density
-- Backdrop: `rgba(0, 0, 0, 0.75)`
-- No accent bar — replaced by subtle team-color tinted panel headers using `rgba(teamColor, 0.2)` fill and `rgba(teamColor, 0.6)` border
-- Title: Bebas Neue Pro 24px `rgba(255,255,255,0.5)` — deliberately muted, the data is the hero not the title
-- Wider layout permitted — max width `1160px` to support side-by-side team comparison panels
-- Border: `1px solid rgba(255,255,255,0.12)`
-- Border radius: `16px`
-- Position badges use the GOB system-wide position color map:
-  - PG: `#4A90D9` · SG: `#7B5EA7` · SF: `#3A8C4A` · PF: `#C0392B` · C: `#D4A017`
-- Submit/confirm action is full-width green (gating — advances gameplay)
-- Dismiss/skip option is a low-prominence checkbox or ghost link, never a competing button
-- Drag-and-drop interactions for reordering use standard GOB drag visual feedback
-- No background imagery — data surfaces must remain fully readable
-- Backdrop click does NOT dismiss — user must explicitly submit or the game cannot proceed
-
-#### Tutorial Alert (Coach Card)
-The contextual Coach Sammy lesson prompt — one component for all 7 tutorial alerts (`gobTutorialAlerts.js` → `GOB.showTip({alertMode:true})`; styles in `css/gob-tutorial.css`, `.gob-talert-*`). A full-screen takeover, distinct from the 560px Moment Modal.
-
-**Design rules:**
-- Layout: two-column card, `grid-template-columns: 256px 1fr`, max width `800px`, radius `20px` (`--radius-lg`)
-- Scrim: `radial-gradient(...rgba(7,8,12,0.55)→0.82)` + `backdrop-filter: blur(7px)`
-- Left rail (branded): whistle-glyph "TUTORIAL" mark top-left; Coach Sammy portrait in a `22px` rounded square with a `2px` orange ring (`--orange #f79420`); "Coach Sammy" in Bebas; bottom-pinned progress block — "Lesson N of 7" + 7-dot indicator (past = `rgba(247,148,32,0.55)`, current = elongated orange pill, future = `rgba(255,255,255,0.2)`)
-- Right content (vertically centered): lesson title as headline (Inter 800 `37px`, no eyebrow), 2–3 lines body (`--muted`), then primary "Start lesson" (orange gradient, ink text) + ghost "I'll do this later" (Bebas)
-- Close ✕ top-right
-- Coach art: lesson 1 = generic white-uniform Sammy; lessons 2–7 = selected team's uniform Sammy (`/images/coaches/<abbr>/Sammy-<abbr>.png`), generic fallback
-- Entrance: scrim fade + card rise/scale via `.is-entering`, dropped on `animationend`; **resting state is fully visible (never `opacity:0`)**; honors `prefers-reduced-motion`
-- Responsive: below `560px` the rail stacks on top (portrait + name inline) and the card narrows to `420px`
-
-#### Tutorial Alert Resume Footer (Back To Game)
-Shown on lesson **sub-pages only**, and **only** when the user arrived via an alert modal's **Start lesson** CTA. Replaces the normal sub-page chrome for that visit. Implementation: `gobTutorialAlertResume.js`; styles `.gob-tut-alert-resume*` in `css/gob-tutorial.css`. Product spec: `projects/Tutorial_Alerts_System.md` → *Back To Game*.
-
-**Design rules:**
-- **Hide** the top `Back To Tutorial Home` button (`[data-gob-back]`) and the bottom **Next up** `.handoff` panel for this entry path only.
-- **Sticky bar:** fixed full-width container sitting directly above the tutorial bottom nav (`bottom: var(--nav-h)`, `z-index: 45`); same frosted dark treatment as the bottom nav (`rgba(10,12,20,0.86)` + blur + top hairline border).
-- **Single CTA:** centered **Back To Game** button (`.gob-btn.gob-btn--lg`, min-width `200px`).
-- **Scroll-gated styling (visual only):** ghost (`.gob-btn--ghost`) until the user reaches the page bottom; then orange fill (`.gob-btn--action`). Button remains clickable in both states.
-- **Body padding:** `.gob-tut--alert-resume` adds extra bottom padding so content is not obscured by the sticky bar + bottom nav stack.
-
-### Shared Rules (All Modal Types)
-- Backdrop click dismisses Functional Modals only
-- Moment Modals and Strategic Modals require explicit button action to dismiss
-- ESC dismisses Functional Modals only
-- Only one modal visible at a time
-- All button copy uses Bebas Neue Pro Bold (`font-weight: 700`)
-- Toggle visibility via `.is-visible` class, not inline `display` style
-
-## Toast Notifications
-
-### Purpose
-- Toasts are the standard approval/confirmation pattern for successful save actions and similar lightweight confirmations.
-- Toasts should replace success modals when the user does not need to make a follow-up decision.
-- Toasts should confirm success without interrupting flow.
-
-### Placement
-- Toasts should be fixed to the bottom right of the viewport.
-- Standard offset: `22px` from the right edge and `22px` from the bottom edge.
-- Toasts must appear above all page content.
-
-### Container Treatment
-- Background: `rgba(28, 33, 43, 0.97)`
-- Border: `1px solid rgba(255, 255, 255, 0.14)`
-- Left accent border: `3px solid` status color
-- Corner radius: `12px`
-- Padding: `14px 18px`
-- Minimum width: `260px`
-- Maximum width: `320px`
-- Shadow: `0 10px 24px rgba(0, 0, 0, 0.3)`
-
-### Content Structure
-- Left: small status icon container
-- Center: text block
-- Right: dismiss control
-- The icon container should be:
-  - `20px` square
-  - circular
-  - lightly tinted with the accent color
-  - bordered with the accent color
-- Success icon should use a white checkmark.
-
-### Typography
-- Title:
-  - `Bebas Neue Pro`
-  - `16px`
-  - full white
-  - letter spacing `0.04em`
-- Subline:
-  - `Inter Regular`
-  - `12px`
-  - `rgba(255, 255, 255, 0.54)`
-
-### Dismiss Control
-- Use a simple `×` character on the far right.
-- Resting color: `rgba(255, 255, 255, 0.3)`
-- Hover color: full white
-- Dismiss should reverse the entrance animation before removal.
-
-### Motion
-- Toasts should slide in from the right.
-- Entrance transition:
-  - from `transform: translateX(120%)`
-  - to `transform: translateX(0)`
-  - opacity `0` to `1`
-  - duration `220ms`
-  - easing `ease`
-- Exit should reverse the same motion.
-
-### Behavior
-- Toasts should auto-dismiss after `3 seconds`.
-- Only one toast should be visible at a time per page context.
-- If a new toast is triggered before the current one dismisses, reuse the existing toast and reset the timer rather than stacking.
-- Toasts should be used for save approvals such as:
-  - `Game Plan Saved`
-  - `Playbooks Saved`
-
-### Status Color Rules
-- Success toast accent color: action green `#34EC27`
-- Other statuses may use a different accent color when appropriate, but the structure and typography should remain the same.
-
-## Data Surfaces
-- Tables, scroll regions, placeholders, and empty states should follow the same neutral-surface system as panels.
-- Placeholder and in-development states should be centered, legible, and visually quiet.
-- Data-heavy views should favor clarity and scan speed over ornament.
-- Unless the data volume makes it impossible, pages and tabs should open with their primary content visible above the fold.
-- Above-the-fold fit should be achieved by reducing dead space and tightening panel composition before introducing scroll.
-
-## Table / Data Grid System
-
-### Canonical References
-- The live FCC `Roster` grid is a canonical reference.
-- The live FCC `Player Stats` grid is a canonical reference.
-- The standalone `Rankings` page, after its contained-panel conversion, is a canonical reference.
-
-### Container Rules
-- Data grids should sit inside a dark contained panel rather than directly on the page shell.
-- The panel should use the standard neutral dark surface treatment:
-  - rounded corners
-  - soft border
-  - restrained inset highlight
-  - restrained outer shadow
-- Data grids should not appear as flat spreadsheets dropped onto the page.
-
-### Scroll And Width Rules
-- Data-heavy grids should use a horizontal scroll container when needed.
-- Scrollbars should be styled in the same subdued neutral treatment used on FCC data grids.
-- If a data grid naturally occupies more than 50% of the available horizontal width, it should expand to fill the available width before relying on scroll.
-- Minimum table width may still be used to preserve column legibility.
-
-### Header Row Rules
-- Header rows should be sticky when appropriate.
-- Header background should use a faint metallic / glass-like neutral treatment, not a flat fill.
-- Header text should use:
-  - `Inter`
-  - small size
-  - bold weight
-  - uppercase
-  - modest letter spacing
-- Header text color should be a muted white, lower contrast than the body rows.
-
-### Body Row Rules
-- Body rows should use subtle horizontal separators only.
-- Avoid full boxed cell borders or spreadsheet-style gridlines.
-- Alternate rows should use a very subtle neutral shade shift.
-- Dark data grids must never use white or near-white zebra striping.
-- Hover states should slightly brighten the row background without becoming noisy.
-- Row density should support quick scan speed and high information density.
-
-### Implementation Rule
-- Redesigned resource pages and management surfaces should use the shared canonical GOB data-grid system rather than inheriting legacy table styling from older page-specific stylesheets.
-
-### Alignment Rules
-- Text-heavy first columns should usually be left aligned.
-- Numeric/stat columns should usually be centered unless there is a specific readability reason to right align them.
-- Important text cells such as the first/name column should carry stronger weight than supporting cells.
-
-### Link Rules
-- Linked names inside grids should remain clearly readable on dark surfaces.
-- Links should not default to underlined in resting state.
-- Underline on hover is preferred over louder treatments.
-
-### Rankings-Specific Rules
-- Rankings pages should use the same contained panel and row system as FCC `Roster` and `Player Stats`.
-- Rankings-specific semantic text treatments should be preserved:
-  - previous win text in green
-  - previous loss text in red
-  - other result-specific emphasis only where meaningful
-
-### Design Intent
-- The system should read as a structured management-sim data surface.
-- It should feel contained, deliberate, and premium.
-- It should never drift into default browser table styling or Excel-sheet aesthetics.
-
-## Audio Rules
-- UI click sounds should be consistent across equivalent interactions.
-- Navigation, action, and confirmation sounds should each follow a distinct pattern.
-- Sound should reinforce interaction hierarchy, not overwhelm it.
-
-## Remaining Sections To Formalize
-- Spacing system
-- Typography scale
-- Iconography
-- Table system
-- Form controls
-- Modal sizing rules
-- Page-level theming rules
-- Audio mapping by interaction type
-
-## Open Confirmation
-- Confirm that `Bebas Neue Pro` and `Inter` should be locked as the official system typefaces.
+Two self-hosted families. No Google Fonts link.
+
+- `--font-display` (Bebas Neue Pro, weight `--fw-bold`): page titles, card and column headings, big numbers, scores, tabs, and every button.
+- `--font-body` (Inter): body copy, data, table cells, labels, metadata.
+- Numerals are tabular everywhere (set on `.gob`).
+
+Roles (sizes are density tokens; they grow at `.gob-1920`):
+
+| Role | Family | Size | Line / tracking | Use |
+|---|---|---|---|---|
+| score | display | `--fs-48` | `--lh-9`, `--tracking-1` | result card score |
+| display-lg | display | `--fs-40` | `--lh-85`–`--lh-9` | tournament round, points remaining |
+| display-md | display | `--fs-32` | `--lh-9` | page title, opponent name, stat-line numbers |
+| display-sm | display | `--fs-28` | `--lh-9` | what-moved values, tier team names |
+| heading-col | display | `--fs-20` | `--lh-1`, `--tracking-7` | column headers |
+| heading-card | display | `--fs-16` | `--lh-1`, `--tracking-8`, `--text-60` | card titles |
+| button | display | `--fs-18` | `--lh-1`, `--tracking-btn` | Advance and buttons (`--tracking-btn-sm` small) |
+| tab | display | `--fs-16` | `--lh-1`, `--tracking-4` | sub-tabs |
+| body-strong | body `--fw-semibold` | `--fs-14` | `--lh-body` | to-do labels, headlines |
+| body | body `--fw-regular`–`--fw-medium` | `--fs-13` | `--lh-body` | default, names in lists |
+| meta | body `--fw-medium` | `--fs-11` / `--fs-12` | `--text-60` | metadata, links |
+| micro-label | body `--fw-bold`, uppercase | `--fs-10` | `--tracking-8` / `--tracking-10`, `--text-60` or `--text-38` | eyebrows, table headers |
+
+Text colour is one of four opacities: `--text-100` display, `--text-87` primary, `--text-60` secondary, `--text-38` disabled / tertiary.
+
+## Spacing, radius, elevation, motion
+
+**Spacing.** `--space-*` (1–24) is fixed and never scales: chrome and controls. `--dsp-*` (4–24) scales with density: card padding, row and column gaps. `--dsz-*` are density-scaled component sizes (row heights, chip heights, avatars). Shell sizes: `--top-h`, `--rail-w`, `--page-pad`, `--col-gap`.
+
+**Radius.** Chip / tag `--radius-4`–`--radius-6`; row, cell, button `--radius-10`; card `--radius-card`; shell `--radius-shell`; team logos `--radius-logo`; dots `--radius-round`. Player headshots are square: `--radius-6` on 28–46px table and list badges, `--radius-10` on large portraits. Never a circle; never more than a quarter of the side.
+
+**Elevation.** Surfaces step up `--bg` → `--surface-1` → `--surface-2` → `--surface-3`, always blue-black, never grey. Page area `--bg-page`, chrome `--bg-chrome`, sticky head `--bg-page-solid`. Shadows: `--shadow-card` (cards), `--shadow-popover` (toasts, popovers), `--shadow-panel` (settings panel), `--shadow-scoreboard`, `--shadow-logo`, `--shadow-advance` (Advance only), `--shadow-tier` (tier card only). Scrim `--scrim`. Layers: `--z-raised`, `--z-sticky`, `--z-sticky-head`, `--z-popover`, `--z-scrim`, `--z-panel`, `--z-modal`.
+
+**Motion.** Press `--dur-press`, hover `--dur-hover`, toggle `--dur-toggle`, tab `--dur-tab`, rail `--dur-rail`, panel `--dur-panel`, arrivals `--dur-arrive-card` / `--dur-arrive-item` with `--stagger` / `--stagger-chip`, pop `--dur-pop` with `--ease-pop`, count-up `--dur-count`, exceptional-gain sweep `--dur-gain-sweep` (once), pulse `--dur-pulse`, skeleton `--dur-skeleton`. Default easing `--ease-out`. Motion never blocks pointer events. `prefers-reduced-motion` shows final states with no movement. No spinners.
+
+## Components
+
+Every reusable control defines default, hover, active (press), selected, disabled and, where it can be dead, dead. Focus is a 2px `--white` outline (`:focus-visible`).
+
+### Buttons
+
+All buttons: `--font-display` bold, `--tracking-btn`, `--radius-10`, height `--dsz-40`, `--space-20` side padding, minimum width 138px. Hover lifts 1px and brightens; press drops 1px and darkens slightly (`--dur-press`); disabled is `--white-6` fill, `--text-38` text, `not-allowed`, no lift, and shows its reason next to it or in its title. No lock icon, no hint link.
+
+| Role | Class | Fill / ink | Rule |
+|---|---|---|---|
+| Gate (Advance) | `.advance`, `.gob-btn--gate` | `--green` / `--bg`, `--shadow-advance` | One per screen. A blocking task changes its label; it never disables it. Loading: `.is-loading`, label `STARTING…`, repeat clicks ignored. |
+| Action (save) | `.gob-btn--action` | `--orange` / dark ink | Only for a save or commit. |
+| Neutral | `.gob-btn` | transparent fill, `--white-28` border, `--text-100` | Navigation, Retry, Autoset, every other button. |
+| Ghost | `.gob-btn--ghost`, `.btn-ghost` | `--white-5` fill, `--white-18` border | Secondary, dismiss, acknowledgement. |
+
+**Back / return** is a ghost text link, not a filled button: small left arrow plus label, left-aligned above the content, `--text-60` resting, `--text-100` on hover. A back that only returned to the locker room is hidden under the shell (the rail replaces it).
+
+**Sticky action bar.** A page with a primary or save button keeps it on screen while the page scrolls (in the sticky page head or an action bar).
+
+### Tabs
+
+Sub-tabs (`.stab` in `.pg-head .subtabs`): parallelogram (`clip-path`), height 40px, tab type role. Default `--white-6` fill, `--white-55` text; hover `--white-11`, `--white-90`; selected `.on` `--white-9`, `--white` text and a 2px `--white-70` top edge; disabled `--text-38`, `not-allowed`, not focusable, title says when it opens. Never blue, navy or team colour. Two levels only (rail, then sub-tab). Segments (Top 25 / All, Conference / National) follow the same neutral states.
+
+### Tables
+
+`.rtab` / `gob-tables.css` inside a contained card (`--white-2`, `--radius-12`). Header: sticky where the table fits `.main`, `--surface-th-top` → `--surface-th-bottom`, micro-label type at `--text-60`, `--line-strong` under it. Rows: `--line` separators only (no boxed cells), even rows `--white-1p2`, hover `--white-5`, your row navy (`tr.me`). Grouped columns `--group-shade`. First (name) column left-aligned and heavier; numbers centred. Linked names are not underlined at rest. A table wider than `.main` scrolls inside its card with an edge fade and no sticky header. Never white zebra stripes, never spreadsheet gridlines.
+
+### Modals
+
+One modal at a time, toggled with `.is-visible`, above everything at `--z-modal`. Surface `--surface-popover` family, border `--white-12`, `--radius-card`, `--shadow-popover`, scrim `--scrim`. Title in the display face, copy in body `--text-60`.
+
+| Type | Use | Rule |
+|---|---|---|
+| Functional | Confirmations, warnings, settings, leave-with-edits, destructive actions | Max 420px. Esc and backdrop dismiss. Two actions: primary `flex: 2`, secondary `flex: 1`. One action: full-width ghost. Action-only variant (no title, stacked equal buttons) must be answered; no backdrop dismiss. |
+| Moment | Milestones and season peaks (`.mm`, season-peak template), results | Max 560px (720px only for tabular content). Requires a button. Outcome is the hero. Gold only on reward tiers; elimination is quiet (fade, no gold, no sound). The server names the style and sting. |
+| Strategic | In-game decision points (defense matchups, timeouts, foul-outs) | Wide (up to 1160px). Requires an explicit submit. Data is the hero; muted title. Team colour only as identification on panel headers. The one forward action is green; skip is a low-weight checkbox or ghost link. |
+| Tutorial | Coach Sammy lesson alerts (`gob-tutorial.css`) | Full-screen takeover card. Tutorial chrome is outside the token gate today (see Open questions). |
+
+### Toasts
+
+`GOBToast.show(text)` (`.gob-save-toast`, `css/gob-toast.css`): one short line, neutral chrome (`--surface-popover`, `--shadow-popover`, `--text-87`), no icon, no orange, no green. Fixed over the centre of `.main`, `--dsp-24` above the bottom, never shifts layout. Fades after 1.5s; a second call restarts the timer instead of stacking. A failed save uses the same toast with a short retry line. Toasts replace success modals whenever no decision follows.
+
+### Headshots and logos
+
+Player headshot: square with a small corner, photo, monogram or placeholder alike. `.av` and list badges `--radius-6` on `--surface-3`; `.portrait` `--radius-10`; image `object-fit: cover`. Team logos and initials badges are not headshots: `--radius-logo`, `--shadow-logo`.
+
+### Chips, pills and badges
+
+`.chip` (`--radius-6`, `--dsz-20` high, micro type). Data chips may carry a tier or delta token; choice and filter chips are neutral (default `--white-6`, selected `--white-9` with `--text-100`). The rail count badge uses `--badge` / `--badge-ink`; the recruiting presence dot is a dot, not a count, and does not pulse. Meters (`.meter`) are neutral unless they show a data ramp.
+
+### W/L plates
+
+`.wl`: display face, `--radius-6`, `--dsz-22` high. WIN is a white plate; LOSS is an outline with no fill. Never green or red (see Open questions for current CSS drift).
+
+## Never do
+
+- A hex, `rgb()` or `rgba()` value in a page, component or doc. Name the token.
+- A second green control on a screen, or green on anything that is not Advance or positive data.
+- Orange on anything that is not a save or commit.
+- Gold outside the five reward surfaces.
+- Blue on chrome, links or navigation; navy as a data colour or page background.
+- A team-colour wash or tint on a card, panel, tab or header.
+- A circular player headshot.
+- A spinner, a disabled-with-lock Advance, or a hint link.
+- A third navigation level.
+- Page-local rating bands, a recomputed attribute or RT tier, or a renamed team.
+- Momentum on a team-measure surface.
+
+## Open questions
+
+1. **Navy for selected items.** Navy is "yours". Set Lineup selection, the standings user row and some active states already use navy as a selected-row colour. Is navy also the generic "selected" colour, or only "yours"? (Jamie)
+2. **Delta chips.** The law says ▲/▼ are neutral, but the Office attribute-change chips (UX_System §12) and `.chip.up` / `.chip.down` use `--delta-up` green / `--delta-down` red, and the checker allows `delta-up` as positive data. Which surfaces must be neutral?
+3. **W/L plates.** The law says white plate / outline; `gob-components.css` `.wl.win` / `.wl.loss` still use `--delta-up` / `--delta-down`, and League › Rankings "Last Week" uses the `.gob-wl` data colours. Neutralise everywhere, or keep W/L as data in tables?
+4. **Orange beyond saves.** The token comment says orange is also "non-advancing actions, gated-task tag"; the checker allows `.gated`, `.td-gate`, `.is-on`; the Office blocking step draws an orange outline; the attitude bars run red, orange, neutral, green; the rail `--badge` is orange; the functional-modal accent defaults to orange; the tutorial alert uses orange. The law says saved / committed only. Which of these stay?
+5. **Weekly / result card wash.** The law forbids a team-colour wash on the weekly card, but `.office-res` paints a `--team-primary` gradient. Is the result card in scope?
+6. **Destructive actions.** The old guide gave destructive modals a red accent; the law gives red no button or chrome role. Neutral, or a sanctioned red?
+7. **Navy aliases.** `--you`, `--you-soft`, `--you-line`, `--you-ink` are defined locally in `recruiting-spine.css`, not in `gob-tokens.css`, yet UX_System cites them. Promote to tokens?
+8. **RT colours.** `rtBucket.js` and `css/rt-buckets.css` carry their own colour values, and RT elite uses the `--blue` value, not `--tier-blue` (which exists for contrast). Point RT at the tier tokens?
+9. **Canonical button CSS.** `css/gob-buttons.css` still hard-codes the old values and labels orange as "advances UI". The shell buttons in `gob-components.css` are tokenised. Retokenise `gob-buttons.css` to match this guide?
+10. **Position colours** (PG/SG/SF/PF/C) and the broadcast's 5-colour data palette have no tokens. Tokenise, or keep as game presentation?
+11. **Tier digit ceiling.** The token comment says the player digit runs 0–16; `attributeDisplay.js` says there is no upper cap. Which is right?
+12. **Repo CLAUDE.md** still says the colour law lives in UX_System. Update it to point here?
