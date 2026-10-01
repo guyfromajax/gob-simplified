@@ -7,6 +7,11 @@
  *
  * Tiers follow the displayed digit: 0–4 red, 5–6 yellow, 7–8 green, 9+ blue.
  * The fill is luminance. The digit carries the tier colour.
+ *
+ * Colour law: the tier colours are the attribute ramp (data), the only colour in this
+ * sheet. Sort arrows, focus rings and the scope / segment controls are neutral: orange
+ * is for saves only. Values stay literal because team-roster-view.html loads this sheet
+ * without gob-tokens.css.
  */
 
 .attr-tiles {
@@ -123,10 +128,9 @@ th.attr-tiles-head {
   content: "▾";
   font-size: 8px;
   margin-left: 2px;
-  color: #F79420;
 }
 .attr-abbr.is-sorted[data-dir="asc"]::after { content: "▴"; }
-.attr-abbr:focus-visible { outline: 2px solid #F79420; outline-offset: 1px; }
+.attr-abbr:focus-visible { outline: 2px solid rgba(255, 255, 255, .7); outline-offset: 1px; }
 
 /* Grouped tiles use the shared tokens; the inner label is suppressed by the builder. */
 .attr-grid .attr-tile { width: var(--tile-w); height: var(--tile-h); }
@@ -250,7 +254,7 @@ th.c-rt, td.c-rt { white-space: nowrap; }
   border-color: rgba(255, 255, 255, .18);
   color: #fff;
 }
-.scope-btn:focus-visible { outline: 2px solid #F79420; outline-offset: 2px; }
+.scope-btn:focus-visible { outline: 2px solid rgba(255, 255, 255, .7); outline-offset: 2px; }
 .scope-btn .n {
   font: 500 11px/1 'Inter', sans-serif;
   font-variant-numeric: tabular-nums;
@@ -289,7 +293,7 @@ th.c-rt, td.c-rt { white-space: nowrap; }
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
   color: #fff;
 }
-.seg-track button:focus-visible { outline: 2px solid #F79420; outline-offset: 1px; }
+.seg-track button:focus-visible { outline: 2px solid rgba(255, 255, 255, .7); outline-offset: 1px; }
 
 /* Region / Archetype sort controls under "Recruit" — their columns folded into the
    identity cell, but the sort affordance had to survive. */

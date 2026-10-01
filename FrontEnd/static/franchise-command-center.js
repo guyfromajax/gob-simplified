@@ -102,21 +102,23 @@ function showFranchiseGoneNotice() {
   const panel = document.createElement('div');
   panel.id = 'fcc-franchise-gone';
   panel.setAttribute('role', 'alert');
+  // Tokens resolve here because the page is html.gob. The button is a neutral plate:
+  // leaving a dead franchise is not Advance, so it is not green.
   panel.style.cssText =
-    'position:fixed;inset:0;z-index:1000000;background:rgba(4,8,16,0.96);' +
+    'position:fixed;inset:0;z-index:1000000;background:var(--bg);' +
     'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-    'gap:18px;padding:24px;text-align:center;';
+    'gap:var(--space-18);padding:var(--space-24);text-align:center;';
   panel.innerHTML =
-    '<div style="font-family:\'Bebas Neue Pro\',\'Bebas Neue\',sans-serif;' +
-    'font-size:38px;letter-spacing:0.03em;color:#ffffff;">This Franchise No Longer Exists</div>' +
-    '<div style="font-family:Inter,sans-serif;font-size:15px;line-height:1.5;' +
-    'color:rgba(255,255,255,0.72);max-width:440px;">It was deleted, so there is nothing left to load. ' +
+    '<div style="font-family:var(--font-display);' +
+    'font-size:var(--fs-36);letter-spacing:var(--tracking-3);color:var(--text-100);">This Franchise No Longer Exists</div>' +
+    '<div style="font-family:var(--font-body);font-size:var(--fs-15);line-height:1.5;' +
+    'color:var(--white-72);max-width:440px;">It was deleted, so there is nothing left to load. ' +
     'Your other program slot is untouched.</div>' +
     '<button type="button" id="fcc-franchise-gone-back" style="min-width:138px;min-height:42px;' +
-    'padding:10px 18px;border:1px solid rgba(255,255,255,0.28);border-radius:10px;' +
-    'background:linear-gradient(180deg,#49ff37 0%,#34ec27 100%);color:#07101f;cursor:pointer;' +
-    'font-family:\'Bebas Neue Pro\',\'Bebas Neue\',sans-serif;font-size:14px;font-weight:700;' +
-    'letter-spacing:0.02em;box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);">Back To Home Base</button>';
+    'padding:var(--space-10) var(--space-18);border:1px solid var(--white-28);border-radius:var(--radius-10);' +
+    'background:var(--white-10);color:var(--text-100);cursor:pointer;' +
+    'font-family:var(--font-display);font-size:var(--fs-14);font-weight:var(--fw-bold);' +
+    'letter-spacing:var(--tracking-2);">Back To Home Base</button>';
   document.body.appendChild(panel);
   const backBtn = document.getElementById('fcc-franchise-gone-back');
   if (backBtn) {
@@ -924,7 +926,7 @@ function buildTeamLink(t) {
   const rank = Number(t?.natl_rank);
   const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
   teamLink.textContent = `${rankPrefix}${label}`;
-  teamLink.style.color = '#4a90e2';
+  teamLink.style.color = 'var(--text-100)';
   teamLink.style.textDecoration = 'none';
   teamLink.style.cursor = 'pointer';
   teamLink.addEventListener('mouseenter', () => { teamLink.style.textDecoration = 'underline'; });
