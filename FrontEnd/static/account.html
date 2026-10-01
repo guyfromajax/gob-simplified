@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
+  <link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/gtm-loader.js"></script>
   <script src="/js/shared/franchiseContext.js"></script>
@@ -11,107 +12,10 @@
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Account - Geeked Out Basketball</title>
 <link rel="stylesheet" href="/css/auth-bar.css">
-  <style>
-    :root { --bebas: 'Bebas Neue Pro', 'Bebas Neue', sans-serif; --inter: 'Inter', sans-serif; --orange: #F79420; }
-    body {
-      font-family: var(--inter); margin: 0; padding: 92px 20px 80px; color: #fff; line-height: 1.5;
-      background: radial-gradient(1200px 620px at 50% -12%, #243049 0%, rgba(36,48,73,0) 60%), #0d1018;
-      min-height: 100vh;
-    }
-    .acct { max-width: 920px; margin: 0 auto; }
-    .acct-title { font-family: var(--bebas); font-weight: 700; font-size: 40px; letter-spacing: 0.04em; margin: 0 0 18px; }
-    /* Colour law: the ambience switch is a choice control, not a save. Neutral on-state. */
-    #acct-ambience-switch.account-switch[aria-checked="true"] {
-      background: rgba(255, 255, 255, 0.16);
-      border-color: rgba(255, 255, 255, 0.28);
-    }
-
-    .card {
-      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px; padding: 20px 22px;
-    }
-    .card + .card, .acct-grid + .card, .card + .acct-grid { margin-top: 14px; }
-    .acct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
-    @media (max-width: 760px) { .acct-grid { grid-template-columns: 1fr; } }
-
-    .card-label {
-      font-family: var(--inter); font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.14em; color: rgba(255,255,255,0.42); margin: 0 0 14px;
-    }
-
-    /* Identity */
-    .acct-identity { display: flex; align-items: center; gap: 16px; }
-    .acct-avatar {
-      flex-shrink: 0; width: 78px; height: 78px; border-radius: 999px;
-      display: flex; align-items: center; justify-content: center;
-      background: linear-gradient(155deg, #2e3a55, #1a2030);
-      border: 1px solid rgba(255,255,255,0.16); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
-      font-family: var(--bebas); font-size: 36px; color: rgba(255,255,255,0.78);
-    }
-    .acct-id-text { min-width: 0; }
-    .acct-name-row { display: flex; align-items: center; gap: 10px; }
-    .acct-name { font-family: var(--bebas); font-size: 34px; letter-spacing: 0.03em; color: #fff; }
-    .acct-status {
-      margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
-      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
-      color: var(--orange); background: rgba(247,148,32,0.12);
-      border: 1px solid rgba(247,148,32,0.4); border-radius: 999px; padding: 4px 11px;
-    }
-
-    /* Geek points */
-    .gp-total { font-family: var(--bebas); font-size: 52px; line-height: 1; color: var(--orange); }
-    .gp-card .card-label, .gp-card .gp-total { text-align: center; }
-    .gp-team-row, .title-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 9px 0; border-top: 1px solid rgba(255,255,255,0.06);
-      font-size: 13.5px;
-    }
-    .gp-team-row:first-of-type, .title-row:first-of-type { border-top: none; }
-    .gp-team-name, .title-name { color: rgba(255,255,255,0.72); }
-    .gp-team-pts, .title-count { font-family: var(--bebas); font-size: 18px; color: #fff; }
-    .title-count.zero { color: rgba(255,255,255,0.3); }
-    .muted-empty { color: rgba(255,255,255,0.4); font-size: 13px; padding: 6px 0; }
-
-    /* Settings rows */
-    .set-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 0; border-top: 1px solid rgba(255,255,255,0.07); }
-    .set-row:first-of-type { border-top: none; }
-    .set-label { font-size: 13.5px; color: rgba(255,255,255,0.82); font-weight: 600; }
-    /* dead segmented control (In-Game Display) */
-    .seg { display: inline-flex; border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; overflow: hidden; opacity: 0.85; cursor: default; }
-    .seg span { padding: 6px 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: rgba(255,255,255,0.5); }
-    .seg span.on { background: rgba(247,148,32,0.9); color: #15181f; }
-
-    /* Archetype board */
-    .arch-board-grid {
-      display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px;
-      grid-auto-flow: column; grid-template-rows: repeat(var(--arch-rows, 4), auto);
-    }
-    @media (max-width: 680px) { .arch-board-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-    @media (max-width: 440px) { .arch-board-grid { grid-template-columns: 1fr; } }
-    .arch-cell {
-      display: flex; align-items: center; gap: 10px;
-      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 11px; padding: 10px 12px;
-    }
-    .arch-rank { font-family: var(--bebas); font-size: 16px; color: rgba(255,255,255,0.42); width: 22px; flex-shrink: 0; }
-    .arch-badge { width: 30px; height: 30px; flex-shrink: 0; display: inline-flex; align-items: center; }
-    .arch-meta { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
-    .arch-aname { flex: 1; min-width: 0; font-family: var(--inter); font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .arch-pct { flex: 0 0 auto; font-family: var(--bebas); font-size: 15px; color: var(--orange); }
-
-    /* footer links */
-    .acct-links { display: flex; gap: 22px; justify-content: center; margin-top: 18px; margin-bottom: 160px; flex-wrap: wrap; }
-    .acct-link { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.5); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-    .acct-link:hover { color: #fff; }
-    .acct-link[aria-disabled="true"] { color: rgba(255,255,255,0.3); cursor: default; }
-    .acct-link .arrow { transition: transform .14s ease; }
-    .acct-link:not([aria-disabled="true"]):hover .arrow { transform: translateX(2px); }
-
-    /* reuse .account-switch from auth-bar.css for the ambience toggle */
-  </style>
+  <link rel="stylesheet" href="/css/community.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
-<body class="has-auth-bar has-footer">
+<body class="has-auth-bar has-footer community-page acct-page">
   <div id="auth-bar" class="auth-bar"></div>
 
   <div class="acct">
