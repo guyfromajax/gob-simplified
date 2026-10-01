@@ -383,7 +383,7 @@ body.tp-page {
 
 /* Toast (aligned with playbooks.css) */
 .toast {
-  --toast-accent: var(--orange); /* colour-law: saved — "Playbooks Saved" */
+  --toast-accent: var(--line-strong); /* neutral like the shared save toast (Jamie, 2026-10-01) */
   position: fixed;
   right: 22px;
   bottom: 22px;

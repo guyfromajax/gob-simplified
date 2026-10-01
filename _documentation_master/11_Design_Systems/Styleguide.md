@@ -9,8 +9,8 @@ One colour, one meaning. Everything not listed is neutral: white text at `--text
 | Colour | Token(s) | Allowed | Banned |
 |---|---|---|---|
 | Green | `--green` (ink on green: `--bg`) | The one Advance per screen (top-bar `#play-now` / `.advance`, `.gob-btn--gate`, the one forward action in a live-game overlay, Submit Training on the weekly training page). Positive data: delta-up, tier green, chemistry high, board-gain bars, the RT / attribute ramps. | Cards, WIN/LOSS plates, badges, scores, choice controls, a second button on the same screen, any button that only navigates or only saves. |
-| Orange | `--orange` | **"There are unsaved changes" and nothing else**: the save or commit of something you changed. Submit Invites, Submit Orders, Save Game Plan / Playbooks (only while there is an unsaved edit: neutral at rest and after a save), Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row. | Brand accent, "warning / low" data, navigation, choice controls and their selected state (`.is-on`), checkboxes, hovers, toasts, a loader, the rail count badge, gated / "Blocks Advance" tags and blocking-step outlines, data ramps (attitude), modal accents, a "Stay" / keep-editing button. |
-| Navy | `--navy`, `--navy-hi` (edge / halo only); aliases `--you`, `--you-soft`, `--you-line`, `--you-ink` | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list, your team in a bracket. What you picked for your team or plan: Set Lineup on-court and selected rows, plays in your Playcall Center, your leaderboard and lean-ladder slot. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. A generic "selected" state on a choice control: tabs, toggles, radios, sliders and filter chips stay neutral. |
+| Orange | `--orange` | **"There are unsaved changes" and nothing else**: the save or commit of something you changed. Submit Invites, Submit Orders, Save Game Plan / Playbooks (only while there is an unsaved edit: neutral at rest and after a save), Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row, and the just-committed moment on Signing Day (the funded-row flash `.prow.flash`, the signing summary `.ssum-nm b` / `.ssum-lr`). | Brand accent, "warning / low" data, navigation, choice controls and their selected state (`.is-on`), checkboxes, hovers, toasts, a loader, "yours" marks (those are navy), a CONTINUE that only continues (`.gob-btn--neutral`), the rail count badge, gated / "Blocks Advance" tags and blocking-step outlines, data ramps (attitude), modal accents, a "Stay" / keep-editing button. |
+| Navy | `--navy`, `--navy-hi` (edge / halo only); aliases `--you`, `--you-soft`, `--you-line`, `--you-ink` | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list, your team in a bracket, on your board / your orders (the invite-board rank badge and on-board pool rows, your committed recruits in the Orders rail, the My Orders mark). What you picked for your team or plan: Set Lineup on-court and selected rows, plays in your Playcall Center, your leaderboard and lean-ladder slot. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. A generic "selected" state on a choice control: tabs, toggles, radios, sliders and filter chips stay neutral. |
 | Blue | `--tier-blue` (attribute tiles), `--blue` (RT letters) | RT only: an A grade, a 9+ attribute, elite. One exception: the top band of the shot-share ramp (see [Data scales](#data-scales)). | Chrome, links, navigation, "good / above average". |
 | Reward gold | `--reward-gold` | Only: title medallions (`.med.gold`); season-peak glow, rule and confetti (`.pk`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`); the exceptional-gain marker (`.xg`, `.xg-key`); the words "Trophy Case" (`.gold-t`); senior-tribute title marks (`.st-titles s`, `.st-cti s`). Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens. | Any button, including the button on a reward modal (the big-news CTA is a neutral plate). Advance, "yours", choice controls, everyday or weekly chrome, Home Base chrome. |
 | Red / yellow | `--tier-red`, `--tier-yellow`; `--red` for the one destructive style | Data ramps (rating tiers, chemistry, energy, the attitude bars' low buckets). **Irreversible deletes only**: the red-outline confirm button and the red menu item for deleting a program on Home Base (`.btn-del`, `.pop-i.danger`). | ▼ deltas, LOSS plates or letters, buttons, chrome, warnings, modal accents, and destructive styling on anything reversible (removing a queued invite, assigning the practice squad, leaving with selections). |
@@ -154,7 +154,7 @@ One modal at a time, toggled with `.is-visible`, above everything at `--z-modal`
 
 ### Toasts
 
-`GOBToast.show(text)` (`.gob-save-toast`, `css/gob-toast.css`): one short line, neutral chrome (`--surface-popover`, `--shadow-popover`, `--text-87`), no icon, no orange, no green. Fixed over the centre of `.main`, `--dsp-24` above the bottom, never shifts layout. Fades after 1.5s; a second call restarts the timer instead of stacking. A failed save uses the same toast with a short retry line. Toasts replace success modals whenever no decision follows.
+`GOBToast.show(text)` (`.gob-save-toast`, `css/gob-toast.css`): one short line, neutral chrome (`--surface-popover`, `--shadow-popover`, `--text-87`), no icon, no orange, no green. Fixed over the centre of `.main`, `--dsp-24` above the bottom, never shifts layout. Fades after 1.5s; a second call restarts the timer instead of stacking. A failed save uses the same toast with a short retry line. Toasts replace success modals whenever no decision follows. Page-local toasts (the recruiting hub `.hub-toast`, the training playbook `.toast`) use the same neutral chrome: a `--line-strong` edge and a neutral icon, never orange.
 
 ### Headshots and logos
 
@@ -241,13 +241,18 @@ Jamie approved every recommendation in `reports/jamie-decisions-2-2026-10-01.md`
 | Weekly / result card wash | None; the dead `.office-res` styling is deleted. | [Colour law](#colour-law), Team colour row |
 | Destructive actions | Red outline only for irreversible deletes (Home Base delete program); everything else neutral. | [Colour law](#colour-law), Red row; [Modals](#modals) |
 
+## Settled 2026-10-01 (orange stragglers)
+
+Jamie's ruling on the annotated-orange list (old Open question 2, `reports/jamie-rulings-batch-2-2026-10-01.md`). Built on `ux/orange-stragglers`. After it, every orange in a new-design file is a save, a commit, or the just-committed flash.
+
+| Was orange | Settled as | Lives in |
+|---|---|---|
+| Toasts (`.hub-toast`, training-playbook `.toast`) | Neutral, like the shared save toast. | [Toasts](#toasts) |
+| Training Report stat toggle (`.tsr-toggle .toggle-btn.active`) | Neutral: a choice control. | [Colour law](#colour-law), Choice controls |
+| On-your-board marks (`.pool tbody tr.rec.on-board`, `.pool-rankbadge`, `.citem`) and the My Orders mark (`.hub-anchor--orders .ic`) | Navy: they are "yours". | [Colour law](#colour-law), Navy row |
+| Signing just-committed flash and summary (`.prow.flash`, `.ssum-lr`, `.ssum-nm b`) | Kept orange: the just-committed moment. | [Colour law](#colour-law), Orange row |
+| `.gob-btn--action` as a CONTINUE (username modal, Game Plan tutorial PLAY NOW) | Neutral plate (`.gob-btn--neutral`). `.gob-btn--action` stays orange only on a real save / commit (Assign Practice Squad). | [Buttons](#buttons) |
+
 ## Open questions
 
 1. **One blue or two for ratings.** RT letters paint `--blue`; a 9+ attribute tile paints the brighter `--tier-blue`, which exists for contrast on the tile. Moving RT A to `--tier-blue` is a visible change. Keep two, or make it one?
-2. **Annotated orange that may not be a save.** Since batch 2 the checker allows orange by selector only on save / commit names. These still pass through a `/* colour-law: committed */` annotation and may not mean "there are unsaved changes":
-   - toasts (`.hub-toast` in `recruiting-dock.css`, `.toast` in `training-playbooks.css`), which the Orange row bans;
-   - a choice control (`.tsr-toggle .toggle-btn.active`, `training-squad-report.html`);
-   - recruiting board and signing marks (`.pool tbody tr.rec.on-board`, `.pool-rankbadge`, `.citem`, `.hub-anchor--orders .ic`, `.prow.flash`, `.ssum-lr`, `.ssum-nm b`);
-   - `.gob-btn--action` used as a CONTINUE (the username modal, which saves the username, and the Game Plan tutorial CTA).
-
-   Audit each, keep or neutralise?

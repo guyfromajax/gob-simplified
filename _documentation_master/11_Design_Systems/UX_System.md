@@ -60,6 +60,21 @@ Jamie approved every recommendation in `reports/jamie-decisions-2-2026-10-01.md`
 | 5 | Red only for irreversible deletes | **Kept red:** Home Base delete program (`.pop-i.danger` menu item, `.btn-del` red-outline confirm, `home-base.css`). **Now neutral:** every Assign Practice Squad modal accent (leave, confirm, load error; the initial and fallback accent in `cut-players.html` / `cut-players.js`) and the recruiting dock's remove-invite × (`.islot-remove`, `recruiting-dock.css`). No other destructive action has a red style (skeleton editors use the browser `confirm()`). |
 | — | Checker | `SAVE_RE` in `scripts/check_ui_tokens.py` is save / commit only (`save`, `saved`, `committed`, `is-saved`, `is-committed`); `.gated`, `.td-gate`, `.is-on`, `toggle-btn`, `gob-btn--action` and the `.att-col` / `.att-bar` orange stop are off. Anything else orange needs `/* colour-law: committed */` or `saved`. |
 
+### Settled rulings, orange stragglers (2026-10-01)
+
+Jamie's ruling on the batch-2 annotated-orange list; rules in the Styleguide ([Settled 2026-10-01 (orange stragglers)](Styleguide.md#settled-2026-10-01-orange-stragglers)). Guard: `orange-stragglers.spec.js`.
+
+| Was orange | Now | Built in |
+|---|---|---|
+| Recruiting hub toast | neutral | `.hub-toast` edge `--line-strong`, `.ti` `--white-6` / `--white-28` / `--text-87` (`recruiting-dock.css`) |
+| Training playbook toast | neutral | `--toast-accent: var(--line-strong)` (`training-playbooks.css`) |
+| Training Report stat toggle | neutral | `.tsr-toggle .toggle-btn.active` white 12% fill, white ink (`training-squad-report.html`) |
+| Invite-board rank badge, on-board pool row | navy | `.pool-rankbadge` `--you` fill, `--text-100` ink; `.pool tbody tr.rec.on-board td` navy 14% (hover 20%) (`recruiting-dock.css`) |
+| Committed recruit in the Orders rail | navy | `.citem` navy 14% fill, `--you-line` border, hover 20% (`recruiting-signing.css`) |
+| My Orders mark | navy ink | `.hub-anchor--orders .ic` `--you-ink`, the hub's "yours" text colour (plain `--navy` is not legible on the dark rail) (`recruiting-signing.css`) |
+| Username CONTINUE, Game Plan tutorial PLAY NOW | neutral plate | `gob-btn gob-btn--neutral` (`usernameModal.js`, `game-plan.js`) |
+| Signing flash and summary | **kept orange** | `.prow.flash`, `.ssum-nm b` (`committed`), `.ssum-lr` (`saved`) unchanged |
+
 ### Live-game overlays (court.html DOM)
 
 The live-game DOM overlays built with `createElement` in `js/phaser/utils/` are on the design system. (This covers the `js/phaser/utils/` overlays; the `court.html` inline **chrome** has its own section below, and the Phaser **canvas** HUD / announcements remain game presentation, out of scope.)
@@ -696,7 +711,7 @@ Tutorial pages (`tutorial*.html`) are `html.gob` and load `gob-tokens.css`; no s
 
 - **Neutral primary is `.gob-btn--neutral`** (`gob-buttons.css`): a white plate with `--bg` ink, for a main CTA that neither saves nor advances (Start lesson, Continue, LET'S GO, pick-opponent CONTINUE, Got It). The tutorial alert / tip primaries (`.gob-talert-btn-primary`, `.gob-tip-overlay .btn-primary`) use the same plate.
 - **Green** is only the FTE Advance: tip-off SIM GAME (`gob-btn--gate`) and the lineup-feedback CONTINUE.
-- **Orange** is only the username CONTINUE (it saves the username).
+- **Orange:** none. The username CONTINUE is the neutral plate (`.gob-btn--neutral`; Jamie, 2026-10-01: orange only for unsaved changes).
 - **Sammy modals** (`sammy-modal.css`): the primary is the neutral plate by default; `primaryClass: 'is-orange'` is a no-op kept for old callers. A CTA that advances game state passes `primaryClass: 'is-advance'` for green (the region-bye "Sim Region First Round", which runs `#play-now`).
 - **Neutral chrome:** Sammy portrait rings, eyebrows and ticks, the active tutorial-nav icon, depth badges, toast and callout bars, tutorial-alert rail, mark, progress and dots, the hub progress bar, order circles and seen check, the attribute-tour band, cue and explored state, and the pick-opponent selected card (the team-colour rail stays).
 - **Hosts without `html.gob`.** `gob-tutorial.css` (injected on every auth-bar page), `sammy-modal.css`, `username-modal.css`, `fte.css` and `.gob-btn--neutral` write tokens as `var(--token, <gob value>)`.
@@ -772,7 +787,8 @@ Not on tokens, on purpose: the Feedback button, its pulse and the Feedback modal
 
 | Element | Colour | Why |
 |---|---|---|
-| Save & Continue (`.tp-btn-primary`), "Playbooks Saved" toast accent | orange, annotated `saved` | Saves. |
+| Save & Continue (`.tp-btn-primary`) | orange, annotated `saved` | Saves. |
+| "Playbooks Saved" toast (`.toast`) | neutral (`--line-strong` edge) | Reports a save; it is not the save (orange stragglers). |
 | Selected play card + check (`.tp-card.is-selected`) | navy | Selection. |
 | PCC chip, dock share bar, overall grade, primary position value, section rules and subheads, position pills (`.pd-pos-pill`) | neutral | Information codes / data. No per-position colour. |
 | "At least 1 required" (`.tp-warn`) | `--red` | Invalid. |
