@@ -190,8 +190,9 @@ test('in-app 1280 / 1920 shots and geometry', async ({ page }) => {
   expect(metrics1280.transition.text).toBe('Transition');
   expect(samePaint(metrics1280.execution.color, BEFORE.inApp1280.execution.color)).toBe(true);
   expect(samePaint(metrics1280.transition.color, BEFORE.inApp1280.transition.color)).toBe(true);
-  expect(samePaint(metrics1280.save.bg, BEFORE.inApp1280.save.bg)).toBe(true);
-  expect(samePaint(metrics1280.save.color, BEFORE.inApp1280.save.color)).toBe(true);
+  // Colour law (2026-10-01 ruling): orange = there is something to save. At rest
+  // Save Game Plan is neutral, so it no longer matches the orange baseline.
+  expect(/rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(metrics1280.save.bg)).toBe(false);
   expect(metrics1920.tracks.length).toBe(BEFORE.inApp1920.tracks.length);
 });
 

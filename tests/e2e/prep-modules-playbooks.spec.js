@@ -234,8 +234,9 @@ test('in-app 1280 / 1920 shots and geometry', async ({ page }) => {
   });
   expect(Math.abs(metrics1280.toggle.x - BEFORE.inApp1280.toggle.x)).toBeLessThanOrEqual(2);
   expect(Math.abs(metrics1280.toggle.y - BEFORE.inApp1280.toggle.y)).toBeLessThanOrEqual(2);
-  expect(samePaint(metrics1280.save.bg, BEFORE.inApp1280.save.bg)).toBe(true);
-  expect(samePaint(metrics1280.save.color, BEFORE.inApp1280.save.color)).toBe(true);
+  // Colour law (2026-10-01 ruling): orange = there is something to save. At rest
+  // Save Playbooks is neutral, so it no longer matches the orange baseline.
+  expect(/rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(metrics1280.save.bg)).toBe(false);
   expect(metrics1920.tracks.length).toBe(BEFORE.inApp1920.tracks.length);
 
   const paints = await page.evaluate(() => {
@@ -378,11 +379,9 @@ test('unsaved Save button 1280', async ({ page }) => {
   await expect(page.locator('#save-btn')).toBeEnabled();
   await capturePage(page, path.join(OUT, `${PREFIX}-unsaved-1280.png`));
   alsoTokenShot(`${PREFIX}-unsaved-1280.png`);
-  const savePaint = await page.evaluate(() => {
-    const s = getComputedStyle(document.getElementById('save-btn'));
-    return s.backgroundColor;
-  });
-  expect(/rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(savePaint)).toBe(true);
+  // The edit makes it dirty: orange once the background transition settles.
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('save-btn')).backgroundColor))
+    .toMatch(/rgb\(\s*247\s*,\s*148\s*,\s*32\s*\)/i);
 });
 
 test('play-details standalone 1280', async ({ page }) => {
