@@ -108,9 +108,34 @@ async function openHub(page, week, extra, wire) {
     await route.continue();
   });
   await page.goto('/recruiting.html?franchise_id=' + FID + '&team_id=' + TID);
-  await page.waitForSelector('#hub-phase .pstrip');
-  await page.waitForFunction(() => !document.documentElement.classList.contains('gob-pending'));
+  await hubReady(page);
   return resultsCalls;
+}
+
+// The hub is ready when three things have happened, in any order: recruiting-data
+// has painted (the phase strip is the first node renderShell writes), the shell has
+// mounted, and the command-center payload has settled browse vs focus (the shell
+// drops gob-pending). "Not pending" alone is true before the shell mounts.
+async function hubReady(page) {
+  await page.waitForSelector('#hub-phase .pstrip');
+  await page.waitForFunction(() => {
+    const cls = document.documentElement.classList;
+    return cls.contains('gob-shell') && !cls.contains('gob-pending');
+  });
+}
+
+// Leave the hub and come Back to it. The away page must not navigate on its own:
+// /login.html redirects a signed-in user to Home Base, and that redirect replaces
+// the login entry only if it lands before the load event. When it lands after,
+// it adds an entry, Back returns to login, login redirects again, and the hub
+// never comes back. about:blank has no script and needs no server.
+async function leaveAndComeBack(page) {
+  const hubUrl = page.url();
+  await page.goto('about:blank');
+  await page.goBack();
+  await expect(page).toHaveURL(hubUrl);
+  await hubReady(page);
+  await page.waitForSelector('#hub-pool tbody tr.rec');
 }
 
 // The wide-table fade is a mask. It does not change hit testing, so a covered
@@ -462,9 +487,7 @@ test('week 21 focus flow lands on the region pool, and Leans toggles to leaners 
   await openHub(page, 21, { recruits: fullPool() }, { board_saved_week: 0 });
   await page.selectOption('#pool-region', 'all');
   await leansBtn(page).click();
-  await page.goto('/login.html');
-  await page.goBack();
-  await page.waitForSelector('#hub-pool .pool-view');
+  await leaveAndComeBack(page);
   await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#pool-region')).toHaveValue('all');
   expect((await poolIds(page)).length).toBe(10);
@@ -506,9 +529,7 @@ test('browse hub keeps the Leans tab and the Leans toggle in sync', async ({ pag
   expect(page.url()).toContain('hub=pool');
 
   await tab(page, 'Leans').click();
-  await page.goto('/login.html');
-  await page.goBack();
-  await page.waitForSelector('#hub-pool .pool-view');
+  await leaveAndComeBack(page);
   await expect(tab(page, 'Leans')).toHaveAttribute('aria-selected', 'true');
   await expect(leansBtn(page)).toHaveAttribute('aria-pressed', 'true');
   expect(await poolIds(page)).toEqual(['r-12', 'r-7']);
