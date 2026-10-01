@@ -126,7 +126,8 @@ test.describe('tab badge', () => {
     expect(result.w).toBe(8);
     expect(result.h).toBe(8);
     expect(result.insideTab).toBe(true);
-    expect(result.bg).toContain('247, 148, 32');
+    // Ruling 2026-10-01 (#7): the presence dot is neutral, not orange and not green.
+    expect(result.bg).toBe('rgb(255, 255, 255)');
   });
 });
 

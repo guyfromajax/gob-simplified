@@ -243,7 +243,8 @@ test('in-app 1280 / 1920 shots and geometry', async ({ page }) => {
     const host = document.getElementById('playbooks-view');
     const orange = (v) => /rgb\(\s*247\s*,\s*148\s*,\s*32/i.test(v);
     const green = (v) => /rgb\(\s*52\s*,\s*236\s*,\s*39/i.test(v);
-    const navy = (v) => /rgb\(\s*39\s*,\s*64\s*,\s*142/i.test(v);
+    // A color-mix() of --navy computes to color(srgb 0.15 0.25 0.56 / a).
+    const navy = (v) => /rgb\(\s*39\s*,\s*64\s*,\s*142|srgb 0\.15\d* 0\.25\d* 0\.55\d*/i.test(v);
     const paint = (el) => {
       if (!el) return { bg: '', color: '' };
       const s = getComputedStyle(el);
@@ -254,6 +255,7 @@ test('in-app 1280 / 1920 shots and geometry', async ({ page }) => {
       return orange(p.bg) || green(p.bg) || orange(p.color);
     });
     const selected = paint(host.querySelector('.play.on'));
+    const unpicked = paint(host.querySelector('.play:not(.on)'));
     const sliders = [...host.querySelectorAll('.wb i')].slice(0, 6).map((el) => {
       const p = paint(el);
       return orange(p.bg) || green(p.bg);
@@ -261,11 +263,14 @@ test('in-app 1280 / 1920 shots and geometry', async ({ page }) => {
     return {
       tabChoicePaint: tabs.some(Boolean),
       selectedNavy: navy(selected.bg),
+      unpickedNavy: navy(unpicked.bg),
       sliderChoicePaint: sliders.some(Boolean),
     };
   });
   expect(paints.tabChoicePaint).toBe(false);
-  expect(paints.selectedNavy).toBe(false);
+  // Ruling 2026-10-01 (#1): a play in your Playcall Center is navy; the rest are not.
+  expect(paints.selectedNavy).toBe(true);
+  expect(paints.unpickedNavy).toBe(false);
   expect(paints.sliderChoicePaint).toBe(false);
 });
 

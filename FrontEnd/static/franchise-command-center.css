@@ -477,8 +477,8 @@ body.has-auth-bar #franchise-container {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--badge);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--badge) 70%, transparent);
+  background: var(--text-100);
+  box-shadow: 0 0 6px var(--white-45);
   animation: inboxBadgePulse 2.5s infinite;
 }
 
@@ -781,10 +781,10 @@ body.has-auth-bar #franchise-container {
 }
 
 .fcc-tb-mu--user {
-  border-color: rgba(43, 214, 106, 0.45);
+  border-color: color-mix(in srgb, var(--navy-hi) 55%, var(--white-10));
   box-shadow:
-    0 0 0 1px rgba(43, 214, 106, 0.45),
-    0 0 26px rgba(43, 214, 106, 0.32),
+    0 0 0 1px color-mix(in srgb, var(--navy-hi) 45%, transparent),
+    0 0 26px color-mix(in srgb, var(--navy-hi) 28%, transparent),
     0 8px 22px rgba(0, 0, 0, 0.4);
 }
 
@@ -836,17 +836,17 @@ body.has-auth-bar #franchise-container {
 }
 
 .fcc-tb-team--user {
-  border-left: 3px solid #2bd66a;
-  background: linear-gradient(90deg, rgba(43, 214, 106, 0.16), rgba(43, 214, 106, 0.04));
+  border-left: 3px solid var(--navy);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--navy) 22%, transparent), transparent);
 }
 
 .fcc-tb-team--user .fcc-tb-name-text,
 .fcc-tb-team--user .fcc-tb-score {
-  color: #eafff2;
+  color: var(--text-100);
 }
 
 .fcc-tb-team--user .fcc-tb-seed {
-  color: #2bd66a;
+  color: var(--text-60);
 }
 
 .fcc-tb-team--champion {
@@ -854,7 +854,7 @@ body.has-auth-bar #franchise-container {
 }
 
 .fcc-tb-team--champion.fcc-tb-team--user {
-  background: linear-gradient(90deg, rgba(43, 214, 106, 0.22), rgba(212, 168, 72, 0.1));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--navy) 18%, transparent), rgba(212, 168, 72, 0.1));
 }
 
 .fcc-tb-team--bye {
@@ -907,7 +907,7 @@ body.has-auth-bar #franchise-container {
 }
 
 .fcc-tb-team--user .fcc-tb-record {
-  color: rgba(43, 214, 106, 0.75);
+  color: var(--text-60);
 }
 
 .fcc-tb-rank-prefix {
