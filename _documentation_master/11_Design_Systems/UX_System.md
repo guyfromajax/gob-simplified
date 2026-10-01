@@ -717,4 +717,19 @@ Not on tokens, on purpose: the Feedback button, its pulse and the Feedback modal
 | Error (`.team-select-error`) | `--red` | |
 
 - Team colour appears only in each program's own banner art.
-- `css/team-picker.css` is not loaded anywhere and `TeamPicker.mount` is never called; the picker UI it styled is dead (see the program-select report).
+- `css/team-picker.css` and `TeamPicker.mount` (the old picker UI) were removed; `js/shared/teamPicker.js` keeps only the league data helpers.
+
+### Play-flow pages (training playbook, playbook report, recruit detail)
+
+`training-playbooks.html`, `playbook-report.html` and `player-detail.html` (recruit detail) are `html.gob` with `gob-tokens.css` and no longer load `resource-pages.css`: each sheet (`training-playbooks.css`, `playbook-report.css`, `player-detail.css`, all `NEW_DESIGN_CSS`) carries the brand shell rules it used, same selectors, on tokens.
+
+| Element | Colour | Why |
+|---|---|---|
+| Save & Continue (`.tp-btn-primary`), "Playbooks Saved" toast accent | orange, annotated `saved` | Saves. |
+| Selected play card + check (`.tp-card.is-selected`) | navy | Selection. |
+| PCC chip, dock share bar, overall grade, primary position value, section rules and subheads, position pills (`.pd-pos-pill`) | neutral | Information codes / data. No per-position colour. |
+| "At least 1 required" (`.tp-warn`) | `--red` | Invalid. |
+| Edit Playbooks (`.report-btn-primary`) | neutral white plate | Navigation. |
+| CMD bars (`.tp-cmd-fill`) | `--tier-yellow` / `--tier-green` / `--blue` | Unchanged hues; same open ramp question as `getPswColor`. |
+
+- Not migrated: `play-details.html` (pending the inspector decision) and the Expected Shot Distribution pills (`getPswColor`, `.psw-*` in `resource-pages.css`).
