@@ -3,8 +3,8 @@
    Ported, not re-derived: lp-* → st-*, tokens scoped to the host instead of :root, the
    prototype-only review dock and its .narrow / .rm preview fallbacks dropped (the host is
    always the full viewport, so the media queries are the real thing).
-   Green appears ONLY on .st-advance. Title marks are neutral (title counts are data;
-   orange is for saves only). */
+   Green appears ONLY on .st-advance. Title marks are reward gold (ruling 2026-10-01:
+   a title won is a reward). */
 
 .st-host {
   --ink: #f7f9ff;
@@ -70,7 +70,7 @@
 .st-career { margin-top: clamp(14px, 2.4vh, 24px); font: 500 clamp(11px, 1vw, 12.5px)/1.5 var(--body); color: var(--m2); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
 .st-titles { margin-top: clamp(12px, 2vh, 18px); display: flex; flex-wrap: wrap; gap: 8px 18px; }
 .st-titles span { display: flex; align-items: center; gap: 7px; font: 700 9px/1 var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.76); }
-.st-titles s { width: 6px; height: 6px; background: var(--ink); text-decoration: none; flex: 0 0 auto; }
+.st-titles s { width: 6px; height: 6px; background: var(--reward-gold); /* colour-law: reward */ text-decoration: none; flex: 0 0 auto; }
 
 .st-shot { position: absolute; right: 0; top: 0; bottom: 0; width: min(46vw, 520px); display: flex; align-items: flex-end; justify-content: center; }
 .st-shot-num { position: absolute; bottom: clamp(14px, 3vh, 26px); left: 50%; transform: translateX(-50%); font: 400 min(330px, 42vh)/0.8 var(--display); color: rgba(255, 255, 255, 0.055); z-index: 0; }
@@ -112,7 +112,7 @@
 .st-cst em { display: block; font: 700 7.5px/1 var(--body); font-style: normal; letter-spacing: 0.1em; text-transform: uppercase; color: var(--m2); margin-bottom: 5px; }
 .st-cst b { font: 400 clamp(15px, calc(var(--cw, 154px) * 0.12), 30px)/1 var(--display); font-variant-numeric: tabular-nums; }
 .st-cti { margin-top: 9px; display: flex; gap: 3px; }
-.st-cti s { width: 5px; height: 5px; background: var(--ink); text-decoration: none; }
+.st-cti s { width: 5px; height: 5px; background: var(--reward-gold); /* colour-law: reward */ text-decoration: none; }
 
 /* The only green on this screen — the gating action. */
 .st-advance { flex: 0 0 auto; height: 46px; padding: 0 30px; border-radius: 10px; cursor: pointer; border: 1px solid rgba(52, 236, 39, 0.55); background: linear-gradient(180deg, #49ff37, #34ec27); color: #06210a; font: 400 21px/1 var(--display); letter-spacing: 0.06em; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 10px 26px rgba(52, 236, 39, 0.18); animation: st-fade 0.4s ease both; animation-delay: var(--d, 300ms); }

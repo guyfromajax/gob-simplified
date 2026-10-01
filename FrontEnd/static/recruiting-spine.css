@@ -8,6 +8,7 @@
   --you:var(--navy);
   --you-soft:color-mix(in srgb,var(--navy) 28%,transparent);
   --you-line:color-mix(in srgb,var(--navy) 55%,transparent);
+  --you-edge:color-mix(in srgb,var(--navy-hi) 55%,transparent);  /* your lean-ladder slot (ruling 2026-10-01) */
   --you-ink:color-mix(in srgb,var(--text-100) 82%,var(--navy));
   --list:var(--navy); --list-soft:var(--you-soft); --list-line:var(--you-line);
   --green-ink:color-mix(in srgb,var(--tier-green) 72%,var(--text-100));
@@ -101,10 +102,10 @@ a{color:var(--text-60);text-decoration:none}a:hover{color:var(--text-100)}
 .lb-tok{display:flex;align-items:center;justify-content:center;width:100%;height:18px;border-radius:var(--radius-4);font:var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);color:var(--muted);background:var(--white-6)}
 .lb-slot.is-open{border-style:dashed;border-color:var(--muted-3)}
 .lb-slot.is-open .lb-tok{background:transparent;color:var(--muted-3);font-style:italic}
-.lb-slot.is-you{background:var(--you-soft);border-color:var(--you-line);box-shadow:0 0 0 1px var(--you-line)}
+.lb-slot.is-you{background:var(--you-soft);border-color:var(--you-edge);box-shadow:0 0 0 1px var(--you-edge)}
 .lb-slot.is-you .rk{color:var(--you-ink)}
 .lb-slot.is-you .lb-tok{background:var(--you);color:var(--text-100);font-weight:var(--fw-bold)}
-.lb-slot.is-you-list{background:var(--you-soft);border-color:var(--you-line)}
+.lb-slot.is-you-list{background:var(--you-soft);border-color:var(--you-edge)}
 .lb-slot.is-you-list .rk{color:var(--you-ink)}
 .lb-slot.is-you-list .lb-tok{background:var(--you);color:var(--text-100);font-weight:var(--fw-bold)}
 .lb-lock{position:absolute;top:-6px;right:-5px;width:15px;height:15px;display:grid;place-items:center;background:var(--bg);border:1px solid color-mix(in srgb,var(--red) 50%,transparent);border-radius:var(--radius-round);color:var(--red)}

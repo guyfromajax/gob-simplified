@@ -870,7 +870,7 @@ a.player-name-link {
 
 .roster-table tr.selected td:first-child,
 .roster-stats-table tr.selected td:first-child {
-  box-shadow: inset 3px 0 0 var(--navy);
+  box-shadow: inset 3px 0 0 var(--navy-hi);
 }
 
 .roster-table tr.selected,
@@ -1378,6 +1378,12 @@ a.player-name-link {
   background: color-mix(in srgb, var(--navy) 22%, transparent);
 }
 
+/* Ruling 2026-10-01: what you picked is navy with a navy-hi edge. */
+.roster-table tbody tr.on-court td:first-child,
+.roster-stats-table tbody tr.on-court td:first-child {
+  box-shadow: inset 3px 0 0 var(--navy-hi);
+}
+
 .roster-table tbody tr.on-court td.slot-cell {
   color: #fff;
 }
@@ -1529,7 +1535,7 @@ a.player-name-link {
 
 .roster-table tbody tr.on-court.selected td:first-child,
 .roster-stats-table tbody tr.on-court.selected td:first-child {
-  box-shadow: inset 3px 0 0 var(--navy);
+  box-shadow: inset 3px 0 0 var(--navy-hi);
 }
 
 .foul-cell.warn {
