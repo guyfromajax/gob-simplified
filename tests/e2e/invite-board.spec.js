@@ -115,6 +115,13 @@ async function mount(page, o = {}) {
   await page.waitForSelector('#hub-board .bpanel', { timeout: 10000 });
 }
 
+/** Seed Sammy (maybeShowSeedModal) loads async and sits over the board. force:true
+ *  still clicks whatever is on top — the reorder test already dismisses it. */
+async function dismissSeedSammy(page) {
+  const gotIt = page.getByRole('button', { name: /got it/i });
+  await gotIt.click({ timeout: 5000 }).catch(() => {});
+}
+
 // FILLED rows only. The board now draws all 20 ranks, empty slots included, so
 // `.brow[data-index]` alone would always report 20.
 const rows = (page) => page.locator('#hub-board .brow[data-id]');
@@ -256,6 +263,7 @@ test.describe('seed notice', () => {
 
   test('dismissible', async ({ page }) => {
     await mount(page, SEEDED);
+    await dismissSeedSammy(page);
     await page.click('#board-seed-dismiss', { force: true });
     await page.waitForFunction(() => !document.querySelector('#board-seed-notice'));
   });
@@ -274,6 +282,7 @@ test.describe('seed notice', () => {
 
   test('disappears once the board is saved', async ({ page }) => {
     await mount(page, SEEDED);
+    await dismissSeedSammy(page);
     await page.click('#dock-save', { force: true });
     await page.waitForFunction(() => !document.querySelector('#board-seed-notice'));
   });
@@ -290,6 +299,7 @@ test.describe('seed notice', () => {
 
   test('saving is the only thing that posts the order', async ({ page }) => {
     await mount(page, { week: 20, watchlist: ['r-2'], board: [], noLeans: true });
+    await dismissSeedSammy(page);
     await page.click('#dock-save', { force: true });
     await page.waitForURL('**/franchise-command-center*', { timeout: 5000 });
     const orders = await page.evaluate(() =>
