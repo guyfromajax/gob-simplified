@@ -14,5 +14,10 @@
 /tournament-select.html  /mode-select.html  302!
 /tournament.html         /mode-select.html  302!
 
+# Retired twins (2026-10-01)
+/play-builder.html  /play-builder-v2.html  301!
+/homepage-v3.html   /                      301!
+/homepage-v3        /                      301!
+
 # Redirect root to homepage.html
 /  /homepage.html  200!

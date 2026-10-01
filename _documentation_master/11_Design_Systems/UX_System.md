@@ -8,7 +8,7 @@ Version 1. How to build franchise screens. The look lives in [Styleguide.md](Sty
 - One green Advance per screen. It is the only control that uses the advance color. A blocking task becomes the Advance button (same id, same `updatePlayButton` state machine, same labels and routes). There is no disabled-with-lock state and no hint link. Recruiting chrome follows the same law: green is only Advance and positive data (board gains); orange is only saves (Submit Invites, Submit Orders); navy is only "yours" (your lean, your region, your signing). Phase labels, week tiles, invite counts, and filter chips stay neutral.
 - No spinners. A click that leaves the page switches Advance to the loading look immediately (`is-loading`, label `STARTING…`) and ignores repeat clicks.
 - Blue belongs to RT. Do not use the rating blue for chrome, links, or navigation.
-- Reward gold (`--reward-gold`) is only for milestone and season-peak reward tiers and exceptional stat gains. It is never for buttons, Advance (green), "yours" (navy), choice controls, everyday / weekly chrome, or Home Base chrome. It is the one reward token: tints are `color-mix()` at the point of use, so there are no gold tint or shadow tokens.
+- Reward gold (`--reward-gold`) is only for milestone and season-peak reward tiers, exceptional stat gains and senior-tribute title marks. It is never for buttons, Advance (green), "yours" (navy), choice controls, everyday / weekly chrome, or Home Base chrome. It is the one reward token: tints are `color-mix()` at the point of use, so there are no gold tint or shadow tokens.
 - Live gameplay has no shell. The court never mounts `.app`, `.top`, or `.rail`.
 - Navigation is two levels: a rail section, then a sub-tab. Do not add a third level.
 - Attribute digits stay on the first-digit scale (`attributeDisplay.js`). Player RT stays a letter grade (`rtBucket.js`).
@@ -16,8 +16,30 @@ Version 1. How to build franchise screens. The look lives in [Styleguide.md](Sty
 ## Colour law
 
 The canonical law is [Styleguide.md#colour-law](Styleguide.md#colour-law); read it before touching colour.
-In short: green is the one Advance plus positive data; orange is saved/committed only; navy is "yours"; blue is RT A / 9+ / elite only; `--reward-gold` is the five reward surfaces only. Choice controls, status codes, W/L plates and ▲/▼ deltas stay neutral, and team colour never washes a card.
+In short: green is the one Advance plus positive data; orange is saved/committed only; navy is "yours" and what you picked; blue is RT A / 9+ / elite only; `--reward-gold` is the six reward surfaces only. Choice controls, status codes, W/L plates and ▲/▼ deltas stay neutral, and team colour never washes a card. That line is a reminder, not the law: if it and the Styleguide differ, the Styleguide wins.
 `scripts/check_ui_tokens.py --strict` enforces it on new-design files (§8). Annotate a legal exception with `/* colour-law: positive-data | committed | saved | reward */`.
+
+### Settled rulings (2026-10-01)
+
+Jamie's rulings (`reports/jamie-decisions-2026-10-01.md`) and the same day's gallery fixes. **The rule for each is in the Styleguide** ([Settled 2026-10-01](Styleguide.md#settled-2026-10-01) links every one to its section). This table is only where each was built and what guards it.
+
+| # | Ruling | Built in | Guard |
+|---|---|---|---|
+| 1 | Navy for what you picked | Set Lineup on-court / selected rows (`set-lineup.css`). Plays in your Playcall Center, their slot number and the call-sheet rows (`#playbooks-view .play.on`, `.slot`, `.csr` in `playbooks.css`). Your lean-ladder slot (`.lb-slot.is-you`, `.is-you-list`, `.recruit-stand-*` in `recruiting-lean-ladder.css`; `--you-edge` in `recruiting-spine.css`). Your leaderboard row (`.alb-row.is-current`). Your team in a bracket (`.fcc-tb-*--user` in the frozen FCC sheet and `css/gob-views.css`; the big-news modal passes `userConnectorNavy`). | `jamie-rulings-batch.spec.js` |
+| 2 | Shot-share ramp kept | `getPswColor()` in `common.js`, the `.psw-*` pills, `css/playbook-cmd.css`. Kept as they are. Not a migration target. | none |
+| 3 | Court game-state colours kept as data | "Live-game screen chrome" below. | the five equivalence specs |
+| 4 | Court side panels on blue-black surfaces | `court.html`, "Live-game screen chrome" below. | `court-panel-tokens.spec.js` |
+| 5 | Court stat toggles neutral | `court.html` `.toggle-btn.active`, `.team-toggle-btn.active`. | `court-panel-tokens.spec.js` |
+| 6 | Senior-tribute title marks gold | `.st-titles s`, `.st-cti s` in `css/senior-tribute.css`, annotated `reward`. | `jamie-rulings-batch.spec.js` |
+| 7 | Recruiting presence dot neutral | `.inbox-badge` in `franchise-command-center.css`. Under the shell the dot only sits on the hidden legacy tab button, so nothing shows on the rail today. The rail count badge (`.office-rail-count`, `--badge`) is a different element and is unchanged. | `jamie-rulings-batch.spec.js`, `fcc-recruiting-layout.spec.js` |
+| 8 | Big-news modal button neutral | `.bn-cta` in `css/big-news-modals.css`. The emblem, eyebrow and title glow keep the gold. | `jamie-rulings-batch.spec.js` |
+| 9 | Submit Training green | `/training.html`. Its sound stays `SFX_COMMIT` (§3): the colour ruling did not change the sound. | none |
+| 10 | Twin pages deleted | `homepage-v3.html` and `play-builder.html` (V1) are gone. `/play-builder.html` → `/play-builder-v2.html` and `/homepage-v3(.html)` → `/` in `netlify.toml` and `FrontEnd/static/_redirects`; the V1 path also in `BackEnd/api/play_routes.py` and in the local static middleware's `retired_pages` (`BackEnd/api/api.py`), because that middleware answers a missing `.html` before any router runs. | `tests/test_play_builder_redirect.py`, `jamie-rulings-batch.spec.js` |
+| 11 | Desktop app icon | `desktop/build/icon.icns`, `icon.ico`, `icon.png` from `icon-source-1024.png`. `desktop/pack.js` picks them up when they exist. | `tests/test_desktop_shell_local.py` |
+| — | Franchise Set Lineup starts empty | "Set Lineup" below. | none |
+| — | One empty-state card | "Empty states" below. | `desktop-gallery-fixes.spec.js` |
+
+**Pending audit** (ruled, not on `develop` when this was written): Save buttons neutral until something has changed; team art `logo_square` → `logo_primary` fallback. Neither is described below yet.
 
 ### Live-game overlays (court.html DOM)
 
@@ -29,7 +51,7 @@ The live-game DOM overlays built with `createElement` in `js/phaser/utils/` are 
 - Kept as data: team-colour name bars / badges / favor arrows (identification), the RT ramp (`matchupsUiShared.js` fallbacks), and the broadcast's 5-colour data palette.
 - **Sim-safety:** visual-only; the five equivalence specs (`game-winner`, `sim-broadcast-fit`, `court-layout`, `game-start-sequence`, `sim-team-callouts` = 55) must stay byte-identical before/after.
 - These are **legacy JS**, not on the `check_ui_tokens` new-design surface (do not add them to it — it would newly gate legacy files).
-- **Game-state category (Jamie ruling #3, settled 2026-10-01):** live-court game-state colours — the Sim broadcast's spotlight/"POSS"/"SPOT" **orange**, "FOUL TROUBLE" **gold**, highlights-toggle-on **green**, and the court HUD/ribbon/momentum/clock colours (see "Live-game screen chrome" below) — are a documented **game-state** data category, exempt from the everyday law (like the RT ramp and the Sim-broadcast palette) and **not recoloured**. Annotate new game-state colour `/* colour-law: game-state */`.
+- **Game-state colours** in these overlays (the Sim broadcast's spotlight / "POSS" / "SPOT" orange, "FOUL TROUBLE" gold, highlights-toggle-on green) are data and are not recoloured (ruling #3). The rule and the full list are in "Live-game screen chrome" below.
 
 ### Live-game screen chrome (court.html)
 
@@ -116,7 +138,7 @@ Rail order: Office, Team, Prep, League, Recruiting, News, then the utility group
 
 `.gob-1280`: the grid column stays `--rail-w`. Labels are hidden. `title` tooltips remain. Hover or keyboard focus (`:focus-visible`) waits 400ms, then the overlay face widens from `--rail-w` to 200px in one `--dur-rail` (180ms) `--ease-out` transition. Labels fade in on that same timing. They do not change the face width. Collapse is one motion as well: 120ms after the pointer leaves (or focus clears), the face narrows with `--dur-rail`. The overlay must not change `.main`'s rectangle. `prefers-reduced-motion` makes the change instant. `.gob-1920`: the rail is `--rail-w` with labels visible.
 
-Recruiting carries the existing `.inbox-badge` when `recruitingIsPrompted` is true. That is a presence dot, not a count. Do not pulse it unless a field already says the recruiting task gates Advance. Turning Advance into the recruiting task is the gating; it is not a pulse signal.
+Recruiting carries the existing `.inbox-badge` when `recruitingIsPrompted` is true. That is a presence dot, not a count, and it is neutral (ruling #7). Do not pulse it unless a field already says the recruiting task gates Advance. Turning Advance into the recruiting task is the gating; it is not a pulse signal.
 
 Sub-tabs sit in `.pg-head` (sticky title plus `.subtabs`). Office has no sub-tab row. Recruiting is a rail item that leaves the page: it calls the existing `openRecruitingSurface` (`GOBNav.go` to the recruiting URL the app already builds). On that page the row is Pool, Leans, and Visits. On the Office, link sub-tabs call `GOBNav.go` with the href the page already built. On a standalone browse page, a link sub-tab uses `GOBNav.replace`: an Office tab goes to `franchise-command-center.html?tab=<id>`, and a link sub-tab goes to that standalone page. Recruiting's own Pool, Leans, and Visits stay on `recruiting.html` and do not use `GOBNav.replace`. Rail section clicks on a standalone page `GOBNav.go` to that section's first Office tab (or to recruiting). There is no Players | Team toggle.
 
@@ -169,7 +191,7 @@ The shared tab module also serves any other command center that calls `initComma
 | Prep | Game Plan | `game-plan-view` (real module: `game-plan.js` `init(root)`; `game-plan.html` redirects here). `?tab=game-plan-tab` opens this view. `game-plan.html` with `resume_from_timeout=true` or `mode=tutorial` does not redirect and stays focus, with no rail and no underline row. |
 | Prep | Playbooks | `playbooks-view` (real module: `playbooks.js` `init(root)`; `playbooks.html` redirects here). `?tab=playbooks-tab` opens this view. `playbooks.html` with `mode=tutorial` does not redirect and stays on the file (browse chrome). |
 | Prep | Scouting Report | `scouting-view` (in-page module view). The underline tab replaces. |
-| League | Standings | `standings-view` (in-page module view; `standings.html` redirects here and keeps `franchise_id`, `team_id`, and return params). `?tab=standings-tab` still opens the old panel. |
+| League | Standings | `standings-view` (in-page module view; `standings.html` redirects here and keeps `franchise_id`, `team_id`, and return params). `?tab=standings-tab` remaps here (`canonicalTab`); the old panel is gone. |
 | League | Rankings | `rankings-view` (in-page module view; `rankings.html` redirects here and keeps `franchise_id`, `team_id`, and return params) |
 | League | Leaders | `leaders-view` (in-page module view; `leaders.html` redirects here). `?tab=awards-tab` still opens the old panel. |
 | League | Team Stats | `team-stats-view` (in-page module view; `team-stats.html` and `stats.html` redirect here and keep `franchise_id`, `team_id`, and `week`). `?tab=fcc-team-stats-summary-tab` still opens the old panel. |
@@ -455,7 +477,7 @@ Awards reads `GET /franchise/awards` (`@browse_cached`). Before week 35 the rout
 
 ### Save feedback
 
-A save inside the command center confirms with `GOBToast.show(text)` (`js/shared/gobToast.js`, `css/gob-toast.css`): one short line such as "Playbooks saved", neutral chrome (`--surface-popover`, `--shadow-popover`, `--text-87`; no orange, no green, no icon), `role="status"` with `aria-live="polite"`. It is fixed over the centre of `.main`, `--dsp-24` above the bottom, so it never shifts layout. It fades after `GOBToast.SHOW_MS` (1500ms); a second call restarts the timer. The class is `.gob-save-toast`, because the tutorials' `.gob-toast` is unscoped. A hosted save stays on the view. A failed save uses the same toast with a short retry line. Standalone pages that still load `game-plan.html` or `playbooks.html` directly keep their own `#toast` and navigation. Playbooks choice chrome (Offense/Defense tabs, weight sliders, the open-row highlight) stays neutral; only the enabled Save button uses `--orange`. Game Plan choice chrome (strategy sliders, shot-diet tip, selected knob) stays neutral; only Save Game Plan uses `--orange`. Scouting choice chrome (Attributes / Stats) stays neutral; attribute tiles keep the shared RT ramp (blue for A / 9+ / elite).
+A save inside the command center confirms with `GOBToast.show(text)` (`js/shared/gobToast.js`, `css/gob-toast.css`): one short line such as "Playbooks saved", neutral chrome (`--surface-popover`, `--shadow-popover`, `--text-87`; no orange, no green, no icon), `role="status"` with `aria-live="polite"`. It is fixed over the centre of `.main`, `--dsp-24` above the bottom, so it never shifts layout. It fades after `GOBToast.SHOW_MS` (1500ms); a second call restarts the timer. The class is `.gob-save-toast`, because the tutorials' `.gob-toast` is unscoped. A hosted save stays on the view. A failed save uses the same toast with a short retry line. Standalone pages that still load `game-plan.html` or `playbooks.html` directly keep their own `#toast` and navigation. Playbooks choice chrome (Offense/Defense tabs, weight sliders, the open-row highlight) stays neutral; only the enabled Save button uses `--orange`. A play in your Playcall Center (`.play.on`), its slot number and the call-sheet rows (`.csr`) are navy with a `--navy-hi` edge: you picked them (ruling #1). Game Plan choice chrome (strategy sliders, shot-diet tip, selected knob) stays neutral; only Save Game Plan uses `--orange`. Scouting choice chrome (Attributes / Stats) stays neutral; attribute tiles keep the shared RT ramp (blue for A / 9+ / elite).
 
 Unsaved-edit leave: see §6 (`warnOnLeave`, `GOBLeaveConfirm`). Game Plan and Playbooks register a confirm for their view. Training saves each edit as its session draft and restores it on the next open.
 
@@ -592,12 +614,12 @@ The Electron shell and the ops pages are on the design system. `desktop/splash.h
 Peel 2 (2026-10-01), what the sheet and its neighbours now assume:
 
 - **A rule is dead only when grep proves it.** Either a class / id in the selector has no mention in any html or js under `FrontEnd/static`, or the selector hangs off an id nothing creates. A rule that only fails to match at runtime stays.
-- **Old tab panels still in the markup keep their rules:** `#home-tab`, `#standings-tab`, `#fcc-team-stats-summary-tab`, `#awards-tab` (old `?tab=` links still reach them).
-- **`.inbox-badge` is `--badge`**, the rail count-badge token. The recruiting link focus ring, the "New" lean badge and the standings team link are neutral.
+- **Old tab panels still in the markup keep their rules:** `#home-tab`, `#fcc-team-stats-summary-tab`, `#awards-tab` (old `?tab=` links still reach them). `#standings-tab` was removed on 2026-10-01; its `.fcc-standings-*` rules are now unused and can go in the next peel.
+- **`.inbox-badge` is neutral** (`--text-100`; ruling #7). The recruiting link focus ring and the "New" lean badge are neutral.
 - **"This Franchise No Longer Exists"** (`#fcc-franchise-gone`) is on tokens with a neutral plate button. Leaving a dead franchise is not Advance.
 - **Attribute tiles (`css/attr-tiles.css`):** the tier ramp is the only colour. Sort arrows and focus rings are neutral. Values stay literal because `team-roster-view.html` loads the sheet without tokens.
-- **Senior tribute title marks are neutral** (title counts are data). Green stays on `.st-advance` only.
-- **Still green or navy on purpose, left for the navy ruling:** the bracket's `.fcc-tb-*--user` rows (green) and the lean ladder's `.is-you` / `.you1` / `.list` (literal navy). `#franchise-container .hero-btn` is the Advance fallback before the shell moves `#play-now`.
+- **Senior tribute title marks are reward gold** (ruling #6). Green stays on `.st-advance` only.
+- **"Yours" is navy from the tokens** (ruling #1): the bracket's `.fcc-tb-*--user` rows and the lean ladder's `.is-you` / `.you1` / `.list`. `#franchise-container .hero-btn` is the Advance fallback before the shell moves `#play-now`, and is the only law hit left in the sheet.
 
 ### Lessons
 
@@ -613,10 +635,11 @@ Peel 2 (2026-10-01), what the sheet and its neighbours now assume:
 
 - **Play Game (`#play-now`, `.lineup-btn-advance`) is the one Advance — green.** Nothing else on the page is green except positive-data ramps.
 - **Choice controls are neutral.** The Game / Attributes / Stats view toggle, Autoset Lineup (a non-advancing action, *not* a save — this overrides the token comment's "non-advancing actions" orange allowance per the colour law), position slots, and the FT-shooter lock badge carry no green or orange.
-- **Selection is navy.** On-court rows and the selected-row left edge use `--navy` (the "selected row" structure colour), not orange. The active drop target (`.slot.drag-over`, `tr.drag-over`) is a navy tint.
+- **Selection is navy** (ruling #1, settled). On-court rows carry a `--navy` tint and a `--navy-hi` left edge; a selected row has the same edge. Never orange. The active drop target (`.slot.drag-over`, `tr.drag-over`) is a navy tint.
 - **Energy / next-game readiness is a data ramp.** High is positive data (`--green`, annotated), then yellow, then an amber `color-mix`, then `--red` — the ramp never uses raw orange.
 - **RT stays blue** via `rt-buckets.css` (`.rt-*`), the sanctioned A-grade / 9+ / elite colour.
 - There is **no save state** on this page (the lineup persists through the flow, confirmed by a neutral toast), so orange has no home here.
+- **A franchise lineup starts empty, by design** (settled 2026-10-01). The page opens with five empty slots and every player on the bench; the coach fills them or presses Autoset Lineup. Only `mode=tutorial` autosets on load (`set-lineup.js`). Do not add a franchise preset.
 - `set-lineup.css` is on the design system (`NEW_DESIGN_CSS` in `check_ui_tokens.py`); `set-lineup.html` is already new-design via `gobShell.js` PAGES.
 
 ### Team Builder
@@ -728,13 +751,13 @@ Not on tokens, on purpose: the Feedback button, its pulse and the Feedback modal
 | PCC chip, dock share bar, overall grade, primary position value, section rules and subheads, position pills (`.pd-pos-pill`) | neutral | Information codes / data. No per-position colour. |
 | "At least 1 required" (`.tp-warn`) | `--red` | Invalid. |
 | Edit Playbooks (`.report-btn-primary`) | neutral white plate | Navigation. |
-| CMD bars (`.tp-cmd-fill`) | `--tier-yellow` / `--tier-green` / `--blue` | Unchanged hues; same open ramp question as `getPswColor`. |
+| CMD bars (`.tp-cmd-fill`) | `--tier-yellow` / `--tier-green` / `--blue` | Unchanged hues. A data ramp, kept (ruling #2). |
 
-- Not migrated: `play-details.html` (pending the inspector decision) and the Expected Shot Distribution pills (`getPswColor`, `.psw-*` in `resource-pages.css`).
+- Not migrated: `play-details.html` (pending the inspector decision). The Expected Shot Distribution pills (`getPswColor`, `.psw-*` in `resource-pages.css`) are not a migration target: the shot-share ramp is kept as a data ramp (ruling #2; [Styleguide, Data scales](Styleguide.md#data-scales)).
 
 ### Empty states
 
-One shared pattern: `.gob-empty` (`css/gob-tables.css`), a neutral card: `--white-2` fill, 1px `--line` border, `--radius-10`, `--text-60` body text at `--fs-14`. No icon, no colour, one short sentence. Use it wherever a view or board has nothing to show:
+One shared pattern: `.gob-empty` (`css/gob-tables.css`). Its look is in the [Styleguide, Empty states](Styleguide.md#empty-states). Use it wherever a view or board has nothing to show, with one short sentence:
 
 - Team › Practice Squad before it opens, News › Awards before week 35, League › Standings with no rows.
 - League › Leaders: a board with no qualified leader shows `No leaders yet.` and drops its "Full list →" (the rate floors in §13 leave FG% / DEF% empty at zero team games; per-game boards are empty before the first game).

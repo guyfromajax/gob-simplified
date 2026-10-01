@@ -392,6 +392,7 @@ function cloneParams(params) {
         topData: Object.assign({}, topData, { week: payload.display_week || topData.week }),
         revealMode: !!revealMode,
         tierHint: payload.tier,
+        userConnectorNavy: true,
       });
     } else {
       scale.innerHTML = '<p>Tournament bracket UI not loaded.</p>';

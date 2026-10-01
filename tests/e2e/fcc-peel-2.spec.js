@@ -246,7 +246,8 @@ test.describe('FCC peel 2', () => {
     }
   });
 
-  test('recruiting presence dot paints from --badge', async ({ page }, testInfo) => {
+  // Ruling 2026-10-01 (#7): the presence dot is neutral. It was orange through --badge.
+  test('recruiting presence dot is neutral', async ({ page }, testInfo) => {
     const captureShots = testInfo.repeatEachIndex === 0;
     await stubAuth(page);
     // Unseen wire events with nothing pending: the tab carries .inbox-badge, not a count.
@@ -256,13 +257,11 @@ test.describe('FCC peel 2', () => {
     await open(page, 'roster-view', '#roster-view table tbody tr');
     await page.waitForSelector('.inbox-badge', { state: 'attached', timeout: 15000 });
     if (captureShots) await shot(page, 'presence-dot-1280.png');
-    const badge = await paint(page, '.inbox-badge');
-    expect(badge.bg).toBe(ORANGE_RGB);
     if (BEFORE) return;
-    const token = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--badge').trim());
-    expect(token).not.toBe('');
-    // Chrome reports a color-mix() shadow as color(srgb r g b / a).
-    expect(badge.shadow).toMatch(/color\(srgb 0\.96\d* 0\.58\d* 0\.12\d* \/ 0\.7\)|rgba\(247, 148, 32, 0\.7\)/);
+    const badge = await paint(page, '.inbox-badge');
+    expect(badge.bg).toBe('rgb(255, 255, 255)');
+    expect(badge.bg).not.toBe(ORANGE_RGB);
+    expect(badge.shadow).not.toMatch(/247,\s*148,\s*32|srgb 0\.96\d* 0\.58\d* 0\.12/);
   });
 
   test('neutralised pieces carry no green or orange', async ({ page }) => {
@@ -327,7 +326,8 @@ test.describe('FCC peel 2', () => {
     expect(got.sortArrow.color).not.toMatch(ORANGE);
     expect(got.title.bg).not.toMatch(ORANGE);
     expect(got.cti.bg).not.toMatch(ORANGE);
-    expect(got.title.bg).toBe('rgb(247, 249, 255)');
+    // Ruling 2026-10-01 (#6): title marks are reward gold.
+    expect(got.title.bg).toBe('rgb(240, 197, 96)');
     expect(Object.keys(got.rings).length).toBeGreaterThanOrEqual(4);
     for (const sel of Object.keys(got.rings)) {
       expect(got.rings[sel], sel).not.toMatch(/247,\s*148,\s*32|#f79420|34c77a|52,\s*199,\s*122/i);
@@ -339,8 +339,8 @@ test.describe('FCC peel 2', () => {
     expect(got.tok.color).toBe('rgba(255, 255, 255, 0.62)');
     expect(got.tok.bg).toBe('rgba(255, 255, 255, 0.06)');
     expect(got.lock.color).toBe('rgb(255, 109, 109)');
-    // "Yours" was skipped on purpose: still the literal navy.
-    expect(got.you.bg).toBe('rgba(39, 64, 142, 0.28)');
+    // Ruling 2026-10-01 (#1): "yours" is --navy from the tokens (28% tint, solid chip).
+    expect(got.you.bg).toMatch(/rgba\(39, 64, 142, 0\.28\)|srgb 0\.15\d* 0\.25\d* 0\.55\d* \/ 0\.28/);
     expect(got.youTok.bg).toBe('rgb(39, 64, 142)');
   });
 

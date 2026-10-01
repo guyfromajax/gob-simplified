@@ -2,8 +2,8 @@
 API routes for managing plays (offensive play skeletons).
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
 
@@ -45,9 +45,10 @@ def serve_play_builder_v2():
 
 
 @router.get("/play-builder.html")
-def serve_play_builder():
-    """Serve the Play Builder V1 HTML page."""
-    return FileResponse(STATIC_DIR / "play-builder.html")
+def redirect_play_builder_v1(request: Request):
+    """Play Builder V1 is gone. Its path lands on V2, query string kept."""
+    query = request.url.query
+    return RedirectResponse("/play-builder-v2.html" + (f"?{query}" if query else ""), status_code=301)
 
 
 class PlayCreate(BaseModel):
