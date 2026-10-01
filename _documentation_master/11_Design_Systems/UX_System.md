@@ -599,7 +599,17 @@ The Electron shell and the ops pages are on the design system. `desktop/splash.h
 
 ### franchise-command-center.css freeze — live
 
-`FrontEnd/static/franchise-command-center.css` is frozen. No new rules. Put new styles in the view's own CSS. `scripts/check_ui_tokens.py --strict --no-write` fails if the file grows past `FCC_CSS_MAX_LINES` / `FCC_CSS_MAX_RULES` (live ceilings: 2261 lines, 293 style rules). Ceilings may shrink; they must not grow.
+`FrontEnd/static/franchise-command-center.css` is frozen. No new rules. Put new styles in the view's own CSS. `scripts/check_ui_tokens.py --strict --no-write` fails if the file grows past `FCC_CSS_MAX_LINES` / `FCC_CSS_MAX_RULES` (live ceilings: 1779 lines, 230 style rules). Ceilings may shrink; they must not grow.
+
+Peel 2 (2026-10-01), what the sheet and its neighbours now assume:
+
+- **A rule is dead only when grep proves it.** Either a class / id in the selector has no mention in any html or js under `FrontEnd/static`, or the selector hangs off an id nothing creates. A rule that only fails to match at runtime stays.
+- **Old tab panels still in the markup keep their rules:** `#home-tab`, `#standings-tab`, `#fcc-team-stats-summary-tab`, `#awards-tab` (old `?tab=` links still reach them).
+- **`.inbox-badge` is `--badge`**, the rail count-badge token. The recruiting link focus ring, the "New" lean badge and the standings team link are neutral.
+- **"This Franchise No Longer Exists"** (`#fcc-franchise-gone`) is on tokens with a neutral plate button. Leaving a dead franchise is not Advance.
+- **Attribute tiles (`css/attr-tiles.css`):** the tier ramp is the only colour. Sort arrows and focus rings are neutral. Values stay literal because `team-roster-view.html` loads the sheet without tokens.
+- **Senior tribute title marks are neutral** (title counts are data). Green stays on `.st-advance` only.
+- **Still green or navy on purpose, left for the navy ruling:** the bracket's `.fcc-tb-*--user` rows (green) and the lean ladder's `.is-you` / `.you1` / `.list` (literal navy). `#franchise-container .hero-btn` is the Advance fallback before the shell moves `#play-now`.
 
 ### Lessons
 

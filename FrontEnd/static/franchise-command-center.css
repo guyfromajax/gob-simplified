@@ -11,8 +11,6 @@
   --fcc-panel-border: rgba(255, 255, 255, 0.18);
   --fcc-text: #f7f9ff;
   --fcc-muted: rgba(255, 255, 255, 0.72);
-  --fcc-metal: #9a9a9a;
-  --fcc-shadow: 0 18px 36px rgba(0, 0, 0, 0.26);
 }
 
 body {
@@ -412,20 +410,7 @@ body.has-auth-bar #franchise-container {
   text-align: center;
 }
 
-.fcc-recruiting-footnote__btn.is-dead{
-  opacity: 0.45;
-  cursor: default;
-  text-decoration: none;
-}
-
 /* Embedded footnotes: Coach's Office Recruiting card + Recruits tab */
-
-#franchise-container #home-tab .fcc-home-card-recruiting .fcc-recruiting-footnote--embed {
-  margin-top: 10px;
-  padding-top: 10px;
-  justify-content: flex-start;
-  text-align: left;
-}
 
 #franchise-container .tab-buttons {
   display: grid;
@@ -492,8 +477,8 @@ body.has-auth-bar #franchise-container {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #f79420;
-  box-shadow: 0 0 6px rgba(247, 148, 32, 0.7);
+  background: var(--badge);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--badge) 70%, transparent);
   animation: inboxBadgePulse 2.5s infinite;
 }
 
@@ -508,33 +493,6 @@ body.has-auth-bar #franchise-container {
     opacity: 0.6;
     transform: scale(0.85);
   }
-}
-
-#franchise-container #playbooks-franchise {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container #playbooks-franchise.needs-playbook-save {
-  border-color: rgba(247, 148, 32, 0.45);
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.09);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-#franchise-container #playbooks-franchise.active {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  transform: translateY(-2px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-#franchise-container #playbooks-franchise.active.needs-playbook-save {
-  border-color: rgba(247, 148, 32, 0.55);
-  color: #ffffff;
 }
 
 #franchise-container .tab-content {
@@ -559,10 +517,6 @@ body.has-auth-bar #franchise-container {
 #franchise-container #tournament-tabs > .tab-content.active > * {
   flex: 0 0 auto;
   min-width: 0;
-}
-
-#franchise-container .fcc-scouting-layout > .fcc-data-card {
-  flex: 0 0 auto;
 }
 
 /* Table wrappers scroll horizontally only; vertical scroll stays on the tab panel */
@@ -604,53 +558,6 @@ body.has-auth-bar #franchise-container {
 
 #home-tab {
   min-height: 0;
-}
-
-#franchise-container #home-tab .fcc-home-card h3 {
-  margin: 0 0 18px;
-  color: #ffffff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
-  font-size: 16px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-#franchise-container #home-tab .fcc-home-card-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-#franchise-container #home-tab .fcc-home-card-head h3 {
-  margin: 0;
-}
-
-/* Tournament tier lockup in the Next/Last Game card headers — Surface B.
-   Right-justified on the same row as the <h3>; collapses when empty so the
-   header renders exactly as before with no tournament active. */
-#franchise-container #home-tab .fcc-home-card-head--tier {
-  align-items: center;
-}
-#franchise-container #home-tab .fcc-card-tier-lockup {
-  flex: 0 0 auto;
-}
-#franchise-container #home-tab .fcc-card-tier-lockup:empty {
-  display: none;
-}
-
-#franchise-container #home-tab .fcc-home-card-link {
-  flex-shrink: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-}
-
-#franchise-container #home-tab .fcc-home-card-link:hover {
-  text-decoration: underline;
 }
 
 /* News tab: full-season list of stories grouped by week */
@@ -711,31 +618,7 @@ body.has-auth-bar #franchise-container {
   visibility: visible;
 }
 
-.fcc-home-matchup-top .team-tooltip-host {
-  justify-self: end;
-}
-
-#franchise-container #home-tab .fcc-home-leaders-head {
-  align-items: center;
-}
-
 /* FCC Tournament tab: bracket mount (styles in .fcc-tb-* below) */
-#tournament-bracket-container.bracket,
-#fcc-tournament-bracket.fcc-tournament-bracket,
-#all-brackets-root.fcc-tournament-bracket {
-  padding-top: 8px;
-  padding-bottom: 16px;
-  min-height: 500px;
-}
-
-#fcc-tournament-bracket.fcc-tournament-bracket,
-#all-brackets-root.fcc-tournament-bracket{
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  width: 100%;
-  overflow-x: auto;
-}
 
 .fcc-tournament-empty-msg {
   margin: 0;
@@ -759,10 +642,6 @@ body.has-auth-bar #franchise-container {
   color: #1f2937;
 }
 
-.fcc-data-card.fcc-tournament-card .fcc-tournament-card-body {
-  min-height: 0;
-}
-
 .fcc-tournament-divider {
   border: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
@@ -770,19 +649,8 @@ body.has-auth-bar #franchise-container {
 }
 
 /* ===== FCC Tournament — Style A (Classic horizontal), .fcc-tb-* ===== */
-.fcc-data-card.fcc-tournament-card .fcc-tournament-divider,
 .resource-page-container .fcc-tournament-divider {
   border-top-color: rgba(255, 255, 255, 0.14);
-}
-
-.fcc-data-card.fcc-tournament-card .fcc-tournament-section.fcc-tb-tier {
-  position: relative;
-  isolation: isolate;
-  padding: 12px 0 16px;
-  background: transparent;
-  border-radius: 16px;
-  --tb-intensity: 0.62;
-  --tb-champ-scale: 1;
 }
 
 .fcc-tb-tier[data-tb-tier='region'] {
@@ -1347,10 +1215,6 @@ body.has-auth-bar #franchise-container {
   color: #fff;
 }
 
-.rankings-list li .rankings-team.conference-1 {
-  font-weight: bold;
-}
-
 /* Standings tab: region toggles and conference sections */
 
 .standings-region-btn {
@@ -1503,8 +1367,7 @@ body.has-auth-bar #franchise-container {
   padding: 0;
 }
 
-#franchise-container #player-stats-tab table.stats-table,
-#franchise-container #fcc-team-stats-summary-tab table.stats-table{
+#franchise-container #fcc-team-stats-summary-tab table.stats-table {
   margin: 0;
   min-width: 1180px;
   width: max(100%, 1180px);
@@ -1512,8 +1375,7 @@ body.has-auth-bar #franchise-container {
   border-spacing: 0;
 }
 
-#franchise-container #player-stats-tab table.stats-table thead th,
-#franchise-container #fcc-team-stats-summary-tab table.stats-table thead th{
+#franchise-container #fcc-team-stats-summary-tab table.stats-table thead th {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -1529,8 +1391,7 @@ body.has-auth-bar #franchise-container {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
 }
 
-#franchise-container #player-stats-tab table.stats-table tbody td,
-#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td{
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td {
   padding: 9px 10px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
@@ -1540,38 +1401,31 @@ body.has-auth-bar #franchise-container {
   background: transparent;
 }
 
-#franchise-container #player-stats-tab table.stats-table tbody tr:nth-child(odd),
-#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody tr:nth-child(odd){
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody tr:nth-child(odd) {
   background: rgba(255, 255, 255, 0.03);
 }
 
-#franchise-container #player-stats-tab table.stats-table tbody tr:hover td,
-#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody tr:hover td{
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody tr:hover td {
   background: rgba(255, 255, 255, 0.04);
 }
 
-#franchise-container #player-stats-tab table.stats-table thead th:first-child,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table thead th:first-child,
-#franchise-container #player-stats-tab table.stats-table tbody td:first-child,
-#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child{
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child {
   text-align: left;
   padding-left: 16px;
 }
 
-#franchise-container #player-stats-tab table.stats-table tbody td:first-child,
-#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child{
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child {
   font-weight: 700;
   color: #ffffff;
 }
 
-#franchise-container #player-stats-tab table.stats-table tbody td:first-child a,
-#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child a{
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child a {
   color: #ffffff;
   text-decoration: none;
 }
 
-#franchise-container #player-stats-tab table.stats-table tbody td:first-child a:hover,
-#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child a:hover{
+#franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child a:hover {
   text-decoration: underline;
 }
 
@@ -1612,122 +1466,6 @@ body.has-auth-bar #franchise-container {
 
 #franchise-container .fcc-scouting-p5-body {
   padding: 14px;
-}
-
-#franchise-container #coaches-tab .scouting-projected-lineup-wrap {
-  min-width: 0;
-}
-
-#franchise-container .fcc-scouting-radar-host .tm-radar-wrap {
-  min-height: 460px;
-}
-
-#franchise-container #coaches-tab .tm-radar-axis-label{
-  font-size: 18px;
-}
-
-#franchise-container #coaches-tab .scouting-projected-lineup-wrap {
-  padding: 0;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table {
-  width: max(100%, 960px);
-  min-width: 960px;
-  margin: 0;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: transparent;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table thead th,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 12px 10px 10px;
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody td,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody td {
-  padding: 9px 10px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: transparent;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody tr:nth-child(odd),
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody tr:nth-child(even),
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:nth-child(even) {
-  background: transparent;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody tr:nth-child(even) td,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:nth-child(even) td {
-  background: transparent;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody tr:hover td,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-#franchise-container #coaches-tab .scouting-projected-table th:first-child,
-#franchise-container #coaches-tab .scouting-projected-table td:first-child,
-#franchise-container #coaches-tab .scouting-projected-table th:nth-child(2),
-#franchise-container #coaches-tab .scouting-projected-table td:nth-child(2),
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table th:first-child,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table td:first-child {
-  text-align: left;
-  padding-left: 16px;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody td:nth-child(2),
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody td:first-child {
-  color: #ffffff;
-  font-weight: 700;
-}
-
-#franchise-container #coaches-tab .scouting-projected-empty {
-  padding: 18px 16px;
-  color: rgba(255, 255, 255, 0.72);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-#franchise-container .fcc-psw-strip .psw-group-label {
-  color: rgba(255,255,255,0.35);
-}
-
-@media (max-width: 1280px) {
-  
-
-  #franchise-container .fcc-scouting-radar-host .tm-radar-wrap {
-    min-height: 420px;
-  }
-
-  
-
-  
-
-  
 }
 
 #franchise-container .fcc-leaders-card-body {
@@ -1835,144 +1573,7 @@ body.has-auth-bar #franchise-container {
   text-align: center;
 }
 
-/* Stats and Team Traits scope toggles (Conference / Region / National) */
-
-/* Schedule tab: 16 conference toggles (2 rows of 8) */
-
-/* Standings tab: note linking to Resources */
-
-body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x {
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x::-webkit-scrollbar {
-  height: 10px;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.24);
-  border-radius: 999px;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid {
-  width: max-content;
-  min-width: 1600px;
-  margin: 0;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.group-row th {
-  padding: 12px 8px 10px;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: 11px 10px 10px;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th.sortable:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th.active {
-  color: #fff;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead th.col-group-start,
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td.col-group-start {
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td {
-  padding: 9px 10px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: transparent;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td:first-child,
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th:first-child {
-  text-align: left;
-  padding-left: 16px;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td:first-child {
-  font-weight: 700;
-  color: #fff;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td.col-w {
-  color: #9ee8b2;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td.col-l {
-  color: #ffd26c;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-row td {
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.05);
-}
-
 /* Resources tab: 3-column grid, buttons like Game Plan (blue fill, white bold) */
-
-.resources-btn.is-dead{
-  opacity: 0.45;
-  cursor: default;
-  pointer-events: auto;
-  box-shadow: none;
-  filter: grayscale(0.2);
-}
-
-.resources-btn.is-dead:hover{
-  background: linear-gradient(180deg, #4b64ba 0%, #27408e 100%);
-  color: #fff;
-  transform: none;
-}
 
 #franchise-container .tab-content table {
   width: 100%;
@@ -2057,21 +1658,6 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   letter-spacing: 0.02em;
 }
 
-#franchise-container .tm-radar-point.is-pulsing {
-  animation: tmRadarPointPulse 2.2s ease-in-out infinite;
-}
-
-@keyframes tmRadarPointPulse {
-  0%, 100% {
-    opacity: 0.8;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.18);
-  }
-}
-
 @keyframes tmRadarOutlinePulse {
   0%, 100% {
     opacity: 0.82;
@@ -2083,15 +1669,7 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   }
 }
 
-/* ───────── Weekly Invite block (Recruiting surfaces) ───────── */
-
 /* Wide variant — Recruits tab */
-
-@keyframes fcc-invite-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--fcc-invite-accent) 55%, transparent); }
-  70%  { box-shadow: 0 0 0 6px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
 
 /* ───────── Recruit name -> player page links (Recruiting surfaces) ─────────
    Lives here, not recruiting.css: recruiting.html and the FCC don't load that
@@ -2110,74 +1688,22 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 }
 
 .recruit-name-link:focus-visible {
-  outline: 2px solid var(--fcc-newlean-accent, #34c77a);
+  outline: 2px solid var(--white-45);
   outline-offset: 2px;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 /* ───────── New-lean highlight (Recruiting surfaces) ───────── */
-:root { --fcc-newlean-accent: #34c77a; }
+/* Neutral: the law keeps green off badges, and nothing on a live view renders this. */
+:root { --fcc-newlean-accent: var(--text-100); }
 .fcc-newlean-badge {
   display:inline-flex; align-items:center;
   font-family:'JetBrains Mono', monospace; font-size:8.5px; font-weight:700;
   letter-spacing:0.12em; text-transform:uppercase;
-  color:#08130d; background:var(--fcc-newlean-accent);
+  color:var(--bg); background:var(--fcc-newlean-accent);
   padding:2px 6px; border-radius:5px; line-height:1;
 }
-/* Coach's Office card: highlighted row pinned to the top of the leans list */
-
-/* ───────── Wire card: drops, as visible as gains ─────────
-   Same geometry as .fcc-newlean-badge / .fcc-newlean-row on purpose — only the
-   accent token differs. Drops are the reason the card exists; anything quieter than
-   the gain treatment would bury them. */
-:root { --fcc-drop-accent: #ff6d6d; }
-
-/* Neutral movement (rival churn on a ladder you're on) — quieter than either. */
-
-/* Your own signings, once week 35 has run. Same row shape as the wire it replaces —
-   green rail because these are yours, which is the app-wide meaning of that colour. */
-
-/* Recruiting card spans two columns (Standings retired to keep rows of 4). */
-
-/* The wire grows without bound — every week adds events — and a grid row is sized to
-   its items' MAX-content, so an uncapped list drags row 2 off the fold as a season
-   runs. A max-height alone was not enough either: the list still grew INTO the cap,
-   so the card climbed 216px -> 337px over the first dozen events and took row 2 with
-   it. The card body therefore reserves ONE fixed height for every week of the season,
-   and whatever is inside fits itself to that box:
-     - the wire list flex-fills the space left under the status line and scrolls;
-     - the empty state fills it;
-     - Signing Day centres its call to action in it.
-   One number, not one per state — the list height follows the box rather than being
-   a second constant to keep in sync. */
-
-/* Signing Day (week 35): one call to action, centred in the card.
-   The event feed is gone, so nothing competes with the button — the copy sits directly
-   above it and the pair is centred on both axes. The footnote's separator rule and its
-   left alignment are dropped here; both exist to divide it from a list that isn't
-   there. The card keeps the same height as every other week (see the fixed-height
-   block above), so row 2 does not move when the season reaches Signing Day. */
-
-/* Two IDs, to outrank `#franchise-container #home-tab .fcc-home-card-recruiting
-   .fcc-recruiting-footnote--embed` above — its margin-top/padding-top otherwise survive
-   here and push the button below the optical centre of the stack. */
-#franchise-container #home-tab .fcc-home-card--recruiting.is-signing-day .fcc-recruiting-footnote--embed {
-  margin: 0;
-  padding: 0;
-  border-top: none;
-  justify-content: center;
-  text-align: center;
-}
-
-/* ============================================================
-   Roster / Recruiting tabs — sticky identity column.
-   The banding sits on the <tr>, so a transparent sticky cell would show rows
-   sliding underneath it. Each row state needs a SOLID equivalent.
-   ============================================================ */
-
-/* The grouped attribute header is a 2-row grid inside one cell, so it sticks as a unit.
-   It still needs opaque backing or rows bleed through on scroll. */
 
 /* ============================================================
    Advancing To Season N — full-screen rollover cover.
@@ -2251,11 +1777,3 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   .fcc-season-advance__bar i { animation: none; left: 0; width: 100%; opacity: 0.7; }
 }
 
-/* Your team's own dispatches inside News (the retired Inbox tab's contents). Marked apart
-   from league headlines so "my team" and "the league" don't read as one list. */
-
-/* The Training tab is a full-width working surface, not a data table. */
-#franchise-container #fcc-training-dev .fcc-data-card-body { padding: 16px 18px 18px; }
-
-/* Training tab header: title left, the tutorial link right — the same pairing the
-   training page's Player Development section uses. */

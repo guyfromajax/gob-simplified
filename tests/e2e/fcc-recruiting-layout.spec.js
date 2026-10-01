@@ -15,6 +15,8 @@ const path = require('path');
 const STATIC_DIR = path.join(__dirname, '../../FrontEnd/static');
 const HTML = fs.readFileSync(path.join(STATIC_DIR, 'franchise-command-center.html'), 'utf8');
 const CSS = fs.readFileSync(path.join(STATIC_DIR, 'franchise-command-center.css'), 'utf8');
+// The shipped page is html.gob with gob-tokens.css, and the sheet reads tokens (--badge).
+const TOKENS = fs.readFileSync(path.join(STATIC_DIR, 'css/gob-tokens.css'), 'utf8');
 
 /** Pull one balanced element out of the real page by id, so the test can't drift from it. */
 function extractById(html, id) {
@@ -52,6 +54,8 @@ const HOME_GRID = extractById(HTML, 'home-tab');
 async function mount(page, innerHtml, opts = {}) {
   await page.setViewportSize({ width: opts.width || 1440, height: 900 });
   await page.setContent(`
+    <script>document.documentElement.classList.add('gob');</script>
+    <style>${TOKENS}</style>
     <style>${CSS}</style>
     <style>
       body { margin: 0; background: #0b0d14; }
