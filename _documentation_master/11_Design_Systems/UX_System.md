@@ -710,3 +710,21 @@ Tokens reach this chrome three ways: `css/auth-bar.css` imports `gob-tokens.css`
 `account.html` is not part of this: the community pass owns it (see Community pages).
 
 Not on tokens, on purpose: the Feedback button, its pulse and the Feedback modal in `auth-bar.css`, and the local modal system and Leaders By Team modal in `mode-select.css` (alpha-feedback and community surfaces, owned by the community pass); the literal `.gob-modal-*` mirror block in `auth-bar.css` (it must render on pages with no tokens).
+
+### Program select
+
+`franchise-select-team.html` (Find Your Program, the first step of a new franchise and Team Builder step 1 with `?builder=1`) is `html.gob` with `gob-tokens.css`; one sheet, `franchise-select-team.css` (`NEW_DESIGN_CSS`). Same rulings as Team Builder:
+
+| Element | Colour | Why |
+|---|---|---|
+| Enter Franchise, Take This Slot (`#ab-primary`, `.btn.advance`) | green | The one Advance. Take This Slot is Team Builder step 1's Continue. |
+| Selected program card (`.pg.sel`, `.pg-check`) | navy | Selection, as Team Builder and Set Lineup. |
+| Open Team Builder, draft Continue (`.btn`) | neutral white plate | Navigation, not a save or an Advance. |
+| Scout, Clear, Discard, Cancel (`.btn.ghost`, `.mb-x`) | ghost | Secondary. |
+| Filters (search focus, active `.fsel.on`), Clear link, card hover | neutral | Choice controls. |
+| Top Talent / Prestige tier (`.top1`, `.top1t`) | `--text-100`, bold | Information codes; weight, not colour. |
+| Team Builder mode banner (`.mbar`), entry card (`.tbe`), unfinished draft card (`.draft-card`), loading dots | neutral | No orange wash, no blue (RT only). |
+| Error (`.team-select-error`) | `--red` | |
+
+- Team colour appears only in each program's own banner art.
+- `css/team-picker.css` is not loaded anywhere and `TeamPicker.mount` is never called; the picker UI it styled is dead (see the program-select report).
