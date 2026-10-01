@@ -23,7 +23,9 @@ chrome, Chapter 7 chrome (``css/office-home.css``, ``css/home-base.css``,
 ``recruiting-results-hub.css``), the migrated focus/module CSS in
 ``NEW_DESIGN_CSS`` (Prep training/report, Playbooks ``playbooks.css`` /
 ``css/playbook-tiles.css``, ``set-lineup.css``, ``box-score.css``,
-``cut-players.css``, ``team-builder.css``), ``js/shared/gob*.js``, and
+``cut-players.css``, Game Plan ``game-plan.css``, Scouting
+``scouting-report.css`` / ``css/prep-v2-scouting.css``, Team Builder
+``team-builder.css``), ``js/shared/gob*.js``, and
 ``js/shared/views/**``. Everything else under the scan root is legacy.
 ``css/gob-tokens.css`` is the token source and is not scanned.
 
@@ -248,6 +250,9 @@ NEW_DESIGN_CSS = frozenset({
     "css/playbook-tiles.css",
     "box-score.css",
     "cut-players.css",
+    "game-plan.css",
+    "scouting-report.css",
+    "css/prep-v2-scouting.css",
     "team-builder.css",
 })
 

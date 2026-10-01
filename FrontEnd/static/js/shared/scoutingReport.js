@@ -442,7 +442,7 @@ function renderPlayUsage(plays, emptyMessage = 'No previous game data available.
   tbody.innerHTML = '';
 
   if (!plays || plays.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; padding: 20px; color: #666;">${emptyMessage}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colspan}" class="scouting-projected-empty-cell">${emptyMessage}</td></tr>`;
     return;
   }
 
