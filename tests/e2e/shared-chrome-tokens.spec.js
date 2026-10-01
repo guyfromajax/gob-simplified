@@ -259,41 +259,10 @@ test.describe('shared chrome token + colour-law guards', () => {
     }
   });
 
-  test('account modal and toast: neutral switch, accent and save feedback', async ({ page }, testInfo) => {
-    const captureShots = testInfo.repeatEachIndex === 0;
-    await stubAuth(page);
-    await installApis(page);
-    await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto('/tutorial.html');
-    await barReady(page);
-    await page.waitForSelector('#account-settings-overlay', { state: 'attached' });
-
-    // Nothing opens this modal today (the gear opens the Settings panel), but the bar
-    // still builds it and its styles ship in auth-bar.css. Opened by hand here.
-    await page.evaluate(() => {
-      document.getElementById('account-settings-overlay').classList.add('is-visible');
-      document.querySelector('#account-settings-overlay .account-modal-box').classList.add('is-entered');
-      document.getElementById('account-settings-username').textContent = 'e2e';
-      document.getElementById('account-avatar').textContent = 'E';
-    });
-    await page.waitForTimeout(350);
-    if (captureShots) await shot(page, 'account-modal-1280.png');
-    if (!BEFORE) {
-      await expect(page.locator('#account-ambience-switch')).toHaveAttribute('aria-checked', 'true');
-      expectNeutral(await paint(page, '#account-ambience-switch'), 'ambience switch on');
-      expectNeutral(await paint(page, '#account-settings-overlay .gob-modal-accent'), 'account modal accent');
-      expectNeutral(await paint(page, '#account-settings-overlay .gob-modal-box'), 'account modal box');
-    }
-
-    await page.locator('#account-ambience-switch').click();
-    await page.waitForSelector('#account-toast.is-visible');
-    await page.waitForTimeout(350);
-    if (captureShots) await shot(page, 'account-toast-1280.png');
-    if (!BEFORE) {
-      expectNeutral(await paint(page, '#account-toast'), 'account toast');
-      expectNeutral(await paint(page, '#account-toast .account-toast-icon'), 'account toast icon');
-    }
-  });
+  // (Removed) The account-settings modal + save toast were unreachable UI — nothing
+  // opened the modal (the gear opens the Settings panel). The modal, its toast and
+  // their CSS were deleted in chore/dead-ui-cleanup; the shared ambience switch
+  // (.account-switch) is still covered by the account-page test below.
 
   test('FAQ and legal pages, and the shared switch on the account page', async ({ page }, testInfo) => {
     const captureShots = testInfo.repeatEachIndex === 0;
