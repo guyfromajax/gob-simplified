@@ -762,3 +762,9 @@ html.gob-focus body.box-score-page #box-score-view {
     gap: 20px;
   }
 }
+
+/* Back to Locker Room: the standard ghost back link (.brand-back-link), inside
+   the page shell above the first card so it never overlaps it. */
+#box-score-container .box-score-back {
+  margin: 0 0 var(--space-12);
+}

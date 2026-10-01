@@ -246,8 +246,12 @@ export function mount(container, ctx) {
             + '</span><b>' + tables.esc(showValue(stat, row.value)) + '</b></div>';
         });
         html += '</div>';
+        html += '<button type="button" class="full" data-stat="' + tables.esc(stat) + '">Full list →</button>';
+      } else {
+        // No qualified leader yet (preseason, or a rate stat below its floor).
+        html += '<p class="gob-empty">No leaders yet.</p>';
       }
-      html += '<button type="button" class="full" data-stat="' + tables.esc(stat) + '">Full list →</button></article>';
+      html += '</article>';
     });
     html += '</div>';
     container.innerHTML = html;

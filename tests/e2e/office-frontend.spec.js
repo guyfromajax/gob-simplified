@@ -608,7 +608,8 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
       }
       if (name === 'first_week') {
         expect(await page.locator('#office-root .sp-card').count()).toBe(1);
-        expect(await page.locator('#office-root').getByText('Set after camp').count()).toBe(2);
+        // One placeholder line (the duplicated pair read as a bug: gallery-fixes #10).
+        expect(await page.locator('#office-root').getByText('Set after camp').count()).toBe(1);
         expect(await page.locator('#office-root .td-gate').count()).toBe(0);
         expect(await page.locator('#office-root .td-adv').count()).toBe(0);
         expect(await page.locator('#office-root .week-k').count()).toBe(0);
