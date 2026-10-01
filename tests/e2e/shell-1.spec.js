@@ -19,7 +19,7 @@ const TABS = [
   ['playbooks-tab', 'prep', 'playbooks-view'],
   ['scouting-view', 'prep'],
   ['coaches-tab', 'prep', 'scouting-view'],
-  ['standings-tab', 'league'],
+  ['standings-tab', 'league', 'standings-view'],
   ['fcc-team-stats-summary-tab', 'league'],
   ['awards-tab', 'league'],
   ['training-tab', 'prep', 'training-view'],

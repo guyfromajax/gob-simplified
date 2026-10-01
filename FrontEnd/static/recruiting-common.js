@@ -58,13 +58,6 @@ function cloneParams(params) {
     return normalized != null && YEAR_SORT_ORDER[normalized] != null ? YEAR_SORT_ORDER[normalized] : -1;
   }
 
-  function recruitRtClass(rt, year) {
-    if (typeof global.getRecruitRtBucketClassForYear === 'function') {
-      return global.getRecruitRtBucketClassForYear(rt, year);
-    }
-    return typeof global.getRecruitRtBucketClass === 'function' ? global.getRecruitRtBucketClass(rt) : '';
-  }
-
   // Potential Rating (§Phase 4) display glue. `potentialRt` is the backend's
   // already-ratcheted ceiling (normalizeRecruits.potentialRt); letters come from the
   // one letter mapping (formatRtDisplay). Returns "C/B" when a ceiling is present, the
@@ -384,7 +377,6 @@ function cloneParams(params) {
     normalizeRecruits: normalizeRecruits,
     playSound: playSound,
     recruitNameLinkHtml: recruitNameLinkHtml,
-    recruitRtClass: recruitRtClass,
     recruitingOrderIds: recruitingOrderIds,
     sortRecruits: sortRecruits,
   };
