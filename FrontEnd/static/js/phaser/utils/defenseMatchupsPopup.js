@@ -102,11 +102,11 @@ function ensureInGameStyles() {
       background: rgba(0, 0, 0, 0.75);
       display: flex; align-items: center; justify-content: center;
       padding: 22px; font-family: Inter, system-ui, sans-serif;
-      color: rgba(255,255,255,0.90); -webkit-font-smoothing: antialiased;
+      color: var(--text-87); -webkit-font-smoothing: antialiased;
     }
     .defense-matchups-content {
       width: min(1000px, 100%); max-height: calc(100% - 24px); overflow: auto;
-      background: rgba(18, 22, 32, 0.98); border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(18, 22, 32, 0.98); border: 1px solid var(--white-12);
       border-radius: 16px; box-shadow: 0 30px 70px rgba(0,0,0,0.6);
       padding: 22px 26px 20px; animation: dmRise .2s ease;
     }
@@ -115,9 +115,9 @@ function ensureInGameStyles() {
       display: grid; grid-template-columns: 1fr 60px 1fr; gap: 0; margin: 0 0 6px;
     }
     .dm-m-head {
-      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 20px; letter-spacing: .06em; color: #fff;
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 20px; letter-spacing: .06em; color: var(--text-100);
       text-align: center; padding: 2px 10px 8px; justify-self: stretch;
-      background: transparent; border: none; border-bottom: 2px solid var(--head-underline, rgba(255,255,255,0.35));
+      background: transparent; border: none; border-bottom: 2px solid var(--head-underline, var(--white-35));
       border-radius: 0;
     }
     .dm-rows { display: flex; flex-direction: column; }
@@ -127,7 +127,7 @@ function ensureInGameStyles() {
     }
     .dm-pair:not(:last-child)::after {
       content: ''; position: absolute; left: 10%; right: 10%; bottom: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 28%, rgba(255,255,255,0.12) 72%, transparent);
+      background: linear-gradient(90deg, transparent, var(--white-12) 28%, var(--white-12) 72%, transparent);
     }
     .dm-side-left { justify-self: end; width: 100%; max-width: 440px; }
     .dm-side-right { justify-self: start; width: 100%; max-width: 440px; }
@@ -155,16 +155,16 @@ function ensureInGameStyles() {
     .dm-ptile[data-side="left"] .dm-pbody { flex-direction: row-reverse; }
     .dm-ptile[data-side="right"] .dm-pbody { flex-direction: row; }
     .dm-user-col .dm-ptile {
-      cursor: grab; border-radius: 12px; padding: 5px 7px; margin: -5px -7px;
+      cursor: grab; border-radius: var(--radius-12); padding: 5px 7px; margin: -5px -7px;
       transition: background .15s, box-shadow .15s;
     }
     .dm-user-col .dm-ptile:hover { background: rgba(255,255,255,0.04); }
     .dm-ptile.dragging { opacity: .45; cursor: grabbing; }
     .dm-ptile.dropcue { background: rgba(255,255,255,0.09); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); }
-    .dm-draghint { display: flex; color: rgba(255,255,255,0.40); }
+    .dm-draghint { display: flex; color: var(--white-40); }
     .dm-draghint svg { width: 14px; height: 14px; }
     .dm-ph {
-      position: relative; flex-shrink: 0; width: 60px; aspect-ratio: 1/1; border-radius: 12px;
+      position: relative; flex-shrink: 0; width: 60px; aspect-ratio: 1/1; border-radius: var(--radius-12);
       overflow: hidden; background: linear-gradient(180deg, #1b2130, #10141d);
       border: 2px solid rgba(255,255,255,0.16); box-shadow: 0 6px 16px rgba(0,0,0,0.4);
     }
@@ -186,39 +186,43 @@ function ensureInGameStyles() {
     }
     @media (prefers-reduced-motion: reduce) { .dm-ph.dm-bold { animation: none; } }
     .dm-pinfo { min-width: 0; }
-    .dm-nm { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.1; white-space: nowrap; }
-    .dm-jn { color: rgba(255,255,255,0.55); font-weight: 600; font-size: .85em; }
-    .dm-meta { color: rgba(255,255,255,0.55); font-weight: 600; font-size: 11px; }
+    .dm-nm { font-size: 14px; font-weight: 700; color: var(--text-100); line-height: 1.1; white-space: nowrap; }
+    .dm-jn { color: var(--text-60); font-weight: 600; font-size: .85em; }
+    .dm-meta { color: var(--text-60); font-weight: 600; font-size: 11px; }
     .dm-statline { margin-top: 5px; display: flex; gap: 11px; font-variant-numeric: tabular-nums; }
     .dm-side-left .dm-statline { justify-content: flex-end; }
     .dm-side-right .dm-statline { justify-content: flex-start; }
     .dm-st { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-    .dm-sv { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.90); }
-    .dm-sl { font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,0.40); }
+    .dm-sv { font-size: 12px; font-weight: 700; color: var(--text-87); }
+    .dm-sl { font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-38); }
     .dm-vs { display: flex; align-items: center; justify-content: center; }
     .dm-favarrow svg { width: 28px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
     .dm-m-foot {
       margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 11px;
     }
+    /* colour-law: advance — this is the one forward action; it saves the matchups
+       and resolves to start the quarter, so green (Advance), not orange (save). */
     .dm-m-submit {
-      width: auto; padding: 0 40px; height: 46px; border: none; border-radius: 10px;
-      background: #34EC27; color: #0a1f06; font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 20px;
+      width: auto; padding: 0 40px; height: 46px; border: none; border-radius: var(--radius-10);
+      background: var(--green); color: var(--bg); font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 20px;
       letter-spacing: .06em; cursor: pointer;
-      box-shadow: 0 8px 22px rgba(52,236,39,0.26), inset 0 1px 0 rgba(255,255,255,0.35);
+      box-shadow: 0 8px 22px color-mix(in srgb, var(--green) 26%, transparent), inset 0 1px 0 var(--white-35);
       transition: filter .15s, transform .1s;
     }
     .dm-m-submit:hover { filter: brightness(1.06); }
     .dm-m-submit:active { transform: translateY(1px); }
     .dm-dontshow {
       display: inline-flex; align-items: center; gap: 8px; font-size: 12px;
-      color: rgba(255,255,255,0.55); cursor: pointer; user-select: none;
+      color: var(--text-60); cursor: pointer; user-select: none;
     }
     .dm-dontshow input {
-      appearance: none; width: 16px; height: 16px; border-radius: 4px;
-      border: 1.5px solid rgba(255,255,255,0.40); display: grid; place-items: center; cursor: pointer;
+      appearance: none; width: 16px; height: 16px; border-radius: var(--radius-4);
+      border: 1.5px solid var(--white-40); display: grid; place-items: center; cursor: pointer;
     }
-    .dm-dontshow input:checked { background: #F79420; border-color: #F79420; }
-    .dm-dontshow input:checked::after { content: '✓'; color: #15181f; font-size: 11px; font-weight: 900; }
+    /* Neutral checked state, not orange: the pref only persists on Submit, so at
+       toggle time it is a pending selection, not a committed save. */
+    .dm-dontshow input:checked { background: var(--text-100); border-color: var(--text-100); }
+    .dm-dontshow input:checked::after { content: '✓'; color: var(--bg); font-size: 11px; font-weight: 900; }
     @media (max-width: 640px) {
       .dm-statline { gap: 7px; }
       .dm-sv { font-size: 11px; }
@@ -258,7 +262,8 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
   let userOrder = userOrderFromMatchups(currentMatchups);
 
   const popup = document.createElement("div");
-  popup.className = "defense-matchups-popup";
+  // `gob` so design tokens resolve (court.html links gob-tokens.css).
+  popup.className = "defense-matchups-popup gob";
   popup.innerHTML = `
     <div class="defense-matchups-content" role="dialog" aria-label="Defense Matchups">
       <div class="dm-m-heads">
