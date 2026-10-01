@@ -655,3 +655,15 @@ Tutorial pages (`tutorial*.html`) are `html.gob` and load `gob-tokens.css`; no s
 - **`css/fte.css`** styles only the pre-press-conference reminder (`pgpcSammyReminderModal.js`) as dark Sammy chrome. It also overrides that module's light-shell label colour and orange checkbox accent.
 - **Out of scope:** the lesson pages' inline teaching diagrams (they keep the `--orange`, `--orange-soft`, `--green` and `--lblue` aliases) and `gob-advanced.css` diagram colours stay legacy. Only that sheet's chrome is neutral.
 - On the design system: `gob-tutorial.css`, plus the Sammy, username, walk-on, attribute-tour, lineup-modal, persona, pick-opponent, tip-off and `fte.css` sheets (`NEW_DESIGN_CSS`).
+
+### Auth pages
+
+`login.html`, `signup.html` (alpha access code + account step + Request Access modal) and `reset-password.html` are `html.gob` with `gob-tokens.css`; one sheet, `auth.css` (`NEW_DESIGN_CSS`). Visual only: ids, names, endpoints and scripts are unchanged.
+
+- **Green** is only the submit that enters the game: LOG IN and SIGN UP (`.auth-button.auth-button--advance`).
+- **Every other button is the neutral white plate** (`.auth-button`, same as `.gob-btn--neutral`): code Continue, Request Access, Got it, Send Reset Link, Update Password.
+- **Errors are `--red`** (`.error-message`: text `--red`, 10% fill, 45% border).
+- **Neutral:** success / confirmation (`.success-message`), "Code accepted", links (underlined `--text-100` / `--text-87`), input focus (`--white-45` border, `--white-12` ring), the Request Access modal top rule.
+- **No navy/blue atmosphere** (navy is "yours", blue is RT): a neutral `--white-4` lift and the faint diagonal banding.
+- Headings and buttons `--font-display` (Bebas Neue Pro); body `--font-body` (Inter).
+- Logout lands on `/mode-select.html`, not an auth page.
