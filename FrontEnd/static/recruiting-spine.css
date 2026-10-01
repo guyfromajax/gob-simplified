@@ -5,11 +5,8 @@
   --surf:var(--white-3); --surf-2:var(--white-5);
   --border:var(--white-9); --border-soft:var(--white-6); --hair:var(--white-7);
   --text:var(--text-100); --muted:var(--white-62); --muted-2:var(--white-40); --muted-3:var(--white-25);
-  --you:var(--navy);
-  --you-soft:color-mix(in srgb,var(--navy) 28%,transparent);
-  --you-line:color-mix(in srgb,var(--navy) 55%,transparent);
+  /* --you, --you-soft, --you-line and --you-ink are tokens (css/gob-tokens.css). */
   --you-edge:color-mix(in srgb,var(--navy-hi) 55%,transparent);  /* your lean-ladder slot (ruling 2026-10-01) */
-  --you-ink:color-mix(in srgb,var(--text-100) 82%,var(--navy));
   --list:var(--navy); --list-soft:var(--you-soft); --list-line:var(--you-line);
   --green-ink:color-mix(in srgb,var(--tier-green) 72%,var(--text-100));
   --red-ink:color-mix(in srgb,var(--red) 70%,var(--text-100));

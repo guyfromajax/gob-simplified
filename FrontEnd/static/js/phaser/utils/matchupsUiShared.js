@@ -4,6 +4,7 @@
 
 export const POSITIONS = Object.freeze(["PG", "SG", "SF", "PF", "C"]);
 
+// Same values as the --pos-* tokens in css/gob-tokens.css (tests/test_token_mirrors.py).
 export const POSITION_COLORS = Object.freeze({
   PG: "#4A90D9",
   SG: "#7B5EA7",

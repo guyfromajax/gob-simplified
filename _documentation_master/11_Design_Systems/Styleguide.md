@@ -10,8 +10,8 @@ One colour, one meaning. Everything not listed is neutral: white text at `--text
 |---|---|---|---|
 | Green | `--green` (ink on green: `--bg`) | The one Advance per screen (top-bar `#play-now` / `.advance`, `.gob-btn--gate`, the one forward action in a live-game overlay, Submit Training on the weekly training page). Positive data: delta-up, tier green, chemistry high, board-gain bars, the RT / attribute ramps. | Cards, WIN/LOSS plates, badges, scores, choice controls, a second button on the same screen, any button that only navigates or only saves. |
 | Orange | `--orange` | **"There are unsaved changes" and nothing else**: the save or commit of something you changed. Submit Invites, Submit Orders, Save Game Plan / Playbooks (only while there is an unsaved edit: neutral at rest and after a save), Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row. | Brand accent, "warning / low" data, navigation, choice controls and their selected state (`.is-on`), checkboxes, hovers, toasts, a loader, the rail count badge, gated / "Blocks Advance" tags and blocking-step outlines, data ramps (attitude), modal accents, a "Stay" / keep-editing button. |
-| Navy | `--navy`, `--navy-hi` (edge / halo only) | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list, your team in a bracket. What you picked for your team or plan: Set Lineup on-court and selected rows, plays in your Playcall Center, your leaderboard and lean-ladder slot. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. A generic "selected" state on a choice control: tabs, toggles, radios, sliders and filter chips stay neutral. |
-| Blue | `--tier-blue` | RT only: an A grade, a 9+ attribute, elite. One exception: the top band of the shot-share ramp (see [Data scales](#data-scales)). | Chrome, links, navigation, "good / above average". |
+| Navy | `--navy`, `--navy-hi` (edge / halo only); aliases `--you`, `--you-soft`, `--you-line`, `--you-ink` | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list, your team in a bracket. What you picked for your team or plan: Set Lineup on-court and selected rows, plays in your Playcall Center, your leaderboard and lean-ladder slot. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. A generic "selected" state on a choice control: tabs, toggles, radios, sliders and filter chips stay neutral. |
+| Blue | `--tier-blue` (attribute tiles), `--blue` (RT letters) | RT only: an A grade, a 9+ attribute, elite. One exception: the top band of the shot-share ramp (see [Data scales](#data-scales)). | Chrome, links, navigation, "good / above average". |
 | Reward gold | `--reward-gold` | Only: title medallions (`.med.gold`); season-peak glow, rule and confetti (`.pk`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`); the exceptional-gain marker (`.xg`, `.xg-key`); the words "Trophy Case" (`.gold-t`); senior-tribute title marks (`.st-titles s`, `.st-cti s`). Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens. | Any button, including the button on a reward modal (the big-news CTA is a neutral plate). Advance, "yours", choice controls, everyday or weekly chrome, Home Base chrome. |
 | Red / yellow | `--tier-red`, `--tier-yellow`; `--red` for the one destructive style | Data ramps (rating tiers, chemistry, energy, the attitude bars' low buckets). **Irreversible deletes only**: the red-outline confirm button and the red menu item for deleting a program on Home Base (`.btn-del`, `.pop-i.danger`). | ▼ deltas, LOSS plates or letters, buttons, chrome, warnings, modal accents, and destructive styling on anything reversible (removing a queued invite, assigning the practice squad, leaving with selections). |
 | Team colour | `--team-primary` (set per team) | Identification: logos, name bars, favour arrows, team badges, the edge border and side tint that say which team a live-game side panel belongs to. | A wash or tint on a card, panel, tab, header or the weekly / result card, win or loss. The selected state of a choice control. |
@@ -34,6 +34,7 @@ Neutral by rule (no green, orange, gold or navy):
 **Data palettes outside the table.** These are data, so the table's "one colour, one meaning" does not recolour them. None of them is chrome, and none is a token:
 
 - The rating ramps and the other ramps in [Data scales](#data-scales), including the shot-share ramp.
+- **Position colours** (`--pos-pg`, `--pos-sg`, `--pos-sf`, `--pos-pf`, `--pos-c`): the position label in the sim broadcast. Game presentation only. Everywhere else a position is a neutral information code.
 - **Live-court game-state colours**: Playcall Center state, the reveal HUD, the lower-third and secondary ribbons, the active-player HUD, momentum bars, the scoreboard quarter, shot clock and timeout pips, and the sim broadcast palette. They are game presentation and are not recoloured. The list and the build rules are in UX_System, "Live-game screen chrome".
 
 **Annotation.** In a new-design file, a legal green, orange or gold that the checker's selector allow-list does not already cover needs `/* colour-law: positive-data */`, `/* colour-law: committed */`, `/* colour-law: saved */` or `/* colour-law: reward */` on the same line or one of the two lines above. `saved` and `committed` mean the same. The annotation records an exception the table already allows; it never licenses a banned use. Legacy files are reported, not failed; the new-design surface is listed in UX_System §8. The legacy court chrome also carries `/* colour-law: game-state */` and `/* colour-law: team-identity */`. Those two document an exemption for readers; the checker does not read them.
@@ -55,7 +56,7 @@ Tiles (`js/shared/attrTiles.js` + `css/attr-tiles.css`), bars and chips all use 
 
 | RT | Grade | Tier | Class |
 |---|---|---|---|
-| 80+ | A, A+ (90+), A++ (100+) | `--tier-blue` | `.rt-elite` |
+| 80+ | A, A+ (90+), A++ (100+) | `--blue` | `.rt-elite` |
 | 60–79 | B, B+ (70+) | `--tier-green` | `.rt-high` |
 | 40–59 | C, C+ (50+) | `--tier-yellow` | `.rt-mid` |
 | below 40 | D (30+), F | `--tier-red` | `.rt-low` |
@@ -123,7 +124,10 @@ All buttons: `--font-display` bold, `--tracking-btn`, `--radius-10`, height `--d
 | Gate (Advance) | `.advance`, `.gob-btn--gate` | `--green` / `--bg`, `--shadow-advance` | One per screen. A blocking task changes its label; it never disables it. Loading: `.is-loading`, label `STARTING…`, repeat clicks ignored. Submit Training is the training page's gate. |
 | Action (save) | `.gob-btn--action` | `--orange` / dark ink | Only for a save or commit, and only while there is something to save (a page save is neutral at rest and after saving). |
 | Neutral | `.gob-btn` | transparent fill, `--white-28` border, `--text-100` | Navigation, Retry, Autoset, every other button. |
+| Neutral primary | `.gob-btn--neutral` | `--white-90` plate, `--bg` ink | The main CTA when it neither saves nor advances. |
 | Ghost | `.gob-btn--ghost`, `.btn-ghost` | `--white-5` fill, `--white-18` border | Secondary, dismiss, acknowledgement. |
+
+Both button sheets read the tokens: the shell buttons in `gob-components.css` and the canonical component in `css/gob-buttons.css`.
 
 **Back / return** is a ghost text link, not a filled button: small left arrow plus label, left-aligned above the content, `--text-60` resting, `--text-100` on hover. A back that only returned to the locker room is hidden under the shell (the rail replaces it).
 
@@ -208,6 +212,17 @@ Done since (ux/logo-fallback-save-state):
 - Save buttons stay neutral until something has changed; orange only when there is something to save. The Orange row and the Action button role now say so.
 - Team art: a missing `logo_square` falls back to `logo_primary` before the generated letter tile (UX_System, "Rulings recorded 2026-10-01").
 
+**Closed mechanically (token hygiene, 2026-10-01).** No look changed; `reports/token-hygiene-2026-10-01.md` has the proof.
+
+| Was open | Now |
+|---|---|
+| Navy aliases local to one sheet | `--you`, `--you-soft`, `--you-line`, `--you-ink` are tokens in `gob-tokens.css`, same values. |
+| RT colours carried their own values | The `.rt-*` classes resolve through `--tier-red`, `--tier-yellow`, `--tier-green` and `--blue`. `rtBucket.js` keeps the same values as literals for scripts that need a concrete colour; a test keeps them equal. |
+| `css/gob-buttons.css` hard-coded | Reads the tokens, with the same values as fallbacks for pages that are not `.gob`. Its header now states the colour law. |
+| Position colours had no tokens | `--pos-pg`, `--pos-sg`, `--pos-sf`, `--pos-pf`, `--pos-c`, same values. |
+| Tier digit ceiling | The rule is `floor(raw / 10)` with no upper cap. The code was right; the token comment said 0–16 and is fixed. |
+| Repo `CLAUDE.md` pointed the colour law at UX_System | Points here. |
+
 ## Settled 2026-10-01 (batch 2)
 
 Jamie approved every recommendation in `reports/jamie-decisions-2-2026-10-01.md`. Net rule: **orange = "there are unsaved changes" and nothing else.** Built on `ux/jamie-rulings-batch-2`; the checker's orange selector allow-list is now save / commit only.
@@ -228,13 +243,8 @@ Jamie approved every recommendation in `reports/jamie-decisions-2-2026-10-01.md`
 
 ## Open questions
 
-1. **Navy aliases.** `--you`, `--you-soft`, `--you-line`, `--you-ink`, `--you-edge` are defined locally in `recruiting-spine.css`, not in `gob-tokens.css`, yet UX_System cites them. Promote to tokens?
-2. **RT colours.** `rtBucket.js` and `css/rt-buckets.css` carry their own colour values, and RT elite uses the `--blue` value, not `--tier-blue` (which exists for contrast). Point RT at the tier tokens?
-3. **Canonical button CSS.** `css/gob-buttons.css` still hard-codes the old values and labels orange as "advances UI". The shell buttons in `gob-components.css` are tokenised. Retokenise `gob-buttons.css` to match this guide?
-4. **Position colours** (PG/SG/SF/PF/C) have no tokens. Tokenise, or keep as game presentation? (The broadcast palette and the other game-state colours are settled: kept as game presentation, in code.)
-5. **Tier digit ceiling.** The token comment says the player digit runs 0–16; `attributeDisplay.js` says there is no upper cap. Which is right?
-6. **Repo CLAUDE.md** still says the colour law lives in UX_System. Update it to point here?
-7. **Annotated orange that may not be a save.** Since batch 2 the checker allows orange by selector only on save / commit names. These still pass through a `/* colour-law: committed */` annotation and may not mean "there are unsaved changes":
+1. **One blue or two for ratings.** RT letters paint `--blue`; a 9+ attribute tile paints the brighter `--tier-blue`, which exists for contrast on the tile. Moving RT A to `--tier-blue` is a visible change. Keep two, or make it one?
+2. **Annotated orange that may not be a save.** Since batch 2 the checker allows orange by selector only on save / commit names. These still pass through a `/* colour-law: committed */` annotation and may not mean "there are unsaved changes":
    - toasts (`.hub-toast` in `recruiting-dock.css`, `.toast` in `training-playbooks.css`), which the Orange row bans;
    - a choice control (`.tsr-toggle .toggle-btn.active`, `training-squad-report.html`);
    - recruiting board and signing marks (`.pool tbody tr.rec.on-board`, `.pool-rankbadge`, `.citem`, `.hub-anchor--orders .ic`, `.prow.flash`, `.ssum-lr`, `.ssum-nm b`);

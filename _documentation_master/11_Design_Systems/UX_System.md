@@ -97,6 +97,13 @@ Root element: `html.gob` plus one density class.
 
 Consume a token with `var(--token-name)` inside a `.gob` subtree. Do not redeclare the value.
 
+Rules for values that scripts or shared sheets also need (token hygiene, 2026-10-01):
+
+- **A sheet that can be injected into a page without `.gob`** (`css/gob-buttons.css`, `css/rt-buckets.css`) writes `var(--token, same-value)`. The fallback must equal the token; `tests/test_token_mirrors.py` checks it.
+- **A script that needs a concrete colour** (canvas, colour maths) keeps the literal next to the token name (`rtBucket.js` `color` / `token`, `POSITION_COLORS` in `matchupsUiShared.js`). The same test keeps the literal equal to the token. For a DOM style, write `var(--token, same-value)` instead (`simGamePresentation.js` `POSC`).
+- **`--fs-*`, `--dsp-*` and `--dsz-*` scale with density.** Do not swap a fixed pixel size for one of them on a component that must not grow at 1920.
+- The "yours" aliases `--you`, `--you-soft`, `--you-line`, `--you-ink` and the position colours `--pos-*` are tokens. Do not redeclare them in a page sheet.
+
 Fonts are self-hosted. Display face: `/css/fonts.css` (Bebas Neue Pro). Body face: `/fonts/app-fonts.css` (Inter). Do not add a Google Fonts link.
 
 Shell rules that must not restyle existing franchise cards live in `FrontEnd/static/css/gob-shell.css`, scoped under `html.gob-shell`. `gob-components.css` is scoped under `.gob`. If a component class (`.logo`, `.nm`, `.lnk`, `.card`) would change existing franchise markup, tighten the shell selector. Do not edit the old content CSS to accommodate the shell.
@@ -653,7 +660,7 @@ Peel 2 (2026-10-01), what the sheet and its neighbours now assume:
 `set-lineup.html` is a `.gob` focus page that opens from Advance (Play Game) and hands off to `court.html`. It loads `gob-tokens.css` but not the shell, so it keeps its own layout. Colour law on it:
 
 - **Play Game (`#play-now`, `.lineup-btn-advance`) is the one Advance — green.** Nothing else on the page is green except positive-data ramps.
-- **Choice controls are neutral.** The Game / Attributes / Stats view toggle, Autoset Lineup (a non-advancing action, *not* a save — this overrides the token comment's "non-advancing actions" orange allowance per the colour law), position slots, and the FT-shooter lock badge carry no green or orange.
+- **Choice controls are neutral.** The Game / Attributes / Stats view toggle, Autoset Lineup (a non-advancing action, *not* a save; orange is unsaved changes only, and the token comment no longer lists non-advancing actions), position slots, and the FT-shooter lock badge carry no green or orange.
 - **Selection is navy** (ruling #1, settled). On-court rows carry a `--navy` tint and a `--navy-hi` left edge; a selected row has the same edge. Never orange. The active drop target (`.slot.drag-over`, `tr.drag-over`) is a navy tint.
 - **Energy / next-game readiness is a data ramp.** High is positive data (`--green`, annotated), then yellow, then an amber `color-mix`, then `--red` — the ramp never uses raw orange.
 - **RT stays blue** via `rt-buckets.css` (`.rt-*`), the sanctioned A-grade / 9+ / elite colour.
