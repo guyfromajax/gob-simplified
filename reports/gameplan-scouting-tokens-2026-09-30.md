@@ -109,11 +109,11 @@ Timeout path is reachable from the stub (`resume_from_timeout=true`). Electron w
 
 | Gate | Result |
 |---|---|
-| `.venv/bin/python -m pytest --ignore=tests/e2e -q` | **4264 passed**, 16 skipped, 109 xfailed, **1 xpassed**, 0 failed (237.63s). XPASS is the pre-existing leaders-scope case. |
-| Playwright `tests/e2e --workers=1`, PORT=8260, CI unset | **503 passed**, then uvicorn died on a pre-existing mongomock `OperationFailure: Unrecognized expression '$replaceAll'` in `GET /roster/…` (`api.py` `get_team_roster`). The remaining 284 tests failed `ERR_CONNECTION_REFUSED`. Not a Game Plan / Scouting assertion. Tail rerun (recruiting-tabs → week-429): **269 passed** (includes `retire-prep-embed` Game Plan + Scouting), same server death at t2-roster. `submit-cuts` SFX_SELECT on a disabled button is unrelated (this batch did not touch `uiSfx` or cut-players). All Game Plan / Scouting specs in the first run passed (tokens + `prep-modules-gameplan` + `prep-scouting`). |
+| `.venv/bin/python -m pytest --ignore=tests/e2e -q` (after `f65a541a9`) | **4297 passed**, 14 skipped, 108 xfailed, **2 xpassed**, 0 failed (246.77s). XPASS: `test_resource_page_scoping::test_leaders_view_scope_filters_to_user_conference` (pre-existing) and `test_settings_application_to_gameplay::...::test_settings_loaded_and_applied_to_gameplay` (XPASS not in the earlier 4264-pass run; this branch does not touch it; origin not investigated). `known_failures.py` not edited. |
+| Playwright full `tests/e2e --workers=1` under `/tmp/gob-full-playwright.lock`, after merging `origin/develop` + `f65a541a9` (PORT=8244, FRAMES_BASE=8243) | **789 passed, 5 skipped, 0 failed** (11.9m). No flaky reruns needed. All 7 `gameplan-scouting-tokens.spec.js` tests passed, frames included; the 3 invite-board seed-notice tests are green. Skips are pre-existing `test.skip`s (office live digest, retire-prep in-app scouting before, t3 offline compact header, tournament offline week 27, training flow shots). |
 | Targeted `gameplan-scouting-tokens.spec.js` | **7 passed** (PORT=8244, FRAMES_BASE=8243) |
-| `scripts/check_ui_tokens.py --strict --no-write` | exit 0. Colour-law new-design **0**. |
-| `scripts/ci/check_migration_gates.py` | passed. Gate A: 0/0. Gate B: 136 lines in 44 files. Did not `--write-allowlist`. |
+| `scripts/check_ui_tokens.py --strict --no-write` | exit 0 (re-run 2026-10-01). Colour-law new-design **0**. |
+| `scripts/ci/check_migration_gates.py` | passed (re-run 2026-10-01). Gate A: 0/0. Gate B: 136 lines in 44 files. NOTES: training-report.html and training.html now clean (allow-list can shrink; not edited). Did not `--write-allowlist`. |
 
 ## Files touched
 
@@ -129,4 +129,21 @@ Timeout path is reachable from the stub (`resume_from_timeout=true`). Electron w
 - `_documentation_master/11_Design_Systems/UX_System.md` (Game Plan / Scouting choice-chrome sentence)
 - `reports/gameplan-scouting-tokens-2026-09-30.md` + `reports/gameplan-scouting-tokens/*.png`
 
-Not touched: `franchise-command-center.css`, `resource-pages.css`, box-score, cut-players, set-lineup, training, playbooks, recruiting, `office-home.*`, `court.html`, Phaser, the sim, `uiSfx`.
+Not touched: `franchise-command-center.css`, `resource-pages.css`, box-score, cut-players, set-lineup, training, playbooks, recruiting (except the seed-notice e2e below), `office-home.*`, `court.html`, Phaser, the sim, `uiSfx`.
+
+## Suite health
+
+`origin/develop` (roster-name-lookup merge) was merged into this branch at `5eec55162`. Full Playwright after that merge is the Gate line above.
+
+### Invite-board seed-notice (the 3 reds from the roster full run)
+
+Not full-run-only. Isolated `--repeat-each=5` on this tree (develop + batch-4; those specs unchanged by Game Plan CSS):
+
+| | Result |
+|---|---|
+| Before fix | **4 failed / 11 passed** (15 runs, 3.3m). `dismissible` timed out twice; `disappears once the board is saved` and `saving is the only thing that posts the order` each failed at least once. |
+| After fix | **15 passed** (17.0s) |
+
+**Cause:** `maybeShowSeedModal` loads `sammyModal.js` from the e2e server and puts **Got It** over the board. Playwright `force: true` still clicks whatever is on top. Screenshot of the isolated fail shows the Sammy overlay; `#board-seed-dismiss` is in the a11y tree underneath. `9bdd19a73` already dismissed Got It before the reorder `×`; the other three tests did not. Not uiSfx disabled-skip, not submit-cuts `adoptMain`, not signing-orders-panel.
+
+**Fix** (same branch, separate commit `f65a541a9`): `dismissSeedSammy()` before those three clicks.
