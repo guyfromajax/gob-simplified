@@ -38,8 +38,8 @@ Jamie's rulings (`reports/jamie-decisions-2026-10-01.md`) and the same day's gal
 | 11 | Desktop app icon | `desktop/build/icon.icns`, `icon.ico`, `icon.png` from `icon-source-1024.png`. `desktop/pack.js` picks them up when they exist. | `tests/test_desktop_shell_local.py` |
 | — | Franchise Set Lineup starts empty | "Set Lineup" below. | none |
 | — | One empty-state card | "Empty states" below. | `desktop-gallery-fixes.spec.js` |
-
-**Pending audit** (ruled, not on `develop` when this was written): Save buttons neutral until something has changed; team art `logo_square` → `logo_primary` fallback. Neither is described below yet.
+| — | Save buttons neutral until something has changed (orange = there is something to save) | "Rulings recorded 2026-10-01 (gallery follow-up)" below. | `desktop-logo-save-state.spec.js`, `prep-modules-*.spec.js` |
+| — | Team art `logo_square` → `logo_primary` → letter tile | "Rulings recorded 2026-10-01 (gallery follow-up)" below. | `desktop-logo-save-state.spec.js`, `tests/test_team_logo_manifest.py` |
 
 ### Live-game overlays (court.html DOM)
 
@@ -776,3 +776,10 @@ Related small rules (gallery fixes, 2026-10-01):
 - Cut Players: the page title is `--font-display`. "Assign Practice Squad" is the page's save (orange when enabled, dead when disabled). The "No Cuts Required" and load-error modals are not errors and not saves: neutral accent, neutral secondary "Back To Locker Room".
 - Set Lineup banner strip: `object-fit: contain` on `--surface-2` (the full lockup, never a crop).
 - Segmented toggles with a count (`.stats-toggle button em`, e.g. "Varsity 15"): `--space-6` before the count.
+
+### Rulings recorded 2026-10-01 (gallery follow-up)
+
+- **Set Lineup, franchise mode: the five are not preset.** Slots stay empty until the user picks or presses Autoset. Intended (Jamie); only the tutorial (`mode=tutorial`) presets.
+- **Team logos:** `getTeamAssetPath(name, 'logo_square')` (`common.js`) serves `<slug>_logo_square.png` when the team has one, else `<slug>_logo_primary.png`, else the generic square. It reads the known-asset lists `TEAM_LOGO_SQUARE_SLUGS` / `TEAM_LOGO_PRIMARY_SLUGS`, built once; `tests/test_team_logo_manifest.py` keeps them in sync with `images/teams/`. No per-image 404 probing. `teamLogoArtKind(name)` returns `none` for a core program with neither file; League tables (`gobTables`) then show the generated letter tile directly. The letter tile is the last resort.
+- **Save buttons: orange = there is something to save.** Save Game Plan (`gamePlanHasEdits`) and Save Playbooks (`hasEdits`, the same check the leave prompt uses) toggle `.is-dirty`; the button is neutral (`--white-6`, `--text-60`, `--line-strong` ring) without it. A disabled Save keeps its dead style. Moving a Game Plan slider away and back is not an edit; a Playbooks weight step rebalances siblings, so stepping back stays an edit until saved or reverted.
+- **Weekly Submit Training stays the green Advance** (Jamie).

@@ -992,6 +992,60 @@ function generatedTeamAssetDataUrl(visual, assetKey) {
 }
 
 /**
+ * Known logo art per core slug (built once from images/teams/, 2026-10-01;
+ * tests/test_team_logo_manifest.py keeps it in sync). logo_square requests use
+ * the square when it exists, else logo_primary, else the generic square, so no
+ * request 404s. A core team with neither shows the letter tile (gobTables).
+ */
+var TEAM_LOGO_SQUARE_SLUGS = {
+  'abilene': 1, 'ada': 1, 'amariabi_international': 1, 'amarillo_tech': 1, 'ann_arbor': 1,
+  'appalachia': 1, 'archbishop_mcclellan': 1, 'austin': 1, 'austin_west': 1,
+  'barton_lutheran': 1, 'bayou_district': 1, 'bentley_truman': 1, 'berkley': 1, 'biloxi': 1,
+  'boise': 1, 'border_academy': 1, 'burroughs': 1, 'cagers_world': 1, 'cardinal_conor': 1,
+  'casino_row': 1, 'chambless_global': 1, 'chapel_hill': 1, 'circus_circus': 1,
+  'cleveland_carlysle': 1, 'columbus': 1, 'concord': 1, 'couer_dalene': 1, 'crickstown': 1,
+  'crimson_county': 1, 'crofton': 1, 'dade_academy': 1, 'deland': 1, 'desert_regional': 1,
+  'dillinger': 1, 'durham': 1, 'east_rockies': 1, 'evanston': 1, 'falls_academy': 1,
+  'four_corners': 1, 'hollywood_prep': 1, 'ida': 1, 'lancaster': 1, 'little_york': 1,
+  'morristown': 1, 'north_columbus': 1, 'ocean_city': 1, 'redwood_high': 1, 'south_lancaster': 1,
+  'templeton_wesley': 1, 'xavien': 1
+};
+
+/** Core slugs with <slug>_logo_primary.png but no logo_square. */
+var TEAM_LOGO_PRIMARY_SLUGS = {
+  'fielding': 1, 'gainesville': 1, 'garden_elites': 1, 'gp_prep_school': 1, 'grayson_ranch': 1,
+  'grizzly_academy': 1, 'grupenberg': 1, 'hana_road': 1, 'harding_central': 1,
+  'hardwood_fields': 1, 'houston_jesuit': 1, 'huntington_canyon': 1, 'hyde_methodist': 1,
+  'independence': 1, 'iowa_academy': 1, 'ivy_prep': 1, 'juneau_nome': 1, 'kenton': 1,
+  'keys_high': 1, 'knoxville': 1, 'lawrence': 1, 'lewis_catholic': 1, 'lexington': 1,
+  'long_island_methodist': 1, 'mahala_alou': 1, 'melbourne_americas': 1, 'middletex': 1,
+  'minot': 1, 'mobile': 1, 'monroe_hayes': 1, 'montpeiler': 1, 'mt_simmons': 1, 'mynsk': 1,
+  'myrtle_private': 1, 'nickel_beach': 1, 'norman': 1, 'ozark_centre': 1, 'pacific_all_stars': 1,
+  'pan_handle_limited': 1, 'pikes_prep': 1, 'providence': 1, 'queens_guard': 1,
+  'quigley_catholic': 1, 'rainier_central': 1, 'rancho_estrada': 1, 'reardon_mayes': 1,
+  'reyes_santiago': 1, 'rivers_edge': 1, 'rodeo_circuit': 1, 'sacred_heart': 1, 'salem': 1,
+  'san_jose': 1, 'seattle_aaa': 1, 'southwest_miner': 1, 'st_peters': 1, 'stormwood': 1,
+  'swoosh': 1, 'syracuse': 1, 'tallahassee': 1, 'toronto_limited': 1, 'tower_academy': 1,
+  'tri_cities_prep': 1, 'tucson': 1, 'two_rivers': 1, 'upper_peninsula': 1, 'upstate': 1,
+  'valdosta_valley': 1, 'valley_high': 1, 'vancouver': 1, 'wacker_west': 1, 'wash_u_prep': 1,
+  'washington_carver': 1, 'west_ocean_city': 1
+};
+
+/**
+ * Which logo art a team has on disk: 'square' | 'primary' | 'none' for a core
+ * program, '' for a name that is not a core asset folder (custom / unknown).
+ */
+function teamLogoArtKind(teamNameOrSlug) {
+  var slug = (teamNameOrSlug && typeof teamNameOrSlug === 'string' && teamNameOrSlug.indexOf(' ') === -1 && teamNameOrSlug.indexOf('-') === -1)
+    ? teamNameOrSlug.toLowerCase()
+    : nameToTeamSlug(teamNameOrSlug);
+  if (!slug || !CORE_TEAM_ASSET_SLUGS[slug]) return '';
+  if (TEAM_LOGO_SQUARE_SLUGS[slug]) return 'square';
+  if (TEAM_LOGO_PRIMARY_SLUGS[slug]) return 'primary';
+  return 'none';
+}
+
+/**
  * Filesystem team asset path (core programs). Used as the no-op pass-through.
  * Unknown / custom slugs fall back to generic art (§1: never broken).
  */
@@ -1008,6 +1062,13 @@ function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
   // IDA predates the lowercase asset-directory convention.
   var folderSlug = useSlug === 'ida' ? 'IDA' : useSlug;
   var fileSlug = useSlug === 'ida' && assetKey === 'banner_primary' ? 'IDA' : useSlug;
+  if (assetKey === 'logo_square' && useSlug !== 'general' && !TEAM_LOGO_SQUARE_SLUGS[useSlug]) {
+    // No square on disk: the primary logo, else the generic square. Never a 404.
+    if (TEAM_LOGO_PRIMARY_SLUGS[useSlug]) {
+      return '/images/teams/' + folderSlug + '/' + fileSlug + '_logo_primary.png';
+    }
+    return '/images/teams/general/general_logo_square.png';
+  }
   return '/images/teams/' + folderSlug + '/' + fileSlug + '_' + assetKey + '.' + spec.ext;
 }
 
