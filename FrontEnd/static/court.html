@@ -835,7 +835,7 @@
       gap: 0;
       overflow: hidden;
       box-sizing: border-box;
-      background: #000 !important;
+      background: var(--black) !important;
     }
 
     /* Court row wrapper (used only when not inside #app-grid) */
@@ -975,7 +975,7 @@
 
     .momentum-bar-wrap {
       padding: 5px 12px 4px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid var(--white-6);
       flex-shrink: 0;
     }
 
@@ -1040,7 +1040,7 @@
 
     .player-stats-panel.home .player-box-score h3,
     .player-stats-panel.away .player-box-score h3 {
-      color: #fff;
+      color: var(--text-100);
     }
 
     .player-box-score table {
@@ -1356,10 +1356,12 @@
       pointer-events: none !important;
     }
 
+    /* Neutral divider (was decorative orange #ff6200); orange is reserved for saves.
+       This is the legacy light sim-quarter popup, so a neutral grey, not gob dark tokens. */
     .sim-quarter-header {
       text-align: center;
       margin-bottom: 20px;
-      border-bottom: 2px solid #ff6200;
+      border-bottom: 2px solid #6b7280;
       padding-bottom: 15px;
     }
 
@@ -1388,7 +1390,7 @@
     }
 
     .sim-quarter-scroll-container::-webkit-scrollbar-thumb {
-      background: #ff6200;
+      background: #6b7280;
       border-radius: 4px;
     }
 
@@ -3658,7 +3660,8 @@
       position: fixed;
       display: none;
       background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
-      border: 2px solid #ff6200;
+      /* Neutral border (was decorative orange #ff6200); orange is reserved for saves. */
+      border: 2px solid var(--white-28);
       border-radius: 8px;
       padding: 12px;
       z-index: 10001;
@@ -3785,7 +3788,7 @@
       font-weight: 700;
       font-size: 11px;
       line-height: 1;
-      color: #fff;
+      color: var(--text-100);
       text-shadow: 0 0 2px #000, 0 0 3px #000, 0 1px 1px #000;
       z-index: 3;
       pointer-events: none;
@@ -3796,7 +3799,8 @@
       position: fixed;
       display: none;
       background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
-      border: 2px solid #ff6200;
+      /* Neutral border (was decorative orange #ff6200); orange is reserved for saves. */
+      border: 2px solid var(--white-28);
       border-radius: 8px;
       padding: 12px 16px;
       z-index: 10001;
