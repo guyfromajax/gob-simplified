@@ -1,14 +1,112 @@
+/* ---------- Page shell (peeled from resource-pages.css) ----------
+   Same selectors as the shared sheet so the cascade is unchanged; tokens
+   instead of literals. This page no longer loads resource-pages.css. */
+.resource-page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: var(--font-body);
+}
+
+.resource-page-container.fcc-brand-page-shell {
+  position: relative;
+  width: min(1400px, calc(100vw - 24px));
+  max-width: none;
+  margin: 12px auto 18px;
+  padding: 24px 28px 28px;
+  overflow: clip;
+  color: var(--text-100);
+}
+
+.resource-page-container.fcc-brand-page-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(160deg, var(--white-3) 0%, var(--white-1p2) 18%, transparent 40%),
+    var(--bg-page);
+  border: 1px solid var(--white-9);
+  border-radius: 24px;
+  box-shadow: 0 20px 48px var(--black-45), inset 0 1px 0 var(--white-7);
+  pointer-events: none;
+}
+
+.resource-page-container.fcc-brand-page-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: repeating-linear-gradient(
+    132deg,
+    transparent 0 102px,
+    var(--white-1p2) 102px 103px,
+    transparent 103px 208px
+  );
+  pointer-events: none;
+}
+
+.resource-page-container.fcc-brand-page-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.resource-page-container.fcc-brand-page-shell h1 {
+  color: var(--text-100);
+  font-family: var(--font-display);
+  font-size: 3rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  margin: 0 0 18px;
+}
+
+.resource-page-container h1 {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+}
+
+.brand-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  color: var(--white-75);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  border: 0;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.brand-back-link:hover {
+  background: none;
+  color: var(--text-100);
+  transform: translateX(-1px);
+}
+
+.brand-back-link::before {
+  content: "<";
+  font-size: 16px;
+  line-height: 1;
+}
+
 body.playbook-report-page {
   min-height: 100vh;
   margin: 0;
-  background: #0b0d14;
-  color: #f7f9ff;
-  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text-100);
+  font-family: var(--font-body);
 }
 
 .playbook-report-shell {
-  --fcc-text: #f7f9ff;
-  --fcc-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+  --fcc-text: var(--text-100);
+  --fcc-shadow: 0 18px 36px var(--black-25);
 }
 
 .playbook-report-back {
@@ -46,18 +144,18 @@ body.playbook-report-page {
 
 .report-title-wrap h1 {
   margin: 0;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(2.6rem, 4vw, 3.35rem);
   line-height: 0.95;
   letter-spacing: 0.02em;
-  color: #f7f9ff;
+  color: var(--text-100);
 }
 
 .report-title-wrap p {
   margin: 8px 0 0;
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.58);
+  color: var(--text-60);
 }
 
 .report-actions {
@@ -81,12 +179,13 @@ body.playbook-report-page {
   filter: brightness(1.03);
 }
 
+/* Edit Playbooks navigates (not a save): the neutral white plate (.gob-btn--neutral). */
 .report-btn-primary {
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: linear-gradient(180deg, #ffab40 0%, #F79420 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  border: 1px solid var(--white-90);
+  background: var(--white-90);
+  box-shadow: none;
+  color: var(--bg);
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -99,13 +198,13 @@ body.playbook-report-page {
 
 .report-card {
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--white-12);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
-    rgba(31, 37, 52, 0.92);
+    linear-gradient(180deg, var(--white-3), transparent 18%),
+    var(--surface-3);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 12px 28px rgba(0, 0, 0, 0.16);
+    inset 0 1px 0 var(--white-5),
+    0 12px 28px var(--black-18);
   padding: 16px 18px 18px;
 }
 
@@ -137,9 +236,9 @@ body.playbook-report-page {
   align-items: center;
   width: fit-content;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(247, 148, 32, 0.8);
-  color: #f7f9ff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  border-bottom: 1px solid var(--white-28);
+  color: var(--text-100);
+  font-family: var(--font-display);
   font-size: 28px;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -149,7 +248,7 @@ body.playbook-report-page {
   margin: 0;
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.56);
+  color: var(--white-55);
 }
 
 .report-subsection {
@@ -161,8 +260,8 @@ body.playbook-report-page {
   display: inline-flex;
   width: fit-content;
   padding-bottom: 5px;
-  border-bottom: 1px solid rgba(247, 148, 32, 0.8);
-  color: #F79420;
+  border-bottom: 1px solid var(--white-18);
+  color: var(--text-60);
   font-size: 15px;
   font-weight: 600;
   line-height: 1;
@@ -179,10 +278,10 @@ body.playbook-report-page {
   min-width: 0;
   padding: 11px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--white-10);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 22%),
-    rgba(255, 255, 255, 0.02);
+    linear-gradient(180deg, var(--white-3), transparent 22%),
+    var(--white-2);
 }
 
 .report-row-main {
@@ -195,7 +294,7 @@ body.playbook-report-page {
 
 .report-row-label {
   min-width: 0;
-  color: #f7f9ff;
+  color: var(--text-100);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.25;
@@ -203,7 +302,7 @@ body.playbook-report-page {
 
 .report-row-value {
   flex-shrink: 0;
-  color: #f7f9ff;
+  color: var(--text-100);
   font-size: 14px;
   font-weight: 700;
 }
@@ -215,20 +314,21 @@ body.playbook-report-page {
   min-width: 0;
   font-size: 12px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.58);
+  color: var(--text-60);
 }
 
+/* is-highlight is never set by playbook-report.js today; kept neutral. */
 .report-row.is-highlight {
-  border-color: rgba(247, 148, 32, 0.26);
+  border-color: var(--white-28);
   background:
-    linear-gradient(180deg, rgba(247, 148, 32, 0.06), transparent 24%),
-    rgba(247, 148, 32, 0.05);
+    linear-gradient(180deg, var(--white-6), transparent 24%),
+    var(--white-5);
 }
 
 .report-row.is-highlight .report-row-label,
 .report-row.is-highlight .report-row-value,
 .report-row.is-highlight .report-row-meta {
-  color: #F79420;
+  color: var(--text-100);
 }
 
 .report-list-ordered .report-row {
@@ -244,17 +344,17 @@ body.playbook-report-page {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--white-10);
+  background: var(--white-5);
+  color: var(--white-75);
   font-size: 12px;
   font-weight: 700;
 }
 
 .report-list-ordered .report-row.is-highlight .report-order-num {
-  background: rgba(247, 148, 32, 0.14);
-  border-color: rgba(247, 148, 32, 0.28);
-  color: #F79420;
+  background: var(--white-12);
+  border-color: var(--white-28);
+  color: var(--text-100);
 }
 
 .report-row-content {
@@ -271,9 +371,9 @@ body.playbook-report-page {
   min-height: 82px;
   padding: 14px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--white-10);
+  background: var(--white-3);
+  color: var(--white-62);
   font-size: 13px;
   font-weight: 600;
   text-align: center;

@@ -1,0 +1,54 @@
+{
+  "1280": {
+    "training": {
+      "x": 18,
+      "w": 1244,
+      "pad": "24px 28px 28px 28px",
+      "radius": "24px",
+      "h1Size": "39px",
+      "h1Margin": "18px"
+    },
+    "report": {
+      "x": 18,
+      "w": 1244,
+      "pad": "24px 28px 28px 28px",
+      "radius": "24px",
+      "h1Size": "39px",
+      "h1Margin": "18px"
+    },
+    "recruit": {
+      "x": 82,
+      "w": 1180,
+      "pad": "24px 28px 28px 28px",
+      "radius": "24px",
+      "h1Size": "",
+      "h1Margin": ""
+    }
+  },
+  "1920": {
+    "training": {
+      "x": 28,
+      "w": 1864,
+      "pad": "24px 28px 28px 28px",
+      "radius": "24px",
+      "h1Size": "46.5px",
+      "h1Margin": "18px"
+    },
+    "report": {
+      "x": 28,
+      "w": 1864,
+      "pad": "24px 28px 28px 28px",
+      "radius": "24px",
+      "h1Size": "46.5px",
+      "h1Margin": "18px"
+    },
+    "recruit": {
+      "x": 228,
+      "w": 1664,
+      "pad": "24px 28px 28px 28px",
+      "radius": "24px",
+      "h1Size": "",
+      "h1Margin": ""
+    }
+  }
+}
