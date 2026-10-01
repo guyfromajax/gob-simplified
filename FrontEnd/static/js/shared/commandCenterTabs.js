@@ -92,6 +92,7 @@ function initCommandCenterTabs(options) {
     if (tabName === 'game-plan-tab') return 'game-plan-view';
     if (tabName === 'playbooks-tab') return 'playbooks-view';
     if (tabName === 'coaches-tab') return 'scouting-view';
+    if (tabName === 'standings-tab') return 'standings-view';
     return tabName;
   }
 
