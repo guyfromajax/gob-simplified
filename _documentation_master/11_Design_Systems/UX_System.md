@@ -667,3 +667,14 @@ Tutorial pages (`tutorial*.html`) are `html.gob` and load `gob-tokens.css`; no s
 - **No navy/blue atmosphere** (navy is "yours", blue is RT): a neutral `--white-4` lift and the faint diagonal banding.
 - Headings and buttons `--font-display` (Bebas Neue Pro); body `--font-body` (Inter).
 - Logout lands on `/mode-select.html`, not an auth page.
+
+### Community pages
+
+`coaching-archetypes-leaderboard.html`, `coaching-archetypes.html` and `account.html` (geek points, titles, archetype board) are `html.gob` with `gob-tokens.css`; one sheet, `css/community.css` (`NEW_DESIGN_CSS`). The old inline `<style>` blocks are gone. The Home Base leaderboard is `home-base.css` (already new-design).
+
+- **Navy is "yours" only:** your leaderboard row (`.alb-row.is-current`, the `.ldb-r.me` recipe) and your lead archetype card (`.ca-card.is-lead`, the `.agc.is-me` ring).
+- **Data is neutral:** archetype share % (`.alb-pct`, `.arch-pct`), the geek points total, title counts. Points are a count, not a reward surface (no `--reward-gold`).
+- **Neutral:** the plan/status pill (`.acct-status`), the In-Game Display segment on-state (a choice control), the tooltip focus ring, the avatar (surface tokens, no navy gradient).
+- **No page wash:** a neutral `--white-4` top lift on `--bg-chrome` (was a navy radial).
+- `body.has-auth-bar` (auth-bar.css) owns `padding-top`; `css/community.css` sets only sides and bottom.
+- **Team Colors Mode** (the old Styleguide community-row fade) is not live in code; it stays retired.
