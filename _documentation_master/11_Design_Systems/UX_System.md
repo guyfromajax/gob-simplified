@@ -743,3 +743,18 @@ Not on tokens, on purpose: the Feedback button, its pulse and the Feedback modal
 | CMD bars (`.tp-cmd-fill`) | `--tier-yellow` / `--tier-green` / `--blue` | Unchanged hues; same open ramp question as `getPswColor`. |
 
 - Not migrated: `play-details.html` (pending the inspector decision) and the Expected Shot Distribution pills (`getPswColor`, `.psw-*` in `resource-pages.css`).
+
+### Empty states
+
+One shared pattern: `.gob-empty` (`css/gob-tables.css`), a neutral card: `--white-2` fill, 1px `--line` border, `--radius-10`, `--text-60` body text at `--fs-14`. No icon, no colour, one short sentence. Use it wherever a view or board has nothing to show:
+
+- Team › Practice Squad before it opens, News › Awards before week 35, League › Standings with no rows.
+- League › Leaders: a board with no qualified leader shows `No leaders yet.` and drops its "Full list →" (the rate floors in §13 leave FG% / DEF% empty at zero team games; per-game boards are empty before the first game).
+- Page-specific empty classes (`.gob-ps-empty`, `.gob-news-empty`) may stay alongside it for spacing; the card look comes from `.gob-empty`.
+
+Related small rules (gallery fixes, 2026-10-01):
+
+- Box Score "Back to Locker Room" is the standard ghost `.brand-back-link`, inside the page shell above the first card.
+- Cut Players: the page title is `--font-display`. "Assign Practice Squad" is the page's save (orange when enabled, dead when disabled). The "No Cuts Required" and load-error modals are not errors and not saves: neutral accent, neutral secondary "Back To Locker Room".
+- Set Lineup banner strip: `object-fit: contain` on `--surface-2` (the full lockup, never a crop).
+- Segmented toggles with a count (`.stats-toggle button em`, e.g. "Varsity 15"): `--space-6` before the count.

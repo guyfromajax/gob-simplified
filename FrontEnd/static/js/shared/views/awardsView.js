@@ -67,7 +67,7 @@ export function mount(container, ctx) {
     if (!alive) return;
     var teams = (body && body.all_american_teams) || null;
     if (!teams) {
-      container.innerHTML = '<p class="gob-news-empty">Awards are not available yet.</p>';
+      container.innerHTML = '<p class="gob-news-empty gob-empty">Awards are not available yet.</p>';
       return;
     }
     var html = '<div class="gob-awards">';
@@ -131,7 +131,7 @@ export function mount(container, ctx) {
     loaded = true;
     body = null;
     signature = 'unavailable';
-    container.innerHTML = '<p class="gob-news-empty">Awards are not available yet.</p>';
+    container.innerHTML = '<p class="gob-news-empty gob-empty">Awards are not available yet.</p>';
   }
 
   function fail() {

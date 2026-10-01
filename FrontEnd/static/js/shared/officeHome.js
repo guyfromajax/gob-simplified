@@ -1069,12 +1069,11 @@
     });
     if (snap.state === 'set_after_camp') {
       node.appendChild(el('div', 'sub-h', 'Moved most'));
-      [0, 1].forEach(function () {
-        var line = el('div', 'msr');
-        line.appendChild(el('span', '', 'Set after camp'));
-        line.appendChild(el('b', '', '—'));
-        node.appendChild(line);
-      });
+      // One placeholder line: two identical "Set after camp" rows read as a bug.
+      var line = el('div', 'msr');
+      line.appendChild(el('span', '', 'Set after camp'));
+      line.appendChild(el('b', '', '—'));
+      node.appendChild(line);
     } else if (moved.length) {
       node.appendChild(el('div', 'sub-h', 'Moved most'));
       moved.slice(0, 2).forEach(function (row) {
