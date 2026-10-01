@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
+  <!-- Design tokens for the DOM game overlays (gameCompletionPopup, PGPC, defense
+       matchups, foul-out, pre-game, sim broadcast). gob-tokens.css defines only
+       .gob-scoped custom properties, so it adds no rules that match court's own
+       chrome — the court paints identically; the overlays carry `.gob` so their
+       var(--token) references resolve. -->
+  <link rel="stylesheet" href="/css/gob-tokens.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->

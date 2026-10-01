@@ -277,7 +277,7 @@ function ensureStyles() {
       --w90:rgba(255,255,255,.90);--w70:rgba(255,255,255,.70);--w55:rgba(255,255,255,.55);--w40:rgba(255,255,255,.40);--w25:rgba(255,255,255,.25);
       --hair:rgba(255,255,255,.08);--green:${GREEN};--orange:${ORANGE}}
     .sgp-root .overlay{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;padding:16px 26px 12px;gap:14px;isolation:isolate;overflow:hidden;
-      background:radial-gradient(120% 78% at 50% 26%,rgba(39,64,142,.13),transparent 62%),radial-gradient(90% 70% at 50% 120%,rgba(247,148,32,.045),transparent 60%),#0b0d14}
+      background:radial-gradient(120% 78% at 50% 26%,rgba(39,64,142,.13),transparent 62%),/* was orange bottom glow (rgba(247,148,32,.045)) -> neutral; orange is reserved for saves */radial-gradient(90% 70% at 50% 120%,rgba(255,255,255,.03),transparent 60%),#0b0d14}
     .sgp-root .overlay::before{content:'';position:absolute;left:50%;bottom:-54%;width:94%;aspect-ratio:1/1;transform:translateX(-50%);border-radius:50%;border:1px solid rgba(255,255,255,.04);pointer-events:none}
     .sgp-root.fade-in{animation:sgpFade .45s ease}
     @keyframes sgpFade{from{opacity:0}to{opacity:1}}

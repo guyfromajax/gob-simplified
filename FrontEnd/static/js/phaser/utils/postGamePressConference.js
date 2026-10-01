@@ -57,7 +57,7 @@ function ensurePgpcStyles() {
       max-height: min(90vh, 640px);
       overflow: auto;
       background: rgba(13, 17, 36, 0.98);
-      border: 1px solid rgba(255,255,255,0.12);
+      border: 1px solid var(--white-12);
       border-radius: 16px;
       padding: 22px 24px 26px;
       box-shadow: 0 24px 48px rgba(0,0,0,0.55);
@@ -65,7 +65,7 @@ function ensurePgpcStyles() {
     .pgpc-modal-title {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 22px;
-      color: rgba(255,255,255,0.92);
+      color: var(--text-87);
       letter-spacing: 0.08em;
       text-transform: uppercase;
       margin: 0 0 14px;
@@ -73,7 +73,7 @@ function ensurePgpcStyles() {
     .pgpc-question {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 28px;
-      color: #fff;
+      color: var(--text-100);
       line-height: 1.15;
       margin: 0 0 16px;
     }
@@ -87,9 +87,9 @@ function ensurePgpcStyles() {
       align-items: center;
       gap: 12px;
       padding: 12px 14px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.05);
+      border-radius: var(--radius-10);
+      border: 1px solid var(--white-12);
+      background: var(--white-6);
       cursor: pointer;
       text-align: left;
       transition: background 0.12s ease, border-color 0.12s ease;
@@ -97,16 +97,18 @@ function ensurePgpcStyles() {
       font-size: 16px;
       font-weight: 400;
       letter-spacing: normal;
-      color: rgba(255,255,255,0.92);
+      color: var(--text-87);
     }
+    /* Neutral hover, not orange: selecting an answer is neither a save nor an advance. */
     .pgpc-choice-row:hover {
-      background: rgba(247, 148, 32, 0.12);
-      border-color: rgba(247, 148, 32, 0.35);
+      background: var(--white-10);
+      border-color: var(--white-20);
     }
+    /* Neutral accent letter, not orange (orange is reserved for saves). */
     .pgpc-choice-letter {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 20px;
-      color: #F79420;
+      color: var(--text-87);
       min-width: 28px;
     }
     .pgpc-wait-logo {
@@ -115,13 +117,13 @@ function ensurePgpcStyles() {
       height: auto;
       display: block;
       margin: 0 auto;
-      border-radius: 12px;
+      border-radius: var(--radius-12);
       box-shadow: 0 14px 28px rgba(0,0,0,0.35);
     }
     .pgpc-wait-sub {
       font-family: 'Inter', sans-serif;
       font-size: 15px;
-      color: rgba(255,255,255,0.68);
+      color: var(--text-60);
       text-align: center;
       margin: 22px 0 20px;
     }
@@ -138,7 +140,9 @@ function ensurePgpcStyles() {
       width: 100%;
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, rgba(52,236,39,0.35), #34EC27 48%, rgba(52,236,39,0.45));
+      /* Neutral pulse, not green: this is a passive "simming" loader, not the
+         Advance action or positive data, so green would be off-law. */
+      background: linear-gradient(90deg, var(--white-10), var(--white-40) 48%, var(--white-18));
       transform-origin: left center;
       animation: pgpcPulseBar 1.2s ease-in-out infinite;
     }
@@ -151,9 +155,11 @@ function ensurePgpcStyles() {
       width: 100%;
       height: 46px;
       border: none;
-      border-radius: 10px;
-      background: #34EC27;
-      color: #15181f;
+      border-radius: var(--radius-10);
+      /* colour-law: advance — this button is always the forward exit
+         ("Go To Locker Room" / dismiss), so green (Advance). */
+      background: var(--green);
+      color: var(--bg);
       font-family: 'Bebas Neue', sans-serif;
       font-size: 18px;
       letter-spacing: 0.04em;
@@ -198,7 +204,8 @@ export async function launchPostGamePressConference(opts) {
   if (typeof onCloseParentPopup === 'function') onCloseParentPopup();
 
   const overlay = document.createElement('div');
-  overlay.className = 'pgpc-overlay';
+  // `gob` so design tokens resolve (court.html links gob-tokens.css).
+  overlay.className = 'pgpc-overlay gob';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', 'Post-game press conference');

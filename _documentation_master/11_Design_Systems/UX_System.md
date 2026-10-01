@@ -30,6 +30,18 @@ The full law. `scripts/check_ui_tokens.py --strict` enforces it on new-design fi
 
 Annotate a legal exception in the CSS/JS with `/* colour-law: positive-data | committed | saved | reward */`. `positive-data` allows green on a data element, `committed`/`saved` allow orange on a save, `reward` allows `--reward-gold` on a reward surface. The annotation is only for the exceptions above — it does not license a colour the law forbids.
 
+### Live-game overlays (court.html DOM)
+
+The live-game DOM overlays built with `createElement` in `js/phaser/utils/` are on the design system. (This covers the DOM overlays only — the Phaser **canvas** HUD, announcements, and `court.html` inline chrome are game presentation, out of scope.)
+
+- `court.html` links `gob-tokens.css` (after `app-fonts`), and each overlay's root carries `.gob`, so `var(--token)` resolves. The `<link>` is the only allowed `court.html` change; it adds only `.gob`-scoped custom props, so the court paints identically.
+- Colour, type, radii use gob tokens. The **one forward action** per overlay is green (`--green`/`--bg`): the EOG locker-room button, "Submit Defense Matchups", PGPC "Go To Locker Room", pregame "Submit & Tip Off". A button that only **navigates** (foul-out "Sub Players" → set-lineup) is neutral, not green.
+- Neutralised law hits: W/L outcome badges → white fill / outline (never win-green/loss-red); orange accents/hovers/"don't-show" checkboxes → neutral (orange is saves only); the PGPC "simming" pulse bar → neutral (passive loader). "Don't show again" checkboxes are neutral because the pref persists only on submit — pending, not committed.
+- Kept as data: team-colour name bars / badges / favor arrows (identification), the RT ramp (`matchupsUiShared.js` fallbacks), and the broadcast's 5-colour data palette.
+- **Sim-safety:** visual-only; the five equivalence specs (`game-winner`, `sim-broadcast-fit`, `court-layout`, `game-start-sequence`, `sim-team-callouts` = 55) must stay byte-identical before/after.
+- These are **legacy JS**, not on the `check_ui_tokens` new-design surface (do not add them to it — it would newly gate legacy files).
+- **Open rulings (flagged, left as-is):** the Sim broadcast's spotlight/"POSS"/"SPOT" **orange**, "FOUL TROUBLE" **gold**, and highlights-toggle-on **green** are data/state indicators that are both spec-locked and ramp-governed; and the pregame **tip-off veil** green glow was neutralised pending a call on whether the "GO" flourish counts as the advance beat. `pgpcSammyReminderModal.js` is the legacy **FTE light shell** (loads `/css/fte.css`, which is **absent from the repo** — pre-existing) and was not re-themed to gob.
+
 ## 2. Tokens and density
 
 Root element: `html.gob` plus one density class.

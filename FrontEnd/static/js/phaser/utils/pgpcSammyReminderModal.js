@@ -59,9 +59,12 @@ export function showPgpcSammyReminderModal(opts) {
   backdrop.setAttribute('aria-modal', 'true');
   backdrop.setAttribute('aria-labelledby', 'pgpc-sammy-reminder-title');
 
+  // Ring is the user's team colour (identification). Fallback is a NEUTRAL grey,
+  // not orange — orange is reserved for saves, and a no-team ring shouldn't signal one.
+  // (This modal is the legacy FTE light shell, not a dark gob overlay, so no gob tokens.)
   const ringColor = userPrimaryColor && /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(String(userPrimaryColor).trim())
     ? String(userPrimaryColor).trim()
-    : '#F79420';
+    : '#6b7280';
 
   const sammySrc = coachSammyImageSrc(userTeamName);
 
@@ -116,7 +119,8 @@ export function showPgpcSammyReminderModal(opts) {
         width: 14px;
         height: 14px;
         cursor: pointer;
-        accent-color: #F79420;
+        /* Neutral accent, not orange (orange is reserved for saves). FTE light shell. */
+        accent-color: #6b7280;
         flex-shrink: 0;
       }
     `;
