@@ -13,6 +13,11 @@
 /* ── Brand ─────────────────────────────────────────────── */
 --navy:#27408E;          /* structure: active rail item, selected rows, switch on */
 --navy-hi:#4A6ED2;       /* edge/halo tint for navy selections only */
+/* "Yours" aliases of navy: fill, soft fill, line, ink. */
+--you:var(--navy);
+--you-soft:color-mix(in srgb,var(--navy) 28%,transparent);
+--you-line:color-mix(in srgb,var(--navy) 55%,transparent);
+--you-ink:color-mix(in srgb,var(--text-100) 82%,var(--navy));
 --orange:#F79420;        /* saves / non-advancing actions, gated-task tag */
 --green:#34EC27;         /* the ONE Advance action per screen + positive data */
 --reward-gold:#F0C560;   /* ONLY milestone / season-peak rewards + exceptional stat gains. Tints are color-mix() at use. */
@@ -23,14 +28,24 @@
 --black:#000000;
 
 /* ── Rating tiers (canonical, game-wide — never remap) ─────
-   Player digit 0–16:  0–4 red · 5–6 yellow · 7–8 green · 9+ blue
-   Team RT letter:     D/F red · C yellow · B green · A blue          */
+   Player digit = floor(raw / 10), no upper cap (105 shows 10, 160 shows 16):
+                       0–4 red · 5–6 yellow · 7–8 green · 9+ blue
+   RT letter:          D/F red · C yellow · B green · A blue
+   RT letters paint through css/rt-buckets.css: red / yellow / green from the
+   tier tokens below, A from --blue. Attribute tiles use --tier-blue.        */
 --tier-red:var(--red);
 --tier-yellow:var(--yellow);
 --tier-green:var(--green);
 /* Brighter than --blue. #4A90D9 is 3.8:1 on the white-10 elite tile; this step of
    the same blue clears 4.5:1. Do not point it back at --blue. */
 --tier-blue:#6BA4E0;
+
+/* ── Position colours (game presentation: sim broadcast, matchups) ── */
+--pos-pg:#4A90D9;
+--pos-sg:#7B5EA7;
+--pos-sf:#3A8C4A;
+--pos-pf:#C0392B;
+--pos-c:#D4A017;
 
 /* ── Deltas, results, badge ─────────────────────────────── */
 --delta-up:var(--green);

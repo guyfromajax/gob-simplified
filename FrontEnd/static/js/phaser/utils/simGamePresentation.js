@@ -36,7 +36,11 @@ import { REG_Q_SEC, clockToSeconds } from './simWormTime.js';
 import { loadCalloutCopy } from './simCalloutCopy.js';
 import { CalloutCadence, CALLOUT_HOLD_S, GAME_WINNER_HOLD_S, GAME_WINNER_TIER } from './simCalloutCadence.js';
 
-const POSC = { PG: '#4A90D9', SG: '#7B5EA7', SF: '#3A8C4A', PF: '#C0392B', C: '#D4A017' };
+// Position colours are gob tokens (--pos-*). The literal is the same value, as a fallback.
+const POSC = {
+  PG: 'var(--pos-pg, #4A90D9)', SG: 'var(--pos-sg, #7B5EA7)', SF: 'var(--pos-sf, #3A8C4A)',
+  PF: 'var(--pos-pf, #C0392B)', C: 'var(--pos-c, #D4A017)',
+};
 const GREEN = '#34EC27', BLUE = '#4A90D9', ORANGE = '#F79420', RED = '#ff6d6d', GOLD = '#FFD700';
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 

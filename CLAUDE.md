@@ -111,9 +111,10 @@ Code must work on both Mongo (hosted) and SQLite (desktop).
 ## Frontend
 
 - UI, colour and live-gameplay screen rules: [_documentation_master/00_Agent_Docs/CLAUDE.md](_documentation_master/00_Agent_Docs/CLAUDE.md). Follow it; don't restate or re-map the RT/energy/momentum ramps.
+- Colour law and the look: [Styleguide.md#colour-law](_documentation_master/11_Design_Systems/Styleguide.md#colour-law). It is canonical.
 - Shell, navigation and settings construction: [UX_System.md](_documentation_master/11_Design_Systems/UX_System.md).
 - Don't touch frontend/UX files unless the task says so.
-- **If you change or rely on a UI rule that isn't in [UX_System.md](_documentation_master/11_Design_Systems/UX_System.md), update UX_System in the same commit.** Colour law, SFX routing, the token-checker new-design surface, and the shell/nav/section map all live there.
+- **If you change or rely on a UI rule that isn't written down, write it down in the same commit:** a look or colour rule in [Styleguide.md](_documentation_master/11_Design_Systems/Styleguide.md), a build rule in [UX_System.md](_documentation_master/11_Design_Systems/UX_System.md). The colour law lives in the Styleguide. SFX routing, the token-checker new-design surface, and the shell/nav/section map live in UX_System.
 
 ## Further reading
 
