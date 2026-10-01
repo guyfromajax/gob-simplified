@@ -607,6 +607,7 @@ The Electron shell and the ops pages are on the design system. `desktop/splash.h
 - **Guards assert computed styles, not class names.** Colour/law and before/after guards read the computed `backgroundColor` / `borderColor` / `borderRadius` off the element, so a rename or a token swap can't fake a pass.
 - **Capture BEFORE screenshots from develop or a served frame.** Take the before shot from the develop build (behind the feature's `*_BEFORE=1` flag or the old embed bridge restored just for the shot) or from the handoff frame served so its CSS loads — never from the half-migrated working tree. Restore any regenerated tracked `reports/*` images with `git checkout -- reports/` before committing.
 - **A page that uses `var(--token)` must carry `.gob` and load `css/gob-tokens.css`.** The tokens are scoped to `.gob`, so a standalone page (`set-lineup.html`) needs `<html class="gob">` + the `gob-tokens.css` link (as `training.html` does). `.gob` alone only defines the custom properties — it does not restyle the page (the shell layout lives in `gob-shell.css`, which a focus page does not load).
+- **Injected chrome uses `.gob-scope`, not `.gob`.** Chrome that is appended to pages which may not be `.gob` (page-load overlay, error screen, the account toast, the Home Base body) carries `.gob-scope`: the same custom properties and nothing else. `.gob` on such an element would also match the component rules in `gob-components.css` (`position: relative; overflow: hidden; background`). The host page still has to load `gob-tokens.css`. `.gob-scope` has no density classes.
 
 ### Set Lineup
 
@@ -678,6 +679,27 @@ Tutorial pages (`tutorial*.html`) are `html.gob` and load `gob-tokens.css`; no s
 - **No page wash:** a neutral `--white-4` top lift on `--bg-chrome` (was a navy radial).
 - `body.has-auth-bar` (auth-bar.css) owns `padding-top`; `css/community.css` sets only sides and bottom.
 - **Team Colors Mode** (the old Styleguide community-row fade) is not live in code; it stays retired.
+
+### Shared chrome (auth bar, overlay, error screens, FAQ / legal)
+
+Tokens reach this chrome three ways: `css/auth-bar.css` imports `gob-tokens.css`, and that file scopes the tokens to `.auth-bar` and `.site-footer` as well as `.gob` (both sit in static markup on pages that are not `.gob`: homepage, community); roots built by script carry `.gob-scope`; `faqs.html` is `html.gob`; `privacy.html`, `terms.html` and `mode-select.html` carry `.gob-scope` on `<body>` (the legal pages stay off `html.gob` because a tutorials spec uses `/privacy.html` as its non-gob host). `css/auth-bar.css`, `css/legal.css` and `mode-select.css` are in `NEW_DESIGN_CSS`.
+
+| Surface | Rule |
+|---|---|
+| Auth bar (`.auth-bar`) | `--bg-chrome`, neutral text and controls. Nothing green or orange. Hidden under the franchise shell. |
+| Tutorials alert (`.is-alert-glow`, `.nav-tutorials-callout`) | Neutral: white glow, white pill with `--bg` ink. An unread tutorial is not a save. |
+| Switch (`.account-switch`) | On-state is a brighter neutral (white 18% / 28%) plus the knob position. A switch is a choice control. Literal values, because `account.html` reuses it and that page is not guaranteed to carry tokens. |
+| Account toast (`.account-toast`) | Neutral rail and icon, like `GOBToast`. |
+| Modal accent (`.gob-modal-accent` mirror in `auth-bar.css`) | Neutral at zero specificity (`:where()`), so `resource-pages.css` and `is-red` / `is-neutral` still win where they load. |
+| Site footer (`.site-footer`) | White strip on `--white`; link is `--bg` ink, not orange. |
+| Page-load overlay (`pageLoadOverlay.js`) | `--black` at 92%; the pulse bar is a neutral gradient. A wait indicator is not Advance and not positive data. |
+| Error screens (`errorHandler.js`) | `--bg` page, `--surface-2` card, neutral heading. Primary action is the neutral plate (like Retry), secondary is a ghost. No orange. |
+| FAQ, Privacy, Terms | Dark `--bg` page; links are neutral and underlined. |
+| Home Base alpha banner (`.alpha-disclaimer`) | Neutral rail and title; only the alert label is `--red`. Hidden while trailer mode is on. |
+
+`account.html` is not part of this: the community pass owns it (see Community pages).
+
+Not on tokens, on purpose: the Feedback button, its pulse and the Feedback modal in `auth-bar.css`, and the local modal system and Leaders By Team modal in `mode-select.css` (alpha-feedback and community surfaces, owned by the community pass); the literal `.gob-modal-*` mirror block in `auth-bar.css` (it must render on pages with no tokens).
 
 ### Program select
 

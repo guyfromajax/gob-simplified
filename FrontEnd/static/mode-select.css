@@ -7,21 +7,25 @@
  * cards, Around The League cards, Community Highlights rows, community
  * leaderboard and hero row that used to fill this file went with the layout
  * they styled.
+ *
+ * On gob tokens (body carries .gob-scope): the page frame and the alpha banner.
+ * NOT migrated here, on purpose: the local modal system and the Leaders By Team
+ * modal below are community surfaces and belong to the community pass.
  */
 body.mode-select-page {
   margin: 0;
   min-height: 100vh;
   padding: 88px 22px 54px;
-  font-family: 'Inter', sans-serif;
-  color: #f7f9ff;
-  background: #0b0d14;
+  font-family: var(--font-body);
+  color: var(--text-100);
+  background: var(--bg);
 }
 
 body.mode-select-page button,
 body.mode-select-page input[type="button"],
 body.mode-select-page input[type="submit"],
 body.mode-select-page input[type="reset"] {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
 }
 body.mode-select-page .alpha-disclaimer {
   position: sticky;
@@ -33,11 +37,12 @@ body.mode-select-page .alpha-disclaimer {
   margin: 0 auto 28px;
   width: min(1100px, 100%);
   padding: 12px 18px;
-  border-radius: 10px;
-  background: rgba(28, 33, 43, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-left: 3px solid #F79420;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+  border-radius: var(--radius-10);
+  background: var(--surface-popover);
+  border: 1px solid var(--line-strong);
+  /* A notice, not a save: neutral rail and title. Only the alert label is red. */
+  border-left: 3px solid var(--text-60);
+  box-shadow: 0 12px 28px var(--black-25);
   box-sizing: border-box;
 }
 
@@ -51,10 +56,10 @@ body.mode-select-page .alpha-disclaimer.is-dismissing {
 
 body.mode-select-page .alpha-disclaimer-title {
   flex: 0 0 auto;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 22px;
-  color: #F79420;
-  letter-spacing: 0.05em;
+  font-family: var(--font-display);
+  font-size: var(--fs-22);
+  color: var(--text-100);
+  letter-spacing: var(--tracking-5);
   line-height: 1;
 }
 
@@ -62,9 +67,9 @@ body.mode-select-page .alpha-disclaimer-text {
   margin: 0;
   min-width: 0;
   flex: 1 1 auto;
-  font-size: 14px;
+  font-size: var(--fs-14);
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.76);
+  color: var(--white-75);
 }
 
 body.mode-select-page .alpha-disclaimer-text p {
@@ -76,13 +81,13 @@ body.mode-select-page .alpha-disclaimer-text p + p {
 }
 
 body.mode-select-page .alpha-disclaimer-text strong {
-  color: #ffffff;
-  font-weight: 600;
+  color: var(--text-100);
+  font-weight: var(--fw-semibold);
 }
 
 body.mode-select-page .alpha-disclaimer-text .alpha-alert-label {
-  color: #e53935;
-  font-weight: 700;
+  color: var(--red);
+  font-weight: var(--fw-bold);
 }
 
 body.mode-select-page .alpha-disclaimer-dismiss {
@@ -90,16 +95,16 @@ body.mode-select-page .alpha-disclaimer-dismiss {
   padding: 0;
   border: 0;
   background: none;
-  color: rgba(255, 255, 255, 0.3);
-  font-family: 'Inter', sans-serif;
-  font-size: 22px;
+  color: var(--white-30);
+  font-family: var(--font-body);
+  font-size: var(--fs-22);
   line-height: 1;
   cursor: pointer;
   transition: color 0.18s ease;
 }
 
 body.mode-select-page .alpha-disclaimer-dismiss:hover {
-  color: #ffffff;
+  color: var(--text-100);
 }
 @keyframes alpha-banner-dismiss {
   from { opacity: 1; transform: translateY(0); }
