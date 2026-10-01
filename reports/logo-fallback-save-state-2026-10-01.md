@@ -1,6 +1,6 @@
 # Logo fallback + save state: 2026-10-01
 
-Jamie's rulings from the gallery-fixes report. Branch `ux/logo-fallback-save-state` from `origin/develop` (`79e4a6e17`), in `~/gob-audit`; upstream unset. Merged develop twice: `76039eaf5` (court part 3) before the full run (clean), and `fe28bb4d0` (Jamie rulings batch) right before push (doc conflict resolved below; gates and overlapping specs re-run).
+Jamie's rulings from the gallery-fixes report. Branch `ux/logo-fallback-save-state` from `origin/develop` (`79e4a6e17`), in `~/gob-audit`; upstream unset. Merged develop three times: `76039eaf5` (court part 3) before the full run (clean), `fe28bb4d0` (Jamie rulings batch) after it (doc conflict; gates and overlapping specs re-run), and `4bbf3074f` (docs rulings-sync, docs only) right before push (doc conflict resolved below; strict re-run).
 
 ## (a) Set Lineup franchise mode: no preset (recorded, no code change)
 
@@ -44,7 +44,11 @@ UX_System "Rulings recorded 2026-10-01 (gallery follow-up)": the five stay empty
 
 - **UX_System:** the Colour law summary adds "orange = there is something to save"; new "Rulings recorded 2026-10-01 (gallery follow-up)" covers (a), (b), (c) and Submit Training.
 - **Styleguide** colour-law table: the orange row adds "Save Game Plan / Playbooks (only while there is an unsaved edit: neutral at rest and after a save)".
-- **Conflict with develop, flagged:** develop's new "Settled rulings" note (from `reports/jamie-decisions-2026-10-01.md`) says "#9 Submit Training green / Save orange" were *kept as they are*. This brief's ruling (c) changes the Save half. The merge keeps develop's table and amends that sentence: Submit Training green (kept); Save buttons were ruled the same day (later): orange only while there is an unsaved edit. **Please confirm this later ruling supersedes #9's Save part.**
+- **Docs merges with develop:**
+  - At `fe28bb4d0`, develop's "Settled rulings" note said "#9 … Save orange" was *kept*; I amended it to record this later same-day ruling.
+  - Develop then merged `docs/rulings-sync` (`4bbf3074f`), which already records the ruling ("Save buttons neutral until something has changed") and the logo fallback, both as **"Pending audit (not on develop yet)"**.
+  - The final merge takes develop's restructured docs and turns those two pending notes into done rows (UX_System index; Styleguide "Done since"), pointing at this branch's tests.
+  - It narrows the Styleguide Orange row and the Action-button role to "only while there is something to save". No contradiction remains.
 
 ## Tests
 
