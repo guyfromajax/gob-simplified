@@ -3,8 +3,12 @@ const fs = require('fs');
 const path = require('path');
 const { stubAuth } = require('./helpers/auth');
 
-const FID = 'f-e2e-submit-cuts';
+const FID_PREFIX = 'f-e2e-submit-cuts';
 const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+
+function franchiseIdFor(testInfo) {
+  return FID_PREFIX + '-w' + testInfo.workerIndex + '-r' + testInfo.repeatEachIndex;
+}
 const CUT_COUNT = 3;
 const OUT = path.join(__dirname, '../../reports/submit-cuts');
 const NAMES = [
@@ -31,9 +35,9 @@ function playerRow(i) {
 
 const ROSTER = NAMES.map((_, i) => playerRow(i));
 
-function ccData(overrides) {
+function ccData(franchiseId, overrides) {
   return Object.assign({
-    franchise_id: FID,
+    franchise_id: franchiseId,
     team_id: TID,
     user_team_id: TID,
     team: 'Lancaster',
@@ -102,7 +106,9 @@ async function installApi(page, state) {
       return;
     }
     if (pathname.startsWith('/franchise/command-center/data')) {
-      await fulfillJson(route, state.assigned ? ccData({ cut_required: false, cut_count: 0 }) : ccData());
+      await fulfillJson(route, state.assigned
+        ? ccData(state.franchiseId, { cut_required: false, cut_count: 0 })
+        : ccData(state.franchiseId));
       return;
     }
     if (pathname.startsWith('/roster/')) {
@@ -150,8 +156,9 @@ async function capture(page, name) {
   await page.screenshot({ path: path.join(OUT, name) });
 }
 
-async function openAssignPage(page, opts) {
+async function openAssignPage(page, testInfo, opts) {
   opts = opts || {};
+  const franchiseId = franchiseIdFor(testInfo);
   if (opts.desktop) {
     await page.addInitScript(() => {
       window.GOB_BUILD_PROFILE = 'desktop';
@@ -161,10 +168,10 @@ async function openAssignPage(page, opts) {
     });
   }
   await stubAuth(page);
-  const state = { posts: [], assigned: false };
+  const state = { posts: [], assigned: false, franchiseId: franchiseId };
   await installApi(page, state);
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto('/cut-players.html?franchise_id=' + FID + '&team_id=' + TID + '&from=fcc');
+  await page.goto('/cut-players.html?franchise_id=' + encodeURIComponent(franchiseId) + '&team_id=' + TID + '&from=fcc');
   await expect(page.locator('#cut-players-table .cut-player-checkbox').first()).toBeVisible({ timeout: 30000 });
   await armSpy(page);
   return state;
@@ -202,8 +209,9 @@ async function clickSubmitForce(page) {
 }
 
 test.describe('week-1 practice-squad assignment', () => {
-  test('web: wrong count is disabled, looks dead, no sound; exact count confirms on top and lands on FCC', async ({ page }) => {
-    const state = await openAssignPage(page);
+  test('web: wrong count is disabled, looks dead, no sound; exact count confirms on top and lands on FCC', async ({ page }, testInfo) => {
+    const state = await openAssignPage(page, testInfo);
+    const captureShots = testInfo.repeatEachIndex === 0;
 
     await expect(page.locator('#submit-btn')).toHaveText('Assign Practice Squad');
     await expect(page.locator('#submit-btn')).toBeDisabled();
@@ -216,7 +224,7 @@ test.describe('week-1 practice-squad assignment', () => {
     expect(fewer.statusVisible, JSON.stringify(fewer)).toBe(true);
     expect(await clickSubmitForce(page)).toEqual([]);
     await expect(page.locator('#cut-modal-backdrop.is-visible')).toHaveCount(0);
-    await capture(page, 'wrong-count-1280.png');
+    if (captureShots) await capture(page, 'wrong-count-1280.png');
 
     const boxes = page.locator('#cut-players-table .cut-player-checkbox');
     await boxes.nth(0).check();
@@ -235,7 +243,7 @@ test.describe('week-1 practice-squad assignment', () => {
     expect(exact.reasonVisible).toBe(false);
     await page.evaluate(() => { window.__gobSfxCalls = []; });
     await resetScroll(page);
-    await capture(page, 'exact-count-1280.png');
+    if (captureShots) await capture(page, 'exact-count-1280.png');
 
     await page.locator('#submit-btn').click();
     await expect(page.locator('#cut-modal-backdrop.is-visible')).toBeVisible();
@@ -258,20 +266,20 @@ test.describe('week-1 practice-squad assignment', () => {
     expect(stack.inMain, JSON.stringify(stack)).toBe(false);
     expect(stack.hitInOverlay, JSON.stringify(stack)).toBe(true);
     expect(stack.overlayPos, JSON.stringify(stack)).toBe('fixed');
-    await capture(page, 'confirm-modal-1280.png');
+    if (captureShots) await capture(page, 'confirm-modal-1280.png');
 
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
     await expect.poll(() => state.posts.length, { timeout: 20000 }).toBe(1);
-    expect(state.posts[0].franchise_id).toBe(FID);
+    expect(state.posts[0].franchise_id).toBe(state.franchiseId);
     expect(state.posts[0].player_ids).toEqual(ROSTER.slice(0, 3).map((row) => row._id));
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
     await expect(page.locator('#play-now')).toBeVisible({ timeout: 20000 });
     await resetScroll(page);
-    await capture(page, 'landing-1280.png');
+    if (captureShots) await capture(page, 'landing-1280.png');
   });
 
-  test('desktop: wrong count is disabled with no sound; exact count POSTs and lands on FCC', async ({ page }) => {
-    const state = await openAssignPage(page, { desktop: true });
+  test('desktop: wrong count is disabled with no sound; exact count POSTs and lands on FCC', async ({ page }, testInfo) => {
+    const state = await openAssignPage(page, testInfo, { desktop: true });
     await expect(page.locator('#submit-btn')).toHaveText('Assign Practice Squad');
     await expect(page.locator('#submit-btn')).toBeDisabled();
     const fewer = await disabledLook(page);

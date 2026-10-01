@@ -207,7 +207,8 @@ function parsePxRadius(value) {
 }
 
 test.describe('box score + practice squad token guards', () => {
-  test('box score browse and focus: W/L plate, no illegal green, square POTG', async ({ page }) => {
+  test('box score browse and focus: W/L plate, no illegal green, square POTG', async ({ page }, testInfo) => {
+    const captureShots = testInfo.repeatEachIndex === 0;
     await stubAuth(page);
     await installBoxApis(page);
 
@@ -256,9 +257,9 @@ test.describe('box score + practice squad token guards', () => {
       expect(potgR).toBe(10);
       expect(styles.nameColor).not.toBe(GREEN_RGB);
 
-      await shot(page, 'after-box-score-browse-' + size[2] + '.png');
-      if (size[2] === '1280') {
-        await shot(page, 'after-box-score-potg-1280.png');
+      if (captureShots) {
+        await shot(page, 'after-box-score-browse-' + size[2] + '.png');
+        if (size[2] === '1280') await shot(page, 'after-box-score-potg-1280.png');
       }
     }
 
@@ -271,18 +272,19 @@ test.describe('box score + practice squad token guards', () => {
       await page.goto('/box-score.html' + focusQs);
       await page.waitForSelector('#home-player-stats-body tr', { timeout: 30000 });
       await expect(page.locator('html.gob-focus')).toHaveCount(1);
-      await shot(page, 'after-box-score-focus-' + size[2] + '.png');
+      if (captureShots) await shot(page, 'after-box-score-focus-' + size[2] + '.png');
     }
   });
 
-  test('practice squad: submit is committed orange when enabled', async ({ page }) => {
+  test('practice squad: submit is committed orange when enabled', async ({ page }, testInfo) => {
+    const captureShots = testInfo.repeatEachIndex === 0;
     await stubAuth(page);
     await installCutApis(page);
 
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/cut-players.html?franchise_id=' + FID + '&team_id=' + TID + '&from=fcc');
     await page.waitForSelector('#cut-players-table .cut-player-checkbox', { timeout: 30000 });
-    await shot(page, 'after-cut-wrong-count-1280.png');
+    if (captureShots) await shot(page, 'after-cut-wrong-count-1280.png');
 
     const boxes = page.locator('#cut-players-table .cut-player-checkbox');
     await boxes.nth(0).check();
@@ -295,16 +297,18 @@ test.describe('box score + practice squad token guards', () => {
     });
     expect(isGreenish(btnStyle.bg)).toBe(false);
     expect(isGreenish(btnStyle.color)).toBe(false);
-    await shot(page, 'after-cut-exact-count-1280.png');
+    if (captureShots) await shot(page, 'after-cut-exact-count-1280.png');
 
     await page.locator('#submit-btn').click();
     await expect(page.locator('#cut-modal-backdrop.is-visible')).toBeVisible();
-    await shot(page, 'after-cut-confirm-modal-1280.png');
+    if (captureShots) await shot(page, 'after-cut-confirm-modal-1280.png');
 
-    await page.setViewportSize({ width: 1920, height: 1080 });
-    await shot(page, 'after-cut-confirm-modal-1920.png');
+    if (captureShots) {
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await shot(page, 'after-cut-confirm-modal-1920.png');
+      await page.setViewportSize({ width: 1280, height: 720 });
+    }
 
-    await page.setViewportSize({ width: 1280, height: 720 });
     await page.unroute('**/*');
     await stubAuth(page);
     await page.route('**/*', async (route) => {
@@ -350,6 +354,7 @@ test.describe('box score + practice squad token guards', () => {
     });
     expect(assigningAccent.classes).toContain('is-neutral');
     expect(isGreenish(assigningAccent.bg)).toBe(false);
-    await shot(page, 'after-cut-assigning-modal-1280.png');
+    if (captureShots) await shot(page, 'after-cut-assigning-modal-1280.png');
+    await page.unroute('**/*');
   });
 });
