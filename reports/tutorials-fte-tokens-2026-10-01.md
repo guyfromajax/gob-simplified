@@ -2,6 +2,8 @@
 
 Branch `ux/tutorials-fte-tokens` from `origin/develop` (`9c45db7c2`), in `~/gob-audit`. The tutorial, FTE and Sammy surfaces are now on `gob-tokens.css` and the colour law. Upstream was unset after `checkout -b` (it tracked `origin/develop`). Push is explicit to `origin ux/tutorials-fte-tokens`.
 
+Merged develop a969aefdb (Team Builder). Conflicts in `check_ui_tokens.py` (`NEW_DESIGN_CSS`, docstring) and `UX_System.md` (Team Builder vs Tutorials and FTE sections) resolved keeping both sides. `box-score.css` takes develop's version (develop fixed the same `:494` annotation). Re-run: pytest 4298 passed / 0 failed, `--strict` exit 0, migration gates passed, `test_check_ui_tokens.py` 10 passed.
+
 ## Decisions (asked, answered)
 
 | Question | Answer |

@@ -488,10 +488,10 @@ html.gob-focus body.box-score-page #box-score-view {
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* colour-law: positive-data */
 .attr-chip.up {
-  /* colour-law: positive-data */
   border-color: color-mix(in srgb, var(--green) 30%, transparent);
-  background: color-mix(in srgb, var(--green) 6%, transparent);
+  background: color-mix(in srgb, var(--green) 6%, transparent); /* colour-law: positive-data */
 }
 
 .attr-chip.down {

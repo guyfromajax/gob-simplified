@@ -1,7 +1,7 @@
 /**
  * Team Builder — Establish sequence.
  * Curtain after Apply. Timing floors are design beats; close waits on the server.
- * Wait row uses the same green pulse bar as the training load overlay.
+ * Wait row is a neutral pulse bar (colour law: no green outside Advance / positive data).
  */
 (function (global) {
   'use strict';
@@ -239,7 +239,7 @@
       ' · ' +
       escapeHtml(confLabel) +
       '</div></div>' +
-      '<button type="button" class="btn" id="tb-est-enter"' +
+      '<button type="button" class="btn tb-advance" id="tb-est-enter"' +
       (this._phase >= 3 && this._franchiseId ? '' : ' disabled') +
       '>Enter Franchise</button></div></div></div>';
 

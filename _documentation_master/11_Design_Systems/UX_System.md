@@ -30,6 +30,18 @@ The full law. `scripts/check_ui_tokens.py --strict` enforces it on new-design fi
 
 Annotate a legal exception in the CSS/JS with `/* colour-law: positive-data | committed | saved | reward */`. `positive-data` allows green on a data element, `committed`/`saved` allow orange on a save, `reward` allows `--reward-gold` on a reward surface. The annotation is only for the exceptions above — it does not license a colour the law forbids.
 
+### Live-game overlays (court.html DOM)
+
+The live-game DOM overlays built with `createElement` in `js/phaser/utils/` are on the design system. (This covers the DOM overlays only — the Phaser **canvas** HUD, announcements, and `court.html` inline chrome are game presentation, out of scope.)
+
+- `court.html` links `gob-tokens.css` (after `app-fonts`), and each overlay's root carries `.gob`, so `var(--token)` resolves. The `<link>` is the only allowed `court.html` change; it adds only `.gob`-scoped custom props, so the court paints identically.
+- Colour, type, radii use gob tokens. The **one forward action** per overlay is green (`--green`/`--bg`): the EOG locker-room button, "Submit Defense Matchups", PGPC "Go To Locker Room", pregame "Submit & Tip Off". A button that only **navigates** (foul-out "Sub Players" → set-lineup) is neutral, not green.
+- Neutralised law hits: W/L outcome badges → white fill / outline (never win-green/loss-red); orange accents/hovers/"don't-show" checkboxes → neutral (orange is saves only); the PGPC "simming" pulse bar → neutral (passive loader). "Don't show again" checkboxes are neutral because the pref persists only on submit — pending, not committed.
+- Kept as data: team-colour name bars / badges / favor arrows (identification), the RT ramp (`matchupsUiShared.js` fallbacks), and the broadcast's 5-colour data palette.
+- **Sim-safety:** visual-only; the five equivalence specs (`game-winner`, `sim-broadcast-fit`, `court-layout`, `game-start-sequence`, `sim-team-callouts` = 55) must stay byte-identical before/after.
+- These are **legacy JS**, not on the `check_ui_tokens` new-design surface (do not add them to it — it would newly gate legacy files).
+- **Open rulings (flagged, left as-is):** the Sim broadcast's spotlight/"POSS"/"SPOT" **orange**, "FOUL TROUBLE" **gold**, and highlights-toggle-on **green** are data/state indicators that are both spec-locked and ramp-governed; and the pregame **tip-off veil** green glow was neutralised pending a call on whether the "GO" flourish counts as the advance beat. `pgpcSammyReminderModal.js` is the legacy **FTE light shell** (loads `/css/fte.css`, which is **absent from the repo** — pre-existing) and was not re-themed to gob.
+
 ## 2. Tokens and density
 
 Root element: `html.gob` plus one density class.
@@ -591,6 +603,28 @@ The Electron shell and the ops pages are on the design system. `desktop/splash.h
 - **RT stays blue** via `rt-buckets.css` (`.rt-*`), the sanctioned A-grade / 9+ / elite colour.
 - There is **no save state** on this page (the lineup persists through the flow, confirmed by a neutral toast), so orange has no home here.
 - `set-lineup.css` is on the design system (`NEW_DESIGN_CSS` in `check_ui_tokens.py`); `set-lineup.html` is already new-design via `gobShell.js` PAGES.
+
+### Team Builder
+
+`team-builder.html` is a pre-franchise flow (Identity → Gate → Roster → Review → Establish). It carries `<html class="gob">` and loads `gob-tokens.css`, but not the shell and not `gobDensity.js`, so it keeps its own layout and the 1280 token sizes at every width. `team-builder.css` is in `NEW_DESIGN_CSS`. Colour law on it:
+
+| Element | Colour | Why |
+|---|---|---|
+| Continue, Continue to Review, Enter Franchise (`.btn.tb-advance`) | green, shell Advance paint | The one Advance per chapter. Disabled is the dead neutral. |
+| Establish <program> (`.btn.sb-commit`) | orange, annotated `committed` | It writes the program into the league and cannot be undone. The only orange. |
+| Attribute fills, signature bars, grid cells (`scaleColor`) | `--tier-red` / `-yellow` / `-green` / `-blue` | The rating ramp on the raw scale: ≤40, ≤60, ≤80, 81+. Blue appears nowhere else. |
+| Selected roster row (`.bd-row.sel`, `.gr tr.sel`) | navy | Selection, as on Set Lineup. |
+| Your seat in the Establish table (`.sw-t tr.slot.now`) | navy | "Yours". |
+| Valid / legal / eligible / exact (`.ok`, `.d-ok`, `.verdict.ok`, `.meter.exact`, `.tally.ok`, `.pool.ok`, `.elig`, `.m-elig.ok`) | `--text-100`, neutral border | Status labels carry no green. Invalid stays `--red`. |
+| Changed from inherited (`.cls.chg`, `.bd-ht.chg`, `.mk.edit`, `.dlt`) | `--text-100` | A diff marker, not a save. |
+| Chapter cell, style buttons, palette ring, chips, year and view toggles, tone filters, input focus | neutral | Choice controls. |
+| Position chips (`.pos`, `.gp`, `.pos-b`), attribute category headings and legend codes | neutral | Information codes. No per-position or per-category colour. |
+| Wait pulse, pending sweep, picker accent, links | neutral | Not Advance, not a save. |
+
+- Headshots are square: `--radius-6` on the 26px board badge and the 38px Review badge, `--radius-10` on the 104px inspector portrait and the picker tile.
+- Team colours stay data: palette and swatch fills, court and banner art, skin-tone filter chips, and the Review "your program" row tint (`--me`, the program's primary).
+- Raw attribute values run 5–99 here and nowhere else (`ATTR_MIN` / `ATTR_MAX` in `js/team-builder/constants.js`). The ramp thresholds are on that raw scale.
+- Team names render as stored (Replacing cell, conference tables).
 
 ### Tutorials and FTE
 

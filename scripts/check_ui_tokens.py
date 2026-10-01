@@ -22,10 +22,12 @@ diagram sheet ``css/gob-advanced.css``, Chapter 7 chrome (``css/office-home.css`
 ``recruiting-dock.css``, ``recruiting-signing.css``,
 ``recruiting-results-hub.css``), the migrated focus/module CSS in
 ``NEW_DESIGN_CSS`` (Prep training/report, Playbooks ``playbooks.css`` /
-``css/playbook-tiles.css``, ``set-lineup.css``, Game Plan ``game-plan.css``,
-Scouting ``scouting-report.css`` / ``css/prep-v2-scouting.css``, tutorial / FTE
-modals and screens: Sammy, username, walk-on, attribute tour, lineup modal,
-persona intro, pick opponent, tip-off, ``css/fte.css``), ``js/shared/gob*.js``, and
+``css/playbook-tiles.css``, ``set-lineup.css``, ``box-score.css``,
+``cut-players.css``, Game Plan ``game-plan.css``, Scouting
+``scouting-report.css`` / ``css/prep-v2-scouting.css``, Team Builder
+``team-builder.css``, tutorial / FTE modals and screens: Sammy, username,
+walk-on, attribute tour, lineup modal, persona intro, pick opponent, tip-off,
+``css/fte.css``), ``js/shared/gob*.js``, and
 ``js/shared/views/**``. Everything else under the scan root is legacy.
 ``css/gob-tokens.css`` is the token source and is not scanned.
 
@@ -252,6 +254,7 @@ NEW_DESIGN_CSS = frozenset({
     "game-plan.css",
     "scouting-report.css",
     "css/prep-v2-scouting.css",
+    "team-builder.css",
     "css/sammy-modal.css",
     "css/username-modal.css",
     "css/walk-on-welcome.css",
