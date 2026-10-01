@@ -441,8 +441,9 @@ test('standings team page returns instantly with in-app Back and browser Back', 
   await installApi(page, commandCenter({ training_completed: true, week: 1 }));
   await openLockerRoom(page);
   await page.waitForFunction(() => window.CommandCenterTabs && typeof window.CommandCenterTabs.show === 'function');
-  await page.evaluate(() => window.CommandCenterTabs.show('standings-tab', 'replace'));
-  const teamLink = page.locator('#standings-by-region a').first();
+  // League › Standings is the only standings surface: the old #standings-tab panel is gone.
+  await page.evaluate(() => window.CommandCenterTabs.show('standings-view', 'replace'));
+  const teamLink = page.locator('#standings-view a.gob-team').first();
   await expect(teamLink).toBeVisible({ timeout: 20000 });
   await page.evaluate(() => { window.__standingsMark = 'alive'; });
   await teamLink.click();
@@ -451,18 +452,18 @@ test('standings team page returns instantly with in-app Back and browser Back', 
   await page.waitForFunction(() => window.GOBNav && history.state && history.state.gobIdx > 0);
   await page.locator('#back-button').click();
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 15000 }).toBe('/franchise-command-center.html');
-  expect(new URL(page.url()).searchParams.get('tab')).toBe('standings-tab');
+  expect(new URL(page.url()).searchParams.get('tab')).toBe('standings-view');
   const afterInApp = await page.evaluate(() => {
     const nav = performance.getEntriesByType('navigation')[0];
     return { mark: window.__standingsMark || null, type: nav ? nav.type : '' };
   });
   expect(afterInApp.mark === 'alive' || afterInApp.type === 'back_forward', JSON.stringify(afterInApp)).toBe(true);
   await page.evaluate(() => { window.__standingsMark = 'alive'; });
-  await page.locator('#standings-by-region a').first().click();
+  await page.locator('#standings-view a.gob-team').first().click();
   await expect(page).toHaveURL(/tab=team-view/, { timeout: 20000 });
   await page.waitForFunction(() => document.readyState === 'complete');
   await page.goBack({ waitUntil: 'commit' });
-  await expect.poll(() => new URL(page.url()).searchParams.get('tab'), { timeout: 15000 }).toBe('standings-tab');
+  await expect.poll(() => new URL(page.url()).searchParams.get('tab'), { timeout: 15000 }).toBe('standings-view');
   const afterBrowser = await page.evaluate(() => {
     const nav = performance.getEntriesByType('navigation')[0];
     return { mark: window.__standingsMark || null, type: nav ? nav.type : '' };

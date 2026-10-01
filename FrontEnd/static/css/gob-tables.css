@@ -460,9 +460,15 @@ html.gob-shell.gob-1920 .gob-tgrid {
   padding-bottom: var(--space-16);
 }
 
+/* Shared empty state (UX_System "Empty states"): one neutral card. */
 .gob-empty {
-  padding: var(--space-16);
+  margin: 0;
+  padding: var(--space-16) var(--space-20);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-10);
+  background: var(--white-2);
   color: var(--text-60);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);
 }
 
 .gob-view-skel-bar,
@@ -860,6 +866,9 @@ html.gob-shell .gob-focus.stats-toggle button {
 #player-stats-view .gob-scroll.gob-xs { overflow-x: auto; overflow-y: visible; }
 #player-stats-view .gob-xs .gob-tbl { min-width: 0; width: max-content; }
 #player-stats-view tbody tr { cursor: pointer; }
+/* The last column (F) sat on the card's rounded edge and read as clipped. */
+#player-stats-view .gob-tbl th:last-child,
+#player-stats-view .gob-tbl td:last-child { padding-right: var(--space-14); }
 #player-stats-view .gob-player {
   align-items: center;
   color: var(--text-100);

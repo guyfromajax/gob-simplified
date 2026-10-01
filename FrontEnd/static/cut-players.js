@@ -388,10 +388,11 @@ function cloneParams(params) {
         showModal({
           title: 'No Cuts Required',
           message: 'Your roster is already at the legal 12-player limit.',
-          accent: 'is-red',
+          // Not an error and not a save: neutral accent, neutral navigation button.
+          accent: 'neutral',
           actions: [{
             label: 'Back To Locker Room',
-            variant: 'gob-modal-btn-primary',
+            variant: 'gob-modal-btn-secondary',
             onClick: navigateBack
           }]
         });
@@ -402,7 +403,7 @@ function cloneParams(params) {
         title: 'Assign Practice Squad',
         message: 'Unable to load practice squad assignment data.',
         accent: 'is-red',
-        actions: [{ label: 'Back To Locker Room', variant: 'gob-modal-btn-primary', onClick: navigateBack }]
+        actions: [{ label: 'Back To Locker Room', variant: 'gob-modal-btn-secondary', onClick: navigateBack }]
       });
     });
   }

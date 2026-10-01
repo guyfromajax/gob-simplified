@@ -918,131 +918,13 @@ function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
   return '/team-roster-view.html?' + params.toString();
 }
 
-function buildTeamLink(t) {
-  const teamLink = document.createElement('a');
-  const label = standingsTeamLabel(t);
-  teamLink.href = buildFranchiseTeamPageUrl(t.team_id, label, 'standings-view');
-  teamLink.setAttribute('data-return', '');
-  const rank = Number(t?.natl_rank);
-  const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
-  teamLink.textContent = `${rankPrefix}${label}`;
-  teamLink.style.color = 'var(--text-100)';
-  teamLink.style.textDecoration = 'none';
-  teamLink.style.cursor = 'pointer';
-  teamLink.addEventListener('mouseenter', () => { teamLink.style.textDecoration = 'underline'; });
-  teamLink.addEventListener('mouseleave', () => { teamLink.style.textDecoration = 'none'; });
-  return teamLink;
-}
-
-function buildStandingsCard(titleText, teams) {
-  const card = document.createElement('section');
-  card.className = 'fcc-standings-card';
-
-  const title = document.createElement('div');
-  title.className = 'fcc-standings-card-title';
-  title.textContent = titleText;
-  card.appendChild(title);
-
-  const headerRow = document.createElement('div');
-  headerRow.className = 'fcc-standings-row fcc-standings-row-header';
-  headerRow.innerHTML = [
-    '<span class="fcc-standings-col-team">Team</span>',
-    '<span class="fcc-standings-col-stat">W</span>',
-    '<span class="fcc-standings-col-stat">L</span>',
-    '<span class="fcc-standings-col-stat">PF</span>',
-    '<span class="fcc-standings-col-stat">PA</span>',
-    '<span class="fcc-standings-col-next">Next</span>'
-  ].join('');
-  card.appendChild(headerRow);
-
-  const body = document.createElement('div');
-  body.className = 'fcc-standings-card-body';
-
-  teams.forEach((t) => {
-    const row = document.createElement('div');
-    row.className = 'fcc-standings-row';
-
-    const teamCell = document.createElement('span');
-    teamCell.className = 'fcc-standings-col-team';
-    teamCell.appendChild(buildTeamLink(t));
-    row.appendChild(teamCell);
-
-    const wCell = document.createElement('span');
-    wCell.className = 'fcc-standings-col-stat';
-    wCell.textContent = t.W;
-    row.appendChild(wCell);
-
-    const lCell = document.createElement('span');
-    lCell.className = 'fcc-standings-col-stat';
-    lCell.textContent = t.L;
-    row.appendChild(lCell);
-
-    const pfCell = document.createElement('span');
-    pfCell.className = 'fcc-standings-col-stat';
-    pfCell.textContent = t.PF;
-    row.appendChild(pfCell);
-
-    const paCell = document.createElement('span');
-    paCell.className = 'fcc-standings-col-stat';
-    paCell.textContent = t.PA;
-    row.appendChild(paCell);
-
-    const nextCell = document.createElement('span');
-    nextCell.className = 'fcc-standings-col-next';
-    nextCell.textContent = t.next || '';
-    row.appendChild(nextCell);
-
-    body.appendChild(row);
-  });
-
-  card.appendChild(body);
-  return card;
-}
-
-function renderStandings(data, selectedRegion) {
+// The League › Standings view draws the table. This keeps the top-bar record and the
+// team id → name map current.
+function renderStandings(data) {
   if (!data) return;
   const list = data.standings || [];
   updateTopRecordLabel();
   list.forEach(t => { teamIdNameMap[t.team_id] = standingsTeamLabel(t); });
-
-  const container = document.getElementById('standings-by-region');
-  if (!container) return;
-  container.innerHTML = '';
-
-  // FCC slim view: two blocks (user conference, sister conference) when API returned user_conference/sister_conference
-  const userConf = data.user_conference;
-  const sisterConf = data.sister_conference;
-  if (userConf != null && sisterConf != null && list.length > 0) {
-    const regionLabels = { 1: 'A1', 2: 'A2', 3: 'B1', 4: 'B2', 5: 'C1', 6: 'C2', 7: 'D1', 8: 'D2', 9: 'E1', 10: 'E2', 11: 'F1', 12: 'F2', 13: 'G1', 14: 'G2', 15: 'H1', 16: 'H2' };
-    [userConf, sisterConf].forEach((confNum) => {
-      const teams = list.filter(t => t.conference === confNum);
-      if (teams.length === 0) return;
-      const label = regionLabels[confNum] ? `Conference ${regionLabels[confNum]}` : `Conference ${confNum}`;
-      container.appendChild(buildStandingsCard(label, teams));
-    });
-    return;
-  }
-
-  // Fallback: full standings by region (e.g. from standalone standings page)
-  selectedRegion = selectedRegion || 'A';
-  const byRegion = list.filter(t => (t.region || '').toString().toUpperCase() === selectedRegion);
-  const byConference = {};
-  byRegion.forEach(t => {
-    const c = t.conference != null ? t.conference : 0;
-    if (!byConference[c]) byConference[c] = [];
-    byConference[c].push(t);
-  });
-  const confNumbers = Object.keys(byConference).map(Number).sort((a, b) => a - b);
-
-  confNumbers.forEach(confNum => {
-    const teams = byConference[confNum];
-    teams.sort((a, b) => (b.W - a.W) || (b.differential - a.differential));
-    container.appendChild(buildStandingsCard(`Conference ${selectedRegion}${confNum}`, teams));
-  });
-
-  document.querySelectorAll('.standings-region-btn').forEach(btn => {
-    if (btn) btn.classList.toggle('active', btn.getAttribute('data-region') === selectedRegion);
-  });
 }
 
 function escapeHomeHtml(value) {
@@ -1153,17 +1035,6 @@ async function loadHomeTabData() {
   await renderHomeTab();
 }
 
-function bindStandingsRegionButtons() {
-  document.querySelectorAll('.standings-region-btn').forEach(btn => {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', () => {
-      const region = btn.getAttribute('data-region');
-      if (standingsDataCache) renderStandings(standingsDataCache, region);
-    });
-  });
-}
-
 function buildResourceUrl(page, extraParams) {
   if (!franchiseId || !userTeamId) return '#';
   const params = emptyParams();
@@ -1221,8 +1092,6 @@ function bindResourcesLinks() {
   };
   const standingsLink = document.getElementById('standings-resources-link');
   if (standingsLink) standingsLink.href = `/standings.html${q()}`;
-  const standingsFullLink = document.getElementById('standings-full-link');
-  if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
   const scheduleFullLink = document.getElementById('schedule-full-link');
   const leagueScheduleHref = q()
     ? `/franchise-command-center.html${q()}&tab=league-schedule-view`
@@ -1532,7 +1401,7 @@ async function init() {
     updateAwardsButton(commandCenterTopDataCache);
     void updatePlaybooksButtonState(commandCenterTopDataCache);
     bindResourcesLinks();
-    if (standingsDataCache) renderStandings(standingsDataCache, 'A');
+    if (standingsDataCache) renderStandings(standingsDataCache);
     if (userRosterPlayersCache.length) renderTeam(userRosterDataCache);
     void renderHomeTab();
     // Keep the full-page overlay visible until authoritative command-center
@@ -1692,7 +1561,7 @@ async function init() {
   console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
   standingsDataCache = standingsData;
   persistFccSessionCache();
-  renderStandings(standingsData, 'A');
+  renderStandings(standingsData);
   bindResourcesLinks();
   const homeTabDataPromise = loadHomeTabData();
     

@@ -389,6 +389,10 @@ html.gob-shell .stats-toggle button {
   padding: var(--space-8) var(--space-12);
 }
 
+html.gob-shell .stats-toggle button em {
+  margin-left: var(--space-6);
+}
+
 html.gob-shell .stats-toggle button.on {
   background: var(--white-10);
   color: var(--text-100);
