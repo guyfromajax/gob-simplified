@@ -442,6 +442,7 @@ function inAppShell() {
       const saved = {};
       EDITABLE_STATE_KEYS.forEach((key) => { saved[key] = this.state[key]; });
       this.savedState = JSON.parse(JSON.stringify(saved));
+      this.syncSaveDirtyState();
     }
 
     hasEdits() {
@@ -1519,6 +1520,13 @@ function inAppShell() {
       if (this.elements.saveBtn) {
         this.elements.saveBtn.disabled = okCount !== 2;
       }
+      this.syncSaveDirtyState();
+    }
+
+    // Colour law: Save Playbooks is orange only while there is something to save
+    // (hasEdits: a real edit since the last load or save). Neutral otherwise.
+    syncSaveDirtyState() {
+      if (this.elements.saveBtn) this.elements.saveBtn.classList.toggle("is-dirty", this.hasEdits());
     }
 
     buildPreviewPayload() {

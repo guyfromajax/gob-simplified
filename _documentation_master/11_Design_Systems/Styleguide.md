@@ -9,7 +9,7 @@ One colour, one meaning. Everything not listed is neutral: white text at `--text
 | Colour | Token(s) | Allowed | Banned |
 |---|---|---|---|
 | Green | `--green` (ink on green: `--bg`) | The one Advance per screen (top-bar `#play-now` / `.advance`, `.gob-btn--gate`, the one forward action in a live-game overlay, Submit Training on the weekly training page). Positive data: delta-up, tier green, chemistry high, board-gain bars, the RT / attribute ramps. | Cards, WIN/LOSS plates, badges, scores, choice controls, a second button on the same screen, any button that only navigates or only saves. |
-| Orange | `--orange` | Saved or committed only: Submit Invites, Submit Orders, Save Game Plan / Playbooks, Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row. | Brand accent, "warning / low" data, navigation, choice controls, checkboxes, hovers, toasts, a loader. |
+| Orange | `--orange` | Saved or committed only: Submit Invites, Submit Orders, Save Game Plan / Playbooks (only while there is an unsaved edit: neutral at rest and after a save), Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row. | Brand accent, "warning / low" data, navigation, choice controls, checkboxes, hovers, toasts, a loader. |
 | Navy | `--navy`, `--navy-hi` (edge / halo only) | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list, your team in a bracket. What you picked for your team or plan: Set Lineup on-court and selected rows, plays in your Playcall Center, your leaderboard and lean-ladder slot. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. A generic "selected" state on a choice control: tabs, toggles, radios, sliders and filter chips stay neutral. |
 | Blue | `--tier-blue` | RT only: an A grade, a 9+ attribute, elite. One exception: the top band of the shot-share ramp (see [Data scales](#data-scales)). | Chrome, links, navigation, "good / above average". |
 | Reward gold | `--reward-gold` | Only: title medallions (`.med.gold`); season-peak glow, rule and confetti (`.pk`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`); the exceptional-gain marker (`.xg`, `.xg-key`); the words "Trophy Case" (`.gold-t`); senior-tribute title marks (`.st-titles s`, `.st-cti s`). Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens. | Any button, including the button on a reward modal (the big-news CTA is a neutral plate). Advance, "yours", choice controls, everyday or weekly chrome, Home Base chrome. |
@@ -115,7 +115,7 @@ All buttons: `--font-display` bold, `--tracking-btn`, `--radius-10`, height `--d
 | Role | Class | Fill / ink | Rule |
 |---|---|---|---|
 | Gate (Advance) | `.advance`, `.gob-btn--gate` | `--green` / `--bg`, `--shadow-advance` | One per screen. A blocking task changes its label; it never disables it. Loading: `.is-loading`, label `STARTING…`, repeat clicks ignored. Submit Training is the training page's gate. |
-| Action (save) | `.gob-btn--action` | `--orange` / dark ink | Only for a save or commit. |
+| Action (save) | `.gob-btn--action` | `--orange` / dark ink | Only for a save or commit, and only while there is something to save (a page save is neutral at rest and after saving). |
 | Neutral | `.gob-btn` | transparent fill, `--white-28` border, `--text-100` | Navigation, Retry, Autoset, every other button. |
 | Ghost | `.gob-btn--ghost`, `.btn-ghost` | `--white-5` fill, `--white-18` border | Secondary, dismiss, acknowledgement. |
 
@@ -196,10 +196,10 @@ Jamie's rulings (`reports/jamie-decisions-2026-10-01.md`) and the same day's gal
 | Franchise Set Lineup opens with five empty slots | By design. Behaviour, not look. | UX_System, "Set Lineup" |
 | Duplicate pages, desktop icon | Done; not a look rule. | UX_System, "Settled rulings" |
 
-**Pending audit** (ruled, not on `develop` when this was written, so not yet in the sections above):
+Done since (ux/logo-fallback-save-state):
 
-- Save buttons stay neutral until something has changed; orange only when there is something to save. This will narrow the Orange row and the Action button role.
-- Team art: a missing `logo_square` falls back to `logo_primary` before the generated letter tile.
+- Save buttons stay neutral until something has changed; orange only when there is something to save. The Orange row and the Action button role now say so.
+- Team art: a missing `logo_square` falls back to `logo_primary` before the generated letter tile (UX_System, "Rulings recorded 2026-10-01").
 
 ## Open questions
 
