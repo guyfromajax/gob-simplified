@@ -37,10 +37,11 @@ function ensureStyles() {
       position: fixed; inset: 0; z-index: 10002;
       background:
         radial-gradient(120% 80% at 50% 42%, rgba(39,64,142,0.12), transparent 62%),
-        radial-gradient(90% 60% at 50% 120%, rgba(247,148,32,0.05), transparent 60%),
-        #0b0d14;
+        /* was an orange bottom glow (rgba(247,148,32,.05)) -> neutral; orange is reserved for saves */
+        radial-gradient(90% 60% at 50% 120%, rgba(255,255,255,0.03), transparent 60%),
+        var(--bg);
       display: flex; flex-direction: column; isolation: isolate;
-      color: rgba(255,255,255,0.90); font-family: Inter, system-ui, sans-serif;
+      color: var(--text-87); font-family: Inter, system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
     .pgxp-root::before {
@@ -52,7 +53,7 @@ function ensureStyles() {
     .pgxp-head { position: relative; z-index: 3; text-align: center; padding: 26px 20px 4px; flex-shrink: 0; }
     .pgxp-title {
       font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: clamp(34px, 5vw, 60px); line-height: .92;
-      letter-spacing: .02em; color: #fff;
+      letter-spacing: .02em; color: var(--text-100);
       opacity: 0; transform: translateY(-8px);
       transition: opacity .5s ease, transform .5s ease;
     }
@@ -68,13 +69,13 @@ function ensureStyles() {
     }
     .pgxp-rec .rk {
       font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: clamp(22px, 2.8vw, 30px);
-      line-height: 1; letter-spacing: .02em; color: #fff;
+      line-height: 1; letter-spacing: .02em; color: var(--text-100);
     }
     .pgxp-rec .wl {
-      font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.45); letter-spacing: .02em;
+      font-size: 13px; font-weight: 600; color: var(--text-38); letter-spacing: .02em;
     }
     .pgxp-rec-div {
-      width: 1px; height: 22px; background: rgba(255,255,255,0.18); flex-shrink: 0;
+      width: 1px; height: 22px; background: var(--white-18); flex-shrink: 0;
     }
     .pgxp-board {
       position: relative; z-index: 2; flex: 1; min-height: 0;
@@ -89,7 +90,7 @@ function ensureStyles() {
     }
     .pgxp-pair:not(:last-child)::after {
       content: ''; position: absolute; left: 12%; right: 12%; bottom: -9px; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.12) 70%, transparent);
+      background: linear-gradient(90deg, transparent, var(--white-12) 30%, var(--white-12) 70%, transparent);
     }
     .pgxp-pair .pgxp-side-left { transform: translateX(-40px); transition: transform .55s cubic-bezier(.2,.7,.2,1); justify-self: end; width: 100%; max-width: 520px; }
     .pgxp-pair .pgxp-side-right { transform: translateX(40px); transition: transform .55s cubic-bezier(.2,.7,.2,1); justify-self: start; width: 100%; max-width: 520px; }
@@ -136,7 +137,7 @@ function ensureStyles() {
     .dm-ptile[data-side="left"] .dm-pbody { flex-direction: row-reverse; justify-content: flex-start; }
     .dm-ptile[data-side="right"] .dm-pbody { flex-direction: row; justify-content: flex-start; }
     .dm-ph {
-      position: relative; flex-shrink: 0; width: clamp(64px, 7vw, 88px); aspect-ratio: 1/1; border-radius: 14px;
+      position: relative; flex-shrink: 0; width: clamp(64px, 7vw, 88px); aspect-ratio: 1/1; border-radius: var(--radius-14);
       overflow: hidden; background: linear-gradient(180deg, #1b2130, #10141d);
       border: 2px solid rgba(255,255,255,0.16); box-shadow: 0 8px 20px rgba(0,0,0,0.4);
     }
@@ -152,15 +153,15 @@ function ensureStyles() {
     .dm-ptile[data-side="left"] .dm-rtedge { text-align: left; }
     .dm-ptile[data-side="right"] .dm-rtedge { text-align: right; }
     .dm-pinfo { min-width: 0; }
-    .dm-nm { font-size: clamp(13px, 1.5vw, 16px); font-weight: 700; color: #fff; line-height: 1.1; white-space: nowrap; }
-    .dm-jn { color: rgba(255,255,255,0.55); font-weight: 600; font-size: .85em; }
-    .dm-meta { color: rgba(255,255,255,0.55); font-weight: 600; font-size: 11.5px; }
+    .dm-nm { font-size: clamp(13px, 1.5vw, 16px); font-weight: 700; color: var(--text-100); line-height: 1.1; white-space: nowrap; }
+    .dm-jn { color: var(--text-60); font-weight: 600; font-size: .85em; }
+    .dm-meta { color: var(--text-60); font-weight: 600; font-size: 11.5px; }
     .dm-statline { margin-top: 6px; display: flex; gap: 12px; font-variant-numeric: tabular-nums; }
     .pgxp-side-left .dm-statline { justify-content: flex-end; }
     .pgxp-side-right .dm-statline { justify-content: flex-start; }
     .dm-st { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-    .dm-sv { font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,0.90); }
-    .dm-sl { font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,0.40); }
+    .dm-sv { font-size: 12.5px; font-weight: 700; color: var(--text-87); }
+    .dm-sl { font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-38); }
     .pgxp-vs { display: flex; flex-direction: column; align-items: center; gap: 5px; }
     .pgxp-vstext {
       font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 20px; line-height: 1; letter-spacing: .06em;
@@ -169,13 +170,13 @@ function ensureStyles() {
     .dm-favarrow { display: flex; }
     .dm-favarrow svg { width: 32px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
     .pgxp-root[data-phase="matchups"] .pgxp-user .dm-ptile {
-      cursor: grab; border-radius: 14px; padding: 6px 8px; margin: -6px -8px;
+      cursor: grab; border-radius: var(--radius-14); padding: 6px 8px; margin: -6px -8px;
       transition: background .15s, box-shadow .15s;
     }
     .pgxp-root[data-phase="matchups"] .pgxp-user .dm-ptile:hover { background: rgba(255,255,255,0.04); }
     .dm-ptile.dragging { opacity: .45; cursor: grabbing; }
     .dm-ptile.dropcue { background: rgba(255,255,255,0.09); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3); }
-    .dm-draghint { display: none; color: rgba(255,255,255,0.40); }
+    .dm-draghint { display: none; color: var(--white-40); }
     .pgxp-root[data-phase="matchups"] .pgxp-user .dm-draghint { display: flex; }
     .dm-draghint svg { width: 15px; height: 15px; }
     .pgxp-foot {
@@ -190,9 +191,11 @@ function ensureStyles() {
     .pgxp-root[data-phase="matchups"] .pgxp-instruction { display: block; }
     .pgxp-cta {
       font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: 22px; letter-spacing: .06em; line-height: 1;
-      height: 50px; padding: 0 34px; border-radius: 10px; border: none;
-      background: #34EC27; color: #0a1f06; cursor: pointer;
-      box-shadow: 0 10px 26px rgba(52,236,39,0.28), inset 0 1px 0 rgba(255,255,255,0.35);
+      height: 50px; padding: 0 34px; border-radius: var(--radius-10); border: none;
+      /* colour-law: advance — "Submit & Tip Off" / "Tip Off" saves matchups and
+         tips off into the game, i.e. the one forward action, so green (Advance). */
+      background: var(--green); color: var(--bg); cursor: pointer;
+      box-shadow: 0 10px 26px color-mix(in srgb, var(--green) 28%, transparent), inset 0 1px 0 var(--white-35);
       opacity: 0; transform: translateY(10px) scale(.98); pointer-events: none;
       transition: opacity .4s ease, transform .4s ease, filter .15s;
     }
@@ -200,25 +203,31 @@ function ensureStyles() {
     .pgxp-cta:hover { filter: brightness(1.06); transform: translateY(-1px); }
     .pgxp-cta:active { transform: translateY(1px); }
     .pgxp-dontshow {
-      display: none; align-items: center; gap: 8px; font-size: 12px; color: rgba(255,255,255,0.55);
+      display: none; align-items: center; gap: 8px; font-size: 12px; color: var(--text-60);
       cursor: pointer; user-select: none;
     }
     .pgxp-root[data-phase="matchups"] .pgxp-dontshow { display: inline-flex; }
     .pgxp-dontshow input {
-      appearance: none; width: 16px; height: 16px; border-radius: 4px;
-      border: 1.5px solid rgba(255,255,255,0.40); display: grid; place-items: center; cursor: pointer;
+      appearance: none; width: 16px; height: 16px; border-radius: var(--radius-4);
+      border: 1.5px solid var(--white-40); display: grid; place-items: center; cursor: pointer;
     }
-    .pgxp-dontshow input:checked { background: #F79420; border-color: #F79420; }
-    .pgxp-dontshow input:checked::after { content: '✓'; color: #15181f; font-size: 11px; font-weight: 900; }
+    /* Neutral checked state, not orange: the pref only persists on Submit, so at
+       toggle time it is a pending selection, not a committed save. */
+    .pgxp-dontshow input:checked { background: var(--text-100); border-color: var(--text-100); }
+    .pgxp-dontshow input:checked::after { content: '✓'; color: var(--bg); font-size: 11px; font-weight: 900; }
     .pgxp-tipoff {
       position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center;
-      background: radial-gradient(60% 60% at 50% 50%, rgba(52,236,39,0.14), rgba(5,6,10,0.96));
+      /* FLAGGED judgment call: the tip-off veil's green glow was decorative, not an
+         Advance action or positive data, so neutralised to a dark veil. If the green
+         "GO" flourish is intended as the advance-into-game moment, revert this line. */
+      background: radial-gradient(60% 60% at 50% 50%, rgba(5,6,10,0.65), rgba(5,6,10,0.96));
       opacity: 0; pointer-events: none; transition: opacity .4s ease;
     }
     .pgxp-root[data-phase="tipoff"] .pgxp-tipoff { opacity: 1; }
     .pgxp-tipoff .to {
-      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: clamp(48px, 9vw, 120px); letter-spacing: .04em; color: #fff;
-      text-shadow: 0 0 40px rgba(52,236,39,0.4);
+      font-family: 'Bebas Neue', 'Bebas Neue Pro', sans-serif; font-size: clamp(48px, 9vw, 120px); letter-spacing: .04em; color: var(--text-100);
+      /* FLAGGED: green text glow neutralised to white (see .pgxp-tipoff note). */
+      text-shadow: 0 0 40px rgba(255,255,255,0.25);
       transform: scale(.8); transition: transform .5s cubic-bezier(.2,.9,.3,1.2);
     }
     .pgxp-root[data-phase="tipoff"] .pgxp-tipoff .to { transform: none; }
@@ -303,7 +312,8 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
   };
 
   const root = document.createElement("div");
-  root.className = "pgxp-root";
+  // `gob` so design tokens resolve (court.html links gob-tokens.css).
+  root.className = "pgxp-root gob";
   root.innerHTML = `
     <div class="pgxp-head">
       <div class="pgxp-title"></div>
@@ -572,7 +582,7 @@ export function showOpaqueSimBridgeCover() {
   if (document.querySelector(".pgxp-root.pgxp-bridge")) return;
   document.querySelectorAll(".pgxp-root").forEach((n) => n.remove());
   const root = document.createElement("div");
-  root.className = "pgxp-root pgxp-bridge";
+  root.className = "pgxp-root pgxp-bridge gob";
   root.setAttribute("aria-hidden", "true");
   document.body.appendChild(root);
 }
@@ -593,7 +603,7 @@ export function showPreppingSimCover(waitForSim) {
   ensureStyles();
   document.querySelectorAll(".pgxp-root").forEach((n) => n.remove());
   const root = document.createElement("div");
-  root.className = "pgxp-root";
+  root.className = "pgxp-root gob";
   root.dataset.phase = "tipoff"; // reuse the tip-off veil styling
   root.innerHTML = `<div class="pgxp-tipoff"><div class="to">PREPPING SIM</div></div>`;
   document.body.appendChild(root);
