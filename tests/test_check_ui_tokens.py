@@ -295,15 +295,26 @@ def test_allow_list_selectors_and_comments(tmp_path):
 .toggle-btn.active { background: #f79420; } /* colour-law: committed */
 """,
     )
-    _write(root, "css/gob-tutorial.css", ".x { color: var(--orange); background: #34EC27; }")
+    _write(root, "css/gob-advanced.css", ".x { color: var(--orange); background: #34EC27; }")
     audit = _audit(root)
     assert audit.law_counts()["new"]["green"] == 0
     assert audit.law_counts()["new"]["orange"] == 0
-    tutorial_new = [
+    advanced_new = [
         hit for hit in audit.laws
-        if hit.path.endswith("gob-tutorial.css") and hit.surface == "new"
+        if hit.path.endswith("gob-advanced.css") and hit.surface == "new"
     ]
-    assert tutorial_new == []
+    assert advanced_new == []
+
+
+def test_tutorial_chrome_is_new_design(tmp_path):
+    root = tmp_path / "tutorial"
+    _write(root, "css/gob-tokens.css", TOKENS_CSS)
+    _write(root, "css/gob-tutorial.css", ".eyebrow .tick { background: var(--orange); }")
+    _write(root, "css/sammy-modal.css", ".sammy-modal-btn-primary { background: #34EC27; }")
+    _write(root, "css/fte.css", ".fte-btn { background: #F79420; }")
+    audit = _audit(root)
+    new_paths = {hit.path for hit in audit.laws if hit.surface == "new"}
+    assert new_paths == {"css/gob-tutorial.css", "css/sammy-modal.css", "css/fte.css"}
 
 
 def test_no_write_skips_report(tmp_path):

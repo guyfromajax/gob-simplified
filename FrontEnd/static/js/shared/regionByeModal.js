@@ -88,6 +88,7 @@ function cloneParams(params) {
         eyebrow: 'Region Tournament Bye',
         body: 'Hey Coach, congratulations! You won both your conference regular-season title and your conference tournament title. This means you\u2019ve earned a bye in the Region Tournament and have automatically qualified for the Region Championship game. Sim this week\u2019s games, then start preparing for the Region Championship!',
         ctaLabel: 'Sim Region First Round',
+        primaryClass: 'is-advance', // runs #play-now: the Advance stays green
         secondaryLabel: 'Back to Locker Room',
         imageSrc: getTeamSammyImage(data.team || ''),
         onCta: function () {
@@ -127,6 +128,7 @@ function cloneParams(params) {
           eyebrow: labeledEyebrow(queue, 'Region Tournament Bye'),
           body: 'Hey Coach, congratulations! You won both your conference regular-season title and your conference tournament title. This means you\u2019ve earned a bye in the Region Tournament and have automatically qualified for the Region Championship game. Sim this week\u2019s games, then start preparing for the Region Championship!',
           ctaLabel: 'Sim Region First Round',
+          primaryClass: 'is-advance', // runs #play-now: the Advance stays green
           secondaryLabel: 'Back to Locker Room',
           imageSrc: loaded[1].getTeamSammyImage(data.team || ''),
           onCta: function () {

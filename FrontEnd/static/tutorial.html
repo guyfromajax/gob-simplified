@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
+  <link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/gtm-loader.js"></script>
   <script src="/js/shared/franchiseContext.js"></script>
@@ -19,8 +20,8 @@
 
   .tut-top { margin-top: 4px; }
   .tm-title { font-family: var(--display); font-weight: 400; font-size: 40px; line-height: 1; letter-spacing: .01em; margin: 6px 0 14px; color: var(--text); }
-  .continue-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--orange-soft); text-decoration: none; }
-  .continue-link:hover { color: var(--orange); }
+  .continue-link { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-87); text-decoration: none; }
+  .continue-link:hover { color: var(--text-100); }
 
   /* PROGRESS STRIP */
   .progress-strip { display: flex; align-items: center; gap: 20px; padding: 16px 20px; margin-top: 4px; }
@@ -30,7 +31,7 @@
   .progress-strip .lbl { font-family: var(--display); font-size: 19px; letter-spacing: .03em; color: var(--text); }
   .progress-strip .sub { font-size: 12px; color: var(--muted-2); }
   .bar { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
-  .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--orange), #ffc06b); border-radius: 999px; transition: width .55s cubic-bezier(.2,.9,.3,1); }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--text-87); border-radius: 999px; transition: width .55s cubic-bezier(.2,.9,.3,1); }
   .reset-link { background: none; border: none; cursor: pointer; font-family: var(--body); font-size: 12px; color: var(--muted-3); text-decoration: underline; text-underline-offset: 2px; }
   .reset-link:hover { color: var(--muted); }
 
@@ -51,7 +52,7 @@
 
   .tile { display: flex; align-items: center; gap: 14px; padding: 13px 12px; border-radius: 11px; text-decoration: none; color: inherit; position: relative; border: 1px solid transparent; transition: background .14s, border-color .14s; }
   .tile:hover { background: rgba(255,255,255,0.04); }
-  .tile .order-circle { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: transparent; border: 2px solid var(--orange); color: var(--orange); font-family: var(--display); font-size: 17px; line-height: 1; letter-spacing: .02em; }
+  .tile .order-circle { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: transparent; border: 2px solid var(--white-28); color: var(--text-87); font-family: var(--display); font-size: 17px; line-height: 1; letter-spacing: .02em; }
   .tile .t-main { flex: 1; min-width: 0; }
   .tile .t-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .tile .t-name { font-weight: 700; font-size: 15px; color: var(--text); letter-spacing: -.01em; }
@@ -61,14 +62,14 @@
   /* tbd + seen states */
   .tile--tbd { opacity: .68; }
 
-  .seen-check { width: 19px; height: 19px; border-radius: 50%; flex-shrink: 0; background: var(--green); color: #07210a; font-size: 12px; font-weight: 800; display: none; align-items: center; justify-content: center; }
+  .seen-check { width: 19px; height: 19px; border-radius: 50%; flex-shrink: 0; background: var(--white-90); color: var(--bg); font-size: 12px; font-weight: 800; display: none; align-items: center; justify-content: center; }
   .tile.is-seen .seen-check { display: flex; }
   .tile.is-seen .t-go { display: none; }
   .tile.pulse { animation: tilePulse 1.6s ease; }
   @keyframes tilePulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(247,148,32,0); }
-    15% { box-shadow: 0 0 0 3px rgba(247,148,32,0.5); background: rgba(247,148,32,0.12); }
-    60% { box-shadow: 0 0 0 2px rgba(247,148,32,0.28); }
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    15% { box-shadow: 0 0 0 3px var(--white-45); background: var(--white-10); }
+    60% { box-shadow: 0 0 0 2px var(--white-28); }
   }
 
   /* ADVANCED TOPICS */

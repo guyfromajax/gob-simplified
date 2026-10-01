@@ -50,7 +50,7 @@ import { loadStylesheets } from './stylesheetReady.js';
 
 // set-lineup.html links NEITHER of these, so the module injects them itself —
 // the same pattern tutorialLineupModals.js uses. gob-buttons is required now that
-// the GOT IT CTA is a brand .gob-btn--action; without it the button renders
+// the GOT IT CTA is a .gob-btn--neutral (it acknowledges); without it the button renders
 // unstyled and, crucially, SILENTLY — no console error, just a plain button.
 const STYLESHEETS = [
   '/css/attribute-tour.css',
@@ -161,7 +161,7 @@ export function showAttributeTour(opts = {}) {
     </div>
     <div class="attribute-tour__sammy-foot">
       <span class="attribute-tour__sammy-count" id="attribute-tour-count">0 of ${total} explored</span>
-      <button type="button" class="gob-btn gob-btn--action attribute-tour__sammy-dismiss" id="attribute-tour-dismiss">GOT IT</button>
+      <button type="button" class="gob-btn gob-btn--neutral attribute-tour__sammy-dismiss" id="attribute-tour-dismiss">GOT IT</button>
     </div>
   `;
   const countEl = sammy.querySelector('#attribute-tour-count');

@@ -28,9 +28,9 @@
   border-radius: 50%;
   object-fit: cover;
   object-position: center top;
-  background: rgba(0, 0, 0, 0.5);
-  border: 3px solid #F79420;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  background: var(--black-50);
+  border: 3px solid var(--white-28);
+  box-shadow: 0 8px 24px var(--black-50);
 }
 
 .tutorial-lineup-modal-body {
@@ -40,10 +40,10 @@
 }
 
 .tutorial-lineup-modal-message {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.55;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--white-90);
   margin: 0;
 }
 

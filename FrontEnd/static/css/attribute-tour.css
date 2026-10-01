@@ -5,7 +5,7 @@
  * page (which fights table-section stacking — <thead> z-index is
  * notoriously unreliable in some browsers and the header row was
  * rendering under the scrim), we DIM the siblings directly. The header
- * row stays at its natural position, full opacity, with the gold ring +
+ * row stays at its natural position, full opacity, with the white ring +
  * glow visible.
  *
  * Layers (no overlay required):
@@ -13,7 +13,7 @@
  *                           drops + pointer-events keep the user from
  *                           clicking buttons mid-tour
  *   thead / its <th>s       untouched — they stay at full opacity and
- *                           get the gold ring/glow + shimmer cue
+ *                           get the white ring/glow + shimmer cue
  *   .attribute-tour__sammy  fixed, high z-index, above everything
  *
  * Existing per-attribute tooltips (position: fixed; z-index: 99999) keep
@@ -30,40 +30,40 @@
 
 /* ---------- Lifted header row ---------- */
 
-/* Gold ring + soft glow on each header cell. No z-index lift — the
+/* White ring + soft glow on each header cell. No z-index lift — the
  * header is fully visible because nothing is over it. */
 .attribute-tour-active th.attribute-tour__lifted {
   position: relative;
-  background-color: rgba(11, 13, 20, 0.96);
+  background-color: var(--bg-page);
   box-shadow:
-    0 0 0 1px rgba(247, 148, 32, 0.5),
-    0 0 38px rgba(247, 148, 32, 0.18);
+    0 0 0 1px var(--white-45),
+    0 0 38px var(--white-6);
 }
 
 /* Build a clean horizontal band — internal vertical edges between
  * adjacent lifted cells merge, only first/last carry the outer ring. */
 .attribute-tour-active th.attribute-tour__lifted + th.attribute-tour__lifted {
   box-shadow:
-    inset 1px 0 0 rgba(247, 148, 32, 0.18),
-    0 -1px 0 rgba(247, 148, 32, 0.5),
-    0 1px 0 rgba(247, 148, 32, 0.5),
-    0 0 38px rgba(247, 148, 32, 0.18);
+    inset 1px 0 0 var(--white-6),
+    0 -1px 0 var(--white-45),
+    0 1px 0 var(--white-45),
+    0 0 38px var(--white-6);
 }
 
 .attribute-tour-active th.attribute-tour__lifted.is-first {
   box-shadow:
-    inset 1px 0 0 rgba(247, 148, 32, 0.5),
-    0 -1px 0 rgba(247, 148, 32, 0.5),
-    0 1px 0 rgba(247, 148, 32, 0.5),
-    0 0 38px rgba(247, 148, 32, 0.18);
+    inset 1px 0 0 var(--white-45),
+    0 -1px 0 var(--white-45),
+    0 1px 0 var(--white-45),
+    0 0 38px var(--white-6);
 }
 
 .attribute-tour-active th.attribute-tour__lifted.is-last {
   box-shadow:
-    inset -1px 0 0 rgba(247, 148, 32, 0.5),
-    0 -1px 0 rgba(247, 148, 32, 0.5),
-    0 1px 0 rgba(247, 148, 32, 0.5),
-    0 0 38px rgba(247, 148, 32, 0.18);
+    inset -1px 0 0 var(--white-45),
+    0 -1px 0 var(--white-45),
+    0 1px 0 var(--white-45),
+    0 0 38px var(--white-6);
 }
 
 /* ---------- Per-header cue: shimmer underline ---------- */
@@ -79,7 +79,7 @@
   right: 18%;
   bottom: 4px;
   height: 2px;
-  background: linear-gradient(90deg, transparent 0%, #F79420 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--white-70) 50%, transparent 100%);
   opacity: 0.85;
   border-radius: 1px;
   pointer-events: none;
@@ -91,26 +91,26 @@
   50%      { opacity: 0.9;  transform: scaleX(1);    }
 }
 
-/* Hover tint: orange invitation. */
+/* Hover: full white (choice/progress chrome is neutral). */
 .attribute-tour-active th.is-cued:hover {
-  color: #F79420;
+  color: var(--text-100);
 }
 
-/* Explored: green status + shimmer suppressed. */
+/* Explored: neutral status (colour law) + shimmer suppressed. */
 .attribute-tour-active th.is-explored {
-  color: #34EC27;
+  color: var(--text-100);
 }
 
 .attribute-tour-active th.is-explored::after {
   animation: none;
   opacity: 0.4;
-  background: linear-gradient(90deg, transparent 0%, rgba(52, 236, 39, 0.6) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--white-45) 50%, transparent 100%);
   transform: scaleX(1);
 }
 
-/* Explored + hover: keep green (don't flicker back to orange). */
+/* Explored + hover: stays white. */
 .attribute-tour-active th.is-cued.is-explored:hover {
-  color: #34EC27;
+  color: var(--text-100);
 }
 
 /* ---------- Sammy coach-mark ---------- */
@@ -120,12 +120,12 @@
   z-index: 1600;
   width: min(420px, calc(100vw - 32px));
   padding: 14px 18px 14px;
-  background: rgba(22, 26, 36, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--surface-popover);
+  border: 1px solid var(--line-strong);
   border-radius: 12px;
   box-shadow:
-    0 18px 36px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 18px 36px var(--black-45),
+    inset 0 1px 0 var(--white-5);
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
   column-gap: 14px;
@@ -151,9 +151,9 @@
   left: var(--sammy-arrow-x, 50%);
   width: 14px;
   height: 14px;
-  background: rgba(22, 26, 36, 0.98);
-  border-left: 1px solid rgba(255, 255, 255, 0.14);
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--surface-popover);
+  border-left: 1px solid var(--line-strong);
+  border-top: 1px solid var(--line-strong);
   transform: translateX(-50%) rotate(45deg);
 }
 
@@ -165,8 +165,8 @@
   border-radius: 50%;
   object-fit: cover;
   object-position: center top;
-  background: rgba(0, 0, 0, 0.4);
-  border: 2px solid rgba(247, 148, 32, 0.65);
+  background: var(--black-35);
+  border: 2px solid var(--white-28);
 }
 
 .attribute-tour__sammy-body {
@@ -179,25 +179,25 @@
 }
 
 .attribute-tour__sammy-eyebrow {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 0.14em;
-  color: #F79420;
+  color: var(--text-60);
   text-transform: uppercase;
   line-height: 1;
 }
 
 .attribute-tour__sammy-text {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 13.5px;
   line-height: 1.4;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-87);
   margin: 0;
 }
 
 .attribute-tour__sammy-text strong {
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 .attribute-tour__sammy-foot {
@@ -211,14 +211,14 @@
 }
 
 .attribute-tour__sammy-count {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--white-45);
   letter-spacing: 0.04em;
 }
 
 .attribute-tour__sammy-count.is-complete {
-  color: #34EC27;
+  color: var(--text-100);
 }
 
 .attribute-tour__sammy-dismiss {
@@ -234,10 +234,10 @@
   min-width: 92px;
   padding: 0 14px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.85);
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  background: var(--white-6);
+  border: 1px solid var(--white-18);
+  color: var(--text-87);
+  font-family: var(--font-display);
   font-size: 13px;
   letter-spacing: 0.06em;
   opacity: 0.55;
@@ -250,9 +250,9 @@
 
 .attribute-tour__sammy-dismiss:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.11);
-  border-color: rgba(255, 255, 255, 0.30);
-  color: #ffffff;
+  background: var(--white-11);
+  border-color: var(--white-30);
+  color: var(--text-100);
 }
 
 @media (max-width: 640px) {
@@ -318,31 +318,30 @@
   gap: 12px;
 }
 
-/* Brand orange CTA.
+/* Neutral primary CTA (GOT IT acknowledges; colour law).
  *
  * The base .attribute-tour__sammy-dismiss rule above inlines a GHOST recipe —
  * translucent white background, hairline border, and `opacity: 0.55` — precisely so
  * the module works without gob-buttons.css. That rule is more specific than
- * `.gob-btn--action`, so simply adding the class left the button grey and faded.
- * The colours are restated here (matching gob-buttons.css .gob-btn--action) rather
- * than fought over with !important. */
+ * `.gob-btn--neutral`, so the colours are restated here (matching gob-buttons.css
+ * .gob-btn--neutral) rather than fought over with !important. */
 .attribute-tour__sammy.is-centered .attribute-tour__sammy-dismiss {
   height: auto;
   padding: 10px 24px;
   min-width: 120px;
   opacity: 1;
-  background: #F79420;
-  border: 1px solid rgba(247, 148, 32, 0.55);
-  color: #15181f;
+  background: var(--white-90);
+  border: 1px solid var(--white-90);
+  color: var(--bg);
   font-size: 13px;
   letter-spacing: 0.08em;
 }
 
 .attribute-tour__sammy.is-centered .attribute-tour__sammy-dismiss:hover {
   opacity: 1;
-  background: #ffa338;
-  border-color: rgba(247, 148, 32, 0.75);
-  color: #15181f;
+  background: var(--text-100);
+  border-color: var(--text-100);
+  color: var(--bg);
 }
 
 @media (prefers-reduced-motion: reduce) {

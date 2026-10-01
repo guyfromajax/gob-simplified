@@ -15,8 +15,8 @@ Always exits 1 when ``franchise-command-center.css`` grows past the frozen
 line / style-rule ceilings.
 
 New surface: shell HTML (``gob-shell`` / ``gob-focus``, or a page listed in
-``gobShell.js`` PAGES), ``css/gob-*.css`` except tutorial/advanced-topic
-chrome, Chapter 7 chrome (``css/office-home.css``, ``css/home-base.css``,
+``gobShell.js`` PAGES), ``css/gob-*.css`` except the advanced-topic
+diagram sheet ``css/gob-advanced.css``, Chapter 7 chrome (``css/office-home.css``, ``css/home-base.css``,
 ``css/milestone-modal.css``, ``css/season-peak.css``,
 ``css/trophy-case.css``), recruiting hub CSS (``recruiting-spine.css``,
 ``recruiting-dock.css``, ``recruiting-signing.css``,
@@ -25,7 +25,9 @@ chrome, Chapter 7 chrome (``css/office-home.css``, ``css/home-base.css``,
 ``css/playbook-tiles.css``, ``set-lineup.css``, ``box-score.css``,
 ``cut-players.css``, Game Plan ``game-plan.css``, Scouting
 ``scouting-report.css`` / ``css/prep-v2-scouting.css``, Team Builder
-``team-builder.css``), ``js/shared/gob*.js``, and
+``team-builder.css``, tutorial / FTE modals and screens: Sammy, username,
+walk-on, attribute tour, lineup modal, persona intro, pick opponent, tip-off,
+``css/fte.css``), ``js/shared/gob*.js``, and
 ``js/shared/views/**``. Everything else under the scan root is legacy.
 ``css/gob-tokens.css`` is the token source and is not scanned.
 
@@ -227,7 +229,6 @@ LAW_ANNOTATION_RE = re.compile(
     r"colour-law:\s*(positive-data|committed|saved|reward)\b", re.I
 )
 NEW_SURFACE_EXCLUDE = frozenset({
-    "css/gob-tutorial.css",
     "css/gob-advanced.css",
 })
 NEW_DESIGN_CSS = frozenset({
@@ -254,6 +255,15 @@ NEW_DESIGN_CSS = frozenset({
     "scouting-report.css",
     "css/prep-v2-scouting.css",
     "team-builder.css",
+    "css/sammy-modal.css",
+    "css/username-modal.css",
+    "css/walk-on-welcome.css",
+    "css/attribute-tour.css",
+    "css/tutorial-lineup-modal.css",
+    "css/tutorial-persona-intro.css",
+    "css/tutorial-pick-opponent.css",
+    "css/tutorial-tipoff.css",
+    "css/fte.css",
 })
 
 # Frozen leftover sheet. New rules belong in the view's own CSS.
@@ -1283,13 +1293,13 @@ def format_report(audit: Audit) -> str:
         "## File split",
         "",
         "New: shell HTML (`gob-shell` / `gob-focus` on `<html>`, or a filename listed in",
-        "`js/shared/gobShell.js` `PAGES`), `css/gob-*.css` except `gob-tutorial.css` /",
-        "`gob-advanced.css` (tutorial chrome), Chapter 7 chrome (`office-home`,",
+        "`js/shared/gobShell.js` `PAGES`), `css/gob-*.css` except `gob-advanced.css`",
+        "(advanced-topic diagrams), Chapter 7 chrome (`office-home`,",
         "`home-base`, `milestone-modal`, `season-peak`, `trophy-case`), recruiting hub CSS",
         "(`recruiting-spine.css`, `recruiting-dock.css`, `recruiting-signing.css`,",
         "`recruiting-results-hub.css`), `js/shared/gob*.js`,",
         "`js/shared/views/**`, training/report CSS, and Playbooks (`playbooks.css`,",
-        "`css/playbook-tiles.css`).",
+        "`css/playbook-tiles.css`), and the tutorial / FTE CSS in `NEW_DESIGN_CSS`.",
         "",
         "Legacy: every other scanned file. That is an old page or stylesheet still to migrate,",
         "not new code breaking the rules.",
@@ -1393,8 +1403,8 @@ def format_report(audit: Audit) -> str:
         "the exceptional-gain marker (`.xg`, `.xg-key`, `xgSweep`), Trophy Case words",
         "(`.gold-t`, `.pk-f` / `.rv-f`), or a nearby `/* colour-law: reward */`.",
         "Token redefinitions of `--green` / `--orange` are listed as literals above and",
-        "are not law hits. `css/gob-tutorial.css` and `css/gob-advanced.css` are tutorial",
-        "chrome, not new-design.",
+        "are not law hits. `css/gob-advanced.css` holds the advanced-topic teaching",
+        "diagrams and is not new-design.",
         "",
     ])
     for surface in ("new", "legacy"):
