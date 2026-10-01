@@ -43,5 +43,9 @@ def test_pack_icon_flag_is_conditional():
     assert "if (hasIcon)" in pack
     assert "args.push('--icon=build/icon')" in pack
     assert "No app icon in desktop/build/; using the default. See desktop/build/README.md" in pack
-    assert not (DESKTOP / "build" / "icon.icns").exists()
-    assert not (DESKTOP / "build" / "icon.ico").exists()
+    # Icons now ship (ux/court-3-and-icon). pack.js still only adds --icon when the
+    # platform icon is present, so the conditional above is what matters; here we just
+    # confirm the generated set exists for the build to pick up.
+    assert (DESKTOP / "build" / "icon.icns").exists()
+    assert (DESKTOP / "build" / "icon.ico").exists()
+    assert (DESKTOP / "build" / "icon.png").exists()
