@@ -346,109 +346,6 @@ function cloneParams(params) {
     });
   }
 
-  /** Neutral POS chip. Colored position chips were built and rejected. */
-  function posChipHtml(pos) {
-    return '<span class="pos-chip">' + escapeHtml(pos || '--') + '</span>';
-  }
-
-  /** RT as an explicit current -> potential lockup. Colours from the RT bucket helper. */
-  function rtLockupHtml(rt, potentialRt, year) {
-    var cls = recruitRtClass(rt, year);
-    var cur = typeof global.formatRtDisplay === 'function'
-      ? global.formatRtDisplay(rt) : (rt == null ? '--' : String(rt));
-    var html = '<span class="rt-lockup"><b class="' + cls + '">' + escapeHtml(cur) + '</b>';
-    if (potentialRt != null) {
-      var pcls = recruitRtClass(potentialRt, year);
-      var pot = typeof global.formatRtDisplay === 'function'
-        ? global.formatRtDisplay(potentialRt) : String(potentialRt);
-      html += '<i class="' + pcls + '">' + escapeHtml(pot) + '</i>';
-    }
-    return html + '</span>';
-  }
-
-  function renderRecruitTableRows(tbody, recruits, options) {
-    if (!tbody) return;
-    var selectedIds = options && options.selectedIds ? options.selectedIds : new Set();
-    var newLeanIds = options && options.newLeanIds ? options.newLeanIds : new Set();
-    var onRowClick = options && options.onRowClick;
-    var onActionClick = options && options.onActionClick;
-    var getActionLabel = options && options.getActionLabel;
-    var franchiseId = options && options.franchiseId;
-    // When a user team id is supplied, render the shared ranked-ladder lean object
-    // (identical markup to the hub) instead of the legacy comma-separated text cell.
-    var userTeamId = options && options.userTeamId != null ? options.userTeamId : null;
-    var teamNameMap = (options && options.teamNameMap) || {};
-    var useLadder = userTeamId != null && global.RecruitingSpine && global.RecruitingSpine.Lean;
-    tbody.innerHTML = '';
-
-    recruits.forEach(function (recruit) {
-      var tr = document.createElement('tr');
-      tr.dataset.recruitId = recruit.recruitId;
-      if (selectedIds.has(recruit.recruitId)) tr.classList.add('recruit-selected');
-      if (newLeanIds.has(String(recruit.recruitId))) tr.classList.add('fcc-newlean');
-      if (onRowClick) tr.classList.add('recruit-clickable');
-      var nameHtml = recruitNameLinkHtml(recruit.recruitId, franchiseId, recruit.name);
-      var isNew = newLeanIds.has(String(recruit.recruitId));
-      // Region is a single letter product-wide, so it reads "Region A" ... "Region H".
-      var regionRaw = String(recruit.homeRegion || '').trim();
-      var regionText = regionRaw && regionRaw !== '--' ? 'Region ' + regionRaw.charAt(0).toUpperCase() : '';
-      var subParts = [];
-      if (regionText) subParts.push(escapeHtml(regionText));
-      if (recruit.archetype && recruit.archetype !== '--') subParts.push('<b>' + escapeHtml(recruit.archetype) + '</b>');
-      var identityCell = '<td class="c-ident"><div class="ident">' +
-        '<span class="ident-body">' +
-          '<span class="ident-name">' +
-            (isNew ? '<span class="fcc-newlean-badge">New</span> ' : '') + nameHtml +
-          '</span>' +
-          (subParts.length ? '<span class="ident-sub">' + subParts.join(' · ') + '</span>' : '') +
-        '</span></div></td>';
-tr.innerHTML = [
-        // Column order: Recruit | RT | POS | YR | HT | WT | Attributes | Current Lean —
-        // the Roster tab's order, so the two tables read the same way. Home Region and
-        // Archetype fold into the identity cell as a sub-line: as separate columns the
-        // table overflowed the panel and pushed Current Lean, the column this table
-        // exists to be scanned for, off-screen.
-        identityCell,
-        '<td class="c-rt">' + rtLockupHtml(recruit.rt, recruit.potentialRt, recruit.year) + '</td>',
-        '<td>' + posChipHtml(recruit.pos) + '</td>',
-        '<td>' + escapeHtml(recruit.yearDisplay || '--') + '</td>',
-        '<td>' + recruit.height + '</td>',
-        '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
-        '<td class="attr-tiles-cell">' + global.GOB_AttrTiles.groupedTilesHtml(recruit.rawAttrs) + '</td>',
-        useLadder
-          ? '<td class="lean-ladder-cell">' + global.RecruitingSpine.Lean.ladderHtml(
-              global.RecruitingSpine.Lean.fromBackend({ Lean: recruit.lean }, { userTeamId: userTeamId, teamNameMap: teamNameMap })
-            ) + '</td>'
-          : '<td>' + (recruit.leanDisplay || '--') + '</td>',
-        onActionClick ? '<td><button class="recruiting-row-action-btn" type="button">' + (getActionLabel ? getActionLabel(recruit, selectedIds.has(recruit.recruitId)) : '+') + '</button></td>' : ''
-      ].join('');
-      if (onActionClick) {
-        tr.querySelector('.recruiting-row-action-btn').addEventListener('click', function (e) {
-          e.stopPropagation();
-          onActionClick(recruit);
-        });
-      }
-      if (onRowClick) {
-        tr.addEventListener('click', function () {
-          onRowClick(recruit);
-        });
-        // The name link navigates; without this the row's click would also fire
-        // and toggle selection on the way out.
-        var nameLink = tr.querySelector('.recruit-name-link');
-        if (nameLink) {
-          nameLink.addEventListener('click', function (e) {
-            e.stopPropagation();
-          });
-        }
-      }
-      tbody.appendChild(tr);
-    });
-
-    if (typeof global.initAttributeTooltips === 'function') {
-      global.initAttributeTooltips(tbody, ['td']);
-    }
-  }
-
   function recruitingOrderIds(savedOrders) {
     return Object.keys(savedOrders || {})
       .sort(function (a, b) { return Number(a) - Number(b); })
@@ -489,7 +386,6 @@ tr.innerHTML = [
     recruitNameLinkHtml: recruitNameLinkHtml,
     recruitRtClass: recruitRtClass,
     recruitingOrderIds: recruitingOrderIds,
-    renderRecruitTableRows: renderRecruitTableRows,
     sortRecruits: sortRecruits,
   };
 })(window);
