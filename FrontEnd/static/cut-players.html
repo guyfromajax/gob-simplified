@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/franchiseContext.js"></script>
@@ -9,20 +9,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Assign Practice Squad</title>
-<link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/css/gob-tokens.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/cut-players.css">
   <link rel="stylesheet" href="/css/fonts.css">
   <link rel="stylesheet" href="/css/rt-buckets.css">
 </head>
-<body>
-  <div class="resource-page-container fcc-brand-page-shell cut-players-page">
+<body class="cut-players-page">
+  <div id="cut-players-view">
+  <div class="resource-page-container cut-players-shell">
     <div class="gob-page-header cut-players-header">
       <button id="back-btn" class="brand-back-link" type="button">Back To Locker Room</button>
       <h1>Assign Practice Squad</h1>
       <div class="gob-page-header-actions">
         <p id="cut-submit-reason" class="gob-page-status cut-submit-reason" hidden></p>
-        <button id="submit-btn" class="gob-action-btn is-green is-dead" type="button" data-sfx="SFX_COMMIT" disabled>Assign Practice Squad</button>
+        <button id="submit-btn" class="gob-btn gob-btn--action is-dead" type="button" data-sfx="SFX_COMMIT" disabled>Assign Practice Squad</button>
       </div>
     </div>
 
@@ -59,6 +61,7 @@
       </div>
       </div>
     </section>
+  </div>
   </div>
 
   <div id="cut-modal-backdrop" class="gob-modal-overlay" aria-hidden="true">

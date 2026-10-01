@@ -741,6 +741,18 @@ function renderHeader() {
     if (stored === 'home' || stored === 'away') userTeamSide = stored;
   }
 
+  const wlPlate = document.getElementById('user-game-wl-plate');
+  if (wlPlate) {
+    if (userTeamSide && homeScore !== awayScore) {
+      const userWon = (userTeamSide === 'home' && homeWon) || (userTeamSide === 'away' && awayWon);
+      wlPlate.textContent = userWon ? 'W' : 'L';
+      wlPlate.hidden = false;
+    } else {
+      wlPlate.hidden = true;
+      wlPlate.textContent = '';
+    }
+  }
+
   // Banner / assets use display labels; side mapping uses core identity.
   const userTeamNameForBanner = bannerTeamParam
     ? resolveBannerTeamNameFromParams(bannerTeamParam, homeLabel, awayLabel)

@@ -150,14 +150,12 @@ training report's Player Changes section). Linked from the FCC Inbox (`renderFcc
 Distinct from Training-Squad assignment: these **permanently delete** players (FPD removed +
 stripped from all FTD lists) to open better recruiting slots.
 
-- **Trigger:** week-35 "Run Recruiting" button shows a modal — *"Would you like to cut any
-  players ahead of recruiting?…"* / **Cut Players** | **No Cuts** (`franchise-command-center.js:3659`).
-  - **No Cuts** → recruiting-orders page.
-  - **Cut Players** → `cut-players.html?mode=cut` → on submit → recruiting-orders page.
-- **User cut page (`mode=cut`)** — `cut-players.js` `isCutMode`: shows **active + training squad**,
-  allows **any number incl. 0**, posts to `POST /franchise/cut-players-final`
-  (`cut_franchise_players_final`, `franchise_routes.py:10026`) → `_hard_release_players`
-  (`franchise_routes.py:9948`) deletes FPD + strips all FTD lists.
+- **User UI (removed 2026-09):** The sunset `cut-players.html?mode=cut` flow and
+  **Submit Cuts** label are gone from the frontend. Week-1 practice-squad assignment remains on
+  `/cut-players.html` (no `mode` param) and posts to `POST /franchise/cut-players` only.
+- **API (retained):** `POST /franchise/cut-players-final` (`cut_franchise_players_final`,
+  `franchise_routes.py:10026`) → `_hard_release_players` (`franchise_routes.py:9948`) remains
+  for CPU/tests; there is no live FE caller.
 - **CPU cuts** — `_apply_cpu_week_35_cuts` (`franchise_routes.py:9986`), run inside
   `run_week_35_recruiting` (`franchise_routes.py:9520`) **before** `_run_week_35_signings`,
   **regardless of the user's choice**. Per-player best-RT roll over **active + training squad**:
@@ -215,8 +213,7 @@ walk-on fill = 15, then Training Camp re-trims to 12 + 3.
 | Capacity (15-cap) | `BackEnd/api/franchise_routes.py:9123` `_current_team_capacity_state` |
 | Roster `training_squad` | `BackEnd/api/api.py:5530` (in `get_team_roster`) |
 | FCC TS display | `FrontEnd/static/franchise-command-center.js:2247` `renderTrainingSquad` |
-| Cut page (dual-mode) | `FrontEnd/static/cut-players.js` (`isCutMode`), `cut-players.html` |
-| Week-35 cut modal | `FrontEnd/static/franchise-command-center.js:3659` |
+| Practice-squad assignment page | `FrontEnd/static/cut-players.js`, `cut-players.html` |
 | Report page | `FrontEnd/static/training-squad-report.html` / `training-squad-report.js` |
 | Inbox link | `FrontEnd/static/franchise-command-center.js:3917` (`renderFccInbox`) |
 | Roster invariant checker | `scripts/inspect_franchise_roster_counts.py` (read-only) |
