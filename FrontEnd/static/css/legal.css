@@ -1,18 +1,13 @@
-:root {
-  --legal-bg: #090a12;
-  --legal-panel: #11131f;
-  --legal-text: rgba(255, 255, 255, 0.82);
-  --legal-muted: rgba(255, 255, 255, 0.58);
-  --legal-border: rgba(255, 255, 255, 0.11);
-  --legal-orange: #ff7a00;
-}
+/* Privacy and Terms. Tokens via body.gob-scope + css/gob-tokens.css (these pages stay
+   off html.gob: tutorials-fte-tokens.spec.js uses /privacy.html as its non-gob host).
+   Links are neutral and underlined: orange is for saves (colour law). */
 
 body.legal-page {
   min-height: 100vh;
   margin: 0;
-  background: var(--legal-bg);
-  color: var(--legal-text);
-  font-family: "Inter", sans-serif;
+  background: var(--bg);
+  color: var(--text-87);
+  font-family: var(--font-body);
 }
 
 .legal-shell {
@@ -24,30 +19,31 @@ body.legal-page {
 .legal-back-link {
   display: inline-block;
   margin-bottom: 24px;
-  color: var(--legal-orange);
-  font-size: 14px;
-  font-weight: 700;
+  color: var(--white-70);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-bold);
   text-decoration: none;
 }
 
 .legal-back-link:hover {
+  color: var(--text-100);
   text-decoration: underline;
 }
 
 .legal-document {
   padding: clamp(28px, 5vw, 56px);
-  border: 1px solid var(--legal-border);
-  border-radius: 16px;
-  background: var(--legal-panel);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--white-11);
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+  box-shadow: 0 24px 70px var(--black-25);
 }
 
 .legal-document h1,
 .legal-document h2 {
   margin: 0;
-  color: #fff;
-  font-family: "Bebas Neue", sans-serif;
-  font-weight: 400;
+  color: var(--text-100);
+  font-family: var(--font-display);
+  font-weight: var(--fw-regular);
   letter-spacing: 0.025em;
 }
 
@@ -64,7 +60,7 @@ body.legal-page {
 
 .legal-document p,
 .legal-document li {
-  font-size: 16px;
+  font-size: var(--fs-16);
   line-height: 1.75;
 }
 
@@ -82,23 +78,23 @@ body.legal-page {
 }
 
 .legal-document strong {
-  color: #fff;
-  font-weight: 700;
+  color: var(--text-100);
+  font-weight: var(--fw-bold);
 }
 
 .legal-document a {
-  color: var(--legal-orange);
+  color: var(--text-100);
   overflow-wrap: anywhere;
 }
 
 .legal-document hr {
   margin: 34px 0 0;
   border: 0;
-  border-top: 1px solid var(--legal-border);
+  border-top: 1px solid var(--white-11);
 }
 
 .legal-meta {
-  color: var(--legal-muted);
+  color: var(--text-60);
 }
 
 .legal-page .site-footer-links {
@@ -116,12 +112,12 @@ body.legal-page {
 
   .legal-document {
     padding: 26px 20px 32px;
-    border-radius: 12px;
+    border-radius: var(--radius-12);
   }
 
   .legal-document p,
   .legal-document li {
-    font-size: 15px;
+    font-size: var(--fs-15);
     line-height: 1.68;
   }
 }

@@ -62,9 +62,11 @@
   function ensureOverlayStructure(overlay) {
     if (!overlay) return overlay;
 
+    // Tokens: the overlay is appended to <body>, which is not always inside .gob.
+    overlay.classList.add('gob-scope');
     overlay.style.cssText =
       'position:fixed;inset:0;z-index:' + Z_INDEX + ';' +
-      'background:rgba(0,0,0,0.92);' +
+      'background:color-mix(in srgb, var(--black) 92%, transparent);' +
       'display:flex;align-items:center;justify-content:center;' +
       'margin:0;padding:0;';
 
@@ -111,7 +113,7 @@
     if (!message) {
       message = document.createElement('div');
       message.className = 'page-load-overlay-message';
-      message.style.cssText = 'color:#ffffff;font-weight:700;font-size:24px;line-height:1.2;';
+      message.style.cssText = 'color:var(--text-100);font-weight:var(--fw-bold);font-size:var(--fs-24);line-height:1.2;';
       content.appendChild(message);
     }
 
@@ -134,41 +136,42 @@
     var pulseLabel = pulse.querySelector('.page-load-overlay-pulse-label');
     if (pulseLabel) {
       pulseLabel.style.cssText =
-        "display:none;margin:0 0 18px;font-family:'Inter',sans-serif;font-size:16px;line-height:1.4;letter-spacing:0;color:rgba(255,255,255,0.72);";
+        'display:none;margin:0 0 18px;font-family:var(--font-body);font-size:var(--fs-16);line-height:1.4;letter-spacing:0;color:var(--white-72);';
     }
 
     var pulseImage = pulse.querySelector('.page-load-overlay-pulse-image');
     if (pulseImage) {
-      pulseImage.style.cssText = 'width:100%;display:block;border-radius:18px;box-shadow:0 18px 36px rgba(0,0,0,0.28);';
+      pulseImage.style.cssText = 'width:100%;display:block;border-radius:var(--radius-card);box-shadow:0 18px 36px var(--black-25);';
     }
 
     var pulseTitle = pulse.querySelector('.page-load-overlay-pulse-title');
     if (pulseTitle) {
       pulseTitle.style.cssText =
-        "margin:26px 0 10px;font-family:'Bebas Neue',sans-serif;font-size:48px;line-height:1;letter-spacing:0.03em;color:#ffffff;";
+        'margin:26px 0 10px;font-family:var(--font-display);font-size:var(--fs-48);line-height:1;letter-spacing:var(--tracking-3);color:var(--text-100);';
     }
 
     var pulseSubtitle = pulse.querySelector('.page-load-overlay-pulse-subtitle');
     if (pulseSubtitle) {
-      pulseSubtitle.style.cssText = 'margin:0 0 22px;font-size:16px;color:rgba(255,255,255,0.68);';
+      pulseSubtitle.style.cssText = 'margin:0 0 22px;font-size:var(--fs-16);color:var(--white-70);';
     }
 
     var pulseStat = pulse.querySelector('.page-load-overlay-pulse-stat');
     if (pulseStat) {
       pulseStat.style.cssText =
-        "display:none;min-height:44px;margin:22px auto 22px;max-width:min(620px,92vw);font-family:'Inter',sans-serif;font-size:16px;line-height:1.4;letter-spacing:0;color:rgba(255,255,255,0.86);";
+        'display:none;min-height:44px;margin:22px auto 22px;max-width:min(620px,92vw);font-family:var(--font-body);font-size:var(--fs-16);line-height:1.4;letter-spacing:0;color:var(--text-87);';
     }
 
     var pulseIndicator = pulse.querySelector('.page-load-overlay-pulse-indicator');
     if (pulseIndicator) {
       pulseIndicator.style.cssText =
-        'width:min(220px,100%);height:8px;margin:0 auto;border-radius:999px;overflow:hidden;background:rgba(255,255,255,0.08);box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);';
+        'width:min(220px,100%);height:8px;margin:0 auto;border-radius:999px;overflow:hidden;background:var(--line);box-shadow:inset 0 1px 0 var(--white-5);';
     }
 
     var pulseBar = pulse.querySelector('.page-load-overlay-pulse-indicator span');
     if (pulseBar) {
       pulseBar.style.cssText =
-        'display:block;width:100%;height:100%;border-radius:inherit;background:linear-gradient(90deg, rgba(52,236,39,0.35), #34EC27 48%, rgba(52,236,39,0.45));transform-origin:left center;animation:pageLoadOverlayPulseBar 1.2s ease-in-out infinite;';
+        // Neutral pulse: a wait indicator is not the Advance and not positive data (colour law).
+        'display:block;width:100%;height:100%;border-radius:inherit;background:linear-gradient(90deg, var(--white-10), var(--text-60) 48%, var(--white-10));transform-origin:left center;animation:pageLoadOverlayPulseBar 1.2s ease-in-out infinite;';
     }
 
     if (!document.getElementById('page-load-overlay-pulse-style')) {
@@ -284,18 +287,18 @@
       // With a title, subtitle is secondary. With no title (e.g. training load: logo + feed only),
       // subtitle is the main copy — use readable body type, not oversized display type.
       if (titleText) {
-        pulseSubtitle.style.fontFamily = "'Inter', sans-serif";
-        pulseSubtitle.style.fontSize = '16px';
+        pulseSubtitle.style.fontFamily = 'var(--font-body)';
+        pulseSubtitle.style.fontSize = 'var(--fs-16)';
         pulseSubtitle.style.lineHeight = '1.4';
         pulseSubtitle.style.letterSpacing = '0';
-        pulseSubtitle.style.color = 'rgba(255,255,255,0.68)';
+        pulseSubtitle.style.color = 'var(--white-70)';
         pulseSubtitle.style.margin = '0 0 22px';
       } else {
-        pulseSubtitle.style.fontFamily = "'Inter', sans-serif";
-        pulseSubtitle.style.fontSize = '17px';
+        pulseSubtitle.style.fontFamily = 'var(--font-body)';
+        pulseSubtitle.style.fontSize = 'var(--fs-17)';
         pulseSubtitle.style.lineHeight = '1.45';
         pulseSubtitle.style.letterSpacing = '0';
-        pulseSubtitle.style.color = 'rgba(255,255,255,0.88)';
+        pulseSubtitle.style.color = 'var(--text-87)';
         pulseSubtitle.style.margin = '26px 0 22px';
         pulseSubtitle.style.maxWidth = 'min(520px, 92vw)';
       }
@@ -330,7 +333,7 @@
       overlay.appendChild(newswire);
     }
     newswire.style.display = 'grid';
-    overlay.style.background = '#07080c';
+    overlay.style.background = 'var(--bg)';
     overlay.setAttribute('role', 'presentation');
     overlay.setAttribute('aria-live', 'off');
     if (global.GOBTrainingNewswire) {
@@ -345,7 +348,7 @@
     var content = overlay && overlay.querySelector('.page-load-overlay-content');
     if (content) content.style.display = 'flex';
     if (overlay) {
-      overlay.style.background = 'rgba(0,0,0,0.92)';
+      overlay.style.background = 'color-mix(in srgb, var(--black) 92%, transparent)';
       overlay.setAttribute('role', 'status');
       overlay.setAttribute('aria-live', 'polite');
     }
