@@ -16,7 +16,7 @@ Version 1. How to build franchise screens. The look lives in [Styleguide.md](Sty
 ## Colour law
 
 The canonical law is [Styleguide.md#colour-law](Styleguide.md#colour-law); read it before touching colour.
-In short: green is the one Advance plus positive data; orange is saved/committed only; navy is "yours" and what you picked; blue is RT A / 9+ / elite only; `--reward-gold` is the six reward surfaces only. Choice controls, status codes, W/L plates and ▲/▼ deltas stay neutral, and team colour never washes a card. That line is a reminder, not the law: if it and the Styleguide differ, the Styleguide wins.
+In short: green is the one Advance plus positive data; orange is "there are unsaved changes" and nothing else (a save or commit); navy is "yours" and what you picked; blue is RT A / 9+ / elite only; `--reward-gold` is the six reward surfaces only. Choice controls, status codes, W/L plates (tables too), ▼ deltas, the rail count badge, blocking tags, modal accents and "Stay" stay neutral; ▲ is green only on data chips; red marks only an irreversible delete; team colour never washes a card. That line is a reminder, not the law: if it and the Styleguide differ, the Styleguide wins.
 `scripts/check_ui_tokens.py --strict` enforces it on new-design files (§8). Annotate a legal exception with `/* colour-law: positive-data | committed | saved | reward */`.
 
 ### Settled rulings (2026-10-01)
@@ -31,7 +31,7 @@ Jamie's rulings (`reports/jamie-decisions-2026-10-01.md`) and the same day's gal
 | 4 | Court side panels on blue-black surfaces | `court.html`, "Live-game screen chrome" below. | `court-panel-tokens.spec.js` |
 | 5 | Court stat toggles neutral | `court.html` `.toggle-btn.active`, `.team-toggle-btn.active`. | `court-panel-tokens.spec.js` |
 | 6 | Senior-tribute title marks gold | `.st-titles s`, `.st-cti s` in `css/senior-tribute.css`, annotated `reward`. | `jamie-rulings-batch.spec.js` |
-| 7 | Recruiting presence dot neutral | `.inbox-badge` in `franchise-command-center.css`. Under the shell the dot only sits on the hidden legacy tab button, so nothing shows on the rail today. The rail count badge (`.office-rail-count`, `--badge`) is a different element and is unchanged. | `jamie-rulings-batch.spec.js`, `fcc-recruiting-layout.spec.js` |
+| 7 | Recruiting presence dot neutral | `.inbox-badge` in `franchise-command-center.css`. Under the shell the dot only sits on the hidden legacy tab button, so nothing shows on the rail today. The rail count badge (`.office-rail-count`, `--badge`) is a different element: neutral since batch 2 (below). | `jamie-rulings-batch.spec.js`, `fcc-recruiting-layout.spec.js` |
 | 8 | Big-news modal button neutral | `.bn-cta` in `css/big-news-modals.css`. The emblem, eyebrow and title glow keep the gold. | `jamie-rulings-batch.spec.js` |
 | 9 | Submit Training green | `/training.html`. Its sound stays `SFX_COMMIT` (§3): the colour ruling did not change the sound. | none |
 | 10 | Twin pages deleted | `homepage-v3.html` and `play-builder.html` (V1) are gone. `/play-builder.html` → `/play-builder-v2.html` and `/homepage-v3(.html)` → `/` in `netlify.toml` and `FrontEnd/static/_redirects`; the V1 path also in `BackEnd/api/play_routes.py` and in the local static middleware's `retired_pages` (`BackEnd/api/api.py`), because that middleware answers a missing `.html` before any router runs. | `tests/test_play_builder_redirect.py`, `jamie-rulings-batch.spec.js` |
@@ -40,6 +40,25 @@ Jamie's rulings (`reports/jamie-decisions-2026-10-01.md`) and the same day's gal
 | — | One empty-state card | "Empty states" below. | `desktop-gallery-fixes.spec.js` |
 | — | Save buttons neutral until something has changed (orange = there is something to save) | "Rulings recorded 2026-10-01 (gallery follow-up)" below. | `desktop-logo-save-state.spec.js`, `prep-modules-*.spec.js` |
 | — | Team art `logo_square` → `logo_primary` → letter tile | "Rulings recorded 2026-10-01 (gallery follow-up)" below. | `desktop-logo-save-state.spec.js`, `tests/test_team_logo_manifest.py` |
+
+### Settled rulings, batch 2 (2026-10-01)
+
+Jamie approved every recommendation in `reports/jamie-decisions-2-2026-10-01.md`. **Net rule: orange = "there are unsaved changes" and nothing else.** The rules are in the Styleguide ([Settled 2026-10-01 (batch 2)](Styleguide.md#settled-2026-10-01-batch-2)); this is where each was built. Guard for all rows: `jamie-rulings-batch-2.spec.js` (computed styles), plus `tests/test_check_ui_tokens.py` for the checker.
+
+| # | Ruling | Built in |
+|---|---|---|
+| 1 | ▲ green on data chips, ▼ neutral | `--delta-down` is `--text-87` (`gob-tokens.css`). `.chip.down` (`gob-components.css`), `.attr-chip.down` / `.attr-chip-val.down` (`box-score.css`), `.gob-chg .is-down i` (`gob-tables.css`) neutral; the recruiting-wire ▼ tag (`.wr.dn .wr-tag`) falls back to the neutral base. Dead `.attr-chip .arr` rules deleted (`office-home.css`). |
+| 2 | W/L plates in tables | `.gob-wl` (`gob-tables.css`): WIN white plate (`--white-90` / `--bg`), LOSS `--white-40` outline. Rankings "Last Week" and Team › Schedule. Dead `.wl.win` / `.wl.loss` deleted (`gob-components.css`). |
+| 3a | Rail count badge neutral | `--badge` is `--white-90` (`gob-tokens.css`); `--badge-ink` unchanged (dark). |
+| 3b | `.td-gate` tag, `.is-on` neutral | `.td-gate` and `.todo.gated` (`gob-components.css`); `.hub-anchor--orders.is-on` (`recruiting-signing.css`); `.fg-pick.is-on` (`gob-advanced.css`). |
+| 3c | Office blocking step | `.wk-step.gated`: `--white-62` outline, `--white-6` fill (`office-home.css`). |
+| 3d | Attitude: no orange stop | `em_20_39` is `color-mix(--red 55%, --white-18)` (`office-home.css`). |
+| 3e | Modal accent neutral by default | `.gob-modal-accent` default `rgba(255,255,255,.14)` in `resource-pages.css` (the `auth-bar.css` `:where()` mirror already was). `is-green` / `is-red` still opt in. |
+| 3f | Tutorial alert neutral | Unchanged (`gob-tutorial.css`); now guarded. |
+| 3g | "Stay" neutral primary | `cut-players.js` passes `neutral: true` → `.gob-modal-btn-primary.is-neutral` (`cut-players.css`, white plate). |
+| 4 | No team-colour wash | Every `.office-res` rule deleted (`gob-components.css`, `office-home.css`); no code created it. The weekly card `.wkc` was already neutral. |
+| 5 | Red only for irreversible deletes | **Kept red:** Home Base delete program (`.pop-i.danger` menu item, `.btn-del` red-outline confirm, `home-base.css`). **Now neutral:** every Assign Practice Squad modal accent (leave, confirm, load error; the initial and fallback accent in `cut-players.html` / `cut-players.js`) and the recruiting dock's remove-invite × (`.islot-remove`, `recruiting-dock.css`). No other destructive action has a red style (skeleton editors use the browser `confirm()`). |
+| — | Checker | `SAVE_RE` in `scripts/check_ui_tokens.py` is save / commit only (`save`, `saved`, `committed`, `is-saved`, `is-committed`); `.gated`, `.td-gate`, `.is-on`, `toggle-btn`, `gob-btn--action` and the `.att-col` / `.att-bar` orange stop are off. Anything else orange needs `/* colour-law: committed */` or `saved`. |
 
 ### Live-game overlays (court.html DOM)
 
@@ -404,7 +423,7 @@ A week strip sits under the top of `.main`, above the columns. It is one row, ab
 |---|---|
 | Done | Check mark, opacity 38%, still clickable. Opens `route`. |
 | Next | The first not-done required step. Neutral bright outline (`--text-100`). Green stays on the top-bar Advance only. If this step is `is_advance_action`, its label copies the top bar and the click runs the same action. |
-| Blocking | `gates_advance` on a step that is not `is_advance_action` draws an orange outline and BLOCKS ADVANCE. |
+| Blocking | `gates_advance` on a step that is not `is_advance_action` draws a neutral strong outline (`--white-62`) and an outlined BLOCKS ADVANCE tag. Never orange (batch 2). |
 | Upcoming | The remaining steps. |
 
 | State | Column 1 · Since last week | Column 2 · This Week | Column 3 · Recruiting |
@@ -711,7 +730,7 @@ Tokens reach this chrome three ways: `css/auth-bar.css` imports `gob-tokens.css`
 | Tutorials alert (`.is-alert-glow`, `.nav-tutorials-callout`) | Neutral: white glow, white pill with `--bg` ink. An unread tutorial is not a save. |
 | Switch (`.account-switch`) | On-state is a brighter neutral (white 18% / 28%) plus the knob position. A switch is a choice control. Literal values, because `account.html` reuses it and that page is not guaranteed to carry tokens. |
 | Account toast (`.account-toast`) | Neutral rail and icon, like `GOBToast`. |
-| Modal accent (`.gob-modal-accent` mirror in `auth-bar.css`) | Neutral at zero specificity (`:where()`), so `resource-pages.css` and `is-red` / `is-neutral` still win where they load. |
+| Modal accent (`.gob-modal-accent` mirror in `auth-bar.css`) | Neutral at zero specificity (`:where()`). `resource-pages.css` is neutral by default too (batch 2); `is-green` / `is-red` / `is-neutral` modifiers still win. |
 | Site footer (`.site-footer`) | White strip on `--white`; link is `--bg` ink, not orange. |
 | Page-load overlay (`pageLoadOverlay.js`) | `--black` at 92%; the pulse bar is a neutral gradient. A wait indicator is not Advance and not positive data. |
 | Error screens (`errorHandler.js`) | `--bg` page, `--surface-2` card, neutral heading. Primary action is the neutral plate (like Retry), secondary is a ghost. No orange. |
@@ -766,7 +785,7 @@ One shared pattern: `.gob-empty` (`css/gob-tables.css`). Its look is in the [Sty
 Related small rules (gallery fixes, 2026-10-01):
 
 - Box Score "Back to Locker Room" is the standard ghost `.brand-back-link`, inside the page shell above the first card.
-- Cut Players: the page title is `--font-display`. "Assign Practice Squad" is the page's save (orange when enabled, dead when disabled). The "No Cuts Required" and load-error modals are not errors and not saves: neutral accent, neutral secondary "Back To Locker Room".
+- Cut Players: the page title is `--font-display`. "Assign Practice Squad" is the page's save (orange when enabled, dead when disabled). The "No Cuts Required" and load-error modals are not errors and not saves: neutral accent, neutral secondary "Back To Locker Room". Every other modal on the page (leave, confirm) has a neutral accent too, and the leave-confirm "Stay" is a neutral primary (batch 2).
 - Set Lineup banner strip: `object-fit: contain` on `--surface-2` (the full lockup, never a crop).
 - Segmented toggles with a count (`.stats-toggle button em`, e.g. "Varsity 15"): `--space-6` before the count.
 

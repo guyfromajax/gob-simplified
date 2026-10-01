@@ -494,9 +494,10 @@ html.gob-focus body.box-score-page #box-score-view {
   background: color-mix(in srgb, var(--green) 6%, transparent); /* colour-law: positive-data */
 }
 
+/* ▼ is neutral, never red (Jamie, 2026-10-01). */
 .attr-chip.down {
-  border-color: rgba(255, 109, 109, 0.3);
-  background: rgba(255, 109, 109, 0.06);
+  border-color: var(--line-strong, rgba(255, 255, 255, 0.14));
+  background: var(--white-4, rgba(255, 255, 255, 0.04));
 }
 
 .attr-chip-name {
@@ -518,7 +519,7 @@ html.gob-focus body.box-score-page #box-score-view {
 }
 
 .attr-chip-val.down {
-  color: var(--delta-down);
+  color: var(--text-87, rgba(255, 255, 255, 0.87));
 }
 
 .attr-flat {

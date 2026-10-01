@@ -13,7 +13,7 @@
 /* ── Brand ─────────────────────────────────────────────── */
 --navy:#27408E;          /* structure: active rail item, selected rows, switch on */
 --navy-hi:#4A6ED2;       /* edge/halo tint for navy selections only */
---orange:#F79420;        /* saves / non-advancing actions, gated-task tag */
+--orange:#F79420;        /* unsaved changes only: save / commit (Jamie, 2026-10-01) */
 --green:#34EC27;         /* the ONE Advance action per screen + positive data */
 --reward-gold:#F0C560;   /* ONLY milestone / season-peak rewards + exceptional stat gains. Tints are color-mix() at use. */
 --red:#ff6d6d;
@@ -34,9 +34,9 @@
 
 /* ── Deltas, results, badge ─────────────────────────────── */
 --delta-up:var(--green);
---delta-down:var(--red);
+--delta-down:var(--text-87);   /* ▼ is neutral, never red (Jamie, 2026-10-01) */
 --delta-flat:var(--text-60);
---badge:var(--orange);   /* amber count badge on the rail */
+--badge:var(--white-90);   /* rail count badge: neutral white plate (orange = unsaved changes only) */
 --badge-ink:#1a1206;
 
 /* ── Base + surface elevations (blue-black, never grey) ─── */

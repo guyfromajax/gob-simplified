@@ -75,7 +75,7 @@ function cloneParams(params) {
         accent.className = 'gob-modal-accent is-neutral';
       } else {
         accent.className = 'gob-modal-accent';
-        accent.classList.add(config.accent || 'is-red');
+        if (config.accent) accent.classList.add(config.accent);
       }
     }
     if (pulse) {
@@ -92,6 +92,7 @@ function cloneParams(params) {
       btn.className = action.variant === 'gob-modal-btn-primary'
         ? 'gob-modal-btn-primary'
         : 'gob-modal-btn-secondary';
+      if (action.neutral) btn.classList.add('is-neutral');
       btn.textContent = action.label;
       btn.disabled = !!action.disabled;
       btn.addEventListener('click', function () {
@@ -275,9 +276,9 @@ function cloneParams(params) {
     showModal({
       title: 'Leave Without Assigning?',
       message: 'You have selected players for the practice squad but have not submitted them. Are you sure you want to leave?',
-      accent: 'is-red',
+      accent: 'neutral',
       actions: [
-        { label: 'Stay', variant: 'gob-modal-btn-primary' },
+        { label: 'Stay', variant: 'gob-modal-btn-primary', neutral: true },
         { label: 'Leave', variant: 'gob-modal-btn-secondary', onClick: navigateBack }
       ]
     });
@@ -293,7 +294,7 @@ function cloneParams(params) {
     showModal({
       title: 'Confirm Practice Squad',
       message: 'You are going to assign ' + formatNames(namesInOrder) + ' to the practice squad. They will be ineligible to play this season, but available for training camp next season. Proceed?',
-      accent: 'is-red',
+      accent: 'neutral',
       actions: [
         { label: 'Cancel', variant: 'gob-modal-btn-secondary' },
         {
@@ -402,7 +403,7 @@ function cloneParams(params) {
       showModal({
         title: 'Assign Practice Squad',
         message: 'Unable to load practice squad assignment data.',
-        accent: 'is-red',
+        accent: 'neutral',
         actions: [{ label: 'Back To Locker Room', variant: 'gob-modal-btn-secondary', onClick: navigateBack }]
       });
     });

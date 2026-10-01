@@ -96,9 +96,10 @@
 .islot-lists .dots i{width:7px;height:7px;border-radius:var(--radius-round);background:var(--white-12);transition:background .15s}
 .islot-lists .dots i.on{background:var(--white-62)}
 .islot-lists .cap{font:var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);letter-spacing:var(--tracking-7);text-transform:uppercase;color:var(--muted-3)}
-.islot-remove{position:absolute;top:5px;right:6px;width:17px;height:17px;border-radius:var(--radius-5);background:var(--black-45);color:var(--red-ink);border:1px solid color-mix(in srgb,var(--red) 40%,transparent);font-size:var(--fs-11);line-height:1;cursor:pointer;opacity:0;transition:opacity .14s;z-index:2}
+.islot-remove{position:absolute;top:5px;right:6px;width:17px;height:17px;border-radius:var(--radius-5);background:var(--black-45);color:var(--text-87);border:1px solid var(--white-28);font-size:var(--fs-11);line-height:1;cursor:pointer;opacity:0;transition:opacity .14s;z-index:2}
 .islot.queued:hover .islot-remove{opacity:1}
-.islot-remove:hover{background:color-mix(in srgb,var(--red) 20%,transparent)}
+/* Removing a queued invite is reversible: neutral, not red (Jamie, 2026-10-01). */
+.islot-remove:hover{background:var(--white-12)}
 
 .idock-empty{padding:26px 16px;text-align:center;border:1px dashed var(--muted-3);border-radius:var(--radius-10);margin:8px 4px}
 .idock-empty .t1{font:var(--fw-regular) var(--fs-18)/var(--lh-1) var(--font-display);color:var(--muted);letter-spacing:var(--tracking-2)}

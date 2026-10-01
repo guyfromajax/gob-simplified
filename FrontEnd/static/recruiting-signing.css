@@ -285,7 +285,8 @@
 /* ---------- My Orders view: the rail takes the whole width ---------- */
 /* colour-law: committed */
 .hub-anchor--orders .ic{color:var(--orange)}
-.hub-anchor--orders.is-on{background:color-mix(in srgb,var(--orange) 12%,transparent);border-color:color-mix(in srgb,var(--orange) 45%,transparent);color:var(--text-87)}
+/* Selected = neutral emphasis, not orange (Jamie, 2026-10-01). */
+.hub-anchor--orders.is-on{background:var(--white-10);border-color:var(--white-40);color:var(--text-87)}
 .hub-body-sign.is-orders-only{grid-template-columns:minmax(0,1fr)}
 .hub-body-sign.is-orders-only .spool{display:none}
 
