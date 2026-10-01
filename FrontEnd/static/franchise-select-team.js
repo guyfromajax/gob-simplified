@@ -491,7 +491,8 @@ function cloneParams(params) {
       ? 'You are taking <em>' + escapeHtml(team.name) + "</em>'s place"
       : escapeHtml(team.name) + ' <em>' + escapeHtml(team.mascot || '') + '</em>';
     var cta = state.builder ? 'Take This Slot' : 'Enter Franchise';
-    var ctaClass = state.builder ? 'btn lg' : 'btn lg grn';
+    // Both are the Advance: Enter Franchise, and Take This Slot (Team Builder's step-1 Continue).
+    var ctaClass = 'btn lg advance';
     els.actionInner.innerHTML =
       '<div class="ab-art"><img src="' +
       escapeHtml(art.src) +

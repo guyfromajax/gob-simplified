@@ -678,3 +678,21 @@ Tutorial pages (`tutorial*.html`) are `html.gob` and load `gob-tokens.css`; no s
 - **No page wash:** a neutral `--white-4` top lift on `--bg-chrome` (was a navy radial).
 - `body.has-auth-bar` (auth-bar.css) owns `padding-top`; `css/community.css` sets only sides and bottom.
 - **Team Colors Mode** (the old Styleguide community-row fade) is not live in code; it stays retired.
+
+### Program select
+
+`franchise-select-team.html` (Find Your Program, the first step of a new franchise and Team Builder step 1 with `?builder=1`) is `html.gob` with `gob-tokens.css`; one sheet, `franchise-select-team.css` (`NEW_DESIGN_CSS`). Same rulings as Team Builder:
+
+| Element | Colour | Why |
+|---|---|---|
+| Enter Franchise, Take This Slot (`#ab-primary`, `.btn.advance`) | green | The one Advance. Take This Slot is Team Builder step 1's Continue. |
+| Selected program card (`.pg.sel`, `.pg-check`) | navy | Selection, as Team Builder and Set Lineup. |
+| Open Team Builder, draft Continue (`.btn`) | neutral white plate | Navigation, not a save or an Advance. |
+| Scout, Clear, Discard, Cancel (`.btn.ghost`, `.mb-x`) | ghost | Secondary. |
+| Filters (search focus, active `.fsel.on`), Clear link, card hover | neutral | Choice controls. |
+| Top Talent / Prestige tier (`.top1`, `.top1t`) | `--text-100`, bold | Information codes; weight, not colour. |
+| Team Builder mode banner (`.mbar`), entry card (`.tbe`), unfinished draft card (`.draft-card`), loading dots | neutral | No orange wash, no blue (RT only). |
+| Error (`.team-select-error`) | `--red` | |
+
+- Team colour appears only in each program's own banner art.
+- `css/team-picker.css` is not loaded anywhere and `TeamPicker.mount` is never called; the picker UI it styled is dead (see the program-select report).
