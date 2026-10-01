@@ -80,11 +80,14 @@ The milestone/"big news" modal's primary button reads **gold**. Current: `report
 **Rec:** **A** — this already is the law (green Advance, orange save); confirm and move on.
 
 ## 10. Duplicate pages: homepage-v3 vs homepage, play-builder v2 vs v1 (delete?)
-Two live copies of each exist. Current: `reports/jamie-decisions/r10-homepage-1280.png` vs
-`…/r10-homepage-v3-1280.png`; `…/r10-playbuilder-v1-1280.png` vs `…/r10-playbuilder-v2-1280.png`.
-- **A.** Pick the canonical of each (likely `homepage.html` + `play-builder-v2.html`) and **delete** the other + its refs.
-- **B.** Keep both (if one is an A/B or a staging source like `homepage-v3-source.html`).
-**Rec:** **A** — confirm which is canonical, then delete the dead twin (a follow-up cleanup task).
+Two live copies of each exist. **`homepage.html` and `homepage-v3.html` render byte-identically**
+(`r10-homepage-1280.png` == `r10-homepage-v3-1280.png`; v3 mirrors/forwards to homepage at runtime —
+no meta-refresh), so they are already effectively one page. Play-builder v1 and v2 **do** differ:
+`reports/jamie-decisions/r10-playbuilder-v1-1280.png` vs `…/r10-playbuilder-v2-1280.png` (+ there is
+also `homepage-v3-source.html`).
+- **A.** Pick the canonical of each (likely `homepage.html` + `play-builder-v2.html`) and **delete** the other + `homepage-v3-source.html` + their refs.
+- **B.** Keep both (if one is an intentional A/B or a build source).
+**Rec:** **A** — the homepage twin is already redundant (identical render); confirm the canonical play-builder, then delete the dead twins (a follow-up cleanup task).
 
 ## 11. Desktop app icon (1024×1024)
 `desktop/build/` has only `README.md` — **no `icon.icns` / `icon.ico` / `icon.png`**, and no
