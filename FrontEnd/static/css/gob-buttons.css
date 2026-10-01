@@ -94,6 +94,22 @@
   background: #4dff3f;
 }
 
+/* Neutral primary — the main CTA when it neither saves nor advances
+ * (tutorial "Start lesson", Sammy "Got It", navigation). A white plate, no
+ * colour. Fallbacks keep it right on hosts without html.gob. Two classes so
+ * the dark ink beats page rules like `body.gob-tut a { color: inherit }`. */
+.gob-btn.gob-btn--neutral {
+  background: var(--white-90, rgba(255, 255, 255, 0.9));
+  border-color: var(--white-90, rgba(255, 255, 255, 0.9));
+  color: var(--bg, #0b0d14);
+  box-shadow: none;
+}
+
+.gob-btn.gob-btn--neutral:hover:not(:disabled):not(.is-disabled) {
+  background: var(--text-100, #ffffff);
+  border-color: var(--text-100, #ffffff);
+}
+
 /* Ghost — acknowledgements and quiet secondaries. */
 .gob-btn--ghost {
   background: rgba(255, 255, 255, 0.06);

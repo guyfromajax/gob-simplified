@@ -203,7 +203,7 @@ From the repo root, run both gates before merge. Leave `CI` unset so Playwright 
 env -u CI PORT=8010 BASE_URL=http://localhost:8010 PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright" PYTHON_PATH=".venv/bin/python" ./node_modules/.bin/playwright test tests/e2e --workers=1 --reporter=line
 ```
 
-**UI tokens (required):** colour-law `--strict` on new-design files (see the Colour law section for the full clauses). Legacy pages are reported and do not fail the gate. New-design surface is: shell HTML (`gob-shell` / `gob-focus`, or a page in `gobShell.js` PAGES), `css/gob-*.css` except the tutorial / advanced-topic chrome, the Chapter 7 chrome (`css/office-home.css`, `home-base.css`, `milestone-modal.css`, `season-peak.css`, `trophy-case.css`), the recruiting-hub CSS (`recruiting-spine.css`, `recruiting-dock.css`, `recruiting-signing.css`, `recruiting-results-hub.css`), `js/shared/gob*.js`, and `js/shared/views/**`. `css/gob-tokens.css` is the token source and is not scanned; everything else is legacy. Annotate a legal exception with `/* colour-law: positive-data | committed | saved | reward */`.
+**UI tokens (required):** colour-law `--strict` on new-design files (see the Colour law section for the full clauses). Legacy pages are reported and do not fail the gate. New-design surface is: shell HTML (`gob-shell` / `gob-focus`, or a page in `gobShell.js` PAGES), `css/gob-*.css` except `css/gob-advanced.css` (advanced-topic teaching diagrams), the tutorial / FTE CSS (see Tutorials and FTE), the Chapter 7 chrome (`css/office-home.css`, `home-base.css`, `milestone-modal.css`, `season-peak.css`, `trophy-case.css`), the recruiting-hub CSS (`recruiting-spine.css`, `recruiting-dock.css`, `recruiting-signing.css`, `recruiting-results-hub.css`), `js/shared/gob*.js`, and `js/shared/views/**`. `css/gob-tokens.css` is the token source and is not scanned; everything else is legacy. Annotate a legal exception with `/* colour-law: positive-data | committed | saved | reward */`.
 
 `--strict --no-write` (summary only, no `reports/ui-token-audit-*.md`) is a **CI gate** — a sibling job to the migration gates in `.github/workflows/test.yml`. Run it before merge:
 
@@ -591,3 +591,17 @@ The Electron shell and the ops pages are on the design system. `desktop/splash.h
 - **RT stays blue** via `rt-buckets.css` (`.rt-*`), the sanctioned A-grade / 9+ / elite colour.
 - There is **no save state** on this page (the lineup persists through the flow, confirmed by a neutral toast), so orange has no home here.
 - `set-lineup.css` is on the design system (`NEW_DESIGN_CSS` in `check_ui_tokens.py`); `set-lineup.html` is already new-design via `gobShell.js` PAGES.
+
+### Tutorials and FTE
+
+Tutorial pages (`tutorial*.html`) are `html.gob` and load `gob-tokens.css`; no shell, own layout. The colour law applies to tutorial chrome; it has no tutorial accent colour.
+
+- **Neutral primary is `.gob-btn--neutral`** (`gob-buttons.css`): a white plate with `--bg` ink, for a main CTA that neither saves nor advances (Start lesson, Continue, LET'S GO, pick-opponent CONTINUE, Got It). The tutorial alert / tip primaries (`.gob-talert-btn-primary`, `.gob-tip-overlay .btn-primary`) use the same plate.
+- **Green** is only the FTE Advance: tip-off SIM GAME (`gob-btn--gate`) and the lineup-feedback CONTINUE.
+- **Orange** is only the username CONTINUE (it saves the username).
+- **Sammy modals** (`sammy-modal.css`): the primary is the neutral plate by default; `primaryClass: 'is-orange'` is a no-op kept for old callers. A CTA that advances game state passes `primaryClass: 'is-advance'` for green (the region-bye "Sim Region First Round", which runs `#play-now`).
+- **Neutral chrome:** Sammy portrait rings, eyebrows and ticks, the active tutorial-nav icon, depth badges, toast and callout bars, tutorial-alert rail, mark, progress and dots, the hub progress bar, order circles and seen check, the attribute-tour band, cue and explored state, and the pick-opponent selected card (the team-colour rail stays).
+- **Hosts without `html.gob`.** `gob-tutorial.css` (injected on every auth-bar page), `sammy-modal.css`, `username-modal.css`, `fte.css` and `.gob-btn--neutral` write tokens as `var(--token, <gob value>)`.
+- **`css/fte.css`** styles only the pre-press-conference reminder (`pgpcSammyReminderModal.js`) as dark Sammy chrome. It also overrides that module's light-shell label colour and orange checkbox accent.
+- **Out of scope:** the lesson pages' inline teaching diagrams (they keep the `--orange`, `--orange-soft`, `--green` and `--lblue` aliases) and `gob-advanced.css` diagram colours stay legacy. Only that sheet's chrome is neutral.
+- On the design system: `gob-tutorial.css`, plus the Sammy, username, walk-on, attribute-tour, lineup-modal, persona, pick-opponent, tip-off and `fte.css` sheets (`NEW_DESIGN_CSS`).

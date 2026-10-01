@@ -110,7 +110,7 @@
       var ready = isAtBottom();
       btn.classList.toggle('is-ready', ready);
       btn.classList.toggle('gob-btn--ghost', !ready);
-      btn.classList.toggle('gob-btn--action', ready);
+      btn.classList.toggle('gob-btn--neutral', ready);
     }
 
     btn.addEventListener('click', function () {

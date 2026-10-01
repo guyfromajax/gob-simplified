@@ -31,10 +31,10 @@ const STYLESHEETS = [
 
 function buildModal({ teamName, message, ctaLabel, ctaVariant, onConfirm }) {
   const sammySrc = getTeamSammyImage(teamName);
-  // Per styleguide: --action (orange) for non-gating (intro Got It),
-  // --gate (green) for gating (feedback modal Return To Game IS the
-  // actual navigation trigger, so it advances game state).
-  const variantClass = ctaVariant === 'gate' ? 'gob-btn--gate' : 'gob-btn--action';
+  // Colour law: --neutral for the intro Got It (an acknowledgement, not a
+  // save), --gate (green) for the feedback CONTINUE, which confirms the lineup
+  // and advances the funnel.
+  const variantClass = ctaVariant === 'gate' ? 'gob-btn--gate' : 'gob-btn--neutral';
 
   const overlay = document.createElement('div');
   overlay.className = 'gob-modal-overlay';

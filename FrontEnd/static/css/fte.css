@@ -1,0 +1,135 @@
+/*
+ * FTE modal shell — restored on gob tokens.
+ *
+ * The legacy light FTE sheet was deleted in fa621a753 with the old welcome
+ * modals, but the pre-press-conference reminder
+ * (js/phaser/utils/pgpcSammyReminderModal.js) still loads /css/fte.css and
+ * builds its markup from these classes. Without the sheet it rendered
+ * unstyled at the end of the page. This file styles ONLY the classes that
+ * modal uses, as the same dark Sammy chrome as css/sammy-modal.css.
+ *
+ * Hosts include court.html, which is not html.gob, so every token carries a
+ * fallback equal to its gob value.
+ */
+
+.fte-username-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: var(--scrim, rgba(5, 6, 10, 0.62));
+}
+.fte-username-backdrop.open {
+  display: flex;
+}
+
+.fte-username-backdrop.open .fte-modal {
+  animation: fte-modal-in 200ms ease both;
+}
+@keyframes fte-modal-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fte-username-backdrop.open .fte-modal {
+    animation: fte-modal-fade 150ms ease-out both;
+  }
+}
+@keyframes fte-modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.fte-modal {
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 26px 28px 24px;
+  border-radius: 16px;
+  background-color: var(--surface-popover, rgba(20, 24, 34, 0.98));
+  border: 1px solid var(--white-12, rgba(255, 255, 255, 0.12));
+  box-shadow: 0 24px 48px var(--black-50, rgba(0, 0, 0, 0.5));
+  color: var(--text-100, #ffffff);
+}
+
+.fte-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+/* Size and ring colour are set by the reminder module (inline). */
+.fte-content-img {
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center top;
+  border: 2px solid var(--white-18, rgba(255, 255, 255, 0.18));
+  background: var(--black-35, rgba(0, 0, 0, 0.35));
+}
+
+.fte-content-main {
+  min-width: 0;
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--white-90, rgba(255, 255, 255, 0.9));
+}
+.fte-content-main p {
+  margin: 0;
+}
+
+/* The reminder's own <style> block was written for the light shell (dark
+   label, orange checkbox). Outrank it so the label reads on the dark surface
+   and the checkbox, a choice control, stays neutral. */
+.fte-username-backdrop.pgpc-sammy-reminder-backdrop .pgpc-sammy-dont-show {
+  color: var(--text-60, rgba(255, 255, 255, 0.6));
+}
+.fte-username-backdrop.pgpc-sammy-reminder-backdrop .pgpc-sammy-dont-show:hover {
+  color: var(--text-87, rgba(255, 255, 255, 0.87));
+}
+.fte-username-backdrop.pgpc-sammy-reminder-backdrop .pgpc-sammy-dont-show input[type="checkbox"] {
+  accent-color: var(--white-90, rgba(255, 255, 255, 0.9));
+}
+
+.fte-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* "Got It" acknowledges, so it is the neutral primary (.gob-btn--neutral). */
+.fte-btn {
+  min-width: 140px;
+  height: 42px;
+  padding: 0 22px;
+  border-radius: 10px;
+  border: 1px solid var(--white-90, rgba(255, 255, 255, 0.9));
+  background: var(--white-90, rgba(255, 255, 255, 0.9));
+  color: var(--bg, #0b0d14);
+  font-family: var(--font-display, 'Bebas Neue Pro', 'Bebas Neue', sans-serif);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+}
+.fte-btn:hover {
+  background: var(--text-100, #ffffff);
+  transform: translateY(-1px);
+}
+.fte-btn:focus-visible {
+  outline: 2px solid var(--white-70, rgba(255, 255, 255, 0.7));
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .fte-modal { padding: 22px 18px 20px; }
+  .fte-btn { width: 100%; }
+}
