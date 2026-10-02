@@ -85,6 +85,82 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
 });
 
+// The shared page loader is solid (Jamie, 2026-10-02): the page fill at full opacity, so
+// nothing being built behind it ghosts through. At 92% black the Office's skeleton heads
+// and the default Advance label could be read under it.
+const LOADER_FILL = 'rgb(11, 13, 20)';   // --bg
+const STATIC = path.join(__dirname, '../../FrontEnd/static');
+
+function loaderFill(page) {
+  return page.evaluate(() => {
+    const overlay = document.getElementById('page-load-overlay');
+    if (!overlay) return null;
+    const cs = getComputedStyle(overlay);
+    return { shown: cs.display !== 'none', bg: cs.backgroundColor, opacity: cs.opacity, image: cs.backgroundImage };
+  });
+}
+
+test.describe('the page loader is opaque', () => {
+  const pages = [
+    ['Office', '/franchise-command-center.html?' + franchiseQuery({ tab: 'home-tab' }), 'office'],
+    ['a browse page (Standings)', '/franchise-command-center.html?' + franchiseQuery({ tab: 'standings-view' }), 'standings'],
+    ['weekly Training', '/training.html?' + franchiseQuery({ from: 'locker-room', session_type: 'preseason' }), 'training'],
+    ['court pre-game', '/court.html?' + franchiseQuery({ home: 'Lancaster', away: 'Four-Corners', my_team: 'home', week: '1' }), 'court-pregame'],
+  ];
+  for (const [name, url, slug] of pages) {
+    test(name, async ({ page }) => {
+      await stubAuth(page);
+      await page.addInitScript(() => { window.alert = () => {}; });
+      await delayApi(page, 2500, franchiseApi());
+      await page.goto(url, { waitUntil: 'commit' });
+      await page.waitForFunction(() => {
+        const overlay = document.getElementById('page-load-overlay');
+        return !!overlay && getComputedStyle(overlay).display !== 'none';
+      });
+      await page.waitForTimeout(500);
+      const fill = await loaderFill(page);
+      expect(fill.shown).toBe(true);
+      expect(fill.bg).toBe(LOADER_FILL);       // no alpha channel: fully opaque
+      expect(fill.opacity).toBe('1');
+      // Whatever is under the middle of each quadrant, the loader is what is on top.
+      const covered = await page.evaluate(() => {
+        const overlay = document.getElementById('page-load-overlay');
+        const points = [[0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9], [0.5, 0.2]];
+        return points.every(([fx, fy]) => {
+          const hit = document.elementFromPoint(window.innerWidth * fx, window.innerHeight * fy);
+          return !!hit && (hit === overlay || overlay.contains(hit));
+        });
+      });
+      expect(covered).toBe(true);
+      if (process.env.PB_SHOTS === '1') {
+        const dir = path.join(__dirname, '../../reports/first-paint-sweep');
+        fs.mkdirSync(dir, { recursive: true });
+        await page.screenshot({ path: path.join(dir, 'loader-solid-' + slug + '-after-1280.png'), animations: 'disabled' });
+      }
+    });
+  }
+
+  test('no page carries a see-through loader in its markup or in the shared script', () => {
+    const script = fs.readFileSync(path.join(STATIC, 'js/shared/pageLoadOverlay.js'), 'utf8');
+    expect(script).toContain("var OVERLAY_BG = 'var(--bg)'");
+    expect(script).not.toMatch(/overlay\.style\.background\s*=\s*'(?!var\(--bg\))/);
+    expect(script).not.toMatch(/background:color-mix/);
+    const carriers = fs.readdirSync(STATIC).filter((name) => name.endsWith('.html'))
+      .map((name) => [name, fs.readFileSync(path.join(STATIC, name), 'utf8')])
+      .filter(([, html]) => html.includes('id="page-load-overlay"'));
+    expect(carriers.map(([name]) => name).sort()).toEqual([
+      'box-score.html', 'court.html', 'franchise-command-center.html', 'mode-select.html', 'set-lineup.html', 'trophy-case.html',
+    ]);
+    carriers.forEach(([name, html]) => {
+      const tag = html.slice(html.indexOf('<div id="page-load-overlay"'));
+      const open = tag.slice(0, tag.indexOf('>') + 1);
+      expect(open, name).toContain('background:var(--bg);');
+      expect(open, name).toContain('class="gob-scope"');     // the token resolves outside .gob
+      expect(open, name).not.toMatch(/rgba\(|color-mix|transparent/);
+    });
+  });
+});
+
 test('shell top strip: no "NR" and no logo alt text before the season data is in', async ({ page }) => {
   const { tracker } = await openHeld(
     page, '/training-playbooks.html?' + franchiseQuery(), franchiseApi(),
