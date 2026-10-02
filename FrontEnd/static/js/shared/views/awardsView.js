@@ -3,8 +3,10 @@
  *
  * Weeks 1-34 it is the projection ("Projected All-Americans", rebuilt once a week and
  * frozen through the tournaments). After the National Tournament it is the final.
- * Each team is one player per position. No season selector, no portraits. Navy row is
- * the user's team.
+ * Each team is one player per position, PG to C. No season selector, no portraits. Navy
+ * row is the user's team. How the teams are picked is not shown: the page has the
+ * status, the player, the rating and the stat line, and the response carries no weights,
+ * scores, ranks or bonus.
  */
 
 var TEAMS = [
@@ -49,10 +51,6 @@ function hasField(teams, field) {
   });
 }
 
-function scoreText(value) {
-  return typeof value === 'number' ? value.toFixed(1) : '--';
-}
-
 function rtCell(rating) {
   if (typeof rating !== 'number') return '<td>--</td>';
   var text = typeof window.formatRtDisplay === 'function' ? window.formatRtDisplay(rating) : String(Math.round(rating));
@@ -60,28 +58,19 @@ function rtCell(rating) {
   return '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + text + '</td>';
 }
 
-/** Title and the one line under it: what this is and when it changes. */
+/**
+ * Title and the status under it: "Preseason", "After week N", "End of regular season ·
+ * Not final: tournament play can still change these", or "Final".
+ */
 function headHtml(body, esc) {
   var status = body && body.status;
   if (status !== 'projected') {
     return '<header class="gob-awards-head"><h2>All-Americans</h2>'
-      + (status === 'final' ? '<p>Final. Named after the National Tournament.</p>' : '')
+      + (status === 'final' ? '<p>Final</p>' : '')
       + '</header>';
   }
   var parts = [esc(body.label || 'Projected')];
-  var weights = body.weights || null;
-  if (weights) {
-    var mix = [];
-    [['attributes', 'Ratings'], ['stats', 'Stats'], ['team', 'Team rank']].forEach(function (pair) {
-      var value = Number(weights[pair[0]]);
-      if (value > 0) mix.push(pair[1] + ' ' + Math.round(value) + '%');
-    });
-    if (mix.length) parts.push(esc(mix.join(' \u00b7 ')));
-  }
-  var week = Number(body.week);
-  parts.push(week >= 26
-    ? 'Not final: tournament play can still change these'
-    : 'Updates every week');
+  if (Number(body.week) >= 26) parts.push('Not final: tournament play can still change these');
   return '<header class="gob-awards-head"><h2>Projected All-Americans</h2><p>'
     + parts.join('<span aria-hidden="true"> \u00b7 </span>') + '</p></header>';
 }
@@ -128,16 +117,13 @@ export function mount(container, ctx) {
       return;
     }
     var esc = tables.esc;
-    // Columns follow the data: an older stored final has no position, rating or score,
-    // and the preseason projection has no stat lines to show.
+    // Columns follow the data: an older stored final has no position or rating, and the
+    // preseason projection has no stat lines to show.
     var showPos = hasField(teams, 'position');
     var showRt = hasField(teams, 'rating');
-    var showScore = hasField(teams, 'score') && !!body.status;
-    var showBonus = body.status === 'final' && hasField(teams, 'bonus');
     var showStats = hasStats(teams);
     var perGame = body.stats_basis === 'per_game';
-    var columns = 3 + (showPos ? 1 : 0) + (showRt ? 1 : 0) + (showStats ? STATS.length : 0)
-      + (showBonus ? 1 : 0) + (showScore ? 1 : 0);
+    var columns = 3 + (showPos ? 1 : 0) + (showRt ? 1 : 0) + (showStats ? STATS.length : 0);
 
     var html = '<div class="gob-awards">' + headHtml(body, esc);
     TEAMS.forEach(function (team) {
@@ -148,15 +134,11 @@ export function mount(container, ctx) {
       html += '<col class="c-player"><col class="c-yr"><col class="c-team">';
       if (showRt) html += '<col class="c-rt">';
       if (showStats) STATS.forEach(function () { html += '<col class="c-stat">'; });
-      if (showBonus) html += '<col class="c-stat">';
-      if (showScore) html += '<col class="c-score">';
       html += '</colgroup><thead><tr>';
       if (showPos) html += '<th class="left">Pos</th>';
       html += '<th class="left">Player</th><th class="left">Yr</th><th class="left">Team</th>';
       if (showRt) html += '<th>RT</th>';
       if (showStats) STATS.forEach(function (key) { html += '<th>' + esc(key) + '</th>'; });
-      if (showBonus) html += '<th title="Postseason bonus points">Bonus</th>';
-      if (showScore) html += '<th>Score</th>';
       html += '</tr></thead><tbody>';
       if (!players.length) {
         html += '<tr><td class="left gob-awards-empty" colspan="' + columns + '">No selections</td></tr>';
@@ -183,19 +165,12 @@ export function mount(container, ctx) {
             html += '<td>' + esc(statText(stats, key, perGame)) + '</td>';
           });
         }
-        if (showBonus) {
-          var bonus = player.bonus && Number(player.bonus.total);
-          html += '<td class="gob-awards-bonus">' + (bonus > 0 ? '+' + bonus : '--') + '</td>';
-        }
-        if (showScore) html += '<td class="gob-awards-score">' + esc(scoreText(player.score)) + '</td>';
         html += '</tr>';
       });
       html += '</tbody></table></div></section>';
     });
     if (showStats && perGame) {
-      html += '<p class="gob-awards-note">Stats are per game, regular season. '
-        + 'Score is 0\u2013100 within the position'
-        + (showBonus ? ', plus postseason bonus points.' : '.') + '</p>';
+      html += '<p class="gob-awards-note">Stats are per game, regular season.</p>';
     }
     html += '</div>';
     container.innerHTML = html;
