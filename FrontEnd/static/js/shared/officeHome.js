@@ -748,7 +748,16 @@
       // Headline (only when the server carries one).
       if (present(result.headline)) {
         var hl = el('a', 'wkc-hl', result.headline);
-        if (boxUrl) { hl.href = boxUrl; bindGo(hl, boxUrl); }
+        if (boxUrl) {
+          // The same read link as "Box score" above: `data-return`, GOBNav handles the
+          // click, and the listener only plays the sound.
+          hl.href = boxUrl;
+          hl.setAttribute('data-return', '');
+          hl.addEventListener('click', function (event) {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+            clickTiny();
+          });
+        }
         node.appendChild(markItem(hl));
       }
 
