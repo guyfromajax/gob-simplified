@@ -1,6 +1,6 @@
 # Training Report, top of the page — 2026-10-02
 
-Branch `polish/training-report-top`, from `origin/develop` `6c6c841f9` (contains the `polish/first-paint-sweep` merge; still the tip at gate time, so there was nothing to merge).
+Branch `polish/training-report-top`, from `origin/develop` `6c6c841f9` (contains the `polish/first-paint-sweep` merge), with `origin/develop` `6d569a465` merged in before the final gates.
 
 Jamie's verdict on the old top: the information runs together and is not elegant. This is a redesign of the **Notes** section and the **Team Report** only. What data is shown and how it is computed are unchanged.
 
@@ -43,7 +43,7 @@ The target was "about half". It is just under two thirds, and the stated purpose
 
 ## CH
 
-- CH is never named. `noteAttributeLabels()` drops it from Rising / Falling whatever a stored report says (the server already excludes it from new ones).
+- CH is never named. `noteAttributeLabels()` drops it from Rising / Falling whatever a stored report says (the server already excludes it from new notes, and develop `6d569a465` now keeps CH out of every payload).
 - If CH was the only attribute on a line, the line reads "No Significant Updates".
 - The Team Report's "Chemistry" is the team attribute, not CH, and stays (the brief lists it).
 
@@ -102,15 +102,18 @@ Fail-on-old-code: with the redesign reverted, 25 of the 28 fail. The 3 that pass
 - **Co-winners.** For "Practice Players Of The Week" the page shows one name (the first id match), as before. Not changed.
 - Running `prep-modules-report.spec.js` rewrites PNGs in other reports' folders; those were not staged.
 
-## Gates (final tree: `6c6c841f9` + this branch)
+## Gates (final merged tree: `origin/develop` `6d569a465` merged in)
+
+Develop moved while the first gate run was in progress (chrome-followups-2: CH hidden at the server). It merged cleanly (`f76d75f4a`) and every gate was run again on the merged tree. The numbers below are that second run.
 
 | Gate | Result |
 |---|---|
-| `git fetch` + merge `origin/develop` | Already up to date: develop is `6c6c841f9`, the base of this branch. |
-| `pytest --ignore=tests/e2e -q` | **4372 passed, 14 skipped, 108 xfailed, 2 xpassed** (exit 0). No `FAILED` / `ERROR`. |
+| `git fetch` + merge `origin/develop` | Merged `6d569a465`, no conflicts. |
+| `pytest --ignore=tests/e2e -q` | **4385 passed, 14 skipped, 108 xfailed, 2 xpassed** (exit 0). No `FAILED` / `ERROR`. |
 | `scripts/check_ui_tokens.py --strict --no-write` | **exit 0** |
 | `scripts/ci/check_migration_gates.py` | **passed** (Gate A 0; Gate B 134 lines in 43 files, unchanged) |
-| Full Playwright, once, under `/tmp/gob-full-playwright.lock` | **1050 passed, 32 skipped, 0 failed** (4.7 min). Nothing to re-run. |
-| `franchise-command-center.css` | 1779 lines, not touched. No sim / finalize / cpu_week_pool / sim_rng changes (no Python changed). |
+| Full Playwright, once, under `/tmp/gob-full-playwright.lock` | **1085 passed, 32 skipped, 0 failed** (5.5 min). Nothing to re-run. |
+| `franchise-command-center.css` | 1779 lines, not touched. No sim / finalize / cpu_week_pool / sim_rng changes (this branch changes no Python). |
 
-The 2 XPASS are the two already on the known-failures list (`test_resource_page_scoping.py::test_leaders_view_scope_filters_to_user_conference`, `test_settings_application_to_gameplay.py::…::test_settings_loaded_and_applied_to_gameplay`); this branch changes no Python and the list was not edited.
+- The 2 XPASS are the two already on the known-failures list (`test_resource_page_scoping.py::test_leaders_view_scope_filters_to_user_conference`, `test_settings_application_to_gameplay.py::…::test_settings_loaded_and_applied_to_gameplay`); the list was not edited.
+- First run, on `6c6c841f9` before develop moved: pytest 4372 passed / 2 xpassed, Playwright 1050 passed / 0 failed.
