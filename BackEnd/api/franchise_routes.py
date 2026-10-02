@@ -20,6 +20,7 @@ from BackEnd.utils.franchise_geek_points import SEASON_GP_FIELD
 from BackEnd.utils.trophy_log import (
     TROPHIES_FIELD,
     record_all_american_trophies_if_missing,
+    record_all_conference_trophies_if_missing,
     record_first_bracket_milestone,
     record_first_signing_class_milestone,
     record_season_record_trophy,
@@ -10948,6 +10949,9 @@ def command_center_data(
                     ensure_projection(franchise_doc)
                 except Exception:
                     logger.exception("[ALL-AMERICAN] projection failed franchise_id=%s", franchise_doc.get("_id"))
+        if franchise_doc and week is not None:
+            # All-Conference: weekly projection, and the final from week 27.
+            _ensure_all_conference(franchise_doc)
         if franchise_id and franchise_doc and team_id:
             try:
                 user_ftd_doc = franchise_team_data_collection.find_one(
@@ -15217,6 +15221,21 @@ def _compute_all_american_teams(franchise_doc: dict[str, Any]) -> dict[str, Any]
     return compute_final(franchise_doc)
 
 
+def _ensure_all_conference(franchise_doc: dict[str, Any]) -> None:
+    """The All-Conference projection, and its final once week 26 is complete, with the
+    user's trophy entries. Runs on the same reads as the All-American projection; a
+    failure never fails the read."""
+    try:
+        from BackEnd.utils.all_american import CONFERENCE_TEAMS_KEY, ensure_conference_projection
+
+        ensure_conference_projection(franchise_doc)
+        awards = franchise_doc.get(AWARDS_FIELD) or {}
+        if awards.get(CONFERENCE_TEAMS_KEY):
+            record_all_conference_trophies_if_missing(franchise_doc, awards)
+    except Exception:
+        logger.exception("[ALL-CONFERENCE] failed franchise_id=%s", franchise_doc.get("_id"))
+
+
 def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str, Any]:
     awards = franchise_doc.get(AWARDS_FIELD) or {}
     if not awards.get("all_american_teams"):
@@ -16300,6 +16319,8 @@ def get_franchise_awards(
     else:
         # Projected All-Americans, weeks 1-26; frozen through the tournaments.
         ensure_projection(franchise_doc)
+    # All-Conference: weekly projection, and the final from week 27.
+    _ensure_all_conference(franchise_doc)
     return awards_payload(franchise_doc)
 
 

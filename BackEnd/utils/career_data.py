@@ -136,6 +136,32 @@ def _per_game_stats(season: Mapping[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in stats.items() if value is not None}
 
 
+_ALL_CONFERENCE_TEAM_ORDER = (
+    ("first_team", "all_conference_1"),
+    ("second_team", "all_conference_2"),
+)
+
+
+def _user_all_conference_kind_by_player(awards: Mapping[str, Any], user_team_id: str) -> list[tuple[str, str]]:
+    """``(player_id, kind)`` for user-team All-Conference picks, 1st then 2nd team.
+    The final is keyed by conference; the user's players are on their own."""
+    by_conference = (awards or {}).get("all_conference_teams") or {}
+    if not isinstance(by_conference, dict):
+        return []
+    picks: list[tuple[str, str]] = []
+    for team_key, kind in _ALL_CONFERENCE_TEAM_ORDER:
+        for teams in by_conference.values():
+            if not isinstance(teams, dict):
+                continue
+            for pick in teams.get(team_key) or []:
+                if not isinstance(pick, dict) or str(pick.get("team_id") or "") != user_team_id:
+                    continue
+                pid = str(pick.get("player_id") or "")
+                if pid:
+                    picks.append((pid, kind))
+    return picks
+
+
 def _user_all_american_kind_by_player(awards: Mapping[str, Any], user_team_id: str) -> list[tuple[str, str]]:
     """``(player_id, kind)`` for user-team picks, in 1st → 2nd → 3rd team order."""
     teams = (awards or {}).get("all_american_teams") or {}
@@ -170,11 +196,13 @@ def best_players(
     team_id: Any,
     awards: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """The three the review shows: user-team All-Americans first, then by PPG.
+    """The three the review shows: user-team All-Americans first, then All-Conference
+    picks, then by PPG.
 
-    All-Americans come in team order (1st, then 2nd, then 3rd). The rest of the
-    roster fills the remaining slots by points per game; equal PPG keeps roster
-    order, so the list is stable across reads.
+    All-Americans come in team order (1st, then 2nd, then 3rd), then All-Conference
+    picks not already listed (1st, then 2nd). The rest of the roster fills the
+    remaining slots by points per game; equal PPG keeps roster order, so the list is
+    stable across reads. A player on both teams carries both tags.
     """
     fid = franchise_doc.get("_id")
     roster = _roster_player_ids(fid, team_id)
@@ -189,7 +217,14 @@ def best_players(
 
     all_americans = _user_all_american_kind_by_player(awards or {}, str(team_id or ""))
     aa_kind = dict(all_americans)
+    all_conference = _user_all_conference_kind_by_player(awards or {}, str(team_id or ""))
+    ac_kind = dict(all_conference)
     chosen = [pid for pid, _kind in all_americans if pid in by_id][:BEST_PLAYERS]
+    for pid, _kind in all_conference:
+        if len(chosen) >= BEST_PLAYERS:
+            break
+        if pid in by_id and pid not in chosen:
+            chosen.append(pid)
     if len(chosen) < BEST_PLAYERS:
         rest = [pid for pid in roster if pid in by_id and pid not in chosen]
         rest.sort(key=lambda pid: -(_int((by_id[pid].get("season") or {}).get("PTS")) or 0))
@@ -215,6 +250,8 @@ def best_players(
         }
         if pid in aa_kind:
             row["all_american"] = aa_kind[pid]
+        if pid in ac_kind:
+            row["all_conference"] = ac_kind[pid]
         rows.append(row)
     return rows
 

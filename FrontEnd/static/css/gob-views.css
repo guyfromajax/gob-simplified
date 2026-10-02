@@ -64,7 +64,7 @@
   gap: var(--dsp-16);
 }
 
-#franchise-container #awards-view .gob-awards > section > h3 {
+#franchise-container #awards-view .gob-awards section > h3 {
   margin: 0 0 var(--space-8);
   font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
   letter-spacing: var(--tracking-8);
@@ -355,6 +355,36 @@ html.gob-shell.gob-1920 #news-view .gob-news-grid {
 
 #franchise-container #awards-view table.gob-awards-tbl col.c-pos { width: 3.25rem; }
 #franchise-container #awards-view table.gob-awards-tbl col.c-rt { width: 3.5rem; }
+
+/* All-Conference sits under the All-American teams: its own head, the row of sixteen
+   conferences (the shared segment control, wrapping), then the two tables. The user's
+   conference is cued with a quiet "Yours"; the chosen one is `on`. */
+#franchise-container #awards-view .gob-awards-conf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-16);
+  margin-top: var(--space-8);
+  padding-top: var(--dsp-16);
+  border-top: 1px solid var(--line);
+}
+#franchise-container #awards-view .gob-awards-conf-row {
+  flex-wrap: wrap;
+  align-self: flex-start;
+  max-width: 100%;
+}
+#franchise-container #awards-view .gob-awards-conf-row button.is-yours {
+  color: var(--text-87);
+}
+#franchise-container #awards-view .gob-awards-conf-row button em {
+  font-style: normal;
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-6);
+  text-transform: uppercase;
+  color: var(--text-60);
+}
+#franchise-container #awards-view .gob-awards-conf-row button.on em {
+  color: var(--text-87);
+}
 
 /* What the page is, and when it changes. Neutral: a projection is information. */
 #franchise-container #awards-view .gob-awards-head h2 {

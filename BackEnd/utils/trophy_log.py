@@ -40,6 +40,10 @@ ALL_AMERICAN_KIND_BY_TEAM = {
     "second_team": "all_american_2",
     "third_team": "all_american_3",
 }
+ALL_CONFERENCE_KIND_BY_TEAM = {
+    "first_team": "all_conference_1",
+    "second_team": "all_conference_2",
+}
 SEASON_RECORD_KIND = "season_record"
 # Once per COACH, so the key carries neither franchise nor season.
 MILESTONE_KINDS = (
@@ -50,6 +54,7 @@ MILESTONE_KINDS = (
 TROPHY_KINDS = (
     *TITLE_TROPHY_KINDS,
     *ALL_AMERICAN_KIND_BY_TEAM.values(),
+    *ALL_CONFERENCE_KIND_BY_TEAM.values(),
     SEASON_RECORD_KIND,
     *MILESTONE_KINDS,
 )
@@ -199,20 +204,36 @@ def record_title_trophy(*, owner_user_id: Any, kind: str, franchise_id: Any) -> 
     return append_trophy(owner_user_id, entry)
 
 
-def _user_all_american_picks(franchise_doc: dict, awards: dict) -> list[tuple[str, dict]]:
-    """``(kind, pick)`` for USER-team players on the three All-American teams."""
+def _user_picks(franchise_doc: dict, teams: Any, kind_by_team: dict[str, str]) -> list[tuple[str, dict]]:
+    """``(kind, pick)`` for USER-team players on the given teams."""
     user_tid = str(franchise_doc.get("user_team_object_id") or "")
     owner = franchise_doc.get("user_id")
-    teams = (awards or {}).get("all_american_teams") or {}
     if not user_tid or not owner or not isinstance(teams, dict):
         return []
     picks: list[tuple[str, dict]] = []
-    for team_key, kind in ALL_AMERICAN_KIND_BY_TEAM.items():
+    for team_key, kind in kind_by_team.items():
         for pick in teams.get(team_key) or []:
             if not isinstance(pick, dict) or str(pick.get("team_id") or "") != user_tid:
                 continue
             if str(pick.get("player_id") or ""):
                 picks.append((kind, pick))
+    return picks
+
+
+def _user_all_american_picks(franchise_doc: dict, awards: dict) -> list[tuple[str, dict]]:
+    """``(kind, pick)`` for USER-team players on the three All-American teams."""
+    return _user_picks(franchise_doc, (awards or {}).get("all_american_teams"), ALL_AMERICAN_KIND_BY_TEAM)
+
+
+def _user_all_conference_picks(franchise_doc: dict, awards: dict) -> list[tuple[str, dict]]:
+    """``(kind, pick)`` for USER-team players on the two All-Conference teams of the
+    user's conference (the final, ``all_conference_teams``, keyed by conference)."""
+    by_conference = (awards or {}).get("all_conference_teams") or {}
+    if not isinstance(by_conference, dict):
+        return []
+    picks: list[tuple[str, dict]] = []
+    for teams in by_conference.values():
+        picks.extend(_user_picks(franchise_doc, teams, ALL_CONFERENCE_KIND_BY_TEAM))
     return picks
 
 
@@ -261,6 +282,53 @@ def record_all_american_trophies(franchise_doc: dict, awards: dict) -> int:
         )
         added += int(append_trophy(owner, entry))
     return added
+
+
+def expected_all_conference_storage_keys(franchise_doc: dict, awards: dict) -> set[str]:
+    user_tid = str(franchise_doc.get("user_team_object_id") or "")
+    if not user_tid:
+        return set()
+    fid = str(franchise_doc.get("_id"))
+    season = int(franchise_doc.get("current_season", 1) or 1)
+    return {
+        _storage_key(trophy_key(fid, season, kind, user_tid, str(pick.get("player_id"))))
+        for kind, pick in _user_all_conference_picks(franchise_doc, awards)
+    }
+
+
+def record_all_conference_trophies(franchise_doc: dict, awards: dict) -> int:
+    """One entry per USER-team player on the All-Conference first / second team. A
+    player on an All-American team too gets both entries."""
+    user_tid = str(franchise_doc.get("user_team_object_id") or "")
+    owner = franchise_doc.get("user_id")
+    picks = _user_all_conference_picks(franchise_doc, awards)
+    if not user_tid or not owner or not picks:
+        return 0
+    added = 0
+    for kind, pick in picks:
+        player_id = str(pick.get("player_id") or "")
+        entry = build_trophy_entry(
+            franchise_doc,
+            kind=kind,
+            team_id=user_tid,
+            player_id=player_id,
+            detail={"player_id": player_id, "player_name": pick.get("name") or ""},
+        )
+        added += int(append_trophy(owner, entry))
+    return added
+
+
+def record_all_conference_trophies_if_missing(franchise_doc: dict, awards: dict) -> int:
+    """Append user-team All-Conference entries only when a key is missing."""
+    owner = franchise_doc.get("user_id")
+    if not owner:
+        return 0
+    expected = expected_all_conference_storage_keys(franchise_doc, awards)
+    if not expected:
+        return 0
+    if expected <= read_trophy_keys(owner):
+        return 0
+    return record_all_conference_trophies(franchise_doc, awards)
 
 
 def record_all_american_trophies_if_missing(franchise_doc: dict, awards: dict) -> int:

@@ -82,12 +82,15 @@ function cameFromFeed() {
 }
 
 // True when the headline already names the story's week ("Week 9 Recruiting Report",
-// "Week 3 Upset Report", "Projected All-Americans: week 7"): the "Week N" line under it
-// would only repeat it.
+// "Week 3 Upset Report", "Projected All-Americans: week 7"), or names it in words
+// ("… end of the regular season" is week 26): the "Week N" line under it would only
+// repeat it.
 function headlineNamesWeek(story) {
   var week = Number(story && story.week);
   if (!isFinite(week)) return false;
-  return new RegExp('\\bweek\\s+' + week + '\\b', 'i').test(String((story && story.headline) || ''));
+  var headline = String((story && story.headline) || '');
+  if (/end of the regular season/i.test(headline)) return true;
+  return new RegExp('\\bweek\\s+' + week + '\\b', 'i').test(headline);
 }
 
 export function mount(container, ctx) {
