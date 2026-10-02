@@ -1357,16 +1357,17 @@ function createMomentumPill(mo) {
 }
 
 /**
- * Map a training delta to a mark. Two scales by report week, and they differ:
+ * Map a training delta to a mark. Exactly 0 is a dash in every week. Otherwise two
+ * scales by report week, and they differ:
  *
- * CAMP (week 1) — symmetric bands, a dash at exactly 0:
- *   0 → dash · 0<|n|<2 → 1 · 2≤|n|≤5 → 2 · |n|>5 → 3
+ * CAMP (week 1) — symmetric bands:
+ *   0<|n|<2 → 1 · 2≤|n|≤5 → 2 · |n|>5 → 3
  *
- * IN-SEASON (weeks 2–26) — asymmetric, NO dash. In-season decay makes tiny negatives
- * normal, so the "up" band absorbs small dips (down to −0.5) and reads them as holding:
+ * IN-SEASON (weeks 2–26) — asymmetric. In-season decay makes tiny negatives normal,
+ * so the "up" band absorbs small dips (down to −0.5) and reads them as holding:
  *   n ≥ 3           → 3 up
  *   1.0 ≤ n < 3     → 2 up
- *   −0.5 ≤ n < 1.0  → 1 up   (absorbs 0 and small dips)
+ *   −0.5 ≤ n < 1.0  → 1 up   (absorbs small dips; exactly 0 is the dash)
  *   −1.5 < n < −0.5 → 1 down
  *   −2.5 < n ≤ −1.5 → 2 down
  *   n ≤ −2.5        → 3 down
@@ -1398,14 +1399,16 @@ function describeTrainingChange(change) {
     };
   };
 
-  // Camp (week 1): symmetric 0/2/5 bands with a grey dash at exactly 0.
+  // Exactly 0 is a grey dash, camp or in season.
+  if (n === 0) return { text: '–', signs: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
+
+  // Camp (week 1): symmetric 0/2/5 bands.
   if (camp) {
-    if (n === 0) return { text: '–', signs: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
     const abs = Math.abs(n);
     return mark(n > 0 ? 1 : -1, abs > 5 ? 3 : abs >= 2 ? 2 : 1);
   }
 
-  // In-season (weeks 2–26): no dash; the up band absorbs dips down to −0.5.
+  // In-season (weeks 2–26): the up band absorbs dips down to −0.5.
   if (n >= -0.5) return mark(1, n >= 3 ? 3 : n >= 1 ? 2 : 1);
   return mark(-1, n <= -2.5 ? 3 : n <= -1.5 ? 2 : 1);
 }
