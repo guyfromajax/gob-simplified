@@ -649,7 +649,11 @@ def _team_lines(picks: Iterable[Mapping[str, Any]]) -> list[dict[str, str]]:
 
 
 def build_news_story(projection: Mapping[str, Any]) -> dict[str, Any] | None:
-    """The story for a publishing week, or None on any other week."""
+    """The story for a publishing week, or None on any other week.
+
+    Names only: position, player, team, year. The copy never says how the teams are
+    picked (no weights, percentages, scores, ratings or bonus).
+    """
     completed = int(projection.get("week", 0) or 0)
     if completed not in NEWS_COMPLETED_WEEKS:
         return None
@@ -659,7 +663,7 @@ def build_news_story(projection: Mapping[str, Any]) -> dict[str, Any] | None:
     week = max(1, completed)
     if completed <= 0:
         headline = "Preseason All-Americans announced"
-        intro = "The preseason All-American teams, picked on ratings before a game has been played."
+        intro = "The preseason All-American teams, named before a game has been played."
     elif completed >= REGULAR_SEASON_WEEKS:
         headline = "Projected All-Americans: end of the regular season"
         intro = (
@@ -817,8 +821,34 @@ def compute_final(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
 # API payload
 # ---------------------------------------------------------------------------
 
+# What a pick shows the player. The formula stays on the server: the stored pick also
+# holds its rank within the position, composite score, component scores and bonus, and
+# none of those (nor the week's weights) leave in a response.
+PUBLIC_PICK_KEYS = (
+    "player_id", "name", "team_id", "team_name", "year", "position", "rating", "games", "stats",
+)
+
+
+def public_teams(teams: Any) -> dict[str, list[dict[str, Any]]] | None:
+    """The stored teams with every pick cut down to ``PUBLIC_PICK_KEYS``."""
+    if not isinstance(teams, Mapping):
+        return None
+    out: dict[str, list[dict[str, Any]]] = {}
+    for key in TEAM_KEYS:
+        picks = teams.get(key) or []
+        out[key] = [
+            {name: pick[name] for name in PUBLIC_PICK_KEYS if name in pick}
+            for pick in picks
+            if isinstance(pick, Mapping)
+        ]
+    return out
+
+
 def awards_payload(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
-    """What GET /franchise/awards returns: the final when it exists, else the projection."""
+    """What GET /franchise/awards returns: the final when it exists, else the projection.
+
+    Teams and status only. Weights, scores, ranks and bonus stay on the franchise doc.
+    """
     awards = franchise_doc.get(AWARDS_FIELD) or {}
     if awards.get(TEAMS_KEY):
         final = awards.get(FINAL_KEY) or {}
@@ -827,7 +857,7 @@ def awards_payload(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
             "label": "Final",
             "computed_at": awards.get("computed_at"),
             "stats_basis": final.get("stats_basis"),
-            TEAMS_KEY: awards.get(TEAMS_KEY),
+            TEAMS_KEY: public_teams(awards.get(TEAMS_KEY)),
         }
     projection = awards.get(PROJECTION_KEY)
     if not isinstance(projection, Mapping) or not projection.get(TEAMS_KEY):
@@ -836,8 +866,7 @@ def awards_payload(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
         "status": "projected",
         "week": projection.get("week"),
         "label": projection.get("label"),
-        "weights": projection.get("weights"),
         "stats_basis": projection.get("stats_basis"),
         "computed_at": projection.get("computed_at"),
-        TEAMS_KEY: projection.get(TEAMS_KEY),
+        TEAMS_KEY: public_teams(projection.get(TEAMS_KEY)),
     }

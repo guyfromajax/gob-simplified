@@ -182,9 +182,14 @@
     }).catch(function () {});
   }
 
-  function openTab(tabName, historyMode) {
+  function openTab(tabName, historyMode, opts) {
     if (!window.CommandCenterTabs || typeof window.CommandCenterTabs.show !== 'function') return;
-    window.CommandCenterTabs.show(tabName, historyMode);
+    window.CommandCenterTabs.show(tabName, historyMode, opts);
+  }
+
+  // A news story is on screen (the News view draws it in place of the feed).
+  function storyOpen() {
+    return !!document.querySelector('#news-view.tab-content.active .gob-news-story');
   }
 
   function hrefOf(el) {
@@ -538,11 +543,16 @@
         return;
       }
       var tab = currentTab();
-      if ((TAB_SECTION[tab] || 'office') === section.id) return;
       var dest = section.tabs.filter(function (item) { return !item.link; })[0];
       if (!dest) return;
+      if ((TAB_SECTION[tab] || 'office') === section.id) {
+        // News always opens the feed: from Awards, and from a story that is open on it.
+        if (section.id !== 'news' || (tab === dest.id && !storyOpen())) return;
+      }
       playClick();
-      openTab(dest.id, 'push');
+      // `fresh`: a rail click lands on the section itself, never on a story or a team
+      // left over in the URL.
+      openTab(dest.id, 'push', { fresh: true });
     });
     sectionEls[section.id] = btn;
     return btn;

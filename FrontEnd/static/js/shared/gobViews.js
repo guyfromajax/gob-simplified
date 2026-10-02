@@ -365,8 +365,10 @@
     'roster-view': 1, 'schedule-tab': 1, 'team-schedule-view': 1, 'player-stats-tab': 1,
     'player-stats-view': 1, 'team-attributes-view': 1
   };
+  // `story` is a drill key like the rest: a link out of a story (to a team) must not
+  // carry the story along, and Back still returns to the story's own entry.
   var DRILL_KEYS = ['player_id', 'view_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
-    'return_url', 'origin', 'return_tab', 'id'];
+    'return_url', 'origin', 'return_tab', 'id', 'story'];
 
   function originFor(returnTab) {
     if (returnTab === 'home-tab') return 'office';

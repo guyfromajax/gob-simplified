@@ -96,6 +96,12 @@ export function mount(container, ctx) {
     });
   }
 
+  function boxHref(gameId) {
+    return '/box-score.html?game_id=' + encodeURIComponent(gameId)
+      + '&mode=franchise&franchise_id=' + encodeURIComponent(franchiseId)
+      + '&team_id=' + encodeURIComponent(userId);
+  }
+
   function scheduleRow(row, result) {
     var href = row.opponent_id ? teamHref(row.opponent_id, (team && team.name) || 'Team') : '';
     var site = siteWord(row.site);
@@ -104,8 +110,15 @@ export function mount(container, ctx) {
     if (result) {
       var letter = row.result || '';
       var score = (row.team_score == null ? '' : row.team_score) + '–' + (row.opp_score == null ? '' : row.opp_score);
-      html += '<span class="gob-sch-res' + (letter === 'L' ? ' is-loss' : '') + '">'
-        + tables.esc((letter ? letter + ' ' : '') + score) + '</span>';
+      var cls = 'gob-sch-res' + (letter === 'L' ? ' is-loss' : '');
+      var text = tables.esc((letter ? letter + ' ' : '') + score);
+      // A result with a stored game opens its box score. `data-return`: GOBNav adds
+      // return_url on the click, so the page opens as a read and its Back comes here.
+      if (row.game_id) {
+        html += '<a class="' + cls + '" data-return href="' + tables.esc(boxHref(row.game_id)) + '">' + text + '</a>';
+      } else {
+        html += '<span class="' + cls + '">' + text + '</span>';
+      }
     }
     return html + '</div>';
   }

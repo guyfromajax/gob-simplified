@@ -34,6 +34,7 @@ Timeline:
 - Week 26: scores and season totals are frozen onto each FPD doc (`aa_w26`). Weeks 27-34 do not update.
 - Week 35: final = frozen week-26 score + postseason bonus (`compute_final`, via `_persist_week_35_awards_if_needed`).
 - News stories after weeks 0 (preseason, shown as week 1), 7, 13, 19, 26: type `all_americans`, ids `w{n}-all-americans`.
+- **The formula is hidden from the player.** `GET /franchise/awards` sends status and teams only: each pick is cut to `PUBLIC_PICK_KEYS` (who, team, year, position, rating, games, stat line). Weights, component scores, composite score, rank within the position and bonus stay on the stored `awards`. The command center sends `awards_ready` only. Story copy names players and never says how they were picked.
 
 Stored under `awards`:
 

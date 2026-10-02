@@ -5,7 +5,7 @@
  * the story or the dispatch target.
  */
 
-import { renderStoryBody } from '/js/shared/newsStory.js';
+import { renderStoryBody, storyIsWide } from '/js/shared/newsStory.js';
 
 function typeLabel(type) {
   var known = {
@@ -33,20 +33,52 @@ function storyParam() {
   catch (err) { return ''; }
 }
 
-function feedUrl() {
+// Keys left by an earlier drill-in (a team opened from the Office, say). The feed and a
+// story are addressed by `tab` and `story` alone, so neither URL carries them.
+function drillKeys() {
+  var tables = window.GOBTables;
+  return tables && typeof tables.drillKeys === 'function'
+    ? tables.drillKeys()
+    : ['story', 'player_id', 'view_team_id', 'return_tab', 'origin', 'return_url', 'up', 'pager'];
+}
+
+function cleanParams() {
   var params = new URLSearchParams(window.location.search);
+  drillKeys().forEach(function (key) { params.delete(key); });
   params.delete('story');
   params.set('tab', 'news-view');
-  var text = params.toString();
+  return params;
+}
+
+function feedUrl() {
+  var text = cleanParams().toString();
   return window.location.pathname + (text ? '?' + text : '');
 }
 
 function storyUrl(id) {
-  var params = new URLSearchParams(window.location.search);
-  params.set('tab', 'news-view');
+  var params = cleanParams();
   params.set('story', id);
   var text = params.toString();
   return window.location.pathname + (text ? '?' + text : '');
+}
+
+// Stamped on a story's history entry when it was opened from the feed: the entry behind
+// it is then the feed, at the scroll the reader left it.
+var FROM_FEED = 'gobNewsFromFeed';
+
+function markFromFeed() {
+  try {
+    var state = {};
+    var current = window.history.state || {};
+    Object.keys(current).forEach(function (key) { state[key] = current[key]; });
+    state[FROM_FEED] = true;
+    window.history.replaceState(state, '');
+  } catch (err) { /* "← News" then opens the feed in place */ }
+}
+
+function cameFromFeed() {
+  try { return !!(window.history.state && window.history.state[FROM_FEED]); }
+  catch (err) { return false; }
 }
 
 export function mount(container, ctx) {
@@ -67,10 +99,34 @@ export function mount(container, ctx) {
   function openStory(id) {
     if (window.GOBViews && typeof window.GOBViews.open === 'function') {
       window.GOBViews.open(storyUrl(id), 'push');
+      markFromFeed();
     }
     if (window.FranchiseContext && typeof window.FranchiseContext.set === 'function') {
       window.FranchiseContext.set('story', id);
     }
+  }
+
+  // "← News" always lands on the feed. Opened from the feed, the feed is the entry
+  // behind this one: step back to it and its scroll comes back with it. Any other way
+  // in (a direct URL, a link from another page or another story), the feed takes this
+  // entry's place, so the browser's Back still returns to where the reader came from.
+  function bindBack() {
+    var link = container.querySelector('.gob-news-story a.gob-dt-up');
+    if (!link) return;
+    link.addEventListener('click', function (event) {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button) return;
+      event.preventDefault();
+      var feed = feedUrl();
+      if (cameFromFeed() && window.GOBNav && typeof window.GOBNav.back === 'function') {
+        window.GOBNav.back(feed);
+        return;
+      }
+      if (window.GOBViews && typeof window.GOBViews.open === 'function') {
+        window.GOBViews.open(feed, 'replace');
+      } else {
+        window.location.replace(feed);
+      }
+    });
   }
 
   function bindFeed() {
@@ -126,15 +182,19 @@ export function mount(container, ctx) {
         if (!story && item && item.story_id === openId) story = item;
       });
       if (story) {
-        container.innerHTML = '<div class="gob-news-story"><a class="gob-dt-up" id="back-button" data-gob-up="'
-          + tables.esc(feedUrl()) + '" href="'
+        // The weekly Recruiting Report names its week in the headline: no "Week N" under it.
+        var meta = story.type === 'recruiting_report'
+          ? ''
+          : '<p class="gob-news-meta">Week ' + tables.esc(story.week) + '</p>';
+        container.innerHTML = '<div class="gob-news-story' + (storyIsWide(story) ? ' is-wide' : '')
+          + '"><a class="gob-dt-up" id="back-button" href="'
           + tables.esc(feedUrl()) + '">← News</a><h2 class="gob-news-headline">'
-          + tables.esc(story.headline || '') + '</h2><p class="gob-news-meta">Week '
-          + tables.esc(story.week) + '</p><div class="gob-news-body">'
+          + tables.esc(story.headline || '') + '</h2>' + meta + '<div class="gob-news-body">'
           + renderStoryBody(story) + '</div></div>';
         if (window.GOBTables && typeof window.GOBTables.bindWide === 'function') {
           window.GOBTables.bindWide(container);
         }
+        bindBack();
         return;
       }
     }

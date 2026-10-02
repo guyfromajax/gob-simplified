@@ -2,8 +2,13 @@
 /**
  * News › Awards: "Projected All-Americans" by position, then the final.
  *
+ * How the teams are picked is hidden: the page shows no weights, score, rank or bonus.
+ * The stubbed bodies below still carry those fields (the stored shape), so the test
+ * proves the page draws none of them whatever a server sends.
+ *
  * AA_SHOTS_DIR=<dir of week-NN.json from a simulated season> also writes the report
  * shots (reports/all-american/awards-*-1280.png) from those real payloads.
+ * TPL_SHOTS=1 writes reports/team-page-links/after-awards-*.png at 1280 and 1920.
  */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
@@ -18,6 +23,10 @@ const OTHER = 'bbbbbbbbbbbbbbbbbbbbbbbb';
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const OUT = path.join(__dirname, '../../reports/all-american');
 const SHOTS_DIR = process.env.AA_SHOTS_DIR || '';
+const HIDDEN_SHOTS = process.env.TPL_SHOTS === '1';
+const HIDDEN_OUT = path.join(__dirname, '../../reports/team-page-links');
+const COLUMNS = ['Pos', 'Player', 'Yr', 'Team', 'RT'];
+const STAT_COLUMNS = ['PTS', 'REB', 'AST', 'STL', 'BLK', 'DEF%'];
 
 function pick(team, position, rank, extra) {
   const mine = team === 'first_team' && position === 'SF';
@@ -132,6 +141,34 @@ async function shot(page, name) {
   await page.screenshot({ path: path.join(OUT, name + '-1280.png'), animations: 'disabled' });
 }
 
+async function hiddenShots(page, name) {
+  if (!HIDDEN_SHOTS) return;
+  fs.mkdirSync(HIDDEN_OUT, { recursive: true });
+  for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(size);
+    await page.evaluate(() => document.fonts && document.fonts.ready);
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(HIDDEN_OUT, 'after-' + name + '-' + size.width + '.png'), animations: 'disabled' });
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+}
+
+/** No weights, percentages of the mix, score, rank or bonus anywhere on the page. */
+async function expectFormulaHidden(view) {
+  await expect(view.locator('table.gob-awards-tbl').first()).toBeVisible();
+  const heads = await view.locator('table.gob-awards-tbl thead th').allTextContents();
+  expect(heads).not.toContain('Score');
+  expect(heads).not.toContain('Bonus');
+  expect(heads).not.toContain('Rank');
+  await expect(view.locator('.gob-awards-score, .gob-awards-bonus, col.c-score')).toHaveCount(0);
+  const text = (await view.innerText()).replace(/\s+/g, ' ');
+  expect(text).not.toMatch(/Ratings|Team rank|Stats \d|Score|Bonus|weight|0\u2013100|within the position/i);
+  // The only percent signs on the page are the DEF% column and its values.
+  const head = await view.locator('.gob-awards-head').innerText();
+  expect(head).not.toMatch(/%|\d\s*points/);
+}
+
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
 });
@@ -140,9 +177,9 @@ test('Awards shows Projected All-Americans by position, and the final after the 
   await openAwards(page, projected());
   const view = page.locator('#awards-view');
   await expect(view.locator('.gob-awards-head h2')).toHaveText('Projected All-Americans');
-  await expect(view.locator('.gob-awards-head p')).toContainText('After week 12');
-  await expect(view.locator('.gob-awards-head p')).toContainText('Ratings 26% · Stats 70% · Team rank 4%');
-  await expect(view.locator('.gob-awards-head p')).toContainText('Updates every week');
+  // The plain status only: no weight mix under the heading.
+  await expect(view.locator('.gob-awards-head p')).toHaveText('After week 12');
+  await expectFormulaHidden(view);
   await expect(view.locator('h3')).toHaveText([
     '1st Team All-American', '2nd Team All-American', '3rd Team All-American',
   ]);
@@ -153,9 +190,9 @@ test('Awards shows Projected All-Americans by position, and the final after the 
     await expect(table.locator('tbody td.gob-awards-pos')).toHaveText(POSITIONS);
   }
   const first = view.locator('table.gob-awards-tbl').first();
-  await expect(first.locator('thead th')).toHaveText([
-    'Pos', 'Player', 'Yr', 'Team', 'RT', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'DEF%', 'Score',
-  ]);
+  await expect(first.locator('thead th')).toHaveText(COLUMNS.concat(STAT_COLUMNS));
+  await expect(first.locator('tbody tr').first().locator('td')).toHaveCount(COLUMNS.length + STAT_COLUMNS.length);
+  await expect(view.locator('.gob-awards-note')).toHaveText('Stats are per game, regular season.');
   // Per game to one decimal; the user's row is the navy "yours" row.
   const mine = view.locator('tr.me');
   await expect(mine).toHaveCount(1);
@@ -163,16 +200,17 @@ test('Awards shows Projected All-Americans by position, and the final after the 
   await expect(mine).toContainText('18.4');
   await expect(mine).toContainText('4.0');
   await expect(mine).toContainText('61%');
-  await expect(mine.locator('.gob-awards-score')).toHaveText('80.3');
-  // RT paints the canonical ramp (84 is an A: blue); the score and position are neutral.
+  // The stored score (80.25) is in the stubbed body and not on the page.
+  await expect(mine).not.toContainText('80.3');
+  await expect(mine).not.toContainText('80.25');
+  // RT paints the canonical ramp (84 is an A: blue); the position is neutral.
   const paint = await mine.evaluate((row) => {
     const cells = [...row.children];
     const colour = (el) => getComputedStyle(el).color;
-    return { rt: colour(cells[4]), rtText: cells[4].textContent, score: colour(row.querySelector('.gob-awards-score')), pos: colour(cells[0]) };
+    return { rt: colour(cells[4]), rtText: cells[4].textContent, pos: colour(cells[0]) };
   });
   expect(paint.rtText).toBe('A');
   expect(paint.rt).toBe('rgb(74, 144, 217)');
-  expect(paint.score).toBe('rgb(255, 255, 255)');
   expect(paint.pos).toMatch(/^rgba\(255, 255, 255, 0\.6\d*\)$/);
   // No green, orange or gold anywhere on the page: a projection is information.
   const loud = await view.evaluate((root) => [...root.querySelectorAll('*')].filter((el) => {
@@ -185,21 +223,30 @@ test('Awards shows Projected All-Americans by position, and the final after the 
   }).length);
   expect(loud).toBe(0);
   if (!SHOTS_DIR) await shot(page, 'awards-projected-fixture');
+  await hiddenShots(page, 'awards-projection');
 
   // Preseason: no games, so no stat columns rather than six columns of dashes.
   await openAwards(page, preseason());
-  await expect(view.locator('.gob-awards-head p')).toContainText('Preseason');
-  await expect(view.locator('table.gob-awards-tbl').first().locator('thead th')).toHaveText([
-    'Pos', 'Player', 'Yr', 'Team', 'RT', 'Score',
-  ]);
+  await expect(view.locator('.gob-awards-head p')).toHaveText('Preseason');
+  await expect(view.locator('table.gob-awards-tbl').first().locator('thead th')).toHaveText(COLUMNS);
+  await expectFormulaHidden(view);
+
+  // Week 26 on: the status says the teams can still change.
+  await openAwards(page, Object.assign(projected(), { week: 26, label: 'End of regular season' }));
+  await expect(view.locator('.gob-awards-head p')).toHaveText(
+    'End of regular season \u00b7 Not final: tournament play can still change these'
+  );
+  await expectFormulaHidden(view);
 
   // After the National Tournament the same page is the final teams.
   await openAwards(page, finalBody());
   await expect(view.locator('.gob-awards-head h2')).toHaveText('All-Americans');
-  await expect(view.locator('.gob-awards-head p')).toContainText('Final');
+  await expect(view.locator('.gob-awards-head p')).toHaveText('Final');
   await expect(view).not.toContainText('Projected');
-  await expect(view.locator('table.gob-awards-tbl').first().locator('thead th')).toContainText(['Bonus', 'Score']);
-  await expect(view.locator('tr.me .gob-awards-bonus')).toHaveText('+15');
+  await expect(view.locator('table.gob-awards-tbl').first().locator('thead th')).toHaveText(COLUMNS.concat(STAT_COLUMNS));
+  await expect(view.locator('tr.me')).not.toContainText('+15');
+  await expectFormulaHidden(view);
+  await hiddenShots(page, 'awards-final');
   for (let i = 0; i < 3; i += 1) {
     await expect(view.locator('table.gob-awards-tbl').nth(i).locator('tbody td.gob-awards-pos')).toHaveText(POSITIONS);
   }
@@ -207,6 +254,15 @@ test('Awards shows Projected All-Americans by position, and the final after the 
   // Nothing to show yet reads as the one empty state.
   await openAwards(page, { status: 'unavailable', all_american_teams: null });
   await expect(view.locator('.gob-empty')).toHaveText('Awards are not available yet.');
+});
+
+test('after shots from a real projection', async ({ page }) => {
+  // TPL_AWARDS_DIR=<dir holding projection.json, a real GET /franchise/awards response>.
+  const dir = process.env.TPL_AWARDS_DIR || '';
+  test.skip(!dir || !HIDDEN_SHOTS, 'TPL_AWARDS_DIR + TPL_SHOTS only');
+  await openAwards(page, JSON.parse(fs.readFileSync(path.join(dir, 'projection.json'), 'utf8')));
+  await expectFormulaHidden(page.locator('#awards-view'));
+  await hiddenShots(page, 'awards-projection-real');
 });
 
 test('report shots from a simulated season', async ({ page }) => {

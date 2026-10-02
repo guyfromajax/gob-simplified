@@ -1,0 +1,2435 @@
+{
+ "_source": "Recorded from a real offline season (the same save as boxscore-real-game.json): franchise at week 4, after the user's week-3 game was played to the final buzzer.",
+ "franchise_id": "6abfdc26c2535f9c39797e57",
+ "team_id": "69a6fcb68d2c56aa82e48a54",
+ "opponent_id": "69a6fcb68d2c56aa82e48a58",
+ "week": 4,
+ "team_detail_opponent": {
+  "team_id": "69a6fcb68d2c56aa82e48a58",
+  "name": "Little York",
+  "primary_color": "#65308e",
+  "conference": "A1",
+  "region": "A",
+  "record": {
+   "wins": 1,
+   "losses": 2
+  },
+  "natl_rank": 71,
+  "conference_place": "5th of 8",
+  "streak": "L2",
+  "next_game": {
+   "week": 4,
+   "site": "away",
+   "opponent_id": "69a6fcb68d2c56aa82e48a57",
+   "opponent_name": "Xavien",
+   "opponent_primary_color": "#016837",
+   "opponent_natl_rank": 124,
+   "opponent_wins": 0,
+   "opponent_losses": 3
+  },
+  "results": [
+   {
+    "week": 3,
+    "site": "home",
+    "team_score": 58,
+    "opp_score": 63,
+    "result": "L",
+    "opponent_id": "69a6fcb68d2c56aa82e48a54",
+    "opponent_name": "Lancaster",
+    "opponent_primary_color": "#d24a1b",
+    "opponent_natl_rank": 5,
+    "opponent_wins": 3,
+    "opponent_losses": 0,
+    "game_id": "6abfdd97f9b08987624f29f1"
+   },
+   {
+    "week": 2,
+    "site": "away",
+    "team_score": 58,
+    "opp_score": 70,
+    "result": "L",
+    "opponent_id": "69a6fcb68d2c56aa82e48a61",
+    "opponent_name": "Durham",
+    "opponent_primary_color": "#1c2a44",
+    "opponent_natl_rank": 2,
+    "opponent_wins": 3,
+    "opponent_losses": 0,
+    "game_id": "6abfdd4bbcf3b337e65da647"
+   },
+   {
+    "week": 1,
+    "site": "away",
+    "team_score": 61,
+    "opp_score": 55,
+    "result": "W",
+    "opponent_id": "69a6fcb68d2c56aa82e48a5f",
+    "opponent_name": "Casino Row",
+    "opponent_primary_color": "#111111",
+    "opponent_natl_rank": 118,
+    "opponent_wins": 0,
+    "opponent_losses": 3,
+    "game_id": "6abfdc73ab448fe4eb280fd8"
+   }
+  ],
+  "upcoming": [
+   {
+    "week": 5,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a53",
+    "opponent_name": "Ocean City",
+    "opponent_primary_color": "#00a89d",
+    "opponent_natl_rank": 73,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 6,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a87",
+    "opponent_name": "Mobile",
+    "opponent_primary_color": "#9b1b30",
+    "opponent_natl_rank": 11,
+    "opponent_wins": 3,
+    "opponent_losses": 0
+   },
+   {
+    "week": 7,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a5d",
+    "opponent_name": "Chapel Hill",
+    "opponent_primary_color": "#87b5e6",
+    "opponent_natl_rank": 43,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 8,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a5e",
+    "opponent_name": "Appalachia",
+    "opponent_primary_color": "#0f3d2e",
+    "opponent_natl_rank": 83,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 9,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a5c",
+    "opponent_name": "Nickel Beach",
+    "opponent_primary_color": "#008b8f",
+    "opponent_natl_rank": 4,
+    "opponent_wins": 3,
+    "opponent_losses": 0
+   },
+   {
+    "week": 10,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a55",
+    "opponent_name": "Four Corners",
+    "opponent_primary_color": "#c0976a",
+    "opponent_natl_rank": 44,
+    "opponent_wins": 2,
+    "opponent_losses": 1
+   },
+   {
+    "week": 11,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a56",
+    "opponent_name": "Morristown",
+    "opponent_primary_color": "#ec1d28",
+    "opponent_natl_rank": 74,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 12,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a60",
+    "opponent_name": "IDA",
+    "opponent_primary_color": "#f2f2f2",
+    "opponent_natl_rank": 95,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 13,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a55",
+    "opponent_name": "Four Corners",
+    "opponent_primary_color": "#c0976a",
+    "opponent_natl_rank": 44,
+    "opponent_wins": 2,
+    "opponent_losses": 1
+   },
+   {
+    "week": 14,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a52",
+    "opponent_name": "Bentley-Truman",
+    "opponent_primary_color": "#4066b2",
+    "opponent_natl_rank": 49,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 15,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a59",
+    "opponent_name": "South Lancaster",
+    "opponent_primary_color": "#7c2b24",
+    "opponent_natl_rank": 101,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 16,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a56",
+    "opponent_name": "Morristown",
+    "opponent_primary_color": "#ec1d28",
+    "opponent_natl_rank": 74,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 17,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a5a",
+    "opponent_name": "Crickstown",
+    "opponent_primary_color": "#6a1f2b",
+    "opponent_natl_rank": 28,
+    "opponent_wins": 3,
+    "opponent_losses": 0
+   },
+   {
+    "week": 18,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a5b",
+    "opponent_name": "Cagers World",
+    "opponent_primary_color": "#5a3a1b",
+    "opponent_natl_rank": 52,
+    "opponent_wins": 2,
+    "opponent_losses": 1
+   },
+   {
+    "week": 19,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a98",
+    "opponent_name": "Grupenberg",
+    "opponent_primary_color": "#4066b2",
+    "opponent_natl_rank": 100,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 20,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a54",
+    "opponent_name": "Lancaster",
+    "opponent_primary_color": "#d24a1b",
+    "opponent_natl_rank": 5,
+    "opponent_wins": 3,
+    "opponent_losses": 0
+   },
+   {
+    "week": 21,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a79",
+    "opponent_name": "Cleveland-Carlysle",
+    "opponent_primary_color": "#0f3d2e",
+    "opponent_natl_rank": 120,
+    "opponent_wins": 0,
+    "opponent_losses": 3
+   },
+   {
+    "week": 22,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a69",
+    "opponent_name": "Ivy Prep",
+    "opponent_primary_color": "#ff6f61",
+    "opponent_natl_rank": 51,
+    "opponent_wins": 2,
+    "opponent_losses": 1
+   },
+   {
+    "week": 23,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a53",
+    "opponent_name": "Ocean City",
+    "opponent_primary_color": "#00a89d",
+    "opponent_natl_rank": 73,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 24,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a57",
+    "opponent_name": "Xavien",
+    "opponent_primary_color": "#016837",
+    "opponent_natl_rank": 124,
+    "opponent_wins": 0,
+    "opponent_losses": 3
+   },
+   {
+    "week": 25,
+    "site": "away",
+    "opponent_id": "69a6fcb68d2c56aa82e48a59",
+    "opponent_name": "South Lancaster",
+    "opponent_primary_color": "#7c2b24",
+    "opponent_natl_rank": 101,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   },
+   {
+    "week": 26,
+    "site": "home",
+    "opponent_id": "69a6fcb68d2c56aa82e48a52",
+    "opponent_name": "Bentley-Truman",
+    "opponent_primary_color": "#4066b2",
+    "opponent_natl_rank": 49,
+    "opponent_wins": 1,
+    "opponent_losses": 2
+   }
+  ],
+  "tournament_by_phase": {
+   "conference": [],
+   "region": [],
+   "national": []
+  }
+ },
+ "rankings": [
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a94",
+   "natl_rank": 1,
+   "team_name": "Lawrence",
+   "primary_color": "#6a1f2b",
+   "conference": 9,
+   "W": 3,
+   "L": 0,
+   "PF": 254,
+   "PA": 197,
+   "last_week": "@ Tri-Cities Prep, 73-42",
+   "last_week_result": "W",
+   "next": "at Iowa Academy"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a61",
+   "natl_rank": 2,
+   "team_name": "Durham",
+   "primary_color": "#1c2a44",
+   "conference": 2,
+   "W": 3,
+   "L": 0,
+   "PF": 245,
+   "PA": 192,
+   "last_week": "vs Casino Row, 89-57",
+   "last_week_result": "W",
+   "next": "at Crickstown"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a7a",
+   "natl_rank": 3,
+   "team_name": "Burroughs",
+   "primary_color": "#3d348b",
+   "conference": 9,
+   "W": 3,
+   "L": 0,
+   "PF": 203,
+   "PA": 176,
+   "last_week": "vs Iowa Academy, 67-59",
+   "last_week_result": "W",
+   "next": "at #16 Wash U Prep"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a5c",
+   "natl_rank": 4,
+   "team_name": "Nickel Beach",
+   "primary_color": "#008b8f",
+   "conference": 2,
+   "W": 3,
+   "L": 0,
+   "PF": 241,
+   "PA": 222,
+   "last_week": "@ Chapel Hill, 75-69",
+   "last_week_result": "W",
+   "next": "vs Appalachia"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a54",
+   "natl_rank": 5,
+   "team_name": "Lancaster",
+   "primary_color": "#d24a1b",
+   "conference": 1,
+   "W": 3,
+   "L": 0,
+   "PF": 107,
+   "PA": 93,
+   "last_week": "@ Little York, 63-58",
+   "last_week_result": "W",
+   "next": "vs South Lancaster"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a6e",
+   "natl_rank": 6,
+   "team_name": "Empire City",
+   "primary_color": "#7c2b24",
+   "conference": 4,
+   "W": 3,
+   "L": 0,
+   "PF": 252,
+   "PA": 182,
+   "last_week": "vs Long Island Methodist, 86-76",
+   "last_week_result": "W",
+   "next": "at #19 Syracuse"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a7b",
+   "natl_rank": 7,
+   "team_name": "Wacker West",
+   "primary_color": "#9b1b30",
+   "conference": 6,
+   "W": 3,
+   "L": 0,
+   "PF": 252,
+   "PA": 223,
+   "last_week": "@ Quigley Catholic, 91-81",
+   "last_week_result": "W",
+   "next": "vs #17 Templeton-Wesley"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a83",
+   "natl_rank": 8,
+   "team_name": "Myrtle Private",
+   "primary_color": "#111111",
+   "conference": 7,
+   "W": 3,
+   "L": 0,
+   "PF": 225,
+   "PA": 192,
+   "last_week": "vs Lexington, 80-70",
+   "last_week_result": "W",
+   "next": "at Knoxville"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48aaa",
+   "natl_rank": 9,
+   "team_name": "Houston Jesuit",
+   "primary_color": "#7c2b24",
+   "conference": 12,
+   "W": 2,
+   "L": 1,
+   "PF": 212,
+   "PA": 201,
+   "last_week": "vs Austin, 72-68",
+   "last_week_result": "W",
+   "next": "at MiddleTEX"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48ad1",
+   "natl_rank": 10,
+   "team_name": "Melbourne Americas",
+   "primary_color": "#005f73",
+   "conference": 16,
+   "W": 3,
+   "L": 0,
+   "PF": 202,
+   "PA": 160,
+   "last_week": "vs Hana Road, 69-47",
+   "last_week_result": "W",
+   "next": "at Pacific All-Stars"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a87",
+   "natl_rank": 11,
+   "team_name": "Mobile",
+   "primary_color": "#9b1b30",
+   "conference": 7,
+   "W": 3,
+   "L": 0,
+   "PF": 250,
+   "PA": 185,
+   "last_week": "@ Washington Carver, 88-53",
+   "last_week_result": "W",
+   "next": "at Independence"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a9a",
+   "natl_rank": 12,
+   "team_name": "HA Rushmore",
+   "primary_color": "#2a2168",
+   "conference": 10,
+   "W": 3,
+   "L": 0,
+   "PF": 247,
+   "PA": 193,
+   "last_week": "vs Rodeo Circuit, 71-62",
+   "last_week_result": "W",
+   "next": "at Crofton"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48abf",
+   "natl_rank": 13,
+   "team_name": "Cardinal Conor",
+   "primary_color": "#3b3b3b",
+   "conference": 14,
+   "W": 3,
+   "L": 0,
+   "PF": 210,
+   "PA": 175,
+   "last_week": "vs Swoosh, 75-68",
+   "last_week_result": "W",
+   "next": "vs Vancouver"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a82",
+   "natl_rank": 14,
+   "team_name": "Crimson County",
+   "primary_color": "#1c2a44",
+   "conference": 13,
+   "W": 3,
+   "L": 0,
+   "PF": 242,
+   "PA": 164,
+   "last_week": "vs Tucson, 80-53",
+   "last_week_result": "W",
+   "next": "vs Border Academy"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a91",
+   "natl_rank": 15,
+   "team_name": "Tallahassee",
+   "primary_color": "#006847",
+   "conference": 8,
+   "W": 3,
+   "L": 0,
+   "PF": 220,
+   "PA": 191,
+   "last_week": "vs Dade Academy, 56-50",
+   "last_week_result": "W",
+   "next": "vs DeLand"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a93",
+   "natl_rank": 16,
+   "team_name": "Wash U Prep",
+   "primary_color": "#2a2168",
+   "conference": 9,
+   "W": 3,
+   "L": 0,
+   "PF": 212,
+   "PA": 193,
+   "last_week": "@ Ozark Centre, 79-78",
+   "last_week_result": "W",
+   "next": "vs #3 Burroughs"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a7e",
+   "natl_rank": 17,
+   "team_name": "Templeton-Wesley",
+   "primary_color": "#7c2b24",
+   "conference": 6,
+   "W": 3,
+   "L": 0,
+   "PF": 251,
+   "PA": 194,
+   "last_week": "@ Dillinger, 94-77",
+   "last_week_result": "W",
+   "next": "at #7 Wacker West"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a8a",
+   "natl_rank": 18,
+   "team_name": "Keys High",
+   "primary_color": "#1f4fb2",
+   "conference": 8,
+   "W": 3,
+   "L": 0,
+   "PF": 232,
+   "PA": 199,
+   "last_week": "@ DeLand, 85-75",
+   "last_week_result": "W",
+   "next": "vs Grayson Ranch"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a6f",
+   "natl_rank": 19,
+   "team_name": "Syracuse",
+   "primary_color": "#2e3a46",
+   "conference": 4,
+   "W": 3,
+   "L": 0,
+   "PF": 248,
+   "PA": 198,
+   "last_week": "vs Upstate, 81-58",
+   "last_week_result": "W",
+   "next": "vs #6 Empire City"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48aa4",
+   "natl_rank": 20,
+   "team_name": "Amarillo Tech",
+   "primary_color": "#6a1f2b",
+   "conference": 11,
+   "W": 3,
+   "L": 0,
+   "PF": 247,
+   "PA": 187,
+   "last_week": "vs Pan Handle Limited, 83-74",
+   "last_week_result": "W",
+   "next": "at Reyes-Santiago"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48aa7",
+   "natl_rank": 21,
+   "team_name": "Kenton",
+   "primary_color": "#3d348b",
+   "conference": 11,
+   "W": 3,
+   "L": 0,
+   "PF": 239,
+   "PA": 182,
+   "last_week": "vs Norman, 76-56",
+   "last_week_result": "W",
+   "next": "at Pan Handle Limited"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48ab2",
+   "natl_rank": 22,
+   "team_name": "Pike's Prep",
+   "primary_color": "#006847",
+   "conference": 13,
+   "W": 3,
+   "L": 0,
+   "PF": 221,
+   "PA": 203,
+   "last_week": "vs Circus Circus, 73-63",
+   "last_week_result": "W",
+   "next": "at Southwest Miner"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a86",
+   "natl_rank": 23,
+   "team_name": "Biloxi",
+   "primary_color": "#f4c300",
+   "conference": 7,
+   "W": 3,
+   "L": 0,
+   "PF": 240,
+   "PA": 199,
+   "last_week": "vs Knoxville, 88-67",
+   "last_week_result": "W",
+   "next": "at Washington Carver"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48ad0",
+   "natl_rank": 24,
+   "team_name": "Cupertino",
+   "primary_color": "#0b1f3a",
+   "conference": 16,
+   "W": 3,
+   "L": 0,
+   "PF": 213,
+   "PA": 161,
+   "last_week": "vs Mahala Alou, 59-47",
+   "last_week_result": "W",
+   "next": "vs Juneau-Nome"
+  },
+  {
+   "team_id": "69a6fcb68d2c56aa82e48a96",
+   "natl_rank": 25,
+   "team_name": "Fielding",
+   "primary_color": "#006847",
+   "conference": 6,
+   "W": 3,
+   "L": 0,
+   "PF": 192,
+   "PA": 160,
+   "last_week": "vs Archbishop McClellan, 58-37",
+   "last_week_result": "W",
+   "next": "at Dillinger"
+  }
+ ],
+ "schedule_week_3": {
+  "week": 3,
+  "label": "Week 3",
+  "current_week": 4,
+  "user_team_id": "69a6fcb68d2c56aa82e48a54",
+  "weeks": [
+   {
+    "week": 1,
+    "label": "Week 1",
+    "enabled": true
+   },
+   {
+    "week": 2,
+    "label": "Week 2",
+    "enabled": true
+   },
+   {
+    "week": 3,
+    "label": "Week 3",
+    "enabled": true
+   },
+   {
+    "week": 4,
+    "label": "Week 4",
+    "enabled": true
+   },
+   {
+    "week": 5,
+    "label": "Week 5",
+    "enabled": true
+   },
+   {
+    "week": 6,
+    "label": "Week 6",
+    "enabled": true
+   },
+   {
+    "week": 7,
+    "label": "Week 7",
+    "enabled": true
+   },
+   {
+    "week": 8,
+    "label": "Week 8",
+    "enabled": true
+   },
+   {
+    "week": 9,
+    "label": "Week 9",
+    "enabled": true
+   },
+   {
+    "week": 10,
+    "label": "Week 10",
+    "enabled": true
+   },
+   {
+    "week": 11,
+    "label": "Week 11",
+    "enabled": true
+   },
+   {
+    "week": 12,
+    "label": "Week 12",
+    "enabled": true
+   },
+   {
+    "week": 13,
+    "label": "Week 13",
+    "enabled": true
+   },
+   {
+    "week": 14,
+    "label": "Week 14",
+    "enabled": true
+   },
+   {
+    "week": 15,
+    "label": "Week 15",
+    "enabled": true
+   },
+   {
+    "week": 16,
+    "label": "Week 16",
+    "enabled": true
+   },
+   {
+    "week": 17,
+    "label": "Week 17",
+    "enabled": true
+   },
+   {
+    "week": 18,
+    "label": "Week 18",
+    "enabled": true
+   },
+   {
+    "week": 19,
+    "label": "Week 19",
+    "enabled": true
+   },
+   {
+    "week": 20,
+    "label": "Week 20",
+    "enabled": true
+   },
+   {
+    "week": 21,
+    "label": "Week 21",
+    "enabled": true
+   },
+   {
+    "week": 22,
+    "label": "Week 22",
+    "enabled": true
+   },
+   {
+    "week": 23,
+    "label": "Week 23",
+    "enabled": true
+   },
+   {
+    "week": 24,
+    "label": "Week 24",
+    "enabled": true
+   },
+   {
+    "week": 25,
+    "label": "Week 25",
+    "enabled": true
+   },
+   {
+    "week": 26,
+    "label": "Week 26",
+    "enabled": true
+   },
+   {
+    "week": 27,
+    "label": "Week 27: Conference Tourney - R1",
+    "enabled": false
+   },
+   {
+    "week": 28,
+    "label": "Week 28: Conference Tourney - R2",
+    "enabled": false
+   },
+   {
+    "week": 29,
+    "label": "Week 29: Conference Tourney - Championships",
+    "enabled": false
+   },
+   {
+    "week": 30,
+    "label": "Week 30: Region Tourney - R1",
+    "enabled": false
+   },
+   {
+    "week": 31,
+    "label": "Week 31: Region Tourney - Championships",
+    "enabled": false
+   },
+   {
+    "week": 32,
+    "label": "Week 32: National Tourney - R1",
+    "enabled": false
+   },
+   {
+    "week": 33,
+    "label": "Week 33: National Tourney - R2",
+    "enabled": false
+   },
+   {
+    "week": 34,
+    "label": "Week 34: National Championship",
+    "enabled": false
+   }
+  ],
+  "games": [
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a52",
+     "name": "Bentley-Truman",
+     "primary_color": "#4066b2",
+     "natl_rank": 49,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a57",
+     "name": "Xavien",
+     "primary_color": "#016837",
+     "natl_rank": 124,
+     "wins": 0,
+     "losses": 3
+    },
+    "away_score": 80,
+    "home_score": 74,
+    "status": "complete",
+    "game_id": "6abfddf0ef94e87960e55686",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a55",
+     "name": "Four Corners",
+     "primary_color": "#c0976a",
+     "natl_rank": 44,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a59",
+     "name": "South Lancaster",
+     "primary_color": "#7c2b24",
+     "natl_rank": 101,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 78,
+    "home_score": 57,
+    "status": "complete",
+    "game_id": "6abfddf024dd6e71a6de9996",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a54",
+     "name": "Lancaster",
+     "primary_color": "#d24a1b",
+     "natl_rank": 5,
+     "wins": 3,
+     "losses": 0
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a58",
+     "name": "Little York",
+     "primary_color": "#65308e",
+     "natl_rank": 71,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 63,
+    "home_score": 58,
+    "status": "complete",
+    "game_id": "6abfdd97f9b08987624f29f1",
+    "is_user": true,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a53",
+     "name": "Ocean City",
+     "primary_color": "#00a89d",
+     "natl_rank": 73,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a56",
+     "name": "Morristown",
+     "primary_color": "#ec1d28",
+     "natl_rank": 74,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 70,
+    "home_score": 62,
+    "status": "complete",
+    "game_id": "6abfddf0bbffe10dac64f120",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a5f",
+     "name": "Casino Row",
+     "primary_color": "#111111",
+     "natl_rank": 118,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a61",
+     "name": "Durham",
+     "primary_color": "#1c2a44",
+     "natl_rank": 2,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 57,
+    "home_score": 89,
+    "status": "complete",
+    "game_id": "6abfddf1bc63322b27bd0f5c",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a5a",
+     "name": "Crickstown",
+     "primary_color": "#6a1f2b",
+     "natl_rank": 28,
+     "wins": 3,
+     "losses": 0
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a5e",
+     "name": "Appalachia",
+     "primary_color": "#0f3d2e",
+     "natl_rank": 83,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 88,
+    "home_score": 87,
+    "status": "complete",
+    "game_id": "6abfddf115b3177ea8b7b74b",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a60",
+     "name": "IDA",
+     "primary_color": "#f2f2f2",
+     "natl_rank": 95,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a5b",
+     "name": "Cagers World",
+     "primary_color": "#5a3a1b",
+     "natl_rank": 52,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 70,
+    "home_score": 73,
+    "status": "complete",
+    "game_id": "6abfddf17423a457ad98b4b8",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a5c",
+     "name": "Nickel Beach",
+     "primary_color": "#008b8f",
+     "natl_rank": 4,
+     "wins": 3,
+     "losses": 0
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a5d",
+     "name": "Chapel Hill",
+     "primary_color": "#87b5e6",
+     "natl_rank": 43,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 75,
+    "home_score": 69,
+    "status": "complete",
+    "game_id": "6abfddf25f602e4cb42ed657",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a88",
+     "name": "Monroe-Hayes",
+     "primary_color": "#264653",
+     "natl_rank": 37,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a69",
+     "name": "Ivy Prep",
+     "primary_color": "#ff6f61",
+     "natl_rank": 51,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 59,
+    "home_score": 85,
+    "status": "complete",
+    "game_id": "6abfddf3b8f555daa012e4e5",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a62",
+     "name": "Montpeiler",
+     "primary_color": "#264653",
+     "natl_rank": 63,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a67",
+     "name": "D1 Institute",
+     "primary_color": "#008b8f",
+     "natl_rank": 104,
+     "wins": 0,
+     "losses": 3
+    },
+    "away_score": 77,
+    "home_score": 70,
+    "status": "complete",
+    "game_id": "6abfddf2d3643c77abc47f2e",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a68",
+     "name": "Providence",
+     "primary_color": "#2a2168",
+     "natl_rank": 80,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a66",
+     "name": "Garden Elites",
+     "primary_color": "#0b1f3a",
+     "natl_rank": 112,
+     "wins": 0,
+     "losses": 3
+    },
+    "away_score": 62,
+    "home_score": 55,
+    "status": "complete",
+    "game_id": "6abfddf316179aa5cb5b9737",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a63",
+     "name": "Queen's Guard",
+     "primary_color": "#111111",
+     "natl_rank": 41,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a65",
+     "name": "Concord",
+     "primary_color": "#ec1d28",
+     "natl_rank": 90,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 65,
+    "home_score": 55,
+    "status": "complete",
+    "game_id": "6abfddf2d90d53c546b7b23e",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a6b",
+     "name": "Falls Academy",
+     "primary_color": "#8d99ae",
+     "natl_rank": 56,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a70",
+     "name": "Toronto Limited",
+     "primary_color": "#3b3b3b",
+     "natl_rank": 50,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 78,
+    "home_score": 82,
+    "status": "complete",
+    "game_id": "6abfddf478c9601524c3fdbe",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a71",
+     "name": "Long Island Methodist",
+     "primary_color": "#005f73",
+     "natl_rank": 119,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a6e",
+     "name": "Empire City",
+     "primary_color": "#7c2b24",
+     "natl_rank": 6,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 76,
+    "home_score": 86,
+    "status": "complete",
+    "game_id": "6abfddf4256135f2588c0110",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a6d",
+     "name": "St Peters",
+     "primary_color": "#3d348b",
+     "natl_rank": 39,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a6a",
+     "name": "Amariabi International",
+     "primary_color": "#65308e",
+     "natl_rank": 65,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 66,
+    "home_score": 54,
+    "status": "complete",
+    "game_id": "6abfddf4a97e72a511175c65",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a6c",
+     "name": "Upstate",
+     "primary_color": "#006847",
+     "natl_rank": 107,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a6f",
+     "name": "Syracuse",
+     "primary_color": "#2e3a46",
+     "natl_rank": 19,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 58,
+    "home_score": 81,
+    "status": "complete",
+    "game_id": "6abfddf3a5fb76ddd83bcf2f",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a75",
+     "name": "Ann Arbor",
+     "primary_color": "#4066b2",
+     "natl_rank": 62,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a73",
+     "name": "Upper Peninsula",
+     "primary_color": "#6a1f2b",
+     "natl_rank": 82,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 51,
+    "home_score": 61,
+    "status": "complete",
+    "game_id": "6abfddf56789eb4835c6ce98",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a72",
+     "name": "Harding Central",
+     "primary_color": "#111111",
+     "natl_rank": 61,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a79",
+     "name": "Cleveland-Carlysle",
+     "primary_color": "#0f3d2e",
+     "natl_rank": 120,
+     "wins": 0,
+     "losses": 3
+    },
+    "away_score": 69,
+    "home_score": 51,
+    "status": "complete",
+    "game_id": "6abfddf6523a10883e1dbd8c",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a78",
+     "name": "North Columbus",
+     "primary_color": "#008b8f",
+     "natl_rank": 96,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a76",
+     "name": "Hardwood Fields",
+     "primary_color": "#b11226",
+     "natl_rank": 84,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 68,
+    "home_score": 65,
+    "status": "complete",
+    "game_id": "6abfddf67727b1d8d8409567",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a8f",
+     "name": "Reardon-Mayes",
+     "primary_color": "#f4c300",
+     "natl_rank": 75,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a77",
+     "name": "Columbus",
+     "primary_color": "#264653",
+     "natl_rank": 105,
+     "wins": 0,
+     "losses": 3
+    },
+    "away_score": 86,
+    "home_score": 71,
+    "status": "complete",
+    "game_id": "6abfddf5499dfc8cb72506c6",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a7c",
+     "name": "Archbishop McClellan",
+     "primary_color": "#ff6f61",
+     "natl_rank": 108,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a96",
+     "name": "Fielding",
+     "primary_color": "#006847",
+     "natl_rank": 25,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 37,
+    "home_score": 58,
+    "status": "complete",
+    "game_id": "6abfddf74cc263a9af78c4b3",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a81",
+     "name": "Evanston",
+     "primary_color": "#6d6e71",
+     "natl_rank": 34,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a7d",
+     "name": "Sacred Heart",
+     "primary_color": "#2e3a46",
+     "natl_rank": 35,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 59,
+    "home_score": 68,
+    "status": "complete",
+    "game_id": "6abfddf7e6ac1c18ca1dbddb",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a7e",
+     "name": "Templeton-Wesley",
+     "primary_color": "#7c2b24",
+     "natl_rank": 17,
+     "wins": 3,
+     "losses": 0
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a7f",
+     "name": "Dillinger",
+     "primary_color": "#0b1f3a",
+     "natl_rank": 54,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 94,
+    "home_score": 77,
+    "status": "complete",
+    "game_id": "6abfddf6b3429a473c9e28ec",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a7b",
+     "name": "Wacker West",
+     "primary_color": "#9b1b30",
+     "natl_rank": 7,
+     "wins": 3,
+     "losses": 0
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a80",
+     "name": "Quigley Catholic",
+     "primary_color": "#2a2168",
+     "natl_rank": 31,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 91,
+    "home_score": 81,
+    "status": "complete",
+    "game_id": "6abfddf70348b1d16551e1bb",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a64",
+     "name": "Independence",
+     "primary_color": "#3b3b3b",
+     "natl_rank": 123,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ab7",
+     "name": "Barton Lutheran",
+     "primary_color": "#ec1d28",
+     "natl_rank": 47,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 55,
+    "home_score": 71,
+    "status": "complete",
+    "game_id": "6abfddf8da5f426e6aa95079",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a85",
+     "name": "Knoxville",
+     "primary_color": "#6a1f2b",
+     "natl_rank": 77,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a86",
+     "name": "Biloxi",
+     "primary_color": "#f4c300",
+     "natl_rank": 23,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 67,
+    "home_score": 88,
+    "status": "complete",
+    "game_id": "6abfddf9ae3c523ba37d826c",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a89",
+     "name": "Lexington",
+     "primary_color": "#8d99ae",
+     "natl_rank": 58,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a83",
+     "name": "Myrtle Private",
+     "primary_color": "#111111",
+     "natl_rank": 8,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 70,
+    "home_score": 80,
+    "status": "complete",
+    "game_id": "6abfddf8dfcdc28faf0334e1",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a87",
+     "name": "Mobile",
+     "primary_color": "#9b1b30",
+     "natl_rank": 11,
+     "wins": 3,
+     "losses": 0
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a84",
+     "name": "Washington Carver",
+     "primary_color": "#7c2b24",
+     "natl_rank": 121,
+     "wins": 0,
+     "losses": 3
+    },
+    "away_score": 88,
+    "home_score": 53,
+    "status": "complete",
+    "game_id": "6abfddf85ac4766b1e7cabf7",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a90",
+     "name": "Dade Academy",
+     "primary_color": "#6d6e71",
+     "natl_rank": 102,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a91",
+     "name": "Tallahassee",
+     "primary_color": "#006847",
+     "natl_rank": 15,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 50,
+    "home_score": 56,
+    "status": "complete",
+    "game_id": "6abfddf939de73a781b17d82",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a8a",
+     "name": "Keys High",
+     "primary_color": "#1f4fb2",
+     "natl_rank": 18,
+     "wins": 3,
+     "losses": 0
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a8d",
+     "name": "DeLand",
+     "primary_color": "#2e3a46",
+     "natl_rank": 70,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 85,
+    "home_score": 75,
+    "status": "complete",
+    "game_id": "6abfddfab2070b85845cb781",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a74",
+     "name": "Mynsk",
+     "primary_color": "#0b1f3a",
+     "natl_rank": 128,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a8b",
+     "name": "Gainesville",
+     "primary_color": "#8d99ae",
+     "natl_rank": 110,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 74,
+    "home_score": 79,
+    "status": "complete",
+    "game_id": "6abfddf93610ab4658778cfd",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a8c",
+     "name": "Valdosta Valley",
+     "primary_color": "#7c2b24",
+     "natl_rank": 85,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a8e",
+     "name": "Grayson Ranch",
+     "primary_color": "#2a2168",
+     "natl_rank": 98,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 66,
+    "home_score": 72,
+    "status": "complete",
+    "game_id": "6abfddfa6bd4ab4169e4cdbd",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a98",
+     "name": "Grupenberg",
+     "primary_color": "#4066b2",
+     "natl_rank": 100,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a92",
+     "name": "Hyde Methodist",
+     "primary_color": "#f4c300",
+     "natl_rank": 64,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 63,
+    "home_score": 83,
+    "status": "complete",
+    "game_id": "6abfddfb0a4caffd2939eb02",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a97",
+     "name": "Iowa Academy",
+     "primary_color": "#1f4fb2",
+     "natl_rank": 94,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a7a",
+     "name": "Burroughs",
+     "primary_color": "#3d348b",
+     "natl_rank": 3,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 59,
+    "home_score": 67,
+    "status": "complete",
+    "game_id": "6abfddfbad2a10ef1c859b50",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a94",
+     "name": "Lawrence",
+     "primary_color": "#6a1f2b",
+     "natl_rank": 1,
+     "wins": 3,
+     "losses": 0
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a99",
+     "name": "Tri-Cities Prep",
+     "primary_color": "#7c2b24",
+     "natl_rank": 117,
+     "wins": 0,
+     "losses": 3
+    },
+    "away_score": 73,
+    "home_score": 42,
+    "status": "complete",
+    "game_id": "6abfddfac1856044d8262822",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a93",
+     "name": "Wash U Prep",
+     "primary_color": "#2a2168",
+     "natl_rank": 16,
+     "wins": 3,
+     "losses": 0
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a95",
+     "name": "Ozark Centre",
+     "primary_color": "#6d6e71",
+     "natl_rank": 91,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 79,
+    "home_score": 78,
+    "status": "complete",
+    "game_id": "6abfddfb256145496f7d4804",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ace",
+     "name": "Grizzly Academy",
+     "primary_color": "#2e3a46",
+     "natl_rank": 57,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a9e",
+     "name": "Crofton",
+     "primary_color": "#6d6e71",
+     "natl_rank": 60,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 69,
+    "home_score": 61,
+    "status": "complete",
+    "game_id": "6abfddfca3a55eebb561897c",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a9f",
+     "name": "Minot",
+     "primary_color": "#ec1d28",
+     "natl_rank": 126,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a9d",
+     "name": "Lewis Catholic",
+     "primary_color": "#0f3d2e",
+     "natl_rank": 67,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 54,
+    "home_score": 66,
+    "status": "complete",
+    "game_id": "6abfddfc77c88f3b9b7667c6",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a9c",
+     "name": "Mt Simmons",
+     "primary_color": "#1c2a44",
+     "natl_rank": 115,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48aa1",
+     "name": "Two Rivers",
+     "primary_color": "#4066b2",
+     "natl_rank": 30,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 44,
+    "home_score": 68,
+    "status": "complete",
+    "game_id": "6abfddfc531dcc8eb04df653",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48a9b",
+     "name": "Rodeo Circuit",
+     "primary_color": "#d24a1b",
+     "natl_rank": 122,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a9a",
+     "name": "HA Rushmore",
+     "primary_color": "#2a2168",
+     "natl_rank": 12,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 62,
+    "home_score": 71,
+    "status": "complete",
+    "game_id": "6abfddfdd78f28009490e328",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aa6",
+     "name": "Ada",
+     "primary_color": "#264653",
+     "natl_rank": 89,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48aa3",
+     "name": "River's Edge",
+     "primary_color": "#1c2a44",
+     "natl_rank": 26,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 72,
+    "home_score": 79,
+    "status": "complete",
+    "game_id": "6abfddfdd370aef7b6caacaf",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aa2",
+     "name": "Norman",
+     "primary_color": "#005f73",
+     "natl_rank": 68,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48aa7",
+     "name": "Kenton",
+     "primary_color": "#3d348b",
+     "natl_rank": 21,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 56,
+    "home_score": 76,
+    "status": "complete",
+    "game_id": "6abfddfec5b08de0990860a5",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aa5",
+     "name": "Pan Handle Limited",
+     "primary_color": "#3b3b3b",
+     "natl_rank": 59,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48aa4",
+     "name": "Amarillo Tech",
+     "primary_color": "#6a1f2b",
+     "natl_rank": 20,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 74,
+    "home_score": 83,
+    "status": "complete",
+    "game_id": "6abfddfea377e1ff8d7fc623",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aa9",
+     "name": "Stormwood",
+     "primary_color": "#65308e",
+     "natl_rank": 45,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48aa8",
+     "name": "Reyes-Santiago",
+     "primary_color": "#4066b2",
+     "natl_rank": 99,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 68,
+    "home_score": 61,
+    "status": "complete",
+    "game_id": "6abfddfdff06a1333a78d213",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aae",
+     "name": "Abilene",
+     "primary_color": "#0f3d2e",
+     "natl_rank": 127,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ab1",
+     "name": "Bayou District",
+     "primary_color": "#0b1f3a",
+     "natl_rank": 97,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 62,
+    "home_score": 83,
+    "status": "complete",
+    "game_id": "6abfddff64e37bd20d3cdb4c",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aab",
+     "name": "Austin",
+     "primary_color": "#6d6e71",
+     "natl_rank": 53,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48aaa",
+     "name": "Houston Jesuit",
+     "primary_color": "#7c2b24",
+     "natl_rank": 9,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 68,
+    "home_score": 72,
+    "status": "complete",
+    "game_id": "6abfddff8188d8c5261cd0a1",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aac",
+     "name": "GP Prep School",
+     "primary_color": "#2e3a46",
+     "natl_rank": 103,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ab0",
+     "name": "Austin West",
+     "primary_color": "#ff6f61",
+     "natl_rank": 81,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 60,
+    "home_score": 65,
+    "status": "complete",
+    "game_id": "6abfddff33328d8b9d15e349",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ac4",
+     "name": "Rancho Estrada",
+     "primary_color": "#006847",
+     "natl_rank": 113,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48aad",
+     "name": "MiddleTEX",
+     "primary_color": "#264653",
+     "natl_rank": 55,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 61,
+    "home_score": 67,
+    "status": "complete",
+    "game_id": "6abfddfec338d42291cf9d24",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ab5",
+     "name": "Circus Circus",
+     "primary_color": "#ff6f61",
+     "natl_rank": 111,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ab2",
+     "name": "Pike's Prep",
+     "primary_color": "#006847",
+     "natl_rank": 22,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 63,
+    "home_score": 73,
+    "status": "complete",
+    "game_id": "6abfde003c4e7f6a2fe54841",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ab3",
+     "name": "Desert Regional",
+     "primary_color": "#f4c300",
+     "natl_rank": 86,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ab8",
+     "name": "Border Academy",
+     "primary_color": "#264653",
+     "natl_rank": 87,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 65,
+    "home_score": 71,
+    "status": "complete",
+    "game_id": "6abfde0161ce12388ed3cb1f",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ab9",
+     "name": "Southwest Miner",
+     "primary_color": "#1f4fb2",
+     "natl_rank": 116,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ab4",
+     "name": "East Rockies",
+     "primary_color": "#2a2168",
+     "natl_rank": 29,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 63,
+    "home_score": 88,
+    "status": "complete",
+    "game_id": "6abfde004e70bc9a6d160b46",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ab6",
+     "name": "Tucson",
+     "primary_color": "#d24a1b",
+     "natl_rank": 33,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48a82",
+     "name": "Crimson County",
+     "primary_color": "#1c2a44",
+     "natl_rank": 14,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 53,
+    "home_score": 80,
+    "status": "complete",
+    "game_id": "6abfde0039a1c4a6f734b13e",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ac0",
+     "name": "Couer d'Alene",
+     "primary_color": "#f4c300",
+     "natl_rank": 40,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48abb",
+     "name": "Salem",
+     "primary_color": "#1c2a44",
+     "natl_rank": 114,
+     "wins": 0,
+     "losses": 3
+    },
+    "away_score": 87,
+    "home_score": 72,
+    "status": "complete",
+    "game_id": "6abfde010eaba724a8f8c517",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aba",
+     "name": "Rainier Central",
+     "primary_color": "#9b1b30",
+     "natl_rank": 38,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ac1",
+     "name": "Boise",
+     "primary_color": "#ff6f61",
+     "natl_rank": 72,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 73,
+    "home_score": 54,
+    "status": "complete",
+    "game_id": "6abfde02bfddb55df3aff422",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48abd",
+     "name": "Seattle AAA",
+     "primary_color": "#006847",
+     "natl_rank": 42,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48abe",
+     "name": "Vancouver",
+     "primary_color": "#d24a1b",
+     "natl_rank": 78,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 45,
+    "home_score": 47,
+    "status": "complete",
+    "game_id": "6abfde02657a163e2cac33ff",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48abc",
+     "name": "Swoosh",
+     "primary_color": "#005f73",
+     "natl_rank": 106,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48abf",
+     "name": "Cardinal Conor",
+     "primary_color": "#3b3b3b",
+     "natl_rank": 13,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 68,
+    "home_score": 75,
+    "status": "complete",
+    "game_id": "6abfde014cbc05e661accb8e",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ac5",
+     "name": "Berkley",
+     "primary_color": "#8d99ae",
+     "natl_rank": 92,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ac9",
+     "name": "Huntington Canyon",
+     "primary_color": "#3d348b",
+     "natl_rank": 46,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 73,
+    "home_score": 83,
+    "status": "complete",
+    "game_id": "6abfde022b97fc5592914207",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aaf",
+     "name": "Chambless Global",
+     "primary_color": "#65308e",
+     "natl_rank": 79,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ac3",
+     "name": "San Jose",
+     "primary_color": "#264653",
+     "natl_rank": 36,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 75,
+    "home_score": 71,
+    "status": "complete",
+    "game_id": "6abfde0333dd271d51747713",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ac2",
+     "name": "Valley High",
+     "primary_color": "#ec1d28",
+     "natl_rank": 125,
+     "wins": 0,
+     "losses": 3
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ac7",
+     "name": "DeCatur Dei",
+     "primary_color": "#1f4fb2",
+     "natl_rank": 66,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 66,
+    "home_score": 83,
+    "status": "complete",
+    "game_id": "6abfde0383c48304ab7874cc",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48ac8",
+     "name": "West Ocean City",
+     "primary_color": "#ff6f61",
+     "natl_rank": 88,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ac6",
+     "name": "Hollywood Prep",
+     "primary_color": "#6d6e71",
+     "natl_rank": 69,
+     "wins": 1,
+     "losses": 2
+    },
+    "away_score": 63,
+    "home_score": 55,
+    "status": "complete",
+    "game_id": "6abfde03336f53dccd58e5ca",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48acf",
+     "name": "Hana Road",
+     "primary_color": "#9b1b30",
+     "natl_rank": 109,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ad1",
+     "name": "Melbourne Americas",
+     "primary_color": "#005f73",
+     "natl_rank": 10,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 47,
+    "home_score": 69,
+    "status": "complete",
+    "game_id": "6abfde040ac77dd5a5562768",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aca",
+     "name": "Mahala Alou",
+     "primary_color": "#ec1d28",
+     "natl_rank": 93,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48ad0",
+     "name": "Cupertino",
+     "primary_color": "#0b1f3a",
+     "natl_rank": 24,
+     "wins": 3,
+     "losses": 0
+    },
+    "away_score": 47,
+    "home_score": 59,
+    "status": "complete",
+    "game_id": "6abfde044a882b5afabc1a84",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48acb",
+     "name": "Pacific All-Stars",
+     "primary_color": "#ff6f61",
+     "natl_rank": 27,
+     "wins": 2,
+     "losses": 1
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48acd",
+     "name": "Redwood High",
+     "primary_color": "#d24a1b",
+     "natl_rank": 32,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 66,
+    "home_score": 71,
+    "status": "complete",
+    "game_id": "6abfde042bd602d03b1415a6",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   },
+   {
+    "away": {
+     "team_id": "69a6fcb68d2c56aa82e48aa0",
+     "name": "Tower Academy",
+     "primary_color": "#1f4fb2",
+     "natl_rank": 76,
+     "wins": 1,
+     "losses": 2
+    },
+    "home": {
+     "team_id": "69a6fcb68d2c56aa82e48acc",
+     "name": "Juneau-Nome",
+     "primary_color": "#2a2168",
+     "natl_rank": 48,
+     "wins": 2,
+     "losses": 1
+    },
+    "away_score": 63,
+    "home_score": 73,
+    "status": "complete",
+    "game_id": "6abfde0595a353d003c6eaf8",
+    "is_user": false,
+    "tournament_context": null,
+    "region": null
+   }
+  ],
+  "byes": []
+ }
+}

@@ -2,6 +2,9 @@
  * League › Rankings, mounted inside the command center. One T1 table in the
  * Standings treatment. Reads the rankings array already on the command-center
  * payload. The payload has no previous rank, so there is no movement column.
+ * Last Week links to that game's box score: the game ids come from last week's
+ * GET /franchise/schedule/week, read once the table is up. Until they land, and for
+ * a game with no stored id, the result is plain text.
  */
 
 function commandCenterUrl(franchiseId) {
@@ -46,6 +49,8 @@ export function mount(container, ctx) {
   var userId = (ctx && ctx.teamId) || '';
   var loaded = false;
   var restoredScroll = false;
+  var gameIds = {};
+  var gamesFor = '';
 
   function restoreScroll() {
     if (restoredScroll || !backForward()) return;
@@ -92,7 +97,46 @@ export function mount(container, ctx) {
     var result = String(row.last_week_result || '').toUpperCase();
     var tone = result === 'W' ? ' up' : (result === 'L' ? ' dn' : '');
     var mark = result ? '<span class="gob-wl' + tone + '">' + tables.esc(result) + '</span> ' : '';
-    return mark + tables.esc(text);
+    var gameId = gameIds[String(row.team_id || '')];
+    if (!gameId) return mark + tables.esc(text);
+    // `data-return`: GOBNav adds return_url on the click, so the box score opens as a
+    // read and its Back comes here.
+    return '<a class="gob-res" data-return href="' + tables.esc(boxHref(gameId)) + '">'
+      + mark + tables.esc(text) + '</a>';
+  }
+
+  function boxHref(gameId) {
+    return '/box-score.html?game_id=' + encodeURIComponent(gameId)
+      + '&mode=franchise&franchise_id=' + encodeURIComponent((ctx && ctx.franchiseId) || '')
+      + '&team_id=' + encodeURIComponent(userId);
+  }
+
+  /** Last week's games, by team: the id that turns a Last Week result into a link. */
+  function loadLastWeek(week) {
+    var store = ctx && ctx.store;
+    var franchiseId = (ctx && ctx.franchiseId) || '';
+    var previous = Number(week) - 1;
+    if (!store || typeof store.get !== 'function' || !franchiseId || !(previous >= 1)) return;
+    var key = franchiseId + ':' + previous;
+    if (gamesFor === key) return;
+    gamesFor = key;
+    store.get(tables.apiBase('/franchise/schedule/week')
+      + '?franchise_id=' + encodeURIComponent(franchiseId)
+      + '&week=' + encodeURIComponent(previous)).then(function (body) {
+      if (gamesFor !== key) return;
+      var next = {};
+      ((body && body.games) || []).forEach(function (game) {
+        if (!game || game.status !== 'complete' || !game.game_id) return;
+        [game.away, game.home].forEach(function (side) {
+          if (side && side.team_id) next[String(side.team_id)] = String(game.game_id);
+        });
+      });
+      gameIds = next;
+      if (loaded && container.querySelector('#rankings-table')) render();
+    }).catch(function () {
+      // The results stay plain text; the next visit asks again.
+      if (gamesFor === key) gamesFor = '';
+    });
   }
 
   function render() {
@@ -135,6 +179,7 @@ export function mount(container, ctx) {
     if (body) {
       userId = body.user_team_object_id || body.user_team_id || (ctx && ctx.teamId) || userId;
     }
+    if (body) loadLastWeek(body.week);
     if (same) return;
     render();
     loaded = true;
