@@ -522,7 +522,7 @@ League › Standings always shows the whole league: eight regions stacked, each 
 
 News reads `GET /franchise/news` (`@browse_cached`). `news` is `season_news` as stored and `dispatches` are your-team rows from `latest_training` and `season_inbox`. Newest first, one section per week under a "Week N" heading. The top story is full width; the rest of each week sits in a 2-column grid at 1280 and a 3-column grid at 1920, left to right then down, equal card height in a row. The card does not repeat the week. The whole headline is the link. There is no separate View or Box Score control. A `game_result` headline ends with ` (Box Score)` and opens the box score. Other stories open the article in this panel; other dispatches open `target`. `yours` is the navy left edge. `news.html?story=` redirects here with the story param. The Office card still uses `news_headlines` (five, upset reports excluded).
 
-Awards reads `GET /franchise/awards` (`@browse_cached`). Before week 35 the route is 400 and the view says "Awards are not available yet." From week 35 the snapshot is `all_american_teams` (1st, 2nd, 3rd) with the stored stat line. The user's team row is `tr.me`. There is no season list and no portrait.
+Awards reads `GET /franchise/awards` (`@browse_cached`), which always answers 200 with `status`: `projected` (weeks 1-34), `final` (week 35 on) or `unavailable`. Projected shows the heading "Projected All-Americans" and one line under it: the label ("Preseason", "After week 12", "End of regular season"), the weight mix, and "Updates every week" (from week 26: "Not final: tournament play can still change these"). Final shows "All-Americans". Each team (1st, 2nd, 3rd) is one row per position, in PG, SG, SF, PF, C order. Columns follow the data: Pos, Player, Yr, Team, RT (the canonical ramp, rating at the listed position), the per-game stat line (omitted in the preseason, when nobody has one), Bonus (final only) and Score. Position and score are neutral; nothing on the page is green, orange or gold. `unavailable` and a 400 from an older server both show "Awards are not available yet." The user's team row is `tr.me`. There is no season list and no portrait. Scoring rules: `End_Of_Season_System.md`, "All-American Logic".
 
 ### Add a module view
 
@@ -823,7 +823,7 @@ Not on tokens, on purpose: the Feedback button, its pulse and the Feedback modal
 
 One shared pattern: `.gob-empty` (`css/gob-tables.css`). Its look is in the [Styleguide, Empty states](Styleguide.md#empty-states). Use it wherever a view or board has nothing to show, with one short sentence:
 
-- League › Practice Squads before it opens, News › Awards before week 35, League › Standings with no rows.
+- League › Practice Squads before it opens, News › Awards with nothing to show, League › Standings with no rows.
 - League › Leaders: a board with no qualified leader shows `No leaders yet.` and drops its "Full list →" (the rate floors in §13 leave FG% / DEF% empty at zero team games; per-game boards are empty before the first game).
 - Page-specific empty classes (`.gob-ps-empty`, `.gob-news-empty`) may stay alongside it for spacing; the card look comes from `.gob-empty`.
 
