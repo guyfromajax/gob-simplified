@@ -565,19 +565,11 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
     await expect(discipline.locator('.dv')).toHaveClass(/is-empty/);
     await expect(page.locator('#team-attributes-view')).not.toContainText('/100');
 
-    // Movement is neutral: ▲ at full text, ▼ muted, and no green or red chip.
+    // No rank-movement marks: the payload still carries rank_delta (Fight +2, Shooting −1),
+    // and the view draws neither an arrow nor a chip for it.
     await expect(page.locator('#team-attributes-view .chip')).toHaveCount(0);
-    await expect(fight.locator('.mv.up')).toHaveText('▲2');
-    await expect(shooting.locator('.mv.down')).toHaveText('▼1');
-    await expect(discipline.locator('.mv')).toHaveText('');
-    const movement = await page.evaluate(() => {
-      const up = document.querySelector('#team-attributes-view .mv.up');
-      const down = document.querySelector('#team-attributes-view .mv.down');
-      const read = (el) => getComputedStyle(el).color;
-      return { up: read(up), down: read(down), text: getComputedStyle(document.body).color };
-    });
-    expect(movement.up).toBe('rgb(255, 255, 255)');
-    expect(movement.down).toBe('rgba(255, 255, 255, 0.6)');
+    await expect(page.locator('#team-attributes-view .mv')).toHaveCount(0);
+    await expect(page.locator('#team-attributes-view')).not.toContainText(/[▲▼]/);
     await park(page);
     await page.screenshot({ path: path.join(OUT, 'team-attributes-' + size[2] + '.png') });
     await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=home-tab');

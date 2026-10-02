@@ -406,8 +406,22 @@
     return { code: upper.length <= 3 ? upper : upper.slice(0, 2), title: labelize(key) };
   }
 
+  // The shell adds .gob-1920 / .gob-1280 from a dynamic import, which can land after the
+  // Office's first render. Until it does, the row caps read the same media query the
+  // shell binds (gobDensity.js), so a 1920 window never opens on the 1280 caps.
+  function largeDensity() {
+    var root = document.documentElement;
+    if (root.classList.contains('gob-1920')) return true;
+    if (root.classList.contains('gob-1280')) return false;
+    try {
+      return !!global.matchMedia('(min-width: 1680px) and (min-height: 1000px)').matches;
+    } catch (err) {
+      return false;
+    }
+  }
+
   function playerCap() {
-    return document.documentElement.classList.contains('gob-1920') ? 8 : 5;
+    return largeDensity() ? 8 : 5;
   }
 
   function groupAttributes(changes) {
@@ -594,7 +608,7 @@
   }
 
   function weeklyPlayerCap() {
-    return document.documentElement.classList.contains('gob-1920') ? 5 : 3;
+    return largeDensity() ? 5 : 3;
   }
 
   // One scoreboard row. `winRow` carries the emphasis; on a loss the card drops
@@ -710,7 +724,15 @@
       if (boxUrl) {
         var box = el('a', 'lnk', 'Box score');
         box.href = boxUrl;
-        bindGo(box, boxUrl);
+        // `data-return`: GOBNav adds return_url on the click, which marks the box score
+        // as a read and brings its Back here. Without it the page treats last week's
+        // game as a finished flow and returns to the Office. A plain link, so that
+        // GOBNav's own click handling runs; the listener only plays the sound.
+        box.setAttribute('data-return', '');
+        box.addEventListener('click', function (event) {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          clickTiny();
+        });
         kick.appendChild(box);
       }
       node.appendChild(kick);
@@ -861,7 +883,7 @@
   }
 
   function recruitCap() {
-    return document.documentElement.classList.contains('gob-1920') ? 12 : 8;
+    return largeDensity() ? 12 : 8;
   }
 
   function wireCard(wire, oneLine, index) {

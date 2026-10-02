@@ -478,7 +478,7 @@ const LINEUP_PLAYBOOK_SECTION_ORDER = [
   { key: 'man_defense', label: 'Man Defense' },
   { key: 'zone_defense', label: 'Zone Defense' },
   { key: 'fast_breaks', label: 'Fast Breaks' },
-  { key: 'hc_traps', label: 'HC Traps' },
+  { key: 'hc_traps', label: 'Half-Court Traps' },
 ];
 
 function getRT(player) {

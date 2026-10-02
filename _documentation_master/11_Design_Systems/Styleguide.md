@@ -91,10 +91,10 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 | Week | One | Two | Three |
 |---|---|---|---|
 | Training Camp (week 1) | 0 < \|n\| < 2 | 2 ≤ \|n\| ≤ 5 | \|n\| > 5 |
-| In season, up | −0.5 ≤ n < 1 | 1 ≤ n < 3 | n ≥ 3 |
+| In season, up | −0.5 ≤ n < 1, n ≠ 0 | 1 ≤ n < 3 | n ≥ 3 |
 | In season, down | −1.5 < n < −0.5 | −2.5 < n ≤ −1.5 | n ≤ −2.5 |
 
-- Camp: exactly 0 is a dash. In season there is no dash: 0 and dips to −0.5 read as one up (holding).
+- Exactly 0 is a dash in every week, camp and in season. In season, a dip down to −0.5 other than 0 reads as one up (holding).
 - Tone: one up neutral (`--text-87`), two up green (`--delta-up`), three up blue (`--blue`), down red (`--tier-red`). In season a single down is neutral too.
 - Glyphs: ▲ / ▼ on their own; `+` / `−` when the mark sits beside an attribute value (Player Report, Attributes).
 

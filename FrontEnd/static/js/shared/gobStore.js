@@ -35,6 +35,7 @@
     '/franchise/recruiting-data',
     '/franchise/recruiting-results',
     '/franchise/practice-squad',
+    '/franchise/tournament/brackets',
     '/franchise/awards',
     '/franchise/scouting-report',
     '/franchise/player-detail',
@@ -357,9 +358,21 @@
     return jsonResponse(entry.body, entry.status || 200, entry.etag);
   }
 
+  // A URL that is not on the browse list is not cached, but it still carries the
+  // session: without the Authorization header a protected route answers 401 on the
+  // hosted server, while a stubbed test and the offline engine both let it through.
+  function passthrough(url, init) {
+    var nextInit = {};
+    if (init) {
+      Object.keys(init).forEach(function (name) { nextInit[name] = init[name]; });
+    }
+    nextInit.headers = authHeaders(init);
+    return nativeFetch(url, nextInit);
+  }
+
   function get(url, init) {
     if (!nativeFetch) return Promise.reject(new Error('fetch unavailable'));
-    if (neverCache(url) || !isBrowseGet(url)) return nativeFetch(url, init);
+    if (neverCache(url) || !isBrowseGet(url)) return passthrough(url, init);
     var key = canonical(url);
     if (inflight.has(key)) {
       return inflight.get(key).then(entryToResponse);
