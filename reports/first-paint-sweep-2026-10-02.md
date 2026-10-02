@@ -124,8 +124,8 @@ One shared pattern for a whole page that waits on data, the way the Training Rep
 
 | # | Question | Where it stands |
 |---|---|---|
-| 1 | **Should the page loader be solid?** It is 92% black, so whatever is under it ghosts through faintly. On the Office you can just read the three section heads of its skeleton and the default "Run Training" label (week 1 really says "Run Training Camp"). | Not changed: it is the shared loader for every page including the court. The pages fixed here hide their body under it, so they do not ghost. Shot: `01-office-after.png`. |
-| 2 | **Training selector outline**: option A (`--white-25`, shipped) or option B (`--white-45`)? | One token, `--train-box-outline` in `css/gob-tokens.css`. See the selector section below. |
+| 1 | ~~Should the page loader be solid?~~ **Ruled: yes.** | Done, see "Update" at the end. The loader is the page fill (`--bg`) at full opacity on every page. Shot: `first-paint-sweep/loader-solid-office-after-1280.png`. |
+| 2 | ~~Training selector outline: A or B?~~ **Ruled: option B.** | Done: `--train-box-outline` is `var(--white-45)`. |
 | 3 | **Login, when already signed in**: the form paints, then the page redirects to Home Base. Hiding the form until the auth check would delay it for every signed-out visitor. | Not changed. Only reachable by opening `/login.html` by hand while signed in. |
 | 4 | **Weekly training now waits behind the loader** instead of showing a usable form at once with a budget that could be wrong. | Done as the rule says. Say if you would rather see the form with only the budget held back. |
 
@@ -151,7 +151,7 @@ One shared pattern for a whole page that waits on data, the way the Training Rep
 | 7. Out of points | Boxes the budget cannot reach dim further and take no click. |
 | 8. Keyboard | Left / right change the value; 2px white focus ring round the boxes. |
 
-- **Outline strength is one token**: `--train-box-outline` in `FrontEnd/static/css/gob-tokens.css`. Shipped: `var(--white-25)` (option A). To switch to option B set it to `var(--white-45)`.
+- **Outline strength is one token**: `--train-box-outline` in `FrontEnd/static/css/gob-tokens.css`. Jamie chose option B: it is now `var(--white-45)` (option A was `var(--white-25)`).
 - Shots in `reports/training-followups/`: `selectors-option-a-untouched-1280/1920.png`, `selectors-option-a-assigned-1280/1920.png`, the same four for `option-b`, and `selectors-option-a-vs-b-1280/1920.png` (A above B on one sheet). Also `selectors-hover-preview-1280.png`, `selectors-out-of-points-1280.png`, `selectors-keyboard-focus-1280.png`.
 - Points are stored and submitted exactly as before: the clipped range input is still the model.
 
@@ -189,3 +189,37 @@ One shared pattern for a whole page that waits on data, the way the Training Rep
 
 - The 2 XPASS are on the known-failures list and are not from this branch (it changes no Python): `tests/test_resource_page_scoping.py::test_leaders_view_scope_filters_to_user_conference` and `tests/test_settings_application_to_gameplay.py::TestSettingsApplicationToGameplay::test_settings_loaded_and_applied_to_gameplay`. The list was not edited.
 - **One red outside the gates, not from this branch**: the offline-profile config (`playwright.desktop.config.js`, not part of the default suite) has `desktop-gallery-fixes.spec.js` "#10/#6 empty state: awards" failing. It expects an empty-state card on Awards in week 1; since the All-American merge (`431511e1f`) Awards shows the projected teams in week 1, so there is no empty card. The test is stale. Left alone here (out of scope); the other 15 offline specs pass.
+
+## Update: merge with develop and Jamie's two rulings
+
+| Commit | What |
+|---|---|
+| `f5f4cf9b4` | Merged `origin/develop` `71048e175` (chrome-followups + tables-followups). One conflict, `tests/e2e/polish-training-playbooks.spec.js`: kept this branch's selector tests and develop's async `teamMarks()`. `gobShell.js` and `gob-shell.css` merged cleanly; both sides work together: develop's season label and "Signing Day" / "Offseason" wording under the week, and this branch's rank hidden until data and no logo alt text. |
+| `5cd5ed03b` | Selector outline is option B (`--white-45`). Tests expect the shipped strength and still prove it is one token. Shots retaken (`selectors-option-*`, the A-vs-B sheet now marks B as shipped). Styleguide and UX_System note the choice. |
+| `02550d9fa` | The shared page loader is solid: `var(--bg)` at full opacity instead of 92% black. Changed in `js/shared/pageLoadOverlay.js` (base, pulse and the reset after the newswire) and in the static markup of the six pages that carry the loader: FCC, court, box score, set lineup, mode select, trophy case. |
+
+Solid loader, checks:
+
+- **Nothing relied on seeing through it.** Every caller uses it as a gate that hides the page: page loads, the court's entry / resume / matchups gates, the pulse variant (paints its own banner and stat feed) and the training newswire (paints its own sheet). The loader image is a transparent GIF, so it sits cleanly on the page fill.
+- Looked at under the loader with the API held: Office, Standings, weekly Training, court pre-game. Nothing shows through on any of them. Shots: `first-paint-sweep/loader-solid-office-after-1280.png`, `-standings-`, `-training-`, `-court-pregame-`.
+- Tests (`tests/e2e/first-paint.spec.js`, "the page loader is opaque"): on those four pages the loader's computed background is `rgb(11, 13, 20)` with no alpha and it is the top element across the viewport; and a static check that neither the shared script nor any page's markup carries a see-through loader.
+- `box-score.html` and `set-lineup.html` each had one attribute changed (the loader's inline style). Their `.js` files, which were the ones in flight, were not touched.
+
+Gates on the final tree (`71048e175` merged in):
+
+| Gate | Result |
+|---|---|
+| `scripts/check_ui_tokens.py --strict --no-write` | **exit 0** |
+| `scripts/ci/check_migration_gates.py` | **passed** (Gate A 0; Gate B 134 lines in 43 files) |
+| Named specs: first-paint, polish-training-playbooks, polish-chrome-followups, polish-chrome-audio, shell-1, prep-scouting | **122 passed, 12 skipped, 0 failed** |
+| Full Playwright, once, under the lock | **1020 passed, 21 skipped, 2 failed** (4.7 min) |
+| The 2 failures, re-run alone with `--repeat-each=5` | **25 passed, 0 failed** (both specs, every test, five times) |
+| `franchise-command-center.css` | 1779 lines, not touched |
+
+The two failures in the full run:
+
+- `shared-chrome-tokens.spec.js` "Home Base alpha banner, page-load overlay and error screens": a real, expected failure. The test pinned the loader's background at `[0, 0, 0, 0.92]`, the value Jamie just overruled. Updated to the solid page fill `[11, 13, 20]`. Passes 5 of 5.
+- `submit-cuts.spec.js` "wrong count is disabled, looks dead, no sound": a flake, not from this branch. A force-click on the disabled Submit logged one `SFX_SELECT` once in the full run; alone it passes 5 of 5. That screen (practice-squad cuts) was not edited here.
+
+pytest was not re-run: this update changes no Python (the earlier run on this branch was 4367 passed, 14 skipped, 108 xfailed, 2 xpassed).
+
