@@ -1644,22 +1644,6 @@ body.training-report-page {
   color: var(--text-100);
 }
 
-.training-report-page .playbook-summary-table,
-#training-report-view .playbook-summary-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.training-report-page .playbook-summary-table th,
-.training-report-page .playbook-summary-table td,
-#training-report-view .playbook-summary-table th,
-#training-report-view .playbook-summary-table td {
-  padding: var(--space-2) var(--space-3);
-  text-align: left;
-  color: var(--text-100);
-  border-bottom: 1px solid var(--line);
-}
-
 #franchise-container #training-report-view.tab-content {
   padding: 0;
   border: 0;
@@ -1705,15 +1689,21 @@ body.training-report-page {
   display: none;
 }
 
+/* The header stays on screen while the report scrolls (it carries the way out), so it
+   needs the page's own solid fill: transparent, it let every section scroll through the
+   title and the button. */
 #training-report-view .report-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-12);
-  padding: 0 0 var(--dsp-16);
-  background: transparent;
+  top: 0;
+  margin-top: calc(-1 * var(--space-10));
+  padding: var(--space-10) 0 var(--dsp-16);
+  background: var(--bg-page-solid);
   box-shadow: none;
   border: 0;
+  border-radius: 0;
 }
 #training-report-view .page-title,
 #training-report-view .report-header .page-title {
@@ -1897,4 +1887,177 @@ body.training-report-page {
   border-radius: var(--radius-8);
   background: var(--white-4);
   box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* --- Loading: nothing half-built ------------------------------------------------
+   Until the report data is in, every section is hidden and a quiet skeleton stands in.
+   The page title and the way out stay; the "--" placeholders do not. */
+#training-report-view.is-loading .training-report-container > section,
+#training-report-view.is-load-failed .training-report-container > section,
+#training-report-view.is-loading .header-meta-row,
+#training-report-view.is-load-failed .header-meta-row {
+  visibility: hidden;
+}
+#training-report-view.is-loading .training-report-container > section,
+#training-report-view.is-load-failed .training-report-container > section {
+  display: none;
+}
+#training-report-view .report-skeleton,
+#training-report-view .report-load-status { display: none; grid-column: 1 / -1; }
+#training-report-view.is-loading .report-skeleton {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: var(--dsp-24) calc(var(--col-gap) * 2);
+  margin-top: var(--dsp-16);
+}
+#training-report-view .rsk-col {
+  display: grid;
+  align-content: start;
+  gap: var(--dsp-12);
+}
+#training-report-view .rsk {
+  display: block;
+  height: var(--dsz-30);
+  border-radius: var(--radius-6);
+  background: linear-gradient(90deg, var(--white-3) 0%, var(--white-6) 50%, var(--white-3) 100%);
+  background-size: 200% 100%;
+  animation: reportSkeleton var(--dur-skeleton) linear infinite;
+}
+#training-report-view .rsk-h { width: 132px; height: var(--dsz-20); }
+#training-report-view .rsk-card { height: 96px; border-radius: var(--radius-10); }
+@keyframes reportSkeleton {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #training-report-view .rsk { animation: none; }
+}
+#training-report-view.is-load-failed .report-load-status {
+  display: block;
+  margin: var(--dsp-16) 0 0;
+  padding: var(--dsp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-10);
+  background: var(--white-2);
+  font-size: var(--fs-14);
+  color: var(--text-60);
+}
+
+/* --- Training movement marks ----------------------------------------------------
+   One up neutral, two up green, three up blue, down red; outside camp a single down
+   is neutral too (training-report.js describeTrainingChange; Styleguide, Data scales).
+   Declared after every .change-* rule above so the tone is what paints. */
+.training-report-page .tr-tone-neutral,
+#training-report-view .tr-tone-neutral,
+#training-report-view .players-table td.tr-tone-neutral,
+.attribute-tooltip.tr-tone-neutral { color: var(--text-87); }
+.training-report-page .tr-tone-up,
+#training-report-view .tr-tone-up,
+#training-report-view .players-table td.tr-tone-up,
+.attribute-tooltip.tr-tone-up { color: var(--delta-up); }
+.training-report-page .tr-tone-elite,
+#training-report-view .tr-tone-elite,
+#training-report-view .players-table td.tr-tone-elite,
+.attribute-tooltip.tr-tone-elite { color: var(--blue); }
+.training-report-page .tr-tone-down,
+#training-report-view .tr-tone-down,
+#training-report-view .players-table td.tr-tone-down,
+.attribute-tooltip.tr-tone-down { color: var(--tier-red); }
+/* Pluses and minuses beside an attribute value: a touch of air, same tones. */
+#training-report-view .delta-mark {
+  margin-left: var(--space-3);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-2);
+}
+
+/* --- Playbook Summary: Offense and Defense side by side -----------------------------
+   Each panel lays its sub-sections out as compact columns, so the whole playbook reads
+   across instead of down one long list. */
+#training-report-view .pbs-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr);
+  gap: var(--dsp-12);
+  align-items: start;
+}
+#training-report-view .pbs-panel {
+  padding: var(--dsp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-10);
+  background: var(--white-2);
+}
+#training-report-view .pbs-panel-title {
+  margin: 0 0 var(--dsp-12);
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
+}
+#training-report-view .pbs-cols {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--dsp-20);
+  align-items: start;
+}
+#training-report-view .pbs-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+  padding: 0 calc(var(--pbs-delta-w) + var(--space-8)) var(--space-6) 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+#training-report-view .pbs-group { --pbs-delta-w: 38px; }
+#training-report-view .pbs-group-head h4,
+#training-report-view .pbs-group-head span {
+  margin: 0;
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
+  color: var(--text-60);
+  white-space: nowrap;
+}
+#training-report-view .pbs-group-head span { color: var(--text-38); }
+#training-report-view .pbs-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+#training-report-view .pbs-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto var(--pbs-delta-w);
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--dsz-30);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+#training-report-view .pbs-row:last-child { border-bottom: 0; }
+#training-report-view .pbs-name {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-1p25);
+  color: var(--text-87);
+  overflow-wrap: anywhere;
+}
+#training-report-view .pbs-cmd {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-100);
+  text-align: right;
+}
+#training-report-view .pbs-delta {
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-2);
+  text-align: left;
+  white-space: nowrap;
+}
+#training-report-view .pbs-delta.change-zero { color: var(--text-38); }
+#training-report-view .pbs-empty {
+  margin: var(--space-8) 0 0;
+  font-size: var(--fs-12);
+  color: var(--text-38);
+}
+@media (max-width: 1100px) {
+  #training-report-view .pbs-panels { grid-template-columns: minmax(0, 1fr); }
+  #training-report-view .pbs-cols { grid-auto-flow: row; }
 }

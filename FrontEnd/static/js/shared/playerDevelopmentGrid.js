@@ -1,9 +1,9 @@
 /**
  * Player Development grid — the 12 active players, their training position and focus.
  *
- * ONE implementation for its two hosts: the training page (under Coaching Focus) and the
- * FCC's Training tab. They are the only two places development is editable, and a coach
- * who learns one has learned the other.
+ * ONE implementation for its two hosts: the weekly training page (under Coaching Focus,
+ * `layout: 'cards'`, four columns of three) and Prep › Player Training (`layout:
+ * 'table'`). They are the only two places development is editable.
  *
  * Hosts differ in where their roster comes from, so each adapts its own payload into the
  * normalised shape below rather than this module learning two payloads:
@@ -201,9 +201,11 @@
   function cardHtml(player) {
     var dev = window.GOBDevelopmentFocus;
     var rt = rtAtTrainingPosition(player);
+    var bucket = (rt != null && typeof window.getRtBucketClass === 'function') ? window.getRtBucketClass(rt) : '';
     return '<div class="pdg-card" data-pdg-player="' + esc(player.id) + '">' +
       '<span class="pdg-name" tabindex="0">' + esc(player.name) + '</span>' +
-      '<span class="pdg-rt" data-pdg-rt>' + (rt == null ? '--' : formatRtDisplay(rt)) + '</span>' +
+      '<span class="pdg-rt"><b data-pdg-rt class="' + esc(bucket) + '">' +
+        (rt == null ? '--' : esc(formatRtDisplay(rt))) + '</b></span>' +
       '<span class="pdg-controls">' +
         dev.positionSelectHtml(player) + dev.focusSelectHtml(player) +
       '</span>' +
@@ -239,7 +241,11 @@
     var grid = host.querySelector('.pdg-grid');
     if (!grid) return;
 
-    if (o.layout === 'table') host.classList.add('pdg-layout-table');
+    host.classList.toggle('pdg-layout-table', o.layout === 'table');
+    host.classList.toggle('pdg-layout-cards', o.layout !== 'table');
+    // Cards run four columns wide, RT order reading down each column: twelve players are
+    // four columns of three, and a longer camp roster adds a row rather than a column.
+    grid.style.setProperty('--pdg-rows', String(Math.max(1, Math.ceil(rows.length / 4))));
     if (o.tallies) host._pdgTallies = o.tallies;
     grid.innerHTML = rows.length
       ? (o.layout === 'table'

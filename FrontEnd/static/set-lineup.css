@@ -1222,9 +1222,12 @@ a.player-name-link {
   min-height: 0;
 }
 
+/* Anchored to the charts, not to the bottom of the panel: the buttons sit directly under
+   the Shot Weight Distribution bars and stay there when the container resizes. */
 .lineup-rail-actions {
-  margin-top: auto;
-  padding-top: 13px;
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding-top: 16px;
   display: flex;
   flex-direction: column;
   gap: 7px;
