@@ -536,7 +536,8 @@ const STANDINGS_SIZES = [[1280, 720], [1440, 900], [1920, 1080], [2048, 1152], [
 for (const [width, height] of STANDINGS_SIZES) {
   test('G5: the conference standings card shows all 8 teams at normal spacing, ' + width + 'x' + height, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    for (const state of ['win', 'loss', 'regular', 'first_week', 'tournament', 'signing_day']) {
+    // Every state that has a standings card (week 1 shows the preseason national rankings instead).
+    for (const state of ['win', 'loss', 'regular', 'tournament', 'signing_day']) {
       const table = conference(TIED, 3);
       await O.openOffice(page, standingsOffice(state, table));
       const label = state + ' ' + width;

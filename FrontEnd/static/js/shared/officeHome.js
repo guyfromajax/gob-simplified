@@ -905,49 +905,254 @@
     }
     rows.forEach(function (row) { node.appendChild(row); });
     if (!rows.length) {
+      // Week 1 (the one-line wire): before a lean has moved there is nothing to report.
       var line = (oneLine && wire && present(wire.status))
         ? wire.status
-        : 'No recruiting movement this week';
+        : (oneLine ? 'No preseason leans' : 'No recruiting movement this week');
       node.appendChild(el('p', 'wr-empty', line));
     }
     return node;
   }
 
-  function previewCard(preview, index) {
-    if (!preview) return null;
-    var node = card('sp-card', index);
-    node.appendChild(el('h3', 'sp-title', 'Season preview'));
-    var grid = el('div', 'sp-grid');
-    function stat(label, value) {
-      if (!present(value)) return;
-      var cell = el('div', 'mv-cell');
-      cell.appendChild(el('span', 'mv-l', label));
-      cell.appendChild(el('b', 'mv-v', String(value)));
-      grid.appendChild(cell);
+  // ---- Week 1 of every season: the season preview (BackEnd/utils/season_preview.py) ----------
+  // Every section is built from one payload, so it paints whole or not at all. The lists
+  // (.office-list) share the signing-class card's rules: two-line rows, grade on the right.
+
+  function listOf(value) {
+    return Array.isArray(value) ? value.filter(Boolean) : [];
+  }
+
+  function titledCard(className, index, title, meta) {
+    var node = card(className, index);
+    var head = el('div', 'card-h');
+    head.appendChild(el('h3', '', title));
+    if (present(meta)) head.appendChild(el('span', 'meta', meta));
+    node.appendChild(head);
+    return node;
+  }
+
+  // RT as a letter in the canonical ramp (rtBucket.js), the same one the roster paints.
+  function rtNode(value) {
+    var letters = rtLetters(value);
+    if (!letters) return null;
+    var cls = (typeof global.getRtBucketClass === 'function' && isFinite(Number(value)))
+      ? global.getRtBucketClass(Number(value))
+      : rtColorClass(letters);
+    return el('b', 'tdig ' + cls, letters);
+  }
+
+  function gradeCell(value) {
+    var grade = el('span', 'sg-rt');
+    var node = rtNode(value);
+    if (node) grade.appendChild(node);
+    return grade;
+  }
+
+  function heightText(inches) {
+    var n = Number(inches);
+    if (!isFinite(n) || n <= 0) return '';
+    return Math.floor(n / 12) + '′' + (n % 12) + '″';
+  }
+
+  // One two-line row: [tag] name + small label / second line ............ grade
+  function personRow(opts) {
+    var row = el(opts.url ? 'a' : 'div', 'wr sg-c' + (opts.mine ? ' me' : ''));
+    if (opts.url) {
+      row.href = opts.url;
+      bindGo(row, opts.url);
     }
-    stat('Preseason rank', present(preview.preseason_rank) ? '#' + preview.preseason_rank : null);
-    if (present(preview.national_rank) && preview.national_rank !== preview.preseason_rank) {
-      stat('National rank', '#' + preview.national_rank);
+    if (present(opts.tag)) row.appendChild(el('span', 'wr-k', opts.tag));
+    var body = el('span', 'wr-b');
+    var line = el('span', 'wr-1');
+    line.appendChild(el('span', 'nm', opts.name));
+    if (present(opts.label)) line.appendChild(el('span', 'wr-m', opts.label));
+    body.appendChild(line);
+    if (present(opts.detail)) body.appendChild(el('span', 'wr-2', opts.detail));
+    row.appendChild(body);
+    if (opts.right) row.appendChild(opts.right);
+    return row;
+  }
+
+  function outlookCard(preview, index) {
+    var outlook = preview && preview.outlook;
+    var picked = outlook && outlook.picked;
+    if (!picked || !present(picked.rank) || !present(picked.of)) return null;
+    var node = card('office-outlook', index);
+    var label = conferenceLabel(outlook.conference);
+    node.appendChild(el('p', 'ol-pick', 'Picked ' + ordinal(picked.rank) + ' of ' + picked.of
+      + (label ? ' in Conference ' + label : '') + '.'));
+    var last = outlook.last_season;
+    if (last && present(last.wins) && present(last.losses)) {
+      node.appendChild(el('p', 'ol-last', 'Last season: ' + last.wins + '-' + last.losses
+        + (present(last.finish) ? ', ' + last.finish : '') + '.'));
     }
-    stat('Conference projection', preview.conference_projection);
-    stat('Returning starters', preview.returning_starters);
-    if (preview.top_returner && present(preview.top_returner.name)) {
-      stat('Top returner', preview.top_returner.name);
+    return node;
+  }
+
+  function rankingsCard(preview, index) {
+    var ranks = preview && preview.rankings;
+    if (!ranks) return null;
+    var node = titledCard('sp-card office-ranks', index, 'Rankings');
+    [['Conference', ranks.conference], ['Region', ranks.region], ['National', ranks.national]].forEach(function (pair) {
+      var place = pair[1];
+      if (!place || !present(place.rank) || !present(place.of)) return;
+      var row = el('div', 'ptw');
+      row.appendChild(el('span', 'nm', pair[0]));
+      row.appendChild(el('span', 'ptw-r', ''));
+      row.appendChild(el('b', '', String(place.rank)));
+      row.appendChild(el('em', '', 'of ' + place.of));
+      node.appendChild(row);
+    });
+    return node.querySelector('.ptw') ? node : null;
+  }
+
+  // The roster's columns, in the roster's order: Player, RT, Pos, Yr, Ht, Wt.
+  function keyPlayersCard(preview, index) {
+    var rows = listOf(preview && preview.key_players).filter(function (row) { return present(row.name); });
+    if (!rows.length) return null;
+    var node = titledCard('office-tb office-kp', index, 'Key Players');
+    var head = el('div', 'st-r st-hd');
+    ['Player', 'RT', 'Pos', 'Yr', 'Ht', 'Wt'].forEach(function (label) { head.appendChild(el('span', '', label)); });
+    node.appendChild(head);
+    rows.forEach(function (row) {
+      var line = el('div', 'st-r');
+      var name = el('span', 'st-n');
+      name.appendChild(linkName('st-nm', row.name, playerHref(row.player_id)));
+      line.appendChild(name);
+      var rt = el('span', 'tb-rt');
+      var grade = rtNode(row.rt);
+      if (grade) rt.appendChild(grade);
+      line.appendChild(rt);
+      line.appendChild(el('span', 'tb-c', present(row.pos) ? String(row.pos) : ''));
+      line.appendChild(el('span', 'tb-c', present(row.year) ? String(row.year) : ''));
+      line.appendChild(el('span', 'tb-c', heightText(row.height)));
+      line.appendChild(el('span', 'tb-c', present(row.weight) ? String(row.weight) : ''));
+      node.appendChild(line);
+    });
+    return node;
+  }
+
+  function plural(count, one, many) {
+    return count + ' ' + (Number(count) === 1 ? one : many);
+  }
+
+  function newcomersCard(preview, index) {
+    var block = preview && preview.newcomers;
+    var rows = listOf(block && block.players).filter(function (row) { return present(row.name); });
+    if (!rows.length) return null;
+    var node = titledCard('office-list office-new', index, 'Newcomers');
+    rows.forEach(function (row) {
+      node.appendChild(personRow({
+        name: row.name, label: row.pos, url: playerHref(row.player_id), right: gradeCell(row.rt)
+      }));
+    });
+    var parts = [];
+    if (present(block.returning)) parts.push('Returning ' + block.returning);
+    if (present(block.lost_seniors)) parts.push('Lost ' + plural(block.lost_seniors, 'senior', 'seniors'));
+    if (present(block.newcomers)) parts.push(plural(block.newcomers, 'newcomer', 'newcomers'));
+    if (parts.length) node.appendChild(el('p', 'nc-sum', parts.join(' · ')));
+    return node;
+  }
+
+  function allAmericansCard(preview, index) {
+    var rows = listOf(preview && preview.all_americans).filter(function (row) { return present(row.name); });
+    if (!rows.length) return null;
+    var node = titledCard('office-list office-aa', index, 'Preseason All-Americans', 'First team');
+    rows.forEach(function (row) {
+      node.appendChild(personRow({
+        tag: row.position, name: row.name, detail: row.team_name, mine: !!row.is_user,
+        url: playerHref(row.player_id), right: gradeCell(row.rt)
+      }));
+    });
+    return node;
+  }
+
+  function circleCard(preview, index) {
+    var rows = listOf(preview && preview.circle_these).filter(function (row) { return present(row.opponent); });
+    if (!rows.length) return null;
+    var node = titledCard('office-list office-circle', index, 'Circle these');
+    rows.forEach(function (row) {
+      var rank = el('span', 'sg-rt');
+      if (present(row.rank)) rank.appendChild(el('b', 'tdig', '#' + row.rank));
+      node.appendChild(personRow({
+        tag: 'Wk ' + row.week, name: row.opponent,
+        label: row.site === 'away' ? 'Away' : (row.site === 'home' ? 'Home' : ''),
+        url: teamHref(row.opponent_team_id), right: rank
+      }));
+    });
+    return node;
+  }
+
+  function walkOnsCard(preview, index) {
+    var rows = listOf(preview && preview.walk_ons).filter(function (row) { return present(row.name); });
+    var node = titledCard('office-list office-walk', index, 'Walk-ons', rows.length ? String(rows.length) : '');
+    if (!rows.length) {
+      node.appendChild(el('p', 'wr-empty', 'No walk-ons'));
+      return node;
     }
-    if (grid.childNodes.length) node.appendChild(grid);
-    var newcomers = Array.isArray(preview.newcomers) ? preview.newcomers : [];
-    if (newcomers.length) {
-      node.appendChild(el('div', 'sub-h', 'Newcomers'));
-      newcomers.forEach(function (row) {
-        if (!row || !present(row.name)) return;
-        var url = playerHref(row.player_id);
-        var line = linkName('nm', row.name, url) || el('span', '', row.name);
-        var wrap = el('div', 'msr');
-        wrap.appendChild(line);
-        node.appendChild(wrap);
-      });
+    rows.forEach(function (row) {
+      node.appendChild(personRow({
+        name: row.name, label: [row.pos, row.year].filter(present).join(' · '),
+        url: playerHref(row.player_id), right: gradeCell(row.rt)
+      }));
+    });
+    return node;
+  }
+
+  // All season until Signing Day: the region's best recruits and who leads for each.
+  function topRecruitsCard(top, index) {
+    if (!top) return null;
+    var rows = listOf(top.rows).filter(function (row) { return present(row.name); });
+    var node = titledCard('office-list office-top', index, 'Top Recruits', present(top.region) ? 'Region ' + top.region : '');
+    if (!rows.length) {
+      node.appendChild(el('p', 'wr-empty', 'No recruits in your region yet'));
+      return node;
     }
-    return node.childNodes.length > 1 ? node : null;
+    var url = recruitingHref();
+    rows.forEach(function (row) {
+      node.appendChild(personRow({
+        name: row.name, label: row.position, mine: !!row.lean_is_user, url: url,
+        detail: present(row.lean_team_name) ? 'Leans ' + row.lean_team_name : 'No lean yet',
+        right: gradeCell(row.rt)
+      }));
+    });
+    return node;
+  }
+
+  // The user's conference by preseason national rank, in the standings card's rows.
+  function preseasonRankingsCard(table, index) {
+    var rows = listOf(table && table.rows);
+    if (!rows.length) return null;
+    var node = card('office-st office-pre', index);
+    var head = el('div', 'card-h');
+    head.appendChild(el('h3', '', 'Preseason National Rankings'));
+    var moreUrl = viewHref({ tab: 'rankings-view' }, '/franchise-command-center.html', { tab: 'rankings-view' });
+    var more = el('a', 'lnk st-more', 'Full rankings');
+    more.href = moreUrl;
+    bindGo(more, moreUrl);
+    head.appendChild(more);
+    node.appendChild(head);
+    var labels = el('div', 'st-r st-hd');
+    labels.appendChild(el('span', '', 'Natl'));
+    labels.appendChild(el('span', '', 'Team'));
+    labels.appendChild(el('span', 'st-wl', ''));
+    node.appendChild(labels);
+    rows.forEach(function (row) {
+      var line = el('div', 'st-r' + (row.is_user ? ' me' : ''));
+      line.dataset.teamId = row.team_id || '';
+      line.appendChild(el('span', 'st-pos', present(row.national_rank) ? String(row.national_rank) : ''));
+      var team = el('span', 'st-n');
+      var mark = standingsMark(row.team_name);
+      if (mark) team.appendChild(mark);
+      team.appendChild(el('span', 'st-nm', present(row.team_name) ? String(row.team_name) : ''));
+      line.appendChild(team);
+      line.appendChild(el('span', 'st-wl', ''));
+      node.appendChild(line);
+    });
+    node.dataset.standingsTotal = String(rows.length);
+    node.dataset.standingsShown = String(rows.length);
+    if (present(table.conference)) node.dataset.conference = String(table.conference);
+    return node;
   }
 
   function weeklyHref(item) {
@@ -991,6 +1196,7 @@
         node.appendChild(el('div', 'tn-round', game.round_name));
       }
     }
+    if (digest.state === 'first_week') node.appendChild(el('div', 'sub-h nx-open', 'Season Opener'));
     var top = el('div', 'nx-top');
     var main = el('div', 'nx-m');
     var names = el('div');
@@ -1008,10 +1214,20 @@
       names.appendChild(opp);
     }
     var sub = [];
+    var opener = digest.state === 'first_week';
     var recordLine = winsLosses(game.record);
     var confLine = conferenceLabel(game.conference);
-    if (recordLine) sub.push(recordLine);
-    if (confLine) {
+    // Before a game is played the record says nothing: the opener shows the opponent's
+    // preseason rank and, when they met last season, how that went.
+    if (opener) {
+      if (present(game.rank)) sub.push('Preseason #' + game.rank);
+      if (confLine) sub.push('Conference ' + confLine);
+      var met = game.last_meeting;
+      if (met && present(met.user_score) && present(met.opp_score)) {
+        sub.push('Last season: ' + (met.won ? 'W ' : 'L ') + met.user_score + '-' + met.opp_score);
+      }
+    } else if (recordLine) sub.push(recordLine);
+    if (confLine && !opener) {
       var place = 'Conference ' + confLine;
       if (present(game.conference_position) && present(game.conference_size)) {
         place += ' (' + game.conference_position + ' of ' + game.conference_size + ')';
@@ -1358,20 +1574,37 @@
     var userRank = digest.what_moved && digest.what_moved.national_rank
       ? digest.what_moved.national_rank.now
       : null;
-    var col1 = column('01', 'Since last week', '');
-    var col2 = column('02', 'This Week', '');
+    var week1 = digest.state === 'first_week';
+    var preview = week1 && digest.season_preview && digest.season_preview.ready !== false
+      ? digest.season_preview
+      : null;
+    var col1 = column('01', week1 ? 'Season Preview' : 'Since last week', '');
+    var col2 = column('02', week1 ? 'Opening Week' : 'This Week', '');
     var col3 = column('03', 'Recruiting', '', recruitingHref());
     var first = [];
     var second = [];
     var third = [];
-    if (digest.state === 'first_week') {
-      first = [previewCard(digest.season_preview, 1)];
+    if (week1) {
+      // Week 1 of every season. The opener carries last season's meeting when the preview has it.
+      var opener = (preview && preview.opener) || digest.next_game;
+      first = preview ? [
+        outlookCard(preview, 1),
+        rankingsCard(preview, 2),
+        keyPlayersCard(preview, 3),
+        newcomersCard(preview, 4),
+        allAmericansCard(preview, 5)
+      ] : [];
       second = [
-        nextCard(digest.next_game, digest, 2),
-        snapshotCard(digest.team_snapshot, 3),
-        standingsCard(digest.conference_standings, 4)
+        nextCard(opener, digest, 2),
+        preview ? circleCard(preview, 3) : null,
+        snapshotCard(digest.team_snapshot, 4),
+        (preview && preseasonRankingsCard(preview.preseason_rankings, 5))
+          || standingsCard(digest.conference_standings, 5)
       ];
-      third = [wireCard(digest.recruiting_wire, true, 5)];
+      third = [
+        wireCard(digest.recruiting_wire, true, 6),
+        preview ? walkOnsCard(preview, 7) : null
+      ];
     } else if (digest.state === 'signing_day') {
       first = [sinceLastWeekCard(digest, 1, false, userRank)];
       second = [
@@ -1388,6 +1621,8 @@
       ];
       third = [wireCard(digest.recruiting_wire, false, 6)];
     }
+    // Top Recruits stays all season (the server stops sending it from Signing Day).
+    if (digest.top_recruits && digest.state !== 'signing_day') third.push(topRecruitsCard(digest.top_recruits, 8));
     // Once Signing Day has run the recruiting column is the class that signed.
     if (digest.signed_class) third = [signedClassCard(digest.signed_class, 6)];
     // The moment-queue weekly items now fold into the card's Also row / "+N more",

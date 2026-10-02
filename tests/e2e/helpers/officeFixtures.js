@@ -138,6 +138,66 @@ function standingsBlock() {
   };
 }
 
+/** The week-1 preview as season_preview.py sends it. Season 1 by default: no last season, no newcomers. */
+function previewBlock(overrides) {
+  const conference = [
+    ['team-0', 'Alpha', 12], ['team-1', 'Crickstown', 21], ['team-2', 'Gamma', 33], [TID, 'Amariabi International', 40],
+    ['team-4', 'Delta', 58], ['team-5', 'Echo', 77], ['team-6', 'Foxtrot', 96], ['team-7', 'Golf', 120],
+  ];
+  return Object.assign({
+    ready: true,
+    season: 1,
+    preseason_rank: 40,
+    national_rank: 40,
+    outlook: { conference: 2, picked: { rank: 4, of: 8 }, last_season: null },
+    rankings: { conference: { rank: 4, of: 8 }, region: { rank: 7, of: 16 }, national: { rank: 40, of: 128 } },
+    key_players: [
+      { player_id: 'p-jalen', name: 'Jalen Carter', rt: 84, pos: 'PG', year: 'SR', height: 75, weight: 190 },
+      { player_id: 'p-marcus', name: 'Marcus Ruiz', rt: 77, pos: 'SF', year: 'JR', height: 79, weight: 215 },
+      { player_id: 'p-avery', name: 'Avery Cole', rt: 71, pos: 'C', year: 'JR', height: 83, weight: 245 },
+      { player_id: 'p-noah', name: 'Noah Peck', rt: 64, pos: 'PF', year: 'SO', height: 81, weight: 230 },
+      { player_id: 'p-dev', name: 'Devonte Whitfield-Alexander', rt: 58, pos: 'SG', year: 'FR', height: 76, weight: 195 },
+    ],
+    newcomers: null,
+    all_americans: [
+      { position: 'PG', player_id: 'aa-1', name: 'Tyrese Vaughn', team_id: 'team-90', team_name: 'Long Island Methodist', rt: 103, is_user: false },
+      { position: 'SG', player_id: 'aa-2', name: 'Cal Okafor', team_id: 'team-91', team_name: 'Chapel Hill', rt: 98, is_user: false },
+      { position: 'SF', player_id: 'p-marcus', name: 'Marcus Ruiz', team_id: TID, team_name: 'Amariabi International', rt: 96, is_user: true },
+      { position: 'PF', player_id: 'aa-4', name: 'Dre Hollis', team_id: 'team-93', team_name: 'Four Corners', rt: 95, is_user: false },
+      { position: 'C', player_id: 'aa-5', name: 'Ansel Brandt', team_id: 'team-94', team_name: 'Seattle AAA', rt: 101, is_user: false },
+    ],
+    opener: nextBlock({ week: 1, site: 'home', record: { wins: 0, losses: 0 }, top_scorer: null, top_rebounder: null, last_meeting: null }),
+    circle_these: [
+      { week: 4, site: 'away', opponent_team_id: 'team-90', opponent: 'Long Island Methodist', rank: 3 },
+      { week: 11, site: 'home', opponent_team_id: 'team-0', opponent: 'Alpha', rank: 12 },
+      { week: 19, site: 'away', opponent_team_id: 'team-91', opponent: 'Chapel Hill', rank: 7 },
+    ],
+    preseason_rankings: {
+      conference: 2,
+      rows: conference.map((row) => ({ team_id: row[0], team_name: row[1], national_rank: row[2], is_user: row[0] === TID })),
+    },
+    walk_ons: [
+      { player_id: 'w-1', name: 'Sam Ortega', pos: 'SG', year: 'FR', rt: 34 },
+      { player_id: 'w-2', name: 'Kip Lawson', pos: 'PF', year: 'SO', rt: 31 },
+      { player_id: 'w-3', name: 'Teo Marsh', pos: 'PG', year: 'JR', rt: 29 },
+    ],
+  }, overrides || {});
+}
+
+/** The region's best recruits and their top lean: sent every week until Signing Day. */
+function topRecruitsBlock(overrides) {
+  return Object.assign({
+    region: 'A',
+    rows: [
+      { recruit_id: 'r10', name: 'Darius Kemp', position: 'C', rt: 92, lean_team_id: 'team-0', lean_team_name: 'Alpha', lean_is_user: false },
+      { recruit_id: 'r11', name: 'Miles Hart', position: 'SG', rt: 88, lean_team_id: TID, lean_team_name: 'Amariabi International', lean_is_user: true },
+      { recruit_id: 'r12', name: 'Owen Blake', position: 'PF', rt: 81, lean_team_id: 'team-1', lean_team_name: 'Crickstown', lean_is_user: false },
+      { recruit_id: 'r13', name: 'Jon Abara', position: 'PG', rt: 74, lean_team_id: null, lean_team_name: null, lean_is_user: false },
+      { recruit_id: 'r14', name: 'Luka Fenn', position: 'SF', rt: 69, lean_team_id: 'team-2', lean_team_name: 'Gamma', lean_is_user: false },
+    ],
+  }, overrides || {});
+}
+
 function digest(state, patch) {
   const body = {
     state: state,
@@ -166,6 +226,8 @@ function digest(state, patch) {
     recruiting_wire: wireBlock(),
     signing_day: null,
     season_preview: null,
+    // Top Recruits stays all season; the server stops sending it from Signing Day.
+    top_recruits: state === 'signing_day' ? null : topRecruitsBlock(),
   };
   return Object.assign(body, patch || {});
 }
@@ -229,18 +291,9 @@ const STATES = {
       attribute_changes: [],
     },
     team_snapshot: snapshotBlock({ state: 'set_after_camp', moved_most: [] }),
-    season_preview: {
-      preseason_rank: 40,
-      conference_projection: null,
-      team_rt: null,
-      national_rank: 40,
-      returning_starters: null,
-      top_returner: null,
-      newcomers: null,
-      opener: nextBlock({ week: 1 }),
-    },
+    season_preview: previewBlock(),
     next_game: nextBlock({ week: 1, site: 'home' }),
-    recruiting_wire: wireBlock({ status: 'Opens with the invite period', events: [], pending_count: 0, urgent: false }),
+    recruiting_wire: wireBlock({ status: 'No preseason leans', events: [], pending_count: 0, urgent: false }),
     todos: [
       { id: 'run_training_camp', label_key: 'run_training_camp', required: true, done: false, gates_advance: true, is_advance_action: true, route: '/training.html' },
     ],
@@ -394,4 +447,4 @@ async function openOffice(page, data) {
   });
 }
 
-module.exports = { FID, TID, STATES, digest, commandCenter, resultBlock, nextBlock, wireBlock, snapshotBlock, standingsBlock, installApi, openOffice, fulfillJson };
+module.exports = { FID, TID, STATES, digest, commandCenter, resultBlock, nextBlock, wireBlock, snapshotBlock, standingsBlock, previewBlock, topRecruitsBlock, installApi, openOffice, fulfillJson };

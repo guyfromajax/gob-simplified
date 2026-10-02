@@ -374,7 +374,8 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 | `recruiting_wire` | Status line, events (`recruit`, `position`, `stars` and `filmed_grade` always null, `event_type`, `event_text` from the stored lean-event sentence, `event_detail`, `list_position`, `direction`), `pending_count`, `urgent`, `unseen_count`. |
 | `signing_day` | Week 35 only. Points remaining out of 50, playing-time promises, open roster spots, up to three targets. Otherwise null. |
 | `signed_class` | Week 36 only (running Signing Day moves the franchise from 35 to 36), once the hub reveal has played (`week_35_reveal_seen_season`). `{recruits: [...]}` from `class_signed`: every non-walk-on who signed with the user's team; an empty list when none did. Otherwise null. |
-| `season_preview` | `first_week` only. Preseason rank is the current national rank. Conference projection, team RT, returning starters, and top returner are null. Newcomers only when `pending_walk_on_welcome` is stored. Opener is `next_game`. |
+| `season_preview` | `first_week` only (week 1 of every season). Built by `BackEnd/utils/season_preview.py`; see "Office week 1" below. `ready: false` when the preview's own reads failed. |
+| `top_recruits` | Weeks 1-34: `{region, rows}`, the five best-rated recruits from the user's region, each with `lean_team_name` (the recruit's `Lean["1"]`) and `lean_is_user`. Null from week 35 and whenever `signed_class` is set. |
 | `weekly_card_items` | WEEKLY-tier moments from the server moment queue, in order. Every item includes an `href` (the archetype row's is omitted on desktop, where the coaching-archetypes page is not served). The Office paints them with the existing card helper as links. They are not pop-ups. |
 | `also` | The highest-priority weekly item as `{kind, title, line, href}`, or null. The weekly card's one folded-moment row. `weekly_card_items` stays the full list. |
 
@@ -481,8 +482,8 @@ A week strip sits under the top of `.main`, above the columns. It is one row, ab
 
 | State | Column 1 · Since last week | Column 2 · This Week | Column 3 · Recruiting |
 |---|---|---|---|
-| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot · Conference standings | Recruiting wire. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
-| `first_week` | Season preview | Next game · Team snapshot · Conference standings | One-line wire. The digest status when it is set, otherwise the empty-state line. The column heading is the hub link. |
+| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot · Conference standings | Recruiting wire, then Top Recruits. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
+| `first_week` | **Season Preview**: outlook · Rankings · Key Players · Newcomers · Preseason All-Americans | **Opening Week**: Season Opener · Circle these · Team snapshot · Preseason National Rankings | One-line wire ("No preseason leans") · Walk-ons · Top Recruits. See "Office week 1". |
 | `signing_day` | Result · What moved | Team snapshot · Conference standings (`next_game` is null) | Signing Day card. The wire is hidden. The column heading still links to the hub. |
 | any, with `signed_class` set (week 36) | as that state | as that state | Signing class card (`.office-class`): one row per signed recruit, name, position, home region, RT now → ceiling. It replaces the wire. |
 
@@ -499,9 +500,34 @@ The three columns are equal width. The column gap is `--dsp-12` (12px at the 128
 | Conference standings | `conference_standings.rows` under Team snapshot. Header is `Conference` plus the short label plus `standings` (`Conference A2 standings`), with "Full standings" always in the card header, to League › Standings. **Every team of the user's conference is shown, in the server's standings order (ties included): never sliced to a window, never tightened to fit.** Each row is the place (`--text-38` tabular), the team's mark as the league tables draw it (`GOBTables.markHtml`) and name (`--fs-13` semibold), and W-L in the display face at `--fs-22`, at the same row padding as a players-to-watch row, at every density. The W-L header sits in the same column as the numbers, right-aligned. The user row uses the navy selected-row treatment. The card does not read the density class, so it cannot be caught by a late `.gob-1280` / `.gob-1920`. On a window too short for the middle column the Office is taller than the fold and `.main` scrolls (the Office chain is `flex-shrink: 0`): at 1280×720 by about 200px on a game week, at 1920×1080 by about 75px. |
 | Signing Day | `signing_day.points_remaining`, `points_total`, `promises_made`, `open_roster_spots`, `targets` |
 | Signing class | `signed_class.recruits[]`: `name`, `position`, `home_region`, `rt_now`, `rt_potential`. The header counts them (`4 signed`). An empty list reads "No recruits signed with your program." The ceiling is shown only when it differs from the grade now. |
-| Season preview | `season_preview` fields that are non-null. The opener is the next-game card. |
+| Season preview | See "Office week 1" below. |
 
 Attribute changes are one row per `player_id`. The player name stays on the left and links to the player page. Chips are right-justified: the rightmost chip meets the card's right content edge, and the others sit to its left with a consistent gap. If they do not fit on one line they wrap, still right-aligned, under the name. A chip shows the attribute abbreviation in Bebas at `--fs-22` and `--text-100` (larger than the player name, the largest text in the chip), the new first-digit value in the tier colour from `attributeDisplay.js`, and a green ▲ or red ▼. Chips are not truncated. The previous value is not shown. The chip `title` is the full name from `ATTRIBUTE_NAMES` (`BH` → "Ball Handling"). Players sort by total absolute movement, then name. Inside a row, increases come before decreases. At 1280 the card shows up to 5 players. At 1920 it shows up to 8. When the list is longer, "All changes →" opens `/training-report.html` in focus for `result.week` (or `next_game.week` when there is no result). Rank, conference, and record tiles omit the delta chip when the delta is 0 or null.
+
+### Office week 1: the season preview
+
+Week 1 of **every** season, before the first game, the Office is the season preview. From week 2 it is the normal Office; only Top Recruits carries on.
+
+| Column | Section | Content | Source |
+|---|---|---|---|
+| 01 Season Preview | Outlook (no title) | "Picked 5th of 8 in Conference A1." From season 2: "Last season: 18-8, lost in the Region semifinal." | pick = conference place by preseason national rank; last season = the coach's `season_record` trophy (`furthest_round`, or "won the National championship" with a national title) |
+| | Rankings | Conference "5 of 8", Region "11 of 16", National "100 of 128" | all three from `rankings[].natl_rank` |
+| | Key Players | Top 5 by RT. Columns in the roster's order: Player, RT, Pos, Yr, Ht, Wt. Names open the player page. | one projected roster read (`meta`, `position_ratings`) |
+| | Newcomers | Last season's signing class now on the roster (name, Pos, RT) and one line: "Returning 9 · Lost 3 seniors · 4 newcomers". Left out in season 1 and when no signee is on the roster. | `last_season.signed_class` ids; names from the season review on a save without the snapshot |
+| | Preseason All-Americans | First team: position, player, team, RT. No score, weights or percentages. The user's players are the navy row. | `awards.all_american_projection` (the week-0 projection) |
+| 02 Opening Week | Season Opener | The next-game card, labelled; "Preseason #21 · Conference A2 · Last season: W 71-64". The meeting only when they met. | `next_game_summary`; `last_season.meetings` |
+| | Circle these | The three toughest games by the opponent's national rank, in week order, with week and site. | `schedule` |
+| | Team snapshot | unchanged | |
+| | Preseason National Rankings | The user's conference by national rank, best first, each with its rank. User row navy. "Full rankings" opens League › Rankings. Replaces the standings card in week 1. | `rankings` |
+| 03 Recruiting | Wire | One line. No leans: "No preseason leans". | |
+| | Walk-ons | This season's walk-ons (name, Pos · Yr, RT). None: one quiet line, "No walk-ons". | see below |
+| | Top Recruits | **All season until Signing Day.** The region's five best-rated recruits; second line "Leans <team>" or "No lean yet". A recruit leaning to the user is the navy row. Steps aside from week 35 (the column is then Signing Day, then the signing class). | one projected recruit read per uncached Office load |
+
+- **What a walk-on is.** A franchise player whose `meta.archetype` is the "Walk On" sentinel (`walk_on_portraits.is_walk_on_fpd`). The section lists **this season's**: in season 1 every walk-on was created with the franchise; from season 2 the archetype cannot tell new arrivals from walk-ons who stayed, so the rollover's `pending_walk_on_welcome` list names them.
+- **`last_season`** (franchise doc): one small snapshot written by the season rollover (`season_preview.last_season_snapshot`) because the reset wipes what the preview needs: the user's last meeting with each opponent, how many seniors left, and the signed class's player ids. A save that rolled over before it existed shows no meeting and no "Lost N seniors".
+- **Build rules.** Sections reuse two patterns and add no card style: `.office-list` (the signing-class card: two-line `.wr` rows, grade on the right) and the standings row (`.st-r`, also `.office-tb` for Key Players). "Yours" is the navy selected-row treatment. RT is a letter in the canonical ramp (`rtBucket.js`). No section has more than five rows (the conference table is its eight teams). A section with nothing to say is left out; the whole preview paints from one payload, so nothing is half-built.
+- **CH is hidden**: the preview reads no attributes, and the All-American rows carry no score.
+- The Office scrolls. Past the fold, week 1: column 01 185px (season 1) / 428px (later seasons) and column 02 219px at 1280×720; 124px / 470px and 146px at 1920×1080. Column 03 fits.
 
 Card titles (What moved, Team snapshot, Signing Day, Conference standings) are one type step smaller than the shared card title, `--fs-15`, and stay larger than the body copy under them.
 

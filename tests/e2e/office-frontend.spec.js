@@ -246,18 +246,10 @@ const STATES = {
       attribute_changes: [],
     },
     team_snapshot: snapshotBlock({ state: 'set_after_camp', moved_most: [] }),
-    season_preview: {
-      preseason_rank: 40,
-      conference_projection: null,
-      team_rt: null,
-      national_rank: 40,
-      returning_starters: null,
-      top_returner: null,
-      newcomers: null,
-      opener: nextBlock({ week: 1 }),
-    },
+    // The week-1 preview, as the server sends it (helpers/officeFixtures previewBlock).
+    season_preview: require('./helpers/officeFixtures').previewBlock(),
     next_game: nextBlock({ week: 1, site: 'home' }),
-    recruiting_wire: wireBlock({ status: 'Opens with the invite period', events: [], pending_count: 0, urgent: false }),
+    recruiting_wire: wireBlock({ status: 'No preseason leans', events: [], pending_count: 0, urgent: false }),
     todos: [
       { id: 'run_training_camp', label_key: 'run_training_camp', required: true, done: false, gates_advance: true, is_advance_action: true, route: '/training.html' },
     ],
@@ -614,7 +606,7 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         expect(await page.locator('#office-root .td-gate').count()).toBe(0);
         expect(await page.locator('#office-root .td-adv').count()).toBe(0);
         expect(await page.locator('#office-root .week-k').count()).toBe(0);
-        await expect(page.locator('#office-root .wr-empty')).toHaveText('Opens with the invite period');
+        await expect(page.locator('#office-root .office-wire .wr-empty')).toHaveText('No preseason leans');
       }
       if (name !== 'first_week') {
         await expect(page.locator('#office-root .sb2-n span').first()).toContainText('Amariabi International');
