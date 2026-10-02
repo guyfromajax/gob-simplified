@@ -127,7 +127,7 @@ body.mode-select-page .alpha-disclaimer {
 
 /* Career strip — the online echo of the offline "Your Career" numerals, sized
    for the left column. Hollow = nothing earned yet; solid = earned. */
-.gob .hb-career{display:flex;align-items:center;gap:var(--dsp-16);margin-top:auto;padding-top:var(--dsp-14)}
+.gob .hb-career{margin-top:auto;padding-top:var(--dsp-14)}
 .gob .cr-n{flex:1;min-width:0;display:grid;grid-template-columns:1.35fr 1fr 1fr 1.25fr;border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line)}
 .gob .cr-n>div{display:flex;flex-direction:column;gap:var(--space-3);min-width:0;padding:var(--dsp-8) var(--dsp-12) var(--dsp-6);border-left:1px solid var(--line)}
 .gob .cr-n>div:first-child{border-left:0;padding-left:var(--space-2)}
@@ -138,6 +138,13 @@ body.mode-select-page .alpha-disclaimer {
 .gob-1920 .cr-n>div{padding-top:var(--dsp-10);padding-bottom:var(--dsp-8)}
 .gob .cr-n span{font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--tracking-8);text-transform:uppercase;color:var(--text-60);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gob .hollow{color:transparent!important;-webkit-text-stroke:1.2px var(--white-40)}
+/* The left-column strip gives the four numerals the whole column: each cell is
+   as wide as its own content and the slack is shared between them, so nothing
+   butts up against a divider or a neighbour. (The offline zone keeps the grid.) */
+.gob .hb-career .cr-n{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--dsp-24);padding:var(--dsp-12) var(--space-2) var(--dsp-10)}
+.gob .hb-career .cr-n>div{flex:none;gap:var(--space-4);padding:0;border-left:0}
+.gob .hb-career .cr-v{gap:var(--space-8)}
+.gob .hb-career .cr-n em{font-size:var(--fs-12)}
 
 /* Utility entries (Tutorials · Settings · FAQs · Trophy Case) */
 .gob .hb-util{display:flex;align-items:center;gap:var(--dsp-24);margin-top:auto;padding-top:var(--dsp-12)}

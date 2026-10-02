@@ -264,7 +264,7 @@ test.describe('shared chrome token + colour-law guards', () => {
   // their CSS were deleted in chore/dead-ui-cleanup; the shared ambience switch
   // (.account-switch) is still covered by the account-page test below.
 
-  test('FAQ and legal pages, and the shared switch on the account page', async ({ page }, testInfo) => {
+  test('FAQ and legal pages, and the shared chrome on the account page', async ({ page }, testInfo) => {
     const captureShots = testInfo.repeatEachIndex === 0;
     await stubAuth(page);
     await installApis(page);
@@ -275,13 +275,12 @@ test.describe('shared chrome token + colour-law guards', () => {
       // account.html is owned by the community pass. It reuses .account-switch and the
       // bar and footer from auth-bar.css, so only check that those still paint there.
       await page.goto('/account.html');
-      await page.waitForSelector('#acct-ambience-switch', { timeout: 30000 });
+      // The account page's audio switch is gone (audio lives in Settings and on the
+      // court). The bar and footer are what this page still shares.
+      await page.waitForSelector('#site-footer a', { timeout: 30000 });
+      await expect(page.locator('#acct-ambience-switch')).toHaveCount(0);
       if (!BEFORE) {
         expect((await paint(page, '#auth-bar')).bg).toBe(CHROME_RGB);
-        const sw = await paint(page, '#acct-ambience-switch');
-        expectNeutral(sw, 'account page switch');
-        expect(parseRgb(sw.bg)[3], 'switch background ' + sw.bg).toBeGreaterThan(0);
-        expect(parseRgb(sw.border)[3], 'switch border ' + sw.border).toBeGreaterThan(0);
         expectNeutral(await paint(page, '#site-footer a'), 'footer link');
       }
 

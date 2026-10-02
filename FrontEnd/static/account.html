@@ -47,12 +47,6 @@
     <div class="card">
       <p class="card-label">Settings</p>
       <div class="set-row">
-        <span class="set-label">Scouting Ambience</span>
-        <button type="button" id="acct-ambience-switch" class="account-switch" role="switch" aria-checked="true" aria-label="Scouting ambience">
-          <span class="account-switch-knob" aria-hidden="true"></span>
-        </button>
-      </div>
-      <div class="set-row">
         <span class="set-label">In-Game Display</span>
         <div class="seg" aria-label="In-game player display (coming soon)" aria-disabled="true" title="Coming soon">
           <span class="on">Pos</span><span>#</span>
@@ -172,23 +166,6 @@
       }
     }
 
-    // Scouting Ambience toggle — instant-apply, mirrors the account modal.
-    function wireAmbience(me) {
-      var sw = document.getElementById('acct-ambience-switch');
-      if (!sw) return;
-      function apply(enabled) { sw.setAttribute('aria-checked', enabled ? 'true' : 'false'); }
-      import('/js/musicController.js').then(function (mc) {
-        apply(mc.isScoutingAmbienceEnabled());
-        sw.addEventListener('click', function () {
-          var turningOn = sw.getAttribute('aria-checked') !== 'true';
-          mc.setScoutingAmbienceEnabled(turningOn);
-          apply(turningOn);
-          if (turningOn) mc.tryStartScoutingAmbienceForCurrentPage();
-          else mc.clearFranchiseMusicState();
-        });
-      }).catch(function () { /* toggle stays visual if controller unavailable */ });
-    }
-
     function loadTeamNameMap() {
       var url = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) ? API_CONFIG.buildUrl('/teams') : '/teams';
       return fetch(url).then(function (r) { return r.ok ? r.json() : []; }).then(function (rows) {
@@ -213,8 +190,7 @@
           var me = pair[0] || {};
           me._teamNameById = pair[1] || {};
           render(me);
-          wireAmbience(me);
-        }).catch(function () { render(window.__gobAuthMeData || {}); wireAmbience({}); });
+        }).catch(function () { render(window.__gobAuthMeData || {}); });
       });
     }
     start();

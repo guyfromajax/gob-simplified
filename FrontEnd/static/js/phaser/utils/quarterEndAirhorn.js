@@ -10,6 +10,8 @@
  *   - `playbackComplete` — after turn animation finishes (Final Turn, FLSS, FT, hold, run-out).
  */
 
+import { outputVolume } from '../../shared/uiSfx.js';
+
 function resolveTurnKey(scene, turnData) {
   const key = turnData?.index ?? turnData?.turnIndex ?? scene?.currentTurn;
   if (key === undefined || key === null || key === '') {
@@ -40,8 +42,11 @@ function playAirhornSound() {
   const staticPath = (window.API_CONFIG && typeof window.API_CONFIG.getStaticPath === 'function')
     ? window.API_CONFIG.getStaticPath()
     : '/static';
+  // On the bus: the court's sound control (and Sim Game's Sound switch) mutes it.
+  const volume = outputVolume(0.7, 'sfx');
+  if (volume <= 0) return;
   const airhorn = new Audio(`${staticPath}/sounds/airhorn-lowervol.wav`);
-  airhorn.volume = 0.7;
+  airhorn.volume = volume;
   airhorn.currentTime = 0;
   airhorn.play().catch(() => {});
 }

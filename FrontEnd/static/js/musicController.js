@@ -152,11 +152,10 @@ function playAudio(audio, label) {
   }
 }
 
-// --- Scouting Ambience preference ---
-// Master switch for the franchise / scouting tracks. Lives in localStorage
-// (device-local). Default is enabled — the only way it goes false is via the
-// Account Settings modal. The timeout-loop and gameplay music are NOT gated
-// by this flag.
+// --- Franchise music on/off ---
+// The franchise / scouting tracks ask the bus for the "ambience" channel. Off
+// the court that is the Music switch in Settings (uiSfx app scope), the only
+// control for non-gameplay music. Gameplay music is the court's own control.
 
 export function isScoutingAmbienceEnabled() {
   return channelGain(getAudioState(), "ambience") > 0;

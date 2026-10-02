@@ -399,23 +399,21 @@
 .gob .set-s{display:flex;flex-direction:column;gap:var(--space-16)}
 .gob .set-s h3{font:var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-10);color:var(--text-60);display:flex;justify-content:space-between;align-items:baseline}
 .gob .set-s h3 span{font:var(--fw-medium) var(--fs-11)/var(--lh-1) var(--font-body);letter-spacing:0;color:var(--text-38)}
-.gob .aud{display:grid;grid-template-columns:32px 96px minmax(0,1fr) 30px;align-items:center;gap:var(--space-12);height:36px}
-.gob .aud-l{font-size:var(--fs-13);font-weight:var(--fw-semibold);color:var(--text-87)}
-.gob .aud-v{font-size:var(--fs-12);color:var(--text-60);text-align:right;font-weight:var(--fw-semibold)}
-.gob .aud.is-muted .aud-l,.gob .aud.is-muted .aud-v{color:var(--text-38)}
-.gob .aud.is-muted .slider i{background:var(--white-22)}.gob .aud.is-muted .slider b{background:var(--slider-knob-muted)}
-.gob .mute{appearance:none;background:transparent;border:0;padding:0;width:32px;height:32px;border-radius:var(--radius-8);display:grid!important;place-items:center;color:var(--text-60)!important;box-shadow:inset 0 0 0 1px var(--line-strong)}
-.gob .mute svg{width:18px;height:18px}
-.gob .mute:hover,.gob .mute.is-hover{background:var(--white-7);color:var(--text-100)!important}
-.gob .mute.on{color:var(--red)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--red) 40%,transparent);background:color-mix(in srgb,var(--red) 8%,transparent)}
+.gob .aud-list{display:flex;flex-direction:column;border-radius:var(--radius-10);background:var(--white-3p5);box-shadow:inset 0 0 0 1px var(--line)}
+.gob .aud{display:flex;align-items:center;justify-content:space-between;gap:var(--space-16);height:48px;padding:0 var(--space-16)}
+.gob .aud+.aud{border-top:1px solid var(--line)}
+.gob .aud .tgl{appearance:none;border:0;padding:0;cursor:pointer}
+.gob .aud-l{font-size:var(--fs-14);font-weight:var(--fw-semibold);color:var(--text-87)}
+.gob .aud.is-off .aud-l{color:var(--text-60)}
+.gob .aud-note{font-size:var(--fs-12);color:var(--text-38)}
 .gob .slider{position:relative;height:18px;display:flex;align-items:center;cursor:pointer}
 .gob .slider::before{content:'';position:absolute;left:0;right:0;height:4px;border-radius:var(--radius-2);background:var(--white-10)}
 .gob .slider i{position:absolute;left:0;height:4px;border-radius:var(--radius-2);background:var(--white-72)}
 .gob .slider b{position:absolute;width:14px;height:14px;margin-left:-7px;border-radius:var(--radius-round);background:var(--white);box-shadow:0 1px 4px var(--black-50),0 0 0 3px transparent;transition:box-shadow var(--dur-hover)}
 .gob .slider:hover b,.gob .slider.is-hover b{box-shadow:0 1px 4px var(--black-50),0 0 0 5px var(--white-12)}
 .gob .slider.is-drag b{box-shadow:0 1px 4px var(--black-50),0 0 0 7px color-mix(in srgb,var(--navy) 55%,transparent)}
-.gob .cs-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-16)}
-.gob .cs{display:flex;flex-direction:column;gap:var(--space-6);padding:var(--space-12) var(--space-16);border-radius:var(--radius-10);background:var(--white-3p5);box-shadow:inset 0 0 0 1px var(--line)}
+.gob .cs-grid{display:flex;flex-wrap:wrap;gap:var(--space-12)}
+.gob .cs{flex:1 1 auto;min-width:max-content;display:flex;flex-direction:column;gap:var(--space-6);padding:var(--space-12) var(--space-16);border-radius:var(--radius-10);background:var(--white-3p5);box-shadow:inset 0 0 0 1px var(--line)}
 .gob .cs b{font:var(--fw-bold) var(--fs-24)/var(--lh-9) var(--font-display);color:var(--text-100)}
 .gob .cs span{font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--tracking-6);text-transform:uppercase;color:var(--text-60);line-height:var(--lh-1p25)}
 .gob .cs-rec b{display:flex;align-items:baseline;gap:var(--space-6);white-space:nowrap}
@@ -482,3 +480,20 @@
 @media (prefers-reduced-motion:reduce){.gob *,.gob *::before,.gob *::after{animation:none!important;transition:none!important}}
 /* ── preview harness (frames/*.html only — not part of the product) ── */
 .gob-preview{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--black);padding:var(--space-24)}
+
+/* Leave-with-edits confirm (gobLeaveConfirm.js). Three actions, one hierarchy:
+   the save across the top, the two ways out of the question beneath it. */
+.gob .gob-leave-confirm .gob-modal-backdrop{background:var(--scrim)}
+.gob .gob-leave-confirm .lc-box{position:relative;z-index:1;width:min(460px,calc(100vw - 40px));box-sizing:border-box;padding:var(--space-24) var(--space-24) var(--space-24);border-radius:var(--radius-card);background:var(--surface-popover);box-shadow:var(--shadow-popover)}
+.gob .gob-leave-confirm .lc-t{margin:0;font:var(--fw-bold) var(--fs-28)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-4);color:var(--text-100)}
+.gob .gob-leave-confirm .lc-c{margin:var(--space-10) 0 0;font:var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);color:var(--text-60)}
+.gob .gob-leave-confirm .lc-c:empty{display:none}
+.gob .gob-leave-confirm .lc-a{display:flex;flex-direction:column;gap:var(--space-10);margin-top:var(--space-24)}
+.gob .gob-leave-confirm .lc-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-10)}
+.gob .gob-leave-confirm .lc-save,.gob .gob-leave-confirm .lc-btn{appearance:none;display:flex!important;align-items:center;justify-content:center;width:100%;min-width:0;height:var(--dsz-44);padding:0 var(--space-16);border-radius:var(--radius-10);font:var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display)!important;letter-spacing:var(--tracking-btn);white-space:nowrap;text-align:center!important;cursor:pointer;transition:transform var(--dur-press) var(--ease-out),filter var(--dur-hover),background var(--dur-hover),border-color var(--dur-hover)}
+.gob .gob-leave-confirm .lc-save{border:0;background:var(--orange)!important;color:var(--bg)!important} /* colour-law: saved */
+.gob .gob-leave-confirm .lc-save:hover{filter:brightness(1.06);transform:translateY(-1px)}
+.gob .gob-leave-confirm .lc-save:disabled{background:var(--white-6)!important;color:var(--text-38)!important;cursor:not-allowed;transform:none;filter:none}
+.gob .gob-leave-confirm .lc-btn{height:var(--dsz-40);background:transparent!important;border:1px solid var(--white-28)!important;color:var(--text-100)!important}
+.gob .gob-leave-confirm .lc-btn:hover{background:var(--white-7)!important;transform:translateY(-1px)}
+.gob .gob-leave-confirm .lc-save:active,.gob .gob-leave-confirm .lc-btn:active{transform:translateY(1px)}

@@ -32,6 +32,7 @@ function cloneParams(params) {
  */
 
 import { fadeOutPregameBed } from './gameSfx.js';
+import { isGameAudioMuted, setGameAudioMuted, subscribeAudio } from '../../shared/uiSfx.js';
 import { REG_Q_SEC, clockToSeconds } from './simWormTime.js';
 import { loadCalloutCopy } from './simCalloutCopy.js';
 import { CalloutCadence, CALLOUT_HOLD_S, GAME_WINNER_HOLD_S, GAME_WINNER_TIER } from './simCalloutCadence.js';
@@ -525,8 +526,8 @@ function buildSkeleton(teams) {
         <div class="f4">
           <div class="bench away" data-bench="away"></div>
           <div class="tgl">
-            <span class="tgl-lbl">HIGHLIGHTS</span>
-            <button type="button" class="tgl-sw on" data-highlights aria-pressed="true" aria-label="Toggle highlights"></button>
+            <span class="tgl-lbl">SOUND</span>
+            <button type="button" class="tgl-sw on" data-sound role="switch" aria-checked="true" aria-label="Sound"></button>
           </div>
           <div class="bench home" data-bench="home"></div>
         </div>
@@ -838,7 +839,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
   const wTeam = root.querySelector('[data-wteam]');
   const wAxis = root.querySelector('[data-waxis]');
   const teamPanelEl = root.querySelector('[data-team-panel]');
-  const highlightsBtn = root.querySelector('[data-highlights]');
+  const soundBtn = root.querySelector('[data-sound]');
   const breakAvEl = root.querySelector('[data-break-av]');
 
   const applyFit = () => {
@@ -858,7 +859,8 @@ export function showSimGamePresentation(timeline, opts = {}) {
   positionBelowScoreboard();
   window.addEventListener('resize', positionBelowScoreboard);
 
-  let highlightsOn = true;
+  // Highlights are always on in Sim Game. The switch in the footer is Sound.
+  const highlightsOn = true;
   let cadence = null;
   let lastRenderedFrame = null;
   let tipMeta = { cx: FIT_W / 2, cy: WORM_PLOT_H / 2, rising: true, w: FIT_W, h: WORM_PLOT_H };
@@ -1022,13 +1024,19 @@ export function showSimGamePresentation(timeline, opts = {}) {
     return true;
   };
 
-  highlightsBtn?.addEventListener('click', () => {
-    highlightsOn = !highlightsOn;
-    highlightsBtn.classList.toggle('on', highlightsOn);
-    highlightsBtn.setAttribute('aria-pressed', highlightsOn ? 'true' : 'false');
-    if (cadence) cadence.suspend(!highlightsOn);
-    if (!highlightsOn) clearCallout();
-    if (dbgEl) renderCalloutsDebug(dbgEl, cadence);
+  // Sound is the gameplay audio switch: the same mute the court's command-center
+  // control sets, stored with it, so the next game starts as the player left it.
+  const paintSound = () => {
+    if (!soundBtn) return;
+    const on = !isGameAudioMuted();
+    soundBtn.classList.toggle('on', on);
+    soundBtn.setAttribute('aria-checked', on ? 'true' : 'false');
+  };
+  paintSound();
+  const stopSoundWatch = subscribeAudio(paintSound);
+  soundBtn?.addEventListener('click', () => {
+    setGameAudioMuted(!isGameAudioMuted());
+    paintSound();
   });
 
   const replaceWormSvg = (html) => {
@@ -1185,6 +1193,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
       timers.forEach(clearTimeout);
       clearCalloutTimers();
       window.removeEventListener('resize', positionBelowScoreboard);
+      stopSoundWatch();
       root.classList.add('dissolving');
       const t = setTimeout(() => { root.remove(); resolve(); }, prefersReduced ? 0 : 450);
       timers.push(t);

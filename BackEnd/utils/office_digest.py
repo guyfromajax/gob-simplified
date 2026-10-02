@@ -1033,6 +1033,33 @@ def signing_day_digest(
     }
 
 
+def signed_class_digest(
+    franchise_doc: Mapping[str, Any] | None,
+    user_team_id: str,
+    *,
+    week: int,
+) -> Optional[dict[str, Any]]:
+    """Week 36: every recruit who signed with the user's team on Signing Day.
+
+    Running Signing Day moves the franchise from week 35 to week 36, so this is
+    the Office "after recruiting has run". It waits for the hub reveal to have
+    played (``week_35_reveal_seen_season``), the same gate as the signed-class
+    moment, so the Office never shows the class before the live beat does. The
+    rows come from the reader the season review uses; an empty class is an empty
+    list, not None.
+    """
+    if week != 36 or not isinstance(franchise_doc, Mapping) or not user_team_id:
+        return None
+    if not franchise_doc.get("week_35_recruiting_ran"):
+        return None
+    season = _as_int(franchise_doc.get("current_season"), 1) or 1
+    if (_as_int(franchise_doc.get("week_35_reveal_seen_season"), 0) or 0) != season:
+        return None
+    from BackEnd.utils.career_data import class_signed
+
+    return {"recruits": class_signed(franchise_doc, user_team_id)}
+
+
 def _player_stat_line(raw: Mapping[str, Any]) -> dict[str, Any]:
     stats = raw.get("stats")
     if isinstance(stats, dict) and isinstance(stats.get("game"), dict):
@@ -1325,6 +1352,7 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
         "todos": build_todos(flags),
         "recruiting_wire": wire,
         "signing_day": signing,
+        "signed_class": signed_class_digest(franchise_doc, user_team_id, week=week),
         "season_preview": season_preview,
         # The folded moment. The command-center load fills both from the moment
         # queue; the shape stays stable for every other caller.

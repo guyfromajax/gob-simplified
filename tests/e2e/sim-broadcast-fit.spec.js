@@ -143,7 +143,8 @@ test.describe('resting state', () => {
     const panel = page.locator('.sgp-root [data-team-panel]');
     await expect(panel).toBeVisible();
     expect(await page.locator('.sgp-root .ctlseg').count()).toBe(0);
-    expect(await page.locator('.sgp-root [data-highlights]').count()).toBe(1);
+    expect(await page.locator('.sgp-root [data-highlights]').count()).toBe(0);
+    expect(await page.locator('.sgp-root [data-sound]').count()).toBe(1);
     expect(await page.locator('.sgp-root .f4').count()).toBe(1);
   });
 

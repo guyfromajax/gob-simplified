@@ -203,10 +203,10 @@ test('#1 #3a #3c #3d #4 Office: chips, wire, badge, blocking step, attitude, wee
   expect(allNeutral(badge.backgroundColor) && parse(badge.backgroundColor).r > 200, `badge white plate: ${badge.backgroundColor}`).toBe(true);
 
   const step = await css(page, '.wk-step.gated', ['boxShadow', 'backgroundColor']);
-  const tag = await css(page, '.wk-step.gated .td-gate', ['color', 'boxShadow', 'backgroundColor']);
   expect(allNeutral(step.boxShadow + ' ' + step.backgroundColor), `blocking step neutral: ${JSON.stringify(step)}`).toBe(true);
   expect(colours(step.boxShadow).some((p) => p.a >= 0.5), `blocking step keeps a strong outline: ${step.boxShadow}`).toBe(true);
-  expect(allNeutral(tag.color + ' ' + tag.boxShadow + ' ' + tag.backgroundColor), `BLOCKS ADVANCE tag neutral: ${JSON.stringify(tag)}`).toBe(true);
+  // The BLOCKS ADVANCE tag is gone (2026-10-02); the outline alone marks the blocking step.
+  expect(await page.locator('.wk-step.gated .td-gate').count()).toBe(0);
 
   const bars = {};
   for (const id of ['em_0_19', 'em_20_39', 'em_40_59', 'em_60_79', 'em_80_plus']) {

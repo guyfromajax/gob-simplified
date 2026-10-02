@@ -783,10 +783,16 @@ function cloneParams(params) {
       backLink: document.getElementById('team-select-back-link'),
     };
 
+    // The lobby track is non-gameplay music: it follows the Music switch in Settings.
     try {
       var lobbyMusic = new Audio('/sounds/crossover-21738.mp3');
       lobbyMusic.loop = true;
-      lobbyMusic.volume = 0.4;
+      lobbyMusic.volume = 0;
+      import('/js/shared/uiSfx.js').then(function (m) {
+        var applyMusic = function () { lobbyMusic.volume = m.outputVolume(0.4, 'music'); };
+        applyMusic();
+        m.subscribeAudio(applyMusic);
+      }).catch(function () { lobbyMusic.volume = 0.4; });
       lobbyMusic.play().catch(function () {});
     } catch (e) {}
 

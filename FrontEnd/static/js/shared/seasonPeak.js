@@ -9,14 +9,15 @@
   var ROOT_ID = 'season-peak-root';
   var STING_MS = 600;
   var CONFETTI_N = 60;
+  // One eyebrow for every title: "Season N". The headline names the title.
   var TITLE_TYPES = [
-    { type: 'national_championship', letter: 'N', label: 'National Champions', eyebrow: 'National Tournament', headline: 'National Champions' },
-    { type: 'banner_raise', letter: 'N', label: 'National Champions', eyebrow: 'National Tournament', headline: 'National Champions' },
-    { type: 'region_championship', letter: 'R', label: 'Region Champions', eyebrow: 'Region Tournament', headline: 'Region Champions' },
-    { type: 'conference_championship', letter: 'C', label: 'Conference Champions', eyebrow: 'Conference Tournament', headline: 'Conference Champions' },
-    { type: 'conference_tournament_championship', letter: 'C', label: 'Conference Tournament Champions', eyebrow: 'Conference Tournament', headline: 'Conference Tournament Champions' },
-    { type: 'trophy_spotlight', letter: 'C', label: 'Conference Regular-Season #1', eyebrow: 'Conference Regular Season', headline: 'Conference Regular-Season Champions' },
-    { type: 'conference_regular_season_championship', letter: 'C', label: 'Conference Regular-Season Champions', eyebrow: 'Conference Regular Season', headline: 'Conference Regular-Season Champions' }
+    { type: 'national_championship', letter: 'N', label: 'National Champions', headline: 'National Champions' },
+    { type: 'banner_raise', letter: 'N', label: 'National Champions', headline: 'National Champions' },
+    { type: 'region_championship', letter: 'R', label: 'Region Champions', headline: 'Region Champions' },
+    { type: 'conference_championship', letter: 'C', label: 'Conference Tournament Champions', headline: 'Conference Tournament Champions' },
+    { type: 'conference_tournament_championship', letter: 'C', label: 'Conference Tournament Champions', headline: 'Conference Tournament Champions' },
+    { type: 'trophy_spotlight', letter: 'C', label: 'Regular Season Conference Champions', headline: 'Regular Season Conference Champions' },
+    { type: 'conference_regular_season_championship', letter: 'C', label: 'Regular Season Conference Champions', headline: 'Regular Season Conference Champions' }
   ];
   var TROPHY_TITLE = {
     national: { letter: 'N', label: 'National Champions' },
@@ -361,7 +362,6 @@
       var total = q.total || 1;
       var eyebrow = [];
       if (present(featured.season)) eyebrow.push('Season ' + featured.season);
-      if (spec.eyebrow) eyebrow.push(spec.eyebrow);
       var nextHint = (total > 1 && opts.nextKind === 'season_review')
         ? ' Your season review is next.'
         : '';

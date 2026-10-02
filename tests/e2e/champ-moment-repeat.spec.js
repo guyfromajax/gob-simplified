@@ -230,7 +230,7 @@ test.describe('championship moment consume-on-show', () => {
     await openOffice(page, state, seen);
     const pk = page.locator('.pk.is-open');
     await expect(pk).toBeVisible({ timeout: 15000 });
-    await expect(pk.locator('.pk-t')).toContainText('Conference Regular-Season Champions');
+    await expect(pk.locator('.pk-t')).toContainText('Regular Season Conference Champions');
     await expect(pk.locator('.pk-f')).toBeVisible();
     await expect.poll(() => seen.filter((s) => s.path.indexOf('championship-moments/dismiss') !== -1).length).toBe(1);
     await page.waitForTimeout(1600);
@@ -269,7 +269,7 @@ test.describe('championship moment consume-on-show', () => {
     await openOffice(page, state, seen);
     const pk = page.locator('.pk.is-open');
     await expect(pk).toBeVisible({ timeout: 15000 });
-    await expect(pk.locator('.pk-t')).toContainText('Conference Champions');
+    await expect(pk.locator('.pk-t')).toContainText('Conference Tournament Champions');
     await expect.poll(() => seen.filter((s) => s.path.indexOf('championship-moments/dismiss') !== -1).length).toBe(1);
     await pk.locator('.lnk').click();
     await page.waitForURL(/box-score\.html|game\.html/, { timeout: 15000 });

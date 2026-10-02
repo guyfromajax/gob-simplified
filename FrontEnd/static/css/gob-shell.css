@@ -176,6 +176,27 @@ html.gob-shell #fcc-header-emblem {
   max-height: calc(var(--top-h) - var(--space-12));
   display: flex;
   align-items: center;
+  flex: none;
+}
+
+html.gob-shell #fcc-header-emblem svg {
+  display: block;
+  width: auto;
+  height: calc(var(--top-h) - var(--space-16));
+}
+
+/* The week stat's text column. In a tournament week it reads
+   "<Tier> Tournament" over the round, with the tier emblem to its left. */
+html.gob-shell .ts-txt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+html.gob-shell .ts-txt b,
+html.gob-shell .ts-txt span {
+  white-space: nowrap;
 }
 
 html.gob-shell #fcc-header-emblem:empty {
