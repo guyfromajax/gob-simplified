@@ -329,9 +329,9 @@ const NOTES_READINESS_ROWS = [
   // The measure is "P/T Defense" everywhere (Styleguide, display text); the stored key is older.
   { key: 'press-traps', title: 'Press/Trap Readiness', label: 'P/T Defense' },
 ];
-// The server's five words on a three-step meter: the word beside it carries "Very".
-const READINESS_STEPS = 3;
-const READINESS_LEVEL = { 'very weak': 1, 'weak': 1, 'neutral': 2, 'strong': 3, 'very strong': 3 };
+// Five steps, one per level the server can send (Jamie, 2026-10-02), with the word beside it.
+const READINESS_STEPS = 5;
+const READINESS_LEVEL = { 'very weak': 1, 'weak': 2, 'neutral': 3, 'strong': 4, 'very strong': 5 };
 // CH is a hidden attribute: it is never named on the report, whatever a stored note says.
 const NOTES_HIDDEN_ATTRIBUTES = ['CH'];
 
@@ -2192,11 +2192,12 @@ function renderTrainingNotes() {
     cards.appendChild(buildReadinessCard(sectionMap));
     container.appendChild(cards);
 
-    // Misc carries the week's energy notes. With nothing to say there is no row.
-    const miscText = noteText(sectionMap.get('Player Energy Levels'));
-    if (miscText) {
-      const misc = createNotesPair('Misc', miscText, 'training-notes-misc-row tr-misc');
-      container.appendChild(misc);
+    // Player Energy: the week's energy notes, the only thing this row has ever shown
+    // (it used to be labelled "Misc"). With nothing to report there is no row.
+    const energyText = noteText(sectionMap.get('Player Energy Levels'));
+    if (energyText) {
+      const energy = createNotesPair('Player Energy', energyText, 'tr-energy');
+      container.appendChild(energy);
     }
     return;
   }

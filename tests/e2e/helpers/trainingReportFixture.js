@@ -121,7 +121,7 @@ function quiet() {
   return report;
 }
 
-/** Training camp (week 1): camp titles, the camp mark scale, and an energy note to show. */
+/** Training camp (week 1): camp titles, the camp mark scale, and a Player Energy note to show. */
 function camp() {
   const report = base(1);
   const p = report.players;
@@ -142,7 +142,6 @@ function camp() {
     { title: 'Strongest Defensive Set', body: '2-3 Zone, Man-to-Man' },
     { title: 'Fast Break Readiness', body: 'Very Strong' },
     { title: 'Press/Trap Readiness', body: 'Neutral' },
-    { title: 'Misc', body: 'Camp physique notes are stored but not shown on the report.' },
     { title: 'Player Energy Levels', body: p[5].name + ' and ' + p[9].name + ' came out of camp with heavy legs.' },
   ];
   return report;

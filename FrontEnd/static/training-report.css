@@ -1853,7 +1853,7 @@ body.training-report-page {
   font-size: var(--fs-10);
 }
 
-/* Readiness: a three-step meter and the word. Neutral only. */
+/* Readiness: a five-step meter, one step per level, and the word. Neutral only. */
 #training-report-view .tr-ready {
   display: inline-flex;
   align-items: center;
@@ -1874,16 +1874,12 @@ body.training-report-page {
   background: var(--text-87);
 }
 
-/* Misc: only when the week has something to say. */
-#training-report-view .training-notes-misc-row.tr-misc {
+/* Player Energy: only when the week has something to report. */
+#training-report-view .tr-energy {
   margin: 0;
   padding: var(--space-2) var(--dsp-14) 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
 }
-#training-report-view .tr-misc .tr-value {
+#training-report-view .tr-energy .tr-value {
   font-weight: var(--fw-regular);
   color: var(--text-87);
   white-space: pre-line;

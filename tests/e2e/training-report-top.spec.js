@@ -45,31 +45,32 @@ test.describe('shots', () => {
   }
 });
 
-// The two calls the brief left open, shown side by side for Jamie (1280, the three cards).
+// The two calls the brief left open, shot both ways (1280, the three cards). Jamie chose
+// the five-step meter, and "Lagging" in camp.
 test.describe('option shots', () => {
   test.skip(PHASE !== 'after', 'TRT_SHOTS=after only');
 
-  test('readiness meter: three steps (shipped) and five steps', async ({ page }) => {
+  test('readiness meter: five steps (shipped, Jamie\'s choice) and three steps', async ({ page }) => {
     fs.mkdirSync(OUT, { recursive: true });
     await page.setViewportSize({ width: 1280, height: 720 });
     await openReport(page, camp());
     const cards = page.locator('#training-report-view .tr-cards');
-    await cards.screenshot({ path: path.join(OUT, 'option-readiness-3-step-1280.png'), animations: 'disabled' });
-    // Five steps: one per word the server can send.
+    await cards.screenshot({ path: path.join(OUT, 'option-readiness-5-step-1280.png'), animations: 'disabled' });
+    // Three steps, the first build: "Very" lit the same step as the plain word.
     await page.evaluate(() => {
-      const five = { 'very weak': 1, weak: 2, neutral: 3, strong: 4, 'very strong': 5 };
+      const three = { 'very weak': 1, weak: 1, neutral: 2, strong: 3, 'very strong': 3 };
       document.querySelectorAll('#training-report-view .tr-readiness').forEach((pair) => {
         const meter = pair.querySelector('.tr-meter');
-        const level = five[String(pair.dataset.word || '').toLowerCase()] || 0;
+        const level = three[String(pair.dataset.word || '').toLowerCase()] || 0;
         meter.innerHTML = '';
-        for (let i = 1; i <= 5; i += 1) {
+        for (let i = 1; i <= 3; i += 1) {
           const step = document.createElement('i');
           if (i <= level) step.className = 'on';
           meter.appendChild(step);
         }
       });
     });
-    await cards.screenshot({ path: path.join(OUT, 'option-readiness-5-step-1280.png'), animations: 'disabled' });
+    await cards.screenshot({ path: path.join(OUT, 'option-readiness-3-step-1280.png'), animations: 'disabled' });
   });
 
   test('camp: the second trend line reads "Lagging" (shipped) or "Falling"', async ({ page }) => {
@@ -150,8 +151,8 @@ function readCards(page) {
       titles: cards.map((card) => text(card.querySelector('.card-h h3'))),
       keys: cards.map((card) => card.dataset.card),
       standouts, trends, schemes, readiness,
-      misc: text(view.querySelector('.tr-misc .tr-value')),
-      miscLabel: text(view.querySelector('.tr-misc .tr-label')),
+      energy: text(view.querySelector('.tr-energy .tr-value')),
+      energyLabel: text(view.querySelector('.tr-energy .tr-label')),
     };
   });
 }
@@ -287,11 +288,11 @@ test.describe('cards', () => {
     ]);
   });
 
-  test('Readiness: three-step meters with the word beside them, neutral colours', async ({ page }) => {
+  test('Readiness: five-step meters, one step per level, with the word beside them, neutral colours', async ({ page }) => {
     await openReport(page, busy());
     let { readiness } = await readCards(page);
     expect(readiness.map((row) => row.label)).toEqual(['Fast Break', 'P/T Defense']);
-    expect(readiness.map((row) => [row.word, row.lit, row.steps])).toEqual([['Strong', 3, 3], ['Weak', 1, 3]]);
+    expect(readiness.map((row) => [row.word, row.lit, row.steps])).toEqual([['Strong', 4, 5], ['Weak', 2, 5]]);
     expect(readiness[1].litColors).toEqual(['rgba(255, 255, 255, 0.87)']);
     expect(readiness[1].offColors).toEqual(['rgba(255, 255, 255, 0.12)']);
     // The meter and its word share a line, the word right after the meter.
@@ -308,26 +309,43 @@ test.describe('cards', () => {
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     await openReport(page, quiet());
     ({ readiness } = await readCards(page));
-    expect(readiness.map((row) => [row.word, row.lit])).toEqual([['Neutral', 2], ['Neutral', 2]]);
+    expect(readiness.map((row) => [row.word, row.lit])).toEqual([['Neutral', 3], ['Neutral', 3]]);
 
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     await openReport(page, camp());
     ({ readiness } = await readCards(page));
-    // Five words on three steps: "Very Strong" lights all three and the word says the rest.
-    expect(readiness.map((row) => [row.word, row.lit])).toEqual([['Very Strong', 3], ['Neutral', 2]]);
+    expect(readiness.map((row) => [row.word, row.lit, row.steps])).toEqual([['Very Strong', 5, 5], ['Neutral', 3, 5]]);
   });
 
-  test('Misc: no row when it has nothing to say; a row, label above text, when it does', async ({ page }) => {
+  test('Readiness: each of the five levels lights its own number of steps', async ({ page }) => {
+    const levels = [['Very Weak', 1], ['Weak', 2], ['Neutral', 3], ['Strong', 4], ['Very Strong', 5]];
+    for (const [word, lit] of levels) {
+      const report = busy();
+      report.training_notes = report.training_notes.map((note) => (
+        /Readiness$/.test(note.title) ? { title: note.title, body: word } : note
+      ));
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await openReport(page, report);
+      const { readiness } = await readCards(page);
+      expect(readiness.map((row) => [row.word, row.lit, row.steps]), word).toEqual([[word, lit, 5], [word, lit, 5]]);
+    }
+  });
+
+  test('Player Energy: no row when there is nothing to report; a row, label above text, when there is', async ({ page }) => {
     await openReport(page, busy());
-    await expect(page.locator('.training-notes-misc-row')).toHaveCount(0);
+    await expect(page.locator('#training-report-view .tr-energy')).toHaveCount(0);
+    await expect(page.locator('.training-notes-section')).not.toContainText(/player energy/i);
+    // The row used to be labelled "Misc": that word is gone from the page.
     await expect(page.locator('.training-notes-section')).not.toContainText(/misc/i);
 
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     const report = camp();
     await openReport(page, report);
     const cards = await readCards(page);
-    expect(cards.miscLabel).toBe('Misc');
-    expect(cards.misc).toBe(report.players[5].name + ' and ' + report.players[9].name + ' came out of camp with heavy legs.');
+    expect(cards.energyLabel).toBe('Player Energy');
+    expect(cards.energy).toBe(report.players[5].name + ' and ' + report.players[9].name + ' came out of camp with heavy legs.');
+    await expect(page.locator('.training-notes-section')).not.toContainText(/misc/i);
+    await expect(page.locator('#training-report-view .tr-energy')).toHaveCount(1);
   });
 
   test('CH is hidden: it never appears, whatever a stored note says', async ({ page }) => {
@@ -488,7 +506,7 @@ test.describe('height', () => {
         expect(m.head, 'Player Report column heads').toBeLessThan(m.fold);
         expect(m.firstRow, 'first player row').toBeLessThan(m.fold);
         // The old top section was 583px tall at 1280 (Notes beside Team Report).
-        if (width === 1280) expect(m.teamBottom - m.notesTop).toBeLessThanOrEqual(name === 'camp' ? 420 : 380);
+        if (width === 1280) expect(m.teamBottom - m.notesTop).toBeLessThanOrEqual(name === 'camp' ? 420 : 380);   // camp has a Player Energy row
       });
     }
   }

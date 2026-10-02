@@ -10,8 +10,8 @@ Jamie's verdict on the old top: the information runs together and is not elegant
 |---|---|---|
 | **Standouts** (card) | Practice Player of the Week, Biggest Regression, Most Positive Locker Room Influence (camp: Training Camp MVP, Biggest Concern) | Headshot (40px, unchanged), then the label with the name, position and year directly under it. "No Significant Updates" keeps the quiet `NS` box and is now dimmed. |
 | **Trends** (card) | Rising, Falling (today's Strong Cumulative Increase and Concerning Regression), then Strongest Defensive Set and Strongest Offensive Plays | Rising / Falling: label with its tags immediately beside it, each attribute behind a faint green ▲ or faint red ▼ (the one-arrow tones of the marks below). Scheme lines: label above value. |
-| **Readiness** (card) | Fast Break, P/T Defense | Label above a three-step neutral meter with the word beside it. |
-| **Misc** (row, only when it speaks) | The week's energy notes (what "Misc" has always shown) | Label above the text, under the cards. No row when it has nothing to say. |
+| **Readiness** (card) | Fast Break, P/T Defense | Label above a five-step neutral meter (one step per level) with the word beside it. |
+| **Player Energy** (row, only when there is something to report) | The week's energy notes. This row was labelled "Misc"; it has only ever shown these notes, so it is named for them. | Label above the text, under the cards. No row when there is nothing to report. |
 | **Team Report** (card) | The eleven team attributes | Four columns, read down, in the order of Team › Team Attributes. A cell is the name and, right beside it, its mark. No movement is a quiet dash and a quieter name. |
 
 - Cards are the shared `.card` (gob-components). No new card style, no new colours, tokens only.
@@ -26,20 +26,22 @@ Jamie's verdict on the old top: the information runs together and is not elegant
 | Top section at 1920 / 2000 | 658px | **415px** | 63% |
 | Player Report starts at, 1280×720 | y = 741 (below the fold) | **y = 530** | heading, column heads and first row all above the fold |
 | Player Report starts at, 1920×1080 | y = 841 | **y = 598** | |
-| Camp week with a Misc note | 583 / 658 | 417 / 468 | Player Report at 575 / 650 |
+| Camp week with a Player Energy note | 583 / 658 | 417 / 468 | Player Report at 575 / 650 |
 
-The target was "about half". It is just under two thirds, and the stated purpose (Player Report above the fold at both sizes) is met in all three weeks. The remaining height is the three headshots (kept at 40px on purpose). Dropping the "Notes" heading would take another 38px (to 57%); I kept it because the brief speaks of a section title. Say if you want it gone.
+The target was "about half". It is just under two thirds, and the stated purpose (Player Report above the fold at both sizes) is met in all three weeks. The remaining height is the three headshots (kept at 40px on purpose). Jamie ruled that the "Notes" heading stays.
 
-## Decisions, and the two I shot both ways
+## Decisions (Jamie's rulings, 2026-10-02)
 
-| # | Decision | Shipped | Alternative |
+| # | Decision | Ruling | Shipped |
 |---|---|---|---|
-| 1 | **Readiness meter steps.** The server sends five words (Very Weak, Weak, Neutral, Strong, Very Strong); the brief asks for three steps. | Three steps: Weak 1, Neutral 2, Strong 3. "Very Strong" lights the same three and the word says "Very". Shot: `option-readiness-3-step-1280.png` | Five steps, one per word. Shot: `option-readiness-5-step-1280.png` |
-| 2 | **Camp: the second trend line.** In camp nothing falls (no decay); that note is the attributes camp under-developed ("Concerning Progression"). | "Lagging" in camp, "Falling" in season. Shot: `option-camp-lagging-1280.png` | "Falling" in every week. Shot: `option-camp-falling-1280.png` |
-| 3 | **The "Week N training brief · for coaching staff only" line.** | **Dropped.** The week is already in the page meta line, one row above. | — |
-| 4 | **Readiness label.** The brief says "Press/Traps Defense Readiness"; the Styleguide says this measure is "P/T Defense" everywhere, and the Team Report cell under it says "P/T Defense". | "P/T Defense" (card title supplies "Readiness"). One string in `NOTES_READINESS_ROWS` to change. | "Press/Traps Defense" |
-| 5 | **"Team Chemistry" → "Chemistry"** in the Team Report grid, as the brief lists it and as Team › Team Attributes names it. | "Chemistry" | Office still says "Team Chemistry" (not touched). |
-| 6 | **Rising / Falling arrows in camp.** Camp's own one-up mark is neutral white. | Faint green ▲ / faint red ▼ in every week, as the brief says: they are tags, not magnitudes. | — |
+| 1 | **Readiness meter steps.** The server sends five words. | **Five steps, one per level**, with the word beside it. | Very Weak 1, Weak 2, Neutral 3, Strong 4, Very Strong 5. Shots: `option-readiness-5-step-1280.png` (shipped), `option-readiness-3-step-1280.png` (the first build, for the record). |
+| 2 | **Camp: the second trend line.** Nothing falls in camp. | **"Lagging" in camp, "Falling" in season.** | As built. Shots: `option-camp-lagging-1280.png` (shipped), `option-camp-falling-1280.png`. |
+| 3 | **The "Notes" heading.** | **Keep it.** | Kept. |
+| 4 | **The row under the cards.** | **"Player Energy"**, not "Misc": it only ever shows the player energy notes. Label above the text; hidden when there is nothing to report. | Renamed. |
+| 5 | The "Week N training brief · for coaching staff only" line. | Not ruled on. | Dropped: the week is in the page meta line, one row above. |
+| 6 | Readiness label: brief says "Press/Traps Defense Readiness", Styleguide says the measure is "P/T Defense" everywhere. | Not ruled on. | "P/T Defense" (the card title supplies "Readiness"). One string in `NOTES_READINESS_ROWS`. |
+| 7 | "Team Chemistry" → "Chemistry" in the Team Report grid. | Not ruled on. | "Chemistry", as the brief lists it and as Team › Team Attributes names it. Office still says "Team Chemistry". |
+| 8 | Rising / Falling arrows in camp (camp's own one-up mark is neutral white). | Not ruled on. | Faint green ▲ / faint red ▼ in every week: they are tags, not magnitudes. |
 
 ## CH
 
@@ -78,27 +80,27 @@ Built on what is on develop; nothing reverted.
 | Training camp (`camp`, week 1) | `before-camp-1280.png`, `-1920`, `-2000` | `after-camp-1280.png`, `-1920`, `-2000` |
 | Options (the three cards, 1280) | | `option-readiness-3-step`, `option-readiness-5-step`, `option-camp-lagging`, `option-camp-falling` |
 
-The weeks are fixtures in the server's own note vocabulary (`trainingReportFixture.js`), on the 12-man fixture roster. The camp Misc sentence is sample text.
+The weeks are fixtures in the server's own note vocabulary (`trainingReportFixture.js`), on the 12-man fixture roster. The camp Player Energy sentence is sample text. The after shots were retaken with the five-step meter and the "Player Energy" label.
 
 ## Tests
 
-`tests/e2e/training-report-top.spec.js`: 28 tests, plus the shot tests.
+`tests/e2e/training-report-top.spec.js`: 29 tests, plus the shot tests.
 
 | Brief asked for | Test |
 |---|---|
-| Each card's contents | Standouts (people, headshot, position · year; empty state), Trends (tags, arrows, the same colours as the marks below; empty; camp), Readiness (steps lit, word beside, neutral colours) |
+| Each card's contents | Standouts (people, headshot, position · year; empty state), Trends (tags, arrows, the same colours as the marks below; empty; camp), Readiness (five steps, each level lights its own count, word beside, neutral colours) |
 | Label-above-value layout | Every pair in every card and every Team Report cell, in all three weeks at 1280, 1920 and 2000: directly above (left edges equal, ≤ 8px under) or immediately beside (same line, a short step right), never more than half a card apart, never outside the card |
 | Team Report grid order | The four columns read down, at all three widths; dash for no change; moved cells white and semibold, unmoved quiet |
-| Empty Misc hidden | No row and no "Misc" text when the note is "No Significant Updates"; a row with label above text when it speaks |
-| Player Report above the fold | Heading, column heads and first row above the fold at 1280×720 and 1920×1080, all three weeks; top section ≤ 380px at 1280 (≤ 420 with Misc) |
+| Empty Player Energy hidden | No row and no "Player Energy" text when the note is "No Significant Updates"; a row with label above text when there is something to report; the word "Misc" is nowhere on the page |
+| Player Report above the fold | Heading, column heads and first row above the fold at 1280×720 and 1920×1080, all three weeks; top section ≤ 380px at 1280 (≤ 420 with a Player Energy row) |
 | No CH anywhere | A stored note with CH in both lists: CH is dropped, and the top of the page has no "CH" |
 | Nothing half-built | With the report held 1.5 s: no headings, no cards, a three-column skeleton with the grid block under it; then the cards |
 
-Fail-on-old-code: with the redesign reverted, 25 of the 28 fail. The 3 that pass are the 1920×1080 above-the-fold checks: the old layout already cleared the fold at that size (y = 841).
+Fail-on-old-code: with the redesign reverted, 25 of the original 28 fail. The 3 that pass are the 1920×1080 above-the-fold checks: the old layout already cleared the fold at that size (y = 841). The three tests changed for the rulings (the two Readiness tests and Player Energy) fail on the three-step / "Misc" build.
 
 ## Unsure / worth knowing
 
-- **Camp physique notes are not shown, and were not before.** The server stores a camp section titled "Misc" (physique notes). The page's "Misc" row has always shown the "Player Energy Levels" note instead. I kept that as it is (no change to what is shown) but it looks like an old oversight.
+- **For the record (Jamie):** `training_camp_physique_notes` is always an empty list today; the code that generated those notes was removed. So there is nothing else to show in the row under the cards, and the server field was left alone.
 - **Co-winners.** For "Practice Players Of The Week" the page shows one name (the first id match), as before. Not changed.
 - Running `prep-modules-report.spec.js` rewrites PNGs in other reports' folders; those were not staged.
 
@@ -117,3 +119,16 @@ Develop moved while the first gate run was in progress (chrome-followups-2: CH h
 
 - The 2 XPASS are the two already on the known-failures list (`test_resource_page_scoping.py::test_leaders_view_scope_filters_to_user_conference`, `test_settings_application_to_gameplay.py::…::test_settings_loaded_and_applied_to_gameplay`); the list was not edited.
 - First run, on `6c6c841f9` before develop moved: pytest 4372 passed / 2 xpassed, Playwright 1050 passed / 0 failed.
+
+## Update: Jamie's rulings applied
+
+- Five-step Readiness meter, "Player Energy" row, "Lagging" in camp and the "Notes" heading kept (decisions table above). Styleguide and UX_System updated; after shots and option shots retaken.
+- `origin/develop` has not moved since the last full run (`6d569a465`), so the full Playwright suite was not re-run, as instructed.
+
+| Gate | Result |
+|---|---|
+| `scripts/check_ui_tokens.py --strict --no-write` | **exit 0** |
+| `scripts/ci/check_migration_gates.py` | **passed** (Gate A 0; Gate B 134 lines in 43 files) |
+| Specs: training-report-top, polish-training-playbooks, prep-modules-report, training-advance-focus, training-report-no-recruiting, first-paint | **104 passed, 24 skipped, 0 failed** |
+| Last full runs (merged tree, before these rulings) | pytest 4385 passed / 2 xpassed; Playwright 1085 passed / 0 failed |
+

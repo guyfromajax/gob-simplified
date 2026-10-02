@@ -107,7 +107,7 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 - Faint and full are told apart by arrow count, not by colour alone. Faint is `color-mix(in srgb, <token> N%, transparent)`, so it lets the row through: 3:1 or better on both zebra rows (red needs 60% to match green's 45%).
 - Glyphs: ▲ / ▼ only. Player Report › Attributes shows current values only: no marks, no change tint, no tooltip. Movement lives on Training Changes.
 - Notes › Trends tags (Rising, Falling / Lagging) are labels, not magnitudes: one faint ▲ or one faint ▼ per attribute, the in-season one-arrow tones, in every week including camp.
-- Readiness meters are neutral (`--text-87` lit, `--white-12` unlit): a meter is not positive data, so it is never green, red or orange.
+- Readiness meters have five steps, one per level (Very Weak, Weak, Neutral, Strong, Very Strong), with the word beside them. They are neutral (`--text-87` lit, `--white-12` unlit): a meter is not positive data, so it is never green, red or orange.
 
 **Hidden attribute.** CH is never displayed and never sent to the client: no column, chip, label, tooltip or copy, on any screen. Player attribute lists are the twelve visible attributes. Build rule and the routes that still carry it: [UX_System.md, CH is hidden](UX_System.md#ch-is-hidden).
 
