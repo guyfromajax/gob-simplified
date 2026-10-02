@@ -20,7 +20,9 @@ from BackEnd.db import (
 )
 from BackEnd.utils.hidden_attrs import (
     HIDDEN_ATTR_KEYS,
+    VISIBLE_ATTR_LABELS,
     HiddenAttrsJSONResponse,
+    scrub_hidden_attr_copy,
     strip_hidden_attrs,
     visible_attr_keys,
 )
@@ -312,3 +314,68 @@ def test_practice_squad_news_copy_counts_and_names_visible_attributes_only():
     assert "Clutch" not in text
     assert "increased by 4 attribute points" in text, "the number is the visible attributes' gain"
     assert "Scoring and Shooting" in text
+
+
+# --- 4. copy stored before the attribute was hidden ------------------------------------------
+
+OLD_STORY = {
+    "story_id": "w7-ps-all-stars",
+    "week": 7,
+    "type": "ps_all_stars",
+    "headline": "Practice Squad All-Stars",
+    "lines": [
+        "Cal Riser of Team0 increased by 9 attribute points this week. His strongest gains were in Shooting and Clutch. He's now rated C+ at PG.",
+        "Dee Marsh of Team3 increased by 6 attribute points this week. His strongest gains were in Clutch. He's now rated D at C.",
+        "Ian Foley increased by 7 attribute points this week. His strongest gains were in Scoring, Clutch, and Passing. He's now rated C at SF.",
+        "Jon Voss increased by 5 attribute points this week. His strongest gains were in Clutch, Strength, Agility, and Basketball IQ. He's now rated C at PF.",
+    ],
+}
+
+
+def test_stored_story_copy_is_scrubbed_of_the_attribute_name():
+    lines = [scrub_hidden_attr_copy(line) for line in OLD_STORY["lines"]]
+    assert lines == [
+        "Cal Riser of Team0 increased by 9 attribute points this week. His strongest gains were in Shooting. He's now rated C+ at PG.",
+        # Nothing left to name: the clause goes, the sentences around it stay.
+        "Dee Marsh of Team3 increased by 6 attribute points this week. He's now rated D at C.",
+        "Ian Foley increased by 7 attribute points this week. His strongest gains were in Scoring and Passing. He's now rated C at SF.",
+        "Jon Voss increased by 5 attribute points this week. His strongest gains were in Strength, Agility, and Basketball IQ. He's now rated C at PF.",
+    ]
+    assert hidden_traces(lines) == []
+
+
+def test_the_ordinary_word_clutch_is_not_the_attribute():
+    for text in (
+        "Clutch free throws sealed it in the final minute.",
+        "How did your team stay so composed in clutch time?",
+        "Clutch. That is the only word for that shot.",
+        "A clutch three from Scoring leader Cal Riser.",
+        "Shooting and Passing were the story tonight.",
+    ):
+        assert scrub_hidden_attr_copy(text) == text
+
+
+def test_the_scrub_knows_every_attribute_name_the_copy_uses():
+    from BackEnd.api import franchise_routes
+
+    assert set(VISIBLE_ATTR_LABELS) == set(franchise_routes.NEWS_ATTRIBUTE_FULL_NAMES.values())
+
+
+@pytest.mark.order("last")
+def test_a_stored_old_story_is_served_scrubbed_and_stays_as_written():
+    team_name, _team_id = _seed_league()
+    created = client.post("/franchise/select-team", json={"team_name": team_name})
+    assert created.status_code == 200, created.text
+    fid = created.json()["franchise_id"]
+    db.franchises.update_one({"_id": ObjectId(fid)}, {"$set": {"season_news": [copy.deepcopy(OLD_STORY)]}})
+
+    res = client.get(f"/franchise/news?franchise_id={fid}")
+    assert res.status_code == 200, res.text
+    served = res.json()["news"]
+    assert [story["story_id"] for story in served] == ["w7-ps-all-stars"]
+    assert hidden_traces(served) == []
+    assert served[0]["lines"][0].endswith("His strongest gains were in Shooting. He's now rated C+ at PG.")
+    assert "strongest gains" not in served[0]["lines"][1]
+    # Read-time only: the save still holds the story exactly as it was written.
+    stored = db.franchises.find_one({"_id": ObjectId(fid)}, {"season_news": 1})["season_news"]
+    assert stored[0]["lines"] == OLD_STORY["lines"]

@@ -12,6 +12,7 @@ the pass-receive sound. See UX_System.md, "CH is hidden".
 
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable
 
 from fastapi.responses import JSONResponse
@@ -26,6 +27,54 @@ HIDDEN_ATTR_KEYS = frozenset(
 _ROW_ATTR_FIELDS = ("attribute", "attr", "attr_key", "attribute_key")
 # A list of bare strings is an attribute-key list when it holds several of these.
 _KNOWN_ATTR_CODES = frozenset({"SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"})
+
+
+# --- copy written before the attribute was hidden --------------------------------------------
+# A story stored in a save can still name it ("His strongest gains were in Shooting and
+# Clutch."). The stored story is never rewritten; the name is taken out as it is served.
+HIDDEN_ATTR_LABELS = ("Clutch",)
+# The attribute names generated copy uses (franchise_routes.NEWS_ATTRIBUTE_FULL_NAMES).
+VISIBLE_ATTR_LABELS = (
+    "Scoring", "Shooting", "Inside Defense", "Outside Defense", "Passing", "Ball Handling",
+    "Rebounding", "Strength", "Agility", "Free Throws", "Endurance", "Basketball IQ",
+)
+_LABEL = "|".join(re.escape(label) for label in sorted(HIDDEN_ATTR_LABELS + VISIBLE_ATTR_LABELS, key=len, reverse=True))
+_SEPARATOR = r"(?:, and |, | and )"
+# Two or more attribute names in a row: "Shooting and Clutch", "Scoring, Clutch, and Passing".
+_ATTR_LIST = re.compile(rf"(?<![A-Za-z])(?:{_LABEL})(?:{_SEPARATOR}(?:{_LABEL}))+(?![A-Za-z])")
+# The one clause that can name it alone: drop the whole sentence when nothing else is left.
+_GAINS_ONLY_HIDDEN = re.compile(
+    r"\s*[^.!?\s][^.!?]*\bstrongest gains were in (?:%s)\." % "|".join(re.escape(label) for label in HIDDEN_ATTR_LABELS)
+)
+
+
+def _join_with_and(items: list[str]) -> str:
+    if len(items) <= 1:
+        return "".join(items)
+    if len(items) == 2:
+        return items[0] + " and " + items[1]
+    return ", ".join(items[:-1]) + ", and " + items[-1]
+
+
+def scrub_hidden_attr_copy(text: str) -> str:
+    """``text`` without the hidden attribute's name where it is listed as an attribute.
+
+    Only attribute lists are touched: a list of attribute names loses the hidden one and
+    is re-joined, and a "strongest gains were in <hidden>." sentence is dropped. The
+    ordinary word (late-game "clutch" in callouts and press-conference questions) is
+    not an attribute list and is left alone.
+    """
+    if not any(label in text for label in HIDDEN_ATTR_LABELS):
+        return text
+
+    def _relist(match: re.Match) -> str:
+        items = re.split(_SEPARATOR, match.group(0))
+        kept = [item for item in items if item not in HIDDEN_ATTR_LABELS]
+        return _join_with_and(kept) if len(kept) != len(items) else match.group(0)
+
+    out = _GAINS_ONLY_HIDDEN.sub("", _ATTR_LIST.sub(_relist, text))
+    # A dropped first sentence leaves the next one's leading space behind.
+    return out if text[:1].isspace() else out.lstrip()
 
 
 def is_hidden_attr(key: Any) -> bool:
@@ -47,7 +96,7 @@ def _is_attr_key_list(items: list) -> bool:
 
 
 def strip_hidden_attrs(value: Any) -> Any:
-    """A copy of a JSON-ready value with every hidden attribute removed.
+    """A copy of a JSON-ready value with every hidden attribute removed, copy included.
 
     Never mutates ``value``: route payloads share objects with documents the engine
     reads and saves, and those must keep the attribute.
@@ -69,6 +118,8 @@ def strip_hidden_attrs(value: Any) -> Any:
                 continue
             out.append(strip_hidden_attrs(item))
         return out
+    if isinstance(value, str):
+        return scrub_hidden_attr_copy(value)
     return value
 
 
