@@ -188,6 +188,7 @@ try:
     from fastapi import Depends, FastAPI, HTTPException, Query, Response
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, FileResponse
+    from BackEnd.utils.hidden_attrs import HiddenAttrsJSONResponse
     from pathlib import Path
     from fastapi.templating import Jinja2Templates
     from fastapi import Request
@@ -8074,7 +8075,9 @@ try:
         games_collection.delete_one({"_id": doc_id})
         return {"ok": True, "deleted": True}
 
-    @app.get("/player/{player_id}")
+    # The player page: no hidden attribute (utils/hidden_attrs). The court's own routes
+    # (/roster, /api/init-game, /api/simulate-turn ...) still carry it; see UX_System.md.
+    @app.get("/player/{player_id}", response_class=HiddenAttrsJSONResponse)
     @browse_cached
     def get_player(
         player_id: str,
@@ -8176,7 +8179,7 @@ try:
     #     print(f"🚀 Registered route: {route.path}")
     
     
-    @app.get("/teams/{team_id}/players")
+    @app.get("/teams/{team_id}/players", response_class=HiddenAttrsJSONResponse)
     def get_team_players(team_id: str):
         # Return roster data for a given team.
         team_doc, players = load_roster(team_id)

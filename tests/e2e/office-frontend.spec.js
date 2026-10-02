@@ -504,7 +504,8 @@ async function assertWireFitsContent(page) {
     const gaps = Math.max(0, kids.length - 1) * gap;
     return wire.getBoundingClientRect().height - (content + pad + gaps);
   });
-  expect(over, 'wire taller than its content').toBeLessThanOrEqual(2);
+  // The two 1px borders, plus sub-pixel rounding of the rows' fractional heights.
+  expect(over, 'wire taller than its content').toBeLessThanOrEqual(2.01);
 }
 
 async function assertHeadersClear(page) {
@@ -629,13 +630,12 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
       fit[name][size[2]] = numbers;
       expect(Math.abs(numbers.left - numbers.pad), name + ' left pad').toBeLessThan(1.5);
       expect(Math.abs(numbers.right - numbers.pad), name + ' right pad').toBeLessThan(1.5);
-      expect(numbers.mainScroll, name + ' ' + size[2] + ' vertical').toBeLessThanOrEqual(1);
-      if (numbers.standings && numbers.standings.mode === 'window') {
-        expect(numbers.standings.shown, name + ' ' + size[2] + ' window').toBeLessThan(numbers.standings.total);
-        expect(numbers.standings.shown, name + ' ' + size[2] + ' window').toBeGreaterThanOrEqual(size[2] === '1280' ? 2 : 5);
-      } else if (numbers.standings) {
-        expect(['all', 'compact'], name + ' ' + size[2] + ' full table').toContain(numbers.standings.mode);
+      // The standings card always shows the whole conference at normal spacing (Jamie,
+      // 2026-10-02), so a short window scrolls `.main` instead of slicing the card. The
+      // scroll is recorded in fit.json; what is asserted is that no row is ever dropped.
+      if (numbers.standings) {
         expect(numbers.standings.shown, name + ' ' + size[2] + ' rows').toBe(numbers.standings.total);
+        expect(numbers.standings.total, name + ' ' + size[2] + ' rows').toBe(8);
       }
       if (size[2] === '1280') {
         expect(numbers.pageWide, name + ' horizontal').toBeLessThanOrEqual(1);
@@ -644,7 +644,7 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         });
         await assertOneVerticalScroll(page);
       }
-      if (size[2] === '1920' && numbers.standings && numbers.standings.mode !== 'window') {
+      if (size[2] === '1920' && numbers.standings) {
         numbers.clip.forEach(function (px, index) {
           expect(px, name + ' 1920 column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
         });
@@ -656,7 +656,7 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
   fs.writeFileSync(path.join(V3C, 'fit.json'), JSON.stringify(fit, null, 2));
 });
 
-// Compact rows come before windowing: every conference team stays on screen at each size.
+// Every conference team is on the card at every size, at normal row spacing: never tightened, never sliced.
 const COMPACT = path.join(__dirname, '../../reports/office-standings-compact');
 const STANDINGS_SIZES = [[1280, 720], [1440, 900], [1920, 1080], [1066, 640], [1024, 600]];
 
@@ -710,7 +710,7 @@ async function standingsFit(page) {
   return Object.assign(extra, { standings: numbers.standings, mainScroll: numbers.mainScroll, clip: numbers.clip });
 }
 
-test('standings show every conference team by tightening rows before windowing', async ({ page }) => {
+test('standings show every conference team at normal spacing, never tightened or sliced', async ({ page }) => {
   const phase = process.env.STANDINGS_PHASE || 'after';
   fs.mkdirSync(COMPACT, { recursive: true });
   const report = {};
@@ -725,27 +725,16 @@ test('standings show every conference team by tightening rows before windowing',
     if (phase !== 'after') continue;
     const label = size.join('x') + ' ' + JSON.stringify(fit);
     expect(fit.standings.total, label).toBe(8);
+    expect(fit.standings.shown, label).toBe(8);
     expect(fit.meNavy, label).toBe(true);
-    expect(fit.compact, label).toBe(fit.standings.mode !== 'all');
-    expect(fit.moreInHead, label).toBe(fit.standings.mode !== 'all');
-    if (size[0] >= 1440) {
-      expect(fit.standings.shown, label).toBe(fit.standings.total);
-      expect(['all', 'compact'], label).toContain(fit.standings.mode);
-      expect(fit.lastRowBottom, label).toBeLessThanOrEqual(fit.fold);
-      expect(fit.mainScroll, label).toBeLessThanOrEqual(1);
-      fit.clip.forEach((px) => expect(px, label).toBeLessThanOrEqual(1));
-    } else {
-      // gob-1280 below 1440x900: the middle column has no room for eight rows, so windowing is the last resort.
-      // Ch8: the middle column's inter-card gap and main padding-bottom were tightened
-      // at 1280 so the fit lands on 4 rows (it had regressed to 3 with the Ch7 weekly
-      // card). Standings still shows all 8 at >= 1440.
-      expect(fit.standings.mode, label).toBe('window');
-      expect(fit.density, label).toBe('tight');
-      expect(fit.standings.shown, label).toBeGreaterThanOrEqual(size[0] === 1280 ? 4 : 2);
-      if (size[0] === 1280) expect(fit.mainScroll, label).toBeLessThanOrEqual(1);
-    }
+    expect(fit.compact, label).toBe(false);
+    expect(fit.rowHeight, label).toBeGreaterThanOrEqual(30);
+    // "Full standings" is always in the card header.
+    expect(fit.moreInHead, label).toBe(true);
+    // The card is not clipped by its column; a short window scrolls the page instead.
+    fit.clip.forEach((px) => expect(px, label).toBeLessThanOrEqual(1));
   }
-  // Ten teams: more than any real conference has today. Compact first; windowing is the fallback.
+  // Ten teams: more than any real conference has today. Still every row.
   for (const size of [[1280, 720], [1920, 1080]]) {
     await page.setViewportSize({ width: size[0], height: size[1] });
     await openOffice(page, commandCenter(digest('win', { conference_standings: bigConference(10) })));
@@ -754,16 +743,8 @@ test('standings show every conference team by tightening rows before windowing',
     if (phase !== 'after') continue;
     const label = 'ten ' + size.join('x') + ' ' + JSON.stringify(fit);
     expect(fit.standings.total, label).toBe(10);
-    expect(fit.mainScroll, label).toBeLessThanOrEqual(1);
-    if (size[0] === 1920) {
-      expect(fit.standings.mode, label).toBe('compact');
-      expect(fit.standings.shown, label).toBe(10);
-      expect(fit.lastRowBottom, label).toBeLessThanOrEqual(fit.fold);
-    } else {
-      expect(fit.standings.mode, label).toBe('window');
-      expect(fit.density, label).toBe('tight');
-      expect(fit.standings.shown, label).toBeGreaterThanOrEqual(4);
-    }
+    expect(fit.standings.shown, label).toBe(10);
+    expect(fit.compact, label).toBe(false);
     expect(fit.moreInHead, label).toBe(true);
     expect(fit.meNavy, label).toBe(true);
   }
@@ -1089,31 +1070,22 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   const shown = await page.locator('#office-root .office-st .st-r:not(.st-hd)').evaluateAll((nodes) => {
     return nodes.map((node) => ({
       me: node.classList.contains('me'),
-      name: node.querySelector('.st-n').textContent,
+      name: node.querySelector('.st-nm').textContent,
       pos: node.firstElementChild.textContent,
     }));
   });
-  const mode = await page.locator('#office-root .office-st').getAttribute('data-standings-mode');
   const order = standingsBlock().rows.map((row) => row.team_name);
   const visible = shown.map((row) => row.name);
   expect(shown.some((row) => row.me && row.name === 'Amariabi International')).toBe(true);
-  const start = order.indexOf(visible[0]);
-  expect(order.slice(start, start + visible.length)).toEqual(visible);
-  const density = await page.locator('#office-root .office-st').getAttribute('data-standings-density');
-  if (mode === 'all') {
-    expect(density).toBe('normal');
-    expect(visible).toEqual(order);
-    expect(await page.locator('#office-root .st-more').count()).toBe(0);
-  } else if (mode === 'compact') {
-    expect(visible).toEqual(order);
-    await expect(page.locator('#office-root .office-st .card-h .st-more')).toHaveAttribute('href', /tab=standings-view/);
-  } else {
-    expect(mode).toBe('window');
-    expect(density).toBe('tight');
-    expect(visible.length).toBeGreaterThanOrEqual(2);
-    expect(visible.length).toBeLessThan(order.length);
-    await expect(page.locator('#office-root .office-st .card-h .st-more')).toHaveAttribute('href', /tab=standings-view/);
-  }
+  // Every team, in standings order, at the normal density; "Full standings" always in the header.
+  expect(visible).toEqual(order);
+  const density = 'normal';
+  await expect(page.locator('#office-root .office-st')).not.toHaveClass(/is-compact|is-tight/);
+  await expect(page.locator('#office-root .office-st .card-h .st-more')).toHaveAttribute('href', /tab=standings-view/);
+  // Each row carries the team's mark, as the league tables draw it.
+  expect(await page.locator('#office-root .office-st .st-r:not(.st-hd) .st-n').evaluateAll((nodes) => {
+    return nodes.every((node) => !!node.querySelector('img, .gob-mark'));
+  })).toBe(true);
   const rowMetrics = await page.evaluate(() => {
     const watch = document.querySelector('#office-root .ptw');
     const row = document.querySelector('#office-root .office-st .st-r:not(.st-hd):not(.me)');
@@ -1192,11 +1164,9 @@ test('next game, standings, chemistry, and attitude', async ({ page }) => {
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await openOffice(page, STATES.win);
-  const mode1440 = await page.locator('#office-root .office-st').getAttribute('data-standings-mode');
   const count1440 = await page.locator('#office-root .office-st .st-r:not(.st-hd)').count();
-  expect(['all', 'compact']).toContain(mode1440);
   expect(count1440).toBe(8);
-  expect(await page.locator('#office-root .office-st .card-h .st-more').count()).toBe(mode1440 === 'compact' ? 1 : 0);
+  expect(await page.locator('#office-root .office-st .card-h .st-more').count()).toBe(1);
   const typeStep = await page.evaluate(() => {
     const title = document.querySelector('#office-root .card-h h3');
     const body = document.querySelector('#office-root .sn-l');

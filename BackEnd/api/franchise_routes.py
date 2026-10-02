@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from BackEnd.utils.browse_cache import browse_cached, bump_browse_rev, fold_browse_rev
+from BackEnd.utils.hidden_attrs import HiddenAttrsJSONResponse, is_hidden_attr, visible_attr_keys
 from BackEnd.utils.franchise_last_played import (
     LAST_PLAYED_FIELD,
     last_played_iso,
@@ -158,7 +159,8 @@ from BackEnd.utils.franchise_rank_prestige import (
     use_franchise_rank_prestige_v2,
 )
 
-router = APIRouter()
+# CH is a hidden attribute: no payload on this router carries it (utils/hidden_attrs).
+router = APIRouter(default_response_class=HiddenAttrsJSONResponse)
 
 # Per-user limits on the heavy week/season routes (rate_limiter.user_rate_limit).
 # If the limiter can't import, the routes stay unlimited rather than failing.
@@ -4832,12 +4834,15 @@ def select_team(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/franchise/team-builder")
+# Team Builder keeps the full attribute set (response_class=JSONResponse on its routes): it
+# round-trips whole player rows (walk-ons, the slot roster) through the client and saves
+# what comes back, so stripping the hidden attribute here would lose it on Apply.
+@router.get("/franchise/team-builder", response_class=JSONResponse)
 def get_team_builder_page():
     return FileResponse(STATIC_DIR / "team-builder.html")
 
 
-@router.get("/franchise/team-builder/slot-roster")
+@router.get("/franchise/team-builder/slot-roster", response_class=JSONResponse)
 def team_builder_slot_roster_json(
     object_id: str = Query(..., description="Core team ObjectId for the replaced slot"),
     user: dict = Depends(get_current_user),
@@ -4867,7 +4872,7 @@ def team_builder_slot_roster_json(
     }
 
 
-@router.get("/franchise/team-builder/league-context")
+@router.get("/franchise/team-builder/league-context", response_class=JSONResponse)
 def team_builder_league_context(user: dict = Depends(get_current_user)):
     """
     Runtime league attribute context for the wizard (Decision #5 / §4.5a).
@@ -4955,7 +4960,7 @@ class TeamBuilderDraftUpsertRequest(BaseModel):
     extra: dict[str, Any] | None = None
 
 
-@router.post("/franchise/team-builder/position-ratings")
+@router.post("/franchise/team-builder/position-ratings", response_class=JSONResponse)
 def team_builder_position_ratings(
     body: TeamBuilderPositionRatingsRequest,
     user: dict = Depends(get_current_user),
@@ -5011,7 +5016,7 @@ def team_builder_position_ratings(
     return {"players": out}
 
 
-@router.get("/franchise/team-builder/drafts")
+@router.get("/franchise/team-builder/drafts", response_class=JSONResponse)
 def team_builder_list_drafts(user: dict = Depends(get_current_user)):
     """Unfinished programs for Program Select — looked up by user_id, not localStorage."""
     from BackEnd.utils.team_builder_drafts import list_unfinished_drafts
@@ -5020,7 +5025,7 @@ def team_builder_list_drafts(user: dict = Depends(get_current_user)):
     return {"drafts": drafts}
 
 
-@router.post("/franchise/team-builder/drafts")
+@router.post("/franchise/team-builder/drafts", response_class=JSONResponse)
 def team_builder_upsert_draft(
     body: TeamBuilderDraftUpsertRequest,
     user: dict = Depends(get_current_user),
@@ -5064,7 +5069,7 @@ def team_builder_upsert_draft(
     return {"draft": doc}
 
 
-@router.delete("/franchise/team-builder/drafts/{replaced_object_id}")
+@router.delete("/franchise/team-builder/drafts/{replaced_object_id}", response_class=JSONResponse)
 def team_builder_discard_draft(
     replaced_object_id: str,
     user: dict = Depends(get_current_user),
@@ -5084,7 +5089,7 @@ def team_builder_discard_draft(
     return {"deleted": deleted}
 
 
-@router.post("/franchise/team-builder/wizard-walk-ons")
+@router.post("/franchise/team-builder/wizard-walk-ons", response_class=JSONResponse)
 def team_builder_wizard_walk_ons(
     body: TeamBuilderWizardWalkOnsRequest,
     user: dict = Depends(get_current_user),
@@ -5160,7 +5165,7 @@ def _tb_portrait_players_payload(
     return out
 
 
-@router.post("/franchise/team-builder/portraits/assign")
+@router.post("/franchise/team-builder/portraits/assign", response_class=JSONResponse)
 def team_builder_portraits_assign(
     body: TeamBuilderPortraitsAssignRequest,
     user: dict = Depends(get_current_user),
@@ -5201,7 +5206,7 @@ def team_builder_portraits_assign(
     }
 
 
-@router.post("/franchise/team-builder/portraits/reroll")
+@router.post("/franchise/team-builder/portraits/reroll", response_class=JSONResponse)
 def team_builder_portraits_reroll(
     body: TeamBuilderPortraitRerollRequest,
     user: dict = Depends(get_current_user),
@@ -5244,7 +5249,7 @@ def team_builder_portraits_reroll(
     return {"portrait": assignment, "portraits": portraits}
 
 
-@router.post("/franchise/team-builder/portraits/pick")
+@router.post("/franchise/team-builder/portraits/pick", response_class=JSONResponse)
 def team_builder_portraits_pick(
     body: TeamBuilderPortraitPickRequest,
     user: dict = Depends(get_current_user),
@@ -5295,7 +5300,7 @@ def team_builder_portraits_pick(
     return {"portrait": assignment, "portraits": portraits}
 
 
-@router.get("/franchise/team-builder/portraits/catalog")
+@router.get("/franchise/team-builder/portraits/catalog", response_class=JSONResponse)
 def team_builder_portraits_catalog(
     skin: str | None = None,
     frame: str | None = None,
@@ -5309,7 +5314,7 @@ def team_builder_portraits_catalog(
     return catalog_for_picker(skin=skin, frame=frame, definition=definition)
 
 
-@router.post("/franchise/team-builder/apply")
+@router.post("/franchise/team-builder/apply", response_class=JSONResponse)
 def team_builder_apply(
     body: TeamBuilderApplyRequest,
     user: dict = Depends(get_current_user),
@@ -14311,7 +14316,6 @@ NEWS_ATTRIBUTE_FULL_NAMES = {
     "FT": "Free Throws",
     "ND": "Endurance",
     "IQ": "Basketball IQ",
-    "CH": "Clutch",
 }
 
 
@@ -14585,18 +14589,19 @@ def _build_ps_all_stars_story(
         qualifiers = [g for g in qualifiers if int(g.get("total_gain") or 0) >= cutoff]
     lines = []
     for g in qualifiers:
-        deltas = g.get("deltas") or {}
+        # Copy names and counts the visible attributes only; the hidden one is never revealed.
+        deltas = {key: value for key, value in (g.get("deltas") or {}).items() if not is_hidden_attr(key)}
         max_gain = max(deltas.values()) if deltas else 0
         top_attrs = [
             NEWS_ATTRIBUTE_FULL_NAMES.get(key, key)
-            for key in TRAINING_SQUAD_ATTR_KEYS
+            for key in visible_attr_keys(TRAINING_SQUAD_ATTR_KEYS)
             if deltas.get(key) == max_gain
         ]
         rt = g.get("rt")
         team_name = team_name_map.get(str(g.get("team_id") or ""), "")
         of_team = f" of {team_name}" if team_name else ""
         lines.append(
-            f"{g.get('name')}{of_team} increased by {int(g.get('total_gain') or 0)} attribute points this week. "
+            f"{g.get('name')}{of_team} increased by {int(sum(deltas.values()))} attribute points this week. "
             f"His strongest gains were in {_join_with_and(top_attrs)}. "
             f"He's now rated {format_rt_display(rt)} at {g.get('pos', '--')}."
         )
@@ -16848,7 +16853,8 @@ def get_training_squad_reports(franchise_id: str, user: dict = Depends(get_curre
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     reports = franchise_doc.get("training_squad_reports") or {}
     ordered = [reports[k] for k in sorted(reports.keys(), key=lambda x: int(x), reverse=True)]
-    return {"reports": ordered, "attr_keys": TRAINING_SQUAD_ATTR_KEYS}
+    # The hidden attribute still develops on the practice squad; it is never a report column.
+    return {"reports": ordered, "attr_keys": visible_attr_keys(TRAINING_SQUAD_ATTR_KEYS)}
 
 
 def _scouting_usage_unlocks_for_week(current_week: int, user_film_study: int) -> tuple[bool, bool]:
@@ -18748,20 +18754,51 @@ def mark_archetype_reveal_seen_offline(
     franchise's browse revision so the next command-center read is not a 304 of
     the body that still carried the moment.
     """
-    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    _stamp_local_coach(req.franchise_id, user, set_fields={"archetype_reveal_seen": True})
+    return {"archetype_reveal_seen": True}
+
+
+def _stamp_local_coach(
+    franchise_id: str,
+    user: dict,
+    set_fields: dict[str, Any] | None = None,
+    unset_fields: tuple[str, ...] = (),
+) -> None:
+    """Offline build only: change coach fields on the save and refresh the Office read."""
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     if not is_local_owner(user.get("user_id")):
         raise HTTPException(status_code=404, detail="Offline build only")
     from datetime import timezone
 
     from BackEnd.utils.local_coach import LOCAL_COACH_ID, coach_collection
 
-    coach_collection().update_one(
-        {"_id": LOCAL_COACH_ID},
-        {"$set": {"archetype_reveal_seen": True, "updated_at": datetime.now(timezone.utc)}},
-        upsert=True,
-    )
+    update: dict[str, Any] = {"$set": {**(set_fields or {}), "updated_at": datetime.now(timezone.utc)}}
+    if unset_fields:
+        update["$unset"] = {field: "" for field in unset_fields}
+    coach_collection().update_one({"_id": LOCAL_COACH_ID}, update, upsert=True)
     bump_browse_rev(franchise_doc["_id"])
-    return {"archetype_reveal_seen": True}
+
+
+@router.patch("/franchise/archetype-evolution-seen")
+def clear_archetype_evolution_offline(
+    req: ArchetypeRevealSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Offline build: clear the "Coaching archetype evolved" weekly-card row.
+
+    The row is ``archetype_evolution_pending`` on the coach. Online that is the
+    account's, cleared by ``PATCH /api/auth/archetype-evolution-seen``; the desktop
+    client cannot reach ``/api/auth``. This removes the same key from the save's
+    ``local_coach`` doc, where ``record_archetype_change_if_any`` wrote it and
+    ``_coach_archetype_signals`` reads it, and bumps the browse revision so the
+    next Office read drops the row.
+
+    The key is removed, not set to "": on SQLite a projected read of a field
+    holding an empty string raises (``sqlite_collection._extracted_value``), and
+    the Office reads this field projected.
+    """
+    _stamp_local_coach(req.franchise_id, user, unset_fields=("archetype_evolution_pending",))
+    return {"archetype_evolution_pending": ""}
 
 
 class SeasonReviewSeenRequest(BaseModel):

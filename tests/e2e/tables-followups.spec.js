@@ -135,9 +135,10 @@ test('Assign Practice Squad: the twelve attributes read as six pairs, rows uncha
   expect(heads.map((t) => t.trim())).toEqual(['Name', 'POS', 'Year', 'Height', 'Weight'].concat(PAIRS, ['RT', 'To Practice Squad']));
 });
 
-test('Practice Squad training report: six pairs then CH, in both views, rows unchanged', async ({ page }) => {
+test('Practice Squad training report: six pairs and no CH column, in both views, rows unchanged', async ({ page }) => {
   await stubAuth(page);
-  // The server's own key order: AG before ST, CH last.
+  // The server's key order (AG before ST). CH is a hidden attribute: this payload still
+  // carries it, the way an older server did, and the page must not draw it.
   const serverKeys = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT', 'CH'];
   const players = NAMES.map((name, i) => {
     const baseline = Object.assign(attributes(i), { CH: 12 });
@@ -163,9 +164,9 @@ test('Practice Squad training report: six pairs then CH, in both views, rows unc
 
   const changes = await rhythm(page, '.tsr-table');
   expectPairs(changes, 'practice squad report, changes');
-  // CH is not one of the twelve: it follows the pairs, on its own.
+  // CH is hidden (UX_System, "CH is hidden"): the twelve paired attributes are the only columns.
   const all = await page.locator('.tsr-table thead tr').first().locator('td, th').allTextContents();
-  expect(all.map((t) => t.trim())).toEqual(['Name', 'POS'].concat(PAIRS, ['CH']));
+  expect(all.map((t) => t.trim())).toEqual(['Name', 'POS'].concat(PAIRS));
   // Each change is still that attribute's: current minus baseline, read by key.
   const p0 = players[0];
   expect(changes.values).toEqual(PAIRS.map((key) => {
@@ -181,6 +182,8 @@ test('Practice Squad training report: six pairs then CH, in both views, rows unc
   expectPairs(absolute, 'practice squad report, absolute');
   expect(absolute.values).toEqual(PAIRS.map((key) => String(p0.current[key])));
   expect(absolute.heights[0]).toBe(30.55);
+  const absoluteHeads = await page.locator('.tsr-table thead tr').first().locator('td, th').allTextContents();
+  expect(absoluteHeads.map((t) => t.trim())).toEqual(['Name', 'POS'].concat(PAIRS));
 });
 
 /** A heading that names Half-Court Traps on one line, inside its box. */
