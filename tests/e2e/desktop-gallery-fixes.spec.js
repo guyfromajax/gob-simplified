@@ -211,9 +211,43 @@ test('#10 office moved-most placeholder', async ({ page }) => {
   expect(m, 'one "Set after camp" line, not a duplicated pair').toBe(1);
 });
 
+// Awards is not an empty state in week 1 any more: since the All-American projection
+// it shows "Projected All-Americans · Preseason", three teams of five by position.
+test('#10/#6 awards: the week-1 preseason projection, not an empty card', async ({ page }) => {
+  await open(page, ctx.fcc('awards-view'), 1280, '#awards-view');
+  await page.waitForTimeout(1500);
+  const view = page.locator('#awards-view');
+  const m = await view.evaluate((host) => {
+    const shown = (el) => !!el.offsetParent;
+    const tables = Array.from(host.querySelectorAll('table.gob-awards-tbl')).filter(shown);
+    return {
+      empties: Array.from(host.querySelectorAll('.gob-empty')).filter(shown).length,
+      heading: (host.querySelector('.gob-awards-head h2') || {}).textContent || '',
+      status: (host.querySelector('.gob-awards-head p') || {}).textContent || '',
+      teams: Array.from(host.querySelectorAll('.gob-awards > section > h3')).map((el) => el.textContent.trim()),
+      rows: tables.map((table) => table.querySelectorAll('tbody tr').length),
+      positions: tables.map((table) => Array.from(table.querySelectorAll('tbody td.gob-awards-pos')).map((el) => el.textContent.trim()).join(' ')),
+      heads: tables[0] ? Array.from(tables[0].querySelectorAll('thead th')).map((el) => el.textContent.trim()) : [],
+      colours: Array.from(host.querySelectorAll('.gob-awards-head *, .gob-awards h3')).map((el) => getComputedStyle(el).color),
+    };
+  });
+  metrics['awards-week-1'] = m;
+  await shot(page, 'awards', 1280);
+  if (BEFORE) return;
+  expect(m.empties, 'no empty card: the projection is there in week 1').toBe(0);
+  expect(m.heading).toBe('Projected All-Americans');
+  expect(m.status).toContain('Preseason');
+  expect(m.teams).toEqual(['1st Team All-American', '2nd Team All-American', '3rd Team All-American']);
+  // One player per position on each team; nobody has played, so there are no stat columns.
+  expect(m.rows).toEqual([5, 5, 5]);
+  expect(m.positions).toEqual(['PG SG SF PF C', 'PG SG SF PF C', 'PG SG SF PF C']);
+  expect(m.heads.slice(0, 5)).toEqual(['Pos', 'Player', 'Yr', 'Team', 'RT']);
+  expect(m.heads).not.toContain('PTS');
+  m.colours.forEach((colour) => expect(isOrange(colour)).toBe(false));
+});
+
 for (const [name, tab, sel] of [
   ['practice-squad', 'practice-squad-view', '#practice-squad-view'],
-  ['awards', 'awards-view', '#awards-view'],
   ['leaders', 'leaders-view', '#leaders-view .gob-ldr, #leaders-view'],
 ]) {
   test(`#10/#6 empty state: ${name}`, async ({ page }) => {
