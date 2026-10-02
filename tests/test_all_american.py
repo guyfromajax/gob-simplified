@@ -536,6 +536,145 @@ def test_awards_payload_projected_then_final(store):
     assert [p["position"] for p in body["all_american_teams"]["third_team"]] == list(POSITIONS)
 
 
+# ---------------------------------------------------------------------------
+# The formula is hidden from the player
+# ---------------------------------------------------------------------------
+
+# Keys that say how a team was picked. None may appear anywhere in a response.
+FORMULA_KEYS = {
+    "weights", "components", "score", "week26_score", "rank", "bonus",
+    "attributes", "individual", "third_team_ranks", "basis", "week26_clean",
+}
+# What a pick may carry: who, where, the rating and the stat line the page shows.
+PICK_KEYS = {"player_id", "name", "team_id", "team_name", "year", "position", "rating", "games", "stats"}
+
+
+def _keys(value):
+    """Every dict key anywhere in ``value``."""
+    found = set()
+    if isinstance(value, dict):
+        for key, inner in value.items():
+            found.add(key)
+            found |= _keys(inner)
+    elif isinstance(value, (list, tuple)):
+        for inner in value:
+            found |= _keys(inner)
+    return found
+
+
+def _assert_formula_hidden(body):
+    assert not (_keys(body) & FORMULA_KEYS), sorted(_keys(body) & FORMULA_KEYS)
+    for key in aa.TEAM_KEYS:
+        picks = body["all_american_teams"][key]
+        assert [p["position"] for p in picks] == list(POSITIONS)      # PG, SG, SF, PF, C
+        for pick in picks:
+            assert set(pick) == PICK_KEYS
+            assert set(pick["stats"]) == set(aa.STAT_KEYS)
+
+
+def test_awards_payload_hides_the_formula_and_the_stored_doc_keeps_it(store):
+    doc, team_ids = _seed_league(store, week=27, games=26)
+    aa.ensure_projection(doc)
+    body = aa.awards_payload(doc)
+    assert body["status"] == "projected" and body["label"] == "End of regular season"
+    assert set(body) == {"status", "week", "label", "stats_basis", "computed_at", "all_american_teams"}
+    _assert_formula_hidden(body)
+
+    # Stored for the engine: weights on the projection, score / rank / components on a pick.
+    stored = _stored(store, doc)["awards"]["all_american_projection"]
+    assert stored["weights"] == {"attributes": 0.0, "stats": 70.0, "team": 30.0}
+    kept = stored["all_american_teams"]["first_team"][0]
+    assert {"score", "rank", "components"} <= set(kept)
+
+    _play_tournaments(store, doc, team_ids)
+    stored_doc = _stored(store, doc)
+    stored_doc["awards"] = {**stored_doc["awards"], **aa.compute_final(stored_doc)}
+    body = aa.awards_payload(stored_doc)
+    assert body["status"] == "final"
+    assert set(body) == {"status", "label", "stats_basis", "computed_at", "all_american_teams"}
+    _assert_formula_hidden(body)
+    kept = stored_doc["awards"]["all_american_teams"]["first_team"][0]
+    assert {"score", "rank", "components", "bonus", "week26_score"} <= set(kept)
+    # The payload is a copy: cutting it down did not touch the stored picks.
+    assert stored_doc["awards"]["all_american_final"]["third_team_ranks"]
+
+
+def test_awards_payload_of_an_older_stored_final_keeps_only_public_keys():
+    # A final stored before positions and scores existed: name, team, year and stats.
+    old_pick = {"player_id": "p1", "name": "Old Pick", "team_id": "t1", "team_name": "Alder",
+                "year": "Senior", "stats": {"PTS": 20}, "score": 91.5, "PPG": 20.1}
+    doc = {"awards": {"all_american_teams": {"first_team": [old_pick], "second_team": [], "third_team": []}}}
+    body = aa.awards_payload(doc)
+    assert body["all_american_teams"] == {
+        "first_team": [{"player_id": "p1", "name": "Old Pick", "team_id": "t1", "team_name": "Alder",
+                        "year": "Senior", "stats": {"PTS": 20}}],
+        "second_team": [], "third_team": [],
+    }
+
+
+@pytest.mark.parametrize("week, status", [(11, "projected"), (27, "projected"), (35, "final")])
+def test_awards_route_response_hides_the_formula(store, monkeypatch, week, status):
+    """GET /franchise/awards, through the app: none of the formula keys in the JSON."""
+    from fastapi.testclient import TestClient
+
+    from BackEnd.api import franchise_routes
+    from BackEnd.api.api import app
+
+    doc, team_ids = _seed_league(store, week=min(week, 27), games=min(week - 1, 26))
+    if week >= 35:
+        aa.ensure_projection(doc)
+        _play_tournaments(store, doc, team_ids)
+    monkeypatch.setattr(
+        franchise_routes, "verify_franchise_owned_by_user",
+        lambda _fid, _uid: _stored(store, doc),
+    )
+    res = TestClient(app).get("/franchise/awards", params={"franchise_id": str(doc["_id"])})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["status"] == status
+    _assert_formula_hidden(body)
+    text = res.text
+    for word in ("weights", "components", "week26_score", "bonus", "third_team_ranks"):
+        assert word not in text
+
+
+def test_command_center_all_american_field_is_a_flag_only():
+    """The command center builds the projection but sends none of it: awards_ready only."""
+    import inspect
+
+    from BackEnd.api import franchise_routes
+
+    source = inspect.getsource(franchise_routes)
+    assert 'response["awards_ready"]' in source
+    for leak in ('response["awards"]', 'response["all_american', "response['awards']", "response[PROJECTION_KEY]"):
+        assert leak not in source
+
+
+def test_stories_carry_no_percentages_weights_scores_or_bonus(store):
+    import re
+
+    doc, _teams = _seed_league(store, week=1, games=0)
+    for completed in range(0, 27):
+        if completed:
+            _advance(store, doc, week=completed + 1, games=completed)
+        aa.ensure_projection(_stored(store, doc))
+    news = [s for s in _stored(store, doc)["season_news"] if s["type"] == "all_americans"]
+    assert len(news) == 5
+    for story in news:
+        assert set(story) == {"story_id", "week", "type", "headline", "rich_lines", "created_at"}
+        for line in story["rich_lines"]:
+            assert set(line) <= {"type", "text"}
+        text = story["headline"] + " " + " ".join(line.get("text", "") for line in story["rich_lines"])
+        assert "%" not in text
+        assert not re.search(r"weight|score|bonus|rating|points|rank", text, re.IGNORECASE), text
+        # The only numbers are the week in the headline and the intro.
+        assert not re.search(r"\d", re.sub(r"week \d+", "", text, flags=re.IGNORECASE)), text
+    # The week-26 story still says the teams can change.
+    last = " ".join(line.get("text", "") for line in news[0]["rich_lines"])
+    assert news[0]["story_id"] == "w26-all-americans"
+    assert "not final" in last and "Tournament performance can still change them" in last
+
+
 def test_user_team_is_listed_at_its_training_position(store):
     doc, team_ids = _seed_league(store, week=11, games=10)
     # The user coaches Fir (last team) and trains his PG as a shooting guard.

@@ -141,7 +141,8 @@ export function mount(container, ctx) {
     if (key === 'team') return String(row.display_name || row.name || '');
     if (key === 'rank') return num(row._rank);
     if (key === 'streak') return String(row.streak || '');
-    if (key === 'next') return num(row.next_week);
+    // NEXT sorts by the opponent it shows; a team with no next game sorts last.
+    if (key === 'next') return row.next_opponent_name ? String(row.next_opponent_name) : null;
     return num(row[key]);
   }
 
@@ -209,9 +210,12 @@ export function mount(container, ctx) {
           } else if (col.diff) {
             cell = tables.diffCell(row.differential, maxAbs);
           } else if (col.next) {
+            // The opponent only: no week label. It links to the opponent's page.
             cell = tables.nextCell(
               row.next_opponent_name,
-              row.next_week,
+              row.next_opponent_id
+                ? tables.rosterHref(franchiseId, row.next_opponent_id, row.next_opponent_name || '', 'standings-view')
+                : '',
               colorById[row.next_opponent_id] || colorByName[row.next_opponent_name] || ''
             );
           } else if (col.key === 'rank') {
@@ -253,7 +257,7 @@ export function mount(container, ctx) {
       th.addEventListener('click', function () {
         var key = th.getAttribute('data-sort');
         if (sortKey === key) sortDir = -sortDir;
-        else { sortKey = key; sortDir = key === 'team' || key === 'streak' ? 1 : -1; }
+        else { sortKey = key; sortDir = key === 'team' || key === 'streak' || key === 'next' ? 1 : -1; }
         render();
       });
     });

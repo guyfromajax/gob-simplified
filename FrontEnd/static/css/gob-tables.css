@@ -224,6 +224,30 @@ html.gob-shell.gob-1920 .gob-tgrid {
   font-variant-numeric: tabular-nums;
 }
 
+/* NEXT is the opponent: its mark, and its name where the card has room (1920 two-up;
+   not 1280 two-up). The name is in the tooltip and the label either way. */
+#standings-view .gob-conf .gob-next-n {
+  display: none;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container (min-width: 760px) {
+  #standings-view .gob-conf .gob-next-n { display: inline; }
+}
+#standings-view .gob-conf .gob-next.is-none {
+  color: var(--text-38);
+}
+#standings-view .gob-conf a.gob-next:hover .gob-next-n {
+  text-decoration: underline;
+}
+#standings-view .gob-conf a.gob-next:focus-visible {
+  outline: 2px solid var(--text-100);
+  outline-offset: 1px;
+  border-radius: var(--radius-4);
+}
+
 /* Narrow: the pair holds, DIFF and its pill go first. */
 @container (max-width: 639px) {
   #standings-view .gob-conf .gob-tbl .c-diff { display: none; }
@@ -1062,6 +1086,25 @@ html.gob-shell .gob-focus.stats-toggle button {
   white-space: nowrap;
 }
 
+/* A result with a box score. It reads as the plain result until hover or focus;
+   the padding is cancelled by the margin so the row does not move. */
+#team-view a.gob-sch-res {
+  padding: var(--space-4) var(--space-6);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
+  border-radius: var(--radius-4);
+  color: var(--text-87);
+  text-decoration: none;
+}
+#team-view a.gob-sch-res.is-loss { color: var(--text-60); }
+#team-view a.gob-sch-res:hover {
+  background-color: var(--white-7);
+  color: var(--text-100);
+}
+#team-view a.gob-sch-res:focus-visible {
+  outline: 2px solid var(--text-100);
+  outline-offset: 1px;
+}
+
 @media (max-width: 1099px) {
   #team-view .gob-sch-list { columns: 1; }
 }
@@ -1306,6 +1349,25 @@ html.gob-shell.gob-1920 #league-schedule-view .gob-gf { min-height: var(--dsz-28
 }
 #rankings-view .gob-rank .gob-tbl td.rk { color: var(--text-60); }
 #rankings-view .gob-rank .gob-tbl tr.me td.rk { color: var(--text-100); }
+/* Last Week with a box score. It reads as the plain result until hover or focus; the
+   padding is cancelled by the margin so the cell and the row do not move. */
+#rankings-view .gob-rank a.gob-res {
+  display: inline-block;
+  padding: var(--space-4) var(--space-6);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
+  border-radius: var(--radius-4);
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+#rankings-view .gob-rank a.gob-res:hover {
+  background-color: var(--white-7);
+  color: var(--text-100);
+}
+#rankings-view .gob-rank a.gob-res:focus-visible {
+  outline: 2px solid var(--text-100);
+  outline-offset: 1px;
+}
 
 /* Team › Schedule: four week columns. Each is a T1 mini-table; the whole regular
    season sits above the fold at 1280×720, and density tokens widen rows at 1920. */

@@ -19,6 +19,24 @@ function cloneParams(params) {
   return out;
 }
 
+// Keys that address one drill-in (a team, a player, a news story) or say where it was
+// opened from. They belong to that one entry. Moving to another tab or section drops
+// them, so a story or a team from earlier cannot ride along and steer a later Back.
+var NAV_KEYS = ['story', 'player_id', 'view_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
+  'return_url', 'origin', 'return_tab', 'id'];
+
+function dropNavKeys(bag) {
+  NAV_KEYS.forEach(function (key) { bag.delete(key); });
+  // The desktop session store is not the URL: a key missing from the next URL would
+  // stay in it. On web the URL is the store, and the entry being left keeps its own.
+  var ctx = franchiseCtx();
+  if (window.GOB_BUILD_PROFILE === 'desktop' && ctx && typeof ctx.setMany === 'function') {
+    var blank = {};
+    NAV_KEYS.forEach(function (key) { blank[key] = ''; });
+    ctx.setMany(blank);
+  }
+}
+
 /**
  * Shared tab management for Franchise and Tournament command centers (Phase 4.4).
  * Expects DOM: .tab-buttons elements with data-tab, and .tab-content elements with id matching data-tab.
@@ -96,28 +114,35 @@ function initCommandCenterTabs(options) {
     return tabName;
   }
 
-  function show(tabName, historyMode) {
+  // `opts.fresh`: open the tab's own landing even when the URL already names this tab
+  // (the rail's News with a story open). Otherwise the drill keys are dropped only when
+  // the tab changes: GOBViews.open writes the new URL, drill keys and all, before it
+  // calls here, so the tab it names is already current and its keys are kept.
+  function show(tabName, historyMode, opts) {
     tabName = canonicalTab(tabName);
     if (leaveForStandaloneReport(tabName)) return;
     if (!isKnown(tabName)) tabName = defaultTab;
     var nav = window.GOBNav;
     if (shownTab && shownTab !== tabName && nav && typeof nav.confirmLeave === 'function') {
       var held = nav.confirmLeave(function () {
-        if (held) show(tabName, historyMode);
+        if (held) show(tabName, historyMode, opts);
       }, shownTab);
       if (held) return;
     }
+    var before = canonicalTab(liveParams().get('tab') || '');
+    var leaving = !!(opts && opts.fresh) || (!!before && before !== tabName);
     if (window.GOB_BUILD_PROFILE === 'desktop' && window.FranchiseContext && typeof window.FranchiseContext.set === 'function') {
       window.FranchiseContext.set('tab', tabName);
     }
     if (historyMode === 'push' && window.GOBNav && typeof window.GOBNav.pushSection === 'function') {
       var bag = liveParams();
       bag.set('tab', tabName);
+      if (leaving) dropNavKeys(bag);
       var qs = bag.toString();
       var next = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
       window.GOBNav.pushSection(next);
     } else {
-      updateUrl(tabName);
+      updateUrl(tabName, leaving);
     }
     setActive(tabName);
     if (historyMode === 'push') {
@@ -127,12 +152,13 @@ function initCommandCenterTabs(options) {
     onTabShow(tabName);
   }
 
-  function updateUrl(tabName) {
+  function updateUrl(tabName, leaving) {
     if (window.FranchiseContext && typeof window.FranchiseContext.absorbLocation === 'function') {
       window.FranchiseContext.absorbLocation();
     }
     var bag = liveParams();
     bag.set('tab', tabName);
+    if (leaving) dropNavKeys(bag);
     var qs = bag.toString();
     // Tabs are sub-navigation. replaceState keeps FCC as one history entry
     // so a later section rail can reuse the same tab switch.

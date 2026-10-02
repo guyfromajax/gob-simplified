@@ -64,10 +64,20 @@
   (through title week 35), and frozen after Week-35 Results until next season. Roster /
   other surfaces read FTD — they do not rescan lean lists.
 - Content (top to bottom):
-  1. `ranking_table` rich lines under `National Recruit Rankings` and `Region {letter}` (when points exist).
-  2. Section heading **Recruiting Leans Announced**, then the former leans story body:
-     - `Top Rated Recruit Announcements` — recruits with RT > 49 who added a lean that week
-     - `Conference {N} Lean Announcements` — new leans toward teams in the user's conference (teams by ascending natl_rank; a recruit can appear in both sections)
+  1. `ranking_table` rich lines under `National Recruit Rankings` and `Region {letter}` (when points exist). Each table is named (`table`: `national` / `region`). Stored with the story, so an old story keeps its own week:
+     - **Rank movement**: each row's `move` (places gained since last week's same table; 0 = unchanged) or `new: true` (not in last week's table). Computed from the previous week's stored report (`w{N-1}-recruiting-report`), national against national and region against region. Week 1, or a week with no report the week before, stores none.
+     - **`user_row`** on the national table when the user's team is outside the top 25: its real rank (its place among every team with points; the durable `recruiting_rank` when it has none), score, and `move` when last week's rank is known.
+     - **`caption`** on the national table: what Score is, in plain words (`WEEKLY_SCORE_CAPTION`; the Results story uses `RESULTS_SCORE_CAPTION`). The scoring is not hidden.
+  2. The lean announcements, under their own two sub-headings (no outer "Recruiting Leans Announced" heading):
+     - `Top Rated Recruit Announcements` — recruits with RT > 49 who added a lean that week, as `text` lines
+     - `Conference {label} Lean Announcements` — the conference as the rest of the app names it (`A2`, not `2`). New leans toward teams in the user's conference (teams by ascending natl_rank; a recruit can appear in both sections). One `team_recruits` rich line per team: `{type, team_id, team_name, recruits: [{recruit_id, name, rt}]}`, recruits by descending RT, `rt` the raw number.
+- Rendering (`newsStory.js`, `newsView.js`):
+  - No "Week N" line under the headline (the headline names the week). Other story types keep it.
+  - Headings are the app's heading styles (Styleguide › Type), never bold body text: a `heading` line is a section (`h3.gob-news-heading`, heading-col); `level: 2`, and a team over its recruits, is a sub-section (`h4.gob-news-sub`, heading-card).
+  - A heading followed by a `ranking_table` is one `.gob-news-rank` section; consecutive ones are a `.gob-news-ranks` group. They stack, and from 1600px sit side by side with the story at full width. The lean sections follow beneath.
+  - Ranking rows: the team is a team link (logo mark and name) to its page; the user's team is the navy "yours" row; `user_row` is the last row of the national table, set off by a rule. Movement is a small neutral mark beside the rank ("▲3" t87, "▼2" and "NEW" t60, nothing when unchanged), the Office's rank-movement treatment. A story stored without movement, caption or `user_row` shows none.
+  - A `team_recruits` block is the team as a sub-heading (logo mark and name in the shared team style, linking to the team page) over its recruits, one per row, name then RT in the canonical ramp. Recruit names are text: no story links a recruit.
+- Stories stored before this (the lean section as plain `text` lines, team and recruits alike) render as before, with the old conference name. Only the outer heading is not drawn. They are not upgraded on read: the old lines hold the RT letter only, and the page does not re-map the ramp from a letter.
 - `story_id`: `w{N}-recruiting-report`. Skipped if already present when prepending.
 
 ##Headline: "Your Recruiting Board Moved"
