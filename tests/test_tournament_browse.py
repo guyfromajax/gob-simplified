@@ -201,3 +201,118 @@ def test_stale_region_served_in_response_not_persisted(monkeypatch):
     assert out["region_tournaments_stale"] is True
     assert out["region_tournaments"] == reconciled
     assert franchise_doc["region_tournaments"] == stored
+
+
+def _real_shape_franchise(owner_id: str, teams: dict[str, ObjectId]) -> dict:
+    """Week 30 as a real season stores it (read off a staging franchise and a full
+    offline season): conference brackets played, with string ids and ``{"home", "away"}``
+    scores; a region with a round-1 game, an ``R1_0`` placeholder in its final and no
+    ``seeds``; a region that is one final and nothing else; no national bracket yet."""
+    ids = {name: str(oid) for name, oid in teams.items()}
+
+    def played(home, away, winner, hs, as_, gid):
+        return {"home_team": ids[home], "away_team": ids[away], "game_id": gid,
+                "winner": ids[winner], "score": {"home": hs, "away": as_}}
+
+    def open_game(away, home):
+        return {"away_team": ids.get(away, away), "home_team": ids.get(home, home),
+                "game_id": None, "winner": None, "score": {}}
+
+    return {
+        "_id": ObjectId(),
+        "user_id": owner_id,
+        "user_team_id": "MORRISTOWN",
+        "user_team_object_id": ids["morristown"],
+        "week": 30,
+        "current_season": 1,
+        "browse_rev": 7,
+        "eos_tournament_active": True,
+        "results": {},
+        "conference_tournaments": {
+            "1": {
+                "bracket": {
+                    "round1": [played("xavien", "little_york", "xavien", 87, 49, "g-r1")],
+                    "round2": [played("xavien", "morristown", "xavien", 85, 58, "g-r2")],
+                    "final": [played("xavien", "lancaster", "lancaster", 78, 82, "g-f")],
+                },
+                "current_round": 3,
+                "seeds": {ids["xavien"]: 1, ids["lancaster"]: 2, ids["morristown"]: 4, ids["little_york"]: 8},
+                "champion": ids["lancaster"],
+            },
+        },
+        "region_tournaments": {
+            "A": {
+                "round1": [open_game("lancaster", "xavien")],
+                "final": [open_game("R1_0", "durham")],
+                "current_round": 1,
+            },
+            "B": {"round1": [], "final": [open_game("concord", "providence")], "current_round": 1},
+        },
+    }
+
+
+def test_route_needs_the_session_and_serves_a_real_season_shape():
+    """The real auth dependency. Every other test runs behind the conftest override,
+    which is how a client that sent no Authorization header went unnoticed: the route
+    is 401 without the bearer token, and 200 with it."""
+    from fastapi.testclient import TestClient
+
+    from BackEnd.api.api import app
+    from BackEnd.db import db, franchise_team_data_collection, users_collection
+    from BackEnd.utils import auth
+    from BackEnd.utils.auth import get_current_user
+
+    override = app.dependency_overrides.pop(get_current_user, None)
+    try:
+        owner = users_collection.insert_one({"email": "coach@example.com", "token_version": 0}).inserted_id
+        auth.invalidate_user_auth_cache()
+        layout = {
+            "morristown": (1, "A"), "xavien": (1, "A"), "lancaster": (1, "A"), "little_york": (1, "A"),
+            "durham": (2, "A"), "concord": (3, "B"), "providence": (4, "B"),
+        }
+        teams = {name: ObjectId() for name in layout}
+        for name, oid in teams.items():
+            db.teams.insert_one({"_id": oid, "name": name.replace("_", " ").title(),
+                                 "conference": layout[name][0], "region": layout[name][1]})
+        doc = _real_shape_franchise(str(owner), teams)
+        db.franchises.insert_one(copy.deepcopy(doc))
+        for rank, oid in enumerate(teams.values(), start=1):
+            franchise_team_data_collection.insert_one(
+                {"franchise_id": doc["_id"], "team_id": oid, "natl_rank": rank})
+
+        client = TestClient(app)
+        params = {"franchise_id": str(doc["_id"])}
+
+        bare = client.get("/franchise/tournament/brackets", params=params)
+        assert bare.status_code == 401
+        assert bare.json() == {"detail": "Not authenticated"}
+
+        token = auth.create_access_token({"sub": str(owner), "email": "coach@example.com", "tv": 0})
+        ok = client.get("/franchise/tournament/brackets", params=params,
+                        headers={"Authorization": f"Bearer {token}"})
+        assert ok.status_code == 200, ok.text
+        body = ok.json()
+        assert body["locked"] is False
+        assert body["week"] == 30
+        assert body["current_phase"] == "region"
+        # What the tab reads to pick each phase's bracket.
+        assert body["user_conference"] == 1
+        assert body["user_region"] == "A"
+        assert body["conference_tournaments"]["1"]["bracket"]["final"][0]["winner"] == str(teams["lancaster"])
+        assert "A" in body["region_tournaments"]
+        assert body["national_tournament"] == {}
+        # Every team in the user's conference bracket has a name; a placeholder is not a team.
+        for name in ("morristown", "xavien", "lancaster", "little_york"):
+            assert str(teams[name]) in body["teams"]
+        assert "R1_0" not in body["teams"]
+        assert body["teams"][str(teams["little_york"])]["name"] == "Little York"
+
+        # A token for someone else's franchise is still refused.
+        other = users_collection.insert_one({"email": "other@example.com", "token_version": 0}).inserted_id
+        stranger = auth.create_access_token({"sub": str(other), "email": "other@example.com", "tv": 0})
+        denied = client.get("/franchise/tournament/brackets", params=params,
+                            headers={"Authorization": f"Bearer {stranger}"})
+        assert denied.status_code == 403
+    finally:
+        if override is not None:
+            app.dependency_overrides[get_current_user] = override

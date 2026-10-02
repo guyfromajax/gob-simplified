@@ -421,7 +421,9 @@ The ETag is `franchise:season:week:browse_rev:BUILD:signature`. The store rememb
 
 `GOBStore.mutate(url, options)` is the write wrapper. `window.fetch` sends POST, PUT, PATCH, and DELETE on `/franchise/`, `/api/gameplan`, and `/api/playbooks` through it. After a successful response it clears that franchise's memory and `sessionStorage`. The next GET is a full read and picks up the new revision. A flow page that navigates away after a write does not have to do anything else.
 
-Cached routes are the browse GETs: command-center, standings, schedule (including national), leaders, team-stats, team-player-stats, player-stats, team-data, news, recruiting-data, recruiting-results, practice-squad, awards, scouting-report, roster, player, player-detail, team-detail, recruit, teams, game plan, and playbooks.
+Cached routes are the browse GETs: command-center, standings, schedule (including national), leaders, team-stats, team-player-stats, player-stats, team-data, news, recruiting-data, recruiting-results, practice-squad, tournament brackets, awards, scouting-report, roster, player, player-detail, team-detail, recruit, teams, game plan, and playbooks.
+
+**The list is also what attaches the session.** A route on `BROWSE_PREFIXES` gets the `Authorization` header and the ETag; a route that is not is a plain uncached request (it now carries the header too). A new `@browse_cached` route must be added to `BROWSE_PREFIXES` in the same change. League › Tournament shipped without its entry: the tab sent no session, the hosted server answered 401, and the tab showed "Tournament could not be opened." in every tournament week. Stubbed specs and the offline engine do not check the header, so neither caught it: a view's spec must refuse a request with no `Authorization` header (`tables-followups.spec.js` does), and the route's own test must run the real auth dependency (`test_tournament_browse.py`).
 
 Never cached: `GET /api/game/{id}`, `POST /api/simulate-quarter`, `/api/auth`, and any URL with `profile=1`. `profile=1` is only added when the page URL has `cc_profile=1`.
 

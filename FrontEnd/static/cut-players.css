@@ -51,6 +51,43 @@ html.gob-focus #cut-players-view .cut-players-shell {
   --gob-data-grid-min-width: 1120px;
 }
 
+/* Attribute pairs (Styleguide, Tables): SC SH | ID OD | PS BH | RB ST | AG ND | IQ FT.
+   The two values of a pair sit against their shared edge, pairs stand a gutter apart,
+   and Weight to SC is the widest gap. The pair columns take none of the table's spare
+   width, so a pair reads the same at any window size. */
+#cut-players-view #cut-players-table th.gstart,
+#cut-players-view #cut-players-table td.gstart,
+#cut-players-view #cut-players-table th.gend,
+#cut-players-view #cut-players-table td.gend {
+  width: 1px;
+}
+
+#cut-players-view #cut-players-table th.gstart,
+#cut-players-view #cut-players-table td.gstart {
+  text-align: right;
+  padding-left: var(--dsp-12);
+  padding-right: var(--space-2);
+}
+
+#cut-players-view #cut-players-table th.gend,
+#cut-players-view #cut-players-table td.gend {
+  text-align: left;
+  padding-left: var(--space-2);
+  padding-right: var(--dsp-12);
+}
+
+#cut-players-view #cut-players-table th.wt,
+#cut-players-view #cut-players-table td.wt {
+  padding-right: var(--dsp-24);
+}
+
+/* A label and its value share one width, so each label sits over its own value. */
+#cut-players-view #cut-players-table .ak {
+  display: inline-block;
+  width: var(--dsz-24);
+  text-align: center;
+}
+
 #cut-players-view .cut-player-name-link {
   color: var(--text-100);
   text-decoration: none;

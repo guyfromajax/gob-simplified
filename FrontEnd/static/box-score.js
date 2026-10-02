@@ -1755,7 +1755,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const hctPct = hctUsed > 0 ? ((hctSuccess / hctUsed) * 100).toFixed(0) : '0';
   const hctBlock = document.createElement('div');
   hctBlock.className = 'scouting-play-type';
-  hctBlock.innerHTML = `<div class="scouting-play-type-header"><span>HC Traps:</span><span>${hctSuccess} / ${hctUsed} (${hctPct}%)</span></div>`;
+  hctBlock.innerHTML = `<div class="scouting-play-type-header"><span>Half-Court Traps:</span><span>${hctSuccess} / ${hctUsed} (${hctPct}%)</span></div>`;
   specialSection.appendChild(hctBlock);
 
   const fcp = defense.FCP || {};

@@ -25,6 +25,15 @@
     .tsr-table th:first-child, .tsr-table td:first-child { text-align: left; }
     .tsr-table thead th { font-family: 'Bebas Neue', sans-serif; letter-spacing: .04em; color: rgba(255,255,255,0.6); }
     .tsr-pos { color: rgba(255,255,255,0.5); }
+    /* Attribute pairs (Styleguide, Tables): SC SH | ID OD | PS BH | RB ST | AG ND | IQ FT.
+       A pair's two values sit against their shared edge, pairs stand a gutter apart, and
+       POS to SC is the widest gap. Pair columns take none of the table's spare width. */
+    .tsr-table .gstart, .tsr-table .gend, .tsr-table .gsolo { width: 1px; }
+    .tsr-table .gstart { text-align: right; padding-left: 12px; padding-right: 2px; }
+    .tsr-table .gend { text-align: left; padding-left: 2px; padding-right: 12px; }
+    .tsr-table .gsolo { padding-left: 12px; padding-right: 12px; }
+    .tsr-table .tsr-lead { width: 1px; padding-right: 24px; }
+    .tsr-table .ak { display: inline-block; width: 3ch; text-align: center; }
     .tsr-up { color: #34ec27; font-weight: 700; } /* colour-law: positive-data */
     .tsr-down { color: #ff6d6d; font-weight: 700; }
     .tsr-zero { color: rgba(255,255,255,0.35); }
