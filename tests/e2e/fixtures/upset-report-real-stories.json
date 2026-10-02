@@ -1,0 +1,50 @@
+{
+ "_source": "Recorded GET /franchise/news stories of a real offline season (the same save as boxscore-real-game.json). with_games (week 9) was written after each upset line began storing its game; without_games (week 8) before.",
+ "with_games": {
+  "story_id": "w9-upset-report",
+  "week": 9,
+  "type": "upset_report",
+  "headline": "Week 9 Upset Report",
+  "lines": [
+   "#50. Bayou District upset #5. Amarillo Tech by a score of 65-61.",
+   "#49. Grayson Ranch upset #12. Myrtle Private by a score of 74-73.",
+   "#83. IDA upset #20. Lancaster by a score of 20-14.",
+   "#71. Xavien upset #24. Cagers World by a score of 72-70."
+  ],
+  "rich_lines": [
+   {
+    "type": "game_result",
+    "text": "#50. Bayou District upset #5. Amarillo Tech by a score of 65-61.",
+    "game_id": "6ac013ebeb2d089e1f47e740"
+   },
+   {
+    "type": "game_result",
+    "text": "#49. Grayson Ranch upset #12. Myrtle Private by a score of 74-73.",
+    "game_id": "6ac013e043c8eb94266f1608"
+   },
+   {
+    "type": "game_result",
+    "text": "#83. IDA upset #20. Lancaster by a score of 20-14.",
+    "game_id": "6ac0138292973bedadff26cd"
+   },
+   {
+    "type": "game_result",
+    "text": "#71. Xavien upset #24. Cagers World by a score of 72-70.",
+    "game_id": "6ac013d13dddac8a82a84fe6"
+   }
+  ],
+  "created_at": "2026-10-02T20:28:47.217691"
+ },
+ "without_games": {
+  "story_id": "w8-upset-report",
+  "week": 8,
+  "type": "upset_report",
+  "headline": "Week 8 Upset Report",
+  "lines": [
+   "#83. Valdosta Valley upset #27. Mobile by a score of 64-61.",
+   "#126. Columbus upset #40. Sacred Heart by a score of 61-58.",
+   "#93. Lexington upset #59. DeLand by a score of 84-75."
+  ],
+  "created_at": "2026-10-02T18:34:51.871574"
+ }
+}

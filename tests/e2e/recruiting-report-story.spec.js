@@ -256,7 +256,9 @@ test('Recruiting Report rankings: team links, the yours row, movement marks, the
   // One quiet caption, under National Recruit Rankings only, saying what Score is.
   await expect(body.locator('.gob-news-caption')).toHaveCount(1);
   await expect(national.locator('.gob-news-caption')).toHaveText(NATIONAL.caption);
-  expect(NATIONAL.caption).toMatch(/first choice counts in full, a second choice half, a third a quarter/);
+  // It says what Score is for. How it is built is hidden.
+  expect(NATIONAL.caption).toBe('Class strength so far');
+  await expect(story).not.toContainText(/first choice|counts in full|a quarter|adds up|ratings of/i);
   const caption = await national.locator('.gob-news-caption').evaluate((node) => ({
     colour: getComputedStyle(node).color,
     size: parseFloat(getComputedStyle(node).fontSize),
@@ -420,10 +422,11 @@ test('stories stored without movement, caption or foot row show none, and keep t
   }
 });
 
-test('another kind of story keeps its "Week N" line', async ({ page }) => {
+test('a story whose headline does not name the week keeps its "Week N" line', async ({ page }) => {
+  // The full table of story types is in news-followups.spec.js.
   await openStory(page, {
-    story_id: 'w3-upset-report', week: 3, type: 'upset_report', headline: 'Week 3 Upset Report',
-    lines: ['Redwood High upset Pacific All-Stars by a score of 71-66.'],
+    story_id: 'w3-ps-all-stars', week: 3, type: 'ps_all_stars', headline: 'Practice Squad All-Stars',
+    lines: ['A practice-squad player gained five attribute points this week.'],
   });
   await expect(page.locator('#news-view .gob-news-meta')).toHaveText('Week 3');
 });

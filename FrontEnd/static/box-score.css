@@ -769,3 +769,26 @@ html.gob-focus body.box-score-page #box-score-view {
 #box-score-container .box-score-back {
   margin: 0 0 var(--space-12);
 }
+
+/* No game to show (opened without a game, or it could not be loaded). The sections are
+   built for a game, so everything but the back button gives way to one card. */
+#box-score-container.is-empty > :not(#locker-room-button):not(.box-score-empty) {
+  display: none;
+}
+#box-score-container .box-score-empty {
+  margin: var(--space-16) 0;
+  padding: var(--space-16) var(--dsp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-10);
+  background: var(--white-4);
+  color: var(--text-87);
+  font: var(--fw-medium) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+#box-score-container .box-score-empty p {
+  margin: 0;
+}
+#box-score-container .box-score-empty .box-score-empty-hint {
+  margin-top: var(--space-4);
+  color: var(--text-60);
+  font-size: var(--fs-12);
+}

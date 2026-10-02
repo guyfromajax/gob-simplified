@@ -397,3 +397,9 @@ body.playbook-report-page {
     grid-template-columns: 1fr;
   }
 }
+
+/* First paint. Until the playbook is in, the page body is held back behind the shared
+   loader: no bare section heads, and no head that jumps when its rows arrive. */
+html.is-loading .playbook-report-shell {
+  visibility: hidden;
+}
