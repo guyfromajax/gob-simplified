@@ -51,7 +51,7 @@ Jamie approved every recommendation in `reports/jamie-decisions-2-2026-10-01.md`
 | 2 | W/L plates in tables | `.gob-wl` (`gob-tables.css`): WIN white plate (`--white-90` / `--bg`), LOSS `--white-40` outline. Rankings "Last Week" and Team › Schedule. Dead `.wl.win` / `.wl.loss` deleted (`gob-components.css`). |
 | 3a | Rail count badge neutral | `--badge` is `--white-90` (`gob-tokens.css`); `--badge-ink` unchanged (dark). |
 | 3b | `.td-gate` tag, `.is-on` neutral | `.td-gate` and `.todo.gated` (`gob-components.css`); `.hub-anchor--orders.is-on` (`recruiting-signing.css`); `.fg-pick.is-on` (`gob-advanced.css`). |
-| 3c | Office blocking step | `.wk-step.gated`: `--white-62` outline, `--white-6` fill (`office-home.css`). |
+| 3c | Office blocking step | Neutral, never orange. Since the strip became a read-only stepper it has no outline or fill: it is the current step, label bold `--text-100` (`office-home.css`). |
 | 3d | Attitude: no orange stop | `em_20_39` is `color-mix(--red 55%, --white-18)` (`office-home.css`). |
 | 3e | Modal accent neutral by default | `.gob-modal-accent` default `rgba(255,255,255,.14)` in `resource-pages.css` (the `auth-bar.css` `:where()` mirror already was). `is-green` / `is-red` still opt in. |
 | 3f | Tutorial alert neutral | Unchanged (`gob-tutorial.css`); now guarded. |
@@ -471,14 +471,22 @@ The Office fills `.main` edge to edge inside the standard page padding (`--page-
 
 While the digest is absent the page shows a skeleton strip and three skeleton cards. There is no spinner.
 
-A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. It does not repeat the week number. The top bar already shows it. Each `todos[]` entry is one step, in order, joined left to right. Labels use the same copy as before. An `is_advance_action` step that is not done copies the top-bar Advance label and does not add an ADVANCE tag. The only Advance button on the page is the green top-bar control. A gating step that is not the Advance action has a strong neutral outline and no tag (the BLOCKS ADVANCE tag was removed, 2026-10-02). Every step uses the same padding. The status circle sits at least `--dsp-8` in from the left edge of the pill at both densities. Steps size to their labels. If the row is wider than the page, the gap between steps comes down before the labels do. Labels are not truncated. The strip does not scroll and does not wrap to a second row.
+A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. It does not repeat the week number. The top bar already shows it. Each `todos[]` entry is one step, in order, joined left to right. An `is_advance_action` step that is not done copies the top-bar Advance label.
+
+**The strip is status, not controls.** The only control that advances the week is the action button in the top bar.
+
+- Markup: an `<ol class="week-track">` of `<li class="wk-step">`. No button, link, `tabindex`, role or handler; the cursor stays default. The current step has `aria-current="step"`; a done step carries a hidden "(done)".
+- Look: a quiet stepper. A small state mark and plain text per step, joined by a thin line. No pill outline, no fill.
+- States: done = a check, dimmed (`--text-38`); current = the mark filled, the label bold `--text-100`; upcoming = dim. A step that blocks the advance is the current step and reads the same (no tag; BLOCKS ADVANCE was removed 2026-10-02). Neutral only: no green, orange or navy.
+- Steps size to their labels. If the row is wider than the page, the gap between steps comes down before the labels do. Labels are not truncated. The strip does not scroll and does not wrap to a second row.
+- A step's `route` is no longer used by the strip (a step used to open its page, and the Advance step used to press the top-bar button).
 
 | Step | Rule |
 |---|---|
-| Done | Check mark, opacity 38%, still clickable. Opens `route`. |
-| Next | The first not-done required step. Neutral bright outline (`--text-100`). Green stays on the top-bar Advance only. If this step is `is_advance_action`, its label copies the top bar and the click runs the same action. |
-| Blocking | `gates_advance` on a step that is not `is_advance_action` draws a neutral strong outline (`--white-62`). No tag. Never orange (batch 2). |
-| Upcoming | The remaining steps. |
+| Done | A check, dimmed (`--text-38`). Not a control. |
+| Next | The first not-done required step: `aria-current="step"`, the mark filled, the label bold `--text-100`. Green stays on the top-bar Advance only. If this step is `is_advance_action`, its label copies the top bar; it does not run the action. |
+| Blocking | `gates_advance` on a step that is not `is_advance_action`. Reads as the current step. No tag, no outline. Never orange (batch 2). |
+| Upcoming | The remaining steps, dim. |
 
 | State | Column 1 · Since last week | Column 2 · This Week | Column 3 · Recruiting |
 |---|---|---|---|

@@ -159,7 +159,13 @@ html.gob-shell.gob-office .office-grid {
   align-items: center;
   flex: 1 1 auto;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
+/* The week's steps are status, not controls: a quiet stepper. A small state mark and plain
+   text per step, joined by a thin line. No outline, no fill, no pointer. Done steps show a
+   check and dim; the current step is full white; upcoming steps are dim. Neutral only. */
 .gob .wk-step {
   display: flex;
   align-items: center;
@@ -167,66 +173,64 @@ html.gob-shell.gob-office .office-grid {
   flex: 0 1 auto;
   min-width: max-content;
   height: 36px;
-  padding: 0 var(--dsp-8);
-  border-radius: var(--radius-10);
-  background: var(--white-3p5);
-  box-shadow: inset 0 0 0 1px var(--line);
+  padding: 0;
   position: relative;
   white-space: nowrap;
+  cursor: default;
 }
 .gob.gob-1920 .wk-step { height: 40px; }
-.gob .wk-step + .wk-step { margin-left: 12px; }
+.gob .wk-step + .wk-step { margin-left: var(--dsz-44); }
 .gob .wk-step + .wk-step::before {
   content: '';
   position: absolute;
-  left: -12px;
-  width: 12px;
+  left: calc(var(--dsz-44) * -1 + var(--dsp-10));
+  width: calc(var(--dsz-44) - var(--dsp-10) * 2);
   top: 50%;
   height: 1px;
   background: var(--line-strong);
 }
-.gob .week-strip.is-tight .wk-step { padding: 0 var(--dsp-8); gap: var(--dsp-8); }
-.gob .week-strip.is-tight .wk-step + .wk-step { margin-left: 8px; }
-.gob .week-strip.is-tight .wk-step + .wk-step::before { left: -8px; width: 8px; }
-.gob .week-strip.is-tight .td-adv,
-.gob .week-strip.is-tight .td-gate {
-  font-size: 9px;
-  letter-spacing: 0.04em;
-  padding: 2px 4px;
-}
-.gob .week-strip.is-tighter .wk-step { padding: 0 var(--dsp-8); gap: var(--dsp-8); }
-.gob .week-strip.is-tighter .wk-step + .wk-step { margin-left: 6px; }
-.gob .week-strip.is-tighter .wk-step + .wk-step::before { left: -6px; width: 6px; }
+.gob .week-strip.is-tight .wk-step + .wk-step { margin-left: var(--dsz-30); }
+.gob .week-strip.is-tight .wk-step + .wk-step::before { left: calc(var(--dsz-30) * -1 + var(--dsp-8)); width: calc(var(--dsz-30) - var(--dsp-8) * 2); }
+.gob .week-strip.is-tighter .wk-step + .wk-step { margin-left: var(--dsz-20); }
+.gob .week-strip.is-tighter .wk-step + .wk-step::before { left: calc(var(--dsz-20) * -1 + var(--space-5)); width: calc(var(--dsz-20) - var(--space-5) * 2); }
 .gob .week-strip.is-tighter .td-l { font-size: var(--fs-12); }
 .gob .wk-step .td-l {
   flex: none;
   overflow: visible;
   text-overflow: unset;
   white-space: nowrap;
+  font-weight: var(--fw-regular);
+  color: var(--text-60);
 }
 .gob .wk-dot {
-  width: 16px;
-  height: 16px;
+  width: var(--dsz-18);
+  height: var(--dsz-18);
   flex: none;
   border-radius: var(--radius-round);
   display: grid;
   place-items: center;
   box-shadow: inset 0 0 0 1.5px var(--white-40);
-  color: var(--bg);
+  color: var(--text-60);
 }
 .gob .wk-dot svg { width: 10px; height: 10px; }
-.gob .wk-step.done { opacity: 0.38; }
-.gob .wk-step.done .wk-dot { background: var(--text-38); box-shadow: none; }
-.gob .wk-step.is-next {
+/* Done: a check, dimmed. */
+.gob .wk-step.done .wk-dot { box-shadow: none; }
+.gob .wk-step.done .td-l { color: var(--text-38); }
+.gob .wk-step.done .wk-dot { color: var(--text-38); }
+/* Current: full white, the mark filled. A step that blocks the advance is the current step
+   too (the top bar says what is needed), so it reads the same. */
+.gob .wk-step.is-next .td-l,
+.gob .wk-step.gated .td-l { font-weight: var(--fw-bold); color: var(--text-100); }
+.gob .wk-step.is-next .wk-dot,
+.gob .wk-step.gated .wk-dot {
   box-shadow: inset 0 0 0 1.5px var(--text-100);
-  background: var(--white-7);
+  background: radial-gradient(circle, var(--text-100) 0, var(--text-100) 34%, transparent 38%);
 }
-/* Blocking step: neutral strong outline; "BLOCKS ADVANCE" carries the meaning
-   (orange = unsaved changes only, Jamie 2026-10-01). */
-.gob .wk-step.gated {
-  box-shadow: inset 0 0 0 1.5px var(--white-62);
-  background: var(--white-6);
-}
+/* Upcoming: dim. */
+.gob .wk-step.is-upcoming .td-l { color: var(--text-38); }
+.gob .wk-step.is-upcoming .wk-dot { box-shadow: inset 0 0 0 1.5px var(--white-20); }
+/* Read out, not shown. */
+.gob .wk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .gob .wk-step .td-adv,
 .gob .wk-step .td-gate {
   flex: none;
@@ -460,12 +464,6 @@ html.gob-shell.gob-office #franchise-container .office-st .st-n .gob-mark {
   width: var(--dsz-18);
   height: var(--dsz-18);
   object-fit: contain;
-}
-.gob .office .wk-step,
-.gob .office .week-strip.is-tight .wk-step,
-.gob .office .week-strip.is-tighter .wk-step {
-  padding: 0 var(--dsp-8);
-  gap: var(--dsp-8);
 }
 .gob.gob-1280 .office-next { gap: 2px; padding-top: 4px; padding-bottom: 2px; }
 .gob.gob-1280 .office-next .nx-name { font-size: var(--fs-24); line-height: 1; }

@@ -400,6 +400,16 @@ async function openOffice(page, data) {
       const now = signature();
       if (now === prev) stable += 1; else { stable = 0; prev = now; }
     }
+    // The arrival animation moves cards with a transform, which a column's scrollHeight
+    // counts while the rounded edges above already look still. Let the finite ones land.
+    const moving = document.getAnimations().filter((a) => {
+      const timing = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+      return timing && isFinite(timing.endTime);
+    });
+    await Promise.race([
+      Promise.all(moving.map((a) => a.finished.catch(() => {}))),
+      new Promise((resolve) => setTimeout(resolve, 4000)),
+    ]);
   });
 }
 
@@ -794,17 +804,14 @@ test('advance mirror matches the top bar', async ({ page }) => {
     await expect(page.locator('[data-advance-mirror="1"] .td-l')).toHaveText(
       ((await page.locator('#play-now').textContent()) || '').trim()
     );
-    const todoUrl = await captureNav(page, '[data-advance-mirror="1"]');
-    await openOffice(page, row[1]);
-    await page.evaluate(() => {
-      window.__officeNav = [];
-      const nav = window.GOBNav;
-      nav.go = function (url) { window.__officeNav.push(String(url)); };
-    });
+    // The step names what the top bar will do. It is status: clicking it does nothing.
+    await mouseClick(page, '[data-advance-mirror="1"]');
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => window.__officeNav.length), row[0] + ' step click').toBe(0);
+    // The action button in the top bar is the control.
     const barUrl = await captureNav(page, '#play-now');
-    expect(new URL(todoUrl, 'http://local').pathname).toBe(row[2]);
-    expect(new URL(barUrl, 'http://local').pathname).toBe(new URL(todoUrl, 'http://local').pathname);
-    log.push(row[0] + ' ' + new URL(todoUrl, 'http://local').pathname);
+    expect(new URL(barUrl, 'http://local').pathname).toBe(row[2]);
+    log.push(row[0] + ' ' + new URL(barUrl, 'http://local').pathname);
   }
   fs.writeFileSync(path.join(OUT, 'advance.txt'), log.join('\n') + '\n');
 });
@@ -858,36 +865,23 @@ test('live mid-season digest', async ({ page }) => {
   }
 });
 
-test('week strip states and clicks', async ({ page }) => {
+test('week strip states: a read-only stepper, not controls', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openOffice(page, STATES.win);
   const steps = await page.locator('#office-root .wk-step').evaluateAll((nodes) => nodes.map((node) => ({
     state: node.dataset.stepState,
     next: node.classList.contains('is-next'),
-    text: node.innerText.replace(/\s+/g, ' ').trim(),
+    current: node.getAttribute('aria-current'),
+    text: node.querySelector('.td-l').innerText.replace(/\s+/g, ' ').trim(),
   })));
   expect(steps.map((step) => step.state)).toEqual(['done', 'blocking', 'upcoming', 'upcoming', 'upcoming']);
   expect(steps[1].next).toBe(true);
-  // The blocking step is an outline only: no BLOCKS ADVANCE tag (removed 2026-10-02).
+  expect(steps.map((step) => step.current)).toEqual([null, 'step', null, null, null]);
+  // No BLOCKS ADVANCE tag (removed 2026-10-02): the current step is just the current step.
   expect(steps[1].text).toBe('Review recruit invites');
   expect(await page.locator('#office-root .td-gate').count()).toBe(0);
   expect(await page.locator('#office-root .td-adv').count()).toBe(0);
   expect(await page.locator('#office-root .week-k').count()).toBe(0);
-  expect(await page.locator('#office-root .wk-step.gated .td-adv').count()).toBe(0);
-  const inset = await page.locator('#office-root .wk-step.is-next').evaluate((node) => {
-    const dot = node.querySelector('.wk-dot');
-    const pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dsp-8'));
-    const pads = [...document.querySelectorAll('#office-root .wk-step')].map((step) => getComputedStyle(step).padding);
-    return {
-      inset: dot.getBoundingClientRect().left - node.getBoundingClientRect().left,
-      pad: pad,
-      pads: pads,
-    };
-  });
-  expect(inset.inset).toBeGreaterThanOrEqual(inset.pad - 0.5);
-  expect(new Set(inset.pads).size).toBe(1);
-  const doneOpacity = await page.locator('#office-root .wk-step.done').evaluate((node) => getComputedStyle(node).opacity);
-  expect(doneOpacity).toBe('0.38');
   const strip = await page.locator('#office-root .week-strip').evaluate((node) => ({
     h: node.getBoundingClientRect().height,
     wide: node.scrollWidth - node.clientWidth,
@@ -895,13 +889,16 @@ test('week strip states and clicks', async ({ page }) => {
   expect(strip.h).toBeGreaterThan(50);
   expect(strip.h).toBeLessThan(60);
   expect(strip.wide).toBeLessThanOrEqual(1);
+  // Clicking a step goes nowhere (the done step used to open Training).
   await page.evaluate(() => {
     window.__officeNav = [];
     window.GOBNav.go = function (url) { window.__officeNav.push(String(url)); };
   });
-  await mouseClick(page, '#office-root .wk-step.done');
-  await page.waitForFunction(() => window.__officeNav && window.__officeNav.length > 0);
-  expect(new URL((await page.evaluate(() => window.__officeNav[0])), 'http://local').pathname).toBe('/training.html');
+  for (const selector of ['.wk-step.done', '.wk-step.is-next', '.wk-step.is-upcoming']) {
+    await mouseClick(page, '#office-root ' + selector);
+  }
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.__officeNav)).toEqual([]);
 });
 
 test('the weekly card row cap does not depend on when the density class lands', async ({ page }) => {

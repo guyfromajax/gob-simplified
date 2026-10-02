@@ -503,6 +503,8 @@
     return href('/training-report.html', params);
   }
 
+  // The week's steps, as status. Read-only: a list, not controls. Nothing here navigates
+  // or advances; the action button in the top bar is the only control that does.
   function weekStrip(digest) {
     var list = Array.isArray(digest && digest.todos) ? digest.todos : [];
     var nextIndex = -1;
@@ -510,7 +512,8 @@
       if (nextIndex === -1 && todo && !todo.done && todo.required !== false) nextIndex = index;
     });
     var strip = el('div', 'week-strip' + (list.length > 6 ? ' is-tight' : ''));
-    var track = el('div', 'week-track');
+    var track = el('ol', 'week-track');
+    track.setAttribute('aria-label', 'This week');
     list.forEach(function (todo, index) {
       if (!todo) return;
       var classes = 'wk-step';
@@ -528,26 +531,21 @@
       } else {
         classes += ' is-upcoming';
       }
-      var row = el('button', classes);
-      row.type = 'button';
+      var row = el('li', classes);
       row.dataset.officeTodo = todo.id || '';
       row.dataset.stepState = state;
+      if (index === nextIndex) row.setAttribute('aria-current', 'step');
       if (todo.is_advance_action && !todo.done) row.dataset.advanceMirror = '1';
       var dot = el('span', 'wk-dot');
+      dot.setAttribute('aria-hidden', 'true');
       if (todo.done) dot.appendChild(checkMark());
       row.appendChild(dot);
       var copy = (todo.is_advance_action && !todo.done)
         ? advanceLabel()
         : (TODO_COPY[todo.label_key] || labelize(todo.label_key));
       row.appendChild(el('span', 'td-l', copy));
-      row.addEventListener('click', function () {
-        if (!todo.done && todo.is_advance_action) {
-          var play = document.getElementById('play-now');
-          if (play) play.click();
-          return;
-        }
-        if (present(todo.route)) go(franchiseHref(todo.route));
-      });
+      // What the mark says, for a reader that cannot see it.
+      if (todo.done) row.appendChild(el('span', 'wk-sr', ' (done)'));
       track.appendChild(row);
     });
     strip.appendChild(track);
