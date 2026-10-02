@@ -626,7 +626,23 @@ def attribute_changes_from_report(report: Mapping[str, Any] | None) -> list[dict
     return rows
 
 
+# The eight team attributes on the signed (-20..+20) scale. Only these are ranked for the
+# Office's "Moved most": Chemistry (7..25), Shooting (~85..95) and Rebounding are on other
+# scales, so their movement is not comparable, and Momentum swings game to game.
+MOVED_MOST_KEYS = frozenset(
+    key
+    for _family, _label, rows in _MEASURE_FAMILIES
+    for key, _name, _scale_max, signed_scale in rows
+    if signed_scale
+)
+
+
 def moved_most(snapshot: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """The two signed-scale team attributes that moved furthest since the last snapshot.
+
+    Empty when none of the eight moved, even if Chemistry, Shooting or Rebounding did:
+    the list never falls back to a measure on another scale.
+    """
     if not isinstance(snapshot, dict):
         return []
     after = snapshot.get("team_measures")
@@ -635,7 +651,7 @@ def moved_most(snapshot: Mapping[str, Any] | None) -> list[dict[str, Any]]:
         return []
     ranked: list[tuple[float, str, float, float]] = []
     for key, raw_after in after.items():
-        if key not in before:
+        if key not in MOVED_MOST_KEYS or key not in before:
             continue
         now = _num(raw_after)
         prev = _num(before.get(key))

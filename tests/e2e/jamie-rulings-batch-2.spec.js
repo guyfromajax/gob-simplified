@@ -90,7 +90,8 @@ function digest() {
         ],
       },
       moved_most: [
-        { measure: 'team_chemistry', value: 18, delta: 2 },
+        // Two of the eight signed-scale attributes: the only ones "Moved most" lists.
+        { measure: 'fight', value: 18, delta: 2 },
         { measure: 'discipline', value: 61, delta: -3 },
       ],
     },

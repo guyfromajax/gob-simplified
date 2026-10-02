@@ -2350,8 +2350,6 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   box-shadow: none;
   border: 0;
 }
-#training-view .pdg-layout-table,
-#training-view .pdg-table,
 #training-view .tcard,
 #training-view .pdg-tally {
   background: transparent;
@@ -2365,25 +2363,6 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   align-items: center;
   gap: var(--space-12);
   margin: 0 0 var(--dsp-10);
-}
-#training-view .pdg-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-#training-view .pdg-table th,
-#training-view .pdg-table td {
-  padding: var(--space-6) var(--space-8);
-  border-bottom: 1px solid var(--line);
-  font-size: var(--fs-13);
-  color: var(--text-87);
-  text-align: left;
-}
-#training-view .pdg-table th {
-  font-size: var(--fs-10);
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--tracking-10);
-  text-transform: uppercase;
-  color: var(--text-38);
 }
 #training-view .pdg-name:focus-visible { outline-color: var(--text-100); }
 

@@ -123,12 +123,50 @@ def test_height_renders_from_inches_and_anchors_win():
 # ── order is stable while editing ───────────────────────────────────────────
 
 def test_a_position_change_repaints_the_number_not_the_order():
-    """Re-sorting on change would pull the row out from under the coach the instant he
-    used it. Only the RT cell is rewritten."""
+    """Re-sorting on change would pull the card out from under the coach the instant he
+    used it. Only the RT cell is rewritten; the order is set once, when the grid renders."""
     fn = GRID_JS[GRID_JS.index("function render(host"):]
     fn = fn[:fn.index("\n  function paintTallies")]
     assert "[data-pdg-rt]" in fn
     assert ".sort(" not in fn
+    assert fn.count("orderByRt(") == 1, "ordered once per render, not in the save handler"
+    handler = fn[fn.index("dev.bind(grid"):]
+    assert "orderByRt" not in handler
+
+
+def test_there_is_one_layout_for_both_hosts():
+    """Prep > Player Training draws the same cards as the weekly page: no table variant."""
+    assert "pdg-table" not in GRID_JS and "tableRowHtml" not in GRID_JS
+    assert "layout:" not in TRAIN_JS[TRAIN_JS.index("function renderPlayerDevelopment"):TRAIN_JS.index("function wirePlayerDevelopmentTutorialButton")]
+
+
+ORDER_HARNESS = """
+'use strict';
+const fs = require('fs');
+global.window = { GOBDevelopmentFocus: { positionOf: (p) => p.resolved_training_position || 'PG' } };
+eval(fs.readFileSync(process.argv[1], 'utf8'));
+const order = window.GOBPlayerDevelopmentGrid.orderByRt;
+const player = (id, pos, ratings) => ({ id, resolved_training_position: pos, position_ratings: ratings });
+const rows = [
+  player('low', 'PG', { PG: 40, C: 99 }),      // shown RT is the TRAINING position's, not his best
+  player('tie-a', 'SG', { SG: 54 }),
+  player('top', 'C', { C: 88 }),
+  player('none', 'SF', {}),                    // no rating: last
+  player('tie-b', 'PG', { PG: 54 }),
+  player('tie-c', 'SF', { SF: 54.2 }),         // rounds to 54: still a tie
+];
+const before = rows.map((r) => r.id);
+const out = order(rows).map((r) => r.id);
+console.log(JSON.stringify({ out, untouched: rows.map((r) => r.id).join() === before.join() }));
+"""
+
+
+def test_cards_are_ordered_by_shown_rt_and_ties_keep_their_order():
+    res = subprocess.run(["node", "-e", ORDER_HARNESS, str(GRID)], capture_output=True, text=True, timeout=30)
+    assert res.returncode == 0, res.stderr
+    got = json.loads(res.stdout.strip().splitlines()[-1])
+    assert got["out"] == ["top", "tie-a", "tie-b", "tie-c", "low", "none"]
+    assert got["untouched"] is True, "the caller's array is not reordered in place"
 
 
 def test_player_training_links_to_the_training_by_position_chart():

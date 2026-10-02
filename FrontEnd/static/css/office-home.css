@@ -555,12 +555,6 @@ html.gob-shell.gob-office #franchise-container .office-st .st-n .gob-mark {
    The lists (.office-list) share the signing-class card's rules above (two-line rows,
    grade on the right) and the standings row (.st-r). Only what those do not already say is here. */
 
-/* The outlook: one line the coach reads first, last season under it. */
-.gob .office-outlook { gap: var(--space-6); }
-.gob .office-outlook p { margin: 0; }
-.gob .office-outlook .ol-pick { font: var(--fw-bold) var(--fs-22)/var(--lh-1) var(--font-display); letter-spacing: var(--tracking-2); color: var(--text-100); }
-.gob .office-outlook .ol-last { font-size: var(--fs-13); color: var(--text-60); }
-
 /* Rankings: "5 of 8". The unit is wider than a stat's "PPG". */
 .gob .office-ranks .card-h + .ptw { border-top: 0; }
 .gob .office-ranks .ptw em { width: var(--dsz-52); text-align: left; white-space: nowrap; }
@@ -580,8 +574,12 @@ html.gob-shell.gob-office #franchise-container .office-st .st-n .gob-mark {
 .gob .office-list .sg-rt .tdig { font-size: var(--fs-18); }
 
 /* A leading tag (position, week) in its own fixed column. */
-.gob .office-list.office-aa .wr,
 .gob .office-list.office-circle .wr { grid-template-columns: var(--dsz-34) minmax(0, 1fr) auto; }
+/* All-Americans: position, headshot, name over team, grade. */
+.gob .office-list.office-aa .wr { grid-template-columns: var(--dsz-30) var(--dsz-40) minmax(0, 1fr) auto; }
+.gob .office-list .aa-pt { width: var(--dsz-40); height: var(--dsz-40); }
+.gob .office-list .aa-pt img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; display: block; }
+.gob .office-list .aa-pt .office-initials { font-size: var(--fs-13); }
 .gob .office-list .wr-k { font-size: var(--fs-10); font-weight: var(--fw-bold); letter-spacing: var(--tracking-8); text-transform: uppercase; color: var(--text-38); white-space: nowrap; }
 .gob .office-list.office-circle .wr-k { color: var(--text-60); }
 .gob .office-list.office-circle .sg-rt .tdig { color: var(--text-100); }
@@ -635,3 +633,8 @@ html.gob-shell.gob-office #franchise-container .office-pre .st-r:not(.st-hd) .st
 
 /* "Season Opener" over the opponent. */
 .gob .office-next .nx-open { margin: 0 0 var(--space-6); }
+
+/* "Moved most" with nothing to list: one quiet line, not a row that invites a click. */
+.gob .msr.msr-empty > span:first-child,
+.gob .msr.msr-empty:hover > span:first-child { color: var(--text-60); text-decoration: none; }
+.gob .msr.msr-empty b { color: var(--text-38); }

@@ -174,7 +174,7 @@ const VIEWS = [
   ['office', 'home-tab', '#office-root, .office'],
   ['team', 'roster-view', '#roster-view table tbody tr'],
   ['league', 'standings-view', '#standings-view table tbody tr'],
-  ['prep', 'training-view', '#training-view .pdg-row, #training-view .pdg, #training-view table'],
+  ['prep', 'training-view', '#training-view .pdg-card'],
 ];
 
 async function open(page, tab, ready) {

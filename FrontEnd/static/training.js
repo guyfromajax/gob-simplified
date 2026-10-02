@@ -382,10 +382,9 @@ function renderPlayerDevelopment() {
   const weekly = isWeekly();
   const pointer = byId('training-advance-pointer');
   if (pointer) pointer.hidden = weekly;
+  // Both hosts (the weekly page and Prep > Player Training) draw the same cards, four
+  // across, in RT order reading left to right; the grid component orders them.
   grid.render(playerDevSection, rows, {
-    // Weekly page: four columns of three cards, RT order running down each column.
-    // Prep tab: the roster table.
-    layout: weekly ? 'cards' : 'table',
     tallies: (positionTallies && focusTallies)
       ? { positions: positionTallies, focuses: focusTallies }
       : null,
