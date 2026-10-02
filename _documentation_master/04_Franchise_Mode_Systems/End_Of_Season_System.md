@@ -57,6 +57,37 @@ Stored under `awards`:
 | `INDIVIDUAL_BONUS_TIERS` | top 10% +5, 25% +3, 50% +1 | One tier, by tournament per-game stat score at the position. |
 | `MIN_TOURNAMENT_GAMES` | 2 | Tournament games needed for the individual bonus. |
 
+### All-Conference Logic (2026-10-02)
+
+Same module (`BackEnd/utils/all_american.py`), same scorer, same ramp, same 70% games rule. Not a fork: `score_players` takes an explicit `team_scores` map, `select_teams` and `_pick` are shared, and the week-26 projection is the final.
+
+| | All-Conference |
+|---|---|
+| Who | Two teams per conference (first, second), one player per position (PG, SG, SF, PF, C). A player's position is his listed position (training position on the user's team). |
+| Compared against | The players of his own conference only: attribute min-max and stat averages are within the conference's position group (`build_conference_projection` scores each conference on its own). |
+| Team part | The team's **conference win percentage** (0–100: conference wins over conference games, regular season), from `franchise_standings.conference_records`, derived from stored results. Not the national rank. |
+| Timing | Projected weekly from the preseason on the same reads as All-American (`ensure_conference_projection`: command-center and Awards reads). Locked after week 26: the first read after week 26 writes the final (`conference_final`). No tournament bonus. |
+| Final second team | Rank 2 or rank 3 by a seeded coin (`conference_second_team_rank`: franchise + season + conference + position). Projections show rank 2. Rank 3 is stored on the projection (`third_team`) for the coin and never sent. |
+| Hidden | `GET /franchise/awards` → `all_conference`: status, label, week, the user's conference, labels (A1…H16) and the two public teams per conference, picks cut to `PUBLIC_PICK_KEYS`. No weights, scores, ranks, bonus, alternates. CH is never on a pick. |
+| News | Type `all_conference`, the user's conference only: weeks 1 (preseason), 7, 13, 19 (`w{n}-all-conference`) and the week-26 final (`w26-all-conference-final`, headline "All-Conference A2: end of the regular season", which the news page reads as naming the week). |
+| Trophies and career | `trophy_log` kinds `all_conference_1` / `all_conference_2` for the user's players (`record_all_conference_trophies_if_missing`, on the same reads); `career_data.best_players` tags `all_conference` beside `all_american`. A player can carry both. The Trophy Case page itself draws neither (it draws titles, milestones and season records). |
+
+Stored under `awards`:
+
+| Key | Holds |
+|---|---|
+| `all_conference_projection` | `{season, week, label, weights, user_conference, conferences: {"1": {first_team, second_team, third_team}, …}, frozen, computed_at}` |
+| `all_conference_teams` | The FINAL: `{"1": {first_team, second_team}, …}`. Read by `trophy_log.py` and `career_data.py`. |
+| `all_conference_final` | `{season, basis: "week_26", user_conference, second_team_ranks: {conference: {position: 2|3}}, includes_tournament_games}` |
+
+#### Tunable Constants (All-Conference, `BackEnd/utils/all_american.py`)
+
+| Constant | Value | Effect |
+|---|---|---|
+| `CONFERENCE_TEAM_KEYS` | first_team, second_team | The two teams sent and drawn. |
+| `CONFERENCE_COUNT` | 16 | Conference labels on the payload. |
+| `WEIGHT_ROWS`, `STAT_WEIGHTS`, `MIN_GAMES_SHARE`, `DEF_ATTEMPTS_PER_GAME`, `NEWS_COMPLETED_WEEKS` | shared | As All-American; the last news week is the final. |
+
 ### FCC Week 35 State
 
 - top-right CTA copy = `Recruiting`

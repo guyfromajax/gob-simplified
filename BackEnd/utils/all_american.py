@@ -33,6 +33,16 @@ Stored on the franchise under ``awards``:
 
 Position ("listed position") is the one the roster page shows: leaders_snapshot's
 _roster_position. No position is stored on a franchise player.
+
+All-Conference teams (same module, same scorer):
+  Two teams per conference, one player per position, compared only against the
+  players of that conference. Same attribute and stat weights, same ramp, same 70%
+  games rule. The team part is the team's conference win percentage (0-100), not its
+  national rank. Weekly projections from the preseason; locked after week 26, and the
+  week-26 projection is the final: first team is rank 1, second team a seeded coin
+  between ranks 2 and 3 decided at the final only (projections show rank 2). No
+  tournament bonus. Stored under ``awards`` as ``all_conference_projection``,
+  ``all_conference_teams`` (the final, by conference) and ``all_conference_final``.
 """
 
 from __future__ import annotations
@@ -53,6 +63,13 @@ PROJECTION_KEY = "all_american_projection"
 TEAMS_KEY = "all_american_teams"
 FINAL_KEY = "all_american_final"
 SNAPSHOT_FIELD = "aa_w26"
+
+CONFERENCE_TEAM_KEYS = ("first_team", "second_team")
+CONFERENCE_PROJECTION_KEY = "all_conference_projection"
+CONFERENCE_TEAMS_KEY = "all_conference_teams"
+CONFERENCE_FINAL_KEY = "all_conference_final"
+CONFERENCE_NEWS_TYPE = "all_conference"
+CONFERENCE_COUNT = 16
 
 REGULAR_SEASON_WEEKS = 26
 FINAL_WEEK = 35
@@ -207,8 +224,15 @@ def score_players(
     team_games: Mapping[str, int],
     rank_by_team: Mapping[str, Any],
     team_count: int,
+    team_scores: Mapping[str, float] | None = None,
 ) -> list[dict[str, Any]]:
-    """Add ``components`` and ``score`` to each player. Returns the same dicts."""
+    """Add ``components`` and ``score`` to each player. Returns the same dicts.
+
+    The team part is the national rank (``team_score``) unless ``team_scores`` gives
+    a 0-100 value per team id, as All-Conference does with the conference win
+    percentage. Attribute and stat parts are within the position of the pool given,
+    so a pool of one conference compares its players against that conference only.
+    """
     pool = list(players)
     by_position: dict[str, list[dict[str, Any]]] = {pos: [] for pos in POSITIONS}
     for player in pool:
@@ -232,10 +256,15 @@ def score_players(
         stats = stat_scores(lines)
         for player in group:
             pid = player["player_id"]
+            team_id = str(player.get("team_id") or "")
+            if team_scores is not None:
+                team_part = max(0.0, min(100.0, _num(team_scores.get(team_id))))
+            else:
+                team_part = team_score(rank_by_team.get(team_id), team_count)
             components = {
                 "attributes": attribute.get(pid, 0.0),
                 "stats": stats.get(pid, 0.0),
-                "team": team_score(rank_by_team.get(str(player.get("team_id") or "")), team_count),
+                "team": team_part,
             }
             player["components"] = {key: round(value, 2) for key, value in components.items()}
             player["score"] = round(
@@ -262,14 +291,20 @@ def rank_by_position(players: Iterable[dict[str, Any]]) -> dict[str, list[dict[s
     return ranked
 
 
-def third_team_rank(franchise_id: Any, season: Any, position: str) -> int:
-    """3 or 4: which rank the final third team takes at this position.
+def seeded_coin(seed: str) -> int:
+    """0 or 1 from a hash of ``seed``: the same on every recompute, and no engine random
+    stream is touched."""
+    return hashlib.sha256(seed.encode("utf-8")).digest()[0] & 1
 
-    A hash of franchise + season + position, so the final is the same on every
-    recompute and no engine random stream is touched.
-    """
-    digest = hashlib.sha256(f"all-american:{franchise_id}:{season}:{position}".encode("utf-8")).digest()
-    return 3 + (digest[0] & 1)
+
+def third_team_rank(franchise_id: Any, season: Any, position: str) -> int:
+    """3 or 4: which rank the final third team takes at this position."""
+    return 3 + seeded_coin(f"all-american:{franchise_id}:{season}:{position}")
+
+
+def conference_second_team_rank(franchise_id: Any, season: Any, conference: Any, position: str) -> int:
+    """2 or 3: which rank the final All-Conference second team takes at this position."""
+    return 2 + seeded_coin(f"all-conference:{franchise_id}:{season}:{conference}:{position}")
 
 
 def _display_stats(line: Mapping[str, float | None] | None) -> dict[str, Any]:
@@ -492,7 +527,12 @@ def _regular_season_results(results: Mapping[str, Any] | None) -> dict[str, Any]
 
 
 def load_league(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
-    """Everything the score needs, in two reads (team data, player data)."""
+    """Everything the score needs, in three reads (team data, player data, teams).
+
+    ``conference_by_team`` and ``conference_pct_by_team`` (conference win percentage
+    from the regular-season results) are what All-Conference adds.
+    """
+    from BackEnd.utils.franchise_standings import conference_records
     from BackEnd.utils.franchise_team_display import resolve_team_name_map
     from BackEnd.utils.leaders_snapshot import team_games_from_results
 
@@ -548,12 +588,31 @@ def load_league(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
             "snapshot": doc.get(SNAPSHOT_FIELD) if isinstance(doc.get(SNAPSHOT_FIELD), Mapping) else None,
         })
 
+    conference_by_team: dict[str, int] = {}
+    try:
+        for doc in store.teams_collection.find({}, {"_id": 1, "conference": 1}):
+            team_id = str(doc.get("_id") or "")
+            try:
+                conference = int(doc.get("conference"))
+            except (TypeError, ValueError):
+                continue
+            if team_id and (not rank_by_team or team_id in rank_by_team):
+                conference_by_team[team_id] = conference
+    except Exception:
+        logger.exception("[ALL-CONFERENCE] conferences failed franchise_id=%s", franchise_id)
+    regular_season = _regular_season_results(franchise_doc.get("results"))
+    records = conference_records(regular_season, conference_by_team)
+
     return {
         "franchise_id": franchise_id,
         "players": players,
         "rank_by_team": rank_by_team,
         "team_count": len(rank_by_team) or 128,
-        "team_games": team_games_from_results(_regular_season_results(franchise_doc.get("results"))),
+        "team_games": team_games_from_results(regular_season),
+        "conference_by_team": conference_by_team,
+        "conference_pct_by_team": {
+            team_id: round(100.0 * float(row.get("PCT") or 0.0), 2) for team_id, row in records.items()
+        },
     }
 
 
@@ -579,9 +638,13 @@ def _season_number(franchise_doc: Mapping[str, Any]) -> int:
     return int(franchise_doc.get("current_season", 1) or 1)
 
 
-def build_projection(franchise_doc: Mapping[str, Any], completed: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def build_projection(
+    franchise_doc: Mapping[str, Any],
+    completed: int,
+    league: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """(projection, every scored player) for ``completed`` regular-season weeks."""
-    league = load_league(franchise_doc)
+    league = league if league is not None else load_league(franchise_doc)
     weights = weights_for_week(max(1, completed))
     scored = score_players(
         league["players"],
@@ -862,12 +925,12 @@ PUBLIC_PICK_KEYS = (
 )
 
 
-def public_teams(teams: Any) -> dict[str, list[dict[str, Any]]] | None:
-    """The stored teams with every pick cut down to ``PUBLIC_PICK_KEYS``."""
+def public_teams(teams: Any, keys: tuple[str, ...] = TEAM_KEYS) -> dict[str, list[dict[str, Any]]] | None:
+    """The stored teams (``keys`` of them) with every pick cut down to ``PUBLIC_PICK_KEYS``."""
     if not isinstance(teams, Mapping):
         return None
     out: dict[str, list[dict[str, Any]]] = {}
-    for key in TEAM_KEYS:
+    for key in keys:
         picks = teams.get(key) or []
         out[key] = [
             {name: pick[name] for name in PUBLIC_PICK_KEYS if name in pick}
@@ -883,6 +946,7 @@ def awards_payload(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
     Teams and status only. Weights, scores, ranks and bonus stay on the franchise doc.
     """
     awards = franchise_doc.get(AWARDS_FIELD) or {}
+    conference = {"all_conference": conference_payload(franchise_doc)}
     if awards.get(TEAMS_KEY):
         final = awards.get(FINAL_KEY) or {}
         return {
@@ -891,10 +955,11 @@ def awards_payload(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
             "computed_at": awards.get("computed_at"),
             "stats_basis": final.get("stats_basis"),
             TEAMS_KEY: public_teams(awards.get(TEAMS_KEY)),
+            **conference,
         }
     projection = awards.get(PROJECTION_KEY)
     if not isinstance(projection, Mapping) or not projection.get(TEAMS_KEY):
-        return {"status": "unavailable", TEAMS_KEY: None}
+        return {"status": "unavailable", TEAMS_KEY: None, **conference}
     return {
         "status": "projected",
         "week": projection.get("week"),
@@ -902,4 +967,277 @@ def awards_payload(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
         "stats_basis": projection.get("stats_basis"),
         "computed_at": projection.get("computed_at"),
         TEAMS_KEY: public_teams(projection.get(TEAMS_KEY)),
+        **conference,
     }
+
+# ---------------------------------------------------------------------------
+# All-Conference
+# ---------------------------------------------------------------------------
+
+def conference_label(conference: Any) -> str:
+    """A2, B3 … as the rest of the app names a conference; the number when unknown."""
+    from BackEnd.utils.t3_detail import conference_label as _label
+
+    return _label(conference) or str(conference)
+
+
+def _user_conference(franchise_doc: Mapping[str, Any], league: Mapping[str, Any]) -> int | None:
+    user_team_id = str(franchise_doc.get("user_team_object_id") or "")
+    value = (league.get("conference_by_team") or {}).get(user_team_id)
+    return int(value) if value is not None else None
+
+
+def build_conference_projection(
+    franchise_doc: Mapping[str, Any],
+    completed: int,
+    league: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The All-Conference projection for ``completed`` regular-season weeks.
+
+    Each conference is scored on its own: ``score_players`` on that conference's
+    players only (attribute and stat parts within the conference's position groups),
+    the team part the conference win percentage. ``select_teams`` keeps rank 3 as
+    ``third_team``: the final's coin needs it. The page never sees it.
+    """
+    league = league if league is not None else load_league(franchise_doc)
+    weights = weights_for_week(max(1, completed))
+    by_conference: dict[int, list[dict[str, Any]]] = {}
+    conference_by_team = league.get("conference_by_team") or {}
+    for player in league["players"]:
+        conference = conference_by_team.get(str(player.get("team_id") or ""))
+        if conference is None:
+            continue
+        # A copy: the scorer writes components onto the dicts, and the All-American
+        # projection scores the same players nationally.
+        by_conference.setdefault(int(conference), []).append(dict(player))
+    conferences: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for conference in sorted(by_conference):
+        scored = score_players(
+            by_conference[conference],
+            weights=weights,
+            team_games=league["team_games"],
+            rank_by_team=league["rank_by_team"],
+            team_count=league["team_count"],
+            team_scores=league.get("conference_pct_by_team") or {},
+        )
+        conferences[str(conference)] = select_teams(rank_by_position(scored))
+    return {
+        "season": _season_number(franchise_doc),
+        "week": int(completed),
+        "label": projection_label(completed),
+        "weights": weights_percent(max(1, completed)),
+        "stats_basis": "per_game",
+        "frozen": completed >= REGULAR_SEASON_WEEKS,
+        "user_conference": _user_conference(franchise_doc, league),
+        "conferences": conferences,
+        "computed_at": datetime.utcnow(),
+    }
+
+
+def conference_final(franchise_doc: Mapping[str, Any], projection: Mapping[str, Any]) -> dict[str, Any]:
+    """The final All-Conference teams from the frozen week-26 projection.
+
+    First team is rank 1. Second team is rank 2 or rank 3 by a coin seeded on
+    franchise + season + conference + position, so a recompute cannot change it. No
+    tournament bonus. Returns the keys to merge into ``awards``.
+    """
+    franchise_id = str(franchise_doc.get("_id"))
+    season = _season_number(franchise_doc)
+    teams: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    second_ranks: dict[str, dict[str, int]] = {}
+    for conference, lists in (projection.get("conferences") or {}).items():
+        by_rank = {
+            key: {pick.get("position"): pick for pick in (lists.get(key) or []) if isinstance(pick, Mapping)}
+            for key in TEAM_KEYS
+        }
+        second: list[dict[str, Any]] = []
+        second_ranks[conference] = {}
+        for position in POSITIONS:
+            want = conference_second_team_rank(franchise_id, season, conference, position)
+            pick = by_rank["third_team"].get(position) if want == 3 else None
+            if pick is None:
+                pick = by_rank["second_team"].get(position)
+                want = 2
+            if pick is None:
+                continue
+            second.append(dict(pick))
+            second_ranks[conference][position] = want
+        teams[conference] = {
+            "first_team": [dict(pick) for pick in (lists.get("first_team") or []) if isinstance(pick, Mapping)],
+            "second_team": second,
+        }
+    return {
+        CONFERENCE_TEAMS_KEY: teams,
+        CONFERENCE_FINAL_KEY: {
+            "season": season,
+            "basis": "week_26",
+            "stats_basis": "per_game",
+            "user_conference": projection.get("user_conference"),
+            "includes_tournament_games": bool(projection.get("includes_tournament_games")),
+            "second_team_ranks": second_ranks,
+            "computed_at": datetime.utcnow(),
+        },
+    }
+
+
+def build_conference_news_story(
+    teams_by_conference: Mapping[str, Any],
+    conference: Any,
+    completed: int,
+    *,
+    final: bool,
+) -> dict[str, Any] | None:
+    """The user's conference's story for a publishing week (or the final), else None.
+
+    Names only, like the All-American story. The final's headline says "end of the
+    regular season", which the news page reads as naming the week.
+    """
+    if conference is None:
+        return None
+    if not final and int(completed) not in NEWS_COMPLETED_WEEKS[:-1]:
+        return None
+    lists = (teams_by_conference or {}).get(str(conference)) or {}
+    if not any(lists.get(key) for key in CONFERENCE_TEAM_KEYS):
+        return None
+    label = conference_label(conference)
+    week = max(1, int(completed))
+    if final:
+        headline = f"All-Conference {label}: end of the regular season"
+        intro = f"The final All-Conference teams for Conference {label}."
+    elif completed <= 0:
+        headline = f"Preseason All-Conference {label} teams"
+        intro = f"The preseason All-Conference teams for Conference {label}, named before a game has been played."
+    else:
+        headline = f"Projected All-Conference {label}: week {completed}"
+        intro = f"Where the Conference {label} race stands after week {completed}."
+    rich_lines: list[dict[str, Any]] = [{"type": "text", "text": intro}]
+    for key, title in zip(CONFERENCE_TEAM_KEYS, ("First Team", "Second Team")):
+        picks = lists.get(key) or []
+        if not picks:
+            continue
+        rich_lines.append({"type": "gap"})
+        rich_lines.append({"type": "heading", "text": title})
+        rich_lines.extend(_team_lines(picks))
+    return {
+        "story_id": f"w{week}-all-conference" + ("-final" if final else ""),
+        "week": int(week),
+        "type": CONFERENCE_NEWS_TYPE,
+        "headline": headline,
+        "rich_lines": rich_lines,
+        "created_at": datetime.utcnow(),
+    }
+
+
+def ensure_conference_projection(franchise_doc: dict[str, Any]) -> dict[str, Any] | None:
+    """Bring the All-Conference projection up to the last completed week, and set the
+    final once week 26 is complete. Cheap when current. Returns the stored projection.
+
+    Weeks 27 on keep the week-26 projection; the first read after week 26 writes the
+    final and its story. A franchise first seen mid-tournament locks what it has, and
+    gets no late story.
+    """
+    if not franchise_doc or franchise_doc.get("_id") is None:
+        return None
+    week = int(franchise_doc.get("week", 1) or 1)
+    awards = dict(franchise_doc.get(AWARDS_FIELD) or {})
+    stored = (
+        awards.get(CONFERENCE_PROJECTION_KEY)
+        if isinstance(awards.get(CONFERENCE_PROJECTION_KEY), Mapping) else None
+    )
+    completed = completed_weeks(franchise_doc)
+    season = _season_number(franchise_doc)
+    current = bool(
+        stored and int(stored.get("season", 0) or 0) == season and int(stored.get("week", -1)) == completed
+    )
+    final_set = bool(awards.get(CONFERENCE_TEAMS_KEY)) and int(
+        (awards.get(CONFERENCE_FINAL_KEY) or {}).get("season", 0) or 0
+    ) == season
+    if current and (completed < REGULAR_SEASON_WEEKS or final_set):
+        return stored
+
+    started = time.perf_counter()
+    update: dict[str, Any] = {}
+    stories: list[dict[str, Any]] = []
+    projection = stored if current else None
+    if projection is None:
+        projection = build_conference_projection(franchise_doc, completed)
+        if completed >= REGULAR_SEASON_WEEKS:
+            projection["includes_tournament_games"] = week != REGULAR_SEASON_WEEKS + 1
+        awards[CONFERENCE_PROJECTION_KEY] = projection
+        if completed < REGULAR_SEASON_WEEKS:
+            story = build_conference_news_story(
+                projection["conferences"], projection.get("user_conference"), completed, final=False
+            )
+            if story is not None:
+                stories.append(story)
+    if completed >= REGULAR_SEASON_WEEKS and not final_set:
+        awards.update(conference_final(franchise_doc, projection))
+        if not projection.get("includes_tournament_games"):
+            story = build_conference_news_story(
+                awards[CONFERENCE_TEAMS_KEY], projection.get("user_conference"), completed, final=True
+            )
+            if story is not None:
+                stories.append(story)
+    update[AWARDS_FIELD] = awards
+    if stories:
+        existing = list(franchise_doc.get("season_news") or [])
+        known = {s.get("story_id") for s in existing if isinstance(s, Mapping)}
+        fresh = [story for story in stories if story["story_id"] not in known]
+        if fresh:
+            update["season_news"] = fresh + existing
+
+    from BackEnd.utils.browse_cache import fold_browse_rev
+
+    _store().franchises_collection.update_one(
+        {"_id": franchise_doc["_id"]}, fold_browse_rev({"$set": update})
+    )
+    franchise_doc.update(update)
+    logger.info(
+        "[ALL-CONFERENCE] projection franchise_id=%s season=%s week=%s conferences=%s final=%s ms=%.0f",
+        franchise_doc.get("_id"), season, completed, len(projection.get("conferences") or {}),
+        bool(awards.get(CONFERENCE_TEAMS_KEY)), (time.perf_counter() - started) * 1000.0,
+    )
+    return projection
+
+
+def conference_payload(franchise_doc: Mapping[str, Any]) -> dict[str, Any]:
+    """The ``all_conference`` block of GET /franchise/awards.
+
+    Status, label, the user's conference, a label for every conference, and the two
+    public teams per conference. The final from week 27 on, else the projection.
+    Weights, scores, ranks and the rank-3 alternates stay on the franchise doc.
+    """
+    awards = franchise_doc.get(AWARDS_FIELD) or {}
+    labels = {str(n): conference_label(n) for n in range(1, CONFERENCE_COUNT + 1)}
+
+    def public(teams_by_conference: Any) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        for conference, lists in (teams_by_conference or {}).items():
+            out[str(conference)] = public_teams(lists, keys=CONFERENCE_TEAM_KEYS)
+        return out
+
+    final = awards.get(CONFERENCE_FINAL_KEY) or {}
+    if awards.get(CONFERENCE_TEAMS_KEY):
+        return {
+            "status": "final",
+            "label": "Final",
+            "conference": final.get("user_conference"),
+            "labels": labels,
+            "computed_at": final.get("computed_at"),
+            "stats_basis": final.get("stats_basis"),
+            "conferences": public(awards.get(CONFERENCE_TEAMS_KEY)),
+        }
+    projection = awards.get(CONFERENCE_PROJECTION_KEY)
+    if not isinstance(projection, Mapping) or not projection.get("conferences"):
+        return {"status": "unavailable", "conference": None, "labels": labels, "conferences": None}
+    return {
+        "status": "projected",
+        "week": projection.get("week"),
+        "label": projection.get("label"),
+        "conference": projection.get("user_conference"),
+        "labels": labels,
+        "stats_basis": projection.get("stats_basis"),
+        "computed_at": projection.get("computed_at"),
+        "conferences": public(projection.get("conferences")),
+    }
+

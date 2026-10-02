@@ -29,10 +29,22 @@
     all_american_1: '1st team',
     all_american_2: '2nd team',
     all_american_3: '3rd team',
+    all_conference_1: '1st team',
+    all_conference_2: '2nd team',
     first_team: '1st team',
     second_team: '2nd team',
     third_team: '3rd team'
   };
+
+  /** "All-American 1st team" / "All-Conference 2nd team": a player can carry both. */
+  function honourTags(p) {
+    var tags = [];
+    var aa = aaLabel(p && p.all_american);
+    var ac = aaLabel(p && p.all_conference);
+    if (aa) tags.push('All-American ' + aa);
+    if (ac) tags.push('All-Conference ' + ac);
+    return tags;
+  }
 
   var stingTimer = null;
   var keyHandler = null;
@@ -499,12 +511,11 @@
     return '<div class="sec"><div class="sec-h"><h3>Best Players</h3><span>Season lines</span></div>'
       + players.map(function (p) {
         var meta = [p.position, p.class_year].filter(present).join(' · ');
-        var aa = aaLabel(p.all_american);
         var stats = playerStats(p);
         return '<div class="bp">' + playerAvatar(p)
           + '<div class="bp-n"><span class="nm">' + esc(p.name || '') + '</span>'
           + '<span>' + esc(meta)
-          + (aa ? ' <span class="tg">' + esc(aa === '1st team' ? 'All-American 1st team' : 'All-American ' + aa) + '</span>' : '')
+          + honourTags(p).map(function (tag) { return ' <span class="tg">' + esc(tag) + '</span>'; }).join('')
           + '</span>'
           + (stats.length ? '<div class="bp-l">' + stats.map(function (s) {
             return '<div><b>' + esc(s.n) + '</b><i>' + esc(s.k) + '</i></div>';
@@ -515,14 +526,18 @@
   }
 
   function awardsHtml(players) {
-    var rows = (players || []).filter(function (p) { return p && p.all_american; });
+    var rows = (players || []).filter(function (p) { return p && (p.all_american || p.all_conference); });
     if (!rows.length) return '';
-    return '<div class="sec"><div class="sec-h"><h3>Awards</h3><span>All-American teams</span></div>'
+    var both = rows.some(function (p) { return p.all_american; }) && rows.some(function (p) { return p.all_conference; });
+    var sub = both ? 'All-American and All-Conference teams'
+      : (rows[0].all_american ? 'All-American teams' : 'All-Conference teams');
+    return '<div class="sec"><div class="sec-h"><h3>Awards</h3><span>' + esc(sub) + '</span></div>'
       + rows.map(function (p) {
         var line = [p.position, present(p.stats && p.stats.ppg) ? fmtStat(p.stats.ppg) + ' PPG' : ''].filter(Boolean).join(' · ');
         return '<div class="aw"><div><b>' + esc(p.name || '') + '</b>'
           + (line ? '<span>' + esc(line) + '</span>' : '') + '</div>'
-          + '<span class="tg">' + esc(aaLabel(p.all_american)) + '</span></div>';
+          + honourTags(p).map(function (tag) { return '<span class="tg">' + esc(tag) + '</span>'; }).join('')
+          + '</div>';
       }).join('')
       + '</div>';
   }

@@ -891,6 +891,8 @@ def test_command_center_region_reconcile_bumps_when_it_writes(as_owner, monkeypa
     # This franchise has no All-American projection yet, so the same read would also
     # store one (a second write, a second bump). Keep this test on the reconcile alone.
     monkeypatch.setattr("BackEnd.utils.all_american.ensure_projection", lambda _doc: None)
+    # The same for the All-Conference projection, which the same read would also store.
+    monkeypatch.setattr("BackEnd.utils.all_american.ensure_conference_projection", lambda _doc: None)
     try:
         before = _doc_hash(fid)
         tag = _etag(fid)
