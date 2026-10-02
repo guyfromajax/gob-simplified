@@ -548,7 +548,21 @@ function measure(page) {
     const clip = [...document.querySelectorAll('#office-root .office-col')].map((col) => {
       return Math.max(0, col.scrollHeight - col.clientHeight);
     });
+    // A column grows with its content: no card ends below its column.
+    const spill = [];
+    // A card never cuts its own content off (a card that clips would scroll inside).
+    const cut = [];
+    document.querySelectorAll('#office-root .office-col').forEach((col, c) => {
+      const colBottom = col.getBoundingClientRect().bottom;
+      [...col.querySelectorAll(':scope > .card')].forEach((card, i) => {
+        const label = 'col ' + (c + 1) + ' card ' + (i + 1) + ' (' + card.className.split(' ').slice(0, 2).join('.') + ')';
+        if (card.getBoundingClientRect().bottom > colBottom + 1) spill.push(label);
+        if (card.scrollHeight > card.clientHeight + 1 || card.scrollWidth > card.clientWidth + 1) cut.push(label);
+      });
+    });
     return {
+      spill: spill,
+      cut: cut,
       mainScroll: main.scrollHeight - main.clientHeight,
       mainWide: main.scrollWidth - main.clientWidth,
       pageWide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -580,7 +594,7 @@ test.beforeAll(() => {
   fs.mkdirSync(V3C, { recursive: true });
 });
 
-test('six states fit at 1280 and 1920', async ({ page }) => {
+test('six states lay out cleanly at 1280, 1440 and 1920', async ({ page }) => {
   const fit = {};
   for (const name of Object.keys(STATES)) {
     fit[name] = {};
@@ -639,18 +653,19 @@ test('six states fit at 1280 and 1920', async ({ page }) => {
         expect(numbers.standings.shown, name + ' ' + size[2] + ' rows').toBe(numbers.standings.total);
         expect(numbers.standings.total, name + ' ' + size[2] + ' rows').toBe(8);
       }
-      if (size[2] === '1280') {
-        expect(numbers.pageWide, name + ' horizontal').toBeLessThanOrEqual(1);
-        numbers.clip.forEach(function (px, index) {
-          expect(px, name + ' column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
-        });
-        await assertOneVerticalScroll(page);
-      }
-      if (size[2] === '1920' && numbers.standings) {
-        numbers.clip.forEach(function (px, index) {
-          expect(px, name + ' 1920 column ' + (index + 1) + ' clipped').toBeLessThanOrEqual(1);
-        });
-      }
+      // The Office may scroll (2026-10-02), so "fits the fold" is no longer the contract.
+      // What must hold at every size: nothing scrolls sideways, each column is as tall as
+      // what it holds, and no card cuts its own content off. Measured after the arrival
+      // animation has landed: its transform is counted by scrollHeight while it runs, which
+      // read as a 3-4px "clip" on a column that is laid out correctly.
+      expect(numbers.pageWide, name + ' ' + size[2] + ' page scrolls sideways').toBeLessThanOrEqual(1);
+      expect(numbers.mainWide, name + ' ' + size[2] + ' main scrolls sideways').toBeLessThanOrEqual(1);
+      numbers.clip.forEach(function (px, index) {
+        expect(px, name + ' ' + size[2] + ' column ' + (index + 1) + ' shorter than its content').toBeLessThanOrEqual(1);
+      });
+      expect(numbers.spill, name + ' ' + size[2] + ' a card hangs out of its column').toEqual([]);
+      expect(numbers.cut, name + ' ' + size[2] + ' a card cuts its content off').toEqual([]);
+      if (size[2] === '1280') await assertOneVerticalScroll(page);
       expect(numbers.standings && numbers.standings.column, name + ' standings column').toBe(2);
       await page.screenshot({ path: path.join(V3C, name + '-' + size[2] + '.png') });
     }
