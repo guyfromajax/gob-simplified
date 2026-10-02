@@ -162,6 +162,10 @@ function cards(page) {
           name: el.querySelector('.pdg-name').textContent.trim(),
           x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width),
           rt: el.querySelector('[data-pdg-rt]').textContent.trim(),
+          pot: (el.querySelector('.pdg-rt b.pot') || { textContent: '' }).textContent.trim(),
+          lockup: [...el.querySelector('.pdg-rt').children].map((n) => n.textContent.trim()).join(' '),
+          arrow: el.querySelectorAll('.pdg-rt i').length,
+          portraits: el.querySelectorAll('img').length,
           selects: el.querySelectorAll('select').length,
         };
       }),
@@ -210,6 +214,64 @@ for (const host of ['prep', 'training']) {
     });
   }
 }
+
+/** The grade the page shows for a rating (its own display function). */
+function grade(page, rt) {
+  return page.evaluate((value) => window.formatRtDisplay(value), rt);
+}
+
+for (const host of ['prep', 'training']) {
+  test(host + ': every card reads "current → potential"; the order is on the current', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const state = shuffled(seasonState());
+    const roster = state.points.custom_focus_roster;
+    // One player whose potential is below his current (a ceiling already reached), one with
+    // no potential on the wire, and one whose potential would put him first if it counted.
+    const byName = Object.fromEntries(roster.map((row) => [row.name, row]));
+    byName['Stuart Marconi'].potential_rt_ratcheted = 55;
+    byName['Norris Khan'].potential_rt_ratcheted = null;
+    byName['Damon Martin'].potential_rt_ratcheted = 120;
+    await open(page, host, state);
+    const got = await cards(page);
+    expect(got.cards.map((c) => c.name), 'ordered by the current, not the potential').toEqual(expectedOrder(roster));
+    for (const card of got.cards) {
+      const row = byName[card.name];
+      const current = await grade(page, shownRt(row));
+      expect(card.rt, card.name).toBe(current);
+      expect(card.portraits, card.name + ' has no portrait').toBe(0);
+      expect(card.lockup, card.name).not.toMatch(/#|\bNo\b\s*\d/); // no jersey number
+      if (row.potential_rt_ratcheted == null) {
+        expect(card.pot, card.name + ' has no potential').toBe('');
+        expect(card.arrow, card.name).toBe(0);
+        expect(card.lockup, card.name).toBe(current);
+      } else {
+        const potential = await grade(page, row.potential_rt_ratcheted);
+        expect(card.arrow, card.name).toBe(1);
+        expect(card.lockup, card.name).toBe(current + ' \u2192 ' + potential);
+      }
+    }
+    expect(got.cards.find((c) => c.name === 'Roger Henrich').lockup).toBe('A+ \u2192 A++');
+  });
+}
+
+test('a position change moves only the current grade; the potential and the card stay', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const saves = [];
+  const state = seasonState();
+  await open(page, 'prep', state, saves);
+  const before = await cards(page);
+  const card = page.locator('#player-dev-section .pdg-card', { hasText: 'Wilbert Struthers' });
+  const was = before.cards.find((c) => c.name === 'Wilbert Struthers');
+  const row = state.points.custom_focus_roster.find((r) => r.name === 'Wilbert Struthers');
+  await card.locator('select').nth(0).selectOption('C');
+  await expect.poll(() => saves.length).toBe(1);
+  const after = await cards(page);
+  const now = after.cards.find((c) => c.name === 'Wilbert Struthers');
+  expect(now.rt).toBe(await grade(page, Math.round(row.position_ratings.C)));
+  expect(now.rt).not.toBe(was.rt);
+  expect(now.pot).toBe(was.pot);
+  expect(after.cards.map((c) => c.name)).toEqual(before.cards.map((c) => c.name));
+});
 
 test('ties keep the order they arrived in', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });

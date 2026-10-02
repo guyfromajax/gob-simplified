@@ -5,7 +5,8 @@
  * M  Team snapshot "Moved most" ranks only the eight signed-scale team attributes
  *    (Offense, Defense, Discipline, Fast Break, Fast Break Defense, Fight, P/T Offense,
  *    P/T Defense). Chemistry, Shooting and Rebounding are on other scales and are never
- *    listed; when none of the eight moved the card shows one quiet line.
+ *    listed; when none of the eight moved the card shows one quiet line, "No movement this
+ *    week", with no trailing dash.
  *
  * The server filters the list (tests/test_office_digest.py). These tests feed the card
  * payloads that still carry the excluded measures, the way an unfiltered server would.
@@ -95,7 +96,9 @@ test('M: a week where only Chemistry, Shooting and Rebounding moved shows the qu
   const card = await snapshot(page);
   expect(card.heads).toContain('Moved most');
   expect(card.rows).toHaveLength(1);
-  expect(card.rows[0]).toMatchObject({ label: 'No movement this week', value: '—', chip: false, empty: true });
+  // The line stands alone: no trailing dash (Jamie, 2026-10-02).
+  expect(card.rows[0]).toMatchObject({ label: 'No movement this week', value: '', chip: false, empty: true });
+  expect(card.text).not.toContain('\u2014');
   expect(card.text).not.toMatch(/Shooting|Rebounding|Momentum/);
   expect(card.chemistry).toBe('18/25');
   // Quiet: dimmer than a row that names a measure, and it does not light up like a link.
@@ -114,6 +117,7 @@ test('M: nothing moved at all shows the same quiet line; every one of the eight 
   await O.openOffice(page, officeWith([]));
   const none = await snapshot(page);
   expect(none.rows.map((row) => row.label)).toEqual(['No movement this week']);
+  expect(none.rows[0].value).toBe('');
 
   const eight = [
     ['offensive_efficiency', 'Offense'], ['defensive_efficiency', 'Defense'], ['discipline', 'Discipline'],
@@ -134,7 +138,9 @@ test('M: before camp the line still reads "Set after camp" (from week 2 only; we
   const data = officeWith([]);
   data.office_digest.team_snapshot.state = 'set_after_camp';
   await O.openOffice(page, data);
-  expect((await snapshot(page)).rows.map((row) => row.label)).toEqual(['Set after camp']);
+  const camp = await snapshot(page);
+  expect(camp.rows.map((row) => row.label)).toEqual(['Set after camp']);
+  expect(camp.rows[0].value).toBe('\u2014'); // unchanged: only "No movement this week" lost its dash
 });
 
 for (const [width, height] of SIZES) {

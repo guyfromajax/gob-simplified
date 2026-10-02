@@ -155,6 +155,7 @@ const rows = [
   player('tie-b', 'PG', { PG: 54 }),
   player('tie-c', 'SF', { SF: 54.2 }),         // rounds to 54: still a tie
 ];
+rows[0].potential_rt_ratcheted = 120;          // a potential never moves a card: the order is on the current
 const before = rows.map((r) => r.id);
 const out = order(rows).map((r) => r.id);
 console.log(JSON.stringify({ out, untouched: rows.map((r) => r.id).join() === before.join() }));
@@ -167,6 +168,47 @@ def test_cards_are_ordered_by_shown_rt_and_ties_keep_their_order():
     got = json.loads(res.stdout.strip().splitlines()[-1])
     assert got["out"] == ["top", "tie-a", "tie-b", "tie-c", "low", "none"]
     assert got["untouched"] is True, "the caller's array is not reordered in place"
+
+
+PAIR_HARNESS = """
+'use strict';
+const fs = require('fs');
+global.window = {
+  GOBDevelopmentFocus: {
+    positionOf: (p) => p.resolved_training_position || 'PG',
+    positionSelectHtml: () => '<select></select>', focusSelectHtml: () => '<select></select>',
+  },
+  formatRtDisplay: (n) => 'G' + Math.round(Number(n)),
+  getRtBucketClass: (n) => (Number(n) >= 60 ? 'rt-high' : 'rt-low'),
+};
+global.formatRtDisplay = window.formatRtDisplay; // the page's global, as in the browser
+eval(fs.readFileSync(process.argv[1], 'utf8'));
+const html = window.GOBPlayerDevelopmentGrid.rtPairHtml;
+const base = { id: 'p', name: 'P', resolved_training_position: 'SF', position_ratings: { SF: 57, C: 34 } };
+console.log(JSON.stringify({
+  pair: html(Object.assign({ potential_rt_ratcheted: 91 }, base)),
+  none: html(base),
+  blank: html(Object.assign({ potential_rt_ratcheted: '' }, base)),
+}));
+"""
+
+
+@pytestmark_node
+def test_each_card_reads_current_then_potential_and_only_when_there_is_one():
+    """Both hosts: "current → potential" in the one RT slot; no arrow and no second grade without a potential."""
+    res = subprocess.run(["node", "-e", PAIR_HARNESS, str(GRID)], capture_output=True, text=True, timeout=30)
+    assert res.returncode == 0, res.stderr
+    got = json.loads(res.stdout.strip().splitlines()[-1])
+    assert got["pair"] == (
+        '<span class="pdg-rt rtl"><b data-pdg-rt class="rt-low">G57</b>'
+        '<i>\u2192</i><b class="pot rt-high">G91</b></span>'
+    )
+    assert got["none"] == '<span class="pdg-rt rtl"><b data-pdg-rt class="rt-low">G57</b></span>'
+    assert got["blank"] == got["none"]
+    # The card has no jersey number and no portrait; the lockup is the only thing after the name.
+    card = GRID_JS[GRID_JS.index("function cardHtml"):GRID_JS.index("function tallyHtml")]
+    assert "rtPairHtml(player)" in card
+    assert "jersey" not in card and "<img" not in card and "portrait" not in card
 
 
 def test_player_training_links_to_the_training_by_position_chart():

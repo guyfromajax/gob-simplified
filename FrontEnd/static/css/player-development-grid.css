@@ -101,6 +101,10 @@
   font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
   letter-spacing: var(--tracking-4);
 }
+/* "current → potential": the arrow and the potential read quieter than the current. */
+.pdg-card .pdg-rt.rtl { display: inline-flex; align-items: baseline; gap: var(--space-4); white-space: nowrap; }
+.pdg-card .pdg-rt i { font-style: normal; font-size: var(--fs-11); color: var(--text-38); }
+.pdg-card .pdg-rt b.pot { font-size: var(--fs-13); }
 .pdg-empty {
   grid-column: 1 / -1;
   padding: 18px;

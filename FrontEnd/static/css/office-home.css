@@ -558,6 +558,8 @@ html.gob-shell.gob-office #franchise-container .office-st .st-n .gob-mark {
 /* Rankings: "5 of 8". The unit is wider than a stat's "PPG". */
 .gob .office-ranks .card-h + .ptw { border-top: 0; }
 .gob .office-ranks .ptw em { width: var(--dsz-52); text-align: left; white-space: nowrap; }
+/* Last season, one quiet line under the rows (not in season 1). */
+.gob .office-ranks .rk-last { margin: 0; padding-top: var(--space-6); font-size: var(--fs-13); color: var(--text-60); }
 
 /* "Yours" on a list row: the navy selected-row treatment the standings row uses. */
 .gob .office-list .wr.me {
