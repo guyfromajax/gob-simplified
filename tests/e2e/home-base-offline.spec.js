@@ -93,9 +93,9 @@ function coachCareerPopulated() {
     // Server order (already ranked by season GP desc): a title finish, a title
     // finish, a NON-title completed finish, then an in-progress season.
     top_seasons: [
-      topSeason('f1', 'Lawrence Eagles', 'lawrence', 2, 31, 5, 'National champions', true, 1860, false, null),
-      topSeason('f1', 'Lawrence Eagles', 'lawrence', 1, 22, 10, 'Conference tournament champions', true, 1120, false, null),
-      topSeason('f1', 'Lawrence Eagles', 'lawrence', 4, 24, 8, 'National semifinal', false, 980, false, null),
+      topSeason('f1', 'Lawrence Eagles', 'lawrence', 2, 31, 5, 'National Champions', true, 1860, false, null),
+      topSeason('f1', 'Lawrence Eagles', 'lawrence', 1, 22, 10, 'Conference Tournament Champions', true, 1120, false, null),
+      topSeason('f1', 'Lawrence Eagles', 'lawrence', 4, 24, 8, 'National Semifinal', false, 980, false, null),
       topSeason('f2', 'Chapel Hill Sky', 'chapel_hill', 1, 4, 2, null, false, 140, true, 6),
     ],
   };
@@ -254,7 +254,7 @@ test.describe('populated state', () => {
     await expect(page.locator('.tsn-f.gold-t')).toHaveCount(2);
     const finishGold = await page.locator('.tsn-f.gold-t').first().evaluate((el) => getComputedStyle(el).color);
     expect(finishGold).toBe(REWARD_GOLD);
-    const semi = page.locator('.tsn-f').filter({ hasText: 'National semifinal' });
+    const semi = page.locator('.tsn-f').filter({ hasText: 'National Semifinal' });
     await expect(semi).not.toHaveClass(/gold-t/);
     const semiColor = await semi.evaluate((el) => getComputedStyle(el).color);
     expect(semiColor).not.toBe(REWARD_GOLD);

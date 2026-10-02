@@ -18,7 +18,6 @@ const ATTRIBUTE_NAMES = {
   FT: 'Free Throws',
   ND: 'Endurance',
   IQ: 'Basketball IQ',
-  CH: 'Clutch',
   EM: 'Emotion',
   MO: 'Momentum',
   NG: 'Energy',

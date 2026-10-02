@@ -433,10 +433,10 @@ function hbResolveBanner(spec) {
 // Trophy kinds → medallion (server owns the counts; the client only maps a kind
 // to its letter, gold flag and display label, the way the frame does).
 const HB_TITLE_MEDALLIONS = {
-  national: { letter: 'N', label: 'National champions' },
-  region: { letter: 'R', label: 'Region champions' },
-  conf_t: { letter: 'C', label: 'Conference tournament champions' },
-  conf_rs: { letter: 'C', label: 'Regular season conference champions' },
+  national: { letter: 'N', label: 'National Champions' },
+  region: { letter: 'R', label: 'Region Champions' },
+  conf_t: { letter: 'C', label: 'Conference Tournament Champions' },
+  conf_rs: { letter: 'C', label: 'Regular Season Conference Champions' },
 };
 const HB_MILESTONE_MEDALLIONS = {
   milestone_first_signing_class: { letter: 'S', label: 'First signing class' },

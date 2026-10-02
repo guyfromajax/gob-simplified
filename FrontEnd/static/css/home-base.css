@@ -278,7 +278,7 @@ body.mode-select-page .alpha-disclaimer {
 /* The finish column is the wider of the two flexible ones: the longest finish
    ("Regular season conference champions") has to read in full at 1280. A long
    team name is what gives way. */
-.gob .tsn{display:grid;grid-template-columns:var(--dsz-28) calc(var(--dsz-40) * 2.84) minmax(0,1fr) var(--dsz-60) minmax(0,1.75fr) var(--dsz-64);align-items:center;gap:var(--dsp-12);height:var(--tsn-h);border-bottom:1px solid var(--line)}
+.gob .tsn{display:grid;grid-template-columns:var(--dsz-28) calc(var(--dsz-40) * 2.84) minmax(0,1fr) var(--dsz-60) minmax(0,2fr) var(--dsz-64);align-items:center;gap:var(--dsp-12);height:var(--tsn-h);border-bottom:1px solid var(--line)}
 .gob-1920 .tsn{grid-template-columns:var(--dsz-28) 159px minmax(0,1fr) var(--dsz-60) minmax(0,1.1fr) var(--dsz-64)}
 .gob .tsn>i{font:normal var(--fw-bold) var(--fs-28)/var(--lh-85) var(--font-display);color:var(--text-60);text-align:center;padding-top:var(--space-2);font-style:normal}
 .gob .tsn:first-child>i{color:var(--text-100)}

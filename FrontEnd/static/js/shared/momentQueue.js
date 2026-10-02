@@ -246,8 +246,25 @@
     return openSammy(kind, topData, moment, ctx);
   }
 
+  // Offline only. "Coaching archetype evolved" is a weekly-card row, not a pop-up,
+  // so nothing in the queue marks it. Once the Office has shown it (this is the
+  // authoritative read, and the Office is the panel on screen) the pending key is
+  // cleared on this computer, so the row shows once. Online is unchanged.
+  function clearShownEvolutionRow(topData) {
+    if (global.GOB_BUILD_PROFILE !== 'desktop') return;
+    var items = Array.isArray(topData && topData.weekly_card_items) ? topData.weekly_card_items : [];
+    var listed = items.some(function (item) { return item && item.kind === 'archetype_evolution'; });
+    if (!listed) return;
+    var office = global.document && global.document.getElementById('office-root');
+    if (!office || !office.getClientRects().length) return;
+    var franchiseId = franchiseIdOf(topData);
+    if (!franchiseId) return;
+    patchJson('/franchise/archetype-evolution-seen', { franchise_id: franchiseId });
+  }
+
   function play(topData, opts) {
     opts = opts || {};
+    clearShownEvolutionRow(topData);
     var list = Array.isArray(topData && topData.moments_for_this_visit)
       ? topData.moments_for_this_visit
       : [];
