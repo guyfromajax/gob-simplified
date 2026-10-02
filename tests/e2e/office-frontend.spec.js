@@ -625,8 +625,9 @@ test('six states lay out cleanly at 1280, 1440 and 1920', async ({ page }) => {
       }
       if (name === 'first_week') {
         expect(await page.locator('#office-root .sp-card').count()).toBe(1);
-        // One placeholder line (the duplicated pair read as a bug: gallery-fixes #10).
-        expect(await page.locator('#office-root').getByText('Set after camp').count()).toBe(1);
+        // Week 1 has no Team snapshot card (2026-10-02), so its "Set after camp" line is gone.
+        expect(await page.locator('#office-root').getByText('Set after camp').count()).toBe(0);
+        expect(await page.locator('#office-root .office-snap').count()).toBe(0);
         expect(await page.locator('#office-root .td-gate').count()).toBe(0);
         expect(await page.locator('#office-root .td-adv').count()).toBe(0);
         expect(await page.locator('#office-root .week-k').count()).toBe(0);

@@ -860,3 +860,53 @@ def test_a_class_with_no_signings_is_an_empty_list_not_missing():
         {"team_id": OPP, "name": "Other Program", "pos": "C"},
     ]})
     assert digest["signed_class"] == {"recruits": []}
+
+
+# --- "Moved most": the eight signed-scale team attributes only ------------------------------------
+
+
+def _snapshot(before, after):
+    return {"team_measures_before": before, "team_measures": after}
+
+
+def test_moved_most_ranks_only_the_eight_signed_scale_attributes():
+    from BackEnd.utils.office_digest import MOVED_MOST_KEYS, moved_most
+
+    assert MOVED_MOST_KEYS == {
+        "offensive_efficiency", "defensive_efficiency", "discipline", "fb_efficiency",
+        "fb_opp_modifier", "fight", "pt_opp_modifier", "pt_efficiency",
+    }
+    # Shooting moved furthest, then Rebounding and Chemistry: none of them is listed.
+    rows = moved_most(_snapshot(
+        {"shot_threshold": 90, "rebound_modifier": 1.0, "team_chemistry": 14, "momentum_score": 2,
+         "fight": 2, "discipline": 5, "offensive_efficiency": 3, "pt_efficiency": 1},
+        {"shot_threshold": 84, "rebound_modifier": 6.0, "team_chemistry": 19, "momentum_score": 11,
+         "fight": 3, "discipline": 3, "offensive_efficiency": 3, "pt_efficiency": 1.5},
+    ))
+    assert rows == [
+        {"measure": "discipline", "value": 3, "delta": -2},
+        {"measure": "fight", "value": 3, "delta": 1},
+    ]
+
+
+def test_moved_most_is_empty_when_only_the_excluded_measures_moved():
+    from BackEnd.utils.office_digest import moved_most
+
+    rows = moved_most(_snapshot(
+        {"shot_threshold": 90, "rebound_modifier": 1.0, "team_chemistry": 14, "momentum_score": 2,
+         "fight": 2, "offensive_efficiency": 3},
+        {"shot_threshold": 84, "rebound_modifier": 6.0, "team_chemistry": 19, "momentum_score": 11,
+         "fight": 2, "offensive_efficiency": 3},
+    ))
+    assert rows == [], "never falls back to Chemistry, Shooting or Rebounding"
+
+
+def test_the_digest_carries_the_filtered_list_and_chemistry_keeps_its_own_bar():
+    franchise = {"_id": "fid", "current_season": 1, "week": 10, "results": {}, "office_week_snapshots": {"1": {"9": {
+        "team_measures_before": {"shot_threshold": 90, "fight": 2, "discipline": 5},
+        "team_measures": {"shot_threshold": 80, "fight": 2, "discipline": 5},
+    }}}}
+    digest = build_office_digest(_ctx(franchise_doc=franchise, week=10))
+    assert digest["team_snapshot"]["state"] == "ready"
+    assert digest["team_snapshot"]["moved_most"] == []
+    assert digest["team_snapshot"]["chemistry"] == {"value": 18, "max": 25}
