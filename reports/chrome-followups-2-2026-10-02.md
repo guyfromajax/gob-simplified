@@ -141,7 +141,7 @@ Not touched: Training page, Playbooks, training point selector (ux); News, Award
 
 | 5 | `g5-office-standings-after-…` (page), `g5-office-standings-card-after-…` (the card) | `g5-office-standings-before-…`, `g5-office-standings-card-before-…` |
 
-Untracked and not committed: `g1-…-before` and `g2-…-before` shots from my old-code runs (their mocked payloads already use the new strings, so they are not true befores). Safe to delete.
+Untracked and not committed: `g1-…-before`, `g2-…-before` and `g3-…-before` shots from my old-code runs. They are not true befores (the mocked payloads already use the new strings, and the g3 ones were written by a later run that had the new label). Safe to delete.
 
 ## Questions
 
