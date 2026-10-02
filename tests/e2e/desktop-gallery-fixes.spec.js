@@ -241,8 +241,9 @@ test('#10/#6 awards: the week-1 preseason projection, not an empty card', async 
   // One player per position on each team; nobody has played, so there are no stat columns.
   expect(m.rows).toEqual([5, 5, 5]);
   expect(m.positions).toEqual(['PG SG SF PF C', 'PG SG SF PF C', 'PG SG SF PF C']);
-  expect(m.heads.slice(0, 5)).toEqual(['Pos', 'Player', 'Yr', 'Team', 'RT']);
-  expect(m.heads).not.toContain('PTS');
+  // No stat columns in the preseason, and how the teams are picked is never shown.
+  expect(m.heads).toEqual(['Pos', 'Player', 'Yr', 'Team', 'RT']);
+  expect(m.status.trim()).toBe('Preseason');
   m.colours.forEach((colour) => expect(isOrange(colour)).toBe(false));
 });
 
