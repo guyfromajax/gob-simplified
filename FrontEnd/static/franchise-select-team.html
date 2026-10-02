@@ -21,6 +21,12 @@
   <script src="/js/shared/pageLoadOverlay.js"></script>
 </head>
 <body>
+  <!-- First paint: stay behind the shared loader until the programs are drawn
+       (franchise-select-team.js lifts it). -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>

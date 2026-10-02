@@ -7,6 +7,7 @@
   <script src="/js/shared/franchiseContext.js"></script>
   <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
@@ -16,6 +17,12 @@
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
 <body class="has-auth-bar has-footer community-page acct-page">
+  <!-- First paint: stay behind the shared loader until the data is drawn (the page
+       script lifts it), so placeholder values and empty cards are never shown. -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
   <div id="auth-bar" class="auth-bar"></div>
 
   <div class="acct">
@@ -112,6 +119,13 @@
         });
     }
 
+    // First paint: lift the loader once the page holds real data (see is-loading in
+    // css/community.css).
+    function liftLoading() {
+      document.documentElement.classList.remove('is-loading');
+      if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+    }
+
     function render(me) {
       me = me || {};
       var name = me.username || (me.email ? me.email.split('@')[0] : 'Coach');
@@ -164,6 +178,7 @@
             + '<span class="arch-meta"><span class="arch-aname">' + nm + '</span> <span class="arch-pct">' + pct + '%</span></span></div>';
         }).join('') + '</div>';
       }
+      liftLoading();
     }
 
     function loadTeamNameMap() {
@@ -191,7 +206,7 @@
           me._teamNameById = pair[1] || {};
           render(me);
         }).catch(function () { render(window.__gobAuthMeData || {}); });
-      });
+      }).catch(liftLoading);
     }
     start();
   </script>

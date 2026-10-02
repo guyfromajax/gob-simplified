@@ -20,6 +20,7 @@ One colour, one meaning. Everything not listed is neutral: white text at `--text
 Neutral by rule (no green, orange, gold or navy):
 
 - **Choice controls**: tabs, segments, filter chips, sliders, the watch star, checkboxes, view toggles, the live-game side-panel stat toggles, Autoset Lineup, a Retry button. Selected is a brighter neutral, never navy, team colour or orange.
+- **Training point boxes** (weekly Training): neutral only. An empty box is a 1px outline in `--train-box-outline`, which is `--white-45` (Jamie's choice, 2026-10-02; the subtler `--white-25` was not chosen). A filled box is solid `--white`. Change the strength in that one token, never per rule. Build detail: UX_System, "Training, point selector".
 - **Status and information codes**: phase labels, week tiles, invite counts, status labels, Player Development Grid "develops" / "adds" markers. Muted text, not colour.
 - **W/L plates**: WIN is a white plate, LOSS is an outline, everywhere, tables included (Rankings "Last Week", Team › Schedule). The result carries the meaning, not a colour.
 - **▼ deltas** everywhere: neutral (`--delta-down` is `--text-87`). Never red. The one exception is the Training Report's movement marks, a data scale of their own (see [Data scales](#data-scales)).

@@ -301,6 +301,35 @@ test('section rhythm is one token at both densities', async ({ page }) => {
   }
 });
 
+// First paint (Jamie: no screen is shown half-built). While the report is on its way the
+// panel shows the shared view skeleton, never a bare line of "Loading…" text.
+test('first paint: the shared skeleton stands in until the report lands', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await stubAuth(page);
+  await installApi(page, {});
+  let release = () => {};
+  const gate = new Promise((resolve) => { release = resolve; });
+  await page.route('**/franchise/scouting-report**', async (route) => {
+    await gate;
+    await route.fallback();
+  });
+  await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=scouting-view');
+  await page.waitForFunction(() => {
+    const overlay = document.getElementById('page-load-overlay');
+    return !overlay || getComputedStyle(overlay).display === 'none';
+  });
+  const status = page.locator('#scouting-view .scouting-status');
+  await expect(status).toHaveClass(/is-loading/);
+  await expect(status.locator('.gob-view-skel')).toBeVisible();
+  await expect(status).toHaveAttribute('aria-label', 'Loading scouting report');
+  expect(await status.innerText()).not.toMatch(/Loading/i);
+  await expect(page.locator('#scouting-view .scouting-ready')).toBeHidden();
+  release();
+  await page.waitForSelector('#scouting-view .opp-n', { timeout: 15000 });
+  await expect(page.locator('#scouting-view .gob-view-skel')).toHaveCount(0);
+  await expect(page.locator('#scouting-view .agrid tbody tr')).toHaveCount(5);
+});
+
 test('reopening keeps the rendered panel up', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openScouting(page, false);

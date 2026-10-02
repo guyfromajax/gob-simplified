@@ -93,7 +93,16 @@ function cloneParams(params) {
     return '/franchise-select-team.html?' + q.toString();
   }
 
+  /* First paint: the page waits behind the shared loader (html.is-loading, see
+     team-builder.css) until it has something finished to show. A redirect to the
+     program-select page keeps the loader up: that page carries it on. */
+  function liftLoading() {
+    document.documentElement.classList.remove('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  }
+
   function showFatal(msg) {
+    liftLoading();
     els.boot.hidden = true;
     els.app.hidden = true;
     els.fatal.hidden = false;
@@ -1071,6 +1080,7 @@ function cloneParams(params) {
     els.boot.hidden = true;
     els.app.hidden = false;
     setChapter(state.chapter, { replace: true });
+    liftLoading();
     ensureChromeObserver();
     measureChrome();
     // Auth bar may inject after first paint — sticky top must track it.
@@ -1078,9 +1088,17 @@ function cloneParams(params) {
     setTimeout(measureChrome, 250);
   }
 
+  // A boot that throws must not leave the loader up for good.
+  function start() {
+    boot().catch(function (err) {
+      liftLoading();
+      throw err;
+    });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    boot();
+    start();
   }
 })();

@@ -257,3 +257,11 @@ body.ca-page { line-height: 1.55; }
 .acct-link[aria-disabled="true"] { color: var(--white-30); cursor: default; }
 .acct-link .arrow { transition: transform .14s ease; }
 .acct-link:not([aria-disabled="true"]):hover .arrow { transform: translateX(2px); }
+
+/* First paint. Until the page's data is in, the body and the footer are held back behind
+   the shared loader: no placeholder name, no "0", no empty cards, no footer that jumps. */
+html.is-loading .acct,
+html.is-loading .alb,
+html.is-loading .community-page .site-footer {
+  visibility: hidden;
+}

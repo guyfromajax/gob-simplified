@@ -75,6 +75,8 @@ function inAppShell() {
   };
 
   const LOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>';
+  // Open padlock: the unlocked state of the same button.
+  const UNLOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 7.6-1.7"></path></svg>';
   const NOSLACK_COPY = "No room — the slack is locked. Unlock a play to make space.";
 
   function playSound(name) {
@@ -481,6 +483,17 @@ function inAppShell() {
     }
 
     syncStickyOffsets() {
+      // The tab row pins directly under the strip, so it needs the strip's real height
+      // (it grows with density and when the read-out wraps).
+      const strip = this.elements.shotWeightsLive;
+      const column = this.elements.editColumn;
+      if (strip && column) {
+        column.style.setProperty("--pb-strip-h", `${strip.getBoundingClientRect().height}px`);
+        if (!this._stripObserver && typeof ResizeObserver !== "undefined") {
+          this._stripObserver = new ResizeObserver(() => this.syncStickyOffsets());
+          this._stripObserver.observe(strip);
+        }
+      }
       const body = rootQuery(".playbooks-page-card-body");
       const header = rootQuery(".playbooks-page-card-header");
       if (!body || !header) return;
@@ -1023,12 +1036,12 @@ function inAppShell() {
       const name = escapeHtml(item.name);
       const pctBlock = flags.isComputed
         ? `<b>${item.percentage}%</b>`
-        : `<input class="et-pct-input${item.percentage >= 100 ? " threed" : ""}" data-pct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric" aria-label="${name} weight"><b aria-hidden="true">%</b>`;
+        : `<input class="et-pct-input${item.percentage >= 100 ? " threed" : ""}" data-pct="${escapeHtml(item.id)}" value="${item.percentage}" inputmode="numeric" aria-label="${name} weight"${item.locked ? ' readonly tabindex="-1" aria-readonly="true"' : ""}><b aria-hidden="true">%</b>`;
       const slider = flags.isComputed || item.locked
         ? `<span class="wb" aria-hidden="true"><i style="width:${item.percentage}%"></i></span>`
         : `<span class="wb et-slider" data-sl="${escapeHtml(item.id)}" role="slider" tabindex="0" aria-label="${name} weight" aria-valuenow="${item.percentage}" aria-valuetext="${item.percentage}%" aria-valuemin="0" aria-valuemax="100"><i style="width:${item.percentage}%"></i></span>`;
       const lock = ENFORCED_SECTIONS.has(sectionKey)
-        ? `<button class="wl${item.locked ? " on" : ""}" type="button" data-lock="${escapeHtml(item.id)}" aria-pressed="${item.locked ? "true" : "false"}" aria-label="${item.locked ? "Unlock" : "Lock"} ${name}" title="${item.locked ? "Unlock" : "Lock"}">${LOCK_SVG}</button>`
+        ? `<button class="wl${item.locked ? " on" : ""}" type="button" data-lock="${escapeHtml(item.id)}" aria-pressed="${item.locked ? "true" : "false"}" aria-label="${item.locked ? "Unlock" : "Lock"} ${name}" title="${item.locked ? "Locked: click to unlock" : "Lock this weight"}">${item.locked ? LOCK_SVG : UNLOCK_SVG}</button>`
         : "";
 
       el.innerHTML = `
@@ -1802,6 +1815,7 @@ function teardown() {
     if (page.previewTimer) { window.clearTimeout(page.previewTimer); page.previewTimer = null; }
     if (page.previewAbort) { try { page.previewAbort.abort(); } catch (err) { /* ignore */ } }
     if (page._onResize) window.removeEventListener('resize', page._onResize);
+    if (page._stripObserver) { try { page._stripObserver.disconnect(); } catch (err) {} page._stripObserver = null; }
   }
   if (window.GOBNav && typeof window.GOBNav.warnOnLeave === 'function') {
     try { window.GOBNav.warnOnLeave(null); } catch (err) { /* leave hook optional */ }

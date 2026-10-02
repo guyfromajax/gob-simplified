@@ -1996,3 +1996,11 @@ button {
     transition: none;
   }
 }
+
+/* First paint. Until step 1 is drawn the boot line and the footer are held back behind the
+   shared loader. */
+html.is-loading #tb-boot,
+html.is-loading .site-footer,
+html.is-loading footer {
+  visibility: hidden;
+}
