@@ -72,7 +72,7 @@
                 </section>
 
                 <div id="shot-weights-live" class="psw playbooks-shot-weights-strip" aria-live="polite">
-                  <div class="psw-strip-label">Expected shot distribution</div>
+                  <div class="psw-strip-label">Shot Distribution</div>
                   <p class="psw-unavailable">Loading shot weights…</p>
                 </div>
 
@@ -80,6 +80,8 @@
                   <div class="seg playbooks-tabs" id="playbooks-side-seg" role="tablist" aria-label="Playbook side">
                     <button class="playbooks-tab on" type="button" role="tab" data-tab="offense" aria-selected="true" aria-controls="pane-offense">Offense</button>
                     <button class="playbooks-tab" type="button" role="tab" data-tab="defense" aria-selected="false" aria-controls="pane-defense">Defense</button>
+                    <button class="playbooks-tab" type="button" role="tab" data-tab="fastBreaks" aria-selected="false" aria-controls="pane-fast-breaks">Fast Breaks</button>
+                    <button class="playbooks-tab" type="button" role="tab" data-tab="pressTraps" aria-selected="false" aria-controls="pane-press-traps">Press/Traps</button>
                   </div>
                 </div>
 
@@ -109,20 +111,6 @@
                     </div>
                     <div class="et-grid" id="set-plays-grid"></div>
                   </section>
-
-                  <section class="pbs pb-sec" data-section="fastBreaks" data-norm="1">
-                    <div class="sh pb-sec-head">
-                      <div class="pb-sec-title">
-                        <h2>Fast Breaks</h2>
-                        <span class="m cnt" id="fast-breaks-count"></span>
-                        <button class="norm-btn btn-q" id="fast-breaks-normalize" type="button" hidden>Normalize → 100</button>
-                      </div>
-                      <div class="section-total tot" id="fast-breaks-total"></div>
-                      <span class="cmd-h">CMD</span>
-                      <span class="slot-h" aria-hidden="true"></span>
-                    </div>
-                    <div class="chips et-grid" id="fast-breaks-chips"></div>
-                  </section>
                 </div>
 
                 <div class="playbooks-tabpane" data-pane="defense" id="pane-defense" role="tabpanel" hidden>
@@ -151,11 +139,29 @@
                     </div>
                     <div class="et-grid" id="zone-defense-grid"></div>
                   </section>
+                </div>
 
+                <div class="playbooks-tabpane" data-pane="fastBreaks" id="pane-fast-breaks" role="tabpanel" hidden>
+                  <section class="pbs pb-sec" data-section="fastBreaks" data-norm="1">
+                    <div class="sh pb-sec-head">
+                      <div class="pb-sec-title">
+                        <h2>Fast Breaks</h2>
+                        <span class="m cnt" id="fast-breaks-count"></span>
+                        <button class="norm-btn btn-q" id="fast-breaks-normalize" type="button" hidden>Normalize → 100</button>
+                      </div>
+                      <div class="section-total tot" id="fast-breaks-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
+                    </div>
+                    <div class="chips et-grid" id="fast-breaks-chips"></div>
+                  </section>
+                </div>
+
+                <div class="playbooks-tabpane" data-pane="pressTraps" id="pane-press-traps" role="tabpanel" hidden>
                   <section class="pbs pb-sec def-sec" data-section="hcTraps" data-norm="1">
                     <div class="sh pb-sec-head">
                       <div class="pb-sec-title">
-                        <h2>HC Traps</h2>
+                        <h2>Half-Court Traps</h2>
                         <span class="m cnt" id="hc-traps-count"></span>
                         <button class="norm-btn btn-q" id="hc-traps-normalize" type="button" hidden>Normalize → 100</button>
                       </div>

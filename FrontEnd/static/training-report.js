@@ -83,6 +83,28 @@ function readOptions(options) {
     : (fromRaw === 'office' || originRaw === 'office') ? 'office' : 'training';
 }
 
+/**
+ * The loading state. While `.is-loading` is on the host, every section is hidden and this
+ * quiet skeleton stands in: the report never shows headings over empty space.
+ */
+const REPORT_SKELETON_HTML = '<div class="report-skeleton" aria-hidden="true"><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-card"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div></div><p class="report-load-status" role="status" aria-live="polite"></p>';
+
+function setReportLoading(loading) {
+  if (!root || !root.classList) return;
+  root.classList.toggle('is-loading', !!loading);
+  if (loading) root.classList.remove('is-load-failed');
+  root.setAttribute('aria-busy', loading ? 'true' : 'false');
+}
+
+function showReportLoadFailed() {
+  if (!root || !root.classList) return;
+  root.classList.remove('is-loading');
+  root.classList.add('is-load-failed');
+  root.setAttribute('aria-busy', 'false');
+  const status = root.querySelector('.report-load-status');
+  if (status) status.textContent = 'The training report did not load.';
+}
+
 function shellHtml() {
   return (
     '<div class="training-report-container resource-page-container fcc-brand-page-shell training-report-resource-shell">'
@@ -97,6 +119,7 @@ function shellHtml() {
     + '</div></div></div>'
     + '<a href="#" role="button" id="locker-room-btn" class="locker-room-button">Go To Locker Room</a>'
     + '</header>'
+    + REPORT_SKELETON_HTML
     + '<section class="training-notes-section"><div class="training-notes-header"><div class="training-notes-header-main">'
     + '<div class="training-notes-header-accent" aria-hidden="true"></div>'
     + '<div class="training-notes-header-copy"><h2>Notes</h2>'
@@ -130,6 +153,11 @@ function ensureShell() {
   if (!root.querySelector('.training-report-container')) {
     root.insertAdjacentHTML('beforeend', shellHtml());
   }
+  // A host page written before the skeleton existed still gets one.
+  const header = root.querySelector('.report-header');
+  if (header && !root.querySelector('.report-skeleton')) {
+    header.insertAdjacentHTML('afterend', REPORT_SKELETON_HTML);
+  }
 }
 
 function reportSignature(data) {
@@ -139,6 +167,7 @@ function reportSignature(data) {
 
 function startTrainingReport() {
   ensureShell();
+  setReportLoading(true);
   setupViewToggle();
   setupProjectedLineupToggle();
   paintBack();
@@ -637,8 +666,10 @@ async function loadTrainingReport() {
     reportData = next;
     lastSignature = sig;
     renderPage();
+    setReportLoading(false);
   } catch (error) {
     console.error('Error loading training report:', error);
+    if (!reportData) showReportLoadFailed();
     alert('Failed to load training report. Please try again.');
   }
 }
@@ -1206,9 +1237,9 @@ function createAttributeCell(attr, value, change, displayMovement = 0) {
 
   const attachChangeTooltip = () => {
     if (!change) return;
-    const arrow = describeTrainingChange(change);
-    td.setAttribute('data-tooltip', arrow.text);
-    td.setAttribute('data-tooltip-class', arrow.className);
+    const mark = describeTrainingChange(change);
+    td.setAttribute('data-tooltip', mark.signs);
+    td.setAttribute('data-tooltip-class', mark.className);
     td.style.cursor = 'help';
     td.addEventListener('mouseenter', showAttributeTooltip);
     td.addEventListener('mouseleave', hideAttributeTooltip);
@@ -1251,12 +1282,12 @@ function createAttributeCell(attr, value, change, displayMovement = 0) {
 function markTrainingDelta(td, change) {
   const n = Number(change);
   if (!Number.isFinite(n) || n === 0) return;
-  const arrow = describeTrainingChange(n);
-  if (!arrow.text || arrow.text === '–') return;
+  const described = describeTrainingChange(n);
+  if (!described.count) return;
   td.classList.add('is-delta');
   const mark = document.createElement('span');
-  mark.className = 'delta-mark ' + arrow.className;
-  mark.textContent = arrow.text;
+  mark.className = 'delta-mark ' + described.className;
+  mark.textContent = described.signs;
   td.appendChild(mark);
 }
 
@@ -1326,46 +1357,60 @@ function createMomentumPill(mo) {
 }
 
 /**
- * Map a training delta to arrow glyphs. Two regimes by report week (2026-08):
+ * Map a training delta to a mark. Exactly 0 is a dash in every week. Otherwise two
+ * scales by report week, and they differ:
  *
- * CAMP (week 1) — symmetric bands, keeps the grey dash at exactly 0:
- *   0 → dash · 0<|n|<2 → 1 · 2≤|n|≤5 → 2 · |n|>5 → 3
+ * CAMP (week 1) — symmetric bands:
+ *   0<|n|<2 → 1 · 2≤|n|≤5 → 2 · |n|>5 → 3
  *
- * IN-SEASON (weeks 2–26) — asymmetric, NO dash. In-season decay makes tiny
- * negatives normal, so the "up" band absorbs small dips (down to −0.5) and reads
- * them as holding, keeping the report from screaming red on an unlucky −0.4 week:
- *   n ≥ 3          → ▲▲▲ blue
- *   1.0 ≤ n < 3    → ▲▲ green
- *   −0.5 ≤ n < 1.0 → ▲ green   (absorbs 0 and small dips)
- *   −1.5 < n < −0.5 → ▼ red    (−0.51 … −1.49)
- *   −2.5 < n ≤ −1.5 → ▼▼ red   (−1.5 … −2.49)
- *   n ≤ −2.5       → ▼▼▼ red
- * Triple-UP uses RT-elite blue; all other ups green; all downs red.
+ * IN-SEASON (weeks 2–26) — asymmetric. In-season decay makes tiny negatives normal,
+ * so the "up" band absorbs small dips (down to −0.5) and reads them as holding:
+ *   n ≥ 3           → 3 up
+ *   1.0 ≤ n < 3     → 2 up
+ *   −0.5 ≤ n < 1.0  → 1 up   (absorbs small dips; exactly 0 is the dash)
+ *   −1.5 < n < −0.5 → 1 down
+ *   −2.5 < n ≤ −1.5 → 2 down
+ *   n ≤ −2.5        → 3 down
+ *
+ * Tone (Jamie, 2026-10-02; Styleguide "Training movement marks"):
+ *   one up neutral · two up green · three up blue · down red,
+ *   except that outside camp a single down is neutral too.
+ *
+ * `text` is the arrow form (Team Report, Training Changes, Playbook Summary). `signs` is the
+ * same count as pluses or minuses, for a mark that sits beside an attribute value.
  */
 function describeTrainingChange(change) {
   const n = Number(change);
   if (!Number.isFinite(n)) {
-    return { text: '–', className: 'change-zero' };
+    return { text: '–', signs: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
   }
-  const up = (count) => ({
-    text: '▲'.repeat(count),
-    className: 'change-delta',
-  });
-  const down = (count) => ({ text: '▼'.repeat(count), className: 'change-negative' });
+  const camp = getReportWeekNumber() === 1;
+  const mark = (direction, count) => {
+    let tone;
+    if (direction > 0) tone = count >= 3 ? 'elite' : count === 2 ? 'up' : 'neutral';
+    else tone = (!camp && count === 1) ? 'neutral' : 'down';
+    return {
+      text: (direction > 0 ? '▲' : '▼').repeat(count),
+      signs: (direction > 0 ? '+' : '\u2212').repeat(count),
+      className: (direction > 0 ? 'change-delta' : 'change-negative') + ' tr-tone-' + tone,
+      tone: tone,
+      direction: direction,
+      count: count,
+    };
+  };
 
-  // Camp (week 1): symmetric 0/2/5 bands with a grey dash at exactly 0.
-  if (getReportWeekNumber() === 1) {
-    if (n === 0) return { text: '–', className: 'change-zero' };
+  // Exactly 0 is a grey dash, camp or in season.
+  if (n === 0) return { text: '–', signs: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
+
+  // Camp (week 1): symmetric 0/2/5 bands.
+  if (camp) {
     const abs = Math.abs(n);
-    const count = abs > 5 ? 3 : abs >= 2 ? 2 : 1;
-    return n > 0 ? up(count) : down(count);
+    return mark(n > 0 ? 1 : -1, abs > 5 ? 3 : abs >= 2 ? 2 : 1);
   }
 
-  // In-season (weeks 2–26): no dash; the up band absorbs dips down to −0.5.
-  if (n >= -0.5) {
-    return up(n >= 3 ? 3 : n >= 1 ? 2 : 1);
-  }
-  return down(n <= -2.5 ? 3 : n <= -1.5 ? 2 : 1);
+  // In-season (weeks 2–26): the up band absorbs dips down to −0.5.
+  if (n >= -0.5) return mark(1, n >= 3 ? 3 : n >= 1 ? 2 : 1);
+  return mark(-1, n <= -2.5 ? 3 : n <= -1.5 ? 2 : 1);
 }
 
 function formatChangeForTooltip(change, attrKey = null) {
@@ -1395,6 +1440,8 @@ function showAttributeTooltip(event) {
 
   const tone = cell.getAttribute('data-tooltip-class') || '';
   tooltip.className = 'attribute-tooltip';
+  const toneClass = (tone.match(/tr-tone-[a-z]+/) || [])[0];
+  if (toneClass) tooltip.classList.add(toneClass);
   if (tone.includes('change-elite')) {
     tooltip.classList.add('attribute-tooltip-elite');
   } else if (tone.includes('change-positive')) {
@@ -1604,25 +1651,28 @@ function renderPlaybookSummary() {
   );
   const defenses_changes = reportData.defenses_effectiveness_changes || {};
   
-  // Organize plays by type
+  // Offense sub-sections: Motion, then set plays by where the shot comes from.
   const motion_plays = [];
-  const set_plays = [];
-  
+  const set_by_focus = { inside: [], attack: [], outside: [], other: [] };
+
   for (const [play_name, play_data] of Object.entries(plays_data)) {
     if (typeof play_data === 'object' && play_data !== null) {
       const play_type = play_data.play_type || '';
       if (play_type === 'motion') {
         motion_plays.push(buildTrainingReportPlayEntry(play_name, play_data));
       } else if (play_type === 'set_play') {
-        set_plays.push(buildTrainingReportPlayEntry(play_name, play_data));
+        // A set play with no recognised focus is still listed, in its own column.
+        const focus = String(play_data.play_focus || '').toLowerCase();
+        const bucket = (focus === 'inside' || focus === 'attack' || focus === 'outside') ? focus : 'other';
+        set_by_focus[bucket].push(buildTrainingReportPlayEntry(play_name, play_data));
       }
     }
   }
-  
-  // Sort plays by name
-  motion_plays.sort((a, b) => a.name.localeCompare(b.name));
-  set_plays.sort((a, b) => a.name.localeCompare(b.name));
-  
+
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  motion_plays.sort(byName);
+  Object.keys(set_by_focus).forEach((focus) => set_by_focus[focus].sort(byName));
+
   let man_defenses = [];
   let zone_defenses = [];
   if (scouting_data.defense && typeof window !== 'undefined' && window.GOBDefenseDisplay) {
@@ -1654,74 +1704,92 @@ function renderPlaybookSummary() {
   man_defenses.sort((a, b) => a.name.localeCompare(b.name));
   zone_defenses.sort((a, b) => a.name.localeCompare(b.name));
   
-  container.appendChild(createPlaybookSummaryTable([
-    { title: 'Offense', items: motion_plays.concat(set_plays), changes: plays_changes },
-    { title: 'Defense', items: man_defenses.concat(zone_defenses), changes: defenses_changes },
+  const playChange = (item) => getTrainingReportPlayChange(plays_changes, item);
+  const defenseChange = (item) => getTrainingReportDefenseChange(defenses_changes, item);
+  const panels = document.createElement('div');
+  panels.className = 'pbs-panels';
+  const offenseGroups = [
+    { title: 'Motion', items: motion_plays, change: playChange },
+    { title: 'Inside Set Plays', items: set_by_focus.inside, change: playChange },
+    { title: 'Attack Set Plays', items: set_by_focus.attack, change: playChange },
+    { title: 'Outside Set Plays', items: set_by_focus.outside, change: playChange },
+  ];
+  if (set_by_focus.other.length) {
+    offenseGroups.push({ title: 'Other Set Plays', items: set_by_focus.other, change: playChange });
+  }
+  panels.appendChild(createPlaybookSummaryPanel('Offense', 'offense', offenseGroups));
+  panels.appendChild(createPlaybookSummaryPanel('Defense', 'defense', [
+    { title: 'Man', items: man_defenses, change: defenseChange },
+    { title: 'Zone', items: zone_defenses, change: defenseChange },
   ]));
+  container.appendChild(panels);
 }
 
-function playSectionLabel(title, item) {
-  if (title === 'Offense') {
-    const kind = String(item.play_type || '');
-    if (kind === 'motion') return 'Motion';
-    if (kind === 'set_play' || kind === 'set') return 'Set';
-  }
-  if (title === 'Defense') {
-    const name = String(item.name || item.display_name || '');
-    if (/zone/i.test(name)) return 'Zone';
-    return 'Man';
-  }
-  return title;
-}
-
-function createPlaybookSummaryTable(groups) {
-  const table = document.createElement('table');
-  table.className = 'playbook-summary-table';
-  const head = document.createElement('thead');
-  const headRow = document.createElement('tr');
-  ['Play', 'Section', 'CMD', 'Change'].forEach(function (label) {
-    const th = document.createElement('th');
-    th.textContent = label;
-    headRow.appendChild(th);
-  });
-  head.appendChild(headRow);
-  table.appendChild(head);
-  const body = document.createElement('tbody');
+/** One side of the playbook: a titled panel whose sub-sections sit side by side. */
+function createPlaybookSummaryPanel(title, key, groups) {
+  const panel = document.createElement('section');
+  panel.className = 'pbs-panel pbs-panel--' + key;
+  panel.setAttribute('aria-label', title);
+  const heading = document.createElement('h3');
+  heading.className = 'pbs-panel-title';
+  heading.textContent = title;
+  panel.appendChild(heading);
+  const cols = document.createElement('div');
+  cols.className = 'pbs-cols';
   groups.forEach(function (group) {
-    (group.items || []).forEach(function (item) {
-      const change = group.title === 'Offense'
-        ? getTrainingReportPlayChange(group.changes, item)
-        : getTrainingReportDefenseChange(group.changes, item);
-      const tr = document.createElement('tr');
-      const name = document.createElement('td');
-      name.textContent = item.display_name || item.name || '';
-      const section = document.createElement('td');
-      section.textContent = playSectionLabel(group.title, item);
-      const cmd = document.createElement('td');
-      const effectiveness = item && typeof item.effectiveness === 'number' ? item.effectiveness : null;
-      cmd.textContent = effectiveness == null ? '—' : String(effectiveness);
-      const delta = document.createElement('td');
-      const arrow = describeTrainingChange(change);
-      delta.textContent = arrow.text;
-      delta.className = arrow.className;
-      if (Number(change) !== 0) delta.classList.add('is-delta');
-      tr.appendChild(name);
-      tr.appendChild(section);
-      tr.appendChild(cmd);
-      tr.appendChild(delta);
-      body.appendChild(tr);
-    });
+    cols.appendChild(createPlaybookSummaryGroup(group));
   });
-  if (!body.children.length) {
-    const empty = document.createElement('tr');
-    const cell = document.createElement('td');
-    cell.colSpan = 4;
-    cell.textContent = 'No data available.';
-    empty.appendChild(cell);
-    body.appendChild(empty);
+  panel.appendChild(cols);
+  return panel;
+}
+
+/** One sub-section: name, CMD and this week's movement for each play. */
+function createPlaybookSummaryGroup(group) {
+  const col = document.createElement('div');
+  col.className = 'pbs-group';
+  const head = document.createElement('div');
+  head.className = 'pbs-group-head';
+  const name = document.createElement('h4');
+  name.textContent = group.title;
+  const cmdHead = document.createElement('span');
+  cmdHead.textContent = 'CMD';
+  head.appendChild(name);
+  head.appendChild(cmdHead);
+  col.appendChild(head);
+
+  const items = group.items || [];
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'pbs-empty';
+    empty.textContent = 'None in the playbook.';
+    col.appendChild(empty);
+    return col;
   }
-  table.appendChild(body);
-  return table;
+  const list = document.createElement('ul');
+  list.className = 'pbs-list';
+  items.forEach(function (item) {
+    const change = group.change(item);
+    const row = document.createElement('li');
+    row.className = 'pbs-row';
+    const label = document.createElement('span');
+    label.className = 'pbs-name';
+    label.textContent = item.display_name || item.name || '';
+    const cmd = document.createElement('span');
+    cmd.className = 'pbs-cmd';
+    const effectiveness = item && typeof item.effectiveness === 'number' ? item.effectiveness : null;
+    cmd.textContent = effectiveness == null ? '—' : String(effectiveness);
+    const delta = document.createElement('span');
+    const described = describeTrainingChange(change);
+    delta.className = 'pbs-delta ' + described.className;
+    delta.textContent = described.text;
+    delta.setAttribute('aria-label', 'Training change ' + (change > 0 ? '+' : '') + change);
+    row.appendChild(label);
+    row.appendChild(cmd);
+    row.appendChild(delta);
+    list.appendChild(row);
+  });
+  col.appendChild(list);
+  return col;
 }
 
 function looksLikeTrainingReportObjectId(value) {

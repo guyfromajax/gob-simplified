@@ -47,6 +47,15 @@
 --pos-pf:#C0392B;
 --pos-c:#D4A017;
 
+/* ── Coaching style marks (data: which of the four coaching styles) ──
+   A small mark only: an icon and a thin edge on a neutral card. Never a fill,
+   a button or a selected state. Styleguide, "Coaching style marks". */
+--purple:#A876E6;
+--coach-authoritarian:var(--red);
+--coach-systems:var(--yellow);
+--coach-maximizer:var(--green);
+--coach-culture:var(--purple);
+
 /* ── Deltas, results, badge ─────────────────────────────── */
 --delta-up:var(--green);
 --delta-down:var(--text-87);   /* ▼ is neutral, never red (Jamie, 2026-10-01) */

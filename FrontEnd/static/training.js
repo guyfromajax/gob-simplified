@@ -29,6 +29,7 @@ let _onResizeReq = null;
 let _onScrollTip = null;
 let _reqObserver = null;
 let _tabShown = null;
+let _onKeyModal = null;
 
 function byId(id) {
   if (id === 'play-now') return document.getElementById(id);
@@ -217,14 +218,10 @@ function applyTrainingFormState(o) {
     o.custom_focus_committed && typeof o.custom_focus_committed === 'object'
       ? Object.assign({}, o.custom_focus_committed)
       : {};
-  const radioVal = o.coaching_radio;
-  qsa('input[name="coaching-focus"]').forEach(function (inp) {
-    inp.checked = !!(radioVal && inp.value === radioVal);
-  });
-  if (radioVal) applyCoachingFocusArchetypeUi(radioVal);
-  else qsa('.archetype-block').forEach(function (block) {
-    block.classList.remove('active', 'header-selected', 'sub-option-selected');
-  });
+  let radioVal = o.coaching_radio || null;
+  if (radioVal === LEGACY_CHOOSE_ATTRIBUTES_VALUE) radioVal = playerMaximizerResolvedFocus;
+  committedCoachingValue = radioVal;
+  setCoachingFocusRadio(radioVal);
   updatePointsRemaining();
 }
 
@@ -268,7 +265,8 @@ function applySections() {
   if (header) header.hidden = !weekly;
   const note = byId('training-state-note');
   if (note && !weekly) note.hidden = true;
-  if (playerDevSection) playerDevSection.hidden = weekly;
+  // Player Development shows in both modes once the roster is in (renderPlayerDevelopment):
+  // under Coaching Focus on the weekly page, and as the whole tab in Prep.
   const pointer = byId('training-advance-pointer');
   if (pointer) pointer.hidden = weekly;
   if (backBtn) {
@@ -337,10 +335,11 @@ function wireTrainingTutorialButton() {
 /**
  * Player Development: the 12 active players, their training position and focus.
  *
- * Rendering lives in js/shared/playerDevelopmentGrid.js, shared with the FCC's Training
- * tab — the only other place these are editable. This function's whole job is adapting
- * `custom_focus_roster` (already RT-descending, already carrying both fields, year, all 12
- * attributes, height/weight and every position rating) into that module's shape.
+ * Rendering lives in js/shared/playerDevelopmentGrid.js. It has two hosts and both are this
+ * module: the weekly training page (under Coaching Focus) and Prep › Player Training.
+ * This function's whole job is adapting `custom_focus_roster` (already RT-descending,
+ * already carrying both fields, year, all 12 attributes, height/weight and every position
+ * rating) into that module's shape.
  */
 function playerDevFranchiseId() {
   return liveParams().get('franchise_id') || '';
@@ -374,20 +373,19 @@ function playerDevRows() {
 function renderPlayerDevelopment() {
   const grid = window.GOBPlayerDevelopmentGrid;
   if (!playerDevSection || !grid) return;
-  if (isWeekly()) {
-    playerDevSection.hidden = true;
-    return;
-  }
   const rows = playerDevRows();
   if (!rows.length) {
     playerDevSection.hidden = true;
     return;
   }
   playerDevSection.hidden = false;
+  const weekly = isWeekly();
   const pointer = byId('training-advance-pointer');
-  if (pointer) pointer.hidden = false;
+  if (pointer) pointer.hidden = weekly;
   grid.render(playerDevSection, rows, {
-    layout: 'table',
+    // Weekly page: four columns of three cards, RT order running down each column.
+    // Prep tab: the roster table.
+    layout: weekly ? 'cards' : 'table',
     tallies: (positionTallies && focusTallies)
       ? { positions: positionTallies, focuses: focusTallies }
       : null,
@@ -432,11 +430,43 @@ function wirePlayerDevelopmentTutorialButton() {
 }
 wirePlayerDevelopmentTutorialButton();
 
-/** Main PM radio value; modal assigns a concrete leaf here before submit */
-const CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
+/** Old drafts stored this umbrella value plus a resolved leaf; the leaf is now the radio. */
+const LEGACY_CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
+const PM_CUSTOM_VALUE = 'player-maximizer-custom';
 
-/** Resolved leaf: top-3 | attributes-4-6 | positional-focus | custom — set when user taps Assign in modal (choose-attributes path only, or stays null until then) */
+/**
+ * The four Player Maximizer options. Each is its own Coaching Focus radio, and choosing
+ * one opens the attribute modal under that option's name.
+ */
+const PM_LEAVES = {
+  'player-maximizer-top-3': {
+    mode: 'top-3',
+    title: 'Top 3 Attributes',
+    hint: 'Sharpens what each player already does best. Highlighted attributes get the focus.',
+  },
+  'player-maximizer-attributes-4-6': {
+    mode: 'attributes-4-6',
+    title: 'Attributes 4\u20136',
+    hint: 'Takes each player from good to great in emerging skills. Highlighted attributes get the focus.',
+  },
+  'player-maximizer-positional-focus': {
+    mode: 'positional',
+    title: 'Positional Focus',
+    hint: 'Builds positional identity around each player\u2019s best position. Highlighted attributes get the focus.',
+  },
+  'player-maximizer-custom': {
+    mode: 'custom',
+    title: 'Custom',
+    hint: 'Pick three attributes for each player.',
+  },
+};
+
+/** The assigned Player Maximizer leaf, or null. Kept in the draft for older readers. */
 let playerMaximizerResolvedFocus = null;
+/** The Coaching Focus value in force: what Cancel in the attribute modal returns to. */
+let committedCoachingValue = null;
+/** The Player Maximizer leaf the attribute modal is showing. */
+let pmModalValue = null;
 
 const PM_POSITION_RT_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
 const PM_POSITIONAL_FOCUS_ATTRS = {
@@ -483,29 +513,8 @@ function sortedAttrCodesByValue(row) {
 }
 
 function getPmModalMode() {
-  const r = rootQuery('input[name="pm-modal-mode"]:checked');
-  return r ? r.value : 'top-3';
-}
-
-function resolvedFocusToModalMode(resolved) {
-  if (resolved === 'player-maximizer-custom') return 'custom';
-  if (resolved === 'player-maximizer-attributes-4-6') return 'attributes-4-6';
-  if (resolved === 'player-maximizer-positional-focus') return 'positional';
-  if (resolved === 'player-maximizer-top-3') return 'top-3';
-  return 'top-3';
-}
-
-function modalModeToCoachingLeaf(mode) {
-  if (mode === 'custom') return 'player-maximizer-custom';
-  if (mode === 'attributes-4-6') return 'player-maximizer-attributes-4-6';
-  if (mode === 'positional') return 'player-maximizer-positional-focus';
-  return 'player-maximizer-top-3';
-}
-
-function syncPmModalCustomHint() {
-  const el = byId('pm-modal-custom-hint');
-  if (!el) return;
-  el.hidden = getPmModalMode() !== 'custom';
+  const leaf = PM_LEAVES[pmModalValue];
+  return leaf ? leaf.mode : 'top-3';
 }
 
 function getRowHighlightPicks(row) {
@@ -839,17 +848,11 @@ function isCustomFocusComplete() {
   });
 }
 
-/** Submit enabled when PM hidden leaf is selected, or Choose Attributes + resolved leaf (custom → committed complete). */
+/** A Player Maximizer option is ready once chosen; Custom also needs three picks per player. */
 function isPlayerMaximizerSubmitReady() {
   const sel = rootQuery('input[name="coaching-focus"]:checked');
-  if (!sel || !sel.value.startsWith('player-maximizer')) return true;
-  if (sel.value === CHOOSE_ATTRIBUTES_VALUE) {
-    if (!playerMaximizerResolvedFocus) return false;
-    if (playerMaximizerResolvedFocus === 'player-maximizer-custom') {
-      return isCustomFocusComplete();
-    }
-    return true;
-  }
+  if (!sel || !PM_LEAVES[sel.value]) return true;
+  if (sel.value === PM_CUSTOM_VALUE) return isCustomFocusComplete();
   return true;
 }
 
@@ -858,42 +861,70 @@ function resetCustomFocusCommitted() {
   customFocusDraft = {};
 }
 
-function openCustomFocusModal() {
-  if (!customFocusModal || !customFocusThead || !customFocusTbody) return;
+function isCustomFocusModalOpen() {
+  return !!(customFocusModal && customFocusModal.classList.contains('is-visible'));
+}
+
+/** Open the attribute modal for one Player Maximizer option. Its title is that option. */
+function openCustomFocusModal(value) {
+  if (!customFocusModal || !customFocusThead || !customFocusTbody) return false;
+  const leaf = PM_LEAVES[value];
+  if (!leaf) return false;
   const urlParams = liveParams();
   if (urlParams.get('mode') !== 'franchise' || !urlParams.get('franchise_id')) {
-    showMessageModal('Choose Attributes is available in franchise mode after roster data loads.');
-    return;
+    showMessageModal('Player Maximizer is available in franchise mode after roster data loads.');
+    return false;
   }
   if (!customFocusRoster.length) {
     showMessageModal('Roster data is still loading. Try again in a moment.');
-    return;
+    return false;
   }
-  const mode = resolvedFocusToModalMode(playerMaximizerResolvedFocus);
-  const modeInput = rootQuery(`input[name="pm-modal-mode"][value="${mode}"]`);
-  if (modeInput) modeInput.checked = true;
+  pmModalValue = value;
+  const title = byId('custom-focus-modal-title');
+  const hint = byId('custom-focus-modal-hint');
+  if (title) title.textContent = leaf.title;
+  if (hint) hint.textContent = leaf.hint;
 
   customFocusDraft = {};
   customFocusRoster.forEach(function (row) {
     const pid = row.player_id;
-    if (mode === 'custom') {
-      const c = customFocusCommitted[pid];
-      customFocusDraft[pid] = c && c.length === 3 ? [c[0], c[1], c[2]] : [];
-    } else {
-      customFocusDraft[pid] = [];
-    }
+    const c = leaf.mode === 'custom' ? customFocusCommitted[pid] : null;
+    customFocusDraft[pid] = c && c.length === 3 ? [c[0], c[1], c[2]] : [];
   });
-  syncPmModalCustomHint();
   renderCustomFocusTable();
   syncCustomFocusAssignButton();
-  customFocusModal.style.display = 'flex';
+  customFocusModal.classList.add('is-visible');
   customFocusModal.setAttribute('aria-hidden', 'false');
+  if (customFocusAssignBtn && !customFocusAssignBtn.disabled) customFocusAssignBtn.focus({ preventScroll: true });
+  else if (customFocusCancelBtn) customFocusCancelBtn.focus({ preventScroll: true });
+  return true;
 }
 
 function closeCustomFocusModal() {
   if (!customFocusModal) return;
-  customFocusModal.style.display = 'none';
+  customFocusModal.classList.remove('is-visible');
   customFocusModal.setAttribute('aria-hidden', 'true');
+}
+
+/** Check the radio for `value` (none when null) and repaint the cards. */
+function setCoachingFocusRadio(value) {
+  qsa('input[name="coaching-focus"]').forEach(function (inp) {
+    inp.checked = !!(value && inp.value === value);
+  });
+  if (value) applyCoachingFocusArchetypeUi(value);
+  else qsa('.archetype-block').forEach(function (block) {
+    block.classList.remove('active', 'header-selected', 'sub-option-selected');
+  });
+}
+
+/** Cancel, Escape or the backdrop: the focus goes back to what it was before the modal. */
+function cancelCustomFocusModal() {
+  if (!isCustomFocusModalOpen()) return;
+  closeCustomFocusModal();
+  customFocusDraft = {};
+  if (committedCoachingValue !== pmModalValue) setCoachingFocusRadio(committedCoachingValue);
+  updatePointsRemaining();
+  saveTrainingFormDraft();
 }
 
 function syncCustomFocusAssignButton() {
@@ -978,9 +1009,10 @@ function onCustomFocusCellClick(playerId, attrCode) {
 }
 
 function commitCustomFocusFromModal() {
-  const mode = getPmModalMode();
-  if (mode === 'custom') {
-    customFocusCommitted = {};
+  const value = pmModalValue;
+  if (!PM_LEAVES[value]) return;
+  customFocusCommitted = {};
+  if (value === PM_CUSTOM_VALUE) {
     customFocusRoster.forEach(function (row) {
       const pid = row.player_id;
       const picks = customFocusDraft[pid];
@@ -988,15 +1020,14 @@ function commitCustomFocusFromModal() {
         customFocusCommitted[pid] = [picks[0], picks[1], picks[2]];
       }
     });
-    playerMaximizerResolvedFocus = 'player-maximizer-custom';
-  } else {
-    customFocusCommitted = {};
-    customFocusDraft = {};
-    playerMaximizerResolvedFocus = modalModeToCoachingLeaf(mode);
   }
+  customFocusDraft = {};
+  playerMaximizerResolvedFocus = value;
+  committedCoachingValue = value;
+  setCoachingFocusRadio(value);
   closeCustomFocusModal();
   updatePointsRemaining();
-  saveTrainingFormDraft();
+  noteTrainingEdit();
 }
 
 /**
@@ -1133,7 +1164,8 @@ window.addEventListener('resize', _onResizeSliders);
  * Auto-Train: assign whole points under the flat budget and pick a random focus
  */
 function autoAssignTraining() {
-  playSound('SFX_SELECT');
+  // Same cue as Autoset Lineup on Set Lineup (Sound_Design_System: chaotic-choice).
+  playSound('chaotic-choice.wav');
   const sliders = Array.from(allSliders);
   if (sliders.length === 0) return;
 
@@ -1183,8 +1215,7 @@ function autoAssignTraining() {
       return (
         value.includes('-') &&
         !archetypeValues.includes(value) &&
-        value !== 'player-maximizer-choose-attributes' &&
-        value !== 'player-maximizer-custom'
+        value !== PM_CUSTOM_VALUE
       );
     });
     
@@ -1194,16 +1225,6 @@ function autoAssignTraining() {
       if (typeof window !== 'undefined') window.__trainingAutoAssigning = true;
       randomRadio.dispatchEvent(new Event('change', { bubbles: true }));
       focusLabel = getFocusLabelText(randomRadio);
-      // Hidden PM leaf radios have no label — use same wording as the modal row
-      const autoTrainPmLeafLabels = {
-        'player-maximizer-top-3': 'Top 3',
-        'player-maximizer-attributes-4-6': 'Attributes 4–6',
-        'player-maximizer-positional-focus': 'Positional Focus'
-      };
-      const rv = randomRadio.value || '';
-      if (autoTrainPmLeafLabels[rv]) {
-        focusLabel = autoTrainPmLeafLabels[rv];
-      }
       archetypeLabel = getArchetypeLabelText(randomRadio);
     }
   }
@@ -1348,54 +1369,35 @@ coachingRadios.forEach(radio => {
     
     applyCoachingFocusArchetypeUi(value);
 
-    if (value.startsWith('player-maximizer')) {
-      if (value === CHOOSE_ATTRIBUTES_VALUE) {
-        openCustomFocusModal();
-      } else {
-        playerMaximizerResolvedFocus = null;
+    if (PM_LEAVES[value]) {
+      if (skipSound) {
+        // Auto-Train never picks Custom, so the leaf is complete as chosen.
         resetCustomFocusCommitted();
+        playerMaximizerResolvedFocus = value;
+        committedCoachingValue = value;
+      } else if (!openCustomFocusModal(value)) {
+        setCoachingFocusRadio(committedCoachingValue);
       }
     } else {
       resetPlayerMaximizerResolvedState();
+      committedCoachingValue = value;
     }
 
     // Update submit button state when focus is selected
     updatePointsRemaining();
     saveTrainingFormDraft();
   });
-});
 
-qsa('input[name="pm-modal-mode"]').forEach(function (radio) {
-  radio.addEventListener('change', function () {
-    if (!this.checked) return;
-    playSound('SFX_SELECT');
-    syncPmModalCustomHint();
-    const mode = getPmModalMode();
-    if (mode !== 'custom') {
-      customFocusDraft = {};
-      customFocusRoster.forEach(function (row) {
-        customFocusDraft[row.player_id] = [];
-      });
-    } else {
-      customFocusRoster.forEach(function (row) {
-        const pid = row.player_id;
-        const c = customFocusCommitted[pid];
-        customFocusDraft[pid] = c && c.length === 3 ? [c[0], c[1], c[2]] : [];
-      });
-    }
-    renderCustomFocusTable();
-    syncCustomFocusAssignButton();
-  });
+  // A second click on the assigned option reopens its modal (to review, or to edit
+  // Custom picks). A first click is handled by `change` above.
+  if (PM_LEAVES[radio.value]) {
+    radio.addEventListener('click', function () {
+      if (this.checked && committedCoachingValue === this.value && !isCustomFocusModalOpen()) {
+        openCustomFocusModal(this.value);
+      }
+    });
+  }
 });
-
-const chooseAttrsRadio = rootQuery(
-  `input[name="coaching-focus"][value="${CHOOSE_ATTRIBUTES_VALUE}"]`
-);
-if (chooseAttrsRadio) {
-  chooseAttrsRadio.addEventListener('click', function () {
-    if (this.checked) openCustomFocusModal();
-  });
-}
 
 if (customFocusAssignBtn) {
   customFocusAssignBtn.addEventListener('click', function () {
@@ -1406,9 +1408,20 @@ if (customFocusAssignBtn) {
 if (customFocusCancelBtn) {
   customFocusCancelBtn.addEventListener('click', function () {
     playSound('SFX_SELECT');
-    closeCustomFocusModal();
+    cancelCustomFocusModal();
   });
 }
+if (customFocusModal) {
+  const backdrop = customFocusModal.querySelector('.gob-modal-backdrop');
+  if (backdrop) backdrop.addEventListener('click', cancelCustomFocusModal);
+}
+_onKeyModal = function (event) {
+  if (event.key === 'Escape' && isCustomFocusModalOpen()) {
+    event.preventDefault();
+    cancelCustomFocusModal();
+  }
+};
+document.addEventListener('keydown', _onKeyModal);
 }
 
 /**
@@ -1503,14 +1516,8 @@ function collectTrainingData() {
       breaks: parseInt(byId('general-breaks').value) || 0
     },
     
-    // Coaching Focus (Choose Attributes → concrete leaf from modal Assign)
-    coaching_focus: (function () {
-      let cf = rootQuery('input[name="coaching-focus"]:checked')?.value || null;
-      if (cf === CHOOSE_ATTRIBUTES_VALUE) {
-        cf = playerMaximizerResolvedFocus;
-      }
-      return cf;
-    })(),
+    // Coaching Focus: the checked option's value is the leaf the server reads.
+    coaching_focus: rootQuery('input[name="coaching-focus"]:checked')?.value || null,
     
     // Playbook Training Mode (+ optional custom CMD focus for franchise)
     playbook_training_mode: (function () {
@@ -1625,9 +1632,8 @@ async function submitTraining(button) {
     return;
   }
 
-  const cfRadio = rootQuery('input[name="coaching-focus"]:checked')?.value;
-  if (cfRadio === CHOOSE_ATTRIBUTES_VALUE && !isPlayerMaximizerSubmitReady()) {
-    alert('Player Maximizer: open Choose Attributes, pick a mode, and tap Assign Focus Attributes (for Custom, pick three distinct attributes per player).');
+  if (!isPlayerMaximizerSubmitReady()) {
+    alert('Player Maximizer Custom: pick three attributes for each player, then Assign Focus Attributes.');
     return;
   }
   
@@ -2039,8 +2045,14 @@ function wireCustomTrainingPlaybook() {
       if (tid) q.set('team_id', tid);
       if (p.get('session_type')) q.set('session_type', p.get('session_type'));
       const playbooksUrl = `/training-playbooks.html?${q.toString()}`;
-      if (window.GOBNav && typeof window.GOBNav.go === 'function') window.GOBNav.go(playbooksUrl);
-      else window.location.href = playbooksUrl;
+      // Not a leave: the draft was saved above and Training Playbook returns here, so
+      // the unsaved-allocation confirm must not stand in the way once points are spent.
+      if (window.GOBNav && typeof window.GOBNav.go === 'function') {
+        if (typeof window.GOBNav.allowNextLeave === 'function') window.GOBNav.allowNextLeave();
+        window.GOBNav.go(playbooksUrl);
+      } else {
+        window.location.href = playbooksUrl;
+      }
     });
   }
   syncPlaybookModeToggleUi();
@@ -2055,12 +2067,6 @@ const ARCH_NAMES = {
   'systems-coach': 'Systems Coach',
   'player-maximizer': 'Player Maximizer',
   'culture-builder': 'Culture Builder'
-};
-const PM_LEAF_NAMES = {
-  'player-maximizer-top-3': 'Top 3',
-  'player-maximizer-attributes-4-6': 'Attributes 4–6',
-  'player-maximizer-positional-focus': 'Positional Focus',
-  'player-maximizer-custom': 'Custom'
 };
 
 function archKeyFromValue(value) {
@@ -2109,16 +2115,10 @@ const FOCUS_TOOLTIPS = {
   'culture-builder-confidence': { name: 'Confidence',           desc: "Build unshakable self-belief through relentless positivity." },
   'culture-builder-community':  { name: 'Community Engagement', desc: "Root the team in its community and rally collective passion." },
   'culture-builder-teamwork':   { name: 'Team Building',        desc: "Forge a brotherhood that plays for each other." },
-  'player-maximizer-choose-attributes': {
-    name: 'Choose Attributes',
-    desc: "Opens a per-player attribute picker. Pick a development mode for the whole roster:",
-    modes: [
-      ['Top 3', "Sharpen what each player already does best."],
-      ['Attributes 4–6', "Take each player from good to great in emerging skills."],
-      ['Positional Focus', "Build positional identity around each player's core strengths."],
-      ['Custom', "Develop each player around the attributes you choose."]
-    ]
-  }
+  'player-maximizer-top-3':             { name: 'Top 3 Attributes', desc: "Sharpen what each player already does best." },
+  'player-maximizer-attributes-4-6':    { name: 'Attributes 4\u20136',   desc: "Take each player from good to great in emerging skills." },
+  'player-maximizer-positional-focus':  { name: 'Positional Focus', desc: "Build positional identity around each player's core strengths." },
+  'player-maximizer-custom':            { name: 'Custom',           desc: "Develop each player around the attributes you choose." }
 };
 
 /* --- Shared tooltip element + positioning --- */
@@ -2285,13 +2285,7 @@ function setupTrainingTooltips() {
 /* --- Requirements bar --- */
 function friendlyFocusName(radio) {
   const v = radio.value;
-  if (v === CHOOSE_ATTRIBUTES_VALUE) {
-    if (playerMaximizerResolvedFocus && PM_LEAF_NAMES[playerMaximizerResolvedFocus]) {
-      return PM_LEAF_NAMES[playerMaximizerResolvedFocus];
-    }
-    return 'Choose Attributes';
-  }
-  if (PM_LEAF_NAMES[v]) return PM_LEAF_NAMES[v];
+  if (PM_LEAVES[v]) return PM_LEAVES[v].title;
   return getFocusLabelText(radio) || v;
 }
 
@@ -2416,7 +2410,8 @@ function teardown() {
   if (_onResizeReq) window.removeEventListener('resize', _onResizeReq);
   if (_onScrollTip) window.removeEventListener('scroll', _onScrollTip, true);
   if (_tabShown) window.removeEventListener('gob-tab-shown', _tabShown);
-  _onPageShow = _onResizeSliders = _onResizeReq = _onScrollTip = _tabShown = null;
+  if (_onKeyModal) document.removeEventListener('keydown', _onKeyModal);
+  _onPageShow = _onResizeSliders = _onResizeReq = _onScrollTip = _tabShown = _onKeyModal = null;
   if (_reqObserver) { try { _reqObserver.disconnect(); } catch (err) {} _reqObserver = null; }
   if (window.GOBAdvance && window.GOBAdvance.clearOverride) window.GOBAdvance.clearOverride();
   if (window.GOBNav && typeof window.GOBNav.warnOnLeave === 'function') {
