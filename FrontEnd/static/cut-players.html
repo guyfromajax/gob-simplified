@@ -5,6 +5,7 @@
   <script src="/js/shared/franchiseContext.js"></script>
   <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
@@ -17,6 +18,13 @@
   <link rel="stylesheet" href="/css/rt-buckets.css">
 </head>
 <body class="cut-players-page">
+  <!-- First paint: stay behind the shared loader until the roster and the week's cut
+       count are in (cut-players.js lifts it). In a week with nothing to cut, the
+       heading and table shell are then never shown before "No Cuts Required". -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
   <div id="cut-players-view">
   <div class="resource-page-container cut-players-shell">
     <div class="gob-page-header cut-players-header">

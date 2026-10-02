@@ -168,6 +168,29 @@ async function releaseClosedGameCover() {
   return redirected;
 }
 
+/**
+ * No game to show: the page was opened without a game (and without two teams for a
+ * pre-game view), or the game's data could not be loaded. The sections are built for a game,
+ * so their bare heads and the "Away Team 0 @ Home Team 0" header say nothing: they are
+ * hidden and one card says what happened. The back button stays.
+ */
+function showNoGameState() {
+  const container = document.getElementById('box-score-container');
+  if (!container || container.classList.contains('is-empty')) return;
+  container.classList.add('is-empty');
+  const card = document.createElement('div');
+  card.className = 'box-score-empty';
+  card.setAttribute('role', 'status');
+  const line = document.createElement('p');
+  line.textContent = 'This box score could not be opened.';
+  const hint = document.createElement('p');
+  hint.className = 'box-score-empty-hint';
+  hint.textContent = 'The game was not found.';
+  card.appendChild(line);
+  card.appendChild(hint);
+  container.appendChild(card);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = liveParams();
   const gameId = urlParams.get('game_id');
@@ -192,6 +215,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('⚠️ No gameId in URL params');
     if (!homeTeamName || !awayTeamName) {
       console.error('❌ No game_id provided and team names missing');
+      showNoGameState();
+      setupLockerRoomButton();
       await releaseClosedGameCover();
       return;
     }
@@ -201,6 +226,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       setupTabs();
     } catch (e) {
       console.error('❌ Error loading pregame box score:', e);
+      // Only when there is no game to draw. A game that loaded and then hit an error
+      // part-way through drawing keeps what it drew.
+      if (!gameData) showNoGameState();
     } finally {
       // ✅ Always setup locker room button, even if data loading fails
       setupLockerRoomButton();
@@ -215,6 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupTabs();
   } catch (error) {
     console.error('❌ Error loading box score:', error);
+    if (!gameData) showNoGameState();
   } finally {
     // ✅ Always setup locker room button, even if data loading fails
     setupLockerRoomButton();

@@ -353,6 +353,13 @@ function cloneParams(params) {
     });
   }
 
+  /* First paint: the page stays behind the shared loader (and hidden, see the
+     is-loading rule in cut-players.css) until the roster and the cut count are in. */
+  function liftLoading() {
+    document.documentElement.classList.remove('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  }
+
   function loadData() {
     var profileQ = urlParams.get('cc_profile') === '1' ? '&profile=1' : '';
     Promise.all([
@@ -392,6 +399,7 @@ function cloneParams(params) {
         return Number(b.highestRT || -1) - Number(a.highestRT || -1);
       });
       renderTable();
+      liftLoading();
       if (!topData.cut_required || cutCount <= 0) {
         showModal({
           title: 'No Cuts Required',
@@ -407,6 +415,7 @@ function cloneParams(params) {
       }
     }).catch(function (err) {
       console.error(err);
+      liftLoading();
       showModal({
         title: 'Assign Practice Squad',
         message: 'Unable to load practice squad assignment data.',

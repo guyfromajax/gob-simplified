@@ -206,3 +206,10 @@ body.cut-players-page .gob-modal-btn-primary.is-neutral {
   border-color: transparent;
   color: var(--bg);
 }
+
+/* First paint. Until the roster and the week's cut count are in, the page body is held
+   back behind the shared loader: no heading and table shell that "No Cuts Required"
+   then replaces. */
+html.is-loading #cut-players-view {
+  visibility: hidden;
+}
