@@ -1283,11 +1283,32 @@ html.gob-shell .pg-head .pg-tools #save-btn:disabled {
 html.gob-shell .pg-head .pg-tools #save-btn:hover:not(:disabled) {
   filter: brightness(1.06);
   transform: none;
-}/* ---- Offense / Defense toggle beside the playcall editor ---- */
+}/* ---- Tab row under the Shot Distribution strip ----
+   The strip is sticky (it is the live read-out while weights move). In the shell it must
+   pin directly under the page head, on the page's solid fill, and the tab row pins with
+   it: a transparent strip pinned at the legacy offset rode up over the page head, and
+   the tab row slid under its bottom edge. --pb-strip-h is the strip's measured height
+   (playbooks.js syncStickyOffsets). Spacing is the section spacing: --dsp-16 above the
+   tabs, --dsp-16 between the tabs and the first section. */
+#playbooks-view .playbooks-shot-weights-strip{
+  top: var(--gob-stick-top, 0px);
+  z-index: 2;
+  background: var(--bg-page-solid);
+}
+/* The row's fill starts --space-8 behind the strip's bottom edge (the strip is the
+   higher layer), so no sliver of a passing play can show between the two. */
 #playbooks-view .playbooks-side-row{
+  position: sticky;
+  top: calc(var(--gob-stick-top, 0px) + var(--pb-strip-h, var(--dsz-50)) - var(--space-8));
+  z-index: 1;
   display: flex;
   align-items: center;
-  margin: var(--dsp-16) 0 0;
+  margin: calc(-1 * var(--space-8)) 0 0;
+  padding: calc(var(--dsp-16) + var(--space-8)) 0 var(--space-8);
+  background: var(--bg-page-solid);
+}
+#playbooks-view .playbooks-tabpane > .pbs:first-child{
+  margin-top: var(--space-8);
 }
 
 #playbooks-view .playbooks-side-row .playbooks-tabs{

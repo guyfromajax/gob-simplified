@@ -1034,6 +1034,69 @@ test.describe('playbooks', () => {
   });
 });
 
+// Follow-ups from Jamie on Prep › Playbooks (2026-10-02). PB_SHOTS=1 writes the after
+// shots to reports/playbooks-followups/.
+const PB_OUT = path.join(__dirname, '../../reports/playbooks-followups');
+async function pbShot(page, name) {
+  if (process.env.PB_SHOTS !== '1') return;
+  fs.mkdirSync(PB_OUT, { recursive: true });
+  await settle(page);
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: path.join(PB_OUT, name + '.png'), animations: 'disabled' });
+}
+
+test.describe('playbooks follow-ups', () => {
+  test.skip(PHASE === 'before', 'after tree only');
+
+  for (const [width, height] of [[1280, 720], [1920, 1080]]) {
+    test('the tab row sits clear below the Shot Distribution strip at ' + width + ', at rest and scrolled', async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await openPlaybooks(page);
+      const measure = (scrollTop) => page.evaluate((y) => {
+        const main = document.querySelector('html.gob-shell .main');
+        main.scrollTop = y;
+        const box = (sel) => {
+          const r = document.querySelector(sel).getBoundingClientRect();
+          return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right) };
+        };
+        const strip = document.querySelector('#playbooks-view .playbooks-shot-weights-strip');
+        return {
+          scrolled: main.scrollTop,
+          head: box('html.gob-shell .pg-head'),
+          strip: box('#playbooks-view .playbooks-shot-weights-strip'),
+          tabs: box('#playbooks-view .playbooks-tabs'),
+          section: box('#playbooks-view .playbooks-tabpane.on .pb-sec-head'),
+          stripFill: getComputedStyle(strip).backgroundColor,
+        };
+      }, scrollTop);
+      const rest = await measure(0);
+      const sectionGap = rest.section.top - rest.tabs.bottom;
+      for (const y of [0, 60, 150, 400, 900]) {
+        const m = await measure(y);
+        const note = width + ' scroll ' + y + ' ' + JSON.stringify(m);
+        // The two boxes never overlap, and the tab row keeps the section spacing below the strip.
+        expect(m.tabs.top, note).toBeGreaterThanOrEqual(m.strip.bottom);
+        expect(m.tabs.top - m.strip.bottom, note).toBe(rest.tabs.top - rest.strip.bottom);
+        expect(m.tabs.top - m.strip.bottom, note).toBeGreaterThanOrEqual(14);
+        expect(Math.abs((m.tabs.top - m.strip.bottom) - sectionGap), note).toBeLessThanOrEqual(6);
+        // The strip pins under the page head, never over it, and is not see-through.
+        expect(m.strip.top, note).toBeGreaterThanOrEqual(m.head.bottom);
+        expect(m.stripFill, note).not.toBe('rgba(0, 0, 0, 0)');
+      }
+      // Scrolled: the plays pass under the pinned pair, the pair stays where it was.
+      const scrolled = await measure(400);
+      expect(scrolled.scrolled).toBeGreaterThan(0);
+      expect(scrolled.strip.top).toBe(rest.strip.top);
+      expect(scrolled.tabs.top).toBe(rest.tabs.top);
+      expect(scrolled.section.top).toBeLessThan(rest.section.top);
+      await measure(0);
+      await pbShot(page, 'tabs-strip-after-' + width);
+      await measure(150);
+      await pbShot(page, 'tabs-strip-after-' + width + '-scrolled');
+    });
+  }
+});
+
 test.describe('set lineup', () => {
   test.skip(PHASE === 'before', 'after tree only');
 

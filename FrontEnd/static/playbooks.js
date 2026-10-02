@@ -481,6 +481,17 @@ function inAppShell() {
     }
 
     syncStickyOffsets() {
+      // The tab row pins directly under the strip, so it needs the strip's real height
+      // (it grows with density and when the read-out wraps).
+      const strip = this.elements.shotWeightsLive;
+      const column = this.elements.editColumn;
+      if (strip && column) {
+        column.style.setProperty("--pb-strip-h", `${strip.getBoundingClientRect().height}px`);
+        if (!this._stripObserver && typeof ResizeObserver !== "undefined") {
+          this._stripObserver = new ResizeObserver(() => this.syncStickyOffsets());
+          this._stripObserver.observe(strip);
+        }
+      }
       const body = rootQuery(".playbooks-page-card-body");
       const header = rootQuery(".playbooks-page-card-header");
       if (!body || !header) return;
@@ -1802,6 +1813,7 @@ function teardown() {
     if (page.previewTimer) { window.clearTimeout(page.previewTimer); page.previewTimer = null; }
     if (page.previewAbort) { try { page.previewAbort.abort(); } catch (err) { /* ignore */ } }
     if (page._onResize) window.removeEventListener('resize', page._onResize);
+    if (page._stripObserver) { try { page._stripObserver.disconnect(); } catch (err) {} page._stripObserver = null; }
   }
   if (window.GOBNav && typeof window.GOBNav.warnOnLeave === 'function') {
     try { window.GOBNav.warnOnLeave(null); } catch (err) { /* leave hook optional */ }
