@@ -393,7 +393,7 @@ test.describe('training page', () => {
     expect(fs.existsSync(path.join(__dirname, '../../FrontEnd/static/sounds/chaotic-choice.wav'))).toBe(true);
   });
 
-  test('T2 T3 Player Development sits under Coaching Focus: 4 columns of 3 by RT, and saves', async ({ page }) => {
+  test('T2 T3 Player Development sits under Coaching Focus: four across by RT, and saves', async ({ page }) => {
     const devSaves = [];
     await openTraining(page, { devSaves });
     const section = page.locator('#player-dev-section');
@@ -413,10 +413,10 @@ test.describe('training page', () => {
     const ys = [...new Set(geom.cards.map((c) => c.y))].sort((a, b) => a - b);
     expect(xs.length, JSON.stringify(xs)).toBe(4);
     expect(ys.length, JSON.stringify(ys)).toBe(3);
-    // DOM order is RT order; it must run down each column, then across.
+    // DOM order is RT order; it reads left to right, then top to bottom.
     geom.cards.forEach((card, i) => {
-      expect(card.x, card.name).toBe(xs[Math.floor(i / 3)]);
-      expect(card.y, card.name).toBe(ys[i % 3]);
+      expect(card.x, card.name).toBe(xs[i % 4]);
+      expect(card.y, card.name).toBe(ys[Math.floor(i / 4)]);
     });
     const roster = inSeasonPoints().custom_focus_roster;
     expect(geom.cards.map((c) => c.name)).toEqual(roster.map((r) => r.name));
@@ -448,9 +448,10 @@ test.describe('training page', () => {
     const ys = [...new Set(cards.map((c) => c.y))].sort((a, b) => a - b);
     expect(xs.length).toBe(4);
     expect(ys.length).toBe(4);
+    // Row by row: three full rows of four, then the last three.
     cards.forEach((card, i) => {
-      expect(card.x).toBe(xs[Math.floor(i / 4)]);
-      expect(card.y).toBe(ys[i % 4]);
+      expect(card.x).toBe(xs[i % 4]);
+      expect(card.y).toBe(ys[Math.floor(i / 4)]);
     });
   });
 
@@ -697,8 +698,9 @@ test.describe('training page', () => {
       return tally.top - btn.bottom;
     });
     expect(gap).toBeGreaterThanOrEqual(14);
-    // Prep keeps its table; the card grid is the weekly page's layout.
-    await expect(page.locator('#training-view .pdg-table tbody tr')).toHaveCount(12);
+    // Prep draws the same cards as the weekly page (one grid, one layout); no table.
+    await expect(page.locator('#training-view .pdg-card')).toHaveCount(12);
+    await expect(page.locator('#training-view .pdg-table')).toHaveCount(0);
     await shot(page, 'T10-fcc-player-development');
   });
 });
