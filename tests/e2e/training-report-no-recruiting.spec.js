@@ -59,7 +59,7 @@ test.describe('training report has no recruiting', () => {
     const markup = HTML.replace(/<script[\s\S]*?<\/script>/g, '');
     await page.setContent(`<style>${CSS}</style>${markup}`);
     const m = await page.evaluate(() => ({
-      notes: !!document.querySelector('#training-notes-brief'),
+      notes: !!document.querySelector('.training-notes-section #training-notes-container'),
       focus: !!document.querySelector('#training-focus'),
       cta: (document.querySelector('#locker-room-btn') || {}).textContent,
       recruitBits: document.querySelectorAll('[id*="recruit"], [class*="recruit"]').length,
