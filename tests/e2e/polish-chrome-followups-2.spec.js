@@ -5,6 +5,7 @@
  * G1 offline: the "Coaching archetype evolved" weekly row is cleared on this computer, so it shows once
  * G2 finish labels are one case (capitalised) wherever they sit together; nothing truncates
  * G3 the court's Play Stats table reads "Half-Court Traps" on one line
+ * G5 the Office conference standings card always shows every team, at normal row spacing
  *
  * FOLLOWUP2_SHOT_TAG=before names the shots when the spec runs against old code.
  */
@@ -357,3 +358,179 @@ for (const [width, height] of COURT_WIDTHS) {
     }
   });
 }
+
+/* ------------------------------------------------------------------ G5 --- */
+
+/** A conference as the server sends it: standings order, ties included. */
+function conference(records, userIndex) {
+  const names = ['Alpha State', 'Bentley-Truman', 'Chapel Hill', 'Crickstown', 'Delta Tech', 'Amariabi International', 'Foxtrot', 'Golf Coast'];
+  return {
+    conference: 2,
+    region: 'A',
+    rows: names.map((name, index) => ({
+      team_id: index === userIndex ? O.TID : 'team-' + index,
+      team_name: name,
+      wins: records[index][0],
+      losses: records[index][1],
+      differential: 20 - index * 5,
+      position: index + 1,
+      is_user: index === userIndex,
+    })),
+  };
+}
+
+/** Week 6: a tall middle column (the state that used to squeeze the card to two rows). */
+function standingsOffice(state, table) {
+  const data = clone(O.STATES[state]);
+  data.week = 6;
+  data.office_digest.conference_standings = table;
+  return data;
+}
+
+async function standingsCard(page) {
+  return page.evaluate(() => {
+    const card = document.querySelector('#office-root .office-st');
+    const rows = [...card.querySelectorAll('.st-r:not(.st-hd)')];
+    const box = (el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height, left: r.left, right: r.right }; };
+    // The other Office list row at its normal spacing (a tournament week tightens its own).
+    const watch = document.querySelector('#office-root .office-next:not(.tier) .ptw');
+    const main = document.querySelector('html.gob-shell .main');
+    return {
+      rows: rows.map((row) => {
+        const name = row.querySelector('.st-nm');
+        const mark = row.querySelector('.st-n img, .st-n .gob-mark');
+        const cs = getComputedStyle(row);
+        return {
+          pos: row.querySelector('.st-pos').textContent.trim(),
+          name: name ? name.textContent.trim() : '',
+          record: row.querySelector('.st-wl').textContent.trim(),
+          me: row.classList.contains('me'),
+          bg: cs.backgroundColor,
+          padTop: parseFloat(cs.paddingTop), padBottom: parseFloat(cs.paddingBottom),
+          box: box(row),
+          text: [...row.querySelectorAll('.st-pos, .st-nm, .st-wl')].map(box),
+          mark: mark ? Object.assign(box(mark), { tag: mark.tagName.toLowerCase() }) : null,
+          nameCut: name ? name.scrollWidth > name.clientWidth + 1 : false,
+        };
+      }),
+      classes: card.className,
+      header: getComputedStyle(card.querySelector('.st-hd')).display !== 'none',
+      more: [...card.querySelectorAll('.card-h .st-more')].map((a) => ({ text: a.textContent.trim(), href: a.getAttribute('href') })),
+      title: card.querySelector('.card-h h3').textContent.trim(),
+      column: [...document.querySelectorAll('#office-root .office-col')].findIndex((col) => col.contains(card)) + 1,
+      watchPad: watch ? [parseFloat(getComputedStyle(watch).paddingTop), parseFloat(getComputedStyle(watch).paddingBottom)] : null,
+      cardRight: box(card).right,
+      pageWide: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      mainWide: main.scrollWidth - main.clientWidth,
+    };
+  });
+}
+
+const NAVY_TINT = /^(rgba|color)\(/; // the navy selected-row wash is a translucent mix
+
+function expectFullTable(card, table, label) {
+  // All eight, in the server's order, each with its rank, mark, name and record.
+  expect(card.rows.map((r) => r.name), label).toEqual(table.rows.map((r) => r.team_name));
+  expect(card.rows.map((r) => r.pos), label).toEqual(table.rows.map((r) => String(r.position)));
+  expect(card.rows.map((r) => r.record), label).toEqual(table.rows.map((r) => r.wins + '-' + r.losses));
+  expect(card.rows).toHaveLength(8);
+  card.rows.forEach((row) => {
+    expect(row.mark, label + ' mark ' + row.name).not.toBeNull();
+    expect(row.mark.height, label).toBeGreaterThanOrEqual(16);
+    expect(row.nameCut, label + ' ' + row.name).toBe(false);
+  });
+  // The user's row, and only it, is navy.
+  expect(card.rows.filter((r) => r.me).map((r) => r.name), label).toEqual(table.rows.filter((r) => r.is_user).map((r) => r.team_name));
+  card.rows.forEach((row) => {
+    if (row.me) expect(row.bg, label).toMatch(NAVY_TINT);
+    else expect(row.bg, label).toBe('rgba(0, 0, 0, 0)');
+  });
+  expect(card.rows.find((r) => r.me).bg, label).not.toBe('rgba(0, 0, 0, 0)');
+  // Normal row spacing: the same padding as the other Office list rows, never the old tight or compact.
+  expect(card.classes, label).not.toMatch(/is-tight|is-compact/);
+  expect(card.header, label).toBe(true);
+  card.rows.forEach((row) => {
+    if (card.watchPad) {
+      expect(Math.abs(row.padTop - card.watchPad[0]), label).toBeLessThanOrEqual(1);
+      expect(Math.abs(row.padBottom - card.watchPad[1]), label).toBeLessThanOrEqual(1);
+    }
+    expect(row.padTop, label).toBeGreaterThanOrEqual(5);
+    expect(row.box.height, label).toBeGreaterThanOrEqual(30);
+    // Text sits inside its own row.
+    row.text.forEach((t) => {
+      expect(t.top, label).toBeGreaterThanOrEqual(row.box.top - 0.5);
+      expect(t.bottom, label).toBeLessThanOrEqual(row.box.bottom + 0.5);
+    });
+    expect(row.box.right, label).toBeLessThanOrEqual(card.cardRight + 0.5);
+  });
+  // Rows are stacked, one height, and none overlaps the next.
+  const heights = card.rows.map((r) => Math.round(r.box.height));
+  expect(Math.max(...heights) - Math.min(...heights), label).toBeLessThanOrEqual(1);
+  for (let i = 1; i < card.rows.length; i += 1) {
+    expect(card.rows[i].box.top, label + ' row ' + i).toBeGreaterThanOrEqual(card.rows[i - 1].box.bottom - 0.5);
+    for (const t of card.rows[i].text) {
+      for (const u of card.rows[i - 1].text) expect(t.top, label + ' text overlap row ' + i).toBeGreaterThanOrEqual(u.bottom - 0.5);
+    }
+  }
+  // "Full standings" stays, once, to League › Standings.
+  expect(card.more, label).toHaveLength(1);
+  expect(card.more[0].text, label).toMatch(/^Full standings/);
+  expect(card.more[0].href, label).toMatch(/tab=standings-view/);
+  expect(card.title, label).toBe('Conference A2 standings');
+  expect(card.column, label).toBe(2);
+  expect(card.pageWide, label).toBeLessThanOrEqual(0);
+  expect(card.mainWide, label).toBeLessThanOrEqual(1);
+}
+
+// Jamie's case: week 6, the user 4th at 2-3 behind a 3-2 team, with ties above and below.
+const TIED = [[4, 1], [4, 1], [3, 2], [2, 3], [2, 3], [2, 3], [1, 4], [0, 5]];
+const STANDINGS_SIZES = [[1280, 720], [1440, 900], [1920, 1080], [2048, 1152], [2560, 1440], [1066, 640], [1024, 600]];
+
+for (const [width, height] of STANDINGS_SIZES) {
+  test('G5: the conference standings card shows all 8 teams at normal spacing, ' + width + 'x' + height, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    for (const state of ['win', 'loss', 'regular', 'first_week', 'tournament', 'signing_day']) {
+      const table = conference(TIED, 3);
+      await O.openOffice(page, standingsOffice(state, table));
+      const label = state + ' ' + width;
+      await expect(page.locator('#office-root .office-st'), label).toHaveCount(1);
+      expectFullTable(await standingsCard(page), table, label);
+    }
+  });
+}
+
+for (const [width, height] of SIZES) {
+  test('G5: shots, and the card is the same whichever density class lands first (' + width + ')', async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const table = conference(TIED, 3);
+    await O.openOffice(page, standingsOffice('win', table));
+    await page.waitForTimeout(2500); // the score count-up
+    const card = page.locator('#office-root .office-st');
+    await card.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    await shot(page, 'g5-office-standings', width);
+    await card.screenshot({ path: path.join(SHOTS, 'g5-office-standings-card-' + TAG + '-' + width + '.png') });
+    expectFullTable(await standingsCard(page), table, 'settled ' + width);
+    // The row-cap race stats fixed read the density class before it was set. This card no
+    // longer reads it at all: strip the class, draw again, and the card is unchanged.
+    const again = await page.evaluate(() => {
+      document.documentElement.classList.remove('gob-1280', 'gob-1920');
+      window.GOBOffice.render(window.__gobCommandCenterData.office_digest);
+      return document.querySelectorAll('#office-root .office-st .st-r:not(.st-hd)').length;
+    });
+    expect(again).toBe(8);
+  });
+}
+
+test('G5: ties render in the server order, every tied team on its own row; the user can be first or last', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const allTied = [[3, 3], [3, 3], [3, 3], [3, 3], [3, 3], [3, 3], [3, 3], [3, 3]];
+  for (const userIndex of [0, 7, 3]) {
+    const table = conference(allTied, userIndex);
+    await O.openOffice(page, standingsOffice('loss', table));
+    const card = await standingsCard(page);
+    expectFullTable(card, table, 'all tied, user ' + userIndex);
+    expect(card.rows.map((r) => r.record)).toEqual(Array(8).fill('3-3'));
+    expect(card.rows.findIndex((r) => r.me)).toBe(userIndex);
+  }
+});
