@@ -71,9 +71,15 @@
     try {
       if (window.__gobAuthMeData) window.__gobAuthMeData.archetype_reveal_seen = true;
       if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl || !API_CONFIG.getAuthHeaders) return;
-      fetch(API_CONFIG.buildUrl('/api/auth/archetype-reveal-seen'), {
+      // Offline the flag is saved on this computer (the offline build cannot
+      // reach /api/auth). Online is unchanged.
+      var offline = window.GOB_BUILD_PROFILE === 'desktop';
+      var franchiseId = offline && window.FranchiseContext ? window.FranchiseContext.franchiseId : '';
+      if (offline && !franchiseId) return;
+      fetch(API_CONFIG.buildUrl(offline ? '/franchise/archetype-reveal-seen' : '/api/auth/archetype-reveal-seen'), {
         method: 'PATCH',
         headers: Object.assign({ 'Content-Type': 'application/json' }, API_CONFIG.getAuthHeaders()),
+        body: offline ? JSON.stringify({ franchise_id: franchiseId }) : undefined,
       }).catch(function () {});
     } catch (e) {}
   }

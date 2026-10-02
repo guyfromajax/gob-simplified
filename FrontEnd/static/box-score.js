@@ -144,10 +144,24 @@ function resolveUserTeamSideForPhaseBPulse(urlParams) {
   return null;
 }
 
+// A box score opened to read it (a schedule result, the Office "Box score" link, a news
+// headline, a bracket score) carries return_url. It is not a step of the game flow, so the
+// closed-game guard must leave it alone: that guard sends a finished game's flow pages
+// back to the Office once the week has moved on, which is exactly last week's result.
+function openedToRead() {
+  try {
+    const raw = liveParams().get('return_url');
+    if (!raw) return false;
+    return typeof getSafeReturnUrl === 'function' ? !!getSafeReturnUrl(raw) : raw.charAt(0) === '/';
+  } catch (e) {
+    return false;
+  }
+}
+
 // Initialize on page load
 async function releaseClosedGameCover() {
   let redirected = false;
-  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+  if (!openedToRead() && window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
     try { redirected = await window.GOBNav.guardClosedFranchiseGame(); } catch (e) { redirected = false; }
   }
   if (!redirected && window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
@@ -1755,7 +1769,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const hctPct = hctUsed > 0 ? ((hctSuccess / hctUsed) * 100).toFixed(0) : '0';
   const hctBlock = document.createElement('div');
   hctBlock.className = 'scouting-play-type';
-  hctBlock.innerHTML = `<div class="scouting-play-type-header"><span>HC Traps:</span><span>${hctSuccess} / ${hctUsed} (${hctPct}%)</span></div>`;
+  hctBlock.innerHTML = `<div class="scouting-play-type-header"><span>Half-Court Traps:</span><span>${hctSuccess} / ${hctUsed} (${hctPct}%)</span></div>`;
   specialSection.appendChild(hctBlock);
 
   const fcp = defense.FCP || {};
@@ -2218,7 +2232,10 @@ function setupLockerRoomButton() {
       e.stopPropagation();
       playSound('x-back.mp3');
       if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(safeReturnUrl)) {
-        window.GOBNav.exitFlow(safeReturnUrl, { tab: 'home-tab' });
+        // Back goes to the tab the reader came from (Team › Schedule, League › Schedule,
+        // a bracket): GOBNav reads it from return_url, and falls back to the tab the
+        // reader left when the URL names none. It used to force the Office.
+        window.GOBNav.exitFlow(safeReturnUrl);
       } else if (window.GOBNav) window.GOBNav.replace(safeReturnUrl);
       else window.location.replace(safeReturnUrl);
     });
@@ -2573,7 +2590,7 @@ function closeSpecialStatsPopup() {
 window.addEventListener('pageshow', (event) => {
   if (!event.persisted) return;
   if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
-  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+  if (!openedToRead() && window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
     window.GOBNav.guardClosedFranchiseGame();
   }
 });

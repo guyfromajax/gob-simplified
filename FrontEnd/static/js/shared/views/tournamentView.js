@@ -201,6 +201,12 @@ export function mount(container, ctx) {
     if (!locked) {
       bindPhasePicker();
       renderBracket(container.querySelector('.gob-tour-bracket'), data, phase, maps, ctx);
+      // A bracket score opens its box score as a read: `data-return` has GOBNav add
+      // return_url on the click, so the page does not treat a finished game as a flow
+      // step (and its Back comes back to this bracket).
+      container.querySelectorAll('a.gob-res').forEach(function (link) {
+        link.setAttribute('data-return', '');
+      });
     }
   }
 

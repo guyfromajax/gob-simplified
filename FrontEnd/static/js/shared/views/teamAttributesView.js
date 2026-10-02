@@ -84,16 +84,6 @@ export function mount(container, ctx) {
     return '(' + ordinal(row.rank) + ' of ' + row.rank_of + ')';
   }
 
-  // Neutral, per the Prep v2 decision: the arrow carries the direction and the
-  // luminance carries the weight. Green and red are spent elsewhere.
-  function movement(delta) {
-    if (delta == null || delta === '') return '<span class="mv"></span>';
-    var n = Number(delta);
-    if (!isFinite(n) || n === 0) return '<span class="mv"></span>';
-    if (n > 0) return '<span class="mv up">▲' + showNum(n) + '</span>';
-    return '<span class="mv down">▼' + showNum(Math.abs(n)) + '</span>';
-  }
-
   /**
    * The diverging pill for a measure stored on a signed scale, otherwise the league
    * percentile bar. Only the eight −20…+20 measures have a zero to sit either side
@@ -127,12 +117,13 @@ export function mount(container, ctx) {
     return '';
   }
 
+  // No rank-movement mark: the cell is the name, the place, the gauge and the value.
+  // `rank_delta` is still on the payload; this view does not draw it.
   function cellHtml(row) {
     return '<div class="mcell" data-measure="' + tables.esc(row.key || '') + '">'
       + '<div class="mtop"><span class="nm">' + tables.esc(row.label || '') + '</span>'
       + '<span class="place">' + tables.esc(placeText(row)) + '</span></div>'
-      + '<div class="mbar">' + gauge(row) + '<b>' + valueText(row) + '</b>'
-      + movement(row.rank_delta) + '</div></div>';
+      + '<div class="mbar">' + gauge(row) + '<b>' + valueText(row) + '</b></div></div>';
   }
 
   /** Rows in grid order, then anything the server sends that the grid does not name. */

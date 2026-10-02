@@ -8,8 +8,8 @@
   var TITLE_KINDS = {
     national: { letter: 'N', label: 'National Champions' },
     region: { letter: 'R', label: 'Region Champions' },
-    conf_t: { letter: 'C', label: 'Conference Champions' },
-    conf_rs: { letter: 'C', label: 'Conference Regular-Season #1' }
+    conf_t: { letter: 'C', label: 'Conference Tournament Champions' },
+    conf_rs: { letter: 'C', label: 'Regular Season Conference Champions' }
   };
   var MILESTONE_KINDS = {
     milestone_first_signing_class: { letter: 'S', label: 'First signing class' },

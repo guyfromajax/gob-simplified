@@ -102,7 +102,10 @@
   var titleEl = null;
   var paintedSection = '';
   var currentWeek = 0;
+  var currentSeason = 0;
   var lastCommandCenter = null;
+  // After the tournament the week is named, not numbered.
+  var POST_SEASON_LABEL = { 35: 'Signing Day', 36: 'Offseason' };
   var pageMode = null;
   var recruitingRowOff = false;
 
@@ -665,19 +668,25 @@
     var tokens = tier && window.GOBTierEmblem.TIER_TOKENS
       ? window.GOBTierEmblem.TIER_TOKENS[tier]
       : null;
-    // Tournament weeks (27-34) show no week number. The stat is the round:
-    // the tier emblem, "<Tier> Tournament", and the round under it, in the
-    // words the Advance button uses. Weeks 1-26 (and 35-36) show "Week N".
+    // From week 27 on the strip shows no week number. Tournament weeks (27-34)
+    // show the round: the tier emblem, "<Tier> Tournament", and the round under
+    // it, in the words the Advance button uses. Week 35 is "Signing Day" and
+    // week 36 is "Offseason". Weeks 1-26 show "Week N".
+    // The season sits under all of them in the strip's small label style
+    // ("Season 3", or "First Round · Season 3"), clearly secondary to the week.
     var round = tier && window.GOBAdvance && typeof window.GOBAdvance.eosRoundForWeek === 'function'
       ? window.GOBAdvance.eosRoundForWeek(n)
       : '';
     wrap.classList.toggle('ts-tier', !!tier);
     valueEl.textContent = tier
       ? tier.charAt(0).toUpperCase() + tier.slice(1) + ' Tournament'
-      : 'Week ' + n;
+      : (POST_SEASON_LABEL[n] || 'Week ' + n);
     if (phaseEl) {
-      phaseEl.hidden = !(tier && round);
-      phaseEl.textContent = tier && round ? round : '';
+      var under = [];
+      if (tier && round) under.push(round);
+      if (currentSeason) under.push('Season ' + currentSeason);
+      phaseEl.hidden = !under.length;
+      phaseEl.textContent = under.join(' \u00b7 ');
     }
     if (top && tokens && tokens.metal && tokens.metalHi) {
       top.classList.add('is-tier');
@@ -737,10 +746,19 @@
     return match ? Number(match[1]) : 0;
   }
 
+  function seasonFromLabel() {
+    var source = document.getElementById('fcc-season-label');
+    var match = String((source && source.textContent) || '').match(/Season\s+(\d+)/i);
+    return match ? Number(match[1]) : 0;
+  }
+
   function syncTop(data) {
     paintRecord(data);
     paintRank(data);
     var week = data && data.week != null ? Number(data.week) : weekFromLabel();
+    // The season the payload names; never a guess. Unknown keeps the last one seen.
+    var season = data && data.current_season != null ? Number(data.current_season) : seasonFromLabel();
+    if (season > 0) currentSeason = season;
     paintWeek(week);
   }
 

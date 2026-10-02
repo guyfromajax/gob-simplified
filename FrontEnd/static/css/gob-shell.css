@@ -199,6 +199,14 @@ html.gob-shell .ts-txt span {
   white-space: nowrap;
 }
 
+/* The line under the week (season, or round and season) never sets the stat's
+   width: the value does. A longer label runs on into the empty strip beside it,
+   so it cannot widen the stats or move the action button. */
+html.gob-shell .ts-txt span {
+  width: 0;
+  min-width: 100%;
+}
+
 html.gob-shell #fcc-header-emblem:empty {
   display: none;
 }

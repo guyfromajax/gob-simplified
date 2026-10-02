@@ -22,8 +22,8 @@
   var TROPHY_TITLE = {
     national: { letter: 'N', label: 'National Champions' },
     region: { letter: 'R', label: 'Region Champions' },
-    conf_t: { letter: 'C', label: 'Conference Champions' },
-    conf_rs: { letter: 'C', label: 'Conference Regular-Season #1' }
+    conf_t: { letter: 'C', label: 'Conference Tournament Champions' },
+    conf_rs: { letter: 'C', label: 'Regular Season Conference Champions' }
   };
   var AA_LABEL = {
     all_american_1: '1st team',
@@ -456,10 +456,11 @@
       raw = medallionsFromTrophies(opts.titleTrophies);
     }
     return (raw || []).map(function (m, i) {
+      // The two conference titles keep their own wording ("Regular Season
+      // Conference Champions", "Conference Tournament Champions"): a named
+      // "Conference A2 Champions" cannot say which of the two it is.
       var label = m.label;
-      if (m.letter === 'C' && String(label || '').indexOf('Regular-Season') === -1) {
-        label = conferenceLabel(ctx.conference) + ' Champions';
-      } else if (m.letter === 'R') {
+      if (m.letter === 'R') {
         label = regionLabel(ctx.region) + ' Champions';
       }
       return {

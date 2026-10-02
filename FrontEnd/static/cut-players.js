@@ -224,9 +224,16 @@ function cloneParams(params) {
           ? (yearMap[String(player.year).toLowerCase()] || String(player.year).toUpperCase())
           : (player.year || '--')));
       addCell(player.height || '--');
-      addCell(player.weight || '--');
-      ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'].forEach(function (key) {
-        addCell(formatAttr(attrs, key));
+      addCell(player.weight || '--', 'wt');
+      // Six pairs, the roster's order: SC SH, ID OD, PS BH, RB ST, AG ND, IQ FT.
+      ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'].forEach(function (key, index) {
+        var td = document.createElement('td');
+        td.className = index % 2 ? 'gend' : 'gstart';
+        var value = document.createElement('span');
+        value.className = 'ak';
+        value.textContent = formatAttr(attrs, key);
+        td.appendChild(value);
+        tr.appendChild(td);
       });
       var rtCell = document.createElement('td');
       rtCell.textContent = player.highestRT != null
