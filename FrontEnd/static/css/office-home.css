@@ -635,3 +635,8 @@ html.gob-shell.gob-office #franchise-container .office-pre .st-r:not(.st-hd) .st
 
 /* "Season Opener" over the opponent. */
 .gob .office-next .nx-open { margin: 0 0 var(--space-6); }
+
+/* "Moved most" with nothing to list: one quiet line, not a row that invites a click. */
+.gob .msr.msr-empty > span:first-child,
+.gob .msr.msr-empty:hover > span:first-child { color: var(--text-60); text-decoration: none; }
+.gob .msr.msr-empty b { color: var(--text-38); }

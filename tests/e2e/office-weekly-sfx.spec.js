@@ -64,13 +64,13 @@ test.describe('office weekly card sfx', () => {
     await expect.poll(() => page.evaluate(() => window.__gobSfxCalls.slice())).toEqual(['SFX_SELECT']);
   });
 
-  test('"Moved most" never surfaces Momentum, even as the top mover', async ({ page }) => {
+  test('"Moved most" never surfaces Momentum or Shooting, even as the top movers', async ({ page }) => {
     await stubAuth(page);
     await page.goto('/mode-select.html');
     await page.addScriptTag({ path: OFFICE_HOME });
-    // Team snapshot whose biggest mover is momentum_score; the next two are real
-    // measures. Momentum was pulled from Team Attributes + the Training Report, so
-    // the Office must not render it here — it shows the next movers instead.
+    // Team snapshot whose biggest mover is momentum_score, with Shooting in the list too.
+    // "Moved most" ranks only the eight signed-scale attributes (2026-10-02): Momentum is
+    // never shown, and Shooting is on another scale. The Office shows the eligible mover.
     const digest = Object.assign({}, DIGEST, {
       team_snapshot: {
         state: 'in_season',
@@ -91,7 +91,7 @@ test.describe('office weekly card sfx', () => {
     await expect(snap).toBeVisible();
     await expect(snap).toContainText('Moved most');
     await expect(snap).toContainText('Offense');
-    await expect(snap).toContainText('Shooting');
+    await expect(snap).not.toContainText('Shooting');
     await expect(snap).not.toContainText('Momentum');
   });
 });

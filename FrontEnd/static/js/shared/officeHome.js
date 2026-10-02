@@ -990,7 +990,7 @@
       + (label ? ' in Conference ' + label : '') + '.'));
     var last = outlook.last_season;
     if (last && present(last.wins) && present(last.losses)) {
-      node.appendChild(el('p', 'ol-last', 'Last season: ' + last.wins + '-' + last.losses
+      node.appendChild(el('p', 'ol-last', 'Last season: ' + last.wins + '\u2013' + last.losses
         + (present(last.finish) ? ', ' + last.finish : '') + '.'));
     }
     return node;
@@ -1231,7 +1231,7 @@
       if (confLine) sub.push('Conference ' + confLine);
       var met = game.last_meeting;
       if (met && present(met.user_score) && present(met.opp_score)) {
-        sub.push('Last season: ' + (met.won ? 'W ' : 'L ') + met.user_score + '-' + met.opp_score);
+        sub.push('Last season: ' + (met.won ? 'W ' : 'L ') + met.user_score + '\u2013' + met.opp_score);
       }
     } else if (recordLine) sub.push(recordLine);
     if (confLine && !opener) {
@@ -1259,6 +1259,12 @@
     watch(game.top_rebounder, 'Top rebounder', 'RPG');
     return node.childNodes.length ? node : null;
   }
+
+  // The signed-scale team attributes: the only ones "Moved most" may rank.
+  var MOVED_MOST = {
+    offensive_efficiency: true, defensive_efficiency: true, discipline: true, fb_efficiency: true,
+    fb_opp_modifier: true, fight: true, pt_opp_modifier: true, pt_efficiency: true
+  };
 
   function snapshotCard(snap, index) {
     if (!snap) return null;
@@ -1304,24 +1310,24 @@
       });
       node.appendChild(spread);
     }
-    // Momentum was pulled from Team Attributes and the Training Report's Team
-    // Report; keep the Office "Moved most" consistent and never surface it here.
-    // The digest still carries momentum_score (office_digest keeps it in
-    // TEAM_MEASURE_KEYS so the weekly snapshot stores it) — this is display-only.
+    // "Moved most" ranks only the eight team attributes on the signed scale. Chemistry
+    // (its own bar above), Shooting and Rebounding are on other scales, so their movement
+    // is not comparable, and Momentum is never shown. The server filters the list
+    // (office_digest.MOVED_MOST_KEYS); this is the guard for a payload that did not.
     var moved = (Array.isArray(snap.moved_most) ? snap.moved_most : []).filter(function (row) {
-      return row && row.measure !== 'momentum_score';
+      return row && MOVED_MOST[row.measure] === true;
     });
-    if (snap.state === 'set_after_camp') {
-      node.appendChild(el('div', 'sub-h', 'Moved most'));
-      // One placeholder line: two identical "Set after camp" rows read as a bug.
-      var line = el('div', 'msr');
-      line.appendChild(el('span', '', 'Set after camp'));
-      line.appendChild(el('b', '', '—'));
+    node.appendChild(el('div', 'sub-h', 'Moved most'));
+    if (snap.state === 'set_after_camp' || !moved.length) {
+      // One quiet line: before camp there is nothing to compare; after it, none of the
+      // eight moved. Never a fallback to a measure on another scale.
+      var line = el('div', 'msr msr-empty');
+      line.appendChild(el('span', '', snap.state === 'set_after_camp' ? 'Set after camp' : 'No movement this week'));
+      line.appendChild(el('b', '', '\u2014'));
       node.appendChild(line);
-    } else if (moved.length) {
-      node.appendChild(el('div', 'sub-h', 'Moved most'));
+    } else {
       moved.slice(0, 2).forEach(function (row) {
-        if (!row || !present(row.measure)) return;
+        if (!present(row.measure)) return;
         var line = el('div', 'msr');
         line.appendChild(el('span', '', labelize(row.measure)));
         if (present(row.value)) line.appendChild(el('b', '', String(row.value)));
@@ -1601,12 +1607,12 @@
         newcomersCard(preview, 4),
         allAmericansCard(preview, 5)
       ] : [];
+      // No Team snapshot in week 1: before camp it could only say "Set after camp".
       second = [
         nextCard(opener, digest, 2),
         preview ? circleCard(preview, 3) : null,
-        snapshotCard(digest.team_snapshot, 4),
-        (preview && preseasonRankingsCard(preview.preseason_rankings, 5))
-          || standingsCard(digest.conference_standings, 5)
+        (preview && preseasonRankingsCard(preview.preseason_rankings, 4))
+          || standingsCard(digest.conference_standings, 4)
       ];
       third = [
         wireCard(digest.recruiting_wire, true, 6),

@@ -203,12 +203,15 @@ test('#10 roster toggle spacing', async ({ page }) => {
 });
 
 test('#10 office moved-most placeholder', async ({ page }) => {
-  await open(page, ctx.fcc('home-tab'), 1280, '.msr');
+  // Week 1 no longer shows the Team snapshot card (2026-10-02): before camp it could only
+  // say "Set after camp". So the placeholder is not there at all, let alone twice.
+  await open(page, ctx.fcc('home-tab'), 1280, '#office-root .office-col .card');
   const m = await page.evaluate(() => Array.from(document.querySelectorAll('.msr')).filter((r) => /Set after camp/.test(r.textContent)).length);
   metrics.officeSetAfterCamp = m;
   await shot(page, 'office', 1280);
   if (BEFORE) return;
-  expect(m, 'one "Set after camp" line, not a duplicated pair').toBe(1);
+  expect(m, 'no "Set after camp" line in week 1').toBe(0);
+  expect(await page.locator('#office-root .office-snap').count(), 'no Team snapshot card in week 1').toBe(0);
 });
 
 for (const [name, tab, sel] of [
