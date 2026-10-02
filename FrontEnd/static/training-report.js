@@ -1480,24 +1480,28 @@ function createMomentumPill(mo) {
  *
  * `text` is the arrow form (Team Report, Training Changes, Playbook Summary).
  */
+/** One mark: `count` arrows in `direction`, in the tone the week gives that count. */
+function describeTrainingMark(direction, count) {
+  const camp = getReportWeekNumber() === 1;
+  let tone;
+  if (direction > 0) tone = count >= 3 ? 'elite' : count === 2 ? 'up' : (camp ? 'neutral' : 'up-faint');
+  else tone = (!camp && count === 1) ? 'down-faint' : 'down';
+  return {
+    text: (direction > 0 ? '▲' : '▼').repeat(count),
+    className: (direction > 0 ? 'change-delta' : 'change-negative') + ' tr-tone-' + tone,
+    tone: tone,
+    direction: direction,
+    count: count,
+  };
+}
+
 function describeTrainingChange(change) {
   const n = Number(change);
   if (!Number.isFinite(n)) {
     return { text: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
   }
   const camp = getReportWeekNumber() === 1;
-  const mark = (direction, count) => {
-    let tone;
-    if (direction > 0) tone = count >= 3 ? 'elite' : count === 2 ? 'up' : (camp ? 'neutral' : 'up-faint');
-    else tone = (!camp && count === 1) ? 'down-faint' : 'down';
-    return {
-      text: (direction > 0 ? '▲' : '▼').repeat(count),
-      className: (direction > 0 ? 'change-delta' : 'change-negative') + ' tr-tone-' + tone,
-      tone: tone,
-      direction: direction,
-      count: count,
-    };
-  };
+  const mark = describeTrainingMark;
 
   // Exactly 0 is a grey dash, camp or in season.
   if (n === 0) return { text: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
@@ -1511,6 +1515,37 @@ function describeTrainingChange(change) {
   // In-season (weeks 2–26): the arrow's direction is the sign of the change.
   if (n > 0) return mark(1, n >= 3 ? 3 : n >= 1 ? 2 : 1);
   return mark(-1, n <= -2.5 ? 3 : n <= -1.5 ? 2 : 1);
+}
+
+/**
+ * Play and defense CMD movement (Playbook Summary).
+ *
+ * Today these use the player-attribute scale above, which was cut for attribute points
+ * (three arrows at +3). A trained play gains far more than that in one session (measured
+ * on the offline engine, 2026-10-02: set plays 2-7, motions 13-35, zones 13-66, Man
+ * 41-178), so nearly every trained play shows three arrows.
+ *
+ * PLAY_CMD_SCALE is the one switch:
+ *   'attribute'  the player-attribute scale (what ships today)
+ *   'play'       the cut-offs below: PROPOSED, waiting for Jamie's approval
+ * Cut-offs are the smallest change that earns two and three arrows. CMD never falls in a
+ * training session (it falls at end of game: offense 2-17 a game, defense 5-47), so the
+ * down cut-offs only matter if a report ever carries a drop.
+ */
+const PLAY_CMD_SCALE = 'attribute';
+const PLAY_CMD_CUTOFFS = {
+  offense: { up: [5, 20], down: [5, 10] },
+  defense: { up: [30, 50], down: [10, 20] },
+};
+
+function describePlayCmdChange(change, kind) {
+  if (PLAY_CMD_SCALE !== 'play') return describeTrainingChange(change);
+  const n = Number(change);
+  if (!Number.isFinite(n) || n === 0) return describeTrainingChange(0);
+  const cut = (PLAY_CMD_CUTOFFS[kind] || PLAY_CMD_CUTOFFS.offense)[n > 0 ? 'up' : 'down'];
+  const size = Math.abs(n);
+  const count = size >= cut[1] ? 3 : size >= cut[0] ? 2 : 1;
+  return describeTrainingMark(n > 0 ? 1 : -1, count);
 }
 
 function formatChangeForTooltip(change, attrKey = null) {
@@ -1790,6 +1825,7 @@ function createPlaybookSummaryPanel(title, key, groups) {
   const cols = document.createElement('div');
   cols.className = 'pbs-cols';
   groups.forEach(function (group) {
+    group.kind = key;      // 'offense' or 'defense': each has its own CMD cut-offs
     cols.appendChild(createPlaybookSummaryGroup(group));
   });
   panel.appendChild(cols);
@@ -1832,7 +1868,7 @@ function createPlaybookSummaryGroup(group) {
     const effectiveness = item && typeof item.effectiveness === 'number' ? item.effectiveness : null;
     cmd.textContent = effectiveness == null ? '—' : String(effectiveness);
     const delta = document.createElement('span');
-    const described = describeTrainingChange(change);
+    const described = describePlayCmdChange(change, group.kind);
     delta.className = 'pbs-delta ' + described.className;
     delta.textContent = described.text;
     delta.setAttribute('aria-label', 'Training change ' + (change > 0 ? '+' : '') + change);

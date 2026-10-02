@@ -322,3 +322,76 @@ test.describe('projected starting 5', () => {
     await expect(page.locator('#training-projected-lineup .gob-pairs table.gob-tbl')).toBeVisible();
   });
 });
+
+// Item 2. The play CMD scale is measured and proposed, not shipped: it sits behind one
+// constant, PLAY_CMD_SCALE, until Jamie approves the cut-offs.
+test.describe('play CMD marks (Playbook Summary)', () => {
+  test.skip(PHASE === 'before', 'after tree only');
+  test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1280, height: 720 }); });
+
+  function withCmdChanges() {
+    const report = busy();
+    report.plays_effectiveness_changes = {
+      '4-1 Motion': 3, '5-0 Motion': 5, '3-2 Motion': 19, 'PF Post Motion': 20,
+      'Base Post Play': 4, 'Quick Midrange Jumper': 0,
+    };
+    report.defenses_effectiveness_changes = { man: 50, '2-3-zone': 29, '3-2-zone': 30, '1-3-1-zone': 49 };
+    return report;
+  }
+
+  function marks(page) {
+    return page.evaluate(() => {
+      const out = {};
+      document.querySelectorAll('#playbook-summary-container .pbs-row').forEach((row) => {
+        out[row.querySelector('.pbs-name').textContent.trim()] = row.querySelector('.pbs-delta').textContent;
+      });
+      return out;
+    });
+  }
+
+  test('today: the player-attribute scale still applies (three arrows from +3)', async ({ page }) => {
+    await openReport(page, withCmdChanges());
+    const m = await marks(page);
+    expect(m['4-1 Motion']).toBe('▲▲▲');
+    expect(m['5-0 Motion']).toBe('▲▲▲');
+    expect(m['Base Post Play']).toBe('▲▲▲');
+    expect(m['Quick Midrange Jumper']).toBe('–');
+    const source = fs.readFileSync(path.join(__dirname, '../../FrontEnd/static/training-report.js'), 'utf8');
+    expect(source).toContain("const PLAY_CMD_SCALE = 'attribute';");
+  });
+
+  test('the proposed play scale is one constant away: offense 5 / 20, defense 30 / 50', async ({ page }) => {
+    const report = withCmdChanges();
+    await stubAuth(page);
+    await installReportApi(page, report);
+    // Flip the one constant in the served module, exactly as the approval commit will.
+    await page.route('**/training-report.js*', async (route) => {
+      const response = await route.fetch();
+      const body = (await response.text()).replace("const PLAY_CMD_SCALE = 'attribute';", "const PLAY_CMD_SCALE = 'play';");
+      expect(body).toContain("const PLAY_CMD_SCALE = 'play';");
+      await route.fulfill({ response, body });
+    });
+    await page.goto(reportUrl(report));
+    await expect(page.locator('#training-report-view')).not.toHaveClass(/is-loading/, { timeout: 30000 });
+    await expect(page.locator('#playbook-summary-container .pbs-row').first()).toBeVisible();
+    const m = await marks(page);
+    // Offense: one arrow under 5, two from 5, three from 20.
+    expect(m['4-1 Motion']).toBe('▲');
+    expect(m['Base Post Play']).toBe('▲');
+    expect(m['5-0 Motion']).toBe('▲▲');
+    expect(m['3-2 Motion']).toBe('▲▲');
+    expect(m['PF Post Motion']).toBe('▲▲▲');
+    expect(m['Quick Midrange Jumper']).toBe('–');
+    // Defense: one arrow under 30, two from 30, three from 50.
+    const defense = await page.evaluate(() => [...document.querySelectorAll('.pbs-panel--defense .pbs-row')].map((row) => (
+      row.querySelector('.pbs-delta').getAttribute('aria-label') + ' ' + row.querySelector('.pbs-delta').textContent
+    )));
+    expect(defense).toContain('Training change +50 ▲▲▲');
+    expect(defense).toContain('Training change +29 ▲');
+    expect(defense).toContain('Training change +30 ▲▲');
+    expect(defense).toContain('Training change +49 ▲▲');
+    // Player marks are untouched by the switch: +2.5 on SC is still two arrows.
+    const sc = await page.locator('#players-tbody tr').first().locator('td.gstart').first().textContent();
+    expect(sc).toBe('▲▲');
+  });
+});
