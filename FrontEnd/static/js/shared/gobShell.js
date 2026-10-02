@@ -187,9 +187,9 @@
     window.CommandCenterTabs.show(tabName, historyMode, opts);
   }
 
+  // A news story is on screen (the News view draws it in place of the feed).
   function storyOpen() {
-    try { return !!new URLSearchParams(window.location.search).get('story'); }
-    catch (err) { return false; }
+    return !!document.querySelector('#news-view.tab-content.active .gob-news-story');
   }
 
   function hrefOf(el) {
