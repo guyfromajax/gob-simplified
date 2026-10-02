@@ -149,7 +149,7 @@ Other agents' files touched: `training-report.js` (ux), as the briefs asked, and
 
 The item 7-8 shots are taken by `polish-training-playbooks.spec.js` only when `FOLLOWUP_SHOT_TAG` is set, so a normal run does not rewrite them.
 
-The item 1 after shots were retaken and now show the season line too. Fifteen stray `*-cssold-*` shots and `f3-archetype-next-visit-before-1280.png` from my old-code runs are in the folder, untracked and not committed (deleting them was not permitted in this session); safe to delete.
+The item 1 after shots were retaken and now show the season line too. Fifteen stray `*-cssold-*` shots, `f3-archetype-next-visit-before-1280.png` and `f2-season-review-before-1280.png` from my old-code runs are in the folder (the last two are mislabelled: they show the fixed state), untracked and not committed (deleting them was not permitted in this session); safe to delete.
 
 ## Questions
 
