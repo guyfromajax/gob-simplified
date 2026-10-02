@@ -1,5 +1,5 @@
 /**
- * Team › Practice Squad. The regional practice-squad league.
+ * League › Practice Squads. The regional practice-squad league: every region's squads.
  * Standings order, win_pct, and is_user come from the standings GET.
  * The schedule opens on current_week and loads one week at a time.
  */

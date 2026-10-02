@@ -312,6 +312,12 @@
     }
     nextInit.method = 'GET';
     nextInit.headers = headers;
+    // The store is the cache; the browser's HTTP cache must not sit under it.
+    // Leaving a flow is a history traversal, and on that kind of load the browser
+    // answers a plain GET from its HTTP cache without revalidating. A write has
+    // just cleared the validator here, so the read after a game came back as the
+    // pre-game body and never reached the server.
+    nextInit.cache = 'no-store';
     return nativeFetch(url, nextInit).then(function (res) {
       var etag = res.headers.get('ETag') || (stored && stored.etag) || '';
       if (res.status === 304 && stored && stored.body != null) {
@@ -431,8 +437,8 @@
     if (init) {
       Object.keys(init).forEach(function (name) { nextInit[name] = init[name]; });
     }
-    nextInit.cache = 'no-store';
     if (neverCache(url) || !isBrowseGet(url)) {
+      nextInit.cache = 'no-store';
       return get(url, nextInit).then(function (res) { return res.json(); });
     }
     var key = canonical(url);

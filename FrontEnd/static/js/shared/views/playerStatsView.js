@@ -46,15 +46,18 @@ var GROUPS = [
   ]}
 ];
 
+// `fam` carries the family's first (`fs`) and last (`fe`) column, so the table spaces
+// by stat family (Styleguide › Tables).
 var LEAF = [];
 GROUPS.forEach(function (group) {
-  group.cols.forEach(function (col) {
+  group.cols.forEach(function (col, index) {
     LEAF.push({
       key: col.key,
       label: col.label,
       pin: !!col.pin,
       shade: group.shade,
-      rate: !!col.rate
+      rate: !!col.rate,
+      fam: col.pin ? '' : (index === 0 ? ' fs' : '') + (index === group.cols.length - 1 ? ' fe' : '')
     });
   });
 });
@@ -89,6 +92,90 @@ function subline(row) {
   var yr = row.year && row.year !== '--' ? String(row.year) : '';
   if (pos && yr) return pos + ' · ' + yr;
   return pos || yr;
+}
+
+function leafOf(key) {
+  var found = null;
+  LEAF.forEach(function (item) { if (item.key === key) found = item; });
+  return found;
+}
+
+export function statsUrlFor(franchiseId, teamId) {
+  return statsUrl(franchiseId, teamId);
+}
+
+/** What a column sorts by: the name, a stored rate, or the per-game / total value. */
+export function statsSortValue(row, key, basis) {
+  var col = leafOf(key);
+  if (!col) return null;
+  if (col.key === 'name') return String(row.name || '');
+  if (col.rate) {
+    var rate = row.rates ? row.rates[col.key] : null;
+    return rate == null || rate === '' ? null : Number(rate);
+  }
+  var raw = ((basis === 'totals' ? row.totals : row.per_game) || {})[col.key];
+  return raw == null || raw === '' ? null : Number(raw);
+}
+
+/**
+ * The stats grid, grouped by stat family. Team › Player Stats and the team page both
+ * call it. `rows` arrive sorted; `playerHref(id)` builds the name link.
+ */
+export function statsTableHtml(tables, rows, options) {
+  var opts = options || {};
+  var basis = opts.basis === 'totals' ? 'totals' : 'per_game';
+  var sortKey = opts.sortKey || '';
+  var sortDir = opts.sortDir || -1;
+  var wide = !!opts.wide;
+  var hrefFor = opts.playerHref || function () { return '#'; };
+
+  function cellText(row, col) {
+    if (col.key === 'name') {
+      var name = row.name || 'Player';
+      var sub = subline(row);
+      return '<a class="gob-team gob-player" href="' + tables.esc(hrefFor(row.player_id)) + '">'
+        + '<span class="av">' + portraitHtml(tables, row) + '</span>'
+        + '<span class="gob-id"><span>' + tables.esc(name) + '</span>'
+        + (sub ? '<span class="sub">' + tables.esc(sub) + '</span>' : '')
+        + '</span></a>';
+    }
+    var value = statsSortValue(row, col.key, basis);
+    if (value == null || !isFinite(value)) return '—';
+    if (col.rate || (basis === 'per_game' && col.key !== 'GP')) {
+      var text = tables.formatOneDecimal(value);
+      return text === '' ? '—' : tables.esc(text);
+    }
+    return tables.esc(String(Math.round(value)));
+  }
+
+  function headerRow(repeat) {
+    var html = '<tr' + (repeat ? ' class="gob-rep"' : '') + '>';
+    LEAF.forEach(function (col) {
+      var on = sortKey === col.key;
+      var cls = 's' + (col.pin ? ' pin team' : '') + (col.shade ? ' gshade' : '') + col.fam
+        + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
+      html += '<th class="' + cls + '" data-sort="' + col.key + '">' + tables.esc(col.label) + '</th>';
+    });
+    return html + '</tr>';
+  }
+
+  var html = '<div class="gob-scroll gob-fam gob-pstats' + (wide ? ' gob-xs' : '') + '"><table class="gob-tbl"><thead>';
+  html += '<tr class="gob-groups">';
+  GROUPS.forEach(function (group, index) {
+    html += '<th class="gob-g' + (index === 0 ? ' pin team' : '') + (group.shade ? ' gshade' : '')
+      + '" colspan="' + group.cols.length + '">' + tables.esc(group.name) + '</th>';
+  });
+  html += '</tr>' + headerRow(false) + '</thead><tbody>';
+  rows.forEach(function (row, index) {
+    if (wide && index > 0 && index % 16 === 0) html += headerRow(true);
+    html += '<tr data-pid="' + tables.esc(row.player_id) + '">';
+    LEAF.forEach(function (leaf) {
+      var cls = (leaf.pin ? 'pin team' : '') + (leaf.shade ? ' gshade' : '') + leaf.fam + (sortKey === leaf.key ? ' on' : '');
+      html += '<td class="' + cls.trim() + '" data-k="' + leaf.key + '">' + cellText(row, leaf) + '</td>';
+    });
+    html += '</tr>';
+  });
+  return html + '</tbody></table></div>';
 }
 
 export function mount(container, ctx) {
@@ -142,39 +229,6 @@ export function mount(container, ctx) {
     if (container.classList.contains('active')) ownTools();
   }
 
-  function bag(row) {
-    return (basis === 'totals' ? row.totals : row.per_game) || {};
-  }
-
-  function valueOf(row, col) {
-    if (col.key === 'name') return String(row.name || '');
-    if (col.rate) {
-      var rate = row.rates ? row.rates[col.key] : null;
-      return rate == null || rate === '' ? null : Number(rate);
-    }
-    var raw = bag(row)[col.key];
-    return raw == null || raw === '' ? null : Number(raw);
-  }
-
-  function cellText(row, col) {
-    var value = valueOf(row, col);
-    if (col.key === 'name') {
-      var name = row.name || 'Player';
-      var sub = subline(row);
-      return '<a class="gob-team gob-player" href="' + tables.esc(playerHref(row.player_id)) + '">'
-        + '<span class="av">' + portraitHtml(tables, row) + '</span>'
-        + '<span class="gob-id"><span>' + tables.esc(name) + '</span>'
-        + (sub ? '<span class="sub">' + tables.esc(sub) + '</span>' : '')
-        + '</span></a>';
-    }
-    if (value == null || !isFinite(value)) return '—';
-    if (col.rate || (basis === 'per_game' && col.key !== 'GP')) {
-      var text = tables.formatOneDecimal(value);
-      return text === '' ? '—' : tables.esc(text);
-    }
-    return tables.esc(String(Math.round(value)));
-  }
-
   function playerHref(pid) {
     var q = new URLSearchParams(window.location.search);
     q.set('tab', 'player-view');
@@ -188,40 +242,18 @@ export function mount(container, ctx) {
     return window.location.pathname + (text ? '?' + text : '');
   }
 
-  function headerRow(repeat) {
-    var html = '<tr' + (repeat ? ' class="gob-rep"' : '') + '>';
-    LEAF.forEach(function (col) {
-      var on = sortKey === col.key;
-      var cls = 's' + (col.pin ? ' pin team' : '') + (col.shade ? ' gshade' : '')
-        + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
-      html += '<th class="' + cls + '" data-sort="' + col.key + '">' + tables.esc(col.label) + '</th>';
-    });
-    html += '</tr>';
-    return html;
-  }
-
   function render() {
     var rows = players.slice();
-    var col = null;
-    LEAF.forEach(function (item) { if (item.key === sortKey) col = item; });
-    if (col) rows = tables.sortRows(rows, function (row) { return valueOf(row, col); }, sortDir);
-    var html = '<section class="gob-tcard"><div class="gob-scroll' + (wide ? ' gob-xs' : '') + '"><table class="gob-tbl"><thead>';
-    html += '<tr class="gob-groups">';
-    GROUPS.forEach(function (group, index) {
-      html += '<th class="gob-g' + (index === 0 ? ' pin team' : '') + (group.shade ? ' gshade' : '')
-        + '" colspan="' + group.cols.length + '">' + tables.esc(group.name) + '</th>';
-    });
-    html += '</tr>' + headerRow(false) + '</thead><tbody id="player-stats-body">';
-    rows.forEach(function (row, index) {
-      if (wide && index > 0 && index % 16 === 0) html += headerRow(true);
-      html += '<tr data-pid="' + tables.esc(row.player_id) + '">';
-      LEAF.forEach(function (leaf) {
-        var cls = (leaf.pin ? 'pin team' : '') + (leaf.shade ? ' gshade' : '') + (sortKey === leaf.key ? ' on' : '');
-        html += '<td class="' + cls.trim() + '" data-k="' + leaf.key + '">' + cellText(row, leaf) + '</td>';
-      });
-      html += '</tr>';
-    });
-    html += '</tbody></table></div></section>';
+    if (leafOf(sortKey)) {
+      rows = tables.sortRows(rows, function (row) { return statsSortValue(row, sortKey, basis); }, sortDir);
+    }
+    var html = '<section class="gob-tcard">' + statsTableHtml(tables, rows, {
+      basis: basis,
+      sortKey: sortKey,
+      sortDir: sortDir,
+      wide: wide,
+      playerHref: playerHref
+    }) + '</section>';
     container.innerHTML = html;
     var scroller = container.querySelector('.gob-scroll');
     var table = scroller.querySelector('table');

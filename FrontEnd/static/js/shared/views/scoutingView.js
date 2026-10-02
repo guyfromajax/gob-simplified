@@ -169,6 +169,19 @@ export function prefetchOpponentReport(franchiseId, opponent) {
   return store.inflight[key];
 }
 
+function teamDataUrl(franchiseId, teamId) {
+  return window.API_CONFIG.buildUrl('/franchise/team-data')
+    + '?franchise_id=' + encodeURIComponent(franchiseId)
+    + '&team_id=' + encodeURIComponent(teamId);
+}
+
+/** The user's team name as the shell already shows it (the top-bar logo's alt). */
+function userTeamName() {
+  var logo = document.getElementById('team-logo');
+  var name = logo ? (logo.getAttribute('alt') || logo.getAttribute('title') || '') : '';
+  return String(name).trim();
+}
+
 function yearLabel(year) {
   if (window.GOB_PlayerYear && typeof window.GOB_PlayerYear.formatDisplay === 'function') {
     return window.GOB_PlayerYear.formatDisplay(year);
@@ -198,29 +211,41 @@ function playerPortraitHtml(row) {
   return '<span class="av">' + esc(mono) + '</span>';
 }
 
+/** Stored inches as 6'4". Missing height shows nothing. */
+function heightText(value) {
+  var n = Number(value);
+  if (!isFinite(n) || n <= 0) return '';
+  var total = Math.round(n);
+  return Math.floor(total / 12) + "'" + (total % 12) + '"';
+}
+
+// Pos leads the row, left of the headshot, in both modes. The attribute pairs follow
+// the roster rule (Styleguide › Tables): `gs` opens a pair, `ge` closes it.
 function agridHead(mode) {
   if (mode === 'stats') {
     var cols = (window.SCOUTING_PROJECTED_STATS_COLUMNS || []);
     var h = '<thead><tr class="g">';
+    h += '<th rowspan="2" class="c pos-h">Pos</th>';
     h += '<th rowspan="2" class="l pl-h">Player</th>';
-    h += '<th rowspan="2" class="c">Pos</th>';
     cols.forEach(function (c) {
       h += '<th class="aa">' + esc(c) + '</th>';
     });
     return h + '</tr></thead>';
   }
   var html = '<thead><tr class="g">';
+  html += '<th rowspan="2" class="c pos-h">Pos</th>';
   html += '<th rowspan="2" class="l pl-h">Player</th>';
   html += '<th rowspan="2" class="c">RT<span class="cap">cur → pot</span></th>';
-  html += '<th rowspan="2" class="c">Pos</th>';
   html += '<th rowspan="2" class="c">Yr</th>';
+  html += '<th rowspan="2" class="c">Ht</th>';
+  html += '<th rowspan="2" class="c wt">Wt</th>';
   ATTR_GROUPS.forEach(function (g) {
     html += '<th colspan="2" class="ag gs">' + esc(g.label) + '</th>';
   });
   html += '</tr><tr>';
   ATTR_GROUPS.forEach(function (g) {
     g.keys.forEach(function (key, idx) {
-      html += '<th class="aa' + (idx === 0 ? ' gs' : '') + '" title="' + esc(key) + '">' + esc(key) + '</th>';
+      html += '<th class="aa ' + (idx === 0 ? 'gs' : 'ge') + '" title="' + esc(key) + '">' + esc(key) + '</th>';
     });
   });
   return html + '</tr></thead>';
@@ -229,16 +254,18 @@ function agridHead(mode) {
 function agridBodyAttributes(rows) {
   var body = '<tbody>';
   (rows || []).forEach(function (r) {
-    body += '<tr><td class="l pcol"><span class="pc">';
+    body += '<tr><td class="c pos-c"><span class="pos">' + esc(r.position || '—') + '</span></td>';
+    body += '<td class="l pcol"><span class="pc">';
     body += playerPortraitHtml(r);
     body += '<span class="jn">' + esc(r.jersey == null ? '' : r.jersey) + '</span>';
     body += '<a class="nm">' + esc(r.name || '—') + '</a></span></td>';
     body += '<td class="c">' + rtLockupHtml(r.rt, r.potential_rt_ratcheted) + '</td>';
-    body += '<td class="c"><span class="pos">' + esc(r.position || '—') + '</span></td>';
     body += '<td class="c dim">' + esc(yearLabel(r.year)) + '</td>';
+    body += '<td class="c dim ht">' + esc(heightText(r.height)) + '</td>';
+    body += '<td class="c dim wt">' + esc(r.weight == null || r.weight === '' ? '' : r.weight) + '</td>';
     ATTR_GROUPS.forEach(function (g) {
       g.keys.forEach(function (key, idx) {
-        var gb = idx === 0 ? ' gs gb' : ' gb';
+        var gb = idx === 0 ? ' gs gb' : ' ge gb';
         body += '<td class="a' + gb + '">' + attrTile(key, r.attributes || {}) + '</td>';
       });
     });
@@ -257,11 +284,11 @@ function agridBodyStats(rows, statsByPlayer) {
   (rows || []).forEach(function (r) {
     var pid = r.player_id != null ? String(r.player_id) : '';
     var stats = map[pid] || {};
-    body += '<tr><td class="l pcol"><span class="pc">';
+    body += '<tr><td class="c pos-c"><span class="pos">' + esc(r.position || '—') + '</span></td>';
+    body += '<td class="l pcol"><span class="pc">';
     body += playerPortraitHtml(r);
     body += '<span class="jn">' + esc(r.jersey == null ? '' : r.jersey) + '</span>';
     body += '<a class="nm">' + esc(r.name || '—') + '</a></span></td>';
-    body += '<td class="c"><span class="pos">' + esc(r.position || '—') + '</span></td>';
     cols.forEach(function (col) {
       body += '<td class="num">' + esc(fmt(stats, col)) + '</td>';
     });
@@ -353,7 +380,7 @@ export function mount(container, ctx) {
   var franchiseId = franchiseIdFrom(ctx);
   var userTeamId = userTeamIdFrom(ctx);
   var projectedMode = 'attributes';
-  var cache = { playUsage: null, projected: [], stats: {}, teamAttrs: {}, measures: [] };
+  var cache = { playUsage: null, projected: [], stats: {}, teamAttrs: {}, measures: [], userAttrs: null };
   var painted = false;
   var signature = null;
 
@@ -442,6 +469,44 @@ export function mount(container, ctx) {
       + ' onerror="this.src=\'/images/teams/general/general_logo_square.png\'"></span>';
   }
 
+  /**
+   * One spider chart: the shared Team Measures radar at its ±20 scale. It is built by
+   * franchise-command-center.js::buildTeamMeasuresRadarMarkup, never redrawn here.
+   */
+  function radarCard(name, attrs, side) {
+    var chart = '';
+    if (attrs && typeof window.buildTeamMeasuresRadarMarkup === 'function') {
+      try { chart = window.buildTeamMeasuresRadarMarkup(attrs); }
+      catch (err) { chart = ''; }
+    }
+    return '<div class="tcard sc-radar" data-side="' + side + '">'
+      + '<div class="sc-radar-h">' + teamLogoHtml(name) + '<span class="nm">' + esc(name) + '</span>'
+      + '<span class="who">' + (side === 'you' ? 'Your team' : 'Opponent') + '</span></div>'
+      + (chart || '<p class="sc-radar-empty">No team measures yet.</p>') + '</div>';
+  }
+
+  function paintSpider(opponent) {
+    var host = readyEl.querySelector('#scouting-spider');
+    if (!host) return;
+    host.innerHTML = radarCard(userTeamName() || 'Your team', cache.userAttrs, 'you')
+      + radarCard((opponent && opponent.name) || 'Opponent', cache.teamAttrs, 'opp');
+  }
+
+  /** The user's own measures, from the same cached GET Team › Team Attributes reads. */
+  function loadUserAttrs(opponent) {
+    var store = ctx && ctx.store;
+    if (cache.userAttrs || !franchiseId || !userTeamId || !window.API_CONFIG) return;
+    var url = teamDataUrl(franchiseId, userTeamId);
+    var read = store && typeof store.get === 'function'
+      ? store.get(url)
+      : fetch(url, { headers: window.API_CONFIG.getAuthHeaders ? window.API_CONFIG.getAuthHeaders() : {} })
+        .then(function (res) { if (!res.ok) throw new Error('load failed'); return res.json(); });
+    read.then(function (payload) {
+      cache.userAttrs = (payload && payload.team_attributes) || null;
+      paintSpider(opponent);
+    }).catch(function () { /* the opponent's chart still shows */ });
+  }
+
   function paintProjectedTable() {
     var tableHost = readyEl.querySelector('#scouting-projected-table');
     if (!tableHost) return;
@@ -516,12 +581,16 @@ export function mount(container, ctx) {
       + '<section><div class="sh"><h2>Half-Court Traps</h2></div><div class="tcard"><table class="tbl tight ut"><thead><tr>'
       + '<th class="l">Play</th><th>Run</th><th>Success</th><th>Usage</th></tr></thead>'
       + '<tbody id="scouting-hct-body"></tbody></table></div></section>'
-      + '</div>';
+      + '</div>'
+      + '<section class="sc-spider"><div class="sh"><h2>Spider Chart Comparison</h2><span class="m">−20 to +20</span></div>'
+      + '<div class="sc-radars" id="scouting-spider"></div></section>';
 
     renderHeaderRanks(readyEl.querySelector('#scouting-header-ranks'), cache.measures);
     renderMeasureRows(readyEl.querySelector('#scouting-measure-rows'), cache.teamAttrs);
     paintProjectedTable();
     wireToggle();
+    paintSpider(opponent);
+    loadUserAttrs(opponent);
 
     var pu = cache.playUsage;
     var playUsageUnlocked = pu.play_usage_unlocked !== false;

@@ -110,6 +110,39 @@
   letter-spacing: var(--tracking-6);
 }
 
+/* One section per week: a quiet heading on a rule, then that week's cards. */
+#news-view .gob-news {
+  gap: var(--dsp-24);
+  padding-top: var(--dsp-8);
+}
+
+#news-view .gob-news-week {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: 0;
+}
+
+#franchise-container #news-view .gob-news-wk {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-10);
+  margin: 0;
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--line);
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-87);
+}
+
+#franchise-container #news-view .gob-news-wk em {
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+
 #news-view .gob-news-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -604,74 +637,139 @@ html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
   color: var(--text-60);
 }
 
-/* ── Team › Roster rhythm (design review item 4) ──────────────────────────────
-   Nineteen columns read as three groups — identity, six attribute pairs, Dev
-   focus — by giving each group its own gutter instead of one uniform padding.
-   Scoped to the view: the same table also renders compact inside #team-view. */
+/* ── Roster rhythm ────────────────────────────────────────────────────────────
+   Nineteen columns read as three groups: identity, six attribute pairs, Dev focus.
+   Scoped to the full roster grid, wherever it renders (Team › Roster, a team page). */
 
-html.gob-shell #roster-view .gob-tbl th,
-html.gob-shell #roster-view .gob-tbl td {
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td {
   padding-left: var(--dsp-6);
   padding-right: var(--dsp-6);
 }
 
 /* Current → Pot starts at the column edge so the two grades read as one lockup. */
-html.gob-shell #roster-view .gob-tbl th.rt,
-html.gob-shell #roster-view .gob-tbl td.rt {
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th.rt,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td.rt {
   text-align: left;
   padding-left: var(--dsp-12);
   padding-right: var(--dsp-12);
 }
 
-html.gob-shell #roster-view .gob-tbl th.code,
-html.gob-shell #roster-view .gob-tbl td.code {
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th.code,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td.code {
   text-align: center;
   padding-left: var(--dsp-8);
   padding-right: var(--dsp-8);
 }
 
-html.gob-shell #roster-view .gob-tbl th.num,
-html.gob-shell #roster-view .gob-tbl td.num {
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th.num,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   padding-left: var(--dsp-8);
 }
 
-/* Close the identity block before the first attribute pair opens. */
-html.gob-shell #roster-view .gob-tbl th.wt,
-html.gob-shell #roster-view .gob-tbl td.wt {
-  padding-right: var(--dsp-16);
-}
-
-/* Attribute values centre under their headers; a pair is tight, pairs are spaced. */
-html.gob-shell #roster-view .gob-tbl th.gstart,
-html.gob-shell #roster-view .gob-tbl td.gstart,
-html.gob-shell #roster-view .gob-tbl th.gend,
-html.gob-shell #roster-view .gob-tbl td.gend {
-  text-align: center;
-  padding-left: var(--space-2);
-  padding-right: var(--space-2);
-}
-
-html.gob-shell #roster-view .gob-tbl th.gstart,
-html.gob-shell #roster-view .gob-tbl td.gstart { padding-left: var(--dsp-10); }
-
-html.gob-shell #roster-view .gob-tbl th.gend,
-html.gob-shell #roster-view .gob-tbl td.gend { padding-right: var(--dsp-10); }
-
-/* Dev focus keeps its right edge, with the pair gutter opening it. */
-html.gob-shell #roster-view .gob-tbl th.dev,
-html.gob-shell #roster-view .gob-tbl td.dev {
+/* Dev focus keeps its right edge, and opens on the gutter that separates two pairs. */
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th.dev,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td.dev {
   text-align: right;
-  padding-left: var(--dsp-16);
+  padding-left: var(--pair-out, var(--dsp-16));
   padding-right: var(--dsp-12);
 }
 
 /* The tier already lives in the digit's colour. The luminance square behind it
    said the same thing a second time and turned the grid into a heat map. */
-html.gob-shell #roster-view .attr-tile {
+html.gob-shell .gob-roster:not(.is-compact) .attr-tile {
   background: transparent;
   box-shadow: none;
+}
+
+/* ── Attribute pairs (Styleguide › Tables) ────────────────────────────────────
+   SC SH | ID OD | PS BH | RB ST | AG ND | IQ FT. The two values of a pair sit
+   against their shared edge, `--pair-in` apart, so a pair reads as one unit however
+   wide the table is; `--pair-out` is the gutter between pairs. The pair columns take
+   no slack: it goes to the identity columns and to `--pair-lead`, the wider gutter
+   that separates WT from the first pair. Row and group shading are untouched. */
+
+html.gob-shell .gob-pairs {
+  --pair-tile: var(--dsz-22);
+  --pair-in: var(--space-2);
+  --pair-out: var(--dsp-16);
+  --pair-lead: var(--dsp-24);
+}
+
+/* The gutters follow the card, not the window, so a roster inside a narrower card
+   keeps the same proportions. */
+@supports (width: 1cqw) {
+  html.gob-shell .gob-pairs {
+    container-type: inline-size;
+    --pair-out: max(var(--dsp-8), 1.65cqw);
+    --pair-lead: max(var(--dsp-16), 4cqw);
+  }
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.gstart,
+html.gob-shell .gob-pairs .gob-tbl td.gstart,
+html.gob-shell .gob-pairs .gob-tbl th.gend,
+html.gob-shell .gob-pairs .gob-tbl td.gend {
+  width: 1px;
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.gstart,
+html.gob-shell .gob-pairs .gob-tbl td.gstart {
+  text-align: right;
+  padding-left: var(--pair-out);
+  padding-right: var(--pair-in);
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.gend,
+html.gob-shell .gob-pairs .gob-tbl td.gend {
+  text-align: left;
+  padding-left: var(--pair-in);
+  padding-right: var(--pair-out);
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.wt,
+html.gob-shell .gob-pairs .gob-tbl td.wt {
+  padding-right: var(--pair-lead);
+}
+
+html.gob-shell .gob-pairs .attr-tile { width: var(--pair-tile); }
+html.gob-shell .gob-pairs td.gstart .attr-tile { margin-left: auto; }
+html.gob-shell .gob-pairs td.gend .attr-tile { margin-right: auto; }
+
+/* The label sits over its value, and the sort caret under the label, so neither
+   widens the column. */
+html.gob-shell .gob-pairs .ak {
+  position: relative;
+  display: inline-block;
+  width: var(--pair-tile);
+  text-align: center;
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.gstart.s::after,
+html.gob-shell .gob-pairs .gob-tbl th.gend.s::after {
+  content: none;
+}
+
+html.gob-shell .gob-pairs th.s .ak::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  margin: var(--space-2) 0 0 calc(-1 * var(--space-3));
+  border: var(--space-3) solid transparent;
+  border-top-color: var(--text-38);
+}
+
+html.gob-shell .gob-pairs th.s.asc .ak::after {
+  margin-top: calc(-1 * var(--space-2));
+  border-top-color: transparent;
+  border-bottom-color: var(--text-100);
+}
+
+html.gob-shell .gob-pairs th.s.desc .ak::after {
+  border-top-color: var(--text-100);
 }
 
 /* ── Team › Team Attributes (design review item 5) ────────────────────────────
@@ -715,11 +813,12 @@ html.gob-shell #team-attributes-view .mcell:nth-child(n+5) {
   border-top: 1px solid var(--line);
 }
 
+/* Name, then its place beside it: "Offense (1st of 128)". */
 html.gob-shell #team-attributes-view .mtop {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-8);
+  justify-content: flex-start;
+  gap: var(--space-6);
   min-width: 0;
 }
 

@@ -403,9 +403,97 @@ html.gob-shell #scouting-view .agrid td.gb {
   background-image: linear-gradient(var(--white-2), var(--white-2));
 }
 
+/* Attribute pairs (Styleguide › Tables): the two values of a pair sit together and
+   the pairs stand apart. */
 html.gob-shell #scouting-view .agrid th.aa.gs,
 html.gob-shell #scouting-view .agrid td.a.gs {
-  padding-left: var(--space-4);
+  width: calc(var(--dsz-34) + var(--dsp-10));
+  padding-left: var(--dsp-12);
+}
+
+html.gob-shell #scouting-view .agrid th.aa.ge,
+html.gob-shell #scouting-view .agrid td.a.ge {
+  width: calc(var(--dsz-34) + var(--dsp-10));
+  padding-right: var(--dsp-12);
+}
+
+/* Pos leads the row, left of the headshot. */
+html.gob-shell #scouting-view .agrid th.pos-h,
+html.gob-shell #scouting-view .agrid td.pos-c {
+  width: 1px;
+  padding-left: var(--dsp-12);
+  padding-right: var(--space-2);
+}
+
+html.gob-shell #scouting-view .agrid td.ht,
+html.gob-shell #scouting-view .agrid td.wt {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The identity block closes before the first pair opens. */
+html.gob-shell #scouting-view .agrid th.wt,
+html.gob-shell #scouting-view .agrid td.wt {
+  padding-right: var(--dsp-16);
+}
+
+/* Spider Chart Comparison: your team on the left, the opponent on the right. */
+html.gob-shell #scouting-view .sc-radars {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--col-gap);
+  align-items: start;
+}
+
+html.gob-shell #scouting-view .sc-radar {
+  padding: var(--dsp-12);
+}
+
+html.gob-shell #scouting-view .sc-radar-h {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  min-width: 0;
+}
+
+html.gob-shell #scouting-view .sc-radar-h .logo,
+html.gob-shell #scouting-view .sc-radar-h .logo img {
+  width: var(--dsz-28);
+  height: var(--dsz-28);
+  flex: none;
+}
+
+html.gob-shell #scouting-view .sc-radar-h .nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fw-bold) var(--fs-20) / var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+
+html.gob-shell #scouting-view .sc-radar-h .who {
+  margin-left: auto;
+  flex: none;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+
+html.gob-shell #scouting-view .sc-radar .tm-radar-wrap {
+  min-height: 0;
+}
+
+html.gob-shell #scouting-view .sc-radar .tm-radar-svg {
+  max-width: min(420px, 100%);
+}
+
+html.gob-shell #scouting-view .sc-radar-empty {
+  margin: var(--dsp-16) 0 var(--space-4);
+  color: var(--text-60);
+  font-size: var(--fs-13);
 }
 
 html.gob-shell #scouting-view .pc {

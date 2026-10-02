@@ -1196,7 +1196,8 @@
       });
     }
     if (rem < 0) {
-      out.push({ level: 'warn', text: Math.abs(rem) + ' points over budget — trim before submitting.' });
+      var over = Math.abs(rem);
+      out.push({ level: 'warn', text: over + ' point' + (over === 1 ? '' : 's') + ' over budget — trim before submitting.' });
     }
     return out;
   }
@@ -2130,10 +2131,10 @@
    * League signing list (week 36). No playback — the drama happened on Signing Day; this
    * is the durable record you come back to.
    *
-   * Grouped by conference then team, ordered user's conference -> sister conference ->
-   * 1..16 ascending with those two removed so neither repeats. The order comes from the
-   * server (`conferences.order`); "same region, other conference" has one definition and
-   * the client does not re-derive it.
+   * Every conference, in one format: its eight teams, highest class score first. The
+   * conference order comes from the server (`conferences.order`): the user's conference,
+   * its sister, then 1..16 with those two removed. "Same region, other conference" has
+   * one definition and the client does not re-derive it.
    *
    * Walk-ons are excluded here as everywhere before rollover — they are roster backfill,
    * not signings, and their first reveal is next season's Walk-On Welcome.
@@ -2142,26 +2143,33 @@
     var conf = state.conferences || {};
     var byTeam = conf.by_team_id || {};
     var order = conf.order || [];
-    var buckets = {};
+    var signings = {};
     (state.week35Results.signed_players || []).forEach(function (e) {
       if (!e || e.walk_on) return;
-      var c = Number(byTeam[String(e.team_id)]) || 0;
-      if (!c) return;
-      (buckets[c] = buckets[c] || {});
       var tid = String(e.team_id);
-      (buckets[c][tid] = buckets[c][tid] || []).push(e);
+      (signings[tid] = signings[tid] || []).push(e);
     });
-    return order.filter(function (c) { return buckets[c]; }).map(function (c) {
-      var teams = Object.keys(buckets[c]).map(function (tid) {
+    var scores = classScores();
+    // Every team of the conference has a place, signings or not.
+    var teamsOf = {};
+    Object.keys(byTeam).forEach(function (tid) {
+      var c = Number(byTeam[tid]) || 0;
+      if (c) (teamsOf[c] = teamsOf[c] || []).push(String(tid));
+    });
+    return order.filter(function (c) { return teamsOf[c]; }).map(function (c) {
+      var teams = teamsOf[c].map(function (tid) {
+        var list = (signings[tid] || []).slice().sort(byRtDesc);
         return {
           teamId: tid,
-          name: (state.teamNameMap && state.teamNameMap[tid]) || (buckets[c][tid][0] || {}).team_name || '',
+          name: teamNameOf(tid, (list[0] || {}).team_name || ''),
           isUser: String(tid) === String(state.userTeamId),
-          signings: buckets[c][tid].sort(function (a, b) {
-            return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1);
-          })
+          score: scores[tid] || 0,
+          signings: list
         };
-      }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      }).sort(function (a, b) {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.name.localeCompare(b.name);
+      });
       return {
         conference: c,
         label: conferenceLabel(c),
@@ -2170,6 +2178,21 @@
         teams: teams
       };
     });
+  }
+
+  /**
+   * team_id -> class score: the signed recruits' RT, summed. It is the number the
+   * Signing Day boards finish on (`revealScores` after the last card), so the week-36
+   * order matches the board the user watched fill.
+   */
+  function classScores() {
+    var scores = {};
+    (state.week35Results.signed_players || []).forEach(function (e) {
+      if (!e || e.walk_on) return;
+      var tid = String(e.team_id);
+      scores[tid] = (scores[tid] || 0) + (Number(e.rt) || 0);
+    });
+    return scores;
   }
 
   /**
@@ -2232,19 +2255,6 @@
     });
   }
 
-  function orderSigningGroups(groups) {
-    var user = [];
-    var sister = [];
-    var rest = [];
-    groups.forEach(function (g) {
-      if (g.isUser) user.push(g);
-      else if (g.isSister) sister.push(g);
-      else rest.push(g);
-    });
-    rest.sort(function (a, b) { return String(a.label).localeCompare(String(b.label)); });
-    return user.concat(sister, rest);
-  }
-
   function yourClassTableHtml(entries) {
     if (!entries.length) return '';
     var rows = entries.map(function (e) {
@@ -2270,26 +2280,35 @@
       '<td class="rt">' + signingRtHtml(e) + '</td></tr>';
   }
 
+  /** One team of a conference: its place, name and class score, then who it signed. */
+  function leagueTeamHtml(t, place) {
+    var body = t.signings.map(function (e) {
+      return leagueSigningRowHtml(e, t.isUser);
+    }).join('');
+    var list = t.signings.length
+      ? '<div class="gob-xs gob-rec-league"><table class="gob-tbl">' +
+        '<colgroup><col class="c-name"><col class="c-pos"><col class="c-yr"><col class="c-rt"></colgroup>' +
+        '<tbody>' + body + '</tbody></table></div>'
+      : '<p class="gob-rec-none">No signings</p>';
+    return '<div class="gob-rec-team' + (t.isUser ? ' is-user-team' : '') + '">' +
+      '<h3 class="gob-rec-team-h"><span class="rk">' + place + '</span>' +
+      '<span class="nm">' + Common.escapeHtml(t.name) + '</span>' +
+      '<span class="sc" title="Class score">' + t.score + '</span></h3>' + list + '</div>';
+  }
+
   function leagueConferenceCardHtml(g) {
     var eye = g.isUser ? '<p class="gob-rec-eye">Your conference</p>'
       : g.isSister ? '<p class="gob-rec-eye">Sister conference</p>' : '';
-    var teams = g.teams.map(function (t) {
-      var body = t.signings.map(function (e) {
-        return leagueSigningRowHtml(e, t.isUser);
-      }).join('');
-      return '<div class="gob-rec-team' + (t.isUser ? ' is-user-team' : '') + '">' +
-        '<h3 class="gob-rec-team-h">' + Common.escapeHtml(t.name) + '<em>' + t.signings.length + '</em></h3>' +
-        '<div class="gob-xs gob-rec-league"><table class="gob-tbl">' +
-        '<colgroup><col class="c-name"><col class="c-pos"><col class="c-yr"><col class="c-rt"></colgroup>' +
-        '<tbody>' + body + '</tbody></table></div></div>';
-    }).join('');
-    var head = '<div class="gob-rec-conf-head">' + eye +
-      '<h2>Conference ' + Common.escapeHtml(g.label) + '</h2></div>';
-    return '<section class="gob-tcard gob-rec-conf">' + head + teams + '</section>';
+    var teams = g.teams.map(function (t, i) { return leagueTeamHtml(t, i + 1); }).join('');
+    var head = '<div class="gob-rec-conf-head"><div>' + eye +
+      '<h2>Conference ' + Common.escapeHtml(g.label) + '</h2></div>' +
+      '<span class="gob-rec-key">Class score</span></div>';
+    return '<section class="gob-tcard gob-rec-conf" data-conference="' + Common.escapeHtml(g.label) + '">' +
+      head + '<div class="gob-rec-teams">' + teams + '</div></section>';
   }
 
   function finalSigningsHtml() {
-    var groups = orderSigningGroups(leagueSigningGroups());
+    var groups = leagueSigningGroups();
     var yours = userClassSignings();
     if (!groups.length && !yours.length) {
       return '<div class="gob-rec-results"><p class="gob-rec-empty">No signings to report yet.</p></div>';
@@ -2622,6 +2641,9 @@
   window.RecruitingHub = {
     show: showHub,
     current: function () { return hubReady ? hubView : ''; },
+    // False until the week is known. The shell paints no Pool / Leans / Visits
+    // row before that: most weeks have a different row, or none.
+    ready: function () { return hubReady; },
     week: function () { return state.week || 0; },
     rowVisible: function () {
       if (!hubReady) return true;
