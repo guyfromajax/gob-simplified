@@ -642,7 +642,24 @@ function paintBack() {
   });
 }
 
+// Leaving the page cancels the report's fetch. That is the player moving on, not
+// a failure, so it shows nothing. beforeunload comes first (the fetch is cancelled
+// after it); the timer clears the flag if the page was not left after all.
+let reportPageLeaving = false;
+let reportLeaveWatchInstalled = false;
+function watchReportPageLeave() {
+  if (reportLeaveWatchInstalled || typeof window === 'undefined') return;
+  reportLeaveWatchInstalled = true;
+  window.addEventListener('beforeunload', () => {
+    reportPageLeaving = true;
+    setTimeout(() => { reportPageLeaving = false; }, 3000);
+  });
+  window.addEventListener('pagehide', () => { reportPageLeaving = true; });
+  window.addEventListener('pageshow', () => { reportPageLeaving = false; });
+}
+
 async function loadTrainingReport() {
+  watchReportPageLeave();
   try {
     const params = emptyParams();
     params.set('mode', mode);
@@ -668,9 +685,11 @@ async function loadTrainingReport() {
     renderPage();
     setReportLoading(false);
   } catch (error) {
+    if (reportPageLeaving || (error && error.name === 'AbortError')) return;
     console.error('Error loading training report:', error);
+    // A real failure is the inline card, never a browser alert. A report that is
+    // already on screen stays: a failed refresh does not take it away.
     if (!reportData) showReportLoadFailed();
-    alert('Failed to load training report. Please try again.');
   }
 }
 

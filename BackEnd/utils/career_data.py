@@ -293,8 +293,8 @@ _FINISH_LABELS = {
 _TITLE_FINISH_LABELS = {
     "national": "National champions",
     "region": "Region champions",
-    "conf_t": "Conference champions",
-    "conf_rs": "Conference regular-season #1",
+    "conf_t": "Conference tournament champions",
+    "conf_rs": "Regular season conference champions",
 }
 _TITLE_FINISH_ORDER = ("national", "region", "conf_t", "conf_rs")
 

@@ -1809,7 +1809,7 @@ function showCutPlayersRequiredModal(cutCount) {
         <p id="fcc-cut-required-copy" class="gob-modal-subtitle">Assign ${cutCount} player${cutCount === 1 ? '' : 's'} to your practice squad. They'll sit out this season, but they'll keep developing and return eligible next year.</p>
       </div>
       <div class="gob-modal-actions">
-        <button type="button" class="gob-modal-btn-primary is-green" id="fcc-cut-required-close">Assign Practice Squad</button>
+        <button type="button" class="gob-modal-btn-dismiss" id="fcc-cut-required-close">Assign Practice Squad</button>
       </div>
     </div>
   `;
@@ -1824,7 +1824,8 @@ function showCutPlayersRequiredModal(cutCount) {
     if (event.target === overlay || event.target.classList.contains('gob-modal-backdrop')) close();
   });
   document.addEventListener('keydown', onKeydown);
-  // Straight to the assignment screen — no extra Green Action Button hop.
+  // Straight to the assignment screen. The button is neutral (one action = a
+  // full-width ghost): green is the top-bar Advance and nothing else.
   overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', async () => {
     playSound('confirm-1-lowervol.wav');
     const sfxReady = waitForConfirmSfx();

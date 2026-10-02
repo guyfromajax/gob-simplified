@@ -117,6 +117,27 @@ for (const [week, tier, round] of [
   });
 }
 
+// Follow-up (2026-10-02): after the tournament the week is named, not numbered.
+for (const [week, label] of [[35, 'Signing Day'], [36, 'Offseason']]) {
+  test('B2: week ' + week + ' shows no week number, only "' + label + '"', async ({ page }) => {
+    const data = clone(week === 35 ? O.STATES.signing_day : O.STATES.regular);
+    data.week = week;
+    if (week === 36) data.office_digest.next_game = null;
+    await O.openOffice(page, data);
+    const g = await topBar(page);
+    expect(g.value).toBe(label);
+    expect(g.text).not.toMatch(/week/i);
+    expect(g.text).not.toMatch(new RegExp('\\b' + week + '\\b'));
+    // Not a tournament round: no emblem, no round line, and it sits in the week's place.
+    expect(g.round).toBe(null);
+    expect(g.emblem).toBe(null);
+    expect(g.valueBox.left).toBeGreaterThan(g.rank.right);
+    expect(g.valueBox.top).toBeGreaterThanOrEqual(g.top.top);
+    expect(g.valueBox.bottom).toBeLessThanOrEqual(g.top.bottom);
+    await expect(page.locator('html.gob-shell .top')).not.toHaveClass(/is-tier/);
+  });
+}
+
 test('B2: a browse page paints the same descriptor (recruiting, week 31)', async ({ page }) => {
   await stubAuth(page);
   await page.route('**/*', async (route) => {

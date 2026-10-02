@@ -94,7 +94,7 @@ function coachCareerPopulated() {
     // finish, a NON-title completed finish, then an in-progress season.
     top_seasons: [
       topSeason('f1', 'Lawrence Eagles', 'lawrence', 2, 31, 5, 'National champions', true, 1860, false, null),
-      topSeason('f1', 'Lawrence Eagles', 'lawrence', 1, 22, 10, 'Conference champions', true, 1120, false, null),
+      topSeason('f1', 'Lawrence Eagles', 'lawrence', 1, 22, 10, 'Conference tournament champions', true, 1120, false, null),
       topSeason('f1', 'Lawrence Eagles', 'lawrence', 4, 24, 8, 'National semifinal', false, 980, false, null),
       topSeason('f2', 'Chapel Hill Sky', 'chapel_hill', 1, 4, 2, null, false, 140, true, 6),
     ],

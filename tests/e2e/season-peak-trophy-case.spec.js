@@ -433,7 +433,9 @@ test.describe('season peak review', () => {
     await expect(page.getByText('1 seed')).toHaveCount(0);
     await expect(page.locator('.rv-t .tro')).toHaveCount(3);
     await expect(page.locator('.rv-t .tro b')).toHaveText([
-      'National Champions', 'Region B Champions', 'Conference A2 Champions',
+      // The conference title is named by which title it is (2026-10-02); the
+      // conference itself is still named in the finish line below.
+      'National Champions', 'Region B Champions', 'Conference Tournament Champions',
     ]);
     await expect(page.locator('.rv-t .tro div span')).toHaveCount(0);
     await expect(page.locator('.rv-fin')).toContainText('Conference A2');
