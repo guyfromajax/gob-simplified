@@ -153,15 +153,15 @@ test('week 1, season 1: every section, in order, with its content', async ({ pag
   await page.setViewportSize({ width: 1280, height: 720 });
   await O.openOffice(page, seasonOne());
   expect(await layout(page)).toEqual([
-    { heading: 'Season Preview', cards: ['(outlook)', 'Rankings', 'Key Players', 'Preseason All-Americans'] },
+    { heading: 'Season Preview', cards: ['Rankings', 'Key Players', 'Preseason All-Americans'] },
     // No Team snapshot in week 1: before camp it could only say "Set after camp".
     { heading: 'Opening Week', cards: ['(game)', 'Circle these', 'Preseason National Rankings'] },
     { heading: 'Recruiting', cards: ['(wire)', 'Walk-ons', 'Top Recruits'] },
   ]);
 
-  // Outlook: the pick. Season 1 has no last season to quote.
-  await expect(page.locator('#office-root .office-outlook .ol-pick')).toHaveText('Picked 4th of 8 in Conference A2.');
-  await expect(page.locator('#office-root .office-outlook .ol-last')).toHaveCount(0);
+  // No "Picked Nth of 8" card (removed 2026-10-02): Rankings says the conference place.
+  await expect(page.locator('#office-root .office-outlook')).toHaveCount(0);
+  await expect(page.locator('#office-root')).not.toContainText(/Picked \d/);
 
   // Rankings: three lines from the preseason national rank.
   expect((await rowsOf(page, '#office-root .office-ranks')).map((row) => row.cells)).toEqual([
@@ -200,6 +200,27 @@ test('week 1, season 1: every section, in order, with its content', async ({ pag
     ['C', 'Ansel Brandt Seattle AAA', 'A++'],
   ]);
   expect(aa.map((row) => row.mine)).toEqual([false, false, true, false, false]);
+  // Each row carries the player's headshot: a square with a small corner, between the
+  // position and the name, the same size on every row.
+  const shots = await page.locator('#office-root .office-aa .wr').evaluateAll((rows) => rows.map((row) => {
+    const box = row.querySelector('.aa-pt');
+    if (!box) return null;
+    const r = box.getBoundingClientRect();
+    const tag = row.querySelector('.wr-k').getBoundingClientRect();
+    const name = row.querySelector('.nm').getBoundingClientRect();
+    const rowBox = row.getBoundingClientRect();
+    return {
+      w: Math.round(r.width), h: Math.round(r.height), radius: parseFloat(getComputedStyle(box).borderTopLeftRadius),
+      img: !!box.querySelector('img'), afterTag: r.left >= tag.right - 0.5, beforeName: r.right <= name.left + 0.5,
+      inside: r.top >= rowBox.top - 0.5 && r.bottom <= rowBox.bottom + 0.5,
+    };
+  }));
+  expect(shots).toHaveLength(5);
+  shots.forEach((shot) => {
+    expect(shot).not.toBeNull();
+    expect(shot).toMatchObject({ w: 40, h: 40, afterTag: true, beforeName: true, inside: true });
+    expect(shot.radius).toBeLessThanOrEqual(8); // a square, never a circle
+  });
   expect(aa[2].bg).not.toBe('rgba(0, 0, 0, 0)');
   expect(aa[0].bg).toBe('rgba(0, 0, 0, 0)');
 
@@ -261,10 +282,9 @@ test('week 1, a later season: last season, the newcomers, and last season’s me
   await O.openOffice(page, laterSeason());
   expect((await layout(page))[0]).toEqual({
     heading: 'Season Preview',
-    cards: ['(outlook)', 'Rankings', 'Key Players', 'Newcomers', 'Preseason All-Americans'],
+    cards: ['Rankings', 'Key Players', 'Newcomers', 'Preseason All-Americans'],
   });
-  await expect(page.locator('#office-root .office-outlook .ol-pick')).toHaveText('Picked 4th of 8 in Conference A2.');
-  await expect(page.locator('#office-root .office-outlook .ol-last')).toHaveText('Last season: 18\u20138, lost in the Region semifinal.');
+  await expect(page.locator('#office-root .office-outlook')).toHaveCount(0);
   const newcomers = await rowsOf(page, '#office-root .office-new');
   expect(newcomers.map((row) => row.cells)).toEqual([
     ['Rafe Dalton PG', 'B'], ['Emeka Sorensen C', 'C+'], ['Coby Tran SF', 'C'], ['Will Hask SG', 'C'],
@@ -284,7 +304,6 @@ test('a loss last season reads as a loss', async ({ page }) => {
   data.office_digest.season_preview.outlook.last_season = { wins: 31, losses: 5, finish: 'won the National championship' };
   await O.openOffice(page, data);
   await expect(page.locator('#office-root .office-next .nx-sub')).toContainText('Last season: L 58\u201361');
-  await expect(page.locator('#office-root .office-outlook .ol-last')).toHaveText('Last season: 31\u20135, won the National championship.');
 });
 
 /* -------------------------------------------------------------- week 2 --- */

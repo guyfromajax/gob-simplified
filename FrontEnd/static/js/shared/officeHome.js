@@ -969,6 +969,7 @@
       bindGo(row, opts.url);
     }
     if (present(opts.tag)) row.appendChild(el('span', 'wr-k', opts.tag));
+    if (opts.portrait) row.appendChild(opts.portrait);
     var body = el('span', 'wr-b');
     var line = el('span', 'wr-1');
     line.appendChild(el('span', 'nm', opts.name));
@@ -978,22 +979,6 @@
     row.appendChild(body);
     if (opts.right) row.appendChild(opts.right);
     return row;
-  }
-
-  function outlookCard(preview, index) {
-    var outlook = preview && preview.outlook;
-    var picked = outlook && outlook.picked;
-    if (!picked || !present(picked.rank) || !present(picked.of)) return null;
-    var node = card('office-outlook', index);
-    var label = conferenceLabel(outlook.conference);
-    node.appendChild(el('p', 'ol-pick', 'Picked ' + ordinal(picked.rank) + ' of ' + picked.of
-      + (label ? ' in Conference ' + label : '') + '.'));
-    var last = outlook.last_season;
-    if (last && present(last.wins) && present(last.losses)) {
-      node.appendChild(el('p', 'ol-last', 'Last season: ' + last.wins + '\u2013' + last.losses
-        + (present(last.finish) ? ', ' + last.finish : '') + '.'));
-    }
-    return node;
   }
 
   function rankingsCard(preview, index) {
@@ -1068,6 +1053,8 @@
     rows.forEach(function (row) {
       node.appendChild(personRow({
         tag: row.position, name: row.name, detail: row.team_name, mine: !!row.is_user,
+        // The player's headshot: square with a small corner, the silhouette on a miss.
+        portrait: portrait(row.player_id, row.name, 'av aa-pt'),
         url: playerHref(row.player_id), right: gradeCell(row.rt)
       }));
     });
@@ -1601,7 +1588,6 @@
       // Week 1 of every season. The opener carries last season's meeting when the preview has it.
       var opener = (preview && preview.opener) || digest.next_game;
       first = preview ? [
-        outlookCard(preview, 1),
         rankingsCard(preview, 2),
         keyPlayersCard(preview, 3),
         newcomersCard(preview, 4),

@@ -491,7 +491,7 @@ A week strip sits under the top of `.main`, above the columns. It is one row, ab
 | State | Column 1 · Since last week | Column 2 · This Week | Column 3 · Recruiting |
 |---|---|---|---|
 | `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot · Conference standings | Recruiting wire, then Top Recruits. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
-| `first_week` | **Season Preview**: outlook · Rankings · Key Players · Newcomers · Preseason All-Americans | **Opening Week**: Season Opener · Circle these · Preseason National Rankings | One-line wire ("No preseason leans") · Walk-ons · Top Recruits. See "Office week 1". |
+| `first_week` | **Season Preview**: Rankings · Key Players · Newcomers · Preseason All-Americans | **Opening Week**: Season Opener · Circle these · Preseason National Rankings | One-line wire ("No preseason leans") · Walk-ons · Top Recruits. See "Office week 1". |
 | `signing_day` | Result · What moved | Team snapshot · Conference standings (`next_game` is null) | Signing Day card. The wire is hidden. The column heading still links to the hub. |
 | any, with `signed_class` set (week 36) | as that state | as that state | Signing class card (`.office-class`): one row per signed recruit, name, position, home region, RT now → ceiling. It replaces the wire. |
 
@@ -518,11 +518,10 @@ Week 1 of **every** season, before the first game, the Office is the season prev
 
 | Column | Section | Content | Source |
 |---|---|---|---|
-| 01 Season Preview | Outlook (no title) | "Picked 5th of 8 in Conference A1." From season 2: "Last season: 18–8, lost in the Region semifinal." | pick = conference place by preseason national rank; last season = the coach's `season_record` trophy (`furthest_round`, or "won the National championship" with a national title) |
-| | Rankings | Conference "5 of 8", Region "11 of 16", National "100 of 128" | all three from `rankings[].natl_rank` |
+| 01 Season Preview | Rankings | Conference "5 of 8", Region "11 of 16", National "100 of 128". The first card: there is no "Picked Nth of 8" line above it (removed 2026-10-02; the conference place is here). | all three from `rankings[].natl_rank` |
 | | Key Players | Top 5 by RT. Columns in the roster's order: Player, RT, Pos, Yr, Ht, Wt. Names open the player page. | one projected roster read (`meta`, `position_ratings`) |
 | | Newcomers | Last season's signing class now on the roster (name, Pos, RT) and one line: "Returning 9 · Lost 3 seniors · 4 newcomers". Left out in season 1 and when no signee is on the roster. | `last_season.signed_class` ids; names from the season review on a save without the snapshot |
-| | Preseason All-Americans | First team: position, player, team, RT. No score, weights or percentages. The user's players are the navy row. | `awards.all_american_projection` (the week-0 projection) |
+| | Preseason All-Americans | First team: position, the player's headshot (40px square, small corner; the silhouette on a miss), player over team, RT. No score, weights or percentages. The user's players are the navy row. | `awards.all_american_projection` (the week-0 projection); `API_CONFIG.getPlayerImageUrl` |
 | 02 Opening Week | Season Opener | The next-game card, labelled; "Preseason #21 · Conference A2 · Last season: W 71–64". The meeting only when they met. | `next_game_summary`; `last_season.meetings` |
 | | Circle these | The three toughest games by the opponent's national rank, in week order, with week and site. | `schedule` |
 | | (no Team snapshot) | Left out in week 1: before camp it could only say "Set after camp". Back from week 2. | |
@@ -536,7 +535,8 @@ Week 1 of **every** season, before the first game, the Office is the season prev
 - **Build rules.** Sections reuse two patterns and add no card style: `.office-list` (the signing-class card: two-line `.wr` rows, grade on the right) and the standings row (`.st-r`, also `.office-tb` for Key Players). "Yours" is the navy selected-row treatment. RT is a letter in the canonical ramp (`rtBucket.js`). No section has more than five rows (the conference table is its eight teams). A section with nothing to say is left out; the whole preview paints from one payload, so nothing is half-built.
 - **CH is hidden**: the preview reads no attributes, and the All-American rows carry no score.
 - Records and scores use the en dash ("18–8", "W 71–64"), as the next-game card's record does.
-- The Office scrolls. Past the fold, week 1: column 01 185px (season 1) / 428px (later seasons) at 1280×720; 124px / 470px at 1920×1080. Columns 02 and 03 fit (column 02 by 5px short at 1280×720).
+- The Office scrolls. Past the fold, week 1: column 01 155px (season 1) / 372px (later seasons) at 1280×720; 75px / 394px at 1920×1080. Columns 02 and 03 fit (column 02 by 5px short at 1280×720).
+- The payload still carries `season_preview.outlook` (the pick, and last season's record and finish). Nothing draws it since the "Picked" card was removed.
 
 Card titles (What moved, Team snapshot, Signing Day, Conference standings) are one type step smaller than the shared card title, `--fs-15`, and stay larger than the body copy under them.
 
