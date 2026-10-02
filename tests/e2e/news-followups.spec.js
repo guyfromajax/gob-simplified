@@ -246,3 +246,18 @@ test('on a section\'s own page the lit rail item still does nothing', async ({ p
   await page.waitForTimeout(600);
   expect(await page.evaluate(() => ({ url: location.href, length: history.length }))).toEqual(before);
 });
+
+// ── Recruiting Report: the Score caption hides the formula ───────────────────
+test('Recruiting Report: the Score caption says "Class strength so far" and explains nothing', async ({ page }) => {
+  const stories = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/recruiting-report-real-stories.json'), 'utf8'));
+  const story = stories.with_movement;
+  await install(page, [story]);
+  await boot(page, storyUrl(story.story_id), '#news-view .gob-news-story .gob-news-caption');
+  const caption = page.locator('#news-view .gob-news-caption');
+  await expect(caption).toHaveCount(1);
+  await expect(caption).toHaveText('Class strength so far');
+  await expect(page.locator('#news-view .gob-news-story')).not.toContainText(
+    /first choice|second choice|counts in full|a quarter|adds up|ratings of the recruits|\d+\s*%/i,
+  );
+  await shots(page, 'recruiting-report-caption');
+});

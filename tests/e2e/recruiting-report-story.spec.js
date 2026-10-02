@@ -422,10 +422,11 @@ test('stories stored without movement, caption or foot row show none, and keep t
   }
 });
 
-test('another kind of story keeps its "Week N" line', async ({ page }) => {
+test('a story whose headline does not name the week keeps its "Week N" line', async ({ page }) => {
+  // The full table of story types is in news-followups.spec.js.
   await openStory(page, {
-    story_id: 'w3-upset-report', week: 3, type: 'upset_report', headline: 'Week 3 Upset Report',
-    lines: ['Redwood High upset Pacific All-Stars by a score of 71-66.'],
+    story_id: 'w3-ps-all-stars', week: 3, type: 'ps_all_stars', headline: 'Practice Squad All-Stars',
+    lines: ['A practice-squad player gained five attribute points this week.'],
   });
   await expect(page.locator('#news-view .gob-news-meta')).toHaveText('Week 3');
 });
