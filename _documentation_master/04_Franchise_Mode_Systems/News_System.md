@@ -65,9 +65,11 @@
   other surfaces read FTD — they do not rescan lean lists.
 - Content (top to bottom):
   1. `ranking_table` rich lines under `National Recruit Rankings` and `Region {letter}` (when points exist).
-  2. Section heading **Recruiting Leans Announced**, then the former leans story body:
-     - `Top Rated Recruit Announcements` — recruits with RT > 49 who added a lean that week
-     - `Conference {N} Lean Announcements` — new leans toward teams in the user's conference (teams by ascending natl_rank; a recruit can appear in both sections)
+  2. The lean announcements, under their own two sub-headings (no outer "Recruiting Leans Announced" heading):
+     - `Top Rated Recruit Announcements` — recruits with RT > 49 who added a lean that week, as `text` lines
+     - `Conference {N} Lean Announcements` — new leans toward teams in the user's conference (teams by ascending natl_rank; a recruit can appear in both sections). One `team_recruits` rich line per team: `{type, team_id, team_name, recruits: [{recruit_id, name, rt}]}`, recruits by descending RT, `rt` the raw number.
+- Rendering (`newsStory.js`): a `team_recruits` block is the team as a sub-heading (logo mark and name in the shared team style, linking to the team page) over its recruits, one per row, name then RT in the canonical ramp. Recruit names are text: no story links a recruit.
+- Stories stored before this (the lean section as plain `text` lines, team and recruits alike) render as before. Only the outer heading is not drawn. They are not upgraded on read: the old lines hold the RT letter only, and the page does not re-map the ramp from a letter.
 - `story_id`: `w{N}-recruiting-report`. Skipped if already present when prepending.
 
 ##Headline: "Your Recruiting Board Moved"

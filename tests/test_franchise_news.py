@@ -354,10 +354,91 @@ def test_append_week_news_resolves_user_conference_from_string_team_id(monkeypat
     assert not any(s.get("type") == "recruiting_leans" for s in stories)
     texts = [line.get("text") for line in report["rich_lines"] if line.get("text")]
     assert "National Recruit Rankings" in texts
-    assert "Recruiting Leans Announced" in texts
+    # The redundant outer heading is gone; the conference sub-heading stays.
+    assert "Recruiting Leans Announced" not in texts
     assert "Conference 4 Lean Announcements" in texts
-    assert "Rival U" in texts
-    assert "Al Low (D)" in texts
+    # The team and its recruit are a block, not two text lines that run together.
+    assert "Rival U" not in texts and "Al Low (D)" not in texts
+    blocks = [line for line in report["rich_lines"] if line.get("type") == "team_recruits"]
+    assert blocks == [{
+        "type": "team_recruits",
+        "team_id": str(rival_oid),
+        "team_name": "Rival U",
+        "recruits": [{"recruit_id": "r1", "name": "Al Low", "rt": 31}],
+    }]
+
+
+def _conference_case():
+    recruit_by_id = {
+        "r1": _recruit_doc("r1", "Al Low", 28),
+        "r2": _recruit_doc("r2", "Bo Mid", 41),
+        "r3": _recruit_doc("r3", "Cy Top", 55),
+        "r4": _recruit_doc("r4", "Out Of Conf", 60),
+    }
+    events = [
+        {"recruit_id": "r1", "team_id": "t1"},
+        {"recruit_id": "r2", "team_id": "t1"},
+        {"recruit_id": "r3", "team_id": "t2"},
+        {"recruit_id": "r4", "team_id": "t9"},  # team outside user's conference
+    ]
+    return (
+        events,
+        {"t1": 88, "t2": 12, "t9": 1},
+        {"t1": "Alpha", "t2": "Beta", "t9": "Niner"},
+        recruit_by_id,
+        {"t1": "3", "t2": "3", "t9": "7"},
+        "3",
+    )
+
+
+def test_recruiting_report_lean_section_is_structured_story_content():
+    content = franchise_routes._recruiting_leans_content(*_conference_case())
+    story = franchise_routes._merge_recruiting_report_with_leans(None, content, report_week=11)
+    assert story["story_id"] == "w11-recruiting-report"
+    assert story["rich_lines"] == [
+        {"type": "gap"},
+        {"type": "heading", "text": "Top Rated Recruit Announcements"},
+        {"type": "text", "text": "Out Of Conf, a Sharp Shooter rated B, has announced a lean toward Niner."},
+        {"type": "text", "text": "Cy Top, a Sharp Shooter rated C+, has announced a lean toward Beta."},
+        {"type": "gap"},
+        {"type": "heading", "text": "Conference 3 Lean Announcements"},
+        # Teams by national rank (12 before 88), recruits by RT.
+        {"type": "team_recruits", "team_id": "t2", "team_name": "Beta",
+         "recruits": [{"recruit_id": "r3", "name": "Cy Top", "rt": 55}]},
+        {"type": "team_recruits", "team_id": "t1", "team_name": "Alpha",
+         "recruits": [{"recruit_id": "r2", "name": "Bo Mid", "rt": 41},
+                      {"recruit_id": "r1", "name": "Al Low", "rt": 28}]},
+    ]
+    assert not any(line.get("text") == "Recruiting Leans Announced" for line in story["rich_lines"])
+
+
+def test_structured_lean_section_names_the_same_teams_and_recruits_as_the_plain_lines():
+    """The block shape changes how the section is stored, not who is in it."""
+    case = _conference_case()
+    lines = franchise_routes._build_recruiting_leans_lines(*case)
+    rich = franchise_routes._recruiting_leans_section_rich_lines(franchise_routes._recruiting_leans_content(*case))
+    flat = []
+    for line in rich:
+        if line["type"] == "gap":
+            flat.append("")
+        elif line["type"] in ("heading", "text"):
+            flat.append(line["text"])
+        else:
+            flat.append(line["team_name"])
+            flat.append(", ".join(
+                f"{r['name']} ({franchise_routes.format_rt_display(r['rt'])})" for r in line["recruits"]
+            ))
+    assert flat[0] == "" and flat[1:] == lines
+
+
+def test_lean_section_with_only_conference_leans_has_no_top_rated_heading():
+    content = franchise_routes._recruiting_leans_content(
+        [{"recruit_id": "r1", "team_id": "t1"}], {"t1": 5}, {"t1": "Alpha"},
+        {"r1": _recruit_doc("r1", "Al Low", 28)}, {"t1": "5"}, "5",
+    )
+    rich = franchise_routes._recruiting_leans_section_rich_lines(content)
+    assert [line["type"] for line in rich] == ["gap", "heading", "team_recruits"]
+    assert rich[1]["text"] == "Conference 5 Lean Announcements"
 
 
 def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):

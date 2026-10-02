@@ -14614,19 +14614,21 @@ NEWS_TOP_RECRUIT_MIN_RT = 49  # recruit RT must exceed this for the Top Rated se
 NEWS_COACH_OFFICE_EXCLUDED_TYPES = frozenset({"upset_report"})
 
 
-def _build_recruiting_leans_lines(
+def _recruiting_leans_content(
     lean_events: list[dict[str, str]],
     rank_by_team_id: dict[str, int],
     team_name_map: dict[str, str],
     recruit_by_id: dict[str, dict[str, Any]],
     conference_by_team_id: dict[str, str],
     user_conference: str | None,
-) -> list[str] | None:
-    """Body lines for the Recruiting Leans Announced section (no outer header).
+) -> dict[str, Any] | None:
+    """The week's lean announcements, as data.
 
-    Recruits with RT > NEWS_TOP_RECRUIT_MIN_RT who newly added a team to their lean
-    list, followed by new leans toward teams in the user's conference (a recruit can
-    appear in both). None when neither section has content.
+    ``top_lines``: one sentence per recruit with RT > NEWS_TOP_RECRUIT_MIN_RT who newly
+    added a team to their lean list, highest RT first. ``conference_teams``: new leans
+    toward teams in the user's conference, teams by ascending national rank and each
+    team's recruits by descending RT (a recruit can appear in both). None when neither
+    has content.
     """
     teams_by_recruit: dict[str, list[str]] = {}
     for event in lean_events or []:
@@ -14641,7 +14643,7 @@ def _build_recruiting_leans_lines(
         return None
 
     top_entries: list[tuple[int, dict[str, Any], list[str]]] = []
-    conference_recruits_by_team: dict[str, list[tuple[int, str]]] = {}
+    conference_recruits_by_team: dict[str, list[tuple[int, str, str]]] = {}
     for recruit_id, team_ids in teams_by_recruit.items():
         recruit_doc = recruit_by_id.get(recruit_id)
         if not recruit_doc:
@@ -14654,7 +14656,7 @@ def _build_recruiting_leans_lines(
         for team_id in team_ids:
             if conference_by_team_id.get(team_id) == user_conference:
                 conference_recruits_by_team.setdefault(team_id, []).append(
-                    (rt, str(recruit_doc.get("name") or ""))
+                    (rt, str(recruit_doc.get("name") or ""), recruit_id)
                 )
 
     top_lines: list[str] = []
@@ -14666,58 +14668,110 @@ def _build_recruiting_leans_lines(
             f"has announced a lean toward {team_names}."
         )
 
-    conference_lines: list[str] = []
+    conference_teams: list[dict[str, Any]] = []
     for team_id in sorted(
         conference_recruits_by_team, key=lambda tid: rank_by_team_id.get(tid, 999)
     ):
         entries = sorted(conference_recruits_by_team[team_id], key=lambda e: e[0], reverse=True)
-        conference_lines.append(team_name_map.get(team_id, team_id))
-        conference_lines.append(", ".join(
-            f"{name} ({format_rt_display(rt)})" for rt, name in entries
-        ))
+        conference_teams.append({
+            "team_id": team_id,
+            "team_name": team_name_map.get(team_id, team_id),
+            "recruits": [
+                {"recruit_id": recruit_id, "name": name, "rt": int(rt)}
+                for rt, name, recruit_id in entries
+            ],
+        })
 
-    if not top_lines and not conference_lines:
+    if not top_lines and not conference_teams:
+        return None
+    return {
+        "top_lines": top_lines,
+        "conference": user_conference,
+        "conference_teams": conference_teams,
+    }
+
+
+def _build_recruiting_leans_lines(
+    lean_events: list[dict[str, str]],
+    rank_by_team_id: dict[str, int],
+    team_name_map: dict[str, str],
+    recruit_by_id: dict[str, dict[str, Any]],
+    conference_by_team_id: dict[str, str],
+    user_conference: str | None,
+) -> list[str] | None:
+    """The lean announcements as plain text lines (the legacy standalone story).
+
+    The weekly Recruiting Report no longer uses this: it stores the conference section
+    as ``team_recruits`` blocks (``_recruiting_leans_section_rich_lines``).
+    """
+    content = _recruiting_leans_content(
+        lean_events,
+        rank_by_team_id,
+        team_name_map,
+        recruit_by_id,
+        conference_by_team_id,
+        user_conference,
+    )
+    if not content:
         return None
     lines: list[str] = []
-    if top_lines:
+    if content["top_lines"]:
         lines.append("Top Rated Recruit Announcements")
-        lines.extend(top_lines)
-    if conference_lines:
+        lines.extend(content["top_lines"])
+    if content["conference_teams"]:
         if lines:
             lines.append("")
-        lines.append(f"Conference {user_conference} Lean Announcements")
-        lines.extend(conference_lines)
+        lines.append(f"Conference {content['conference']} Lean Announcements")
+        for team in content["conference_teams"]:
+            lines.append(team["team_name"])
+            lines.append(", ".join(
+                f"{recruit['name']} ({format_rt_display(recruit['rt'])})" for recruit in team["recruits"]
+            ))
     return lines
 
 
-def _recruiting_leans_section_rich_lines(leans_lines: list[str]) -> list[dict[str, Any]]:
-    """Wrap lean body lines under a Recruiting Leans Announced section heading."""
-    rich: list[dict[str, Any]] = [
-        {"type": "gap"},
-        {"type": "heading", "text": "Recruiting Leans Announced"},
-    ]
-    for line in leans_lines:
-        if not str(line).strip():
-            rich.append({"type": "gap"})
-            continue
-        text = str(line)
-        if text == "Top Rated Recruit Announcements" or (
-            text.startswith("Conference ") and text.endswith(" Lean Announcements")
-        ):
-            rich.append({"type": "heading", "text": text})
-        else:
-            rich.append({"type": "text", "text": text})
+def _recruiting_leans_section_rich_lines(content: dict[str, Any]) -> list[dict[str, Any]]:
+    """The lean announcements as story content, under their own two sub-headings.
+
+    The conference section is one ``team_recruits`` block per team: the team (id and
+    name, so the page can draw its mark and link its page) over its recruits, one per
+    row with the raw RT. The page formats it; nothing is left to guess from text.
+    """
+    rich: list[dict[str, Any]] = []
+    top_lines = list(content.get("top_lines") or [])
+    teams = list(content.get("conference_teams") or [])
+    if top_lines:
+        rich.append({"type": "gap"})
+        rich.append({"type": "heading", "text": "Top Rated Recruit Announcements"})
+        rich.extend({"type": "text", "text": str(line)} for line in top_lines)
+    if teams:
+        rich.append({"type": "gap"})
+        rich.append({"type": "heading", "text": f"Conference {content.get('conference')} Lean Announcements"})
+        for team in teams:
+            rich.append({
+                "type": "team_recruits",
+                "team_id": str(team.get("team_id") or ""),
+                "team_name": str(team.get("team_name") or ""),
+                "recruits": [
+                    {
+                        "recruit_id": str(recruit.get("recruit_id") or ""),
+                        "name": str(recruit.get("name") or ""),
+                        "rt": int(recruit.get("rt") or 0),
+                    }
+                    for recruit in team.get("recruits") or []
+                ],
+            })
     return rich
 
 
 def _merge_recruiting_report_with_leans(
     report_story: dict[str, Any] | None,
-    leans_lines: list[str] | None,
+    leans_content: dict[str, Any] | None,
     *,
     report_week: int,
 ) -> dict[str, Any] | None:
-    """One Week N Recruiting Report story: rankings first, then leans section."""
-    if not report_story and not leans_lines:
+    """One Week N Recruiting Report story: rankings first, then the lean announcements."""
+    if not report_story and not leans_content:
         return None
     if report_story is None:
         report_story = {
@@ -14732,8 +14786,8 @@ def _merge_recruiting_report_with_leans(
         # Copy so callers can reuse the rankings builder output safely.
         report_story = dict(report_story)
         report_story["rich_lines"] = list(report_story.get("rich_lines") or [])
-    if leans_lines:
-        report_story["rich_lines"].extend(_recruiting_leans_section_rich_lines(leans_lines))
+    if leans_content:
+        report_story["rich_lines"].extend(_recruiting_leans_section_rich_lines(leans_content))
     if not report_story.get("rich_lines"):
         return None
     return report_story
@@ -14777,7 +14831,7 @@ def _build_recruiting_movement_story(
 ) -> dict[str, Any] | None:
     """"Your Recruiting Board Moved" — the user's own lean movement, gains AND drops.
 
-    Distinct from the league-wide Recruiting Leans Announced section on the weekly
+    Distinct from the league-wide lean announcements on the weekly
     Recruiting Report, which reports only additions and only for top recruits / the
     user's conference. This one is personal and carries the losses.
     """
@@ -14884,7 +14938,7 @@ def _append_franchise_week_news(
 
     team_name_map = _format_team_name_map(franchise=franchise_doc)
 
-    recruiting_leans_lines = None
+    recruiting_leans_content = None
     if new_lean_events:
         recruit_ids = list({str(e.get("recruit_id") or "") for e in new_lean_events})
         recruit_by_id = {
@@ -14919,7 +14973,7 @@ def _append_franchise_week_news(
             )
             if user_team_doc and user_team_doc.get("conference") is not None:
                 user_conference = str(user_team_doc.get("conference"))
-        recruiting_leans_lines = _build_recruiting_leans_lines(
+        recruiting_leans_content = _recruiting_leans_content(
             new_lean_events,
             rank_by_team_id,
             team_name_map,
@@ -14937,7 +14991,7 @@ def _append_franchise_week_news(
     report_week = week + 1
     recruiting_report_story = _merge_recruiting_report_with_leans(
         _build_weekly_recruiting_report_story(franchise_id, franchise_doc, report_week),
-        recruiting_leans_lines,
+        recruiting_leans_content,
         report_week=report_week,
     )
     stories = [

@@ -4,6 +4,7 @@
  */
 
 var PLAYER_TABLE_ATTRS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'];
+var RETIRED_HEADING = 'Recruiting Leans Announced';
 
 function esc(value) {
   return String(value == null ? '' : value)
@@ -90,12 +91,42 @@ function renderRankingTable(columns, rows, columnSplit) {
     + '</div>';
 }
 
+/**
+ * `team_recruits`: one team and the recruits who leaned to it (Recruiting Report ›
+ * Conference Lean Announcements). The team is the sub-heading: logo mark and name in the
+ * shared team style, linking to the team page. Its recruits are a list under it, one per
+ * row, name then RT in the canonical ramp. No story links a recruit, so names are text.
+ */
+function renderTeamRecruits(item) {
+  var tables = window.GOBTables;
+  var name = item.team_name || '';
+  var team = esc(name);
+  if (tables && typeof tables.markHtml === 'function') {
+    team = (item.team_id && typeof tables.rosterHref === 'function' && typeof tables.teamLink === 'function')
+      ? tables.teamLink(tables.rosterHref('', item.team_id, name, 'news-view'), name, name, '')
+      : '<span class="gob-team">' + tables.markHtml(name, '') + '<span>' + esc(name) + '</span></span>';
+  }
+  var rows = (item.recruits || []).map(function (recruit) {
+    var rt = recruit ? recruit.rt : null;
+    var known = typeof rt === 'number' && isFinite(rt);
+    var rtText = !known ? '--' : (typeof formatRtDisplay === 'function' ? formatRtDisplay(rt) : String(rt));
+    var rtClass = known && typeof getRtBucketClass === 'function' ? getRtBucketClass(rt) : '';
+    return '<li><span class="gob-news-recruit">' + esc((recruit && recruit.name) || '--') + '</span>'
+      + '<span class="gob-news-rt' + (rtClass ? ' ' + esc(rtClass) : '') + '">' + esc(rtText) + '</span></li>';
+  }).join('');
+  return '<section class="gob-news-team"><h3 class="gob-news-team-h">' + team + '</h3>'
+    + (rows ? '<ul class="gob-news-recruits">' + rows + '</ul>' : '') + '</section>';
+}
+
 export function renderRichLines(richLines) {
   if (!richLines || !richLines.length) return '';
   return richLines.map(function (item) {
     var type = item.type || 'text';
     if (type === 'gap') return '<div class="gob-news-gap"></div>';
     if (type === 'heading') {
+      // A Recruiting Report stored before the lean section became team blocks carries
+      // this outer heading over its two sub-headings. It is redundant: not drawn.
+      if (item.text === RETIRED_HEADING) return '';
       return '<p class="gob-news-line gob-news-heading"><strong>' + esc(item.text) + '</strong></p>';
     }
     if (type === 'link') {
@@ -105,6 +136,7 @@ export function renderRichLines(richLines) {
       return '<p class="gob-news-line"><a class="gob-news-link" href="' + esc(item.href) + '">' + esc(item.label) + '</a></p>'
         + '<p class="gob-news-line">' + esc(item.players_line) + '</p>';
     }
+    if (type === 'team_recruits') return renderTeamRecruits(item);
     if (type === 'player_table') return renderPlayerTable(item.players || []);
     if (type === 'ranking_table') return renderRankingTable(item.columns || [], item.rows || [], item.column_split);
     if (type === 'game_result') {

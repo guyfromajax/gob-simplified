@@ -200,6 +200,43 @@ html.gob-shell.gob-1920 #news-view .gob-news-grid {
   height: 10px;
 }
 
+/* Recruiting Report › conference leans: a team is a sub-heading over its recruits. The
+   recruits sit under the team name (past the mark), names in one column and RT in the
+   next, so a team can never be read as one more recruit. */
+#franchise-container #news-view .gob-news-team {
+  margin: 0 0 var(--space-12);
+}
+#franchise-container #news-view .gob-news-team-h {
+  margin: 0 0 var(--space-4);
+  font: var(--fw-semibold) var(--fs-14)/var(--lh-body) var(--font-body);
+  color: var(--text-100);
+}
+#franchise-container #news-view .gob-news-team-h a.gob-team:hover > span {
+  text-decoration: underline;
+}
+#franchise-container #news-view .gob-news-recruits {
+  margin: 0;
+  padding: 0 0 0 var(--dsp-24);
+  list-style: none;
+}
+#franchise-container #news-view .gob-news-recruits li {
+  display: grid;
+  grid-template-columns: 14rem 3rem;
+  column-gap: var(--space-12);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  color: var(--text-87);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+#franchise-container #news-view .gob-news-recruit {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#franchise-container #news-view .gob-news-rt {
+  font-weight: var(--fw-bold);
+}
+
 .gob-news-split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
