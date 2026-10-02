@@ -231,7 +231,7 @@
   // Params owned by one drill-in. A new view URL starts without them so the
   // previous drill's player, team, pager or return_url never rides along.
   var DRILL_KEYS = ['player_id', 'view_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
-    'return_url', 'origin', 'return_tab', 'id'];
+    'return_url', 'origin', 'return_tab', 'id', 'story'];
   var TEAM_RETURN_TABS = {
     'roster-view': 1, 'schedule-tab': 1, 'team-schedule-view': 1, 'player-stats-tab': 1,
     'player-stats-view': 1, 'team-attributes-view': 1
