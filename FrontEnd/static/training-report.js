@@ -39,8 +39,6 @@ let togglesWired = false;
 let backClickWired = false;
 let loadSeq = 0;
 
-const TOOLTIP_ID = 'training-report-attr-tooltip';
-
 function byId(id) {
   if (!root) return null;
   if (root.id === id) return root;
@@ -181,8 +179,7 @@ function revalidate(options) {
 }
 
 function teardown() {
-  const tip = document.getElementById(TOOLTIP_ID);
-  if (tip) tip.remove();
+  // Nothing outside the host to clean up.
 }
 
 function init(host, options) {
@@ -642,7 +639,24 @@ function paintBack() {
   });
 }
 
+// Leaving the page cancels the report's fetch. That is the player moving on, not
+// a failure, so it shows nothing. beforeunload comes first (the fetch is cancelled
+// after it); the timer clears the flag if the page was not left after all.
+let reportPageLeaving = false;
+let reportLeaveWatchInstalled = false;
+function watchReportPageLeave() {
+  if (reportLeaveWatchInstalled || typeof window === 'undefined') return;
+  reportLeaveWatchInstalled = true;
+  window.addEventListener('beforeunload', () => {
+    reportPageLeaving = true;
+    setTimeout(() => { reportPageLeaving = false; }, 3000);
+  });
+  window.addEventListener('pagehide', () => { reportPageLeaving = true; });
+  window.addEventListener('pageshow', () => { reportPageLeaving = false; });
+}
+
 async function loadTrainingReport() {
+  watchReportPageLeave();
   try {
     const params = emptyParams();
     params.set('mode', mode);
@@ -668,9 +682,11 @@ async function loadTrainingReport() {
     renderPage();
     setReportLoading(false);
   } catch (error) {
+    if (reportPageLeaving || (error && error.name === 'AbortError')) return;
     console.error('Error loading training report:', error);
+    // A real failure is the inline card, never a browser alert. A report that is
+    // already on screen stays: a failed refresh does not take it away.
     if (!reportData) showReportLoadFailed();
-    alert('Failed to load training report. Please try again.');
   }
 }
 
@@ -1080,22 +1096,6 @@ function createNotesHeroInitials(displayName, accentConfig, isMuted) {
   return fallback;
 }
 
-function displayMovementsForPlayer(player) {
-  const all = (reportData && reportData.player_attribute_display_movements) || {};
-  const id = player && (player.id != null ? String(player.id) : '');
-  return all[id] || all[player && player.name] || {};
-}
-
-function displayMovementValue(cell) {
-  if (cell && typeof cell === 'object') {
-    const from = Number(cell.from);
-    const to = Number(cell.to);
-    if (!Number.isFinite(from) || !Number.isFinite(to) || to === from) return 0;
-    return to > from ? 1 : -1;
-  }
-  return Number(cell) || 0;
-}
-
 function createPlayerNameCell(player) {
   const td = document.createElement('td');
   td.className = 'player-name-cell';
@@ -1164,7 +1164,7 @@ function renderPlayersTable() {
     row.appendChild(createPlayerNameCell(player));
     
     if (currentView === 'attributes') {
-      // Show current attribute values with tooltips
+      // Current attribute values only; movement lives on Training Changes.
       attributeList.forEach(attr => {
         let value;
         if (attr === 'NG' || attr === 'EM' || attr === 'MO') {
@@ -1173,11 +1173,7 @@ function renderPlayersTable() {
           value = window.GOB_AttributeDisplay.rawAttr(player.attributes, attr);
           if (value == null) value = 0;
         }
-        const changes = reportData.player_changes[player.name] || {};
-        const change = changes[attr] || 0;
-        const displayMovements = displayMovementsForPlayer(player);
-        const displayMovement = displayMovementValue(displayMovements[attr]);
-        row.appendChild(createAttributeCell(attr, value, change, displayMovement));
+        row.appendChild(createAttributeCell(attr, value));
       });
     } else {
       // Show changes for this player (0 if no change)
@@ -1231,64 +1227,31 @@ function createCell(text) {
   return td;
 }
 
-function createAttributeCell(attr, value, change, displayMovement = 0) {
+function createAttributeCell(attr, value) {
   const td = document.createElement('td');
   td.className = 'attribute-value-cell';
 
-  const attachChangeTooltip = () => {
-    if (!change) return;
-    const mark = describeTrainingChange(change);
-    td.setAttribute('data-tooltip', mark.signs);
-    td.setAttribute('data-tooltip-class', mark.className);
-    td.style.cursor = 'help';
-    td.addEventListener('mouseenter', showAttributeTooltip);
-    td.addEventListener('mouseleave', hideAttributeTooltip);
-    td.addEventListener('mousemove', positionAttributeTooltip);
-  };
-  
   // Special handling for NG, EM, MO
   if (attr === 'NG') {
     // Display with 2 decimal places
     td.textContent = typeof value === 'number' ? value.toFixed(2) : '1.00';
-    attachChangeTooltip();
   } else if (attr === 'EM') {
     // Display with emoji
     const emoji = getEmotionEmoji(value);
     td.innerHTML = emoji;
     td.style.fontSize = 'var(--fs-24)';
     td.style.textAlign = 'center';
-    attachChangeTooltip();
   } else if (attr === 'MO') {
     // Display with red/green pill (no integer on top)
     const pillContainer = createMomentumPill(value);
     td.appendChild(pillContainer);
     td.style.padding = 'var(--spacing-xs)';
-    attachChangeTooltip();
   } else {
     const displayValue = window.GOB_AttributeDisplay.displayAttr(value);
     td.textContent = String(displayValue == null ? 0 : displayValue);
-    if (displayMovement > 0) {
-      td.classList.add('attribute-display-increase');
-    } else if (displayMovement < 0) {
-      td.classList.add('attribute-display-decrease');
-    }
-    attachChangeTooltip();
   }
 
-  markTrainingDelta(td, change);
   return td;
-}
-
-function markTrainingDelta(td, change) {
-  const n = Number(change);
-  if (!Number.isFinite(n) || n === 0) return;
-  const described = describeTrainingChange(n);
-  if (!described.count) return;
-  td.classList.add('is-delta');
-  const mark = document.createElement('span');
-  mark.className = 'delta-mark ' + described.className;
-  mark.textContent = described.signs;
-  td.appendChild(mark);
 }
 
 function getEmotionEmoji(em) {
@@ -1363,35 +1326,34 @@ function createMomentumPill(mo) {
  * CAMP (week 1) — symmetric bands:
  *   0<|n|<2 → 1 · 2≤|n|≤5 → 2 · |n|>5 → 3
  *
- * IN-SEASON (weeks 2–26) — asymmetric. In-season decay makes tiny negatives normal,
- * so the "up" band absorbs small dips (down to −0.5) and reads them as holding:
+ * IN-SEASON (weeks 2–26) — a single arrow follows the sign; the two- and three-arrow
+ * bands are asymmetric (in-season decay makes small negatives normal):
  *   n ≥ 3           → 3 up
  *   1.0 ≤ n < 3     → 2 up
- *   −0.5 ≤ n < 1.0  → 1 up   (absorbs small dips; exactly 0 is the dash)
- *   −1.5 < n < −0.5 → 1 down
+ *   0 < n < 1.0     → 1 up
+ *   −1.5 < n < 0    → 1 down
  *   −2.5 < n ≤ −1.5 → 2 down
  *   n ≤ −2.5        → 3 down
  *
  * Tone (Jamie, 2026-10-02; Styleguide "Training movement marks"):
- *   one up neutral · two up green · three up blue · down red,
- *   except that outside camp a single down is neutral too.
+ *   in season: one up faint green · one down faint red · two up green · three up blue ·
+ *   two or three down red.
+ *   camp: one up neutral · two up green · three up blue · any down red.
  *
- * `text` is the arrow form (Team Report, Training Changes, Playbook Summary). `signs` is the
- * same count as pluses or minuses, for a mark that sits beside an attribute value.
+ * `text` is the arrow form (Team Report, Training Changes, Playbook Summary).
  */
 function describeTrainingChange(change) {
   const n = Number(change);
   if (!Number.isFinite(n)) {
-    return { text: '–', signs: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
+    return { text: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
   }
   const camp = getReportWeekNumber() === 1;
   const mark = (direction, count) => {
     let tone;
-    if (direction > 0) tone = count >= 3 ? 'elite' : count === 2 ? 'up' : 'neutral';
-    else tone = (!camp && count === 1) ? 'neutral' : 'down';
+    if (direction > 0) tone = count >= 3 ? 'elite' : count === 2 ? 'up' : (camp ? 'neutral' : 'up-faint');
+    else tone = (!camp && count === 1) ? 'down-faint' : 'down';
     return {
       text: (direction > 0 ? '▲' : '▼').repeat(count),
-      signs: (direction > 0 ? '+' : '\u2212').repeat(count),
       className: (direction > 0 ? 'change-delta' : 'change-negative') + ' tr-tone-' + tone,
       tone: tone,
       direction: direction,
@@ -1400,7 +1362,7 @@ function describeTrainingChange(change) {
   };
 
   // Exactly 0 is a grey dash, camp or in season.
-  if (n === 0) return { text: '–', signs: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
+  if (n === 0) return { text: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
 
   // Camp (week 1): symmetric 0/2/5 bands.
   if (camp) {
@@ -1408,8 +1370,8 @@ function describeTrainingChange(change) {
     return mark(n > 0 ? 1 : -1, abs > 5 ? 3 : abs >= 2 ? 2 : 1);
   }
 
-  // In-season (weeks 2–26): the up band absorbs dips down to −0.5.
-  if (n >= -0.5) return mark(1, n >= 3 ? 3 : n >= 1 ? 2 : 1);
+  // In-season (weeks 2–26): the arrow's direction is the sign of the change.
+  if (n > 0) return mark(1, n >= 3 ? 3 : n >= 1 ? 2 : 1);
   return mark(-1, n <= -2.5 ? 3 : n <= -1.5 ? 2 : 1);
 }
 
@@ -1422,59 +1384,6 @@ function formatChangeForTooltip(change, attrKey = null) {
     return change > 0 ? `+${change}` : String(change);
   }
   return describeTrainingChange(change).text;
-}
-
-function showAttributeTooltip(event) {
-  const cell = event.currentTarget || event.target;
-  const changeText = cell.getAttribute('data-tooltip');
-  if (!changeText) return;
-  
-  // Create tooltip element if it doesn't exist
-  let tooltip = document.getElementById(TOOLTIP_ID);
-  if (!tooltip) {
-    tooltip = document.createElement('div');
-    tooltip.id = TOOLTIP_ID;
-    tooltip.className = 'attribute-tooltip';
-    document.body.appendChild(tooltip);
-  }
-
-  const tone = cell.getAttribute('data-tooltip-class') || '';
-  tooltip.className = 'attribute-tooltip';
-  const toneClass = (tone.match(/tr-tone-[a-z]+/) || [])[0];
-  if (toneClass) tooltip.classList.add(toneClass);
-  if (tone.includes('change-elite')) {
-    tooltip.classList.add('attribute-tooltip-elite');
-  } else if (tone.includes('change-positive')) {
-    tooltip.classList.add('attribute-tooltip-positive');
-  } else if (tone.includes('change-negative')) {
-    tooltip.classList.add('attribute-tooltip-negative');
-  } else {
-    tooltip.classList.add('attribute-tooltip-zero');
-  }
-  
-  tooltip.textContent = changeText;
-  tooltip.style.display = 'block';
-  positionAttributeTooltip(event);
-}
-
-function hideAttributeTooltip() {
-  const tooltip = document.getElementById(TOOLTIP_ID);
-  if (tooltip) {
-    tooltip.style.display = 'none';
-  }
-}
-
-function positionAttributeTooltip(event) {
-  const tooltip = document.getElementById(TOOLTIP_ID);
-  if (!tooltip || tooltip.style.display === 'none') return;
-  
-  const cell = event.currentTarget || event.target;
-  const rect = cell.getBoundingClientRect();
-  
-  // Position tooltip above the cell
-  tooltip.style.left = `${rect.left + rect.width / 2}px`;
-  tooltip.style.top = `${rect.top - 10}px`;
-  tooltip.style.transform = 'translate(-50%, -100%)';
 }
 
 function createChangeCell(change) {

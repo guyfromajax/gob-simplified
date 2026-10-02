@@ -84,6 +84,13 @@
       try {
         if (global.__gobAuthMeData) global.__gobAuthMeData.archetype_reveal_seen = true;
       } catch (e) { /* ignore */ }
+      // Offline the flag is saved on this computer: /api/auth is always remote
+      // and the offline build cannot reach it, so the reveal used to come back
+      // on every Office visit. Online is unchanged.
+      if (global.GOB_BUILD_PROFILE === 'desktop') {
+        if (!franchiseId) return Promise.resolve();
+        return patchJson('/franchise/archetype-reveal-seen', { franchise_id: franchiseId });
+      }
       return patchJson('/api/auth/archetype-reveal-seen', {});
     }
     if (!franchiseId) return Promise.resolve();

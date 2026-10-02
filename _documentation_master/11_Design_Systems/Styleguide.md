@@ -86,17 +86,25 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 - Never a fill, a wash, a button, a tab or a selected state. The chosen option inside a card is a neutral choice control.
 - Not a rating: the green here does not mean "good" and the red does not mean "bad".
 
-**Training movement marks** (Training Report: Team Report, Player Report, Playbook Summary). One function decides the count and the tone: `describeTrainingChange()` in `training-report.js`. `n` is the raw change.
+**Training movement marks** (Training Report: Team Report, Player Report › Training Changes, Playbook Summary). One function decides the count and the tone: `describeTrainingChange()` in `training-report.js`. `n` is the raw change. Exactly 0 is a dash in every week.
 
 | Week | One | Two | Three |
 |---|---|---|---|
 | Training Camp (week 1) | 0 < \|n\| < 2 | 2 ≤ \|n\| ≤ 5 | \|n\| > 5 |
-| In season, up | −0.5 ≤ n < 1, n ≠ 0 | 1 ≤ n < 3 | n ≥ 3 |
-| In season, down | −1.5 < n < −0.5 | −2.5 < n ≤ −1.5 | n ≤ −2.5 |
+| In season, up | 0 < n < 1 | 1 ≤ n < 3 | n ≥ 3 |
+| In season, down | −1.5 < n < 0 | −2.5 < n ≤ −1.5 | n ≤ −2.5 |
 
-- Exactly 0 is a dash in every week, camp and in season. In season, a dip down to −0.5 other than 0 reads as one up (holding).
-- Tone: one up neutral (`--text-87`), two up green (`--delta-up`), three up blue (`--blue`), down red (`--tier-red`). In season a single down is neutral too.
-- Glyphs: ▲ / ▼ on their own; `+` / `−` when the mark sits beside an attribute value (Player Report, Attributes).
+| Tone | In season | Camp |
+|---|---|---|
+| One up | faint green: `--delta-up` at 45% | neutral (`--text-87`) |
+| One down | faint red: `--tier-red` at 60% | red (`--tier-red`) |
+| Two up | green (`--delta-up`) | green |
+| Three up | blue (`--blue`) | blue |
+| Two or three down | red (`--tier-red`) | red |
+
+- In season a single arrow follows the sign: any drop is ▼, never a green arrow. The two- and three-arrow bands stay asymmetric.
+- Faint and full are told apart by arrow count, not by colour alone. Faint is `color-mix(in srgb, <token> N%, transparent)`, so it lets the row through: 3:1 or better on both zebra rows (red needs 60% to match green's 45%).
+- Glyphs: ▲ / ▼ only. Player Report › Attributes shows current values only: no marks, no change tint, no tooltip. Movement lives on Training Changes.
 
 **Display text.** Class year is always a two-letter uppercase abbreviation (`FR`, `SO`, `JR`, `SR`, `GR`, `JH`; unknown `--`) via `playerYear.js` / `BackEnd/utils/player_year.py`. Team names show exactly as stored in `teams.name`: no title-casing, no hyphen stripping, no exception map. Team measures use one vocabulary of eleven measures; Momentum is never shown on Team Attributes, the Training Report Team Report or Office "Moved most". `pt_efficiency` is P/T Defense and `pt_opp_modifier` is P/T Offense everywhere.
 
@@ -295,8 +303,8 @@ Jamie's walk-through feedback. Built on `polish/training-playbooks` (`reports/tr
 | Ruling | Settled as | Lives in |
 |---|---|---|
 | Coaching styles have an identity | Red, yellow, green, purple as a small mark (icon + thin edge) on a neutral card. `--purple` is new. | [Data scales](#data-scales), Coaching style marks |
-| Training Report marks carry colour | One up neutral, two up green, three up blue, down red; in season one down is neutral. The only place a ▼ is red and the second place blue is not RT. | [Colour law](#colour-law), Blue and Red rows; [Data scales](#data-scales) |
-| Player Report, Attributes | Pluses and minuses instead of arrows, same tones. | [Data scales](#data-scales), Training movement marks |
+| Training Report marks carry colour | In season: one up faint green, one down faint red, two up green, three up blue, two or three down red. Camp: one up neutral, any down red. The only place a ▼ is red and the second place blue is not RT. | [Colour law](#colour-law), Blue and Red rows; [Data scales](#data-scales) |
+| Player Report, Attributes | Current values only: no marks, no change tint, no tooltip. | [Data scales](#data-scales), Training movement marks |
 | "Expected Shot Distribution" | Renamed "Shot Distribution". | [Data scales](#data-scales), Other ramps |
 | Training page label | "P/T" reads "Press/Traps" on the weekly training page. Team measures keep "P/T Defense" / "P/T Offense". | [Data scales](#data-scales), Display text |
 
