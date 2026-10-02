@@ -91,13 +91,36 @@ test.beforeEach(async ({ page }) => {
 const LOADER_FILL = 'rgb(11, 13, 20)';   // --bg
 const STATIC = path.join(__dirname, '../../FrontEnd/static');
 
-function loaderFill(page) {
-  return page.evaluate(() => {
+/**
+ * Runs in the page from its first frame. Records every distinct state the loader is in
+ * while it is on screen: its fill, its opacity, and whether it is the top element across
+ * the viewport. A page lifts its loader when it is ready (the court does so on its own
+ * "court-ready" event, well inside a second, whatever the API is doing), so the loader is
+ * judged over every frame it was up, never at one moment picked by the test.
+ */
+function watchLoader() {
+  const state = { frames: 0, seenAt: 0, goneAt: 0, states: [] };
+  window.__loaderWatch = state;
+  const points = [[0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9], [0.5, 0.2]];
+  const tick = () => {
     const overlay = document.getElementById('page-load-overlay');
-    if (!overlay) return null;
-    const cs = getComputedStyle(overlay);
-    return { shown: cs.display !== 'none', bg: cs.backgroundColor, opacity: cs.opacity, image: cs.backgroundImage };
-  });
+    const cs = overlay ? getComputedStyle(overlay) : null;
+    if (cs && cs.display !== 'none') {
+      if (!state.frames) state.seenAt = performance.now();
+      state.frames += 1;
+      state.goneAt = 0;
+      const covered = points.every(([fx, fy]) => {
+        const hit = document.elementFromPoint(window.innerWidth * fx, window.innerHeight * fy);
+        return !!hit && (hit === overlay || overlay.contains(hit));
+      });
+      const key = [cs.backgroundColor, cs.opacity, cs.visibility, covered].join(' | ');
+      if (state.states.indexOf(key) === -1) state.states.push(key);
+    } else if (state.frames && !state.goneAt) {
+      state.goneAt = performance.now();
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 test.describe('the page loader is opaque', () => {
@@ -111,32 +134,25 @@ test.describe('the page loader is opaque', () => {
     test(name, async ({ page }) => {
       await stubAuth(page);
       await page.addInitScript(() => { window.alert = () => {}; });
+      await page.addInitScript(watchLoader);
       await delayApi(page, 2500, franchiseApi());
       await page.goto(url, { waitUntil: 'commit' });
-      await page.waitForFunction(() => {
-        const overlay = document.getElementById('page-load-overlay');
-        return !!overlay && getComputedStyle(overlay).display !== 'none';
-      });
-      await page.waitForTimeout(500);
-      const fill = await loaderFill(page);
-      expect(fill.shown).toBe(true);
-      expect(fill.bg).toBe(LOADER_FILL);       // no alpha channel: fully opaque
-      expect(fill.opacity).toBe('1');
-      // Whatever is under the middle of each quadrant, the loader is what is on top.
-      const covered = await page.evaluate(() => {
-        const overlay = document.getElementById('page-load-overlay');
-        const points = [[0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9], [0.5, 0.2]];
-        return points.every(([fx, fy]) => {
-          const hit = document.elementFromPoint(window.innerWidth * fx, window.innerHeight * fy);
-          return !!hit && (hit === overlay || overlay.contains(hit));
-        });
-      });
-      expect(covered).toBe(true);
+      await page.waitForFunction(() => window.__loaderWatch && window.__loaderWatch.frames > 0);
       if (process.env.PB_SHOTS === '1') {
         const dir = path.join(__dirname, '../../reports/first-paint-sweep');
         fs.mkdirSync(dir, { recursive: true });
         await page.screenshot({ path: path.join(dir, 'loader-solid-' + slug + '-after-1280.png'), animations: 'disabled' });
       }
+      // Watch it until the page lifts it, or for a good second if the page is still waiting.
+      await page.waitForFunction(() => {
+        const watch = window.__loaderWatch;
+        return watch.goneAt > 0 || performance.now() - watch.seenAt > 1200;
+      });
+      const watch = await page.evaluate(() => window.__loaderWatch);
+      expect(watch.frames, 'frames the loader was up').toBeGreaterThan(3);
+      // One state, in every frame it was on screen: the page fill with no alpha channel,
+      // fully opaque, visible, and the top element across the viewport.
+      expect(watch.states).toEqual([LOADER_FILL + ' | 1 | visible | true']);
     });
   }
 

@@ -132,3 +132,17 @@ Develop moved while the first gate run was in progress (chrome-followups-2: CH h
 | Specs: training-report-top, polish-training-playbooks, prep-modules-report, training-advance-focus, training-report-no-recruiting, first-paint | **104 passed, 24 skipped, 0 failed** |
 | Last full runs (merged tree, before these rulings) | pytest 4385 passed / 2 xpassed; Playwright 1085 passed / 0 failed |
 
+## Update: flaky "the page loader is opaque › court pre-game" (first-paint.spec.js)
+
+Not a see-through loader: the test sampled at the wrong time. Fixed in the test.
+
+| Question | Finding |
+|---|---|
+| Is the court's loader ever non-opaque? | No. Recorded frame by frame from the first frame, in the test's own setup: in every frame the loader is on screen its fill is `rgb(11, 13, 20)` (the page fill, no alpha), opacity 1, visible, and it is the top element across the viewport. It leaves in one step (`display:none`), no fade. |
+| Why did the test fail? | The court lifts its loader on its own `court-ready` event, not on the API the test holds back. Measured time on screen: from 314 ms to 1067 ms across runs. The test waited a fixed 500 ms after first seeing the loader and then asserted it was still shown, so a fast lift failed `fill.shown`. The other three pages keep the loader for the whole API hold, so they never raced. |
+| Fix | The test records every distinct state of the loader, every frame, from the page's first frame (`watchLoader()` via `addInitScript`), and asserts there was exactly one: opaque page fill, on top. No fixed wait, so it cannot sample after the lift; and it is stricter, since it covers every frame instead of one. All four pages use it. |
+| Does it still catch a see-through loader? | Yes: with the court's markup put back to `rgba(0,0,0,0.92)` it fails with that value. |
+
+- I could not make the old test fail on this machine (130 runs); the measured 314 ms lift is the evidence for the race, not a reproduced red.
+- Runs after the fix: court pre-game alone `--repeat-each=10`: **10 passed** (default config) and 10 passed (private server); `--repeat-each=60` on 16 workers: 60 passed; the whole spec: 14 passed, and ×5: 70 passed.
+
