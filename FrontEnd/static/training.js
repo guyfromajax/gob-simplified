@@ -716,13 +716,16 @@ function primeSliderPrev() {
   });
 }
 
+const PS_CLEAR_SVG = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg>';
+
 /**
- * Build the 6-pip stepper for one drill.
+ * Build the point selector for one drill: a clear control, five boxes and the number.
  *
  * The <input type="range"> stays the model. Everything that reads a drill value — the
  * points counter, the draft save/restore, Auto-Train, collectTrainingData — still reads
- * `slider.value`, so the swap is visual plus a click target and changes no contract. The
- * input is clipped out of sight but stays focusable, so arrow keys still work.
+ * `slider.value`, so this is visual plus click targets and changes no contract. The
+ * input is clipped out of sight but stays focusable: arrow keys change the value, and
+ * Home, Backspace, Delete or 0 clear it.
  */
 function ensureTrainingSliderVisual(slider) {
   const wrapper = slider?.closest('.slider-container');
@@ -732,13 +735,25 @@ function ensureTrainingSliderVisual(slider) {
 
   row = document.createElement('div');
   row.className = 'ps';
-  for (let i = 0; i <= 5; i++) {
+  // The range input carries the accessible name and value; these are pointer shortcuts
+  // to it, so they stay out of the accessibility tree rather than repeating it.
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'ps-clear';
+  clear.dataset.value = '0';
+  clear.title = 'Clear';
+  clear.setAttribute('aria-hidden', 'true');
+  clear.tabIndex = -1;
+  clear.innerHTML = PS_CLEAR_SVG;
+  clear.addEventListener('click', function () {
+    setSliderValueFromPip(slider, 0);
+  });
+  row.appendChild(clear);
+  for (let i = 1; i <= 5; i++) {
     const pip = document.createElement('button');
     pip.type = 'button';
-    pip.className = 'x';
+    pip.className = 'pip x';
     pip.dataset.value = String(i);
-    // The range input carries the accessible name and value; the pips are a shortcut
-    // to it, so they stay out of the accessibility tree rather than repeating it.
     pip.setAttribute('aria-hidden', 'true');
     pip.tabIndex = -1;
     pip.addEventListener('click', function () {
@@ -752,11 +767,20 @@ function ensureTrainingSliderVisual(slider) {
   numeral.textContent = '0';
   row.appendChild(numeral);
   wrapper.appendChild(row);
+  if (!slider.dataset.clearKeys) {
+    slider.dataset.clearKeys = '1';
+    slider.addEventListener('keydown', function (event) {
+      if (event.key === 'Backspace' || event.key === 'Delete' || event.key === '0') {
+        event.preventDefault();
+        setSliderValueFromPip(slider, 0);
+      }
+    });
+  }
   return row;
 }
 
 /**
- * A pip click routes through the input's own `input` handler, so over-allocation is
+ * A box click routes through the input's own `input` handler, so over-allocation is
  * refused by the one rule that already guards dragging and keyboard use.
  */
 function setSliderValueFromPip(slider, value) {
@@ -774,14 +798,17 @@ function updateTrainingSliderVisual(slider, rawValue) {
   const value = Math.max(0, Math.min(5, Number(rawValue) || 0));
   const spent = calculateTotalPoints();
   const headroom = TOTAL_POINTS - spent + value;   // what this drill alone could reach
-  row.querySelectorAll('button').forEach((pip, index) => {
-    pip.classList.remove('f', 'c', 'x');
-    if (index < value) pip.classList.add('f');
-    else if (index === value) pip.classList.add('c');
-    else pip.classList.add('x');
-    // Stops past the remaining budget stay hollow and disabled.
-    pip.disabled = index > headroom;
+  row.dataset.value = String(value);
+  row.classList.toggle('has-points', value > 0);
+  row.querySelectorAll('.pip').forEach((pip) => {
+    const n = Number(pip.dataset.value);
+    pip.classList.toggle('f', n <= value);
+    pip.classList.toggle('x', n > value);
+    // Boxes past the remaining budget dim and cannot be clicked.
+    pip.disabled = n > headroom;
   });
+  const clear = row.querySelector('.ps-clear');
+  if (clear) clear.disabled = value === 0;
   const numeral = row.querySelector('.ps-n');
   if (numeral) {
     numeral.textContent = String(value);

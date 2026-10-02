@@ -1884,29 +1884,6 @@ body.training-page .ps {
   align-items: center;
   gap: var(--space-2);
 }
-body.training-page .ps button {
-  display: block;
-  width: 18px;
-  height: 10px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-3);
-  background: var(--white-6);
-}
-body.training-page .ps button:first-of-type {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-body.training-page .ps button.f { background: var(--white-45); }
-body.training-page .ps button.c { background: var(--white-90); }
-body.training-page .ps button.x {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--white-6);
-}
-body.training-page .ps button:disabled {
-  cursor: not-allowed;
-}
 body.training-page .ps-n {
   min-width: 1ch;
   font-variant-numeric: tabular-nums;
@@ -2077,32 +2054,112 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+/* Point selector: five boxes per drill. The <input type="range"> stays the model.
+   - Empty box: a 1px outline, no fill, so a row reads as five open slots. The outline
+     strength is ONE token, --train-box-outline (gob-tokens.css).
+   - Filled box: solid white.
+   - Hovering box N previews 1..N; boxes that would be given back dim.
+   - A box the budget cannot reach dims further and is not clickable.
+   - Clear: a small control, not a permanent mark. It shows once the row has points, or
+     on row hover / keyboard focus.
+   Each box is 22px wide with a 28px tall hit area around a 12px mark. */
 #training-view .ps {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
-#training-view .ps button {
+#training-view .ps .pip {
+  position: relative;
   display: block;
-  width: 18px;
-  height: 10px;
+  width: 22px;
+  height: 28px;
+  margin: 0;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-3);
-  background: var(--white-6);
-}
-#training-view .ps button:first-of-type {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-#training-view .ps button.f { background: var(--white-45); }
-#training-view .ps button.c { background: var(--white-90); }
-#training-view .ps button.x {
   background: transparent;
-  box-shadow: inset 0 0 0 1px var(--white-6);
+  cursor: pointer;
 }
-#training-view .ps button:disabled { cursor: not-allowed; }
+#training-view .ps .pip::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 12px;
+  box-sizing: border-box;
+  transform: translateY(-50%);
+  border: 1px solid var(--train-box-outline);
+  border-radius: var(--radius-3);
+  background: transparent;
+  transition: background-color var(--dur-hover) var(--ease-out), border-color var(--dur-hover) var(--ease-out), opacity var(--dur-hover) var(--ease-out);
+}
+#training-view .ps .pip.f::before {
+  border-color: var(--white);
+  background: var(--white);
+}
+/* Hover preview: boxes 1..N (those not after the hovered one) light up; a filled box
+   past N, which the click would give back, dims. */
+#training-view .ps:has(.pip:hover) .pip:not(.f):not(.pip:hover ~ .pip)::before {
+  border-color: var(--white-45);
+  background: var(--white-25);
+}
+#training-view .ps .pip:hover ~ .pip.f::before {
+  border-color: var(--white-45);
+  background: var(--white-45);
+}
+/* Out of points: past what the budget can reach. */
+#training-view .ps .pip:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+#training-view .ps .pip:disabled::before {
+  opacity: .35;
+}
+#training-view .ps .ps-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-60);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+}
+#training-view .ps .ps-clear svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+#training-view .ps.has-points .ps-clear {
+  opacity: 1;
+  pointer-events: auto;
+}
+#training-view .ps.has-points .ps-clear:hover { color: var(--text-100); }
+/* Nothing to clear yet: the control only ghosts in while the row is hovered or focused. */
+#training-view .slider-label:hover .ps:not(.has-points) .ps-clear,
+#training-view .slider-container:has(.slider:focus-visible) .ps:not(.has-points) .ps-clear {
+  opacity: .35;
+  cursor: default;
+}
+/* Label and control read as one line. */
+#training-view .slider-label {
+  border-radius: var(--radius-4);
+  transition: background-color var(--dur-hover) var(--ease-out);
+}
+#training-view .slider-label:hover,
+#training-view .slider-label:has(.slider:focus-visible) {
+  background: var(--white-3);
+}
+/* Wide screens: a column no wider than this keeps the boxes near their label. */
+#training-view .main-content-grid > .content-section {
+  max-width: 390px;
+}
 #training-view .slider-container .slider:focus-visible ~ .ps {
   outline: 2px solid var(--text-100);
   outline-offset: 3px;

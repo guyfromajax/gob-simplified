@@ -713,6 +713,290 @@ const TONE = {
 };
 
 /** Team Report rows by label: the mark text and its painted colour. */
+/** The drawn box of a point selector: its ::before. */
+function boxMark(locator) {
+  return locator.evaluate((el) => {
+    const cs = getComputedStyle(el, '::before');
+    return {
+      border: cs.borderTopWidth + ' ' + cs.borderTopStyle + ' ' + cs.borderTopColor,
+      bg: cs.backgroundColor,
+      opacity: cs.opacity,
+    };
+  });
+}
+
+function drillRow(page, id) {
+  return page.locator('#training-view .slider-label').filter({ has: page.locator('#' + id) });
+}
+
+const SEL_SHOTS = path.join(__dirname, '../../reports/training-followups');
+const CLEAR_WHITE = 'rgba(0, 0, 0, 0)';
+const OUTLINE_A = 'rgba(255, 255, 255, 0.25)';   // --train-box-outline as shipped (option A)
+const OUTLINE_B = 'rgba(255, 255, 255, 0.45)';   // option B
+
+test.describe('training point selectors', () => {
+  test.skip(PHASE === 'before', 'after tree only');
+
+  test('an empty row reads as five open slots: outlined, unfilled, no permanent zero mark', async ({ page }) => {
+    await openTraining(page);
+    const rows = page.locator('#training-view .slider-label');
+    expect(await rows.count()).toBe(20);
+    const shape = await page.evaluate(() => [...document.querySelectorAll('#training-view .ps')].map((ps) => ({
+      boxes: ps.querySelectorAll('.pip').length,
+      buttons: ps.querySelectorAll('button').length,
+      clearOpacity: getComputedStyle(ps.querySelector('.ps-clear')).opacity,
+      clearEvents: getComputedStyle(ps.querySelector('.ps-clear')).pointerEvents,
+      numeral: ps.querySelector('.ps-n').textContent,
+      numeralColor: getComputedStyle(ps.querySelector('.ps-n')).color,
+    })));
+    shape.forEach((row) => {
+      expect(row.boxes).toBe(5);
+      expect(row.buttons).toBe(6);            // five boxes and the clear control
+      expect(row.clearOpacity).toBe('0');     // not a permanent mark
+      expect(row.clearEvents).toBe('none');
+      expect(row.numeral).toBe('0');
+      expect(row.numeralColor).toBe('rgba(255, 255, 255, 0.38)');   // dim at rest
+    });
+    const row = drillRow(page, 'offense-inside');
+    for (let n = 0; n < 5; n++) {
+      const mark = await boxMark(row.locator('.pip').nth(n));
+      expect(mark.border).toBe('1px solid ' + OUTLINE_A);
+      expect(mark.bg).toBe(CLEAR_WHITE);
+    }
+    // Size: a 28px tall hit area per box.
+    const hit = await row.locator('.pip').first().boundingBox();
+    expect(hit.height).toBeGreaterThanOrEqual(28);
+    expect(hit.width).toBeGreaterThanOrEqual(22);
+    // The outline strength is one token.
+    await page.addStyleTag({ content: ':root{--train-box-outline:var(--white-45)}' });
+    await page.waitForTimeout(250);
+    expect((await boxMark(row.locator('.pip').nth(2))).border).toBe('1px solid ' + OUTLINE_B);
+    expect((await boxMark(drillRow(page, 'team-scrimmages').locator('.pip').nth(4))).border).toBe('1px solid ' + OUTLINE_B);
+  });
+
+  test('filled boxes are solid white and the number turns full white', async ({ page }) => {
+    await openTraining(page);
+    const row = drillRow(page, 'offense-inside');
+    await row.locator('.pip').nth(2).click();
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(250);
+    await expect(page.locator('#offense-inside')).toHaveValue('3');
+    for (let n = 0; n < 5; n++) {
+      const mark = await boxMark(row.locator('.pip').nth(n));
+      if (n < 3) expect(mark.bg).toBe('rgb(255, 255, 255)');
+      else {
+        expect(mark.bg).toBe(CLEAR_WHITE);
+        expect(mark.border).toBe('1px solid ' + OUTLINE_A);
+      }
+    }
+    await expect(row.locator('.ps-n')).toHaveText('3');
+    await expect(row.locator('.ps-n')).toHaveCSS('color', 'rgb(255, 255, 255)');
+  });
+
+  test('hovering box N previews 1..N without changing the value, and the row highlights', async ({ page }) => {
+    await openTraining(page);
+    const row = drillRow(page, 'offense-outside');
+    await expect(row).toHaveCSS('background-color', CLEAR_WHITE);
+    await row.locator('.pip').nth(2).hover();
+    await page.waitForTimeout(250);
+    for (let n = 0; n < 5; n++) {
+      const mark = await boxMark(row.locator('.pip').nth(n));
+      if (n < 3) expect(mark.bg, 'box ' + (n + 1)).toBe('rgba(255, 255, 255, 0.25)');
+      else expect(mark.bg, 'box ' + (n + 1)).toBe(CLEAR_WHITE);
+    }
+    await expect(page.locator('#offense-outside')).toHaveValue('0');
+    await expect(row).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.03)');
+    // The row above is untouched.
+    expect((await boxMark(drillRow(page, 'offense-inside').locator('.pip').first())).bg).toBe(CLEAR_WHITE);
+
+    // Hovering below the current value shows what would be given back.
+    await row.locator('.pip').nth(3).click();
+    await row.locator('.pip').nth(1).hover();
+    await page.waitForTimeout(250);
+    const marks = [];
+    for (let n = 0; n < 5; n++) marks.push((await boxMark(row.locator('.pip').nth(n))).bg);
+    expect(marks).toEqual([
+      'rgb(255, 255, 255)', 'rgb(255, 255, 255)',
+      'rgba(255, 255, 255, 0.45)', 'rgba(255, 255, 255, 0.45)',
+      CLEAR_WHITE,
+    ]);
+    await expect(page.locator('#offense-outside')).toHaveValue('4');
+  });
+
+  test('the clear control shows only with points or on row hover, and clears by click or key', async ({ page }) => {
+    await openTraining(page);
+    const row = drillRow(page, 'defense-inside');
+    const clear = row.locator('.ps-clear');
+    const slider = page.locator('#defense-inside');
+    await expect(clear).toHaveCSS('opacity', '0');
+    // Row hover with nothing to clear: it ghosts in, and does nothing.
+    await row.locator('.label-text').hover();
+    await page.waitForTimeout(250);
+    await expect(clear).toHaveCSS('opacity', '0.35');
+    await expect(clear).toBeDisabled();
+    await page.mouse.move(0, 0);
+
+    await row.locator('.pip').nth(3).click();
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(250);
+    await expect(slider).toHaveValue('4');
+    await expect(clear).toHaveCSS('opacity', '1');     // stays while the row has points
+    await expect(clear).toBeEnabled();
+    await expect(page.locator('#req-points-used')).toHaveText('4');
+    await clear.click();
+    await expect(slider).toHaveValue('0');
+    await expect(row.locator('.ps-n')).toHaveText('0');
+    await expect(page.locator('#req-points-used')).toHaveText('0');
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(250);
+    await expect(clear).toHaveCSS('opacity', '0');
+
+    // By keyboard: Delete, Backspace, 0 and Home all clear from the focused row.
+    for (const key of ['Delete', 'Backspace', '0', 'Home']) {
+      await row.locator('.pip').nth(2).click();
+      await expect(slider).toHaveValue('3');
+      await slider.focus();
+      await page.keyboard.press(key);
+      await expect(slider, key).toHaveValue('0');
+    }
+    await expect(page.locator('#req-points-used')).toHaveText('0');
+  });
+
+  test('left and right arrows change the value, with a visible focus ring', async ({ page }) => {
+    await openTraining(page);
+    const slider = page.locator('#technical-passing');
+    const row = drillRow(page, 'technical-passing');
+    await page.keyboard.press('Tab');
+    await slider.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await expect(slider).toHaveValue('3');
+    await expect(row.locator('.ps-n')).toHaveText('3');
+    await expect(row.locator('.pip.f')).toHaveCount(3);
+    await page.keyboard.press('ArrowLeft');
+    await expect(slider).toHaveValue('2');
+    await expect(row.locator('.pip.f')).toHaveCount(2);
+    await expect(page.locator('#req-points-used')).toHaveText('2');
+    const ring = await row.locator('.ps').evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return cs.outlineStyle + ' ' + cs.outlineWidth + ' ' + cs.outlineColor;
+    });
+    expect(ring).toBe('solid 2px rgb(255, 255, 255)');
+    await expect(row).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.03)');
+  });
+
+  test('out of points: boxes the budget cannot reach dim further and do not take a click', async ({ page }) => {
+    await openTraining(page);
+    // 24 to spend: 22 spent leaves 2.
+    await allocate(page, [5, 5, 5, 5, 2]);
+    await expect(page.locator('#req-points-used')).toHaveText('22');
+    const row = drillRow(page, 'technical-ball-handling');
+    const slider = page.locator('#technical-ball-handling');
+    await page.waitForTimeout(250);
+    for (let n = 0; n < 5; n++) {
+      const pip = row.locator('.pip').nth(n);
+      const mark = await boxMark(pip);
+      if (n < 2) {
+        await expect(pip).toBeEnabled();
+        expect(mark.opacity).toBe('1');
+      } else {
+        await expect(pip).toBeDisabled();
+        expect(mark.opacity).toBe('0.35');
+        await expect(pip).toHaveCSS('pointer-events', 'none');
+      }
+    }
+    const far = await row.locator('.pip').nth(4).boundingBox();
+    await page.mouse.click(far.x + far.width / 2, far.y + far.height / 2);
+    await expect(slider).toHaveValue('0');
+    // An unaffordable box never previews.
+    await row.locator('.pip').nth(1).hover();
+    await page.waitForTimeout(250);
+    expect((await boxMark(row.locator('.pip').nth(3))).bg).toBe(CLEAR_WHITE);
+    await row.locator('.pip').nth(1).click();
+    await expect(slider).toHaveValue('2');
+    await expect(page.locator('#req-points-used')).toHaveText('24');
+    // Nothing left: every empty box on the page is out of reach, the spent ones are not.
+    await page.mouse.move(0, 0);
+    expect(await page.locator('#training-view .pip.x:not(:disabled)').count()).toBe(0);
+    expect(await page.locator('#training-view .pip.f:disabled').count()).toBe(0);
+    // Arrow keys respect the same budget.
+    await page.locator('#technical-rebounding').focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('#technical-rebounding')).toHaveValue('0');
+  });
+
+  for (const width of [1280, 1920, 2200]) {
+    test('the boxes sit within about 200px of their label at ' + width, async ({ page }) => {
+      await page.setViewportSize({ width, height: width === 1280 ? 720 : 1080 });
+      await openTraining(page);
+      const gaps = await page.evaluate(() => [...document.querySelectorAll('#training-view .slider-label')].map((row) => {
+        const range = document.createRange();
+        range.selectNodeContents(row.querySelector('.label-text'));
+        return Math.round(row.querySelector('.ps .pip').getBoundingClientRect().left - range.getBoundingClientRect().right);
+      }));
+      expect(gaps.length).toBe(20);
+      expect(Math.max(...gaps)).toBeLessThanOrEqual(215);
+      expect(Math.min(...gaps)).toBeGreaterThan(24);
+    });
+  }
+
+  test('option-a / option-b shots', async ({ page }) => {
+    test.skip(process.env.PB_SHOTS !== '1', 'PB_SHOTS=1 only');
+    test.setTimeout(240000);
+    fs.mkdirSync(SEL_SHOTS, { recursive: true });
+    const ASSIGNED = [3, 0, 2, 0, 0, 4, 0, 0, 5, 0, 0, 1, 0, 0, 2, 0, 0, 0, 1, 0];
+    const crops = {};
+    for (const width of [1280, 1920]) {
+      for (const option of ['a', 'b']) {
+        await page.setViewportSize({ width, height: width === 1280 ? 900 : 1080 });
+        await openTraining(page);
+        if (option === 'b') await page.addStyleTag({ content: ':root{--train-box-outline:var(--white-45)}' });
+        await settle(page);
+        await page.mouse.move(0, 0);
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-option-' + option + '-untouched-' + width + '.png'), animations: 'disabled' });
+        await allocate(page, ASSIGNED);
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-option-' + option + '-assigned-' + width + '.png'), animations: 'disabled' });
+        crops[option + width] = (await page.locator('#training-view .main-content-grid').screenshot({ animations: 'disabled' })).toString('base64');
+        if (option === 'a' && width === 1280) {
+          await drillRow(page, 'defense-outside').locator('.pip').nth(3).hover();
+          await page.waitForTimeout(300);
+          await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-hover-preview-1280.png') });
+          await page.mouse.move(0, 0);
+          await allocate(page, []);
+          await allocate(page, [5, 0, 5, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 4, 0, 0, 3]);
+          await page.waitForTimeout(300);
+          await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-out-of-points-1280.png'), animations: 'disabled' });
+          await page.locator('#technical-rebounding').focus();
+          await page.keyboard.press('ArrowLeft');
+          await page.waitForTimeout(300);
+          await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-keyboard-focus-1280.png'), animations: 'disabled' });
+        }
+        // The page keeps a draft of the allocation: leave none for the next pass.
+        await allocate(page, []);
+        await page.evaluate(() => {
+          try { localStorage.clear(); sessionStorage.clear(); } catch (err) { /* storage off */ }
+        });
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+      }
+    }
+    // The two strengths on one sheet, A above B, same rows assigned.
+    for (const width of [1280, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.setContent('<body style="margin:0;padding:16px;background:#0b0e14;color:#fff;font:600 13px/1 sans-serif">'
+        + '<p style="margin:0 0 8px">OPTION A (shipped): --train-box-outline: var(--white-25)</p>'
+        + '<img style="display:block;max-width:100%" src="data:image/png;base64,' + crops['a' + width] + '">'
+        + '<p style="margin:24px 0 8px">OPTION B: --train-box-outline: var(--white-45)</p>'
+        + '<img style="display:block;max-width:100%" src="data:image/png;base64,' + crops['b' + width] + '">'
+        + '</body>');
+      await page.waitForTimeout(300);
+      await page.locator('body').screenshot({ path: path.join(SEL_SHOTS, 'selectors-option-a-vs-b-' + width + '.png') });
+    }
+  });
+});
+
 function teamMarks(page) {
   return page.evaluate(() => {
     const out = {};
