@@ -108,6 +108,14 @@ function busy() {
     shot_threshold: -1, offensive_efficiency: 3.5, defensive_efficiency: 1.2, fb_efficiency: 0.4,
     fb_opp_modifier: -0.6, fight: -2, discipline: -3,
   };
+  // CMD gains the size the engine really gives in a session (measured 2026-10-02): set
+  // plays a few points, motions a few dozen, zones 20-50, Man near 85. Untrained plays: 0.
+  report.plays_effectiveness_changes = {
+    '4-1 Motion': 29, '5-0 Motion': 23, '3-2 Motion': 33, 'PF Post Motion': 16,
+    'Pick & Roll - Entry Pass': 5, 'Double Screen Three - Wing': 4, 'Base Post Play': 6,
+    'Iso': 3, 'Back Door Cut': 7, 'Misdirection Three': 4, 'Quick Midrange Jumper': 2,
+  };
+  report.defenses_effectiveness_changes = { man: 85, '2-3-zone': 26, '3-2-zone': 31, '1-3-1-zone': 52 };
   report.training_notes = [
     person('Practice Player Of The Week', p[11]),
     person('Biggest Regression', p[8]),
@@ -159,6 +167,13 @@ function camp() {
     shot_threshold: -6, rebound_modifier: 0.05, offensive_efficiency: 6, defensive_efficiency: 2.5,
     fb_efficiency: 1, pt_efficiency: 3, fight: 2, discipline: -1, team_chemistry: 4, pt_opp_modifier: 5.5,
   };
+  // A camp session with full installs and a Custom Playbook play (real week 1 sizes).
+  report.plays_effectiveness_changes = {
+    '4-1 Motion': 46, '5-0 Motion': 46, '3-2 Motion': 48,
+    'Pick & Roll - Entry Pass': 7, 'Double Screen Three - Wing': 7, 'Base Post Play': 7,
+    'Iso': 8, 'Back Door Cut': 12, 'Misdirection Three': 4, 'High Post Drive': 20,
+  };
+  report.defenses_effectiveness_changes = { man: 120, '2-3-zone': 39, '3-2-zone': 29, '1-3-1-zone': 41 };
   report.training_notes = [
     person('Training Camp MVP', p[0]),
     person('Biggest Concern', p[8]),
