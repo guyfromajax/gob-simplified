@@ -2233,14 +2233,9 @@ function setupLockerRoomButton() {
       playSound('x-back.mp3');
       if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(safeReturnUrl)) {
         // Back goes to the tab the reader came from (Team › Schedule, League › Schedule,
-        // a bracket); the Office only when return_url names no tab.
-        let returnTab = 'home-tab';
-        try {
-          returnTab = new URL(safeReturnUrl, window.location.origin).searchParams.get('tab') || 'home-tab';
-        } catch (err) {
-          returnTab = 'home-tab';
-        }
-        window.GOBNav.exitFlow(safeReturnUrl, { tab: returnTab });
+        // a bracket): GOBNav reads it from return_url, and falls back to the tab the
+        // reader left when the URL names none. It used to force the Office.
+        window.GOBNav.exitFlow(safeReturnUrl);
       } else if (window.GOBNav) window.GOBNav.replace(safeReturnUrl);
       else window.location.replace(safeReturnUrl);
     });

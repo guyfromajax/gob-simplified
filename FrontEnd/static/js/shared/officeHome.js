@@ -719,19 +719,20 @@
       if (result.site === 'home') when.push('Home');
       else if (result.site === 'away') when.push('Away');
       kick.appendChild(el('span', 'wkc-when', when.join(' · ')));
-      // return_url marks the box score as a read and brings its Back here. Without it
-      // the page treats last week's game as a finished flow and returns to the Office.
-      var boxParams = {};
-      Object.keys((result.box_score && result.box_score.params) || {}).forEach(function (key) {
-        boxParams[key] = result.box_score.params[key];
-      });
-      boxParams.return_url = global.location.pathname + global.location.search;
       var boxUrl = (result.box_score && present(result.box_score.path))
-        ? href(result.box_score.path, boxParams) : '';
+        ? href(result.box_score.path, result.box_score.params) : '';
       if (boxUrl) {
         var box = el('a', 'lnk', 'Box score');
         box.href = boxUrl;
-        bindGo(box, boxUrl);
+        // `data-return`: GOBNav adds return_url on the click, which marks the box score
+        // as a read and brings its Back here. Without it the page treats last week's
+        // game as a finished flow and returns to the Office. A plain link, so that
+        // GOBNav's own click handling runs; the listener only plays the sound.
+        box.setAttribute('data-return', '');
+        box.addEventListener('click', function (event) {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          clickTiny();
+        });
         kick.appendChild(box);
       }
       node.appendChild(kick);

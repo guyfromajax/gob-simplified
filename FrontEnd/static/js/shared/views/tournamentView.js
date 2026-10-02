@@ -63,14 +63,11 @@ function teamsToMaps(teams) {
   return { names: names, meta: meta };
 }
 
-// return_url marks the box score as a read (not a step of the finished game's flow) and
-// is where its Back returns: this bracket.
 function boxHref(franchiseId, teamId, gameId) {
   if (!gameId) return '';
   return '/box-score.html?game_id=' + encodeURIComponent(gameId)
     + '&mode=franchise&franchise_id=' + encodeURIComponent(franchiseId)
-    + '&team_id=' + encodeURIComponent(teamId)
-    + '&return_url=' + encodeURIComponent(window.location.pathname + window.location.search);
+    + '&team_id=' + encodeURIComponent(teamId);
 }
 
 function phasePayload(data, phase) {
@@ -204,6 +201,12 @@ export function mount(container, ctx) {
     if (!locked) {
       bindPhasePicker();
       renderBracket(container.querySelector('.gob-tour-bracket'), data, phase, maps, ctx);
+      // A bracket score opens its box score as a read: `data-return` has GOBNav add
+      // return_url on the click, so the page does not treat a finished game as a flow
+      // step (and its Back comes back to this bracket).
+      container.querySelectorAll('a.gob-res').forEach(function (link) {
+        link.setAttribute('data-return', '');
+      });
     }
   }
 

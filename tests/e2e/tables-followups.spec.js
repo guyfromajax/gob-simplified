@@ -399,6 +399,14 @@ for (const week of Object.keys(REAL).map(Number).sort((a, b) => a - b)) {
     names.filter((text) => text.trim() && text.trim() !== 'TBD').forEach((text) => {
       expect(known.some((name) => text.indexOf(name) !== -1), text).toBe(true);
     });
+    // A played game's score links to its box score as a read (GOBNav adds return_url).
+    const scores = page.locator('#tournament-view a.gob-res');
+    const played = await scores.count();
+    if (week > 27) expect(played).toBeGreaterThan(0);
+    for (let i = 0; i < played; i += 1) {
+      await expect(scores.nth(i)).toHaveAttribute('data-return', '');
+      await expect(scores.nth(i)).toHaveAttribute('href', /\/box-score\.html\?game_id=/);
+    }
     // Each phase that has been drawn by this week draws; one that has not says when.
     for (const phase of ['conference', 'region', 'national']) {
       await page.locator('#tournament-view [data-tour-phase="' + phase + '"]').click();
