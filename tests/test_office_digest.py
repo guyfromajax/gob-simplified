@@ -814,3 +814,49 @@ def test_exceptional_flag_and_result_key_survive_both_stores(kind, tmp_path):
         ("SC", True), ("SH", None),
     ]
     assert digest["result"]["result_key"] == "g-18"
+
+
+# --- signed class (week 36) --------------------------------------------------------------------
+
+_SIGNED = {"signed_players": [
+    {"team_id": USER, "name": "Dee Prospect", "pos": "PG", "home_region": "B", "rt": 71, "potential_rt_ratcheted": 84},
+    {"team_id": USER, "name": "Eli Wing", "pos": "SF", "rt": 64},
+    {"team_id": OPP, "name": "Other Program", "pos": "C", "rt": 80},
+    {"team_id": USER, "name": "Walk On", "walk_on": True, "pos": "C"},
+]}
+
+
+def _week36(**extra):
+    doc = _franchise(week=36, current_season=3, week_35_recruiting_ran=True,
+                     week_35_recruiting_results=_SIGNED, week_35_reveal_seen_season=3)
+    doc.update(extra)
+    return build_office_digest(_ctx(franchise_doc=doc, week=36, advance_flags={"week": 36}, last_game=None))
+
+
+def test_week_36_lists_every_recruit_who_signed_with_the_user_team():
+    digest = _week36()
+    assert digest["signed_class"] == {"recruits": [
+        {"name": "Dee Prospect", "position": "PG", "home_region": "B", "rt_now": 71, "rt_potential": 84},
+        {"name": "Eli Wing", "position": "SF", "rt_now": 64},
+    ]}
+
+
+def test_signed_class_waits_for_the_run_and_for_its_reveal():
+    # Before the hub reveal has played, the Office does not show the class first.
+    assert _week36(week_35_reveal_seen_season=2)["signed_class"] is None
+    assert _week36(week_35_reveal_seen_season=None)["signed_class"] is None
+    assert _week36(week_35_recruiting_ran=False)["signed_class"] is None
+    # Signing Day itself (week 35) and every other week: no class card.
+    signing_day = build_office_digest(_ctx(
+        franchise_doc=_franchise(week=35, current_season=3, week_35_recruiting_results=_SIGNED,
+                                 week_35_recruiting_ran=True, week_35_reveal_seen_season=3),
+        week=35, advance_flags={"week": 35}, last_game=None))
+    assert signing_day["signed_class"] is None
+    assert build_office_digest(_ctx())["signed_class"] is None
+
+
+def test_a_class_with_no_signings_is_an_empty_list_not_missing():
+    digest = _week36(week_35_recruiting_results={"signed_players": [
+        {"team_id": OPP, "name": "Other Program", "pos": "C"},
+    ]})
+    assert digest["signed_class"] == {"recruits": []}

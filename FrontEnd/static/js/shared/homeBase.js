@@ -166,12 +166,15 @@
     if (career.geekPoints != null) cell(career.geekPoints, 'Geek Points', Number(career.geekPointsRaw) === 0);
     if (!cells) return '';
 
-    // PR 5 owns the Trophy Case route. Until it lands the entry stays off.
-    var trophy = view.trophyCaseHref
-      ? '<a class="lnk" href="' + esc(view.trophyCaseHref) + '" data-hb-trophy-case data-sfx="SFX_SELECT">Trophy Case</a>'
-      : '';
+    // The numerals get the whole column. The Trophy Case link is navigation,
+    // so it sits with the other utility entries below.
     return '<div class="hb-career" data-hb-career>'
-      + '<div class="cr-n">' + cells + '</div>' + trophy + '</div>';
+      + '<div class="cr-n">' + cells + '</div></div>';
+  }
+
+  function trophyCaseLinkHtml(view) {
+    if (!view.online || !view.career || !view.trophyCaseHref) return '';
+    return '<a class="hb-link go" href="' + esc(view.trophyCaseHref) + '" data-hb-trophy-case data-sfx="SFX_SELECT">Trophy Case</a>';
   }
 
   function leftHtml(view) {
@@ -185,6 +188,7 @@
       + '<a class="hb-link go" href="/tutorial.html" data-sfx="SFX_SELECT">Tutorials</a>'
       + '<button type="button" class="hb-link" data-hb-settings data-sfx="SFX_SELECT">Settings</button>'
       + '<a class="hb-link go" href="/faqs.html" data-sfx="SFX_SELECT">FAQs</a>'
+      + trophyCaseLinkHtml(view)
       + '</div>'
       + '</section>';
   }

@@ -102,6 +102,7 @@
   var titleEl = null;
   var paintedSection = '';
   var currentWeek = 0;
+  var lastCommandCenter = null;
   var pageMode = null;
   var recruitingRowOff = false;
 
@@ -339,6 +340,15 @@
     if (!recruitingRowOff && window.RecruitingHub && typeof window.RecruitingHub.mountSearch === 'function') {
       window.RecruitingHub.mountSearch();
     }
+  }
+
+  // The hub decides its row from the week (tabs, the invite stack, or none).
+  // Until its data lands the row is not painted at all, so the default
+  // Pool / Leans / Visits row never shows for a beat before the real hub.
+  function recruitingHubReady() {
+    var hub = window.RecruitingHub;
+    if (!hub || typeof hub.rowVisible !== 'function') return false;
+    return typeof hub.ready === 'function' ? !!hub.ready() : true;
   }
 
   function setRecruitingTabs(visible) {
@@ -643,17 +653,26 @@
       return;
     }
     wrap.hidden = false;
-    valueEl.textContent = 'Week ' + n;
-    if (phaseEl) {
-      phaseEl.hidden = true;
-      phaseEl.textContent = '';
-    }
     var tier = window.GOBTierEmblem && window.GOBTierEmblem.tierForWeek
       ? window.GOBTierEmblem.tierForWeek(n)
       : null;
     var tokens = tier && window.GOBTierEmblem.TIER_TOKENS
       ? window.GOBTierEmblem.TIER_TOKENS[tier]
       : null;
+    // Tournament weeks (27-34) show no week number. The stat is the round:
+    // the tier emblem, "<Tier> Tournament", and the round under it, in the
+    // words the Advance button uses. Weeks 1-26 (and 35-36) show "Week N".
+    var round = tier && window.GOBAdvance && typeof window.GOBAdvance.eosRoundForWeek === 'function'
+      ? window.GOBAdvance.eosRoundForWeek(n)
+      : '';
+    wrap.classList.toggle('ts-tier', !!tier);
+    valueEl.textContent = tier
+      ? tier.charAt(0).toUpperCase() + tier.slice(1) + ' Tournament'
+      : 'Week ' + n;
+    if (phaseEl) {
+      phaseEl.hidden = !(tier && round);
+      phaseEl.textContent = tier && round ? round : '';
+    }
     if (top && tokens && tokens.metal && tokens.metalHi) {
       top.classList.add('is-tier');
       top.style.setProperty('--tier-metal', tokens.metal);
@@ -752,7 +771,7 @@
     stats.innerHTML = [
       '<div class="ts" id="gob-record-stat" hidden><b id="gob-record-value"></b><span>Record</span></div>',
       '<div class="ts" id="gob-rank-stat" hidden><b id="gob-rank-value"></b><span>National Rank</span></div>',
-      '<div class="ts" id="gob-week-stat" hidden><b id="gob-week-value"></b><span id="gob-week-phase" hidden></span></div>'
+      '<div class="ts" id="gob-week-stat" hidden><div class="ts-txt"><b id="gob-week-value"></b><span id="gob-week-phase" hidden></span></div></div>'
     ].join('');
 
     var spacer = document.createElement('div');
@@ -775,7 +794,7 @@
     var emblem = document.getElementById('fcc-header-emblem');
     if (emblem) {
       var weekStat = stats.querySelector('#gob-week-stat');
-      if (weekStat) weekStat.appendChild(emblem);
+      if (weekStat) weekStat.insertBefore(emblem, weekStat.firstChild);
     }
     top.appendChild(spacer);
     top.appendChild(adv);
@@ -974,7 +993,7 @@
     });
     if (titleEl) titleEl.textContent = section.title;
     paintedSection = '';
-    if (pageMode.file === 'recruiting' && window.RecruitingHub && typeof window.RecruitingHub.rowVisible === 'function' && window.RecruitingHub.rowVisible() === false) {
+    if (pageMode.file === 'recruiting' && (!recruitingHubReady() || window.RecruitingHub.rowVisible() === false)) {
       setRecruitingTabs(false);
       paintedSection = section.id;
       return;
@@ -1004,7 +1023,7 @@
     if (!tier) { slot.innerHTML = ''; return; }
     if (typeof api.injectCss === 'function') api.injectCss();
     var sz = api.EMBLEM_SIZING && api.EMBLEM_SIZING.fccFranchiseHeader;
-    if (!sz || typeof api.renderLockup !== 'function') return;
+    if (!sz) return;
     var value = null;
     if (tier === 'conference' && (data.user_conference === 0 || data.user_conference)) value = String(data.user_conference);
     if (tier === 'region') {
@@ -1014,14 +1033,9 @@
         if (c >= 1 && c <= 16) value = String.fromCharCode(65 + Math.floor((c - 1) / 2));
       }
     }
-    slot.innerHTML = api.renderLockup({
-      tier: tier,
-      value: value,
-      size: sz.emblem,
-      l1: sz.labelL1,
-      l2: sz.labelL2,
-      variant: 'stack'
-    });
+    slot.innerHTML = typeof api.renderEmblem === 'function'
+      ? api.renderEmblem({ tier: tier, value: value, size: sz.emblem })
+      : '';
   }
 
   function paintIdentity(data) {
@@ -1041,6 +1055,7 @@
   }
 
   function noteCommandCenter(data) {
+    lastCommandCenter = data || lastCommandCenter;
     paintIdentity(data);
     if (pageMode && pageMode.file === 'recruiting' && window.GOBAdvance && window.GOBAdvance.ordersAreFocus(data)) {
       document.documentElement.classList.add('gob-focus');
@@ -1116,7 +1131,7 @@
     stats.innerHTML = [
       '<div class="ts" id="gob-record-stat" hidden><b id="gob-record-value"></b><span>Record</span></div>',
       '<div class="ts" id="gob-rank-stat" hidden><b id="gob-rank-value"></b><span>National Rank</span></div>',
-      '<div class="ts" id="gob-week-stat" hidden><b id="gob-week-value"></b><span id="gob-week-phase" hidden></span><span id="fcc-header-emblem"></span></div>'
+      '<div class="ts" id="gob-week-stat" hidden><span id="fcc-header-emblem"></span><div class="ts-txt"><b id="gob-week-value"></b><span id="gob-week-phase" hidden></span></div></div>'
     ].join('');
     var spacer = document.createElement('div');
     spacer.className = 'top-sp';
@@ -1310,6 +1325,9 @@
     }).catch(function () {});
     import('/js/shared/gobSettings.js').catch(function () {});
     import('/js/shared/tierEmblem.js').then(function () {
+      // The week may have painted before the tier module arrived.
+      if (currentWeek) paintWeek(currentWeek);
+      if (lastCommandCenter) paintEmblem(lastCommandCenter);
       refreshTournamentLock();
     }).catch(function () {});
     if (window.GOBAdvance && window.GOBAdvance.load) window.GOBAdvance.load();

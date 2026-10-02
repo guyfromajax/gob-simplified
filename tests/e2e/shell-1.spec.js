@@ -298,7 +298,9 @@ test('advance labels match the three week states and repeat clicks are ignored',
 
   await openFcc(page, cc({ week: 28, training_completed: true, training_disabled_for_postseason: true, user_eliminated: false, has_eos_game_this_week: true }));
   await expect(page.locator('header.top')).toHaveClass(/is-tier/);
-  await expect(page.locator('#gob-week-phase')).toBeHidden();
+  // A tournament week shows the round, not a week number.
+  await expect(page.locator('#gob-week-value')).toHaveText('Conference Tournament');
+  await expect(page.locator('#gob-week-phase')).toHaveText('Semifinals');
 });
 
 test('back restores the section as it was left, including scroll', async ({ page }) => {

@@ -10864,6 +10864,14 @@ def command_center_data(
             response["awards_ready"] = bool((awards or {}).get("all_american_teams"))
         else:
             response["awards_ready"] = False
+            if franchise_doc and week is not None:
+                # Weekly All-American projection: rebuilt on the first read after an advance.
+                try:
+                    from BackEnd.utils.all_american import ensure_projection
+
+                    ensure_projection(franchise_doc)
+                except Exception:
+                    logger.exception("[ALL-AMERICAN] projection failed franchise_id=%s", franchise_doc.get("_id"))
         if franchise_id and franchise_doc and team_id:
             try:
                 user_ftd_doc = franchise_team_data_collection.find_one(
@@ -14975,71 +14983,18 @@ def _franchise_news_headlines(franchise_doc: dict[str, Any], limit: int = 5) -> 
     return headlines
 
 
-def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
-    pts = int(season_stats.get("PTS", 0) or 0)
-    ast = int(season_stats.get("AST", 0) or 0)
-    reb = int(season_stats.get("REB", 0) or (int(season_stats.get("OREB", 0) or 0) + int(season_stats.get("DREB", 0) or 0)))
-    stl = int(season_stats.get("STL", 0) or 0)
-    blk = int(season_stats.get("BLK", 0) or 0)
-    def_a = int(season_stats.get("DEF_A", 0) or 0)
-    def_s = int(season_stats.get("DEF_S", 0) or 0)
-    def_pct = int(round((def_s / def_a) * 100)) if def_a >= 130 else 0
-
-    score = 2 * (pts + ast + reb + stl + blk)
-    if def_a >= 130:
-        if def_pct > 80:
-            score += 15
-        elif def_pct > 60:
-            score += 10
-        elif def_pct > 40:
-            score += 5
-    return score, def_pct
-
-
 def _compute_all_american_teams(franchise_doc: dict[str, Any]) -> dict[str, Any]:
-    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_doc["_id"])}))
-    team_name_map = _format_team_name_map(franchise=franchise_doc)
-    candidates = []
-    for doc in fpd_docs:
-        meta = doc.get("meta", {})
-        season_stats = doc.get("season", {}) or {}
-        score, def_pct = _season_awards_score(season_stats)
-        team_id = str(meta.get("team_id") or "")
-        candidates.append({
-            "player_id": doc.get("player_id"),
-            "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip(),
-            "team_id": team_id,
-            "team_name": team_name_map.get(team_id, meta.get("team", "")),
-            "year": meta.get("year") or "",
-            "score": score,
-            "stats": {
-                "PTS": int(season_stats.get("PTS", 0) or 0),
-                "REB": int(season_stats.get("REB", 0) or (int(season_stats.get("OREB", 0) or 0) + int(season_stats.get("DREB", 0) or 0))),
-                "AST": int(season_stats.get("AST", 0) or 0),
-                "STL": int(season_stats.get("STL", 0) or 0),
-                "BLK": int(season_stats.get("BLK", 0) or 0),
-                "DEF%": def_pct,
-            },
-        })
-    candidates.sort(key=lambda player: (-player["score"], -player["stats"]["PTS"], player["name"]))
+    """The final All-American teams. The logic lives in BackEnd/utils/all_american.py."""
+    from BackEnd.utils.all_american import compute_final
 
-    top_twenty = candidates[:20]
-    third_team_pool = top_twenty[10:20]
-    third_team = random.sample(third_team_pool, min(5, len(third_team_pool))) if third_team_pool else []
-    return {
-        "computed_at": datetime.utcnow(),
-        "all_american_teams": {
-            "first_team": top_twenty[:5],
-            "second_team": top_twenty[5:10],
-            "third_team": third_team,
-        },
-    }
+    return compute_final(franchise_doc)
 
 
 def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str, Any]:
     awards = franchise_doc.get(AWARDS_FIELD) or {}
     if not awards.get("all_american_teams"):
-        awards = _compute_all_american_teams(franchise_doc)
+        # Merge: the weekly projection is stored under the same field and stays.
+        awards = {**awards, **_compute_all_american_teams(franchise_doc)}
         db.franchises.update_one(
             {"_id": franchise_doc["_id"]},
             fold_browse_rev({"$set": {AWARDS_FIELD: awards}}),
@@ -16103,12 +16058,17 @@ def get_franchise_awards(
     franchise_id: str,
     user: dict = Depends(get_current_user),
 ):
+    from BackEnd.utils.all_american import awards_payload, ensure_projection
+
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     week = int(franchise_doc.get("week", 1) or 1)
-    if week < 35:
-        raise HTTPException(status_code=400, detail="Awards are not available until week 35")
-    awards = _persist_week_35_awards_if_needed(franchise_doc)
-    return awards
+    if week >= 35:
+        # The final, set after the National Tournament.
+        _persist_week_35_awards_if_needed(franchise_doc)
+    else:
+        # Projected All-Americans, weeks 1-26; frozen through the tournaments.
+        ensure_projection(franchise_doc)
+    return awards_payload(franchise_doc)
 
 
 @router.post("/franchise/recruiting-orders")

@@ -895,7 +895,9 @@ test('week strip states and clicks', async ({ page }) => {
   })));
   expect(steps.map((step) => step.state)).toEqual(['done', 'blocking', 'upcoming', 'upcoming', 'upcoming']);
   expect(steps[1].next).toBe(true);
-  expect(steps[1].text).toContain('BLOCKS ADVANCE');
+  // The blocking step is an outline only: no BLOCKS ADVANCE tag (removed 2026-10-02).
+  expect(steps[1].text).toBe('Review recruit invites');
+  expect(await page.locator('#office-root .td-gate').count()).toBe(0);
   expect(await page.locator('#office-root .td-adv').count()).toBe(0);
   expect(await page.locator('#office-root .week-k').count()).toBe(0);
   expect(await page.locator('#office-root .wk-step.gated .td-adv').count()).toBe(0);

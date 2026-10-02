@@ -228,6 +228,36 @@ html.gob-shell.gob-1920 #news-view .gob-news-grid {
 #franchise-container #awards-view table.gob-awards-tbl col.c-team { width: 14rem; }
 #franchise-container #awards-view table.gob-awards-tbl col.c-stat { width: 3.5rem; }
 
+#franchise-container #awards-view table.gob-awards-tbl col.c-pos { width: 3.25rem; }
+#franchise-container #awards-view table.gob-awards-tbl col.c-rt { width: 3.5rem; }
+#franchise-container #awards-view table.gob-awards-tbl col.c-score { width: 4.25rem; }
+
+/* What the page is, and when it changes. Neutral: a projection is information. */
+#franchise-container #awards-view .gob-awards-head h2 {
+  margin: 0 0 var(--space-4);
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+#franchise-container #awards-view .gob-awards-head p,
+#franchise-container #awards-view .gob-awards-note {
+  margin: 0;
+  font: var(--fw-medium) var(--fs-12)/var(--lh-body) var(--font-body);
+  color: var(--text-60);
+}
+/* Position is an information code, and the score a supporting numeral: luminance only. */
+#franchise-container #awards-view .gob-awards-pos {
+  font-weight: var(--fw-bold);
+  color: var(--text-60);
+}
+#franchise-container #awards-view .gob-awards-score {
+  font-weight: var(--fw-bold);
+  color: var(--text-100);
+}
+#franchise-container #awards-view .gob-awards-bonus {
+  color: var(--text-87);
+}
+
 #franchise-container #awards-view a.gob-player {
   color: var(--text-100);
   text-decoration: none;

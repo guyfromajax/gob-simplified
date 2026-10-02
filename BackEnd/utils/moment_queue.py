@@ -136,6 +136,8 @@ def collect_moments(
     rows: list[dict[str, Any]] = []
     champs = [m for m in (championship_moments or []) if m]
     if champs:
+        # Another team's title is news, not the coach's reward: quiet, no sting.
+        user_won = any(isinstance(m, dict) and m.get("user_is_winner") for m in champs)
         rows.append(
             _item(
                 kind="championship",
@@ -146,6 +148,7 @@ def collect_moments(
                 duration="long",
                 title="Championship moment",
                 line="A title moment is waiting.",
+                style=None if user_won else STYLE_QUIET,
             )
         )
     if _eligible_payload(season_review):

@@ -538,9 +538,6 @@
         ? advanceLabel()
         : (TODO_COPY[todo.label_key] || labelize(todo.label_key));
       row.appendChild(el('span', 'td-l', copy));
-      if (!todo.done && todo.gates_advance && !todo.is_advance_action) {
-        row.appendChild(el('span', 'td-gate', 'BLOCKS ADVANCE'));
-      }
       row.addEventListener('click', function () {
         if (!todo.done && todo.is_advance_action) {
           var play = document.getElementById('play-now');
@@ -1160,6 +1157,49 @@
     return node;
   }
 
+  // Week 36, after Signing Day has run: every recruit who signed with the
+  // program. The rows are the server's (office_digest.signed_class); nothing
+  // here is derived.
+  function signedClassCard(signed, index) {
+    var recruits = Array.isArray(signed && signed.recruits) ? signed.recruits : [];
+    var rows = recruits.filter(function (recruit) { return recruit && present(recruit.name); });
+    var node = card('office-sign office-class', index);
+    var head = el('div', 'card-h');
+    head.appendChild(el('h3', '', 'Signing class'));
+    if (rows.length) head.appendChild(el('span', 'meta', rows.length + ' signed'));
+    node.appendChild(head);
+    if (!rows.length) {
+      node.appendChild(el('p', 'wr-empty', 'No recruits signed with your program.'));
+      return node;
+    }
+    var url = recruitingHref();
+    rows.forEach(function (recruit) {
+      var row = el('a', 'wr sg-c');
+      row.href = url;
+      bindGo(row, url);
+      var body = el('span', 'wr-b');
+      var line = el('span', 'wr-1');
+      line.appendChild(el('span', 'nm', recruit.name));
+      if (present(recruit.position)) line.appendChild(el('span', 'wr-m', recruit.position));
+      body.appendChild(line);
+      if (present(recruit.home_region)) body.appendChild(el('span', 'wr-2', 'Region ' + recruit.home_region));
+      row.appendChild(body);
+      var now = rtLetters(recruit.rt_now);
+      var potential = rtLetters(recruit.rt_potential);
+      if (now) {
+        var grade = el('span', 'sg-rt');
+        grade.appendChild(el('b', 'tdig ' + rtColorClass(now), now));
+        if (potential && potential !== now) {
+          grade.appendChild(el('i', '', '\u2192'));
+          grade.appendChild(el('b', 'tdig ' + rtColorClass(potential), potential));
+        }
+        row.appendChild(grade);
+      }
+      node.appendChild(row);
+    });
+    return node;
+  }
+
   function standingsHref() {
     var current = new URLSearchParams(global.location.search);
     var params = { tab: 'standings-view' };
@@ -1380,6 +1420,8 @@
       ];
       third = [wireCard(digest.recruiting_wire, false, 6)];
     }
+    // Once Signing Day has run the recruiting column is the class that signed.
+    if (digest.signed_class) third = [signedClassCard(digest.signed_class, 6)];
     // The moment-queue weekly items now fold into the card's Also row / "+N more",
     // so column 2 no longer carries a separate "This week" card.
     first.forEach(function (node) { if (node) col1.appendChild(node); });

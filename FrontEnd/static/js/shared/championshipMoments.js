@@ -719,9 +719,12 @@
         }
       }
       root.appendChild(variationNode);
-      import('/js/shared/uiSfx.js').then(function (m) {
-        if (m && m.playSfx) m.playSfx(m.STING_SEASON_PEAK);
-      }).catch(function () {});
+      // Another team's title is silent: the sting is the coach's own reward.
+      if (moment.user_is_winner) {
+        import('/js/shared/uiSfx.js').then(function (m) {
+          if (m && m.playSfx) m.playSfx(m.STING_SEASON_PEAK);
+        }).catch(function () {});
+      }
 
       // Animate-in: needs to render first, then add is-visible on root.
       requestAnimationFrame(() => {

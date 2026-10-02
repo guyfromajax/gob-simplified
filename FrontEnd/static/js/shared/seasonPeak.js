@@ -9,14 +9,15 @@
   var ROOT_ID = 'season-peak-root';
   var STING_MS = 600;
   var CONFETTI_N = 60;
+  // One eyebrow for every title: "Season N". The headline names the title.
   var TITLE_TYPES = [
-    { type: 'national_championship', letter: 'N', label: 'National Champions', eyebrow: 'National Tournament', headline: 'National Champions' },
-    { type: 'banner_raise', letter: 'N', label: 'National Champions', eyebrow: 'National Tournament', headline: 'National Champions' },
-    { type: 'region_championship', letter: 'R', label: 'Region Champions', eyebrow: 'Region Tournament', headline: 'Region Champions' },
-    { type: 'conference_championship', letter: 'C', label: 'Conference Champions', eyebrow: 'Conference Tournament', headline: 'Conference Champions' },
-    { type: 'conference_tournament_championship', letter: 'C', label: 'Conference Tournament Champions', eyebrow: 'Conference Tournament', headline: 'Conference Tournament Champions' },
-    { type: 'trophy_spotlight', letter: 'C', label: 'Conference Regular-Season #1', eyebrow: 'Conference Regular Season', headline: 'Conference Regular-Season Champions' },
-    { type: 'conference_regular_season_championship', letter: 'C', label: 'Conference Regular-Season Champions', eyebrow: 'Conference Regular Season', headline: 'Conference Regular-Season Champions' }
+    { type: 'national_championship', letter: 'N', label: 'National Champions', headline: 'National Champions' },
+    { type: 'banner_raise', letter: 'N', label: 'National Champions', headline: 'National Champions' },
+    { type: 'region_championship', letter: 'R', label: 'Region Champions', headline: 'Region Champions' },
+    { type: 'conference_championship', letter: 'C', label: 'Conference Tournament Champions', headline: 'Conference Tournament Champions' },
+    { type: 'conference_tournament_championship', letter: 'C', label: 'Conference Tournament Champions', headline: 'Conference Tournament Champions' },
+    { type: 'trophy_spotlight', letter: 'C', label: 'Regular Season Conference Champions', headline: 'Regular Season Conference Champions' },
+    { type: 'conference_regular_season_championship', letter: 'C', label: 'Regular Season Conference Champions', headline: 'Regular Season Conference Champions' }
   ];
   var TROPHY_TITLE = {
     national: { letter: 'N', label: 'National Champions' },
@@ -257,8 +258,16 @@
     return AA_LABEL[kind] || '';
   }
 
+  // The server names the sting. A row that says "no sting" (another team's title)
+  // stays silent; only a caller with no queue row at all gets the default.
+  function stingName(item) {
+    if (item && Object.prototype.hasOwnProperty.call(item, 'sting')) return item.sting || '';
+    return 'STING_SEASON_PEAK';
+  }
+
   function playSting(item) {
-    var name = (item && item.sting) || 'STING_SEASON_PEAK';
+    var name = stingName(item);
+    if (!name) return;
     try { (global.__gobSeasonPeakSfx || (global.__gobSeasonPeakSfx = [])).push(name); } catch (e) { /* tests */ }
     import('/js/shared/uiSfx.js').then(function (m) {
       if (m && m.playSfx) m.playSfx(name);
@@ -339,6 +348,10 @@
       unbindKeys();
       closeResolver = resolve;
       var featured = featuredMoment(moments);
+      // Someone else's title is an announcement, not the coach's reward:
+      // no confetti, no sting, and nothing goes in the Trophy Case.
+      var userWon = moments.some(function (m) { return !!(m && m.user_is_winner); });
+      var quiet = !userWon || !!(opts.item && opts.item.style === 'quiet');
       var spec = specForType(featured.type) || TITLE_TYPES[0];
       var score = scoreParts(featured);
       var team = featured.winner_team_name || '';
@@ -349,7 +362,6 @@
       var total = q.total || 1;
       var eyebrow = [];
       if (present(featured.season)) eyebrow.push('Season ' + featured.season);
-      if (spec.eyebrow) eyebrow.push(spec.eyebrow);
       var nextHint = (total > 1 && opts.nextKind === 'season_review')
         ? ' Your season review is next.'
         : '';
@@ -364,16 +376,16 @@
           + (present(score.loseName) ? esc(score.loseName) + ' ' : '')
           + '<b>' + esc(score.lose) + '</b></span></div>';
       }
-      var html = '<section class="pk is-open' + (reducedMotion() ? ' rm pk-in' : '') + '" role="dialog" aria-modal="true" aria-labelledby="pk-t">'
+      var html = '<section class="pk is-open' + (quiet ? ' is-quiet' : '') + (reducedMotion() ? ' rm pk-in' : '') + '" role="dialog" aria-modal="true" aria-labelledby="pk-t">'
         + (art ? '<img class="pk-art" src="' + esc(art) + '" alt="">' : '')
-        + confettiHtml()
+        + (quiet ? '' : confettiHtml())
         + (eyebrow.length ? '<div class="pk-k">' + esc(eyebrow.join(' · ')) + '</div>' : '')
         + '<h1 class="pk-t" id="pk-t">' + esc(spec.headline) + '</h1>'
         + '<div class="pk-rule"></div>'
         + (present(team) ? '<div class="pk-team" style="--i:0">' + esc(team) + '</div>' : '')
         + scoreHtml
         + medHtml(meds)
-        + '<div class="pk-f"><p>Added to your <em>Trophy Case</em>.' + nextHint + '</p>'
+        + '<div class="pk-f"><p>' + (quiet ? '' : 'Added to your <em>Trophy Case</em>.') + nextHint + '</p>'
         + mqHtml(index, total)
         + (box ? '<a class="lnk" href="' + esc(box) + '" data-sfx="SFX_SELECT">Box score</a>' : '')
         + '<button type="button" class="btn-ghost lg pk-go" data-sfx="SFX_SELECT">Continue</button></div></section>';
@@ -386,7 +398,8 @@
           if (pk) pk.classList.add('pk-in');
         });
       }
-      scheduleSting(opts.item);
+      if (quiet) clearSting();
+      else scheduleSting(opts.item);
       bindContinue('.pk-go');
       var go = host.querySelector('.pk-go');
       if (go) go.focus();

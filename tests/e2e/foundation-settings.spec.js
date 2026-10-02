@@ -69,22 +69,26 @@ test('settings panel opens and closes three ways', async ({ page }) => {
   expect(covered, 'the open panel covers Home Base’s Settings trigger').toBe(true);
 });
 
-test('sliders change uiSfx live and persist across reload', async ({ page }) => {
+test('the Music switch changes uiSfx live and persists across reload', async ({ page }) => {
   await stubAuth(page);
   await stubMe(page, ME);
   await page.goto('/mode-select.html');
   await page.locator(SETTINGS_TRIGGER).click();
-  const music = page.locator('.slider[data-channel="music"]');
-  await music.focus();
-  await page.keyboard.press('Home');
-  const level = await page.evaluate(() => window.GOBUiSfx.getAudioState().music.level);
-  expect(level).toBe(0);
+  // Two switches and nothing else: no sliders, no per-channel mute buttons.
+  await expect(page.locator('#gob-settings-host [data-audio-switch]')).toHaveCount(2);
+  await expect(page.locator('#gob-settings-host .slider')).toHaveCount(0);
+  const music = page.locator('[data-audio-switch="music"]');
+  await expect(music).toHaveAttribute('aria-checked', 'true');
+  await music.click();
+  await expect(music).toHaveAttribute('aria-checked', 'false');
+  expect(await page.evaluate(() => window.GOBUiSfx.getAppAudio())).toEqual({ music: false, sound: true });
+  expect(await page.evaluate(() => window.GOBUiSfx.outputVolume(0.4, 'music'))).toBe(0);
   await page.reload();
   const kept = await page.evaluate(async () => {
     const mod = await import('/js/shared/uiSfx.js');
-    return mod.getAudioState().music.level;
+    return mod.getAppAudio();
   });
-  expect(kept).toBe(0);
+  expect(kept).toEqual({ music: false, sound: true });
 });
 
 test('offline profile hides Account and shows the offline note', async ({ page }) => {
@@ -393,57 +397,68 @@ function expectFlatButton(state, label) {
   expect(state.appearance, label).toBe('none');
 }
 
-for (const spec of ICON_PAGES) {
-  test('settings mute icons and close render flat on ' + spec.name, async ({ page }) => {
-    await openOn(page, spec);
-    const MUTE = '[data-mute="music"]';
+function switchState(page, selector) {
+  return page.evaluate((sel) => {
+    const host = document.getElementById('gob-settings-host');
+    const token = (name) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(' + name + ')';
+      host.appendChild(probe);
+      const value = getComputedStyle(probe).color;
+      probe.remove();
+      return value;
+    };
+    const el = host.querySelector(sel);
+    const cs = getComputedStyle(el);
+    return { bg: cs.backgroundColor, on: el.classList.contains('on'), checked: el.getAttribute('aria-checked'),
+      role: el.getAttribute('role'), navy: token('--navy'), red: token('--red'), orange: token('--orange'), green: token('--green'),
+      w: el.getBoundingClientRect().width };
+  }, selector);
+}
 
-    const rest = await iconState(page, MUTE);
-    expectFlatButton(rest, spec.name + ' mute');
-    expect(rest.color).toBe(rest.text60);
-    expect(rest.svg.w).toBeGreaterThan(0);
-    expect(rest.svg.h).toBeGreaterThan(0);
-    expect(rest.svg.fill).toBe('none');
-    expect(rest.svg.stroke).toBe(rest.text60);
-    expect(parseFloat(rest.svg.strokeWidth)).toBeGreaterThan(0);
-    expect(rest.svg.d).toContain('M15.5 9a4 4 0 0 1 0 6');
-    expect(rest.pressed).toBe('false');
+for (const spec of ICON_PAGES) {
+  test('settings audio switches and close render on ' + spec.name, async ({ page }) => {
+    await openOn(page, spec);
+    const MUSIC = '[data-audio-switch="music"]';
+    const SOUND = '[data-audio-switch="sound"]';
+
+    await expect(page.locator('#gob-settings-host [data-audio-switch]')).toHaveCount(2);
+    await expect(page.locator('#gob-settings-host .aud .aud-l')).toHaveText(['Music', 'Sound']);
+    await expect(page.locator('#gob-settings-host [data-mute]')).toHaveCount(0);
+    await expect(page.locator('#gob-settings-host .slider')).toHaveCount(0);
+
+    // On is the structural navy ("switch on"); never green, orange or red.
+    const rest = await switchState(page, MUSIC);
+    expect(rest.role).toBe('switch');
+    expect(rest.checked).toBe('true');
+    expect(rest.on).toBe(true);
+    expect(rest.bg).toBe(rest.navy);
+    expect(rest.w).toBeGreaterThan(0);
 
     const close = await iconState(page, '.set-x');
     expectFlatButton(close, spec.name + ' close');
     expect(close.color).toBe(close.text60);
 
-    await page.hover('#gob-settings-host ' + MUTE);
-    await expect.poll(async () => (await iconState(page, MUTE)).color).toBe(rest.text100);
-
-    await page.click('#gob-settings-host ' + MUTE);
+    await page.click('#gob-settings-host ' + MUSIC);
     await page.mouse.move(900, 400);
-    await expect.poll(async () => (await iconState(page, MUTE)).on).toBe(true);
-    await expect.poll(async () => (await iconState(page, MUTE)).color).toBe(rest.red);
-    const muted = await iconState(page, MUTE);
-    expect(muted.pressed).toBe('true');
-    expect(muted.svg.d).toContain('M16 9.5l5 5');
-    expect(muted.svg.stroke).toBe(rest.red);
-    expect(muted.svg.w).toBeGreaterThan(0);
-
-    const others = await page.evaluate(() => [...document.querySelectorAll('#gob-settings-host [data-mute]')]
-      .map((b) => ({ id: b.dataset.mute, bg: getComputedStyle(b).backgroundColor, on: b.classList.contains('on') })));
-    for (const other of others.filter((o) => o.id !== 'music')) {
-      expect(other.on, other.id).toBe(false);
-      expect(other.bg, other.id).toBe('rgba(0, 0, 0, 0)');
-    }
+    await expect.poll(async () => (await switchState(page, MUSIC)).checked).toBe('false');
+    // The fill eases out over --dur-toggle; read it once it has left navy.
+    await expect.poll(async () => { const now = await switchState(page, MUSIC); return now.bg !== now.navy; }).toBe(true);
+    await page.locator('#gob-settings-host ' + MUSIC).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const off = await switchState(page, MUSIC);
+    expect(off.on).toBe(false);
+    for (const colour of [off.navy, off.red, off.orange, off.green]) expect(off.bg).not.toBe(colour);
+    // The other switch is its own setting.
+    expect((await switchState(page, SOUND)).checked).toBe('true');
 
     if (spec.name === 'mode-select' || spec.name === 'office') {
       await page.screenshot({ path: 'reports/settings-mute-icons/settings-' + spec.name + '-1280x720-music-muted.png' });
     }
 
-    await page.click('#gob-settings-host ' + MUTE);
+    await page.click('#gob-settings-host ' + MUSIC);
     await page.mouse.move(900, 400);
-    await expect.poll(async () => (await iconState(page, MUTE)).on).toBe(false);
-    const back = await iconState(page, MUTE);
-    expect(back.pressed).toBe('false');
-    expect(back.svg.d).toContain('M15.5 9a4 4 0 0 1 0 6');
-    await expect.poll(async () => (await iconState(page, MUTE)).color).toBe(rest.text60);
+    await expect.poll(async () => (await switchState(page, MUSIC)).checked).toBe('true');
+    await expect.poll(async () => (await switchState(page, MUSIC)).bg).toBe(rest.navy);
   });
 }
 

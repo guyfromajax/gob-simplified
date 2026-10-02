@@ -85,7 +85,7 @@ The live-game DOM overlays built with `createElement` in `js/phaser/utils/` are 
 - Kept as data: team-colour name bars / badges / favor arrows (identification), the RT ramp (`matchupsUiShared.js` fallbacks), and the broadcast's 5-colour data palette.
 - **Sim-safety:** visual-only; the five equivalence specs (`game-winner`, `sim-broadcast-fit`, `court-layout`, `game-start-sequence`, `sim-team-callouts` = 55) must stay byte-identical before/after.
 - These are **legacy JS**, not on the `check_ui_tokens` new-design surface (do not add them to it — it would newly gate legacy files).
-- **Game-state colours** in these overlays (the Sim broadcast's spotlight / "POSS" / "SPOT" orange, "FOUL TROUBLE" gold, highlights-toggle-on green) are data and are not recoloured (ruling #3). The rule and the full list are in "Live-game screen chrome" below.
+- **Game-state colours** in these overlays (the Sim broadcast's spotlight / "POSS" / "SPOT" orange, "FOUL TROUBLE" gold, the Sound switch's on green) are data and are not recoloured (ruling #3). The rule and the full list are in "Live-game screen chrome" below.
 
 ### Live-game screen chrome (court.html)
 
@@ -133,9 +133,19 @@ Team logos and team initials badges are not headshots. They keep `--radius-logo`
 
 ## 3. Audio
 
-`uiSfx.js` is the volume bus. Channels: `master`, `music`, `sfx`, `ambience`. Effective gain is master × channel, or 0 when either is muted. Levels are 0–100.
+`uiSfx.js` is the one audio bus. It has two scopes and one stored record (`gob_audio_v1`, `AUDIO_STORAGE_KEY`; the same record works online and in the offline desktop build). The scope is the page.
 
-Persisted in `localStorage` under `gob_audio_v1` (`AUDIO_STORAGE_KEY`). The same record works online and in the offline desktop build.
+| Scope | Where | Controlled only from | Shape |
+|---|---|---|---|
+| `game` | `court.html`: everything on the court screen, a played game and Sim Game alike | The court. The command-center sound control (mute all, music level, SFX level) and the Sound switch in Sim Game, which is the same mute. | `master` / `music` / `sfx`, each a level 0-100 and a mute. Gain is master × channel, 0 when either is muted. |
+| `app` | Every other page | Settings: two on/off switches, **Music** and **Sound**. | `app.music`, `app.sound`. No levels, no sliders. |
+
+- Callers ask for a channel (`music`, `sfx`, `ambience`) through `outputVolume` / `channelGain(getAudioState(), ch)` and the bus answers for the scope the page is in. Off the court `music` and `ambience` are the Music switch and `sfx` is the Sound switch.
+- **Music** is all non-gameplay music: the franchise track (`musicController.js`), the timeout loop on Set Lineup / Game Plan, the Home Base track, and the lobby track on team select and the persona intro. **Sound** is every non-gameplay sound: UI clicks, Advance, commits and stings.
+- The two scopes never touch each other. Settings does not change the court; the court does not change Settings. A record written before the switches existed keeps what the player had silenced.
+- There is no other audio control anywhere in the app. Do not add one to a page (the Account page's ambience switch was removed, 2026-10-02).
+- Sim Game always plays its highlights (the callout cadence is never suspended). The switch in its footer is Sound, not Highlights.
+- Settings uses `getAppAudio()` / `setAppAudio('music' | 'sound', on)`. Sim Game uses `isGameAudioMuted()` / `setGameAudioMuted()`. The court control keeps `setChannelMuted` / `setChannelLevel`, which write the game scope on the court and do nothing to levels elsewhere.
 
 `playSfx(name, baseVolume)` plays one named sound on the `sfx` channel. `baseVolume` defaults to `0.7`. It still accepts a raw filename so existing callers keep working. Named catalog: `SFX_SELECT` (`click-tiny.wav`), `SFX_ADVANCE` (`confirm-1-lowervol.wav`), `SFX_COMMIT` (`click-beep.wav`), `STING_WIN` (`sting-win.wav`), `STING_MILESTONE` (`sting-milestone.wav`), `STING_SEASON_PEAK` (`sting-season-peak.wav`). Short UI sounds may overlap. A new sting stops the previous sting. A missing file fails silently (one `console.debug` per name) and must not throw or block a modal or navigation.
 
@@ -143,11 +153,9 @@ One delegated click listener per document (`installSfxHooks(document)`) plays `d
 
 One sound per action. A control that has a `data-sfx` hook must not also call `playSfx` in its own handler, and vice versa — pick one path (proved in tests with the `window.__gobSfxCalls` spy). `SFX_ADVANCE` is reserved for `#play-now`; a page's own primary action (Submit Training, a tutorial PLAY NOW) uses `SFX_COMMIT`, not Advance. Everything goes through `playSfx` + the settings channels — a caller that constructs `new Audio()` itself bypasses the mute/level settings and is a bug to fix, not a pattern to copy.
 
-Losses are silent. `STING_WIN` plays only on a win's first showing (the office weekly card, at the score cue); a loss and a milestone elimination make no sound. A gold milestone or season-peak open plays its server-named sting (`playSfx(item.sting)`); a new sting stops the previous one. Stings follow the audio settings even under `prefers-reduced-motion`, and closing a modal early does not cancel or replay the sting. The client never picks a moment's sound — the server names it.
+Losses are silent, and so is a title the user's team did not win. `STING_WIN` plays only on a win's first showing (the office weekly card, at the score cue); a loss and a milestone elimination make no sound. A gold milestone or season-peak open plays its server-named sting (`playSfx(item.sting)`); a new sting stops the previous one. Stings follow the audio settings even under `prefers-reduced-motion`, and closing a modal early does not cancel or replay the sting. The client never picks a moment's sound — the server names it.
 
-Routed today: `playSfx` callers (rail, sub-tabs, the shared tab strip), `data-sfx` on Advance, the championship-moment season-peak sting, and the court sound control (`courtAudio.js`), which mirrors master / music / sfx into this bus.
-
-Not routed: any player that constructs `Audio()` itself and never calls `playSfx` or the court bus. Leave those until that caller is moved onto the bus. Do not add a second volume store.
+Routed: `playSfx` callers, `data-sfx`, the season-peak and milestone stings, `musicController.js`, the lobby tracks, `gameSfx.js`, and the court's quarter-end airhorn, whistle and timeout sounds (they scale by `outputVolume(base, 'sfx')` when they play). A sound that sets its own `Audio().volume` without asking the bus is a bug: it ignores both the Settings switches and the court control. Do not add a second store.
 
 ## 4. Settings panel
 
@@ -155,9 +163,9 @@ Module: `FrontEnd/static/js/shared/gobSettings.js`.
 
 API on `window.GOBSettings`: `open()`, `close()`, `toggle()`, `isOpen()`.
 
-Sections, top to bottom: Audio (four channels, mute and level, applied immediately), Coach stats (only fields `/api/auth/me` already returns; hidden until those fields exist), Account. The footer shows `window.GOB_BUILD_LABEL` when that string is set, and Online / Offline.
+Sections, top to bottom: Audio (two switches, Music and Sound, applied immediately; a line says game sound is set on the court), Stats (only fields `/api/auth/me` already returns; hidden until those fields exist: Career record, Titles, National Titles), Account. Stat tiles size to their content (`.cs-grid` is a wrapping flex row, each `.cs` at least as wide as its text), so a long record widens its tile instead of spilling out of it. The footer shows `window.GOB_BUILD_LABEL` when that string is set, and Online / Offline.
 
-Online: Account shows username, email, a link to account details, and log out. Offline (`window.GOB_BUILD_PROFILE === 'desktop'`): Account is the offline note, coach stats are not fetched, and the connection label is Offline.
+Online: Account shows username, email, a link to account details, and log out. Offline (`window.GOB_BUILD_PROFILE === 'desktop'`): Account is the offline note, the stats are not fetched, and the connection label is Offline.
 
 The gear that opened the panel gets `.open` and `aria-expanded="true"` while it is open. Close with Escape, the scrim, the close control, or the gear again.
 
@@ -173,7 +181,7 @@ Right side, browse pages: the ghost Edit Recruit Invites button (`#fcc-edit-recr
 
 On a browse page that does not already paint `#fcc-record-label`, Record comes from `team_record.wins` and `team_record.losses` on the command-center payload. National Rank still comes from `data.rank`. Week still comes from `data.week`. The Office keeps painting Record from the standings label.
 
-Tier weeks: when `GOBTierEmblem.tierForWeek(data.week)` returns a tier and `TIER_TOKENS` has `metal` and `metalHi`, `.top` gets `is-tier` and those two custom properties. The existing `#fcc-header-emblem` is the emblem. If the tier is not available, the bar stays plain.
+Tier weeks (27-34): when `GOBTierEmblem.tierForWeek(data.week)` returns a tier and `TIER_TOKENS` has `metal` and `metalHi`, `.top` gets `is-tier` and those two custom properties. **A tournament week shows no week number.** The week stat (`#gob-week-stat.ts-tier`) becomes the round descriptor, in the place the week sits: the tier emblem (`#fcc-header-emblem`, the emblem alone), then `#gob-week-value` reading `<Tier> Tournament` over `#gob-week-phase` reading the round. The round comes from `GOBAdvance.eosRoundForWeek(week)`, so it uses the same words as the Advance button (First Round, Semifinals, Championship). Weeks 1-26, 35 and 36 read `Week N` with no emblem. Nothing sits between the stats and the action button. If the tier module is not loaded yet the bar paints `Week N` and repaints when it arrives.
 
 Rail order: Office, Team, Prep, League, Recruiting, News, then the utility group: Tutorials (`/tutorial.html`), Feedback, Settings, a quieter divider, Exit Franchise. Exit calls the existing `#exit-franchise` handler (same sound, same `/mode-select.html` destination). Feedback is the existing `#feedback-btn` modal and is omitted when `window.GOB_BUILD_PROFILE === 'desktop'`. On a browse page the rail Feedback appears once the auth bar has added `#feedback-btn`, which can be after the shell mounts. Settings calls `GOBSettings.toggle()`.
 
@@ -212,7 +220,7 @@ Rail and sub-tab clicks play `click-tiny.wav` through `playSfx`. Advance does no
 - Browser Back and Forward restore the section, the sub-tab, and the scroll position from `popstate` (`showTabFromUrl` plus `GOBNav.restoreScroll`). Scroll is stored per URL on `.main` when `html.gob-shell` is present, otherwise on the active tab panel.
 - In-app flows (Play Game, Run Training → `/training.html` focus, and the other Advance routes) still return to the locker-room entry via `exitFlow`. That collapse is separate from the section stack.
 - `exitFlow` jumps back to the locker-room index that launched the flow. In-app Back uses `history.back()` only when the previous entry is that parent.
-- `warnOnLeave(hasEdits, { view, confirm })` registers an unsaved-edit check. `hasEdits` compares the current values with the last saved ones, so moving a control and moving it back is not an edit. A plain boolean "touched" flag is not enough. `CommandCenterTabs.show` asks `confirmLeave(proceed, view)` before it leaves `view`; with real edits the owner's `confirm` opens the in-app `GOBLeaveConfirm` (Keep Editing, Discard, Save) and `proceed` runs after Discard or a landed Save. `go`, `replace`, `back`, and same-origin link clicks ask every check the same way. The browser's own `beforeunload` prompt fires only for a reload or a window close with real edits. The weekly training focus page (`/training.html`) registers a confirm: the allocation draft still persists, but leaving with a dirty form opens `GOBLeaveConfirm` (Keep Draft / Discard / Keep Editing). Prep › Player Training has no leave confirm — per-player settings save on change. A Back or Forward `popstate` is not guarded.
+- `warnOnLeave(hasEdits, { view, confirm })` registers an unsaved-edit check. `hasEdits` compares the current values with the last saved ones, so moving a control and moving it back is not an edit. A plain boolean "touched" flag is not enough. `CommandCenterTabs.show` asks `confirmLeave(proceed, view)` before it leaves `view`; with real edits the owner's `confirm` opens the in-app `GOBLeaveConfirm` and `proceed` runs after Discard or a landed Save. Its layout is its own (`.gob-leave-confirm .lc-*` in `gob-components.css`): the save across the top (the only orange), then Discard Changes and Keep Editing side by side as two equal neutral buttons; Keep Editing has focus, and Escape or the backdrop is Keep Editing. The root keeps `gob-modal-overlay` so the focus shell leaves it as a viewport layer. `go`, `replace`, `back`, and same-origin link clicks ask every check the same way. The browser's own `beforeunload` prompt fires only for a reload or a window close with real edits. The weekly training focus page (`/training.html`) registers a confirm: the allocation draft still persists, but leaving with a dirty form opens `GOBLeaveConfirm` (Keep Draft / Discard / Keep Editing). Prep › Player Training has no leave confirm — per-player settings save on change. A Back or Forward `popstate` is not guarded.
 
 Old `?tab=` values still open the matching section and sub-tab. `schedule-tab` opens Team › Schedule (`team-schedule-view`). `fcc-team-stats-summary-tab` is League › Team Stats. `recruits-tab` opens Office (`home-tab`). Each tab's `onTabShow` lazy-load still runs.
 
@@ -245,6 +253,8 @@ The shared tab module also serves any other command center that calls `initComma
 History is not a section.
 
 The page h1 is the only title. There is no second "Recruiting Hub" heading and no outer card around the hub. The phase strip is the first content, 8px under the row hairline. Pool, Leans, and Visits do not show a Recruit Pool jump. Signing Day keeps the Recruit Pool / My Orders switch, because My Orders replaces the pool.
+
+The Pool / Leans / Visits row, the search and the top-bar identity are not painted until the hub has its data (`RecruitingHub.ready()`), because the week decides whether there is a row at all. Until then the page is the title and a still skeleton (`.hub-skel` in `recruiting-spine.css`); the row then arrives in the same paint as the hub.
 
 A fresh Recruiting Hub arrival with no `hub` query (not a back/forward restore of filters the user already changed) selects the Leans tab when `viewCounts().leans` is greater than 0 and the week is outside 20–26. Otherwise it selects Pool and sets region = `team_region` (the existing "your region" value). A reload or `popstate` with `hub` already set restores that tab when the tabs are showing. Region, position, year, Watchlist, Unranked by me, and the name search stick for the rest of the visit, including a back/forward restore. Weeks 20–26 always show the visit calendar and the invite board above the pool; the in-pool Leans / Watchlist / Unranked filters stay. There is no weekly results panel. Weeks 1–19 Visits shows the calendar as a preview ("Invite window opens Week 20") with the seven weeks upcoming. Weeks 27–34 Visits shows `visit_history` for weeks 20–26. Pool, Leans, Visits, and the board list recruits with a square headshot from `getRecruitImageUrl(image_id)`, falling back to the generic silhouette or initials.
 
@@ -352,6 +362,7 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 | `todos` | `{id, label_key, required, done, gates_advance, is_advance_action, route}` from the same flags as `gobAdvance.js`. A blocking task is the Advance action. |
 | `recruiting_wire` | Status line, events (`recruit`, `position`, `stars` and `filmed_grade` always null, `event_type`, `event_text` from the stored lean-event sentence, `event_detail`, `list_position`, `direction`), `pending_count`, `urgent`, `unseen_count`. |
 | `signing_day` | Week 35 only. Points remaining out of 50, playing-time promises, open roster spots, up to three targets. Otherwise null. |
+| `signed_class` | Week 36 only (running Signing Day moves the franchise from 35 to 36), once the hub reveal has played (`week_35_reveal_seen_season`). `{recruits: [...]}` from `class_signed`: every non-walk-on who signed with the user's team; an empty list when none did. Otherwise null. |
 | `season_preview` | `first_week` only. Preseason rank is the current national rank. Conference projection, team RT, returning starters, and top returner are null. Newcomers only when `pending_walk_on_welcome` is stored. Opener is `next_game`. |
 | `weekly_card_items` | WEEKLY-tier moments from the server moment queue, in order. Every item includes an `href` (the archetype row's is omitted on desktop, where the coaching-archetypes page is not served). The Office paints them with the existing card helper as links. They are not pop-ups. |
 | `also` | The highest-priority weekly item as `{kind, title, line, href}`, or null. The weekly card's one folded-moment row. `weekly_card_items` stays the full list. |
@@ -379,6 +390,10 @@ Priority (lower number first):
 | 110 | bracket_reveal | WEEKLY | — | — | — | `bracket_reveal_modal`, when the user's team is **not** in it |
 
 Cap: a season peak shows alone. When one is eligible the visit is the season-peak items only, and a championship plus its review are the one pair that shows together — exactly `[championship, season_review]`, as "1 of 2 / 2 of 2". Otherwise `moments_for_this_visit` is the first pop-up-tier item, plus a second only when the first is `duration=short` and the second is MILESTONE or SEASON PEAK. Remaining pop-up-tier items stay in `moments` (still eligible next visit; seen keys and championship consume are marked when the overlay mounts, not on Continue). WEEKLY items go to `weekly_card_items` and never take a pop-up slot.
+
+A `championship` row is gold with `STING_SEASON_PEAK` only when at least one of its moments has `user_is_winner`. Another team's title is an announcement, not the coach's reward: the row is `style: quiet` with no sting, and the takeover (`.pk.is-quiet`) drops the confetti and the "Added to your Trophy Case" line. The same rule holds on the court's live-game overlay.
+
+The command-center payload has no `franchise_id`, and the page's own `franchiseId` is script-scoped, not a window property. `momentQueue.js` reads the id from `window.FranchiseContext` for every consume and seen write. Without it those writes were skipped and each moment replayed on every Office visit. A test mock of this payload must not add a `franchise_id` key.
 
 `recruiting_results_modal` is not queued as itself: the live Signing Day beat stays the week-35 hub reveal, and the Office's one-time summary is `signed_class`, which reuses that modal's `recruiting_results_modal_seen_season` stamp. Elimination and the review add the only new stored fields, `elimination_seen_season` and `season_review_seen_season`, written by `PATCH /franchise/elimination-seen` and `PATCH /franchise/season-review-seen` in the same season-stamped style as the existing modal flags.
 
@@ -415,6 +430,7 @@ A new franchise write must fold or bump. A new browse GET must use the dependenc
 - Two callers of the same URL in one document share one request.
 - A resolved entry in that document is reused. A new document does not keep the JavaScript heap, so it sends `If-None-Match` with the stored ETag.
 - `304` returns the stored body. `200` replaces the body and the ETag.
+- Every request the store sends is `cache: 'no-store'`. The store is the cache; the browser's HTTP cache must not sit under it. Leaving a flow is a history traversal (`exitFlow` → `history.go`), and on that kind of load the browser answers a plain GET from its HTTP cache without revalidating. The week-completion writes have just cleared the store's ETag, so the Office read after a game came back as the pre-game body and never reached the server (the "refresh to see the new week" bug, 2026-10-02). Do not remove the mode, and do not read a browse GET with a bare `fetch` from a page that has no store. Request routing in Playwright turns the HTTP cache off, so only a real server can reproduce this (`polish-flow-bugs.spec.js` A1 runs one).
 - The body is also written to `sessionStorage` under `gob-store:<franchise_id>`, inside try/catch. Bodies larger than about 1.5 MB are kept in memory only. If `sessionStorage` throws, the request still completes.
 
 The ETag is `franchise:season:week:browse_rev:BUILD:signature`. The store remembers the newest season, week, revision, and build it has seen for that franchise. A greater season, a greater week in that season, a greater revision in that week, or a different `BUILD` drops every cached body for that franchise. A newer revision means any cached route may be stale, because every franchise write bumps the revision.
@@ -441,13 +457,13 @@ The Office fills `.main` edge to edge inside the standard page padding (`--page-
 
 While the digest is absent the page shows a skeleton strip and three skeleton cards. There is no spinner.
 
-A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. It does not repeat the week number. The top bar already shows it. Each `todos[]` entry is one step, in order, joined left to right. Labels use the same copy as before. An `is_advance_action` step that is not done copies the top-bar Advance label and does not add an ADVANCE tag. The only Advance button on the page is the green top-bar control. A gating step that is not the Advance action shows BLOCKS ADVANCE. Every step uses the same padding. The status circle sits at least `--dsp-8` in from the left edge of the pill at both densities. Steps size to their labels. If the row is wider than the page, the gap between steps comes down before the labels do. Labels are not truncated. The strip does not scroll and does not wrap to a second row.
+A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. It does not repeat the week number. The top bar already shows it. Each `todos[]` entry is one step, in order, joined left to right. Labels use the same copy as before. An `is_advance_action` step that is not done copies the top-bar Advance label and does not add an ADVANCE tag. The only Advance button on the page is the green top-bar control. A gating step that is not the Advance action has a strong neutral outline and no tag (the BLOCKS ADVANCE tag was removed, 2026-10-02). Every step uses the same padding. The status circle sits at least `--dsp-8` in from the left edge of the pill at both densities. Steps size to their labels. If the row is wider than the page, the gap between steps comes down before the labels do. Labels are not truncated. The strip does not scroll and does not wrap to a second row.
 
 | Step | Rule |
 |---|---|
 | Done | Check mark, opacity 38%, still clickable. Opens `route`. |
 | Next | The first not-done required step. Neutral bright outline (`--text-100`). Green stays on the top-bar Advance only. If this step is `is_advance_action`, its label copies the top bar and the click runs the same action. |
-| Blocking | `gates_advance` on a step that is not `is_advance_action` draws a neutral strong outline (`--white-62`) and an outlined BLOCKS ADVANCE tag. Never orange (batch 2). |
+| Blocking | `gates_advance` on a step that is not `is_advance_action` draws a neutral strong outline (`--white-62`). No tag. Never orange (batch 2). |
 | Upcoming | The remaining steps. |
 
 | State | Column 1 · Since last week | Column 2 · This Week | Column 3 · Recruiting |
@@ -455,6 +471,7 @@ A week strip sits under the top of `.main`, above the columns. It is one row, ab
 | `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot · Conference standings | Recruiting wire. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
 | `first_week` | Season preview | Next game · Team snapshot · Conference standings | One-line wire. The digest status when it is set, otherwise the empty-state line. The column heading is the hub link. |
 | `signing_day` | Result · What moved | Team snapshot · Conference standings (`next_game` is null) | Signing Day card. The wire is hidden. The column heading still links to the hub. |
+| any, with `signed_class` set (week 36) | as that state | as that state | Signing class card (`.office-class`): one row per signed recruit, name, position, home region, RT now → ceiling. It replaces the wire. |
 
 The three columns are equal width. The column gap is `--dsp-12` (12px at the 1280 density, 14px at 1920) between the heading and the first card and between stacked cards, so Result and What moved, Next game and Team snapshot and Conference standings, and the recruiting column all share one rhythm. The wire card is as tall as its rows. "Recruiting →" opens the recruiting hub. Result team names wrap, and at the 1280 density the score is smaller so a long name is not cut off.
 
@@ -468,6 +485,7 @@ The three columns are equal width. The column gap is `--dsp-12` (12px at the 128
 | Team snapshot | `team_snapshot.chemistry` (red 0–8, yellow 9–16, green 17–25), five equal attitude columns, `moved_most`, `state` |
 | Conference standings | `conference_standings.rows` under Team snapshot. Header is `Conference` plus the short label plus `standings` (`Conference A2 standings`). Show every row when the card fits above the fold. When the full table would scroll `.main` or overflow its column, show as many rows as fit, centred on the user — at least five when five fit, otherwise the shorter window that keeps the page still — plus "Full standings" in the card header to League › Standings. A row matches a players-to-watch row: the team name is `--fs-13` semibold, W-L is the display face at `--fs-22`, and the place is `--text-38` tabular. At the 1920 density the standings rows drop their vertical padding so the type sizes stay. The W-L header sits in the same column as the numbers, right-aligned. The user row uses the navy selected-row treatment, with padding inside the highlight. The gap under the card title matches the other Office cards. |
 | Signing Day | `signing_day.points_remaining`, `points_total`, `promises_made`, `open_roster_spots`, `targets` |
+| Signing class | `signed_class.recruits[]`: `name`, `position`, `home_region`, `rt_now`, `rt_potential`. The header counts them (`4 signed`). An empty list reads "No recruits signed with your program." The ceiling is shown only when it differs from the grade now. |
 | Season preview | `season_preview` fields that are non-null. The opener is the next-game card. |
 
 Attribute changes are one row per `player_id`. The player name stays on the left and links to the player page. Chips are right-justified: the rightmost chip meets the card's right content edge, and the others sit to its left with a consistent gap. If they do not fit on one line they wrap, still right-aligned, under the name. A chip shows the attribute abbreviation in Bebas at `--fs-22` and `--text-100` (larger than the player name, the largest text in the chip), the new first-digit value in the tier colour from `attributeDisplay.js`, and a green ▲ or red ▼. Chips are not truncated. The previous value is not shown. The chip `title` is the full name from `ATTRIBUTE_NAMES` (`BH` → "Ball Handling"). Players sort by total absolute movement, then name. Inside a row, increases come before decreases. At 1280 the card shows up to 5 players. At 1920 it shows up to 8. When the list is longer, "All changes →" opens `/training-report.html` in focus for `result.week` (or `next_game.week` when there is no result). Rank, conference, and record tiles omit the delta chip when the delta is 0 or null.
@@ -506,7 +524,7 @@ League › Standings always shows the whole league: eight regions stacked, each 
 
 News reads `GET /franchise/news` (`@browse_cached`). `news` is `season_news` as stored and `dispatches` are your-team rows from `latest_training` and `season_inbox`. Newest first, one section per week under a "Week N" heading. The top story is full width; the rest of each week sits in a 2-column grid at 1280 and a 3-column grid at 1920, left to right then down, equal card height in a row. The card does not repeat the week. The whole headline is the link. There is no separate View or Box Score control. A `game_result` headline ends with ` (Box Score)` and opens the box score. Other stories open the article in this panel; other dispatches open `target`. `yours` is the navy left edge. `news.html?story=` redirects here with the story param. The Office card still uses `news_headlines` (five, upset reports excluded).
 
-Awards reads `GET /franchise/awards` (`@browse_cached`). Before week 35 the route is 400 and the view says "Awards are not available yet." From week 35 the snapshot is `all_american_teams` (1st, 2nd, 3rd) with the stored stat line. The user's team row is `tr.me`. There is no season list and no portrait.
+Awards reads `GET /franchise/awards` (`@browse_cached`), which always answers 200 with `status`: `projected` (weeks 1-34), `final` (week 35 on) or `unavailable`. Projected shows the heading "Projected All-Americans" and one line under it: the label ("Preseason", "After week 12", "End of regular season"), the weight mix, and "Updates every week" (from week 26: "Not final: tournament play can still change these"). Final shows "All-Americans". Each team (1st, 2nd, 3rd) is one row per position, in PG, SG, SF, PF, C order. Columns follow the data: Pos, Player, Yr, Team, RT (the canonical ramp, rating at the listed position), the per-game stat line (omitted in the preseason, when nobody has one), Bonus (final only) and Score. Position and score are neutral; nothing on the page is green, orange or gold. `unavailable` and a 400 from an older server both show "Awards are not available yet." The user's team row is `tr.me`. There is no season list and no portrait. Scoring rules: `End_Of_Season_System.md`, "All-American Logic".
 
 ### Add a module view
 
@@ -785,6 +803,8 @@ Not on tokens, on purpose: the Feedback button, its pulse and the Feedback modal
 - Team colour appears only in each program's own banner art.
 - `css/team-picker.css` and `TeamPicker.mount` (the old picker UI) were removed; `js/shared/teamPicker.js` keeps only the league data helpers.
 
+- **Career strip (online, left column, `.hb-career`).** The four numerals (Career record with the win % beside it, Titles, Seasons, Geek Points) take the whole column: each cell is as wide as its own content and the slack is shared between them (`justify-content: space-between`), with no dividers. The Trophy Case link is navigation and sits in the utility row with Tutorials, Settings and FAQs. The offline "Your Career" zone keeps its grid.
+
 ### Play-flow pages (training playbook, playbook report, recruit detail)
 
 `training-playbooks.html`, `playbook-report.html` and `player-detail.html` (recruit detail) are `html.gob` with `gob-tokens.css` and no longer load `resource-pages.css`: each sheet (`training-playbooks.css`, `playbook-report.css`, `player-detail.css`, all `NEW_DESIGN_CSS`) carries the brand shell rules it used, same selectors, on tokens.
@@ -805,7 +825,7 @@ Not on tokens, on purpose: the Feedback button, its pulse and the Feedback modal
 
 One shared pattern: `.gob-empty` (`css/gob-tables.css`). Its look is in the [Styleguide, Empty states](Styleguide.md#empty-states). Use it wherever a view or board has nothing to show, with one short sentence:
 
-- League › Practice Squads before it opens, News › Awards before week 35, League › Standings with no rows.
+- League › Practice Squads before it opens, News › Awards with nothing to show, League › Standings with no rows.
 - League › Leaders: a board with no qualified leader shows `No leaders yet.` and drops its "Full list →" (the rate floors in §13 leave FG% / DEF% empty at zero team games; per-game boards are empty before the first game).
 - Page-specific empty classes (`.gob-ps-empty`, `.gob-news-empty`) may stay alongside it for spacing; the card look comes from `.gob-empty`.
 

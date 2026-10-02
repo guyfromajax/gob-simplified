@@ -1,13 +1,22 @@
 /**
- * One UI / music / ambience / gameplay-sfx volume bus.
+ * One audio bus, two scopes, one stored record.
  *
- * Effective gain for a channel is master × channel, or 0 when either is muted.
- * Levels are 0–100. Persisted in localStorage under AUDIO_STORAGE_KEY so the
- * same settings work online and in the offline desktop build.
+ *   game  Gameplay audio: everything on the court screen. Controlled only from
+ *         the court (the command-center sound control, and the Sound switch in
+ *         Sim Game). master / music / sfx, each a level 0-100 and a mute;
+ *         effective gain is master x channel, or 0 when either is muted.
+ *   app   Everything else. Controlled only in Settings, by two on/off switches:
+ *         Music (all non-gameplay music) and Sound (all non-gameplay sound).
+ *         No levels.
+ *
+ * The scope is the page: court.html is `game`, every other page is `app`.
+ * Callers keep asking for a channel (music / sfx / ambience) and the bus answers
+ * for the scope they are in. Persisted in localStorage under AUDIO_STORAGE_KEY,
+ * so the same settings work online and in the offline desktop build.
  *
  * Named constants stay the call-site vocabulary. playSfx(name) maps those
- * names (and legacy filenames) onto files, respects the sfx channel, and
- * installs one data-sfx click hook per document.
+ * names (and legacy filenames) onto files, respects the scope, and installs
+ * one data-sfx click hook per document.
  */
 
 const SFX_FILES = {
@@ -88,7 +97,32 @@ function storage() {
   }
 }
 
-let state = null;
+let state = null;      // the game scope's channels (the stored master / music / sfx / ambience)
+let appState = null;   // the app scope's two switches
+let scopeOverride = null;
+
+/** court.html is gameplay; every other page is the app. */
+export function audioScope() {
+  if (scopeOverride) return scopeOverride;
+  try {
+    if (typeof location !== 'undefined' && /\/court\.html$/.test(location.pathname || '')) return 'game';
+  } catch (_err) { /* no location */ }
+  return 'app';
+}
+
+/**
+ * The two Settings switches. A record written before the switches existed has
+ * none: a channel the player had silenced there stays off.
+ */
+export function normalizeAppAudio(raw, channels) {
+  const src = raw && typeof raw === 'object' ? raw : null;
+  if (src) return { music: src.music !== false, sound: src.sound !== false };
+  const base = channels || defaultAudioState();
+  return {
+    music: channelGain(base, 'music') > 0 && channelGain(base, 'ambience') > 0,
+    sound: channelGain(base, 'sfx') > 0,
+  };
+}
 
 function ensureState() {
   if (state) return state;
@@ -101,6 +135,7 @@ function ensureState() {
   }
   const hadRecord = !!(raw && typeof raw === 'object');
   state = normalizeAudioState(raw, legacy);
+  appState = normalizeAppAudio(hadRecord ? raw.app : null, state);
   if (store && !hadRecord && legacy === 'false') writeState();
   return state;
 }
@@ -108,21 +143,55 @@ function ensureState() {
 function writeState() {
   const store = storage();
   if (!store || !state) return;
-  try { store.setItem(AUDIO_STORAGE_KEY, JSON.stringify(state)); } catch (_err) { /* quota */ }
+  const record = Object.assign({}, state, { app: appState });
+  try { store.setItem(AUDIO_STORAGE_KEY, JSON.stringify(record)); } catch (_err) { /* quota */ }
 }
 
-function emit() {
+let announcing = false;
+
+function notify() {
   const snapshot = getAudioState();
   listeners.forEach((fn) => {
     try { fn(snapshot); } catch (_err) { /* listener */ }
   });
+  return snapshot;
+}
+
+function emit() {
+  const snapshot = notify();
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-    window.dispatchEvent(new CustomEvent('gob-audio-change', { detail: snapshot }));
+    announcing = true;
+    try { window.dispatchEvent(new CustomEvent('gob-audio-change', { detail: snapshot })); } finally { announcing = false; }
   }
 }
 
+// Two copies of this module can be alive in one page: localhost serves the
+// Phaser tree from /static and the shell from /js, and each copy has its own
+// listeners (game sfx on one, music on the other). They share the stored record,
+// so when another copy announces a change this one re-reads it and tells its
+// own listeners. A control only ever has to write through one copy.
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('gob-audio-change', () => {
+    if (announcing) return;
+    state = null;
+    appState = null;
+    notify();
+  });
+}
+
+function appSnapshot() {
+  return {
+    master: { level: 100, muted: false },
+    music: { level: 100, muted: !appState.music },
+    sfx: { level: 100, muted: !appState.sound },
+    ambience: { level: 100, muted: !appState.music },
+  };
+}
+
+/** The channels of the scope this page is in. */
 export function getAudioState() {
   const current = ensureState();
+  if (audioScope() === 'app') return appSnapshot();
   const copy = {};
   AUDIO_CHANNELS.forEach((name) => {
     copy[name] = { level: current[name].level, muted: current[name].muted };
@@ -136,9 +205,11 @@ export function subscribeAudio(fn) {
   return function () { listeners.delete(fn); };
 }
 
+/** Levels exist only for gameplay audio. Outside the court this does nothing. */
 export function setChannelLevel(channel, level) {
   if (!AUDIO_CHANNELS.includes(channel)) return getAudioState();
   ensureState();
+  if (audioScope() !== 'game') return getAudioState();
   state[channel].level = clampLevel(level);
   writeState();
   emit();
@@ -148,20 +219,50 @@ export function setChannelLevel(channel, level) {
 export function setChannelMuted(channel, muted) {
   if (!AUDIO_CHANNELS.includes(channel)) return getAudioState();
   ensureState();
-  state[channel].muted = !!muted;
-  writeState();
-  if (channel === 'ambience') {
-    const store = storage();
-    if (store) {
-      try { store.setItem(LEGACY_AMBIENCE_KEY, state.ambience.muted ? 'false' : 'true'); } catch (_err) { /* ignore */ }
-    }
+  if (audioScope() === 'game') {
+    state[channel].muted = !!muted;
+  } else {
+    if (channel !== 'sfx') appState.music = !muted;
+    if (channel === 'sfx' || channel === 'master') appState.sound = !muted;
   }
+  writeState();
   emit();
   return getAudioState();
 }
 
-export function resetAudioStateForTests(next) {
+/** Settings: { music, sound }, both booleans. */
+export function getAppAudio() {
+  ensureState();
+  return { music: appState.music, sound: appState.sound };
+}
+
+/** Settings: turn all non-gameplay music or all non-gameplay sound on or off. */
+export function setAppAudio(kind, on) {
+  ensureState();
+  if (kind !== 'music' && kind !== 'sound') return getAppAudio();
+  appState[kind] = !!on;
+  writeState();
+  emit();
+  return getAppAudio();
+}
+
+/** Gameplay audio as one switch (Sim Game). The court control mutes the same thing. */
+export function isGameAudioMuted() {
+  return !!ensureState().master.muted;
+}
+
+export function setGameAudioMuted(muted) {
+  ensureState();
+  state.master.muted = !!muted;
+  writeState();
+  emit();
+  return isGameAudioMuted();
+}
+
+export function resetAudioStateForTests(next, scope) {
   state = next ? normalizeAudioState(next, null) : null;
+  appState = next ? normalizeAppAudio(next.app, state) : null;
+  scopeOverride = scope || null;
 }
 
 function soundBase() {
@@ -175,7 +276,7 @@ function soundBase() {
 
 export function outputVolume(baseVolume, channel) {
   const base = typeof baseVolume === 'number' ? baseVolume : 0.7;
-  const gain = channelGain(ensureState(), channel || 'sfx');
+  const gain = channelGain(getAudioState(), channel || 'sfx');
   return Math.max(0, Math.min(1, base * gain));
 }
 
@@ -342,6 +443,11 @@ const api = {
   getAudioState,
   setChannelLevel,
   setChannelMuted,
+  getAppAudio,
+  setAppAudio,
+  isGameAudioMuted,
+  setGameAudioMuted,
+  audioScope,
   subscribeAudio,
   channelGain,
   outputVolume,
