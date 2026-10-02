@@ -350,7 +350,7 @@ test('custom-focus modal 1280 shot', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openStandalone(page, { mode: 'franchise', session_type: 'in-season' });
   await waitAllocation(page);
-  await page.locator('.archetype-option:has(input[value="player-maximizer-choose-attributes"])').click();
+  await page.locator('.archetype-option:has(input[value="player-maximizer-top-3"])').click();
   await expect(page.locator('#custom-focus-modal')).toBeVisible({ timeout: 10000 });
   const metrics = await measureTraining(page, 'body');
   const prefix = CAPTURE_BEFORE ? 'before' : 'after';

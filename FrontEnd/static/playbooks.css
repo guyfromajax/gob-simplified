@@ -1441,3 +1441,54 @@ html.gob-shell .pg-head .pg-tools #save-btn:not(.is-dirty):not(:disabled) {
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 
+/* ---- Set Plays sub-sections: Inside, Attack, Outside ----
+   A quiet head on the same four columns as the section head, so each sub-total sits
+   in the weight column, under the section total it is part of. */
+#playbooks-view .pb-sub,
+.playbooks-page .pb-sub{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px 56px 28px;
+  align-items: baseline;
+  gap: var(--space-16);
+  margin: 0;
+  padding: var(--dsp-20) 0 var(--space-8) var(--space-10);
+  border-bottom: 1px solid var(--line);
+}
+#playbooks-view .pb-sub:first-child,
+.playbooks-page .pb-sub:first-child{
+  padding-top: var(--dsp-12);
+}
+#playbooks-view .pb-sub-title,
+.playbooks-page .pb-sub-title{
+  grid-column: 1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
+  min-width: 0;
+}
+#franchise-container #playbooks-view .pb-sub h3,
+#playbooks-view .pb-sub h3,
+.playbooks-page .pb-sub h3{
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  text-transform: none;
+  color: var(--text-87);
+}
+#playbooks-view .pb-sub-cnt,
+.playbooks-page .pb-sub-cnt{
+  font-size: var(--fs-12);
+  color: var(--text-38);
+}
+#playbooks-view .pb-sub-tot,
+.playbooks-page .pb-sub-tot{
+  grid-column: 2;
+  justify-self: end;
+  padding-right: var(--space-6);
+  font: var(--fw-bold) var(--fs-14)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-2);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-60);
+}

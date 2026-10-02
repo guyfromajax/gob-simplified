@@ -824,32 +824,12 @@ html.gob-shell .gpc .gt-l.c { right: 0; left: auto; text-align: right; }
 html.gob-shell .gpc .gt-l.on { color: var(--text-100); }
 html.gob-shell .gpc .gt-l.nr { color: var(--text-60); }
 
-html.gob-shell .gpc .nest {
-  position: relative;
-  padding-left: var(--dsp-14);
-}
-
-html.gob-shell .gpc .nest::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 14px;
-  bottom: 12px;
-  width: 1px;
-  background: var(--line-strong);
-}
-
-html.gob-shell .gpc .nest .gpr {
-  grid-template-columns: 290px minmax(0, 1fr);
-}
-
-html.gob-shell .gpc .nest-h {
+/* A section head that carries a control (Shot Diet and its tip button). The head keeps
+   the same .grp-h spacing as every other section. */
+html.gob-shell .gpc .grp-hd {
   display: flex;
   align-items: baseline;
   gap: var(--space-10);
-  padding: var(--space-10) 0 var(--space-2);
-  font-size: var(--fs-11);
-  color: var(--text-60);
   white-space: nowrap;
 }
 
@@ -867,7 +847,7 @@ html.gob-shell .gpc .grp-h {
   padding: var(--space-12) 0 var(--space-2);
 }
 
-html.gob-shell .nest .slider-nest__info:focus-visible {
+html.gob-shell .gpc .slider-nest__info:focus-visible {
   border-color: var(--line-strong);
   color: var(--text-100);
   outline: 2px solid var(--white);
@@ -880,8 +860,8 @@ html.gob-shell .nest .slider-nest__info:focus-visible {
 }
 
 /* One track geometry for all twelve sliders. The title column is one density
-   width; the shot-diet nest gives back exactly its own inset, so every track
-   starts and ends at the same x in its column and both columns match. */
+   width, so every track starts and ends at the same x in its column and both
+   columns match. */
 html.gob-shell .gpc {
   --gp-name-w: calc(var(--dsz-118) * 2 + var(--dsz-50));
 }
@@ -891,24 +871,11 @@ html.gob-shell .gpc .gpr {
   column-gap: var(--dsp-24);
 }
 
-html.gob-shell .gpc .nest .gpr {
-  grid-template-columns: calc(var(--gp-name-w) - var(--dsp-14)) minmax(0, 1fr);
-}
-
-/* Fixed height, so Transition can drop by exactly this much and line up with
-   Execution across the gutter. */
-html.gob-shell .gpc .nest-h {
-  box-sizing: border-box;
-  height: var(--dsz-30);
-  padding: var(--space-8) 0 0;
-}
-
+/* Four section heads, one spacing: Shot Diet and Execution on the left, Disruption
+   and Transition on the right. Each column is one lead slider, a section of three and
+   a section of two, so the heads line up across the gutter with no offset. */
 html.gob-shell .gpc .grp-h {
   padding: var(--dsp-24) 0 var(--space-2);
-}
-
-html.gob-shell .gpc .grp-h-trans {
-  padding-top: calc(var(--dsp-24) + var(--dsz-30));
 }
 
 html.gob-shell .gpc .slider-nest__info:hover {
