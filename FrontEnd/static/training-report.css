@@ -1664,42 +1664,114 @@ body.training-report-page {
   font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
   color: var(--text-100);
 }
-#training-report-view .header-meta-line,
-#training-report-view .training-notes-brief {
+#training-report-view .header-meta-line {
   font-size: var(--fs-12);
   color: var(--text-60);
 }
-#training-report-view .training-notes-header-accent,
-#training-report-view .training-notes-rule,
-#training-report-view .training-notes-subrule {
-  display: none;
-}
 
+/* --- Top of the report: Notes cards and the Team Report grid ----------------------
+   Three shared cards (.card, gob-components.css), one kind of information each:
+   Standouts (people), Trends (attributes and schemes), Readiness (two meters). Every
+   label sits directly above its value, or immediately beside it; no pair is split
+   across a card. One layer of small grey caps (the labels); values are white; an empty
+   value is quiet (--text-38). Under them the Team Report is one card: eleven
+   attributes in the four columns of Team > Team Attributes, each a name and its mark. */
 #training-report-view .training-notes-container {
   display: flex;
   flex-direction: column;
-  gap: var(--dsp-16);
+  gap: var(--dsp-10);
   min-height: 0;
+  margin: 0;
   padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
+  box-shadow: none;
   white-space: normal;
   word-wrap: normal;
   overflow-wrap: normal;
 }
-#training-report-view .training-notes-hero-grid {
+#training-report-view .tr-cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 var(--col-gap);
-  margin: 0 0 var(--dsp-16);
-  padding: 0 0 var(--dsp-10);
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, .8fr);
+  gap: var(--col-gap);
+  align-items: stretch;
 }
-#training-report-view .training-notes-hero-body {
+#training-report-view .training-notes-section {
+  display: block;
+}
+/* "Notes" is a section heading like the others on the page. */
+#training-report-view .training-notes-section > h2 {
+  position: relative;
+  padding-bottom: 10px;
+  font-size: 1.7rem;
+}
+#training-report-view .training-notes-section > h2,
+#training-report-view .team-section > h2 {
+  margin: 0 0 var(--dsp-6);
+}
+#training-report-view .training-notes-section > h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 48px;
+  height: 1px;
+  background: color-mix(in srgb, var(--text-60) 95%, transparent);
+}
+#training-report-view .tr-card {
+  gap: var(--dsp-8);
+  padding: var(--dsp-10) var(--dsp-14) var(--dsp-12);
+}
+#training-report-view .tr-card .card-h h3 {
+  margin: 0;
+}
+
+#training-report-view .tr-pair {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+#training-report-view .tr-label,
+#training-report-view .training-notes-hero-label {
+  margin: 0;
+  font: var(--fw-semibold) var(--fs-10)/var(--lh-1p25) var(--font-body);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-60);
+}
+#training-report-view .tr-value {
+  min-width: 0;
+  max-width: 100%;
+  font: var(--fw-medium) var(--fs-13)/var(--lh-1p25) var(--font-body);
+  color: var(--text-100);
+}
+#training-report-view .tr-none {
+  font-weight: var(--fw-regular);
+  color: var(--text-38);
+}
+
+/* Standouts: the headshot, then the label with the name under it. */
+#training-report-view .tr-standouts {
+  display: grid;
+  gap: var(--dsp-8);
+}
+#training-report-view .training-notes-hero-card,
+#training-report-view .training-notes-hero-card.is-muted {
   display: flex;
   align-items: center;
-  gap: var(--space-10, 12px);
+  gap: var(--space-10);
   min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  --notes-accent: var(--text-38);
+  --notes-accent-border: var(--line);
+  --notes-accent-tint: var(--white-4);
 }
 #training-report-view .training-notes-hero-portrait,
 #training-report-view .training-notes-hero-portrait-img,
@@ -1713,77 +1785,169 @@ body.training-report-page {
   display: block;
   object-fit: cover;
 }
-#training-report-view .training-notes-hero-card,
-#training-report-view .training-notes-hero-card.is-muted {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  min-height: var(--dsz-40);
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  --notes-accent: var(--text-60);
-  --notes-accent-border: var(--line);
-  --notes-accent-tint: transparent;
+#training-report-view .training-notes-hero-portrait-fallback,
+#training-report-view .training-notes-hero-portrait-fallback.is-muted {
+  border: 1px solid var(--line);
+  background: var(--white-3);
+  color: var(--text-38);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-8);
 }
-#training-report-view .training-notes-tactical-grid {
+#training-report-view .training-notes-hero-copy {
+  flex: 1 1 auto;
+}
+#training-report-view .tr-standout-value {
   display: flex;
-  flex-direction: column;
-  gap: 0;
+  align-items: baseline;
+  gap: var(--space-8);
 }
-#training-report-view .training-notes-tactical-pill {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2);
-  padding: var(--dsp-10) 0;
-  border-bottom: 1px solid var(--line);
+#training-report-view .training-notes-hero-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-14);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-1p25);
+  color: var(--text-100);
 }
-#training-report-view .training-notes-hero-label,
-#training-report-view .training-notes-tactical-label,
-#training-report-view .training-notes-misc-label {
+#training-report-view .training-notes-hero-meta {
+  flex: 0 0 auto;
+  font-size: var(--fs-11);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-1p25);
   color: var(--text-60);
+  white-space: nowrap;
 }
-#training-report-view .training-notes-hero-name,
-#training-report-view .training-notes-hero-meta,
-#training-report-view .training-notes-tactical-value,
-#training-report-view .training-notes-tactical-pill.is-positive .training-notes-tactical-value,
-#training-report-view .training-notes-tactical-pill.is-negative .training-notes-tactical-value,
-#training-report-view .training-notes-misc-value {
-  color: var(--text-87);
-}
-#training-report-view .training-notes-tactical-pill,
-#training-report-view .training-notes-tactical-pill.is-positive,
-#training-report-view .training-notes-tactical-pill.is-negative,
-#training-report-view .training-notes-misc-row {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+#training-report-view .training-notes-hero-card.is-muted .training-notes-hero-name {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-regular);
+  color: var(--text-38);
 }
 
-#training-report-view .team-attributes-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-#training-report-view .team-attr-item {
+/* Trends: Rising / Falling read on one line (label beside its tags); the two scheme
+   lines put the label above. */
+#training-report-view .tr-trend-list {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-6) var(--space-12);
+}
+#training-report-view .tr-trend {
+  display: contents;
+}
+#training-report-view .tr-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-12);
+}
+#training-report-view .tr-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-5);
+  white-space: nowrap;
+}
+#training-report-view .tr-tag i {
+  font-style: normal;
+  font-size: var(--fs-10);
+}
+
+/* Readiness: a five-step meter, one step per level, and the word. Neutral only. */
+#training-report-view .tr-ready {
+  display: inline-flex;
   align-items: center;
-  height: var(--dsz-40);
+  gap: var(--space-10);
+}
+#training-report-view .tr-meter {
+  display: inline-flex;
+  gap: var(--space-3);
+}
+#training-report-view .tr-meter i {
+  display: block;
+  width: 16px;
+  height: 6px;
+  border-radius: var(--radius-2);
+  background: var(--white-12);
+}
+#training-report-view .tr-meter i.on {
+  background: var(--text-87);
+}
+
+/* Player Energy: only when the week has something to report. */
+#training-report-view .tr-energy {
+  margin: 0;
+  padding: var(--space-2) var(--dsp-14) 0;
+}
+#training-report-view .tr-energy .tr-value {
+  font-weight: var(--fw-regular);
+  color: var(--text-87);
+  white-space: pre-line;
+}
+
+/* Team Report: one card, four columns read down. A cell is the name and, right beside
+   it, the mark. No movement is a quiet dash and a quieter name, so what moved stands out. */
+#training-report-view .team-attributes-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 var(--col-gap);
+  padding: var(--dsp-8) var(--dsp-14);
+}
+#training-report-view .team-attr-item,
+#training-report-view .team-attr-item.is-delta,
+#training-report-view .team-attr-item.is-muted {
+  display: block;
+  min-width: 0;
+  height: auto;
+  margin: 0;
   padding: 0;
   border: 0;
-  border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  opacity: 1;
 }
-#training-report-view .team-attr-item.is-delta {
-  box-shadow: none;
+#training-report-view .team-attr-item .attr-label {
+  display: grid;
+  grid-template-columns: minmax(0, 10em) auto;
+  justify-content: start;
+  align-items: center;
+  column-gap: var(--space-10);
+  min-height: var(--dsz-26);
+  margin: 0;
+  font-size: var(--fs-13);
+}
+#training-report-view .team-attr-item .attr-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-regular);
+  color: var(--text-60);
+}
+#training-report-view .team-attr-item.is-delta .attr-name {
+  font-weight: var(--fw-semibold);
+  color: var(--text-100);
+}
+#training-report-view .team-attr-item .attr-change {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-1);
+  letter-spacing: var(--tracking-8);
+  white-space: nowrap;
+}
+#training-report-view .team-attr-item .attr-change.change-zero {
+  color: var(--text-38);
 }
 #training-report-view .notes-placeholder {
   color: var(--text-38);
   font-style: normal;
+}
+@media (max-width: 900px) {
+  #training-report-view .tr-cards { grid-template-columns: minmax(0, 1fr); }
+  #training-report-view .team-attributes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 #training-report-view .attr-pill,
 #training-report-view .chemistry-bar-container,
@@ -1795,8 +1959,8 @@ body.training-report-page {
 
 #training-report-view .training-report-container {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  gap: var(--dsp-16) calc(var(--col-gap) * 2);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--dsp-16);
   width: 100%;
 }
 #training-report-view .report-header,
@@ -1858,8 +2022,8 @@ body.training-report-page {
 #training-report-view .report-load-status { display: none; grid-column: 1 / -1; }
 #training-report-view.is-loading .report-skeleton {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-  gap: var(--dsp-24) calc(var(--col-gap) * 2);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, .8fr);
+  gap: var(--dsp-16) var(--col-gap);
   margin-top: var(--dsp-16);
 }
 #training-report-view .rsk-col {
@@ -1877,6 +2041,7 @@ body.training-report-page {
 }
 #training-report-view .rsk-h { width: 132px; height: var(--dsz-20); }
 #training-report-view .rsk-card { height: 96px; border-radius: var(--radius-10); }
+#training-report-view .rsk-grid { grid-column: 1 / -1; height: 96px; border-radius: var(--radius-10); }
 @keyframes reportSkeleton {
   from { background-position: 100% 0; }
   to { background-position: -100% 0; }

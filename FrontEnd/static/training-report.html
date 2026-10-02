@@ -48,30 +48,21 @@
     </header>
 
     <!-- Loading state: stands in for every section until the report data is in. -->
-    <div class="report-skeleton" aria-hidden="true"><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-card"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div></div>
+    <div class="report-skeleton" aria-hidden="true"><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><i class="rsk rsk-grid"></i></div>
     <p class="report-load-status" role="status" aria-live="polite"></p>
 
     <!-- Training Notes (Notes → Team → Players → Projected → Playbook) -->
     <section class="training-notes-section">
-      <div class="training-notes-header">
-        <div class="training-notes-header-main">
-          <div class="training-notes-header-accent" aria-hidden="true"></div>
-          <div class="training-notes-header-copy">
-            <h2>Notes</h2>
-            <div id="training-notes-brief" class="training-notes-brief">Week -- Training Brief · For Coaching Staff Only</div>
-          </div>
-        </div>
-      </div>
-      <div class="training-notes-rule" aria-hidden="true"></div>
+      <h2>Notes</h2>
       <div class="training-notes-container" id="training-notes-container">
-        <!-- Populated by training-report.js -->
+        <!-- Populated by training-report.js: Standouts, Trends, Readiness -->
       </div>
     </section>
 
     <!-- Team Section -->
     <section class="team-section">
       <h2>Team Report</h2>
-      <div class="team-attributes-grid" id="team-attributes-grid"></div>
+      <div class="team-attributes-grid card" id="team-attributes-grid"></div>
     </section>
 
     <!-- Players Section -->

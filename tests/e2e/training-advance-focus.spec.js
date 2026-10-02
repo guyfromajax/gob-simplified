@@ -479,7 +479,8 @@ test('a) training week Advance → focus → allocate → Submit → Report → 
   expect(reportLook.host, JSON.stringify(reportLook)).toBe(true);
   expect(reportLook.rowCount, JSON.stringify(reportLook)).toBe(11);
   expect(reportLook.visiblePills, JSON.stringify(reportLook)).toBe(0);
-  expect(reportLook.rowDisplay, JSON.stringify(reportLook)).toBe('grid');
+  // Team Report cells are plain blocks in a four-column grid (name and mark side by side).
+  expect(reportLook.rowDisplay, JSON.stringify(reportLook)).toBe('block');
   expect(reportLook.rowBgImage, JSON.stringify(reportLook)).toBe('none');
   expect(reportLook.emptyButtons, JSON.stringify(reportLook)).toEqual([]);
   expect(reportGets.some((row) => String(row.week) === '12'), JSON.stringify(reportGets)).toBe(true);
