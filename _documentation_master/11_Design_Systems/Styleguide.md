@@ -87,7 +87,7 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 - Never a fill, a wash, a button, a tab or a selected state. The chosen option inside a card is a neutral choice control.
 - Not a rating: the green here does not mean "good" and the red does not mean "bad".
 
-**Training movement marks** (Training Report: Team Report, Player Report › Training Changes, Playbook Summary). One function decides the count and the tone: `describeTrainingChange()` in `training-report.js`. `n` is the raw change. Exactly 0 is a dash in every week.
+**Training movement marks** (Training Report: Team Report, Player Report › Training Changes, Playbook Summary). One function decides the count and the tone for attributes: `describeTrainingChange()` in `training-report.js` (plays and defenses count on their own bands, below). `n` is the raw change. Exactly 0 is a dash in every week.
 
 | Week | One | Two | Three |
 |---|---|---|---|
@@ -106,6 +106,16 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 - In season a single arrow follows the sign: any drop is ▼, never a green arrow. The two- and three-arrow bands stay asymmetric.
 - Faint and full are told apart by arrow count, not by colour alone. Faint is `color-mix(in srgb, <token> N%, transparent)`, so it lets the row through: 3:1 or better on both zebra rows (red needs 60% to match green's 45%).
 - Glyphs: ▲ / ▼ only. Player Report › Attributes shows current values only: no marks, no change tint, no tooltip. Movement lives on Training Changes.
+- **Plays and defenses have their own bands** (Playbook Summary, CMD points; Jamie approved 2026-10-02). The tones above are unchanged; only the counts differ, because a trained play gains far more than an attribute does. `describePlayCmdChange()`, `PLAY_CMD_CUTOFFS`; `PLAY_CMD_SCALE = 'play'` is the switch.
+
+  | | One | Two | Three |
+  |---|---|---|---|
+  | Offense play, up | under 5 | 5 to 19 | 20 or more |
+  | Defense, up | under 30 | 30 to 49 | 50 or more |
+  | Offense play, down | under 5 | 5 to 9 | 10 or more |
+  | Defense, down | under 10 | 10 to 19 | 20 or more |
+
+  CMD never falls in a training session (it falls at end of game), so the down bands only show if a report carries a drop. Exactly 0 is a dash. Measurements: `reports/training-report-tables-2026-10-02.md`.
 - Notes › Trends tags (Rising, Falling / Lagging) are labels, not magnitudes: one faint ▲ or one faint ▼ per attribute, the in-season one-arrow tones, in every week including camp.
 - Readiness meters have five steps, one per level (Very Weak, Weak, Neutral, Strong, Very Strong), with the word beside them. They are neutral (`--text-87` lit, `--white-12` unlit): a meter is not positive data, so it is never green, red or orange.
 

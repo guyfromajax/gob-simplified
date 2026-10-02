@@ -81,7 +81,8 @@ function report(week) {
   Object.keys(plays_data).forEach((name, i) => { plays_data[name].effectiveness = 40 + (i * 3) % 55; });
   const plays_effectiveness_changes = {};
   Object.keys(plays_data).forEach((name, i) => {
-    plays_effectiveness_changes[name] = [3.5, 1.2, 0.2, -1, -3][i % 5];
+    // CMD points, on the play scale: three arrows from 20, two from 5; a drop of 10 or more is three.
+    plays_effectiveness_changes[name] = [22, 6, 2, -4, -12][i % 5];
   });
   return {
     week,
@@ -1145,7 +1146,7 @@ test.describe('training report', () => {
       { text: '▼▼', color: TONE.down },
       { text: '▼▼▼', color: TONE.down },
     ]);
-    // Playbook Summary: +3.5 / +1.2 / +0.2 / -1 / -3 across the plays, same marks.
+    // Playbook Summary: +22 / +6 / +2 / -4 / -12 CMD across the plays: the play scale, the same tones.
     const plays = (await page.locator('.playbook-summary-section .pbs-panel--offense .pbs-delta').evaluateAll((els) => els.map((el) => ({
       text: el.textContent, color: getComputedStyle(el).color,
     })))).map(tones);

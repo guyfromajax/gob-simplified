@@ -1520,19 +1520,20 @@ function describeTrainingChange(change) {
 /**
  * Play and defense CMD movement (Playbook Summary).
  *
- * Today these use the player-attribute scale above, which was cut for attribute points
- * (three arrows at +3). A trained play gains far more than that in one session (measured
- * on the offline engine, 2026-10-02: set plays 2-7, motions 13-35, zones 13-66, Man
- * 41-178), so nearly every trained play shows three arrows.
+ * Plays have their own scale (Jamie approved the cut-offs, 2026-10-02). The player-
+ * attribute scale above was cut for attribute points (three arrows at +3); a trained play
+ * gains far more than that in one session (measured on the offline engine: set plays 2-7,
+ * motions 13-35, zones 13-66, Man 41-178), so on that scale 97% of trained plays showed
+ * three arrows. These cut-offs split real results into roughly equal thirds.
  *
  * PLAY_CMD_SCALE is the one switch:
- *   'attribute'  the player-attribute scale (what ships today)
- *   'play'       the cut-offs below: PROPOSED, waiting for Jamie's approval
+ *   'play'       the cut-offs below (what ships)
+ *   'attribute'  the player-attribute scale (the old behaviour)
  * Cut-offs are the smallest change that earns two and three arrows. CMD never falls in a
  * training session (it falls at end of game: offense 2-17 a game, defense 5-47), so the
  * down cut-offs only matter if a report ever carries a drop.
  */
-const PLAY_CMD_SCALE = 'attribute';
+const PLAY_CMD_SCALE = 'play';
 const PLAY_CMD_CUTOFFS = {
   offense: { up: [5, 20], down: [5, 10] },
   defense: { up: [30, 50], down: [10, 20] },
