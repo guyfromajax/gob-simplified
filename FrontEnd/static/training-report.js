@@ -126,7 +126,7 @@ function shellHtml() {
     + '<div class="view-toggle">'
     + '<button type="button" class="toggle-btn" data-view="attributes">Attributes</button>'
     + '<button type="button" class="toggle-btn active" data-view="changes">Training Changes</button>'
-    + '</div></div><div class="scroll-x"><table class="players-table" id="players-table">'
+    + '</div></div><div class="scroll-x gob-roster gob-pairs tr-ptable"><table class="gob-tbl" id="players-table">'
     + '<thead id="players-thead"></thead><tbody id="players-tbody"></tbody></table></div></section>'
     + '<section class="projected-lineup-section"><div class="section-header projected-lineup-header">'
     + '<h2>Projected Starting 5</h2>'
@@ -229,6 +229,43 @@ const ATTRIBUTE_ORDER = [
   'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'EM'
 ];
 const STATIC_COLUMNS = ['RT'];
+
+/**
+ * The six attribute pairs, in the roster's order (Styleguide, Tables: column grouping).
+ * The report's tables use the roster's own classes for them (`.gob-pairs`, `gstart` /
+ * `gend`, `gshade`); nothing here styles a pair a second way.
+ */
+const ATTRIBUTE_PAIRS = [['SC', 'SH'], ['ID', 'OD'], ['PS', 'BH'], ['RB', 'ST'], ['AG', 'ND'], ['IQ', 'FT']];
+
+/**
+ * Lay attribute columns out by pair. `attrs` is whatever the table shows (all twelve on
+ * Attributes, only what was trained on Training Changes). A pair present in full keeps its
+ * two columns together (`gstart`, `gend`); an attribute whose partner is absent, or one
+ * that has no pair (NG, EM), stands alone (`gsolo`) with a gutter on both sides. Groups
+ * alternate the roster's shade in the order shown, so two neighbours never share it.
+ */
+function layoutAttributeColumns(attrs) {
+  const present = new Set(attrs);
+  const columns = [];
+  let group = 0;
+  const push = (keys) => {
+    const shade = group % 2 === 1 ? ' gshade' : '';
+    if (keys.length === 2) {
+      columns.push({ attr: keys[0], cls: 'gstart' + shade });
+      columns.push({ attr: keys[1], cls: 'gend' + shade });
+    } else {
+      columns.push({ attr: keys[0], cls: 'gsolo' + shade });
+    }
+    group += 1;
+  };
+  ATTRIBUTE_PAIRS.forEach((pair) => {
+    const keys = pair.filter((attr) => present.has(attr));
+    if (keys.length) push(keys);
+  });
+  const paired = new Set(ATTRIBUTE_PAIRS.flat());
+  attrs.filter((attr) => !paired.has(attr)).forEach((attr) => push([attr]));
+  return columns;
+}
 
 const ATTRIBUTE_NAMES = {
   'SC': 'SC',
@@ -528,14 +565,93 @@ function renderProjectedStartingFiveSection() {
     renderProjectedStartingFiveStats(rows);
     return;
   }
-  if (typeof renderProjectedStartingFive === 'function') {
-    renderProjectedStartingFive(rows, {
-      containerId: 'training-projected-lineup',
-      tableClass: 'training-projected-table',
-      emptyClass: 'training-projected-empty',
-    });
-    enhanceProjectedStartingFiveTable();
+  renderProjectedStartingFiveAttributes(rows);
+}
+
+/**
+ * Projected Starting 5, Attributes: identity columns, then the six attribute pairs in the
+ * roster's layout and classes, then RT. Values arrive on the 0-10 display scale.
+ */
+function renderProjectedStartingFiveAttributes(rows) {
+  const el = byId('training-projected-lineup');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!rows || rows.length === 0) {
+    el.innerHTML =
+      '<p class="training-projected-empty">No projected lineup (missing position ratings or roster data).</p>';
+    return;
   }
+  const columns = layoutAttributeColumns(ATTRIBUTE_PAIRS.flat());
+  const wrap = document.createElement('div');
+  wrap.className = 'gob-roster gob-pairs tr-ptable tr-projected';
+  const table = document.createElement('table');
+  table.className = 'gob-tbl';
+  const head = document.createElement('tr');
+  const headCell = (text, cls) => {
+    const th = document.createElement('th');
+    th.className = cls;
+    th.textContent = text;
+    head.appendChild(th);
+    return th;
+  };
+  headCell('Player', 'team');
+  headCell('Year', 'code');
+  headCell('Ht', 'num');
+  headCell('Wt', 'num wt');
+  columns.forEach((column) => {
+    const th = document.createElement('th');
+    th.className = column.cls;
+    th.dataset.attr = column.attr;
+    th.appendChild(pairBox(column.attr));
+    head.appendChild(th);
+  });
+  headCell('RT', 'tr-rt');
+  head.appendChild(fillCell('th'));
+  const thead = document.createElement('thead');
+  thead.appendChild(head);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  rows.forEach((r) => {
+    const tr = document.createElement('tr');
+    const cell = (text, cls) => {
+      const td = document.createElement('td');
+      td.className = cls;
+      td.textContent = text;
+      tr.appendChild(td);
+      return td;
+    };
+    const nameCell = document.createElement('td');
+    nameCell.className = 'team player-name-cell';
+    const badge = document.createElement('span');
+    badge.className = 'position-badge';
+    badge.textContent = r.position || '—';
+    const name = document.createElement('span');
+    name.className = 'player-name-text projected-player-name-cell';
+    name.textContent = typeof formatNameWithJersey === 'function'
+      ? formatNameWithJersey(r.jersey, r.name || '')
+      : r.name || '—';
+    nameCell.appendChild(badge);
+    nameCell.appendChild(name);
+    tr.appendChild(nameCell);
+    cell(getTrainingReportPlayerYear(r) || '—', 'code');
+    cell(typeof formatHeight === 'function' ? formatHeight(r.height) : String(r.height == null ? '—' : r.height), 'num');
+    cell(r.weight != null && r.weight !== '' ? String(r.weight) : '—', 'num wt');
+    columns.forEach((column) => {
+      const raw = r.attributes && r.attributes[column.attr] != null ? Number(r.attributes[column.attr]) : NaN;
+      const td = document.createElement('td');
+      td.className = 'attribute-value-cell ' + column.cls;
+      td.appendChild(pairBox(Number.isFinite(raw) ? String(raw) : '—'));
+      tr.appendChild(td);
+    });
+    const rtCell = cell(typeof formatRtDisplay === 'function' ? formatRtDisplay(r.rt) : (r.rt != null ? String(r.rt) : '—'), 'tr-rt');
+    if (typeof getRtBucketClass === 'function') rtCell.className += ' ' + getRtBucketClass(r.rt);
+    tr.appendChild(fillCell('td'));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  el.appendChild(wrap);
 }
 
 function setupViewToggle() {
@@ -1086,7 +1202,7 @@ function createNotesHeroInitials(displayName, accentConfig, isMuted) {
 
 function createPlayerNameCell(player) {
   const td = document.createElement('td');
-  td.className = 'player-name-cell';
+  td.className = 'team player-name-cell';
 
   const badge = document.createElement('span');
   badge.className = 'position-badge';
@@ -1101,27 +1217,40 @@ function createPlayerNameCell(player) {
   return td;
 }
 
+/**
+ * The last, empty cell of a row. It takes the table's spare width, so the row lines and
+ * zebra run the full width of the page while the values stay right beside the names.
+ */
+function fillCell(tag) {
+  const cell = document.createElement(tag);
+  cell.className = 'tr-fill';
+  cell.setAttribute('aria-hidden', 'true');
+  return cell;
+}
+
+/** A value or a mark in a pair column: the roster's fixed-width box, so pairs line up. */
+function pairBox(text) {
+  const box = document.createElement('span');
+  box.className = 'ak';
+  box.textContent = text;
+  return box;
+}
+
 function renderPlayersTable() {
   if (!reportData || !reportData.players) return;
   
   const thead = byId('players-thead');
   const tbody = byId('players-tbody');
+  const wrap = thead.closest('.tr-ptable');
   
   // Clear existing content
   thead.innerHTML = '';
   tbody.innerHTML = '';
   
-  // Build header
-  const headerRow = document.createElement('tr');
-  headerRow.appendChild(createHeaderCell('Name'));
-  
   let attributeList = [];
   if (currentView === 'attributes') {
     // Attributes view: show all player attributes in exact order
     attributeList = ATTRIBUTE_ORDER.filter(attr => ATTRIBUTE_NAMES[attr]);
-    attributeList.forEach(attr => {
-      headerRow.appendChild(createHeaderCell(attr));
-    });
   } else {
     // Changes view: show only attributes that changed, but maintain order
     const changedAttrs = new Set();
@@ -1131,14 +1260,28 @@ function renderPlayersTable() {
     
     // Filter to only changed attrs, but maintain ATTRIBUTE_ORDER
     attributeList = ATTRIBUTE_ORDER.filter(attr => changedAttrs.has(attr));
-    attributeList.forEach(attr => {
-      headerRow.appendChild(createHeaderCell(attr));
-    });
   }
+  const columns = layoutAttributeColumns(attributeList);
+  if (wrap) wrap.dataset.view = currentView;
 
-  STATIC_COLUMNS.forEach(col => {
-    headerRow.appendChild(createHeaderCell(col));
+  // Build header
+  const headerRow = document.createElement('tr');
+  const nameHead = createHeaderCell('Name');
+  nameHead.className = 'team';
+  headerRow.appendChild(nameHead);
+  columns.forEach((column) => {
+    const th = document.createElement('th');
+    th.className = column.cls;
+    th.dataset.attr = column.attr;
+    th.appendChild(pairBox(column.attr));
+    headerRow.appendChild(th);
   });
+  STATIC_COLUMNS.forEach(col => {
+    const th = createHeaderCell(col);
+    th.className = 'tr-rt';
+    headerRow.appendChild(th);
+  });
+  headerRow.appendChild(fillCell('th'));
   
   thead.appendChild(headerRow);
   
@@ -1153,7 +1296,8 @@ function renderPlayersTable() {
     
     if (currentView === 'attributes') {
       // Current attribute values only; movement lives on Training Changes.
-      attributeList.forEach(attr => {
+      columns.forEach((column) => {
+        const attr = column.attr;
         let value;
         if (attr === 'NG' || attr === 'EM' || attr === 'MO') {
           value = player.attributes[attr] || (attr === 'NG' ? 1.0 : attr === 'EM' ? 50 : 0);
@@ -1161,24 +1305,30 @@ function renderPlayersTable() {
           value = window.GOB_AttributeDisplay.rawAttr(player.attributes, attr);
           if (value == null) value = 0;
         }
-        row.appendChild(createAttributeCell(attr, value));
+        const cell = createAttributeCell(attr, value);
+        cell.className += ' ' + column.cls;
+        row.appendChild(cell);
       });
     } else {
       // Show changes for this player (0 if no change)
-      attributeList.forEach(attr => {
+      columns.forEach((column) => {
         const changes = reportData.player_changes[player.name] || {};
-        const change = changes[attr] || 0;
-        row.appendChild(createChangeCell(change));
+        const change = changes[column.attr] || 0;
+        const cell = createChangeCell(change);
+        cell.className += ' ' + column.cls;
+        row.appendChild(cell);
       });
     }
 
     const rt = getPlayerHighestRt(player);
     const rtCell = document.createElement('td');
     rtCell.textContent = formatRtDisplay(rt);
+    rtCell.className = 'tr-rt';
     if (typeof getRtBucketClass === 'function') {
-      rtCell.className = getRtBucketClass(rt);
+      rtCell.className += ' ' + getRtBucketClass(rt);
     }
     row.appendChild(rtCell);
+    row.appendChild(fillCell('td'));
     
     tbody.appendChild(row);
   });
@@ -1236,7 +1386,7 @@ function createAttributeCell(attr, value) {
     td.style.padding = 'var(--spacing-xs)';
   } else {
     const displayValue = window.GOB_AttributeDisplay.displayAttr(value);
-    td.textContent = String(displayValue == null ? 0 : displayValue);
+    td.appendChild(pairBox(String(displayValue == null ? 0 : displayValue)));
   }
 
   return td;
@@ -1330,24 +1480,28 @@ function createMomentumPill(mo) {
  *
  * `text` is the arrow form (Team Report, Training Changes, Playbook Summary).
  */
+/** One mark: `count` arrows in `direction`, in the tone the week gives that count. */
+function describeTrainingMark(direction, count) {
+  const camp = getReportWeekNumber() === 1;
+  let tone;
+  if (direction > 0) tone = count >= 3 ? 'elite' : count === 2 ? 'up' : (camp ? 'neutral' : 'up-faint');
+  else tone = (!camp && count === 1) ? 'down-faint' : 'down';
+  return {
+    text: (direction > 0 ? '▲' : '▼').repeat(count),
+    className: (direction > 0 ? 'change-delta' : 'change-negative') + ' tr-tone-' + tone,
+    tone: tone,
+    direction: direction,
+    count: count,
+  };
+}
+
 function describeTrainingChange(change) {
   const n = Number(change);
   if (!Number.isFinite(n)) {
     return { text: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
   }
   const camp = getReportWeekNumber() === 1;
-  const mark = (direction, count) => {
-    let tone;
-    if (direction > 0) tone = count >= 3 ? 'elite' : count === 2 ? 'up' : (camp ? 'neutral' : 'up-faint');
-    else tone = (!camp && count === 1) ? 'down-faint' : 'down';
-    return {
-      text: (direction > 0 ? '▲' : '▼').repeat(count),
-      className: (direction > 0 ? 'change-delta' : 'change-negative') + ' tr-tone-' + tone,
-      tone: tone,
-      direction: direction,
-      count: count,
-    };
-  };
+  const mark = describeTrainingMark;
 
   // Exactly 0 is a grey dash, camp or in season.
   if (n === 0) return { text: '–', className: 'change-zero', tone: 'flat', direction: 0, count: 0 };
@@ -1361,6 +1515,37 @@ function describeTrainingChange(change) {
   // In-season (weeks 2–26): the arrow's direction is the sign of the change.
   if (n > 0) return mark(1, n >= 3 ? 3 : n >= 1 ? 2 : 1);
   return mark(-1, n <= -2.5 ? 3 : n <= -1.5 ? 2 : 1);
+}
+
+/**
+ * Play and defense CMD movement (Playbook Summary).
+ *
+ * Today these use the player-attribute scale above, which was cut for attribute points
+ * (three arrows at +3). A trained play gains far more than that in one session (measured
+ * on the offline engine, 2026-10-02: set plays 2-7, motions 13-35, zones 13-66, Man
+ * 41-178), so nearly every trained play shows three arrows.
+ *
+ * PLAY_CMD_SCALE is the one switch:
+ *   'attribute'  the player-attribute scale (what ships today)
+ *   'play'       the cut-offs below: PROPOSED, waiting for Jamie's approval
+ * Cut-offs are the smallest change that earns two and three arrows. CMD never falls in a
+ * training session (it falls at end of game: offense 2-17 a game, defense 5-47), so the
+ * down cut-offs only matter if a report ever carries a drop.
+ */
+const PLAY_CMD_SCALE = 'attribute';
+const PLAY_CMD_CUTOFFS = {
+  offense: { up: [5, 20], down: [5, 10] },
+  defense: { up: [30, 50], down: [10, 20] },
+};
+
+function describePlayCmdChange(change, kind) {
+  if (PLAY_CMD_SCALE !== 'play') return describeTrainingChange(change);
+  const n = Number(change);
+  if (!Number.isFinite(n) || n === 0) return describeTrainingChange(0);
+  const cut = (PLAY_CMD_CUTOFFS[kind] || PLAY_CMD_CUTOFFS.offense)[n > 0 ? 'up' : 'down'];
+  const size = Math.abs(n);
+  const count = size >= cut[1] ? 3 : size >= cut[0] ? 2 : 1;
+  return describeTrainingMark(n > 0 ? 1 : -1, count);
 }
 
 function formatChangeForTooltip(change, attrKey = null) {
@@ -1377,9 +1562,9 @@ function formatChangeForTooltip(change, attrKey = null) {
 function createChangeCell(change) {
   const td = document.createElement('td');
   const arrow = describeTrainingChange(change);
-  td.textContent = arrow.text;
+  td.appendChild(pairBox(arrow.text));
+  // A moved cell is marked by its arrows alone: no box, so no `is-delta` here.
   td.className = arrow.className;
-  if (Number(change) !== 0) td.classList.add('is-delta');
   td.setAttribute('aria-label', `Training change ${change > 0 ? '+' : ''}${change}`);
   return td;
 }
@@ -1640,6 +1825,7 @@ function createPlaybookSummaryPanel(title, key, groups) {
   const cols = document.createElement('div');
   cols.className = 'pbs-cols';
   groups.forEach(function (group) {
+    group.kind = key;      // 'offense' or 'defense': each has its own CMD cut-offs
     cols.appendChild(createPlaybookSummaryGroup(group));
   });
   panel.appendChild(cols);
@@ -1682,7 +1868,7 @@ function createPlaybookSummaryGroup(group) {
     const effectiveness = item && typeof item.effectiveness === 'number' ? item.effectiveness : null;
     cmd.textContent = effectiveness == null ? '—' : String(effectiveness);
     const delta = document.createElement('span');
-    const described = describeTrainingChange(change);
+    const described = describePlayCmdChange(change, group.kind);
     delta.className = 'pbs-delta ' + described.className;
     delta.textContent = described.text;
     delta.setAttribute('aria-label', 'Training change ' + (change > 0 ? '+' : '') + change);

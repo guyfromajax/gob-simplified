@@ -246,20 +246,36 @@
     return openSammy(kind, topData, moment, ctx);
   }
 
-  // Offline only. "Coaching archetype evolved" is a weekly-card row, not a pop-up,
-  // so nothing in the queue marks it. Once the Office has shown it (this is the
-  // authoritative read, and the Office is the panel on screen) the pending key is
-  // cleared on this computer, so the row shows once. Online is unchanged.
+  // "Coaching archetype evolved" is a weekly-card row, not a pop-up, so nothing in the
+  // queue marks it. Once the Office has shown it (this is the authoritative read, and the
+  // Office is the panel on screen) the pending key is cleared, so the row shows for one
+  // Office visit. Offline that is a write to this computer; online it is the account's.
   function clearShownEvolutionRow(topData) {
-    if (global.GOB_BUILD_PROFILE !== 'desktop') return;
     var items = Array.isArray(topData && topData.weekly_card_items) ? topData.weekly_card_items : [];
     var listed = items.some(function (item) { return item && item.kind === 'archetype_evolution'; });
     if (!listed) return;
     var office = global.document && global.document.getElementById('office-root');
     if (!office || !office.getClientRects().length) return;
     var franchiseId = franchiseIdOf(topData);
-    if (!franchiseId) return;
-    patchJson('/franchise/archetype-evolution-seen', { franchise_id: franchiseId });
+    if (global.GOB_BUILD_PROFILE === 'desktop') {
+      if (franchiseId) patchJson('/franchise/archetype-evolution-seen', { franchise_id: franchiseId });
+      return;
+    }
+    try {
+      if (global.__gobAuthMeData) global.__gobAuthMeData.archetype_evolution_pending = '';
+    } catch (e) { /* ignore */ }
+    // The account route does not touch the franchise's browse revision, so the cached
+    // Office body (which still has the row) would come back as a 304. Drop it, now and
+    // once the write has landed, so the next visit reads a fresh body.
+    function dropCachedOffice() {
+      try {
+        if (franchiseId && global.GOBStore && typeof global.GOBStore.clearFranchise === 'function') {
+          global.GOBStore.clearFranchise(franchiseId);
+        }
+      } catch (e) { /* ignore */ }
+    }
+    dropCachedOffice();
+    patchJson('/api/auth/archetype-evolution-seen', {}).then(dropCachedOffice);
   }
 
   function play(topData, opts) {

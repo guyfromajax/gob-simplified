@@ -184,10 +184,12 @@ Sub-tabs (`.stab` in `.pg-head .subtabs`): parallelogram (`clip-path`), height 4
 
 | Rule | Applies to | How |
 |---|---|---|
-| Attribute pairs | Every table that shows the 12 core attributes: Team › Roster, a team page, a news story roster, the Scouting Report starting five | Six pairs, in this order: SC SH, ID OD, PS BH, RB ST, AG ND, IQ FT. The two values of a pair sit against their shared edge (`--pair-in`); pairs are a gutter apart (`--pair-out`); the gap between WT and SC is wider still (`--pair-lead`). Wrapper `.gob-pairs`, cells `gstart` / `gend` (`gs` / `ge` in Scouting). |
+| Attribute pairs | Every table that shows the 12 core attributes: Team › Roster, a team page, a news story roster, the Scouting Report starting five, the Training Report's Player Report (Attributes, Training Changes) and Projected Starting 5 | Six pairs, in this order: SC SH, ID OD, PS BH, RB ST, AG ND, IQ FT. The two values of a pair sit against their shared edge (`--pair-in`); pairs are a gutter apart (`--pair-out`); the gap between WT and SC is wider still (`--pair-lead`). Wrapper `.gob-pairs`, cells `gstart` / `gend` (`gs` / `ge` in Scouting). |
 | Stat families | Stats tables: Player Stats, Team Stats, Standings, Rankings | Columns of one family sit `--fam-in` apart, families `--fam-out` apart. Wrapper `.gob-fam`, `fs` on a family's first column and `fe` on its last. Families: shooting splits (FGM FGA FG%), 3PT, free throws, rebounds, playmaking, defense; on a standings table (Team W L), (PF PA), then each of Streak, Last Week, Next on its own. |
 
 Pair and family columns never take a card's spare width (`width: 1px`); the name column and the gutters do. So a pair or a family reads the same at 1280 and at 1920. No table builds its own grouping.
+
+A table that shows only some of the twelve (Training Changes shows what was trained) keeps the pair logic: a pair present in full stays together; an attribute whose partner is absent stands alone with a gutter on both sides (`gsolo`); the group shade alternates in the order shown. On the Training Report the values sit right beside the names: the name column is as wide as its longest name and an empty last cell takes the spare width, so rows and zebra still span the page.
 
 ### Modals
 

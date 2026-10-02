@@ -10353,6 +10353,9 @@ def _build_office_digest_for_command_center(
         "session_type": response.get("session_type") or "in-season",
         "cpu_training_resume": bool((response.get("cpu_training_resume") or {}).get("required")),
     }
+    season_preview_block, top_recruits_block = _office_preview_blocks(
+        response, franchise_doc, team_id, week, player_ids
+    )
     rank = response.get("rank")
     try:
         national_rank = int(rank) if rank not in (None, "-", "") else None
@@ -10378,7 +10381,72 @@ def _build_office_digest_for_command_center(
         "signing_points_total": WEEK_35_RECRUITING_POINTS_BUDGET,
         "roster_spots": roster_spots,
         "newcomers": newcomers,
+        "season_preview_block": season_preview_block,
+        "top_recruits": top_recruits_block,
     })
+
+
+def _office_preview_blocks(
+    response: dict[str, Any],
+    franchise_doc: dict[str, Any],
+    team_id: Any,
+    week: int,
+    player_ids: list[Any],
+) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]]]:
+    """(season preview, top recruits) for the Office, with the reads they need.
+
+    Week 1 of every season gets the preview: one projected roster read, and from season 2
+    the coach's trophies for last season's line. Weeks 1-34 get Top Recruits: one projected
+    recruit read. A failure in either leaves that block out; the Office still loads.
+    """
+    from BackEnd.utils.season_preview import build_season_preview, region_letter, top_recruits
+
+    if franchise_doc.get("_id") is None or not team_id:
+        return None, None
+    fid = str(franchise_doc["_id"])
+    tid = str(team_id)
+    preview = None
+    recruits = None
+    if week <= 1:
+        try:
+            roster_docs = list(franchise_players_data_collection.find(
+                {"franchise_id": fid, "player_id": {"$in": [str(pid) for pid in player_ids]}},
+                # Identity and ratings only: no attributes leave the database for this.
+                {"player_id": 1, "meta": 1, "position_ratings": 1},
+            )) if player_ids else []
+            trophies: list[Any] = []
+            if int(franchise_doc.get("current_season", 1) or 1) > 1:
+                from BackEnd.utils.local_coach import coach_fields
+
+                trophies = list(coach_fields(franchise_doc.get("user_id"), "trophies").get("trophies") or [])
+            preview = build_season_preview({
+                "franchise_doc": franchise_doc,
+                "user_team_id": tid,
+                "user_conference": response.get("user_conference"),
+                "rankings": response.get("rankings") or [],
+                "roster_docs": roster_docs,
+                "trophies": trophies,
+                "next_game": response.get("next_game_summary"),
+            })
+        except Exception:
+            logger.exception("[OFFICE] season preview failed franchise_id=%s", fid)
+    if week < 35:
+        try:
+            region = str(response.get("user_region") or "").strip().upper() or region_letter(
+                response.get("user_conference")
+            )
+            recruits = top_recruits(
+                franchise_recruits_data_collection.find(
+                    {"franchise_id": fid},
+                    {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1, "Home Region": 1},
+                ),
+                region=region,
+                user_team_id=tid,
+                team_name_map=response.get("team_name_map") if isinstance(response.get("team_name_map"), dict) else {},
+            )
+        except Exception:
+            logger.exception("[OFFICE] top recruits failed franchise_id=%s", fid)
+    return preview, recruits
 
 
 def _build_moment_queue_for_command_center(
@@ -20468,6 +20536,39 @@ def finish_season(req: FinishSeasonRequest):
             str(franchise_id),
         )
 
+    # Next season's Office preview reads three things this reset wipes: the user's results
+    # (last meeting with each opponent), the seniors who leave, and the class that signed.
+    # One small snapshot, written with the reset below. Never blocks the rollover.
+    last_season_summary = None
+    try:
+        from BackEnd.utils.season_preview import last_season_snapshot
+
+        _ls_ftd = next(
+            (doc for doc in ftd_docs if str(doc.get("team_id")) == str(_welcome_user_team_id)), None
+        ) if _welcome_user_team_id else None
+        _ls_graduating = None
+        if _ls_ftd is not None:
+            _ls_ids = dict.fromkeys(
+                str(pid)
+                for pid in list(_ls_ftd.get("players") or []) + list(_ls_ftd.get("training_squad_players") or [])
+                if pid
+            )
+            _ls_graduating = sum(
+                1 for pid in _ls_ids
+                if fpd_by_id.get(pid) and _is_graduating_year(_player_year_from_fpd_or_core(pid, fpd_by_id.get(pid)))
+            )
+        last_season_summary = last_season_snapshot(
+            franchise_doc,
+            _welcome_user_team_id,
+            graduated_seniors=_ls_graduating,
+            signed_class=signed_players_by_team.get(str(_welcome_user_team_id), []),
+        )
+    except Exception:
+        logger.exception(
+            "[OFFICE] last-season snapshot failed at rollover; continuing. franchise_id=%s",
+            str(franchise_id),
+        )
+
     db.games.delete_many({"franchise_id": str(franchise_id)})
     from BackEnd.practice_squad.stats import clear_ps_season_stats_for_franchise
 
@@ -20512,6 +20613,8 @@ def finish_season(req: FinishSeasonRequest):
             # Consumed by the Walk-On Welcome modal on the first FCC landing of the
             # new season; captured above, before the week-35 results are cleared.
             PENDING_WALK_ON_WELCOME_FIELD: pending_walk_on_welcome,
+            # Read by the week-1 Office preview (season_preview.LAST_SEASON_FIELD).
+            "last_season": last_season_summary,
             AWARDS_FIELD: awards_reset,
             # Fresh walk-on portrait deck each season (camp-cut assign reuses only within a season).
             "walk_on_image_ids_used": [],

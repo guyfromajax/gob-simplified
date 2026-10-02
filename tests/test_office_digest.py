@@ -302,11 +302,11 @@ def test_preseason_first_week_and_signing_day_states():
     assert preseason["team_snapshot"]["moved_most"] == []
     assert preseason["team_snapshot"]["chemistry"] == {"value": 18, "max": 25}
     assert preseason["season_preview"]["preseason_rank"] == 8
-    assert preseason["season_preview"]["team_rt"] is None
-    assert preseason["season_preview"]["conference_projection"] is None
-    assert preseason["season_preview"]["returning_starters"] is None
-    assert preseason["season_preview"]["newcomers"][0]["name"] == "Walk On"
     assert preseason["season_preview"]["opener"]["opponent"] == "Appalachia"
+    # The preview's sections come from season_preview.py (tests/test_season_preview.py).
+    # Without that block the preview says so, and carries no placeholder fields.
+    assert preseason["season_preview"]["ready"] is False
+    assert set(preseason["season_preview"]) == {"ready", "preseason_rank", "national_rank", "opener"}
     assert preseason["signing_day"] is None
 
     ready = build_office_digest(_ctx())

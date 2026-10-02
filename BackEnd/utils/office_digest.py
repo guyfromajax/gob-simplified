@@ -1316,17 +1316,28 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
     )
     season_preview = None
     if state == "first_week":
-        newcomers = ctx.get("newcomers")
+        # Week 1 of every season: the Office is the season preview (season_preview.py).
+        # ``ready`` is false when the preview's own reads failed; the client then shows
+        # nothing for those sections rather than half of them.
+        block = ctx.get("season_preview_block") if isinstance(ctx.get("season_preview_block"), dict) else None
         season_preview = {
+            "ready": block is not None,
             "preseason_rank": now_rank,
-            "conference_projection": None,
-            "team_rt": None,
             "national_rank": now_rank,
-            "returning_starters": None,
-            "top_returner": None,
-            "newcomers": newcomers if newcomers else None,
             "opener": next_game,
         }
+        if block is not None:
+            opener_extra = block.get("opener") if isinstance(block.get("opener"), dict) else {}
+            season_preview.update({key: value for key, value in block.items() if key != "opener"})
+            if next_game is not None:
+                season_preview["opener"] = dict(next_game, **opener_extra)
+        if not wire.get("events") and wire.get("status") == "No recruiting movement":
+            wire["status"] = "No preseason leans"
+    # Top Recruits stays all season and steps aside once Signing Day arrives.
+    signed_class = signed_class_digest(franchise_doc, user_team_id, week=week)
+    top_recruits = ctx.get("top_recruits") if isinstance(ctx.get("top_recruits"), dict) else None
+    if week >= 35 or signed_class:
+        top_recruits = None
 
     return {
         "state": state,
@@ -1355,8 +1366,9 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
         "todos": build_todos(flags),
         "recruiting_wire": wire,
         "signing_day": signing,
-        "signed_class": signed_class_digest(franchise_doc, user_team_id, week=week),
+        "signed_class": signed_class,
         "season_preview": season_preview,
+        "top_recruits": top_recruits,
         # The folded moment. The command-center load fills both from the moment
         # queue; the shape stays stable for every other caller.
         "also": None,

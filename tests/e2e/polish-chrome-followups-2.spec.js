@@ -85,6 +85,11 @@ async function installEvolutionApi(page, state, writes) {
       await fulfillJson(route, { archetype_evolution_pending: '' });
       return;
     }
+    if (pathname === '/api/auth/archetype-evolution-seen') {
+      state.pending = false;
+      await fulfillJson(route, { archetype_evolution_pending: '', message: 'Archetype evolution cleared' });
+      return;
+    }
     if (pathname === '/api/auth/me') {
       await fulfillJson(route, { user_id: 'e2e-user', username: 'e2e', lead_archetype: 'defensive_rebounding',
         archetype_reveal_seen: true, archetype_evolution_pending: state.pending ? 'defensive_rebounding' : '' });
@@ -92,7 +97,18 @@ async function installEvolutionApi(page, state, writes) {
     }
     if (pathname === '/app-config') { await fulfillJson(route, { isAlpha: false, alphaDisclaimer: null, version: '1.0' }); return; }
     if (pathname === '/teams') { await fulfillJson(route, [{ name: 'Lancaster', display_name: 'Lancaster', object_id: O.TID, _id: O.TID }]); return; }
-    if (pathname.startsWith('/franchise/command-center/data')) { await fulfillJson(route, evolutionVisit(state)); return; }
+    if (pathname.startsWith('/franchise/command-center/data')) {
+      // As the server does: one ETag per browse revision. An account write does not move
+      // it, so a client that still holds the cached body gets a 304 of the stale one.
+      const etag = 'W/"' + FID + ':1:22:' + (state.rev || 0) + ':e2e:cc"';
+      if (state.etags && request.headers()['if-none-match'] === etag) {
+        await route.fulfill({ status: 304, headers: { ETag: etag } });
+        return;
+      }
+      const headers = state.etags ? { ETag: etag, 'Cache-Control': 'private, no-cache', 'Access-Control-Expose-Headers': 'ETag' } : {};
+      await route.fulfill({ status: 200, contentType: 'application/json', headers, body: JSON.stringify(evolutionVisit(state)) });
+      return;
+    }
     await fulfillJson(route, {});
   });
 }
@@ -156,16 +172,47 @@ test('G1: offline, a visit that does not show the Office leaves the row for the 
   await expect.poll(() => writesTo(writes, '/franchise/archetype-evolution-seen').length).toBe(1);
 });
 
-test('G1: online is unchanged: no local write', async ({ page }) => {
+test('G1: online, the row is marked seen through the account route and is gone on the next visit', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const writes = [];
+  const reads = [];
+  const state = { pending: true, desktop: false, etags: true };
+  await stubAuth(page);
+  await installEvolutionApi(page, state, writes);
+  page.on('request', (request) => {
+    if (request.url().includes('/franchise/command-center/data')) reads.push(request.headers()['if-none-match'] || '');
+  });
+  await openFcc(page);
+  await expect(evolutionRow(page)).toBeVisible({ timeout: 15000 });
+  await expect.poll(() => writesTo(writes, '/api/auth/archetype-evolution-seen').length).toBe(1);
+  expect(writesTo(writes, '/api/auth/archetype-evolution-seen')[0].method).toBe('PATCH');
+  expect(writesTo(writes, '/franchise/archetype-evolution-seen')).toHaveLength(0);
+  await expect(evolutionRow(page)).toBeVisible();
+
+  for (let visit = 0; visit < 2; visit += 1) {
+    await openFcc(page);
+    await page.waitForTimeout(800);
+    await expect(evolutionRow(page)).toHaveCount(0);
+  }
+  expect(writesTo(writes, '/api/auth/archetype-evolution-seen')).toHaveLength(1);
+  // The account write does not change the Office's ETag, so the cached body must be dropped:
+  // the visit after the write asks for a full body, not a revalidation of the stale one.
+  expect(reads[1]).toBe('');
+});
+
+test('G1: online, a visit that does not show the Office leaves the row for the next one', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   const writes = [];
   const state = { pending: true, desktop: false };
   await stubAuth(page);
   await installEvolutionApi(page, state, writes);
-  await openFcc(page);
-  await expect(evolutionRow(page)).toBeVisible({ timeout: 15000 });
+  await openFcc(page, 'team-view');
+  await expect(page.locator('#office-root')).toBeHidden();
   await page.waitForTimeout(1500);
-  expect(writesTo(writes, '/franchise/archetype-evolution-seen')).toHaveLength(0);
+  expect(writesTo(writes, '/api/auth/archetype-evolution-seen')).toHaveLength(0);
+  await openFcc(page, 'home-tab');
+  await expect(evolutionRow(page)).toBeVisible({ timeout: 15000 });
+  await expect.poll(() => writesTo(writes, '/api/auth/archetype-evolution-seen').length).toBe(1);
 });
 
 /* ------------------------------------------------------------------ G2 --- */
@@ -489,7 +536,8 @@ const STANDINGS_SIZES = [[1280, 720], [1440, 900], [1920, 1080], [2048, 1152], [
 for (const [width, height] of STANDINGS_SIZES) {
   test('G5: the conference standings card shows all 8 teams at normal spacing, ' + width + 'x' + height, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    for (const state of ['win', 'loss', 'regular', 'first_week', 'tournament', 'signing_day']) {
+    // Every state that has a standings card (week 1 shows the preseason national rankings instead).
+    for (const state of ['win', 'loss', 'regular', 'tournament', 'signing_day']) {
       const table = conference(TIED, 3);
       await O.openOffice(page, standingsOffice(state, table));
       const label = state + ' ' + width;
