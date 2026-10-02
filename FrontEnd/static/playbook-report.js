@@ -354,21 +354,33 @@ function configureButtons() {
   });
 }
 
+/* First paint: the page stays behind the shared loader (and hidden, see the is-loading
+   rule in playbook-report.css) until the playbook is drawn, so the bare "Offense /
+   Motion / Set Plays" heads are never shown and no head jumps when its rows arrive. */
+function liftLoading() {
+  document.documentElement.classList.remove('is-loading');
+  if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+}
+
 async function initPlaybookReport() {
-  configureButtons();
+  try {
+    configureButtons();
+    const opponentName = await resolveOpponentName();
+    const subhead = document.getElementById('report-subhead');
+    if (subhead) subhead.textContent = `vs ${opponentName}`;
 
-  const opponentName = await resolveOpponentName();
-  const subhead = document.getElementById('report-subhead');
-  if (subhead) subhead.textContent = `vs ${opponentName}`;
+    const data = await reportFetchJson(getPlaybookUrl());
+    if (!data) return;
 
-  const data = await reportFetchJson(getPlaybookUrl());
-  if (!data) return;
-
-  buildOffenseRows(data);
-  buildDefenseRows(data);
-  buildFastBreakRows(data);
-  buildHcTrapRows(data);
-  buildPcRows(data);
+    buildOffenseRows(data);
+    buildDefenseRows(data);
+    buildFastBreakRows(data);
+    buildHcTrapRows(data);
+    buildPcRows(data);
+  } finally {
+    // A failed load lifts it too: the page and its Back button must not stay covered.
+    liftLoading();
+  }
 }
 
 window.addEventListener('DOMContentLoaded', initPlaybookReport);

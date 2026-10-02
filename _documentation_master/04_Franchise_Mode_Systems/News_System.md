@@ -29,6 +29,7 @@
     "#{winning team rank}. {winning team name} upset #{losing team rank}.{losing team name} by a score of {final score}.
     - list each game on its own line
     - list games in ascending order of the natl_rank of the losing team, starting with teh lowest
+- Stored shape: `lines` (the sentences) and `rich_lines`, one `game_result` line per upset: `{type, text, game_id}`. `game_id` is the stored game for that matchup, looked up when the story is written (`_week_game_ids`, a read; a failed lookup writes the story without ids). The page draws a "Box Score" link after a line that has one (`data-return`: the box score opens as a read and its Back returns to the story). A story stored before this has `lines` only and shows no link.
 - Coach's Office: Upset Reports are **excluded** from the News container (still on the standalone news page / News tab).
 
 ##Headline: "Practice Squad All-Stars"
@@ -67,12 +68,12 @@
   1. `ranking_table` rich lines under `National Recruit Rankings` and `Region {letter}` (when points exist). Each table is named (`table`: `national` / `region`). Stored with the story, so an old story keeps its own week:
      - **Rank movement**: each row's `move` (places gained since last week's same table; 0 = unchanged) or `new: true` (not in last week's table). Computed from the previous week's stored report (`w{N-1}-recruiting-report`), national against national and region against region. Week 1, or a week with no report the week before, stores none.
      - **`user_row`** on the national table when the user's team is outside the top 25: its real rank (its place among every team with points; the durable `recruiting_rank` when it has none), score, and `move` when last week's rank is known.
-     - **`caption`** on the national table: what Score is, in plain words (`WEEKLY_SCORE_CAPTION`; the Results story uses `RESULTS_SCORE_CAPTION`). The scoring is not hidden.
+     - **`caption`** on the national table: "Class strength so far" (`WEEKLY_SCORE_CAPTION`; the Results story's is "Class strength", `RESULTS_SCORE_CAPTION`). **The scoring is hidden from the player:** the caption says what Score is for, and no news copy explains how it is built.
   2. The lean announcements, under their own two sub-headings (no outer "Recruiting Leans Announced" heading):
      - `Top Rated Recruit Announcements` — recruits with RT > 49 who added a lean that week, as `text` lines
      - `Conference {label} Lean Announcements` — the conference as the rest of the app names it (`A2`, not `2`). New leans toward teams in the user's conference (teams by ascending natl_rank; a recruit can appear in both sections). One `team_recruits` rich line per team: `{type, team_id, team_name, recruits: [{recruit_id, name, rt}]}`, recruits by descending RT, `rt` the raw number.
 - Rendering (`newsStory.js`, `newsView.js`):
-  - No "Week N" line under the headline (the headline names the week). Other story types keep it.
+  - No "Week N" line under a headline that already names the story's week (`headlineNamesWeek` in `newsView.js`, any story type): Recruiting Report, Upset Report, Practice Squad Game Results, and the "Projected All-Americans: week N" stories. A headline that does not name the week keeps the line (Preseason All-Americans, the end-of-regular-season projection, Practice Squad All-Stars, Your Recruiting Board Moved, Walk Ons, Recruiting Results).
   - Headings are the app's heading styles (Styleguide › Type), never bold body text: a `heading` line is a section (`h3.gob-news-heading`, heading-col); `level: 2`, and a team over its recruits, is a sub-section (`h4.gob-news-sub`, heading-card).
   - A heading followed by a `ranking_table` is one `.gob-news-rank` section; consecutive ones are a `.gob-news-ranks` group. They stack, and from 1600px sit side by side with the story at full width. The lean sections follow beneath.
   - Ranking rows: the team is a team link (logo mark and name) to its page; the user's team is the navy "yours" row; `user_row` is the last row of the national table, set off by a rule. Movement is a small neutral mark beside the rank ("▲3" t87, "▼2" and "NEW" t60, nothing when unchanged), the Office's rank-movement treatment. A story stored without movement, caption or `user_row` shows none.

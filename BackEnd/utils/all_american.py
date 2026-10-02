@@ -648,6 +648,39 @@ def _team_lines(picks: Iterable[Mapping[str, Any]]) -> list[dict[str, str]]:
     return lines
 
 
+# The preseason story's first sentence. Stories written before the formula was hidden
+# say the teams were "picked on ratings": the stored story is left as it is and the
+# sentence is replaced when the story is read (``public_story``).
+PRESEASON_INTRO = "The preseason All-American teams, named before a game has been played."
+RETIRED_PRESEASON_INTRO = (
+    "The preseason All-American teams, picked on ratings before a game has been played."
+)
+
+
+def public_story(story: Any) -> Any:
+    """A stored news story as the player reads it.
+
+    An All-American story that still carries the retired preseason sentence is returned
+    as a copy with the current one. Anything else, and the stored story itself, is
+    untouched.
+    """
+    if not isinstance(story, Mapping) or story.get("type") != NEWS_TYPE:
+        return story
+    lines = story.get("rich_lines")
+    if not isinstance(lines, list) or not any(
+        isinstance(line, Mapping) and line.get("text") == RETIRED_PRESEASON_INTRO for line in lines
+    ):
+        return story
+    scrubbed = dict(story)
+    scrubbed["rich_lines"] = [
+        {**line, "text": PRESEASON_INTRO}
+        if isinstance(line, Mapping) and line.get("text") == RETIRED_PRESEASON_INTRO
+        else line
+        for line in lines
+    ]
+    return scrubbed
+
+
 def build_news_story(projection: Mapping[str, Any]) -> dict[str, Any] | None:
     """The story for a publishing week, or None on any other week.
 
@@ -663,7 +696,7 @@ def build_news_story(projection: Mapping[str, Any]) -> dict[str, Any] | None:
     week = max(1, completed)
     if completed <= 0:
         headline = "Preseason All-Americans announced"
-        intro = "The preseason All-American teams, named before a game has been played."
+        intro = PRESEASON_INTRO
     elif completed >= REGULAR_SEASON_WEEKS:
         headline = "Projected All-Americans: end of the regular season"
         intro = (

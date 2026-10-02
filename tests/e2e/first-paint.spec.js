@@ -321,3 +321,188 @@ test('Account: no placeholder "Coach", "0" or empty cards before the account is 
   await expect(page.locator('#acct-name')).toHaveText('e2e');
   await expect(page.locator('#gp-total')).toHaveText('1,250');
 });
+
+// ── Playbook report, cut players, box score with no game (the sweep's items 31, 29, 28) ──
+const NF_SHOTS = process.env.NF_SHOTS === '1';
+const NF_OUT = path.join(__dirname, '../../reports/news-followups');
+
+async function nfShots(page, name) {
+  if (!NF_SHOTS) return;
+  fs.mkdirSync(NF_OUT, { recursive: true });
+  for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(size);
+    await page.mouse.move(size.width - 6, size.height - 6);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(NF_OUT, 'after-' + name + '-' + size.width + '.png'), animations: 'disabled' });
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+}
+
+/** Where each section head sits, by its text. */
+function headTops(page, scope) {
+  return page.locator(scope + ' h2, ' + scope + ' h3').evaluateAll((nodes) => {
+    const out = {};
+    nodes.filter((node) => node.getClientRects().length > 0).forEach((node) => {
+      out[node.textContent.trim()] = Math.round(node.getBoundingClientRect().top + window.scrollY);
+    });
+    return out;
+  });
+}
+
+test('Playbook report: no bare section heads before data, and no head moves once it is shown', async ({ page }) => {
+  // Record every frame in which the page body is on show, with where its heads sit.
+  const frames = [];
+  await page.exposeFunction('__pbFrame', (frame) => { frames.push(frame); });
+  await page.addInitScript(() => {
+    const tick = () => {
+      const shell = document.querySelector('.playbook-report-shell');
+      const overlay = document.getElementById('page-load-overlay');
+      const loaderUp = !!overlay && getComputedStyle(overlay).display !== 'none';
+      if (shell && !loaderUp && getComputedStyle(shell).visibility !== 'hidden') {
+        const heads = {};
+        shell.querySelectorAll('h2, h3').forEach((node) => {
+          if (node.getClientRects().length) heads[node.textContent.trim()] = Math.round(node.getBoundingClientRect().top + window.scrollY);
+        });
+        window.__pbFrame({ heads, rows: shell.querySelectorAll('.report-list > *').length });
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const { tracker, first } = await openHeld(page, '/playbook-report.html?' + franchiseQuery(), franchiseApi({
+    '/franchise/play-next-game': { home: 'Lancaster', away: 'Four-Corners', home_id: 'Lancaster', away_id: 'Four-Corners', week: 1 },
+  }));
+  expectHeldBack(first);
+  await expect(page.locator('html')).toHaveClass(/is-loading/);
+  await expect(page.locator('.playbook-report-shell')).toHaveCSS('visibility', 'hidden');
+  expect(frames, 'the page body was on show before its data').toEqual([]);
+
+  await landed(page, tracker);
+  await expect(page.locator('.playbook-report-shell')).toHaveCSS('visibility', 'visible');
+  await expect(page.locator('#offense-motion-list > *').first()).toBeVisible();
+  // The markup's placeholder ("vs Opponent") was never on show; the real opponent is.
+  await expect(page.locator('#report-subhead')).toHaveText(/^vs Four[ -]Corners$/);
+  await page.waitForTimeout(600);
+  // Every frame the page was on show, it already had its rows and its heads were where
+  // they end up: "Set Plays" and "Zone" do not jump, and no head appears late.
+  const settled = await headTops(page, '.playbook-report-shell');
+  expect(Object.keys(settled)).toEqual(expect.arrayContaining([
+    'Offense', 'Motion', 'Set Plays', 'Defense', 'Man', 'Zone', 'Fast Breaks', 'Half-Court Traps',
+  ]));
+  expect(frames.length).toBeGreaterThan(0);
+  frames.forEach((frame) => {
+    expect(frame.rows, 'shown with no rows').toBeGreaterThan(0);
+    expect(frame.heads).toEqual(settled);
+  });
+  await nfShots(page, 'playbook-report');
+});
+
+test('Playbook report: a failed load still lifts the loader', async ({ page }) => {
+  await stubAuth(page);
+  await page.addInitScript(() => { window.alert = () => {}; });
+  await page.route('**/api/playbooks**', (route) => route.fulfill({
+    status: 500, contentType: 'application/json', body: '{"detail":"nope"}',
+  }));
+  await page.goto('/playbook-report.html?' + franchiseQuery());
+  await expect(page.locator('html')).not.toHaveClass(/is-loading/);
+  await expect(page.locator('#back-btn')).toBeVisible();
+});
+
+test('Cut players, nothing to cut: the heading and table shell are never shown before "No Cuts Required"', async ({ page }) => {
+  // Record every frame in which the page is on show without the modal over it.
+  const bare = [];
+  await page.exposeFunction('__cutBare', (text) => { bare.push(text); });
+  await page.addInitScript(() => {
+    const tick = () => {
+      const view = document.getElementById('cut-players-view');
+      const overlay = document.getElementById('page-load-overlay');
+      const modal = document.getElementById('cut-modal-backdrop');
+      const loaderUp = !!overlay && getComputedStyle(overlay).display !== 'none';
+      const modalUp = !!modal && modal.classList.contains('is-visible');
+      if (view && !loaderUp && !modalUp && getComputedStyle(view).visibility !== 'hidden') {
+        const head = view.querySelector('h1');
+        window.__cutBare(head ? head.textContent.trim() : 'view');
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  const { tracker, first } = await openHeld(page, '/cut-players.html?' + franchiseQuery(), franchiseApi());
+  expectHeldBack(first);
+  await expect(page.locator('#cut-players-view')).toHaveCSS('visibility', 'hidden');
+  await landed(page, tracker);
+  await expect(page.locator('#cut-modal-title')).toHaveText('No Cuts Required');
+  await expect(page.locator('#cut-modal-title')).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(bare, 'the page was on show without the modal').toEqual([]);
+  await nfShots(page, 'cut-players-no-cuts');
+});
+
+test('Cut players, cuts to make: held until the roster and the count are in, then the table', async ({ page }) => {
+  const cc = Object.assign({}, FIXTURE.cc, { cut_required: true, cut_count: 3 });
+  const { tracker, first } = await openHeld(
+    page, '/cut-players.html?' + franchiseQuery(), franchiseApi({ '/franchise/command-center/data': cc }),
+  );
+  expectHeldBack(first);
+  await expect(page.locator('#cut-players-view')).toHaveCSS('visibility', 'hidden');
+  await landed(page, tracker);
+  await expect(page.locator('#cut-players-view')).toHaveCSS('visibility', 'visible');
+  await expect(page.locator('#cut-players-view h1')).toHaveText('Assign Practice Squad');
+  await expect(page.locator('#cut-players-body tr')).toHaveCount(FIXTURE.roster.players.length);
+  await expect(page.locator('#cut-status')).toContainText('3');
+});
+
+test('Cut players: a failed load still lifts the loader', async ({ page }) => {
+  await stubAuth(page);
+  await page.addInitScript(() => { window.alert = () => {}; });
+  await page.route('**/roster/**', (route) => route.fulfill({
+    status: 500, contentType: 'application/json', body: '{"detail":"nope"}',
+  }));
+  await page.goto('/cut-players.html?' + franchiseQuery());
+  await expect(page.locator('html')).not.toHaveClass(/is-loading/);
+  await expect(page.locator('#cut-modal-message')).toHaveText('Unable to load practice squad assignment data.');
+});
+
+for (const [name, query, api] of [
+  ['opened without a game id', {}, null],
+  ['a game that cannot be loaded', { game_id: 'aaaaaaaaaaaaaaaaaaaaaaaa' }, { status: 404, body: { detail: 'Game not found' } }],
+]) {
+  test('Box score, ' + name + ': one card says so, no bare section heads', async ({ page }) => {
+    await stubAuth(page);
+    await page.addInitScript(() => { window.alert = () => {}; });
+    const fulfil = franchiseApi();
+    await page.route('**/*', async (route) => {
+      const request = route.request();
+      const pathname = new URL(request.url()).pathname;
+      if (api && pathname.startsWith('/api/game/')) {
+        return route.fulfill({ status: api.status, contentType: 'application/json', body: JSON.stringify(api.body) });
+      }
+      const canned = (request.resourceType() === 'fetch' || request.resourceType() === 'xhr') ? fulfil(request) : null;
+      if (canned) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(canned.body) });
+      return route.continue();
+    });
+    await page.goto('/box-score.html?' + franchiseQuery(query));
+    await page.waitForFunction(() => {
+      const overlay = document.getElementById('page-load-overlay');
+      return !overlay || getComputedStyle(overlay).display === 'none';
+    });
+    const card = page.locator('#box-score-container .box-score-empty');
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('This box score could not be opened.');
+    await page.waitForTimeout(400);
+    const seen = await probe(page);
+    // No "Quarter Scoring / Player Of The Game / Player Stats" heads, and no placeholder
+    // header ("Away Team 0 @ Home Team 0").
+    expect(seen.headings.filter((h) => !h.chrome).map((h) => h.t)).toEqual([]);
+    expect(seen.sample).not.toMatch(/Quarter Scoring|Player Of The Game|Player Stats|Away Team|Home Team/);
+    expect(seen.flagged.filter((entry) => !entry.chrome).map((entry) => entry.t)).toEqual([]);
+    await expect(page.locator('#box-score-header')).toBeHidden();
+    await expect(page.locator('#quarter-scoring-section')).toBeHidden();
+    // The way out is still there, and it works.
+    const back = page.locator('#locker-room-button');
+    await expect(back).toBeVisible();
+    if (!api) await nfShots(page, 'box-score-no-game');
+    await back.click();
+    await expect(page).toHaveURL(/franchise-command-center\.html|mode-select\.html/, { timeout: 20000 });
+  });
+}

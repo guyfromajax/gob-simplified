@@ -650,3 +650,116 @@ def test_weekly_report_story_carries_movement_the_user_row_and_the_caption(monke
     third = franchise_routes._build_weekly_recruiting_report_story(doc["_id"], doc, 4)
     national = next(line for line in third["rich_lines"] if line.get("table") == "national")
     assert all("move" not in row and "new" not in row for row in national["rows"])
+
+
+# ---------------------------------------------------------------------------
+# Upset Report: each line stores its game
+# ---------------------------------------------------------------------------
+
+def _upset_case():
+    ranks = {"t1": 95, "t2": 10, "t5": 60, "t6": 3, "t3": 59, "t4": 30}
+    names = {"t1": "Alpha", "t2": "Beta", "t5": "Epsilon", "t6": "Zeta", "t3": "Gamma", "t4": "Delta"}
+    results = [
+        _result_row("t1", "t2", 80, 72),      # Alpha (away) upsets Beta
+        _result_row("t6", "t5", 90, 95),      # Epsilon (home) upsets Zeta
+        _result_row("t3", "t4", 70, 75),      # no upset
+    ]
+    return results, ranks, names
+
+
+def test_upset_lines_store_their_game_and_keep_the_same_text():
+    results, ranks, names = _upset_case()
+    # Keyed (away id, home id), as the result rows are.
+    game_ids = {("t1", "t2"): "g-alpha-beta", ("t6", "t5"): "g-zeta-epsilon", ("t3", "t4"): "g-no-upset"}
+    story = franchise_routes._build_week_upset_report_story(5, results, ranks, names, game_id_by_matchup=game_ids)
+    assert story["rich_lines"] == [
+        {"type": "game_result", "text": "#60. Epsilon upset #3. Zeta by a score of 95-90.", "game_id": "g-zeta-epsilon"},
+        {"type": "game_result", "text": "#95. Alpha upset #10. Beta by a score of 80-72.", "game_id": "g-alpha-beta"},
+    ]
+    # The plain lines are the same sentences, in the same order.
+    assert story["lines"] == [line["text"] for line in story["rich_lines"]]
+
+
+def test_upset_line_with_no_stored_game_has_no_game_id():
+    results, ranks, names = _upset_case()
+    story = franchise_routes._build_week_upset_report_story(
+        5, results, ranks, names, game_id_by_matchup={("t1", "t2"): "g-alpha-beta"},
+    )
+    by_text = {line["text"]: line for line in story["rich_lines"]}
+    assert by_text["#95. Alpha upset #10. Beta by a score of 80-72."]["game_id"] == "g-alpha-beta"
+    assert "game_id" not in by_text["#60. Epsilon upset #3. Zeta by a score of 95-90."]
+    # No lookup at all: every line is written, none has a game.
+    bare = franchise_routes._build_week_upset_report_story(5, results, ranks, names)
+    assert [line["type"] for line in bare["rich_lines"]] == ["game_result", "game_result"]
+    assert not any("game_id" in line for line in bare["rich_lines"])
+
+
+def test_the_game_lookup_runs_only_when_the_week_has_an_upset():
+    results, ranks, names = _upset_case()
+    calls = []
+
+    def lookup():
+        calls.append(1)
+        return {("t1", "t2"): "g1"}
+
+    assert franchise_routes._build_week_upset_report_story(
+        5, [_result_row("t3", "t4", 70, 75)], ranks, names, game_id_by_matchup=lookup) is None
+    assert calls == []
+    story = franchise_routes._build_week_upset_report_story(5, results, ranks, names, game_id_by_matchup=lookup)
+    assert calls == [1]
+    assert any(line.get("game_id") == "g1" for line in story["rich_lines"])
+
+
+def test_week_game_ids_keeps_one_week_and_survives_a_failed_read(monkeypatch):
+    import BackEnd.utils.schedule_browse as schedule_browse
+
+    seen = {}
+
+    def fake(franchise_id, stamp=None):
+        seen["args"] = (franchise_id, stamp)
+        return {(4, "a", "b"): "g-week-4", (5, "a", "b"): "g-week-5", (5, "c", "d"): "g-week-5b"}
+
+    monkeypatch.setattr(schedule_browse, "matchup_game_ids", fake)
+    assert franchise_routes._week_game_ids("fid", 5) == {("a", "b"): "g-week-5", ("c", "d"): "g-week-5b"}
+    # Its own stamp, so a cache keyed on the stored franchise cannot answer for a week
+    # whose results are not stored yet.
+    assert seen["args"][0] == "fid" and seen["args"][1] != None  # noqa: E711
+
+    def broken(_franchise_id, stamp=None):
+        raise RuntimeError("no games collection")
+
+    monkeypatch.setattr(schedule_browse, "matchup_game_ids", broken)
+    assert franchise_routes._week_game_ids("fid", 5) == {}
+
+
+def test_append_week_news_stores_the_game_on_each_upset_line(monkeypatch):
+    franchise_id = ObjectId()
+    team_a, team_b = str(ObjectId()), str(ObjectId())
+
+    class _Ftd:
+        def find(self, _query, _projection=None):
+            return [{"team_id": team_a, "natl_rank": 50}, {"team_id": team_b, "natl_rank": 11}]
+
+    monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", _Ftd())
+    monkeypatch.setattr(
+        franchise_routes, "_format_team_name_map",
+        lambda team_ids=None, franchise=None: {team_a: "Underdog U", team_b: "Favorite State"},
+    )
+    monkeypatch.setattr(franchise_routes, "_build_weekly_recruiting_report_story", lambda *_a, **_k: None)
+    asked = []
+
+    def week_ids(fid, week):
+        asked.append((fid, week))
+        return {(team_a, team_b): "game-123"}
+
+    monkeypatch.setattr(franchise_routes, "_week_game_ids", week_ids)
+    doc = {"season_news": []}
+    franchise_routes._append_franchise_week_news(franchise_id, doc, 2, [_result_row(team_a, team_b, 88, 81)], [])
+    story = doc["season_news"][0]
+    assert story["story_id"] == "w2-upset-report"
+    assert story["rich_lines"] == [{
+        "type": "game_result",
+        "text": "#50. Underdog U upset #11. Favorite State by a score of 88-81.",
+        "game_id": "game-123",
+    }]
+    assert asked == [(franchise_id, 2)]

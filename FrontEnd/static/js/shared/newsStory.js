@@ -65,6 +65,17 @@ function renderPlayerTable(players) {
     + rows.join('') + '</tbody></table></div>';
 }
 
+// A stored game opened from a story. `data-return` on the link makes it a read: GOBNav
+// adds return_url on the click, the closed-game guard is skipped, and the box score's
+// Back comes back to this story.
+function boxScoreHref(gameId) {
+  var ctx = window.FranchiseContext;
+  var franchiseId = ctx && typeof ctx.get === 'function' ? (ctx.get('franchise_id') || '') : '';
+  return '/box-score.html?game_id=' + encodeURIComponent(gameId)
+    + '&mode=franchise&franchise_id=' + encodeURIComponent(franchiseId)
+    + '&team_id=' + encodeURIComponent(userTeamId());
+}
+
 function userTeamId() {
   var views = window.GOBViews;
   return views && typeof views.userTeamId === 'function' ? String(views.userTeamId() || '') : '';
@@ -196,9 +207,14 @@ function renderLine(item) {
   if (type === 'player_table') return renderPlayerTable(item.players || []);
   if (type === 'ranking_table') return renderRankingTable(item);
   if (type === 'game_result') {
+    // A line about one game. `box_score_href` is a ready link (it carries its own
+    // return); `game_id` is the stored game, linked as a read. A line stored with
+    // neither (an Upset Report from before games were stored) has no link.
     var line = esc(item.text);
     if (item.box_score_href) {
       line += ' <a class="lnk" href="' + esc(item.box_score_href) + '">Box Score</a>';
+    } else if (item.game_id) {
+      line += ' <a class="lnk" data-return href="' + esc(boxScoreHref(item.game_id)) + '">Box Score</a>';
     }
     return '<p class="gob-news-line">' + line + '</p>';
   }

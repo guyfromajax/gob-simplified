@@ -1,5 +1,5 @@
 {
- "_source": "Recorded GET /franchise/news stories of a real offline season (the same save as boxscore-real-game.json). old_shape (w4): the lean section as plain lines, no movement. new_shape (w5): team blocks, no movement. with_movement (w9): tables named, rank movement, the user's foot row, the score caption, the conference as A1.",
+ "_source": "Recorded GET /franchise/news stories of a real offline season (the same save as boxscore-real-game.json). old_shape (w4): the lean section as plain lines, no movement. new_shape (w5): team blocks, no movement. with_movement (w9): tables named, rank movement, the user's foot row, the score caption, the conference as A1. The week-9 caption is the current one ('Class strength so far'); the recording carried the earlier wording.",
  "new_shape": {
   "story_id": "w5-recruiting-report",
   "week": 5,
@@ -925,7 +925,7 @@
      13,
      12
     ],
-    "caption": "Score adds up the ratings of the recruits leaning toward a team: a first choice counts in full, a second choice half, a third a quarter.",
+    "caption": "Class strength so far",
     "user_row": {
      "rank": 80,
      "team_id": "69a6fcb68d2c56aa82e48a54",

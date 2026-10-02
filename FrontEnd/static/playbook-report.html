@@ -7,6 +7,7 @@
   <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Playbook Settings - GOB</title>
@@ -17,6 +18,14 @@
 </head>
 <body class="playbook-report-page">
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <!-- First paint: stay behind the shared loader until the playbook is drawn
+       (playbook-report.js lifts it), so the bare section heads are never shown and
+       nothing jumps when the rows arrive. -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
 
   <div class="resource-page-container fcc-brand-page-shell playbook-report-shell">
     <header class="report-header">

@@ -24,14 +24,11 @@ REGION_LIMIT = 16  # full region (2 conferences × 8 teams)
 NATIONAL_COLUMN_SPLIT = (13, 12)
 REGION_COLUMN_SPLIT = (8, 8)
 
-# What Score is, in plain words, under "National Recruit Rankings". From the scorers
-# below: lean slots 1 / 2 / 3 count 100% / 50% / 25% of a recruit's rating; a signing
-# counts the whole rating for the team that signed it.
-WEEKLY_SCORE_CAPTION = (
-    "Score adds up the ratings of the recruits leaning toward a team: "
-    "a first choice counts in full, a second choice half, a third a quarter."
-)
-RESULTS_SCORE_CAPTION = "Score adds up the ratings of the recruits a team signed."
+# The quiet line under "National Recruit Rankings". It says what Score is for, not how
+# it is built: the formula (lean slots, signings) is hidden from the player, so no news
+# copy explains it.
+WEEKLY_SCORE_CAPTION = "Class strength so far"
+RESULTS_SCORE_CAPTION = "Class strength"
 
 FTD_RECRUITING_RANK = "recruiting_rank"
 FTD_RECRUITING_REGION_RANK = "recruiting_region_rank"

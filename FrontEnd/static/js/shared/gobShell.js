@@ -503,7 +503,7 @@
     if (section.id === 'recruiting') btn.id = 'gob-rail-recruiting';
     btn.addEventListener('click', function () {
       if (section.id === 'prep') {
-        if (pageMode && pageMode.section === 'prep') return;
+        if (pageMode && pageMode.section === 'prep' && !pageMode.drill) return;
         if (!pageMode && (TAB_SECTION[currentTab()] || 'office') === 'prep') return;
         playClick();
         if (pageMode) {
@@ -517,7 +517,10 @@
         return;
       }
       if (pageMode) {
-        if (pageMode.section === section.id) return;
+        // A drill-in page (a box score opened to read, a practice-squad roster) lights
+        // the section it came from but is not that section's own page: every rail item
+        // leaves it, the lit one too. On a section's own page the lit item does nothing.
+        if (pageMode.section === section.id && !pageMode.drill) return;
         playClick();
         var nav = window.GOBNav;
         if (section.go === 'recruiting') {
@@ -1000,7 +1003,7 @@
     if (!spec) return null;
     var q = new URLSearchParams(window.location.search);
     if (path === '/box-score.html') {
-      if (q.get('return_url')) return { kind: 'browse', section: 'league', sub: '', keepBack: true };
+      if (q.get('return_url')) return { kind: 'browse', section: 'league', sub: '', keepBack: true, drill: true };
       return { kind: 'focus' };
     }
     if (path === '/recruiting.html' && q.get('action') === 'run') return { kind: 'focus', file: 'recruiting' };
@@ -1015,7 +1018,12 @@
       keepBack: !!spec.keepBack
     };
     if (out.file === 'recruiting') out.sub = hubFromUrl();
-    if (out.section === 'context') out.section = sectionFromReturn();
+    // A context page (a player, a team's roster) is a drill-in: it lights the section it
+    // was opened from but is not that section's own page.
+    if (out.section === 'context') {
+      out.section = sectionFromReturn();
+      out.drill = true;
+    }
     return out;
   }
 

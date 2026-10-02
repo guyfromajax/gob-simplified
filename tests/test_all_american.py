@@ -687,3 +687,76 @@ def test_user_team_is_listed_at_its_training_position(store):
     assert players["f-pg"]["position"] == "SG"
     assert players["f-pg"]["rating"] == 35        # his SG rating (65 at PG), not his best
     assert players["a-pg"]["position"] == "PG"
+
+
+# ---------------------------------------------------------------------------
+# The retired preseason sentence is scrubbed on read, not rewritten
+# ---------------------------------------------------------------------------
+
+OLD_INTRO = "The preseason All-American teams, picked on ratings before a game has been played."
+NEW_INTRO = "The preseason All-American teams, named before a game has been played."
+
+
+def _old_preseason_story():
+    return {
+        "story_id": "w1-all-americans", "week": 1, "type": "all_americans",
+        "headline": "Preseason All-Americans announced",
+        "rich_lines": [
+            {"type": "text", "text": OLD_INTRO},
+            {"type": "gap"},
+            {"type": "heading", "text": "First Team"},
+            {"type": "text", "text": "PG: Alder PG (Alder, SR)"},
+        ],
+    }
+
+
+def test_public_story_replaces_the_retired_sentence_and_leaves_the_stored_story_alone():
+    assert aa.RETIRED_PRESEASON_INTRO == OLD_INTRO and aa.PRESEASON_INTRO == NEW_INTRO
+    stored = _old_preseason_story()
+    before = copy.deepcopy(stored)
+    read = aa.public_story(stored)
+    assert read["rich_lines"][0] == {"type": "text", "text": NEW_INTRO}
+    assert read["rich_lines"][1:] == stored["rich_lines"][1:]
+    assert {key: read[key] for key in read if key != "rich_lines"} == {
+        key: stored[key] for key in stored if key != "rich_lines"}
+    assert stored == before                                   # the stored story is untouched
+    assert "picked on ratings" not in str(read)
+
+
+def test_public_story_passes_everything_else_through_unchanged():
+    current = _old_preseason_story()
+    current["rich_lines"][0]["text"] = NEW_INTRO
+    assert aa.public_story(current) is current
+    # The same sentence in another kind of story is not this module's to change.
+    other = {"type": "upset_report", "rich_lines": [{"type": "text", "text": OLD_INTRO}]}
+    assert aa.public_story(other) is other
+    plain = {"type": "all_americans", "lines": ["no rich lines"]}
+    assert aa.public_story(plain) is plain
+    assert aa.public_story(None) is None
+
+
+def test_news_route_scrubs_on_read_and_does_not_rewrite_the_store(store, monkeypatch):
+    """GET /franchise/news, through the app."""
+    from fastapi.testclient import TestClient
+
+    from BackEnd.api import franchise_routes
+    from BackEnd.api.api import app
+
+    doc, _teams = _seed_league(store, week=3, games=2)
+    other = {"story_id": "w2-upset-report", "week": 2, "type": "upset_report",
+             "headline": "Week 2 Upset Report", "lines": ["Alder upset Birch by a score of 70-60."]}
+    store.franchises_collection.update_one(
+        {"_id": doc["_id"]}, {"$set": {"season_news": [_old_preseason_story(), other]}})
+    monkeypatch.setattr(
+        franchise_routes, "verify_franchise_owned_by_user", lambda _fid, _uid: _stored(store, doc))
+    monkeypatch.setattr(franchise_routes, "_news_dispatch_items", lambda _doc: [])
+
+    res = TestClient(app).get("/franchise/news", params={"franchise_id": str(doc["_id"])})
+    assert res.status_code == 200, res.text
+    news = res.json()["news"]
+    assert [story["story_id"] for story in news] == ["w1-all-americans", "w2-upset-report"]
+    assert news[0]["rich_lines"][0]["text"] == NEW_INTRO
+    assert "picked on ratings" not in res.text
+    assert news[1]["lines"] == other["lines"]
+    # Still the old sentence in the store.
+    assert _stored(store, doc)["season_news"][0]["rich_lines"][0]["text"] == OLD_INTRO
