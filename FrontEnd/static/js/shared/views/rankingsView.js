@@ -98,10 +98,12 @@ export function mount(container, ctx) {
   function render() {
     var franchiseId = (ctx && ctx.franchiseId) || '';
     var shown = showAll ? rankings : rankings.slice(0, 25);
-    var html = '<section class="gob-tcard gob-rank"><h2>National Rankings</h2>'
+    // Families (Styleguide › Tables): (#, Team, W, L), (PF, PA), Last Week, Next.
+    var html = '<section class="gob-tcard gob-rank gob-fam"><h2>National Rankings</h2>'
       + '<table id="rankings-table" class="gob-tbl"><thead><tr>'
-      + '<th class="rk">#</th><th class="team">Team</th><th>W</th><th>L</th><th>PF</th><th>PA</th>'
-      + '<th class="left">Last Week</th><th class="left">Next</th>'
+      + '<th class="rk fs">#</th><th class="team">Team</th><th>W</th><th class="fe">L</th>'
+      + '<th class="fs">PF</th><th class="fe">PA</th>'
+      + '<th class="left fs fe">Last Week</th><th class="left fs fe">Next</th>'
       + '</tr></thead><tbody id="rankings-table-body">';
     if (!shown.length) html += '<tr><td class="team" colspan="8">No rankings yet.</td></tr>';
     shown.forEach(function (row) {
@@ -109,14 +111,14 @@ export function mount(container, ctx) {
       var name = row.team_name || '';
       var href = tables.rosterHref(franchiseId, row.team_id || '', name, 'rankings-view');
       html += '<tr' + (mine ? ' class="me is-user"' : '') + '>'
-        + '<td class="rk">' + tables.esc(row.natl_rank != null ? row.natl_rank : '') + '</td>'
+        + '<td class="rk fs">' + tables.esc(row.natl_rank != null ? row.natl_rank : '') + '</td>'
         + '<td class="team">' + tables.teamLink(href, name, name, row.primary_color) + '</td>'
         + '<td>' + tables.esc(row.W || 0) + '</td>'
-        + '<td>' + tables.esc(row.L || 0) + '</td>'
-        + '<td>' + tables.esc(row.PF != null ? row.PF : '') + '</td>'
-        + '<td>' + tables.esc(row.PA != null ? row.PA : '') + '</td>'
-        + '<td class="left">' + lastWeekCell(row) + '</td>'
-        + '<td class="left">' + tables.esc(row.next || '') + '</td>'
+        + '<td class="fe">' + tables.esc(row.L || 0) + '</td>'
+        + '<td class="fs">' + tables.esc(row.PF != null ? row.PF : '') + '</td>'
+        + '<td class="fe">' + tables.esc(row.PA != null ? row.PA : '') + '</td>'
+        + '<td class="left fs fe">' + lastWeekCell(row) + '</td>'
+        + '<td class="left fs fe">' + tables.esc(row.next || '') + '</td>'
         + '</tr>';
     });
     html += '</tbody></table></section>';

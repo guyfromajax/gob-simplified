@@ -2,7 +2,8 @@
  * League › Leaders. Category boards from GET /franchise/leaders.
  * Each category uses the API default (basis omitted): PTS/REB/AST per game,
  * 3PTM/BLK/STL season totals, FG% and DEF% as percentages.
- * Full list replaces this history entry and shows the top 50 of one category.
+ * Full list replaces this history entry and shows the top 50 of one category, under a
+ * "← Leaders" bar that returns to the boards.
  */
 
 var CATS = ['PTS', '3PTM', 'AST', 'BLK', 'FG%', 'REB', 'STL', 'DEF%'];
@@ -272,16 +273,23 @@ export function mount(container, ctx) {
   function renderFull() {
     var stat = expanded;
     var rows = ((full && full[stat]) || []).filter(matches);
-    var html = '<section class="gob-tcard gob-full"><h2>' + tables.esc(LABELS[stat] || stat)
-      + '</h2><button type="button" class="gob-board">Board</button>'
-      + '<table class="gob-tbl"><thead><tr><th class="left">#</th><th class="left">Player</th><th class="left">Team</th><th>Value</th></tr></thead><tbody>';
+    var title = LABELS[stat] || stat;
+    var meta = headerMeta(stat);
+    // The same bar the team and player pages use: one way back, in one place.
+    var html = '<div class="gob-dt-bar"><button type="button" class="gob-dt-up gob-board">← Leaders</button>'
+      + '<span class="gob-dt-crumb"><span>League</span><i>/</i><span>Leaders</span><i>/</i><b>'
+      + tables.esc(title) + '</b></span></div>'
+      + '<section class="gob-tcard gob-full"><h2>' + tables.esc(title)
+      + (meta ? '<em>' + tables.esc(meta) + '</em>' : '') + '</h2>'
+      + '<table class="gob-tbl"><thead><tr><th class="left rk">#</th><th class="left">Player</th><th class="left">Team</th>'
+      + '<th>' + tables.esc(unit(stat) || 'Total') + '</th></tr></thead><tbody>';
     rows.forEach(function (row, index) {
       var href = tables.rosterHref(franchiseId, row.team_id, row.team || '', 'leaders-view') + '&origin=league';
       var nameCell = row.player_id
         ? '<a class="gob-player" href="' + tables.esc(playerHref(row.player_id)) + '">' + tables.esc(row.name || '') + '</a>'
         : tables.esc(row.name || '');
       html += '<tr' + (mine(row) ? ' class="me is-user"' : '') + '>'
-        + '<td class="left">' + (index + 1) + '</td>'
+        + '<td class="left rk">' + (index + 1) + '</td>'
         + '<td class="left">' + nameCell + '</td>'
         + '<td class="left">' + (row.team_id
           ? '<a class="gob-team" data-return href="' + tables.esc(href) + '">' + tables.esc(row.team || '') + '</a>'

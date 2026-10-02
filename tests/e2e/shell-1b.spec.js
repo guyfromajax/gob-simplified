@@ -275,8 +275,11 @@ test('section map opens the right panel or the existing page', async ({ page }) 
     }
   }
   await expect(page.locator('#gob-stats-toggle')).toHaveCount(0);
+  // Practice Squads is a League sub-tab: it shows every region's squads.
   await mouseClick(page, '[data-gob-section="team"]');
-  await mouseClick(page, stab(page, 'Practice Squad'));
+  await expect(stab(page, 'Practice Squad')).toHaveCount(0);
+  await mouseClick(page, '[data-gob-section="league"]');
+  await mouseClick(page, stab(page, 'Practice Squads'));
   await expect(page.locator('#practice-squad-view.tab-content.active')).toBeVisible();
   expect(page.url()).toContain('tab=practice-squad-view');
 

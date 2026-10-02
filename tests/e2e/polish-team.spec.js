@@ -292,6 +292,7 @@ for (const [width, height, tag] of SIZES) {
         pos: read('#roster-view tbody td.code'),
         wt: read('#roster-view tbody td.wt'),
         attr: read('#roster-view tbody td.gstart'),
+        attrEnd: read('#roster-view tbody td.gend'),
         attrHead: read('#roster-view thead th.gstart'),
         dev: read('#roster-view tbody td.dev'),
       };
@@ -300,9 +301,17 @@ for (const [width, height, tag] of SIZES) {
     expect(align.rt).toBe('left');
     expect(align.rtHead).toBe('left');
     expect(align.dev).toBe('right');
-    // Attribute values centre under their headers.
-    expect(align.attr).toBe('center');
-    expect(align.attrHead).toBe('center');
+    // The two values of a pair sit against their shared edge, so a pair holds together
+    // however wide the table is; each header sits over its own value.
+    expect(align.attr).toBe('right');
+    expect(align.attrEnd).toBe('left');
+    expect(align.attrHead).toBe('right');
+    const headOverValue = await page.evaluate(() => {
+      const head = document.querySelector('#roster-view thead th.gstart .ak').getBoundingClientRect();
+      const value = document.querySelector('#roster-view tbody td.gstart .attr-tile').getBoundingClientRect();
+      return Math.abs((head.left + head.width / 2) - (value.left + value.width / 2));
+    });
+    expect(headOverValue).toBeLessThanOrEqual(1);
     expect(align.pos).toBe('center');
     expect(align.wt).toBe('right');
 
@@ -425,17 +434,17 @@ for (const [width, height, tag] of SIZES) {
       return nodes.filter((n) => Math.round(n.getBoundingClientRect().top) === lowest)
         .map((n) => n.getAttribute('data-measure'));
     });
-    expect(bottomRow).toEqual(['team_chemistry', 'fight', 'discipline']);
+    expect(bottomRow).toEqual(['team_chemistry', 'discipline', 'fight']);
     const grid4 = await page.locator('#team-attributes-view .mgrid').evaluate((el) => {
       const cells = Array.from(el.querySelectorAll('.mcell'));
       const lowest = Math.max.apply(null, cells.map((c) => Math.round(c.getBoundingClientRect().top)));
       const last = cells.filter((c) => Math.round(c.getBoundingClientRect().top) === lowest).pop();
-      // Nothing is rendered to the right of Discipline in the bottom row.
+      // Nothing is rendered to the right of Fight in the bottom row.
       return { right: Math.round(last.getBoundingClientRect().right), gridRight: Math.round(el.getBoundingClientRect().right) };
     });
     expect(grid4.gridRight - grid4.right).toBeGreaterThan(80);
 
-    // Pairs share a column: each measure sits above or below its partner.
+    // Each column reads down: a measure sits above the one Jamie's order puts under it.
     const centres = await page.locator('#team-attributes-view .mcell').evaluateAll((nodes) => {
       const out = {};
       nodes.forEach((node) => {
@@ -445,10 +454,13 @@ for (const [width, height, tag] of SIZES) {
       return out;
     });
     for (const [a, b] of [
-      ['offensive_efficiency', 'defensive_efficiency'],
-      ['pt_opp_modifier', 'pt_efficiency'],
-      ['fb_efficiency', 'fb_opp_modifier'],
       ['shot_threshold', 'rebound_modifier'],
+      ['rebound_modifier', 'team_chemistry'],
+      ['offensive_efficiency', 'defensive_efficiency'],
+      ['defensive_efficiency', 'discipline'],
+      ['fb_efficiency', 'fb_opp_modifier'],
+      ['fb_opp_modifier', 'fight'],
+      ['pt_opp_modifier', 'pt_efficiency'],
     ]) {
       expect(Math.abs(centres[a] - centres[b])).toBeLessThanOrEqual(1);
     }

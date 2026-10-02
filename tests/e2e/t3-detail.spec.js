@@ -250,7 +250,10 @@ async function installApi(page, state) {
       return;
     }
     if (pathname.startsWith('/roster/')) {
-      await fulfillJson(route, rosterBody(state.focus));
+      // As the route does: only the franchise's own team is the user's team.
+      const body = rosterBody(state.focus);
+      body.is_user_team = decodeURIComponent(pathname.split('/')[2] || '') === TID;
+      await fulfillJson(route, body);
       return;
     }
     await fulfillJson(route, {});
@@ -526,9 +529,9 @@ test('a null percentage renders an em dash and a real zero stays 0.0', async ({ 
   await expect(row).toContainText('—');
 });
 
-async function assertCompactRoster(page) {
-  const table = page.locator('#team-view .gob-roster.is-compact table');
-  await expect(table.locator('tr').first().locator('th').first()).toHaveText('Player');
+async function assertTeamRoster(page) {
+  const table = page.locator('#team-view .gob-roster table');
+  await expect(table.locator('thead tr').nth(1).locator('th').first()).toHaveText('Player');
   const shape = await table.evaluate((node) => {
     const bodyFirst = node.tBodies[0] && node.tBodies[0].rows[0];
     function rects(cell) {
@@ -567,7 +570,7 @@ async function assertCompactRoster(page) {
     const starters = bodyFirst ? bodyFirst.getBoundingClientRect() : null;
     const playerRow = node.tBodies[0] && node.tBodies[0].rows[1];
     const player = playerRow ? playerRow.getBoundingClientRect() : null;
-    const title = node.closest('.gob-tcard').querySelector('.card-h').getBoundingClientRect();
+    const title = node.closest('.gob-tcard').querySelector('.gob-card-head').getBoundingClientRect();
     return {
       headerTop: header.top,
       startersTop: starters ? starters.top : 0,
@@ -586,12 +589,23 @@ async function assertCompactRoster(page) {
   expect(shape.rtInside).toBe(true);
 }
 
-test('the team page roster is the compact five-attribute grid', async ({ page }) => {
+test('the team page roster is the full grid: all twelve attributes, above the schedule', async ({ page }) => {
   const state = { focus: 'offensive' };
   await openFcc(page, state, '?franchise_id=' + FID + '&team_id=' + TID + '&tab=team-view&view_team_id=' + OPP + '&origin=league');
-  await page.waitForSelector('#team-view .gob-roster.is-compact');
-  const headers = await page.locator('#team-view .gob-roster thead th').allTextContents();
-  expect(headers.map((text) => text.trim())).toEqual(['Player', 'RT', 'POS', 'YR', 'HT', 'SC', 'SH', 'ID', 'OD', 'RB']);
+  await page.waitForSelector('#team-view .gob-roster tbody td.rt');
+  await expect(page.locator('#team-view .gob-roster.is-compact')).toHaveCount(0);
+  const headers = await page.locator('#team-view .gob-roster thead tr').nth(1).locator('th').allTextContents();
+  expect(headers.map((text) => text.trim())).toEqual(['Player', 'RT', 'POS', 'YR', 'HT', 'WT',
+    'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT']);
+  // Roster above Schedule, each the full width of the page.
+  const stack = await page.evaluate(() => {
+    const roster = document.querySelector('#team-view .gob-team-roster').getBoundingClientRect();
+    const sched = document.querySelector('#team-view .gob-team-sched').getBoundingClientRect();
+    return { below: sched.top - roster.bottom, sameLeft: Math.abs(sched.left - roster.left), sameWidth: Math.abs(sched.width - roster.width) };
+  });
+  expect(stack.below).toBeGreaterThan(0);
+  expect(stack.sameLeft).toBeLessThanOrEqual(1);
+  expect(stack.sameWidth).toBeLessThanOrEqual(1);
   await expect(page.locator('#team-view .gob-roster')).toContainText('Starters');
   await expect(page.locator('#team-view .gob-roster')).toContainText('Bench');
   const split = await page.locator('#team-view .gob-roster tbody tr').evaluateAll((rows) => {
@@ -606,13 +620,13 @@ test('the team page roster is the compact five-attribute grid', async ({ page })
   expect(split.between).toBe(5);
   expect(split.first).toContain('cedric buckles');
   await expect(page.locator('#team-view .gob-roster')).toContainText('Montgomery Worthington-Blake');
+  // Dev focus is stored for the user's own players only, so another team has no such column.
   await expect(page.locator('#team-view .gob-roster thead')).not.toContainText('Dev focus');
-  await expect(page.locator('#team-view .gob-roster thead')).not.toContainText('PS');
   for (const size of [[1280, 720], [1920, 1080]]) {
     await page.setViewportSize({ width: size[0], height: size[1] });
     await page.waitForTimeout(100);
-    await assertCompactRoster(page);
-    const fit = await page.locator('#team-view .gob-roster.is-compact').evaluate((el) => el.scrollWidth - el.clientWidth);
+    await assertTeamRoster(page);
+    const fit = await page.locator('#team-view .gob-roster').evaluate((el) => el.scrollWidth - el.clientWidth);
     expect(fit).toBeLessThanOrEqual(1);
     const overflow = await page.evaluate(() => {
       const main = document.querySelector('html.gob-shell .main');
@@ -622,7 +636,7 @@ test('the team page roster is the compact five-attribute grid', async ({ page })
   }
 });
 
-test('compact header sits under the title on the offline save', async ({ page }) => {
+test('the roster header sits under the title on the offline save', async ({ page }) => {
   let up = false;
   try {
     const res = await page.request.get('http://127.0.0.1:8766/franchise-command-center.html', { timeout: 2000 });
@@ -637,11 +651,11 @@ test('compact header sits under the title on the offline save', async ({ page })
   });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('http://127.0.0.1:8766/franchise-command-center.html?franchise_id=6ab284847ab3853ae89a1184&team_id=69a6fcb68d2c56aa82e48a54&tab=team-view&view_team_id=69a6fcb68d2c56aa82e48a58&origin=league', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#team-view .gob-roster.is-compact tbody td.rt');
+  await page.waitForSelector('#team-view .gob-roster tbody td.rt');
   for (const size of [[1280, 720], [1920, 1080]]) {
     await page.setViewportSize({ width: size[0], height: size[1] });
     await page.waitForTimeout(150);
-    await assertCompactRoster(page);
+    await assertTeamRoster(page);
   }
 });
 

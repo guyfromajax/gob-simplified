@@ -212,3 +212,81 @@ def test_ids_past_the_prefix_match_the_projected_read():
     full = browse.projected_game_ids(str(fid))
     assert hybrid == full
     assert hybrid[(8, str(SISTER), str(OTHER))] == str(inserted)
+
+
+def _region_franchise(played=False):
+    """Week 30. Region A: one game and a bye. Region B: two byes. Region C: two games."""
+    ids = {name: ObjectId() for name in ("a1", "a2", "a3", "b1", "b2", "c1", "c2", "c3", "c4")}
+    conference = {"a": 1, "b": 3, "c": 5}
+    for name, oid in ids.items():
+        _team(oid, name.upper(), conference[name[0]], "#101010", 1)
+
+    def game(away, home, winner=None):
+        return {
+            "away_team": str(ids[away]) if away in ids else away,
+            "home_team": str(ids[home]) if home in ids else home,
+            "game_id": None,
+            "winner": str(ids[winner]) if winner else None,
+            "score": {"away": 70, "home": 60} if winner else {},
+        }
+
+    final_a = game("a2", "a1") if played else game("R1_0", "a1")
+    fid = db.franchises.insert_one({
+        "user_team_id": "A1",
+        "user_team_object_id": str(ids["a1"]),
+        "week": 30,
+        "current_season": 1,
+        "browse_rev": 5,
+        "schedule": [],
+        "results": {},
+        "eos_tournament_active": True,
+        "region_tournaments": {
+            # Stored out of order on purpose: the page must still read A, B, C.
+            "C": {"round1": [game("c1", "c4"), game("c2", "c3")], "final": [game("R1_0", "R1_1")], "current_round": 1},
+            "A": {"round1": [game("a2", "a3", "a2" if played else None)], "final": [final_a], "current_round": 1},
+            "B": {"round1": [], "final": [game("b1", "b2")], "current_round": 1},
+        },
+    }).inserted_id
+    for oid in ids.values():
+        franchise_team_data_collection.insert_one({"franchise_id": fid, "team_id": oid, "natl_rank": 10})
+    return fid, ids
+
+
+def test_week_30_lists_the_byes_by_region_and_orders_the_games_by_region():
+    fid, ids = _region_franchise()
+    response = client.get("/franchise/schedule/week", params={"franchise_id": str(fid), "week": 30})
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    assert [(row["region"], row["team"]["name"]) for row in body["byes"]] == [
+        ("A", "A1"),
+        ("B", "B1"),
+        ("B", "B2"),
+    ]
+    user_bye = body["byes"][0]
+    assert user_bye["is_user"] is True
+    assert user_bye["team"]["team_id"] == str(ids["a1"])
+    assert user_bye["tournament_context"] == "Region A"
+    assert body["byes"][1]["is_user"] is False
+
+    assert [row["region"] for row in body["games"]] == ["A", "C", "C"]
+    assert [(row["away"]["name"], row["home"]["name"]) for row in body["games"]] == [
+        ("A2", "A3"),
+        ("C1", "C4"),
+        ("C2", "C3"),
+    ]
+    # A placeholder for a round-1 winner is never a bye.
+    assert all(row["team"]["name"] != "R1_0" for row in body["byes"])
+
+
+def test_a_round_1_winner_placed_in_the_final_is_not_a_bye():
+    fid, _ids = _region_franchise(played=True)
+    body = client.get("/franchise/schedule/week", params={"franchise_id": str(fid), "week": 30}).json()
+    assert [row["team"]["name"] for row in body["byes"] if row["region"] == "A"] == ["A1"]
+
+
+def test_byes_are_only_sent_for_week_30():
+    fid = seed()
+    body = client.get("/franchise/schedule/week", params={"franchise_id": str(fid), "week": 8}).json()
+    assert body["byes"] == []
+    assert all(row["region"] is None for row in body["games"])

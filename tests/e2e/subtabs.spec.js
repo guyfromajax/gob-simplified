@@ -178,7 +178,15 @@ test('switching, ink, overflow, keyboard, lock, and search', async ({ page }) =>
   await page.keyboard.press('Home');
   await expect(tab(page, 'Standings')).toBeFocused();
   await expect(tab(page, 'Standings')).toHaveAttribute('aria-selected', 'true');
+  // End lands on the row's last tab. Practice Squads closes the League row now, so the
+  // locked Tournament tab is reached from its neighbour instead.
   await page.keyboard.press('End');
+  await expect(tab(page, 'Practice Squads')).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(tab(page, 'Standings')).toBeFocused();
+  await expect(tab(page, 'Standings')).toHaveAttribute('aria-selected', 'true');
+  await tab(page, 'Schedule').focus();
+  await page.keyboard.press('ArrowRight');
   await expect(tab(page, 'Tournament')).toBeFocused();
   await expect(tab(page, 'Standings')).toHaveAttribute('aria-selected', 'true');
   await expect(tab(page, 'Tournament')).toHaveAttribute('aria-disabled', 'true');

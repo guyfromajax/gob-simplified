@@ -282,9 +282,9 @@
 
   register({
     id: 'practice-squad-view',
-    section: 'team',
+    section: 'league',
     subtab: 'practice-squad-view',
-    title: 'Practice Squad',
+    title: 'Practice Squads',
     module: viewModule('practiceSquadView.js')
   });
 

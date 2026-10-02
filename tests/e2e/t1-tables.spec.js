@@ -338,7 +338,7 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await expect(page.locator('#standings-view')).not.toContainText(/Mon|Tue|Wed|Thu|Fri|Sat|Sun|\d{1,2}:\d{2}/);
     const labels = await page.locator('#gob-subtabs .tabs > .tb .tb-l').allTextContents();
     expect(labels.map(function (text) { return text.trim(); }).filter(Boolean)).toEqual([
-      'Standings', 'Rankings', 'Leaders', 'Team Stats', 'Schedule', 'Tournament',
+      'Standings', 'Rankings', 'Leaders', 'Team Stats', 'Schedule', 'Tournament', 'Practice Squads',
     ]);
     await clickStab(page, 'Rankings');
     const standingsSecond = await timedOpen(page, 'Standings', '#standings-view .gob-tbl tbody tr');
@@ -421,10 +421,9 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
     await expect(page.locator('#gob-subtabs .pg-tools .stats-toggle')).toHaveCount(0);
     await expect(page.locator('#standings-view .gob-tcard')).toHaveCount(4);
-    if (size[0] >= 1680) {
-      const columns = await page.evaluate(() => getComputedStyle(document.querySelector('#standings-view .gob-tgrid')).gridTemplateColumns);
-      expect(columns.split(' ').length).toBe(2);
-    }
+    // Sister conferences sit side by side at both reference widths.
+    const columns = await page.evaluate(() => getComputedStyle(document.querySelector('#standings-view .gob-region')).gridTemplateColumns);
+    expect(columns.split(' ').length).toBe(2);
     await parkPointer(page);
     await page.screenshot({ path: path.join(OUT, 'standings-national-' + size[2] + '.png') });
     await assertNoMainOverflow(page);
@@ -438,13 +437,15 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
   }
   fs.writeFileSync(path.join(OUT, 'timings.txt'), notes.join('\n') + '\n');
 
-  await page.setViewportSize({ width: 1280, height: 720 });
+  // Sister conferences sit side by side, so four cards are two rows: a short window
+  // keeps enough of the page below the fold to scroll.
+  await page.setViewportSize({ width: 1280, height: 480 });
   await openFcc(page);
   await mouseClick(page, '[data-gob-section="league"]');
   await page.waitForSelector('#standings-view .gob-tbl tbody tr');
   const leagueIdx = await page.evaluate(() => history.state && history.state.gobIdx);
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 0; });
-  await page.waitForSelector('#standings-view .gob-tcard:nth-child(4)');
+  await expect(page.locator('#standings-view .gob-tcard')).toHaveCount(4);
   await page.evaluate(() => { document.querySelector('html.gob-shell .main').scrollTop = 520; });
   const saved = await page.evaluate(() => document.querySelector('html.gob-shell .main').scrollTop);
   expect(saved).toBeGreaterThan(200);

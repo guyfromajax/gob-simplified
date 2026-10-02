@@ -157,6 +157,84 @@ html.gob-shell.gob-1920 .gob-tgrid {
   background: var(--surface-th-bottom);
 }
 
+/* ── Stat families (Styleguide › Tables) ──────────────────────────────────────
+   Columns of one family (FGM FGA FG%; OREB DREB REB; PF PA) sit `--fam-in` apart
+   and families `--fam-out` apart. `fs` is a family's first column and `fe` its last.
+   Only the name column and the family starts are auto-width, so a wide card puts
+   its slack in the gutters between families, never inside one. */
+.gob-fam {
+  --fam-in: var(--space-6);
+  --fam-out: var(--dsp-14);
+}
+
+.gob-fam .gob-tbl th,
+.gob-fam .gob-tbl td {
+  width: 1px;
+  padding-left: var(--fam-in);
+  padding-right: var(--fam-in);
+}
+
+.gob-fam .gob-tbl th.team,
+.gob-fam .gob-tbl td.team,
+.gob-fam .gob-tbl th.fs,
+.gob-fam .gob-tbl td.fs {
+  width: auto;
+}
+
+.gob-fam .gob-tbl th.fs,
+.gob-fam .gob-tbl td.fs {
+  padding-left: var(--fam-out);
+}
+
+/* A rank column opens the row; it never takes slack. */
+.gob-fam .gob-tbl th.rk,
+.gob-fam .gob-tbl td.rk {
+  width: 1px;
+}
+
+.gob-fam .gob-tbl th.fe,
+.gob-fam .gob-tbl td.fe {
+  padding-right: var(--fam-out);
+}
+
+/* ── League › Standings: eight regions, two sister conferences side by side ── */
+#standings-view .gob-regions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: 0;
+  padding-bottom: var(--space-16);
+  container-type: inline-size;
+}
+
+#standings-view .gob-region {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dsp-12);
+  align-items: start;
+}
+
+#standings-view .gob-conf {
+  container-type: inline-size;
+}
+
+#standings-view .gob-conf .gob-tbl th.rk,
+#standings-view .gob-conf .gob-tbl td.rk {
+  color: var(--text-60);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Narrow: the pair holds, DIFF and its pill go first. */
+@container (max-width: 639px) {
+  #standings-view .gob-conf .gob-tbl .c-diff { display: none; }
+  #standings-view .gob-conf .gob-tbl .pre-diff { padding-right: var(--fam-out); }
+}
+
+/* Narrower still: one conference per row, and DIFF has room again. */
+@container (max-width: 1059px) {
+  #standings-view .gob-region { grid-template-columns: minmax(0, 1fr); }
+}
+
 .gob-team,
 .gob-next {
   display: inline-flex;
@@ -467,6 +545,51 @@ a.gob-team.gob-player {
 
 .gob-full {
   padding-bottom: var(--space-16);
+}
+
+/* Leaders › Full list. The bar above the card is the way back to the boards. */
+button.gob-dt-up {
+  border: 0;
+  background: transparent;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+button.gob-dt-up:hover {
+  color: var(--text-100);
+  background: var(--white-5);
+}
+
+button.gob-dt-up:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+.gob-full .gob-tbl th.rk,
+.gob-full .gob-tbl td.rk {
+  width: 1px;
+  padding-left: var(--space-16);
+  padding-right: var(--space-16);
+  color: var(--text-60);
+  font-variant-numeric: tabular-nums;
+}
+
+.gob-full .gob-tbl tr.me td.rk { color: var(--text-100); }
+
+.gob-full .gob-tbl th:last-child,
+.gob-full .gob-tbl td:last-child {
+  padding-right: var(--space-16);
+}
+
+.gob-full a.gob-player,
+.gob-full a.gob-team {
+  color: var(--text-100);
+  text-decoration: none;
+}
+
+.gob-full a.gob-player:hover,
+.gob-full a.gob-team:hover {
+  text-decoration: underline;
 }
 
 /* Shared empty state (UX_System "Empty states"): one neutral card. */
@@ -868,37 +991,113 @@ html.gob-shell .gob-focus.stats-toggle button {
 }
 .gob-roster.is-compact { max-height: none; }
 
+/* ── Team page: Roster above Schedule ────────────────────────────────────────
+   Side by side, the roster had room for five attributes. Stacked, it is the full
+   grid, and the schedule runs four columns under it. */
+#team-view .gob-dt-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: 0;
+  margin-top: var(--dsp-12);
+  padding-bottom: var(--space-16);
+}
+
+#team-view .gob-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-height: var(--dsz-44);
+  padding-right: var(--space-12);
+}
+
+#team-view .gob-card-head h2 {
+  padding-top: var(--space-12);
+  padding-bottom: var(--space-12);
+}
+
+#team-view .gob-team-roster-body .gob-view-skel,
+#team-view .gob-team-roster-body .gob-view-error {
+  margin: 0 var(--space-12) var(--space-12);
+}
+
+#team-view .gob-sch-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dsp-16) var(--dsp-24);
+  padding: 0 var(--space-12) var(--space-12);
+}
+
+#team-view .gob-sch-split .gob-sub {
+  margin: 0 0 var(--space-4);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--line);
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-60);
+}
+
+#team-view .gob-sch-list {
+  columns: 2;
+  column-gap: var(--dsp-24);
+}
+
+#team-view .gob-sch {
+  break-inside: avoid;
+  font-size: var(--fs-12);
+  color: var(--text-87);
+}
+
+#team-view .gob-sch-opp > span:last-child,
+#team-view .gob-sch-opp .gob-team > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#team-view .gob-sch-res {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 1099px) {
+  #team-view .gob-sch-list { columns: 1; }
+}
+
+/* The Player Stats grid. Team › Player Stats and a team page's Stats mode share it. */
 #player-stats-view { min-width: 0; }
 #player-stats-view .gob-tcard { max-width: 100%; min-width: 0; }
-#player-stats-view .gob-scroll { max-width: 100%; overflow: visible; }
-#player-stats-view .gob-scroll .gob-tbl { width: max-content; min-width: 100%; }
-#player-stats-view .gob-scroll.gob-xs { overflow-x: auto; overflow-y: visible; }
-#player-stats-view .gob-xs .gob-tbl { min-width: 0; width: max-content; }
+:is(#player-stats-view, #team-view) .gob-scroll { max-width: 100%; overflow: visible; }
+:is(#player-stats-view, #team-view) .gob-scroll .gob-tbl { width: max-content; min-width: 100%; }
+:is(#player-stats-view, #team-view) .gob-scroll.gob-xs { overflow-x: auto; overflow-y: visible; }
+:is(#player-stats-view, #team-view) .gob-pstats.gob-xs .gob-tbl { min-width: 0; width: max-content; }
 #player-stats-view tbody tr { cursor: pointer; }
 /* The last column (F) sat on the card's rounded edge and read as clipped. */
-#player-stats-view .gob-tbl th:last-child,
-#player-stats-view .gob-tbl td:last-child { padding-right: var(--space-14); }
-#player-stats-view .gob-player {
+:is(#player-stats-view, #team-view) .gob-pstats .gob-tbl th:last-child,
+:is(#player-stats-view, #team-view) .gob-pstats .gob-tbl td:last-child { padding-right: var(--space-14); }
+:is(#player-stats-view, #team-view) .gob-pstats .gob-player {
   align-items: center;
   color: var(--text-100);
   text-decoration: none;
 }
-#player-stats-view .gob-player:hover,
-#player-stats-view .gob-player:hover .gob-id span { text-decoration: none; }
-#player-stats-view .av {
+:is(#player-stats-view, #team-view) .gob-pstats .gob-player:hover,
+:is(#player-stats-view, #team-view) .gob-pstats .gob-player:hover .gob-id span { text-decoration: none; }
+:is(#player-stats-view, #team-view) .gob-pstats .av {
   width: 28px;
   height: 28px;
   overflow: hidden;
   flex: none;
 }
-#player-stats-view .av img {
+:is(#player-stats-view, #team-view) .gob-pstats .av img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: 50% 22%;
   display: block;
 }
-#player-stats-view .gob-id {
+:is(#player-stats-view, #team-view) .gob-pstats .gob-id {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -907,20 +1106,20 @@ html.gob-shell .gob-focus.stats-toggle button {
   line-height: 1;
   text-align: left;
 }
-#player-stats-view .gob-id > span:first-child {
+:is(#player-stats-view, #team-view) .gob-pstats .gob-id > span:first-child {
   color: var(--text-100);
   font-size: 13px;
   line-height: 14px;
   text-decoration: none;
 }
-#player-stats-view .gob-id .sub {
+:is(#player-stats-view, #team-view) .gob-pstats .gob-id .sub {
   color: var(--text-60);
   font-size: 11px;
   line-height: 12px;
   font-weight: 500;
   text-decoration: none;
 }
-html.gob-shell .main #player-stats-view .gob-xs thead th.pin {
+html.gob-shell .main :is(#player-stats-view, #team-view) .gob-pstats.gob-xs thead th.pin {
   position: sticky !important;
   left: 0;
   top: auto !important;
@@ -1021,6 +1220,19 @@ html.gob-shell .pg-tools .gob-wk-label {
   font-weight: var(--fw-bold);
   font-variant-numeric: tabular-nums;
 }
+/* No footer (an unplayed regular-season game): the card closes on its top padding. */
+#league-schedule-view .gob-game:not(:has(.gob-gf)) {
+  padding-bottom: var(--dsp-6);
+}
+/* A bye: the team over "Bye", in the same card as a game. */
+#league-schedule-view .gob-bye-line .nm {
+  /* Lines up under the team name: the logo's width plus its gap. */
+  padding-left: calc(18px + var(--dsp-6));
+  color: var(--text-38);
+  font-size: var(--fs-12);
+  letter-spacing: var(--tracking-6);
+  text-transform: uppercase;
+}
 #league-schedule-view .gob-gf {
   display: flex;
   align-items: center;
@@ -1061,7 +1273,13 @@ html.gob-shell.gob-1920 #league-schedule-view .gob-gf { min-height: var(--dsz-28
 }
 #team-stats-view .gob-ts .gob-tbl th,
 #team-stats-view .gob-ts .gob-tbl td {
-  padding: var(--space-6) var(--space-4);
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+/* Twenty-eight columns in ten families: a tighter pair of gutters than the default. */
+#team-stats-view .gob-ts.gob-fam {
+  --fam-in: var(--space-4);
+  --fam-out: var(--dsp-10);
 }
 #team-stats-view .gob-ts .gob-tbl th {
   font-size: var(--fs-11);

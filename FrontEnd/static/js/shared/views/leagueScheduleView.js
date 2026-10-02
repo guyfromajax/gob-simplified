@@ -2,6 +2,11 @@
  * League › Schedule. One national week from GET /franchise/schedule/week, as a
  * four-column grid of compact game cards. Order, scores, ranks, and which weeks
  * have games come from that payload. Only top-25 ranks are shown.
+ *
+ * A card's footer is the tournament round, or Final with the box score. An unplayed
+ * regular-season game has nothing to say there, so it has no footer. In Region
+ * Tourney R1 (week 30) the payload also lists the teams with a bye: each is a card in
+ * the same style, the team over "Bye", and the week reads region by region, A to H.
  */
 
 function weekUrl(tables, franchiseId, week) {
@@ -102,14 +107,49 @@ export function mount(container, ctx) {
     var done = game.status === 'complete' && game.away_score != null && game.home_score != null;
     var away = done ? Number(game.away_score) : null;
     var home = done ? Number(game.home_score) : null;
-    var foot = '<span class="ctx">' + tables.esc(game.tournament_context || (done ? 'Final' : 'Scheduled')) + '</span>';
-    if (done && game.game_id) {
-      foot += '<a class="gob-box" href="' + tables.esc(boxHref(game.game_id)) + '">Box score</a>';
+    var context = game.tournament_context || (done ? 'Final' : '');
+    var foot = '';
+    if (context) {
+      foot = '<span class="ctx">' + tables.esc(context) + '</span>';
+      if (done && game.game_id) {
+        foot += '<a class="gob-box" href="' + tables.esc(boxHref(game.game_id)) + '">Box score</a>';
+      }
     }
     return '<article class="gob-game' + (game.is_user ? ' me is-user' : '') + '">'
       + sideRow(game.away, done ? game.away_score : null, done && away > home)
       + sideRow(game.home, done ? game.home_score : null, done && home > away)
-      + '<div class="gob-gf">' + foot + '</div></article>';
+      + (foot ? '<div class="gob-gf">' + foot + '</div>' : '') + '</article>';
+  }
+
+  function byeCard(bye) {
+    var context = bye.tournament_context || '';
+    return '<article class="gob-game gob-bye' + (bye.is_user ? ' me is-user' : '') + '">'
+      + sideRow(bye.team, null, false)
+      + '<div class="gob-gs gob-bye-line"><span class="nm">Bye</span></div>'
+      + (context ? '<div class="gob-gf"><span class="ctx">' + tables.esc(context) + '</span></div>' : '')
+      + '</article>';
+  }
+
+  /** Games, then byes, region by region. With no byes the games keep the server's order. */
+  function cardsHtml(games, byes) {
+    if (!byes.length) return games.map(gameCard).join('');
+    var regions = Object.create(null);
+    var letters = [];
+    function bucket(letter) {
+      var key = String(letter || '');
+      if (!regions[key]) {
+        regions[key] = [];
+        letters.push(key);
+      }
+      return regions[key];
+    }
+    games.forEach(function (game) { bucket(game.region).push(gameCard(game)); });
+    byes.forEach(function (bye) { bucket(bye.region).push(byeCard(bye)); });
+    letters.sort(function (a, b) {
+      if (!a || !b) return a ? -1 : (b ? 1 : 0);
+      return a.localeCompare(b);
+    });
+    return letters.map(function (letter) { return regions[letter].join(''); }).join('');
   }
 
   function neighbor(dir) {
@@ -159,18 +199,19 @@ export function mount(container, ctx) {
 
   function render() {
     var games = (payload && payload.games) || [];
+    var byes = (payload && Array.isArray(payload.byes)) ? payload.byes : [];
     var title = payload && payload.label && payload.label.indexOf(':') >= 0
       ? payload.label.split(':').slice(1).join(':').trim()
       : '';
     var html = '<section class="gob-lsch">';
     if (title) html += '<p class="gob-sch-round">' + tables.esc(title) + '</p>';
-    if (!games.length) {
+    if (!games.length && !byes.length) {
       var empty = payload && payload.week >= 27
         ? 'No tournament matchups available yet.'
         : 'No games scheduled.';
       html += '<p class="gob-lsch-empty">' + tables.esc(empty) + '</p>';
     } else {
-      html += '<div class="gob-lgrid">' + games.map(gameCard).join('') + '</div>';
+      html += '<div class="gob-lgrid">' + cardsHtml(games, byes) + '</div>';
     }
     html += '</section>';
     container.innerHTML = html;
