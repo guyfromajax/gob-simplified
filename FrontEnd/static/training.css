@@ -2902,3 +2902,10 @@ html.gob-focus #training-view .training-state-note-link[hidden] {
   outline: 2px solid var(--white);
   outline-offset: 2px;
 }
+
+/* First paint, weekly page. Until the week's data is in, the form is held back behind the
+   shared loader: no default budget, no rows that refill from a draft, no grid landing late. */
+html.is-loading #training-view,
+html.is-loading .pg-head {
+  visibility: hidden;
+}

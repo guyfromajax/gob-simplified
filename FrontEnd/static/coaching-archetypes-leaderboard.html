@@ -7,6 +7,7 @@
   <script src="/js/shared/franchiseContext.js"></script>
   <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
@@ -16,6 +17,12 @@
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
 <body class="has-auth-bar has-footer community-page alb-page">
+  <!-- First paint: stay behind the shared loader until the data is drawn (the page
+       script lifts it), so placeholder values and empty cards are never shown. -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
   <div id="auth-bar" class="auth-bar"></div>
 
   <div class="alb">
@@ -24,7 +31,7 @@
       <h1 class="alb-title">Coaching Archetypes</h1>
       <a href="/coaching-archetypes.html" class="alb-ca-link">See Coaching Archetypes<span class="arrow" aria-hidden="true">&rarr;</span></a>
     </div>
-    <div id="alb-grid" class="alb-grid"><div class="alb-empty">Loading…</div></div>
+    <div id="alb-grid" class="alb-grid"></div>
   </div>
 
   <footer id="site-footer" class="site-footer">
@@ -77,6 +84,13 @@
       return String(s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; });
     }
 
+    // First paint: lift the loader once the page holds real data (see is-loading in
+    // css/community.css).
+    function liftLoading() {
+      document.documentElement.classList.remove('is-loading');
+      if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+    }
+
     function render(boards) {
       boards = boards || {};
       var host = document.getElementById('alb-grid');
@@ -104,6 +118,7 @@
           + '<span class="alb-card-name">' + escapeHtml(name) + '</span>' + headTip + '</div>'
           + body + '</div>';
       }).join('');
+      liftLoading();
     }
 
     window.GOBArchetype.ensureManifest().then(function () {
@@ -113,7 +128,7 @@
         .then(function (r) { return r.ok ? r.json() : {}; })
         .then(render)
         .catch(function () { render({}); });
-    });
+    }).catch(liftLoading);
   </script>
 </body>
 </html>

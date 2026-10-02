@@ -2476,8 +2476,24 @@ async function init(host, options) {
   } catch (error) {
     console.error('Failed to initialize training page:', error);
     throw error;
+  } finally {
+    liftWeeklyLoading();
   }
   return { revalidate: revalidate, unmount: teardown };
+}
+
+/**
+ * First paint, weekly page only. training.html holds the page behind the shared loader
+ * (html.is-loading); this lifts it once the week's budget, the saved draft and the Player
+ * Development grid are in, so a 24-point budget that becomes 30, rows that refill from a
+ * draft and a grid that lands late are never shown. A resume that is on its way to the
+ * report keeps its own loader up. In the FCC tab the class is never set, so this is a no-op.
+ */
+function liftWeeklyLoading() {
+  const html = document.documentElement;
+  if (!html.classList.contains('is-loading') || trainingNewswireOverlayActive) return;
+  html.classList.remove('is-loading');
+  if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
 }
 
 function shellHtml() {

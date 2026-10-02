@@ -868,6 +868,12 @@ function cloneParams(params) {
     } catch (err) {
       console.error(err);
       showError(err.message || 'Unable to load programs');
+    } finally {
+      // First paint: the page stays behind the loader (and hidden, see the page's
+      // is-loading rule) until the programs are in, so "0 of 128 match", the empty
+      // filters and a footer that jumps are never shown.
+      document.documentElement.classList.remove('is-loading');
+      if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
     }
   });
 })();

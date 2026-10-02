@@ -1110,3 +1110,10 @@ html.gob-shell .pg-head .sbtn:focus-visible {
     view-transition-name: none;
   }
 }
+
+
+/* First paint: a logo with no source yet draws nothing, not its alt text. */
+html.gob-shell .top .top-id img:not([src]),
+html.gob-shell .top .top-id img[src=""] {
+  visibility: hidden;
+}

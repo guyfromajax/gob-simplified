@@ -32,6 +32,12 @@
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
+  <!-- First paint: stay behind the shared loader until the week's budget, draft and
+       Player Development grid are in (training.js liftWeeklyLoading lifts it). -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
   <div id="training-view">
   <div class="training-container resource-page-container fcc-brand-page-shell training-resource-shell">
     <!-- Header -->
