@@ -438,6 +438,32 @@ test('B8: Settings audio is two switches, Music and Sound, and nothing else', as
   expect(await page.evaluate(() => window.__gobSfxCalls)).toEqual(['SFX_SELECT']);
 });
 
+test('B8: Music off stops the franchise track where it is playing; on starts it again', async ({ page }) => {
+  // A recording Audio, so the test sees what would be heard without a sound card.
+  await page.addInitScript(() => {
+    window.__audios = [];
+    window.Audio = class {
+      constructor(src) { this.src = src || ''; this.volume = 1; this.paused = true; this.currentTime = 0; this.loop = false; this.dataset = {}; window.__audios.push(this); }
+      play() { this.paused = false; return Promise.resolve(); }
+      pause() { this.paused = true; }
+      addEventListener() {}
+      removeEventListener() {}
+    };
+  });
+  const playing = () => page.evaluate(() => window.__audios
+    .filter((a) => /scouting-track/.test(a.src) && !a.paused && a.volume > 0).length);
+  const panel = await openSettings(page);
+  await expect.poll(playing, { message: 'the franchise track plays in the Office' }).toBe(1);
+
+  await panel.locator('[data-audio-switch="music"]').click();
+  await expect.poll(playing, { message: 'Music off: nothing is playing' }).toBe(0);
+  // Sound is untouched by the Music switch.
+  expect(await page.evaluate(() => window.GOBUiSfx.outputVolume(0.7, 'sfx'))).toBe(0.7);
+
+  await panel.locator('[data-audio-switch="music"]').click();
+  await expect.poll(playing, { message: 'Music on: the track starts again on this page' }).toBe(1);
+});
+
 test('B8: the Account page has no audio control', async ({ page }) => {
   await stubAuth(page);
   await page.route('**/api/auth/me', (r) => r.fulfill({ status: 200, contentType: 'application/json',
