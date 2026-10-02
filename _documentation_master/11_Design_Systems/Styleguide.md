@@ -106,6 +106,8 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 - In season a single arrow follows the sign: any drop is ▼, never a green arrow. The two- and three-arrow bands stay asymmetric.
 - Faint and full are told apart by arrow count, not by colour alone. Faint is `color-mix(in srgb, <token> N%, transparent)`, so it lets the row through: 3:1 or better on both zebra rows (red needs 60% to match green's 45%).
 - Glyphs: ▲ / ▼ only. Player Report › Attributes shows current values only: no marks, no change tint, no tooltip. Movement lives on Training Changes.
+- Notes › Trends tags (Rising, Falling / Lagging) are labels, not magnitudes: one faint ▲ or one faint ▼ per attribute, the in-season one-arrow tones, in every week including camp.
+- Readiness meters are neutral (`--text-87` lit, `--white-12` unlit): a meter is not positive data, so it is never green, red or orange.
 
 **Display text.** Class year is always a two-letter uppercase abbreviation (`FR`, `SO`, `JR`, `SR`, `GR`, `JH`; unknown `--`) via `playerYear.js` / `BackEnd/utils/player_year.py`. Team names show exactly as stored in `teams.name`: no title-casing, no hyphen stripping, no exception map. Team measures use one vocabulary of eleven measures; Momentum is never shown on Team Attributes, the Training Report Team Report or Office "Moved most". `pt_efficiency` is P/T Defense and `pt_opp_modifier` is P/T Offense everywhere.
 

@@ -85,7 +85,7 @@ function readOptions(options) {
  * The loading state. While `.is-loading` is on the host, every section is hidden and this
  * quiet skeleton stands in: the report never shows headings over empty space.
  */
-const REPORT_SKELETON_HTML = '<div class="report-skeleton" aria-hidden="true"><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-card"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div></div><p class="report-load-status" role="status" aria-live="polite"></p>';
+const REPORT_SKELETON_HTML = '<div class="report-skeleton" aria-hidden="true">' + '<div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div>'.repeat(3) + '<i class="rsk rsk-grid"></i></div><p class="report-load-status" role="status" aria-live="polite"></p>';
 
 function setReportLoading(loading) {
   if (!root || !root.classList) return;
@@ -118,15 +118,10 @@ function shellHtml() {
     + '<a href="#" role="button" id="locker-room-btn" class="locker-room-button">Go To Locker Room</a>'
     + '</header>'
     + REPORT_SKELETON_HTML
-    + '<section class="training-notes-section"><div class="training-notes-header"><div class="training-notes-header-main">'
-    + '<div class="training-notes-header-accent" aria-hidden="true"></div>'
-    + '<div class="training-notes-header-copy"><h2>Notes</h2>'
-    + '<div id="training-notes-brief" class="training-notes-brief">Week -- Training Brief · For Coaching Staff Only</div>'
-    + '</div></div></div>'
-    + '<div class="training-notes-rule" aria-hidden="true"></div>'
+    + '<section class="training-notes-section"><h2>Notes</h2>'
     + '<div class="training-notes-container" id="training-notes-container"></div></section>'
     + '<section class="team-section"><h2>Team Report</h2>'
-    + '<div class="team-attributes-grid" id="team-attributes-grid"></div></section>'
+    + '<div class="team-attributes-grid card" id="team-attributes-grid"></div></section>'
     + '<section class="players-section"><div class="section-header"><h2>Player Report</h2>'
     + '<div class="view-toggle">'
     + '<button type="button" class="toggle-btn" data-view="attributes">Attributes</button>'
@@ -264,7 +259,7 @@ const TEAM_ATTR_NAMES = {
   'fight': 'Fight',
   'discipline': 'Discipline',
   'momentum_score': 'Momentum',
-  'team_chemistry': 'Team Chemistry',
+  'team_chemistry': 'Chemistry',
   'fb_opp_modifier': 'Fast Break Defense',
   'pt_opp_modifier': 'P/T Offense'
 };
@@ -313,27 +308,32 @@ const NOTES_HERO_CONFIG = [
   }
 ];
 
-/** In-season tactical row title; camp week uses Concerning Progression (see training_notes.py). */
-const NOTES_TACTICAL_ORDER_BASE = [
-  'Strong Cumulative Increase',
-  'Strongest Defensive Set',
-  'Strongest Offensive Plays',
-  'Fast Break Readiness',
-  'Press/Trap Readiness',
-];
-
 /**
- * These titles are the lookup keys the server writes into the stored report, so they can't
- * be renamed without rewriting history. The shown name comes from here instead, which means
+ * The top of the report is three cards, one kind of information each (Jamie, 2026-10-02):
+ * Standouts (people), Trends (attributes and schemes), Readiness (two meters). The titles
+ * below are the lookup keys the server writes into the stored report, so they can't be
+ * renamed without rewriting history; the shown label comes from here instead, which means
  * a report generated last season reads with today's vocabulary.
  */
-const NOTES_TACTICAL_DISPLAY_TITLES = {
-  'Press/Trap Readiness': 'P/T Defense Readiness',
-};
-
-function notesTacticalDisplayTitle(title) {
-  return NOTES_TACTICAL_DISPLAY_TITLES[title] || title;
-}
+const NOTES_RISING_TITLE = 'Strong Cumulative Increase';
+// In season the second list is what the team lost ground in. Camp skips decay, so nothing
+// falls: that list is what camp under-developed, and it says so.
+const NOTES_FALLING_LABEL = 'Falling';
+const NOTES_CAMP_FALLING_LABEL = 'Lagging';
+const NOTES_SCHEME_ROWS = [
+  { title: 'Strongest Defensive Set', label: 'Strongest Defensive Set' },
+  { title: 'Strongest Offensive Plays', label: 'Strongest Offensive Plays' },
+];
+const NOTES_READINESS_ROWS = [
+  { key: 'fast-break', title: 'Fast Break Readiness', label: 'Fast Break' },
+  // The measure is "P/T Defense" everywhere (Styleguide, display text); the stored key is older.
+  { key: 'press-traps', title: 'Press/Trap Readiness', label: 'P/T Defense' },
+];
+// The server's five words on a three-step meter: the word beside it carries "Very".
+const READINESS_STEPS = 3;
+const READINESS_LEVEL = { 'very weak': 1, 'weak': 1, 'neutral': 2, 'strong': 3, 'very strong': 3 };
+// CH is a hidden attribute: it is never named on the report, whatever a stored note says.
+const NOTES_HIDDEN_ATTRIBUTES = ['CH'];
 
 function getConcerningTeamAttrNoteTitle(sectionMap) {
   if (sectionMap.has('Concerning Progression')) return 'Concerning Progression';
@@ -378,11 +378,6 @@ function resolveHeroNoteSection(config, sectionMap) {
       body: 'No Significant Updates',
     };
   return { section, order };
-}
-
-function buildNotesTacticalOrder(sectionMap) {
-  const concerning = getConcerningTeamAttrNoteTitle(sectionMap);
-  return [NOTES_TACTICAL_ORDER_BASE[0], concerning, ...NOTES_TACTICAL_ORDER_BASE.slice(1)];
 }
 
 // Coaching focus display names
@@ -1035,33 +1030,26 @@ function formatNoteAttributeToken(token) {
   return NOTE_ATTRIBUTE_LABELS[trimmed] || trimmed;
 }
 
-function formatNoteAttributeList(text) {
+/**
+ * The attributes a Rising / Falling note names, as display labels. A muted note ("No
+ * Significant Updates") is an empty list. Hidden attributes are dropped here, so an old
+ * stored report cannot put one on the page.
+ */
+function noteAttributeLabels(text) {
   const normalized = String(text || '').trim();
-  if (!normalized || isMutedTrainingNote(normalized)) return normalized || 'No Significant Updates';
+  if (!normalized || isMutedTrainingNote(normalized) || /^none$/i.test(normalized)) return [];
   return normalized
     .split(',')
+    .map((token) => String(token || '').trim())
+    .filter((token) => token && !NOTES_HIDDEN_ATTRIBUTES.includes(token.toUpperCase()))
     .map((token) => formatNoteAttributeToken(token))
-    .filter(Boolean)
-    .join(', ');
+    .filter(Boolean);
 }
 
-function getTrainingNoteValueTone(title, body) {
-  const text = String(body || '').trim();
-  if (isMutedTrainingNote(text) || /^none$/i.test(text)) return 'muted';
-  if (title === 'Strong Cumulative Increase') return 'positive';
-  if (title === 'Concerning Regression' || title === 'Concerning Progression') return 'negative';
-  return 'default';
-}
-
-function formatTrainingNoteValue(title, body) {
-  if (
-    title === 'Strong Cumulative Increase' ||
-    title === 'Concerning Regression' ||
-    title === 'Concerning Progression'
-  ) {
-    return formatNoteAttributeList(body);
-  }
-  return String(body || '').trim() || 'No Significant Updates';
+/** A note's text, or '' when it has nothing to say. */
+function noteText(section) {
+  const text = String((section && section.body) || '').trim();
+  return (isMutedTrainingNote(text) || /^none$/i.test(text)) ? '' : text;
 }
 
 function createNotesHeroPortrait(player, displayName, accentConfig, isMuted) {
@@ -1396,6 +1384,18 @@ function createChangeCell(change) {
   return td;
 }
 
+/**
+ * Team Report: the eleven team attributes in the four columns of Team > Team Attributes,
+ * read down: Shooting, Rebounding, Chemistry; Offense, Defense, Discipline; Fast Break,
+ * Fast Break Defense, Fight; P/T Offense, P/T Defense. Emitted row-major, so a four-column
+ * grid puts each list in one column. Momentum is not a Team Report measure.
+ */
+const TEAM_REPORT_GRID_ROWS = [
+  ['shot_threshold', 'offensive_efficiency', 'fb_efficiency', 'pt_opp_modifier'],
+  ['rebound_modifier', 'defensive_efficiency', 'fb_opp_modifier', 'pt_efficiency'],
+  ['team_chemistry', 'discipline', 'fight'],
+];
+
 function renderTeamAttributes() {
   if (!reportData) return;
   
@@ -1404,25 +1404,16 @@ function renderTeamAttributes() {
   
   const teamAttrs = reportData.team_attributes || {};
   const teamChanges = reportData.team_changes || {};
-  
-  // Team Report display list. Momentum is omitted (Jamie: same 11 as Team Attributes).
-  const attrOrder = [
-    'shot_threshold',
-    'rebound_modifier',
-    'offensive_efficiency',
-    'defensive_efficiency',
-    'fb_efficiency',
-    'pt_efficiency',
-    'fight',
-    'discipline',
-    'team_chemistry',
-    'fb_opp_modifier',
-    'pt_opp_modifier'
-  ];
-  
-  attrOrder.forEach(attrKey => {
-    const item = createTeamAttrItem(attrKey, teamAttrs[attrKey], teamChanges[attrKey]);
-    if (item) grid.appendChild(item);
+
+  TEAM_REPORT_GRID_ROWS.forEach((row, rowIndex) => {
+    row.forEach((attrKey, colIndex) => {
+      const item = createTeamAttrItem(attrKey, teamAttrs[attrKey], teamChanges[attrKey]);
+      if (!item) return;
+      item.dataset.attr = attrKey;
+      item.style.gridRow = String(rowIndex + 1);
+      item.style.gridColumn = String(colIndex + 1);
+      grid.appendChild(item);
+    });
   });
 }
 
@@ -1458,10 +1449,13 @@ function createTeamAttrItem(attrKey, currentValue, change) {
     const arrow = describeTrainingChange(displayDelta);
     changeSpan.textContent = arrow.text;
     changeSpan.className = 'attr-change ' + arrow.className;
+    changeSpan.setAttribute('aria-label', (arrow.direction > 0 ? 'Up ' : 'Down ') + arrow.count);
     item.classList.add('is-delta');
   } else {
-    changeSpan.textContent = 'No change';
+    // No movement is a quiet dash, never the words: what moved is what stands out.
+    changeSpan.textContent = '–';
     changeSpan.className += ' change-zero';
+    changeSpan.setAttribute('aria-label', 'No change');
   }
   
   label.appendChild(nameSpan);
@@ -1984,16 +1978,190 @@ function createPlaybookMetricCard(title, value, maxValue, color) {
   return metricDiv;
 }
 
+/** A shared card (`.card`, gob-components.css) with its title. */
+function createNotesCard(key, title) {
+  const card = document.createElement('article');
+  card.className = 'card tr-card tr-card--' + key;
+  card.dataset.card = key;
+  const head = document.createElement('div');
+  head.className = 'card-h';
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  head.appendChild(heading);
+  card.appendChild(head);
+  return card;
+}
+
+/** One label with its value directly under it. `value` is text or a node. */
+function createNotesPair(labelText, value, extraClass) {
+  const pair = document.createElement('div');
+  pair.className = 'tr-pair' + (extraClass ? ' ' + extraClass : '');
+  const label = document.createElement('div');
+  label.className = 'tr-label';
+  label.textContent = labelText;
+  const body = document.createElement('div');
+  body.className = 'tr-value';
+  if (value && value.nodeType) body.appendChild(value);
+  else body.textContent = String(value == null ? '' : value);
+  pair.appendChild(label);
+  pair.appendChild(body);
+  return pair;
+}
+
+/** Standouts: the three people, headshot beside the label and the name under it. */
+function buildStandoutsCard(sectionMap) {
+  const card = createNotesCard('standouts', 'Standouts');
+  const list = document.createElement('div');
+  list.className = 'tr-standouts';
+
+  NOTES_HERO_CONFIG.forEach((config) => {
+    const { section } = resolveHeroNoteSection(config, sectionMap);
+    const text = section.body != null ? String(section.body).trim() : '';
+    const muted = isMutedTrainingNote(text) || /^none$/i.test(text);
+    const player = muted ? null : getTrainingNotePortraitPlayer(section, text);
+    const displayName = muted ? 'No Significant Updates' : (getTrainingReportPlayerName(player) || text || 'No Significant Updates');
+
+    const row = document.createElement('div');
+    row.className = 'training-notes-hero-card tr-standout';
+    row.dataset.standout = config.key;
+    if (muted) row.classList.add('is-muted');
+
+    row.appendChild(createNotesHeroPortrait(player, displayName, config, muted));
+
+    const copy = document.createElement('div');
+    copy.className = 'training-notes-hero-copy tr-pair';
+    const label = document.createElement('div');
+    label.className = 'training-notes-hero-label tr-label';
+    label.textContent = config.key === 'locker' ? config.label : section.title || config.label;
+    copy.appendChild(label);
+
+    const value = document.createElement('div');
+    value.className = 'tr-value tr-standout-value';
+    const name = document.createElement('span');
+    name.className = 'training-notes-hero-name';
+    name.textContent = displayName;
+    value.appendChild(name);
+    if (!muted && player) {
+      const meta = document.createElement('span');
+      meta.className = 'training-notes-hero-meta';
+      const position = getPlayerDisplayPosition(player);
+      const year = getTrainingReportPlayerYear(player);
+      meta.textContent = year ? `${position} · ${year}` : position;
+      value.appendChild(meta);
+    }
+    copy.appendChild(value);
+    row.appendChild(copy);
+    list.appendChild(row);
+  });
+
+  card.appendChild(list);
+  return card;
+}
+
+/** Rising / Falling: short tagged attributes, each behind the faint arrow of its direction. */
+function createTrendTags(labels, direction) {
+  if (!labels.length) {
+    const none = document.createElement('span');
+    none.className = 'tr-none';
+    none.textContent = 'No Significant Updates';
+    return none;
+  }
+  const tags = document.createElement('span');
+  tags.className = 'tr-tags';
+  labels.forEach((text) => {
+    const tag = document.createElement('span');
+    tag.className = 'tr-tag';
+    const arrow = document.createElement('i');
+    arrow.className = direction > 0 ? 'tr-tone-up-faint' : 'tr-tone-down-faint';
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = direction > 0 ? '▲' : '▼';
+    tag.appendChild(arrow);
+    tag.appendChild(document.createTextNode(text));
+    tags.appendChild(tag);
+  });
+  return tags;
+}
+
+/** Trends: what the team's attributes did, then its strongest schemes. */
+function buildTrendsCard(sectionMap) {
+  const card = createNotesCard('trends', 'Trends');
+  const camp = isTrainingCampReportNotes(sectionMap);
+
+  // Rising and Falling share one small grid, so their tags start on the same line.
+  const trends = document.createElement('div');
+  trends.className = 'tr-trend-list';
+  card.appendChild(trends);
+
+  const rising = noteAttributeLabels((sectionMap.get(NOTES_RISING_TITLE) || {}).body);
+  const risingPair = createNotesPair('Rising', createTrendTags(rising, 1), 'tr-trend');
+  risingPair.dataset.trend = 'rising';
+  trends.appendChild(risingPair);
+
+  const falling = noteAttributeLabels((sectionMap.get(getConcerningTeamAttrNoteTitle(sectionMap)) || {}).body);
+  const fallingPair = createNotesPair(
+    camp ? NOTES_CAMP_FALLING_LABEL : NOTES_FALLING_LABEL, createTrendTags(falling, -1), 'tr-trend'
+  );
+  fallingPair.dataset.trend = 'falling';
+  trends.appendChild(fallingPair);
+
+  NOTES_SCHEME_ROWS.forEach((row) => {
+    const text = noteText(sectionMap.get(row.title));
+    let value = text;
+    if (!text) {
+      value = document.createElement('span');
+      value.className = 'tr-none';
+      value.textContent = 'No Significant Updates';
+    }
+    const pair = createNotesPair(row.label, value, 'tr-scheme');
+    pair.dataset.scheme = row.title;
+    card.appendChild(pair);
+  });
+  return card;
+}
+
+/** A small stepped meter: `level` of `steps` lit. Neutral colours; the word says the rest. */
+function createReadinessMeter(level, steps, word) {
+  const meter = document.createElement('span');
+  meter.className = 'tr-meter';
+  meter.dataset.level = String(level);
+  meter.dataset.steps = String(steps);
+  meter.setAttribute('role', 'img');
+  meter.setAttribute('aria-label', word);
+  for (let i = 1; i <= steps; i += 1) {
+    const step = document.createElement('i');
+    if (i <= level) step.className = 'on';
+    meter.appendChild(step);
+  }
+  return meter;
+}
+
+/** Readiness: Fast Break and P/T Defense, a meter with the word beside it. */
+function buildReadinessCard(sectionMap) {
+  const card = createNotesCard('readiness', 'Readiness');
+  NOTES_READINESS_ROWS.forEach((row) => {
+    const word = String((sectionMap.get(row.title) || {}).body || '').trim() || 'Neutral';
+    const level = READINESS_LEVEL[word.toLowerCase()] || 0;
+    const value = document.createElement('span');
+    value.className = 'tr-ready';
+    if (level) value.appendChild(createReadinessMeter(level, READINESS_STEPS, word));
+    const text = document.createElement('span');
+    text.className = 'tr-ready-word';
+    text.textContent = word;
+    value.appendChild(text);
+    const pair = createNotesPair(row.label, value, 'tr-readiness');
+    pair.dataset.ready = row.key;
+    pair.dataset.word = word;
+    card.appendChild(pair);
+  });
+  return card;
+}
+
 function renderTrainingNotes() {
   if (!reportData) return;
   
   const container = byId('training-notes-container');
   if (!container) return;
   container.innerHTML = '';
-  const brief = byId('training-notes-brief');
-  if (brief) {
-    brief.textContent = `Week ${getReportWeekNumber() || '--'} Training Brief · For Coaching Staff Only`;
-  }
   
   const training_notes = reportData.training_notes || [];
   
@@ -2017,104 +2185,19 @@ function renderTrainingNotes() {
       sectionMap.set(section.title || '', section);
     });
 
-    const heroGrid = document.createElement('div');
-    heroGrid.className = 'training-notes-hero-grid';
+    const cards = document.createElement('div');
+    cards.className = 'tr-cards';
+    cards.appendChild(buildStandoutsCard(sectionMap));
+    cards.appendChild(buildTrendsCard(sectionMap));
+    cards.appendChild(buildReadinessCard(sectionMap));
+    container.appendChild(cards);
 
-    NOTES_HERO_CONFIG.forEach((config) => {
-      const { section } = resolveHeroNoteSection(config, sectionMap);
-      const text = section.body != null ? String(section.body).trim() : '';
-      const muted = isMutedTrainingNote(text) || /^none$/i.test(text);
-      const player = muted ? null : getTrainingNotePortraitPlayer(section, text);
-      const displayName = muted ? 'No Significant Updates' : (getTrainingReportPlayerName(player) || text || 'No Significant Updates');
-      const hero = document.createElement('article');
-      hero.className = 'training-notes-hero-card';
-      if (muted) hero.classList.add('is-muted');
-      if (!inAppShell()) {
-        hero.style.setProperty('--notes-accent', config.accent);
-        hero.style.setProperty('--notes-accent-border', config.accentBorder);
-        hero.style.setProperty('--notes-accent-tint', config.accentTint);
-      }
-
-      const label = document.createElement('div');
-      label.className = 'training-notes-hero-label';
-      label.textContent =
-        config.key === 'locker' ? config.label : section.title || config.label;
-
-      const body = document.createElement('div');
-      body.className = 'training-notes-hero-body';
-
-      const portrait = createNotesHeroPortrait(player, displayName, config, muted);
-      body.appendChild(portrait);
-
-      const copy = document.createElement('div');
-      copy.className = 'training-notes-hero-copy';
-      const name = document.createElement('div');
-      name.className = 'training-notes-hero-name';
-      name.textContent = displayName;
-      copy.appendChild(name);
-      const meta = document.createElement('div');
-      meta.className = 'training-notes-hero-meta';
-      if (!muted && player) {
-        const position = getPlayerDisplayPosition(player);
-        const year = getTrainingReportPlayerYear(player);
-        meta.textContent = year ? `${position} · ${year}` : position;
-      } else {
-        meta.textContent = '';
-      }
-      copy.appendChild(meta);
-      body.appendChild(copy);
-
-      hero.appendChild(label);
-      hero.appendChild(body);
-      heroGrid.appendChild(hero);
-    });
-
-    container.appendChild(heroGrid);
-
-    const dividerOne = document.createElement('div');
-    dividerOne.className = 'training-notes-subrule';
-    container.appendChild(dividerOne);
-
-    const tacticalGrid = document.createElement('div');
-    tacticalGrid.className = 'training-notes-tactical-grid';
-    buildNotesTacticalOrder(sectionMap).forEach((title) => {
-      const section = sectionMap.get(title) || { title, body: 'No Significant Updates' };
-      const valueText = formatTrainingNoteValue(title, section.body);
-      const tone = getTrainingNoteValueTone(title, section.body);
-      const pill = document.createElement('div');
-      pill.className = `training-notes-tactical-pill is-${tone}`;
-
-      const label = document.createElement('div');
-      label.className = 'training-notes-tactical-label';
-      label.textContent = notesTacticalDisplayTitle(title);
-      pill.appendChild(label);
-
-      const value = document.createElement('div');
-      value.className = 'training-notes-tactical-value';
-      value.textContent = valueText;
-      pill.appendChild(value);
-
-      tacticalGrid.appendChild(pill);
-    });
-    container.appendChild(tacticalGrid);
-
-    const dividerTwo = document.createElement('div');
-    dividerTwo.className = 'training-notes-subrule';
-    container.appendChild(dividerTwo);
-
-    const miscSection = sectionMap.get('Player Energy Levels') || { body: 'No Significant Updates' };
-    const miscText = String(miscSection.body || '').trim() || 'No Significant Updates';
-    const miscRow = document.createElement('div');
-    miscRow.className = 'training-notes-misc-row';
-    const miscLabel = document.createElement('div');
-    miscLabel.className = 'training-notes-misc-label';
-    miscLabel.textContent = 'Misc';
-    const miscValue = document.createElement('div');
-    miscValue.className = 'training-notes-misc-value';
-    miscValue.textContent = miscText;
-    miscRow.appendChild(miscLabel);
-    miscRow.appendChild(miscValue);
-    container.appendChild(miscRow);
+    // Misc carries the week's energy notes. With nothing to say there is no row.
+    const miscText = noteText(sectionMap.get('Player Energy Levels'));
+    if (miscText) {
+      const misc = createNotesPair('Misc', miscText, 'training-notes-misc-row tr-misc');
+      container.appendChild(misc);
+    }
     return;
   }
   
