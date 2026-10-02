@@ -200,6 +200,90 @@ html.gob-shell.gob-1920 #news-view .gob-news-grid {
   height: 10px;
 }
 
+/* Story headings are the app's heading styles (Styleguide › Type), never bold body
+   text: a section is heading-col, a sub-section (and a team over its recruits) is
+   heading-card. */
+#franchise-container #news-view .gob-news-heading {
+  margin: var(--space-12) 0 var(--space-8);
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+#franchise-container #news-view .gob-news-sub {
+  margin: var(--space-8) 0 var(--space-4);
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
+}
+/* A story with no "Week N" line under its headline: the body keeps its distance. */
+#franchise-container #news-view .gob-news-headline + .gob-news-body {
+  margin-top: var(--space-12);
+}
+#franchise-container #news-view .gob-news-body > .gob-news-heading:first-child,
+#franchise-container #news-view .gob-news-rank > .gob-news-heading {
+  margin-top: 0;
+}
+
+/* Ranking tables. National and Region stack; from 1600px they sit side by side and the
+   story takes the page's width. */
+#franchise-container #news-view .gob-news-ranks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--dsp-16) var(--dsp-24);
+  margin: 0 0 var(--space-12);
+}
+@media (min-width: 1600px) {
+  #franchise-container #news-view .gob-news-story.is-wide {
+    max-width: none;
+  }
+  #franchise-container #news-view .gob-news-ranks.is-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+/* What Score is: one quiet line under the heading. */
+#franchise-container #news-view .gob-news-caption {
+  margin: 0 0 var(--space-8);
+  color: var(--text-60);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-body) var(--font-body);
+}
+/* The rank column is as wide as its content; the team name takes the slack. */
+#franchise-container #news-view .gob-news-rank-tbl th.rk,
+#franchise-container #news-view .gob-news-rank-tbl td.rk {
+  width: 1px;
+  text-align: left;
+  white-space: nowrap;
+}
+#franchise-container #news-view .gob-news-rkn {
+  display: inline-block;
+  min-width: 2.5ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* Rank movement since last week. Neutral both ways (the arrow carries the direction),
+   as the Office draws national rank movement: up t87, down t60. */
+#franchise-container #news-view .gob-news-mv {
+  display: inline-block;
+  min-width: var(--dsz-30);
+  margin-left: var(--space-6);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  color: var(--text-87);
+  white-space: nowrap;
+}
+#franchise-container #news-view .gob-news-mv.dn,
+#franchise-container #news-view .gob-news-mv.is-new {
+  color: var(--text-60);
+}
+#franchise-container #news-view .gob-news-mv.is-new {
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-6);
+}
+/* The user's team outside the table: its own row at the foot, set off by a rule. */
+#franchise-container #news-view .gob-news-rank-tbl tr.is-foot td {
+  border-top: 1px solid var(--line);
+}
+
 /* Recruiting Report › conference leans: a team is a sub-heading over its recruits. The
    recruits sit under the team name (past the mark), names in one column and RT in the
    next, so a team can never be read as one more recruit. */
@@ -208,7 +292,11 @@ html.gob-shell.gob-1920 #news-view .gob-news-grid {
 }
 #franchise-container #news-view .gob-news-team-h {
   margin: 0 0 var(--space-4);
-  font: var(--fw-semibold) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+#franchise-container #news-view .gob-news-team-h .gob-team {
+  color: inherit;
+}
+#franchise-container #news-view .gob-news-team-h a.gob-team:hover {
   color: var(--text-100);
 }
 #franchise-container #news-view .gob-news-team-h a.gob-team:hover > span {

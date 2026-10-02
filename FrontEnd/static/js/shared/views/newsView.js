@@ -5,7 +5,7 @@
  * the story or the dispatch target.
  */
 
-import { renderStoryBody } from '/js/shared/newsStory.js';
+import { renderStoryBody, storyIsWide } from '/js/shared/newsStory.js';
 
 function typeLabel(type) {
   var known = {
@@ -182,10 +182,14 @@ export function mount(container, ctx) {
         if (!story && item && item.story_id === openId) story = item;
       });
       if (story) {
-        container.innerHTML = '<div class="gob-news-story"><a class="gob-dt-up" id="back-button" href="'
+        // The weekly Recruiting Report names its week in the headline: no "Week N" under it.
+        var meta = story.type === 'recruiting_report'
+          ? ''
+          : '<p class="gob-news-meta">Week ' + tables.esc(story.week) + '</p>';
+        container.innerHTML = '<div class="gob-news-story' + (storyIsWide(story) ? ' is-wide' : '')
+          + '"><a class="gob-dt-up" id="back-button" href="'
           + tables.esc(feedUrl()) + '">← News</a><h2 class="gob-news-headline">'
-          + tables.esc(story.headline || '') + '</h2><p class="gob-news-meta">Week '
-          + tables.esc(story.week) + '</p><div class="gob-news-body">'
+          + tables.esc(story.headline || '') + '</h2>' + meta + '<div class="gob-news-body">'
           + renderStoryBody(story) + '</div></div>';
         if (window.GOBTables && typeof window.GOBTables.bindWide === 'function') {
           window.GOBTables.bindWide(container);

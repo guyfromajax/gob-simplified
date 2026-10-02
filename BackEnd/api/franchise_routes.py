@@ -134,6 +134,9 @@ from BackEnd.models.franchise_manager import choose_franchise_first_name, get_fr
 from BackEnd.models.franchise_manager import carry_dev_fields
 from BackEnd.models.franchise_manager import build_walk_ons_news_story, walk_on_news_row
 from BackEnd.utils.recruiting_report_news import (
+    FTD_RECRUITING_RANK,
+    RESULTS_SCORE_CAPTION,
+    WEEKLY_SCORE_CAPTION,
     build_recruiting_rankings_story,
     compute_recruiting_rank_fields,
     persist_recruiting_ranks_to_ftd,
@@ -14351,12 +14354,13 @@ def _region_team_ids_for_letter(region_letter: str) -> set[str]:
 def _persist_recruiting_ranks_from_scores(
     franchise_id: ObjectId | str,
     scores: dict[str, int],
-) -> None:
+) -> dict[str, dict[str, int]]:
     """Rank all 128 teams (zeros included) and write recruiting_* fields to FTD.
 
     Called whenever weekly lean scores or Week-35 signing scores are computed so
     Roster / FCC can read durable ranks without rescanning FRDs. After Week 35
     Results this freezes until the next season's Week-1 lean recompute.
+    Returns the ranks it wrote, by team id.
     """
     team_docs = list(db.teams.find({}, {"_id": 1, "region": 1}))
     team_ids = [str(doc["_id"]) for doc in team_docs if doc.get("_id") is not None]
@@ -14371,6 +14375,7 @@ def _persist_recruiting_ranks_from_scores(
         ranked_by_team_id=ranked,
         franchise_team_data_collection=franchise_team_data_collection,
     )
+    return ranked
 
 
 def _build_recruiting_rankings_story(
@@ -14383,8 +14388,12 @@ def _build_recruiting_rankings_story(
     team_name_map: dict[str, str],
     user_region_letter: str | None,
     region_team_ids: set[str] | None,
+    user_team_id: str | None = None,
+    user_zero_rank: int | None = None,
+    previous_story: dict[str, Any] | None = None,
+    score_caption: str | None = None,
 ) -> dict[str, Any] | None:
-    """National Top 25 + user-region Top 5 ranking tables. None if nobody has points."""
+    """National Top 25 + the user's full region. None if nobody has points."""
     return build_recruiting_rankings_story(
         story_id=story_id,
         week=week,
@@ -14396,7 +14405,27 @@ def _build_recruiting_rankings_story(
         region_team_ids=region_team_ids,
         national_limit=NEWS_RECRUITING_REPORT_NATIONAL_LIMIT,
         region_limit=NEWS_RECRUITING_REPORT_REGION_LIMIT,
+        user_team_id=user_team_id,
+        user_zero_rank=user_zero_rank,
+        previous_story=previous_story,
+        score_caption=score_caption,
     )
+
+
+def _recruiting_story_user_team(
+    franchise_doc: dict[str, Any],
+    durable_ranks: dict[str, dict[str, int]] | None,
+) -> tuple[str | None, int | None]:
+    """(user team id, its durable national recruiting rank) for the story's own row."""
+    try:
+        _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    except Exception:
+        user_team_object_id = None
+    user_tid = str(user_team_object_id) if user_team_object_id else None
+    if not user_tid:
+        return None, None
+    rank = int(((durable_ranks or {}).get(user_tid) or {}).get(FTD_RECRUITING_RANK) or 0)
+    return user_tid, (rank or None)
 
 
 def _build_weekly_recruiting_report_story(
@@ -14415,8 +14444,9 @@ def _build_weekly_recruiting_report_story(
         )
     )
     scores = team_points_from_lean_lists(recruits, _recruit_rt)
+    durable_ranks: dict[str, dict[str, int]] | None = None
     try:
-        _persist_recruiting_ranks_from_scores(franchise_id, scores)
+        durable_ranks = _persist_recruiting_ranks_from_scores(franchise_id, scores)
     except Exception:
         logger.exception(
             "[RECRUITING-RANK] weekly persist failed franchise=%s week=%s",
@@ -14426,6 +14456,20 @@ def _build_weekly_recruiting_report_story(
     team_name_map = _format_team_name_map(franchise=franchise_doc)
     region_letter = _user_team_region_letter(franchise_doc)
     region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
+    user_tid, user_zero_rank = _recruiting_story_user_team(franchise_doc, durable_ranks)
+    # Last week's report, for rank movement. Week 1 has none, and neither does a week
+    # that follows one with no report: those stories carry no movement.
+    previous_id = f"w{report_week - 1}-recruiting-report"
+    previous_story = next(
+        (
+            story
+            for story in (franchise_doc.get("season_news") or [])
+            if isinstance(story, dict)
+            and story.get("story_id") == previous_id
+            and story.get("type") == "recruiting_report"
+        ),
+        None,
+    )
     return _build_recruiting_rankings_story(
         story_id=f"w{report_week}-recruiting-report",
         week=report_week,
@@ -14435,6 +14479,10 @@ def _build_weekly_recruiting_report_story(
         team_name_map=team_name_map,
         user_region_letter=region_letter,
         region_team_ids=region_ids,
+        user_team_id=user_tid,
+        user_zero_rank=user_zero_rank,
+        previous_story=previous_story,
+        score_caption=WEEKLY_SCORE_CAPTION,
     )
 
 
@@ -14452,9 +14500,10 @@ def _build_season_recruiting_results_story(
         [player for player in (signed_players or []) if not player.get("walk_on")]
     )
     franchise_id = franchise_doc.get("_id")
+    durable_ranks: dict[str, dict[str, int]] | None = None
     if franchise_id is not None:
         try:
-            _persist_recruiting_ranks_from_scores(franchise_id, scores)
+            durable_ranks = _persist_recruiting_ranks_from_scores(franchise_id, scores)
         except Exception:
             logger.exception(
                 "[RECRUITING-RANK] results persist failed franchise=%s season=%s",
@@ -14464,6 +14513,7 @@ def _build_season_recruiting_results_story(
     team_name_map = _format_team_name_map(franchise=franchise_doc)
     region_letter = _user_team_region_letter(franchise_doc)
     region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
+    user_tid, user_zero_rank = _recruiting_story_user_team(franchise_doc, durable_ranks)
     return _build_recruiting_rankings_story(
         story_id=f"s{season}-recruiting-results",
         week=36,
@@ -14473,6 +14523,9 @@ def _build_season_recruiting_results_story(
         team_name_map=team_name_map,
         user_region_letter=region_letter,
         region_team_ids=region_ids,
+        user_team_id=user_tid,
+        user_zero_rank=user_zero_rank,
+        score_caption=RESULTS_SCORE_CAPTION,
     )
 
 
@@ -14745,8 +14798,12 @@ def _recruiting_leans_section_rich_lines(content: dict[str, Any]) -> list[dict[s
         rich.append({"type": "heading", "text": "Top Rated Recruit Announcements"})
         rich.extend({"type": "text", "text": str(line)} for line in top_lines)
     if teams:
+        # The conference as the rest of the app names it: region letter + number (A2).
+        from BackEnd.utils.t3_detail import conference_label
+
+        label = conference_label(content.get("conference")) or content.get("conference")
         rich.append({"type": "gap"})
-        rich.append({"type": "heading", "text": f"Conference {content.get('conference')} Lean Announcements"})
+        rich.append({"type": "heading", "text": f"Conference {label} Lean Announcements"})
         for team in teams:
             rich.append({
                 "type": "team_recruits",

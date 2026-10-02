@@ -1,5 +1,5 @@
 {
- "_source": "Recorded GET /franchise/news stories of a real offline season (the same save as boxscore-real-game.json). w5 was written after the lean section became team blocks; w4 before, in the plain-line shape.",
+ "_source": "Recorded GET /franchise/news stories of a real offline season (the same save as boxscore-real-game.json). old_shape (w4): the lean section as plain lines, no movement. new_shape (w5): team blocks, no movement. with_movement (w9): tables named, rank movement, the user's foot row, the score caption, the conference as A1.",
  "new_shape": {
   "story_id": "w5-recruiting-report",
   "week": 5,
@@ -725,5 +725,396 @@
    }
   ],
   "created_at": "2026-10-02T16:38:33.366804"
+ },
+ "with_movement": {
+  "story_id": "w9-recruiting-report",
+  "week": 9,
+  "type": "recruiting_report",
+  "headline": "Week 9 Recruiting Report",
+  "rich_lines": [
+   {
+    "type": "heading",
+    "text": "National Recruit Rankings"
+   },
+   {
+    "type": "ranking_table",
+    "table": "national",
+    "columns": [
+     "Rank",
+     "Team",
+     "Score"
+    ],
+    "rows": [
+     {
+      "rank": 1,
+      "team_id": "69a6fcb68d2c56aa82e48a82",
+      "team": "Crimson County",
+      "score": 280,
+      "move": 1
+     },
+     {
+      "rank": 2,
+      "team_id": "69a6fcb68d2c56aa82e48a72",
+      "team": "Harding Central",
+      "score": 267,
+      "move": -1
+     },
+     {
+      "rank": 3,
+      "team_id": "69a6fcb68d2c56aa82e48a8a",
+      "team": "Keys High",
+      "score": 260,
+      "move": 0
+     },
+     {
+      "rank": 4,
+      "team_id": "69a6fcb68d2c56aa82e48a8e",
+      "team": "Grayson Ranch",
+      "score": 244,
+      "move": 7
+     },
+     {
+      "rank": 5,
+      "team_id": "69a6fcb68d2c56aa82e48a6f",
+      "team": "Syracuse",
+      "score": 235,
+      "move": -1
+     },
+     {
+      "rank": 6,
+      "team_id": "69a6fcb68d2c56aa82e48a6d",
+      "team": "St Peters",
+      "score": 234,
+      "move": 1
+     },
+     {
+      "rank": 7,
+      "team_id": "69a6fcb68d2c56aa82e48a86",
+      "team": "Biloxi",
+      "score": 228,
+      "move": -2
+     },
+     {
+      "rank": 8,
+      "team_id": "69a6fcb68d2c56aa82e48a9d",
+      "team": "Lewis Catholic",
+      "score": 226,
+      "move": -2
+     },
+     {
+      "rank": 9,
+      "team_id": "69a6fcb68d2c56aa82e48a9a",
+      "team": "HA Rushmore",
+      "score": 224,
+      "move": 12
+     },
+     {
+      "rank": 10,
+      "team_id": "69a6fcb68d2c56aa82e48a7d",
+      "team": "Sacred Heart",
+      "score": 202,
+      "move": -2
+     },
+     {
+      "rank": 11,
+      "team_id": "69a6fcb68d2c56aa82e48a65",
+      "team": "Concord",
+      "score": 192,
+      "new": true
+     },
+     {
+      "rank": 12,
+      "team_id": "69a6fcb68d2c56aa82e48a7a",
+      "team": "Burroughs",
+      "score": 192,
+      "move": 5
+     },
+     {
+      "rank": 13,
+      "team_id": "69a6fcb68d2c56aa82e48a57",
+      "team": "Xavien",
+      "score": 190,
+      "move": -4
+     },
+     {
+      "rank": 14,
+      "team_id": "69a6fcb68d2c56aa82e48aa7",
+      "team": "Kenton",
+      "score": 182,
+      "move": 8
+     },
+     {
+      "rank": 15,
+      "team_id": "69a6fcb68d2c56aa82e48a5b",
+      "team": "Cagers World",
+      "score": 181,
+      "move": -5
+     },
+     {
+      "rank": 16,
+      "team_id": "69a6fcb68d2c56aa82e48a56",
+      "team": "Morristown",
+      "score": 180,
+      "move": -4
+     },
+     {
+      "rank": 17,
+      "team_id": "69a6fcb68d2c56aa82e48a97",
+      "team": "Iowa Academy",
+      "score": 178,
+      "move": -4
+     },
+     {
+      "rank": 18,
+      "team_id": "69a6fcb68d2c56aa82e48a7f",
+      "team": "Dillinger",
+      "score": 177,
+      "new": true
+     },
+     {
+      "rank": 19,
+      "team_id": "69a6fcb68d2c56aa82e48ac5",
+      "team": "Berkley",
+      "score": 175,
+      "move": -5
+     },
+     {
+      "rank": 20,
+      "team_id": "69a6fcb68d2c56aa82e48a93",
+      "team": "Wash U Prep",
+      "score": 172,
+      "move": -4
+     },
+     {
+      "rank": 21,
+      "team_id": "69a6fcb68d2c56aa82e48ab4",
+      "team": "East Rockies",
+      "score": 168,
+      "move": -6
+     },
+     {
+      "rank": 22,
+      "team_id": "69a6fcb68d2c56aa82e48acb",
+      "team": "Pacific All-Stars",
+      "score": 166,
+      "move": 1
+     },
+     {
+      "rank": 23,
+      "team_id": "69a6fcb68d2c56aa82e48aa0",
+      "team": "Tower Academy",
+      "score": 166,
+      "move": -4
+     },
+     {
+      "rank": 24,
+      "team_id": "69a6fcb68d2c56aa82e48a81",
+      "team": "Evanston",
+      "score": 163,
+      "move": 1
+     },
+     {
+      "rank": 25,
+      "team_id": "69a6fcb68d2c56aa82e48aaa",
+      "team": "Houston Jesuit",
+      "score": 162,
+      "move": -7
+     }
+    ],
+    "column_split": [
+     13,
+     12
+    ],
+    "caption": "Score adds up the ratings of the recruits leaning toward a team: a first choice counts in full, a second choice half, a third a quarter.",
+    "user_row": {
+     "rank": 80,
+     "team_id": "69a6fcb68d2c56aa82e48a54",
+     "team": "Lancaster",
+     "score": 76,
+     "move": 1
+    }
+   },
+   {
+    "type": "gap"
+   },
+   {
+    "type": "heading",
+    "text": "Region A"
+   },
+   {
+    "type": "ranking_table",
+    "table": "region",
+    "columns": [
+     "Rank",
+     "Team",
+     "Score"
+    ],
+    "rows": [
+     {
+      "rank": 1,
+      "team_id": "69a6fcb68d2c56aa82e48a57",
+      "team": "Xavien",
+      "score": 190,
+      "move": 0
+     },
+     {
+      "rank": 2,
+      "team_id": "69a6fcb68d2c56aa82e48a5b",
+      "team": "Cagers World",
+      "score": 181,
+      "move": 0
+     },
+     {
+      "rank": 3,
+      "team_id": "69a6fcb68d2c56aa82e48a56",
+      "team": "Morristown",
+      "score": 180,
+      "move": 0
+     },
+     {
+      "rank": 4,
+      "team_id": "69a6fcb68d2c56aa82e48a61",
+      "team": "Durham",
+      "score": 151,
+      "move": 0
+     },
+     {
+      "rank": 5,
+      "team_id": "69a6fcb68d2c56aa82e48a5e",
+      "team": "Appalachia",
+      "score": 117,
+      "move": 0
+     },
+     {
+      "rank": 6,
+      "team_id": "69a6fcb68d2c56aa82e48a5f",
+      "team": "Casino Row",
+      "score": 109,
+      "move": 0
+     },
+     {
+      "rank": 7,
+      "team_id": "69a6fcb68d2c56aa82e48a55",
+      "team": "Four Corners",
+      "score": 89,
+      "move": 0
+     },
+     {
+      "rank": 8,
+      "team_id": "69a6fcb68d2c56aa82e48a53",
+      "team": "Ocean City",
+      "score": 77,
+      "move": 0
+     },
+     {
+      "rank": 9,
+      "team_id": "69a6fcb68d2c56aa82e48a54",
+      "team": "Lancaster",
+      "score": 76,
+      "move": 0
+     },
+     {
+      "rank": 10,
+      "team_id": "69a6fcb68d2c56aa82e48a59",
+      "team": "South Lancaster",
+      "score": 71,
+      "move": 3
+     },
+     {
+      "rank": 11,
+      "team_id": "69a6fcb68d2c56aa82e48a5c",
+      "team": "Nickel Beach",
+      "score": 70,
+      "move": -1
+     },
+     {
+      "rank": 12,
+      "team_id": "69a6fcb68d2c56aa82e48a5d",
+      "team": "Chapel Hill",
+      "score": 68,
+      "move": -1
+     },
+     {
+      "rank": 13,
+      "team_id": "69a6fcb68d2c56aa82e48a5a",
+      "team": "Crickstown",
+      "score": 60,
+      "move": 2
+     },
+     {
+      "rank": 14,
+      "team_id": "69a6fcb68d2c56aa82e48a60",
+      "team": "IDA",
+      "score": 47,
+      "move": -2
+     },
+     {
+      "rank": 15,
+      "team_id": "69a6fcb68d2c56aa82e48a52",
+      "team": "Bentley-Truman",
+      "score": 35,
+      "move": -1
+     },
+     {
+      "rank": 16,
+      "team_id": "69a6fcb68d2c56aa82e48a58",
+      "team": "Little York",
+      "score": 0,
+      "move": 0
+     }
+    ],
+    "column_split": [
+     8,
+     8
+    ]
+   },
+   {
+    "type": "gap"
+   },
+   {
+    "type": "heading",
+    "text": "Top Rated Recruit Announcements"
+   },
+   {
+    "type": "text",
+    "text": "Scot Mccall, a Classic C rated B, has announced a lean toward Crickstown."
+   },
+   {
+    "type": "text",
+    "text": "Brennon Jaramillo, a Four-Star rated C+, has announced a lean toward Grayson Ranch."
+   },
+   {
+    "type": "text",
+    "text": "Aydin Horton, a Four-Star rated C+, has announced a lean toward Kenton."
+   },
+   {
+    "type": "text",
+    "text": "Dempsey Gilmore, a Classic PG rated C+, has announced a lean toward HA Rushmore."
+   },
+   {
+    "type": "text",
+    "text": "Santos Maxwell, a Five-Star rated C+, has announced a lean toward Keys High."
+   },
+   {
+    "type": "gap"
+   },
+   {
+    "type": "heading",
+    "text": "Conference A1 Lean Announcements"
+   },
+   {
+    "type": "team_recruits",
+    "team_id": "69a6fcb68d2c56aa82e48a59",
+    "team_name": "South Lancaster",
+    "recruits": [
+     {
+      "recruit_id": "6a5034a5-d402-403c-897f-d038319579d6",
+      "name": "Dexter Truong",
+      "rt": 35
+     }
+    ]
+   }
+  ],
+  "created_at": "2026-10-02T18:34:51.871294"
  }
 }
