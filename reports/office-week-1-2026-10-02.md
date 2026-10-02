@@ -178,4 +178,10 @@ Existing tests updated: `tests/test_office_digest.py` (it asserted the old week-
 | `check_ui_tokens.py --strict --no-write` | exit 0 |
 | `check_migration_gates.py` | passed (Gate A 0, Gate B 134 lines / 43 files) |
 | `franchise-command-center.css` | 1779 lines, unchanged |
-| Full Playwright (lock held) | PENDING |
+| Full Playwright (lock held 16:38-16:58, 1 worker) | 1076 passed, 21 skipped, **1 failed**: `first-paint.spec.js:111` "the page loader is opaque › court pre-game". Re-run alone `--repeat-each=5`: **fails 5 of 5** (the other three pages in that block pass). |
+
+**That failure is not from this branch.** With this branch's three client files put back to develop's (`officeHome.js`, `office-home.css`, `momentQueue.js`) and a server still running develop's code, it fails the same way. This branch does not touch `court.html`, the Phaser client or `first-paint.spec.js`. The test (added on develop at 14:45 today with the opaque page loader) waits 500ms after the court's loader appears and expects it still up; on the court pre-game page it is already gone. For whoever owns the first-paint sweep.
+
+**A lock incident, mine.** When the strip brief arrived I cancelled a queued full run by killing its `sleep` child first. That made its wait loop run `mkdir` once more; the lock happened to be free, so the script took it and was killed before it could set its release trap. The lock sat orphaned from 16:00:13 to 16:38:06 and would have blocked any other agent's full run in that window. I released it once I had worked out it was mine (its creation time matched my kill to the second, and no full suite was running anywhere). My runner now sets its release trap before it waits.
+
+**Full suite: pytest 4413 passed, 14 skipped, 108 xfailed, 2 xpassed, 0 failed · Playwright 1076 passed, 21 skipped, 1 failed (`first-paint.spec.js:111` court pre-game; fails on develop's code too, 5 of 5 alone).**
