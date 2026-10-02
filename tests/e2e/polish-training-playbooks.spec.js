@@ -1097,6 +1097,145 @@ test.describe('playbooks follow-ups', () => {
   }
 });
 
+test.describe('playbooks lock states', () => {
+  test.skip(PHASE === 'before', 'after tree only');
+
+  const rowState = (page, name) => page.evaluate((label) => {
+    const row = [...document.querySelectorAll('#playbooks-view .play')].find((el) => el.querySelector('.pn b').textContent === label);
+    const lock = row.querySelector('[data-lock]');
+    const track = row.querySelector('.wb');
+    const fill = track.querySelector('i');
+    const pct = row.querySelector('.wt input, .wt > b');
+    const cs = (el, pseudo) => getComputedStyle(el, pseudo || null);
+    return {
+      classes: row.className,
+      pressed: lock.getAttribute('aria-pressed'),
+      lockOn: lock.classList.contains('on'),
+      lockColor: cs(lock).color,
+      lockPlate: cs(lock).backgroundColor,
+      // The closed padlock's shackle comes back down to the body; the open one stops short.
+      glyph: lock.querySelector('svg path').getAttribute('d'),
+      draggable: track.classList.contains('et-slider'),
+      focusable: track.getAttribute('tabindex'),
+      handle: cs(fill, '::after').content,
+      fill: cs(fill).backgroundColor,
+      trackCursor: cs(track).cursor,
+      pctColor: cs(pct).color,
+      pctReadonly: pct.tagName === 'INPUT' ? pct.readOnly : true,
+      nameColor: cs(row.querySelector('.pn b')).color,
+    };
+  }, name);
+  const neutral = (rgb) => {
+    const m = String(rgb).match(/([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
+    return !!m && Math.abs(m[1] - m[2]) < 6 && Math.abs(m[2] - m[3]) < 6;
+  };
+  const alpha = (rgb) => { const m = String(rgb).match(/rgba\([^)]*,\s*([\d.]+)\)/); return m ? Number(m[1]) : 1; };
+
+  for (const [width, height] of [[1280, 720], [1920, 1080]]) {
+    test('a locked slider row is unmistakable beside unlocked rows at ' + width, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await openPlaybooks(page);
+      const lockOf = (name) => page.locator('#playbooks-view .play', { has: page.locator('.pn b', { hasText: new RegExp('^' + name + '$') }) }).locator('[data-lock]');
+
+      const before = await rowState(page, 'PF Post Motion');
+      expect(before.pressed).toBe('false');
+      expect(before.classes).not.toMatch(/is-locked/);
+      expect(before.draggable).toBe(true);
+      expect(before.handle).not.toBe('none');                 // a draggable slider has a handle
+      expect(alpha(before.lockPlate)).toBe(0);                // open padlock, no plate
+      expect(before.lockColor).toBe('rgba(255, 255, 255, 0.38)');
+
+      await lockOf('PF Post Motion').click();
+      await lockOf('4-1 Motion').click();
+      const locked = await rowState(page, 'PF Post Motion');
+      const other = await rowState(page, '3-2 Motion');
+
+      // The distinct class and aria-pressed.
+      expect(locked.classes).toMatch(/(^| )is-locked( |$)/);
+      expect(locked.pressed).toBe('true');
+      expect(locked.lockOn).toBe(true);
+      expect(other.classes).not.toMatch(/is-locked/);
+      expect(other.pressed).toBe('false');
+      // Closed padlock, full white, on a filled neutral plate. The open one is dim, no plate.
+      expect(locked.glyph).not.toBe(other.glyph);
+      expect(locked.lockColor).toBe('rgb(255, 255, 255)');
+      expect(alpha(locked.lockPlate)).toBeGreaterThan(0.1);
+      expect(neutral(locked.lockPlate)).toBe(true);
+      expect(alpha(other.lockPlate)).toBe(0);
+      // The locked slider: muted track, no handle, not a control.
+      expect(locked.draggable).toBe(false);
+      expect(locked.focusable).toBeNull();
+      expect(locked.handle).toBe('none');
+      expect(locked.trackCursor).toBe('default');
+      expect(alpha(locked.fill)).toBeLessThan(alpha(other.fill));
+      expect(other.handle).not.toBe('none');
+      // The percentage dims one step; the play name does not.
+      expect(locked.pctColor).toBe('rgba(255, 255, 255, 0.6)');
+      expect(other.pctColor).toBe('rgb(255, 255, 255)');
+      expect(locked.pctReadonly).toBe(true);
+      expect(locked.nameColor).toBe(other.nameColor);
+      [locked.lockColor, locked.lockPlate, locked.fill, locked.pctColor].forEach((c) => expect(neutral(c), c).toBe(true));
+
+      // Hover and keyboard focus on the lock button.
+      const freeLock = lockOf('3-2 Motion');
+      await freeLock.hover();
+      await expect.poll(() => freeLock.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+      await page.mouse.move(0, 0);
+      await lockOf('PF Post Motion').focus();
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      const ring = await lockOf('PF Post Motion').evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return { focused: document.activeElement === el, style: cs.outlineStyle, width: cs.outlineWidth };
+      });
+      expect(ring).toEqual({ focused: true, style: 'solid', width: '2px' });
+      await page.locator('#playbooks-view .pb-sec-title').first().click();
+      await pbShot(page, 'locks-after-' + width);
+
+      // Space on the focused lock unlocks it again.
+      await lockOf('PF Post Motion').focus();
+      await page.keyboard.press('Space');
+      await expect(lockOf('PF Post Motion')).toHaveAttribute('aria-pressed', 'false');
+      expect((await rowState(page, 'PF Post Motion')).classes).not.toMatch(/is-locked/);
+    });
+  }
+
+  test('every lockable slider on every tab carries the lock; the other tabs have none', async ({ page }) => {
+    await openPlaybooks(page);
+    const tab = (key) => page.locator('#playbooks-view .playbooks-tab[data-tab="' + key + '"]');
+    const audit = () => page.evaluate(() => [...document.querySelectorAll('#playbooks-view .playbooks-tabpane.on .pb-sec')].map((sec) => {
+      const rows = [...sec.querySelectorAll('.play:not(.lk), .chip, [data-csl]')];
+      const locks = [...sec.querySelectorAll('[data-lock]')];
+      return {
+        section: sec.dataset.section,
+        sliders: sec.querySelectorAll('.wb').length,
+        locks: locks.length,
+        pressed: locks.every((b) => b.getAttribute('aria-pressed') === 'true' || b.getAttribute('aria-pressed') === 'false'),
+        rows: rows.length,
+      };
+    }));
+    const offense = await audit();
+    expect(offense.map((s) => s.section)).toEqual(['motion', 'setPlays']);
+    offense.forEach((s) => { expect(s.locks, s.section).toBe(s.sliders); expect(s.locks, s.section).toBeGreaterThan(0); expect(s.pressed).toBe(true); });
+    await tab('defense').click();
+    const defense = await audit();
+    expect(defense.map((s) => s.section)).toEqual(['manDefense', 'zoneDefense']);
+    defense.forEach((s) => { expect(s.locks, s.section).toBe(s.sliders); expect(s.locks, s.section).toBeGreaterThan(0); });
+    // A locked defense row takes the same treatment.
+    const first = page.locator('#playbooks-view #zone-defense-grid .play').first();
+    await first.locator('[data-lock]').click();
+    await expect(page.locator('#playbooks-view #zone-defense-grid .play.is-locked [data-lock][aria-pressed="true"]')).toHaveCount(1);
+    // Fast Breaks and Press/Traps weights normalise instead of locking: no lock there.
+    for (const key of ['fastBreaks', 'pressTraps']) {
+      await tab(key).click();
+      const flexible = await audit();
+      expect(flexible.length).toBe(1);
+      expect(flexible[0].locks, key).toBe(0);
+      expect(flexible[0].sliders, key).toBeGreaterThan(0);
+    }
+  });
+});
+
 test.describe('set lineup', () => {
   test.skip(PHASE === 'before', 'after tree only');
 
