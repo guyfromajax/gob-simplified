@@ -1252,8 +1252,9 @@ test.describe('training report', () => {
     expect(cells.length).toBeGreaterThanOrEqual(8);
     cells.forEach((cell) => {
       expect(cell.text).toMatch(/^\d+$/);
-      expect(cell.classes).toBe('attribute-value-cell');
-      expect(cell.children).toBe(0);
+      // The value, in the roster's pair box (gstart / gend), and nothing else.
+      expect(cell.classes).toMatch(/^attribute-value-cell g(start|end)( gshade)?$/);
+      expect(cell.children).toBe(1);
       expect(cell.tip).toBeNull();
       expect(cell.cursor).not.toBe('help');
       expect(cell.color).toBe(cells[3].color);    // row 3 did not move

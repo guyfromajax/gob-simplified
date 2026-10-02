@@ -19,6 +19,10 @@
   <link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/css/rt-buckets.css">
+  <!-- The shared table styles: the Player Report and Projected Starting 5 use the roster's
+       attribute pairs (.gob-pairs / .gob-tbl), not a table style of their own. -->
+  <link rel="stylesheet" href="/css/gob-views.css">
+  <link rel="stylesheet" href="/css/gob-tables.css">
   <link rel="stylesheet" href="/training-report.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
@@ -74,8 +78,8 @@
           <button class="toggle-btn active" data-view="changes">Training Changes</button>
         </div>
       </div>
-      <div class="scroll-x">
-        <table class="players-table" id="players-table">
+      <div class="scroll-x gob-roster gob-pairs tr-ptable">
+        <table class="gob-tbl" id="players-table">
           <thead id="players-thead"></thead>
           <tbody id="players-tbody"></tbody>
         </table>
