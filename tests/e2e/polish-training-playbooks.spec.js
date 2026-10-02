@@ -746,8 +746,8 @@ function drillRow(page, id) {
 
 const SEL_SHOTS = path.join(__dirname, '../../reports/training-followups');
 const CLEAR_WHITE = 'rgba(0, 0, 0, 0)';
-const OUTLINE_A = 'rgba(255, 255, 255, 0.25)';   // --train-box-outline as shipped (option A)
-const OUTLINE_B = 'rgba(255, 255, 255, 0.45)';   // option B
+const OUTLINE = 'rgba(255, 255, 255, 0.45)';     // --train-box-outline as shipped (option B, Jamie's choice)
+const OUTLINE_A = 'rgba(255, 255, 255, 0.25)';   // option A, the subtler strength not chosen
 
 test.describe('training point selectors', () => {
   test.skip(PHASE === 'before', 'after tree only');
@@ -775,7 +775,7 @@ test.describe('training point selectors', () => {
     const row = drillRow(page, 'offense-inside');
     for (let n = 0; n < 5; n++) {
       const mark = await boxMark(row.locator('.pip').nth(n));
-      expect(mark.border).toBe('1px solid ' + OUTLINE_A);
+      expect(mark.border).toBe('1px solid ' + OUTLINE);
       expect(mark.bg).toBe(CLEAR_WHITE);
     }
     // Size: a 28px tall hit area per box.
@@ -783,10 +783,10 @@ test.describe('training point selectors', () => {
     expect(hit.height).toBeGreaterThanOrEqual(28);
     expect(hit.width).toBeGreaterThanOrEqual(22);
     // The outline strength is one token.
-    await page.addStyleTag({ content: ':root{--train-box-outline:var(--white-45)}' });
+    await page.addStyleTag({ content: ':root{--train-box-outline:var(--white-25)}' });
     await page.waitForTimeout(250);
-    expect((await boxMark(row.locator('.pip').nth(2))).border).toBe('1px solid ' + OUTLINE_B);
-    expect((await boxMark(drillRow(page, 'team-scrimmages').locator('.pip').nth(4))).border).toBe('1px solid ' + OUTLINE_B);
+    expect((await boxMark(row.locator('.pip').nth(2))).border).toBe('1px solid ' + OUTLINE_A);
+    expect((await boxMark(drillRow(page, 'team-scrimmages').locator('.pip').nth(4))).border).toBe('1px solid ' + OUTLINE_A);
   });
 
   test('filled boxes are solid white and the number turns full white', async ({ page }) => {
@@ -801,7 +801,7 @@ test.describe('training point selectors', () => {
       if (n < 3) expect(mark.bg).toBe('rgb(255, 255, 255)');
       else {
         expect(mark.bg).toBe(CLEAR_WHITE);
-        expect(mark.border).toBe('1px solid ' + OUTLINE_A);
+        expect(mark.border).toBe('1px solid ' + OUTLINE);
       }
     }
     await expect(row.locator('.ps-n')).toHaveText('3');
@@ -966,7 +966,7 @@ test.describe('training point selectors', () => {
       for (const option of ['a', 'b']) {
         await page.setViewportSize({ width, height: width === 1280 ? 900 : 1080 });
         await openTraining(page);
-        if (option === 'b') await page.addStyleTag({ content: ':root{--train-box-outline:var(--white-45)}' });
+        if (option === 'a') await page.addStyleTag({ content: ':root{--train-box-outline:var(--white-25)}' });
         await settle(page);
         await page.mouse.move(0, 0);
         await page.waitForTimeout(300);
@@ -1001,9 +1001,9 @@ test.describe('training point selectors', () => {
     for (const width of [1280, 1920]) {
       await page.setViewportSize({ width, height: 900 });
       await page.setContent('<body style="margin:0;padding:16px;background:#0b0e14;color:#fff;font:600 13px/1 sans-serif">'
-        + '<p style="margin:0 0 8px">OPTION A (shipped): --train-box-outline: var(--white-25)</p>'
+        + '<p style="margin:0 0 8px">OPTION A: --train-box-outline: var(--white-25)</p>'
         + '<img style="display:block;max-width:100%" src="data:image/png;base64,' + crops['a' + width] + '">'
-        + '<p style="margin:24px 0 8px">OPTION B: --train-box-outline: var(--white-45)</p>'
+        + '<p style="margin:24px 0 8px">OPTION B (shipped, Jamie\'s choice): --train-box-outline: var(--white-45)</p>'
         + '<img style="display:block;max-width:100%" src="data:image/png;base64,' + crops['b' + width] + '">'
         + '</body>');
       await page.waitForTimeout(300);

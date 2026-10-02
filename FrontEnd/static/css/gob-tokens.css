@@ -58,8 +58,8 @@
 
 /* ── Training point boxes ───────────────────────────────────
    The outline of an EMPTY box on the weekly Training page. One token so its strength is
-   one decision: option A (shipped) is --white-25, option B (stronger) is --white-45. */
---train-box-outline:var(--white-25);
+   one decision. Jamie chose option B, --white-45 (2026-10-02); option A was --white-25. */
+--train-box-outline:var(--white-45);
 
 /* ── Deltas, results, badge ─────────────────────────────── */
 --delta-up:var(--green);
