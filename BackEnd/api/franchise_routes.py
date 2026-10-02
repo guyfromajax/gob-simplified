@@ -18782,6 +18782,42 @@ def mark_elimination_seen(
     return {"seen": True, "season": current_season}
 
 
+class ArchetypeRevealSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/archetype-reveal-seen")
+def mark_archetype_reveal_seen_offline(
+    req: ArchetypeRevealSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Offline build: stamp the first-archetype reveal as seen on the save.
+
+    Online the flag is on the account and is written by
+    ``PATCH /api/auth/archetype-reveal-seen``; that stays the only online path.
+    The desktop client cannot reach ``/api/auth`` (always remote, and loopback
+    does not serve it), so the reveal was shown and never marked, and came back
+    on every Office visit. This writes the same key to the save's ``local_coach``
+    doc, the one ``_coach_archetype_signals`` reads it back from, and bumps the
+    franchise's browse revision so the next command-center read is not a 304 of
+    the body that still carried the moment.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    if not is_local_owner(user.get("user_id")):
+        raise HTTPException(status_code=404, detail="Offline build only")
+    from datetime import timezone
+
+    from BackEnd.utils.local_coach import LOCAL_COACH_ID, coach_collection
+
+    coach_collection().update_one(
+        {"_id": LOCAL_COACH_ID},
+        {"$set": {"archetype_reveal_seen": True, "updated_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+    bump_browse_rev(franchise_doc["_id"])
+    return {"archetype_reveal_seen": True}
+
+
 class SeasonReviewSeenRequest(BaseModel):
     franchise_id: str
 

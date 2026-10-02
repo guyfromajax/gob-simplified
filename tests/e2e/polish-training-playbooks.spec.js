@@ -171,7 +171,9 @@ async function installApi(page, extra) {
     }
     if (pathname === '/franchise/training-report') {
       if (opts.reportDelayMs) await new Promise((resolve) => setTimeout(resolve, opts.reportDelayMs));
-      return fulfillJson(route, report(opts.reportWeek || cc.week || 12));
+      const body = report(opts.reportWeek || cc.week || 12);
+      if (opts.reportPatch) opts.reportPatch(body);
+      return fulfillJson(route, body);
     }
     return fulfillJson(route, {});
   });
@@ -219,11 +221,11 @@ async function settle(page) {
   }));
 }
 
-async function shot(page, item, locator) {
-  if (!PHASE) return;
+async function shot(page, item, locator, file) {
+  if (!PHASE && !file) return;
   fs.mkdirSync(OUT, { recursive: true });
   await settle(page);
-  const dest = path.join(OUT, PHASE + '-' + item + '-1280.png');
+  const dest = file || path.join(OUT, PHASE + '-' + item + '-1280.png');
   if (locator) {
     // Bring the item to the top of its scroller, clear of any sticky page head.
     await locator.first().evaluate((el) => {
@@ -661,14 +663,28 @@ test.describe('training page', () => {
 const TONE = {
   neutral: 'rgba(255, 255, 255, 0.87)',
   up: 'rgb(52, 236, 39)',
+  upFaint: 'rgba(52, 236, 39, 0.45)',
   elite: 'rgb(74, 144, 217)',
   down: 'rgb(255, 109, 109)',
+  downFaint: 'rgba(255, 109, 109, 0.6)',
   flat: 'rgba(255, 255, 255, 0.38)',
 };
 
+/** Chrome reports a color-mix() as `color(srgb r g b / a)`; read it back as rgba() like the rest. */
+function rgba(color) {
+  const m = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)$/.exec(color);
+  if (!m) return color;
+  const ch = (v) => Math.round(Number(v) * 255);
+  const alpha = m[4] == null ? 1 : Math.round(Number(m[4]) * 100) / 100;
+  return alpha === 1
+    ? 'rgb(' + ch(m[1]) + ', ' + ch(m[2]) + ', ' + ch(m[3]) + ')'
+    : 'rgba(' + ch(m[1]) + ', ' + ch(m[2]) + ', ' + ch(m[3]) + ', ' + alpha + ')';
+}
+const tones = (mark) => (mark ? { text: mark.text, color: rgba(mark.color) } : null);
+
 /** Team Report rows by label: the mark text and its painted colour. */
-function teamMarks(page) {
-  return page.evaluate(() => {
+async function teamMarks(page) {
+  const raw = await page.evaluate(() => {
     const out = {};
     document.querySelectorAll('#team-attributes-grid .team-attr-item').forEach((item) => {
       const name = item.querySelector('.attr-name').textContent.trim();
@@ -677,11 +693,13 @@ function teamMarks(page) {
     });
     return out;
   });
+  Object.keys(raw).forEach((name) => { raw[name] = tones(raw[name]); });
+  return raw;
 }
 
 /** Player Report rows by player: the SC cell's mark text and colour. */
-function playerMarks(page, markSelector) {
-  return page.evaluate((sel) => {
+async function playerMarks(page, markSelector) {
+  const raw = await page.evaluate((sel) => {
     const head = [...document.querySelectorAll('#players-thead th')].map((th) => th.textContent.trim());
     const sc = head.indexOf('SC');
     return [...document.querySelectorAll('#players-tbody tr')].map((tr) => {
@@ -690,6 +708,44 @@ function playerMarks(page, markSelector) {
       return mark ? { text: mark.textContent, color: getComputedStyle(mark).color } : null;
     });
   }, markSelector || '');
+  return raw.map(tones);
+}
+
+/** WCAG contrast of a (possibly translucent) colour painted over an opaque one. */
+function contrastOver(fg, bg) {
+  const parse = (c) => {
+    const m = /^rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)$/.exec(rgba(c));
+    return [Number(m[1]), Number(m[2]), Number(m[3]), m[4] == null ? 1 : Number(m[4])];
+  };
+  const f = parse(fg);
+  const b = parse(bg);
+  const mixed = [0, 1, 2].map((i) => f[i] * f[3] + b[i] * (1 - f[3]));
+  const lum = (rgb) => {
+    const lin = rgb.map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); });
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+  };
+  const a = lum(mixed);
+  const c = lum(b);
+  return (Math.max(a, c) + 0.05) / (Math.min(a, c) + 0.05);
+}
+
+/** The opaque colour actually behind the SC cell of each Player Report row. */
+function rowBackgrounds(page) {
+  return page.evaluate(() => {
+    const parse = (c) => {
+      const m = /rgba?\(([\d.]+), ([\d.]+), ([\d.]+)(?:, ([\d.]+))?\)/.exec(c);
+      return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] == null ? 1 : Number(m[4])] : [0, 0, 0, 0];
+    };
+    const head = [...document.querySelectorAll('#players-thead th')].map((th) => th.textContent.trim());
+    const sc = head.indexOf('SC');
+    return [...document.querySelectorAll('#players-tbody tr')].map((tr) => {
+      const layers = [];
+      for (let node = tr.children[sc]; node; node = node.parentElement) layers.unshift(parse(getComputedStyle(node).backgroundColor));
+      let out = [0, 0, 0];
+      layers.forEach((l) => { out = out.map((v, i) => l[i] * l[3] + v * (1 - l[3])); });
+      return { highlight: tr.classList.contains('practice-player-highlight'), color: 'rgb(' + out.map(Math.round).join(', ') + ')' };
+    });
+  });
 }
 
 async function reportReady(page, week) {
@@ -737,32 +793,87 @@ test.describe('training report', () => {
     expect(html).toContain('class="report-skeleton"');
   });
 
-  test('R2 in-season marks: one up and one down neutral, two up green, three up blue, more down red', async ({ page }) => {
+  test('R2 in-season marks: one up faint green, one down faint red, two up green, three up blue, more down red', async ({ page }) => {
     await openReport(page, { reportWeek: 12 });
     await reportReady(page, 12);
     const team = await teamMarks(page);
-    expect(team.Offense).toEqual({ text: '▲▲▲', color: TONE.elite });      // +6
-    expect(team.Defense).toEqual({ text: '▲▲', color: TONE.up });           // +2.5
-    expect(team['Fast Break']).toEqual({ text: '▲', color: TONE.neutral });  // +0.4
-    expect(team['P/T Defense']).toEqual({ text: '▼', color: TONE.neutral }); // -1: one down, neutral outside camp
-    expect(team.Fight).toEqual({ text: '▼▼', color: TONE.down });           // -2
-    expect(team.Discipline).toEqual({ text: '▼▼▼', color: TONE.down });     // -3
+    expect(team.Offense).toEqual({ text: '▲▲▲', color: TONE.elite });        // +6
+    expect(team.Defense).toEqual({ text: '▲▲', color: TONE.up });             // +2.5
+    expect(team['Fast Break']).toEqual({ text: '▲', color: TONE.upFaint });    // +0.4
+    expect(team['P/T Defense']).toEqual({ text: '▼', color: TONE.downFaint }); // -1: one down, faint red outside camp
+    expect(team.Fight).toEqual({ text: '▼▼', color: TONE.down });             // -2
+    expect(team.Discipline).toEqual({ text: '▼▼▼', color: TONE.down });       // -3
     // Player Report, Training Changes: +6 / +2.5 / +0.4 / 0 / -0.3 / -1 / -2 / -3
     const players = await playerMarks(page);
     expect(players.slice(0, 8)).toEqual([
       { text: '▲▲▲', color: TONE.elite },
       { text: '▲▲', color: TONE.up },
-      { text: '▲', color: TONE.neutral },
-      { text: '–', color: TONE.flat },      // exactly 0 is a dash, as in camp
-      { text: '▲', color: TONE.neutral },   // -0.3 still reads as holding
-      { text: '▼', color: TONE.neutral },
+      { text: '▲', color: TONE.upFaint },
+      { text: '–', color: TONE.flat },        // exactly 0 is a dash, as in camp
+      { text: '▼', color: TONE.downFaint },   // -0.3 is a drop: one down, never a green arrow
+      { text: '▼', color: TONE.downFaint },
       { text: '▼▼', color: TONE.down },
       { text: '▼▼▼', color: TONE.down },
     ]);
+    // Playbook Summary: +3.5 / +1.2 / +0.2 / -1 / -3 across the plays, same marks.
+    const plays = (await page.locator('.playbook-summary-section .pbs-panel--offense .pbs-delta').evaluateAll((els) => els.map((el) => ({
+      text: el.textContent, color: getComputedStyle(el).color,
+    })))).map(tones);
+    const byText = {};
+    plays.forEach((mark) => { byText[mark.text] = mark.color; });
+    expect(byText).toEqual({ '▲▲▲': TONE.elite, '▲▲': TONE.up, '▲': TONE.upFaint, '▼': TONE.downFaint, '▼▼▼': TONE.down });
     // Team Report: an attribute that did not move carries no arrow, in season as in camp.
     expect(team.Shooting.text).not.toMatch(/[▲▼]/);
     await shot(page, 'R2-report-in-season');
     await shot(page, 'R2-player-report-training-changes', page.locator('.players-section'));
+  });
+
+  test('R2 in-season: a single arrow follows the sign; the two- and three-arrow thresholds have not moved', async ({ page }) => {
+    const deltas = [0.01, 0.99, 1, 2.99, 3, -0.01, -0.5, -1.49, -1.5, -2.49, -2.5, 0];
+    await openReport(page, {
+      reportWeek: 12,
+      reportPatch: (body) => {
+        body.player_changes = {};
+        body.players.forEach((player, i) => { body.player_changes[player.name] = { SC: deltas[i] }; });
+      },
+    });
+    await reportReady(page, 12);
+    const players = await playerMarks(page);
+    expect(players.length).toBe(deltas.length);
+    expect(players).toEqual([
+      { text: '▲', color: TONE.upFaint },     // 0.01
+      { text: '▲', color: TONE.upFaint },     // 0.99
+      { text: '▲▲', color: TONE.up },         // 1
+      { text: '▲▲', color: TONE.up },         // 2.99
+      { text: '▲▲▲', color: TONE.elite },     // 3
+      { text: '▼', color: TONE.downFaint },   // -0.01
+      { text: '▼', color: TONE.downFaint },   // -0.5 (was an up arrow)
+      { text: '▼', color: TONE.downFaint },   // -1.49
+      { text: '▼▼', color: TONE.down },       // -1.5
+      { text: '▼▼', color: TONE.down },       // -2.49
+      { text: '▼▼▼', color: TONE.down },      // -2.5
+      { text: '–', color: TONE.flat },        // 0
+    ]);
+  });
+
+  test('R2 in-season: the faint arrows read on both zebra rows (3:1 or better)', async ({ page }) => {
+    await openReport(page, { reportWeek: 12 });
+    await reportReady(page, 12);
+    const rows = (await rowBackgrounds(page)).filter((row) => !row.highlight);
+    const zebra = [...new Set(rows.map((row) => row.color))];
+    expect(zebra.length).toBe(2);
+    // The colours as painted: +0.4 is row 2, -0.3 is row 4.
+    const marks = await playerMarks(page);
+    const upFaint = marks[2].color;
+    const downFaint = marks[4].color;
+    expect([upFaint, downFaint]).toEqual([TONE.upFaint, TONE.downFaint]);
+    zebra.forEach((bg) => {
+      expect(contrastOver(upFaint, bg)).toBeGreaterThanOrEqual(3);
+      expect(contrastOver(downFaint, bg)).toBeGreaterThanOrEqual(3);
+      // Faint is clearly fainter than full strength on the same row.
+      expect(contrastOver(TONE.up, bg) / contrastOver(upFaint, bg)).toBeGreaterThan(2);
+      expect(contrastOver(TONE.down, bg) / contrastOver(downFaint, bg)).toBeGreaterThan(1.5);
+    });
   });
 
   test('R2 camp marks: the camp scale, and any down is red', async ({ page }) => {
@@ -781,32 +892,80 @@ test.describe('training report', () => {
     await shot(page, 'R2-report-camp');
   });
 
-  test('R3 Attributes view marks are pluses and minuses in the same tones', async ({ page }) => {
-    await openReport(page, { reportWeek: 12 });
+  test('R3 Attributes view shows current values only: no marks, no change tint, no tooltip', async ({ page }) => {
+    await openReport(page, {
+      reportWeek: 12,
+      reportPatch: (body) => {
+        // The displayed value moved for two players: that used to tint the value.
+        body.player_attribute_display_movements = {
+          [String(body.players[0].id)]: { SC: { from: 10, to: 12 } },
+          [String(body.players[7].id)]: { SC: { from: 12, to: 10 } },
+        };
+      },
+    });
     await reportReady(page, 12);
     await page.locator('.players-section .toggle-btn[data-view="attributes"]').click();
-    const marks = await playerMarks(page, '.delta-mark');
-    expect(marks.slice(0, 8)).toEqual([
-      { text: '+++', color: TONE.elite },
-      { text: '++', color: TONE.up },
-      { text: '+', color: TONE.neutral },
-      null,                                   // no change: no mark
-      { text: '+', color: TONE.neutral },    // -0.3 reads as holding in season
-      { text: '\u2212', color: TONE.neutral },
-      { text: '\u2212\u2212', color: TONE.down },
-      { text: '\u2212\u2212\u2212', color: TONE.down },
-    ]);
-    const table = await page.locator('#players-tbody').innerText();
-    expect(table).not.toMatch(/[▲▼]/);
-    // Exactly 0: no plus beside the value, and nothing to hover for.
-    const zero = await page.evaluate(() => {
+    await expect(page.locator('#players-tbody .attribute-value-cell').first()).toBeVisible();
+    const cells = await page.evaluate(() => {
       const head = [...document.querySelectorAll('#players-thead th')].map((th) => th.textContent.trim());
-      const cell = document.querySelectorAll('#players-tbody tr')[3].children[head.indexOf('SC')];
-      return { delta: cell.classList.contains('is-delta'), tip: cell.getAttribute('data-tooltip') };
+      const sc = head.indexOf('SC');
+      return [...document.querySelectorAll('#players-tbody tr')].map((tr) => {
+        const cell = tr.children[sc];
+        const cs = getComputedStyle(cell);
+        return {
+          text: cell.textContent, classes: cell.className, children: cell.children.length,
+          tip: cell.getAttribute('data-tooltip'), cursor: cs.cursor, color: cs.color, weight: cs.fontWeight, shadow: cs.boxShadow,
+        };
+      });
     });
-    expect(zero).toEqual({ delta: false, tip: null });
+    // +6 / +2.5 / +0.4 / 0 / -0.3 / -1 / -2 / -3 this week: every value reads the same way.
+    expect(cells.length).toBeGreaterThanOrEqual(8);
+    cells.forEach((cell) => {
+      expect(cell.text).toMatch(/^\d+$/);
+      expect(cell.classes).toBe('attribute-value-cell');
+      expect(cell.children).toBe(0);
+      expect(cell.tip).toBeNull();
+      expect(cell.cursor).not.toBe('help');
+      expect(cell.color).toBe(cells[3].color);    // row 3 did not move
+      expect(cell.weight).toBe(cells[3].weight);
+      expect(cell.shadow).toBe('none');
+    });
+    await expect(page.locator('#players-tbody .delta-mark')).toHaveCount(0);
+    await expect(page.locator('#players-tbody .is-delta')).toHaveCount(0);
+    const values = (await page.locator('#players-tbody .attribute-value-cell').allTextContents()).join(' ');
+    expect(values).not.toMatch(/[▲▼+\u2212]/);
+    // Nothing to hover for.
+    await page.locator('#players-tbody tr').first().locator('.attribute-value-cell').first().hover();
+    await expect(page.locator('.attribute-tooltip, #training-report-attr-tooltip')).toHaveCount(0);
     await shot(page, 'R3-player-report-attributes', page.locator('.players-section'));
+    // Movement still lives on Training Changes.
+    await page.locator('.players-section .toggle-btn[data-view="changes"]').click();
+    expect((await playerMarks(page))[0]).toEqual({ text: '▲▲▲', color: TONE.elite });
   });
+
+  // After shots for the chrome follow-ups report (FOLLOWUP_SHOT_TAG=after|before), 1280 and 1920.
+  for (const width of [1280, 1920]) {
+    test('chrome follow-ups shots at ' + width + ': Attributes tab, marks in season and in camp', async ({ page }) => {
+      const tag = process.env.FOLLOWUP_SHOT_TAG;
+      test.skip(!tag, 'shots only');
+      const dir = path.join(__dirname, '../../reports/chrome-followups');
+      const snap = (name, locator) => shot(page, name, locator, path.join(dir, name + '-' + tag + '-' + width + '.png'));
+      await page.setViewportSize({ width, height: width === 1280 ? 720 : 1080 });
+      await openReport(page, { reportWeek: 12 });
+      await reportReady(page, 12);
+      await snap('f8-marks-in-season-team-report');
+      await snap('f8-marks-in-season-training-changes', page.locator('.players-section'));
+      await snap('f8-marks-in-season-playbook-summary', page.locator('.playbook-summary-section'));
+      await page.locator('.players-section .toggle-btn[data-view="attributes"]').click();
+      await snap('f7-attributes-tab', page.locator('.players-section'));
+      const campCc = inSeasonCc();
+      campCc.week = 1;
+      await openReport(page, { reportWeek: 1, cc: campCc });
+      await reportReady(page, 1);
+      await snap('f8-marks-camp-team-report');
+      await snap('f8-marks-camp-training-changes', page.locator('.players-section'));
+    });
+  }
 
   test('R4 Playbook Summary: Offense and Defense panels, sub-sections as columns, no Section column', async ({ page }) => {
     await openReport(page, { reportWeek: 12 });

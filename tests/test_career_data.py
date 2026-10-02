@@ -443,6 +443,64 @@ def test_command_center_reads_the_desktop_archetype_signals(store):
     assert online["archetype_reveal_seen"] is True
 
 
+def _reveal_route_env(store, monkeypatch):
+    import BackEnd.utils.browse_cache as browse_cache
+    import BackEnd.utils.ownership as ownership
+
+    monkeypatch.setattr(ownership, "franchises_collection", store.franchises_collection)
+    monkeypatch.setattr(browse_cache, "franchise_collection", lambda: store.franchises_collection)
+
+
+def test_offline_first_archetype_reveal_is_marked_seen_on_the_save(store, monkeypatch):
+    """Offline the seen flag has nowhere remote to go: it is saved on this computer."""
+    from BackEnd.utils.season_moments import first_archetype_payload
+
+    _reveal_route_env(store, monkeypatch)
+    doc, _, _ = _seed(store, LOCAL_USER_ID, browse_rev=4)
+    store.db["save_meta"].update_one(
+        {"_id": lc.LOCAL_COACH_ID}, {"$set": {"lead_archetype": "tactician"}}, upsert=True
+    )
+    before = franchise_routes._coach_archetype_signals(dict(LOCAL_PRINCIPAL))
+    assert first_archetype_payload(before) == {"eligible": True, "archetype": "tactician"}
+
+    request = franchise_routes.ArchetypeRevealSeenRequest(franchise_id=str(doc["_id"]))
+    out = franchise_routes.mark_archetype_reveal_seen_offline(request, user=dict(LOCAL_PRINCIPAL))
+    assert out == {"archetype_reveal_seen": True}
+
+    after = franchise_routes._coach_archetype_signals(dict(LOCAL_PRINCIPAL))
+    assert after["archetype_reveal_seen"] is True
+    assert after["lead_archetype"] == "tactician", "the rest of the coach doc is untouched"
+    assert first_archetype_payload(after) is None, "the reveal is not offered a second time"
+    # The Office read is keyed on browse_rev: without the bump the next load would be
+    # a 304 of the body that still carried the moment.
+    assert store.franchises_collection.find_one({"_id": doc["_id"]})["browse_rev"] == 5
+
+    # A second call changes nothing but the revision.
+    franchise_routes.mark_archetype_reveal_seen_offline(request, user=dict(LOCAL_PRINCIPAL))
+    assert franchise_routes._coach_archetype_signals(dict(LOCAL_PRINCIPAL))["archetype_reveal_seen"] is True
+
+
+def test_offline_archetype_route_refuses_an_online_coach(store, monkeypatch):
+    """Online keeps its own path (PATCH /api/auth/archetype-reveal-seen); this route is not it."""
+    from fastapi import HTTPException
+
+    _reveal_route_env(store, monkeypatch)
+    oid = ObjectId()
+    store.users_collection.insert_one({"_id": oid, "username": "online-coach", "lead_archetype": "grinder"})
+    doc, _, _ = _seed(store, str(oid), browse_rev=2)
+    request = franchise_routes.ArchetypeRevealSeenRequest(franchise_id=str(doc["_id"]))
+    with pytest.raises(HTTPException) as denied:
+        franchise_routes.mark_archetype_reveal_seen_offline(request, user={"user_id": str(oid)})
+    assert denied.value.status_code == 404
+    assert "archetype_reveal_seen" not in store.users_collection.find_one({"_id": oid})
+    assert store.db["save_meta"].find_one({"_id": lc.LOCAL_COACH_ID}) is None
+    assert store.franchises_collection.find_one({"_id": doc["_id"]})["browse_rev"] == 2
+    # Someone else's franchise is still refused before anything else.
+    with pytest.raises(HTTPException) as foreign:
+        franchise_routes.mark_archetype_reveal_seen_offline(request, user=dict(LOCAL_PRINCIPAL))
+    assert foreign.value.status_code == 403
+
+
 # --- 6 + 7. coach-career ---------------------------------------------------------------------
 
 
@@ -508,7 +566,7 @@ def test_top_seasons_rank_by_gp_then_win_rate_with_live_seasons(store, owner):
 
 
 def test_finish_label_prefers_a_title_then_the_round():
-    assert cd.finish_label({"furthest_round": "region_final"}, {"conf_t"}) == "Conference champions"
+    assert cd.finish_label({"furthest_round": "region_final"}, {"conf_t"}) == "Conference tournament champions"
     assert cd.finish_label({"furthest_round": "region_final"}, set()) == "Region final"
     assert cd.finish_label({"furthest_round": "missed"}, set()) == "Missed the bracket"
     assert cd.finish_label({}, set()) is None

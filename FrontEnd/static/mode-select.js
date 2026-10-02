@@ -435,8 +435,8 @@ function hbResolveBanner(spec) {
 const HB_TITLE_MEDALLIONS = {
   national: { letter: 'N', label: 'National champions' },
   region: { letter: 'R', label: 'Region champions' },
-  conf_t: { letter: 'C', label: 'Conference champions' },
-  conf_rs: { letter: 'C', label: 'Conference regular-season #1' },
+  conf_t: { letter: 'C', label: 'Conference tournament champions' },
+  conf_rs: { letter: 'C', label: 'Regular season conference champions' },
 };
 const HB_MILESTONE_MEDALLIONS = {
   milestone_first_signing_class: { letter: 'S', label: 'First signing class' },
