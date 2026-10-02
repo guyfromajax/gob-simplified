@@ -18748,20 +18748,51 @@ def mark_archetype_reveal_seen_offline(
     franchise's browse revision so the next command-center read is not a 304 of
     the body that still carried the moment.
     """
-    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    _stamp_local_coach(req.franchise_id, user, set_fields={"archetype_reveal_seen": True})
+    return {"archetype_reveal_seen": True}
+
+
+def _stamp_local_coach(
+    franchise_id: str,
+    user: dict,
+    set_fields: dict[str, Any] | None = None,
+    unset_fields: tuple[str, ...] = (),
+) -> None:
+    """Offline build only: change coach fields on the save and refresh the Office read."""
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     if not is_local_owner(user.get("user_id")):
         raise HTTPException(status_code=404, detail="Offline build only")
     from datetime import timezone
 
     from BackEnd.utils.local_coach import LOCAL_COACH_ID, coach_collection
 
-    coach_collection().update_one(
-        {"_id": LOCAL_COACH_ID},
-        {"$set": {"archetype_reveal_seen": True, "updated_at": datetime.now(timezone.utc)}},
-        upsert=True,
-    )
+    update: dict[str, Any] = {"$set": {**(set_fields or {}), "updated_at": datetime.now(timezone.utc)}}
+    if unset_fields:
+        update["$unset"] = {field: "" for field in unset_fields}
+    coach_collection().update_one({"_id": LOCAL_COACH_ID}, update, upsert=True)
     bump_browse_rev(franchise_doc["_id"])
-    return {"archetype_reveal_seen": True}
+
+
+@router.patch("/franchise/archetype-evolution-seen")
+def clear_archetype_evolution_offline(
+    req: ArchetypeRevealSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Offline build: clear the "Coaching archetype evolved" weekly-card row.
+
+    The row is ``archetype_evolution_pending`` on the coach. Online that is the
+    account's, cleared by ``PATCH /api/auth/archetype-evolution-seen``; the desktop
+    client cannot reach ``/api/auth``. This removes the same key from the save's
+    ``local_coach`` doc, where ``record_archetype_change_if_any`` wrote it and
+    ``_coach_archetype_signals`` reads it, and bumps the browse revision so the
+    next Office read drops the row.
+
+    The key is removed, not set to "": on SQLite a projected read of a field
+    holding an empty string raises (``sqlite_collection._extracted_value``), and
+    the Office reads this field projected.
+    """
+    _stamp_local_coach(req.franchise_id, user, unset_fields=("archetype_evolution_pending",))
+    return {"archetype_evolution_pending": ""}
 
 
 class SeasonReviewSeenRequest(BaseModel):
