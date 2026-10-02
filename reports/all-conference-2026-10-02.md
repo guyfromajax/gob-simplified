@@ -1,6 +1,6 @@
 # All-Conference teams — 2026-10-02
 
-Branch `feature/all-conference`, from `origin/develop` b24564e67 (develop had not moved when the gates ran, so that is also the final merged tree). Final tree: 041e01db6 plus this report.
+Branch `feature/all-conference`, from `origin/develop` b24564e67. Develop had not moved when the gates started; it moved while the full suite ran (f5bc9b66f: `polish/player-dev-grid`, `polish/office-followups`). That develop merges cleanly and the only file both touched is `UX_System.md` (different paragraphs), so I did not re-run the suite for it. Final tree: 041e01db6 plus this report.
 
 **Status: ready for review.** Built as asked, with the two answers you gave on the way (Trophy Case: data paths only; team part: win percentage straight). Two things to know and two questions at the end.
 
@@ -103,7 +103,7 @@ As you chose: the data paths All-American uses. User-team picks on the final are
 
 New tests against the code before this branch (product files stashed, then restored): 24 pytest tests fail; 4 e2e tests fail (the three All-Conference page tests and the "Week N" table). The "no All-Conference data" page test passes on both, by design.
 
-Gates on the final tree (041e01db6 = branch on `origin/develop` b24564e67, which had not moved):
+Gates on the final tree (041e01db6 = branch on `origin/develop` b24564e67; develop moved to f5bc9b66f during the Playwright run, see the top):
 
 | Gate | Result |
 |---|---|
