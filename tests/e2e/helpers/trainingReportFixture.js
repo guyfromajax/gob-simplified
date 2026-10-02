@@ -37,8 +37,30 @@ function players() {
     position_ratings: row.position_ratings,
     attributes: row.attrs,
     attrs: row.attrs,
+    height: row.height,
+    weight: row.weight,
     season_stats: {},
   }));
+}
+
+/** Five starters in the shape `compute_projected_starting_five` serves (0-10 display scale). */
+function projectedFive(list) {
+  return ['PG', 'SG', 'SF', 'PF', 'C'].map((position, i) => {
+    const player = list.find((p) => p.position === position) || list[i];
+    const attributes = {};
+    Object.keys(player.attributes).forEach((key) => { attributes[key] = Math.floor(Number(player.attributes[key]) / 10); });
+    return {
+      position,
+      player_id: player.player_id,
+      name: player.name,
+      jersey: player.jersey,
+      year: player.year,
+      height: player.height,
+      weight: player.weight,
+      rt: Math.max.apply(null, Object.values(player.position_ratings || {}).map(Number)),
+      attributes,
+    };
+  });
 }
 
 const TEAM_ATTRIBUTES = {
@@ -65,7 +87,7 @@ function base(week) {
     scouting_data: clone(FIXTURE.teamData.scouting_data),
     plays_effectiveness_changes: {},
     defenses_effectiveness_changes: {},
-    projected_starting_five: [],
+    projected_starting_five: projectedFive(list),
     training_notes: [],
   };
 }
@@ -79,7 +101,8 @@ function busy() {
   const report = base(12);
   const p = report.players;
   [2.5, 0.4, 0.6, -0.3, 1.2, 0, -1, 0.2, -2, 0.5, -0.4, 3.2].forEach((delta, i) => {
-    report.player_changes[p[i].name] = { SC: delta, SH: delta / 2, PS: delta, AG: -delta / 2 };
+    // Five trained attributes: one whole pair (SC SH), PS alone, and the AG ND pair.
+    report.player_changes[p[i].name] = { SC: delta, SH: delta / 2, PS: delta, AG: -delta / 2, ND: delta / 4 };
   });
   report.team_changes = {
     shot_threshold: -1, offensive_efficiency: 3.5, defensive_efficiency: 1.2, fb_efficiency: 0.4,
@@ -126,7 +149,11 @@ function camp() {
   const report = base(1);
   const p = report.players;
   [7, 5.5, 4, 3, 6, 2.5, 1.5, 4.5, 0.8, 3.5, 2, 5].forEach((delta, i) => {
-    report.player_changes[p[i].name] = { SC: delta, SH: delta - 1, ST: delta / 2, AG: delta / 3 };
+    // Camp trains everything: all twelve attributes move.
+    report.player_changes[p[i].name] = {
+      SC: delta, SH: delta - 1, ID: delta / 2, OD: delta / 3, PS: delta - 2, BH: delta / 4,
+      RB: delta / 2, ST: delta / 2, AG: delta / 3, ND: delta - 3, IQ: delta / 5, FT: delta / 6,
+    };
   });
   report.team_changes = {
     shot_threshold: -6, rebound_modifier: 0.05, offensive_efficiency: 6, defensive_efficiency: 2.5,
