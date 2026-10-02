@@ -13,6 +13,7 @@ from typing import Any, Iterable, Mapping, Optional
 from bson import ObjectId
 
 from BackEnd.utils.attribute_gain import exceptional_attributes
+from BackEnd.utils.hidden_attrs import is_hidden_attr
 from BackEnd.utils.franchise_standings import (
     calculate_franchise_standings,
     standings_display_sort_key,
@@ -607,6 +608,8 @@ def attribute_changes_from_report(report: Mapping[str, Any] | None) -> list[dict
         for attr, cell in entry.items():
             if attr == "name" or not isinstance(cell, dict):
                 continue
+            if is_hidden_attr(attr):
+                continue  # CH moves like any attribute but is never shown
             if "from" not in cell or "to" not in cell:
                 continue
             row: dict[str, Any] = {

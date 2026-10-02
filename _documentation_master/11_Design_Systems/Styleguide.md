@@ -106,6 +106,8 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 - Faint and full are told apart by arrow count, not by colour alone. Faint is `color-mix(in srgb, <token> N%, transparent)`, so it lets the row through: 3:1 or better on both zebra rows (red needs 60% to match green's 45%).
 - Glyphs: ▲ / ▼ only. Player Report › Attributes shows current values only: no marks, no change tint, no tooltip. Movement lives on Training Changes.
 
+**Hidden attribute.** CH is never displayed and never sent to the client: no column, chip, label, tooltip or copy, on any screen. Player attribute lists are the twelve visible attributes. Build rule and the routes that still carry it: [UX_System.md, CH is hidden](UX_System.md#ch-is-hidden).
+
 **Display text.** Class year is always a two-letter uppercase abbreviation (`FR`, `SO`, `JR`, `SR`, `GR`, `JH`; unknown `--`) via `playerYear.js` / `BackEnd/utils/player_year.py`. Team names show exactly as stored in `teams.name`: no title-casing, no hyphen stripping, no exception map. Team measures use one vocabulary of eleven measures; Momentum is never shown on Team Attributes, the Training Report Team Report or Office "Moved most". `pt_efficiency` is P/T Defense and `pt_opp_modifier` is P/T Offense everywhere.
 
 ## Typography

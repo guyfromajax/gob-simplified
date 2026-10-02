@@ -429,6 +429,8 @@
     var map = {};
     (Array.isArray(changes) ? changes : []).forEach(function (change) {
       if (!change || !present(change.from) || !present(change.to)) return;
+      // CH is a hidden attribute: the server does not send it, and it is never a chip.
+      if (change.attribute === 'CH') return;
       var delta = Number(change.to) - Number(change.from);
       if (!isFinite(delta) || delta === 0) return;
       var id = present(change.player_id) ? String(change.player_id) : String(change.name || '');

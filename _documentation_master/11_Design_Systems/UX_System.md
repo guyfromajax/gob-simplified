@@ -665,6 +665,24 @@ The franchise team-measure surfaces show the same eleven measures and the same l
 
 A title has one name everywhere it is a label: **Regular Season Conference Champions** (`conf_rs`, `trophy_spotlight`), **Conference Tournament Champions** (`conf_t`, `conference_championship`), **Region Champions**, **National Champions**. That covers the title overlays, the Trophy Case medallions, the season-review medallions, the Home Base shelf and the server's season finish line (`career_data._TITLE_FINISH_LABELS`). **Finish labels are capitalised everywhere**: the four titles and the round finishes (`career_data._FINISH_LABELS`: "Region Semifinal", "Missed the Bracket"), so the Trophy Case Finish column, its shelf, the Home Base shelf and Top Seasons read in one case. Top Seasons gives the finish twice the room of the program name (`home-base.css` `.tsn`), so the longest label is not cut off at 1280; a long program name is what gives way. The old "Conference Champions" could not say which conference title it meant, and "Conference Regular-Season #1" is retired. The season review names the region ("Region B Champions") and no longer swaps a conference title's label for "Conference X Champions".
 
+### CH is hidden
+
+CH is a hidden attribute. **It is never displayed and never sent to the client.** The engine, training and the database keep using it unchanged.
+
+| Layer | Rule | Where |
+|---|---|---|
+| Display | No CH column, chip, label, tooltip or copy on any screen. Attribute lists are the twelve visible attributes (six pairs). | Practice Squad report draws the pair attributes only (`training-squad-report.js` `orderKeys`); the Office drops a CH row (`officeHome.js` `groupAttributes`); no `CH` entry in `attributeTooltips.js`. |
+| Payloads | `CH`, `anchor_CH` and `development.ch_seed` are stripped from every response on the franchise and press-conference routers and from `/player/{id}`. Rows that name it (`{"attribute": "CH"}`) and attribute-key lists drop it too. The strip works on a copy; engine objects are never touched. | `BackEnd/utils/hidden_attrs.py`: `HiddenAttrsJSONResponse` is the router's default response class, so a new franchise route is covered without anyone remembering. |
+| Copy | Generated text names and counts visible attributes only (Practice Squad All-Stars news). | `franchise_routes._build_ps_all_stars_story`; `NEWS_ATTRIBUTE_FULL_NAMES` has no CH. |
+| Guards | `tests/test_hidden_attrs.py` (the strip, every franchise route's response class, a real franchise's payloads, DB still has it); `tests/e2e/hidden-attr-ch.spec.js` (main screens fed payloads that still carry CH). | |
+
+Routes that still carry CH, pinned in `tests/test_hidden_attrs.py` (a decision for Jamie, not an oversight):
+
+| Routes | Why |
+|---|---|
+| The court's own: `/roster/{team}`, `/api/init-game`, `/api/simulate-turn`, `/api/simulate-quarter`, `/api/call-timeout`, `/api/autoset-lineup`, `/api/game/{id}` and its `resume-state` / `lineup-for-matchups` | The Phaser client reads the receiver's CH to pick the pass-receive sound (`gameSfx.js` `playHcoReceiveSfx`: IQ + CH), and autoset posts roster attributes back. Nothing on the court displays it. |
+| `/franchise/team-builder/*` | Team Builder round-trips whole player rows (walk-ons, the slot roster) through the client and saves what comes back; stripping would lose CH on Apply. Nothing in Team Builder displays it. |
+
 ### Team names are shown as stored
 
 The display string is `teams.name` as stored. The stored key shows unchanged when no team document exists. Nothing is title-cased, hyphen-stripped, or exception-listed (e.g. `IDA`, `Bentley-Truman`, `Seattle AAA` render as stored). Do not reintroduce a `TEAM_NAMES` map or a `titleCaseName` helper. `common.js` `formatTeamName` returns the name unchanged (`String(name)`), and its callers (`set-lineup.js`, `playbook-report.js`, `pgpcSammyReminderModal.js`, FCC) display it as-is. `titleCaseTeamName` still exists but is only a lookup key for coach-asset abbreviations (`getTeamCoachAssetPath`), never a display string.
