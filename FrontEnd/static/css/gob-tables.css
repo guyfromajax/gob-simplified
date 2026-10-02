@@ -224,6 +224,30 @@ html.gob-shell.gob-1920 .gob-tgrid {
   font-variant-numeric: tabular-nums;
 }
 
+/* NEXT is the opponent: its mark, and its name where the card has room (1920 two-up;
+   not 1280 two-up). The name is in the tooltip and the label either way. */
+#standings-view .gob-conf .gob-next-n {
+  display: none;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container (min-width: 760px) {
+  #standings-view .gob-conf .gob-next-n { display: inline; }
+}
+#standings-view .gob-conf .gob-next.is-none {
+  color: var(--text-38);
+}
+#standings-view .gob-conf a.gob-next:hover .gob-next-n {
+  text-decoration: underline;
+}
+#standings-view .gob-conf a.gob-next:focus-visible {
+  outline: 2px solid var(--text-100);
+  outline-offset: 1px;
+  border-radius: var(--radius-4);
+}
+
 /* Narrow: the pair holds, DIFF and its pill go first. */
 @container (max-width: 639px) {
   #standings-view .gob-conf .gob-tbl .c-diff { display: none; }

@@ -78,11 +78,16 @@
       + '<span>' + esc(name || '') + '</span></a>';
   }
 
-  function nextCell(name, week, color) {
-    if (!name && (week == null || week === '')) return '';
-    var mark = name ? markHtml(name, color) : '';
-    var label = week == null || week === '' ? '' : ('W' + week);
-    return '<span class="gob-next">' + mark + '<span>' + esc(label) + '</span></span>';
+  // The next opponent, and nothing else: its mark, with its name beside it where the
+  // card has room (CSS decides). The week is the same on every row and read like a
+  // second streak, so it is not shown. The full name is the tooltip and the label
+  // either way. `href` links to the opponent's page. No next game: a quiet dash.
+  function nextCell(name, href, color) {
+    if (!name) return '<span class="gob-next is-none" role="img" aria-label="No next game">\u2014</span>';
+    var inner = markHtml(name, color) + '<span class="gob-next-n">' + esc(name) + '</span>';
+    var label = ' title="' + esc(name) + '" aria-label="Next: ' + esc(name) + '"';
+    if (!href) return '<span class="gob-next"' + label + '>' + inner + '</span>';
+    return '<a class="gob-next" data-return href="' + esc(href) + '"' + label + '>' + inner + '</a>';
   }
 
   function diffCell(value, maxAbs) {

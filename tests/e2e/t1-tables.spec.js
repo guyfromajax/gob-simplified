@@ -331,7 +331,9 @@ test('standings, leaders, and team stats open in place', async ({ page }) => {
     await expect(page.locator('#standings-view tr.is-user')).toHaveCount(1);
     await expect(page.locator('#standings-view tr.is-user')).toContainText('Lancaster');
     await expect(page.locator('#standings-view tr.is-user')).toContainText('W3');
-    await expect(page.locator('#standings-view .gob-next').first()).toContainText('W1');
+    // NEXT is the opponent, with no week label beside the streak.
+    await expect(page.locator('#standings-view .gob-next').first()).toHaveAttribute('title', /\S/);
+    await expect(page.locator('#standings-view .gob-next').first()).not.toContainText(/W\d/);
     await expect(page.locator('#standings-view tr.is-user')).toContainText('.833');
     await parkPointer(page);
     await assertCollapsedRail(page);
