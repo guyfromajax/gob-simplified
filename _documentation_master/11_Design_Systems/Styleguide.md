@@ -20,6 +20,7 @@ One colour, one meaning. Everything not listed is neutral: white text at `--text
 Neutral by rule (no green, orange, gold or navy):
 
 - **Choice controls**: tabs, segments, filter chips, sliders, the watch star, checkboxes, view toggles, the live-game side-panel stat toggles, Autoset Lineup, a Retry button. Selected is a brighter neutral, never navy, team colour or orange.
+- **Training point boxes** (weekly Training): neutral only. An empty box is a 1px outline in `--train-box-outline`, which is `--white-45` (Jamie's choice, 2026-10-02; the subtler `--white-25` was not chosen). A filled box is solid `--white`. Change the strength in that one token, never per rule. Build detail: UX_System, "Training, point selector".
 - **Status and information codes**: phase labels, week tiles, invite counts, status labels, Player Development Grid "develops" / "adds" markers. Muted text, not colour.
 - **W/L plates**: WIN is a white plate, LOSS is an outline, everywhere, tables included (Rankings "Last Week", Team › Schedule). The result carries the meaning, not a colour.
 - **▼ deltas** everywhere: neutral (`--delta-down` is `--text-87`). Never red. The one exception is the Training Report's movement marks, a data scale of their own (see [Data scales](#data-scales)).
@@ -105,6 +106,8 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 - In season a single arrow follows the sign: any drop is ▼, never a green arrow. The two- and three-arrow bands stay asymmetric.
 - Faint and full are told apart by arrow count, not by colour alone. Faint is `color-mix(in srgb, <token> N%, transparent)`, so it lets the row through: 3:1 or better on both zebra rows (red needs 60% to match green's 45%).
 - Glyphs: ▲ / ▼ only. Player Report › Attributes shows current values only: no marks, no change tint, no tooltip. Movement lives on Training Changes.
+
+**Hidden attribute.** CH is never displayed and never sent to the client: no column, chip, label, tooltip or copy, on any screen. Player attribute lists are the twelve visible attributes. Build rule and the routes that still carry it: [UX_System.md, CH is hidden](UX_System.md#ch-is-hidden).
 
 **Display text.** Class year is always a two-letter uppercase abbreviation (`FR`, `SO`, `JR`, `SR`, `GR`, `JH`; unknown `--`) via `playerYear.js` / `BackEnd/utils/player_year.py`. Team names show exactly as stored in `teams.name`: no title-casing, no hyphen stripping, no exception map. Team measures use one vocabulary of eleven measures; Momentum is never shown on Team Attributes, the Training Report Team Report or Office "Moved most". `pt_efficiency` is P/T Defense and `pt_opp_modifier` is P/T Offense everywhere.
 

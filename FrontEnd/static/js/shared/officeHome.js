@@ -429,6 +429,8 @@
     var map = {};
     (Array.isArray(changes) ? changes : []).forEach(function (change) {
       if (!change || !present(change.from) || !present(change.to)) return;
+      // CH is a hidden attribute: the server does not send it, and it is never a chip.
+      if (change.attribute === 'CH') return;
       var delta = Number(change.to) - Number(change.from);
       if (!isFinite(delta) || delta === 0) return;
       var id = present(change.player_id) ? String(change.player_id) : String(change.name || '');
@@ -1226,17 +1228,13 @@
     return href('/franchise-command-center.html', params);
   }
 
-  function standingsWindow(rows, size) {
-    if (!rows || rows.length <= size) return rows || [];
-    var user = -1;
-    rows.forEach(function (row, index) {
-      if (user === -1 && row && row.is_user) user = index;
-    });
-    if (user < 0) user = 0;
-    var start = user - Math.floor((size - 1) / 2);
-    if (start < 0) start = 0;
-    if (start + size > rows.length) start = Math.max(0, rows.length - size);
-    return rows.slice(start, start + size);
+  // The team's mark as the league tables draw it (logo, or the letter tile).
+  function standingsMark(name) {
+    var tables = global.GOBTables;
+    if (!tables || typeof tables.markHtml !== 'function' || !present(name)) return null;
+    var holder = document.createElement('span');
+    holder.innerHTML = tables.markHtml(String(name));
+    return holder.firstElementChild;
   }
 
   function standingsRow(row) {
@@ -1244,14 +1242,21 @@
     var line = el('div', 'st-r' + (row.is_user ? ' me' : ''));
     line.dataset.teamId = row.team_id || '';
     line.appendChild(el('span', 'st-pos', present(row.position) ? String(row.position) : ''));
-    line.appendChild(el('span', 'st-n', present(row.team_name) ? String(row.team_name) : ''));
+    var team = el('span', 'st-n');
+    var mark = standingsMark(row.team_name);
+    if (mark) team.appendChild(mark);
+    team.appendChild(el('span', 'st-nm', present(row.team_name) ? String(row.team_name) : ''));
+    line.appendChild(team);
     var record = '';
     if (present(row.wins) && present(row.losses)) record = row.wins + '-' + row.losses;
     line.appendChild(el('span', 'st-wl', record));
     return line;
   }
 
-  function paintStandingsRows(node, rows, mode, density) {
+  // Every team of the user's conference, in the server's standings order, at the normal
+  // Office row spacing. Never sliced and never tightened to fit: on a short window the
+  // Office scrolls instead. "Full standings" is always in the card header.
+  function paintStandingsRows(node, rows) {
     node.querySelectorAll('.st-r, .st-more').forEach(function (child) { child.remove(); });
     var head = el('div', 'st-r st-hd');
     head.appendChild(el('span', '', '#'));
@@ -1262,21 +1267,14 @@
       var line = standingsRow(row);
       if (line) node.appendChild(line);
     });
-    density = mode === 'all' ? 'normal' : (density || 'compact');
-    node.classList.toggle('is-compact', density !== 'normal');
-    node.classList.toggle('is-tight', density === 'tight');
-    node.dataset.standingsDensity = density;
-    if (mode !== 'all') {
-      var moreUrl = standingsHref();
-      var more = el('a', 'lnk st-more', 'Full standings');
-      more.href = moreUrl;
-      bindGo(more, moreUrl);
-      var title = node.querySelector('.card-h');
-      if (title) title.appendChild(more);
-      else node.appendChild(more);
-    }
+    var moreUrl = standingsHref();
+    var more = el('a', 'lnk st-more', 'Full standings');
+    more.href = moreUrl;
+    bindGo(more, moreUrl);
+    var title = node.querySelector('.card-h');
+    if (title) title.appendChild(more);
+    else node.appendChild(more);
     node.dataset.standingsShown = String(rows.length);
-    node.dataset.standingsMode = mode;
   }
 
   function standingsCard(table, index) {
@@ -1287,49 +1285,11 @@
     var head = el('div', 'card-h');
     head.appendChild(el('h3', '', label ? ('Conference ' + label + ' standings') : 'Conference standings'));
     node.appendChild(head);
-    node._rows = rows;
     node.dataset.standingsTotal = String(rows.length);
     if (present(table.region)) node.dataset.region = String(table.region);
     if (present(table.conference)) node.dataset.conference = String(table.conference);
-    paintStandingsRows(node, rows, 'all');
+    paintStandingsRows(node, rows);
     return node;
-  }
-
-  function mainPastFold() {
-    var main = document.querySelector('html.gob-shell .main') || document.querySelector('.main');
-    return !!(main && main.scrollHeight - main.clientHeight > 1);
-  }
-
-  function standingsOverflow(card) {
-    if (mainPastFold()) return true;
-    var col = card.closest('.office-col');
-    var last = col && col.lastElementChild;
-    if (last && last.getBoundingClientRect().bottom > foldBottom() + 1) return true;
-    var tight = document.documentElement.classList.contains('gob-1280') || card.classList.contains('is-compact');
-    return !!(tight && col && col.scrollHeight - col.clientHeight > 1);
-  }
-
-  function fitStandings(root) {
-    var card = root.querySelector('.office-st');
-    if (!card || !card._rows || card._rows.length <= 2) return;
-    var rows = card._rows;
-    if (card.dataset.standingsMode !== 'all') paintStandingsRows(card, rows, 'all');
-    if (!standingsOverflow(card)) return;
-    paintStandingsRows(card, rows, 'compact', 'compact');
-    if (!standingsOverflow(card)) return;
-    paintStandingsRows(card, rows, 'compact', 'tight');
-    if (!standingsOverflow(card)) return;
-    var size = rows.length - 1;
-    while (size >= 5) {
-      paintStandingsRows(card, standingsWindow(rows, size), 'window', 'tight');
-      if (!standingsOverflow(card)) return;
-      size -= 1;
-    }
-    while (size >= 2 && standingsOverflow(card)) {
-      paintStandingsRows(card, standingsWindow(rows, size), 'window', 'tight');
-      if (!standingsOverflow(card)) return;
-      size -= 1;
-    }
   }
 
   function foldBottom() {
@@ -1450,7 +1410,6 @@
     root.append(strip, grid);
     tightenStrip(strip);
     function settle() {
-      fitStandings(root);
       trimRecruiting(root);
     }
     settle();
@@ -1461,7 +1420,7 @@
       });
     }
     // The display font (Bebas Neue Pro) loads async and its metrics change card
-    // heights, so a settle() during first paint can window the standings one row
+    // heights, so a settle() during first paint can trim the recruiting wire one row
     // short. Re-fit once the font is actually ready (the real signal, not a timeout).
     var fonts = global.document && global.document.fonts;
     if (fonts && fonts.ready && typeof fonts.ready.then === 'function') {

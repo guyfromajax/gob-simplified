@@ -26,7 +26,8 @@ function cloneParams(params) {
   var franchiseId = urlParams.get('franchise_id');
   var teamId = urlParams.get('team_id');
   // Default to the changes view, mirroring the training report.
-  var ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT', 'CH'];
+  // The twelve visible attributes. CH is hidden: never a column, and the server does not send it.
+  var ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
   function buildFccUrl() {
     if (typeof resolveFranchiseLockerRoomUrl === 'function') {
@@ -43,11 +44,11 @@ function cloneParams(params) {
   // Presentation only: values are read by key, so the server's key order is not relied on.
   var PAIR_ORDER = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'];
 
-  /** The pair attributes first, in pair order, then anything else the server sends (CH). */
+  /** The pair attributes the server sent, in pair order. Nothing else is ever a column:
+   *  CH is a hidden attribute (UX_System, "CH is hidden"), whatever a payload carries. */
   function orderKeys(keys) {
     var list = keys || [];
-    var paired = PAIR_ORDER.filter(function (key) { return list.indexOf(key) !== -1; });
-    return paired.concat(list.filter(function (key) { return PAIR_ORDER.indexOf(key) === -1; }));
+    return PAIR_ORDER.filter(function (key) { return list.indexOf(key) !== -1; });
   }
 
   /** `gstart` opens a pair and `gend` closes it; an attribute outside the pairs stands alone. */

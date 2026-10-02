@@ -16,6 +16,9 @@
   var OVERLAY_ID = 'page-load-overlay';
   var LOADER_IMG_PATH = '/images/loader1.gif';
   var Z_INDEX = 999999;
+  // Solid, on the page fill: a loader hides the page being built behind it. Never a
+  // see-through tint (at 92% black, half-built pages ghosted through).
+  var OVERLAY_BG = 'var(--bg)';
   var DEFAULT_BANNER_PATH = '/images/teams/general/general_banner_primary.jpg';
   var pulseFeedTimer = null;
 
@@ -66,7 +69,7 @@
     overlay.classList.add('gob-scope');
     overlay.style.cssText =
       'position:fixed;inset:0;z-index:' + Z_INDEX + ';' +
-      'background:color-mix(in srgb, var(--black) 92%, transparent);' +
+      'background:' + OVERLAY_BG + ';' +
       'display:flex;align-items:center;justify-content:center;' +
       'margin:0;padding:0;';
 
@@ -333,7 +336,7 @@
       overlay.appendChild(newswire);
     }
     newswire.style.display = 'grid';
-    overlay.style.background = 'var(--bg)';
+    overlay.style.background = OVERLAY_BG;
     overlay.setAttribute('role', 'presentation');
     overlay.setAttribute('aria-live', 'off');
     if (global.GOBTrainingNewswire) {
@@ -348,7 +351,7 @@
     var content = overlay && overlay.querySelector('.page-load-overlay-content');
     if (content) content.style.display = 'flex';
     if (overlay) {
-      overlay.style.background = 'color-mix(in srgb, var(--black) 92%, transparent)';
+      overlay.style.background = OVERLAY_BG;
       overlay.setAttribute('role', 'status');
       overlay.setAttribute('aria-live', 'polite');
     }

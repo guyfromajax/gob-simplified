@@ -333,7 +333,7 @@ export const TRAINING_SHELL = `<div class="training-container resource-page-cont
         <!-- Culture Builder -->
         <div class="archetype-block" data-archetype="culture-builder">
           <div class="archetype-header">
-            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.2" r="2"/><circle cx="3.6" cy="7.2" r="1.4"/><circle cx="12.4" cy="7.2" r="1.4"/><path d="M4.4 13.5c0-2 1.6-3.6 3.6-3.6s3.6 1.6 3.6 3.6"/></svg></span>
+            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13.4S2.5 10.2 2.5 6.3A2.9 2.9 0 0 1 8 5a2.9 2.9 0 0 1 5.5 1.3c0 3.9-5.5 7.1-5.5 7.1z"/></svg></span>
             <span class="archetype-name">Culture Builder</span>
           </div>
           <div class="archetype-options">

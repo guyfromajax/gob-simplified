@@ -501,6 +501,67 @@ def test_offline_archetype_route_refuses_an_online_coach(store, monkeypatch):
     assert foreign.value.status_code == 403
 
 
+def test_offline_archetype_evolution_row_is_cleared_on_the_save(store, monkeypatch):
+    """The "Coaching archetype evolved" weekly row is cleared on this computer, so it shows once."""
+    from BackEnd.utils.moment_queue import build_moment_queue
+
+    def weekly_kinds():
+        signals = franchise_routes._coach_archetype_signals(dict(LOCAL_PRINCIPAL))
+        queue = build_moment_queue(archetype_evolution_pending=signals["archetype_evolution_pending"])
+        return [row["kind"] for row in queue["weekly_card_items"]]
+
+    _reveal_route_env(store, monkeypatch)
+    doc, _, _ = _seed(store, LOCAL_USER_ID, browse_rev=7)
+    store.db["save_meta"].update_one(
+        {"_id": lc.LOCAL_COACH_ID},
+        {"$set": {"lead_archetype": "tactician", "archetype_reveal_seen": True,
+                  "archetype_evolution_pending": "tactician"}},
+        upsert=True,
+    )
+    assert weekly_kinds() == ["archetype_evolution"]
+
+    request = franchise_routes.ArchetypeRevealSeenRequest(franchise_id=str(doc["_id"]))
+    out = franchise_routes.clear_archetype_evolution_offline(request, user=dict(LOCAL_PRINCIPAL))
+    assert out == {"archetype_evolution_pending": ""}
+
+    after = franchise_routes._coach_archetype_signals(dict(LOCAL_PRINCIPAL))
+    assert after == {"archetype_evolution_pending": "", "lead_archetype": "tactician", "archetype_reveal_seen": True}
+    assert weekly_kinds() == [], "the row is not offered a second time"
+    # Removed, not blanked: SQLite cannot project a field that holds an empty string.
+    assert "archetype_evolution_pending" not in store.db["save_meta"].find_one({"_id": lc.LOCAL_COACH_ID})
+    # Without the bump the next Office read would be a 304 of the body that still had the row.
+    assert store.franchises_collection.find_one({"_id": doc["_id"]})["browse_rev"] == 8
+
+    # A later evolution sets the key again and the row comes back, once.
+    store.db["save_meta"].update_one(
+        {"_id": lc.LOCAL_COACH_ID}, {"$set": {"archetype_evolution_pending": "grinder"}}
+    )
+    assert weekly_kinds() == ["archetype_evolution"]
+
+
+def test_offline_archetype_evolution_route_refuses_an_online_coach(store, monkeypatch):
+    """Online keeps the account's key (PATCH /api/auth/archetype-evolution-seen); this route is not it."""
+    from fastapi import HTTPException
+
+    _reveal_route_env(store, monkeypatch)
+    oid = ObjectId()
+    store.users_collection.insert_one(
+        {"_id": oid, "username": "online-coach", "archetype_evolution_pending": "grinder"}
+    )
+    doc, _, _ = _seed(store, str(oid), browse_rev=2)
+    request = franchise_routes.ArchetypeRevealSeenRequest(franchise_id=str(doc["_id"]))
+    with pytest.raises(HTTPException) as denied:
+        franchise_routes.clear_archetype_evolution_offline(request, user={"user_id": str(oid)})
+    assert denied.value.status_code == 404
+    assert store.users_collection.find_one({"_id": oid})["archetype_evolution_pending"] == "grinder"
+    assert store.db["save_meta"].find_one({"_id": lc.LOCAL_COACH_ID}) is None
+    assert store.franchises_collection.find_one({"_id": doc["_id"]})["browse_rev"] == 2
+    # Someone else's franchise is still refused before anything else.
+    with pytest.raises(HTTPException) as foreign:
+        franchise_routes.clear_archetype_evolution_offline(request, user=dict(LOCAL_PRINCIPAL))
+    assert foreign.value.status_code == 403
+
+
 # --- 6 + 7. coach-career ---------------------------------------------------------------------
 
 
@@ -558,7 +619,7 @@ def test_top_seasons_rank_by_gp_then_win_rate_with_live_seasons(store, owner):
     assert live["finish"] is None
     best = extras["top_seasons"][0]
     assert best["in_progress"] is False and best["week"] is None
-    assert best["finish"] == "National champions"
+    assert best["finish"] == "National Champions"
     assert extras["seasons_completed"] == 3
     assert extras["programs"] == 2
     assert extras["geek_points"] == 4060
@@ -566,9 +627,9 @@ def test_top_seasons_rank_by_gp_then_win_rate_with_live_seasons(store, owner):
 
 
 def test_finish_label_prefers_a_title_then_the_round():
-    assert cd.finish_label({"furthest_round": "region_final"}, {"conf_t"}) == "Conference tournament champions"
-    assert cd.finish_label({"furthest_round": "region_final"}, set()) == "Region final"
-    assert cd.finish_label({"furthest_round": "missed"}, set()) == "Missed the bracket"
+    assert cd.finish_label({"furthest_round": "region_final"}, {"conf_t"}) == "Conference Tournament Champions"
+    assert cd.finish_label({"furthest_round": "region_final"}, set()) == "Region Final"
+    assert cd.finish_label({"furthest_round": "missed"}, set()) == "Missed the Bracket"
     assert cd.finish_label({}, set()) is None
 
 
@@ -639,7 +700,7 @@ def test_coach_career_route_computes_the_same_shape_online(as_user):
         assert body["geek_points"] == 310
         assert body["seasons_completed"] == 1
         assert body["programs"] == 1
-        assert body["top_seasons"][0]["finish"] == "Region champions"
+        assert body["top_seasons"][0]["finish"] == "Region Champions"
         assert not scan_json_for_replaced_name(body, CORE_NAME)
     finally:
         users.delete_one({"_id": user_oid})

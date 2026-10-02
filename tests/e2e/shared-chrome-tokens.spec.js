@@ -360,7 +360,8 @@ test.describe('shared chrome token + colour-law guards', () => {
         expectNeutral(await paint(page, '#page-load-overlay .page-load-overlay-pulse-indicator span'), 'overlay pulse bar');
         expectNeutral(await paint(page, '#page-load-overlay .page-load-overlay-pulse-title'), 'overlay title');
         const overlay = await paint(page, '#page-load-overlay');
-        expect(parseRgb(overlay.bg), 'overlay bg ' + overlay.bg).toEqual([0, 0, 0, 0.92]);
+        // Solid, on the page fill (--bg): the loader hides the page, it does not tint it.
+        expect(parseRgb(overlay.bg), 'overlay bg ' + overlay.bg).toEqual([11, 13, 20]);
       }
       await page.evaluate(() => window.PageLoadOverlay.hide());
     }

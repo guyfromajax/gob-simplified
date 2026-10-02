@@ -643,6 +643,12 @@
       valueEl.textContent = '#' + data.rank;
       return;
     }
+    // Before the season data is in there is no rank to show. Show nothing: "NR" is a
+    // real answer (unranked) and must not stand in as a placeholder on first paint.
+    if (!match && !data && !window.__gobCommandCenterData && !/\bNR\b|unranked/i.test(text)) {
+      wrap.hidden = true;
+      return;
+    }
     wrap.hidden = false;
     valueEl.textContent = match ? ('#' + match[1]) : 'NR';
   }

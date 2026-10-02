@@ -502,6 +502,52 @@ test.describe('training page', () => {
     await shot(page, 'T4-coaching-focus', page.locator('.coaching-section'));
   });
 
+  test('the Culture Builder mark is a heart; the other three icons are untouched', async ({ page }) => {
+    await openTraining(page);
+    const marks = await page.evaluate(() => {
+      const out = {};
+      document.querySelectorAll('#training-view .archetype-block').forEach((block) => {
+        const svg = block.querySelector('.arch-mark svg');
+        const cs = getComputedStyle(svg);
+        const box = svg.getBoundingClientRect();
+        out[block.dataset.archetype] = {
+          inner: svg.innerHTML,
+          viewBox: svg.getAttribute('viewBox'),
+          strokeWidth: svg.getAttribute('stroke-width'),
+          linecap: svg.getAttribute('stroke-linecap'),
+          fill: svg.getAttribute('fill'),
+          size: Math.round(box.width) + 'x' + Math.round(box.height),
+          color: cs.color,
+        };
+      });
+      return out;
+    });
+    // Jamie likes these three: byte for byte as they were.
+    expect(marks.authoritarian.inner).toBe('<circle cx="6" cy="10" r="3.5"></circle><path d="M6 6.5h8v3H9.4"></path><path d="M3.2 3.6l1.1 1.5M6.4 2.6v1.9"></path>');
+    expect(marks['systems-coach'].inner).toBe('<rect x="2.5" y="2.5" width="11" height="11" rx="2"></rect><path d="M5 5l2 2M7 5L5 7"></path><circle cx="10.6" cy="10.6" r="1.3"></circle><path d="M6.2 10.8c1-.2 2.6-1.6 3.4-4"></path>');
+    expect(marks['player-maximizer'].inner).toBe('<path d="M2.5 13.5h11"></path><path d="M4.5 13.5v-3M8 13.5v-5.5M11.5 13.5V6.5"></path><path d="M9.5 4.2l2-2 2 2"></path>');
+    // The heart: one closed outline, no figures.
+    const heart = marks['culture-builder'];
+    expect(heart.inner).toBe('<path d="M8 13.4S2.5 10.2 2.5 6.3A2.9 2.9 0 0 1 8 5a2.9 2.9 0 0 1 5.5 1.3c0 3.9-5.5 7.1-5.5 7.1z"></path>');
+    expect(heart.inner).not.toContain('circle');
+    // Same line weight, size and outline style as the set; its own purple mark colour.
+    ['viewBox', 'strokeWidth', 'linecap', 'fill', 'size'].forEach((key) => {
+      expect(heart[key], key).toBe(marks.authoritarian[key]);
+      expect(heart[key], key).toBe(marks['player-maximizer'][key]);
+    });
+    expect(heart.color).toBe('rgb(168, 118, 230)');
+    if (process.env.PB_SHOTS === '1') {
+      const dir = path.join(__dirname, '../../reports/training-followups');
+      fs.mkdirSync(dir, { recursive: true });
+      await page.locator('.coaching-section').evaluate((el) => {
+        el.scrollIntoView({ block: 'center' });
+      });
+      await settle(page);
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: path.join(dir, 'culture-builder-heart-after-1280.png'), animations: 'disabled' });
+    }
+  });
+
   test('T5 four Player Maximizer options, each opening its own modal in view', async ({ page }) => {
     await openTraining(page);
     const block = page.locator('.archetype-block[data-archetype="player-maximizer"]');
@@ -681,6 +727,290 @@ function rgba(color) {
     : 'rgba(' + ch(m[1]) + ', ' + ch(m[2]) + ', ' + ch(m[3]) + ', ' + alpha + ')';
 }
 const tones = (mark) => (mark ? { text: mark.text, color: rgba(mark.color) } : null);
+
+/** The drawn box of a point selector: its ::before. */
+function boxMark(locator) {
+  return locator.evaluate((el) => {
+    const cs = getComputedStyle(el, '::before');
+    return {
+      border: cs.borderTopWidth + ' ' + cs.borderTopStyle + ' ' + cs.borderTopColor,
+      bg: cs.backgroundColor,
+      opacity: cs.opacity,
+    };
+  });
+}
+
+function drillRow(page, id) {
+  return page.locator('#training-view .slider-label').filter({ has: page.locator('#' + id) });
+}
+
+const SEL_SHOTS = path.join(__dirname, '../../reports/training-followups');
+const CLEAR_WHITE = 'rgba(0, 0, 0, 0)';
+const OUTLINE = 'rgba(255, 255, 255, 0.45)';     // --train-box-outline as shipped (option B, Jamie's choice)
+const OUTLINE_A = 'rgba(255, 255, 255, 0.25)';   // option A, the subtler strength not chosen
+
+test.describe('training point selectors', () => {
+  test.skip(PHASE === 'before', 'after tree only');
+
+  test('an empty row reads as five open slots: outlined, unfilled, no permanent zero mark', async ({ page }) => {
+    await openTraining(page);
+    const rows = page.locator('#training-view .slider-label');
+    expect(await rows.count()).toBe(20);
+    const shape = await page.evaluate(() => [...document.querySelectorAll('#training-view .ps')].map((ps) => ({
+      boxes: ps.querySelectorAll('.pip').length,
+      buttons: ps.querySelectorAll('button').length,
+      clearOpacity: getComputedStyle(ps.querySelector('.ps-clear')).opacity,
+      clearEvents: getComputedStyle(ps.querySelector('.ps-clear')).pointerEvents,
+      numeral: ps.querySelector('.ps-n').textContent,
+      numeralColor: getComputedStyle(ps.querySelector('.ps-n')).color,
+    })));
+    shape.forEach((row) => {
+      expect(row.boxes).toBe(5);
+      expect(row.buttons).toBe(6);            // five boxes and the clear control
+      expect(row.clearOpacity).toBe('0');     // not a permanent mark
+      expect(row.clearEvents).toBe('none');
+      expect(row.numeral).toBe('0');
+      expect(row.numeralColor).toBe('rgba(255, 255, 255, 0.38)');   // dim at rest
+    });
+    const row = drillRow(page, 'offense-inside');
+    for (let n = 0; n < 5; n++) {
+      const mark = await boxMark(row.locator('.pip').nth(n));
+      expect(mark.border).toBe('1px solid ' + OUTLINE);
+      expect(mark.bg).toBe(CLEAR_WHITE);
+    }
+    // Size: a 28px tall hit area per box.
+    const hit = await row.locator('.pip').first().boundingBox();
+    expect(hit.height).toBeGreaterThanOrEqual(28);
+    expect(hit.width).toBeGreaterThanOrEqual(22);
+    // The outline strength is one token.
+    await page.addStyleTag({ content: ':root{--train-box-outline:var(--white-25)}' });
+    await page.waitForTimeout(250);
+    expect((await boxMark(row.locator('.pip').nth(2))).border).toBe('1px solid ' + OUTLINE_A);
+    expect((await boxMark(drillRow(page, 'team-scrimmages').locator('.pip').nth(4))).border).toBe('1px solid ' + OUTLINE_A);
+  });
+
+  test('filled boxes are solid white and the number turns full white', async ({ page }) => {
+    await openTraining(page);
+    const row = drillRow(page, 'offense-inside');
+    await row.locator('.pip').nth(2).click();
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(250);
+    await expect(page.locator('#offense-inside')).toHaveValue('3');
+    for (let n = 0; n < 5; n++) {
+      const mark = await boxMark(row.locator('.pip').nth(n));
+      if (n < 3) expect(mark.bg).toBe('rgb(255, 255, 255)');
+      else {
+        expect(mark.bg).toBe(CLEAR_WHITE);
+        expect(mark.border).toBe('1px solid ' + OUTLINE);
+      }
+    }
+    await expect(row.locator('.ps-n')).toHaveText('3');
+    await expect(row.locator('.ps-n')).toHaveCSS('color', 'rgb(255, 255, 255)');
+  });
+
+  test('hovering box N previews 1..N without changing the value, and the row highlights', async ({ page }) => {
+    await openTraining(page);
+    const row = drillRow(page, 'offense-outside');
+    await expect(row).toHaveCSS('background-color', CLEAR_WHITE);
+    await row.locator('.pip').nth(2).hover();
+    await page.waitForTimeout(250);
+    for (let n = 0; n < 5; n++) {
+      const mark = await boxMark(row.locator('.pip').nth(n));
+      if (n < 3) expect(mark.bg, 'box ' + (n + 1)).toBe('rgba(255, 255, 255, 0.25)');
+      else expect(mark.bg, 'box ' + (n + 1)).toBe(CLEAR_WHITE);
+    }
+    await expect(page.locator('#offense-outside')).toHaveValue('0');
+    await expect(row).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.03)');
+    // The row above is untouched.
+    expect((await boxMark(drillRow(page, 'offense-inside').locator('.pip').first())).bg).toBe(CLEAR_WHITE);
+
+    // Hovering below the current value shows what would be given back.
+    await row.locator('.pip').nth(3).click();
+    await row.locator('.pip').nth(1).hover();
+    await page.waitForTimeout(250);
+    const marks = [];
+    for (let n = 0; n < 5; n++) marks.push((await boxMark(row.locator('.pip').nth(n))).bg);
+    expect(marks).toEqual([
+      'rgb(255, 255, 255)', 'rgb(255, 255, 255)',
+      'rgba(255, 255, 255, 0.45)', 'rgba(255, 255, 255, 0.45)',
+      CLEAR_WHITE,
+    ]);
+    await expect(page.locator('#offense-outside')).toHaveValue('4');
+  });
+
+  test('the clear control shows only with points or on row hover, and clears by click or key', async ({ page }) => {
+    await openTraining(page);
+    const row = drillRow(page, 'defense-inside');
+    const clear = row.locator('.ps-clear');
+    const slider = page.locator('#defense-inside');
+    await expect(clear).toHaveCSS('opacity', '0');
+    // Row hover with nothing to clear: it ghosts in, and does nothing.
+    await row.locator('.label-text').hover();
+    await page.waitForTimeout(250);
+    await expect(clear).toHaveCSS('opacity', '0.35');
+    await expect(clear).toBeDisabled();
+    await page.mouse.move(0, 0);
+
+    await row.locator('.pip').nth(3).click();
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(250);
+    await expect(slider).toHaveValue('4');
+    await expect(clear).toHaveCSS('opacity', '1');     // stays while the row has points
+    await expect(clear).toBeEnabled();
+    await expect(page.locator('#req-points-used')).toHaveText('4');
+    await clear.click();
+    await expect(slider).toHaveValue('0');
+    await expect(row.locator('.ps-n')).toHaveText('0');
+    await expect(page.locator('#req-points-used')).toHaveText('0');
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(250);
+    await expect(clear).toHaveCSS('opacity', '0');
+
+    // By keyboard: Delete, Backspace, 0 and Home all clear from the focused row.
+    for (const key of ['Delete', 'Backspace', '0', 'Home']) {
+      await row.locator('.pip').nth(2).click();
+      await expect(slider).toHaveValue('3');
+      await slider.focus();
+      await page.keyboard.press(key);
+      await expect(slider, key).toHaveValue('0');
+    }
+    await expect(page.locator('#req-points-used')).toHaveText('0');
+  });
+
+  test('left and right arrows change the value, with a visible focus ring', async ({ page }) => {
+    await openTraining(page);
+    const slider = page.locator('#technical-passing');
+    const row = drillRow(page, 'technical-passing');
+    await page.keyboard.press('Tab');
+    await slider.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await expect(slider).toHaveValue('3');
+    await expect(row.locator('.ps-n')).toHaveText('3');
+    await expect(row.locator('.pip.f')).toHaveCount(3);
+    await page.keyboard.press('ArrowLeft');
+    await expect(slider).toHaveValue('2');
+    await expect(row.locator('.pip.f')).toHaveCount(2);
+    await expect(page.locator('#req-points-used')).toHaveText('2');
+    const ring = await row.locator('.ps').evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return cs.outlineStyle + ' ' + cs.outlineWidth + ' ' + cs.outlineColor;
+    });
+    expect(ring).toBe('solid 2px rgb(255, 255, 255)');
+    await expect(row).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.03)');
+  });
+
+  test('out of points: boxes the budget cannot reach dim further and do not take a click', async ({ page }) => {
+    await openTraining(page);
+    // 24 to spend: 22 spent leaves 2.
+    await allocate(page, [5, 5, 5, 5, 2]);
+    await expect(page.locator('#req-points-used')).toHaveText('22');
+    const row = drillRow(page, 'technical-ball-handling');
+    const slider = page.locator('#technical-ball-handling');
+    await page.waitForTimeout(250);
+    for (let n = 0; n < 5; n++) {
+      const pip = row.locator('.pip').nth(n);
+      const mark = await boxMark(pip);
+      if (n < 2) {
+        await expect(pip).toBeEnabled();
+        expect(mark.opacity).toBe('1');
+      } else {
+        await expect(pip).toBeDisabled();
+        expect(mark.opacity).toBe('0.35');
+        await expect(pip).toHaveCSS('pointer-events', 'none');
+      }
+    }
+    const far = await row.locator('.pip').nth(4).boundingBox();
+    await page.mouse.click(far.x + far.width / 2, far.y + far.height / 2);
+    await expect(slider).toHaveValue('0');
+    // An unaffordable box never previews.
+    await row.locator('.pip').nth(1).hover();
+    await page.waitForTimeout(250);
+    expect((await boxMark(row.locator('.pip').nth(3))).bg).toBe(CLEAR_WHITE);
+    await row.locator('.pip').nth(1).click();
+    await expect(slider).toHaveValue('2');
+    await expect(page.locator('#req-points-used')).toHaveText('24');
+    // Nothing left: every empty box on the page is out of reach, the spent ones are not.
+    await page.mouse.move(0, 0);
+    expect(await page.locator('#training-view .pip.x:not(:disabled)').count()).toBe(0);
+    expect(await page.locator('#training-view .pip.f:disabled').count()).toBe(0);
+    // Arrow keys respect the same budget.
+    await page.locator('#technical-rebounding').focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('#technical-rebounding')).toHaveValue('0');
+  });
+
+  for (const width of [1280, 1920, 2200]) {
+    test('the boxes sit within about 200px of their label at ' + width, async ({ page }) => {
+      await page.setViewportSize({ width, height: width === 1280 ? 720 : 1080 });
+      await openTraining(page);
+      const gaps = await page.evaluate(() => [...document.querySelectorAll('#training-view .slider-label')].map((row) => {
+        const range = document.createRange();
+        range.selectNodeContents(row.querySelector('.label-text'));
+        return Math.round(row.querySelector('.ps .pip').getBoundingClientRect().left - range.getBoundingClientRect().right);
+      }));
+      expect(gaps.length).toBe(20);
+      expect(Math.max(...gaps)).toBeLessThanOrEqual(215);
+      expect(Math.min(...gaps)).toBeGreaterThan(24);
+    });
+  }
+
+  test('option-a / option-b shots', async ({ page }) => {
+    test.skip(process.env.PB_SHOTS !== '1', 'PB_SHOTS=1 only');
+    test.setTimeout(240000);
+    fs.mkdirSync(SEL_SHOTS, { recursive: true });
+    const ASSIGNED = [3, 0, 2, 0, 0, 4, 0, 0, 5, 0, 0, 1, 0, 0, 2, 0, 0, 0, 1, 0];
+    const crops = {};
+    for (const width of [1280, 1920]) {
+      for (const option of ['a', 'b']) {
+        await page.setViewportSize({ width, height: width === 1280 ? 900 : 1080 });
+        await openTraining(page);
+        if (option === 'a') await page.addStyleTag({ content: ':root{--train-box-outline:var(--white-25)}' });
+        await settle(page);
+        await page.mouse.move(0, 0);
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-option-' + option + '-untouched-' + width + '.png'), animations: 'disabled' });
+        await allocate(page, ASSIGNED);
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-option-' + option + '-assigned-' + width + '.png'), animations: 'disabled' });
+        crops[option + width] = (await page.locator('#training-view .main-content-grid').screenshot({ animations: 'disabled' })).toString('base64');
+        if (option === 'a' && width === 1280) {
+          await drillRow(page, 'defense-outside').locator('.pip').nth(3).hover();
+          await page.waitForTimeout(300);
+          await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-hover-preview-1280.png') });
+          await page.mouse.move(0, 0);
+          await allocate(page, []);
+          await allocate(page, [5, 0, 5, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 4, 0, 0, 3]);
+          await page.waitForTimeout(300);
+          await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-out-of-points-1280.png'), animations: 'disabled' });
+          await page.locator('#technical-rebounding').focus();
+          await page.keyboard.press('ArrowLeft');
+          await page.waitForTimeout(300);
+          await page.screenshot({ path: path.join(SEL_SHOTS, 'selectors-keyboard-focus-1280.png'), animations: 'disabled' });
+        }
+        // The page keeps a draft of the allocation: leave none for the next pass.
+        await allocate(page, []);
+        await page.evaluate(() => {
+          try { localStorage.clear(); sessionStorage.clear(); } catch (err) { /* storage off */ }
+        });
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+      }
+    }
+    // The two strengths on one sheet, A above B, same rows assigned.
+    for (const width of [1280, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.setContent('<body style="margin:0;padding:16px;background:#0b0e14;color:#fff;font:600 13px/1 sans-serif">'
+        + '<p style="margin:0 0 8px">OPTION A: --train-box-outline: var(--white-25)</p>'
+        + '<img style="display:block;max-width:100%" src="data:image/png;base64,' + crops['a' + width] + '">'
+        + '<p style="margin:24px 0 8px">OPTION B (shipped, Jamie\'s choice): --train-box-outline: var(--white-45)</p>'
+        + '<img style="display:block;max-width:100%" src="data:image/png;base64,' + crops['b' + width] + '">'
+        + '</body>');
+      await page.waitForTimeout(300);
+      await page.locator('body').screenshot({ path: path.join(SEL_SHOTS, 'selectors-option-a-vs-b-' + width + '.png') });
+    }
+  });
+});
 
 /** Team Report rows by label: the mark text and its painted colour. */
 async function teamMarks(page) {
@@ -1190,6 +1520,208 @@ test.describe('playbooks', () => {
     await expect(label).toHaveText('Shot Distribution');
     await expect(page.locator('#playbooks-view')).not.toContainText('Expected', { ignoreCase: true });
     await shot(page, 'P1-P2-P4-playbooks-offense');
+  });
+});
+
+// Follow-ups from Jamie on Prep › Playbooks (2026-10-02). PB_SHOTS=1 writes the after
+// shots to reports/playbooks-followups/.
+const PB_OUT = path.join(__dirname, '../../reports/playbooks-followups');
+async function pbShot(page, name) {
+  if (process.env.PB_SHOTS !== '1') return;
+  fs.mkdirSync(PB_OUT, { recursive: true });
+  await settle(page);
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: path.join(PB_OUT, name + '.png'), animations: 'disabled' });
+}
+
+test.describe('playbooks follow-ups', () => {
+  test.skip(PHASE === 'before', 'after tree only');
+
+  for (const [width, height] of [[1280, 720], [1920, 1080]]) {
+    test('the tab row sits clear below the Shot Distribution strip at ' + width + ', at rest and scrolled', async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await openPlaybooks(page);
+      const measure = (scrollTop) => page.evaluate((y) => {
+        const main = document.querySelector('html.gob-shell .main');
+        main.scrollTop = y;
+        const box = (sel) => {
+          const r = document.querySelector(sel).getBoundingClientRect();
+          return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right) };
+        };
+        const strip = document.querySelector('#playbooks-view .playbooks-shot-weights-strip');
+        return {
+          scrolled: main.scrollTop,
+          head: box('html.gob-shell .pg-head'),
+          strip: box('#playbooks-view .playbooks-shot-weights-strip'),
+          tabs: box('#playbooks-view .playbooks-tabs'),
+          section: box('#playbooks-view .playbooks-tabpane.on .pb-sec-head'),
+          stripFill: getComputedStyle(strip).backgroundColor,
+        };
+      }, scrollTop);
+      const rest = await measure(0);
+      const sectionGap = rest.section.top - rest.tabs.bottom;
+      for (const y of [0, 60, 150, 400, 900]) {
+        const m = await measure(y);
+        const note = width + ' scroll ' + y + ' ' + JSON.stringify(m);
+        // The two boxes never overlap, and the tab row keeps the section spacing below the strip.
+        expect(m.tabs.top, note).toBeGreaterThanOrEqual(m.strip.bottom);
+        expect(m.tabs.top - m.strip.bottom, note).toBe(rest.tabs.top - rest.strip.bottom);
+        expect(m.tabs.top - m.strip.bottom, note).toBeGreaterThanOrEqual(14);
+        expect(Math.abs((m.tabs.top - m.strip.bottom) - sectionGap), note).toBeLessThanOrEqual(6);
+        // The strip pins under the page head, never over it, and is not see-through.
+        expect(m.strip.top, note).toBeGreaterThanOrEqual(m.head.bottom);
+        expect(m.stripFill, note).not.toBe('rgba(0, 0, 0, 0)');
+      }
+      // Scrolled: the plays pass under the pinned pair, the pair stays where it was.
+      const scrolled = await measure(400);
+      expect(scrolled.scrolled).toBeGreaterThan(0);
+      expect(scrolled.strip.top).toBe(rest.strip.top);
+      expect(scrolled.tabs.top).toBe(rest.tabs.top);
+      expect(scrolled.section.top).toBeLessThan(rest.section.top);
+      await measure(0);
+      await pbShot(page, 'tabs-strip-after-' + width);
+      await measure(150);
+      await pbShot(page, 'tabs-strip-after-' + width + '-scrolled');
+    });
+  }
+});
+
+test.describe('playbooks lock states', () => {
+  test.skip(PHASE === 'before', 'after tree only');
+
+  const rowState = (page, name) => page.evaluate((label) => {
+    const row = [...document.querySelectorAll('#playbooks-view .play')].find((el) => el.querySelector('.pn b').textContent === label);
+    const lock = row.querySelector('[data-lock]');
+    const track = row.querySelector('.wb');
+    const fill = track.querySelector('i');
+    const pct = row.querySelector('.wt input, .wt > b');
+    const cs = (el, pseudo) => getComputedStyle(el, pseudo || null);
+    return {
+      classes: row.className,
+      pressed: lock.getAttribute('aria-pressed'),
+      lockOn: lock.classList.contains('on'),
+      lockColor: cs(lock).color,
+      lockPlate: cs(lock).backgroundColor,
+      // The closed padlock's shackle comes back down to the body; the open one stops short.
+      glyph: lock.querySelector('svg path').getAttribute('d'),
+      draggable: track.classList.contains('et-slider'),
+      focusable: track.getAttribute('tabindex'),
+      handle: cs(fill, '::after').content,
+      fill: cs(fill).backgroundColor,
+      trackCursor: cs(track).cursor,
+      pctColor: cs(pct).color,
+      pctReadonly: pct.tagName === 'INPUT' ? pct.readOnly : true,
+      nameColor: cs(row.querySelector('.pn b')).color,
+    };
+  }, name);
+  const neutral = (rgb) => {
+    const m = String(rgb).match(/([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
+    return !!m && Math.abs(m[1] - m[2]) < 6 && Math.abs(m[2] - m[3]) < 6;
+  };
+  const alpha = (rgb) => { const m = String(rgb).match(/rgba\([^)]*,\s*([\d.]+)\)/); return m ? Number(m[1]) : 1; };
+
+  for (const [width, height] of [[1280, 720], [1920, 1080]]) {
+    test('a locked slider row is unmistakable beside unlocked rows at ' + width, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await openPlaybooks(page);
+      const lockOf = (name) => page.locator('#playbooks-view .play', { has: page.locator('.pn b', { hasText: new RegExp('^' + name + '$') }) }).locator('[data-lock]');
+
+      const before = await rowState(page, 'PF Post Motion');
+      expect(before.pressed).toBe('false');
+      expect(before.classes).not.toMatch(/is-locked/);
+      expect(before.draggable).toBe(true);
+      expect(before.handle).not.toBe('none');                 // a draggable slider has a handle
+      expect(alpha(before.lockPlate)).toBe(0);                // open padlock, no plate
+      expect(before.lockColor).toBe('rgba(255, 255, 255, 0.38)');
+
+      await lockOf('PF Post Motion').click();
+      await lockOf('4-1 Motion').click();
+      const locked = await rowState(page, 'PF Post Motion');
+      const other = await rowState(page, '3-2 Motion');
+
+      // The distinct class and aria-pressed.
+      expect(locked.classes).toMatch(/(^| )is-locked( |$)/);
+      expect(locked.pressed).toBe('true');
+      expect(locked.lockOn).toBe(true);
+      expect(other.classes).not.toMatch(/is-locked/);
+      expect(other.pressed).toBe('false');
+      // Closed padlock, full white, on a filled neutral plate. The open one is dim, no plate.
+      expect(locked.glyph).not.toBe(other.glyph);
+      expect(locked.lockColor).toBe('rgb(255, 255, 255)');
+      expect(alpha(locked.lockPlate)).toBeGreaterThan(0.1);
+      expect(neutral(locked.lockPlate)).toBe(true);
+      expect(alpha(other.lockPlate)).toBe(0);
+      // The locked slider: muted track, no handle, not a control.
+      expect(locked.draggable).toBe(false);
+      expect(locked.focusable).toBeNull();
+      expect(locked.handle).toBe('none');
+      expect(locked.trackCursor).toBe('default');
+      expect(alpha(locked.fill)).toBeLessThan(alpha(other.fill));
+      expect(other.handle).not.toBe('none');
+      // The percentage dims one step; the play name does not.
+      expect(locked.pctColor).toBe('rgba(255, 255, 255, 0.6)');
+      expect(other.pctColor).toBe('rgb(255, 255, 255)');
+      expect(locked.pctReadonly).toBe(true);
+      expect(locked.nameColor).toBe(other.nameColor);
+      [locked.lockColor, locked.lockPlate, locked.fill, locked.pctColor].forEach((c) => expect(neutral(c), c).toBe(true));
+
+      // Hover and keyboard focus on the lock button.
+      const freeLock = lockOf('3-2 Motion');
+      await freeLock.hover();
+      await expect.poll(() => freeLock.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+      await page.mouse.move(0, 0);
+      await lockOf('PF Post Motion').focus();
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      const ring = await lockOf('PF Post Motion').evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return { focused: document.activeElement === el, style: cs.outlineStyle, width: cs.outlineWidth };
+      });
+      expect(ring).toEqual({ focused: true, style: 'solid', width: '2px' });
+      await page.locator('#playbooks-view .pb-sec-title').first().click();
+      await pbShot(page, 'locks-after-' + width);
+
+      // Space on the focused lock unlocks it again.
+      await lockOf('PF Post Motion').focus();
+      await page.keyboard.press('Space');
+      await expect(lockOf('PF Post Motion')).toHaveAttribute('aria-pressed', 'false');
+      expect((await rowState(page, 'PF Post Motion')).classes).not.toMatch(/is-locked/);
+    });
+  }
+
+  test('every lockable slider on every tab carries the lock; the other tabs have none', async ({ page }) => {
+    await openPlaybooks(page);
+    const tab = (key) => page.locator('#playbooks-view .playbooks-tab[data-tab="' + key + '"]');
+    const audit = () => page.evaluate(() => [...document.querySelectorAll('#playbooks-view .playbooks-tabpane.on .pb-sec')].map((sec) => {
+      const rows = [...sec.querySelectorAll('.play:not(.lk), .chip, [data-csl]')];
+      const locks = [...sec.querySelectorAll('[data-lock]')];
+      return {
+        section: sec.dataset.section,
+        sliders: sec.querySelectorAll('.wb').length,
+        locks: locks.length,
+        pressed: locks.every((b) => b.getAttribute('aria-pressed') === 'true' || b.getAttribute('aria-pressed') === 'false'),
+        rows: rows.length,
+      };
+    }));
+    const offense = await audit();
+    expect(offense.map((s) => s.section)).toEqual(['motion', 'setPlays']);
+    offense.forEach((s) => { expect(s.locks, s.section).toBe(s.sliders); expect(s.locks, s.section).toBeGreaterThan(0); expect(s.pressed).toBe(true); });
+    await tab('defense').click();
+    const defense = await audit();
+    expect(defense.map((s) => s.section)).toEqual(['manDefense', 'zoneDefense']);
+    defense.forEach((s) => { expect(s.locks, s.section).toBe(s.sliders); expect(s.locks, s.section).toBeGreaterThan(0); });
+    // A locked defense row takes the same treatment.
+    const first = page.locator('#playbooks-view #zone-defense-grid .play').first();
+    await first.locator('[data-lock]').click();
+    await expect(page.locator('#playbooks-view #zone-defense-grid .play.is-locked [data-lock][aria-pressed="true"]')).toHaveCount(1);
+    // Fast Breaks and Press/Traps weights normalise instead of locking: no lock there.
+    for (const key of ['fastBreaks', 'pressTraps']) {
+      await tab(key).click();
+      const flexible = await audit();
+      expect(flexible.length).toBe(1);
+      expect(flexible[0].locks, key).toBe(0);
+      expect(flexible[0].sliders, key).toBeGreaterThan(0);
+    }
   });
 });
 

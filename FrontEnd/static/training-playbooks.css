@@ -444,3 +444,9 @@ body.tp-page {
   .tp-btn-primary { justify-self: center; width: 100%; max-width: 280px; }
   .tp-dock { grid-template-columns: 1fr; }
 }
+
+/* First paint. Until the playbooks are in, the page body is held back behind the shared
+   loader: no bare section titles, no "—" docks, no Save button with nothing to save. */
+html.is-loading .tp-shell {
+  visibility: hidden;
+}

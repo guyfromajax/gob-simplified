@@ -279,22 +279,24 @@ def season_review_snapshot(
 
 # --- coach career ----------------------------------------------------------------------------
 
+# One case for every finish line (they share the Finish column on the Trophy Case and
+# Home Base Top Seasons with the Trophy Case's own title labels): capitalised.
 _FINISH_LABELS = {
-    "national_final": "National final",
-    "national_semis": "National semifinal",
-    "national_quarters": "National quarterfinal",
-    "region_final": "Region final",
-    "region_semis": "Region semifinal",
-    "conference_final": "Conference final",
-    "conference_semis": "Conference semifinal",
-    "conference_quarters": "Conference quarterfinal",
-    "missed": "Missed the bracket",
+    "national_final": "National Final",
+    "national_semis": "National Semifinal",
+    "national_quarters": "National Quarterfinal",
+    "region_final": "Region Final",
+    "region_semis": "Region Semifinal",
+    "conference_final": "Conference Final",
+    "conference_semis": "Conference Semifinal",
+    "conference_quarters": "Conference Quarterfinal",
+    "missed": "Missed the Bracket",
 }
 _TITLE_FINISH_LABELS = {
-    "national": "National champions",
-    "region": "Region champions",
-    "conf_t": "Conference tournament champions",
-    "conf_rs": "Regular season conference champions",
+    "national": "National Champions",
+    "region": "Region Champions",
+    "conf_t": "Conference Tournament Champions",
+    "conf_rs": "Regular Season Conference Champions",
 }
 _TITLE_FINISH_ORDER = ("national", "region", "conf_t", "conf_rs")
 

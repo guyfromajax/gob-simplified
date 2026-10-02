@@ -162,3 +162,13 @@ button{font-family:inherit;cursor:pointer}
 @keyframes tbpulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}
 @media(max-width:1100px){.row{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:720px){.row{grid-template-columns:repeat(2,minmax(0,1fr))}.tbe{flex-direction:column;align-items:stretch}.tbe-a{align-items:stretch}.tbe-a .btn{width:100%}.ab-in{flex-wrap:wrap}.ab-art{width:120px}}
+
+/* First paint. Until the programs are in, the page body and the footer are held back:
+   no "0 of 128 match", no empty filters, no footer that jumps when the grid lands. */
+html.is-loading #claim-root,
+html.is-loading #mode-banner,
+html.is-loading .team-select-back-link,
+html.is-loading .site-footer,
+html.is-loading footer {
+  visibility: hidden;
+}

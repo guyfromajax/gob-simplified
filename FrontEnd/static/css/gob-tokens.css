@@ -56,6 +56,11 @@
 --coach-maximizer:var(--green);
 --coach-culture:var(--purple);
 
+/* ── Training point boxes ───────────────────────────────────
+   The outline of an EMPTY box on the weekly Training page. One token so its strength is
+   one decision. Jamie chose option B, --white-45 (2026-10-02); option A was --white-25. */
+--train-box-outline:var(--white-45);
+
 /* ── Deltas, results, badge ─────────────────────────────── */
 --delta-up:var(--green);
 --delta-down:var(--text-87);   /* ▼ is neutral, never red (Jamie, 2026-10-01) */

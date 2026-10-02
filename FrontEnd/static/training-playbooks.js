@@ -352,7 +352,23 @@ function cloneParams(params) {
     document.getElementById('tp-save-footer').addEventListener('click', persistAndLeave);
   }
 
+  /* First paint: the page stays behind the loader (and hidden, see the is-loading rule
+     in training-playbooks.css) until the cards are in, so the bare Offense / Defense
+     titles, the "—" docks and a Save button with nothing to save are never shown. */
+  function liftLoading() {
+    document.documentElement.classList.remove('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  }
+
   async function init() {
+    try {
+      await load();
+    } finally {
+      liftLoading();
+    }
+  }
+
+  async function load() {
     if (!franchiseId || !teamId) {
       alert('Missing franchise or team. Open this page from Training Orders.');
       window.location.href = '/mode-select.html';

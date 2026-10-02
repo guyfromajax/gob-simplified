@@ -401,15 +401,32 @@ export function mount(container, ctx) {
   }
 
   container.innerHTML = '<div class="pv sc" data-state="loading">'
-    + '<p class="scouting-status" role="status">Loading scouting report…</p>'
+    + '<div class="scouting-status" role="status"></div>'
     + '<div class="scouting-ready" hidden></div></div>';
 
   var statusEl = container.querySelector('.scouting-status');
   var readyEl = container.querySelector('.scouting-ready');
 
   function setStatus(text) {
-    if (statusEl) statusEl.textContent = text;
+    if (statusEl) {
+      statusEl.classList.remove('is-loading');
+      statusEl.removeAttribute('aria-label');
+      statusEl.textContent = text;
+    }
     readyEl.hidden = true;
+  }
+
+  /** Loading: the shared view skeleton, not a line of text. */
+  function setLoading() {
+    readyEl.hidden = true;
+    if (!statusEl) return;
+    if (window.GOBTables && typeof window.GOBTables.paintSkeleton === 'function') {
+      statusEl.classList.add('is-loading');
+      statusEl.setAttribute('aria-label', 'Loading scouting report');
+      window.GOBTables.paintSkeleton(statusEl);
+    } else {
+      statusEl.textContent = '';
+    }
   }
 
   function fcc() {
@@ -620,6 +637,9 @@ export function mount(container, ctx) {
     );
 
     statusEl.hidden = true;
+    statusEl.classList.remove('is-loading');
+    statusEl.removeAttribute('aria-label');
+    statusEl.textContent = '';
     readyEl.hidden = false;
     container.querySelector('.pv').setAttribute('data-state', 'ready');
     mark('scouting-paint-done');
@@ -631,7 +651,7 @@ export function mount(container, ctx) {
     // Once something is painted it stays up, and the data is swapped in place below only
     // if it actually changed.
     mark('scouting-load');
-    if (!painted) setStatus('Loading scouting report…');
+    if (!painted) setLoading();
     var scriptsP = Promise.all([
       loadScript('/js/utils/attributeDisplay.js'),
       loadScript('/js/shared/scoutingReport.js'),

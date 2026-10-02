@@ -11,6 +11,7 @@ from typing import Any, Literal
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
+from BackEnd.utils.hidden_attrs import HiddenAttrsJSONResponse
 from pydantic import BaseModel, Field
 
 from BackEnd.persistence import get_store
@@ -37,7 +38,8 @@ from BackEnd.utils.auth import get_current_user
 from BackEnd.utils.ownership import verify_franchise_owned_by_user
 
 logger = logging.getLogger(__name__)
-router = APIRouter(tags=["press_conference"])
+# /franchise/press-conference/*: same rule as the franchise router, no hidden attribute in a payload.
+router = APIRouter(tags=["press_conference"], default_response_class=HiddenAttrsJSONResponse)
 
 VALID_CHOICES = frozenset({"A", "B", "C", "D", "E"})
 

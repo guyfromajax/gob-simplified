@@ -236,9 +236,9 @@ function career() {
     // The finish line is the server's string (career_data.finish_label).
     top_seasons: [
       { franchise_id: 'f1', team_name: 'Lawrence Eagles', team_slug: 'lawrence', season: 1, wins: 22, losses: 10,
-        finish: 'Conference tournament champions', finish_is_title: true, season_gp: 1120, in_progress: false, week: null },
+        finish: 'Conference Tournament Champions', finish_is_title: true, season_gp: 1120, in_progress: false, week: null },
       { franchise_id: 'f1', team_name: 'Lawrence Eagles', team_slug: 'lawrence', season: 2, wins: 24, losses: 8,
-        finish: 'Regular season conference champions', finish_is_title: true, season_gp: 980, in_progress: false, week: null },
+        finish: 'Regular Season Conference Champions', finish_is_title: true, season_gp: 980, in_progress: false, week: null },
     ],
   };
 }
@@ -300,10 +300,18 @@ test('F2: the offline Home Base shelf uses the new champion wording', async ({ p
   // The longer finish lines read in full in Top Seasons (they used to fit "Conference champions").
   const finishes = await page.locator('.tsn .tsn-f').evaluateAll((nodes) => nodes
     .filter((n) => n.textContent.trim())
-    .map((n) => ({ text: n.textContent.trim(), clipped: n.scrollWidth > n.clientWidth })));
+    .map((n) => {
+      // Text width against the room it has: scrollWidth misses an overflow of under a pixel.
+      const probe = n.cloneNode(true);
+      probe.style.cssText = 'position:absolute;visibility:hidden;width:auto;max-width:none;overflow:visible;white-space:nowrap';
+      n.parentNode.appendChild(probe);
+      const natural = probe.getBoundingClientRect().width;
+      probe.remove();
+      return { text: n.textContent.trim(), clipped: natural > n.getBoundingClientRect().width + 0.01 };
+    }));
   expect(finishes).toEqual([
-    { text: 'Conference tournament champions', clipped: false },
-    { text: 'Regular season conference champions', clipped: false },
+    { text: 'Conference Tournament Champions', clipped: false },
+    { text: 'Regular Season Conference Champions', clipped: false },
   ]);
 });
 

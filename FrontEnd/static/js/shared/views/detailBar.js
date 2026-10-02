@@ -111,7 +111,9 @@ export function barHtml(tables, name, pager) {
   var html = '<div class="gob-dt-bar"><a class="gob-dt-up" id="back-button" href="'
     + tables.esc(fallbackUrl()) + '">← ' + tables.esc(page) + '</a>'
     + '<span class="gob-dt-crumb"><span>' + tables.esc(section) + '</span><i>/</i><span>'
-    + tables.esc(page) + '</span><i>/</i><b>' + tables.esc(name || '') + '</b></span>';
+    + tables.esc(page) + '</span>'
+    // No name yet (the skeleton is up): no trailing separator waiting for one.
+    + (name ? '<i>/</i><b>' + tables.esc(name) + '</b>' : '') + '</span>';
   if (pager) {
     var prev = pager.index > 0 ? pager.ids[pager.index - 1] : '';
     var next = pager.index < pager.ids.length - 1 ? pager.ids[pager.index + 1] : '';

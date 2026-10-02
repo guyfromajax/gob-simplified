@@ -6,6 +6,7 @@
   <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
@@ -19,6 +20,13 @@
 <body>
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <!-- First paint: stay behind the shared loader until step 1 is drawn (team-builder.js
+       lifts it), so the boot line and a footer waiting to jump are never shown. -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
 
   <div id="tb-boot" class="tb-boot">Loading Team Builder…</div>
   <div id="tb-fatal" class="tb-fatal" hidden role="alert"></div>
