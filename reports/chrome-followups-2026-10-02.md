@@ -175,4 +175,19 @@ The one full-run failure is the known Back-from-`login.html` flake (`login.html`
 
 Earlier full runs on this branch, before items 6-8 were added: 964 passed, 17 skipped, 0 failed (tree `436a11944`).
 
+## After merging `origin/develop` @ `0fe743624` (polish/tables-followups), merge commit `15b2aceaa`
+
+- One conflict: Styleguide "Training movement marks". Kept this branch's entry (single arrows follow the sign, faint green / faint red, Attributes tab plain values); stats' side was the old in-season rule.
+- `UX_System.md` merged without conflict; the two sides edited different lines, both kept. No other file was changed on both sides.
+
+| Check on the merged tree | Result |
+|---|---|
+| `check_ui_tokens.py --strict --no-write` | exit 0 |
+| `check_migration_gates.py` | passed (Gate A 0, Gate B 134 lines / 43 files) |
+| `pytest tests/test_career_data.py` | 70 passed |
+| `polish-chrome-followups`, `polish-training-playbooks`, `polish-chrome-audio`, `tables-followups` specs | 86 passed, 11 skipped (the shot-only tests), 0 failed |
+| `franchise-command-center.css` | 1779 lines |
+
+No full Playwright re-run on the merged tree (not asked for). The full-suite line below is from the pre-merge tree `b8e69f007`.
+
 **Full suite: pytest 4371 passed, 14 skipped, 108 xfailed, 2 xpassed, 0 failed · Playwright 975 passed, 19 skipped, 1 failed (flake, 5/5 alone).**
