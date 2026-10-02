@@ -57,6 +57,13 @@ function inAppShell() {
 
   const ENFORCED_SECTIONS = new Set(["motion", "setPlays", "manDefense", "zoneDefense"]);
   const NORMALIZE_SECTIONS = new Set(["fastBreaks", "hcTraps"]);
+  // Tab order: Offense, Defense, Fast Breaks, Press/Traps. Each is its own pane.
+  const PLAYBOOK_TABS = ["offense", "defense", "fastBreaks", "pressTraps"];
+  const SET_PLAY_FOCUS_GROUPS = [
+    { key: "inside", label: "Inside" },
+    { key: "attack", label: "Attack" },
+    { key: "outside", label: "Outside" },
+  ];
 
   const LOCK_API_KEYS = {
     motion: "motion",
@@ -106,12 +113,9 @@ function inAppShell() {
     return "Balanced";
   }
 
-  function setPlayFocusLabel(focus) {
+  function setPlayFocusKey(focus) {
     const key = String(focus || "").toLowerCase();
-    if (key === "inside") return "Inside";
-    if (key === "attack") return "Attack";
-    if (key === "outside") return "Outside";
-    return "";
+    return (key === "inside" || key === "attack" || key === "outside") ? key : "other";
   }
 
   function setPlayFocusRank(focus) {
@@ -552,7 +556,7 @@ function inAppShell() {
         if (typeof draft.evenDistributionAll === "boolean") {
           this.state.evenDistributionAll = draft.evenDistributionAll;
         }
-        if (draft.activeTab === "offense" || draft.activeTab === "defense") {
+        if (PLAYBOOK_TABS.includes(draft.activeTab)) {
           this.state.activeTab = draft.activeTab;
         }
         if (typeof draft.openPlayId === "string") {
@@ -607,7 +611,7 @@ function inAppShell() {
       qsa(".playbooks-tab").forEach((tab) => {
         tab.addEventListener("click", () => {
           playSound("SFX_SELECT");
-          this.state.activeTab = tab.dataset.tab === "defense" ? "defense" : "offense";
+          this.state.activeTab = PLAYBOOK_TABS.includes(tab.dataset.tab) ? tab.dataset.tab : "offense";
           this.applyTab();
         });
       });
@@ -625,7 +629,7 @@ function inAppShell() {
     }
 
     applyTab() {
-      const tab = this.state.activeTab === "defense" ? "defense" : "offense";
+      const tab = PLAYBOOK_TABS.includes(this.state.activeTab) ? this.state.activeTab : "offense";
       qsa(".playbooks-tab").forEach((button) => {
         const on = button.dataset.tab === tab;
         button.classList.toggle("on", on);
@@ -839,7 +843,17 @@ function inAppShell() {
         : "Determined — the only unlocked play.";
       container.innerHTML = "";
 
+      // Set Plays read as three sub-sections. The list is already sorted by focus
+      // (compareSetPlaysByFocusCmd), so a head goes in where the focus changes.
+      let lastFocus = null;
       arr.forEach((item, idx) => {
+        if (options.kind === "set") {
+          const focus = setPlayFocusKey(item.focus);
+          if (focus !== lastFocus) {
+            lastFocus = focus;
+            container.appendChild(this.buildSetPlayGroupHead(focus, arr));
+          }
+        }
         if (item.isActive === false) {
           container.appendChild(this.buildDeadTile(item));
           return;
@@ -857,6 +871,33 @@ function inAppShell() {
           container.appendChild(detail);
           this.bindPlayDetail(detail, tile, sectionKey, idx, side, options);
         }
+      });
+    }
+
+    /** Sub-section head inside Set Plays: the focus, its play count and its share. */
+    buildSetPlayGroupHead(focus, arr) {
+      const group = SET_PLAY_FOCUS_GROUPS.find((entry) => entry.key === focus);
+      const plays = arr.filter((item) => setPlayFocusKey(item.focus) === focus);
+      const head = document.createElement("div");
+      head.className = "pb-sub";
+      head.dataset.focusGroup = focus;
+      head.innerHTML = `
+        <div class="pb-sub-title"><h3>${escapeHtml(group ? group.label : "Other")}</h3><span class="pb-sub-cnt">${plays.length} ${plays.length === 1 ? "play" : "plays"}</span></div>
+        <span class="pb-sub-tot" data-focus-total="${escapeHtml(focus)}"></span>
+      `;
+      return head;
+    }
+
+    /** Each Set Plays sub-section shows how much of the 100% it holds. */
+    paintSetPlayGroupTotals() {
+      const grid = this.elements.setPlaysGrid;
+      if (!grid) return;
+      grid.querySelectorAll("[data-focus-total]").forEach((el) => {
+        const focus = el.dataset.focusTotal;
+        const sum = activeItems(this.state.setPlays)
+          .filter((item) => setPlayFocusKey(item.focus) === focus)
+          .reduce((total, item) => total + item.percentage, 0);
+        el.textContent = `${sum}%`;
       });
     }
 
@@ -895,11 +936,8 @@ function inAppShell() {
 
     playMeta(item, options) {
       if (options.kind === "motion") return `Focus · ${displayMotionFocusLabel(item.motion_focus)}`;
-      if (options.kind === "set") {
-        const focus = setPlayFocusLabel(item.focus);
-        const shooter = `Target shooter ${item.target_shooter || "PG"}`;
-        return focus ? `${focus} · ${shooter}` : shooter;
-      }
+      // The focus is the sub-section the play sits in, so the line names only the shooter.
+      if (options.kind === "set") return `Target shooter ${item.target_shooter || "PG"}`;
       if (item.top_scorer && item.top_scorer !== "N/A") return `Top scorer · ${item.top_scorer}`;
       return "";
     }
@@ -1083,6 +1121,7 @@ function inAppShell() {
         slider.addEventListener("pointerdown", (event) => {
           if (item.locked) return;
           event.stopPropagation();
+          slider.focus({ preventScroll: true });
           dragging = true;
           this.sliderDragging = true;
           this.elements.editColumn?.classList.add("no-anim");
@@ -1100,6 +1139,7 @@ function inAppShell() {
           playSound("SFX_SELECT");
           this.state.evenDistributionAll = false;
           this.render();
+          this.refocusSlider("data-sl", item.id);
           this.scheduleShotWeightsPreview();
         };
         slider.addEventListener("pointerup", end);
@@ -1133,6 +1173,15 @@ function inAppShell() {
           }
         });
       }
+    }
+
+    /**
+     * render() rebuilds every tile, so the slider that was just dragged is gone and the
+     * keyboard would have nothing to act on. Focus the slider that replaced it.
+     */
+    refocusSlider(attr, id) {
+      const next = rootQuery(`[${attr}="${CSS.escape(id)}"]`);
+      if (next && typeof next.focus === "function") next.focus({ preventScroll: true });
     }
 
     paintEnforcedSection(sectionKey) {
@@ -1218,6 +1267,7 @@ function inAppShell() {
         };
         slider.addEventListener("pointerdown", (event) => {
           event.stopPropagation();
+          slider.focus({ preventScroll: true });
           dragging = true;
           this.elements.editColumn?.classList.add("no-anim");
           slider.setPointerCapture(event.pointerId);
@@ -1233,6 +1283,7 @@ function inAppShell() {
           playSound("SFX_SELECT");
           this.state.evenDistributionAll = false;
           this.render();
+          this.refocusSlider("data-csl", item.id);
           this.scheduleShotWeightsPreview();
         };
         slider.addEventListener("pointerup", end);
@@ -1492,6 +1543,7 @@ function inAppShell() {
     }
 
     updateTotals() {
+      this.paintSetPlayGroupTotals();
       const totals = this.getSectionTotals();
       this.renderSectionTotal(this.elements.motionTotal, totals.motion, true);
       this.renderSectionTotal(this.elements.setPlaysTotal, totals.setPlays, true);
@@ -1558,7 +1610,7 @@ function inAppShell() {
     paintShotWeights(shotWeights) {
       const container = this.elements.shotWeightsLive;
       if (!container) return;
-      const label = `<div class="psw-strip-label">Expected shot distribution</div>`;
+      const label = `<div class="psw-strip-label">Shot Distribution</div>`;
       const host = document.createElement("div");
       host.className = "psw-root";
       renderShotWeightsLocal(host, shotWeights, true);
@@ -1847,7 +1899,7 @@ function shellHtml() {
                 </section>
 
                 <div id="shot-weights-live" class="psw playbooks-shot-weights-strip" aria-live="polite">
-                  <div class="psw-strip-label">Expected shot distribution</div>
+                  <div class="psw-strip-label">Shot Distribution</div>
                   <p class="psw-unavailable">Loading shot weights…</p>
                 </div>
 
@@ -1855,6 +1907,8 @@ function shellHtml() {
                   <div class="seg playbooks-tabs" id="playbooks-side-seg" role="tablist" aria-label="Playbook side">
                     <button class="playbooks-tab on" type="button" role="tab" data-tab="offense" aria-selected="true" aria-controls="pane-offense">Offense</button>
                     <button class="playbooks-tab" type="button" role="tab" data-tab="defense" aria-selected="false" aria-controls="pane-defense">Defense</button>
+                    <button class="playbooks-tab" type="button" role="tab" data-tab="fastBreaks" aria-selected="false" aria-controls="pane-fast-breaks">Fast Breaks</button>
+                    <button class="playbooks-tab" type="button" role="tab" data-tab="pressTraps" aria-selected="false" aria-controls="pane-press-traps">Press/Traps</button>
                   </div>
                 </div>
 
@@ -1884,20 +1938,6 @@ function shellHtml() {
                     </div>
                     <div class="et-grid" id="set-plays-grid"></div>
                   </section>
-
-                  <section class="pbs pb-sec" data-section="fastBreaks" data-norm="1">
-                    <div class="sh pb-sec-head">
-                      <div class="pb-sec-title">
-                        <h2>Fast Breaks</h2>
-                        <span class="m cnt" id="fast-breaks-count"></span>
-                        <button class="norm-btn btn-q" id="fast-breaks-normalize" type="button" hidden>Normalize → 100</button>
-                      </div>
-                      <div class="section-total tot" id="fast-breaks-total"></div>
-                      <span class="cmd-h">CMD</span>
-                      <span class="slot-h" aria-hidden="true"></span>
-                    </div>
-                    <div class="chips et-grid" id="fast-breaks-chips"></div>
-                  </section>
                 </div>
 
                 <div class="playbooks-tabpane" data-pane="defense" id="pane-defense" role="tabpanel" hidden>
@@ -1926,7 +1966,25 @@ function shellHtml() {
                     </div>
                     <div class="et-grid" id="zone-defense-grid"></div>
                   </section>
+                </div>
 
+                <div class="playbooks-tabpane" data-pane="fastBreaks" id="pane-fast-breaks" role="tabpanel" hidden>
+                  <section class="pbs pb-sec" data-section="fastBreaks" data-norm="1">
+                    <div class="sh pb-sec-head">
+                      <div class="pb-sec-title">
+                        <h2>Fast Breaks</h2>
+                        <span class="m cnt" id="fast-breaks-count"></span>
+                        <button class="norm-btn btn-q" id="fast-breaks-normalize" type="button" hidden>Normalize → 100</button>
+                      </div>
+                      <div class="section-total tot" id="fast-breaks-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
+                    </div>
+                    <div class="chips et-grid" id="fast-breaks-chips"></div>
+                  </section>
+                </div>
+
+                <div class="playbooks-tabpane" data-pane="pressTraps" id="pane-press-traps" role="tabpanel" hidden>
                   <section class="pbs pb-sec def-sec" data-section="hcTraps" data-norm="1">
                     <div class="sh pb-sec-head">
                       <div class="pb-sec-title">

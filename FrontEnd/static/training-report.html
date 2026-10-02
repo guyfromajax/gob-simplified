@@ -28,7 +28,7 @@
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
-  <div id="training-report-view">
+  <div id="training-report-view" class="is-loading" aria-busy="true">
   <div class="training-report-container resource-page-container fcc-brand-page-shell training-report-resource-shell">
     <!-- Header -->
     <header class="report-header">
@@ -46,6 +46,10 @@
       </div>
       <button id="locker-room-btn" class="locker-room-button">Go To Locker Room</button>
     </header>
+
+    <!-- Loading state: stands in for every section until the report data is in. -->
+    <div class="report-skeleton" aria-hidden="true"><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-card"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div></div>
+    <p class="report-load-status" role="status" aria-live="polite"></p>
 
     <!-- Training Notes (Notes → Team → Players → Projected → Playbook) -->
     <section class="training-notes-section">

@@ -11,9 +11,9 @@ One colour, one meaning. Everything not listed is neutral: white text at `--text
 | Green | `--green` (ink on green: `--bg`) | The one Advance per screen (top-bar `#play-now` / `.advance`, `.gob-btn--gate`, the one forward action in a live-game overlay, Submit Training on the weekly training page). Positive data: delta-up, tier green, chemistry high, board-gain bars, the RT / attribute ramps. | Cards, WIN/LOSS plates, badges, scores, choice controls, a second button on the same screen, any button that only navigates or only saves. |
 | Orange | `--orange` | **"There are unsaved changes" and nothing else**: the save or commit of something you changed. Submit Invites, Submit Orders, Save Game Plan / Playbooks (only while there is an unsaved edit: neutral at rest and after a save), Assign Practice Squad (`.gob-btn--action`), the promise toggle, the committed-order rail, the funded row, and the just-committed moment on Signing Day (the funded-row flash `.prow.flash`, the signing summary `.ssum-nm b` / `.ssum-lr`). | Brand accent, "warning / low" data, navigation, choice controls and their selected state (`.is-on`), checkboxes, hovers, toasts, a loader, "yours" marks (those are navy), a CONTINUE that only continues (`.gob-btn--neutral`), the rail count badge, gated / "Blocks Advance" tags and blocking-step outlines, data ramps (attitude), modal accents, a "Stay" / keep-editing button. |
 | Navy | `--navy`, `--navy-hi` (edge / halo only); aliases `--you`, `--you-soft`, `--you-line`, `--you-ink` | "Yours": your row, your game, your lean, your region, your signing, your `#n`, on-your-list, your team in a bracket, on your board / your orders (the invite-board rank badge and on-board pool rows, your committed recruits in the Orders rail, the My Orders mark). What you picked for your team or plan: Set Lineup on-court and selected rows, plays in your Playcall Center, your leaderboard and lean-ladder slot. Structure: the active rail item, switch on. | Data fills, stat bars, page or shell backgrounds, a green or gold substitute. A generic "selected" state on a choice control: tabs, toggles, radios, sliders and filter chips stay neutral. |
-| Blue | `--tier-blue` (attribute tiles), `--blue` (RT letters) | RT only: an A grade, a 9+ attribute, elite. One exception: the top band of the shot-share ramp (see [Data scales](#data-scales)). | Chrome, links, navigation, "good / above average". |
+| Blue | `--tier-blue` (attribute tiles), `--blue` (RT letters) | RT only: an A grade, a 9+ attribute, elite. Two exceptions, both data: the top band of the shot-share ramp, and a three-step gain on the Training Report (see [Data scales](#data-scales)). | Chrome, links, navigation, "good / above average". |
 | Reward gold | `--reward-gold` | Only: title medallions (`.med.gold`); season-peak glow, rule and confetti (`.pk`, `.cf`); milestone accents (`.mm.is-gold`, `.mm .med`); the exceptional-gain marker (`.xg`, `.xg-key`); the words "Trophy Case" (`.gold-t`); senior-tribute title marks (`.st-titles s`, `.st-cti s`). Tints are `color-mix()` at the point of use; there are no gold tint or shadow tokens. | Any button, including the button on a reward modal (the big-news CTA is a neutral plate). Advance, "yours", choice controls, everyday or weekly chrome, Home Base chrome. |
-| Red / yellow | `--tier-red`, `--tier-yellow`; `--red` for the one destructive style | Data ramps (rating tiers, chemistry, energy, the attitude bars' low buckets). **Irreversible deletes only**: the red-outline confirm button and the red menu item for deleting a program on Home Base (`.btn-del`, `.pop-i.danger`). | ▼ deltas, LOSS plates or letters, buttons, chrome, warnings, modal accents, and destructive styling on anything reversible (removing a queued invite, assigning the practice squad, leaving with selections). |
+| Red / yellow | `--tier-red`, `--tier-yellow`; `--red` for the one destructive style | Data ramps (rating tiers, chemistry, energy, the attitude bars' low buckets, the Training Report movement marks). **Irreversible deletes only**: the red-outline confirm button and the red menu item for deleting a program on Home Base (`.btn-del`, `.pop-i.danger`). | ▼ deltas outside the Training Report, LOSS plates or letters, buttons, chrome, warnings, modal accents, and destructive styling on anything reversible (removing a queued invite, assigning the practice squad, leaving with selections). |
 | Team colour | `--team-primary` (set per team) | Identification: logos, name bars, favour arrows, team badges, the edge border and side tint that say which team a live-game side panel belongs to. | A wash or tint on a card, panel, tab, header or the weekly / result card, win or loss. The selected state of a choice control. |
 | Tier metal | `--tier-metal`, `--tier-metal-hi` (set per tournament tier) | Tournament-tier top bar and the tier next-game card. | Anything outside tournament weeks. |
 
@@ -22,7 +22,7 @@ Neutral by rule (no green, orange, gold or navy):
 - **Choice controls**: tabs, segments, filter chips, sliders, the watch star, checkboxes, view toggles, the live-game side-panel stat toggles, Autoset Lineup, a Retry button. Selected is a brighter neutral, never navy, team colour or orange.
 - **Status and information codes**: phase labels, week tiles, invite counts, status labels, Player Development Grid "develops" / "adds" markers. Muted text, not colour.
 - **W/L plates**: WIN is a white plate, LOSS is an outline, everywhere, tables included (Rankings "Last Week", Team › Schedule). The result carries the meaning, not a colour.
-- **▼ deltas** everywhere: neutral (`--delta-down` is `--text-87`). Never red.
+- **▼ deltas** everywhere: neutral (`--delta-down` is `--text-87`). Never red. The one exception is the Training Report's movement marks, a data scale of their own (see [Data scales](#data-scales)).
 - **▲ deltas** on result and weekly surfaces: ▲ at `--text-100`, ▼ at `--text-60`. On data chips (Office "Moved most", box-score attribute chips, Player › attribute changes, the Office recruiting wire) ▲ is green as positive data (`--delta-up`).
 - **The rail count badge**: a white plate (`--badge`) with dark ink (`--badge-ink`); the urgent pulse stays.
 - **Blocking to-dos**: the Office blocking step and its "Blocks Advance" tag are a neutral strong outline (`--white-62`) and an outlined tag; the words carry the meaning.
@@ -35,6 +35,7 @@ Neutral by rule (no green, orange, gold or navy):
 
 - The rating ramps and the other ramps in [Data scales](#data-scales), including the shot-share ramp.
 - **Position colours** (`--pos-pg`, `--pos-sg`, `--pos-sf`, `--pos-pf`, `--pos-c`): the position label in the sim broadcast. Game presentation only. Everywhere else a position is a neutral information code.
+- **Coaching style marks** (`--coach-authoritarian`, `--coach-systems`, `--coach-maximizer`, `--coach-culture`): which of the four coaching styles a Coaching Focus card belongs to. See [Data scales](#data-scales).
 - **Live-court game-state colours**: Playcall Center state, the reveal HUD, the lower-third and secondary ribbons, the active-player HUD, momentum bars, the scoreboard quarter, shot clock and timeout pips, and the sim broadcast palette. They are game presentation and are not recoloured. The list and the build rules are in UX_System, "Live-game screen chrome".
 
 **Annotation.** In a new-design file, a legal green, orange or gold that the checker's selector allow-list does not already cover needs `/* colour-law: positive-data */`, `/* colour-law: committed */`, `/* colour-law: saved */` or `/* colour-law: reward */` on the same line or one of the two lines above. `saved` and `committed` mean the same. The annotation records an exception the table already allows; it never licenses a banned use. Legacy files are reported, not failed; the new-design surface is listed in UX_System §8. The legacy court chrome also carries `/* colour-law: game-state */` and `/* colour-law: team-identity */`. Those two document an exemption for readers; the checker does not read them.
@@ -68,9 +69,34 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 - Chemistry: 0–8 `--tier-red`, 9–16 `--tier-yellow`, 17–25 `--tier-green`. Track stays neutral.
 - Energy / readiness: high `--green` (annotated), then `--yellow`, then an amber `color-mix()`, then `--red`. Never raw `--orange`.
 - Team measures (−20…+20): the diverging pill `.dv`, neutral white fills, zero in the centre. Place bars are neutral white, not navy.
-- Shot share (Expected Shot Distribution, shot weights; `getPswColor()` in `common.js`): four bands by share of shots. Above 35% blue, 21–35% green, 11–20% gold, 10% and below red. A self-contained data ramp, and the one place blue is not RT. Its values live in the helper, not in tokens. The playbook CMD bands (`css/playbook-cmd.css`: blue, green, yellow) were kept by the same ruling.
+- Shot share (Shot Distribution, shot weights; `getPswColor()` in `common.js`): four bands by share of shots. Above 35% blue, 21–35% green, 11–20% gold, 10% and below red. A self-contained data ramp, and the one place blue is not RT. Its values live in the helper, not in tokens. The playbook CMD bands (`css/playbook-cmd.css`: blue, green, yellow) were kept by the same ruling.
 - Deltas: `--delta-up` (green) marks ▲ on data chips; `--delta-down` is neutral (`--text-87`), so ▼ is never red; `--delta-flat` is `--text-60`.
 - Attitude (Office Team snapshot, buckets 0–19 … 80+): red, muted red, neutral, green-mix, green. No orange stop.
+
+**Coaching style marks** (data: which coaching style). Weekly training page, Coaching Focus.
+
+| Style | Token | Value |
+|---|---|---|
+| Authoritarian | `--coach-authoritarian` | `--red` |
+| Systems Coach | `--coach-systems` | `--yellow` |
+| Player Maximizer | `--coach-maximizer` | `--green` |
+| Culture Builder | `--coach-culture` | `--purple` (new; no other use) |
+
+- The mark is small: a 16–18px icon and a 2px left edge on an otherwise neutral card (`--white-2` fill, `--line` border).
+- Never a fill, a wash, a button, a tab or a selected state. The chosen option inside a card is a neutral choice control.
+- Not a rating: the green here does not mean "good" and the red does not mean "bad".
+
+**Training movement marks** (Training Report: Team Report, Player Report, Playbook Summary). One function decides the count and the tone: `describeTrainingChange()` in `training-report.js`. `n` is the raw change.
+
+| Week | One | Two | Three |
+|---|---|---|---|
+| Training Camp (week 1) | 0 < \|n\| < 2 | 2 ≤ \|n\| ≤ 5 | \|n\| > 5 |
+| In season, up | −0.5 ≤ n < 1 | 1 ≤ n < 3 | n ≥ 3 |
+| In season, down | −1.5 < n < −0.5 | −2.5 < n ≤ −1.5 | n ≤ −2.5 |
+
+- Camp: exactly 0 is a dash. In season there is no dash: 0 and dips to −0.5 read as one up (holding).
+- Tone: one up neutral (`--text-87`), two up green (`--delta-up`), three up blue (`--blue`), down red (`--tier-red`). In season a single down is neutral too.
+- Glyphs: ▲ / ▼ on their own; `+` / `−` when the mark sits beside an attribute value (Player Report, Attributes).
 
 **Display text.** Class year is always a two-letter uppercase abbreviation (`FR`, `SO`, `JR`, `SR`, `GR`, `JH`; unknown `--`) via `playerYear.js` / `BackEnd/utils/player_year.py`. Team names show exactly as stored in `teams.name`: no title-casing, no hyphen stripping, no exception map. Team measures use one vocabulary of eleven measures; Momentum is never shown on Team Attributes, the Training Report Team Report or Office "Moved most". `pt_efficiency` is P/T Defense and `pt_opp_modifier` is P/T Offense everywhere.
 
@@ -261,6 +287,18 @@ Jamie's ruling on the annotated-orange list (old Open question 2, `reports/jamie
 | On-your-board marks (`.pool tbody tr.rec.on-board`, `.pool-rankbadge`, `.citem`) and the My Orders mark (`.hub-anchor--orders .ic`) | Navy: they are "yours". | [Colour law](#colour-law), Navy row |
 | Signing just-committed flash and summary (`.prow.flash`, `.ssum-lr`, `.ssum-nm b`) | Kept orange: the just-committed moment. | [Colour law](#colour-law), Orange row |
 | `.gob-btn--action` as a CONTINUE (username modal, Game Plan tutorial PLAY NOW) | Neutral plate (`.gob-btn--neutral`). `.gob-btn--action` stays orange only on a real save / commit (Assign Practice Squad). | [Buttons](#buttons) |
+
+## Settled 2026-10-02
+
+Jamie's walk-through feedback. Built on `polish/training-playbooks` (`reports/training-playbooks-2026-10-02.md`).
+
+| Ruling | Settled as | Lives in |
+|---|---|---|
+| Coaching styles have an identity | Red, yellow, green, purple as a small mark (icon + thin edge) on a neutral card. `--purple` is new. | [Data scales](#data-scales), Coaching style marks |
+| Training Report marks carry colour | One up neutral, two up green, three up blue, down red; in season one down is neutral. The only place a ▼ is red and the second place blue is not RT. | [Colour law](#colour-law), Blue and Red rows; [Data scales](#data-scales) |
+| Player Report, Attributes | Pluses and minuses instead of arrows, same tones. | [Data scales](#data-scales), Training movement marks |
+| "Expected Shot Distribution" | Renamed "Shot Distribution". | [Data scales](#data-scales), Other ramps |
+| Training page label | "P/T" reads "Press/Traps" on the weekly training page. Team measures keep "P/T Defense" / "P/T Offense". | [Data scales](#data-scales), Display text |
 
 ## Open questions
 

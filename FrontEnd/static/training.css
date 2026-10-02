@@ -543,178 +543,6 @@ body.training-page input[type="reset"] {
   accent-color: var(--color-culture-builder);
 }
 
-/* Player Maximizer — Auto-Train leaf radios (off-screen, same group as Choose Attributes) */
-.training-coaching-focus-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* Player Maximizer modal — mode row */
-.pm-modal-mode-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1.25rem;
-  margin-bottom: 0.25rem;
-}
-
-.pm-modal-mode-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.9rem;
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.pm-modal-mode-option input[type='radio'] {
-  accent-color: var(--color-player-maximizer);
-}
-
-.pm-modal-custom-hint {
-  font-size: 0.88rem;
-  color: var(--color-text-muted);
-  margin: 0 0 0.35rem;
-  line-height: 1.4;
-}
-
-/* Player Maximizer — Custom attributes modal */
-.custom-focus-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.72);
-  padding: var(--spacing-sm);
-}
-
-.custom-focus-modal-content {
-  background: var(--surface-2);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius);
-  max-width: min(96vw, 1200px);
-  max-height: min(92vh, 900px);
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  box-shadow: 0 12px 40px var(--black-45);
-}
-
-.custom-focus-modal-title {
-  font-size: 1.25rem;
-  color: var(--color-accent);
-}
-
-.custom-focus-modal-hint {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  line-height: 1.45;
-}
-
-.custom-focus-table-wrap {
-  overflow: auto;
-  flex: 1;
-  min-height: 0;
-  border: 1px solid color-mix(in srgb, var(--text-100) 15%, transparent);
-  border-radius: var(--radius-sm);
-}
-
-.custom-focus-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.75rem;
-}
-
-.custom-focus-table th,
-.custom-focus-table td {
-  padding: 0.35rem 0.45rem;
-  text-align: center;
-  border-bottom: 1px solid var(--white-7);
-}
-
-.custom-focus-table th:first-child,
-.custom-focus-table td.player-cell {
-  text-align: left;
-  position: sticky;
-  left: 0;
-  background: var(--surface-3);
-  z-index: 1;
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
-}
-
-.custom-focus-table thead th {
-  background: var(--surface-3);
-  color: var(--color-accent);
-  font-weight: var(--fw-bold);
-}
-
-.custom-focus-cell {
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s, color 0.15s;
-}
-
-.custom-focus-cell.is-readonly {
-  cursor: default;
-}
-
-.custom-focus-cell.is-readonly:hover {
-  background: transparent;
-}
-
-.custom-focus-cell:hover {
-  background: color-mix(in srgb, var(--text-60) 18%, transparent);
-}
-
-.custom-focus-cell.selected {
-  background: color-mix(in srgb, var(--text-60) 45%, transparent);
-  color: var(--text-100);
-  font-weight: 800;
-}
-
-.custom-focus-modal-actions {
-  display: flex;
-  gap: var(--spacing-sm);
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
-
-.custom-focus-assign-btn {
-  padding: 0.5rem 1.25rem;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: var(--color-player-maximizer);
-  color: var(--text-100);
-  font-weight: var(--fw-bold);
-  cursor: pointer;
-}
-
-.custom-focus-assign-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.custom-focus-cancel-btn {
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text);
-  cursor: pointer;
-}
-
 body.training-page {
   margin: 0;
   min-height: 100vh;
@@ -855,8 +683,7 @@ body.training-page .header-actions {
 
 body.training-page .auto-train-button,
 body.training-page .submit-button,
-body.training-page .recruiting-invites-button,
-body.training-page .custom-focus-assign-btn {
+body.training-page .recruiting-invites-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -881,10 +708,6 @@ body.training-page .submit-button.advance {
   background: var(--green);
   color: var(--bg);
 }
-body.training-page .custom-focus-assign-btn { /* colour-law: committed */
-  background: var(--orange);
-  color: var(--badge-ink);
-}
 
 body.training-page .auto-train-button:hover:not(:disabled),
 body.training-page .recruiting-invites-button:hover:not(:disabled) {
@@ -893,9 +716,6 @@ body.training-page .recruiting-invites-button:hover:not(:disabled) {
 }
 
 body.training-page .submit-button.advance:hover:not(:disabled) {
-  filter: brightness(1.04);
-}
-body.training-page .custom-focus-assign-btn:hover:not(:disabled) { /* colour-law: committed */
   filter: brightness(1.04);
 }
 
@@ -1404,53 +1224,6 @@ body.training-page .archetype-block[data-archetype="culture-builder"] .archetype
   border-color: rgba(123, 94, 167, 0.94);
 }
 
-body.training-page .custom-focus-modal-content {
-  background: rgba(28, 33, 43, 0.97);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-14);
-}
-
-body.training-page .custom-focus-modal-title {
-  font-family: var(--font-display);
-  font-size: var(--fs-28);
-  letter-spacing: var(--tracking-3);
-  color: var(--text-100);
-}
-
-body.training-page .custom-focus-table-wrap {
-  border: 1px solid var(--white-12);
-}
-
-body.training-page .custom-focus-table {
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-body.training-page .custom-focus-table thead th {
-  color: var(--white-62);
-  background: linear-gradient(180deg, var(--white-6), var(--white-1p2));
-}
-
-body.training-page .custom-focus-table th,
-body.training-page .custom-focus-table td {
-  border-bottom: 1px solid var(--white-7);
-}
-
-body.training-page .custom-focus-table th:first-child,
-body.training-page .custom-focus-table td.player-cell {
-  background: rgba(24, 29, 41, 0.96);
-  color: var(--text-100);
-}
-
-body.training-page .custom-focus-cancel-btn {
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-10);
-  border: 1px solid var(--white-20);
-  background: transparent;
-  color: var(--text-87);
-  cursor: pointer;
-}
-
 /* ============================================================
    Training polish: requirements bar, coaching cards, tooltips
    ============================================================ */
@@ -1623,7 +1396,6 @@ body.training-page .req-focus-nudge:hover {
   background: color-mix(in srgb, var(--text-60) 28%, transparent);
   color: var(--text-100);
 }
-
 
 /* Flash when the nudge scrolls to the coaching section */
 @keyframes coachingFlash {
@@ -2346,6 +2118,9 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
 }
 #training-view .ps-n.z { color: var(--text-38); }
 
+#training-view .playbook-mode-selection h3.drill-title {
+  margin-bottom: var(--dsp-10);
+}
 #training-view .playbook-mode-selection {
   margin-top: var(--dsp-12);
   padding: 0;
@@ -2394,63 +2169,109 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   color: var(--text-60);
   text-align: left;
 }
+/* Coaching Focus: four neutral cards. A style's identity is a small mark, an icon and
+   a thin edge in its --coach-* token. The colour never fills the card and never marks
+   the selected option, which stays a neutral choice control. */
+#training-view .coaching-subtitle {
+  margin-bottom: var(--dsp-12);
+}
 #training-view .archetypes-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: var(--space-10) calc(var(--col-gap) * 2);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dsp-12);
   background: transparent;
 }
-#training-view .archetype-block {
-  display: grid;
-  grid-template-columns: calc(var(--dsz-118) - 6px) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-12);
-  padding: 0;
-  background: transparent;
+#training-view .archetype-block[data-archetype="authoritarian"] { --arch: var(--coach-authoritarian); }
+#training-view .archetype-block[data-archetype="systems-coach"] { --arch: var(--coach-systems); }
+#training-view .archetype-block[data-archetype="player-maximizer"] { --arch: var(--coach-maximizer); }
+#training-view .archetype-block[data-archetype="culture-builder"] { --arch: var(--coach-culture); }
+#training-view .archetype-block,
+#training-view .archetype-block[data-archetype] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  padding: var(--dsp-14) var(--dsp-14) var(--dsp-16);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--arch);
+  border-radius: var(--radius-10);
+  background: var(--white-2);
   box-shadow: none;
-  border: 0;
+  opacity: 1;
+  transition: border-color var(--dur-toggle) var(--ease-out), background-color var(--dur-toggle) var(--ease-out);
 }
-#training-view .archetype-block[data-archetype] { --arch: var(--text-38); }
-#training-view .arch-dot { display: none; }
-#training-view .archetype-header {
+#training-view .archetype-block:has(input:checked) {
+  border-top-color: var(--line-strong);
+  border-right-color: var(--line-strong);
+  border-bottom-color: var(--line-strong);
+  background: var(--white-4);
+}
+#training-view .archetype-header,
+#franchise-container #training-view .archetype-block[data-archetype] .archetype-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
   margin: 0;
   padding: 0;
   background: transparent;
 }
-#training-view .archetype-name {
-  font-size: var(--fs-10);
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--tracking-10);
-  text-transform: uppercase;
-  color: var(--text-38);
+#training-view .arch-mark {
+  display: inline-flex;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--arch);
 }
-#training-view .archetype-block:has(input:checked) .archetype-name { color: var(--text-87); }
+#training-view .arch-mark svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+#training-view .archetype-name {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  text-transform: none;
+  color: var(--text-60);
+  padding-top: var(--space-1);
+}
+#training-view .archetype-block:has(input:checked) .archetype-name { color: var(--text-100); }
 #training-view .archetype-options,
 #franchise-container #training-view .archetype-options {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto auto;
   gap: var(--space-6);
 }
+/* Two to a row; the columns size to their longest label, then share what is left. */
 #training-view .archetype-option,
 #franchise-container #training-view .archetype-option {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   width: auto;
-  flex: 0 0 auto;
-  height: var(--dsz-28);
-  padding: 0 var(--space-10);
+  min-width: 0;
+  height: var(--dsz-30);
+  padding: 0 var(--space-8);
   border-radius: var(--radius-7);
   background: var(--white-4);
   box-shadow: inset 0 0 0 1px var(--line);
   font-size: var(--fs-12);
   font-weight: var(--fw-semibold);
   color: var(--text-60);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+}
+#training-view .archetype-option:hover {
+  background: var(--white-7);
+  color: var(--text-87);
 }
 #training-view .archetype-option:has(input:checked) {
-  background: var(--white-11);
+  background: var(--white-12);
   color: var(--text-100);
-  box-shadow: inset 0 1px 0 var(--white-9), inset 0 0 0 1px var(--white-12);
+  box-shadow: inset 0 1px 0 var(--white-9), inset 0 0 0 1px var(--white-28);
+}
+#training-view .archetype-option:has(input:focus-visible) {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
 }
 #training-view .archetype-option span {
   display: inline;
@@ -2460,13 +2281,10 @@ body.training-page .slider-container .slider:focus-visible ~ .ps {
   font: inherit;
 }
 #training-view .archetype-option span::before { display: none; }
-#training-view .archetype-header {
-  background: transparent;
-}
-#franchise-container #training-view .archetype-block[data-archetype] .archetype-header {
-  background: transparent;
-}
 #training-view .archetype-radio { position: absolute; opacity: 0; width: 0; height: 0; }
+@media (max-width: 1100px) {
+  #training-view .archetypes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 #training-view .player-dev-section {
   margin-top: var(--dsp-24);
@@ -2844,4 +2662,186 @@ html.gob-focus #training-view #submit-btn[hidden],
 html.gob-focus #training-view .training-state-note[hidden],
 html.gob-focus #training-view .training-state-note-link[hidden] {
   display: none;
+}
+
+/* Player Development head: title left, the Training by Position link right, and clear
+   air before the tally strip that follows. */
+#training-view .player-dev-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+#training-view .player-dev-head h2.player-dev-title { margin: 0; }
+#training-view .player-dev-head + .pdg-tally {
+  margin-top: var(--dsp-16);
+}
+
+/* Weekly page: the section sits under Coaching Focus, set off by a rule. */
+#training-view[data-training-sections="weekly"] .player-dev-section {
+  margin-top: var(--dsp-24);
+  padding-top: var(--dsp-20);
+  border-top: 1px solid var(--line);
+}
+#training-view .player-dev-section { grid-column: 1 / -1; }
+#training-view .player-dev-section[hidden] { display: none; }
+
+/* --- Player Maximizer attribute modal ----------------------------------------
+   A viewport layer (.gob-modal-overlay), wide because its content is a table:
+   twelve players by twelve attributes. Titled by the option that opened it. */
+.gob-modal-overlay.custom-focus-modal {
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-24);
+}
+.custom-focus-modal .gob-modal-backdrop {
+  background: var(--scrim);
+}
+.custom-focus-modal .custom-focus-modal-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-16);
+  width: min(1040px, 100%);
+  max-height: 100%;
+  padding: var(--dsp-24);
+  border: 1px solid var(--white-12);
+  border-radius: var(--radius-card);
+  background: var(--surface-popover);
+  box-shadow: var(--shadow-popover);
+}
+.custom-focus-modal .custom-focus-modal-head {
+  display: grid;
+  gap: var(--space-6);
+}
+.custom-focus-modal .custom-focus-modal-eyebrow {
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
+  color: var(--text-60);
+}
+.custom-focus-modal .custom-focus-modal-title {
+  margin: 0;
+  font: var(--fw-bold) var(--fs-32)/var(--lh-9) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-100);
+}
+.custom-focus-modal .custom-focus-modal-hint {
+  margin: 0;
+  font: var(--fw-regular) var(--fs-13)/var(--lh-body) var(--font-body);
+  color: var(--text-60);
+}
+.custom-focus-modal .custom-focus-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-10);
+  background: var(--white-2);
+}
+.custom-focus-modal .custom-focus-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+/* The header is sticky inside the modal's own scroll box and nowhere else: the shell's
+   page-level sticky offset is what used to park it on top of the first player rows. */
+.custom-focus-modal .custom-focus-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: var(--dsz-30);
+  padding: 0 var(--space-8);
+  background: var(--surface-th-bottom);
+  border-bottom: 1px solid var(--line-strong);
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--text-60);
+}
+.custom-focus-modal .custom-focus-table thead th:first-child {
+  width: 200px;
+  padding-left: var(--space-14);
+  text-align: left;
+}
+.custom-focus-modal .custom-focus-table tbody td {
+  position: static;
+  height: var(--dsz-30);
+  padding: 0 var(--space-8);
+  border-bottom: 1px solid var(--line);
+  font: var(--fw-medium) var(--fs-13)/var(--lh-1) var(--font-body);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--text-60);
+  background: transparent;
+}
+.custom-focus-modal .custom-focus-table tbody tr:last-child td { border-bottom: 0; }
+.custom-focus-modal .custom-focus-table tbody td.player-cell {
+  padding-left: var(--space-14);
+  text-align: left;
+  font-weight: var(--fw-semibold);
+  color: var(--text-87);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.custom-focus-modal .custom-focus-cell { user-select: none; }
+.custom-focus-modal .custom-focus-cell:not(.is-readonly) { cursor: pointer; }
+.custom-focus-modal .custom-focus-cell:not(.is-readonly):hover {
+  background: var(--white-6);
+  color: var(--text-100);
+}
+/* The three attributes in focus: a brighter neutral, like any other choice. */
+.custom-focus-modal .custom-focus-table tbody td.custom-focus-cell.selected {
+  background: var(--white-12);
+  box-shadow: inset 0 0 0 1px var(--white-18);
+  font-weight: var(--fw-bold);
+  color: var(--text-100);
+}
+.custom-focus-modal .custom-focus-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-10);
+}
+.custom-focus-modal .custom-focus-assign-btn,
+.custom-focus-modal .custom-focus-cancel-btn {
+  height: var(--dsz-40);
+  min-width: 138px;
+  padding: var(--space-1) var(--space-20) 0;
+  border-radius: var(--radius-10);
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-btn);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), filter var(--dur-hover) var(--ease-out), background-color var(--dur-hover) var(--ease-out);
+}
+/* Assign confirms a choice inside the page; Submit Training is the save. Neutral plate. */
+.custom-focus-modal .custom-focus-assign-btn {
+  border: 1px solid transparent;
+  background: var(--white-90);
+  color: var(--bg);
+}
+.custom-focus-modal .custom-focus-cancel-btn {
+  border: 1px solid var(--white-18);
+  background: var(--white-5);
+  color: var(--text-100);
+}
+.custom-focus-modal .custom-focus-assign-btn:hover:not(:disabled),
+.custom-focus-modal .custom-focus-cancel-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+.custom-focus-modal .custom-focus-assign-btn:active:not(:disabled),
+.custom-focus-modal .custom-focus-cancel-btn:active {
+  transform: translateY(1px);
+}
+.custom-focus-modal .custom-focus-assign-btn:disabled {
+  background: var(--white-6);
+  color: var(--text-38);
+  cursor: not-allowed;
+}
+.custom-focus-modal .custom-focus-assign-btn:focus-visible,
+.custom-focus-modal .custom-focus-cancel-btn:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
 }

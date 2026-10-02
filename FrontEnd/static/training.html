@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="/css/gob-toast.css">
   <link rel="stylesheet" href="/css/development-focus.css">
   <link rel="stylesheet" href="/css/player-development-grid.css">
+  <link rel="stylesheet" href="/css/rt-buckets.css">
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
@@ -179,15 +180,15 @@
             </div>
 
             <div class="drill-group">
-              <h3 class="drill-title">P/T</h3>
+              <h3 class="drill-title">Press/Traps</h3>
               <label class="slider-label">
-                <span class="label-text">P/T Offense Install</span>
+                <span class="label-text">Press/Traps Offense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="press-offense-install" data-category="team-drills">
                 </div>
               </label>
               <label class="slider-label">
-                <span class="label-text">P/T Defense Install</span>
+                <span class="label-text">Press/Traps Defense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="press-defense-install" data-category="team-drills">
                 </div>
@@ -196,13 +197,13 @@
 
           </div>
 
-          <!-- Playbook mode sits under the install rows it governs. -->
+          <!-- Which plays the install points train. Sits under the install rows it governs. -->
           <div class="playbook-mode-selection">
-            <h3 class="drill-title">Playbook training</h3>
+            <h3 class="drill-title">Training Plays</h3>
             <p id="custom-playbook-banner" class="custom-playbook-banner" hidden>
               Custom playbook is configured for this session (CMD gains only on selected plays).
             </p>
-            <div class="playbook-mode-toggle" role="group" aria-label="Playbook training mode">
+            <div class="playbook-mode-toggle" role="group" aria-label="Training plays">
               <button type="button" id="playbook-mode-current-btn" class="playbook-mode-btn is-selected" aria-pressed="true">
                 Current Playbooks
               </button>
@@ -288,7 +289,7 @@
         <!-- Authoritarian -->
         <div class="archetype-block" data-archetype="authoritarian">
           <div class="archetype-header">
-            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="10" r="3.5"/><path d="M6 6.5h8v3H9.4"/><path d="M3.2 3.6l1.1 1.5M6.4 2.6v1.9"/></svg></span>
             <span class="archetype-name">Authoritarian</span>
           </div>
           <div class="archetype-options">
@@ -307,14 +308,14 @@
             <label class="archetype-option">
               <input type="radio" name="coaching-focus" value="authoritarian-teamwork" class="archetype-radio">
               <span>Teamwork</span>
-      </label>
-    </div>
+            </label>
+          </div>
         </div>
 
         <!-- Systems Coach -->
         <div class="archetype-block" data-archetype="systems-coach">
           <div class="archetype-header">
-            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 5l2 2M7 5L5 7"/><circle cx="10.6" cy="10.6" r="1.3"/><path d="M6.2 10.8c1-.2 2.6-1.6 3.4-4"/></svg></span>
             <span class="archetype-name">Systems Coach</span>
           </div>
           <div class="archetype-options">
@@ -332,33 +333,42 @@
             </label>
             <label class="archetype-option">
               <input type="radio" name="coaching-focus" value="systems-coach-press-trap" class="archetype-radio">
-              <span>P/T</span>
-      </label>
-    </div>
-  </div>
+              <span>Press/Traps</span>
+            </label>
+          </div>
+        </div>
 
         <!-- Player Maximizer -->
         <div class="archetype-block" data-archetype="player-maximizer">
           <div class="archetype-header">
-            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5h11"/><path d="M4.5 13.5v-3M8 13.5v-5.5M11.5 13.5V6.5"/><path d="M9.5 4.2l2-2 2 2"/></svg></span>
             <span class="archetype-name">Player Maximizer</span>
           </div>
           <div class="archetype-options">
+            <!-- Each option opens the attribute modal under its own name. -->
             <label class="archetype-option">
-              <input type="radio" name="coaching-focus" value="player-maximizer-choose-attributes" class="archetype-radio">
-              <span>Choose Attributes</span>
+              <input type="radio" name="coaching-focus" value="player-maximizer-top-3" class="archetype-radio">
+              <span>Top 3 Attributes</span>
             </label>
-            <!-- Auto-Train: leaf values not shown in main UI -->
-            <input type="radio" name="coaching-focus" value="player-maximizer-top-3" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
-            <input type="radio" name="coaching-focus" value="player-maximizer-attributes-4-6" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
-            <input type="radio" name="coaching-focus" value="player-maximizer-positional-focus" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-attributes-4-6" class="archetype-radio">
+              <span>Attributes 4&ndash;6</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-positional-focus" class="archetype-radio">
+              <span>Positional Focus</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-custom" class="archetype-radio">
+              <span>Custom</span>
+            </label>
           </div>
-  </div>
+        </div>
 
         <!-- Culture Builder -->
         <div class="archetype-block" data-archetype="culture-builder">
           <div class="archetype-header">
-            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.2" r="2"/><circle cx="3.6" cy="7.2" r="1.4"/><circle cx="12.4" cy="7.2" r="1.4"/><path d="M4.4 13.5c0-2 1.6-3.6 3.6-3.6s3.6 1.6 3.6 3.6"/></svg></span>
             <span class="archetype-name">Culture Builder</span>
           </div>
           <div class="archetype-options">
@@ -384,8 +394,9 @@
     </div>
 
     <!-- Player Development: per-player training position + focus, for the 12 active
-         players. Read and written through the shared Development Focus module, the same
-         one the roster surfaces use, so the six values cannot drift between screens. -->
+         players. On the weekly page it sits under Coaching Focus as four columns of
+         three; in Prep it is the whole tab, as a table. Read and written through the
+         shared Development Focus module, so the six values cannot drift between screens. -->
     <section class="player-dev-section" id="player-dev-section" hidden>
       <p class="training-advance-pointer" id="training-advance-pointer" hidden>Weekly training is set when you advance.</p>
       <div class="player-dev-head">
@@ -406,29 +417,17 @@
   </div>
   </div>
 
-  <!-- Player Maximizer: Choose Attributes modal -->
-  <div id="custom-focus-modal" class="custom-focus-modal" style="display: none;" aria-hidden="true">
-    <div class="custom-focus-modal-content">
-      <h2 class="custom-focus-modal-title">Custom Focus Attributes</h2>
-      <div class="pm-modal-mode-row" role="radiogroup" aria-label="Focus mode">
-        <label class="pm-modal-mode-option">
-          <input type="radio" name="pm-modal-mode" value="top-3" class="archetype-radio">
-          <span>Top 3</span>
-        </label>
-        <label class="pm-modal-mode-option">
-          <input type="radio" name="pm-modal-mode" value="attributes-4-6" class="archetype-radio">
-          <span>Attributes 4–6</span>
-        </label>
-        <label class="pm-modal-mode-option">
-          <input type="radio" name="pm-modal-mode" value="positional" class="archetype-radio">
-          <span>Positional Focus</span>
-        </label>
-        <label class="pm-modal-mode-option">
-          <input type="radio" name="pm-modal-mode" value="custom" class="archetype-radio">
-          <span>Custom</span>
-        </label>
-      </div>
-      <p id="pm-modal-custom-hint" class="pm-modal-custom-hint" hidden>Pick three attributes per player.</p>
+  <!-- Player Maximizer attribute modal. .gob-modal-overlay keeps it a viewport layer:
+       the focus shell adopts every other body child into .main, where a fixed box
+       becomes an in-flow one and opens below the fold. -->
+  <div id="custom-focus-modal" class="gob-modal-overlay custom-focus-modal" aria-hidden="true">
+    <div class="gob-modal-backdrop"></div>
+    <div class="custom-focus-modal-content" role="dialog" aria-modal="true" aria-labelledby="custom-focus-modal-title">
+      <header class="custom-focus-modal-head">
+        <span class="custom-focus-modal-eyebrow">Player Maximizer</span>
+        <h2 class="custom-focus-modal-title" id="custom-focus-modal-title">Top 3 Attributes</h2>
+        <p class="custom-focus-modal-hint" id="custom-focus-modal-hint"></p>
+      </header>
       <div class="custom-focus-table-wrap">
         <table class="custom-focus-table" id="custom-focus-table">
           <thead id="custom-focus-thead"></thead>
@@ -436,8 +435,8 @@
         </table>
       </div>
       <div class="custom-focus-modal-actions">
-        <button type="button" id="custom-focus-assign-btn" class="custom-focus-assign-btn" disabled>Assign Focus Attributes</button>
         <button type="button" id="custom-focus-cancel-btn" class="custom-focus-cancel-btn">Cancel</button>
+        <button type="button" id="custom-focus-assign-btn" class="custom-focus-assign-btn" disabled>Assign Focus Attributes</button>
       </div>
     </div>
   </div>

@@ -50,15 +50,40 @@
   .pdg-grid { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-flow: row; }
 }
 
+/* Cards (weekly training page): four columns of three, filled COLUMN-first, so RT order
+   reads down column one and then across. */
+.pdg-layout-cards .pdg-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(var(--pdg-rows, 3), auto);
+  grid-auto-flow: column;
+  gap: var(--dsp-10) var(--dsp-12);
+}
+@media (max-width: 1100px) {
+  .pdg-layout-cards .pdg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-flow: row; }
+}
+
+/* Name and RT on one line, the two editors on the next. */
 .pdg-card {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--white-10);
+  gap: var(--space-10) var(--space-8);
+  padding: var(--dsp-12) var(--dsp-14);
+  border: 1px solid var(--line);
   border-radius: var(--radius-10);
-  background: var(--white-4);
+  background: var(--white-2);
+}
+.pdg-card .pdg-controls {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-8);
+}
+.pdg-card .devfocus-select,
+.pdg-card .devfocus-select--pos {
+  width: 100%;
+  max-width: none;
 }
 
 /* The name is the hover target, so it gets a focus ring and keyboard access — a card that
@@ -82,8 +107,10 @@
   transition: color .16s ease;
 }
 .pdg-controls { display: inline-flex; gap: 6px; }
-.pdg-card .devfocus-select { max-width: 116px; }
-.pdg-card .devfocus-select--pos { width: 58px; }
+.pdg-card .pdg-rt b {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+}
 .pdg-empty {
   grid-column: 1 / -1;
   padding: 18px;

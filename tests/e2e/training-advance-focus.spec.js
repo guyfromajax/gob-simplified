@@ -368,7 +368,9 @@ test('a) training week Advance → focus → allocate → Submit → Report → 
   await expect(page.locator('#back-btn')).toHaveText('Back to Locker Room');
   await expect(page.locator('#submit-btn')).toHaveText('Submit Training');
   await expect(page.locator('#training-view .ps').first()).toBeVisible({ timeout: 30000 });
-  await expect(page.locator('#player-dev-section')).toBeHidden();
+  // Player Development is back on the weekly page, under Coaching Focus (2026-10-02).
+  await expect(page.locator('#player-dev-section')).toBeVisible();
+  await expect(page.locator('#player-dev-section .pdg-card')).toHaveCount(inSeasonPoints().custom_focus_roster.length);
   const focusLook = await page.evaluate(() => {
     const header = document.querySelector('#training-view .training-header');
     const hs = header ? getComputedStyle(header) : null;

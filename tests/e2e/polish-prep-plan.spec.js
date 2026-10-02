@@ -361,7 +361,10 @@ test.describe('playbooks', () => {
       expect(rank[a.focus]).toBeLessThanOrEqual(rank[b.focus]);
       if (a.focus === b.focus) expect(a.cmd).toBeGreaterThanOrEqual(b.cmd);
     }
-    setPlays.forEach((p) => expect(p.meta.startsWith(p.focus.charAt(0).toUpperCase() + p.focus.slice(1) + ' · ')).toBe(true));
+    // The focus is the sub-section head a play sits under (Inside / Attack / Outside),
+    // so the row's own line names only the target shooter.
+    setPlays.forEach((p) => expect(p.meta.startsWith('Target shooter ')).toBe(true));
+    await expect(view.locator('#set-plays-grid .pb-sub h3')).toHaveText(['Inside', 'Attack', 'Outside']);
 
     const firstSet = view.locator('#set-plays-grid .play').first();
     const lock = firstSet.locator('[data-lock]');
