@@ -9,10 +9,10 @@
  */
 
 /**
- * PRESENTATION-ONLY layout. Four columns of paired measures, then the four that
- * have no pair. Emitted row-major, so a CSS grid of four columns puts each pair in
- * one column: Offense/Defense, the two P/T measures, the two Fast Break
- * measures, Shooting/Rebounding.
+ * PRESENTATION-ONLY layout. Four columns, read down: Shooting, Rebounding, Chemistry;
+ * Offense, Defense, Discipline; Fast Break, Fast Break Defense, Fight; P/T Offense,
+ * P/T Defense. Emitted row-major, so a CSS grid of four columns puts each list in one
+ * column.
  *
  * Deliberately separate from the server's family order, which groups by where a
  * measure comes from rather than by how it reads on the page.
@@ -20,9 +20,9 @@
 /* Eleven measures in a four-column grid, so the bottom row's fourth cell is empty.
    It stays empty: a placeholder there would read as a measure with no reading. */
 var GRID_ROWS = [
-  ['offensive_efficiency', 'pt_opp_modifier', 'fb_efficiency', 'shot_threshold'],
-  ['defensive_efficiency', 'pt_efficiency', 'fb_opp_modifier', 'rebound_modifier'],
-  ['team_chemistry', 'fight', 'discipline']
+  ['shot_threshold', 'offensive_efficiency', 'fb_efficiency', 'pt_opp_modifier'],
+  ['rebound_modifier', 'defensive_efficiency', 'fb_opp_modifier', 'pt_efficiency'],
+  ['team_chemistry', 'discipline', 'fight']
 ];
 
 function showNum(value) {
@@ -78,9 +78,10 @@ export function mount(container, ctx) {
     return n + suffix;
   }
 
+  // The place sits beside the name: "Offense (1st of 128)".
   function placeText(row) {
     if (row.rank == null || row.rank === '' || row.rank_of == null || row.rank_of === '') return '—';
-    return ordinal(row.rank) + ' of ' + row.rank_of;
+    return '(' + ordinal(row.rank) + ' of ' + row.rank_of + ')';
   }
 
   // Neutral, per the Prep v2 decision: the arrow carries the direction and the

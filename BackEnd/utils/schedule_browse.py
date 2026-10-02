@@ -26,6 +26,8 @@ _WEEK_MIN = 1
 _WEEK_MAX = 34
 _REGULAR_MAX = 26
 
+_REGION_R1_WEEK = 30
+
 _TOURNAMENT_LABELS = {
     27: "Conference Tourney - R1",
     28: "Conference Tourney - R2",
@@ -556,6 +558,52 @@ def _eos_games(eos_schedule: dict[Any, Any], directory: dict[str, dict[str, Any]
     return by_week
 
 
+def _region_byes(
+    franchise: dict[str, Any],
+    directory: dict[str, dict[str, Any]],
+    user_id: str,
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Week 30 byes, in region order, and the region letter of every region team.
+
+    A region sends two, three or four teams. A team seeded straight into the region
+    final has no round-1 game: it is in ``final`` and in no ``round1`` matchup. Round-1
+    winners also land in ``final`` once played, so "not in round1" is the test.
+    """
+    byes: list[dict[str, Any]] = []
+    region_of: dict[str, str] = {}
+    tournaments = franchise.get("region_tournaments") or {}
+    if not isinstance(tournaments, dict):
+        return byes, region_of
+    for letter in sorted(str(key) for key in tournaments):
+        bracket = tournaments.get(letter) or {}
+        if not isinstance(bracket, dict):
+            continue
+        playing: set[str] = set()
+        for matchup in bracket.get("round1") or []:
+            if not isinstance(matchup, dict):
+                continue
+            for key in ("away_team", "home_team"):
+                team_id = str(matchup.get(key) or "")
+                if team_id in directory:
+                    playing.add(team_id)
+                    region_of[team_id] = letter
+        for matchup in bracket.get("final") or []:
+            if not isinstance(matchup, dict):
+                continue
+            for key in ("away_team", "home_team"):
+                team_id = str(matchup.get(key) or "")
+                if team_id not in directory or team_id in playing or team_id in region_of:
+                    continue
+                region_of[team_id] = letter
+                byes.append({
+                    "team": _side(team_id, directory),
+                    "region": letter,
+                    "is_user": bool(user_id and user_id == team_id),
+                    "tournament_context": f"Region {letter}",
+                })
+    return byes, region_of
+
+
 def _bundle(franchise_id: str, eos_builder: Callable[..., Any]) -> dict[str, Any]:
     stamp = _light_stamp(franchise_id)
     cached = _BUNDLES.get(str(franchise_id))
@@ -576,7 +624,15 @@ def _bundle(franchise_id: str, eos_builder: Callable[..., Any]) -> dict[str, Any
         sister = user_c - 1 if user_c % 2 == 0 else user_c + 1
     for rows in weeks.values():
         rows.sort(key=lambda game: _sort_key(game, user_c, sister))
+    # Region Tourney R1 reads by region, A to H, with the byes beside the games.
+    byes, region_of = _region_byes(franchise, directory, user_id)
+    region_rows = weeks.get(_REGION_R1_WEEK) or []
+    for game in region_rows:
+        game["region"] = region_of.get(str((game.get("away") or {}).get("team_id") or ""))
+    region_rows.sort(key=lambda game: game.get("region") or "~")
     enabled = {week: bool(weeks.get(week)) for week in range(_WEEK_MIN, _WEEK_MAX + 1)}
+    if byes:
+        enabled[_REGION_R1_WEEK] = True
     current = _as_int(franchise.get("week")) or 1
     if current < _WEEK_MIN:
         current = 1
@@ -588,6 +644,7 @@ def _bundle(franchise_id: str, eos_builder: Callable[..., Any]) -> dict[str, Any
         "user_team_id": user_id,
         "weeks": weeks,
         "enabled": enabled,
+        "byes": {_REGION_R1_WEEK: byes},
     }
     _BUNDLES[str(franchise_id)] = (stamp, bundle)
     return bundle
@@ -603,6 +660,7 @@ def _public_game(game: dict[str, Any]) -> dict[str, Any]:
         "game_id": game.get("game_id"),
         "is_user": bool(game.get("is_user")),
         "tournament_context": game.get("tournament_context"),
+        "region": game.get("region"),
     }
 
 
@@ -629,4 +687,5 @@ def build_schedule_week(
         "user_team_id": bundle["user_team_id"],
         "weeks": catalog,
         "games": [_public_game(game) for game in bundle["weeks"].get(chosen) or []],
+        "byes": list((bundle.get("byes") or {}).get(chosen) or []),
     }

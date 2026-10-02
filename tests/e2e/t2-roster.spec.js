@@ -490,14 +490,15 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
     await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=team-attributes-view');
     await page.waitForSelector('#team-attributes-view .mcell');
     await assertNoMainOverflow(page);
-    // Eleven measures in four columns, in the paired reading order. Momentum is not
-    // one of them, so the bottom row's fourth cell is simply absent.
+    // Eleven measures in four columns, each read down: Shooting, Rebounding, Chemistry;
+    // Offense, Defense, Discipline; Fast Break, Fast Break Defense, Fight; P/T Offense,
+    // P/T Defense. Momentum is not one of them, so the bottom row's fourth cell is absent.
     await expect(page.locator('#team-attributes-view .mcell')).toHaveCount(11);
     const order = await page.locator('#team-attributes-view .mcell .nm').allTextContents();
     expect(order).toEqual([
-      'Offense', 'P/T Offense', 'Fast Break', 'Shooting',
-      'Defense', 'P/T Defense', 'Fast Break Defense', 'Rebounding',
-      'Chemistry', 'Fight', 'Discipline',
+      'Shooting', 'Offense', 'Fast Break', 'P/T Offense',
+      'Rebounding', 'Defense', 'Fast Break Defense', 'P/T Defense',
+      'Chemistry', 'Discipline', 'Fight',
     ]);
     await expect(page.locator('#team-attributes-view')).not.toContainText('Momentum');
     const columns = await page.locator('#team-attributes-view .mgrid').evaluate((grid) => {
@@ -545,11 +546,20 @@ test('the grid, tiles, lineup, and practice squad match the locked rules', async
 
     await expect(chemistry.locator('b')).toContainText('18');
     await expect(chemistry.locator('b')).toContainText('/25');
-    await expect(chemistry.locator('.place')).toHaveText('12th of 128');
+    // The place sits beside the name, in brackets: "Chemistry (12th of 128)".
+    await expect(chemistry.locator('.place')).toHaveText('(12th of 128)');
+    const beside = await chemistry.evaluate((cell) => {
+      const name = cell.querySelector('.nm').getBoundingClientRect();
+      const place = cell.querySelector('.place').getBoundingClientRect();
+      return { gap: place.left - name.right, toEdge: cell.getBoundingClientRect().right - place.right };
+    });
+    expect(beside.gap).toBeGreaterThanOrEqual(0);
+    expect(beside.gap).toBeLessThanOrEqual(12);
+    expect(beside.toEdge).toBeGreaterThan(beside.gap);
     await expect(chemistry.locator('.gob-meter i')).toHaveAttribute('style', /--w:\s*80%/);
-    await expect(fight.locator('.place')).toHaveText('34th of 128');
+    await expect(fight.locator('.place')).toHaveText('(34th of 128)');
     await expect(page.locator('#team-attributes-view')).not.toContainText('T-');
-    await expect(shooting.locator('.place')).toHaveText('8th of 128');
+    await expect(shooting.locator('.place')).toHaveText('(8th of 128)');
     await expect(shooting.locator('b')).toHaveText('');
     await expect(discipline.locator('.place')).toHaveText('—');
     await expect(discipline.locator('.dv')).toHaveClass(/is-empty/);

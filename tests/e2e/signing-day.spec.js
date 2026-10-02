@@ -362,6 +362,29 @@ test.describe('pre-flight warnings', () => {
     expect(txt).not.toContain('1 recruits');
   });
 
+  test('one point over budget reads in the singular', async ({ page }) => {
+    await mount(page, { savedEntries: [{ id: 'r-0', points: 51, playing_time: false }] });
+    // TL_SHOTS=before|after: the rail for reports/tables-league (S7). Before skips the guard.
+    const shots = process.env.TL_SHOTS || '';
+    if (shots) {
+      const out = path.join(__dirname, '../../reports/tables-league');
+      fs.mkdirSync(out, { recursive: true });
+      for (const width of [1280, 1920]) {
+        await page.setViewportSize({ width: width, height: width === 1280 ? 720 : 1080 });
+        await page.locator('#sign-rail').screenshot({ path: path.join(out, shots + '-s07-over-budget-' + width + '.png') });
+      }
+      if (shots === 'before') return;
+    }
+    const txt = await railText(page);
+    expect(txt).toContain('1 point over budget');
+    expect(txt).not.toContain('1 points');
+  });
+
+  test('two points over budget reads in the plural', async ({ page }) => {
+    await mount(page, { savedEntries: [{ id: 'r-0', points: 52, playing_time: false }] });
+    expect(await railText(page)).toContain('2 points over budget');
+  });
+
   test('a clean board says so rather than showing an empty panel', async ({ page }) => {
     await mount(page, {
       capacity: { roster_spots: 0, scholarships: 0, roster_cap: 15, roster_used: 15 },

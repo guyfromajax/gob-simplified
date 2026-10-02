@@ -1,7 +1,8 @@
 /**
- * News › News. Newest first: the top story is full width, then a 2- or 3-column
- * grid. The whole headline is the link. Game results append " (Box Score)" and
- * open the box score. Other rows open the story or the dispatch target.
+ * News › News. Newest first, one section per week. The top story is full width, then
+ * each week is a 2- or 3-column grid under its "Week N" heading. The whole headline is
+ * the link. Game results append " (Box Score)" and open the box score. Other rows open
+ * the story or the dispatch target.
  */
 
 import { renderStoryBody } from '/js/shared/newsStory.js';
@@ -103,9 +104,9 @@ export function mount(container, ctx) {
   function cardHtml(item, hero) {
     var href = cardHref(item);
     var cls = 'gob-news-card' + (hero ? ' is-hero' : '') + (item.yours ? ' is-yours' : '');
+    // The week is the section heading, so the card does not repeat it.
     var inner = '<span class="gob-news-type">' + tables.esc(typeLabel(item.type)) + '</span>'
-      + '<p>' + tables.esc(cardHeadline(item)) + '</p>'
-      + '<span class="gob-news-when">Week ' + tables.esc(item.week) + '</span>';
+      + '<p>' + tables.esc(cardHeadline(item)) + '</p>';
     var story = item.story_id && !isGameResult(item) ? ' data-story="' + tables.esc(item.story_id) + '"' : '';
     if (!href) return '<div class="' + cls + '"' + story + '>' + inner + '</div>';
     return '<a class="' + cls + '"' + story + ' href="' + tables.esc(href) + '">' + inner + '</a>';
@@ -149,13 +150,30 @@ export function mount(container, ctx) {
       container.innerHTML = '<p class="gob-news-empty">No News To Report</p>';
       return;
     }
+    // One section per week, newest first. The feed's first story leads its week.
+    var weeks = [];
+    items.forEach(function (item) {
+      var last = weeks[weeks.length - 1];
+      if (!last || String(last.week) !== String(item.week)) {
+        last = { week: item.week, items: [] };
+        weeks.push(last);
+      }
+      last.items.push(item);
+    });
     var html = '<div class="gob-news">';
-    html += cardHtml(items[0], true);
-    if (items.length > 1) {
-      html += '<div class="gob-news-grid">';
-      items.slice(1).forEach(function (item) { html += cardHtml(item, false); });
-      html += '</div>';
-    }
+    weeks.forEach(function (group, index) {
+      var rest = index === 0 ? group.items.slice(1) : group.items;
+      html += '<section class="gob-news-week" data-week="' + tables.esc(group.week) + '">'
+        + '<h2 class="gob-news-wk">Week ' + tables.esc(group.week)
+        + '<em>' + group.items.length + (group.items.length === 1 ? ' story' : ' stories') + '</em></h2>';
+      if (index === 0) html += cardHtml(group.items[0], true);
+      if (rest.length) {
+        html += '<div class="gob-news-grid">';
+        rest.forEach(function (item) { html += cardHtml(item, false); });
+        html += '</div>';
+      }
+      html += '</section>';
+    });
     html += '</div>';
     container.innerHTML = html;
     bindFeed();

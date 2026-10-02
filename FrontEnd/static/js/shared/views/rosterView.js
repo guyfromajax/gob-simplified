@@ -168,31 +168,57 @@ export function orderLineup(rows) {
   });
 }
 
+/** What a column sorts by. Shared by Team › Roster and the team page. */
+export function rosterSortValue(player, key, userTeam) {
+  if (key === 'name') return displayName(player);
+  if (key === 'rt') return player.rt == null || player.rt === '' ? null : Number(player.rt);
+  if (key === 'pos') return player.position || '';
+  if (key === 'yr') return player.year || '';
+  if (key === 'ht') return player.height == null || player.height === '' ? null : Number(player.height);
+  if (key === 'wt') return player.weight == null || player.weight === '' ? null : Number(player.weight);
+  if (key === 'dev') return devText(player, userTeam);
+  var tiles = window.GOB_AttrTiles;
+  if (!tiles) return null;
+  return tiles.tileValue(player.attributes || {}, key);
+}
+
+/** First click on a text column sorts A to Z; on a number, highest first. */
+export function rosterSortDir(key) {
+  return key === 'name' || key === 'pos' || key === 'yr' || key === 'dev' ? 1 : -1;
+}
+
+/**
+ * The roster grid. `dev: false` leaves the Dev focus column out: it is only stored
+ * for the user's own players, so on another team it would be an empty column.
+ */
 export function rosterTableHtml(tables, rows, options) {
   var opts = options || {};
   if (opts.compact) return compactRosterHtml(tables, rows, opts);
   var sortKey = opts.sortKey || '';
   var lineup = !!opts.lineup;
   var userTeam = !!opts.userTeam;
+  var dev = opts.dev !== false;
+  var span = dev ? 19 : 18;
   var hrefFor = opts.playerHref || function () { return '#'; };
-  var html = '<div class="gob-xs gob-roster' + (opts.compact ? ' is-compact' : '') + '"><table class="gob-tbl"><thead>';
+  // `gob-pairs`: the six attribute pairs share one gutter rule (Styleguide › Tables).
+  var html = '<div class="gob-xs gob-roster gob-pairs"><table class="gob-tbl"><thead>';
   html += '<tr class="gob-groups"><th colspan="6"></th>';
   GROUPS.forEach(function (group) {
     html += '<th class="gob-g' + (group.shade ? ' gshade' : '') + '" colspan="2">' + tables.esc(group.name) + '</th>';
   });
-  html += '<th></th></tr>';
-  html += headerRow(tables, sortKey, opts.sortDir);
+  html += (dev ? '<th></th>' : '') + '</tr>';
+  html += headerRow(tables, sortKey, opts.sortDir, false, dev);
   html += '</thead><tbody>';
   var seenStarter = false;
   var seenBench = false;
   rows.forEach(function (player, index) {
-    if (index > 0 && index % 16 === 0) html += headerRow(tables, sortKey, opts.sortDir, true);
+    if (index > 0 && index % 16 === 0) html += headerRow(tables, sortKey, opts.sortDir, true, dev);
     if (lineup && player.starter && !seenStarter) {
-      html += '<tr class="gob-sep"><td colspan="19">Starters</td></tr>';
+      html += '<tr class="gob-sep"><td colspan="' + span + '">Starters</td></tr>';
       seenStarter = true;
     }
     if (lineup && !player.starter && seenStarter && !seenBench) {
-      html += '<tr class="gob-sep"><td colspan="19">Bench</td></tr>';
+      html += '<tr class="gob-sep"><td colspan="' + span + '">Bench</td></tr>';
       seenBench = true;
     }
     html += '<tr>';
@@ -213,14 +239,16 @@ export function rosterTableHtml(tables, rows, options) {
         html += '<td class="' + cls + '">' + cell + '</td>';
       });
     });
-    var focus = devText(player, userTeam);
-    html += '<td class="dev' + (focus ? '' : ' none') + (sortKey === 'dev' ? ' on' : '') + '">' + tables.esc(focus) + '</td>';
+    if (dev) {
+      var focus = devText(player, userTeam);
+      html += '<td class="dev' + (focus ? '' : ' none') + (sortKey === 'dev' ? ' on' : '') + '">' + tables.esc(focus) + '</td>';
+    }
     html += '</tr>';
   });
   return html + '</tbody></table></div>';
 }
 
-function headerRow(tables, sortKey, sortDir, repeat) {
+function headerRow(tables, sortKey, sortDir, repeat, dev) {
   var html = '<tr' + (repeat ? ' class="gob-rep"' : '') + '>';
   IDENTITY.forEach(function (col) {
     var cls = 's ' + col.cls + (sortKey === col.key ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
@@ -234,11 +262,13 @@ function headerRow(tables, sortKey, sortDir, repeat) {
       html += '<th class="' + cls.trim() + '" data-sort="' + key + '"'
         + ' data-tooltip="' + tables.esc(tip(key)) + '"'
         + ' aria-label="Sort by ' + tables.esc(fullName(key)) + '"'
-        + ' title="' + tables.esc(fullName(key)) + '">' + tables.esc(key) + '</th>';
+        + ' title="' + tables.esc(fullName(key)) + '"><span class="ak">' + tables.esc(key) + '</span></th>';
     });
   });
-  var devOn = sortKey === 'dev';
-  html += '<th class="s dev' + (devOn ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '') + '" data-sort="dev">Dev focus</th>';
+  if (dev !== false) {
+    var devOn = sortKey === 'dev';
+    html += '<th class="s dev' + (devOn ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '') + '" data-sort="dev">Dev focus</th>';
+  }
   return html + '</tr>';
 }
 
@@ -334,16 +364,7 @@ export function mount(container, ctx) {
   }
 
   function readValue(player, key) {
-    if (key === 'name') return displayName(player);
-    if (key === 'rt') return player.rt == null || player.rt === '' ? null : Number(player.rt);
-    if (key === 'pos') return player.position || '';
-    if (key === 'yr') return player.year || '';
-    if (key === 'ht') return player.height == null || player.height === '' ? null : Number(player.height);
-    if (key === 'wt') return player.weight == null || player.weight === '' ? null : Number(player.weight);
-    if (key === 'dev') return devText(player, body && body.is_user_team);
-    var tiles = window.GOB_AttrTiles;
-    if (!tiles) return null;
-    return tiles.tileValue(player.attributes || {}, key);
+    return rosterSortValue(player, key, body && body.is_user_team);
   }
 
   function playerHref(player) {
@@ -384,7 +405,7 @@ export function mount(container, ctx) {
         if (sortKey === key) sortDir = -sortDir;
         else {
           sortKey = key;
-          sortDir = key === 'name' || key === 'pos' || key === 'yr' || key === 'dev' ? 1 : -1;
+          sortDir = rosterSortDir(key);
         }
         render();
       });

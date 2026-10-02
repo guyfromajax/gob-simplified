@@ -167,6 +167,15 @@ Sub-tabs (`.stab` in `.pg-head .subtabs`): parallelogram (`clip-path`), height 4
 
 `.rtab` / `gob-tables.css` inside a contained card (`--white-2`, `--radius-12`). Header: sticky where the table fits `.main`, `--surface-th-top` → `--surface-th-bottom`, micro-label type at `--text-60`, `--line-strong` under it. Rows: `--line` separators only (no boxed cells), even rows `--white-1p2`, hover `--white-5`, your row navy (`tr.me`). Grouped columns `--group-shade`. Player rows are one height whatever the avatar holds: a headshot, a monogram or a headshot that fails late (the avatar link `a.gob-team.gob-player` sits on `vertical-align: middle`, so an image-only avatar cannot lift the line). First (name) column left-aligned and heavier; numbers centred. Linked names are not underlined at rest. A table wider than `.main` scrolls inside its card with an edge fade and no sticky header. Never white zebra stripes, never spreadsheet gridlines.
 
+**Column grouping.** Columns that belong together sit together; the gap between groups is always larger than the gap inside one. Row zebra and group shade (`--group-shade`) stay.
+
+| Rule | Applies to | How |
+|---|---|---|
+| Attribute pairs | Every table that shows the 12 core attributes: Team › Roster, a team page, a news story roster, the Scouting Report starting five | Six pairs, in this order: SC SH, ID OD, PS BH, RB ST, AG ND, IQ FT. The two values of a pair sit against their shared edge (`--pair-in`); pairs are a gutter apart (`--pair-out`); the gap between WT and SC is wider still (`--pair-lead`). Wrapper `.gob-pairs`, cells `gstart` / `gend` (`gs` / `ge` in Scouting). |
+| Stat families | Stats tables: Player Stats, Team Stats, Standings, Rankings | Columns of one family sit `--fam-in` apart, families `--fam-out` apart. Wrapper `.gob-fam`, `fs` on a family's first column and `fe` on its last. Families: shooting splits (FGM FGA FG%), 3PT, free throws, rebounds, playmaking, defense; on a standings table (Team W L), (PF PA), then each of Streak, Last Week, Next on its own. |
+
+Pair and family columns never take a card's spare width (`width: 1px`); the name column and the gutters do. So a pair or a family reads the same at 1280 and at 1920. No table builds its own grouping.
+
 ### Modals
 
 One modal at a time, toggled with `.is-visible`, above everything at `--z-modal`. Surface `--surface-popover` family, border `--white-12`, `--radius-card`, `--shadow-popover`, scrim `--scrim`. Title in the display face, copy in body `--text-60`.

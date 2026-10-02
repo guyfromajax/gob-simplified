@@ -27,8 +27,7 @@
       { id: 'roster-view', label: 'Roster' },
       { id: 'player-stats-view', label: 'Player Stats' },
       { id: 'team-attributes-view', label: 'Team Attributes' },
-      { id: 'team-schedule-view', label: 'Schedule' },
-      { id: 'practice-squad-view', label: 'Practice Squad' }
+      { id: 'team-schedule-view', label: 'Schedule' }
     ]},
     { id: 'prep', label: 'Prep', title: 'Prep', icon: 'prep', tabs: [
       { id: 'game-plan-view', label: 'Game Plan' },
@@ -44,7 +43,9 @@
       { id: 'leaders-view', label: 'Leaders' },
       { id: 'team-stats-view', label: 'Team Stats' },
       { id: 'league-schedule-view', label: 'Schedule' },
-      { id: 'tournament-view', label: 'Tournament', lock: 'tournament' }
+      { id: 'tournament-view', label: 'Tournament', lock: 'tournament' },
+      // Every region's practice squads: a league, so it lives here, not under Team.
+      { id: 'practice-squad-view', label: 'Practice Squads' }
     ]},
     { id: 'recruiting', label: 'Recruiting', title: 'Recruiting', icon: 'recruiting', go: 'recruiting', tabs: [
       { id: 'pool', label: 'Pool' },
@@ -67,7 +68,7 @@
     'team-attributes-view': 'team',
     'schedule-tab': 'team',
     'team-schedule-view': 'team',
-    'practice-squad-view': 'team',
+    'practice-squad-view': 'league',
     'training-tab': 'prep',
     'training-view': 'prep',
     'game-plan-tab': 'prep',
@@ -108,8 +109,8 @@
     '/recruiting.html': { kind: 'browse', section: 'recruiting', sub: '', file: 'recruiting' },
     '/rankings.html': { kind: 'browse', section: 'league', sub: 'rankings' },
     '/schedule.html': { kind: 'browse', section: 'league', sub: 'schedule' },
-    '/practice-squad-standings.html': { kind: 'browse', section: 'team', sub: 'practice-squad-view' },
-    '/practice-squad-bracket.html': { kind: 'browse', section: 'team', sub: 'practice-squad-view', keepBack: true },
+    '/practice-squad-standings.html': { kind: 'browse', section: 'league', sub: 'practice-squad-view' },
+    '/practice-squad-bracket.html': { kind: 'browse', section: 'league', sub: 'practice-squad-view', keepBack: true },
     '/brackets.html': { kind: 'browse', section: 'league', sub: 'tournament-view', keepBack: true },
     '/awards.html': { kind: 'browse', section: 'news', sub: 'awards-view' },
     '/news.html': { kind: 'browse', section: 'news', sub: 'news-view' },
