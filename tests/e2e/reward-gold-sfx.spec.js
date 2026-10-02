@@ -145,10 +145,36 @@ test.describe('reward-gold sfx hooks', () => {
         winner_seed: 1,
         winner_record: { wins: 28, losses: 4 },
         winner_primary_color: '#224488',
+        user_is_winner: true,
       }, {});
     });
     await page.waitForFunction(() => (window.__sfxPlays || []).some((src) => String(src).indexOf('sting-season-peak.wav') !== -1));
     const srcs = await page.evaluate(() => window.__sfxPlays.slice());
     expect(playsOf(srcs, 'sting-season-peak.wav')).toHaveLength(1);
+  });
+
+  test('another team\'s championship moment plays no sting', async ({ page }) => {
+    await installFakeAudio(page);
+    await stubAuth(page);
+    await page.goto('/mode-select.html');
+    await importBus(page);
+    await page.addScriptTag({ path: MOMENTS });
+    await page.evaluate(() => { window.__sfxPlays = []; });
+    await page.evaluate(() => {
+      window.ChampionshipMoments.showMoment({
+        type: 'conference_championship',
+        season: 2,
+        conference: 'East',
+        winner_team_name: 'Four Corners',
+        loser_team_name: 'Lancaster',
+        score: { winner: 70, loser: 61 },
+        winner_primary_color: '#224488',
+        user_is_winner: false,
+      }, {});
+    });
+    await expect(page.locator('.cm-overlay.is-visible')).toBeVisible();
+    await page.waitForTimeout(1200);
+    const srcs = await page.evaluate(() => window.__sfxPlays.slice());
+    expect(playsOf(srcs, 'sting-season-peak.wav')).toHaveLength(0);
   });
 });

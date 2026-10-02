@@ -341,6 +341,15 @@
     }
   }
 
+  // The hub decides its row from the week (tabs, the invite stack, or none).
+  // Until its data lands the row is not painted at all, so the default
+  // Pool / Leans / Visits row never shows for a beat before the real hub.
+  function recruitingHubReady() {
+    var hub = window.RecruitingHub;
+    if (!hub || typeof hub.rowVisible !== 'function') return false;
+    return typeof hub.ready === 'function' ? !!hub.ready() : true;
+  }
+
   function setRecruitingTabs(visible) {
     if (!pageMode || pageMode.file !== 'recruiting' || !subtabHost) return;
     recruitingRowOff = !visible;
@@ -974,7 +983,7 @@
     });
     if (titleEl) titleEl.textContent = section.title;
     paintedSection = '';
-    if (pageMode.file === 'recruiting' && window.RecruitingHub && typeof window.RecruitingHub.rowVisible === 'function' && window.RecruitingHub.rowVisible() === false) {
+    if (pageMode.file === 'recruiting' && (!recruitingHubReady() || window.RecruitingHub.rowVisible() === false)) {
       setRecruitingTabs(false);
       paintedSection = section.id;
       return;

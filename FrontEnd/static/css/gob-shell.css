@@ -460,7 +460,10 @@ html.gob-shell.gob-focus #gob-focus-settings svg {
 }
 
 html.gob-shell.gob-pending .rail,
-html.gob-shell.gob-pending .adv-wrap {
+html.gob-shell.gob-pending .adv-wrap,
+html.gob-shell.gob-pending .top-id,
+html.gob-shell.gob-pending .top-div,
+html.gob-shell.gob-pending .top-stats {
   visibility: hidden;
 }
 

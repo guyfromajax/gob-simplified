@@ -257,8 +257,16 @@
     return AA_LABEL[kind] || '';
   }
 
+  // The server names the sting. A row that says "no sting" (another team's title)
+  // stays silent; only a caller with no queue row at all gets the default.
+  function stingName(item) {
+    if (item && Object.prototype.hasOwnProperty.call(item, 'sting')) return item.sting || '';
+    return 'STING_SEASON_PEAK';
+  }
+
   function playSting(item) {
-    var name = (item && item.sting) || 'STING_SEASON_PEAK';
+    var name = stingName(item);
+    if (!name) return;
     try { (global.__gobSeasonPeakSfx || (global.__gobSeasonPeakSfx = [])).push(name); } catch (e) { /* tests */ }
     import('/js/shared/uiSfx.js').then(function (m) {
       if (m && m.playSfx) m.playSfx(name);
@@ -339,6 +347,10 @@
       unbindKeys();
       closeResolver = resolve;
       var featured = featuredMoment(moments);
+      // Someone else's title is an announcement, not the coach's reward:
+      // no confetti, no sting, and nothing goes in the Trophy Case.
+      var userWon = moments.some(function (m) { return !!(m && m.user_is_winner); });
+      var quiet = !userWon || !!(opts.item && opts.item.style === 'quiet');
       var spec = specForType(featured.type) || TITLE_TYPES[0];
       var score = scoreParts(featured);
       var team = featured.winner_team_name || '';
@@ -364,16 +376,16 @@
           + (present(score.loseName) ? esc(score.loseName) + ' ' : '')
           + '<b>' + esc(score.lose) + '</b></span></div>';
       }
-      var html = '<section class="pk is-open' + (reducedMotion() ? ' rm pk-in' : '') + '" role="dialog" aria-modal="true" aria-labelledby="pk-t">'
+      var html = '<section class="pk is-open' + (quiet ? ' is-quiet' : '') + (reducedMotion() ? ' rm pk-in' : '') + '" role="dialog" aria-modal="true" aria-labelledby="pk-t">'
         + (art ? '<img class="pk-art" src="' + esc(art) + '" alt="">' : '')
-        + confettiHtml()
+        + (quiet ? '' : confettiHtml())
         + (eyebrow.length ? '<div class="pk-k">' + esc(eyebrow.join(' · ')) + '</div>' : '')
         + '<h1 class="pk-t" id="pk-t">' + esc(spec.headline) + '</h1>'
         + '<div class="pk-rule"></div>'
         + (present(team) ? '<div class="pk-team" style="--i:0">' + esc(team) + '</div>' : '')
         + scoreHtml
         + medHtml(meds)
-        + '<div class="pk-f"><p>Added to your <em>Trophy Case</em>.' + nextHint + '</p>'
+        + '<div class="pk-f"><p>' + (quiet ? '' : 'Added to your <em>Trophy Case</em>.') + nextHint + '</p>'
         + mqHtml(index, total)
         + (box ? '<a class="lnk" href="' + esc(box) + '" data-sfx="SFX_SELECT">Box score</a>' : '')
         + '<button type="button" class="btn-ghost lg pk-go" data-sfx="SFX_SELECT">Continue</button></div></section>';
@@ -386,7 +398,8 @@
           if (pk) pk.classList.add('pk-in');
         });
       }
-      scheduleSting(opts.item);
+      if (quiet) clearSting();
+      else scheduleSting(opts.item);
       bindContinue('.pk-go');
       var go = host.querySelector('.pk-go');
       if (go) go.focus();
