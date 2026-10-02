@@ -41,6 +41,18 @@
     settled.then(function () { fn(); }, function () { fn(); });
   }
 
+  // The command-center payload carries no franchise_id and the page's own
+  // `franchiseId` is a script-scoped binding, not a window property. Without the
+  // context read every consume / seen write was skipped and the moment replayed
+  // on each Office visit.
+  function franchiseIdOf(topData) {
+    var fid = (topData && topData.franchise_id) || global.franchiseId || '';
+    if (!fid && global.FranchiseContext) {
+      try { fid = global.FranchiseContext.franchiseId || ''; } catch (e) { fid = ''; }
+    }
+    return fid ? String(fid) : '';
+  }
+
   function payload(topData, moment) {
     var ref = moment && moment.payload_ref;
     if (!ref || !topData) return null;
@@ -109,7 +121,7 @@
     var listAll = ctx.list || [];
     var next = listAll[(ctx.queue && ctx.queue.index) || 1];
     return global.ChampionshipMoments.processPendingMoments(
-      (topData && topData.franchise_id) || global.franchiseId,
+      franchiseIdOf(topData),
       list,
       {
         boxScoreUrlBuilder: ctx.boxScoreUrlBuilder,
@@ -136,7 +148,7 @@
     }
     var data = payload(topData, moment);
     if (!data || data.eligible === false) return Promise.resolve();
-    var fid = (topData && topData.franchise_id) || global.franchiseId || '';
+    var fid = franchiseIdOf(topData);
     var champs = championshipsFromVisit(topData, ctx.list);
     var color = '';
     champs.forEach(function (m) {
@@ -199,7 +211,7 @@
     var list = ctx.list || [];
     var index = queue.index || 1;
     var next = list[index];
-    var fid = (topData && topData.franchise_id) || global.franchiseId || '';
+    var fid = franchiseIdOf(topData);
     var seen = markMilestoneSeen(moment.kind, fid, data);
     return global.MilestoneModal.show({
       item: moment,

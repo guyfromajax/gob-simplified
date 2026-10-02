@@ -38,7 +38,7 @@ def _queue(**kwargs):
 def _all_kinds(**overrides):
     """Every kind eligible at once, so order and tier are checked together."""
     kwargs = dict(
-        championship_moments=[{"id": "c1"}],
+        championship_moments=[{"id": "c1", "user_is_winner": True}],
         season_review={"eligible": True, "season": 3},
         elimination={"eligible": True, "round_name": "Region Tourney Championship"},
         bracket_reveal_modal=_eligible(reveal_key="region:3"),
@@ -129,6 +129,21 @@ def test_style_and_sting_are_server_decided():
     assert (rows["elimination"]["style"], rows["elimination"]["sting"]) == ("quiet", None)
     for kind in ("bracket_update", "recruit_visit", "archetype_evolution"):
         assert (rows[kind]["style"], rows[kind]["sting"]) == (None, None)
+
+
+def test_another_teams_title_is_quiet_and_silent():
+    """A title the coach's team did not win is news: no gold celebration, no sting."""
+    def champ(*moments):
+        rows = collect_moments(championship_moments=list(moments))
+        return [(r["style"], r["sting"]) for r in rows if r["kind"] == "championship"]
+
+    assert champ({"id": "c1", "user_is_winner": False}) == [("quiet", None)]
+    assert champ({"id": "c1"}) == [("quiet", None)]
+    assert champ({"id": "c1", "user_is_winner": True}) == [("gold", STING_SEASON_PEAK)]
+    # One of the coach's own titles in the visit keeps the celebration.
+    assert champ({"id": "c1", "user_is_winner": False}, {"id": "c2", "user_is_winner": True}) == [
+        ("gold", STING_SEASON_PEAK)
+    ]
 
 
 # --- 4. cap ------------------------------------------------------------------------------------

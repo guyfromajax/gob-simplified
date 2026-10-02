@@ -2622,6 +2622,9 @@
   window.RecruitingHub = {
     show: showHub,
     current: function () { return hubReady ? hubView : ''; },
+    // False until the week is known. The shell paints no Pool / Leans / Visits
+    // row before that: most weeks have a different row, or none.
+    ready: function () { return hubReady; },
     week: function () { return state.week || 0; },
     rowVisible: function () {
       if (!hubReady) return true;

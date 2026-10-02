@@ -356,6 +356,10 @@ tr.region-row td{padding:0;border:0}
    ASSEMBLED SPINE
    ============================================================ */
 .spine{margin-top:22px;border:1px solid var(--border);border-radius:var(--radius-card);background:var(--bg);overflow:hidden}
+/* First paint, before the hub knows its week: still blocks in the hub's shape. No controls, no spinner. */
+.hub-skel{display:grid;gap:var(--dsp-12);padding-top:var(--space-8)}
+.hub-skel i{display:block;height:62px;border-radius:var(--radius-card);background:var(--white-4)}
+.hub-skel i.tall{height:216px}
 .spine-topbar{display:flex;align-items:center;gap:14px;padding:16px 20px 0}
 .spine-h{font:var(--fw-regular) var(--fs-24)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-3)}
 .spine-h b{color:var(--text-100);font-weight:var(--fw-regular)}
