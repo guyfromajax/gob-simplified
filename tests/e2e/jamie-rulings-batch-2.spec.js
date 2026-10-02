@@ -202,10 +202,14 @@ test('#1 #3a #3c #3d #4 Office: chips, wire, badge, blocking step, attitude, wee
   const badge = await css(page, '#gob-rail-recruiting em.office-rail-count', ['backgroundColor', 'color']);
   expect(allNeutral(badge.backgroundColor) && parse(badge.backgroundColor).r > 200, `badge white plate: ${badge.backgroundColor}`).toBe(true);
 
+  // The strip is a read-only stepper (2026-10-02): the blocking step has no outline or fill.
+  // It is the current step, so its label is full white; still neutral, never orange.
   const step = await css(page, '.wk-step.gated', ['boxShadow', 'backgroundColor']);
-  expect(allNeutral(step.boxShadow + ' ' + step.backgroundColor), `blocking step neutral: ${JSON.stringify(step)}`).toBe(true);
-  expect(colours(step.boxShadow).some((p) => p.a >= 0.5), `blocking step keeps a strong outline: ${step.boxShadow}`).toBe(true);
-  // The BLOCKS ADVANCE tag is gone (2026-10-02); the outline alone marks the blocking step.
+  expect(step.boxShadow, 'blocking step has no button outline').toBe('none');
+  expect(parse(step.backgroundColor).a, 'blocking step has no button fill').toBe(0);
+  const stepLabel = await css(page, '.wk-step.gated .td-l', ['color']);
+  expect(allNeutral(stepLabel.color) && parse(stepLabel.color).r > 240, `blocking step label white: ${stepLabel.color}`).toBe(true);
+  // The BLOCKS ADVANCE tag is gone (2026-10-02).
   expect(await page.locator('.wk-step.gated .td-gate').count()).toBe(0);
 
   const bars = {};

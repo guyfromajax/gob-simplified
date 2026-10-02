@@ -51,7 +51,7 @@ Jamie approved every recommendation in `reports/jamie-decisions-2-2026-10-01.md`
 | 2 | W/L plates in tables | `.gob-wl` (`gob-tables.css`): WIN white plate (`--white-90` / `--bg`), LOSS `--white-40` outline. Rankings "Last Week" and Team › Schedule. Dead `.wl.win` / `.wl.loss` deleted (`gob-components.css`). |
 | 3a | Rail count badge neutral | `--badge` is `--white-90` (`gob-tokens.css`); `--badge-ink` unchanged (dark). |
 | 3b | `.td-gate` tag, `.is-on` neutral | `.td-gate` and `.todo.gated` (`gob-components.css`); `.hub-anchor--orders.is-on` (`recruiting-signing.css`); `.fg-pick.is-on` (`gob-advanced.css`). |
-| 3c | Office blocking step | `.wk-step.gated`: `--white-62` outline, `--white-6` fill (`office-home.css`). |
+| 3c | Office blocking step | Neutral, never orange. Since the strip became a read-only stepper it has no outline or fill: it is the current step, label bold `--text-100` (`office-home.css`). |
 | 3d | Attitude: no orange stop | `em_20_39` is `color-mix(--red 55%, --white-18)` (`office-home.css`). |
 | 3e | Modal accent neutral by default | `.gob-modal-accent` default `rgba(255,255,255,.14)` in `resource-pages.css` (the `auth-bar.css` `:where()` mirror already was). `is-green` / `is-red` still opt in. |
 | 3f | Tutorial alert neutral | Unchanged (`gob-tutorial.css`); now guarded. |
@@ -374,7 +374,8 @@ The top bar and Advance read `/franchise/command-center/data`. `gobAdvance.js` r
 | `recruiting_wire` | Status line, events (`recruit`, `position`, `stars` and `filmed_grade` always null, `event_type`, `event_text` from the stored lean-event sentence, `event_detail`, `list_position`, `direction`), `pending_count`, `urgent`, `unseen_count`. |
 | `signing_day` | Week 35 only. Points remaining out of 50, playing-time promises, open roster spots, up to three targets. Otherwise null. |
 | `signed_class` | Week 36 only (running Signing Day moves the franchise from 35 to 36), once the hub reveal has played (`week_35_reveal_seen_season`). `{recruits: [...]}` from `class_signed`: every non-walk-on who signed with the user's team; an empty list when none did. Otherwise null. |
-| `season_preview` | `first_week` only. Preseason rank is the current national rank. Conference projection, team RT, returning starters, and top returner are null. Newcomers only when `pending_walk_on_welcome` is stored. Opener is `next_game`. |
+| `season_preview` | `first_week` only (week 1 of every season). Built by `BackEnd/utils/season_preview.py`; see "Office week 1" below. `ready: false` when the preview's own reads failed. |
+| `top_recruits` | Weeks 1-34: `{region, rows}`, the five best-rated recruits from the user's region, each with `lean_team_name` (the recruit's `Lean["1"]`) and `lean_is_user`. Null from week 35 and whenever `signed_class` is set. |
 | `weekly_card_items` | WEEKLY-tier moments from the server moment queue, in order. Every item includes an `href` (the archetype row's is omitted on desktop, where the coaching-archetypes page is not served). The Office paints them with the existing card helper as links. They are not pop-ups. |
 | `also` | The highest-priority weekly item as `{kind, title, line, href}`, or null. The weekly card's one folded-moment row. `weekly_card_items` stays the full list. |
 
@@ -408,7 +409,7 @@ The command-center payload has no `franchise_id`, and the page's own `franchiseI
 
 `recruiting_results_modal` is not queued as itself: the live Signing Day beat stays the week-35 hub reveal, and the Office's one-time summary is `signed_class`, which reuses that modal's `recruiting_results_modal_seen_season` stamp. Elimination and the review add the only new stored fields, `elimination_seen_season` and `season_review_seen_season`, written by `PATCH /franchise/elimination-seen` and `PATCH /franchise/season-review-seen` in the same season-stamped style as the existing modal flags.
 
-The first-archetype reveal is marked seen in two places, one per build. Online the flag is on the account: `PATCH /api/auth/archetype-reveal-seen`. The offline build cannot reach `/api/auth` (always remote; loopback does not serve it), so there the client sends `PATCH /franchise/archetype-reveal-seen` with the `franchise_id`. That writes `archetype_reveal_seen` on the save's `local_coach` doc (the doc `_coach_archetype_signals` reads) and bumps the franchise's `browse_rev`, so the next command-center read is not a 304 of the body that still had the moment. The route refuses a principal that is not the local owner. `archetype_evolution_pending` (the "Coaching archetype" weekly-card row) has the same pair: the account's `PATCH /api/auth/archetype-evolution-seen`, and offline `PATCH /franchise/archetype-evolution-seen`, which removes the key from `local_coach` (removed, not set to `""`: a projected SQLite read of an empty-string field raises) and bumps `browse_rev`. A weekly row never pops, so nothing in the queue marks it: offline, `momentQueue.js` sends the write when the Office is the panel on screen for the authoritative read, so the row shows for one Office visit. Online nothing sends the account write today, so the row stays until the next evolution replaces it.
+The first-archetype reveal is marked seen in two places, one per build. Online the flag is on the account: `PATCH /api/auth/archetype-reveal-seen`. The offline build cannot reach `/api/auth` (always remote; loopback does not serve it), so there the client sends `PATCH /franchise/archetype-reveal-seen` with the `franchise_id`. That writes `archetype_reveal_seen` on the save's `local_coach` doc (the doc `_coach_archetype_signals` reads) and bumps the franchise's `browse_rev`, so the next command-center read is not a 304 of the body that still had the moment. The route refuses a principal that is not the local owner. `archetype_evolution_pending` (the "Coaching archetype" weekly-card row) has the same pair: the account's `PATCH /api/auth/archetype-evolution-seen`, and offline `PATCH /franchise/archetype-evolution-seen`, which removes the key from `local_coach` (removed, not set to `""`: a projected SQLite read of an empty-string field raises) and bumps `browse_rev`. A weekly row never pops, so nothing in the queue marks it: `momentQueue.js` sends the write (the local route offline, the account route online) when the Office is the panel on screen for the authoritative read, so the row shows for one Office visit; a visit that lands on another tab leaves it for the next Office visit. The account route does not move the franchise's `browse_rev`, so online the client also drops its cached Office body (`GOBStore.clearFranchise`), otherwise the next visit would be a 304 of the body that still had the row.
 
 Cut-players (blocking) and tutorial return alerts stay outside the queue. The cut-players modal ("Trim Your Roster to Size") has one action, so it is a full-width ghost (`gob-modal-btn-dismiss`), not green: the green on that screen is the top-bar Advance. Tutorial alerts settle first. The queue plays next. The cut modal waits for both.
 
@@ -470,19 +471,27 @@ The Office fills `.main` edge to edge inside the standard page padding (`--page-
 
 While the digest is absent the page shows a skeleton strip and three skeleton cards. There is no spinner.
 
-A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. It does not repeat the week number. The top bar already shows it. Each `todos[]` entry is one step, in order, joined left to right. Labels use the same copy as before. An `is_advance_action` step that is not done copies the top-bar Advance label and does not add an ADVANCE tag. The only Advance button on the page is the green top-bar control. A gating step that is not the Advance action has a strong neutral outline and no tag (the BLOCKS ADVANCE tag was removed, 2026-10-02). Every step uses the same padding. The status circle sits at least `--dsp-8` in from the left edge of the pill at both densities. Steps size to their labels. If the row is wider than the page, the gap between steps comes down before the labels do. Labels are not truncated. The strip does not scroll and does not wrap to a second row.
+A week strip sits under the top of `.main`, above the columns. It is one row, about 56px tall at the 1280 density and 64px at 1920. It does not repeat the week number. The top bar already shows it. Each `todos[]` entry is one step, in order, joined left to right. An `is_advance_action` step that is not done copies the top-bar Advance label.
+
+**The strip is status, not controls.** The only control that advances the week is the action button in the top bar.
+
+- Markup: an `<ol class="week-track">` of `<li class="wk-step">`. No button, link, `tabindex`, role or handler; the cursor stays default. The current step has `aria-current="step"`; a done step carries a hidden "(done)".
+- Look: a quiet stepper. A small state mark and plain text per step, joined by a thin line. No pill outline, no fill.
+- States: done = a check, dimmed (`--text-38`); current = the mark filled, the label bold `--text-100`; upcoming = dim. A step that blocks the advance is the current step and reads the same (no tag; BLOCKS ADVANCE was removed 2026-10-02). Neutral only: no green, orange or navy.
+- Steps size to their labels. If the row is wider than the page, the gap between steps comes down before the labels do. Labels are not truncated. The strip does not scroll and does not wrap to a second row.
+- A step's `route` is no longer used by the strip (a step used to open its page, and the Advance step used to press the top-bar button).
 
 | Step | Rule |
 |---|---|
-| Done | Check mark, opacity 38%, still clickable. Opens `route`. |
-| Next | The first not-done required step. Neutral bright outline (`--text-100`). Green stays on the top-bar Advance only. If this step is `is_advance_action`, its label copies the top bar and the click runs the same action. |
-| Blocking | `gates_advance` on a step that is not `is_advance_action` draws a neutral strong outline (`--white-62`). No tag. Never orange (batch 2). |
-| Upcoming | The remaining steps. |
+| Done | A check, dimmed (`--text-38`). Not a control. |
+| Next | The first not-done required step: `aria-current="step"`, the mark filled, the label bold `--text-100`. Green stays on the top-bar Advance only. If this step is `is_advance_action`, its label copies the top bar; it does not run the action. |
+| Blocking | `gates_advance` on a step that is not `is_advance_action`. Reads as the current step. No tag, no outline. Never orange (batch 2). |
+| Upcoming | The remaining steps, dim. |
 
 | State | Column 1 · Since last week | Column 2 · This Week | Column 3 · Recruiting |
 |---|---|---|---|
-| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot · Conference standings | Recruiting wire. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
-| `first_week` | Season preview | Next game · Team snapshot · Conference standings | One-line wire. The digest status when it is set, otherwise the empty-state line. The column heading is the hub link. |
+| `win`, `loss`, `regular`, `tournament` | Result · What moved | Next game · Team snapshot · Conference standings | Recruiting wire, then Top Recruits. The column heading is the link to the recruiting hub. No events: "No recruiting movement this week". |
+| `first_week` | **Season Preview**: outlook · Rankings · Key Players · Newcomers · Preseason All-Americans | **Opening Week**: Season Opener · Circle these · Team snapshot · Preseason National Rankings | One-line wire ("No preseason leans") · Walk-ons · Top Recruits. See "Office week 1". |
 | `signing_day` | Result · What moved | Team snapshot · Conference standings (`next_game` is null) | Signing Day card. The wire is hidden. The column heading still links to the hub. |
 | any, with `signed_class` set (week 36) | as that state | as that state | Signing class card (`.office-class`): one row per signed recruit, name, position, home region, RT now → ceiling. It replaces the wire. |
 
@@ -499,9 +508,34 @@ The three columns are equal width. The column gap is `--dsp-12` (12px at the 128
 | Conference standings | `conference_standings.rows` under Team snapshot. Header is `Conference` plus the short label plus `standings` (`Conference A2 standings`), with "Full standings" always in the card header, to League › Standings. **Every team of the user's conference is shown, in the server's standings order (ties included): never sliced to a window, never tightened to fit.** Each row is the place (`--text-38` tabular), the team's mark as the league tables draw it (`GOBTables.markHtml`) and name (`--fs-13` semibold), and W-L in the display face at `--fs-22`, at the same row padding as a players-to-watch row, at every density. The W-L header sits in the same column as the numbers, right-aligned. The user row uses the navy selected-row treatment. The card does not read the density class, so it cannot be caught by a late `.gob-1280` / `.gob-1920`. On a window too short for the middle column the Office is taller than the fold and `.main` scrolls (the Office chain is `flex-shrink: 0`): at 1280×720 by about 200px on a game week, at 1920×1080 by about 75px. |
 | Signing Day | `signing_day.points_remaining`, `points_total`, `promises_made`, `open_roster_spots`, `targets` |
 | Signing class | `signed_class.recruits[]`: `name`, `position`, `home_region`, `rt_now`, `rt_potential`. The header counts them (`4 signed`). An empty list reads "No recruits signed with your program." The ceiling is shown only when it differs from the grade now. |
-| Season preview | `season_preview` fields that are non-null. The opener is the next-game card. |
+| Season preview | See "Office week 1" below. |
 
 Attribute changes are one row per `player_id`. The player name stays on the left and links to the player page. Chips are right-justified: the rightmost chip meets the card's right content edge, and the others sit to its left with a consistent gap. If they do not fit on one line they wrap, still right-aligned, under the name. A chip shows the attribute abbreviation in Bebas at `--fs-22` and `--text-100` (larger than the player name, the largest text in the chip), the new first-digit value in the tier colour from `attributeDisplay.js`, and a green ▲ or red ▼. Chips are not truncated. The previous value is not shown. The chip `title` is the full name from `ATTRIBUTE_NAMES` (`BH` → "Ball Handling"). Players sort by total absolute movement, then name. Inside a row, increases come before decreases. At 1280 the card shows up to 5 players. At 1920 it shows up to 8. When the list is longer, "All changes →" opens `/training-report.html` in focus for `result.week` (or `next_game.week` when there is no result). Rank, conference, and record tiles omit the delta chip when the delta is 0 or null.
+
+### Office week 1: the season preview
+
+Week 1 of **every** season, before the first game, the Office is the season preview. From week 2 it is the normal Office; only Top Recruits carries on.
+
+| Column | Section | Content | Source |
+|---|---|---|---|
+| 01 Season Preview | Outlook (no title) | "Picked 5th of 8 in Conference A1." From season 2: "Last season: 18-8, lost in the Region semifinal." | pick = conference place by preseason national rank; last season = the coach's `season_record` trophy (`furthest_round`, or "won the National championship" with a national title) |
+| | Rankings | Conference "5 of 8", Region "11 of 16", National "100 of 128" | all three from `rankings[].natl_rank` |
+| | Key Players | Top 5 by RT. Columns in the roster's order: Player, RT, Pos, Yr, Ht, Wt. Names open the player page. | one projected roster read (`meta`, `position_ratings`) |
+| | Newcomers | Last season's signing class now on the roster (name, Pos, RT) and one line: "Returning 9 · Lost 3 seniors · 4 newcomers". Left out in season 1 and when no signee is on the roster. | `last_season.signed_class` ids; names from the season review on a save without the snapshot |
+| | Preseason All-Americans | First team: position, player, team, RT. No score, weights or percentages. The user's players are the navy row. | `awards.all_american_projection` (the week-0 projection) |
+| 02 Opening Week | Season Opener | The next-game card, labelled; "Preseason #21 · Conference A2 · Last season: W 71-64". The meeting only when they met. | `next_game_summary`; `last_season.meetings` |
+| | Circle these | The three toughest games by the opponent's national rank, in week order, with week and site. | `schedule` |
+| | Team snapshot | unchanged | |
+| | Preseason National Rankings | The user's conference by national rank, best first, each with its rank. User row navy. "Full rankings" opens League › Rankings. Replaces the standings card in week 1. | `rankings` |
+| 03 Recruiting | Wire | One line. No leans: "No preseason leans". | |
+| | Walk-ons | This season's walk-ons (name, Pos · Yr, RT). None: one quiet line, "No walk-ons". | see below |
+| | Top Recruits | **All season until Signing Day.** The region's five best-rated recruits; second line "Leans <team>" or "No lean yet". A recruit leaning to the user is the navy row. Steps aside from week 35 (the column is then Signing Day, then the signing class). | one projected recruit read per uncached Office load |
+
+- **What a walk-on is.** A franchise player whose `meta.archetype` is the "Walk On" sentinel (`walk_on_portraits.is_walk_on_fpd`). The section lists **this season's**: in season 1 every walk-on was created with the franchise; from season 2 the archetype cannot tell new arrivals from walk-ons who stayed, so the rollover's `pending_walk_on_welcome` list names them.
+- **`last_season`** (franchise doc): one small snapshot written by the season rollover (`season_preview.last_season_snapshot`) because the reset wipes what the preview needs: the user's last meeting with each opponent, how many seniors left, and the signed class's player ids. A save that rolled over before it existed shows no meeting and no "Lost N seniors".
+- **Build rules.** Sections reuse two patterns and add no card style: `.office-list` (the signing-class card: two-line `.wr` rows, grade on the right) and the standings row (`.st-r`, also `.office-tb` for Key Players). "Yours" is the navy selected-row treatment. RT is a letter in the canonical ramp (`rtBucket.js`). No section has more than five rows (the conference table is its eight teams). A section with nothing to say is left out; the whole preview paints from one payload, so nothing is half-built.
+- **CH is hidden**: the preview reads no attributes, and the All-American rows carry no score.
+- The Office scrolls. Past the fold, week 1: column 01 185px (season 1) / 428px (later seasons) and column 02 219px at 1280×720; 124px / 470px and 146px at 1920×1080. Column 03 fits.
 
 Card titles (What moved, Team snapshot, Signing Day, Conference standings) are one type step smaller than the shared card title, `--fs-15`, and stay larger than the body copy under them.
 
@@ -673,7 +707,7 @@ CH is a hidden attribute. **It is never displayed and never sent to the client.*
 |---|---|---|
 | Display | No CH column, chip, label, tooltip or copy on any screen. Attribute lists are the twelve visible attributes (six pairs). | Practice Squad report draws the pair attributes only (`training-squad-report.js` `orderKeys`); the Office drops a CH row (`officeHome.js` `groupAttributes`); no `CH` entry in `attributeTooltips.js`. |
 | Payloads | `CH`, `anchor_CH` and `development.ch_seed` are stripped from every response on the franchise and press-conference routers and from `/player/{id}`. Rows that name it (`{"attribute": "CH"}`) and attribute-key lists drop it too. The strip works on a copy; engine objects are never touched. | `BackEnd/utils/hidden_attrs.py`: `HiddenAttrsJSONResponse` is the router's default response class, so a new franchise route is covered without anyone remembering. |
-| Copy | Generated text names and counts visible attributes only (Practice Squad All-Stars news). | `franchise_routes._build_ps_all_stars_story`; `NEWS_ATTRIBUTE_FULL_NAMES` has no CH. |
+| Copy | Generated text names and counts visible attributes only (Practice Squad All-Stars news). A story stored before CH was hidden is scrubbed as it is served, never rewritten: the name leaves the attribute list ("Shooting and Clutch" → "Shooting"), and a "strongest gains were in Clutch." sentence is dropped. The ordinary word (late-game "clutch") is not touched. | `franchise_routes._build_ps_all_stars_story`; `NEWS_ATTRIBUTE_FULL_NAMES` has no CH; `hidden_attrs.scrub_hidden_attr_copy`, applied to every string by the response class. |
 | Guards | `tests/test_hidden_attrs.py` (the strip, every franchise route's response class, a real franchise's payloads, DB still has it); `tests/e2e/hidden-attr-ch.spec.js` (main screens fed payloads that still carry CH). | |
 
 Routes that still carry CH, pinned in `tests/test_hidden_attrs.py` (a decision for Jamie, not an oversight):

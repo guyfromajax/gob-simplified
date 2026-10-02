@@ -1,0 +1,29 @@
+{
+  "season-1-week-1": {
+    "columns": [
+      185,
+      219,
+      0
+    ],
+    "scroll": 219,
+    "wide": 0
+  },
+  "later-season-week-1": {
+    "columns": [
+      428,
+      219,
+      0
+    ],
+    "scroll": 428,
+    "wide": 0
+  },
+  "week-2": {
+    "columns": [
+      0,
+      196,
+      0
+    ],
+    "scroll": 196,
+    "wide": 0
+  }
+}

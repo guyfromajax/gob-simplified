@@ -159,7 +159,13 @@ html.gob-shell.gob-office .office-grid {
   align-items: center;
   flex: 1 1 auto;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
+/* The week's steps are status, not controls: a quiet stepper. A small state mark and plain
+   text per step, joined by a thin line. No outline, no fill, no pointer. Done steps show a
+   check and dim; the current step is full white; upcoming steps are dim. Neutral only. */
 .gob .wk-step {
   display: flex;
   align-items: center;
@@ -167,66 +173,64 @@ html.gob-shell.gob-office .office-grid {
   flex: 0 1 auto;
   min-width: max-content;
   height: 36px;
-  padding: 0 var(--dsp-8);
-  border-radius: var(--radius-10);
-  background: var(--white-3p5);
-  box-shadow: inset 0 0 0 1px var(--line);
+  padding: 0;
   position: relative;
   white-space: nowrap;
+  cursor: default;
 }
 .gob.gob-1920 .wk-step { height: 40px; }
-.gob .wk-step + .wk-step { margin-left: 12px; }
+.gob .wk-step + .wk-step { margin-left: var(--dsz-44); }
 .gob .wk-step + .wk-step::before {
   content: '';
   position: absolute;
-  left: -12px;
-  width: 12px;
+  left: calc(var(--dsz-44) * -1 + var(--dsp-10));
+  width: calc(var(--dsz-44) - var(--dsp-10) * 2);
   top: 50%;
   height: 1px;
   background: var(--line-strong);
 }
-.gob .week-strip.is-tight .wk-step { padding: 0 var(--dsp-8); gap: var(--dsp-8); }
-.gob .week-strip.is-tight .wk-step + .wk-step { margin-left: 8px; }
-.gob .week-strip.is-tight .wk-step + .wk-step::before { left: -8px; width: 8px; }
-.gob .week-strip.is-tight .td-adv,
-.gob .week-strip.is-tight .td-gate {
-  font-size: 9px;
-  letter-spacing: 0.04em;
-  padding: 2px 4px;
-}
-.gob .week-strip.is-tighter .wk-step { padding: 0 var(--dsp-8); gap: var(--dsp-8); }
-.gob .week-strip.is-tighter .wk-step + .wk-step { margin-left: 6px; }
-.gob .week-strip.is-tighter .wk-step + .wk-step::before { left: -6px; width: 6px; }
+.gob .week-strip.is-tight .wk-step + .wk-step { margin-left: var(--dsz-30); }
+.gob .week-strip.is-tight .wk-step + .wk-step::before { left: calc(var(--dsz-30) * -1 + var(--dsp-8)); width: calc(var(--dsz-30) - var(--dsp-8) * 2); }
+.gob .week-strip.is-tighter .wk-step + .wk-step { margin-left: var(--dsz-20); }
+.gob .week-strip.is-tighter .wk-step + .wk-step::before { left: calc(var(--dsz-20) * -1 + var(--space-5)); width: calc(var(--dsz-20) - var(--space-5) * 2); }
 .gob .week-strip.is-tighter .td-l { font-size: var(--fs-12); }
 .gob .wk-step .td-l {
   flex: none;
   overflow: visible;
   text-overflow: unset;
   white-space: nowrap;
+  font-weight: var(--fw-regular);
+  color: var(--text-60);
 }
 .gob .wk-dot {
-  width: 16px;
-  height: 16px;
+  width: var(--dsz-18);
+  height: var(--dsz-18);
   flex: none;
   border-radius: var(--radius-round);
   display: grid;
   place-items: center;
   box-shadow: inset 0 0 0 1.5px var(--white-40);
-  color: var(--bg);
+  color: var(--text-60);
 }
 .gob .wk-dot svg { width: 10px; height: 10px; }
-.gob .wk-step.done { opacity: 0.38; }
-.gob .wk-step.done .wk-dot { background: var(--text-38); box-shadow: none; }
-.gob .wk-step.is-next {
+/* Done: a check, dimmed. */
+.gob .wk-step.done .wk-dot { box-shadow: none; }
+.gob .wk-step.done .td-l { color: var(--text-38); }
+.gob .wk-step.done .wk-dot { color: var(--text-38); }
+/* Current: full white, the mark filled. A step that blocks the advance is the current step
+   too (the top bar says what is needed), so it reads the same. */
+.gob .wk-step.is-next .td-l,
+.gob .wk-step.gated .td-l { font-weight: var(--fw-bold); color: var(--text-100); }
+.gob .wk-step.is-next .wk-dot,
+.gob .wk-step.gated .wk-dot {
   box-shadow: inset 0 0 0 1.5px var(--text-100);
-  background: var(--white-7);
+  background: radial-gradient(circle, var(--text-100) 0, var(--text-100) 34%, transparent 38%);
 }
-/* Blocking step: neutral strong outline; "BLOCKS ADVANCE" carries the meaning
-   (orange = unsaved changes only, Jamie 2026-10-01). */
-.gob .wk-step.gated {
-  box-shadow: inset 0 0 0 1.5px var(--white-62);
-  background: var(--white-6);
-}
+/* Upcoming: dim. */
+.gob .wk-step.is-upcoming .td-l { color: var(--text-38); }
+.gob .wk-step.is-upcoming .wk-dot { box-shadow: inset 0 0 0 1.5px var(--white-20); }
+/* Read out, not shown. */
+.gob .wk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .gob .wk-step .td-adv,
 .gob .wk-step .td-gate {
   flex: none;
@@ -461,12 +465,6 @@ html.gob-shell.gob-office #franchise-container .office-st .st-n .gob-mark {
   height: var(--dsz-18);
   object-fit: contain;
 }
-.gob .office .wk-step,
-.gob .office .week-strip.is-tight .wk-step,
-.gob .office .week-strip.is-tighter .wk-step {
-  padding: 0 var(--dsp-8);
-  gap: var(--dsp-8);
-}
 .gob.gob-1280 .office-next { gap: 2px; padding-top: 4px; padding-bottom: 2px; }
 .gob.gob-1280 .office-next .nx-name { font-size: var(--fs-24); line-height: 1; }
 .gob.gob-1280 .office-next.tier { padding-top: 0; padding-bottom: 0; gap: 2px; }
@@ -543,11 +541,97 @@ html.gob-shell.gob-office #franchise-container .office-st .st-n .gob-mark {
 @keyframes wkFade{from{opacity:0}}
 @keyframes xgSweep{0%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--reward-gold) 60%,transparent),0 0 0 0 color-mix(in srgb,var(--reward-gold) 0%,transparent)}35%{box-shadow:inset 0 0 0 1px var(--reward-gold),0 0 0 5px color-mix(in srgb,var(--reward-gold) 22%,transparent)}100%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--reward-gold) 60%,transparent),0 0 0 9px transparent}}
 
-/* Signing class (week 36): one row per signed recruit, grade now -> ceiling. */
-.gob .office-class .wr { grid-template-columns: minmax(0, 1fr) auto; }
-.gob .office-class .card-h + .wr { border-top: 0; }
-.gob .office-class .card-h .meta { margin-left: auto; font-size: var(--fs-11); font-weight: var(--fw-semibold); color: var(--text-60); }
-.gob .office-class .wr-1 .nm { overflow: hidden; text-overflow: ellipsis; }
-.gob .office-class .wr-2 { color: var(--text-60); }
-.gob .office-class .sg-rt { display: inline-flex; align-items: baseline; gap: var(--space-6); white-space: nowrap; }
-.gob .office-class .sg-rt i { font-style: normal; font-size: var(--fs-12); color: var(--text-38); }
+/* Signing class (week 36): one row per signed recruit, grade now -> ceiling.
+   The week-1 lists and Top Recruits (.office-list) are the same card. */
+.gob :is(.office-class, .office-list) .wr { grid-template-columns: minmax(0, 1fr) auto; }
+.gob :is(.office-class, .office-list) .card-h + .wr { border-top: 0; }
+.gob :is(.office-class, .office-list) .card-h .meta { margin-left: auto; font-size: var(--fs-11); font-weight: var(--fw-semibold); color: var(--text-60); }
+.gob :is(.office-class, .office-list) .wr-1 .nm { overflow: hidden; text-overflow: ellipsis; }
+.gob :is(.office-class, .office-list) .wr-2 { color: var(--text-60); }
+.gob :is(.office-class, .office-list) .sg-rt { display: inline-flex; align-items: baseline; gap: var(--space-6); white-space: nowrap; }
+.gob :is(.office-class, .office-list) .sg-rt i { font-style: normal; font-size: var(--fs-12); color: var(--text-38); }
+
+/* --- Week 1: the season preview ------------------------------------------------------
+   The lists (.office-list) share the signing-class card's rules above (two-line rows,
+   grade on the right) and the standings row (.st-r). Only what those do not already say is here. */
+
+/* The outlook: one line the coach reads first, last season under it. */
+.gob .office-outlook { gap: var(--space-6); }
+.gob .office-outlook p { margin: 0; }
+.gob .office-outlook .ol-pick { font: var(--fw-bold) var(--fs-22)/var(--lh-1) var(--font-display); letter-spacing: var(--tracking-2); color: var(--text-100); }
+.gob .office-outlook .ol-last { font-size: var(--fs-13); color: var(--text-60); }
+
+/* Rankings: "5 of 8". The unit is wider than a stat's "PPG". */
+.gob .office-ranks .card-h + .ptw { border-top: 0; }
+.gob .office-ranks .ptw em { width: var(--dsz-52); text-align: left; white-space: nowrap; }
+
+/* "Yours" on a list row: the navy selected-row treatment the standings row uses. */
+.gob .office-list .wr.me {
+  padding-left: var(--dsp-8);
+  padding-right: var(--dsp-8);
+  background: color-mix(in srgb, var(--navy) 35%, transparent);
+  border-radius: var(--radius-6);
+  border-top-color: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy-hi) 35%, transparent);
+}
+.gob .office-list .wr.me + .wr { border-top-color: transparent; }
+.gob .office-list a.wr { color: inherit; text-decoration: none; }
+.gob .office-list a.wr:hover .nm { text-decoration: underline; text-underline-offset: 3px; }
+.gob .office-list .sg-rt .tdig { font-size: var(--fs-18); }
+
+/* A leading tag (position, week) in its own fixed column. */
+.gob .office-list.office-aa .wr,
+.gob .office-list.office-circle .wr { grid-template-columns: var(--dsz-34) minmax(0, 1fr) auto; }
+.gob .office-list .wr-k { font-size: var(--fs-10); font-weight: var(--fw-bold); letter-spacing: var(--tracking-8); text-transform: uppercase; color: var(--text-38); white-space: nowrap; }
+.gob .office-list.office-circle .wr-k { color: var(--text-60); }
+.gob .office-list.office-circle .sg-rt .tdig { color: var(--text-100); }
+
+/* The newcomers' summary line sits under the rows, on the list's hairline. */
+.gob .office-list .nc-sum { margin: 0; padding-top: var(--dsp-8); border-top: 1px solid var(--line); font-size: var(--fs-12); color: var(--text-60); }
+
+/* Key Players: the roster's columns as standings rows. One template, so labels sit over values. */
+html.gob-shell.gob-office #franchise-container .office-tb { gap: 0; }
+html.gob-shell.gob-office #franchise-container .office-tb .card-h { margin-bottom: var(--dsp-8); }
+html.gob-shell.gob-office #franchise-container .office-tb .st-r {
+  grid-template-columns: minmax(0, 1fr) var(--dsz-34) var(--dsz-28) var(--dsz-26) var(--dsz-34) var(--dsz-30);
+  gap: var(--space-8);
+  align-items: center;
+  padding: var(--dsp-6) var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-12);
+  line-height: 1.35;
+  letter-spacing: normal;
+  color: var(--text-87);
+}
+html.gob-shell.gob-office #franchise-container .office-tb .st-hd {
+  padding: 0 var(--space-2) var(--space-4);
+  border-top: 0;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+html.gob-shell.gob-office #franchise-container .office-tb .st-r > span:nth-child(n + 2) { text-align: right; }
+html.gob-shell.gob-office #franchise-container .office-tb .st-n { min-width: 0; }
+html.gob-shell.gob-office #franchise-container .office-tb .st-nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  color: var(--text-100);
+  text-decoration: none;
+}
+html.gob-shell.gob-office #franchise-container .office-tb a.st-nm:hover { text-decoration: underline; text-underline-offset: 3px; }
+html.gob-shell.gob-office #franchise-container .office-tb .tb-c { color: var(--text-60); font-variant-numeric: tabular-nums; }
+html.gob-shell.gob-office #franchise-container .office-tb .tb-rt .tdig { font-size: var(--fs-16); }
+
+/* Preseason National Rankings: the standings card, the place column is a national rank. */
+html.gob-shell.gob-office #franchise-container .office-pre .st-r:not(.st-hd),
+html.gob-shell.gob-office #franchise-container .office-pre .st-hd { grid-template-columns: var(--dsz-34) minmax(0, 1fr) auto; }
+html.gob-shell.gob-office #franchise-container .office-pre .st-r:not(.st-hd) .st-pos { font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display); color: var(--text-87); }
+
+/* "Season Opener" over the opponent. */
+.gob .office-next .nx-open { margin: 0 0 var(--space-6); }
