@@ -300,7 +300,7 @@ test('advance labels match the three week states and repeat clicks are ignored',
   await expect(page.locator('header.top')).toHaveClass(/is-tier/);
   // A tournament week shows the round, not a week number.
   await expect(page.locator('#gob-week-value')).toHaveText('Conference Tournament');
-  await expect(page.locator('#gob-week-phase')).toHaveText('Semifinals');
+  await expect(page.locator('#gob-week-phase')).toHaveText('Semifinals · Season 1');
 });
 
 test('back restores the section as it was left, including scroll', async ({ page }) => {

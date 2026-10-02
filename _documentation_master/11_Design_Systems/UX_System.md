@@ -181,7 +181,18 @@ Right side, browse pages: the ghost Edit Recruit Invites button (`#fcc-edit-recr
 
 On a browse page that does not already paint `#fcc-record-label`, Record comes from `team_record.wins` and `team_record.losses` on the command-center payload. National Rank still comes from `data.rank`. Week still comes from `data.week`. The Office keeps painting Record from the standings label.
 
-Tier weeks (27-34): when `GOBTierEmblem.tierForWeek(data.week)` returns a tier and `TIER_TOKENS` has `metal` and `metalHi`, `.top` gets `is-tier` and those two custom properties. **A tournament week shows no week number.** The week stat (`#gob-week-stat.ts-tier`) becomes the round descriptor, in the place the week sits: the tier emblem (`#fcc-header-emblem`, the emblem alone), then `#gob-week-value` reading `<Tier> Tournament` over `#gob-week-phase` reading the round. The round comes from `GOBAdvance.eosRoundForWeek(week)`, so it uses the same words as the Advance button (First Round, Semifinals, Championship). After the tournament the week is named, not numbered: week 35 reads `Signing Day` and week 36 reads `Offseason` (no emblem, no round line). Only weeks 1-26 read `Week N`. Nothing sits between the stats and the action button. If the tier module is not loaded yet the bar paints `Week N` and repaints when it arrives.
+Tier weeks (27-34): when `GOBTierEmblem.tierForWeek(data.week)` returns a tier and `TIER_TOKENS` has `metal` and `metalHi`, `.top` gets `is-tier` and those two custom properties. **A tournament week shows no week number.** The week stat (`#gob-week-stat.ts-tier`) becomes the round descriptor, in the place the week sits: the tier emblem (`#fcc-header-emblem`, the emblem alone), then `#gob-week-value` reading `<Tier> Tournament` over `#gob-week-phase` reading the round. The round comes from `GOBAdvance.eosRoundForWeek(week)`, so it uses the same words as the Advance button (First Round, Semifinals, Championship). After the tournament the week is named, not numbered: week 35 reads `Signing Day` and week 36 reads `Offseason` (no emblem, no round line). Only weeks 1-26 read `Week N`. Nothing sits between the stats and the action button.
+
+The season sits under the week, in the strip's value-over-label pattern (like `11-3 / RECORD`), on every page with the top bar:
+
+| Weeks | `#gob-week-value` | `#gob-week-phase` |
+|---|---|---|
+| 1-26 | `Week 2` | `SEASON 3` |
+| 27-34 | `Conference Tournament` | `FIRST ROUND · SEASON 3` |
+| 35, 36 | `Signing Day`, `Offseason` | `SEASON 3` |
+
+- The season is the payload's `current_season` (`syncTop(data)`); with no payload it is read from the Office's `#fcc-season-label`. Unknown season: the line is hidden, never guessed.
+- The label never sets the stat's width (`.ts-txt span { width: 0; min-width: 100% }`): the value does, and a longer label runs on into the empty strip. It cannot widen `.top-stats` or move the action button. If the tier module is not loaded yet the bar paints `Week N` and repaints when it arrives.
 
 Rail order: Office, Team, Prep, League, Recruiting, News, then the utility group: Tutorials (`/tutorial.html`), Feedback, Settings, a quieter divider, Exit Franchise. Exit calls the existing `#exit-franchise` handler (same sound, same `/mode-select.html` destination). Feedback is the existing `#feedback-btn` modal and is omitted when `window.GOB_BUILD_PROFILE === 'desktop'`. On a browse page the rail Feedback appears once the auth bar has added `#feedback-btn`, which can be after the shell mounts. Settings calls `GOBSettings.toggle()`.
 

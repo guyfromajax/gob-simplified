@@ -27,6 +27,7 @@ test.beforeAll(() => { fs.mkdirSync(SHOTS, { recursive: true }); });
 test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1280, height: 720 }); });
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const FID = O.FID;
 const isGreen = (rgb) => { const m = /rgba?\((\d+), (\d+), (\d+)/.exec(rgb || ''); return !!m && +m[2] > 180 && +m[1] < 120 && +m[3] < 120; };
 
 async function fulfillJson(route, body, status) {
@@ -56,9 +57,9 @@ for (const [week, label] of [[35, 'Signing Day'], [36, 'Offseason']]) {
     await expect(page.locator('#gob-week-value')).toHaveText(label);
     await expect(page.locator('.top-stats')).not.toContainText(/week/i);
     await expect(page.locator('.top-stats')).not.toContainText(String(week));
-    // Not a tournament week: no emblem, no round line, plain bar.
+    // Not a tournament week: no emblem, no round, plain bar. Only the season sits under it.
     await expect(page.locator('#fcc-header-emblem svg')).toHaveCount(0);
-    await expect(page.locator('#gob-week-phase')).toBeHidden();
+    await expect(page.locator('#gob-week-phase')).toHaveText('Season 1');
     await expect(page.locator('html.gob-shell .top')).not.toHaveClass(/is-tier/);
     // It sits where the week sits: the stat after National Rank, inside the bar.
     const g = await page.evaluate(() => {
@@ -71,6 +72,146 @@ for (const [week, label] of [[35, 'Signing Day'], [36, 'Offseason']]) {
     expect(g.value.bottom).toBeLessThanOrEqual(g.top.bottom);
   });
 }
+
+/* ------------------------------------------------------- F1b: season --- */
+
+/** What the week stat shows, how its label is styled, and whether the label moves anything. */
+async function weekStat(page) {
+  return page.evaluate(() => {
+    const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width }; };
+    const style = (el) => { const cs = getComputedStyle(el); return { size: cs.fontSize, weight: cs.fontWeight, transform: cs.textTransform, color: cs.color, family: cs.fontFamily, tracking: cs.letterSpacing }; };
+    const value = document.getElementById('gob-week-value');
+    const label = document.getElementById('gob-week-phase');
+    const stats = document.querySelector('.top-stats');
+    const advance = document.querySelector('.adv-wrap');
+    const measure = () => ({ stats: box(stats), advance: box(advance), stat: box(document.getElementById('gob-week-stat')) });
+    const withLabel = measure();
+    const text = label.textContent;
+    // The same strip with no season line: nothing may be in a different place.
+    label.hidden = true;
+    const without = measure();
+    label.hidden = false;
+    label.textContent = text;
+    return {
+      value: value.textContent.trim(), label: label.hidden ? null : text.trim(),
+      valueBox: box(value), labelBox: box(label), valueSize: parseFloat(getComputedStyle(value).fontSize),
+      labelStyle: style(label), recordLabelStyle: style(document.querySelector('#gob-record-stat span')),
+      rankLabelStyle: style(document.querySelector('#gob-rank-stat span')),
+      withLabel, without, top: box(document.querySelector('html.gob-shell .top')),
+      rankLabelBox: box(document.querySelector('#gob-rank-stat span')),
+    };
+  });
+}
+
+function seasonData(week) {
+  const base = week >= 27 && week <= 34 ? O.STATES.tournament : (week === 35 ? O.STATES.signing_day : O.STATES.win);
+  const data = clone(base);
+  data.week = week;
+  data.current_season = 3;
+  data.season = 3;
+  return data;
+}
+
+function expectSecondaryAndStill(g, expected) {
+  expect(g.label).toBe(expected);
+  // Beneath the value, on the same line as the other stats' labels, inside the bar.
+  expect(g.labelBox.top).toBeGreaterThanOrEqual(g.valueBox.bottom - 1);
+  expect(Math.abs(g.labelBox.top - g.rankLabelBox.top)).toBeLessThanOrEqual(2);
+  expect(g.labelBox.bottom).toBeLessThanOrEqual(g.top.bottom);
+  expect(Math.abs(g.labelBox.left - g.valueBox.left)).toBeLessThanOrEqual(1);
+  // Clearly secondary: the small label type, far smaller than the value.
+  expect(g.labelStyle.size).toBe(g.recordLabelStyle.size);
+  expect(g.labelStyle.weight).toBe(g.recordLabelStyle.weight);
+  expect(g.labelStyle.transform).toBe('uppercase');
+  expect(g.labelStyle.tracking).toBe(g.recordLabelStyle.tracking);
+  expect(g.labelStyle.family).toBe(g.recordLabelStyle.family);
+  expect(parseFloat(g.labelStyle.size)).toBeLessThanOrEqual(g.valueSize * 0.6);
+  // It does not widen the strip or move the action button.
+  expect(g.withLabel.stats.width).toBe(g.without.stats.width);
+  expect(g.withLabel.stat.width).toBe(g.without.stat.width);
+  expect(g.withLabel.advance.left).toBe(g.without.advance.left);
+  // Nothing sits beside the action button (a focus page has no action button in its bar).
+  if (g.withLabel.advance.width > 0) {
+    expect(g.withLabel.advance.left - Math.max(g.labelBox.right, g.withLabel.stats.right)).toBeGreaterThan(100);
+  }
+}
+
+const SEASON_CASES = [
+  { week: 2, name: 'regular', value: 'Week 2', label: 'Season 3' },
+  { week: 27, name: 'tournament', value: 'Conference Tournament', label: 'First Round · Season 3' },
+  { week: 35, name: 'signing-day', value: 'Signing Day', label: 'Season 3' },
+];
+
+for (const item of SEASON_CASES) {
+  for (const size of [[1280, 720], [1920, 1080]]) {
+    test('F1b: ' + item.name + ' week shows the season under "' + item.value + '" at ' + size[0], async ({ page }) => {
+      await page.setViewportSize({ width: size[0], height: size[1] });
+      await O.openOffice(page, seasonData(item.week));
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: path.join(SHOTS, 'f1b-season-' + item.name + '-' + TAG + '-' + size[0] + '.png'),
+        clip: { x: 0, y: 0, width: size[0], height: 130 } });
+      const g = await weekStat(page);
+      expect(g.value).toBe(item.value);
+      expectSecondaryAndStill(g, item.label);
+      if (item.week <= 26 || item.week === 35) {
+        // The same quiet label colour as RECORD and NATIONAL RANK.
+        expect(g.labelStyle.color).toBe(g.recordLabelStyle.color);
+        expect(g.labelStyle.color).toBe(g.rankLabelStyle.color);
+      }
+    });
+  }
+}
+
+test('F1b: a double-digit season under the shortest value still moves nothing', async ({ page }) => {
+  const data = seasonData(2);
+  data.current_season = 12;
+  await O.openOffice(page, data);
+  const g = await weekStat(page);
+  expect(g.value).toBe('Week 2');
+  expectSecondaryAndStill(g, 'Season 12');
+});
+
+/** A recruiting page (browse, or focus when the invite board is the week's task) over a given Office payload. */
+async function openRecruiting(page, data, focus) {
+  await stubAuth(page);
+  await page.route('**/*', async (route) => {
+    const pathname = apiPath(route);
+    if (!pathname) { await route.continue(); return; }
+    if (pathname.startsWith('/franchise/command-center/data')) {
+      const body = clone(data);
+      body.recruiting_wire = { board_saved_week: focus ? 0 : body.week, counts: {} };
+      await fulfillJson(route, body);
+      return;
+    }
+    if (pathname.startsWith('/franchise/recruiting-data')) {
+      await fulfillJson(route, { week: data.week, team_id: O.TID, team: 'Lancaster', team_region: 'A', recruits: [], team_name_map: {} });
+      return;
+    }
+    await fulfillJson(route, {});
+  });
+  await page.goto('/recruiting.html?franchise_id=' + FID + '&team_id=' + O.TID + '&from=fcc');
+  await expect(page.locator('#gob-week-value')).toHaveText('Week ' + data.week, { timeout: 15000 });
+}
+
+for (const mode of ['browse', 'focus']) {
+  const week = mode === 'browse' ? 5 : 22;
+  test('F1b: the season shows on a ' + mode + ' page too (recruiting, week ' + week + ')', async ({ page }) => {
+    // Week 22 with the invite board not saved yet: recruiting is the week's task, so the page is focus.
+    await openRecruiting(page, seasonData(week), mode === 'focus');
+    await expect(page.locator('#gob-week-phase')).toHaveText('Season 3');
+    if (mode === 'focus') await expect(page.locator('html')).toHaveClass(/gob-focus/);
+    const g = await weekStat(page);
+    expectSecondaryAndStill(g, 'Season 3');
+  });
+}
+
+test('F1b: a payload that names no season shows no season line (never a guess)', async ({ page }) => {
+  const data = seasonData(5);
+  delete data.current_season;
+  delete data.season;
+  await openRecruiting(page, data, false);
+  await expect(page.locator('#gob-week-phase')).toBeHidden();
+});
 
 /* ------------------------------------------------------------------ F2 --- */
 
@@ -167,8 +308,6 @@ test('F2: the offline Home Base shelf uses the new champion wording', async ({ p
 });
 
 /* ------------------------------------------------------------------ F3 --- */
-
-const FID = O.FID;
 
 function archetypeVisit(state) {
   const data = clone(O.STATES.regular);

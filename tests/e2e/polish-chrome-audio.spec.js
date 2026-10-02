@@ -78,7 +78,8 @@ test('B2: a regular-season week still shows "Week N" and no tournament descripto
   await shot(page, 'b2-top-strip-week-22', { clip: { x: 0, y: 0, width: 1280, height: 120 } });
   const g = await topBar(page);
   expect(g.value).toBe('Week 22');
-  expect(g.round).toBe(null);
+  // The line under the week is the season (follow-up), never a round.
+  expect(g.round).toBe('Season 1');
   expect(g.emblem).toBe(null);
   await expect(page.locator('html.gob-shell .top')).not.toHaveClass(/is-tier/);
 });
@@ -100,7 +101,7 @@ for (const [week, tier, round] of [
     expect(g.text).not.toMatch(new RegExp('\\b' + week + '\\b'));
     // The round descriptor sits where the week sits: the stat after National Rank.
     expect(g.value).toBe(tier + ' Tournament');
-    expect(g.round).toBe(round);
+    expect(g.round).toBe(round + ' · Season 1');
     expect(g.valueBox.left).toBeGreaterThan(g.rank.right);
     expect(g.roundBox.top).toBeGreaterThanOrEqual(g.valueBox.bottom - 1);
     // The emblem is beside the words, not over them, and everything is inside the bar.
@@ -111,7 +112,7 @@ for (const [week, tier, round] of [
       expect(part.bottom).toBeLessThanOrEqual(g.top.bottom);
     }
     // The space beside the action button stays empty.
-    expect(g.advance.left - g.stats.right).toBeGreaterThan(120);
+    expect(g.advance.left - Math.max(g.stats.right, g.roundBox.right)).toBeGreaterThan(120);
     // The round is named in the same words as the Advance button.
     await expect(page.locator('#play-now')).toContainText(round.replace(/s$/, ''));
   });
@@ -128,8 +129,8 @@ for (const [week, label] of [[35, 'Signing Day'], [36, 'Offseason']]) {
     expect(g.value).toBe(label);
     expect(g.text).not.toMatch(/week/i);
     expect(g.text).not.toMatch(new RegExp('\\b' + week + '\\b'));
-    // Not a tournament round: no emblem, no round line, and it sits in the week's place.
-    expect(g.round).toBe(null);
+    // Not a tournament round: no emblem, only the season under it, in the week's place.
+    expect(g.round).toBe('Season 1');
     expect(g.emblem).toBe(null);
     expect(g.valueBox.left).toBeGreaterThan(g.rank.right);
     expect(g.valueBox.top).toBeGreaterThanOrEqual(g.top.top);
@@ -154,7 +155,7 @@ test('B2: a browse page paints the same descriptor (recruiting, week 31)', async
   });
   await page.goto('/recruiting.html?franchise_id=' + O.FID + '&team_id=' + O.TID + '&from=fcc');
   await expect(page.locator('#gob-week-value')).toHaveText('Region Tournament', { timeout: 15000 });
-  await expect(page.locator('#gob-week-phase')).toHaveText('Championship');
+  await expect(page.locator('#gob-week-phase')).toHaveText('Championship · Season 1');
   await expect(page.locator('#fcc-header-emblem svg')).toBeVisible();
   await expect(page.locator('.top-stats')).not.toContainText(/week/i);
 });
