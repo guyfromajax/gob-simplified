@@ -190,7 +190,7 @@ Sub-tabs (`.stab` in `.pg-head .subtabs`): parallelogram (`clip-path`), height 4
 
 `.rtab` / `gob-tables.css` inside a contained card (`--white-2`, `--radius-12`). Header: sticky where the table fits `.main`, `--surface-th-top` → `--surface-th-bottom`, micro-label type at `--text-60`, `--line-strong` under it. Rows: `--line` separators only (no boxed cells), even rows `--white-1p2`, hover `--white-5`, your row navy (`tr.me`). Grouped columns `--group-shade`. Player rows are one height whatever the avatar holds: a headshot, a monogram or a headshot that fails late (the avatar link `a.gob-team.gob-player` sits on `vertical-align: middle`, so an image-only avatar cannot lift the line). First (name) column left-aligned and heavier; numbers centred. Linked names are not underlined at rest. A table wider than `.main` scrolls inside its card with an edge fade and no sticky header. Never white zebra stripes, never spreadsheet gridlines.
 
-**Column grouping.** Columns that belong together sit together; the gap between groups is always larger than the gap inside one. Row zebra and group shade (`--group-shade`) stay.
+**Column grouping.** Columns that belong together sit together; the gap between groups is always larger than the gap inside one. Row zebra and group shade (`--group-shade`) stay. In a pinned header the shade is a layer over the solid page fill, not the cell's colour, so a header never lets a row show through; a hairline under the header appears only while it is pinned (UX_System › Pinned header paint).
 
 | Rule | Applies to | How |
 |---|---|---|

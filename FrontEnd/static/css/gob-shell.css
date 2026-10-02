@@ -575,6 +575,40 @@ html.gob-shell .main thead tr + tr th {
   top: calc(var(--gob-stick-top) + var(--gob-stick-row));
 }
 
+/* A pinned header's dividers travel with its cells. In a collapsed table the 1px border
+   under a row is painted by the table where the row is laid out, so when the cells are
+   pinned the border stays behind and the rows show through its pixel row (the Lean chips,
+   Recruiting › Pool, 2026-10-02). Where a header row has that border (the group row of a
+   grouped header; every header row of the recruiting pool) it keeps its width and goes
+   transparent, and each cell draws the line in its place with a pseudo-element hung one
+   pixel below its box: same colour, same pixel row, same heights. The id selector outranks
+   `#franchise-container .tab-content th` in the command center (Player Stats). */
+html.gob-shell .main .gob-tbl tr.gob-groups th,
+html.gob-shell .main #franchise-container .tab-content .gob-tbl tr.gob-groups th,
+html.gob-shell .main .gob-tbl.pool thead th {
+  border-bottom-color: transparent;
+}
+html.gob-shell .main .gob-tbl tr.gob-groups th::before,
+html.gob-shell .main .gob-tbl tr.gob-groups ~ tr th::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  pointer-events: none;
+}
+html.gob-shell .main .gob-tbl tr.gob-groups th::before,
+html.gob-shell .main .gob-tbl.pool thead th::before {
+  background: color-mix(in srgb, var(--white) 8%, var(--bg-page-solid));
+}
+
+/* While the header is pinned (the shell sets `is-pinned` on the table as .main scrolls),
+   a hairline under its last row closes it off from the rows. At rest there is none. */
+html.gob-shell .main table.is-pinned thead tr:last-child th::before {
+  background: color-mix(in srgb, var(--white) 14%, var(--bg-page-solid));
+}
+
 html.gob-shell .main #roster-table thead th,
 html.gob-shell .main #roster-table thead th.c-ident {
   z-index: var(--z-sticky);

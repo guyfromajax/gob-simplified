@@ -1237,6 +1237,28 @@
       if (rowHead && rowNext) table.style.setProperty('--gob-stick-row', rowHead.getBoundingClientRect().height + 'px');
     });
     classifyTables();
+    paintPinnedHeaders();
+  }
+
+  /**
+   * `is-pinned` on every table whose header is currently held at the top of .main by the
+   * sticky rule (the table has scrolled under the page head, and has not scrolled away).
+   * gob-shell.css draws the hairline under a pinned header; at rest there is none.
+   */
+  function paintPinnedHeaders() {
+    var main = document.querySelector('html.gob-shell .main');
+    if (!main) return;
+    var stickTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gob-stick-top')) || 0;
+    var edge = main.getBoundingClientRect().top + stickTop;
+    Array.prototype.forEach.call(main.querySelectorAll('table'), function (table) {
+      var th = table.querySelector('thead th');
+      var pinned = false;
+      if (th && getComputedStyle(th).position === 'sticky') {
+        var box = table.getBoundingClientRect();
+        pinned = box.top < edge - 0.5 && box.bottom > edge + th.getBoundingClientRect().height;
+      }
+      table.classList.toggle('is-pinned', pinned);
+    });
   }
 
   function mainContentWidth(main) {
@@ -1355,6 +1377,15 @@
       if (typeof MutationObserver !== 'undefined') {
         new MutationObserver(queueSync).observe(main, { childList: true, subtree: true });
       }
+      var pinQueued = false;
+      main.addEventListener('scroll', function () {
+        if (pinQueued) return;
+        pinQueued = true;
+        requestAnimationFrame(function () {
+          pinQueued = false;
+          paintPinnedHeaders();
+        });
+      }, { passive: true });
     }
     window.addEventListener('resize', queueSync);
   }
