@@ -6,10 +6,16 @@
 
 var GROUPS = [
   { name: '', shade: false, cols: [
-    { key: 'team', label: 'Team', pin: true },
-    { key: 'natl_rank', label: 'Rank' },
+    { key: 'team', label: 'Team', pin: true }
+  ]},
+  { name: '', shade: false, cols: [
+    { key: 'natl_rank', label: 'Rank' }
+  ]},
+  { name: '', shade: false, cols: [
     { key: 'W', label: 'W' },
-    { key: 'L', label: 'L' },
+    { key: 'L', label: 'L' }
+  ]},
+  { name: '', shade: false, cols: [
     { key: 'PF', label: 'PF' },
     { key: 'PA', label: 'PA' }
   ]},
@@ -48,9 +54,11 @@ var GROUPS = [
   ]}
 ];
 
+// `fam` carries the family's first (`fs`) and last (`fe`) column, so the table spaces
+// by stat family (Styleguide › Tables).
 var LEAF = [];
 GROUPS.forEach(function (group) {
-  group.cols.forEach(function (col) {
+  group.cols.forEach(function (col, index) {
     LEAF.push({
       key: col.key,
       label: col.label,
@@ -58,7 +66,8 @@ GROUPS.forEach(function (group) {
       shade: group.shade,
       group: group.name,
       stat: group.name !== '',
-      decimal: !!col.decimal
+      decimal: !!col.decimal,
+      fam: col.pin ? '' : (index === 0 ? ' fs' : '') + (index === group.cols.length - 1 ? ' fe' : '')
     });
   });
 });
@@ -166,7 +175,7 @@ export function mount(container, ctx) {
     var html = '<tr>';
     LEAF.forEach(function (col) {
       var on = sortKey === col.key;
-      var cls = 's' + (col.pin ? ' pin team' : '') + (col.shade ? ' gshade' : '')
+      var cls = 's' + (col.pin ? ' pin team' : '') + (col.shade ? ' gshade' : '') + col.fam
         + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
       html += '<th class="' + cls + '" data-sort="' + col.key + '"'
         + (col.group ? ' title="' + tables.esc(col.group) + '"' : '') + '>' + tables.esc(col.label) + '</th>';
@@ -186,7 +195,7 @@ export function mount(container, ctx) {
       LEAF.forEach(function (item) { if (item.key === sortKey) col = item; });
       if (col) rows = tables.sortRows(rows, function (row) { return valueOf(row, col); }, sortDir);
     }
-    var html = '<section class="gob-tcard gob-ts"><table class="gob-tbl"><thead>'
+    var html = '<section class="gob-tcard gob-ts gob-fam"><table class="gob-tbl"><thead>'
       + headerRow() + '</thead><tbody id="teamstats-body">';
     if (!rows.length) {
       html += '<tr><td class="team" colspan="' + LEAF.length + '">No teams.</td></tr>';
@@ -195,7 +204,7 @@ export function mount(container, ctx) {
       var mine = sameId(row.team_id, userId);
       html += '<tr' + (mine ? ' class="me is-user"' : '') + '>';
       LEAF.forEach(function (col) {
-        var cls = (col.pin ? 'pin team' : '') + (col.shade ? ' gshade' : '') + (sortKey === col.key ? ' on' : '');
+        var cls = (col.pin ? 'pin team' : '') + (col.shade ? ' gshade' : '') + col.fam + (sortKey === col.key ? ' on' : '');
         html += '<td class="' + cls.trim() + '">' + cellText(row, col) + '</td>';
       });
       html += '</tr>';

@@ -1,20 +1,29 @@
 /**
- * League › Standings. Renders the standings payload. Card order puts the
- * user's conference first; team order inside a card is the API order.
+ * League › Standings. Renders the standings payload: eight regions stacked, each
+ * with its two sister conferences side by side. The user's region is first and the
+ * user's conference is on the left. Team order inside a card is the API order.
  */
 
+// `fam` marks the first (`s`) and last (`e`) column of a stat family, so the table
+// spaces by family (Styleguide › Tables): standing, points, streak, next.
 var COLS = [
-  { key: 'rank', label: '#' },
+  { key: 'rank', label: '#', fam: 's' },
   { key: 'team', label: 'Team', team: true },
   { key: 'W', label: 'W' },
   { key: 'L', label: 'L' },
-  { key: 'pct', label: 'PCT' },
-  { key: 'PF', label: 'PF' },
-  { key: 'PA', label: 'PA' },
-  { key: 'differential', label: 'DIFF', diff: true },
-  { key: 'streak', label: 'STRK' },
-  { key: 'next', label: 'NEXT', next: true }
+  { key: 'pct', label: 'PCT', fam: 'e' },
+  { key: 'PF', label: 'PF', fam: 's' },
+  { key: 'PA', label: 'PA', preDiff: true },
+  { key: 'differential', label: 'DIFF', diff: true, fam: 'e' },
+  { key: 'streak', label: 'STRK', fam: 'se' },
+  { key: 'next', label: 'NEXT', next: true, fam: 'se' }
 ];
+
+function famClass(col) {
+  var fam = col.fam || '';
+  return (col.key === 'rank' ? ' rk' : '') + (fam.indexOf('s') !== -1 ? ' fs' : '') + (fam.indexOf('e') !== -1 ? ' fe' : '')
+    + (col.diff ? ' c-diff' : '') + (col.preDiff ? ' pre-diff' : '');
+}
 
 function url(franchiseId, teamId) {
   var base = window.GOBTables.apiBase('/franchise/standings');
@@ -93,19 +102,30 @@ export function mount(container, ctx) {
       map[key].rows.push(row);
     });
     var cards = order.map(function (key) { return map[key]; });
-    function band(card) {
-      if (sameConference(card, userConference, userRegion)) return 0;
-      if (userRegion && String(card.region).toUpperCase() === String(userRegion).toUpperCase()) return 1;
-      return 2;
-    }
-    cards.sort(function (a, b) {
-      var delta = band(a) - band(b);
-      if (delta) return delta;
-      var region = String(a.region).localeCompare(String(b.region));
-      if (region) return region;
-      return Number(a.conference) - Number(b.conference);
+    var regions = Object.create(null);
+    var letters = [];
+    cards.forEach(function (card) {
+      var letter = String(card.region || '').toUpperCase();
+      if (!regions[letter]) {
+        regions[letter] = [];
+        letters.push(letter);
+      }
+      regions[letter].push(card);
     });
-    return cards;
+    var mine = String(userRegion || '').toUpperCase();
+    letters.sort(function (a, b) {
+      if (mine && a === mine && b !== mine) return -1;
+      if (mine && b === mine && a !== mine) return 1;
+      return a.localeCompare(b);
+    });
+    return letters.map(function (letter) {
+      var pair = regions[letter].slice().sort(function (a, b) {
+        var delta = Number(sameConference(b, userConference, userRegion)) - Number(sameConference(a, userConference, userRegion));
+        if (delta) return delta;
+        return Number(a.conference) - Number(b.conference);
+      });
+      return { region: letter, cards: pair };
+    });
   }
 
   function visibleRows(rows) {
@@ -147,14 +167,12 @@ export function mount(container, ctx) {
       if (row.display_name) colorByName[row.display_name] = row.primary_color;
     });
     var filtered = visibleRows(rows);
-    var cards = groups(filtered, userConference, userRegion);
+    var regions = groups(filtered, userConference, userRegion);
     var franchiseId = (ctx && ctx.franchiseId) || '';
     var linkMeta = [];
-    var html = '<div class="gob-tgrid">';
-    if (!cards.length) {
-      html += '<p class="gob-empty">No standings.</p>';
-    }
-    cards.forEach(function (card) {
+    var html = '';
+
+    function renderCard(card) {
       card.rows.forEach(function (row, index) { row._rank = index + 1; });
       var shown = sortKey ? tables.sortRows(card.rows, function (row) { return readSort(row, sortKey); }, sortDir) : card.rows;
       var maxAbs = 0;
@@ -164,12 +182,12 @@ export function mount(container, ctx) {
       });
       var yours = sameConference(card, userConference, userRegion);
       var title = String(card.region || '') + String(card.conference == null ? '' : card.conference) + ' CONFERENCE';
-      html += '<section class="gob-tcard"><h2>' + tables.esc(title);
+      html += '<section class="gob-tcard gob-conf' + (yours ? ' is-yours' : '') + '"><h2>' + tables.esc(title);
       if (yours) html += '<em>· Yours</em>';
-      html += '</h2><table class="gob-tbl"><thead><tr>';
+      html += '</h2><div class="gob-fam"><table class="gob-tbl"><thead><tr>';
       COLS.forEach(function (col) {
         var on = sortKey === col.key;
-        var cls = 's' + (col.team ? ' team' : '') + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
+        var cls = 's' + (col.team ? ' team' : '') + famClass(col) + (on ? ' on ' + (sortDir < 0 ? 'desc' : 'asc') : '');
         html += '<th class="' + cls + '" data-sort="' + col.key + '">' + tables.esc(col.label) + '</th>';
       });
       html += '</tr></thead><tbody>';
@@ -177,7 +195,7 @@ export function mount(container, ctx) {
         var mine = sameId(row.team_id, userId);
         html += '<tr' + (mine ? ' class="me is-user"' : '') + '>';
         COLS.forEach(function (col) {
-          var cls = (col.team ? 'team' : '') + (sortKey === col.key ? ' on' : '');
+          var cls = (col.team ? 'team' : '') + famClass(col) + (sortKey === col.key ? ' on' : '');
           var cell = '';
           if (col.team) {
             var name = row.display_name || row.name || '';
@@ -207,11 +225,19 @@ export function mount(container, ctx) {
           } else {
             cell = tables.esc(row[col.key]);
           }
-          html += '<td class="' + cls + '">' + cell + '</td>';
+          html += '<td class="' + cls.trim() + '">' + cell + '</td>';
         });
         html += '</tr>';
       });
-      html += '</tbody></table></section>';
+      html += '</tbody></table></div></section>';
+    }
+
+    html += '<div class="gob-regions">';
+    if (!regions.length) html += '<p class="gob-empty">No standings.</p>';
+    regions.forEach(function (region) {
+      html += '<div class="gob-region" data-region="' + tables.esc(region.region) + '">';
+      region.cards.forEach(renderCard);
+      html += '</div>';
     });
     html += '</div>';
     container.innerHTML = html;

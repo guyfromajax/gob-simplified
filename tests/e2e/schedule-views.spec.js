@@ -239,8 +239,11 @@ test('both schedule tabs open from the row', async ({ page }) => {
   await expect(page.locator('#league-schedule-view .gob-game.me')).toContainText('70');
   await expect(page.locator('#league-schedule-view .gob-game.me .gob-box')).toHaveAttribute('href', /game_id=g-box/);
   const open = page.locator('#league-schedule-view .gob-game').nth(1);
-  await expect(open).toContainText('Scheduled');
+  // An unplayed regular-season game has no footer: no "Scheduled", no box score.
+  await expect(open).not.toContainText('Scheduled');
+  await expect(open.locator('.gob-gf')).toHaveCount(0);
   await expect(open.locator('.gob-box')).toHaveCount(0);
+  await expect(page.locator('#league-schedule-view .gob-game.me .gob-gf')).toContainText('Final');
 });
 
 test('week stepper defaults to the current week and stops at the ends', async ({ page }) => {

@@ -3,7 +3,7 @@
  * The view supplies the back bar and the headline. Names in a headline stay plain text.
  */
 
-var PLAYER_TABLE_ATTRS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
+var PLAYER_TABLE_ATTRS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'];
 
 function esc(value) {
   return String(value == null ? '' : value)
@@ -30,10 +30,12 @@ function formatTableYear(year) {
 function renderPlayerTable(players) {
   if (!players || !players.length) return '';
   var tiles = window.GOB_AttrTiles;
-  var head = '<th class="team">Name</th><th>Pos</th><th>Yr</th><th>Ht</th><th>Wt</th>';
-  PLAYER_TABLE_ATTRS.forEach(function (key) {
+  // The twelve attributes read as six pairs (Styleguide › Tables): `gstart` opens a
+  // pair, `gend` closes it, and `wt` carries the wider gutter before the first pair.
+  var head = '<th class="team">Name</th><th>Pos</th><th>Yr</th><th>Ht</th><th class="wt">Wt</th>';
+  PLAYER_TABLE_ATTRS.forEach(function (key, index) {
     var tip = tiles && tiles.ATTR_FULL_NAMES ? (tiles.ATTR_FULL_NAMES[key] || key) : key;
-    head += '<th data-tooltip="' + esc(tip) + '">' + esc(key) + '</th>';
+    head += '<th class="' + (index % 2 ? 'gend' : 'gstart') + '" data-tooltip="' + esc(tip) + '"><span class="ak">' + esc(key) + '</span></th>';
   });
   head += '<th>RT</th>';
   var rows = players.map(function (player) {
@@ -43,12 +45,12 @@ function renderPlayerTable(players) {
       '<td>' + esc(player.pos || '--') + '</td>',
       '<td>' + esc(formatTableYear(player.year)) + '</td>',
       '<td>' + esc(formatTableHeight(player.height)) + '</td>',
-      '<td>' + esc(player.weight == null ? '--' : String(player.weight)) + '</td>'
+      '<td class="wt">' + esc(player.weight == null ? '--' : String(player.weight)) + '</td>'
     ];
-    PLAYER_TABLE_ATTRS.forEach(function (key) {
+    PLAYER_TABLE_ATTRS.forEach(function (key, index) {
       var value = tiles && typeof tiles.tileValue === 'function' ? tiles.tileValue(attrs, key) : null;
       var tile = tiles && typeof tiles.tileHtml === 'function' ? tiles.tileHtml(key, value, false) : esc(value == null ? '--' : value);
-      cells.push('<td>' + tile + '</td>');
+      cells.push('<td class="' + (index % 2 ? 'gend' : 'gstart') + '">' + tile + '</td>');
     });
     var rt = player.rt;
     var rtText = rt == null
@@ -58,7 +60,7 @@ function renderPlayerTable(players) {
     cells.push('<td class="' + esc(rtClass) + '">' + esc(rtText) + '</td>');
     return '<tr>' + cells.join('') + '</tr>';
   });
-  return '<div class="gob-xs"><table class="gob-tbl"><thead><tr>' + head + '</tr></thead><tbody>'
+  return '<div class="gob-xs gob-pairs"><table class="gob-tbl"><thead><tr>' + head + '</tr></thead><tbody>'
     + rows.join('') + '</tbody></table></div>';
 }
 

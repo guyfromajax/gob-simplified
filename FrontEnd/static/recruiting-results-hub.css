@@ -41,28 +41,22 @@
   max-width: 42rem;
 }
 
+/* Every conference in one format: a full-width card, its eight teams in two rows of
+   four, highest class score first, read left to right then down. */
 #hub-signings .gob-rec-conf-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--space-12);
-  align-items: start;
-  max-width: 72rem;
-}
-
-@media (min-width: 1600px) {
-  #hub-signings .gob-rec-conf-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  #hub-signings .gob-rec-conf-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  min-width: 0;
 }
 
 #hub-signings .gob-rec-conf-head {
-  padding: var(--space-12) var(--space-12) var(--space-8);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16) var(--space-10);
+  border-bottom: 1px solid var(--line);
 }
 
 #hub-signings .gob-rec-conf-head h2 {
@@ -82,31 +76,94 @@
   color: var(--text-38);
 }
 
-#hub-signings .gob-rec-team {
-  padding: 0 var(--space-12) var(--space-12);
+/* Names what the number beside each team is. */
+#hub-signings .gob-rec-key {
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
 }
 
-#hub-signings .gob-rec-team + .gob-rec-team {
+#hub-signings .gob-rec-teams {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-16) var(--dsp-20);
+  padding: var(--space-12) var(--space-16) var(--space-16);
+}
+
+@media (max-width: 1099px) {
+  #hub-signings .gob-rec-teams {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+#hub-signings .gob-rec-team {
+  min-width: 0;
+}
+
+/* The second row of four opens on a rule, so the two rows read as rows. */
+#hub-signings .gob-rec-team:nth-child(n+5) {
+  padding-top: var(--space-16);
   border-top: 1px solid var(--line);
-  padding-top: var(--space-12);
+}
+
+@media (max-width: 1099px) {
+  #hub-signings .gob-rec-team:nth-child(n+3) {
+    padding-top: var(--space-16);
+    border-top: 1px solid var(--line);
+  }
 }
 
 #hub-signings .gob-rec-team-h {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
   margin: 0 0 var(--space-6);
-  font: var(--fw-bold) var(--fs-12)/var(--lh-1p25) var(--font-body);
+  font: var(--fw-bold) var(--fs-13)/var(--lh-1p25) var(--font-body);
+  color: var(--text-100);
+}
+
+#hub-signings .gob-rec-team-h .rk {
+  flex: none;
+  min-width: 1.2ch;
+  font: var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-38);
+}
+
+#hub-signings .gob-rec-team-h .nm {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#hub-signings .gob-rec-team-h .sc {
+  flex: none;
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  font-variant-numeric: tabular-nums;
   color: var(--text-87);
 }
 
-#hub-signings .gob-rec-team-h em {
-  margin-left: var(--space-6);
-  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
-  font-style: normal;
+#hub-signings .gob-rec-none {
+  margin: 0;
+  padding: var(--space-4) var(--space-8);
+  font: var(--fw-medium) var(--fs-12)/var(--lh-body) var(--font-body);
   color: var(--text-38);
 }
 
 #hub-signings .gob-xs .gob-tbl th,
 #hub-signings .gob-xs .gob-tbl td {
   padding: var(--space-4) var(--space-8);
+}
+
+/* A team's signings sit under its name, on the block's own left edge. */
+#hub-signings .gob-rec-league .gob-tbl td:first-child { padding-left: var(--space-8); }
+#hub-signings .gob-rec-league .gob-tbl td:last-child { padding-right: var(--space-8); }
+#hub-signings .gob-rec-league {
+  border-radius: var(--radius-6);
+  overflow: clip;
 }
 
 #hub-signings .gob-rec-class .av {
