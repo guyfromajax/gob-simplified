@@ -931,6 +931,48 @@ test('week strip states and clicks', async ({ page }) => {
   expect(new URL((await page.evaluate(() => window.__officeNav[0])), 'http://local').pathname).toBe('/training.html');
 });
 
+test('the weekly card row cap does not depend on when the density class lands', async ({ page }) => {
+  // The shell adds .gob-1920 from a dynamic import. When that module lands after the
+  // Office has rendered, the weekly card must still show the 1920 cap (5), not 3.
+  const changes = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, i) => ({
+    player_id: 'p-' + id, name: 'Player ' + id.toUpperCase(), attribute: 'SC', from: 3, to: 4 + i,
+  }));
+  const data = commandCenter(digest('win', {
+    what_moved: {
+      national_rank: { now: 18, prev: 18, delta: 0 },
+      conference_standing: { now: 3, prev: 3, delta: 0 },
+      record: { wins: 16, losses: 5 },
+      streak: null,
+      attribute_changes: changes,
+    },
+  }));
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await stubAuth(page);
+  await installApi(page, data);
+  // Registered last, so it answers first: hold the density module back.
+  await page.route('**/js/shared/gobDensity.js', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID);
+  await page.waitForFunction(() => {
+    const overlay = document.getElementById('page-load-overlay');
+    const root = document.getElementById('office-root');
+    return (!overlay || getComputedStyle(overlay).display === 'none')
+      && root && root.getAttribute('aria-busy') === 'false';
+  });
+  await page.waitForSelector('#office-root .wkc .gn');
+  // The Office is up before the class is: this is the order that showed 3 rows.
+  const early = await page.evaluate(() => ({
+    bound: /gob-1920|gob-1280/.test(document.documentElement.className),
+    rows: document.querySelectorAll('#office-root .wkc .gn').length,
+  }));
+  expect(early.bound, 'the density class has not landed yet').toBe(false);
+  expect(early.rows).toBe(5);
+  await page.waitForFunction(() => document.documentElement.classList.contains('gob-1920'));
+  expect(await page.locator('#office-root .wkc .gn').count()).toBe(5);
+});
+
 test('attribute chips group, order, and cap', async ({ page }) => {
   const changes = [
     { player_id: 'p-zoe', name: 'Zoe Ng', attribute: 'SH', from: 1, to: 2 },

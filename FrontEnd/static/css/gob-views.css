@@ -774,7 +774,7 @@ html.gob-shell .gob-pairs th.s.desc .ak::after {
 
 /* ── Team › Team Attributes (design review item 5) ────────────────────────────
    Four columns of paired measures over three rows. Each cell carries its name and
-   place on one line and its gauge, value and movement on the next, so no row ends
+   place on one line and its gauge and value on the next, so no row ends
    in a long empty run. */
 
 /* The card stays a block: `.tm-radar-wrap` already centres the chart, and making it
@@ -840,7 +840,7 @@ html.gob-shell #team-attributes-view .mtop .place {
 
 html.gob-shell #team-attributes-view .mbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 3.6ch 3.4ch;
+  grid-template-columns: minmax(0, 1fr) 3.6ch;
   align-items: center;
   gap: var(--space-8);
 }
@@ -867,14 +867,3 @@ html.gob-shell #team-attributes-view .gob-meter {
   min-width: 0;
   flex: none;
 }
-
-/* Neutral movement: the arrow says the direction, luminance says the weight. */
-html.gob-shell #team-attributes-view .mv {
-  text-align: right;
-  font-size: var(--fs-11);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-html.gob-shell #team-attributes-view .mv.up { color: var(--text-100); }
-html.gob-shell #team-attributes-view .mv.down { color: var(--text-60); }
