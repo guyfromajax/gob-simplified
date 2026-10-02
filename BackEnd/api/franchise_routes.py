@@ -14564,16 +14564,46 @@ def _carryover_recruiting_results_story(
     return carried
 
 
+def _week_game_ids(franchise_id: Any, week: int) -> dict[tuple[str, str], str]:
+    """``(away id, home id) -> game id`` for one week's stored games.
+
+    A read, for the news story only: an upset line stores its game so the page can link
+    the box score. Empty when the lookup fails; the story is then written without links.
+    """
+    try:
+        from BackEnd.utils.schedule_browse import matchup_game_ids
+
+        # A stamp of its own: the browse routes' cache is keyed on the stored franchise,
+        # which does not have this week's results yet.
+        found = matchup_game_ids(str(franchise_id), stamp=("week-news", int(week)))
+    except Exception:
+        logger.exception("[NEWS] game id lookup failed franchise_id=%s week=%s", franchise_id, week)
+        return {}
+    return {
+        (away_id, home_id): game_id
+        for (game_week, away_id, home_id), game_id in found.items()
+        if game_week == int(week)
+    }
+
+
 def _build_week_upset_report_story(
     week: int,
     results: list[dict[str, Any]],
     rank_by_team_id: dict[str, int],
     team_name_map: dict[str, str],
+    game_id_by_matchup: Any = None,
 ) -> dict[str, Any] | None:
     """Week {n} Upset Report: games where the winner's entering-week natl_rank was
     more than NEWS_UPSET_RANK_GAP spots worse than the loser's, and the losing team
-    was ranked 1–NEWS_UPSET_LOSER_RANK_MAX. None when no games qualify."""
-    upsets: list[tuple[int, str]] = []
+    was ranked 1–NEWS_UPSET_LOSER_RANK_MAX. None when no games qualify.
+
+    Each line is a ``game_result`` rich line: its text, and the ``game_id`` of that game
+    when one is stored, so the page can link its box score. ``game_id_by_matchup`` is
+    ``{(away id, home id): game id}`` or a callable returning it (called only when the
+    week has an upset). ``lines`` keeps the same text for a reader that knows no rich
+    lines.
+    """
+    upsets: list[tuple[int, str, tuple[str, str]]] = []
     for row in results or []:
         away_id = str(row.get("away_id") or "")
         home_id = str(row.get("home_id") or "")
@@ -14602,17 +14632,27 @@ def _build_week_upset_report_story(
             f"#{loser_rank}. {team_name_map.get(loser_id, loser_id)} "
             f"by a score of {winner_score}-{loser_score}."
         )
-        upsets.append((int(loser_rank), line))
+        upsets.append((int(loser_rank), line, (away_id, home_id)))
     if not upsets:
         return None
     # Ascending by the losing team's natl_rank (biggest-name victim first).
     upsets.sort(key=lambda item: item[0])
+    game_ids = game_id_by_matchup() if callable(game_id_by_matchup) else game_id_by_matchup
+    game_ids = game_ids if isinstance(game_ids, dict) else {}
+    rich_lines: list[dict[str, Any]] = []
+    for _rank, line, matchup in upsets:
+        rich: dict[str, Any] = {"type": "game_result", "text": line}
+        game_id = game_ids.get(matchup)
+        if game_id:
+            rich["game_id"] = str(game_id)
+        rich_lines.append(rich)
     return {
         "story_id": f"w{week}-upset-report",
         "week": int(week),
         "type": "upset_report",
         "headline": f"Week {week} Upset Report",
-        "lines": [line for _, line in upsets],
+        "lines": [line for _rank, line, _matchup in upsets],
+        "rich_lines": rich_lines,
         "created_at": datetime.utcnow(),
     }
 
@@ -15059,7 +15099,10 @@ def _append_franchise_week_news(
     stories = [
         story
         for story in (
-            _build_week_upset_report_story(week, results, rank_by_team_id, team_name_map)
+            _build_week_upset_report_story(
+                week, results, rank_by_team_id, team_name_map,
+                game_id_by_matchup=lambda: _week_game_ids(franchise_id, week),
+            )
             if regular_season else None,
             _build_ps_all_stars_story(week, ts_weekly_gains, team_name_map)
             if regular_season else None,
@@ -15876,6 +15919,8 @@ def get_franchise_news(
     ``dispatches`` are your-team rows from ``season_inbox`` and ``latest_training``,
     included on every response. Headlines are the stored sentences.
     """
+    from BackEnd.utils.all_american import public_story
+
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     news = franchise_doc.get("season_news") or []
     if category:
@@ -15884,6 +15929,9 @@ def get_franchise_news(
             story for story in news
             if str(story.get("type") or "").startswith(prefix)
         ]
+    # Stored copy that says how All-Americans are picked is replaced on the way out; the
+    # stored story is not rewritten.
+    news = [public_story(story) for story in news]
     return {
         "week": int(franchise_doc.get("week", 1) or 1),
         "category": category,

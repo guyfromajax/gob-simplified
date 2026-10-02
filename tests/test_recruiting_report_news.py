@@ -287,8 +287,10 @@ def test_score_caption_is_stored_on_the_national_table_only():
     assert tables["national"]["caption"] == WEEKLY_SCORE_CAPTION
     assert "caption" not in tables["region"]
     assert "caption" not in _tables(_report(2, {"a": 50}))["national"]
-    # The captions say what the scorers do: 100% / 50% / 25% of the rating by lean slot,
-    # and the whole rating for a signing.
-    assert "first choice counts in full" in WEEKLY_SCORE_CAPTION
-    assert "second choice half" in WEEKLY_SCORE_CAPTION and "third a quarter" in WEEKLY_SCORE_CAPTION
-    assert "signed" in RESULTS_SCORE_CAPTION
+    # The formula is hidden: the caption says what Score is for, never how it is built.
+    assert WEEKLY_SCORE_CAPTION == "Class strength so far"
+    assert RESULTS_SCORE_CAPTION == "Class strength"
+    for caption in (WEEKLY_SCORE_CAPTION, RESULTS_SCORE_CAPTION):
+        assert not any(word in caption.lower() for word in (
+            "rating", "choice", "half", "quarter", "full", "signed", "lean", "adds", "%",
+        ))

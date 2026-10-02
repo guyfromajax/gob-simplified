@@ -256,7 +256,9 @@ test('Recruiting Report rankings: team links, the yours row, movement marks, the
   // One quiet caption, under National Recruit Rankings only, saying what Score is.
   await expect(body.locator('.gob-news-caption')).toHaveCount(1);
   await expect(national.locator('.gob-news-caption')).toHaveText(NATIONAL.caption);
-  expect(NATIONAL.caption).toMatch(/first choice counts in full, a second choice half, a third a quarter/);
+  // It says what Score is for. How it is built is hidden.
+  expect(NATIONAL.caption).toBe('Class strength so far');
+  await expect(story).not.toContainText(/first choice|counts in full|a quarter|adds up|ratings of/i);
   const caption = await national.locator('.gob-news-caption').evaluate((node) => ({
     colour: getComputedStyle(node).color,
     size: parseFloat(getComputedStyle(node).fontSize),

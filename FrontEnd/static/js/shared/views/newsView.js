@@ -81,6 +81,15 @@ function cameFromFeed() {
   catch (err) { return false; }
 }
 
+// True when the headline already names the story's week ("Week 9 Recruiting Report",
+// "Week 3 Upset Report", "Projected All-Americans: week 7"): the "Week N" line under it
+// would only repeat it.
+function headlineNamesWeek(story) {
+  var week = Number(story && story.week);
+  if (!isFinite(week)) return false;
+  return new RegExp('\\bweek\\s+' + week + '\\b', 'i').test(String((story && story.headline) || ''));
+}
+
 export function mount(container, ctx) {
   var tables = window.GOBTables;
   var body = null;
@@ -182,8 +191,8 @@ export function mount(container, ctx) {
         if (!story && item && item.story_id === openId) story = item;
       });
       if (story) {
-        // The weekly Recruiting Report names its week in the headline: no "Week N" under it.
-        var meta = story.type === 'recruiting_report'
+        // No "Week N" line under a headline that already names the week.
+        var meta = headlineNamesWeek(story)
           ? ''
           : '<p class="gob-news-meta">Week ' + tables.esc(story.week) + '</p>';
         container.innerHTML = '<div class="gob-news-story' + (storyIsWide(story) ? ' is-wide' : '')
