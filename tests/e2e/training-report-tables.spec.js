@@ -65,6 +65,29 @@ test.describe('shots', () => {
   }
 });
 
+// Playbook Summary shots for the play CMD scale (PCS_SHOTS=before|after):
+// reports/play-cmd-scale/<phase>-<week>-playbook-summary-<width>.png
+test.describe('playbook summary shots', () => {
+  const phase = process.env.PCS_SHOTS || '';
+  test.skip(!phase, 'PCS_SHOTS only');
+  for (const week of Object.keys(WEEKS)) {
+    for (const width of [1280, 1920]) {
+      test(week + ' at ' + width, async ({ page }) => {
+        const dir = path.join(__dirname, '../../reports/play-cmd-scale');
+        fs.mkdirSync(dir, { recursive: true });
+        await page.setViewportSize({ width, height: 2400 });
+        await openReport(page, WEEKS[week]());
+        await expect(page.locator('#playbook-summary-container .pbs-row').first()).toBeVisible();
+        await page.mouse.move(0, 0);
+        await page.waitForTimeout(250);
+        await page.locator('.playbook-summary-section').screenshot({
+          path: path.join(dir, phase + '-' + week + '-playbook-summary-' + width + '.png'), animations: 'disabled',
+        });
+      });
+    }
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
@@ -323,74 +346,113 @@ test.describe('projected starting 5', () => {
   });
 });
 
-// Item 2. The play CMD scale is measured and proposed, not shipped: it sits behind one
-// constant, PLAY_CMD_SCALE, until Jamie approves the cut-offs.
+// The play CMD scale (Jamie approved the cut-offs, 2026-10-02): a play's or a defense's
+// movement in the Playbook Summary is marked on its own scale, not the player-attribute one.
 test.describe('play CMD marks (Playbook Summary)', () => {
   test.skip(PHASE === 'before', 'after tree only');
   test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1280, height: 720 }); });
 
-  function withCmdChanges() {
+  function withCmdChanges(overrides) {
     const report = busy();
-    report.plays_effectiveness_changes = {
+    report.plays_effectiveness_changes = Object.assign({
       '4-1 Motion': 3, '5-0 Motion': 5, '3-2 Motion': 19, 'PF Post Motion': 20,
       'Base Post Play': 4, 'Quick Midrange Jumper': 0,
-    };
-    report.defenses_effectiveness_changes = { man: 50, '2-3-zone': 29, '3-2-zone': 30, '1-3-1-zone': 49 };
+    }, (overrides && overrides.plays) || {});
+    report.defenses_effectiveness_changes = Object.assign(
+      { man: 50, '2-3-zone': 29, '3-2-zone': 30, '1-3-1-zone': 49 }, (overrides && overrides.defenses) || {},
+    );
     return report;
   }
 
+  /** Every Playbook Summary row: its mark and the mark's painted colour. */
   function marks(page) {
     return page.evaluate(() => {
       const out = {};
       document.querySelectorAll('#playbook-summary-container .pbs-row').forEach((row) => {
-        out[row.querySelector('.pbs-name').textContent.trim()] = row.querySelector('.pbs-delta').textContent;
+        const delta = row.querySelector('.pbs-delta');
+        out[row.querySelector('.pbs-name').textContent.trim()] = {
+          text: delta.textContent, color: getComputedStyle(delta).color, label: delta.getAttribute('aria-label'),
+          defense: !!row.closest('.pbs-panel--defense'),
+        };
       });
       return out;
     });
   }
 
-  test('today: the player-attribute scale still applies (three arrows from +3)', async ({ page }) => {
-    await openReport(page, withCmdChanges());
-    const m = await marks(page);
-    expect(m['4-1 Motion']).toBe('▲▲▲');
-    expect(m['5-0 Motion']).toBe('▲▲▲');
-    expect(m['Base Post Play']).toBe('▲▲▲');
-    expect(m['Quick Midrange Jumper']).toBe('–');
+  test('the play scale ships: one constant, the approved cut-offs', async () => {
     const source = fs.readFileSync(path.join(__dirname, '../../FrontEnd/static/training-report.js'), 'utf8');
-    expect(source).toContain("const PLAY_CMD_SCALE = 'attribute';");
+    expect(source).toContain("const PLAY_CMD_SCALE = 'play';");
+    expect(source).toMatch(/offense: \{ up: \[5, 20\], down: \[5, 10\] \}/);
+    expect(source).toMatch(/defense: \{ up: \[30, 50\], down: \[10, 20\] \}/);
   });
 
-  test('the proposed play scale is one constant away: offense 5 / 20, defense 30 / 50', async ({ page }) => {
-    const report = withCmdChanges();
-    await stubAuth(page);
-    await installReportApi(page, report);
-    // Flip the one constant in the served module, exactly as the approval commit will.
-    await page.route('**/training-report.js*', async (route) => {
-      const response = await route.fetch();
-      const body = (await response.text()).replace("const PLAY_CMD_SCALE = 'attribute';", "const PLAY_CMD_SCALE = 'play';");
-      expect(body).toContain("const PLAY_CMD_SCALE = 'play';");
-      await route.fulfill({ response, body });
-    });
-    await page.goto(reportUrl(report));
-    await expect(page.locator('#training-report-view')).not.toHaveClass(/is-loading/, { timeout: 30000 });
-    await expect(page.locator('#playbook-summary-container .pbs-row').first()).toBeVisible();
+  test('offense: one arrow under 5, two from 5, three from 20; an untrained play is a dash', async ({ page }) => {
+    await openReport(page, withCmdChanges());
     const m = await marks(page);
-    // Offense: one arrow under 5, two from 5, three from 20.
-    expect(m['4-1 Motion']).toBe('▲');
-    expect(m['Base Post Play']).toBe('▲');
-    expect(m['5-0 Motion']).toBe('▲▲');
-    expect(m['3-2 Motion']).toBe('▲▲');
-    expect(m['PF Post Motion']).toBe('▲▲▲');
-    expect(m['Quick Midrange Jumper']).toBe('–');
-    // Defense: one arrow under 30, two from 30, three from 50.
-    const defense = await page.evaluate(() => [...document.querySelectorAll('.pbs-panel--defense .pbs-row')].map((row) => (
-      row.querySelector('.pbs-delta').getAttribute('aria-label') + ' ' + row.querySelector('.pbs-delta').textContent
-    )));
-    expect(defense).toContain('Training change +50 ▲▲▲');
+    expect(m['4-1 Motion'].text).toBe('▲');          // +3
+    expect(m['Base Post Play'].text).toBe('▲');      // +4
+    expect(m['5-0 Motion'].text).toBe('▲▲');         // +5
+    expect(m['3-2 Motion'].text).toBe('▲▲');         // +19
+    expect(m['PF Post Motion'].text).toBe('▲▲▲');    // +20
+    expect(m['Quick Midrange Jumper'].text).toBe('–');
+    expect(m['Iso'].text).toBe('–');                 // not trained at all
+    // The existing training movement marks: faint green, green, blue.
+    expect(m['4-1 Motion'].color).toMatch(/0\.45\)$|\/ 0\.45\)$/);
+    expect(m['5-0 Motion'].color).toBe('rgb(52, 236, 39)');
+    expect(m['PF Post Motion'].color).toBe('rgb(74, 144, 217)');
+  });
+
+  test('defense: one arrow under 30, two from 30, three from 50', async ({ page }) => {
+    await openReport(page, withCmdChanges());
+    const m = await marks(page);
+    const defense = Object.values(m).filter((row) => row.defense).map((row) => row.label + ' ' + row.text);
     expect(defense).toContain('Training change +29 ▲');
     expect(defense).toContain('Training change +30 ▲▲');
     expect(defense).toContain('Training change +49 ▲▲');
-    // Player marks are untouched by the switch: +2.5 on SC is still two arrows.
+    expect(defense).toContain('Training change +50 ▲▲▲');
+    // A gain that is three arrows for a play is one for a defense: the scales are separate.
+    expect(m['PF Post Motion'].text).toBe('▲▲▲');   // +20
+  });
+
+  test('drops, should a report ever carry one: offense 5 / 10, defense 10 / 20', async ({ page }) => {
+    await openReport(page, withCmdChanges({
+      plays: { '4-1 Motion': -4, '5-0 Motion': -5, '3-2 Motion': -9, 'PF Post Motion': -10 },
+      defenses: { man: -20, '2-3-zone': -9, '3-2-zone': -10, '1-3-1-zone': -19 },
+    }));
+    const m = await marks(page);
+    expect(m['4-1 Motion'].text).toBe('▼');
+    expect(m['5-0 Motion'].text).toBe('▼▼');
+    expect(m['3-2 Motion'].text).toBe('▼▼');
+    expect(m['PF Post Motion'].text).toBe('▼▼▼');
+    const defense = Object.values(m).filter((row) => row.defense).map((row) => row.label + ' ' + row.text);
+    expect(defense).toContain('Training change -9 ▼');
+    expect(defense).toContain('Training change -10 ▼▼');
+    expect(defense).toContain('Training change -19 ▼▼');
+    expect(defense).toContain('Training change -20 ▼▼▼');
+  });
+
+  test('a real-sized week no longer reads as all three arrows; camp uses the camp tones', async ({ page }) => {
+    // In season: set plays a few points, motions a few dozen, zones 26-52, Man 85.
+    await openReport(page, busy());
+    let m = await marks(page);
+    const counts = (rows) => rows.reduce((acc, row) => { acc[row.text] = (acc[row.text] || 0) + 1; return acc; }, {});
+    const offense = counts(Object.values(m).filter((row) => !row.defense && row.text !== '–'));
+    expect(offense).toEqual({ '▲': 4, '▲▲': 4, '▲▲▲': 3 });
+    const defense = counts(Object.values(m).filter((row) => row.defense && row.text !== '–'));
+    expect(defense).toEqual({ '▲': 1, '▲▲': 1, '▲▲▲': 2 });
+
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+    await openReport(page, camp());
+    m = await marks(page);
+    expect(m['Misdirection Three'].text).toBe('▲');          // +4
+    expect(m['Misdirection Three'].color).toBe('rgba(255, 255, 255, 0.87)');   // camp: one up is neutral
+    expect(m['Back Door Cut'].text).toBe('▲▲');             // +12
+    expect(m['4-1 Motion'].text).toBe('▲▲▲');               // +46
+  });
+
+  test('player marks are untouched: the attribute scale still marks the Player Report', async ({ page }) => {
+    await openReport(page, withCmdChanges());
+    // Roger Henrich gained 2.5 on SC this week: two arrows on the attribute scale.
     const sc = await page.locator('#players-tbody tr').first().locator('td.gstart').first().textContent();
     expect(sc).toBe('▲▲');
   });
