@@ -38,29 +38,19 @@
 }
 .pdg-tally-item.is-zero { opacity: .4; }
 
-/* 4 rows x 3 columns, filled COLUMN-first so the best players run down column one. */
-.pdg-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(4, auto);
-  grid-auto-flow: column;
-  gap: 10px;
-}
-@media (max-width: 1100px) {
-  .pdg-grid { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-flow: row; }
-}
-
-/* Cards (weekly training page): four columns of three, filled COLUMN-first, so RT order
-   reads down column one and then across. */
+/* Four cards across, filled ROW by row: RT order reads left to right, then top to bottom.
+   Twelve players are three rows of four; a longer camp roster adds a row. One layout for
+   both hosts (the weekly training page and Prep > Player Training). */
+.pdg-grid,
 .pdg-layout-cards .pdg-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(var(--pdg-rows, 3), auto);
-  grid-auto-flow: column;
+  grid-auto-flow: row;
   gap: var(--dsp-10) var(--dsp-12);
 }
 @media (max-width: 1100px) {
-  .pdg-layout-cards .pdg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-auto-flow: row; }
+  .pdg-grid,
+  .pdg-layout-cards .pdg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Name and RT on one line, the two editors on the next. */
@@ -200,38 +190,4 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .pdg-hovercard { transition: none; }
-}
-
-.pdg-layout-table .pdg-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.pdg-layout-table .pdg-av {
-  width: 28px;
-}
-.pdg-layout-table .pdg-av img,
-.pdg-layout-table .pdg-av {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-6, 6px);
-  object-fit: cover;
-  text-align: center;
-  line-height: 28px;
-  font-size: var(--fs-10);
-  color: var(--text-60);
-  background: var(--white-6);
-}
-.pdg-layout-table .pdg-jn,
-.pdg-layout-table .pdg-pos {
-  color: var(--text-60);
-  font-variant-numeric: tabular-nums;
-}
-.pdg-layout-table .rtl {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.pdg-layout-table .rtl i {
-  font-style: normal;
-  color: var(--text-38);
 }

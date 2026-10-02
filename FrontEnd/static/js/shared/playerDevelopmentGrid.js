@@ -1,9 +1,9 @@
 /**
  * Player Development grid — the 12 active players, their training position and focus.
  *
- * ONE implementation for its two hosts: the weekly training page (under Coaching Focus,
- * `layout: 'cards'`, four columns of three) and Prep › Player Training (`layout:
- * 'table'`). They are the only two places development is editable.
+ * ONE implementation and ONE layout for its two hosts: the weekly training page (under
+ * Coaching Focus) and Prep › Player Training. Both draw the same cards, four across. They
+ * are the only two places development is editable.
  *
  * Hosts differ in where their roster comes from, so each adapts its own payload into the
  * normalised shape below rather than this module learning two payloads:
@@ -13,9 +13,11 @@
  *     position_ratings: { PG: 72, ... },
  *     training_position, training_focus, resolved_training_position, resolved_training_focus }
  *
- * Row order is fixed by the caller and never re-sorted. The displayed RT follows the
- * TRAINING position, so it changes when the coach changes the position — but re-sorting on
- * that would make a row jump out from under the cursor immediately after it was used.
+ * Order: by the RT the card shows (the rating at the TRAINING position), highest first,
+ * reading left to right and then top to bottom; ties keep the caller's order. The order is
+ * set when the grid is rendered and not while it is being edited: that RT changes when the
+ * coach changes a position, and re-sorting then would move a card out from under the
+ * cursor immediately after it was used. A longer roster (camp, before cuts) adds a row.
  */
 (function () {
   'use strict';
@@ -35,6 +37,17 @@
     var pos = dev ? dev.positionOf(player) : null;
     var v = pos ? Number(ratings[pos]) : NaN;
     return isFinite(v) ? Math.round(v) : null;
+  }
+
+  /** Highest shown RT first; a card with no rating last; ties keep the caller's order. */
+  function orderByRt(players) {
+    return (players || []).map(function (player, index) {
+      return { player: player, index: index, rt: rtAtTrainingPosition(player) };
+    }).sort(function (a, b) {
+      var ar = a.rt == null ? -Infinity : a.rt;
+      var br = b.rt == null ? -Infinity : b.rt;
+      return (br - ar) || (a.index - b.index);
+    }).map(function (entry) { return entry.player; });
   }
 
   /** Height may arrive as inches (training payload) or preformatted (roster payload). */
@@ -237,20 +250,17 @@
     var dev = window.GOBDevelopmentFocus;
     if (!host || !dev) return;
     var o = opts || {};
-    var rows = players || [];
+    var rows = orderByRt(players);
     var grid = host.querySelector('.pdg-grid');
     if (!grid) return;
 
-    host.classList.toggle('pdg-layout-table', o.layout === 'table');
-    host.classList.toggle('pdg-layout-cards', o.layout !== 'table');
-    // Cards run four columns wide, RT order reading down each column: twelve players are
-    // four columns of three, and a longer camp roster adds a row rather than a column.
-    grid.style.setProperty('--pdg-rows', String(Math.max(1, Math.ceil(rows.length / 4))));
+    // One layout for both hosts: cards, four across, filled row by row. Twelve players
+    // are three rows of four, and a longer camp roster adds a row.
+    host.classList.remove('pdg-layout-table');
+    host.classList.add('pdg-layout-cards');
     if (o.tallies) host._pdgTallies = o.tallies;
     grid.innerHTML = rows.length
-      ? (o.layout === 'table'
-        ? '<table class="pdg-table"><thead><tr><th colspan="3" class="l">Player</th><th class="c">RT</th><th class="c">Pos</th><th class="l">Training</th></tr></thead><tbody>' + rows.map(tableRowHtml).join('') + '</tbody></table>'
-        : rows.map(cardHtml).join(''))
+      ? rows.map(cardHtml).join('')
       : '<div class="pdg-empty">No active players.</div>';
     paintTallies(host, rows);
 
@@ -324,51 +334,11 @@
     }).join('');
   }
 
-  function portraitHtml(player) {
-    var letters = String(player.name || '').split(/\s+/).filter(Boolean).slice(0, 2)
-      .map(function (part) { return part.charAt(0).toUpperCase(); }).join('');
-    var url = '';
-    var api = window.API_CONFIG;
-    if (player.portrait_source === 'recruit' && player.image_id && api && typeof api.getRecruitImageUrl === 'function') {
-      url = api.getRecruitImageUrl(player.image_id);
-    } else if (player.id && api && typeof api.getPlayerImageUrl === 'function') {
-      url = api.getPlayerImageUrl(player.id, { size: 'card' });
-    }
-    if (!url) return esc(letters);
-    return '<img alt="" src="' + esc(url) + '" data-letters="' + esc(letters)
-      + '" onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';}">';
-  }
-
-  function rtPairHtml(player) {
-    var current = rtAtTrainingPosition(player);
-    var bucket = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass : function () { return ''; };
-    var show = typeof window.formatRtDisplay === 'function' ? window.formatRtDisplay : function (n) { return String(n); };
-    var currentText = current == null ? '--' : show(current);
-    var html = '<span class="rtl"><b data-pdg-rt class="' + (current == null ? '' : bucket(current)) + '">' + esc(currentText) + '</b>';
-    if (player.potential_rt_ratcheted != null && player.potential_rt_ratcheted !== '') {
-      html += '<i>→</i><b class="pot ' + bucket(player.potential_rt_ratcheted) + '">'
-        + esc(show(player.potential_rt_ratcheted)) + '</b>';
-    }
-    return html + '</span>';
-  }
-
-  function tableRowHtml(player) {
-    var dev = window.GOBDevelopmentFocus;
-    var jersey = player.jersey == null || player.jersey === '' ? '' : String(player.jersey);
-    return '<tr data-pdg-player="' + esc(player.id) + '">' +
-      '<td class="pdg-av">' + portraitHtml(player) + '</td>' +
-      '<td class="pdg-jn">' + esc(jersey) + '</td>' +
-      '<td class="pdg-name" tabindex="0">' + esc(player.name) + '</td>' +
-      '<td class="pdg-rt">' + rtPairHtml(player) + '</td>' +
-      '<td class="pdg-pos">' + esc(player.pos || '') + '</td>' +
-      '<td class="pdg-controls">' + dev.positionSelectHtml(player) + dev.focusSelectHtml(player) + '</td>' +
-    '</tr>';
-  }
-
   window.GOBPlayerDevelopmentGrid = {
     ATTR_ORDER: ATTR_ORDER,
     render: render,
     rtAtTrainingPosition: rtAtTrainingPosition,
+    orderByRt: orderByRt,
     formatHeight: formatHeight,
     attrValue: attrValue,
     developsFor: developsFor,

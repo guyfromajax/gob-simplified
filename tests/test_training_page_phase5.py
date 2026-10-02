@@ -270,12 +270,14 @@ def test_it_costs_no_extra_request():
     assert "renderPlayerDevelopment" in load[:800]
 
 
-def test_the_grid_is_four_rows_of_three_filled_column_first():
+def test_the_grid_is_four_across_filled_row_by_row():
+    """RT order reads left to right, then top to bottom; a longer roster adds a row."""
     block = CSS_GRID[CSS_GRID.index(".pdg-grid {"):]
     block = block[:block.index("}")]
-    assert "repeat(3, 1fr)" in block
-    assert "repeat(4, auto)" in block
-    assert "grid-auto-flow: column" in block
+    assert "repeat(4, minmax(0, 1fr))" in block
+    assert "grid-auto-flow: row" in block
+    assert "grid-template-rows" not in block
+    assert "grid-auto-flow: column" not in CSS_GRID
 
 
 def test_positions_tally_left_focuses_tally_right():
