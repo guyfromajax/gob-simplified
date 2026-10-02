@@ -500,6 +500,52 @@ test.describe('training page', () => {
     await shot(page, 'T4-coaching-focus', page.locator('.coaching-section'));
   });
 
+  test('the Culture Builder mark is a heart; the other three icons are untouched', async ({ page }) => {
+    await openTraining(page);
+    const marks = await page.evaluate(() => {
+      const out = {};
+      document.querySelectorAll('#training-view .archetype-block').forEach((block) => {
+        const svg = block.querySelector('.arch-mark svg');
+        const cs = getComputedStyle(svg);
+        const box = svg.getBoundingClientRect();
+        out[block.dataset.archetype] = {
+          inner: svg.innerHTML,
+          viewBox: svg.getAttribute('viewBox'),
+          strokeWidth: svg.getAttribute('stroke-width'),
+          linecap: svg.getAttribute('stroke-linecap'),
+          fill: svg.getAttribute('fill'),
+          size: Math.round(box.width) + 'x' + Math.round(box.height),
+          color: cs.color,
+        };
+      });
+      return out;
+    });
+    // Jamie likes these three: byte for byte as they were.
+    expect(marks.authoritarian.inner).toBe('<circle cx="6" cy="10" r="3.5"></circle><path d="M6 6.5h8v3H9.4"></path><path d="M3.2 3.6l1.1 1.5M6.4 2.6v1.9"></path>');
+    expect(marks['systems-coach'].inner).toBe('<rect x="2.5" y="2.5" width="11" height="11" rx="2"></rect><path d="M5 5l2 2M7 5L5 7"></path><circle cx="10.6" cy="10.6" r="1.3"></circle><path d="M6.2 10.8c1-.2 2.6-1.6 3.4-4"></path>');
+    expect(marks['player-maximizer'].inner).toBe('<path d="M2.5 13.5h11"></path><path d="M4.5 13.5v-3M8 13.5v-5.5M11.5 13.5V6.5"></path><path d="M9.5 4.2l2-2 2 2"></path>');
+    // The heart: one closed outline, no figures.
+    const heart = marks['culture-builder'];
+    expect(heart.inner).toBe('<path d="M8 13.4S2.5 10.2 2.5 6.3A2.9 2.9 0 0 1 8 5a2.9 2.9 0 0 1 5.5 1.3c0 3.9-5.5 7.1-5.5 7.1z"></path>');
+    expect(heart.inner).not.toContain('circle');
+    // Same line weight, size and outline style as the set; its own purple mark colour.
+    ['viewBox', 'strokeWidth', 'linecap', 'fill', 'size'].forEach((key) => {
+      expect(heart[key], key).toBe(marks.authoritarian[key]);
+      expect(heart[key], key).toBe(marks['player-maximizer'][key]);
+    });
+    expect(heart.color).toBe('rgb(168, 118, 230)');
+    if (process.env.PB_SHOTS === '1') {
+      const dir = path.join(__dirname, '../../reports/training-followups');
+      fs.mkdirSync(dir, { recursive: true });
+      await page.locator('.coaching-section').evaluate((el) => {
+        el.scrollIntoView({ block: 'center' });
+      });
+      await settle(page);
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: path.join(dir, 'culture-builder-heart-after-1280.png'), animations: 'disabled' });
+    }
+  });
+
   test('T5 four Player Maximizer options, each opening its own modal in view', async ({ page }) => {
     await openTraining(page);
     const block = page.locator('.archetype-block[data-archetype="player-maximizer"]');
