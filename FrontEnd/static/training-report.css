@@ -207,50 +207,8 @@
   padding-bottom: var(--spacing-sm);
 }
 
-/* Attribute tooltip */
 .attribute-value-cell {
   position: relative;
-}
-
-.training-report-page .players-table td.attribute-display-increase {
-  color: var(--text-100);
-  font-weight: var(--fw-bold);
-}
-
-.training-report-page .players-table td.attribute-display-decrease {
-  color: var(--red);
-  font-weight: var(--fw-bold);
-}
-
-.attribute-tooltip {
-  position: fixed;
-  display: none;
-  background: rgba(0, 0, 0, 0.9);
-  color: var(--text-100);
-  padding: 0.4rem 0.8rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
-  font-weight: var(--fw-semibold);
-  z-index: 10000;
-  pointer-events: none;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px var(--black-50);
-}
-
-.attribute-tooltip-positive {
-  color: var(--text-100);
-}
-
-.attribute-tooltip-negative {
-  color: var(--color-error);
-}
-
-.attribute-tooltip-zero {
-  color: var(--color-text);
-}
-
-.attribute-tooltip-elite {
-  color: var(--blue); /* RT A / 9+ / elite glyphs */
 }
 
 /* Momentum pill in table */
@@ -1638,12 +1596,6 @@ body.training-report-page {
   box-shadow: inset 0 0 0 2px var(--text-60);
 }
 
-.training-report-page .delta-mark,
-#training-report-view .delta-mark {
-  margin-left: var(--space-2);
-  color: var(--text-100);
-}
-
 #franchise-container #training-report-view.tab-content {
   padding: 0;
   border: 0;
@@ -1944,31 +1896,30 @@ body.training-report-page {
 }
 
 /* --- Training movement marks ----------------------------------------------------
-   One up neutral, two up green, three up blue, down red; outside camp a single down
-   is neutral too (training-report.js describeTrainingChange; Styleguide, Data scales).
+   In season: one up faint green, one down faint red, two up green, three up blue, two
+   or three down red. Camp: one up neutral, any down red (training-report.js
+   describeTrainingChange; Styleguide, Data scales). The faint pair is the same green and
+   red let through to the row behind: 45% for green; red needs 60% to read as clearly
+   (3:1 or better on both zebra rows).
    Declared after every .change-* rule above so the tone is what paints. */
 .training-report-page .tr-tone-neutral,
 #training-report-view .tr-tone-neutral,
-#training-report-view .players-table td.tr-tone-neutral,
-.attribute-tooltip.tr-tone-neutral { color: var(--text-87); }
+#training-report-view .players-table td.tr-tone-neutral { color: var(--text-87); }
 .training-report-page .tr-tone-up,
 #training-report-view .tr-tone-up,
-#training-report-view .players-table td.tr-tone-up,
-.attribute-tooltip.tr-tone-up { color: var(--delta-up); }
+#training-report-view .players-table td.tr-tone-up { color: var(--delta-up); }
+.training-report-page .tr-tone-up-faint,
+#training-report-view .tr-tone-up-faint,
+#training-report-view .players-table td.tr-tone-up-faint { color: color-mix(in srgb, var(--delta-up) 45%, transparent); }
 .training-report-page .tr-tone-elite,
 #training-report-view .tr-tone-elite,
-#training-report-view .players-table td.tr-tone-elite,
-.attribute-tooltip.tr-tone-elite { color: var(--blue); }
+#training-report-view .players-table td.tr-tone-elite { color: var(--blue); }
 .training-report-page .tr-tone-down,
 #training-report-view .tr-tone-down,
-#training-report-view .players-table td.tr-tone-down,
-.attribute-tooltip.tr-tone-down { color: var(--tier-red); }
-/* Pluses and minuses beside an attribute value: a touch of air, same tones. */
-#training-report-view .delta-mark {
-  margin-left: var(--space-3);
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--tracking-2);
-}
+#training-report-view .players-table td.tr-tone-down { color: var(--tier-red); }
+.training-report-page .tr-tone-down-faint,
+#training-report-view .tr-tone-down-faint,
+#training-report-view .players-table td.tr-tone-down-faint { color: color-mix(in srgb, var(--tier-red) 60%, transparent); }
 
 /* --- Playbook Summary: Offense and Defense side by side -----------------------------
    Each panel lays its sub-sections out as compact columns, so the whole playbook reads
