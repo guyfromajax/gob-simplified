@@ -18,10 +18,20 @@ const errorEl = document.getElementById('persona-intro-error');
 // so the audio feels continuous across the onboarding funnel. Each page
 // owns its own Audio instance (the prior page's instance is GC'd on
 // unload); matches the existing precedent on those two pages.
+// The lobby track is non-gameplay music: it follows the Music switch in Settings.
+function followMusicSwitch(audio, base) {
+  import('/js/shared/uiSfx.js').then(function (m) {
+    var apply = function () { audio.volume = m.outputVolume(base, 'music'); };
+    apply();
+    m.subscribeAudio(apply);
+  }).catch(function () { audio.volume = base; });
+}
+
 try {
   const lobbyMusic = new Audio('/sounds/crossover-21738.mp3');
   lobbyMusic.loop = true;
-  lobbyMusic.volume = 0.4;
+  lobbyMusic.volume = 0;
+  followMusicSwitch(lobbyMusic, 0.4);
   lobbyMusic.play().catch(function () {});
 } catch (e) { /* autoplay or codec fail — silent */ }
 

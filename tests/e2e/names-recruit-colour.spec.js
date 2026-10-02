@@ -150,17 +150,15 @@ test.beforeAll(() => {
   fs.mkdirSync(OUT, { recursive: true });
 });
 
-test('account geek points show stored names and a neutral ambience switch', async ({ page }) => {
+test('account geek points show stored names and no audio switch', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await installApi(page, 12);
   await page.goto('/account.html');
   await page.waitForSelector('#gp-by-team .gp-team-name');
   const names = await page.locator('#gp-by-team .gp-team-name').allTextContents();
   expect(names).toEqual(['IDA', 'Bentley-Truman', 'Seattle AAA']);
-  const sw = page.locator('#acct-ambience-switch');
-  await expect(sw).toBeVisible();
-  const onBg = await sw.evaluate((el) => getComputedStyle(el).backgroundImage + ' ' + getComputedStyle(el).backgroundColor);
-  expect(onBg.toLowerCase()).not.toMatch(/247,\s*148,\s*32|#f79420|#ffab40/);
+  // Audio is set in Settings (Music, Sound) and on the court, nowhere else.
+  await expect(page.locator('#acct-ambience-switch')).toHaveCount(0);
   await shot(page, 'account-geek-points');
 });
 

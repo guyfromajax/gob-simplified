@@ -24,6 +24,16 @@
     34: 'Play National Championship!',
   });
 
+  // The round alone, in the same words as the button ("First Round",
+  // "Semifinals", "Championship"): the top bar names the tier itself.
+  function eosRoundForWeek(week) {
+    var label = EOS_PLAY_CTA_BY_WEEK[Number(week)] || '';
+    return label
+      .replace(/^Play\s+/, '')
+      .replace(/^(Conference|Region|National)\s+(Tourney\s+)?/, '')
+      .replace(/!+$/, '');
+  }
+
   var EOS_SIM_CTA_BY_WEEK = Object.freeze({
     28: 'Sim Conference Tourney Semifinals',
     29: 'Sim Conference Tourney Championship',
@@ -801,6 +811,7 @@
   }
 
   window.GOBAdvance = {
+    eosRoundForWeek: eosRoundForWeek,
     updatePlayButton: updatePlayButton,
     setOverride: setOverride,
     clearOverride: clearOverride,

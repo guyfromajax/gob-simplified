@@ -605,13 +605,11 @@ function renderFccHeaderEmblem(data) {
   if (!tier) { slot.innerHTML = ''; return; }
   window.GOBTierEmblem.injectCss();
   const sz = window.GOBTierEmblem.EMBLEM_SIZING.fccFranchiseHeader;
-  slot.innerHTML = window.GOBTierEmblem.renderLockup({
+  // The emblem alone: the top bar spells out the tournament and the round beside it.
+  slot.innerHTML = window.GOBTierEmblem.renderEmblem({
     tier,
     value: emblemValueForTier(tier, data),
     size: sz.emblem,
-    l1: sz.labelL1,
-    l2: sz.labelL2,
-    variant: 'stack'
   });
 }
 

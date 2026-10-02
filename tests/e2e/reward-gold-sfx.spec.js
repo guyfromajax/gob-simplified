@@ -75,14 +75,24 @@ test.describe('reward-gold sfx hooks', () => {
     srcs = await page.evaluate(() => window.__sfxPlays.slice());
     expect(playsOf(srcs, 'click-tiny.wav')).toHaveLength(0);
 
+    // Off the court there are no levels: Sound in Settings is the one switch.
     await page.evaluate(async () => {
       const m = await import('/js/shared/uiSfx.js');
       m.setChannelMuted('sfx', false);
-      m.setChannelLevel('master', 0);
+      m.setAppAudio('sound', false);
     });
     await page.locator('#sfx-probe').click();
     srcs = await page.evaluate(() => window.__sfxPlays.slice());
     expect(playsOf(srcs, 'click-tiny.wav')).toHaveLength(0);
+
+    await page.evaluate(async () => {
+      window.__sfxPlays = [];
+      const m = await import('/js/shared/uiSfx.js');
+      m.setAppAudio('sound', true);
+    });
+    await page.locator('#sfx-probe').click();
+    srcs = await page.evaluate(() => window.__sfxPlays.slice());
+    expect(playsOf(srcs, 'click-tiny.wav')).toHaveLength(1);
   });
 
   test('missing sting file does not throw or block a modal', async ({ page }) => {

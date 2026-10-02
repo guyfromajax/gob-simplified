@@ -4,6 +4,7 @@
  */
 
 import gameStore from '../../state/gameStore.js';
+import { outputVolume } from '../../shared/uiSfx.js';
 import { isFastBreakEntryAnnouncementsEnabled } from '../constants/fastBreakConstants.js';
 import { isBonusFreeThrowFoulTurn } from './foulAnnouncementClassifier.js';
 import {
@@ -44,8 +45,11 @@ export function isPassInterception(turnData = {}, context = {}) {
 export function playAnnouncementSfx(kind) {
   const filename = kind === 'shot_clock_violation' ? 'whistle-3.mp3' : 'whistle-1-lowervol.wav';
   try {
+    // On the bus: the court's sound control mutes the whistle with everything else.
+    const volume = outputVolume(0.7, 'sfx');
+    if (volume <= 0) return;
     const sfx = new Audio('/sounds/' + encodeURIComponent(filename));
-    sfx.volume = 0.7;
+    sfx.volume = volume;
     sfx.play().catch(() => {});
   } catch (e) {}
 }

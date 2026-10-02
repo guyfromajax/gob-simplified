@@ -1,24 +1,15 @@
 /**
- * Settings panel. Opens from the auth-bar gear today and from GOBSettings.open()
- * for the future shell rail. Audio writes straight to uiSfx. Coach tiles render
- * only fields /api/auth/me already returns.
+ * Settings panel. Opens from the auth-bar gear, the shell rail and Home Base.
+ * Audio is two switches, Music and Sound: every non-gameplay sound in the app
+ * follows them and nothing else does. Gameplay audio is set on the court.
+ * Stat tiles render only fields /api/auth/me already returns.
  */
 import { bindGobDensity } from './gobDensity.js';
-import {
-  getAudioState,
-  setChannelLevel,
-  setChannelMuted,
-  subscribeAudio,
-} from './uiSfx.js';
+import { getAppAudio, setAppAudio, subscribeAudio } from './uiSfx.js';
 
-const SPEAKER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
-const SPEAKER_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>';
-
-const ROWS = [
-  ['master', 'Master'],
+const SWITCHES = [
   ['music', 'Music'],
-  ['sfx', 'Sound Effects'],
-  ['ambience', 'Ambience'],
+  ['sound', 'Sound'],
 ];
 
 let host = null;
@@ -95,22 +86,16 @@ function isDesktop() {
   return typeof window !== 'undefined' && window.GOB_BUILD_PROFILE === 'desktop';
 }
 
-function sliderHtml(channel) {
-  return '<div class="slider" data-channel="' + channel + '" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-label="' + channel + ' volume"><i></i><b></b></div>';
-}
-
 function build() {
   ensureCss();
   host = document.createElement('div');
   host.className = 'gob gob-settings-host';
   host.id = 'gob-settings-host';
   host.hidden = true;
-  const rows = ROWS.map(([id, label]) => {
+  const rows = SWITCHES.map(([id, label]) => {
     return '<div class="aud" data-aud="' + id + '">'
-      + '<button type="button" class="mute" data-mute="' + id + '" data-sfx="SFX_SELECT" aria-pressed="false" title="Mute ' + label + '">' + SPEAKER + '</button>'
-      + '<span class="aud-l">' + label + '</span>'
-      + sliderHtml(id)
-      + '<span class="aud-v" data-val="' + id + '">100</span>'
+      + '<span class="aud-l" id="gob-aud-' + id + '">' + label + '</span>'
+      + '<button type="button" class="tgl" role="switch" data-audio-switch="' + id + '" aria-checked="true" aria-labelledby="gob-aud-' + id + '"></button>'
       + '</div>';
   }).join('');
   host.innerHTML = ''
@@ -118,8 +103,9 @@ function build() {
     + '<aside class="settings" role="dialog" aria-modal="true" aria-labelledby="gob-settings-title">'
     + '  <div class="set-h"><h2 id="gob-settings-title">Settings</h2><button type="button" class="set-x" data-settings-close data-sfx="SFX_SELECT" title="Close (Esc)" aria-label="Close">×</button></div>'
     + '  <div class="set-b">'
-    + '    <section class="set-s"><h3>Audio <span>Changes apply instantly</span></h3>' + rows + '</section>'
-    + '    <section class="set-s" data-coach hidden><h3>Coach stats</h3><div class="cs-grid" data-coach-grid></div></section>'
+    + '    <section class="set-s"><h3>Audio</h3><div class="aud-list">' + rows + '</div>'
+    + '      <p class="aud-note">Game sound is set on the court.</p></section>'
+    + '    <section class="set-s" data-coach hidden><h3>Stats</h3><div class="cs-grid" data-coach-grid></div></section>'
     + '    <section class="set-s" data-account></section>'
     + '  </div>'
     + '  <div class="set-f"><span class="set-f-l"><a class="lnk" href="/faqs.html" target="_blank" rel="noopener" data-settings-faqs data-sfx="SFX_SELECT">FAQs</a><span data-build></span></span><span class="conn" data-conn><i></i><span data-conn-label>Online</span></span></div>'
@@ -127,71 +113,29 @@ function build() {
   document.body.appendChild(host);
   bindGobDensity(host);
   host.addEventListener('click', onClick);
-  host.addEventListener('keydown', onSliderKey);
-  host.addEventListener('pointerdown', onPointerDown);
   unsubscribe = subscribeAudio(paintAudio);
-  paintAudio(getAudioState());
+  paintAudio();
 }
 
-function paintAudio(snapshot) {
+function paintAudio() {
   if (!host) return;
-  const state = snapshot || getAudioState();
-  ROWS.forEach(([id]) => {
-    const row = host.querySelector('[data-aud="' + id + '"]');
-    const slot = state[id];
-    if (!row || !slot) return;
-    row.classList.toggle('is-muted', !!slot.muted);
-    const mute = row.querySelector('[data-mute]');
-    mute.classList.toggle('on', !!slot.muted);
-    mute.setAttribute('aria-pressed', slot.muted ? 'true' : 'false');
-    mute.innerHTML = slot.muted ? SPEAKER_OFF : SPEAKER;
-    mute.title = (slot.muted ? 'Unmute ' : 'Mute ') + row.querySelector('.aud-l').textContent;
-    const slider = row.querySelector('.slider');
-    slider.setAttribute('aria-valuenow', String(slot.level));
-    slider.querySelector('i').style.width = slot.level + '%';
-    slider.querySelector('b').style.left = slot.level + '%';
-    row.querySelector('[data-val]').textContent = String(slot.level);
+  const app = getAppAudio();
+  SWITCHES.forEach(([id]) => {
+    const sw = host.querySelector('[data-audio-switch="' + id + '"]');
+    if (!sw) return;
+    const on = !!app[id];
+    sw.classList.toggle('on', on);
+    sw.setAttribute('aria-checked', on ? 'true' : 'false');
+    sw.closest('.aud').classList.toggle('is-off', !on);
   });
 }
 
-function levelFromPointer(slider, event) {
-  const rect = slider.getBoundingClientRect();
-  const width = rect.width || 1;
-  const x = Math.min(Math.max(0, event.clientX - rect.left), width);
-  return Math.round((x / width) * 100);
-}
-
-function onPointerDown(event) {
-  const slider = event.target.closest && event.target.closest('.slider');
-  if (!slider || !host.contains(slider)) return;
-  event.preventDefault();
-  slider.classList.add('is-drag');
-  const channel = slider.getAttribute('data-channel');
-  const move = (ev) => setChannelLevel(channel, levelFromPointer(slider, ev));
-  const up = () => {
-    slider.classList.remove('is-drag');
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', up);
-  };
-  move(event);
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', up);
-}
-
-function onSliderKey(event) {
-  const slider = event.target.closest && event.target.closest('.slider');
-  if (!slider) return;
-  const channel = slider.getAttribute('data-channel');
-  const now = Number(slider.getAttribute('aria-valuenow') || 0);
-  const step = event.shiftKey ? 10 : 5;
-  let next = null;
-  if (event.key === 'ArrowRight' || event.key === 'ArrowUp') next = now + step;
-  else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') next = now - step;
-  else if (event.key === 'Home') next = 0;
-  else if (event.key === 'End') next = 100;
-  if (next == null) return;
-  event.preventDefault();
-  setChannelLevel(channel, next);
+// Music that was silenced is paused, not playing at zero: turning it back on
+// has to start the track for the page the player is on.
+function resumeMusic() {
+  import('/js/musicController.js')
+    .then((m) => { if (m && m.tryStartScoutingAmbienceForCurrentPage) m.tryStartScoutingAmbienceForCurrentPage(); })
+    .catch(() => {});
 }
 
 function onClick(event) {
@@ -199,11 +143,12 @@ function onClick(event) {
     close();
     return;
   }
-  const mute = event.target.closest('[data-mute]');
-  if (mute) {
-    const id = mute.getAttribute('data-mute');
-    const slot = getAudioState()[id];
-    setChannelMuted(id, !(slot && slot.muted));
+  const sw = event.target.closest('[data-audio-switch]');
+  if (sw) {
+    const id = sw.getAttribute('data-audio-switch');
+    const on = !getAppAudio()[id];
+    setAppAudio(id, on);
+    if (id === 'music' && on) resumeMusic();
     return;
   }
   const logout = event.target.closest('[data-settings-logout]');
@@ -242,9 +187,14 @@ function paintCoach(me) {
     tiles.push('<div class="cs cs-rec"><b><em>' + Number(record.wins) + '</em><i>\u2013</i><em>'
       + Number(record.losses) + '</em></b><span>Career record</span></div>');
   }
-  const titles = titleCount(me && me.championships_total);
-  if (titles != null && me && me.championships_total) {
+  const champs = me && me.championships_total;
+  const titles = titleCount(champs);
+  if (titles != null && champs) {
     tiles.push('<div class="cs"><b>' + titles + '</b><span>Titles</span></div>');
+    const national = Number(champs.national);
+    if (Number.isFinite(national)) {
+      tiles.push('<div class="cs"><b>' + national + '</b><span>National Titles</span></div>');
+    }
   }
   if (!tiles.length) {
     section.hidden = true;
@@ -316,7 +266,7 @@ export function openSettings() {
   placeHost();
   open = true;
   loadIdentity();
-  paintAudio(getAudioState());
+  paintAudio();
   if (!onKey) {
     onKey = onEscape;
     document.addEventListener('keydown', onKey);
