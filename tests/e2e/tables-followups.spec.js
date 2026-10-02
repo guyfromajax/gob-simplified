@@ -411,3 +411,185 @@ for (const week of Object.keys(REAL).map(Number).sort((a, b) => a - b)) {
     }
   });
 }
+
+// ── A result's box score, from a real played game ─────────────────────────────
+// The responses below are the real server's, recorded from one real game played to the
+// final buzzer on the offline engine (week 3), with the week then closed (week 4). That
+// is the state that sent every "Box score" click back to the Office: the game is final,
+// it is the franchise's last game, and the week has moved on, which is exactly what the
+// closed-game guard looks for. A box score opened to read carries return_url and is left
+// alone; the post-game flow page, which carries none, is still guarded.
+const GAME = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/boxscore-real-game.json'), 'utf8'));
+const RESULT_URL = '/franchise-command-center.html?franchise_id=' + GAME.franchise_id + '&team_id=' + GAME.team_id;
+
+async function installRealGame(page) {
+  await stubAuth(page);
+  await page.route('**/*', async (route) => {
+    const request = route.request();
+    let url;
+    try { url = new URL(request.url()); } catch (err) { return route.continue(); }
+    const pathname = url.pathname;
+    if (pathname.indexOf('/images/players/') !== -1) return route.fulfill({ status: 404, body: '' });
+    const api = pathname.startsWith('/api/') || pathname.startsWith('/franchise/') || pathname.startsWith('/roster/')
+      || pathname === '/app-config' || pathname === '/teams';
+    if (!api) return route.continue();
+    if (pathname === '/api/auth/me') return json(route, { user_id: 'e2e-user', username: 'e2e' });
+    if (pathname === '/app-config') return json(route, { isAlpha: false, alphaDisclaimer: null, version: '1.0' });
+    if (pathname === '/teams') return json(route, []);
+    if (pathname.startsWith('/franchise/command-center/data')) return json(route, GAME.command_center);
+    if (pathname.startsWith('/franchise/team-detail')) return json(route, GAME.team_detail);
+    if (pathname.startsWith('/franchise/schedule/week')) return json(route, GAME.schedule_week_3);
+    if (pathname.startsWith('/franchise/news')) {
+      return json(route, {
+        news: [],
+        dispatches: [{
+          type: 'game_result', week: 3, yours: true, headline: 'Lancaster defeated Little York 63-58',
+          target: '/box-score.html?game_id=' + GAME.game_id + '&mode=franchise&franchise_id=' + GAME.franchise_id,
+        }],
+      });
+    }
+    if (pathname === '/api/game/' + GAME.game_id + '/resume-state') return json(route, GAME.resume_state);
+    if (pathname === '/api/game/' + GAME.game_id) return json(route, GAME.game);
+    if (pathname.startsWith('/roster/')) {
+      return json(route, pathname.indexOf(GAME.opponent_id) !== -1 ? GAME.roster_opponent : GAME.roster_user);
+    }
+    return json(route, {});
+  });
+}
+
+async function openResultSource(page, query, ready) {
+  await installRealGame(page);
+  await page.goto(RESULT_URL + query);
+  await page.waitForFunction(() => {
+    const overlay = document.getElementById('page-load-overlay');
+    return !overlay || getComputedStyle(overlay).display === 'none';
+  });
+  await page.waitForSelector(ready, { timeout: 20000 });
+}
+
+/** The box score for the recorded game is on screen and stays there. */
+async function expectBoxScore(page) {
+  await expect(page).toHaveURL(/\/box-score\.html\?/, { timeout: 15000 });
+  await page.waitForSelector('#home-player-stats-body tr', { timeout: 20000 });
+  // The bounce took a second or two (two reads, then the jump): give it room to happen.
+  await page.waitForTimeout(3500);
+  await expect(page).toHaveURL(/\/box-score\.html\?/);
+  const here = new URL(page.url());
+  expect(here.searchParams.get('game_id')).toBe(GAME.game_id);
+  await expect(page.locator('#box-score-container')).toContainText('Lancaster');
+  await expect(page.locator('#box-score-container')).toContainText('63');
+  await expect(page.locator('#home-tab.tab-content.active')).toHaveCount(0);
+  return here;
+}
+
+test('the real game is the case the guard matches: final, the last game, the week moved on', () => {
+  expect(GAME.resume_state.status).toBe('final');
+  expect(String(GAME.command_center.last_game_summary.game_id)).toBe(GAME.game_id);
+  expect(Number(GAME.command_center.last_game_summary.week)).toBeLessThan(Number(GAME.command_center.week));
+});
+
+test('Team › Schedule: clicking a real result opens that game\'s box score, and Back returns to the schedule', async ({ page }) => {
+  await openResultSource(page, '&tab=team-schedule-view', '#team-schedule-view a.gob-res');
+  const result = page.locator('#team-schedule-view a.gob-res[href*="' + GAME.game_id + '"]');
+  await expect(result).toHaveText(/W\s*63-58/);
+  await result.click();
+  const here = await expectBoxScore(page);
+  expect(here.searchParams.get('return_url')).toContain('tab=team-schedule-view');
+  if (SHOTS) {
+    fs.mkdirSync(OUT, { recursive: true });
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: path.join(OUT, 'after-box-score-from-team-schedule-1280.png'), animations: 'disabled' });
+  }
+  await page.locator('#locker-room-button').click();
+  await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
+  await expect.poll(() => new URL(page.url()).searchParams.get('tab'), { timeout: 15000 }).toBe('team-schedule-view');
+});
+
+test('League › Schedule: the "Box score" link of a real result opens the box score', async ({ page }) => {
+  await openResultSource(page, '&tab=league-schedule-view&week=3', '#league-schedule-view .gob-game.me a.gob-box');
+  await page.locator('#league-schedule-view .gob-game.me a.gob-box').click();
+  const here = await expectBoxScore(page);
+  expect(here.searchParams.get('return_url')).toContain('tab=league-schedule-view');
+});
+
+test('Office: the weekly card\'s "Box score" link opens the box score', async ({ page }) => {
+  await openResultSource(page, '', '#office-root .wkc a.lnk');
+  const link = page.locator('#office-root .wkc a.lnk', { hasText: 'Box score' });
+  await link.click();
+  const here = await expectBoxScore(page);
+  expect(here.searchParams.get('return_url')).toContain('/franchise-command-center.html');
+});
+
+test('News: a game-result headline opens the box score', async ({ page }) => {
+  await openResultSource(page, '&tab=news-view', '#news-view .gob-news-card');
+  await page.locator('#news-view a.gob-news-card', { hasText: 'Box Score' }).click();
+  const here = await expectBoxScore(page);
+  expect(here.searchParams.get('return_url')).toContain('tab=news-view');
+});
+
+test('the finished game\'s flow page is still guarded: no return_url, back to the Office', async ({ page }) => {
+  await installRealGame(page);
+  await page.goto('/box-score.html?game_id=' + GAME.game_id + '&mode=franchise&franchise_id=' + GAME.franchise_id + '&team_id=' + GAME.team_id);
+  await expect(page).toHaveURL(/franchise-command-center\.html/, { timeout: 20000 });
+  await expect.poll(() => new URL(page.url()).searchParams.get('tab'), { timeout: 15000 }).toBe('home-tab');
+});
+
+
+// ── Team › Team Attributes: no rank-movement arrows ───────────────────────────
+test('Team Attributes draws no rank-movement arrows, whatever rank_delta says', async ({ page }) => {
+  await stubAuth(page);
+  const defs = [
+    ['team_chemistry', 'Chemistry', 19, null, 25, null], ['fight', 'Fight', 6, 20, null, 2],
+    ['discipline', 'Discipline', -3, 20, null, -1], ['offensive_efficiency', 'Offense', 12, 20, null, 3],
+    ['defensive_efficiency', 'Defense', 5, 20, null, -4], ['pt_opp_modifier', 'P/T Offense', -4, 20, null, 1],
+    ['pt_efficiency', 'P/T Defense', 9, 20, null, -2], ['fb_efficiency', 'Fast Break', 14, 20, null, 5],
+    ['fb_opp_modifier', 'Fast Break Defense', -7, 20, null, -6], ['shot_threshold', 'Shooting', 88, null, null, 7],
+    ['rebound_modifier', 'Rebounding', 0.52, null, null, -8],
+  ];
+  const attrs = {};
+  const measures = defs.map((d, i) => {
+    attrs[d[0]] = d[2];
+    return {
+      family: i < 3 ? 'character' : 'floor', key: d[0], label: d[1], value: d[2], signed_scale: d[3], scale_max: d[4],
+      direction: d[0] === 'shot_threshold' ? 'lower_better' : 'higher_better',
+      rank: 10 + i * 9, rank_of: 128, percentile: 90 - i * 7, rank_delta: d[5], tied: false,
+    };
+  });
+  await page.route('**/*', async (route) => {
+    let pathname = '';
+    try { pathname = new URL(route.request().url()).pathname; } catch (err) { return route.continue(); }
+    const api = pathname.startsWith('/api/') || pathname.startsWith('/franchise/') || pathname.startsWith('/roster/')
+      || pathname === '/app-config' || pathname === '/teams';
+    if (!api) return route.continue();
+    if (pathname === '/api/auth/me') return json(route, { user_id: 'e2e-user', username: 'e2e' });
+    if (pathname === '/app-config') return json(route, { isAlpha: false, version: '1.0' });
+    if (pathname === '/teams') return json(route, []);
+    if (pathname.startsWith('/franchise/command-center/data')) {
+      return json(route, { franchise_id: FID, team_id: TID, user_team_id: TID, team: 'Lancaster', week: 13, rank: 14, season: 1, current_season: 1, training_completed: true, cut_required: false, recruiting_wire: { board_saved_week: 13, counts: {} }, team_record: { wins: 9, losses: 3 } });
+    }
+    if (pathname.startsWith('/franchise/team-data')) {
+      return json(route, { team_attributes: attrs, measures: measures, updated_after_week: 12, plays_data: {}, scouting_data: {} });
+    }
+    return json(route, {});
+  });
+  await page.goto('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=team-attributes-view');
+  await page.waitForSelector('#team-attributes-view .mcell', { timeout: 20000 });
+  await expect(page.locator('#team-attributes-view .mcell')).toHaveCount(11);
+  await shot(page, 'team-attributes-no-arrows');
+  // Every measure the server tracks has moved (Chemistry is never in the snapshot), and
+  // none of it is drawn.
+  expect(measures.filter((m) => m.key !== 'team_chemistry').every((m) => m.rank_delta)).toBe(true);
+  await expect(page.locator('#team-attributes-view .mv')).toHaveCount(0);
+  await expect(page.locator('#team-attributes-view .mgrid')).not.toContainText(/[▲▼]/);
+  // Each cell keeps its name, place, gauge and value; the gauge now runs to the value.
+  const cell = page.locator('#team-attributes-view .mcell[data-measure="offensive_efficiency"]');
+  await expect(cell.locator('.nm')).toHaveText('Offense');
+  await expect(cell.locator('.place')).toHaveText('(37th of 128)');
+  await expect(cell.locator('.mbar > *')).toHaveCount(2);
+  await expect(cell.locator('b')).toHaveText('+12');
+  const bar = await cell.locator('.mbar').evaluate((el) => {
+    const value = el.querySelector('b').getBoundingClientRect();
+    return Math.round(el.getBoundingClientRect().right - value.right);
+  });
+  expect(bar).toBeLessThanOrEqual(1);
+});

@@ -112,7 +112,8 @@ export function mount(container, ctx) {
     if (context) {
       foot = '<span class="ctx">' + tables.esc(context) + '</span>';
       if (done && game.game_id) {
-        foot += '<a class="gob-box" href="' + tables.esc(boxHref(game.game_id)) + '">Box score</a>';
+        // `data-return`: the box score opens as a read and comes back to this week.
+      foot += '<a class="gob-box" data-return href="' + tables.esc(boxHref(game.game_id)) + '">Box score</a>';
       }
     }
     return '<article class="gob-game' + (game.is_user ? ' me is-user' : '') + '">'

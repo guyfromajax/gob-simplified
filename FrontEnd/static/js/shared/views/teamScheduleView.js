@@ -98,7 +98,9 @@ export function mount(container, ctx) {
     }
     var text = letter + tables.esc(String(row.team_score) + '-' + String(row.opp_score));
     if (!row.game_id) return text;
-    return '<a class="gob-res" href="' + tables.esc(boxHref(row.game_id)) + '">' + text + '</a>';
+    // `data-return`: GOBNav adds return_url on the click, so the box score opens as a
+    // read (and comes back here), not as a step of the finished game's flow.
+    return '<a class="gob-res" data-return href="' + tables.esc(boxHref(row.game_id)) + '">' + text + '</a>';
   }
 
   function tournamentRowHtml(row) {

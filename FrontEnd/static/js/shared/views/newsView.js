@@ -109,7 +109,9 @@ export function mount(container, ctx) {
       + '<p>' + tables.esc(cardHeadline(item)) + '</p>';
     var story = item.story_id && !isGameResult(item) ? ' data-story="' + tables.esc(item.story_id) + '"' : '';
     if (!href) return '<div class="' + cls + '"' + story + '>' + inner + '</div>';
-    return '<a class="' + cls + '"' + story + ' href="' + tables.esc(href) + '">' + inner + '</a>';
+    // A game result opens the box score as a read: GOBNav adds return_url on the click.
+    var back = isGameResult(item) ? ' data-return' : '';
+    return '<a class="' + cls + '"' + story + back + ' href="' + tables.esc(href) + '">' + inner + '</a>';
   }
 
   function render() {

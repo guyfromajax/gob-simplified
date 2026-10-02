@@ -63,11 +63,14 @@ function teamsToMaps(teams) {
   return { names: names, meta: meta };
 }
 
+// return_url marks the box score as a read (not a step of the finished game's flow) and
+// is where its Back returns: this bracket.
 function boxHref(franchiseId, teamId, gameId) {
   if (!gameId) return '';
   return '/box-score.html?game_id=' + encodeURIComponent(gameId)
     + '&mode=franchise&franchise_id=' + encodeURIComponent(franchiseId)
-    + '&team_id=' + encodeURIComponent(teamId);
+    + '&team_id=' + encodeURIComponent(teamId)
+    + '&return_url=' + encodeURIComponent(window.location.pathname + window.location.search);
 }
 
 function phasePayload(data, phase) {

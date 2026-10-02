@@ -719,8 +719,15 @@
       if (result.site === 'home') when.push('Home');
       else if (result.site === 'away') when.push('Away');
       kick.appendChild(el('span', 'wkc-when', when.join(' · ')));
+      // return_url marks the box score as a read and brings its Back here. Without it
+      // the page treats last week's game as a finished flow and returns to the Office.
+      var boxParams = {};
+      Object.keys((result.box_score && result.box_score.params) || {}).forEach(function (key) {
+        boxParams[key] = result.box_score.params[key];
+      });
+      boxParams.return_url = global.location.pathname + global.location.search;
       var boxUrl = (result.box_score && present(result.box_score.path))
-        ? href(result.box_score.path, result.box_score.params) : '';
+        ? href(result.box_score.path, boxParams) : '';
       if (boxUrl) {
         var box = el('a', 'lnk', 'Box score');
         box.href = boxUrl;
