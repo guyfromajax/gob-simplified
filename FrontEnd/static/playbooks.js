@@ -1988,7 +1988,7 @@ function shellHtml() {
                   <section class="pbs pb-sec def-sec" data-section="hcTraps" data-norm="1">
                     <div class="sh pb-sec-head">
                       <div class="pb-sec-title">
-                        <h2>HC Traps</h2>
+                        <h2>Half-Court Traps</h2>
                         <span class="m cnt" id="hc-traps-count"></span>
                         <button class="norm-btn btn-q" id="hc-traps-normalize" type="button" hidden>Normalize → 100</button>
                       </div>

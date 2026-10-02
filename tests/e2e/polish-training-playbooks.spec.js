@@ -663,6 +663,7 @@ const TONE = {
   up: 'rgb(52, 236, 39)',
   elite: 'rgb(74, 144, 217)',
   down: 'rgb(255, 109, 109)',
+  flat: 'rgba(255, 255, 255, 0.38)',
 };
 
 /** Team Report rows by label: the mark text and its painted colour. */
@@ -752,12 +753,14 @@ test.describe('training report', () => {
       { text: '▲▲▲', color: TONE.elite },
       { text: '▲▲', color: TONE.up },
       { text: '▲', color: TONE.neutral },
-      { text: '▲', color: TONE.neutral },
-      { text: '▲', color: TONE.neutral },
+      { text: '–', color: TONE.flat },      // exactly 0 is a dash, as in camp
+      { text: '▲', color: TONE.neutral },   // -0.3 still reads as holding
       { text: '▼', color: TONE.neutral },
       { text: '▼▼', color: TONE.down },
       { text: '▼▼▼', color: TONE.down },
     ]);
+    // Team Report: an attribute that did not move carries no arrow, in season as in camp.
+    expect(team.Shooting.text).not.toMatch(/[▲▼]/);
     await shot(page, 'R2-report-in-season');
     await shot(page, 'R2-player-report-training-changes', page.locator('.players-section'));
   });
@@ -773,7 +776,7 @@ test.describe('training report', () => {
     expect(team.Fight).toEqual({ text: '▼▼', color: TONE.down });        // -2
     expect(team.Discipline).toEqual({ text: '▼▼', color: TONE.down });   // -3 is still two on the camp scale
     const players = await playerMarks(page);
-    expect(players[3].text).toBe('–');                                   // exactly 0 is a dash in camp
+    expect(players[3]).toEqual({ text: '–', color: TONE.flat });          // exactly 0 is a dash
     expect(players[4]).toEqual({ text: '▼', color: TONE.down });          // -0.3
     await shot(page, 'R2-report-camp');
   });
@@ -795,6 +798,13 @@ test.describe('training report', () => {
     ]);
     const table = await page.locator('#players-tbody').innerText();
     expect(table).not.toMatch(/[▲▼]/);
+    // Exactly 0: no plus beside the value, and nothing to hover for.
+    const zero = await page.evaluate(() => {
+      const head = [...document.querySelectorAll('#players-thead th')].map((th) => th.textContent.trim());
+      const cell = document.querySelectorAll('#players-tbody tr')[3].children[head.indexOf('SC')];
+      return { delta: cell.classList.contains('is-delta'), tip: cell.getAttribute('data-tooltip') };
+    });
+    expect(zero).toEqual({ delta: false, tip: null });
     await shot(page, 'R3-player-report-attributes', page.locator('.players-section'));
   });
 
@@ -807,6 +817,13 @@ test.describe('training report', () => {
       'Motion', 'Inside Set Plays', 'Attack Set Plays', 'Outside Set Plays',
     ]);
     await expect(section.locator('.pbs-panel--defense .pbs-group-head h4')).toHaveText(['Man', 'Zone']);
+    // No defense moved this week (in season): every row is a dash, not one up.
+    const defenseDeltas = await section.locator('.pbs-panel--defense .pbs-delta').evaluateAll((els) => els.map((el) => ({
+      text: el.textContent, color: getComputedStyle(el).color,
+    })));
+    expect(defenseDeltas.length).toBeGreaterThan(0);
+    defenseDeltas.forEach((delta) => expect(delta).toEqual({ text: '–', color: TONE.flat }));
+    expect(await section.locator('.pbs-panel--offense .pbs-delta').allTextContents()).toContain('▲');
     await expect(section.locator('table')).toHaveCount(0);
     expect(await section.innerText()).not.toMatch(/\bSection\b/);
     const plays = FIXTURE.teamData.plays_data;
@@ -966,6 +983,7 @@ test.describe('playbooks', () => {
     await tabs.nth(3).click();
     await expect(tabs.nth(3)).toHaveAttribute('aria-selected', 'true');
     expect(await visibleSections()).toEqual(['hcTraps']);
+    await expect(page.locator('#playbooks-view section[data-section="hcTraps"] h2')).toHaveText('Half-Court Traps');
     await expect(page.locator('#playbooks-view #hc-traps-chips > *')).toHaveCount(FIXTURE.playbooks.hc_traps.length);
     await shot(page, 'P2-press-traps-tab');
     await tabs.nth(0).click();
