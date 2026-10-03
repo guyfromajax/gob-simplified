@@ -99,10 +99,15 @@ html.gob-shell.gob-1920 .gob-tgrid {
   background-color: var(--white-2);
 }
 
-.gob-tbl thead tr th.gshade,
+/* Body cells take the shade as their colour. A HEADER cell takes it as a layer over its
+   solid base instead: the header is pinned, and a 4% tint on its own let the rows scroll
+   through it (Recruiting › Pool, 2026-10-02). It looks the same at rest. */
 .gob-tbl tbody tr td.gshade,
 .gob-tbl tbody tr th.gshade {
   background-color: var(--group-shade);
+}
+.gob-tbl thead tr th.gshade {
+  background-image: linear-gradient(var(--group-shade), var(--group-shade));
 }
 
 .gob-tbl tbody tr.me td,
