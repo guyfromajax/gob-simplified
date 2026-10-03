@@ -155,13 +155,49 @@ def _year_normalized_total(player: Dict, baselines_by_id: Dict[Any, Dict[str, in
     return total / YEAR_SWING_FACTOR.get(year, 1.0)
 
 
-def _readiness_label(s: float) -> str:
-    if s > 11:
-        return "Very Strong"
-    if 4 <= s <= 11:
-        return "Strong"
-    if -3 <= s <= 3:
-        return "Neutral"
+# Readiness (Jamie, 2026-10-03): two team attributes combined, each a whole number in
+# -20..20 (TEAM_ATTR_CLAMPS), so the sum is a whole number in -40..40. Seven bands, each a
+# number of bars out of six on the Training Report. (floor, bars, word), highest first.
+READINESS_MIN = -40
+READINESS_MAX = 40
+READINESS_BANDS = (
+    (30, 6, "Elite"),
+    (20, 5, "Very Strong"),
+    (10, 4, "Strong"),
+    (-9, 3, "Neutral"),
+    (-19, 2, "Weak"),
+    (-29, 1, "Very Weak"),
+    (-40, 0, "Awful"),
+)
+READINESS_UNKNOWN = "—"
+
+
+def _readiness_value(team: Dict, first: str, second: str) -> Optional[int]:
+    """The two attributes combined, or None when the sum is not a whole number in -40..40.
+
+    No current writer can produce such a value; there is deliberately no rule for one.
+    """
+    total = (team.get(first, 0) or 0) + (team.get(second, 0) or 0)
+    if isinstance(total, bool) or not isinstance(total, (int, float)):
+        return None
+    if total != int(total) or not READINESS_MIN <= total <= READINESS_MAX:
+        return None
+    return int(total)
+
+
+def _readiness_label(value: Optional[int]) -> str:
+    if value is None:
+        return READINESS_UNKNOWN
+    for floor, _bars, word in READINESS_BANDS:
+        if value >= floor:
+            return word
+    return READINESS_UNKNOWN
+
+
+def _readiness_section(title: str, team: Dict, first: str, second: str) -> Dict[str, Any]:
+    """A readiness note: the word, and the number it came from so the report can draw the bars."""
+    value = _readiness_value(team, first, second)
+    return {"title": title, "body": _readiness_label(value), "value": value}
     if -11 <= s <= -4:
         return "Weak"
     if s < -11:
@@ -362,11 +398,9 @@ def build_structured_training_report_notes(
         "body": ", ".join(defs) if defs else NSS,
     })
 
-    fb = float(team.get("fb_efficiency", 0) or 0) + float(team.get("fb_opp_modifier", 0) or 0)
-    sections.append({"title": "Fast Break Readiness", "body": _readiness_label(fb)})
-
-    pt = float(team.get("pt_efficiency", 0) or 0) + float(team.get("pt_opp_modifier", 0) or 0)
-    sections.append({"title": "Press/Trap Readiness", "body": _readiness_label(pt)})
+    # Fast Break + Fast Break Defense; P/T Defense + P/T Offense. Read here, after training.
+    sections.append(_readiness_section("Fast Break Readiness", team, "fb_efficiency", "fb_opp_modifier"))
+    sections.append(_readiness_section("Press/Trap Readiness", team, "pt_efficiency", "pt_opp_modifier"))
 
     if is_training_camp and training_camp_physique_notes:
         sections.append({

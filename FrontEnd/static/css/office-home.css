@@ -558,6 +558,20 @@ html.gob-shell.gob-office #franchise-container .office-st .st-n .gob-mark {
 /* Rankings: "5 of 8". The unit is wider than a stat's "PPG". */
 .gob .office-ranks .card-h + .ptw { border-top: 0; }
 .gob .office-ranks .ptw em { width: var(--dsz-52); text-align: left; white-space: nowrap; }
+/* Recruit rows (Top Recruits, Watchlist, week-35 Orders): the name; under it position, RT,
+   year. The right-hand column is the lean, or the points. */
+.gob .office-list .rc-facts { display: inline-flex; align-items: baseline; gap: var(--space-8); font-size: var(--fs-12); white-space: nowrap; }
+.gob .office-list .rc-facts .tdig { font-size: var(--fs-14); }
+.gob .office-list .rc-row { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-12); }
+.gob .office-list .rc-lean { justify-self: end; white-space: nowrap; text-align: right; font-size: var(--fs-13); font-weight: var(--fw-semibold); color: var(--text-100); }
+.gob .office-list .rc-lean.is-none { font-weight: var(--fw-regular); color: var(--text-38); }
+.gob .office-list .rc-pts { display: inline-flex; align-items: baseline; gap: var(--space-4); white-space: nowrap; }
+.gob .office-list .rc-pts i { font-style: normal; font-size: var(--fs-11); color: var(--text-60); }
+/* Top / Watchlist: the app's segment control, right-aligned in the title row and sized
+   for a card header. */
+.gob .office-top .card-h .office-seg { margin-left: auto; flex: none; }
+html.gob-shell .gob .office-top .office-seg button { padding: var(--space-6) var(--space-10); font-size: var(--fs-11); }
+
 /* Last season, one quiet line under the rows (not in season 1). */
 .gob .office-ranks .rk-last { margin: 0; padding-top: var(--space-6); font-size: var(--fs-13); color: var(--text-60); }
 

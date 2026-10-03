@@ -77,7 +77,7 @@ test('M: a week where Shooting moved most does not list it', async ({ page }) =>
   await page.setViewportSize({ width: 1280, height: 720 });
   await O.openOffice(page, officeWith(SHOOTING_FIRST));
   const card = await snapshot(page);
-  expect(card.heads).toContain('Moved most');
+  expect(card.heads).toContain('Team Attributes Moved Most');
   // The two of the eight that moved furthest, in the order sent. Nothing on another scale.
   expect(card.rows.map((row) => row.label)).toEqual(['Discipline', 'Fast Break Defense']);
   card.rows.forEach((row) => {
@@ -94,7 +94,7 @@ test('M: a week where only Chemistry, Shooting and Rebounding moved shows the qu
   await page.setViewportSize({ width: 1280, height: 720 });
   await O.openOffice(page, officeWith(EXCLUDED_ONLY));
   const card = await snapshot(page);
-  expect(card.heads).toContain('Moved most');
+  expect(card.heads).toContain('Team Attributes Moved Most');
   expect(card.rows).toHaveLength(1);
   // The line stands alone: no trailing dash (Jamie, 2026-10-02).
   expect(card.rows[0]).toMatchObject({ label: 'No movement this week', value: '', chip: false, empty: true });
@@ -133,14 +133,14 @@ test('M: nothing moved at all shows the same quiet line; every one of the eight 
   }
 });
 
-test('M: before camp the line still reads "Set after camp" (from week 2 only; week 1 has no card)', async ({ page }) => {
+test('M: before camp the line reads "Set after camp", with no dash (from week 2 only; week 1 has no card)', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   const data = officeWith([]);
   data.office_digest.team_snapshot.state = 'set_after_camp';
   await O.openOffice(page, data);
   const camp = await snapshot(page);
   expect(camp.rows.map((row) => row.label)).toEqual(['Set after camp']);
-  expect(camp.rows[0].value).toBe('\u2014'); // unchanged: only "No movement this week" lost its dash
+  expect(camp.rows[0].value).toBe(''); // neither quiet line carries a dash (2026-10-03)
 });
 
 for (const [width, height] of SIZES) {

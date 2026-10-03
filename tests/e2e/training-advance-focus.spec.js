@@ -9,6 +9,8 @@ const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/prep-p
 const FID = FIXTURE.franchise_id;
 const TEAM = 'Lancaster';
 const OUT = path.join(__dirname, '../../reports/training-advance-focus');
+const V3_OUT = path.join(__dirname, '../../reports/v3-office');
+const TEAM_OBJECT_ID = FIXTURE.cc.user_team_object_id;
 const CAPTURE_BEFORE = process.env.TRAINING_ADVANCE_BEFORE === '1';
 
 function clone(value) {
@@ -678,6 +680,43 @@ test('h) Office All changes → standalone report → Back → Office', async ({
   await page.getByRole('button', { name: 'Back to Locker Room', exact: true }).click();
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 20000 }).toBe('/franchise-command-center.html');
   await expect(page.locator('#office-root')).toBeVisible({ timeout: 15000 });
+});
+
+test('h2) All changes loads the report when the Office was opened with franchise_id only', async ({ page }) => {
+  test.skip(CAPTURE_BEFORE, 'after only');
+  // The app returns to the Office this way after a game, from the mode select and from
+  // Set Lineup: no team_id in the address. The link must still carry the coach's team,
+  // or the report page has nothing to load.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await stubAuth(page);
+  await installApi(page, { cc: officeWithChangesCc() });
+  const reportCalls = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/franchise/training-report') reportCalls.push(request.url());
+  });
+  await page.goto('/franchise-command-center.html?franchise_id=' + FID);
+  await waitOverlay(page);
+  const link = page.locator('#office-root .wkc-f .lnk');
+  await expect(link).toHaveText(/All changes/);
+  const href = new URL(await link.getAttribute('href'), 'http://local');
+  await link.click();
+  await expect(page).toHaveURL(/\/training-report\.html/, { timeout: 20000 });
+  // Landed on the report itself: its week, its title, its rows, and no failure card.
+  await expect(page.locator('#week-number')).toHaveText('12', { timeout: 20000 });
+  await expect(page.locator('#training-report-view h1.page-title')).toHaveText('Training Report');
+  await expect(page.locator('#training-report-view')).toContainText('Roger Henrich', { timeout: 20000 });
+  await expect(page.locator('#training-report-view')).not.toContainText(/could not|couldn.t|failed to load/i);
+  expect(reportCalls.length).toBeGreaterThan(0);
+  expect(new URL(reportCalls[0]).searchParams.get('team_id')).toBe(TEAM_OBJECT_ID);
+  // The link carried everything the page needs.
+  expect(href.pathname).toBe('/training-report.html');
+  expect(href.searchParams.get('franchise_id')).toBe(FID);
+  expect(href.searchParams.get('team_id')).toBe(TEAM_OBJECT_ID);
+  expect(href.searchParams.get('week')).toBe('12');
+  await expectHeaderVisible(page);
+  await capturePage(page, path.join(V3_OUT, 'all-changes-report-after-1280.png'));
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await capturePage(page, path.join(V3_OUT, 'all-changes-report-after-1920.png'));
 });
 
 test('i) old /training-report.html and ?tab=training-report-view land on the standalone page', async ({ page }) => {

@@ -212,14 +212,15 @@ test.describe('cards', () => {
     const report = busy();
     await openReport(page, report);
     const { standouts } = await readCards(page);
+    // Order (Jamie, 2026-10-03): the week's best, the locker room, then the regression.
     expect(standouts.map((row) => row.label)).toEqual([
-      'Practice Player Of The Week', 'Biggest Regression', 'Most Positive Locker Room Influence',
+      'Practice Player Of The Week', 'Most Positive Locker Room Influence', 'Biggest Regression',
     ]);
     expect(standouts.map((row) => row.name)).toEqual([
-      report.players[11].name, report.players[8].name, report.players[2].name,
+      report.players[11].name, report.players[2].name, report.players[8].name,
     ]);
     standouts.forEach((row, i) => {
-      const player = [report.players[11], report.players[8], report.players[2]][i];
+      const player = [report.players[11], report.players[2], report.players[8]][i];
       expect(row.photo).toBe(true);
       expect(row.muted).toBe(false);
       expect(row.meta).toBe(player.position + ' · ' + player.year);
@@ -284,15 +285,15 @@ test.describe('cards', () => {
     expect(trends[0].tags.map((tag) => tag.text)).toEqual(['Scoring (SC)', 'Strength (ST)', 'Shooting (SH)']);
     expect(trends[1].tags.map((tag) => tag.text)).toEqual(['Free Throws (FT)']);
     expect(standouts.map((row) => row.label)).toEqual([
-      'Training Camp MVP', 'Biggest Concern', 'Most Positive Locker Room Influence',
+      'Training Camp MVP', 'Most Positive Locker Room Influence', 'Biggest Concern',
     ]);
   });
 
-  test('Readiness: five-step meters, one step per level, with the word beside them, neutral colours', async ({ page }) => {
+  test('Readiness: six-bar meters with the word in parentheses beside them, neutral colours', async ({ page }) => {
     await openReport(page, busy());
     let { readiness } = await readCards(page);
-    expect(readiness.map((row) => row.label)).toEqual(['Fast Break', 'P/T Defense']);
-    expect(readiness.map((row) => [row.word, row.lit, row.steps])).toEqual([['Strong', 4, 5], ['Weak', 2, 5]]);
+    expect(readiness.map((row) => row.label)).toEqual(['Fast Break', 'Press/Traps']);
+    expect(readiness.map((row) => [row.word, row.lit, row.steps])).toEqual([['(Strong)', 4, 6], ['(Weak)', 2, 6]]);
     expect(readiness[1].litColors).toEqual(['rgba(255, 255, 255, 0.87)']);
     expect(readiness[1].offColors).toEqual(['rgba(255, 255, 255, 0.12)']);
     // The meter and its word share a line, the word right after the meter.
@@ -309,27 +310,15 @@ test.describe('cards', () => {
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     await openReport(page, quiet());
     ({ readiness } = await readCards(page));
-    expect(readiness.map((row) => [row.word, row.lit])).toEqual([['Neutral', 3], ['Neutral', 3]]);
+    expect(readiness.map((row) => [row.word, row.lit])).toEqual([['(Neutral)', 3], ['(Neutral)', 3]]);
 
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     await openReport(page, camp());
     ({ readiness } = await readCards(page));
-    expect(readiness.map((row) => [row.word, row.lit, row.steps])).toEqual([['Very Strong', 5, 5], ['Neutral', 3, 5]]);
+    expect(readiness.map((row) => [row.word, row.lit, row.steps])).toEqual([['(Very Strong)', 5, 6], ['(Neutral)', 3, 6]]);
   });
 
-  test('Readiness: each of the five levels lights its own number of steps', async ({ page }) => {
-    const levels = [['Very Weak', 1], ['Weak', 2], ['Neutral', 3], ['Strong', 4], ['Very Strong', 5]];
-    for (const [word, lit] of levels) {
-      const report = busy();
-      report.training_notes = report.training_notes.map((note) => (
-        /Readiness$/.test(note.title) ? { title: note.title, body: word } : note
-      ));
-      await page.unrouteAll({ behavior: 'ignoreErrors' });
-      await openReport(page, report);
-      const { readiness } = await readCards(page);
-      expect(readiness.map((row) => [row.word, row.lit, row.steps]), word).toEqual([[word, lit, 5], [word, lit, 5]]);
-    }
-  });
+  // Every band of the six-bar scale is tested in v3-training.spec.js.
 
   test('Player Energy: no row when there is nothing to report; a row, label above text, when there is', async ({ page }) => {
     await openReport(page, busy());

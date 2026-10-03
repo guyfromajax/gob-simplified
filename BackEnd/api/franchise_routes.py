@@ -4132,6 +4132,11 @@ RECRUITING_BOARD_SAVED_WEEK_FIELD = "recruiting_board_saved_week"
 # It seeds the board CLIENT-SIDE at week 20; nothing here ever writes FTD "Recruits",
 # because has_saved_board derives from that field and the week-20 gate keys off it.
 RECRUITING_WATCHLIST_FIELD = "recruiting_watchlist"
+# The user's Training playbook choice: Current Playbooks (absent) or a Custom Playbook and
+# the plays in it. A saved setting on the franchise document, so it survives every week,
+# training camp and the season rollover until the user switches back.
+TRAINING_PLAYBOOK_CHOICE_FIELD = "training_playbook_choice"
+TRAINING_PLAYBOOK_CHOICE_MAX_IDS = 64
 
 BRACKET_REVEAL_WEEKS = {
     27: ("conference", "Conference Tournament · Weeks 27–29", "full"),
@@ -10321,6 +10326,21 @@ def _build_office_digest_for_command_center(
     roster_spots = None
     if week == 35 and franchise_doc.get("_id") is not None and team_id:
         roster_spots = _calculate_available_roster_spots(franchise_doc["_id"], str(team_id))
+        # Signing Day: the Office lists every recruit on the submitted Orders, so each
+        # needs his name, position, rating and year (identity only, no attributes).
+        orders = team_doc.get("_office_signing_orders")
+        order_ids = sorted({
+            str(entry.get("id")) for entry in (orders.values() if isinstance(orders, dict) else [])
+            if isinstance(entry, dict) and entry.get("id")
+        })
+        if order_ids:
+            lookup.update(recruit_lookup_from_docs(
+                list(franchise_recruits_data_collection.find(
+                    {"franchise_id": str(franchise_doc["_id"]), "recruit_id": {"$in": order_ids}},
+                    {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1, "year": 1},
+                )),
+                str(team_id or ""),
+            ))
     newcomers = None
     if week <= 1:
         walk_ons = franchise_doc.get("pending_walk_on_welcome") or []
@@ -10439,11 +10459,14 @@ def _office_preview_blocks(
             recruits = top_recruits(
                 franchise_recruits_data_collection.find(
                     {"franchise_id": fid},
-                    {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1, "Home Region": 1},
+                    {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1,
+                     "Home Region": 1, "year": 1},
                 ),
                 region=region,
                 user_team_id=tid,
                 team_name_map=response.get("team_name_map") if isinstance(response.get("team_name_map"), dict) else {},
+                # The Office's Watchlist side: the coach's own list, from any region.
+                watchlist=_recruiting_watchlist(franchise_doc),
             )
         except Exception:
             logger.exception("[OFFICE] top recruits failed franchise_id=%s", fid)
@@ -17742,6 +17765,7 @@ def get_training_points(franchise_id: str):
         "position_tallies": position_tallies,
         "focus_tallies": focus_tallies,
         "player_maximizer_ranking_attrs": ranking_attrs,
+        "training_playbook_choice": _training_playbook_choice(franchise_doc),
         "cpu_training_resume": (
             {
                 "required": True,
@@ -19157,8 +19181,10 @@ def toggle_recruiting_watchlist(
     if not recruit_id:
         raise HTTPException(status_code=400, detail="recruit_id is required")
 
+    # No ``limit``: the SQLite store's count_documents takes the filter only, and passing one
+    # made every watch-star click a 500 on desktop. One recruit id matches at most one row.
     valid = franchise_recruits_data_collection.count_documents(
-        {"franchise_id": str(req.franchise_id), "recruit_id": recruit_id}, limit=1
+        {"franchise_id": str(req.franchise_id), "recruit_id": recruit_id}
     )
     if not valid:
         raise HTTPException(status_code=400, detail="Unknown recruit for this franchise")
@@ -19177,6 +19203,74 @@ def toggle_recruiting_watchlist(
         fold_browse_rev({"$set": {RECRUITING_WATCHLIST_FIELD: watchlist}}),
     )
     return {"watching": watching, "count": len(watchlist), "watchlist": watchlist}
+
+
+def _training_playbook_focus_ids(raw: Any) -> list[str]:
+    """Play ids as the Custom Playbook page sends them: strings, in order, no repeats."""
+    out: list[str] = []
+    for item in raw if isinstance(raw, (list, tuple)) else []:
+        text = str(item or "").strip()[:80]
+        if text and text not in out:
+            out.append(text)
+        if len(out) >= TRAINING_PLAYBOOK_CHOICE_MAX_IDS:
+            break
+    return out
+
+
+def _training_playbook_choice(franchise_doc: dict[str, Any] | None) -> dict[str, Any]:
+    """The saved Training playbook choice, in the shape the training page reads.
+
+    Custom needs at least one offense play and one defense (the Custom Playbook page's own
+    save rule); anything less reads as Current Playbooks.
+    """
+    saved = (franchise_doc or {}).get(TRAINING_PLAYBOOK_CHOICE_FIELD)
+    if isinstance(saved, dict) and saved.get("mode") == "custom":
+        focus = saved.get("focus") if isinstance(saved.get("focus"), dict) else {}
+        offense = _training_playbook_focus_ids(focus.get("offense"))
+        defense = _training_playbook_focus_ids(focus.get("defense"))
+        if offense and defense:
+            return {"mode": "custom", "focus": {"offense": offense, "defense": defense}}
+    return {"mode": "current-playbooks", "focus": None}
+
+
+def _training_playbook_choice_update(mode: str, focus: Any) -> dict[str, Any]:
+    """The franchise-document update that saves a choice. Current Playbooks removes the field."""
+    choice = _training_playbook_choice(
+        {TRAINING_PLAYBOOK_CHOICE_FIELD: {"mode": mode, "focus": focus}}
+    )
+    if choice["mode"] == "custom":
+        return {"$set": {TRAINING_PLAYBOOK_CHOICE_FIELD: choice}}
+    return {"$unset": {TRAINING_PLAYBOOK_CHOICE_FIELD: ""}}
+
+
+class TrainingPlaybookChoiceRequest(BaseModel):
+    franchise_id: str
+    mode: str
+    focus: dict[str, list[str]] | None = None
+
+
+@router.patch("/franchise/training-playbook-choice")
+def save_training_playbook_choice(
+    req: TrainingPlaybookChoiceRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Save the Training playbook choice so it is the default for every later training.
+
+    Writes ONLY ``training_playbook_choice`` on the franchise doc. It does not run or change
+    training: ``/franchise/run-training/user`` still trains with what the page submits.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    if req.mode not in ("custom", "current-playbooks"):
+        raise HTTPException(status_code=400, detail="mode must be custom or current-playbooks")
+    update = _training_playbook_choice_update(req.mode, req.focus)
+    if req.mode == "custom" and "$set" not in update:
+        raise HTTPException(
+            status_code=400,
+            detail="A custom playbook needs at least one offense play and one defense",
+        )
+    db.franchises.update_one({"_id": franchise_doc["_id"]}, update)
+    saved = db.franchises.find_one({"_id": franchise_doc["_id"]}, {TRAINING_PLAYBOOK_CHOICE_FIELD: 1})
+    return _training_playbook_choice(saved)
 
 
 class RecruitingWireSeenRequest(BaseModel):

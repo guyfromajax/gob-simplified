@@ -117,7 +117,7 @@ Development deltas stay numeric (`+6 RT`). Minimum-RT controls show threshold an
 
   CMD never falls in a training session (it falls at end of game), so the down bands only show if a report carries a drop. Exactly 0 is a dash. Measurements: `reports/training-report-tables-2026-10-02.md`.
 - Notes › Trends tags (Rising, Falling / Lagging) are labels, not magnitudes: one faint ▲ or one faint ▼ per attribute, the in-season one-arrow tones, in every week including camp.
-- Readiness meters have five steps, one per level (Very Weak, Weak, Neutral, Strong, Very Strong), with the word beside them. They are neutral (`--text-87` lit, `--white-12` unlit): a meter is not positive data, so it is never green, red or orange.
+- Readiness meters have six bars on a −40…40 scale (two ±20 team attributes combined), with the band's word in parentheses beside them: Awful 0 bars (−40…−30), Very Weak 1 (−29…−20), Weak 2 (−19…−10), Neutral 3 (−9…9), Strong 4 (10…19), Very Strong 5 (20…29), Elite 6 (30…40). "Awful" is six empty bars. They are neutral (`--text-87` lit, `--white-12` unlit): a meter is not positive data, so it is never green, red or orange.
 
 **Hidden attribute.** CH is never displayed and never sent to the client: no column, chip, label, tooltip or copy, on any screen. Player attribute lists are the twelve visible attributes. Build rule and the routes that still carry it: [UX_System.md, CH is hidden](UX_System.md#ch-is-hidden).
 

@@ -18,6 +18,7 @@ from BackEnd.utils.franchise_standings import (
     calculate_franchise_standings,
     standings_display_sort_key,
 )
+from BackEnd.utils.player_year import format_player_year_display
 from BackEnd.utils.recruiting_lean_events import lean_event_detail
 from BackEnd.utils.rt_display import rt_letter_grade
 
@@ -994,6 +995,7 @@ def signing_day_digest(
     roster_spots: Optional[int],
     recruit_lookup: Mapping[str, Mapping[str, Any]],
     events: Any,
+    orders_submitted: bool = False,
 ) -> Optional[dict[str, Any]]:
     if week != 35:
         return None
@@ -1043,12 +1045,30 @@ def signing_day_digest(
             "lean_rank": info.get("lean_rank"),
             "direction": direction_by_recruit.get(rid),
         })
+    # Once the Orders list is in (and until Signing Day runs): every recruit the coach put
+    # points on, most points first; equal points keep the order of the list. The points are
+    # the coach's own entries. Nothing here is a score.
+    submitted_orders = None
+    if orders_submitted:
+        submitted_orders = []
+        for entry in sorted((e for e in entries if e["points"] > 0), key=lambda e: -e["points"]):
+            info = recruit_lookup.get(entry["recruit_id"]) or {}
+            submitted_orders.append({
+                "recruit_id": entry["recruit_id"],
+                "name": info.get("name"),
+                "position": info.get("position"),
+                "rt": info.get("rt"),
+                "year": info.get("year"),
+                "points": entry["points"],
+            })
     return {
         "points_remaining": int(points_total) - spent if entries else None,
         "points_total": int(points_total),
         "promises_made": sum(1 for entry in entries if entry["playing_time"]) if entries else None,
         "open_roster_spots": roster_spots,
         "targets": targets,
+        "orders_submitted": bool(orders_submitted),
+        "orders": submitted_orders,
     }
 
 
@@ -1329,6 +1349,7 @@ def build_office_digest(ctx: Mapping[str, Any]) -> dict[str, Any]:
         roster_spots=ctx.get("roster_spots"),
         recruit_lookup=ctx.get("recruit_lookup") or {},
         events=(ctx.get("recruiting_wire") or {}).get("events") if isinstance(ctx.get("recruiting_wire"), dict) else [],
+        orders_submitted=bool(flags.get("week_35_orders_submitted")),
     )
     season_preview = None
     if state == "first_week":
@@ -1413,5 +1434,6 @@ def recruit_lookup_from_docs(recruits: Any, user_team_id: str) -> dict[str, dict
             "position": position,
             "rt": _best_rt_letter(ratings),
             "lean_rank": lean_rank,
+            "year": format_player_year_display(recruit.get("year")) if recruit.get("year") else None,
         }
     return lookup

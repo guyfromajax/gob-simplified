@@ -318,11 +318,20 @@ const NOTE_ATTRIBUTE_LABELS = {
   EM: 'Emotion (EM)',
 };
 
+// Standouts order (Jamie, 2026-10-03): the week's best, then the locker room, then the regression.
 const NOTES_HERO_CONFIG = [
   {
     key: 'practice',
     titles: ['Practice Player Of The Week', 'Practice Players Of The Week'],
     label: 'Practice Player Of The Week',
+    accent: 'var(--text-100)',
+    accentBorder: 'var(--line-strong)',
+    accentTint: 'var(--white-6)',
+  },
+  {
+    key: 'locker',
+    titles: ['Most Positive Locker Room Influence'],
+    label: 'Most Positive Locker Room Influence',
     accent: 'var(--text-100)',
     accentBorder: 'var(--line-strong)',
     accentTint: 'var(--white-6)',
@@ -334,14 +343,6 @@ const NOTES_HERO_CONFIG = [
     accent: 'var(--red)',
     accentBorder: 'color-mix(in srgb, var(--red) 35%, transparent)',
     accentTint: 'color-mix(in srgb, var(--red) 12%, transparent)',
-  },
-  {
-    key: 'locker',
-    titles: ['Most Positive Locker Room Influence'],
-    label: 'Most Positive Locker Room Influence',
-    accent: 'var(--text-100)',
-    accentBorder: 'var(--line-strong)',
-    accentTint: 'var(--white-6)',
   }
 ];
 
@@ -361,14 +362,29 @@ const NOTES_SCHEME_ROWS = [
   { title: 'Strongest Defensive Set', label: 'Strongest Defensive Set' },
   { title: 'Strongest Offensive Plays', label: 'Strongest Offensive Plays' },
 ];
+// Readiness (Jamie, 2026-10-03): each row is two team attributes combined. Each attribute is
+// a whole number in -20..20, so a row is a whole number in -40..40, shown as bars out of six
+// with the band's word in parentheses. `title` is the stored note's lookup key (older than
+// the label); `attrs` are the two attributes, for a report stored before the note carried
+// its number.
 const NOTES_READINESS_ROWS = [
-  { key: 'fast-break', title: 'Fast Break Readiness', label: 'Fast Break' },
-  // The measure is "P/T Defense" everywhere (Styleguide, display text); the stored key is older.
-  { key: 'press-traps', title: 'Press/Trap Readiness', label: 'P/T Defense' },
+  { key: 'fast-break', title: 'Fast Break Readiness', label: 'Fast Break', attrs: ['fb_efficiency', 'fb_opp_modifier'] },
+  { key: 'press-traps', title: 'Press/Trap Readiness', label: 'Press/Traps', attrs: ['pt_efficiency', 'pt_opp_modifier'] },
 ];
-// Five steps, one per level the server can send (Jamie, 2026-10-02), with the word beside it.
-const READINESS_STEPS = 5;
-const READINESS_LEVEL = { 'very weak': 1, 'weak': 2, 'neutral': 3, 'strong': 4, 'very strong': 5 };
+const READINESS_STEPS = 6;
+const READINESS_MIN = -40;
+const READINESS_MAX = 40;
+// [floor, bars, word], highest first. The same table as READINESS_BANDS in training_notes.py.
+const READINESS_BANDS = [
+  [30, 6, 'Elite'],
+  [20, 5, 'Very Strong'],
+  [10, 4, 'Strong'],
+  [-9, 3, 'Neutral'],
+  [-19, 2, 'Weak'],
+  [-29, 1, 'Very Weak'],
+  [-40, 0, 'Awful'],
+];
+const READINESS_UNKNOWN = '\u2014';
 // CH is a hidden attribute: it is never named on the report, whatever a stored note says.
 const NOTES_HIDDEN_ATTRIBUTES = ['CH'];
 
@@ -2322,22 +2338,49 @@ function createReadinessMeter(level, steps, word) {
   return meter;
 }
 
-/** Readiness: Fast Break and P/T Defense, a meter with the word beside it. */
+/** A whole number on the readiness scale, or it is not a readiness value at all. */
+function isReadinessValue(value) {
+  return Number.isInteger(value) && value >= READINESS_MIN && value <= READINESS_MAX;
+}
+
+/** { level, word } for a value on the scale; null for anything else (there is no rule for it). */
+function readinessBand(value) {
+  if (!isReadinessValue(value)) return null;
+  const band = READINESS_BANDS.find((row) => value >= row[0]);
+  return band ? { level: band[1], word: band[2] } : null;
+}
+
+/**
+ * A row's number. The note stores it at training time (`value`). A report stored before
+ * that has only the old word, which was cut on another scale, so its number is the two
+ * team attributes as they stand now, the same values the Team Report below shows.
+ */
+function readinessValue(row, sectionMap) {
+  const section = sectionMap.get(row.title) || {};
+  if (section.value !== undefined) return isReadinessValue(section.value) ? section.value : null;
+  const attrs = (reportData && reportData.team_attributes) || {};
+  const total = attrs[row.attrs[0]] + attrs[row.attrs[1]];
+  return isReadinessValue(total) ? total : null;
+}
+
+/** Readiness: Fast Break and Press/Traps, six bars with the band's word in parentheses. */
 function buildReadinessCard(sectionMap) {
   const card = createNotesCard('readiness', 'Readiness');
   NOTES_READINESS_ROWS.forEach((row) => {
-    const word = String((sectionMap.get(row.title) || {}).body || '').trim() || 'Neutral';
-    const level = READINESS_LEVEL[word.toLowerCase()] || 0;
+    const number = readinessValue(row, sectionMap);
+    const band = readinessBand(number);
     const value = document.createElement('span');
     value.className = 'tr-ready';
-    if (level) value.appendChild(createReadinessMeter(level, READINESS_STEPS, word));
+    // "Awful" is six empty bars: the meter is always drawn when there is a band.
+    if (band) value.appendChild(createReadinessMeter(band.level, READINESS_STEPS, band.word));
     const text = document.createElement('span');
     text.className = 'tr-ready-word';
-    text.textContent = word;
+    text.textContent = band ? '(' + band.word + ')' : READINESS_UNKNOWN;
     value.appendChild(text);
     const pair = createNotesPair(row.label, value, 'tr-readiness');
     pair.dataset.ready = row.key;
-    pair.dataset.word = word;
+    pair.dataset.word = band ? band.word : '';
+    if (band) pair.dataset.value = String(number);
     card.appendChild(pair);
   });
   return card;
