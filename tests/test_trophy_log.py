@@ -459,3 +459,25 @@ def test_sim_modules_never_mention_trophies():
     for fn in (franchise_routes._complete_week_finish_cpu_and_persist,):
         src = inspect.getsource(fn)
         assert "trophies" not in src and "trophy" not in src
+
+
+def test_honour_entries_carry_the_position_when_the_pick_has_one(store, owner):
+    doc, user_tid, _cpu = _seed(store, owner)
+    doc["awards"] = {
+        "all_american_teams": {
+            "first_team": [dict(_pick("p1", "Ada Guard", user_tid), position="PG")],
+            "second_team": [],
+            "third_team": [_pick("p3", "Bo Wing", user_tid)],          # an older pick: no position
+        },
+        "all_conference_teams": {
+            "4": {"first_team": [dict(_pick("p1", "Ada Guard", user_tid), position="PG")], "second_team": []},
+        },
+    }
+    tl.record_all_american_trophies_if_missing(doc, doc["awards"])
+    tl.record_all_conference_trophies_if_missing(doc, doc["awards"])
+    by_kind = {t["kind"]: t for t in _coach_doc(store, owner)["trophies"]}
+    assert by_kind["all_american_1"]["detail"] == {"player_id": "p1", "player_name": "Ada Guard", "position": "PG"}
+    assert by_kind["all_american_3"]["detail"] == {"player_id": "p3", "player_name": "Bo Wing"}
+    # The same player, on both: two entries, each with the position.
+    assert by_kind["all_conference_1"]["detail"] == {"player_id": "p1", "player_name": "Ada Guard", "position": "PG"}
+    assert by_kind["all_conference_1"]["key"] != by_kind["all_american_1"]["key"]

@@ -156,12 +156,15 @@ const WEEK_LINE = [
   ['recruiting_report', 9, 'Week 9 Recruiting Report', false],
   ['ps_game_results', 4, 'Week 4 Practice Squad Game Results', false],
   ['all_americans', 7, 'Projected All-Americans: week 7', false],
-  ['all_americans', 1, 'Preseason All-Americans announced', true],
+  // "Preseason" names week 1 in words (Jamie, 2026-10-02).
+  ['all_americans', 1, 'Preseason All-Americans announced', false],
   // "end of the regular season" names week 26 in words (Jamie, 2026-10-02).
   ['all_americans', 26, 'Projected All-Americans: end of the regular season', false],
   ['all_conference', 26, 'All-Conference A2: end of the regular season', false],
   ['all_conference', 7, 'Projected All-Conference A2: week 7', false],
-  ['all_conference', 1, 'Preseason All-Conference A2 teams', true],
+  ['all_conference', 1, 'Preseason All-Conference A2 teams', false],
+  // A later story that happens to say "preseason" keeps its line: only week 1 is the preseason.
+  ['ps_all_stars', 5, 'Preseason form carries into week five', true],
   ['ps_all_stars', 3, 'Practice Squad All-Stars', true],
   ['recruiting_movement', 3, 'Your Recruiting Board Moved', true],
   ['walk_ons_announced', 1, 'Lancaster Walk Ons Announced', true],
