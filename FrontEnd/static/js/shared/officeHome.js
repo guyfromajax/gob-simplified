@@ -1211,9 +1211,13 @@
     function paint(which) {
       node.dataset.recruitList = which;
       // The region belongs to the Top list only; the watchlist is from every region.
-      title.textContent = which === 'top' && present(top.region)
-        ? 'Top Recruits (Region ' + top.region + ')'
-        : 'Top Recruits';
+      if (which === 'watchlist') {
+        title.textContent = 'Your Watchlist';
+      } else {
+        title.textContent = present(top.region)
+          ? 'Top Recruits (Region ' + top.region + ')'
+          : 'Top Recruits';
+      }
       Object.keys(buttons).forEach(function (key) {
         buttons[key].classList.toggle('on', key === which);
         buttons[key].setAttribute('aria-pressed', key === which ? 'true' : 'false');

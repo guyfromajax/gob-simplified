@@ -5,7 +5,7 @@
  * 1  Team snapshot: the heading reads "Team Attributes Moved Most"; neither quiet line
  *    ("Set after camp", "No movement this week") carries a trailing dash.
  * 2  Top Recruits: "Top Recruits (Region A)" with a Top / Watchlist segment on the right.
- *    Watchlist is the coach's five best by RT from any region, titled "Top Recruits", and
+ *    Watchlist is the coach's five best by RT from any region, titled "Your Watchlist", and
  *    one line when empty. Rows: the name; under it position, RT, year; the lean on the right.
  *    The choice is remembered for the session.
  * 3  Week 35, Orders submitted, Signing Day not run: the Signing Day card, then everyone
@@ -176,12 +176,12 @@ test('2a/2b/2d: "Top Recruits (Region A)", the segment on the right, and the row
   await expect(page.locator('#office-root .office-top')).not.toContainText(/Leans /);
 });
 
-test('2c: Watchlist is the coach’s five best from any region, and the title drops the region', async ({ page }) => {
+test('2c: Watchlist is the coach’s five best from any region, titled "Your Watchlist"', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await O.openOffice(page, week(10));
   await page.locator('#office-root .office-top .stats-toggle button', { hasText: 'Watchlist' }).click();
   const card = await recruitsCard(page);
-  expect(card.title).toBe('Top Recruits');
+  expect(card.title).toBe('Your Watchlist');
   expect(card.seg.buttons).toEqual([
     { text: 'Top', on: false, pressed: 'false' },
     { text: 'Watchlist', on: true, pressed: 'true' },
@@ -211,7 +211,7 @@ test('2c: an empty watchlist shows one line', async ({ page }) => {
   await O.openOffice(page, data);
   await page.locator('#office-root .office-top .stats-toggle button', { hasText: 'Watchlist' }).click();
   const card = await recruitsCard(page);
-  expect(card.title).toBe('Top Recruits');
+  expect(card.title).toBe('Your Watchlist');
   expect(card.rows).toEqual([]);
   expect(card.empty).toBe('Hey Coach, add players to your watchlist');
   await expect(page.locator('#office-root .office-top .wr-empty')).toHaveCount(1);
@@ -227,7 +227,7 @@ test('2e: the choice is remembered for the session, and a new session starts on 
   // The Office paints again (a reload, the next week): still Watchlist.
   await page.reload();
   await expect(page.locator('#office-root .office-top .stats-toggle button.on')).toHaveText('Watchlist');
-  expect((await recruitsCard(page)).title).toBe('Top Recruits');
+  expect((await recruitsCard(page)).title).toBe('Your Watchlist');
   await O.openOffice(page, week(11));
   await expect(page.locator('#office-root .office-top .stats-toggle button.on')).toHaveText('Watchlist');
   // Week 1 has the same card.
