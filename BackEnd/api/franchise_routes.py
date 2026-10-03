@@ -16305,7 +16305,15 @@ def get_practice_squad_team(
     }
     from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
 
-    projected_starting_five = build_enriched_projected_starting_five(players, season_map)
+    # The selector reads a flat ``stats`` dict as THIS GAME's line (``Player._merge_stats_from_data``),
+    # so a squad player's season fouls looked like fouls in a game in progress: five in a
+    # season read as fouled out, fewer as foul trouble, and the five came back short (two or
+    # three seats) or seated the wrong players. The five at tip has no fouls: select on the
+    # players without their season line; the season averages are still attached from
+    # ``season_map``.
+    projected_starting_five = build_enriched_projected_starting_five(
+        [{**p, "stats": {}} for p in players], season_map
+    )
 
     # The standard team page (team-view) reads the squad in the shapes it already knows:
     # roster rows (rt, position) and season lines (per_game / totals / rates).
@@ -16320,13 +16328,18 @@ def get_practice_squad_team(
         str(five.get("player_id") or ""): index
         for index, five in enumerate(projected_starting_five or [])
     }
+    # A starter reads at the position he starts at, so the five read PG, SG, SF, PF, C.
+    starter_slot = {
+        str(five.get("player_id") or ""): five.get("position")
+        for five in (projected_starting_five or [])
+    }
     for row in players:
         ratings = _ratings_dict(row.get("position_ratings"))
         bases = season_bases(row.get("stats") or {})
         row["starter"] = str(row.get("player_id") or "") in starter_order
         row["lineup_order"] = starter_order.get(str(row.get("player_id") or ""))
         row["rt"] = _highest_rt(ratings)
-        row["position"] = _best_position(ratings)
+        row["position"] = starter_slot.get(str(row.get("player_id") or "")) or _best_position(ratings)
         row["per_game"] = bases["per_game"]
         row["totals"] = bases["totals"]
         row["rates"] = bases["rates"]

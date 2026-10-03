@@ -186,7 +186,11 @@ walk-on fill = 15, then Training Camp re-trims to 12 + 3.
   Squad team pages; not tournament). Same "Training Squad" section below the roster.
 - **Practice Squad team pages** are the standard team page (`tab=team-view&ps_team_id=…`,
   `teamView.js`), not `team-roster-view.html`: the route's `page` block and player rows are in
-  that page's shapes, and the projected five are its Starters. The route
+  that page's shapes, and the projected five are its Starters (five, PG to C, each shown
+  at his slot; the other seven are the Bench). The five is selected on the players WITHOUT
+  their season line: the selector reads a flat `stats` dict as the current game's, so
+  season fouls looked like foul trouble and squads came back with two or three starters
+  (fixed 2026-10-03). The route
   (`GET /franchise/practice-squad/team`) also returns
   `projected_starting_five` enriched from `ps_season_stats`. The PS portrait contract carries
   `portrait_source` plus `image_id`: unsigned FRD recruits use their white recruit master,

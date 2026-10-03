@@ -532,3 +532,206 @@ test('a varsity roster has no program line, and its rows are the height a squad\
   const squad = await readNameCells(page);
   expect(squad.rows[0].height).toBe(varsity.rows[0].height);
 });
+
+// ── Practice squad marks: never another team's logo (v3 pages 3) ─────────────────
+const SHOTS3 = process.env.V33_SHOTS === '1';
+const OUT3 = path.join(__dirname, '../../reports/v3-pages-3');
+const TIERS = ['All-Americans', 'All-Stars', 'Varsity', 'JV', 'Squad', 'Scrubs'];
+const REGIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+// Any program's art, the generic set included (the generic square is Bentley-Truman's knight).
+const TEAM_ART = /\/images\/teams\//;
+
+async function shot3(page, name) {
+  if (!SHOTS3) return;
+  fs.mkdirSync(OUT3, { recursive: true });
+  await page.mouse.move(700, 4);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(OUT3, name), animations: 'disabled' });
+}
+
+test('no practice squad name or id ever resolves to a program\'s art', async ({ page }) => {
+  await install(page, { squad: 'played', squadReads: [] });
+  await open(page, 'tab=practice-squad-view', 1280, 720);
+  const seen = await page.evaluate(({ tiers, regions }) => {
+    const names = [];
+    regions.forEach((region) => {
+      tiers.forEach((tier, index) => {
+        names.push('Region ' + region + ' ' + tier);
+        names.push('ps_' + region + '_' + (index + 1));
+      });
+    });
+    const bad = [];
+    const keys = ['logo_square', 'banner_primary', 'banner_card', 'background', 'mark', 'no-such-key'];
+    names.forEach((name) => {
+      keys.forEach((key) => {
+        const url = window.getTeamAssetPath(name, key);
+        if (/\/images\//.test(String(url))) bad.push(name + ' ' + key + ' -> ' + url);
+      });
+      const logo = window.GOBTables.logo(name);
+      if (/\/images\//.test(String(logo))) bad.push(name + ' GOBTables.logo -> ' + logo);
+      const mark = window.GOBTables.markHtml(name, '');
+      if (/<img/i.test(mark) || !/gob-squad-mark/.test(mark)) bad.push(name + ' markHtml -> ' + mark);
+      const link = window.GOBTables.teamLink('#', name, name, '') + window.GOBTables.nextCell(name, '#', '');
+      if (/<img/i.test(link)) bad.push(name + ' teamLink/nextCell -> ' + link);
+    });
+    return {
+      bad,
+      count: names.length,
+      letter: window.practiceSquadOf('Region C Varsity'),
+      // A real program is untouched.
+      real: [window.getTeamAssetPath('Lancaster', 'logo_square'), window.practiceSquadOf('Lancaster'), window.practiceSquadOf('Four Corners')],
+      court: window.getTeamAssetPath('Region A Squad', 'court'),
+    };
+  }, { tiers: TIERS, regions: REGIONS });
+  expect(seen.count).toBe(96);
+  expect(seen.bad, seen.bad.slice(0, 5).join('\n')).toEqual([]);
+  expect(seen.letter).toEqual({ region: 'C', tier: 'Varsity' });
+  expect(seen.real[0]).toMatch(/\/images\/teams\/lancaster\//);
+  expect(seen.real[1]).toBeNull();
+  expect(seen.real[2]).toBeNull();
+});
+
+for (const [width, height] of SIZES.slice(0, 2)) {
+  test('squad mark: letter and tier on the banner, letter alone when small, at ' + width, async ({ page }) => {
+    const art = [];
+    page.on('request', (request) => { if (TEAM_ART.test(request.url())) art.push(new URL(request.url()).pathname); });
+    await install(page, { squad: 'played', squadReads: [] });
+    await open(page, 'tab=team-view&ps_team_id=' + SQUAD + '&origin=league&return_tab=practice-squad-view', width, height);
+    await expect(page.locator('#team-view .gob-hero-n')).toHaveText('Region C Varsity');
+    const seen = await page.evaluate((tiers) => {
+      const root = document.querySelector('#team-view');
+      const read = (el) => {
+        const letter = el.querySelector('b');
+        const tier = el.querySelector('i');
+        const box = el.getBoundingClientRect();
+        const shown = tier && getComputedStyle(tier).display !== 'none';
+        const inside = (node) => {
+          const r = node.getBoundingClientRect();
+          return r.left >= box.left - 0.5 && r.right <= box.right + 0.5 && r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5;
+        };
+        return {
+          size: [Math.round(box.width), Math.round(box.height)],
+          letter: letter.textContent,
+          letterPx: parseFloat(getComputedStyle(letter).fontSize),
+          letterInside: inside(letter),
+          tier: tier ? tier.textContent : '',
+          tierShown: !!shown,
+          tierPx: shown ? parseFloat(getComputedStyle(tier).fontSize) : 0,
+          tierFits: shown ? tier.scrollWidth <= tier.clientWidth && inside(tier) : null,
+          tierBelow: shown ? tier.getBoundingClientRect().top >= letter.getBoundingClientRect().top + 10 : null,
+          label: el.getAttribute('aria-label'),
+        };
+      };
+      const hero = root.querySelector('.gob-hero-logo .gob-squad-mark');
+      // Every tier name the data has, on the same banner mark: the longest must fit.
+      const each = tiers.map((name) => {
+        hero.querySelector('i').textContent = name;
+        return Object.assign({ name }, read(hero));
+      });
+      hero.querySelector('i').textContent = 'Varsity';
+      return {
+        hero: read(hero),
+        each,
+        small: [...root.querySelectorAll('.gob-sch-list .gob-squad-mark')].map(read),
+        images: [...root.querySelectorAll('img')].map((img) => img.getAttribute('src') || ''),
+        backgrounds: [...root.querySelectorAll('*')].map((el) => getComputedStyle(el).backgroundImage).filter((bg) => /url\(/.test(bg)),
+      };
+    }, TIERS);
+    // The banner mark: the Region letter large, the tier name small under it.
+    expect(seen.hero.size).toEqual([72, 72]);
+    expect(seen.hero.letter).toBe('C');
+    expect(seen.hero.tier).toBe('Varsity');
+    expect(seen.hero.tierShown).toBe(true);
+    expect(seen.hero.tierBelow).toBe(true);
+    expect(seen.hero.letterPx).toBeGreaterThan(seen.hero.tierPx * 4);
+    expect(seen.hero.label).toBe('Region C Varsity');
+    seen.each.forEach((row) => {
+      const note = JSON.stringify(row);
+      expect(row.tierShown, note).toBe(true);
+      expect(row.tierFits, note).toBe(true);
+      expect(row.tierPx, note).toBeGreaterThanOrEqual(8);
+      expect(row.letterInside, note).toBe(true);
+    });
+    // The small mark beside an opponent's name: the letter alone, readable.
+    expect(seen.small.length).toBe(3);
+    seen.small.forEach((row) => {
+      const note = JSON.stringify(row);
+      expect(row.size, note).toEqual([18, 18]);
+      expect(row.tierShown, note).toBe(false);
+      expect(row.letter, note).toMatch(/^[A-H]$/);
+      expect(row.letterPx, note).toBeGreaterThanOrEqual(10);
+      expect(row.letterInside, note).toBe(true);
+    });
+    expect(seen.small.map((row) => row.letter)).toEqual(['A', 'B', 'D']);
+    // No program's art anywhere on the squad's page: no image, no background, no request
+    // for the generic set or for any team but the user's own (the top strip's banner).
+    expect(seen.images.filter((src) => TEAM_ART.test(src))).toEqual([]);
+    expect(seen.backgrounds.filter((bg) => TEAM_ART.test(bg))).toEqual([]);
+    expect(art.filter((p) => !/\/images\/teams\/lancaster\//.test(p)), art.join('\n')).toEqual([]);
+    await shot3(page, 'after-squad-mark-team-page-' + width + '.png');
+  });
+}
+
+test('a practice squad box score has no program banner behind it; a varsity one keeps its own', async ({ page }) => {
+  const game = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/practice-squad-real-game.json'), 'utf8'));
+  const art = [];
+  page.on('request', (request) => { if (TEAM_ART.test(request.url())) art.push(new URL(request.url()).pathname); });
+  await install(page, { squad: 'played', squadReads: [] });
+  await page.route('**/api/game/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(game) }));
+  const back = encodeURIComponent('/franchise-command-center.html?franchise_id=' + FID + '&team_id=' + TID + '&tab=practice-squad-view');
+  for (const [width, height] of SIZES.slice(0, 2)) {
+    await page.setViewportSize({ width, height });
+    await page.goto('/box-score.html?game_id=ps-real&mode=practice_squad&franchise_id=' + FID + '&team_id=' + TID + '&return_url=' + back);
+    await expect(page.locator('#home-player-stats-body tr').first()).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('#box-score-header')).toContainText('Region A All-Americans');
+    const header = await page.evaluate(() => getComputedStyle(document.getElementById('box-score-header')).backgroundImage);
+    expect(header).toBe('none');
+    await shot3(page, 'after-squad-box-score-' + width + '.png');
+  }
+  expect(art.filter((p) => !/\/images\/teams\/lancaster\//.test(p)), art.join('\n')).toEqual([]);
+
+  // The same game document read as a varsity game still draws a banner.
+  await page.goto('/box-score.html?game_id=ps-real&mode=franchise&franchise_id=' + FID + '&team_id=' + TID + '&return_url=' + back);
+  await expect(page.locator('#home-player-stats-body tr').first()).toBeVisible({ timeout: 30000 });
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('box-score-header')).backgroundImage)).toMatch(/url\(/);
+});
+
+test('the Practice Squads table, schedule and bracket draw no program art', async ({ page }) => {
+  const art = [];
+  page.on('request', (request) => { if (TEAM_ART.test(request.url())) art.push(new URL(request.url()).pathname); });
+  await install(page, { squad: 'played', squadReads: [] });
+  await open(page, 'tab=practice-squad-view', 1280, 720);
+  await expect(page.locator('#practice-squad-view a', { hasText: 'Region C Varsity' }).first()).toBeVisible();
+  const images = await page.evaluate(() => [...document.querySelectorAll('#practice-squad-view img')].map((img) => img.getAttribute('src') || ''));
+  expect(images.filter((src) => TEAM_ART.test(src))).toEqual([]);
+  expect(art.filter((p) => !/\/images\/teams\/lancaster\//.test(p)), art.join('\n')).toEqual([]);
+});
+
+test('practice squad roster: five Starters from PG to C, the other seven on the Bench', async ({ page }) => {
+  const slots = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const players = [];
+  for (let n = 0; n < 12; n += 1) {
+    // Sent out of order: the page sorts the five by their slot.
+    const order = n < 5 ? 4 - n : null;
+    players.push(Object.assign(squadPlayer('p-' + n, 'Player ' + String.fromCharCode(65 + n), n % 2 ? 'frd' : 'fpd', n % 2 ? null : 'Lancaster', 6), {
+      starter: n < 5, lineup_order: order, position: n < 5 ? slots[order] : 'SF',
+    }));
+  }
+  await install(page, { squad: 'played', squadReads: [] });
+  await page.route('**/franchise/practice-squad/team**', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign(squadBody('played'), { players })),
+  }));
+  await open(page, 'tab=team-view&ps_team_id=' + SQUAD + '&origin=league&return_tab=practice-squad-view', 1280, 720);
+  await expect(page.locator('#team-view .gob-team-roster-body a.gob-player')).toHaveCount(12);
+  const groups = await page.evaluate(() => {
+    const out = {}; let current = '';
+    [...document.querySelectorAll('#team-view .gob-team-roster-body tbody tr')].forEach((tr) => {
+      if (tr.classList.contains('gob-sep')) { current = tr.textContent.trim(); out[current] = []; return; }
+      if (tr.querySelector('a.gob-player') && current) out[current].push(tr.children[2].textContent.trim());
+    });
+    return out;
+  });
+  expect(Object.keys(groups)).toEqual(['Starters', 'Bench']);
+  expect(groups.Starters).toEqual(slots);
+  expect(groups.Bench.length).toBe(7);
+});

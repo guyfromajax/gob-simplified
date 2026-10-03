@@ -142,6 +142,15 @@ async function sfxCalls(page) {
   return page.evaluate(() => (window.__gobSfxCalls || []).slice());
 }
 
+/**
+ * The page plays a checkbox's sound through a dynamic import, so it lands a moment after
+ * the click. Wait for the sounds already on their way before clearing the list, or a late
+ * one is counted against the next step.
+ */
+async function waitForSfx(page, count) {
+  await expect.poll(async () => (await sfxCalls(page)).length, { timeout: 10000 }).toBe(count);
+}
+
 async function resetScroll(page) {
   await page.evaluate(() => {
     window.scrollTo(0, 0);
@@ -231,12 +240,14 @@ test.describe('week-1 practice-squad assignment', () => {
     await boxes.nth(1).check();
     await boxes.nth(2).check();
     await boxes.nth(3).check();
+    await waitForSfx(page, 4);
     const more = await disabledLook(page);
     expect(more.disabled).toBe(true);
     expect(more.reason).toBe('Remove 1');
     expect(await clickSubmitForce(page)).toEqual([]);
 
     await boxes.nth(3).uncheck();
+    await waitForSfx(page, 1);
     await expect(page.locator('#submit-btn')).toBeEnabled();
     const exact = await disabledLook(page);
     expect(exact.disabled).toBe(false);
@@ -306,6 +317,7 @@ test.describe('week-1 practice-squad assignment', () => {
     await boxes.nth(1).check();
     await boxes.nth(2).check();
     await expect(page.locator('#submit-btn')).toBeEnabled();
+    await waitForSfx(page, 3);
     await page.evaluate(() => { window.__gobSfxCalls = []; });
     await page.locator('#submit-btn').click();
     await expect(page.locator('#cut-modal-backdrop.is-visible')).toBeVisible();
