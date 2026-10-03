@@ -2,27 +2,34 @@
  * Canonical, reversible RT display experiment.
  *
  * RT stays numeric in data and logic. Only final display formatting changes.
- * This file owns the canonical bands, colors, and letter/number switch.
+ * This file owns the canonical bands and the letter/number switch. The colours are
+ * gob tokens (`token`); `color` is the same value as a literal, for scripts that need
+ * a concrete colour (canvas, inline bars) and for pages with no gob tokens.
+ * tests/test_token_mirrors.py keeps the two equal.
  *
  * Loaded as a classic script (no module export) for ES modules and IIFE pages.
  */
 (function (global) {
   global.RT_DISPLAY_MODE = 'letter';
   var RT_BANDS = Object.freeze([
-    Object.freeze({ minimum: 100, grade: 'A++', className: 'rt-elite', color: '#4A90D9' }),
-    Object.freeze({ minimum: 90, grade: 'A+', className: 'rt-elite', color: '#4A90D9' }),
-    Object.freeze({ minimum: 80, grade: 'A', className: 'rt-elite', color: '#4A90D9' }),
-    Object.freeze({ minimum: 70, grade: 'B+', className: 'rt-high', color: '#34EC27' }),
-    Object.freeze({ minimum: 60, grade: 'B', className: 'rt-high', color: '#34EC27' }),
-    Object.freeze({ minimum: 50, grade: 'C+', className: 'rt-mid', color: '#FFD700' }),
-    Object.freeze({ minimum: 40, grade: 'C', className: 'rt-mid', color: '#FFD700' }),
-    Object.freeze({ minimum: 30, grade: 'D', className: 'rt-low', color: '#ff6d6d' }),
-    Object.freeze({ minimum: -Infinity, grade: 'F', className: 'rt-low', color: '#ff6d6d' })
+    Object.freeze({ minimum: 100, grade: 'A++', className: 'rt-elite', color: '#4A90D9', token: '--blue' }),
+    Object.freeze({ minimum: 90, grade: 'A+', className: 'rt-elite', color: '#4A90D9', token: '--blue' }),
+    Object.freeze({ minimum: 80, grade: 'A', className: 'rt-elite', color: '#4A90D9', token: '--blue' }),
+    Object.freeze({ minimum: 70, grade: 'B+', className: 'rt-high', color: '#34EC27', token: '--tier-green' }),
+    Object.freeze({ minimum: 60, grade: 'B', className: 'rt-high', color: '#34EC27', token: '--tier-green' }),
+    Object.freeze({ minimum: 50, grade: 'C+', className: 'rt-mid', color: '#FFD700', token: '--tier-yellow' }),
+    Object.freeze({ minimum: 40, grade: 'C', className: 'rt-mid', color: '#FFD700', token: '--tier-yellow' }),
+    Object.freeze({ minimum: 30, grade: 'D', className: 'rt-low', color: '#ff6d6d', token: '--tier-red' }),
+    Object.freeze({ minimum: -Infinity, grade: 'F', className: 'rt-low', color: '#ff6d6d', token: '--tier-red' })
   ]);
 
   if (global.document && global.document.documentElement) {
     RT_BANDS.forEach(function (band) {
-      global.document.documentElement.style.setProperty('--' + band.className + '-color', band.color);
+      // The .rt-* classes read the token; the literal is the fallback on a page without gob tokens.
+      global.document.documentElement.style.setProperty(
+        '--' + band.className + '-color',
+        'var(' + band.token + ', ' + band.color + ')'
+      );
     });
   }
 

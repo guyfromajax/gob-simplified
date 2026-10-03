@@ -33,7 +33,6 @@ function cloneParams(params) {
   'use strict';
 
   var authMeDataCache = null;
-  var musicControllerPromise = null;
 
   var PAGES_WITHOUT_AUTH_BAR = [
     // Gameplay / lineup
@@ -54,6 +53,9 @@ function cloneParams(params) {
     // FTE v2 tutorial funnel — immersive screens, no auth bar
     'tutorial-persona-intro.html',
     'tutorial-situation.html',
+    // Home Base carries its own top bar (Ch7), so the site bar would double it
+    'mode-select.html',
+    'trophy-case.html',
     // Optional non-.html route variants
     '/box-score',
     '/game-plan',
@@ -174,67 +176,6 @@ function cloneParams(params) {
   //
   // Username modal lives in /js/shared/usernameModal.js (FTE v2 chrome).
   // Loaded on demand via dynamic import — see openUsernameModal() below.
-
-  // Account Settings — a Functional Modal (per Styleguide §Modal System).
-  // Reuses the shared `.gob-modal-overlay/backdrop/box/accent/body` classes;
-  // only the username/toggle/link rows add field-level CSS (see auth-bar.css).
-  function ensureAccountSettingsModal() {
-    if (document.getElementById('account-settings-overlay')) return;
-    var overlay = document.createElement('div');
-    overlay.id = 'account-settings-overlay';
-    overlay.className = 'gob-modal-overlay account-modal-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-labelledby', 'account-settings-title');
-    overlay.innerHTML = [
-      '<div class="gob-modal-backdrop" data-account-dismiss></div>',
-      '<div class="gob-modal-box account-modal-box">',
-      // Orange accent — Account Settings is a non-gating settings surface.
-      '  <div class="gob-modal-accent"></div>',
-      '  <div class="account-modal-header">',
-      '    <h3 id="account-settings-title" class="gob-modal-title">Username</h3>',
-      '    <button type="button" id="account-settings-close" class="account-modal-close" aria-label="Close account settings">',
-      '      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">',
-      '        <path d="M3.5 3.5 L12.5 12.5 M12.5 3.5 L3.5 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
-      '      </svg>',
-      '    </button>',
-      '  </div>',
-      '  <div class="gob-modal-body account-modal-body">',
-      // Field 1 — Username (display-only, intentionally locked)
-      '    <div class="account-field account-field--first">',
-      '      <div class="account-identity">',
-      '        <div id="account-avatar" class="account-avatar" aria-hidden="true"></div>',
-      '        <div class="account-identity-text">',
-      '          <div class="account-username-row">',
-      '            <span id="account-settings-username" class="account-username">-</span>',
-      '            <span id="account-settings-badge" class="account-username-badge"></span>',
-      '          </div>',
-      '        </div>',
-      '        <span class="account-locked">',
-      '          <svg viewBox="0 0 12 12" width="12" height="12" fill="none" aria-hidden="true">',
-      '            <rect x="2.25" y="5.25" width="7.5" height="5.25" rx="1" stroke="currentColor" stroke-width="1.1"/>',
-      '            <path d="M4 5.25 V3.75 a2 2 0 0 1 4 0 V5.25" stroke="currentColor" stroke-width="1.1"/>',
-      '          </svg>',
-      '          LOCKED',
-      '        </span>',
-      '      </div>',
-      '    </div>',
-      // Field 2 — Scouting Ambience (instant-apply sliding switch)
-      '    <div class="account-field account-toggle-row">',
-      '      <div class="account-field-label">Scouting Ambience</div>',
-      '      <button type="button" id="account-ambience-switch" class="account-switch" role="switch" aria-checked="true" aria-label="Scouting ambience">',
-      '        <span class="account-switch-knob" aria-hidden="true"></span>',
-      '      </button>',
-      '    </div>',
-      // Forward link to the full account page.
-      '    <div class="account-field account-manage-row">',
-      '      <a href="/account.html" id="account-manage-link" class="account-manage-link">Account Details<span class="account-manage-arrow" aria-hidden="true">&rarr;</span></a>',
-      '    </div>',
-      '  </div>',
-      '</div>'
-    ].join('');
-    document.body.appendChild(overlay);
-  }
 
   // Username modal: delegated to /js/shared/usernameModal.js (FTE v2 chrome).
   // Loaded on demand so this classic script doesn't need to be a module.
@@ -391,7 +332,7 @@ function cloneParams(params) {
       '    <a href="/signup.html" class="auth-link">Sign Up</a>',
       '  </div>',
       '  <div id="auth-logged-in" class="auth-status" style="display: none;">',
-      '    <button type="button" id="auth-settings-btn" class="auth-settings-btn" aria-label="Account settings" title="Account settings">',
+      '    <button type="button" id="auth-settings-btn" class="auth-settings-btn" aria-label="Settings" title="Settings" aria-expanded="false">',
       '      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>',
       '    </button>',
       '    <button type="button" id="logout-btn" class="auth-logout-btn">Log Out</button>',
@@ -426,8 +367,9 @@ function cloneParams(params) {
       settingsBtn.type = 'button';
       settingsBtn.id = 'auth-settings-btn';
       settingsBtn.className = 'auth-settings-btn';
-      settingsBtn.setAttribute('aria-label', 'Account settings');
-      settingsBtn.setAttribute('title', 'Account settings');
+      settingsBtn.setAttribute('aria-label', 'Settings');
+      settingsBtn.setAttribute('title', 'Settings');
+      settingsBtn.setAttribute('aria-expanded', 'false');
       settingsBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>';
       var logoutBtn = document.getElementById('logout-btn');
       if (logoutBtn) loggedIn.insertBefore(settingsBtn, logoutBtn);
@@ -438,11 +380,7 @@ function cloneParams(params) {
   }
 
   function playNavSound(filename) {
-    try {
-      var a = new Audio('/sounds/' + encodeURIComponent(filename));
-      a.volume = 0.7;
-      a.play().catch(function () {});
-    } catch (e) {}
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
   }
 
   function injectAuthBar() {
@@ -455,6 +393,12 @@ function cloneParams(params) {
       document.body.classList.add('has-auth-bar');
       return;
     }
+    // The auth bar carries its own #alpha-badge. If another init (alphaBanner.js on
+    // the franchise shell) already inserted a standalone badge before this async
+    // script ran, remove it first so the bar's badge is the only one — two
+    // #alpha-badge elements is a duplicate id and breaks getElementById.
+    var strayBadge = document.getElementById('alpha-badge');
+    if (strayBadge && strayBadge.parentNode) strayBadge.parentNode.removeChild(strayBadge);
     var bar = createAuthBarHTML();
     document.body.insertBefore(bar, document.body.firstChild);
     document.body.classList.add('has-auth-bar');
@@ -595,14 +539,6 @@ function cloneParams(params) {
     setStoredAuthUser(stored);
   }
 
-  function emitAccountSettingsUpdated(settings) {
-    try {
-      window.dispatchEvent(new CustomEvent('gob:account-settings-updated', {
-        detail: { account_settings: normalizeAccountSettings(settings) }
-      }));
-    } catch (e) {}
-  }
-
   function getDisplayContext() {
     try {
       if (typeof window.getGobDisplayColorContext === 'function') {
@@ -630,225 +566,13 @@ function cloneParams(params) {
     };
   }
 
-  function loadMusicController() {
-    if (!musicControllerPromise) {
-      musicControllerPromise = import('/js/musicController.js');
-    }
-    return musicControllerPromise;
-  }
-
-  function applyAmbienceSwitchVisual(switchEl, enabled) {
-    if (!switchEl) return;
-    // aria-checked drives the knob slide / on-state styling in CSS.
-    switchEl.setAttribute('aria-checked', enabled ? 'true' : 'false');
-  }
-
-  function syncAmbienceSwitchFromController(switchEl, mc) {
-    applyAmbienceSwitchVisual(switchEl, mc.isScoutingAmbienceEnabled());
-  }
-
-  function refreshAccountSettingsModal() {
-    var usernameEl = document.getElementById('account-settings-username');
-    var switchEl = document.getElementById('account-ambience-switch');
-    if (!usernameEl || !switchEl) return;
-
-    var meData = authMeDataCache || window.__gobAuthMeData || {};
-    var displayName = meData.username || meData.email || 'Coach';
-    usernameEl.textContent = displayName;
-
-    var avatar = document.getElementById('account-avatar');
-    if (avatar) {
-      // First initial fallback (a real coach avatar image could replace this).
-      avatar.textContent = displayName.charAt(0).toUpperCase();
-    }
-
-    renderAccountArchetypeBadge(meData);
-
-    loadMusicController()
-      .then(function (mc) {
-        syncAmbienceSwitchFromController(switchEl, mc);
-      })
-      .catch(function (err) {
-        console.warn('[account-settings] music controller import failed', err);
-      });
-  }
-
-  // Load the shared archetype-badge module on demand (auth bar runs on many pages).
-  function ensureArchetypeBadgeScript() {
-    if (window.GOBArchetype) return Promise.resolve();
-    if (window.__gobArchetypeBadgeLoading) return window.__gobArchetypeBadgeLoading;
-    window.__gobArchetypeBadgeLoading = new Promise(function (resolve) {
-      var s = document.createElement('script');
-      s.src = '/js/shared/archetypeBadge.js';
-      s.onload = function () { resolve(); };
-      s.onerror = function () { resolve(); };
-      document.head.appendChild(s);
-    });
-    return window.__gobArchetypeBadgeLoading;
-  }
-
-  // Coaching-archetype badge beside the username (reads lead_archetype, with
-  // the shared fallback to derive from archetype counts on older docs).
-  function renderAccountArchetypeBadge(meData) {
-    var badgeEl = document.getElementById('account-settings-badge');
-    if (!badgeEl) return;
-    badgeEl.innerHTML = '';
-    ensureArchetypeBadgeScript().then(function () {
-      if (!window.GOBArchetype) return;
-      var lead = window.GOBArchetype.leadFrom(meData);
-      if (!lead) return;
-      var badge = window.GOBArchetype.createBadge(lead, 22);
-      if (badge) { badgeEl.innerHTML = ''; badgeEl.appendChild(badge); }
-    });
-  }
-
-  function closeAccountSettingsModal() {
-    var overlay = document.getElementById('account-settings-overlay');
-    if (!overlay) return;
-    overlay.classList.remove('is-visible');
-    var box = overlay.querySelector('.account-modal-box');
-    if (box) box.classList.remove('is-entered'); // reset so it re-animates next open
-  }
-
-  function openAccountSettingsModal() {
-    refreshAccountSettingsModal();
-    var overlay = document.getElementById('account-settings-overlay');
-    if (!overlay) return;
-    overlay.classList.add('is-visible');
-    var box = overlay.querySelector('.account-modal-box');
-    if (box) {
-      // Reflow at the pre-entrance scale (overlay is now displayed) so the
-      // scale 0.96 -> 1.0 transition actually runs.
-      box.classList.remove('is-entered');
-      void box.offsetWidth;
-      box.classList.add('is-entered');
-    }
-  }
-
-  // --- Save toast (shared Toast pattern, Styleguide §Toast Notifications) ---
-  var accountToastTimer = null;
-
-  function ensureAccountToast() {
-    var existing = document.getElementById('account-toast');
-    if (existing) return existing;
-    var toast = document.createElement('div');
-    toast.id = 'account-toast';
-    toast.className = 'account-toast';
-    toast.setAttribute('role', 'status');
-    toast.setAttribute('aria-live', 'polite');
-    toast.hidden = true;
-    toast.innerHTML = [
-      '<span class="account-toast-icon" aria-hidden="true">',
-      '  <svg viewBox="0 0 20 20" width="11" height="11" fill="none">',
-      '    <path d="M5.1 10.4 8.3 13.6 14.9 7" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>',
-      '  </svg>',
-      '</span>',
-      '<div class="account-toast-copy">',
-      '  <div id="account-toast-message" class="account-toast-message"></div>',
-      '</div>'
-    ].join('');
-    document.body.appendChild(toast);
-    return toast;
-  }
-
-  // One toast at a time — a rapid second flip reuses it and resets the 3s timer.
-  function showAccountToast(enabled) {
-    var toast = ensureAccountToast();
-    var message = document.getElementById('account-toast-message');
-    if (message) {
-      message.textContent = enabled ? 'Scouting ambience on.' : 'Scouting ambience off.';
-    }
-    if (accountToastTimer) {
-      clearTimeout(accountToastTimer);
-      accountToastTimer = null;
-    }
-    toast.hidden = false;
-    // Force reflow so the entrance transition replays on a reused toast.
-    void toast.offsetWidth;
-    toast.classList.add('is-visible');
-    accountToastTimer = setTimeout(function () {
-      toast.classList.remove('is-visible');
-      accountToastTimer = null;
-    }, 3000);
-  }
-
-  function persistDisplayColor(displayColor) {
-    if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl || !API_CONFIG.getAuthHeaders) {
-      return Promise.reject(new Error('API unavailable'));
-    }
-    return fetch(API_CONFIG.buildUrl('/api/auth/account-settings'), {
-      method: 'PATCH',
-      headers: Object.assign({ 'Content-Type': 'application/json' }, API_CONFIG.getAuthHeaders()),
-      body: JSON.stringify({ display_color: displayColor })
-    })
-      .then(function (res) {
-        if (!res.ok) throw new Error('Unable to save setting');
-        return res.json();
-      })
-      .then(function (data) {
-        var nextSettings = normalizeAccountSettings(data.account_settings);
-        if (authMeDataCache) authMeDataCache.account_settings = nextSettings;
-        emitAccountSettingsUpdated(nextSettings);
-        setAuthMeData(Object.assign({}, authMeDataCache || {}, { account_settings: nextSettings }));
-        refreshAccountSettingsModal();
-        return data;
-      });
-  }
-
-  function initAccountSettingsModal() {
-    ensureAccountSettingsModal();
+  // Wire the auth-bar gear to the shared Settings panel (gobSettings.js).
+  function initSettingsButton() {
     var settingsBtn = document.getElementById('auth-settings-btn');
-    var overlay = document.getElementById('account-settings-overlay');
-    var closeBtn = document.getElementById('account-settings-close');
     if (settingsBtn && !settingsBtn.dataset.bound) {
       settingsBtn.dataset.bound = '1';
-      settingsBtn.addEventListener('click', openAccountSettingsModal);
-    }
-    if (closeBtn && !closeBtn.dataset.bound) {
-      closeBtn.dataset.bound = '1';
-      closeBtn.addEventListener('click', closeAccountSettingsModal);
-    }
-    if (overlay && !overlay.dataset.bound) {
-      overlay.dataset.bound = '1';
-      // Backdrop click dismisses (Functional Modal rule).
-      overlay.addEventListener('click', function (e) {
-        if (e.target && e.target.hasAttribute('data-account-dismiss')) {
-          closeAccountSettingsModal();
-        }
-      });
-    }
-    // ESC dismisses (Functional Modal rule). Bound once at the document level.
-    if (!document.body.dataset.accountEscBound) {
-      document.body.dataset.accountEscBound = '1';
-      document.addEventListener('keydown', function (e) {
-        if (e.key !== 'Escape' && e.key !== 'Esc') return;
-        var open = document.getElementById('account-settings-overlay');
-        if (open && open.classList.contains('is-visible')) {
-          closeAccountSettingsModal();
-        }
-      });
-    }
-    var switchEl = document.getElementById('account-ambience-switch');
-    if (switchEl && !switchEl.dataset.bound) {
-      switchEl.dataset.bound = '1';
-      switchEl.addEventListener('click', function () {
-        var turningOn = switchEl.getAttribute('aria-checked') !== 'true';
-        loadMusicController()
-          .then(function (mc) {
-            // Apply instantly — no Save button. setScoutingAmbienceEnabled is
-            // the account's real persistence for this preference.
-            mc.setScoutingAmbienceEnabled(turningOn);
-            syncAmbienceSwitchFromController(switchEl, mc);
-            if (turningOn) {
-              mc.tryStartScoutingAmbienceForCurrentPage();
-            } else {
-              mc.clearFranchiseMusicState();
-            }
-            showAccountToast(turningOn);
-          })
-          .catch(function (err) {
-            console.warn('[ambience-toggle] music controller import failed', err);
-          });
+      settingsBtn.addEventListener('click', function () {
+        import('/js/shared/gobSettings.js').then(function (mod) { mod.toggle(); }).catch(function () {});
       });
     }
   }
@@ -904,7 +628,6 @@ function cloneParams(params) {
       if (authLoggedIn) authLoggedIn.style.display = 'flex';
       updateLogoDestination(true);
       setAuthMeData(localUser);
-      refreshAccountSettingsModal();
       return;
     }
 
@@ -926,7 +649,6 @@ function cloneParams(params) {
                 updateLogoDestination(true);
                 res.json().then(function (meData) {
                   setAuthMeData(meData);
-                  refreshAccountSettingsModal();
                   routeToTutorial(meData);
                   ensureTutorialAlertExperience().then(function () {
                     /* Read the live global, not the closure's meData: the alerts
@@ -942,7 +664,6 @@ function cloneParams(params) {
                     email: user.email || null,
                     account_settings: user.account_settings || { display_color: 'default' }
                   });
-                  refreshAccountSettingsModal();
                 });
               } else {
                 // Token invalid - clear and show logged-out state
@@ -975,7 +696,6 @@ function cloneParams(params) {
             email: user.email || null,
             account_settings: user.account_settings || { display_color: 'default' }
           });
-          refreshAccountSettingsModal();
         }
       } catch (e) {
         if (typeof localStorage !== 'undefined') {
@@ -992,12 +712,11 @@ function cloneParams(params) {
 
     if (logoutBtn) {
       logoutBtn.addEventListener('click', function () {
-        try {
-          if (typeof API_CONFIG !== 'undefined') {
-            fetch(API_CONFIG.buildUrl('/api/auth/logout'), { method: 'POST' }).catch(function () {});
-          }
-        } catch (e) {}
-        if (typeof localStorage !== 'undefined') {
+        // Shared helper attaches the bearer token before clearing it (so the server
+        // revokes the session), clears the local token, and never throws.
+        if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.logout === 'function') {
+          API_CONFIG.logout();
+        } else if (typeof localStorage !== 'undefined') {
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth_user');
         }
@@ -1079,11 +798,7 @@ function cloneParams(params) {
     }
 
     function playSound(filename) {
-      try {
-        var a = new Audio('/sounds/' + encodeURIComponent(filename));
-        a.volume = 0.7;
-        a.play().catch(function () {});
-      } catch (e) {}
+      import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
     }
     function openModal() {
       playSound('click-tiny.wav');
@@ -1188,7 +903,7 @@ function cloneParams(params) {
     whenAuthBarStylesReady(function () {
       injectAuthBar();
       injectFooter();
-      initAccountSettingsModal();
+      initSettingsButton();
       initAuthState();
       ensureTutorialAlertExperience();
       initAlphaBadge();

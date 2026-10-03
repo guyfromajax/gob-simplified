@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
+  <link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8">
@@ -33,7 +35,7 @@
       <li class="opp-pick__loading">Loading your conference&hellip;</li>
     </ol>
 
-    <button id="opp-cta" type="button" class="gob-btn gob-btn--action gob-btn--lg" disabled>CONTINUE</button>
+    <button id="opp-cta" type="button" class="gob-btn gob-btn--neutral gob-btn--lg" disabled>CONTINUE</button>
     <p id="opp-error" class="opp-pick__error" aria-live="polite"></p>
   </main>
 

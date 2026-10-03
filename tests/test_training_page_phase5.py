@@ -44,7 +44,7 @@ def test_every_drill_id_is_still_on_the_page(drill_id):
 
 @pytest.mark.parametrize("drill_id", DRILL_IDS)
 def test_collect_training_data_still_reads_it(drill_id):
-    assert f"getElementById('{drill_id}')" in JS
+    assert f"byId('{drill_id}')" in JS or f"getElementById('{drill_id}')" in JS
 
 
 def test_there_are_exactly_twenty_drills():
@@ -221,7 +221,7 @@ def test_no_column_reserves_height_it_is_not_using():
 
 def test_the_before_you_submit_bar_became_a_pill():
     assert 'class="req-bar"' not in HTML
-    assert 'class="req-pill"' in HTML
+    assert 'class="req-pill bud"' in HTML
     # Same ids, so the same updateRequirementsBar drives it.
     for el_id in ("requirements-bar", "req-points", "req-focus", "req-points-used",
                   "req-points-total", "req-points-meter", "req-focus-value",
@@ -246,7 +246,7 @@ def test_back_stacks_above_the_tutorial_button():
 
 def test_the_pill_sits_under_the_page_title():
     title = HTML.index('class="page-title"')
-    pill = HTML.index('class="req-pill"')
+    pill = HTML.index('class="req-pill bud"')
     actions = HTML.index('class="header-actions"')
     assert title < pill < actions
 
@@ -267,15 +267,17 @@ def test_it_costs_no_extra_request():
     both development fields through training_position_projection."""
     assert "renderPlayerDevelopment();" in JS
     load = JS[JS.index("data.custom_focus_roster"):]
-    assert "renderPlayerDevelopment" in load[:400]
+    assert "renderPlayerDevelopment" in load[:800]
 
 
-def test_the_grid_is_four_rows_of_three_filled_column_first():
+def test_the_grid_is_four_across_filled_row_by_row():
+    """RT order reads left to right, then top to bottom; a longer roster adds a row."""
     block = CSS_GRID[CSS_GRID.index(".pdg-grid {"):]
     block = block[:block.index("}")]
-    assert "repeat(3, 1fr)" in block
-    assert "repeat(4, auto)" in block
-    assert "grid-auto-flow: column" in block
+    assert "repeat(4, minmax(0, 1fr))" in block
+    assert "grid-auto-flow: row" in block
+    assert "grid-template-rows" not in block
+    assert "grid-auto-flow: column" not in CSS_GRID
 
 
 def test_positions_tally_left_focuses_tally_right():
@@ -297,5 +299,5 @@ def test_leaving_for_the_chart_saves_the_draft_first():
 def test_tally_recounts_after_a_save():
     """Counting lives with the grid now; a save repaints both tallies."""
     grid = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "playerDevelopmentGrid.js").read_text()
-    saved = grid[grid.index("dev.bind(grid,"):]
-    assert "paintTallies(host, rows);" in saved[:1400]
+    saved = grid[grid.index("dev.bind(grid,"): grid.index("function paintTallies", grid.index("dev.bind(grid,"))]
+    assert "paintTallies(host, rows);" in saved

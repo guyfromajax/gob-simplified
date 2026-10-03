@@ -69,7 +69,7 @@
         '<td>' + (stats.STL || 0) + '</td>' +
         '<td>' + (stats.BLK || 0) + '</td>' +
         '<td>' + (stats.F || 0) + '</td>' +
-        '<td>' + (stats.MIN || 0) + '</td>' +
+        '<td>' + Math.round(Number(stats.MIN) || 0) + '</td>' +
         '<td>' + (stats.TO || 0) + '</td>';
       tbody.appendChild(tr);
     });

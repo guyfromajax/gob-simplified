@@ -1,0 +1,1574 @@
+/* Shared table template for League browse views. Narrow tables pin their
+   header under the measured page head. Wide tables scroll inside the card. */
+
+html.gob-shell .pg-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+html.gob-shell .gob-search {
+  width: 9.5rem;
+  max-width: 36vw;
+  height: 28px;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  background: transparent;
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+html.gob-shell .gob-search::placeholder {
+  color: var(--text-38);
+}
+
+.gob-tgrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: 0;
+  padding-bottom: var(--space-16);
+}
+
+html.gob-shell.gob-1920 .gob-tgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+}
+
+.gob-tcard {
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  overflow: clip;
+}
+
+.gob-tcard h2 {
+  margin: 0;
+  padding: var(--space-12) var(--space-12) var(--space-8);
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-87);
+}
+
+.gob-tcard h2 em {
+  margin-left: var(--space-10);
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
+}
+
+.gob-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+  color: var(--text-100);
+}
+
+.gob-tbl th,
+.gob-tbl td {
+  padding: var(--space-8) var(--space-8);
+  text-align: right;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.gob-tbl th {
+  position: sticky;
+  top: var(--gob-stick-top);
+  z-index: var(--z-sticky);
+  background: var(--surface-th-top);
+  color: var(--text-60);
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-6);
+}
+
+.gob-tbl th.team,
+.gob-tbl td.team,
+.gob-tbl th.left,
+.gob-tbl td.left {
+  text-align: left;
+}
+
+.gob-tbl tbody tr:nth-child(even) td {
+  background-color: var(--white-2);
+}
+
+/* Body cells take the shade as their colour. A HEADER cell takes it as a layer over its
+   solid base instead: the header is pinned, and a 4% tint on its own let the rows scroll
+   through it (Recruiting › Pool, 2026-10-02). It looks the same at rest. */
+.gob-tbl tbody tr td.gshade,
+.gob-tbl tbody tr th.gshade {
+  background-color: var(--group-shade);
+}
+.gob-tbl thead tr th.gshade {
+  background-image: linear-gradient(var(--group-shade), var(--group-shade));
+}
+
+.gob-tbl tbody tr.me td,
+.gob-tbl tbody tr.is-user td {
+  background-color: #1c2a52;
+}
+
+.gob-tbl th.s {
+  cursor: pointer;
+}
+
+.gob-tbl th.s::after {
+  content: "";
+  display: inline-block;
+  margin-left: 4px;
+  border: 3px solid transparent;
+  border-top-color: var(--text-38);
+  vertical-align: middle;
+}
+
+.gob-tbl th.s.asc::after {
+  border-top-color: transparent;
+  border-bottom-color: var(--text-100);
+  transform: translateY(-2px);
+}
+
+.gob-tbl th.s.desc::after {
+  border-top-color: var(--text-100);
+}
+
+.gob-tbl th.on {
+  box-shadow: inset 0 -2px 0 var(--text-60);
+}
+
+.gob-tbl td.on,
+.gob-tbl th.on {
+  background-image: linear-gradient(var(--white-12), var(--white-12));
+}
+
+.gob-tbl tr.gob-groups th {
+  height: var(--dsz-22);
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-10);
+  color: var(--text-38);
+  text-align: center;
+  background: var(--surface-th-top);
+  border-bottom: 1px solid var(--line);
+}
+
+.gob-tbl tr.gob-rep th {
+  position: static;
+  background: var(--surface-th-bottom);
+}
+
+/* ── Stat families (Styleguide › Tables) ──────────────────────────────────────
+   Columns of one family (FGM FGA FG%; OREB DREB REB; PF PA) sit `--fam-in` apart
+   and families `--fam-out` apart. `fs` is a family's first column and `fe` its last.
+   Only the name column and the family starts are auto-width, so a wide card puts
+   its slack in the gutters between families, never inside one. */
+.gob-fam {
+  --fam-in: var(--space-6);
+  --fam-out: var(--dsp-14);
+}
+
+.gob-fam .gob-tbl th,
+.gob-fam .gob-tbl td {
+  width: 1px;
+  padding-left: var(--fam-in);
+  padding-right: var(--fam-in);
+}
+
+.gob-fam .gob-tbl th.team,
+.gob-fam .gob-tbl td.team,
+.gob-fam .gob-tbl th.fs,
+.gob-fam .gob-tbl td.fs {
+  width: auto;
+}
+
+.gob-fam .gob-tbl th.fs,
+.gob-fam .gob-tbl td.fs {
+  padding-left: var(--fam-out);
+}
+
+/* A rank column opens the row; it never takes slack. */
+.gob-fam .gob-tbl th.rk,
+.gob-fam .gob-tbl td.rk {
+  width: 1px;
+}
+
+.gob-fam .gob-tbl th.fe,
+.gob-fam .gob-tbl td.fe {
+  padding-right: var(--fam-out);
+}
+
+/* ── League › Standings: eight regions, two sister conferences side by side ── */
+#standings-view .gob-regions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: 0;
+  padding-bottom: var(--space-16);
+  container-type: inline-size;
+}
+
+#standings-view .gob-region {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dsp-12);
+  align-items: start;
+}
+
+#standings-view .gob-conf {
+  container-type: inline-size;
+}
+
+#standings-view .gob-conf .gob-tbl th.rk,
+#standings-view .gob-conf .gob-tbl td.rk {
+  color: var(--text-60);
+  font-variant-numeric: tabular-nums;
+}
+
+/* NEXT is the opponent: its mark, and its name where the card has room (1920 two-up;
+   not 1280 two-up). The name is in the tooltip and the label either way. */
+#standings-view .gob-conf .gob-next-n {
+  display: none;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container (min-width: 760px) {
+  #standings-view .gob-conf .gob-next-n { display: inline; }
+}
+#standings-view .gob-conf .gob-next.is-none {
+  color: var(--text-38);
+}
+#standings-view .gob-conf a.gob-next:hover .gob-next-n {
+  text-decoration: underline;
+}
+#standings-view .gob-conf a.gob-next:focus-visible {
+  outline: 2px solid var(--text-100);
+  outline-offset: 1px;
+  border-radius: var(--radius-4);
+}
+
+/* Narrow: the pair holds, DIFF and its pill go first. */
+@container (max-width: 639px) {
+  #standings-view .gob-conf .gob-tbl .c-diff { display: none; }
+  #standings-view .gob-conf .gob-tbl .pre-diff { padding-right: var(--fam-out); }
+}
+
+/* Narrower still: one conference per row, and DIFF has room again. */
+@container (max-width: 1059px) {
+  #standings-view .gob-region { grid-template-columns: minmax(0, 1fr); }
+}
+
+.gob-team,
+.gob-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-100);
+  text-decoration: none;
+}
+
+/* One row height whatever the avatar holds. On the text baseline an image-only avatar
+   has no baseline of its own, so it lifted the line by 2px: headshot rows were 46px and
+   monogram rows 44px, and a row jumped when its headshot failed late. Only the avatar
+   link (.gob-team.gob-player): a text-only .gob-player (Leaders, Awards) stays on the
+   baseline, where middle would nudge it by a fraction of a pixel. */
+a.gob-team.gob-player {
+  vertical-align: middle;
+}
+
+.gob-team img,
+.gob-next img,
+.gob-mark {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex: none;
+}
+
+.gob-mark {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 3px;
+  color: #fff;
+  font: var(--fw-bold) 10px/1 var(--font-display);
+  letter-spacing: 0;
+}
+
+/* A practice squad's mark: the Region letter in a square, generated (common.js
+   `practiceSquadMarkHtml`). The tier name sits under the letter only when the square is
+   large enough to read it (40px and up: the team page banner); a small mark is the
+   letter alone, beside the squad's full name. Tokens only. */
+.gob-squad-mark {
+  container-type: size;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-content: center;
+  justify-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 3px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text-100);
+  vertical-align: middle;
+}
+.gob-squad-mark b {
+  font: var(--fw-bold) 66cqh/1 var(--font-display);
+  letter-spacing: 0;
+}
+.gob-squad-mark i { display: none; }
+@container (min-width: 40px) {
+  .gob-squad-mark b { font-size: 56cqh; line-height: 0.9; }
+  .gob-squad-mark i {
+    display: block;
+    max-width: 92cqw;
+    margin-top: 3cqh;
+    overflow: hidden;
+    white-space: nowrap;
+    /* The condensed display face: "All-Americans", the longest tier, fits the square. */
+    font: var(--fw-bold) 13cqh/1 var(--font-display);
+    font-style: normal;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-60);
+  }
+}
+.gob-hero-logo .gob-squad-mark { width: 72px; height: 72px; border-radius: 8px; }
+
+.gob-diff {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-8);
+}
+
+.gob-diff i {
+  position: relative;
+  display: inline-block;
+  width: var(--dsz-40);
+  height: var(--dsz-6);
+  border-radius: var(--radius-2);
+  background: var(--white-4);
+  flex: none;
+}
+
+.gob-diff i::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--white-25);
+}
+
+.gob-diff i::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: calc(var(--v, 0) * 50%);
+  border-radius: var(--radius-2);
+  background: var(--white-55);
+}
+
+.gob-diff i.neg::after {
+  left: auto;
+  right: 50%;
+  background: var(--white-25);
+}
+
+.gob-diff > span {
+  display: inline-block;
+  min-width: 4.2ch;
+  text-align: right;
+}
+
+.gob-diff.neg > span {
+  color: var(--text-60);
+}
+
+.gob-xs {
+  overflow-x: auto;
+  overflow-y: visible;
+  max-width: 100%;
+}
+
+.gob-xs .gob-tbl {
+  width: max-content;
+  min-width: 1760px;
+}
+
+.gob-xs .gob-tbl th {
+  position: static;
+  top: auto;
+}
+
+.gob-xs .gob-tbl th.pin,
+.gob-xs .gob-tbl td.pin {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.gob-xs .gob-tbl th.pin,
+.gob-xs .gob-tbl tr:not(.me):not(.is-user) td.pin {
+  background-color: var(--surface-1);
+}
+
+.gob-xs.can-l {
+  box-shadow: inset 16px 0 14px -12px rgba(0, 0, 0, 0.65);
+}
+
+.gob-xs.can-r {
+  box-shadow: inset -16px 0 14px -12px rgba(0, 0, 0, 0.65);
+}
+
+.gob-xs.can-l.can-r {
+  box-shadow:
+    inset 16px 0 14px -12px rgba(0, 0, 0, 0.65),
+    inset -16px 0 14px -12px rgba(0, 0, 0, 0.65);
+}
+
+.gob-ldr {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dsp-12);
+  padding-bottom: var(--space-16);
+}
+
+.gob-ldb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  padding: var(--space-12);
+}
+
+.gob-ldb .card-h h3 {
+  margin: 0;
+}
+
+.gob-ldb .cap,
+.gob-full .cap {
+  margin: 0;
+  color: var(--text-38);
+  font: var(--fw-regular) var(--fs-11)/1.3 var(--font-body);
+}
+
+.gob-ldb .ldb-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--dsp-10);
+  padding: var(--dsp-8) var(--dsp-10);
+  border-radius: var(--radius-10);
+  background: var(--white-3);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.gob-ldb .av {
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  font-size: var(--fs-13);
+}
+
+.gob-ldb .av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  display: block;
+}
+
+.gob-ldb .ldb-id {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.gob-ldb .ldb-id .nm {
+  font-size: var(--fs-14);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gob-ldb .ldb-id > span {
+  font-size: var(--fs-11);
+  color: var(--text-60);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gob-ldb .ldb-v {
+  font: var(--fw-bold) var(--fs-32)/0.9 var(--font-display);
+  color: var(--text-100);
+  white-space: nowrap;
+}
+
+.gob-ldb .ldb-v em {
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: var(--tracking-6);
+  color: var(--text-60);
+  margin-left: 3px;
+}
+
+.gob-ldb .ldb-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.gob-ldb .ldb-r {
+  display: grid;
+  grid-template-columns: var(--dsz-18) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--dsp-8);
+  height: var(--dsz-28);
+  padding: 0 var(--dsp-8);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-12);
+}
+
+.gob-ldb .ldb-r:first-child {
+  border-top: 0;
+}
+
+.gob-ldb .ldb-r > span:first-child {
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  color: var(--text-38);
+}
+
+.gob-ldb .ldb-n {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.gob-ldb .ldb-n .nm {
+  font-weight: var(--fw-medium);
+  color: var(--text-87);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gob-ldb .ldb-n em {
+  font-style: normal;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-6);
+  color: var(--text-38);
+}
+
+.gob-ldb .ldb-r b {
+  font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display);
+  color: var(--text-87);
+}
+
+.gob-ldb .ldb-top.me,
+.gob-ldb .ldb-r.me,
+.gob-ldb .ldb-top.is-user,
+.gob-ldb .ldb-r.is-user,
+.gob-full tr.me td {
+  background: #1c2a52;
+}
+
+.gob-ldb .ldb-r.me {
+  border-radius: 6px;
+  border-top-color: transparent;
+}
+
+.gob-ldb .ldb-top.me {
+  border-radius: var(--radius-10);
+}
+
+.gob-ldb .full,
+.gob-board {
+  align-self: flex-end;
+  margin-top: var(--space-4);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-60);
+  cursor: pointer;
+  font: var(--fw-semibold) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+.gob-full {
+  padding-bottom: var(--space-16);
+}
+
+/* Leaders › Full list. The bar above the card is the way back to the boards. */
+button.gob-dt-up {
+  border: 0;
+  background: transparent;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+button.gob-dt-up:hover {
+  color: var(--text-100);
+  background: var(--white-5);
+}
+
+button.gob-dt-up:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+.gob-full .gob-tbl th.rk,
+.gob-full .gob-tbl td.rk {
+  width: 1px;
+  padding-left: var(--space-16);
+  padding-right: var(--space-16);
+  color: var(--text-60);
+  font-variant-numeric: tabular-nums;
+}
+
+.gob-full .gob-tbl tr.me td.rk { color: var(--text-100); }
+
+.gob-full .gob-tbl th:last-child,
+.gob-full .gob-tbl td:last-child {
+  padding-right: var(--space-16);
+}
+
+.gob-full a.gob-player,
+.gob-full a.gob-team {
+  color: var(--text-100);
+  text-decoration: none;
+}
+
+.gob-full a.gob-player:hover,
+.gob-full a.gob-team:hover {
+  text-decoration: underline;
+}
+
+/* Shared empty state (UX_System "Empty states"): one neutral card. */
+.gob-empty {
+  margin: 0;
+  padding: var(--space-16) var(--space-20);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-10);
+  background: var(--white-2);
+  color: var(--text-60);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+
+.gob-view-skel-bar,
+.gob-view-skel-row {
+  animation: gob-skel var(--dur-skeleton) ease-in-out infinite;
+}
+
+@keyframes gob-skel {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gob-view-skel-bar,
+  .gob-view-skel-row {
+    animation: none;
+  }
+}
+
+.gob-xs.gob-roster .gob-tbl {
+  min-width: 0;
+  width: max-content;
+}
+
+.gob-roster .av {
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  font-size: 11px;
+}
+
+.gob-roster .av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  display: block;
+}
+
+/* A practice squad's roster: name over the player's own program. One block height with
+   or without the second line (the avatar's), so every row is the same height. */
+.gob-roster.has-program .gob-id {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 28px;
+  min-width: 0;
+  line-height: 1;
+  text-align: left;
+}
+.gob-roster.has-program .gob-id > span:first-child { line-height: 14px; }
+.gob-roster.has-program .gob-id .sub {
+  color: var(--text-60);
+  font-size: var(--fs-11);
+  line-height: 12px;
+  font-weight: 500;
+}
+
+.gob-roster .rtl {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.gob-roster .rtl i {
+  font-style: normal;
+  color: var(--text-38);
+}
+
+.gob-roster .rt-elite { color: var(--tier-blue); }
+.gob-roster .rt-high { color: var(--tier-green); }
+.gob-roster .rt-mid { color: var(--tier-yellow); }
+.gob-roster .rt-low { color: var(--tier-red); }
+
+.gob-roster .attr-tile,
+.gob-apan .attr-tile {
+  width: var(--dsz-30);
+  height: var(--dsz-26);
+  border-radius: var(--radius-5);
+}
+
+.gob-roster .attr-tile s,
+.gob-apan .attr-tile s {
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  padding-top: var(--space-1);
+}
+
+.gob-roster.is-compact {
+  max-width: 100%;
+  overflow: visible;
+}
+
+.gob-roster.is-compact .gob-tbl {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.gob-roster.is-compact col.c-player { width: auto; }
+.gob-roster.is-compact col.c-rt { width: 4.75rem; }
+.gob-roster.is-compact col.c-pos { width: 2.4rem; }
+.gob-roster.is-compact col.c-yr { width: 2.15rem; }
+.gob-roster.is-compact col.c-ht { width: 3rem; }
+.gob-roster.is-compact col.c-attr { width: calc(var(--dsz-30) + var(--space-8)); }
+
+.gob-roster.is-compact th,
+.gob-roster.is-compact td {
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+  overflow: hidden;
+}
+
+.gob-roster.is-compact td.team,
+.gob-roster.is-compact th.team {
+  min-width: 8.5rem;
+}
+
+.gob-roster.is-compact td.rt,
+.gob-roster.is-compact th.rt {
+  width: 4.75rem;
+  min-width: 4.75rem;
+}
+
+.gob-roster.is-compact .gob-player {
+  max-width: 100%;
+}
+
+.gob-roster.is-compact .gob-player .av {
+  flex: none;
+}
+
+.gob-roster.is-compact .gob-player span:last-child {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gob-roster tr.gob-sep td {
+  height: var(--dsz-28);
+  padding-top: var(--space-6);
+  padding-left: var(--dsp-14);
+  text-align: left;
+  font: var(--fw-bold) var(--fs-10)/1 var(--font-display);
+  letter-spacing: var(--tracking-10);
+  color: var(--text-38);
+  text-transform: uppercase;
+  background: transparent;
+}
+
+.gob-roster .dev.none { color: var(--text-38); }
+
+.gob-measures {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.gob-measures .gob-meta {
+  margin: 0 0 var(--space-8);
+  color: var(--text-38);
+  font-size: var(--fs-12);
+}
+
+.gob-mrow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 36px;
+}
+
+.gob-mrow .nm { flex: 1 1 auto; color: var(--text-100); }
+.gob-mrow .val,
+.gob-mrow .place { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gob-mrow .val em {
+  font-style: normal;
+  color: var(--text-38);
+}
+
+.gob-meter {
+  display: block;
+  width: 120px;
+  flex: 0 0 120px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--white-6);
+  overflow: hidden;
+}
+
+.gob-meter > i {
+  display: block;
+  height: 100%;
+  width: var(--w, 0%);
+  background: var(--white-55);
+}
+
+.gob-meter.is-empty > i { width: 0; }
+
+.gob-back {
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-60);
+  cursor: pointer;
+  font: inherit;
+}
+
+html.gob-shell #player-view,
+html.gob-shell #team-view {
+  min-width: 0;
+}
+
+.gob-dt-bar {
+  position: static;
+  top: auto;
+  z-index: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin-top: 0;
+  margin-bottom: 12px;
+  background: transparent;
+}
+
+.gob-dt-up {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--line-strong, var(--line));
+  color: var(--text-87);
+  text-decoration: none;
+  font: var(--fw-bold) var(--fs-16)/1 var(--font-display);
+}
+
+.gob-dt-crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-60);
+  font-size: var(--fs-12);
+}
+
+.gob-dt-crumb i { font-style: normal; color: var(--text-38); }
+.gob-dt-crumb b {
+  font-weight: 600;
+  color: var(--text-87);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gob-pager {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-60);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.gob-pager button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-87);
+  box-shadow: inset 0 0 0 1px var(--line-strong, var(--line));
+}
+
+.gob-pager button:disabled { opacity: 0.35; }
+.gob-pager svg { width: 14px; height: 14px; }
+
+.gob-hero {
+  --tc: var(--navy, #27408e);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--tc) 45%, transparent);
+  background:
+    linear-gradient(112deg, color-mix(in srgb, var(--tc) 42%, transparent), transparent 72%),
+    linear-gradient(180deg, var(--white-4, rgba(255,255,255,0.04)), transparent);
+}
+
+.gob-hero.is-neutral { border-color: var(--line); }
+.gob-portrait {
+  width: 88px;
+  height: 104px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--white-6, rgba(255,255,255,0.06));
+  color: var(--text-87);
+  font: var(--fw-bold) 28px/1 var(--font-display);
+}
+.gob-portrait img { width: 100%; height: 100%; object-fit: cover; }
+.gob-hero-logo { width: 72px; height: 72px; display: grid; place-items: center; }
+.gob-hero-logo .gob-mark,
+.gob-hero-logo img { width: 72px; height: 72px; font-size: 36px; border-radius: 8px; }
+.gob-hero-id { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.gob-hero-k { color: var(--text-60); font-size: var(--fs-11); letter-spacing: 0.06em; text-transform: uppercase; }
+.gob-hero-k a { color: inherit; }
+.gob-hero-n {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fw-bold) var(--fs-32, 32px)/0.95 var(--font-display);
+  color: var(--text-100);
+}
+.gob-hero-bio { color: var(--text-87); font-size: var(--fs-13); }
+.gob-hero-rt { display: flex; align-items: baseline; gap: 8px; }
+.gob-hero-rt b { font: var(--fw-bold) 28px/1 var(--font-display); }
+.gob-hero-rt i { font-style: normal; color: var(--text-38); }
+.gob-hero-rt span { color: var(--text-60); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+.gob-hero-stats { min-width: 0; padding-left: 16px; border-left: 1px solid var(--white-10, rgba(255,255,255,0.1)); }
+.gob-eyebrow { color: var(--text-60); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.gob-hs { display: flex; flex-wrap: wrap; gap: 14px 18px; }
+.gob-hs div { display: flex; flex-direction: column; gap: 2px; }
+.gob-hs b { font: var(--fw-bold) var(--fs-22)/1 var(--font-display); color: var(--text-100); white-space: nowrap; }
+.gob-hs span { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-60); }
+/* Player hero: two stacked rows that never wrap, on one column grid so the rows line up. */
+.gob-hs-rows { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+.gob-hs-rows .gob-hs { display: grid; grid-template-columns: repeat(4, 52px); gap: 0 14px; }
+/* Player page cards: the content sits inside the card, clear of its border. */
+#player-view .gob-dt-body > .gob-tcard:not(.gob-span),
+#player-view .gob-dt-side > .gob-tcard { padding: var(--space-12) var(--space-16) var(--space-16); }
+#player-view .gob-tcard.gob-span > .card-h { padding: var(--space-12) var(--space-16) 0; }
+.gob-dt-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+  align-items: start;
+  min-width: 0;
+}
+.gob-span { grid-column: 1 / -1; }
+.gob-dt-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.gob-apan { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+html.gob-1920 .gob-apan { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.gob-apg, .gob-apr { min-width: 0; }
+.gob-apg h4 {
+  margin: 0 0 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+.gob-apr { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; }
+.gob-quiet { margin: 8px 0; color: var(--text-38); font-size: var(--fs-12); }
+.gob-chg { display: flex; align-items: baseline; gap: 8px; min-height: 28px; }
+.gob-chg b { font-weight: 600; }
+.gob-chg i { font-style: normal; }
+.gob-chg .is-up i { color: var(--delta-up); } /* colour-law: positive-data */
+.gob-chg .is-down i { color: var(--text-87); } /* ▼ is neutral */
+.gob-chg em { margin-left: auto; color: var(--text-38); font-style: normal; font-size: var(--fs-11); }
+.gob-focus-read, .gob-focus-edit { display: flex; align-items: stretch; gap: 12px; }
+.gob-focus-read, .gob-focus-edit { flex-direction: column; align-items: flex-start; }
+.gob-focus-note { margin: 0; color: var(--text-60); font-size: var(--fs-12); }
+html.gob-shell .gob-focus.stats-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  max-width: 100%;
+}
+
+html.gob-shell .gob-focus.stats-toggle button {
+  white-space: nowrap;
+  text-align: center;
+  min-width: 0;
+  padding: var(--space-8) var(--space-4);
+}
+.gob-save {
+  height: 34px;
+  min-width: 88px;
+  border-radius: 10px;
+  border: 1px solid var(--white-28, rgba(255,255,255,0.28));
+  background: var(--orange, #e07a2f);
+  color: var(--badge-ink, #1a1208);
+  font: var(--fw-bold) var(--fs-16)/1 var(--font-display);
+  cursor: pointer;
+}
+.gob-save:disabled { background: var(--white-6, rgba(255,255,255,0.06)); color: var(--text-38); cursor: default; }
+.gob-sub { margin: 10px 0 4px; color: var(--text-38); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.gob-sch { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 32px; }
+.gob-sch-w { color: var(--text-38); font-size: var(--fs-11); }
+.gob-sch-opp { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.gob-sch-res.is-loss { color: var(--text-60); }
+.gob-scout {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-87);
+  text-decoration: none;
+}
+.gob-roster.is-compact { max-height: none; }
+
+/* ── Team page: Roster above Schedule ────────────────────────────────────────
+   Side by side, the roster had room for five attributes. Stacked, it is the full
+   grid, and the schedule runs four columns under it. */
+#team-view .gob-dt-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: 0;
+  margin-top: var(--dsp-12);
+  padding-bottom: var(--space-16);
+}
+
+#team-view .gob-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-height: var(--dsz-44);
+  padding-right: var(--space-12);
+}
+
+#team-view .gob-card-head h2 {
+  padding-top: var(--space-12);
+  padding-bottom: var(--space-12);
+}
+
+#team-view .gob-team-roster-body .gob-view-skel,
+#team-view .gob-team-roster-body .gob-view-error {
+  margin: 0 var(--space-12) var(--space-12);
+}
+
+#team-view .gob-sch-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dsp-16) var(--dsp-24);
+  padding: 0 var(--space-12) var(--space-12);
+}
+
+#team-view .gob-sch-split .gob-sub {
+  margin: 0 0 var(--space-4);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--line);
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-60);
+}
+
+#team-view .gob-sch-list {
+  columns: 2;
+  column-gap: var(--dsp-24);
+}
+
+#team-view .gob-sch {
+  break-inside: avoid;
+  font-size: var(--fs-12);
+  color: var(--text-87);
+}
+
+#team-view .gob-sch-opp > span:last-child,
+#team-view .gob-sch-opp .gob-team > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#team-view .gob-sch-res {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A result with a box score. It reads as the plain result until hover or focus;
+   the padding is cancelled by the margin so the row does not move. */
+#team-view a.gob-sch-res {
+  padding: var(--space-4) var(--space-6);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
+  border-radius: var(--radius-4);
+  color: var(--text-87);
+  text-decoration: none;
+}
+#team-view a.gob-sch-res.is-loss { color: var(--text-60); }
+#team-view a.gob-sch-res:hover {
+  background-color: var(--white-7);
+  color: var(--text-100);
+}
+#team-view a.gob-sch-res:focus-visible {
+  outline: 2px solid var(--text-100);
+  outline-offset: 1px;
+}
+
+@media (max-width: 1099px) {
+  #team-view .gob-sch-list { columns: 1; }
+}
+
+/* The Player Stats grid. Team › Player Stats and a team page's Stats mode share it. */
+#player-stats-view { min-width: 0; }
+#player-stats-view .gob-tcard { max-width: 100%; min-width: 0; }
+:is(#player-stats-view, #team-view) .gob-scroll { max-width: 100%; overflow: visible; }
+:is(#player-stats-view, #team-view) .gob-scroll .gob-tbl { width: max-content; min-width: 100%; }
+:is(#player-stats-view, #team-view) .gob-scroll.gob-xs { overflow-x: auto; overflow-y: visible; }
+:is(#player-stats-view, #team-view) .gob-pstats.gob-xs .gob-tbl { min-width: 0; width: max-content; }
+#player-stats-view tbody tr { cursor: pointer; }
+/* The last column (F) sat on the card's rounded edge and read as clipped. */
+:is(#player-stats-view, #team-view) .gob-pstats .gob-tbl th:last-child,
+:is(#player-stats-view, #team-view) .gob-pstats .gob-tbl td:last-child { padding-right: var(--space-14); }
+:is(#player-stats-view, #team-view) .gob-pstats .gob-player {
+  align-items: center;
+  color: var(--text-100);
+  text-decoration: none;
+}
+:is(#player-stats-view, #team-view) .gob-pstats .gob-player:hover,
+:is(#player-stats-view, #team-view) .gob-pstats .gob-player:hover .gob-id span { text-decoration: none; }
+:is(#player-stats-view, #team-view) .gob-pstats .av {
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  flex: none;
+}
+:is(#player-stats-view, #team-view) .gob-pstats .av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  display: block;
+}
+:is(#player-stats-view, #team-view) .gob-pstats .gob-id {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 28px;
+  min-width: 0;
+  line-height: 1;
+  text-align: left;
+}
+:is(#player-stats-view, #team-view) .gob-pstats .gob-id > span:first-child {
+  color: var(--text-100);
+  font-size: 13px;
+  line-height: 14px;
+  text-decoration: none;
+}
+:is(#player-stats-view, #team-view) .gob-pstats .gob-id .sub {
+  color: var(--text-60);
+  font-size: 11px;
+  line-height: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+html.gob-shell .main :is(#player-stats-view, #team-view) .gob-pstats.gob-xs thead th.pin {
+  position: sticky !important;
+  left: 0;
+  top: auto !important;
+  z-index: 2;
+  background-color: var(--surface-1);
+}
+/* W/L letters: white WIN plate, outlined LOSS, never green/red (Jamie, 2026-10-01). */
+.gob-wl {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  border-radius: 5px;
+  font-weight: 700;
+  line-height: 1;
+}
+.gob-wl.up { background: var(--white-90); color: var(--bg); }
+.gob-wl.dn { color: var(--text-87); box-shadow: inset 0 0 0 1.5px var(--white-40); }
+.gob-sch-round {
+  margin: 0 0 8px;
+  color: var(--text-60);
+  font-size: 12px;
+}
+html.gob-shell .pg-tools .gob-wk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+html.gob-shell .pg-tools .gob-wk button {
+  min-width: 28px;
+  text-align: center;
+}
+html.gob-shell .pg-tools .gob-wk button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+html.gob-shell .pg-tools .gob-wk-label {
+  min-width: 72px;
+  text-align: center;
+}
+/* League › Schedule: four columns of compact game cards. The winner's line is
+   full white, the loser's dims; your game is the navy card. */
+#league-schedule-view .gob-lgrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dsp-10) var(--dsp-12);
+  align-items: start;
+  padding-bottom: var(--space-16);
+}
+@media (max-width: 1099px) {
+  #league-schedule-view .gob-lgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+#league-schedule-view .gob-game {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--dsp-6) var(--dsp-10) var(--dsp-4);
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+}
+#league-schedule-view .gob-game.me {
+  background: color-mix(in srgb, var(--navy) 45%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--navy-hi) 45%, transparent);
+}
+#league-schedule-view .gob-gs {
+  display: flex;
+  align-items: center;
+  gap: var(--dsp-8);
+  height: var(--dsz-28);
+  color: var(--text-60);
+  font-size: var(--fs-13);
+}
+#league-schedule-view .gob-gs.won { color: var(--text-100); }
+#league-schedule-view .gob-gs .gob-team {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--dsp-6);
+  min-width: 0;
+  color: inherit;
+}
+#league-schedule-view .gob-gs .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#league-schedule-view .gob-gs a.gob-team:hover .nm { color: var(--text-100); text-decoration: underline; }
+#league-schedule-view .gob-gs .rk {
+  flex: none;
+  color: var(--text-38);
+  font-size: var(--fs-11);
+  font-variant-numeric: tabular-nums;
+}
+#league-schedule-view .gob-gs .sc {
+  flex: none;
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+/* No footer (an unplayed regular-season game): the card closes on its top padding. */
+#league-schedule-view .gob-game:not(:has(.gob-gf)) {
+  padding-bottom: var(--dsp-6);
+}
+/* A bye: the team over "Bye", in the same card as a game. */
+#league-schedule-view .gob-bye-line .nm {
+  /* Lines up under the team name: the logo's width plus its gap. */
+  padding-left: calc(18px + var(--dsp-6));
+  color: var(--text-38);
+  font-size: var(--fs-12);
+  letter-spacing: var(--tracking-6);
+  text-transform: uppercase;
+}
+#league-schedule-view .gob-gf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dsp-8);
+  min-height: var(--dsz-22);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  color: var(--text-38);
+  font-size: var(--fs-11);
+}
+#league-schedule-view .gob-gf .ctx {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#league-schedule-view .gob-lsch-empty {
+  margin: 0;
+  color: var(--text-60);
+  font-size: var(--fs-13);
+}
+#league-schedule-view a.gob-box {
+  flex: none;
+  color: var(--text-60);
+  text-decoration: none;
+}
+#league-schedule-view a.gob-box:hover {
+  color: var(--text-100);
+  text-decoration: underline;
+}
+html.gob-shell.gob-1920 #league-schedule-view .gob-gs { height: var(--dsz-34); font-size: var(--fs-14); }
+html.gob-shell.gob-1920 #league-schedule-view .gob-gf { min-height: var(--dsz-28); font-size: var(--fs-12); }
+
+/* League › Team Stats: 28 columns sized to fit .main, so the one header row
+   pins under the page head instead of scrolling inside a wide card. */
+#team-stats-view .gob-ts {
+  overflow: visible;
+}
+#team-stats-view .gob-ts .gob-tbl th,
+#team-stats-view .gob-ts .gob-tbl td {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+/* Twenty-eight columns in ten families: a tighter pair of gutters than the default. */
+#team-stats-view .gob-ts.gob-fam {
+  --fam-in: var(--space-4);
+  --fam-out: var(--dsp-10);
+}
+#team-stats-view .gob-ts .gob-tbl th {
+  font-size: var(--fs-11);
+  letter-spacing: var(--tracking-6);
+  background: var(--bg-page-solid);
+  box-shadow: 0 -12px 0 var(--bg-page-solid);
+}
+#team-stats-view .gob-ts .gob-tbl th.s::after { margin-left: var(--space-2); }
+#team-stats-view .gob-ts .gob-tbl th.team,
+#team-stats-view .gob-ts .gob-tbl td.team { padding-left: var(--space-10); }
+#team-stats-view .gob-ts .gob-team > span {
+  max-width: calc(var(--dsz-118) + var(--dsz-20));
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* League › Rankings: the Standings table treatment, rank first. */
+#rankings-view .gob-rank .gob-tbl th.rk,
+#rankings-view .gob-rank .gob-tbl td.rk {
+  width: 1%;
+  padding-left: var(--space-16);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+#rankings-view .gob-rank .gob-tbl td.rk { color: var(--text-60); }
+#rankings-view .gob-rank .gob-tbl tr.me td.rk { color: var(--text-100); }
+/* Last Week with a box score. It reads as the plain result until hover or focus; the
+   padding is cancelled by the margin so the cell and the row do not move. */
+#rankings-view .gob-rank a.gob-res {
+  display: inline-block;
+  padding: var(--space-4) var(--space-6);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
+  border-radius: var(--radius-4);
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+#rankings-view .gob-rank a.gob-res:hover {
+  background-color: var(--white-7);
+  color: var(--text-100);
+}
+#rankings-view .gob-rank a.gob-res:focus-visible {
+  outline: 2px solid var(--text-100);
+  outline-offset: 1px;
+}
+
+/* Team › Schedule: four week columns. Each is a T1 mini-table; the whole regular
+   season sits above the fold at 1280×720, and density tokens widen rows at 1920. */
+#team-schedule-view .gob-schcols {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dsp-12);
+  align-items: start;
+  padding-bottom: var(--space-16);
+}
+@media (max-width: 1099px) {
+  #team-schedule-view .gob-schcols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* The score is never clipped: the result column takes the width of its widest score and
+   the team column takes what is left, so a long name gives way (ellipsis), not the score. */
+#team-schedule-view .gob-schwk {
+  table-layout: auto;
+}
+#team-schedule-view .gob-schwk td.wk { box-sizing: border-box; min-width: calc(var(--dsz-30) + var(--dsp-8)); }
+#team-schedule-view .gob-schwk td.site { box-sizing: border-box; min-width: calc(var(--dsz-20) + var(--dsp-4)); }
+#team-schedule-view .gob-schwk thead th {
+  height: var(--dsz-28);
+  padding: 0 var(--dsp-10);
+  text-align: left;
+  font-size: var(--fs-12);
+  letter-spacing: var(--tracking-10);
+  color: var(--text-60);
+  border-bottom: 1px solid var(--line);
+}
+#team-schedule-view .gob-schwk tbody td {
+  height: var(--dsz-40);
+  padding: var(--dsp-4) var(--dsp-6);
+  color: var(--text-87);
+  border-top: 1px solid var(--line);
+}
+#team-schedule-view .gob-schwk tbody tr:first-child td { border-top: 0; }
+#team-schedule-view .gob-schcol .gob-schwk tbody tr:nth-child(n),
+#team-schedule-view .gob-schcol .gob-schwk tbody tr:nth-child(n) td {
+  background: transparent;
+}
+#team-schedule-view .gob-schwk td.wk {
+  padding-left: var(--dsp-10);
+  text-align: left;
+  color: var(--text-60);
+  font-variant-numeric: tabular-nums;
+}
+#team-schedule-view .gob-schwk td.site {
+  padding-left: 0;
+  text-align: left;
+  color: var(--text-60);
+}
+#team-schedule-view .gob-schwk td.team {
+  width: 100%;
+  max-width: 0;
+  overflow: hidden;
+  text-align: left;
+}
+#team-schedule-view .gob-schwk td.res {
+  width: 1px;
+  padding-right: var(--dsp-10);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+#team-schedule-view .gob-schwk .gob-team {
+  display: flex;
+  max-width: 100%;
+  border-radius: var(--radius-4);
+}
+#team-schedule-view .gob-schwk .gob-id {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.15;
+}
+#team-schedule-view .gob-schwk .gob-id > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#team-schedule-view .gob-schwk .gob-id > span:first-child {
+  color: var(--text-87);
+  font-size: var(--fs-12);
+}
+#team-schedule-view .gob-schwk .gob-id .sub {
+  color: var(--text-38);
+  font-size: var(--fs-11);
+}
+#team-schedule-view .gob-schwk a.gob-team:hover .gob-id > span:first-child { color: var(--text-100); }
+#team-schedule-view .gob-schwk tr.is-open td.team,
+#team-schedule-view .gob-schwk tr.is-eos td.team {
+  color: var(--text-38);
+}
+#team-schedule-view .gob-schwk tr.is-eos td {
+  height: var(--dsz-30);
+  font-size: var(--fs-11);
+  letter-spacing: var(--tracking-6);
+}
+#team-schedule-view .gob-schwk a.gob-res {
+  display: inline-block;
+  padding: var(--space-4) var(--space-6);
+  margin-right: calc(-1 * var(--space-6));
+  border-radius: var(--radius-4);
+  color: var(--text-87);
+  text-decoration: none;
+  white-space: nowrap;
+}
+#team-schedule-view .gob-schwk a.gob-res:hover {
+  background-color: var(--white-7);
+  color: var(--text-100);
+}
+#team-schedule-view .gob-schwk a.gob-res:focus-visible,
+#team-schedule-view .gob-schwk a.gob-team:focus-visible {
+  outline: 2px solid var(--text-100);
+  outline-offset: 1px;
+}
+#team-schedule-view .gob-schcol .gob-schwk tbody tr.is-next td {
+  background-color: var(--white-5);
+  color: var(--text-100);
+}
+#team-schedule-view .gob-schwk tr.is-next td.wk { box-shadow: inset 2px 0 0 var(--text-60); }
+#team-schedule-view .gob-schwk tr.is-next .gob-id > span:first-child { color: var(--text-100); }
+#team-schedule-view .gob-schwk tr.is-next .gob-id .sub { color: var(--text-60); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk tbody td { height: calc(var(--dsz-44) + var(--dsz-18)); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk tbody tr.is-eos td { height: var(--dsz-44); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk thead th { height: var(--dsz-40); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk .gob-id > span:first-child { font-size: var(--fs-13); }
+html.gob-shell.gob-1920 #team-schedule-view .gob-schwk .gob-id { gap: var(--dsp-4); }

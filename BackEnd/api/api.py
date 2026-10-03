@@ -9,21 +9,22 @@ import logging
 from BackEnd.loopback_env import is_loopback
 from BackEnd.runtime_paths import bundle_path
 
-# Sentry - init before FastAPI (captures unhandled exceptions)
-_sentry_dsn = os.getenv("SENTRY_DSN")
-if _sentry_dsn and not is_loopback():
-    import sentry_sdk
-    sentry_sdk.init(
-        dsn=_sentry_dsn,
-        traces_sample_rate=0.1,
-        send_default_pii=True,
-        environment=os.getenv("RAILWAY_ENVIRONMENT", os.getenv("ENV", "development")),
-    )
+# Sentry - init before FastAPI (captures unhandled exceptions). Private (no PII,
+# scrubbed), tagged with environment + release, desktop off unless opted in.
+# See BackEnd/utils/observability.py.
+from BackEnd.utils.observability import (
+    init_sentry as _init_sentry,
+    sentry_environment as _sentry_environment,
+    sentry_release as _sentry_release,
+)
+
+if _init_sentry():
     print("🔶 [SENTRY] Backend error tracking enabled", file=sys.stderr, flush=True)
 
 
 # Bootstrap: get app with /health so server starts even if rest fails
 from BackEnd.api._bootstrap import app
+from BackEnd.utils.browse_cache import browse_cached, bump_browse_rev, fold_browse_rev
 import traceback
 
 def _persisted_strategy_settings(team) -> dict:
@@ -65,6 +66,57 @@ def _player_on_user_team(franchise_doc, player_meta) -> bool:
     if team_oid and str(meta.get("team_id") or "") == team_oid:
         return True
     return bool(team_name) and str(meta.get("team") or "") == team_name
+
+
+def _normalize_roster_lookup_name(value: str) -> str:
+    """Query-side name: strip, hyphen→space, unidecode, lower. Same as Strategy 3."""
+    from unidecode import unidecode
+
+    return unidecode((value or "").strip().replace("-", " ")).lower()
+
+
+def _normalize_stored_team_name(name: str) -> str:
+    """Document-side name: hyphen→space + lower. Matches the $replaceAll+$toLower pipeline."""
+    return str(name or "").replace("-", " ").lower()
+
+
+def lookup_team_doc_by_normalized_name(teams_collection, lookup_value: str):
+    """Strategy 3 team-name lookup. Aggregate on Mongo/SQLite; Python fallback on mongomock.
+
+    Real Mongo and SQLite support ``$replaceAll``. mongomock raises
+    ``OperationFailure: Unrecognized expression '$replaceAll'``. Catch that and
+    walk a cheap prefiltered ``find()`` with the same hyphen/lower rules so the
+    first match is the same team the aggregate would have returned.
+    """
+    from pymongo.errors import OperationFailure
+
+    normalized_name = _normalize_roster_lookup_name(lookup_value)
+    pipeline = [
+        {
+            "$addFields": {
+                "normalized_name": {
+                    "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
+                }
+            }
+        },
+        {"$match": {"normalized_name": normalized_name}},
+        {"$limit": 1},
+    ]
+    try:
+        team_result = list(teams_collection.aggregate(pipeline))
+        return team_result[0] if team_result else None
+    except OperationFailure:
+        token = (normalized_name.split() or [""])[0]
+        query = {"name": {"$exists": True, "$ne": ""}}
+        if token:
+            query = {"name": {"$regex": re.escape(token), "$options": "i"}}
+        for cand in teams_collection.find(query):
+            stored = cand.get("name")
+            if stored is None:
+                continue
+            if _normalize_stored_team_name(stored) == normalized_name:
+                return cand
+        return None
 
 
 def _saved_player_pts_by_side(saved: dict | None) -> tuple[int, int]:
@@ -136,6 +188,7 @@ try:
     from fastapi import Depends, FastAPI, HTTPException, Query, Response
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, FileResponse
+    from BackEnd.utils.hidden_attrs import HiddenAttrsJSONResponse
     from pathlib import Path
     from fastapi.templating import Jinja2Templates
     from fastapi import Request
@@ -143,7 +196,7 @@ try:
     from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
     import uuid
     import math
-    from BackEnd.main import run_simulation, simulate_quarter
+    from BackEnd.main import simulate_quarter
     from BackEnd.models.game_manager import GameManager
     # ✅ PERFORMANCE: Removed debug print statements
     from BackEnd.persistence import get_store
@@ -157,6 +210,8 @@ try:
     franchise_team_data_collection = _store.franchise_team_data_collection
     franchise_recruits_data_collection = _store.franchise_recruits_data_collection
     ensure_users_username_index = _store.ensure_users_username_index
+    ensure_users_email_index = _store.ensure_users_email_index
+    ensure_alpha_otps_code_index = _store.ensure_alpha_otps_code_index
     ensure_alpha_access_requests_email_index = _store.ensure_alpha_access_requests_email_index
     ensure_ftd_index = _store.ensure_ftd_index
     ensure_fpd_index = _store.ensure_fpd_index
@@ -189,7 +244,6 @@ try:
     from fastapi.staticfiles import StaticFiles
     from BackEnd.models.animator import Animator   
     # ✅ PERFORMANCE: Removed debug print statements
-    from .training_routes import router as training_router
     from .franchise_routes import router as franchise_router
     from .player_image_routes import router as player_image_router
     from .press_conference_routes import router as press_conference_router
@@ -215,7 +269,6 @@ try:
     import time
     from datetime import datetime
     from pathlib import Path
-    from BackEnd.models.player import Player
     
     logger = logging.getLogger(__name__)
 
@@ -283,7 +336,7 @@ try:
             )
             franchises_collection.update_one(
                 {"_id": franchise_oid},
-                {"$set": {"cpu_playbook_schedule": schedule_meta}},
+                fold_browse_rev({"$set": {"cpu_playbook_schedule": schedule_meta}}),
             )
             franchise_doc["cpu_playbook_schedule"] = schedule_meta
 
@@ -336,6 +389,7 @@ try:
             franchise_team_data_collection=franchise_team_data_collection,
         )
         if refreshed:
+            bump_browse_rev(franchise_id_str)
             logger.warning(
                 "✅ [CPU PLAYBOOK INIT] Refreshed CPU playbooks franchise_id=%s week=%s group=%s teams=%s",
                 franchise_id_str,
@@ -386,6 +440,13 @@ try:
         return await call_next(request)
 
     @app.middleware("http")
+    async def browse_etag_middleware(request: Request, call_next):
+        from BackEnd.utils.browse_cache import attach_browse_etag_header
+
+        response = await call_next(request)
+        return attach_browse_etag_header(request, response)
+
+    @app.middleware("http")
     async def team_builder_feature_middleware(request: Request, call_next):
         """Block Team Builder authoring routes when TEAM_BUILDER_ENABLED is off.
 
@@ -405,12 +466,6 @@ try:
             )
         return await call_next(request)
 
-    @app.get("/sentry-debug")
-    def sentry_debug():
-        """Test endpoint - raises error to verify backend Sentry capture. Remove before public launch."""
-        raise RuntimeError("Test Sentry backend capture")
-
-    
     @app.get("/app-config")
     def get_app_config():
         """
@@ -424,6 +479,9 @@ try:
             "alphaDisclaimer": "This is an alpha release. Data may be wiped without notice. Gameplay balance and features may change." if IS_ALPHA else None,
             "version": "alpha-1.0" if IS_ALPHA else "1.0",
             "sentryDsn": os.getenv("SENTRY_DSN_FRONTEND") or None,
+            # For the browser SDK to tag events like the backend does.
+            "sentryEnvironment": _sentry_environment(),
+            "release": _sentry_release(),
             # Authoring only — existing TB overlays still resolve when false.
             "teamBuilderEnabled": team_builder_enabled(),
         }
@@ -470,6 +528,14 @@ try:
     )
     
     print(f"🌐 [CORS] Configured with origins: {cors_origins}")
+
+    # Request body cap (413), GOB_MAX_REQUEST_BYTES, default 1 MiB. Appended, not
+    # add_middleware, so it sits INSIDE CORSMiddleware and a 413 carries CORS headers.
+    # Same cap on desktop: no desktop path posts more than the hosted client does.
+    from starlette.middleware import Middleware as _Middleware
+    from BackEnd.utils.request_limits import RequestSizeLimitMiddleware
+
+    app.user_middleware.append(_Middleware(RequestSizeLimitMiddleware))
     logging.info(f"🌐 CORS configured with origins: {cors_origins}")
 
     # Team Builder replaced-name leak detector (dev/staging). Scans franchise-scoped
@@ -486,7 +552,8 @@ try:
     # RATE LIMITING (Step 6)
     # ============================================================================
     # Protects against brute force, DoS, and resource exhaustion
-    # Limits: auth=10/min, simulation=30/min, general=100/min (per IP)
+    # Limits: auth=10/min, simulation=30/min, general default=300/min (per IP),
+    # heavy franchise routes per user (see BackEnd/utils/rate_limiter.py)
     # Optional: if slowapi/rate_limiter fails to import, app still starts (deploy resilience)
     limiter = None
     SIM_RATE_LIMIT = "30/minute"
@@ -507,6 +574,13 @@ try:
             SIM_TURN_RATE_LIMIT = _SIM_TURN_RATE_LIMIT
             app.state.limiter = limiter
             app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+            from BackEnd.utils.rate_limiter import install_default_rate_limit
+            from BackEnd.api import _bootstrap as _liveness
+
+            install_default_rate_limit(
+                app,
+                exempt=(_liveness.health_check, _liveness.health_check_head, _liveness.health_ready),
+            )
             print("🛡️ [RATE LIMIT] Rate limiting enabled", file=sys.stderr, flush=True)
         except Exception as e:
             print(f"⚠️ [RATE LIMIT] Failed to enable rate limiting: {e}", file=sys.stderr, flush=True)
@@ -520,7 +594,6 @@ try:
     _rate_limit_turn = limiter.limit(SIM_TURN_RATE_LIMIT) if limiter else _no_limit
     
     # Include routers AFTER CORS middleware is configured
-    app.include_router(training_router)
     app.include_router(franchise_router)
     app.include_router(player_image_router)
     app.include_router(press_conference_router)
@@ -554,16 +627,6 @@ try:
             print(f"⚠️ [BILLING] could not log configuration: {_billing_log_exc}",
                   file=sys.stderr, flush=True)
 
-    @app.get("/debug/server-state")
-    def debug_server_state():
-        """
-        Return in-memory and disk state for performance debugging (e.g. on Railway).
-        No auth; restrict in production if desired (e.g. by IP or remove).
-        """
-        return {
-            "ongoing_games_count": len(ongoing_games),
-        }
-    
     templates = Jinja2Templates(directory=str(bundle_path("FrontEnd", "static")))
     
     # Conditionally mount static files (local development and test).
@@ -616,6 +679,19 @@ try:
                     target = f"{target}?{query}"
                 return RedirectResponse(url=target, status_code=307)
 
+            # Retired pages: the file is gone, the path still lands somewhere. The
+            # router's own redirect never runs here, because a missing .html is
+            # answered below with the 404 page.
+            retired_pages = {
+                "/play-builder.html": "/play-builder-v2.html",
+            }
+            retired_target = retired_pages.get(path)
+            if retired_target:
+                query = request.url.query
+                if query:
+                    retired_target = f"{retired_target}?{query}"
+                return RedirectResponse(url=retired_target, status_code=301)
+
             static_dirs = (
                 "/js/",
                 "/images/",
@@ -652,6 +728,10 @@ try:
                 served = _file_at(path)
                 if served is not None:
                     return served
+                if path.endswith(".html"):
+                    not_found = static_root / "404.html"
+                    if not_found.is_file():
+                        return FileResponse(not_found, status_code=404)
                 query = request.url.query
                 target = f"/static{path}"
                 if query:
@@ -661,6 +741,28 @@ try:
 
         app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
         print("✅ Static files mounted (development/test mode)")
+
+    def _html_404_page():
+        page = Path(bundle_path("FrontEnd", "static")) / "404.html"
+        if page.is_file():
+            return FileResponse(page, status_code=404)
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+    def _wants_html_404(request: Request) -> bool:
+        path = request.url.path or ""
+        if path.startswith(("/api/", "/franchise/", "/roster/", "/player/", "/recruit/", "/health")):
+            return False
+        if path in {"/teams", "/app-config"}:
+            return False
+        accept = (request.headers.get("accept") or "").lower()
+        return "text/html" in accept
+
+    @app.exception_handler(404)
+    async def html_not_found_handler(request: Request, exc):
+        if _wants_html_404(request):
+            return _html_404_page()
+        detail = getattr(exc, "detail", "Not Found")
+        return JSONResponse(status_code=404, content={"detail": detail})
     
     # ✅ PERFORMANCE: Removed debug print statements
     
@@ -684,29 +786,74 @@ try:
     # ✅ PERFORMANCE: Removed debug print statements
     
     # ✅ Add global exception handler to catch all unhandled exceptions
+    # 422s keep loc / msg / type; FastAPI's default also echoed the submitted input.
+    from fastapi.exceptions import RequestValidationError
+    from BackEnd.utils.request_limits import validation_error_payload
+
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+        return JSONResponse(status_code=422, content=validation_error_payload(exc.errors()))
+
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
-        print(f"🔴 [ERROR] Global exception handler: {type(exc).__name__}: {str(exc)}", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
+        # The client gets only an opaque id; the exception text stays in the logs,
+        # findable by that id.
+        import uuid
+        error_id = uuid.uuid4().hex[:12]
+        print(
+            f"🔴 [ERROR] Global exception handler error_id={error_id} "
+            f"{request.method} {request.url.path}: {type(exc).__name__}: {str(exc)}",
+            file=sys.stderr,
+            flush=True,
+        )
+        logging.error(
+            "[UNHANDLED] error_id=%s %s %s",
+            error_id,
+            request.method,
+            request.url.path,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
         # ✅ CORS FIX: Ensure CORS headers are included even on error responses
         response = JSONResponse(
             status_code=500,
-            content={"error": "Internal server error", "type": type(exc).__name__, "message": str(exc)}
+            content={"error": "Internal server error", "error_id": error_id}
         )
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        # CORS headers will be added by middleware, but explicitly set origin header for safety
+        # Reflect the origin only if CORSMiddleware would allow it (same allowlist).
         origin = request.headers.get("origin")
-        if origin and (origin in cors_origins or any(origin.startswith(p) for p in ["https://", "http://localhost"])):
+        if origin and origin in cors_origins:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
     
+    # Deploy/SIGTERM: uvicorn drains in-flight requests (--timeout-graceful-shutdown in
+    # start.sh), then runs this. Anything still mid week-advance is stopped cleanly:
+    # pools terminated (flag set first, so persist loops stop before their next game),
+    # then THIS process's CPU-sim claims released so the new deployment re-claims at
+    # once instead of waiting out the stale window. See reports/graceful-deploy-*.md.
+    @app.on_event("shutdown")
+    def release_cpu_week_work_on_shutdown():
+        try:
+            from BackEnd.utils.cpu_week_pool import shutdown_all_pools
+            shutdown_all_pools()
+        except Exception:
+            logging.exception("[SHUTDOWN] pool shutdown failed")
+        try:
+            from BackEnd.api.franchise_routes import release_owned_cpu_sim_claims
+            release_owned_cpu_sim_claims("shutdown")
+        except Exception:
+            logging.exception("[SHUTDOWN] CPU-sim claim release failed")
+
     # ✅ Add startup event to verify app is ready
     @app.on_event("startup")
     async def startup_event():
+        try:
+            from BackEnd.utils.cpu_week_pool import reset_shutdown_state
+            reset_shutdown_state()
+        except Exception as e:
+            print(f"⚠️ [WARNING] startup: cpu pool shutdown flag not reset: {e}", file=sys.stderr, flush=True)
         # RNG isolation watchdog (LOG-ONLY in production). The engine must draw only
         # from sim_rng; a site still bound to the global module is not isolated from
         # third-party RNG (pymongo consumes it) and breaks seeded reproducibility.
@@ -719,6 +866,14 @@ try:
         except Exception as e:
             print(f"⚠️ [WARNING] startup: RNG draw guard not installed: {e}",
                   file=sys.stderr, flush=True)
+
+        # Auth uniqueness indexes, each on its own: duplicate data logs a WARNING and
+        # must not skip the other indexes (scripts/ops/check_auth_dupes.py).
+        for _ensure_auth_index in (ensure_users_email_index, ensure_alpha_otps_code_index):
+            try:
+                _ensure_auth_index()
+            except Exception as e:
+                logging.warning("startup: %s failed: %s", _ensure_auth_index.__name__, e)
 
         # Ensure indexes exist (idempotent; safe on every deploy)
         try:
@@ -750,13 +905,18 @@ try:
         except Exception as e:
             print(f"⚠️ [WARNING] startup_event: Could not check MongoDB config: {e}", file=sys.stderr, flush=True)
             # Don't crash startup - MongoDB might connect later
-    
-    class SimulationRequest(BaseModel):
-        home_team: str
-        away_team: str
-        home_lineup: dict[str, str] | None = None
-        away_lineup: dict[str, str] | None = None
-    
+
+        # Readiness (/health/ready): startup finished; the endpoint pings the DB per request.
+        def _ready_ping():
+            conn = getattr(_store, "_conn", None)
+            if conn is not None:  # desktop SQLite store
+                with _store._lock:
+                    conn.execute("SELECT 1").fetchone()
+                return
+            _store.client.admin.command("ping")
+
+        from BackEnd.api._bootstrap import mark_startup_complete
+        mark_startup_complete(_ready_ping)
     
     class QuarterSimulationRequest(BaseModel):
         game_id: str | None = None
@@ -798,7 +958,10 @@ try:
         away_rim_runner_player_id: str | None = None
     
     
-    ongoing_games: dict[str, GameManager] = {}
+    # Bounded (idle TTL + LRU cap) and evicted at final; see live_game_cache.
+    from BackEnd.utils.live_game_cache import LiveGameCache, evict_game as _evict_ongoing_game
+
+    ongoing_games: dict[str, GameManager] = LiveGameCache()
 
     BULK_SIM_ADVANCE_METHODS = {"sim_full_game", "sim_rest_of_game"}
     VALID_ADVANCE_METHODS = BULK_SIM_ADVANCE_METHODS | {"play_quarter", "sim_quarter"}
@@ -1978,6 +2141,7 @@ try:
     # We don't need an explicit OPTIONS handler - the middleware does this
     
     @app.get("/teams")
+    @browse_cached
     def get_team_names(franchise_id: str | None = None):
         # conference + region are required by the franchise team-select / Team Builder
         # picker (search, conference grouping, region filter). Additive fields only —
@@ -2110,85 +2274,6 @@ try:
         _assign_rank_bands(rows, "height_total", "height_band")
         _assign_rank_bands(rows, "class_total", "class_band")
         return sorted(rows, key=lambda t: (t["name"] or ""))
-    
-    
-    @app.post("/api/simulate")
-    @app.post("/simulate")
-    @_rate_limit_sim
-    def simulate_game(request: Request, body: SimulationRequest):
-        """Rate limited: 30/minute per IP."""
-        home_team = body.home_team
-        away_team = body.away_team
-    
-        known_teams = [team["name"] for team in teams_collection.find({}, {"name": 1})]
-    
-        if home_team not in known_teams:
-            raise HTTPException(status_code=400, detail=f"Unknown home_team: '{home_team}'")
-        if away_team not in known_teams:
-            raise HTTPException(status_code=400, detail=f"Unknown away_team: '{away_team}'")
-        
-        print("🔥 Simulate endpoint hit - BOOM!!")
-        print(f"Home: {body.home_team}, Away: {body.away_team}")
-    
-        # ✅ Add this line to print the full request body
-        # print("🔍 Full request body:", body)
-    
-    
-        game = run_simulation(home_team, away_team, body.home_lineup, body.away_lineup)
-        # print("Right before summarize_game_state")
-        # print("🧪 Turns sample:", game.turns[:3])
-
-        # Consolidated end-of-game shot diagnostics (one master report).
-        from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
-        if calibration_diagnostics_enabled(game):
-            from BackEnd.utils.shot_split_tracker import format_master_eog_report
-            logger.warning(format_master_eog_report(game))
-
-        summary = summarize_game_state(game)
-    
-        # Build a consolidated score map from available sources
-        score_map = summary.get("final_score") or summary.get("score") or {}
-    
-        # Ensure team objects exist for the frontend and populate scores
-        summary["homeTeam"] = summary.get("homeTeam") or {
-            "name": summary.get("home_team", home_team),
-        }
-        summary["homeTeam"]["score"] = score_map.get(summary["homeTeam"]["name"], 0)
-    
-        summary["awayTeam"] = summary.get("awayTeam") or {
-            "name": summary.get("away_team", away_team),
-        }
-        summary["awayTeam"]["score"] = score_map.get(summary["awayTeam"]["name"], 0)
-    
-        # Expose the score map under a consistent key
-        summary["score"] = score_map
-    
-        # ✅ Minimal debug visibility
-        # print(f"✅ Game finished: {home_team} vs. {away_team}")
-        # print(f"🏀 Final Score: {game.score}")
-        # print(f"📊 Team Totals: {game.team_totals}")# show first few entries
-    
-        # ✅ PERFORMANCE: Removed verbose debug print
-    
-        # Log keys and ensure no Player objects remain at the top level
-        print("Summary top-level keys:", list(summary.keys()))
-        for k, v in summary.items():
-            if isinstance(v, Player):
-                raise TypeError(f"Summary key '{k}' contains a Player instance")
-    
-        try:
-            print("🔍 About to insert summary into Mongo...")
-            inserted_id = games_collection.insert_one(summary).inserted_id
-            summary["_id"] = str(inserted_id)
-            # games_collection.insert_one(summary)
-            # summary.pop("_id", None)
-        except Exception as e:
-            print("🚨 Mongo insert failed:", e)
-            traceback.print_exc()
-        
-        print("Inside simulate_game()\nReturning summary keys:", summary.keys())
-    
-        return JSONResponse(content=summary, status_code=200)
     
     
     @app.get("/api/game/{game_id}")
@@ -3252,6 +3337,36 @@ try:
             "source": "none"
         }
     
+    def _quarter_replay_block_response(saved_quarter, requested_quarter, game_id, _body):
+        """409 when the request would simulate a quarter the saved game has already passed.
+
+        Call this only after resume handling has rewritten the request quarter
+        to the saved or anchor quarter. A real resume then compares equal and
+        is allowed. A stale request that only carries a resume flag, with
+        nothing to rewrite, is checked the same way. One comparison, no I/O.
+        """
+        try:
+            saved_q = int(saved_quarter)
+            requested_q = int(requested_quarter)
+        except (TypeError, ValueError):
+            return None
+        if saved_q <= requested_q:
+            return None
+        logging.warning(
+            "[QUARTER-REPLAY-BLOCKED] game_id=%s saved_quarter=%s requested_quarter=%s",
+            game_id,
+            saved_q,
+            requested_q,
+        )
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": "QUARTER_ALREADY_PLAYED",
+                "saved_quarter": saved_q,
+                "requested_quarter": requested_q,
+            },
+        )
+
     @app.options("/api/simulate-quarter")
     async def simulate_quarter_options():
         """
@@ -3393,12 +3508,22 @@ try:
                 )
             # Check if this is a "new game" scenario: user wants Q1 but saved game is Q2+
             # In this case, remove from memory and reload from DB (which will run new game detection)
-            if gm is not None and body.quarter == 1 and gm.quarter > 1:
+            # Q1 against an in-memory game that is already past Q1 must be decided
+            # from the persisted document (loaded below), not by starting a new game.
+            if (
+                gm is not None
+                and body.quarter == 1
+                and gm.quarter > 1
+                and not body.resume_from_timeout
+                and not body.resume_from_anchor
+            ):
                 logging.warning(
-                    f"🆕 [ONGOING_GAMES] Removing game from cache: game_id={game_id}, reason='New game scenario (Q1 requested but game in memory at Q{gm.quarter})'"
+                    "[ONGOING_GAMES] Q1 requested while memory is at Q%s; reloading saved game_id=%s",
+                    gm.quarter,
+                    game_id,
                 )
                 _drop_cached_game()
-                gm = None  # Force reload from DB where new game detection will run
+                gm = None
                 sim_quarter_load_source = None
             
             # ✅ SS&S: Ensure user_team_side is set in in-memory game if missing
@@ -3674,6 +3799,11 @@ try:
                 else:
                     # ✅ PERFORMANCE: Removed debug logging
                     pass
+
+            if gm is not None:
+                blocked = _quarter_replay_block_response(gm.quarter, body.quarter, game_id, body)
+                if blocked is not None:
+                    return blocked
             
             if gm is None:
                 logging.warning(
@@ -3718,6 +3848,11 @@ try:
                             )
                         else:
                             logging.warning("⚠️ [RESUME-ANCHOR-RESTORE] resume_anchor missing snapshot game_id=%s", game_id)
+                    blocked = _quarter_replay_block_response(
+                        saved.get("quarter", 1), body.quarter, game_id, body
+                    )
+                    if blocked is not None:
+                        return blocked
                     try:
                         # ✅ UNIFIED STRUCTURE: Get team IDs from top level (unified structure)
                         home_team_id = saved.get("home_team_id")
@@ -3978,9 +4113,9 @@ try:
                             # We only treat as timeout resume when the client sent resume_from_timeout=true (see earlier block).
                             # Otherwise "Play Quarter" after "Sim quarter" would incorrectly restore FREE_THROW state and cause instant EOG.
                             
-                            # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
-                            # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
-                            is_new_game = (body.quarter == 1 and saved_quarter > 1) and not body.resume_from_timeout
+                            # A saved game already past Q1 is rejected above. Never start a
+                            # fresh game over that document.
+                            is_new_game = False
                             should_restore_stats = not is_new_game or body.resume_from_timeout
                             # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log restore path so we can confirm Hypothesis 1
                             logging.debug(
@@ -5198,6 +5333,7 @@ try:
         
         # Save to database (WITHOUT animations to reduce document size)
         db_save_start = time.time()
+        final_saved = False
         try:
             db_summary = summarize_game_state(
                 gm,
@@ -5284,6 +5420,7 @@ try:
                     body.consume_resume_anchor,
                 )
             games_collection.update_one({"_id": game_id_oid}, save_update, upsert=True)
+            final_saved = bool(is_final)
 
             # Stash the user's coaching archetype for this period (franchise only).
             # Diagnosis via DB breadcrumbs (Railway drops logs). `archetype_hook`
@@ -5442,6 +5579,10 @@ try:
         )
         if profile_summary_sim is not None:
             frontend_summary["profile_summary"] = profile_summary_sim
+        if final_saved and game_id:
+            # Final is saved (and returned as final_game_document); every post-final
+            # reader (GET /api/game/{id}, resume-state, complete-week) reads the doc.
+            _evict_ongoing_game(ongoing_games, "final", *_candidate_game_ids())
         return JSONResponse(content=frontend_summary, status_code=200)
     
     
@@ -5668,6 +5809,7 @@ try:
                 gm.game_state.get("shot_clock_remaining"),
                 pending_terminal_ft,
             )
+            final_saved = False
             if game_id:
                 try:
                     quarter_save_id = resolve_game_write_id(games_collection, game_id)
@@ -5707,6 +5849,7 @@ try:
                     else:
                         save_update["$unset"] = {"resume_anchor": ""}
                     games_collection.update_one({"_id": quarter_save_id}, save_update, upsert=True)
+                    final_saved = is_final
                 except Exception as e:
                     logging.error("⚠️ [RESUME-ANCHOR-SAVE] phase=quarter_complete_early_return failed: %s", e)
             early_return = {
@@ -5726,6 +5869,8 @@ try:
             #     f"⏱️ [PERF] /api/simulate-turn - EARLY RETURN (quarter complete), "
             #     f"quarter={gm.quarter}, total: {total_time:.2f}ms"
             # )
+            if final_saved:
+                _evict_ongoing_game(ongoing_games, "final", game_id)
             return JSONResponse(content=early_return, status_code=200)
         elif gm.game_state["time_remaining"] <= 0 and pending_terminal_ft:
             logging.warning(
@@ -6104,6 +6249,7 @@ try:
             # user-facing resume target. Quarter completion is a stable stoppage
             # point, so non-final quarter breaks create the durable resume anchor.
             db_save_time = 0
+            final_saved = False
             if game_id and quarter_complete:
                 db_save_start = time.time()
                 try:
@@ -6140,6 +6286,7 @@ try:
                     else:
                         save_update["$unset"] = {"resume_anchor": ""}
                     games_collection.update_one({"_id": quarter_save_id}, save_update, upsert=True)
+                    final_saved = is_final
                     logging.info(f"💾 Saved quarter-break state at turn {len(gm.turns)}, quarter={gm.quarter}")
                 except Exception as e:
                     logging.error(f"Failed to save game state: {e}")
@@ -6224,6 +6371,9 @@ try:
             #     f"response_size: {response_size} bytes, total: {total_time:.2f}ms, "
             #     f"quarter_complete={quarter_complete}"
             # )
+            if final_saved:
+                # Final save ran above; post-final readers fall back to the game doc.
+                _evict_ongoing_game(ongoing_games, "final", game_id)
             
             return JSONResponse(content=response_data, status_code=200)
             
@@ -6880,6 +7030,7 @@ try:
     
     
     @app.get("/roster/{team_identifier}")
+    @browse_cached
     def get_team_roster(team_identifier: str, team_id: str | None = None, tournament_id: str | None = None, franchise_id: str | None = None, response: Response = None, profile: bool = False):
         if profile:
             from BackEnd.utils.profiling import run_profiled
@@ -6940,26 +7091,7 @@ try:
         
         # Strategy 3: If not found, try team_name lookup (backward compatibility)
         if not team_doc:
-            normalized_name = unidecode(lookup_value.strip().replace("-", " ")).lower()
-            pipeline = [
-                {
-                    "$addFields": {
-                        "normalized_name": {
-                            "$toLower": {"$replaceAll": {"input": "$name", "find": "-", "replacement": " "}}
-                        }
-                    }
-                },
-                {
-                    "$match": {
-                        "normalized_name": normalized_name
-                    }
-                },
-                {
-                    "$limit": 1
-                }
-            ]
-            team_result = list(teams_collection.aggregate(pipeline))
-            team_doc = team_result[0] if team_result else None
+            team_doc = lookup_team_doc_by_normalized_name(teams_collection, lookup_value)
         
         query_time = (time.time() - query_start) * 1000
         
@@ -7099,6 +7231,12 @@ try:
                     "resolved_training_focus": p.get("resolved_training_focus"),
                 } if is_user_team else {}),
             })
+            from BackEnd.utils.roster_display import stamp_roster_player
+            stamp_roster_player(
+                players[-1],
+                on_user_team=bool(is_user_team),
+                stored_position=p.get("position") or (p.get("meta") or {}).get("position"),
+            )
             
             # ✅ DEBUG: Log final attributes for first player (or Kevin Nelson)
             if len(players) == 1 or "Nelson" in player_name:
@@ -7230,6 +7368,12 @@ try:
                             "ps_stats": d.get("ps_season_stats") or {},
                             "is_recruit": False,
                         })
+                        from BackEnd.utils.roster_display import stamp_roster_player
+                        stamp_roster_player(
+                            training_squad[-1],
+                            on_user_team=bool(is_user_team),
+                            stored_position=ts_meta.get("position"),
+                        )
             except Exception:
                 training_squad = []
 
@@ -7280,6 +7424,12 @@ try:
                             "ps_stats": frd_stats.get(s.get("recruit_id"), {}),
                             "is_recruit": True,
                         })
+                        from BackEnd.utils.roster_display import stamp_roster_player
+                        stamp_roster_player(
+                            practice_squad_recruits[-1],
+                            on_user_team=bool(is_user_team),
+                            stored_position=s.get("position"),
+                        )
             except Exception:
                 practice_squad_recruits = []
 
@@ -7306,11 +7456,25 @@ try:
                                 season_map[pid] = dict(season_raw)
                 except Exception:
                     season_map = {}
+            # Same season dict rosterLoader used to copy off GET /franchise/state.
+            # Computed here from the FPD rows already read for the starting five.
+            # No new stored field. /franchise/state is unchanged.
+            if franchise_id:
+                for player in players:
+                    pid = str(player.get("_id") or "")
+                    season = season_map.get(pid)
+                    if not isinstance(season, dict):
+                        season = {}
+                    existing_stats = player.get("stats") if isinstance(player.get("stats"), dict) else {}
+                    player["stats"] = dict(existing_stats)
+                    player["stats"]["season"] = dict(season)
             from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
 
             projected_starting_five = build_enriched_projected_starting_five(
                 players, season_map
             )
+            from BackEnd.utils.roster_display import apply_lineup_roles
+            apply_lineup_roles(players, projected_starting_five)
 
         response_data = {
             "team": team.get("name", match if match else team_identifier),
@@ -7335,7 +7499,10 @@ try:
         response_data["team_record"] = None
         if franchise_id and team.get("_id") is not None:
             try:
-                from BackEnd.utils.franchise_standings import calculate_franchise_standings
+                from BackEnd.utils.franchise_standings import (
+                    calculate_franchise_standings,
+                    standings_display_sort_key,
+                )
                 from BackEnd.utils.game_team_scoreboard_enrichment import (
                     natl_rank_from_ftd_document,
                 )
@@ -7353,15 +7520,10 @@ try:
                 own = standings.get(str(team["_id"]), {}) or {}
                 wins = int(own.get("W", 0) or 0)
                 losses = int(own.get("L", 0) or 0)
-                # Conference place by wins, then point differential — same ordering the
-                # Standings tab presents.
+                # Conference place uses the Standings page order (wins, then point differential).
                 ranked = sorted(
                     conf_team_ids.keys(),
-                    key=lambda tid: (
-                        -int((standings.get(tid, {}) or {}).get("W", 0) or 0),
-                        -(int((standings.get(tid, {}) or {}).get("PF", 0) or 0)
-                          - int((standings.get(tid, {}) or {}).get("PA", 0) or 0)),
-                    ),
+                    key=lambda tid: standings_display_sort_key(standings.get(tid, {}) or {}),
                 )
                 place = ranked.index(str(team["_id"])) + 1 if str(team["_id"]) in ranked else None
                 ftd_rank_doc = franchise_team_data_collection.find_one(
@@ -7489,6 +7651,16 @@ try:
         
         if not home_team or not away_team:
             raise HTTPException(status_code=400, detail="home_team and away_team required")
+
+        # Week-step guard (GOB_ENFORCE_WEEK_STEPS, default report). init-game is the one
+        # point every new franchise user game passes through; resumes never call it.
+        # Runs before anything below writes (community engagement, the game doc).
+        if mode == "franchise" and franchise_id:
+            from BackEnd.api.franchise_routes import check_week_steps_before_game_start
+
+            blocked = check_week_steps_before_game_start(franchise_id, context="init_game")
+            if blocked is not None:
+                return blocked
 
         # home_team/away_team must be core names (identity). Never rewrite via display resolver.
         # home_id/away_id (ObjectIds) are preferred for FTD load when present.
@@ -7869,17 +8041,6 @@ try:
         return response_data
     
     
-    @app.get("/games")
-    def get_games():
-        # Fetch the 10 most recent games (you can adjust this)
-        games = list(games_collection.find().sort("_id", -1).limit(10))
-    
-        # Convert ObjectId to string for JSON serialization
-        for game in games:
-            game["_id"] = str(game["_id"])
-    
-        return JSONResponse(content=games)
-
     class DeleteCompletedSingleGameRequest(BaseModel):
         game_id: str
 
@@ -7914,7 +8075,10 @@ try:
         games_collection.delete_one({"_id": doc_id})
         return {"ok": True, "deleted": True}
 
-    @app.get("/player/{player_id}")
+    # The player page: no hidden attribute (utils/hidden_attrs). The court's own routes
+    # (/roster, /api/init-game, /api/simulate-turn ...) still carry it; see UX_System.md.
+    @app.get("/player/{player_id}", response_class=HiddenAttrsJSONResponse)
+    @browse_cached
     def get_player(
         player_id: str,
         mode: Optional[str] = None,
@@ -8015,7 +8179,7 @@ try:
     #     print(f"🚀 Registered route: {route.path}")
     
     
-    @app.get("/teams/{team_id}/players")
+    @app.get("/teams/{team_id}/players", response_class=HiddenAttrsJSONResponse)
     def get_team_players(team_id: str):
         # Return roster data for a given team.
         team_doc, players = load_roster(team_id)
@@ -8059,12 +8223,18 @@ try:
         mismatchCount: int
     
     
+    def _diagnostics_enabled() -> bool:
+        """Diagnostic file dumps are unauthenticated and unbounded: off unless opted in."""
+        return os.environ.get("GOB_DIAGNOSTICS_ENABLED") == "1"
+
     @app.post("/api/diagnostics/sim-quarter")
     def save_sim_quarter_diagnostics(request: SimQuarterDiagnosticRequest):
         """
         Save Sim Quarter diagnostic data to a markdown file.
         Tracks score increments and printed events to identify missing prints.
         """
+        if not _diagnostics_enabled():
+            return {}  # 200 {} so bootGame.js's response.json() doesn't throw
         try:
             # Create diagnostics directory if it doesn't exist
             diagnostics_dir = Path("docs/0_Text_Scroll_Debug")
@@ -8224,6 +8394,8 @@ try:
         Save Free Throw and Made Field Goal diagnostic data to a markdown file.
         Tracks free throws and made FGs to identify edge cases where result types don't match.
         """
+        if not _diagnostics_enabled():
+            return {}  # 200 {} so bootGame.js's response.json() doesn't throw
         try:
             # Create diagnostics directory if it doesn't exist
             diagnostics_dir = Path("docs/0_Text_Scroll_Debug")

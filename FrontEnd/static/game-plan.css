@@ -1,21 +1,23 @@
-* {
-  margin: 0;
-  padding: 0;
+/* Standalone page chrome only. Do not reset the command center. */
+body.game-plan-page,
+body.game-plan-page * {
   box-sizing: border-box;
 }
 
-body {
-  font-family: 'Inter', sans-serif;
-  background: #0b0d14;
-  color: #ffffff;
+body.game-plan-page {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-100);
   min-height: 100vh;
 }
 
-button,
-input[type="button"],
-input[type="submit"],
-input[type="reset"] {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+body.game-plan-page button,
+body.game-plan-page input[type="button"],
+body.game-plan-page input[type="submit"],
+body.game-plan-page input[type="reset"] {
+  font-family: var(--font-display);
 }
 
 .resource-page-container.fcc-brand-page-shell {
@@ -35,7 +37,7 @@ input[type="reset"] {
   height: auto;
   padding: 0;
   background: none;
-  color: rgba(255, 255, 255, 0.76);
+  color: var(--white-75);
   font-weight: 600;
   font-size: 14px;
   letter-spacing: 0.01em;
@@ -48,7 +50,7 @@ input[type="reset"] {
 
 .brand-back-link:hover {
   background: none;
-  color: #ffffff;
+  color: var(--text-100);
   transform: translateX(-1px);
 }
 
@@ -75,10 +77,10 @@ input[type="reset"] {
    game-plan is opened via ?mode=tutorial. */
 .tutorial-readonly-subhead {
   margin: 4px 0 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.66);
+  font-family: var(--font-body);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-medium);
+  color: var(--text-60);
   text-align: center;
   letter-spacing: 0.02em;
 }
@@ -90,7 +92,7 @@ input[type="reset"] {
 .sliders-container.tutorial-readonly {
   opacity: 0.62;
 }
-.sliders-container.tutorial-readonly input[type="range"] {
+.sliders-container.tutorial-readonly body.game-plan-page input[type="range"] {
   cursor: not-allowed;
 }
 .sliders-container.tutorial-readonly .strategy-slider-node {
@@ -117,12 +119,10 @@ input[type="reset"] {
   height: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%),
-    linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-12);
+  background: var(--white-4);
+  box-shadow: inset 0 1px 0 var(--white-5);
   padding: 16px 18px 18px;
 }
 
@@ -136,7 +136,7 @@ input[type="reset"] {
   column-gap: 18px;
   align-content: center;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--line);
 }
 
 .slider-group:first-of-type {
@@ -153,12 +153,12 @@ input[type="reset"] {
   display: flex;
   align-items: center;
   margin: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-family: var(--font-body);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-1);
   text-transform: none;
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 .slider-wrapper {
@@ -172,7 +172,7 @@ input[type="reset"] {
   margin: 0;
 }
 
-input[type="range"] {
+body.game-plan-page input[type="range"] {
   position: relative;
   z-index: 3;
   width: 100%;
@@ -185,12 +185,12 @@ input[type="range"] {
   cursor: pointer;
 }
 
-input[type="range"]::-webkit-slider-runnable-track {
+body.game-plan-page input[type="range"]::-webkit-slider-runnable-track {
   height: 54px;
   background: transparent;
 }
 
-input[type="range"]::-webkit-slider-thumb {
+body.game-plan-page input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 40px;
@@ -202,17 +202,17 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: pointer;
 }
 
-input[type="range"]::-webkit-slider-thumb:hover {
+body.game-plan-page input[type="range"]::-webkit-slider-thumb:hover {
   filter: none;
 }
 
-input[type="range"]::-moz-range-track {
+body.game-plan-page input[type="range"]::-moz-range-track {
   height: 54px;
   background: transparent;
   border: 0;
 }
 
-input[type="range"]::-moz-range-thumb {
+body.game-plan-page input[type="range"]::-moz-range-thumb {
   width: 40px;
   height: 40px;
   border: 0;
@@ -237,7 +237,7 @@ input[type="range"]::-moz-range-thumb {
   top: 50%;
   height: 6px;
   transform: translateY(-50%);
-  background: rgba(0, 0, 0, 0.9);
+  background: var(--black);
   border-radius: 999px;
 }
 
@@ -257,7 +257,8 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .strategy-slider-node.is-selected {
-  background-image: url("/images/buttons/orange_gp_bball.svg");
+  background-image: url("/images/buttons/black_gp_bball.svg");
+  box-shadow: 0 0 0 2px var(--white);
 }
 
 .slider-value {
@@ -267,9 +268,9 @@ input[type="range"]::-moz-range-thumb {
   min-width: 34px;
   height: 28px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
+  background: var(--white-9);
+  color: var(--text-100);
+  font-family: var(--font-body);
   font-size: 13px;
   font-weight: 800;
 }
@@ -282,7 +283,7 @@ input[type="range"]::-moz-range-thumb {
   margin: 0 0 2px;
   font-size: 10px;
   font-weight: 400;
-  color: #9e9d9d;
+  color: var(--text-60);
   line-height: 1.3;
 }
 
@@ -322,9 +323,9 @@ input[type="range"]::-moz-range-thumb {
   height: 40px;
   padding: 0 16px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  border: 1px solid var(--white-28);
+  box-shadow: inset 0 1px 0 var(--white-18);
+  font-family: var(--font-display);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -341,13 +342,13 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, #49ff37 0%, #34EC27 100%);
-  color: #0f160f;
+  background: var(--white-4);
+  color: var(--text-87);
 }
 
 .btn-save-game-plan {
-  background: linear-gradient(180deg, #ffab40 0%, #F79420 100%);
-  color: #ffffff;
+  background: var(--orange); /* colour-law: committed */
+  color: var(--badge-ink);
 }
 
 .btn-save-game-plan:hover {
@@ -359,8 +360,9 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .btn-secondary {
-  background: linear-gradient(180deg, rgba(118, 128, 145, 0.94), rgba(77, 86, 100, 0.96));
-  color: #ffffff;
+  background: var(--white-4);
+  color: var(--text-87);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 
 .btn-secondary:hover {
@@ -370,7 +372,7 @@ input[type="range"]::-moz-range-thumb {
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--scrim);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -384,28 +386,26 @@ input[type="range"]::-moz-range-thumb {
 .modal-content {
   width: min(92vw, 500px);
   padding: 28px 30px;
-  background: linear-gradient(180deg, rgba(42, 48, 58, 0.96), rgba(30, 35, 44, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 18px 36px rgba(0, 0, 0, 0.28);
+  background: var(--surface-popover);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-12);
+  box-shadow: var(--shadow-popover);
   text-align: center;
 }
 
 .modal-content h2 {
   margin-bottom: 14px;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 2rem;
-  letter-spacing: 0.03em;
-  color: #f7f9ff;
+  font-family: var(--font-display);
+  font-size: var(--fs-32);
+  letter-spacing: var(--tracking-3);
+  color: var(--text-100);
 }
 
 .modal-content p {
   margin-bottom: 24px;
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.84);
+  color: var(--text-87);
 }
 
 #modal-close {
@@ -413,7 +413,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .toast {
-  --toast-accent: #34EC27;
+  --toast-accent: var(--text-60);
   position: fixed;
   right: 22px;
   bottom: 22px;
@@ -425,11 +425,11 @@ input[type="range"]::-moz-range-thumb {
   min-width: 260px;
   max-width: 320px;
   padding: 14px 18px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-12);
+  border: 1px solid var(--line-strong);
   border-left: 3px solid var(--toast-accent);
-  background: rgba(28, 33, 43, 0.97);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  background: var(--surface-popover);
+  box-shadow: var(--shadow-popover);
   opacity: 0;
   pointer-events: none;
   transform: translateX(120%);
@@ -468,17 +468,17 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .toast-title {
-  color: #ffffff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 16px;
-  letter-spacing: 0.04em;
+  color: var(--text-100);
+  font-family: var(--font-display);
+  font-size: var(--fs-16);
+  letter-spacing: var(--tracking-4);
   line-height: 1;
 }
 
 .toast-subline {
   margin-top: 4px;
-  color: rgba(255, 255, 255, 0.54);
-  font-size: 12px;
+  color: var(--text-60);
+  font-size: var(--fs-12);
   line-height: 1.35;
 }
 
@@ -486,9 +486,9 @@ input[type="range"]::-moz-range-thumb {
   appearance: none;
   border: 0;
   background: none;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-38);
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 18px;
   line-height: 1;
   padding: 0;
@@ -496,7 +496,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .toast-dismiss:hover {
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 @media (max-width: 980px) {
@@ -540,9 +540,9 @@ input[type="range"]::-moz-range-thumb {
  * sliders stay the focus, the grouping is a hint.
  */
 .slider-nest {
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.032);
+  border: 1px solid var(--white-10);
+  border-radius: var(--radius-10);
+  background: var(--white-3);
   padding: 12px 12px 4px;
   margin-bottom: 18px;
 }
@@ -555,11 +555,11 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .slider-nest__title {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 13px;
-  letter-spacing: 0.16em;
+  font-family: var(--font-display);
+  font-size: var(--fs-13);
+  letter-spacing: var(--tracking-10);
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--text-60);
 }
 
 /* One shared tip for the family. There is intentionally no per-slider icon —
@@ -570,20 +570,386 @@ input[type="range"]::-moz-range-thumb {
   line-height: 14px;
   padding: 0;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.30);
+  border: 1px solid var(--white-30);
   background: transparent;
-  color: rgba(255, 255, 255, 0.65);
-  font-family: 'Inter', sans-serif;
-  font-size: 10px;
+  color: var(--text-60);
+  font-family: var(--font-body);
+  font-size: var(--fs-10);
   font-style: italic;
   cursor: help;
 }
 .slider-nest__info:hover,
 .slider-nest__info:focus-visible {
-  border-color: #f79420;
-  color: #f79420;
+  border-color: var(--white-50);
+  color: var(--text-100);
   outline: none;
 }
 
 /* The nest supplies the bottom spacing; its last child should not double it. */
 .slider-nest .slider-group:last-child { margin-bottom: 8px; }
+
+/* Prep v2 game plan. Tokens only. Ported from the handoff .gt / .gpr / .nest.
+   The legacy glass shell (::before/::after) and the data-card chrome stay off
+   in browse and in timeout focus. Columns sit on the page. */
+html.gob-shell .main .resource-page-container.fcc-brand-page-shell:has(.gpc),
+html.gob-shell.gob-focus .resource-page-container.fcc-brand-page-shell:has(.gpc) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+}
+
+html.gob-shell .main .resource-page-container.fcc-brand-page-shell:has(.gpc)::before,
+html.gob-shell .main .resource-page-container.fcc-brand-page-shell:has(.gpc)::after,
+html.gob-shell.gob-focus .resource-page-container.fcc-brand-page-shell:has(.gpc)::before,
+html.gob-shell.gob-focus .resource-page-container.fcc-brand-page-shell:has(.gpc)::after {
+  content: none;
+}
+
+html.gob-shell .main .fcc-data-card.game-plan-card:has(.gpc),
+html.gob-shell .main .fcc-data-card.game-plan-card:has(.gpc) .game-plan-card-body,
+html.gob-shell.gob-focus .fcc-data-card.game-plan-card:has(.gpc),
+html.gob-shell.gob-focus .fcc-data-card.game-plan-card:has(.gpc) .game-plan-card-body {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+}
+
+html.gob-shell .game-plan-page-header,
+html.gob-shell .game-plan-back-link[hidden] {
+  display: none !important;
+}
+
+html.gob-shell .pg-head .pg-tools .button-container,
+html.gob-shell.gob-focus .button-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  flex-wrap: nowrap;
+}
+
+html.gob-shell.gob-focus .button-container {
+  margin-bottom: var(--space-8);
+}
+
+html.gob-shell .pg-head .pg-tools .btn-o,
+html.gob-shell .button-container .btn-o {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--dsz-30);
+  min-width: 0;
+  padding: var(--space-1) var(--space-12) 0;
+  border-radius: var(--radius-8);
+  background: var(--orange); /* colour-law: committed */
+  color: var(--badge-ink);
+  border: 0;
+  box-shadow: none;
+  font: var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  text-align: center;
+  white-space: nowrap;
+}
+
+html.gob-shell .pg-head .pg-tools .btn-o:hover,
+html.gob-shell .button-container .btn-o:hover {
+  filter: brightness(1.06);
+  transform: none;
+}
+
+html.gob-shell .pg-head .pg-tools .btn-o:focus-visible,
+html.gob-shell .button-container .btn-o:focus-visible,
+html.gob-shell .button-container .btn-secondary:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+html.gob-shell .button-container .btn-secondary {
+  height: var(--dsz-30);
+  min-width: 0;
+  padding: var(--space-1) var(--space-12) 0;
+  border: 0;
+  border-radius: var(--radius-8);
+  background: var(--white-4);
+  color: var(--text-87);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font: var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+}
+
+html.gob-shell .gpc.cols2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dsp-24) calc(var(--col-gap) * 2);
+  align-items: start;
+}
+
+html.gob-shell .gpc .sh {
+  display: flex;
+  align-items: baseline;
+  min-height: 0;
+  margin: 0 0 var(--space-2);
+}
+
+html.gob-shell .gpc .sh h2 {
+  margin: 0;
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+
+html.gob-shell .gpc .gpr {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: var(--space-20);
+  align-items: center;
+  min-height: var(--dsz-60);
+  padding: var(--space-6) 0;
+  border-bottom: 1px solid var(--line);
+  overflow: visible;
+}
+
+html.gob-shell .gpc .gpr-n b {
+  display: block;
+  font: var(--fw-bold) var(--fs-17)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-100);
+}
+
+html.gob-shell .gpc .gpr-n span {
+  display: block;
+  margin-top: var(--space-5);
+  font-size: var(--fs-12);
+  line-height: var(--lh-1);
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+html.gob-shell .gpc .gt {
+  position: relative;
+  height: 36px;
+  margin: 0 var(--space-2);
+  overflow: visible;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+html.gob-shell .gpc .gt:focus {
+  outline: none;
+}
+
+html.gob-shell .gpc .gt:focus-visible .gt-k {
+  box-shadow: 0 0 0 3px var(--bg-page-solid), 0 0 0 5px var(--white);
+}
+
+html.gob-shell .gpc .gt-r,
+html.gob-shell .gpc .gt-s,
+html.gob-shell .gpc .gt-k {
+  position: absolute;
+  font-style: normal;
+}
+
+html.gob-shell .gpc .gt-r {
+  left: 8px;
+  right: 8px;
+  top: 8px;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: var(--white-10);
+}
+
+html.gob-shell .gpc .gt-s {
+  top: 8px;
+  width: 2px;
+  height: 10px;
+  margin: -5px 0 0 -1px;
+  border-radius: 1px;
+  background: var(--white-30);
+}
+
+html.gob-shell .gpc .gt-s.n {
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--white-20);
+}
+
+html.gob-shell .gpc .gt-k {
+  top: 8px;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 0 0 3px var(--bg-page-solid), 0 0 0 4px var(--white-25), 0 2px 6px var(--black-35);
+}
+
+html.gob-shell .gpc .gt {
+  overflow: visible;
+  min-height: 52px;
+}
+html.gob-shell .gpc .gt-l {
+  position: absolute;
+  top: 22px;
+  max-width: calc(50% - 28px);
+  overflow: visible;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-2);
+  line-height: 1.15;
+  color: var(--text-38);
+  white-space: normal;
+}
+
+html.gob-shell .gpc .gt-l.a { left: 0; }
+html.gob-shell .gpc .gt-l.b { left: 50%; transform: translateX(-50%); max-width: none; white-space: nowrap; }
+html.gob-shell .gpc .gt-l.c { right: 0; left: auto; text-align: right; }
+html.gob-shell .gpc .gt-l.on { color: var(--text-100); }
+html.gob-shell .gpc .gt-l.nr { color: var(--text-60); }
+
+/* A section head that carries a control (Shot Diet and its tip button). The head keeps
+   the same .grp-h spacing as every other section. */
+html.gob-shell .gpc .grp-hd {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-10);
+  white-space: nowrap;
+}
+
+html.gob-shell .gpc .eb {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+html.gob-shell .gpc .grp-h {
+  display: block;
+  padding: var(--space-12) 0 var(--space-2);
+}
+
+html.gob-shell .gpc .slider-nest__info:focus-visible {
+  border-color: var(--line-strong);
+  color: var(--text-100);
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+#game-plan-view .game-plan-page-header-wrap,
+#game-plan-view .game-plan-page-header {
+  display: none;
+}
+
+/* One track geometry for all twelve sliders. The title column is one density
+   width, so every track starts and ends at the same x in its column and both
+   columns match. */
+html.gob-shell .gpc {
+  --gp-name-w: calc(var(--dsz-118) * 2 + var(--dsz-50));
+}
+
+html.gob-shell .gpc .gpr {
+  grid-template-columns: var(--gp-name-w) minmax(0, 1fr);
+  column-gap: var(--dsp-24);
+}
+
+/* Four section heads, one spacing: Shot Diet and Execution on the left, Disruption
+   and Transition on the right. Each column is one lead slider, a section of three and
+   a section of two, so the heads line up across the gutter with no offset. */
+html.gob-shell .gpc .grp-h {
+  padding: var(--dsp-24) 0 var(--space-2);
+}
+
+html.gob-shell .gpc .slider-nest__info:hover {
+  border-color: var(--white-50);
+  color: var(--text-100);
+}
+
+.gameplan-warning-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.gameplan-warning-modal {
+  background: var(--surface-popover);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-8);
+  padding: var(--dsp-24);
+  max-width: 500px;
+  width: 90%;
+  color: var(--text-100);
+  box-shadow: var(--shadow-popover);
+}
+
+.gameplan-warning-modal p {
+  font-size: var(--fs-18);
+  margin-bottom: var(--space-20);
+  font-weight: var(--fw-semibold);
+}
+
+.gameplan-warning-modal label {
+  color: var(--text-100);
+  cursor: pointer;
+}
+
+.gameplan-warning-actions {
+  display: flex;
+  gap: var(--space-12);
+  justify-content: flex-end;
+}
+
+.gameplan-warning-save {
+  padding: 10px 20px;
+  background: var(--orange); /* colour-law: committed */
+  color: var(--badge-ink);
+  border: 0;
+  border-radius: var(--radius-4);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+
+.gameplan-warning-leave {
+  padding: 10px 20px;
+  background: var(--white-10);
+  color: var(--text-100);
+  border: 1px solid var(--white-30);
+  border-radius: var(--radius-4);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+
+/* Colour law: orange = there is something to save. Save Game Plan is neutral at
+   rest and after a save; .is-dirty (game-plan.js, real edits only) restores the
+   orange from the rules above. */
+.btn-save-game-plan:not(.is-dirty),
+html.gob-shell .pg-head .pg-tools .btn-save-game-plan:not(.is-dirty),
+html.gob-shell .button-container .btn-save-game-plan:not(.is-dirty) {
+  background: var(--white-6);
+  color: var(--text-60);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  filter: none;
+}
+

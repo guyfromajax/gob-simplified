@@ -31,6 +31,7 @@ from BackEnd.utils.animation_step_helpers import (
     pass_arrival_sfx,
     pass_release_sfx,
     stamp_idle_wander_on_still_players,
+    defender_movement_rate,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -108,20 +109,13 @@ def _pick_pg_receive_target(
     return {"x": x, "y": y}
 
 
-def _interrupted_coord(
-    start: GridCoord, target: GridCoord, rate: float, t: float
-) -> GridCoord:
-    """Where the player ends up after moving from ``start`` toward ``target``
-    at ``rate`` (grid/game-sec) for ``t`` game-seconds. Clamps at target."""
-    dist = _euclid(start, target)
-    max_traversal = max(0.0, rate * t)
-    if dist <= max_traversal or dist < 1e-9:
-        return {"x": float(target["x"]), "y": float(target["y"])}
-    ratio = max_traversal / dist
-    return {
-        "x": float(start["x"] + (target["x"] - start["x"]) * ratio),
-        "y": float(start["y"] + (target["y"] - start["y"]) * ratio),
-    }
+# STAGE 1 (2026-09-24): the four `_interrupted_coord` definitions collapsed to one core
+# in animation_step_helpers. This module reached VARIANT A, so it binds the strict wrapper;
+# the name is kept because other modules import it from here BY VALUE.
+# See reports/movement-rate-inventory.md and reports/rate-unify-stage1.md.
+from BackEnd.utils.animation_step_helpers import _interrupted_coord_strict
+
+_interrupted_coord = _interrupted_coord_strict
 
 
 def _pick_kickout_receiver_outlet(is_away_offense: bool) -> tuple:
@@ -337,9 +331,31 @@ def build_walk_up_step(
         destinations[pid] = dict(target)
         # End coord: gate players + fast-enough non-gate players → full target.
         # Slower non-gate players → interrupted at their natural rate within T.
+        #
+        # ORDERING, AND WHY IT IS SAFE: `t` was frozen at the `max(min_t, slowest_t)` above, and
+        # `natural_t` / `rates` were already consumed by the gate selection before that. The
+        # defender spread is applied HERE and nowhere earlier, so a widened defender rate cannot
+        # reach `natural_t`, cannot reach `_offense_arrival_times`, and therefore cannot change
+        # step duration. That is the whole design (reports/ag-spread-sweep-2026-09-24.md §5:
+        # widening the shared rate function instead costs +11.2% game length at s = 0.50).
         player_rate = rates.get(pid, 0.0)
-        if player_rate > 0 and pid in natural_t and natural_t[pid] > t:
-            final_end_coords[pid] = _interrupted_coord(sc, target, player_rate, t)
+        if player_rate > 0 and pid in natural_t:
+            arch_pid = bh_archetype if pid == bh_id else other_archetype
+            eff_rate = defender_movement_rate(
+                _player_lookup_by_id(off_lineup, def_lineup, pid),
+                arch_pid,
+                not _is_offense_player(pid, off_lineup),
+            )
+            if eff_rate == player_rate:
+                # flag off, or an offensive player: reuse the value computed above so the
+                # result is byte-identical rather than merely arithmetically equal.
+                eff_natural_t = natural_t[pid]
+            else:
+                eff_natural_t = _euclid(sc, target) / eff_rate if eff_rate > 0 else 0.0
+            if eff_rate > 0 and eff_natural_t > t:
+                final_end_coords[pid] = _interrupted_coord(sc, target, eff_rate, t)
+            else:
+                final_end_coords[pid] = dict(target)
         else:
             final_end_coords[pid] = dict(target)
         if pid == bh_id:
@@ -568,7 +584,7 @@ def _build_handoff_hold_substep(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_state: BallState = {"owner_player_id": bh_id}
@@ -648,7 +664,7 @@ def _build_handoff_converge_substep(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_state: BallState = {"owner_player_id": bh_id}
@@ -824,7 +840,7 @@ def build_pass_step(
             archetype[pid] = continuing_archetype
             destinations[pid] = dict(target)
             player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-            rate_player = _ag_grid_per_game_sec(player, continuing_archetype)
+            rate_player = defender_movement_rate(player, continuing_archetype, not _is_offense_player(pid, off_lineup))
             end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate_player, t)
 
     ball_start: BallState = {
@@ -1056,7 +1072,7 @@ def _build_kickout_positioning_substep(
         archetype[pid] = "cruise"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "cruise")
+        rate = defender_movement_rate(player, "cruise", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_state: BallState = {"owner_player_id": bh_id}
@@ -1155,7 +1171,8 @@ def _build_inbound_passer_hold_step(
                 archetype[pid] = moving_archetype
                 destinations[pid] = dict(target)
                 player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-                rate = _ag_grid_per_game_sec(player, moving_archetype)
+                rate = defender_movement_rate(
+                    player, moving_archetype, not _is_offense_player(pid, off_lineup))
                 end_coords[pid] = (
                     _interrupted_coord(sc, target, rate, t) if rate > 0 else dict(target)
                 )

@@ -1,0 +1,6 @@
+---
+description: GOB project rules for agents
+alwaysApply: true
+---
+
+Read and follow the root [CLAUDE.md](../../CLAUDE.md) before any task: worktree workflow, reports, testing, data safety, deploys, persistence and engine rules.

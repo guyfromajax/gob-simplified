@@ -25,12 +25,16 @@ function cloneParams(params) {
     ['SH', 'OD', 'BH', 'ST', 'ND', 'FT']
   ];
 
+  // Position pills are information codes: neutral, no per-position colour
+  // (colour law; same ruling as Team Builder's position chips).
+  const PILL_COLOR = 'var(--text-87)';
+  const PILL_BG = 'var(--white-10)';
   const POSITION_CONFIG = {
-    PG: { color: '#4065AF', background: 'rgba(64,101,175,0.20)', fullName: 'POINT GUARD' },
-    SG: { color: '#7B5EA7', background: 'rgba(123,94,167,0.20)', fullName: 'SHOOTING GUARD' },
-    SF: { color: '#3A8C4A', background: 'rgba(58,140,74,0.20)', fullName: 'SMALL FORWARD' },
-    PF: { color: '#C0392B', background: 'rgba(192,57,43,0.20)', fullName: 'POWER FORWARD' },
-    C: { color: '#D4A017', background: 'rgba(212,160,23,0.20)', fullName: 'CENTER' }
+    PG: { color: PILL_COLOR, background: PILL_BG, fullName: 'POINT GUARD' },
+    SG: { color: PILL_COLOR, background: PILL_BG, fullName: 'SHOOTING GUARD' },
+    SF: { color: PILL_COLOR, background: PILL_BG, fullName: 'SMALL FORWARD' },
+    PF: { color: PILL_COLOR, background: PILL_BG, fullName: 'POWER FORWARD' },
+    C: { color: PILL_COLOR, background: PILL_BG, fullName: 'CENTER' }
   };
 
   function getHighestPosition(player) {
@@ -87,18 +91,19 @@ function cloneParams(params) {
   }
 
   function renderAttributeRow(code, attributes) {
-    const rawValue = attributes[`anchor_${code}`] ?? attributes[code] ?? 0;
-    const scaledValue = Math.max(1, Math.floor(rawValue / 10));
-    const fillPercentage = Math.min(100, scaledValue * 10);
-    const colorBucket = Math.max(0, Math.ceil(Number(rawValue) / 10));
+    const ad = window.GOB_AttributeDisplay;
+    const rawValue = ad.rawAttr(attributes, code);
+    const scaledValue = ad.displayAttr(rawValue);
+    const shown = scaledValue == null ? 0 : scaledValue;
+    const fillPercentage = Math.min(100, shown * 10);
     const row = document.createElement('div');
     row.className = 'pd-attribute-row';
     row.innerHTML = `
       <span class="pd-attribute-label attribute-label" data-attr="${code}">${code}</span>
       <div class="pd-attribute-track">
-        <div class="pd-attribute-fill" data-width="${fillPercentage}" style="background:${getAttrColor(colorBucket)};"></div>
+        <div class="pd-attribute-fill" data-width="${fillPercentage}" style="background:${getAttrColor(rawValue)};"></div>
       </div>
-      <span class="pd-attribute-value">${scaledValue}</span>
+      <span class="pd-attribute-value">${shown}</span>
     `;
     return row;
   }
@@ -232,20 +237,16 @@ function cloneParams(params) {
 
   function goBack() {
     const params = liveParams();
-    // Same-origin guard: return_url is attacker-controllable via the query string.
     const returnUrl = typeof getSafeReturnUrl === 'function'
       ? getSafeReturnUrl(params.get('return_url'))
       : params.get('return_url');
-    if (returnUrl) {
-      window.location.href = returnUrl;
-      return;
+    let fallback = returnUrl || '/homepage.html';
+    const returnTab = params.get('return_tab');
+    if (returnTab && window.GOBNav && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(fallback) && !/[?&]tab=/.test(fallback)) {
+      fallback += (fallback.indexOf('?') === -1 ? '?' : '&') + 'tab=' + encodeURIComponent(returnTab);
     }
-
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      window.location.href = '/homepage.html';
-    }
+    if (window.GOBNav) window.GOBNav.back(fallback);
+    else window.location.replace(fallback);
   }
 
   function showError(message) {
@@ -319,7 +320,7 @@ function cloneParams(params) {
       <td class="pd-career-num">${stats.STL ?? 0}</td>
       <td class="pd-career-num">${stats.BLK ?? 0}</td>
       <td class="pd-career-num">${stats.F ?? 0}</td>
-      <td class="pd-career-num">${stats.MIN ?? 0}</td>
+      <td class="pd-career-num">${Math.round(Number(stats.MIN) || 0)}</td>
       <td class="pd-career-num">${stats.TO ?? 0}</td>
       <td class="pd-career-num">${scrA}</td>
       <td class="pd-career-num">${formatPct(scrS, scrA)}</td>
@@ -647,6 +648,9 @@ function renderPlayerPage(player) {
       setTimeout(() => {
         initAttributeTooltips(document, ['.attribute-label']);
       }, 500);
+    }
+    if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
+      window.GOBNav.restoreScroll();
     }
   }
 

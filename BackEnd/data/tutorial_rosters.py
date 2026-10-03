@@ -14,8 +14,10 @@ Stat keys here intentionally match BackEnd.constants.BOX_SCORE_KEYS. Keys not
 listed (DEF_A, FB_PTS, etc.) retain their zero defaults.
 
 Source of truth: _documentation_master/projects/fte_inject_state.md §5.
-Invariants verified at import time: PTS sum = 60, MIN sum = 140, per-player
-PTS = 2·FGM + 3PTM + FTM, REB = OREB + DREB.
+The table below lists MIN in design minutes (sum 140). Stored ``MIN`` is
+seconds, the same unit as a live game box, so each value is multiplied by 60.
+Invariants verified at import time: PTS sum = 60, stored MIN sum = 8400,
+per-player PTS = 2·FGM + 3PTM + FTM, REB = OREB + DREB.
 """
 
 from typing import Iterable, List, Tuple
@@ -66,12 +68,12 @@ def _row(pts, oreb, dreb, ast, stl, blk, to, fgm, fga, tptm, tpta, ftm, fta, f, 
         "FTM": ftm,
         "FTA": fta,
         "F": f,
-        "MIN": min_,
+        "MIN": int(min_) * 60,
     }
 
 
 # fte_inject_state.md §5 — "User Team Player Stats" block.
-# Invariants: PTS sum = 60, MIN sum = 140.
+# Invariants: PTS sum = 60. The MIN column is design minutes; stored MIN is seconds (sum 8400).
 USER_TEAM_STAT_TEMPLATE = {
     #                    PTS OREB DREB AST STL BLK TO  FGM FGA  3PTM 3PTA  FTM FTA  F  MIN
     "starting_pg": _row(   9,   0,   1,  6,  3,  0,  8,  4, 10,    1,   3,   0,  2, 2,  21),
@@ -90,7 +92,7 @@ USER_TEAM_STAT_TEMPLATE = {
 
 
 # fte_inject_state.md §5 — "Computer Team Player Stats" block.
-# Invariants: PTS sum = 60, MIN sum = 140.
+# Invariants: PTS sum = 60. The MIN column is design minutes; stored MIN is seconds (sum 8400).
 COMPUTER_TEAM_STAT_TEMPLATE = {
     #                    PTS OREB DREB AST STL BLK TO  FGM FGA  3PTM 3PTA  FTM FTA  F  MIN
     "starting_pg": _row(   5,   0,   2, 10,  2,  0,  4,  2,  3,    1,   3,   0,  2, 1,  21),
@@ -117,8 +119,8 @@ def _verify_template(template: dict, name: str) -> None:
     min_sum = sum(row["MIN"] for row in template.values())
     if pts_sum != 60:
         raise ValueError(f"{name}: PTS sum is {pts_sum}, expected 60")
-    if min_sum != 140:
-        raise ValueError(f"{name}: MIN sum is {min_sum}, expected 140")
+    if min_sum != 140 * 60:
+        raise ValueError(f"{name}: MIN sum is {min_sum}, expected {140 * 60} seconds")
     for slot, row in template.items():
         expected_pts = 2 * row["FGM"] + row["3PTM"] + row["FTM"]
         if row["PTS"] != expected_pts:

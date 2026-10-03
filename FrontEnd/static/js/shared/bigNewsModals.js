@@ -167,13 +167,7 @@ function cloneParams(params) {
     disconnectFitObservers();
     var done = markSeenFn ? markSeenFn() : Promise.resolve();
     activeOverlay = null;
-    return done.then(function () {
-      if (pendingTopData) {
-        var data = pendingTopData;
-        pendingTopData = null;
-        maybeShow(data);
-      }
-    });
+    return done;
   }
 
   function buildShell(opts) {
@@ -210,7 +204,9 @@ function cloneParams(params) {
 
     var eyebrow = document.createElement('div');
     eyebrow.className = 'bn-eyebrow';
-    eyebrow.textContent = opts.eyebrow || '';
+    eyebrow.textContent = (global.MomentQueue && global.MomentQueue.queueLabel)
+      ? global.MomentQueue.queueLabel(opts.queue, opts.eyebrow || '')
+      : (opts.eyebrow || '');
 
     var title = document.createElement('div');
     title.className = 'bn-title';
@@ -396,6 +392,7 @@ function cloneParams(params) {
         topData: Object.assign({}, topData, { week: payload.display_week || topData.week }),
         revealMode: !!revealMode,
         tierHint: payload.tier,
+        userConnectorNavy: true,
       });
     } else {
       scale.innerHTML = '<p>Tournament bracket UI not loaded.</p>';
@@ -444,68 +441,45 @@ function cloneParams(params) {
     });
   }
 
-  function showBracketModal(payload, topData, maps) {
+  function showBracketModal(payload, topData, maps, queue) {
     presentedBracket = true;
-    mountBracketModal(payload, topData, maps, {
-      title: 'The Bracket Is Set!',
-      subtitle: 'Eight teams. One title. Here\u2019s the road ahead.',
-      revealMode: true,
-      onDismiss: function () {
-        return markBracketSeen(payload.reveal_key);
-      },
+    return new Promise(function (resolve) {
+      mountBracketModal(payload, topData, maps, {
+        title: 'The Bracket Is Set!',
+        subtitle: 'Eight teams. One title. Here\u2019s the road ahead.',
+        revealMode: true,
+        queue: queue,
+        onDismiss: function () {
+          return Promise.resolve(markBracketSeen(payload.reveal_key)).then(resolve, resolve);
+        },
+      });
     });
   }
 
-  function showBracketUpdateModal(payload, topData, maps) {
+  function showBracketUpdateModal(payload, topData, maps, queue) {
     presentedBracketUpdate = true;
-    mountBracketModal(payload, topData, maps, {
-      title: 'Tournament Update',
-      subtitle: '',
-      confettiCount: 0,
-      revealMode: false,
-      onDismiss: function () {
-        return markBracketSeen(payload.update_key);
-      },
+    return new Promise(function (resolve) {
+      mountBracketModal(payload, topData, maps, {
+        title: 'Tournament Update',
+        subtitle: '',
+        confettiCount: 0,
+        revealMode: false,
+        queue: queue,
+        onDismiss: function () {
+          return Promise.resolve(markBracketSeen(payload.update_key)).then(resolve, resolve);
+        },
+      });
     });
   }
 
-  function scheduleRetry(data) {
-    if (retryTimer || retries >= MAX_RETRIES) return;
-    retryTimer = setTimeout(function () {
-      retryTimer = null;
-      retries += 1;
-      maybeShow(data);
-    }, 1000);
-  }
-
-  function maybeShow(topData, maps) {
-    if (!topData || activeOverlay) return;
-    if (blockerVisible()) {
-      pendingTopData = topData;
-      scheduleRetry(topData);
-      return;
-    }
-
-    var bracketPayload = topData.bracket_reveal_modal;
-    if (!presentedBracket && bracketPayload && bracketPayload.eligible) {
-      showBracketModal(bracketPayload, topData, maps);
-      return;
-    }
-
-    var bracketUpdatePayload = topData.bracket_update_modal;
-    if (!presentedBracketUpdate && bracketUpdatePayload && bracketUpdatePayload.eligible) {
-      showBracketUpdateModal(bracketUpdatePayload, topData, maps);
-      return;
-    }
-
-    var recruitingPayload = topData.recruiting_results_modal;
-    if (!presentedRecruiting && recruitingPayload && recruitingPayload.eligible) {
-      showRecruitingModal(recruitingPayload);
-    }
+  function maybeShow() {
+    // Office flow uses MomentQueue. Recruiting-results is no longer an FCC pop-up.
   }
 
   global.BigNewsModals = {
     maybeShow: maybeShow,
+    showBracketReveal: showBracketModal,
+    showBracketUpdate: showBracketUpdateModal,
     fitBracketToContainer: fitBracketToContainer,
   };
 })(typeof window !== 'undefined' ? window : this);

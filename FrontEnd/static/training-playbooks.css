@@ -1,10 +1,76 @@
+/* ---------- Page shell (peeled from resource-pages.css) ----------
+   Same selectors as the shared sheet so the cascade is unchanged; tokens
+   instead of literals. This page no longer loads resource-pages.css. */
+.resource-page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: var(--font-body);
+}
+
+.resource-page-container.fcc-brand-page-shell {
+  position: relative;
+  width: min(1400px, calc(100vw - 24px));
+  max-width: none;
+  margin: 12px auto 18px;
+  padding: 24px 28px 28px;
+  overflow: clip;
+  color: var(--text-100);
+}
+
+.resource-page-container.fcc-brand-page-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(160deg, var(--white-3) 0%, var(--white-1p2) 18%, transparent 40%),
+    var(--bg-page);
+  border: 1px solid var(--white-9);
+  border-radius: 24px;
+  box-shadow: 0 20px 48px var(--black-45), inset 0 1px 0 var(--white-7);
+  pointer-events: none;
+}
+
+.resource-page-container.fcc-brand-page-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: repeating-linear-gradient(
+    132deg,
+    transparent 0 102px,
+    var(--white-1p2) 102px 103px,
+    transparent 103px 208px
+  );
+  pointer-events: none;
+}
+
+.resource-page-container.fcc-brand-page-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.resource-page-container.fcc-brand-page-shell h1 {
+  color: var(--text-100);
+  font-family: var(--font-display);
+  font-size: 3rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  margin: 0 0 18px;
+}
+
+.resource-page-container h1 {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+}
+
 /* Training Playbooks — Custom CMD selection (standalone resource shell) */
 body.tp-page {
   margin: 0;
   min-height: 100vh;
-  background: #0b0d14;
-  color: #f7f9ff;
-  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text-100);
+  font-family: var(--font-body);
 }
 
 .tp-shell {
@@ -25,16 +91,16 @@ body.tp-page {
   justify-self: start;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--white-55);
   text-decoration: none;
 }
 .tp-back:hover {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-87);
 }
 
 .tp-title {
   margin: 0;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(28px, 4vw, 40px);
   letter-spacing: 0.06em;
   text-align: center;
@@ -47,14 +113,14 @@ body.tp-page {
   height: 42px;
   padding: 0 18px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: #f79420;
-  color: #0b0d14;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  border: 1px solid var(--white-28);
+  background: var(--orange); /* colour-law: saved — Save & Continue saves the playbook */
+  color: var(--bg);
+  font-family: var(--font-display);
   font-size: 15px;
   letter-spacing: 0.06em;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 var(--white-18);
 }
 .tp-btn-primary:disabled {
   opacity: 0.45;
@@ -66,10 +132,10 @@ body.tp-page {
   height: 42px;
   padding: 0 18px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid var(--white-22);
   background: transparent;
-  color: rgba(255, 255, 255, 0.82);
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  color: var(--text-87);
+  font-family: var(--font-display);
   font-size: 15px;
   letter-spacing: 0.06em;
   cursor: pointer;
@@ -84,19 +150,19 @@ body.tp-page {
   z-index: 5;
   padding-bottom: 12px;
   margin-bottom: 8px;
-  background: linear-gradient(180deg, rgba(11, 13, 20, 0.98) 70%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 98%, transparent) 70%, transparent);
 }
 
 .tp-dock-card {
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--white-10);
+  background: var(--white-4);
   padding: 12px 14px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 var(--white-5);
 }
 
 .tp-dock-head {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 18px;
   letter-spacing: 0.08em;
   margin-bottom: 6px;
@@ -105,13 +171,13 @@ body.tp-page {
 .tp-dock-pct {
   font-size: 22px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--white-90);
 }
 
 .tp-dock-bar {
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--line);
   margin: 10px 0;
   overflow: hidden;
 }
@@ -120,7 +186,7 @@ body.tp-page {
   height: 100%;
   width: 0%;
   border-radius: 999px;
-  background: #f79420;
+  background: var(--text-87); /* share of plays chosen: data, neutral */
   transition: width 0.2s ease;
 }
 
@@ -129,12 +195,12 @@ body.tp-page {
   justify-content: space-between;
   gap: 10px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--white-62);
   flex-wrap: wrap;
 }
 
 .tp-dock-foot .tp-warn {
-  color: rgba(247, 148, 32, 0.95);
+  color: var(--red); /* "At least 1 required": invalid, as Team Builder */
 }
 
 .tp-main {
@@ -146,11 +212,11 @@ body.tp-page {
 }
 
 .tp-section-title {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 22px;
   letter-spacing: 0.06em;
   margin: 0 0 12px;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-87);
 }
 
 .tp-grid {
@@ -163,11 +229,11 @@ body.tp-page {
   min-width: 0;
   padding: 10px 12px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--white-10);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
-    rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    linear-gradient(180deg, var(--white-3p5), var(--white-1p2)),
+    var(--white-3);
+  box-shadow: inset 0 1px 0 var(--white-5);
   text-align: left;
   cursor: pointer;
   color: inherit;
@@ -176,17 +242,18 @@ body.tp-page {
   transition: opacity 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Selection is navy (as Team Builder and Set Lineup). */
 .tp-card.is-selected {
   opacity: 1;
-  border-color: #f79420;
-  box-shadow: 0 0 0 1px rgba(247, 148, 32, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border-color: var(--navy-hi);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--navy-hi) 45%, transparent), inset 0 1px 0 var(--white-6);
 }
 
 .tp-card.is-disabled {
   position: relative;
   opacity: 0.38;
   cursor: not-allowed;
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: var(--white-6);
   box-shadow: none;
 }
 
@@ -195,7 +262,7 @@ body.tp-page {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: rgba(11, 13, 20, 0.58);
+  background: color-mix(in srgb, var(--bg) 58%, transparent);
   pointer-events: none;
 }
 
@@ -211,7 +278,7 @@ body.tp-page {
 }
 
 .tp-card-name {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 17px;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -231,7 +298,7 @@ body.tp-page {
   gap: 6px;
   margin-top: 6px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--white-62);
 }
 
 .tp-chip {
@@ -239,13 +306,14 @@ body.tp-page {
   align-items: center;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--line);
+  border: 1px solid var(--white-12);
 }
 
+/* Playcall Center slot: an information code, neutral. */
 .tp-chip-pcc {
-  border-color: rgba(247, 148, 32, 0.55);
-  color: #f79420;
+  border-color: var(--white-28);
+  color: var(--text-100);
   font-weight: 600;
 }
 
@@ -259,7 +327,7 @@ body.tp-page {
 .tp-cmd-label {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--white-55);
   width: 34px;
 }
 
@@ -267,7 +335,7 @@ body.tp-page {
   flex: 1;
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--white-10);
   overflow: hidden;
 }
 
@@ -276,10 +344,12 @@ body.tp-page {
   border-radius: 999px;
 }
 
-.tp-cmd-fill.is-red { background: #ff6d6d; }
-.tp-cmd-fill.is-yellow { background: #ffd700; }
-.tp-cmd-fill.is-green { background: #34ec27; }
-.tp-cmd-fill.is-blue { background: #4a90d9; }
+/* CMD rating ramp (yellow < 50, green 50–79, blue 80+), hues unchanged pending the
+   ramp ruling (see the play-flow report: same question as getPswColor). */
+.tp-cmd-fill.is-red { background: var(--tier-red); }
+.tp-cmd-fill.is-yellow { background: var(--tier-yellow); }
+.tp-cmd-fill.is-green { background: var(--tier-green); }
+.tp-cmd-fill.is-blue { background: var(--blue); }
 
 .tp-cmd-num {
   font-size: 12px;
@@ -292,14 +362,14 @@ body.tp-page {
   width: 16px;
   height: 16px;
   border-radius: 4px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
+  border: 2px solid var(--white-35);
   margin-top: 2px;
   flex-shrink: 0;
 }
 .tp-card.is-selected .tp-check {
-  border-color: #f79420;
-  background: #f79420;
-  box-shadow: inset 0 0 0 2px #0b0d14;
+  border-color: var(--navy-hi);
+  background: var(--navy-hi);
+  box-shadow: inset 0 0 0 2px var(--bg);
 }
 
 .tp-footer {
@@ -308,12 +378,12 @@ body.tp-page {
   gap: 12px;
   padding-top: 20px;
   margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--line);
 }
 
 /* Toast (aligned with playbooks.css) */
 .toast {
-  --toast-accent: #f79420;
+  --toast-accent: var(--line-strong); /* neutral like the shared save toast (Jamie, 2026-10-01) */
   position: fixed;
   right: 22px;
   bottom: 22px;
@@ -326,10 +396,10 @@ body.tp-page {
   max-width: 320px;
   padding: 14px 18px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line-strong);
   border-left: 3px solid var(--toast-accent);
-  background: rgba(28, 33, 43, 0.97);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  background: var(--surface-popover);
+  box-shadow: 0 10px 24px var(--black-25);
   opacity: 0;
   pointer-events: none;
   transform: translateX(120%);
@@ -344,21 +414,21 @@ body.tp-page {
   display: none;
 }
 .toast-title {
-  color: #fff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  color: var(--text-100);
+  font-family: var(--font-display);
   font-size: 16px;
   letter-spacing: 0.04em;
 }
 .toast-subline {
   margin-top: 4px;
-  color: rgba(255, 255, 255, 0.54);
+  color: var(--white-55);
   font-size: 12px;
 }
 .toast-dismiss {
   appearance: none;
   border: 0;
   background: none;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--white-55);
   font-size: 18px;
   cursor: pointer;
   line-height: 1;
@@ -373,4 +443,10 @@ body.tp-page {
   .tp-title { order: -1; }
   .tp-btn-primary { justify-self: center; width: 100%; max-width: 280px; }
   .tp-dock { grid-template-columns: 1fr; }
+}
+
+/* First paint. Until the playbooks are in, the page body is held back behind the shared
+   loader: no bare section titles, no "—" docks, no Save button with nothing to save. */
+html.is-loading .tp-shell {
+  visibility: hidden;
 }

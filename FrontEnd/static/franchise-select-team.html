@@ -1,16 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Who are you coaching?</title>
+  <link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/css/username-modal.css">
@@ -19,6 +21,12 @@
   <script src="/js/shared/pageLoadOverlay.js"></script>
 </head>
 <body>
+  <!-- First paint: stay behind the shared loader until the programs are drawn
+       (franchise-select-team.js lifts it). -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>

@@ -24,6 +24,12 @@ REGION_LIMIT = 16  # full region (2 conferences × 8 teams)
 NATIONAL_COLUMN_SPLIT = (13, 12)
 REGION_COLUMN_SPLIT = (8, 8)
 
+# The quiet line under "National Recruit Rankings". It says what Score is for, not how
+# it is built: the formula (lean slots, signings) is hidden from the player, so no news
+# copy explains it.
+WEEKLY_SCORE_CAPTION = "Class strength so far"
+RESULTS_SCORE_CAPTION = "Class strength"
+
 FTD_RECRUITING_RANK = "recruiting_rank"
 FTD_RECRUITING_REGION_RANK = "recruiting_region_rank"
 FTD_RECRUITING_SCORE = "recruiting_score"
@@ -206,6 +212,65 @@ def persist_recruiting_ranks_to_ftd(
         return 0
 
 
+def previous_table_ranks(previous_story: Mapping[str, Any] | None) -> dict[str, dict[str, int]]:
+    """``{"national": {team_id: rank}, "region": {team_id: rank}}`` from a stored report.
+
+    A table is named by its ``table`` key. A story stored before that key existed has
+    the national table first and the region table second. The national map includes the
+    user's foot row when the story has one.
+    """
+    out: dict[str, dict[str, int]] = {}
+    if not isinstance(previous_story, Mapping):
+        return out
+    tables = [
+        line for line in (previous_story.get("rich_lines") or [])
+        if isinstance(line, Mapping) and line.get("type") == "ranking_table"
+    ]
+    for index, line in enumerate(tables):
+        name = str(line.get("table") or ("national" if index == 0 else "region" if index == 1 else ""))
+        if name not in ("national", "region") or name in out:
+            continue
+        ranks: dict[str, int] = {}
+        rows = list(line.get("rows") or [])
+        if isinstance(line.get("user_row"), Mapping):
+            rows.append(line["user_row"])
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            team_id = str(row.get("team_id") or "")
+            try:
+                rank = int(row.get("rank"))
+            except (TypeError, ValueError):
+                continue
+            if team_id and rank > 0:
+                ranks[team_id] = rank
+        out[name] = ranks
+    return out
+
+
+def stamp_rank_movement(
+    rows: list[dict[str, Any]],
+    previous: Mapping[str, int] | None,
+    *,
+    mark_new: bool = True,
+) -> None:
+    """Write each row's movement against last week's same table, in place.
+
+    ``move`` is places gained (positive = rose, 0 = unchanged). A team that was not in
+    last week's table gets ``new: True``. No previous table: nothing is written, so the
+    page shows no marks.
+    """
+    if not previous:
+        return
+    for row in rows:
+        before = previous.get(str(row.get("team_id") or ""))
+        if before is None:
+            if mark_new:
+                row["new"] = True
+            continue
+        row["move"] = int(before) - int(row["rank"])
+
+
 def build_recruiting_rankings_story(
     *,
     story_id: str,
@@ -218,24 +283,63 @@ def build_recruiting_rankings_story(
     region_team_ids: set[str] | None,
     national_limit: int = NATIONAL_LIMIT,
     region_limit: int = REGION_LIMIT,
+    user_team_id: str | None = None,
+    user_zero_rank: int | None = None,
+    previous_story: Mapping[str, Any] | None = None,
+    score_caption: str | None = None,
 ) -> dict[str, Any] | None:
-    """National Top 25 + full user-region rankings. None if nobody has national points."""
-    national = rank_teams_by_points(
+    """National Top 25 + full user-region rankings. None if nobody has national points.
+
+    ``user_team_id``: when that team is outside the national top 25 its row is stored
+    as the table's ``user_row``, with its real rank (its place among every team with
+    points; ``user_zero_rank``, the durable full-league rank, when it has none).
+    ``previous_story``: last week's stored report. Each row then carries its movement
+    against the same table (``stamp_rank_movement``), stored with the story so an old
+    story keeps its own week's movement.
+    """
+    # Every team with points, ranked once: the top 25 is the table, and a user team
+    # further down reads its rank from the same order.
+    everyone = rank_teams_by_points(
         scores,
         team_name_map,
-        limit=national_limit,
+        limit=len(scores or {}) + 1,
     )
+    national = everyone[: max(0, int(national_limit))]
     if not national:
         return None
 
+    user_tid = str(user_team_id or "")
+    user_row: dict[str, Any] | None = None
+    if user_tid and not any(row["team_id"] == user_tid for row in national):
+        user_row = next((dict(row) for row in everyone if row["team_id"] == user_tid), None)
+        if user_row is None and user_zero_rank:
+            user_row = {
+                "rank": int(user_zero_rank),
+                "team_id": user_tid,
+                "team": team_name_map.get(user_tid, user_tid),
+                "score": 0,
+            }
+
+    previous = previous_table_ranks(previous_story)
+    stamp_rank_movement(national, previous.get("national"))
+    if user_row is not None:
+        # Outside the table both weeks is not "new": only a known earlier rank is a move.
+        stamp_rank_movement([user_row], previous.get("national"), mark_new=False)
+
+    national_table: dict[str, Any] = {
+        "type": "ranking_table",
+        "table": "national",
+        "columns": ["Rank", "Team", "Score"],
+        "rows": national,
+        "column_split": list(NATIONAL_COLUMN_SPLIT),
+    }
+    if score_caption:
+        national_table["caption"] = str(score_caption)
+    if user_row is not None:
+        national_table["user_row"] = user_row
     rich_lines: list[dict[str, Any]] = [
         {"type": "heading", "text": "National Recruit Rankings"},
-        {
-            "type": "ranking_table",
-            "columns": ["Rank", "Team", "Score"],
-            "rows": national,
-            "column_split": list(NATIONAL_COLUMN_SPLIT),
-        },
+        national_table,
     ]
 
     region_letter = (user_region_letter or "").strip().upper()
@@ -248,11 +352,13 @@ def build_recruiting_rankings_story(
             include_zeros=True,
         )
         if regional:
+            stamp_rank_movement(regional, previous.get("region"))
             rich_lines.append({"type": "gap"})
             rich_lines.append({"type": "heading", "text": f"Region {region_letter}"})
             rich_lines.append(
                 {
                     "type": "ranking_table",
+                    "table": "region",
                     "columns": ["Rank", "Team", "Score"],
                     "rows": regional,
                     "column_split": list(REGION_COLUMN_SPLIT),

@@ -34,6 +34,9 @@
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { BALL_ATTACH_OFFSET } from '../setup/markerConfig.js';
 
+// Single source for the ball's floor depth — same constant the tween paths use.
+import { BALL_DEPTH } from "./ballDepth.js";
+
 export class BallController {
   constructor(scene, ballSprite) {
     this.scene = scene;
@@ -78,7 +81,7 @@ export class BallController {
 
     // Set initial state
     this.ballSprite.setVisible(false);
-    this.ballSprite.setDepth(1000); // High depth to appear on top
+    this.ballSprite.setDepth(BALL_DEPTH); // above every player, unconditionally
     
     if (this.debug) {
       console.log('BallController: Initialized ball sprite', {
@@ -342,7 +345,19 @@ export class BallController {
 
     this.ballSprite.setPosition(x, y);
     this.ballSprite.setVisible(true);
-    this.ballSprite.setDepth(playerSprite.depth + 1);
+    // THE BALL MUST STAY ABOVE EVERY PLAYER, UNCONDITIONALLY.
+    // `playerSprite.depth + 1` was safe only because every player container sat at depth 1, so
+    // the ball landed at 2 and nothing could be above it. With depth ordering on, player depths
+    // span 100..675, so a ball pinned one above a LOW-depth carrier would be occluded by any
+    // nearer player. Taking the max keeps the old "just above my carrier" intent while making
+    // the floor the same BALL_DEPTH the two tween paths already use
+    // (ballAnimationSimple.js:183, ballTween.js:29).
+    //
+    // WITH THE FLAG OFF THIS IS NOT A BEHAVIOUR CHANGE IN THE DRAW ORDER: every player is at
+    // depth 1, so the old value was 2 and the new value is 1000 — both are above all ten
+    // players and below nothing else, so the rendered stacking is identical. It DOES change the
+    // stored number, which is why the flag-off gate asserts the rendered order, not the scalar.
+    this.ballSprite.setDepth(Math.max(BALL_DEPTH, playerSprite.depth + 1));
   }
 
   /**

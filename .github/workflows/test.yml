@@ -10,9 +10,45 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.12
+          python-version: "3.11"
       - name: Check desktop-migration ratchets
         run: python scripts/ci/check_migration_gates.py
+
+  ui-tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Check UI token colour law
+        run: python scripts/check_ui_tokens.py --strict --no-write
+
+  engine-equiv:
+    # Engine regression smoke: 60 games (14 path-coverage seeds x both footings x both
+    # arms against scripts/sim_verify/CURRENT_REFERENCE, plus 2 seeds x both arms against
+    # the loose-posture baseline in CURRENT_LOOSE_BASELINE), compared field-for-field.
+    # ~3.5 min; runs alongside the longer test job. Fails on any fingerprint difference and
+    # prints which metric moved. Never re-cut to make this green without Jamie
+    # (CLAUDE.md, "Engine regression check").
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: equiv-v3 smoke against the current reference
+        env:
+          PYTHONHASHSEED: "0"
+          GOB_DB_MODE: mongomock
+          ENVIRONMENT: test
+          MONGO_DB_NAME: gob-test
+        run: python -m scripts.sim_verify.equiv --check --smoke
 
   test:
     runs-on: ubuntu-latest
@@ -21,15 +57,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.12
+          python-version: "3.11"
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest
+        # Fully pinned (pip-compile). requirements-dev.txt = requirements.txt + pytest,
+        # mongomock. See requirements.in / requirements-dev.in.
+        run: pip install -r requirements-dev.txt
       - name: Run tests
         # Select in-memory Mongo explicitly. Missing or failed real Mongo config never
         # falls back to mongomock.

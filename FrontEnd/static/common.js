@@ -20,7 +20,11 @@ function cloneParams(params) {
 }
 
 function formatTeamName(name) {
-  return (name || '')
+  return name == null ? '' : String(name);
+}
+
+function titleCaseTeamName(name) {
+  return String(name || '')
     .toLowerCase()
     .replace(/_/g, ' ')
     .split(' ')
@@ -329,7 +333,11 @@ async function ensureTeamBuilderVisualHydratedFromFranchise(franchiseId) {
       typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl
         ? API_CONFIG.buildUrl('/franchise/command-center/data')
         : '/franchise/command-center/data';
-    var url = base + '?franchise_id=' + encodeURIComponent(franchiseId) + '&profile=1';
+    var profile = '';
+    try {
+      if (new URLSearchParams(window.location.search).get('cc_profile') === '1') profile = '&profile=1';
+    } catch (e) {}
+    var url = base + '?franchise_id=' + encodeURIComponent(franchiseId) + profile;
     var headers =
       typeof API_CONFIG !== 'undefined' && API_CONFIG.getAuthHeaders
         ? API_CONFIG.getAuthHeaders()
@@ -984,6 +992,116 @@ function generatedTeamAssetDataUrl(visual, assetKey) {
 }
 
 /**
+ * Known logo art per core slug (built once from images/teams/, 2026-10-01;
+ * tests/test_team_logo_manifest.py keeps it in sync). logo_square requests use
+ * the square when it exists, else logo_primary, else the generic square, so no
+ * request 404s. A core team with neither shows the letter tile (gobTables).
+ */
+var TEAM_LOGO_SQUARE_SLUGS = {
+  'abilene': 1, 'ada': 1, 'amariabi_international': 1, 'amarillo_tech': 1, 'ann_arbor': 1,
+  'appalachia': 1, 'archbishop_mcclellan': 1, 'austin': 1, 'austin_west': 1,
+  'barton_lutheran': 1, 'bayou_district': 1, 'bentley_truman': 1, 'berkley': 1, 'biloxi': 1,
+  'boise': 1, 'border_academy': 1, 'burroughs': 1, 'cagers_world': 1, 'cardinal_conor': 1,
+  'casino_row': 1, 'chambless_global': 1, 'chapel_hill': 1, 'circus_circus': 1,
+  'cleveland_carlysle': 1, 'columbus': 1, 'concord': 1, 'couer_dalene': 1, 'crickstown': 1,
+  'crimson_county': 1, 'crofton': 1, 'dade_academy': 1, 'deland': 1, 'desert_regional': 1,
+  'dillinger': 1, 'durham': 1, 'east_rockies': 1, 'evanston': 1, 'falls_academy': 1,
+  'four_corners': 1, 'hollywood_prep': 1, 'ida': 1, 'lancaster': 1, 'little_york': 1,
+  'morristown': 1, 'north_columbus': 1, 'ocean_city': 1, 'redwood_high': 1, 'south_lancaster': 1,
+  'templeton_wesley': 1, 'xavien': 1
+};
+
+/** Core slugs with <slug>_logo_primary.png but no logo_square. */
+var TEAM_LOGO_PRIMARY_SLUGS = {
+  'fielding': 1, 'gainesville': 1, 'garden_elites': 1, 'gp_prep_school': 1, 'grayson_ranch': 1,
+  'grizzly_academy': 1, 'grupenberg': 1, 'hana_road': 1, 'harding_central': 1,
+  'hardwood_fields': 1, 'houston_jesuit': 1, 'huntington_canyon': 1, 'hyde_methodist': 1,
+  'independence': 1, 'iowa_academy': 1, 'ivy_prep': 1, 'juneau_nome': 1, 'kenton': 1,
+  'keys_high': 1, 'knoxville': 1, 'lawrence': 1, 'lewis_catholic': 1, 'lexington': 1,
+  'long_island_methodist': 1, 'mahala_alou': 1, 'melbourne_americas': 1, 'middletex': 1,
+  'minot': 1, 'mobile': 1, 'monroe_hayes': 1, 'montpeiler': 1, 'mt_simmons': 1, 'mynsk': 1,
+  'myrtle_private': 1, 'nickel_beach': 1, 'norman': 1, 'ozark_centre': 1, 'pacific_all_stars': 1,
+  'pan_handle_limited': 1, 'pikes_prep': 1, 'providence': 1, 'queens_guard': 1,
+  'quigley_catholic': 1, 'rainier_central': 1, 'rancho_estrada': 1, 'reardon_mayes': 1,
+  'reyes_santiago': 1, 'rivers_edge': 1, 'rodeo_circuit': 1, 'sacred_heart': 1, 'salem': 1,
+  'san_jose': 1, 'seattle_aaa': 1, 'southwest_miner': 1, 'st_peters': 1, 'stormwood': 1,
+  'swoosh': 1, 'syracuse': 1, 'tallahassee': 1, 'toronto_limited': 1, 'tower_academy': 1,
+  'tri_cities_prep': 1, 'tucson': 1, 'two_rivers': 1, 'upper_peninsula': 1, 'upstate': 1,
+  'valdosta_valley': 1, 'valley_high': 1, 'vancouver': 1, 'wacker_west': 1, 'wash_u_prep': 1,
+  'washington_carver': 1, 'west_ocean_city': 1
+};
+
+/**
+ * Which logo art a team has on disk: 'square' | 'primary' | 'none' for a core
+ * program, '' for a name that is not a core asset folder (custom / unknown).
+ */
+function teamLogoArtKind(teamNameOrSlug) {
+  var slug = (teamNameOrSlug && typeof teamNameOrSlug === 'string' && teamNameOrSlug.indexOf(' ') === -1 && teamNameOrSlug.indexOf('-') === -1)
+    ? teamNameOrSlug.toLowerCase()
+    : nameToTeamSlug(teamNameOrSlug);
+  if (!slug || !CORE_TEAM_ASSET_SLUGS[slug]) return '';
+  if (TEAM_LOGO_SQUARE_SLUGS[slug]) return 'square';
+  if (TEAM_LOGO_PRIMARY_SLUGS[slug]) return 'primary';
+  return 'none';
+}
+
+/**
+ * A practice squad is not a program: it has no art, and it must never borrow another
+ * team's. Its mark is generated: the Region letter in a square, the tier name under it
+ * when the square is large enough to read (the CSS decides: `.gob-squad-mark`).
+ *
+ * `practiceSquadOf(name)` reads the squad's display name ("Region A All-Americans"), so
+ * the tier is whatever the data calls it. Returns { region, tier } or null.
+ */
+function practiceSquadOf(teamName) {
+  var match = /^Region ([A-Z]) (\S.*)$/.exec(String(teamName == null ? '' : teamName).trim());
+  if (match) return { region: match[1], tier: match[2] };
+  // A bare squad id ("ps_A_1") names the region; the tier's name is not in an id.
+  var byId = /^ps_([A-Za-z])_\d+$/.exec(String(teamName == null ? '' : teamName).trim());
+  return byId ? { region: byId[1].toUpperCase(), tier: '' } : null;
+}
+
+function _squadEsc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** The one squad mark, as markup. Every surface that can draw markup uses this. */
+function practiceSquadMarkHtml(teamName) {
+  var squad = practiceSquadOf(teamName);
+  if (!squad) return '';
+  return '<span class="gob-squad-mark" role="img" aria-label="' + _squadEsc(teamName) + '">'
+    + '<b>' + _squadEsc(squad.region) + '</b>'
+    + (squad.tier ? '<i>' + _squadEsc(squad.tier) + '</i>' : '')
+    + '</span>';
+}
+
+/**
+ * The same mark for a surface that can only take an image URL: the letter alone (an
+ * image cannot know how large it is drawn), in the page's own token colours.
+ */
+function practiceSquadMarkDataUrl(teamName) {
+  var squad = practiceSquadOf(teamName);
+  if (!squad) return '';
+  var fill = 'Canvas';
+  var ink = 'CanvasText';
+  try {
+    var host = document.querySelector('.gob') || document.documentElement;
+    var style = getComputedStyle(host);
+    fill = (style.getPropertyValue('--surface-2') || '').trim() || fill;
+    ink = (style.getPropertyValue('--text-100') || '').trim() || ink;
+  } catch (err) { /* system colours */ }
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    + '<rect width="64" height="64" rx="8" fill="' + _squadEsc(fill) + '"/>'
+    + '<text x="32" y="33" text-anchor="middle" dominant-baseline="central" font-family="sans-serif"'
+    + ' font-weight="700" font-size="40" fill="' + _squadEsc(ink) + '">' + _squadEsc(squad.region) + '</text></svg>';
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/** A practice squad has no banner or background either: nothing, never the generic art. */
+var _SQUAD_NO_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+/**
  * Filesystem team asset path (core programs). Used as the no-op pass-through.
  * Unknown / custom slugs fall back to generic art (§1: never broken).
  */
@@ -1000,6 +1118,13 @@ function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
   // IDA predates the lowercase asset-directory convention.
   var folderSlug = useSlug === 'ida' ? 'IDA' : useSlug;
   var fileSlug = useSlug === 'ida' && assetKey === 'banner_primary' ? 'IDA' : useSlug;
+  if (assetKey === 'logo_square' && useSlug !== 'general' && !TEAM_LOGO_SQUARE_SLUGS[useSlug]) {
+    // No square on disk: the primary logo, else the generic square. Never a 404.
+    if (TEAM_LOGO_PRIMARY_SLUGS[useSlug]) {
+      return '/images/teams/' + folderSlug + '/' + fileSlug + '_logo_primary.png';
+    }
+    return '/images/teams/general/general_logo_square.png';
+  }
   return '/images/teams/' + folderSlug + '/' + fileSlug + '_' + assetKey + '.' + spec.ext;
 }
 
@@ -1020,6 +1145,11 @@ function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
  * @param {object} [visualOverride] - optional overlay (e.g. mode-select multi-slot cards)
  */
 function getTeamAssetPath(teamNameOrSlug, assetKey, visualOverride) {
+  // A practice squad: its own generated mark, or no image. Never a program's art. This
+  // is the one gate every logo and banner lookup goes through.
+  if (assetKey !== 'court' && practiceSquadOf(teamNameOrSlug)) {
+    return assetKey === 'logo_square' ? practiceSquadMarkDataUrl(teamNameOrSlug) : _SQUAD_NO_IMAGE;
+  }
   // Prefer total chrome snapshot when ready — overlay entry drives generated art
   // with the display label (agreement with .team-name / Sim Exp).
   if (!visualOverride && _tbChromeSnapshotByKey && teamNameOrSlug) {
@@ -1069,7 +1199,7 @@ function getTeamCoachAssetPath(teamName, coach, visualOverride) {
   if (teamBuilderVisualMatchesName(visual, teamName) && visual.replaced_name) {
     lookupName = visual.replaced_name;
   }
-  var formatted = typeof formatTeamName === 'function' ? formatTeamName(lookupName) : lookupName;
+  var formatted = titleCaseTeamName(lookupName);
   var abbr = TEAM_COACH_ABBR[formatted] || TEAM_COACH_ABBR[lookupName];
   if (!abbr) {
     return which === 'Duke' ? '' : GENERIC_TEAM_SAMMY;
@@ -1196,18 +1326,20 @@ function resolveFranchiseLockerRoomUrl(options = {}) {
   return buildFranchiseLockerRoomUrl(franchiseId, teamId, extraParams);
 }
 
-// Canonical attribute bar color scale — see Styleguide.md ### Attribute Bar Scale
-// Do not add a fifth color tier. All values 81+ including 100+ return light blue.
+// Attribute bar colors. Pass the RAW attribute. The tier is the displayed
+// first digit (GOB_AttributeDisplay): 0–4 red, 5–6 yellow, 7–8 green, 9+ blue.
+// Do not add a fifth color. Do not pre-bucket the argument — a displayed 8
+// passed in here would be floored again.
 /**
- * @param {number} scaledValue Bucket from Math.ceil(rawAttribute / 10) for anchor storage on a 0–100+ raw scale (e.g. raw 81 → 9 → light blue). Values above 10 (raw > 100) still map to light blue.
- * @returns {string} Hex fill color for attribute / position-rating bars.
+ * @param {number} raw Raw attribute (anchor scale, uncapped). Not a 0–10 bucket.
+ * @returns {string} Hex fill color for attribute bars.
  */
-function getAttrColor(scaledValue) {
-  const s = Number(scaledValue);
-  if (!Number.isFinite(s)) return '#ff6d6d';
-  if (s >= 9) return '#4A90D9';
-  if (s >= 7) return '#34EC27';
-  if (s >= 5) return '#FFD700';
+function getAttrColor(raw) {
+  const ad = typeof window !== 'undefined' ? window.GOB_AttributeDisplay : null;
+  const tier = ad ? ad.attrTier(ad.displayAttr(raw)) : null;
+  if (tier === 'elite') return '#4A90D9';
+  if (tier === 'high') return '#34EC27';
+  if (tier === 'mid') return '#FFD700';
   return '#ff6d6d';
 }
 

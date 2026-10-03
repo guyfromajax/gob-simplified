@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from BackEnd.models.pgpc_snapshot import FranchiseContextForPGPC
 from BackEnd.pgpc_context import _team_blob_from_game_doc
+from BackEnd.utils.minutes_display import display_minutes
 
 from BackEnd.runtime_paths import bundle_path
 
@@ -719,8 +720,8 @@ def _condition_holds(
             rt = _player_rt(pid, ctx)
             if rt is None or rt < min_rt:
                 continue
-            mn = _stat_row(row, "MIN")
-            if mn <= max_min:
+            # Game MIN is seconds. max_minutes is whole minutes, same floor the box score shows.
+            if display_minutes(_stat_row(row, "MIN")) <= max_min:
                 return True
         return False
 

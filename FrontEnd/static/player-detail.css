@@ -1,3 +1,69 @@
+/* ---------- Page shell (peeled from resource-pages.css) ----------
+   Same selectors as the shared sheet so the cascade is unchanged; tokens
+   instead of literals. This page no longer loads resource-pages.css. */
+.resource-page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: var(--font-body);
+}
+
+.resource-page-container.fcc-brand-page-shell {
+  position: relative;
+  width: min(1400px, calc(100vw - 24px));
+  max-width: none;
+  margin: 12px auto 18px;
+  padding: 24px 28px 28px;
+  overflow: clip;
+  color: var(--text-100);
+}
+
+.resource-page-container.fcc-brand-page-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(160deg, var(--white-3) 0%, var(--white-1p2) 18%, transparent 40%),
+    var(--bg-page);
+  border: 1px solid var(--white-9);
+  border-radius: 24px;
+  box-shadow: 0 20px 48px var(--black-45), inset 0 1px 0 var(--white-7);
+  pointer-events: none;
+}
+
+.resource-page-container.fcc-brand-page-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: repeating-linear-gradient(
+    132deg,
+    transparent 0 102px,
+    var(--white-1p2) 102px 103px,
+    transparent 103px 208px
+  );
+  pointer-events: none;
+}
+
+.resource-page-container.fcc-brand-page-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.resource-page-container.fcc-brand-page-shell h1 {
+  color: var(--text-100);
+  font-family: var(--font-display);
+  font-size: 3rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  margin: 0 0 18px;
+}
+
+.resource-page-container h1 {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -5,9 +71,9 @@
 body.player-detail-page {
   margin: 0;
   min-height: 100vh;
-  color: #f7f9ff;
-  font-family: 'Inter', sans-serif;
-  background: #0b0d14;
+  color: var(--text-100);
+  font-family: var(--font-body);
+  background: var(--bg);
 }
 
 body.player-detail-page::before {
@@ -16,8 +82,8 @@ body.player-detail-page::before {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(var(--white-3) 1px, transparent 1px),
+    linear-gradient(90deg, var(--white-3) 1px, transparent 1px);
   background-size: 44px 44px;
   opacity: 0.18;
 }
@@ -29,7 +95,8 @@ body.player-detail-page::after {
   width: 460px;
   height: 460px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(39, 64, 142, 0.34) 0%, rgba(39, 64, 142, 0.12) 38%, transparent 72%);
+  /* Neutral corner lift (was a navy glow; navy is "yours" only). */
+  background: radial-gradient(circle, var(--white-4) 0%, var(--white-1p2) 38%, transparent 72%);
   filter: blur(12px);
   pointer-events: none;
 }
@@ -38,7 +105,7 @@ button,
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
 }
 
 .pd-shell {
@@ -50,8 +117,8 @@ input[type="reset"] {
 
 .pd-left-card {
   flex: 0 0 280px;
-  background: rgba(16, 20, 36, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--surface-1);
+  border: 1px solid var(--white-6);
   border-radius: 14px;
   padding: 20px;
   display: flex;
@@ -65,10 +132,10 @@ input[type="reset"] {
   background: transparent;
   border: 0;
   padding: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--white-55);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -77,7 +144,7 @@ input[type="reset"] {
 }
 
 .pd-back-btn:hover {
-  color: #ffffff;
+  color: var(--text-100);
   transform: translateX(-1px);
 }
 
@@ -86,14 +153,17 @@ input[type="reset"] {
   font-size: 14px;
 }
 
+/* Square, like every other player headshot. A circle cropped this to its inscribed
+   disc and threw away the shoulders. 10px is the same corner weight at 120px that
+   the 28px table badges get from 6px. */
 .pd-portrait-wrap {
   width: 120px;
   height: 120px;
   margin-top: 20px;
-  border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  border: 3px solid var(--white-12);
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,17 +186,17 @@ input[type="reset"] {
 .pd-portrait-placeholder {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  border-radius: 10px;
+  background: radial-gradient(circle at 50% 34%, var(--white-12), var(--white-4));
 }
 
 .pd-player-name {
   margin-top: 12px;
   text-align: center;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 36px;
   line-height: 1.1;
-  color: #ffffff;
+  color: var(--text-100);
   letter-spacing: 0.02em;
 }
 
@@ -135,11 +205,11 @@ input[type="reset"] {
   text-align: center;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--white-55);
 }
 
 .pd-overall {
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--black-45);
   border-radius: 10px;
   padding: 10px 24px;
   margin: 14px auto;
@@ -151,15 +221,15 @@ input[type="reset"] {
 .pd-overall-label {
   font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--white-40);
   letter-spacing: 0.08em;
 }
 
 .pd-overall-value {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 72px;
   line-height: 1;
-  color: #F79420;
+  color: var(--text-100); /* overall grade: neutral (not a save) */
 }
 
 .pd-position-ratings {
@@ -182,7 +252,7 @@ input[type="reset"] {
   text-align: center;
   border-radius: 5px;
   padding: 2px 6px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-weight: 700;
   font-size: 11px;
 }
@@ -191,7 +261,7 @@ input[type="reset"] {
   flex: 1;
   height: 5px;
   border-radius: 3px;
-  background: rgba(255,255,255,0.08);
+  background: var(--line);
 }
 
 .pd-pos-bar-fill {
@@ -203,19 +273,20 @@ input[type="reset"] {
 .pd-pos-rating-value {
   min-width: 24px;
   text-align: right;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 12px;
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 .pd-pos-rating-value.is-primary {
-  color: #F79420;
+  color: var(--text-100);
+  font-weight: 700;
 }
 
 .pd-divider {
   width: 100%;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--white-6);
   margin: 16px 0;
 }
 
@@ -227,7 +298,7 @@ input[type="reset"] {
   text-align: center;
   font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--white-35);
   letter-spacing: 0.1em;
   margin-bottom: 10px;
 }
@@ -239,7 +310,7 @@ input[type="reset"] {
 }
 
 .pd-status-cell {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--white-4);
   border-radius: 8px;
   padding: 10px 8px;
   text-align: center;
@@ -248,7 +319,7 @@ input[type="reset"] {
 .pd-status-cell-label {
   font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--white-45);
   margin-bottom: 6px;
 }
 
@@ -260,7 +331,7 @@ input[type="reset"] {
 .pd-status-value {
   font-size: 22px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-100);
   line-height: 1;
 }
 
@@ -277,7 +348,7 @@ input[type="reset"] {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--white-4);
   border-radius: 8px;
   padding: 8px 10px;
 }
@@ -285,14 +356,14 @@ input[type="reset"] {
 .pd-recruiting-label {
   font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--white-45);
   letter-spacing: 0.06em;
 }
 
 .pd-recruiting-value {
   font-size: 13px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-100);
   text-align: right;
 }
 
@@ -307,18 +378,18 @@ input[type="reset"] {
 }
 
 .pd-section {
-  background: rgba(22, 26, 42, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--surface-2);
+  border: 1px solid var(--white-6);
   border-radius: 12px;
   padding: 20px 24px;
 }
 
 .pd-section-header {
   display: block;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 20px;
-  color: #ffffff;
-  border-bottom: 2px solid #F79420;
+  color: var(--text-100);
+  border-bottom: 2px solid var(--white-28);
   padding-bottom: 6px;
   margin-bottom: 16px;
   letter-spacing: 0.03em;
@@ -345,7 +416,7 @@ input[type="reset"] {
 .pd-attribute-label {
   min-width: 24px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--white-50);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -354,7 +425,7 @@ input[type="reset"] {
   flex: 1;
   height: 8px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--line);
   overflow: hidden;
 }
 
@@ -369,7 +440,7 @@ input[type="reset"] {
   min-width: 28px;
   text-align: right;
   font-size: 12px;
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 .pd-scouting-body {
@@ -381,7 +452,7 @@ input[type="reset"] {
   margin: 0;
   font-size: 14px;
   line-height: 1.65;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--text-87);
   text-align: left;
 }
 
@@ -389,14 +460,14 @@ input[type="reset"] {
   margin: 0;
   font-size: 14px;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.22);
+  color: var(--white-22);
   text-align: center;
 }
 
 .pd-placeholder {
   font-size: 14px;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.22);
+  color: var(--white-22);
 }
 
 .pd-table-wrap {
@@ -411,9 +482,9 @@ input[type="reset"] {
 
 .pd-career-table th {
   padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--line);
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--white-45);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   text-align: left;
@@ -426,21 +497,21 @@ input[type="reset"] {
 
 .pd-career-table td {
   padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--white-4);
   font-size: 13px;
-  color: #ffffff;
+  color: var(--text-100);
 }
 
 .pd-career-table tr.pd-current-season td {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--white-4);
 }
 
 .pd-season-cell {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--white-70);
 }
 
 .pd-team-cell {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--white-70);
   font-weight: 600;
 }
 
@@ -455,27 +526,27 @@ input[type="reset"] {
 
 .pd-loading {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--white-45);
 }
 
 .pd-error-card {
-  background: rgba(22, 26, 42, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--surface-2);
+  border: 1px solid var(--white-6);
   border-radius: 12px;
   padding: 24px 28px;
 }
 
 .pd-error-title {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 24px;
-  color: #ff6d6d;
+  color: var(--red);
   letter-spacing: 0.03em;
   margin-bottom: 8px;
 }
 
 .pd-error-copy {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--white-70);
   margin-bottom: 16px;
 }
 
@@ -525,5 +596,5 @@ input[type="reset"] {
 .pd-attitude-line { margin-top: 6px; font-size: 20px; line-height: 1; }
 .pd-dev-grid { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .pd-dev-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.pd-dev-key { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255, 255, 255, .5); }
-.pd-dev-val { font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: .02em; color: #fff; }
+.pd-dev-key { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--white-50); }
+.pd-dev-val { font-family: var(--font-display); font-size: 18px; letter-spacing: .02em; color: var(--text-100); }

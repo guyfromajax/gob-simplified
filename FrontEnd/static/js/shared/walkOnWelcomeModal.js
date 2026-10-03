@@ -63,7 +63,8 @@ function cloneParams(params) {
       + '.afm-overlay.is-visible,'
       + '.gob-talert-overlay,'
       + '.sammy-modal-backdrop.open,'
-      + '.bn-overlay.show'
+      + '.bn-overlay.show,'
+      + '.mm-scrim.is-open'
     ));
   }
 
@@ -91,13 +92,9 @@ function cloneParams(params) {
     return Math.floor(raw / 12) + "'" + (raw % 12) + '"';
   }
 
-  // Roster page shows attributes on the 0-10 scale and prefers the anchor value.
   function formatAttr(attrs, key) {
-    var raw = (attrs || {})['anchor_' + key];
-    if (raw == null || raw === '') raw = (attrs || {})[key];
-    if (raw == null || raw === '') return '--';
-    var num = Number(raw);
-    return Number.isNaN(num) ? '--' : Math.floor(num / 10);
+    var d = window.GOB_AttributeDisplay.displayAttr(window.GOB_AttributeDisplay.rawAttr(attrs, key));
+    return d == null ? '--' : d;
   }
 
   /** Current/potential as letter grades — the pair the roster and pool already show. */
@@ -226,7 +223,7 @@ function cloneParams(params) {
         modalClass: 'is-wide',
         primaryClass: 'is-orange',
         onCta: function () {
-          var card = document.getElementById('home-locker-room-body');
+          var card = document.getElementById('office-root') || document.getElementById('home-locker-room-body');
           if (!card) return;
           var homeTab = document.querySelector('[data-tab="home-tab"]');
           if (homeTab && !document.getElementById('home-tab').classList.contains('active')) {
@@ -245,5 +242,57 @@ function cloneParams(params) {
     });
   }
 
-  window.WalkOnWelcomeModal = { maybeShow: maybeShow };
+  function labeledEyebrow(queue, eyebrow) {
+    return (window.MomentQueue && window.MomentQueue.queueLabel)
+      ? window.MomentQueue.queueLabel(queue, eyebrow)
+      : eyebrow;
+  }
+
+  function showFromQueue(data, queue) {
+    return new Promise(function (resolve) {
+      var payload = data && data.walk_on_welcome_modal;
+      var walkOns = payload && payload.walk_ons ? payload.walk_ons : [];
+      if (presented || !payload || !payload.eligible || !walkOns.length) {
+        resolve();
+        return;
+      }
+      presented = true;
+      ensureStylesheetLoaded();
+      var fid = franchiseId();
+      Promise.all([
+        import('/js/shared/sammyModal.js'),
+        import('/js/shared/teamCoachAsset.js'),
+      ]).then(function (loaded) {
+        loaded[0].showSammyModal({
+          eyebrow: labeledEyebrow(queue, 'Season ' + (payload.season || '')),
+          body: buildBody(walkOns),
+          ctaLabel: 'Go To Locker Room',
+          imageSrc: loaded[1].getTeamSammyImage(data.team || ''),
+          modalClass: 'is-wide',
+          primaryClass: 'is-orange',
+          onCta: function () {
+            var card = document.getElementById('office-root') || document.getElementById('home-locker-room-body');
+            if (card) {
+              var homeTab = document.querySelector('[data-tab="home-tab"]');
+              if (homeTab && !document.getElementById('home-tab').classList.contains('active')) {
+                homeTab.click();
+              }
+              card.scrollIntoView({
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                  ? 'auto' : 'smooth',
+                block: 'center',
+              });
+            }
+            resolve();
+          },
+        });
+        return markSeen(fid);
+      }).catch(function (err) {
+        console.error('[WalkOnWelcomeModal] failed to show:', err);
+        resolve();
+      });
+    });
+  }
+
+  window.WalkOnWelcomeModal = { maybeShow: maybeShow, showFromQueue: showFromQueue };
 })();

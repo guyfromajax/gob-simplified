@@ -78,6 +78,7 @@
     function close() {
       overlay.classList.remove('is-entered');
       setTimeout(function () { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }, 200);
+      if (typeof overlay._onQueueClose === 'function') overlay._onQueueClose();
     }
     overlay.addEventListener('click', function (e) {
       if (e.target && e.target.hasAttribute('data-dismiss')) {
@@ -97,17 +98,22 @@
     overlay.classList.add('is-visible');
     void overlay.offsetWidth;
     overlay.classList.add('is-entered');
+    return overlay;
   }
 
-  function present(leadKey) {
+  function present(leadKey, onClose) {
     ensureBadgeScript().then(function () {
-      if (!window.GOBArchetype) return;
+      if (!window.GOBArchetype) {
+        if (typeof onClose === 'function') onClose();
+        return;
+      }
       window.GOBArchetype.ensureManifest().then(function (m) {
         var meta = null;
         if (m && Array.isArray(m.archetypes)) {
           meta = m.archetypes.filter(function (a) { return a.id === leadKey; })[0] || null;
         }
-        buildModal(meta, leadKey);
+        var overlay = buildModal(meta, leadKey);
+        if (overlay && typeof onClose === 'function') overlay._onQueueClose = onClose;
       });
     });
   }
@@ -120,19 +126,33 @@
     });
   }
 
-  // Called once by the FCC orchestrator after the modal sequence settles.
-  // `competing` = a higher-priority modal claimed this visit.
+  // Legacy entry. If a higher-priority modal owns the visit, leave the
+  // pending flag so the queue can show it next time.
   function run(competing) {
     if (ran) return;
-    ran = true;
     withMe(function (me) {
       var key = me && me.archetype_evolution_pending;
-      if (!key) return;          // nothing pending
-      clearPending(me);          // consume regardless of shown/skipped (skip-permanently)
-      if (competing) return;     // a higher-priority modal owns this visit → skip
+      if (!key) return;
+      if (competing) return;
+      ran = true;
+      clearPending(me);
       present(key);
     });
   }
 
-  window.ArchetypeEvolutionModal = { run: run };
+  function showFromQueue(leadKey, queue) {
+    return new Promise(function (resolve) {
+      if (ran || !leadKey) {
+        resolve();
+        return;
+      }
+      ran = true;
+      withMe(function (me) {
+        clearPending(me);
+        present(leadKey, resolve);
+      });
+    });
+  }
+
+  window.ArchetypeEvolutionModal = { run: run, showFromQueue: showFromQueue };
 })();

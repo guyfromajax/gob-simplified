@@ -56,7 +56,7 @@ export function getOrStartFranchiseStartCpuSims(payload) {
     });
   }
 
-  const promise = fetch(API.buildUrl('/franchise/complete-week/start-cpu-sims'), {
+  const promise = API.fetchWithRateLimitRetry(API.buildUrl('/franchise/complete-week/start-cpu-sims'), {
     method: 'POST',
     headers,
     body: JSON.stringify({

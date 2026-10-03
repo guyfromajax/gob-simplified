@@ -755,6 +755,32 @@ def autoset_lineup_player_ids_from_payload(
 PREGAME_STATE = {"quarter": 1, "time_remaining": 480}
 
 
+def _apply_stored_player_name(data: dict) -> None:
+    """Give a Player payload the name parts the stored document actually has.
+
+    Franchise recruits and practice-squad slots store one ``name`` string
+    (``"Clinton Vang"``) and no ``first_name`` / ``last_name``. ``Player``
+    requires the two keys. This is the same first-space split used when a
+    recruit is signed onto a roster. A document with no name stays blank —
+    nothing is invented. Callers pass a copy; the response payload is unchanged.
+    """
+    if "first_name" in data and "last_name" in data:
+        return
+    if "first_name" in data or "last_name" in data:
+        data.setdefault("first_name", "")
+        data.setdefault("last_name", "")
+        return
+    raw = data.get("name")
+    text = raw.strip() if isinstance(raw, str) else ""
+    if not text:
+        data["first_name"] = ""
+        data["last_name"] = ""
+        return
+    parts = text.split(" ", 1)
+    data["first_name"] = parts[0]
+    data["last_name"] = parts[1] if len(parts) > 1 else ""
+
+
 def projected_starting_five_from_payload(players_payload: List[dict]) -> Dict[str, str]:
     """The five that AUTOSET WOULD FIELD AT TIP -> { PG/SG/...: player_id }.
 
@@ -802,6 +828,7 @@ def projected_starting_five_from_payload(players_payload: List[dict]) -> Dict[st
             # carry ``player_id`` only (e.g. training report) seat unmappable ids and
             # the display five renders empty.
             data["_id"] = pid_s
+        _apply_stored_player_name(data)
         players.append(Player(data))
 
     if not players:

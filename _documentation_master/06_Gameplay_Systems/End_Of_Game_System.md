@@ -268,7 +268,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
   - Box Score path: `box-score.js` uses the already-loaded `gameData`.
 - Feed builder: `PageLoadOverlay.buildPostgameStatFeed(gameDoc, { userTeamSide })`. Feed entries include the stat line and the player's team context.
 - Ordering: user team first, opponent second; within each team, players are sorted by points scored descending, then minutes played descending when points are tied.
-- Eligibility: only players with more than 0 displayed minutes are included (`MIN` seconds floored to whole minutes).
+- Eligibility: only players with more than 0 displayed minutes are included (`MIN` seconds floored to whole minutes). This is game-level display only; season/career GP and MIN rules are in `Box_Score_System.md` §5.
 - Line format: `{Player Name} (#{jersey}): {points} points, {non-zero TREB/AST/STL/BLK}, {minutes} minutes played, DEF: {defPct}%`.
 - Rebounds use **TREB = DREB + OREB**. Points are always shown, including `0 points`; all other zero stats are omitted.
 - DEF uses `DEF_S / DEF_A * 100`, rounded to a whole percent; players with no defensive attempts show `DEF: -`.

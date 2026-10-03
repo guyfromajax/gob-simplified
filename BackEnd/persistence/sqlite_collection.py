@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
+import os
 import sqlite3
 import threading
+import time
 from datetime import datetime
 from typing import Any
 
 from bson import ObjectId
+
+logger = logging.getLogger(__name__)
 from pymongo.results import (
     BulkWriteResult,
     DeleteResult,
@@ -62,10 +67,28 @@ def decode_doc(raw: str) -> dict[str, Any]:
     return json.loads(raw, object_hook=_hook)
 
 
-def _safe_json_path(field: str) -> str | None:
-    if not field or "." in field or not field.isidentifier():
+def _json_path_component(part: str) -> str | None:
+    """One JSON-path key. Box-score names like ``3PTM`` are quoted."""
+    if not part:
         return None
-    return f"$.{field}"
+    if part.isidentifier():
+        return part
+    if all(ch.isalnum() or ch == "_" for ch in part):
+        return f'"{part}"'
+    return None
+
+
+def _safe_json_path(field: str) -> str | None:
+    if not field:
+        return None
+    parts = field.split(".")
+    rendered: list[str] = []
+    for part in parts:
+        piece = _json_path_component(part)
+        if piece is None:
+            return None
+        rendered.append(piece)
+    return "$." + ".".join(rendered)
 
 
 def inclusion_projection_fields(projection: dict[str, Any] | None) -> list[str] | None:
@@ -84,6 +107,22 @@ def inclusion_projection_fields(projection: dict[str, Any] | None) -> list[str] 
     if not fields or any(_safe_json_path(field) is None for field in fields):
         return None
     return fields
+
+
+def _assign_projected(doc: dict[str, Any], field: str, value: Any) -> None:
+    """Match Mongo's dotted inclusion shape: ``season.GP`` nests under ``season``."""
+    if "." not in field:
+        doc[field] = value
+        return
+    cursor = doc
+    parts = field.split(".")
+    for part in parts[:-1]:
+        child = cursor.get(part)
+        if not isinstance(child, dict):
+            child = {}
+            cursor[part] = child
+        cursor = child
+    cursor[parts[-1]] = value
 
 
 def _extracted_value(raw: Any) -> Any:
@@ -132,9 +171,9 @@ class SqliteCollection:
     """One JSON1 table with generated-column indexes for hot equality filters.
 
     Queries that compile to ``id`` / ``g_franchise_id`` / ``g_player_id`` /
-    ``g_team_id`` are index seeks. Everything else still full-scans. Python
-    ``match_query`` always re-checks decoded rows so a SQL miss is never a
-    correctness miss.
+    ``g_team_id`` / ``g_week`` (equality, ``$in``, or ``$gt``/``$gte``/``$lt``/
+    ``$lte``) are pushed to SQL. Everything else still full-scans. When the
+    filter is not fully compiled, ``match_query`` re-checks decoded rows.
     """
 
     def __init__(
@@ -173,6 +212,7 @@ class SqliteCollection:
         *,
         one: bool = False,
         projection: dict[str, Any] | None = None,
+        natural_order: bool = False,
     ) -> list[tuple[str, dict[str, Any]]]:
         """Decode only the rows SQL can narrow to; residual-match in Python.
 
@@ -189,6 +229,8 @@ class SqliteCollection:
         fully = filter_fully_compiled(filt)
         limit_sql = one and fully
         fields = inclusion_projection_fields(projection) if fully else None
+        log_query = os.environ.get("GOB_SQLITE_QUERY_LOG") == "1"
+        started = time.perf_counter() if log_query else 0.0
         with self._lock:
             if compiled is None:
                 where_sql = ""
@@ -203,6 +245,10 @@ class SqliteCollection:
                 sql = f'SELECT id, {extracts} FROM "{self.name}"{where_sql}'
             else:
                 sql = f'SELECT id, doc FROM "{self.name}"{where_sql}'
+            # Full-table aggregate walks rowid order. An index seek does not.
+            # Leaders ties keep that scan order.
+            if natural_order and not limit_sql:
+                sql += " ORDER BY rowid"
             if limit_sql:
                 sql += " LIMIT 1"
             cur = self._conn.execute(sql, params)
@@ -210,11 +256,11 @@ class SqliteCollection:
             if fields:
                 for row in cur:
                     row_id = row[0]
-                    doc = {
-                        field: value
-                        for field, raw in zip(fields, row[1:])
-                        if (value := _extracted_value(raw)) is not None
-                    }
+                    doc = {}
+                    for field, raw in zip(fields, row[1:]):
+                        value = _extracted_value(raw)
+                        if value is not None:
+                            _assign_projected(doc, field, value)
                     matched.append((row_id, doc))
                     if one:
                         break
@@ -225,6 +271,17 @@ class SqliteCollection:
                         matched.append((row_id, doc))
                         if one:
                             break
+        if log_query:
+            logger.warning(
+                "[SQLITE-QUERY] coll=%s ms=%.1f rows=%s fully=%s decoded=%s filter=%s proj=%s",
+                self.name,
+                (time.perf_counter() - started) * 1000,
+                len(matched),
+                fully,
+                not bool(fields),
+                filt,
+                list(projection) if isinstance(projection, dict) else None,
+            )
         return matched
 
     def _rows(self) -> list[tuple[str, dict[str, Any]]]:
@@ -270,7 +327,62 @@ class SqliteCollection:
             cursor.limit(kwargs["limit"])
         return cursor
 
-    def find_one(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None):
+    def find_in_natural_order(self, filter: dict[str, Any] | None = None, projection: dict[str, Any] | None = None):
+        """Match order of an aggregate ``$match`` with no ``$sort`` (rowid scan)."""
+        projected = inclusion_projection_fields(projection) if filter_fully_compiled(filter) else None
+        matched = [
+            copy.deepcopy(doc)
+            for _row_id, doc in self._select(filter, projection=projection, natural_order=True)
+        ]
+        if projection and not projected:
+            matched = [project_doc(doc, projection) for doc in matched]
+        return SqliteCursor(matched)
+
+    def projected_tuples(
+        self,
+        filt: dict[str, Any],
+        fields: list[str],
+        *,
+        natural_order: bool = False,
+    ) -> list[tuple]:
+        """Scalar JSON extracts in scan order. Skips document decode."""
+        compiled = compile_filter(filt)
+        if compiled is None or not fields or any(_safe_json_path(field) is None for field in fields):
+            raise ValueError("projected_tuples requires a compiled filter and safe paths")
+        where, params = compiled
+        extracts = ", ".join(f"json_extract(doc, '{_safe_json_path(field)}')" for field in fields)
+        order = " ORDER BY rowid" if natural_order else ""
+        sql = f'SELECT {extracts} FROM "{self.name}" WHERE {where}{order}'
+        with self._lock:
+            return list(self._conn.execute(sql, params))
+
+    def upsert_owned(self, doc: dict[str, Any]) -> None:
+        """Replace one document by ``_id`` without copying it first."""
+        self._require_write()
+        if "_id" not in doc:
+            doc["_id"] = ObjectId()
+        row_id = encode_id(doc["_id"])
+        payload = encode_doc(doc)
+        with self._lock:
+            self._conn.execute(
+                f'INSERT OR REPLACE INTO "{self.name}" (id, doc) VALUES (?, ?)',
+                (row_id, payload),
+            )
+        self._commit()
+
+    def find_one(
+        self,
+        filter: dict[str, Any] | None = None,
+        projection: dict[str, Any] | None = None,
+        sort: list | None = None,
+    ):
+        """One document. ``sort`` matches ``find(...).sort(...).limit(1)``.
+
+        Unsorted ``find_one`` keeps the SQL ``LIMIT 1`` seek. A sort has to
+        order every match first, so it cannot limit in SQL before ordering.
+        """
+        if sort:
+            return next(iter(self.find(filter, projection, sort=sort, limit=1)), None)
         projected = inclusion_projection_fields(projection) if filter_fully_compiled(filter) else None
         for _row_id, doc in self._select(filter, one=True, projection=projection):
             out = copy.deepcopy(doc)
@@ -399,7 +511,9 @@ class SqliteCollection:
         result = self.update_one(filter, update, upsert=bool(kwargs.get("upsert")))
         if result.matched_count == 0 and result.upserted_id is None:
             return None
-        if kwargs.get("return_document") and str(kwargs.get("return_document")).endswith("AFTER"):
+        # pymongo's ReturnDocument.AFTER is the bool True.
+        after = kwargs.get("return_document")
+        if after is True or (after and str(after).endswith("AFTER")):
             return self.find_one(filter) or self.find_one({"_id": result.upserted_id})
         return doc
 

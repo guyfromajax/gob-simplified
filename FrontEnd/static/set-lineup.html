@@ -1,17 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Set Lineup</title>
-<link rel="stylesheet" href="/resource-pages.css" />
+<link rel="stylesheet" href="/css/gob-tokens.css" />
+  <link rel="stylesheet" href="/resource-pages.css" />
   <link rel="stylesheet" href="/set-lineup.css" />
   <link rel="stylesheet" href="/css/rt-buckets.css" />
   <link rel="stylesheet" href="/css/playbook-cmd.css" />
@@ -21,7 +23,7 @@
 </head>
 <body class="set-lineup-page">
   <!-- Page load overlay: hides stale/incomplete lineup until data and UI are ready -->
-  <div id="page-load-overlay" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
+  <div id="page-load-overlay" class="gob-scope" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:var(--bg);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
     <img src="/images/loader1.gif" alt="Loading…" style="width:240px;height:auto;max-width:90vw;">
   </div>
   <!-- Google Tag Manager (noscript) -->
@@ -55,7 +57,8 @@
       <div id="lineup-tier-emblem" class="lineup-tier-emblem" aria-hidden="true"></div>
 
       <div class="context-actions">
-        <button id="play-now" class="lineup-btn lineup-btn-green disabled" type="button">Play Game</button>
+        <button id="sim-now" class="lineup-btn lineup-btn-ghost disabled" type="button">Sim Game</button>
+        <button id="play-now" class="lineup-btn lineup-btn-advance disabled" type="button">Play Game</button>
       </div>
     </section>
 
@@ -79,12 +82,15 @@
                     <tr>
                       <th data-sort="POS" style="width:42px">POS</th>
                       <th class="hs-col" style="width:32px"></th>
-                      <th class="l" data-sort="PLAYER" style="width:172px">PLAYER</th>
+                      <th class="l" data-sort="PLAYER" style="width:142px">PLAYER</th>
                       <th class="l eng-col" data-sort="ENG">ENG</th>
-                      <th class="prod-col" aria-label="Production"></th>
+                      <th class="prod-head" style="width:28px">PTS</th>
+                      <th class="prod-head" style="width:28px">REB</th>
+                      <th class="prod-head" style="width:28px">AST</th>
+                      <th class="prod-head" style="width:34px">DEF%</th>
                       <th class="attr-label" data-attr="RT" data-sort="RT" style="width:46px">RT</th>
                       <th data-sort="F" style="width:36px">F</th>
-                      <th data-sort="MIN" style="width:48px">MIN</th>
+                      <th data-sort="MIN" style="width:44px">MIN</th>
                       <th data-sort="MO" style="width:74px">MO</th>
                       <th class="rm-col" style="width:30px"></th>
                     </tr>
@@ -163,7 +169,7 @@
         <section class="lineup-weights-section">
           <div id="lineup-shot-weights" class="lineup-shot-weights"></div>
           <div class="lineup-rail-actions">
-            <button id="autoset-lineup" class="lineup-btn lineup-btn-orange autoset-lineup-btn" type="button">Autoset Lineup</button>
+            <button id="autoset-lineup" class="lineup-btn lineup-btn-neutral autoset-lineup-btn" type="button">Autoset Lineup</button>
             <div class="roster-panel-actions">
               <button id="gameplan-optional" class="lineup-btn lineup-btn-ghost" type="button">Game Plan</button>
               <button id="playbooks-button" class="lineup-btn lineup-btn-ghost" type="button">Playbooks</button>
@@ -197,12 +203,13 @@
       <div class="lineup-modal-body exhausted-lineup-body">
         <h2 id="exhausted-lineup-title">Lineup Set</h2>
         <p>You have 8 or more players fouled out. A legal lineup will be randomly set for you.</p>
-        <button id="exhausted-lineup-got-it" class="lineup-btn lineup-btn-green" type="button">Got It</button>
+        <button id="exhausted-lineup-got-it" class="lineup-btn lineup-btn-neutral" type="button">Got It</button>
       </div>
     </div>
   </div>
 
   <div id="toast" hidden></div>
+  <script src="/js/utils/attributeDisplay.js"></script>
   <script src="/common.js"></script>
   <script src="/js/shared/playbookTeamId.js"></script>
   <script src="/js/shared/timeoutNavigationHelper.js"></script>

@@ -7,6 +7,7 @@ singleton. The adapter never imports or draws from ``random``.
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 import sys
@@ -43,6 +44,8 @@ from BackEnd.persistence.sqlite_schema import (
 )
 
 
+logger = logging.getLogger(__name__)
+
 LOCAL_COLLECTIONS: tuple[str, ...] = (
     "players",
     "teams",
@@ -51,6 +54,8 @@ LOCAL_COLLECTIONS: tuple[str, ...] = (
     "franchise_state",
     "franchise_team_data",
     "franchise_players_data",
+    "leaders_snapshots",
+    "standings_snapshots",
     "franchise_recruits_data",
     "training_sessions",
     "press_conference_sessions",
@@ -83,6 +88,8 @@ _COLLECTION_BINDINGS: tuple[tuple[str, str], ...] = (
     ("franchises_collection", "franchises"),
     ("franchise_team_data_collection", "franchise_team_data"),
     ("franchise_players_data_collection", "franchise_players_data"),
+    ("leaders_snapshots_collection", "leaders_snapshots"),
+    ("standings_snapshots_collection", "standings_snapshots"),
     ("franchise_recruits_data_collection", "franchise_recruits_data"),
     ("plays_collection", "plays"),
     ("defenses_collection", "defenses"),
@@ -278,8 +285,18 @@ class SqliteStore:
             if remote_db is not None:
                 eog = remote_db["eog_band_log"]
             else:
-                import mongomock
-                eog = mongomock.MongoClient()["gob-eog-memory"]["eog_band_log"]
+                # mongomock is a dev dependency (requirements-dev.txt). An opted-in
+                # desktop build without it keeps running and simply doesn't log.
+                try:
+                    import mongomock
+                except ImportError:
+                    logger.warning(
+                        "[EOG-BAND] GOB_EOG_BAND_ENABLED is set but mongomock is not installed "
+                        "(dev dependency); EOG band logging is disabled for this session."
+                    )
+                    eog = NullCollection("eog_band_log")
+                else:
+                    eog = mongomock.MongoClient()["gob-eog-memory"]["eog_band_log"]
         else:
             eog = NullCollection("eog_band_log")
 
@@ -474,6 +491,10 @@ class SqliteStore:
         either = {"franchise_id": {"$in": [oid, sid]}}
         self.franchise_team_data_collection.delete_many({"franchise_id": oid})
         self.franchise_players_data_collection.delete_many({"franchise_id": sid})
+        self.leaders_snapshots_collection.delete_one({"_id": sid})
+        self.leaders_snapshots_collection.delete_one({"_id": f"meta:{sid}"})
+        self.standings_snapshots_collection.delete_one({"_id": sid})
+        self.standings_snapshots_collection.delete_one({"_id": f"meta:{sid}"})
         self.franchise_recruits_data_collection.delete_many({"franchise_id": sid})
         self.games_collection.delete_many({"franchise_id": sid})
         self.press_conference_sessions_collection.delete_many(either)
@@ -512,6 +533,13 @@ class SqliteStore:
 
     def ensure_users_username_index(self) -> None:
         return None
+
+    # users / alpha_otps are REMOTE collections on desktop (hosted Mongo owns them).
+    def ensure_users_email_index(self) -> bool:
+        return False
+
+    def ensure_alpha_otps_code_index(self) -> bool:
+        return False
 
     def ensure_tutorial_game_ttl_index(self) -> None:
         return None

@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Minimal Electron shell for a local GOB franchise (WS-4).",
+  "productName": "Geeked-Out Basketball",
   "main": "main.js",
   "scripts": {
     "start": "env -u ELECTRON_RUN_AS_NODE electron .",
-    "pack": "env -u ELECTRON_RUN_AS_NODE electron-packager . GOB --platform=darwin --out=out --overwrite --prune"
+    "pack": "env -u ELECTRON_RUN_AS_NODE node pack.js"
   },
   "engines": {
     "node": ">=18"

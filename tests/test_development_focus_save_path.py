@@ -134,8 +134,8 @@ def test_the_failure_handler_is_thens_second_argument():
 def test_toast_timer_is_declared():
     """The specific regression: an unrelated edit deleted this line, and 'use strict' turned
     the read into a ReferenceError on every single successful save."""
-    assert "var toastTimer = null;" in SRC
-    assert SRC.index("var toastTimer") < SRC.index("if (toastTimer)")
+    assert "var savedTimer = null;" in SRC
+    assert SRC.index("var savedTimer") < SRC.index("if (savedTimer)")
 
 
 def test_post_save_side_effects_are_individually_guarded():

@@ -14,8 +14,8 @@ const path = require('path');
 
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
-const CSS = read('recruiting-spine.css') + read('recruiting-signing.css') + read('css/attr-tiles.css');
-const SCRIPTS = ['js/shared/franchiseContext.js', 'common.js', 'js/shared/attrTiles.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js',
+const CSS = read('css/gob-tokens.css') + read('recruiting-spine.css') + read('recruiting-signing.css') + read('css/attr-tiles.css');
+const SCRIPTS = ['js/shared/franchiseContext.js', 'common.js', 'js/utils/attributeDisplay.js', 'js/shared/attrTiles.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js',
   'recruiting-common.js', 'recruiting-spine.js'].map(read);
 const HUB = read('recruiting-hub.js');
 
@@ -69,6 +69,7 @@ async function mount(page, o = {}) {
   await page.setContent(`
     <style>${CSS}</style><style>body{margin:0}.doc{max-width:1440px;margin:0 auto;padding:16px}</style>
     <div class="doc"><a id="back-btn" href="#"></a><div id="hub-root" class="spine"></div></div>`);
+  await page.evaluate(() => document.documentElement.classList.add('gob'));
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
   await page.evaluate(({ data }) => {
     window.__writes = [];
@@ -349,6 +350,39 @@ test.describe('pre-flight warnings', () => {
     });
     const txt = await railText(page);
     expect(txt).toContain('2 recruits funded but only 1 roster spot');
+  });
+
+  test('one funded recruit with no roster spot reads in the singular', async ({ page }) => {
+    await mount(page, {
+      capacity: { roster_spots: 0, scholarships: 0, roster_cap: 15, roster_used: 15 },
+      savedEntries: [{ id: 'r-0', points: 3, playing_time: false }],
+    });
+    const txt = await railText(page);
+    expect(txt).toContain('1 recruit funded but only 0 roster spots');
+    expect(txt).not.toContain('1 recruits');
+  });
+
+  test('one point over budget reads in the singular', async ({ page }) => {
+    await mount(page, { savedEntries: [{ id: 'r-0', points: 51, playing_time: false }] });
+    // TL_SHOTS=before|after: the rail for reports/tables-league (S7). Before skips the guard.
+    const shots = process.env.TL_SHOTS || '';
+    if (shots) {
+      const out = path.join(__dirname, '../../reports/tables-league');
+      fs.mkdirSync(out, { recursive: true });
+      for (const width of [1280, 1920]) {
+        await page.setViewportSize({ width: width, height: width === 1280 ? 720 : 1080 });
+        await page.locator('#sign-rail').screenshot({ path: path.join(out, shots + '-s07-over-budget-' + width + '.png') });
+      }
+      if (shots === 'before') return;
+    }
+    const txt = await railText(page);
+    expect(txt).toContain('1 point over budget');
+    expect(txt).not.toContain('1 points');
+  });
+
+  test('two points over budget reads in the plural', async ({ page }) => {
+    await mount(page, { savedEntries: [{ id: 'r-0', points: 52, playing_time: false }] });
+    expect(await railText(page)).toContain('2 points over budget');
   });
 
   test('a clean board says so rather than showing an empty panel', async ({ page }) => {

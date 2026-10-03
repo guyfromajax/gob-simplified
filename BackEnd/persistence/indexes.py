@@ -6,8 +6,53 @@ facade therefore invokes these helpers with those names so tests keep working.
 
 from __future__ import annotations
 
+import logging
 import sys
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
+AUTH_DUPES_HINT = (
+    "Run scripts/ops/check_auth_dupes.py against this database, resolve the "
+    "duplicates by hand, then redeploy/restart to create the index."
+)
+
+
+def _ensure_unique_or_warn(collection: Any, keys: list, name: str, label: str) -> bool:
+    """Create a unique index; on failure log one WARNING and carry on (never raise).
+
+    Duplicate data (E11000) must not take the app down: the index simply isn't
+    enforced until the data is cleaned. Returns True when the index is in place.
+    """
+    try:
+        collection.create_index(keys, unique=True, name=name)
+        return True
+    except Exception as e:
+        code = getattr(e, "code", None)
+        text = str(e)
+        if code == 11000 or "E11000" in text or "duplicate key" in text.lower():
+            msg = f"[DB] unique index {label} NOT created: duplicate values exist. {AUTH_DUPES_HINT} ({text[:200]})"
+        else:
+            msg = f"[DB] unique index {label} NOT created: {type(e).__name__}: {text[:200]}"
+        logger.warning(msg)
+        print(f"⚠️ {msg}", file=sys.stderr, flush=True)
+        return False
+
+
+def ensure_users_email_index(*, client: Any, users_collection: Any) -> bool:
+    """Unique index on users.email (stored lower-cased by signup; one account per email)."""
+    if not client:
+        return False
+    return _ensure_unique_or_warn(users_collection, [("email", 1)], "email_unique", "users.email")
+
+
+def ensure_alpha_otps_code_index(*, client: Any, alpha_otps_collection: Any) -> bool:
+    """Unique index on alpha_otps.otp_code (codes are stored upper-cased)."""
+    if not client:
+        return False
+    return _ensure_unique_or_warn(
+        alpha_otps_collection, [("otp_code", 1)], "otp_code_unique", "alpha_otps.otp_code"
+    )
 
 
 def ensure_ftd_index(*, client: Any, franchise_team_data_collection: Any) -> None:

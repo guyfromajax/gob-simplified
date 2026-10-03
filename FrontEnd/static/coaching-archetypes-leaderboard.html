@@ -1,94 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
+  <link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/gtm-loader.js"></script>
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Coaching Archetypes Leaderboard - Geeked Out Basketball</title>
 <link rel="stylesheet" href="/css/auth-bar.css">
-  <style>
-    :root { --bebas: 'Bebas Neue Pro', 'Bebas Neue', sans-serif; --inter: 'Inter', sans-serif; --orange: #F79420; }
-    body {
-      font-family: var(--inter); margin: 0; padding: 92px 20px 80px; color: #fff; line-height: 1.5;
-      background: radial-gradient(1200px 620px at 50% -12%, #243049 0%, rgba(36,48,73,0) 60%), #0d1018;
-      min-height: 100vh;
-    }
-    .alb { max-width: 1080px; margin: 0 auto 20px; }
-    .alb-back {
-      display: inline-block; margin-bottom: 14px; font-size: 13px; font-weight: 600;
-      color: rgba(255,255,255,0.5); text-decoration: none;
-    }
-    .alb-back:hover { color: #fff; }
-    .alb-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
-    .alb-title { font-family: var(--bebas); font-weight: 700; font-size: 40px; letter-spacing: 0.04em; margin: 0; }
-    .alb-ca-link {
-      display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
-      font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.5); text-decoration: none;
-    }
-    .alb-ca-link:hover { color: #fff; }
-    .alb-ca-link .arrow { transition: transform 0.14s ease; }
-    .alb-ca-link:hover .arrow { transform: translateX(2px); }
-    .alb-intro { margin: 0 0 26px; color: rgba(255,255,255,0.55); font-size: 14px; }
-
-    .alb-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
-    @media (max-width: 880px) { .alb-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-    @media (max-width: 560px) { .alb-grid { grid-template-columns: 1fr; } }
-
-    .alb-card {
-      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 14px; padding: 14px 16px;
-    }
-    .alb-card-head {
-      position: relative;
-      display: flex; align-items: center; gap: 10px;
-      padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
-    .alb-card-head.has-tip { cursor: help; }
-    .alb-card-head.has-tip:focus-visible { outline: 2px solid rgba(247,148,32,0.6); outline-offset: 3px; border-radius: 6px; }
-
-    /* Hover/focus definition tooltip for each archetype header. Text mirrors the
-       archetype `description` shown on coaching-archetypes.html. */
-    .alb-tip {
-      position: absolute; left: 0; bottom: calc(100% + 9px);
-      width: max-content; max-width: 260px;
-      background: #1b2233; border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 10px; padding: 9px 11px;
-      font-size: 12.5px; line-height: 1.45; font-weight: 400;
-      color: rgba(255,255,255,0.88); white-space: normal;
-      box-shadow: 0 10px 26px rgba(0,0,0,0.45);
-      opacity: 0; visibility: hidden; transform: translateY(4px);
-      transition: opacity 0.14s ease, transform 0.14s ease;
-      z-index: 20; pointer-events: none;
-    }
-    .alb-tip::after {
-      content: ''; position: absolute; top: 100%; left: 18px;
-      border: 6px solid transparent; border-top-color: #1b2233;
-    }
-    .alb-card-head.has-tip:hover .alb-tip,
-    .alb-card-head.has-tip:focus-within .alb-tip {
-      opacity: 1; visibility: visible; transform: translateY(0);
-    }
-    .alb-card-badge { width: 28px; height: 28px; flex: 0 0 auto; display: inline-flex; align-items: center; }
-    .alb-card-name { font-family: var(--bebas); font-size: 18px; letter-spacing: 0.03em; color: #fff; }
-
-    .alb-row {
-      display: flex; align-items: center; gap: 8px; padding: 6px 4px;
-      font-size: 13px; border-radius: 7px;
-    }
-    .alb-row.is-current { background: rgba(247,148,32,0.12); }
-    .alb-rank { font-family: var(--bebas); font-size: 14px; color: rgba(255,255,255,0.4); width: 20px; flex: 0 0 auto; }
-    .alb-user { flex: 1; min-width: 0; color: rgba(255,255,255,0.85); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .alb-row.is-current .alb-user { color: #fff; }
-    .alb-pct { flex: 0 0 auto; font-family: var(--bebas); font-size: 15px; color: var(--orange); font-variant-numeric: tabular-nums; }
-    .alb-empty { color: rgba(255,255,255,0.35); font-size: 12.5px; padding: 8px 4px; }
-  </style>
+  <link rel="stylesheet" href="/css/community.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
-<body class="has-auth-bar has-footer">
+<body class="has-auth-bar has-footer community-page alb-page">
+  <!-- First paint: stay behind the shared loader until the data is drawn (the page
+       script lifts it), so placeholder values and empty cards are never shown. -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
   <div id="auth-bar" class="auth-bar"></div>
 
   <div class="alb">
@@ -97,7 +31,7 @@
       <h1 class="alb-title">Coaching Archetypes</h1>
       <a href="/coaching-archetypes.html" class="alb-ca-link">See Coaching Archetypes<span class="arrow" aria-hidden="true">&rarr;</span></a>
     </div>
-    <div id="alb-grid" class="alb-grid"><div class="alb-empty">Loading…</div></div>
+    <div id="alb-grid" class="alb-grid"></div>
   </div>
 
   <footer id="site-footer" class="site-footer">
@@ -129,11 +63,10 @@
       var back = document.getElementById('alb-back');
       if (!back) return;
       back.addEventListener('click', function (e) {
-        if (window.history.length > 1) { e.preventDefault(); window.history.back(); return; }
-        try {
-          var ref = document.referrer;
-          if (ref && new URL(ref).origin === window.location.origin) { e.preventDefault(); window.location.href = ref; }
-        } catch (_) {}
+        e.preventDefault();
+        var fallback = back.getAttribute('href') || '/mode-select.html';
+        if (window.GOBNav) window.GOBNav.back(fallback);
+        else window.location.replace(fallback);
       });
     })();
 
@@ -149,6 +82,13 @@
 
     function escapeHtml(s) {
       return String(s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; });
+    }
+
+    // First paint: lift the loader once the page holds real data (see is-loading in
+    // css/community.css).
+    function liftLoading() {
+      document.documentElement.classList.remove('is-loading');
+      if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
     }
 
     function render(boards) {
@@ -178,6 +118,7 @@
           + '<span class="alb-card-name">' + escapeHtml(name) + '</span>' + headTip + '</div>'
           + body + '</div>';
       }).join('');
+      liftLoading();
     }
 
     window.GOBArchetype.ensureManifest().then(function () {
@@ -187,7 +128,7 @@
         .then(function (r) { return r.ok ? r.json() : {}; })
         .then(render)
         .catch(function () { render({}); });
-    });
+    }).catch(liftLoading);
   </script>
 </body>
 </html>

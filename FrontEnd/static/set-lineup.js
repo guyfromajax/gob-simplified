@@ -95,7 +95,7 @@ const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
 // game_id is optional for new games (will be created by init-game), but if present must be in URL
 // Note: This is a snapshot of initial URL state - always read from currentSearch() when needed
-const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
+let gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 /** game_id from URL (updated by init-game replaceState); falls back to page-load snapshot. */
 function getActiveGameId() {
   const fromUrl = liveParams().get('game_id');
@@ -113,13 +113,25 @@ function abortIfAccessDenied(response) {
 }
 
 function playSound(filename) {
-  try {
-    const base = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
-    const a = new Audio(base + encodeURIComponent(filename));
-    a.volume = 0.7;
-    a.play().catch(() => {});
-  } catch (e) {}
+  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
 }
+
+function stripStaleQuarterBreakFrom() {
+  try {
+    const params = liveParams();
+    if (!params.has('quarter_break_from')) return;
+    params.delete('quarter_break_from');
+    if (franchiseCtx() && typeof franchiseCtx().commitParams === 'function') {
+      franchiseCtx().commitParams(params);
+    } else {
+      const next = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      history.replaceState(history.state, '', next);
+    }
+  } catch (err) {
+    console.warn('[set-lineup] could not strip quarter_break_from', err);
+  }
+}
+stripStaleQuarterBreakFrom();
 
 async function redirectIfFranchiseGameplayAlreadyCommitted() {
   if (modeParam !== 'franchise' || !franchiseId || !weekParam) return false;
@@ -137,7 +149,10 @@ async function redirectIfFranchiseGameplayAlreadyCommitted() {
     const currentWeek = Number(data.week || 1);
     const pageWeek = Number(weekParam || 0);
     if (pageWeek && currentWeek > pageWeek) {
-      window.location.replace(`/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`);
+      const fccUrl = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+      if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(fccUrl, { tab: 'home-tab' });
+      else if (window.GOBNav) window.GOBNav.replace(fccUrl);
+      else window.location.replace(fccUrl);
       return true;
     }
   } catch (error) {
@@ -152,7 +167,6 @@ function buildPlayerDetailUrl(playerId) {
   if (modeParam) qs.set('mode', modeParam);
   if (franchiseId) qs.set('franchise_id', franchiseId);
   if (gameId) qs.set('game_id', gameId);
-  qs.set('return_url', window.location.pathname + currentSearch());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -247,18 +261,32 @@ function isGameplayLineupContext() {
   return Boolean(gameId);
 }
 
+function playerDetailPeekUrl(playerId) {
+  const dest = new URL(buildPlayerDetailUrl(playerId), window.location.origin);
+  dest.searchParams.set(
+    'return_url',
+    window.location.pathname + window.location.search + window.location.hash
+  );
+  return dest.pathname + dest.search + dest.hash;
+}
+
 function applyPlayerDetailLinkBehavior(linkEl, playerId) {
-  if (!linkEl) return;
+  if (!linkEl || !playerId) return;
   if (isGameplayLineupContext()) {
-    linkEl.removeAttribute('href');
-    linkEl.style.cursor = 'default';
+    linkEl.href = buildPlayerDetailUrl(playerId);
     linkEl.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
       e.preventDefault();
       e.stopPropagation();
+      const next = playerDetailPeekUrl(playerId);
+      if (window.GOBNav) window.GOBNav.go(next);
+      else window.location.assign(next);
     });
     return;
   }
   linkEl.href = buildPlayerDetailUrl(playerId);
+  linkEl.setAttribute('data-return', '');
+  linkEl.setAttribute('data-gob-replace', '');
 }
 
 // ✅ PHASE 2: Validate pointers on page load (if present)
@@ -385,10 +413,16 @@ if (gameId && quarter === 1 && !urlParams.has('resume_from_timeout')) {
     : (storedHome && storedAway && (storedHome !== homeTeam || storedAway !== awayTeam));
   
   if (isNewMatchup) {
-    // Teams changed = definitely a new matchup, clear game_id from URL
+    // Teams changed = definitely a new matchup, clear game_id from URL.
+    // The page-load snapshot must drop too, or init-game is skipped and the
+    // previous week's document is simmed again.
+    gameId = null;
     if (franchiseCtx()) {
       const clean = cloneParams(urlParams);
       clean.delete('game_id');
+      ['quarter', 'period', 'clock', 'resume_from_timeout', 'resume_from_anchor', 'consume_resume_anchor', 'active_resume', 'anchor_type', 'quarter_break_from', 'lineup_checkpoint'].forEach((key) => {
+        clean.delete(key);
+      });
       // In-place: drop a stale game_id for a new matchup. Do not navigate.
       franchiseCtx().commitParams(clean);
     }
@@ -431,6 +465,7 @@ let roster = [];
 /** Team chemistry from /roster (franchise/tournament FTD); single-game default 15. */
 let rosterTeamChemistry = 15;
 const lineup = {};
+let lineupDirty = false;
 /** @type {string|null} Selected Rim Runner player id (single-select); null = use backend default */
 let rimRunnerPlayerId = null;
 const playerMap = {};
@@ -443,7 +478,7 @@ const LINEUP_PLAYBOOK_SECTION_ORDER = [
   { key: 'man_defense', label: 'Man Defense' },
   { key: 'zone_defense', label: 'Zone Defense' },
   { key: 'fast_breaks', label: 'Fast Breaks' },
-  { key: 'hc_traps', label: 'HC Traps' },
+  { key: 'hc_traps', label: 'Half-Court Traps' },
 ];
 
 function getRT(player) {
@@ -1155,26 +1190,29 @@ function getRosterDefPct(stats) {
   return defa > 0 ? Math.round((defs / defa) * 100) : 0;
 }
 
+// Four value-only cells (PTS / REB / AST / DEF%). The labels live in the header
+// row (like the Attributes and Stats views), so each stat has its own column with
+// a real gap from ENG% on the left and RT on the right — no inline-label overlap.
 function buildProductionCell(player) {
-  const td = document.createElement('td');
-  td.className = 'prod-cell';
-  if (!player) {
-    td.innerHTML = '<div class="prod"></div>';
-    return td;
+  const frag = document.createDocumentFragment();
+  let values = ['—', '—', '—', '—'];
+  if (player) {
+    const stats = getGameStatsForRoster(player);
+    const reb = (Number(stats.DREB) || 0) + (Number(stats.OREB) || 0);
+    values = [
+      String(Number(stats.PTS) || 0),
+      String(reb),
+      String(Number(stats.AST) || 0),
+      String(getRosterDefPct(stats)),
+    ];
   }
-  const stats = getGameStatsForRoster(player);
-  const reb = (Number(stats.DREB) || 0) + (Number(stats.OREB) || 0);
-  const pts = Number(stats.PTS) || 0;
-  const ast = Number(stats.AST) || 0;
-  const defPct = getRosterDefPct(stats);
-  td.innerHTML = `
-    <div class="prod">
-      <span><b class="pv">${pts}</b><i class="pk">PTS</i></span>
-      <span><b class="pv">${reb}</b><i class="pk">REB</i></span>
-      <span><b class="pv">${ast}</b><i class="pk">AST</i></span>
-      <span><b class="pv">${defPct}</b><i class="pk">DEF%</i></span>
-    </div>`;
-  return td;
+  ['pts', 'reb', 'ast', 'def'].forEach((key, i) => {
+    const td = document.createElement('td');
+    td.className = `prod-cell prod-${key}`;
+    td.textContent = values[i];
+    frag.appendChild(td);
+  });
+  return frag;
 }
 
 function buildMoPipsCell(moValue) {
@@ -1274,8 +1312,9 @@ function appendSharedLeadingCells(tr, {
   nameTd.className = 'player-name-cell';
   const wrap = document.createElement('div');
   wrap.className = 'player-name-wrap';
-  const nameText = document.createElement('span');
+  const nameText = document.createElement(isGameplayLineupContext() ? 'a' : 'span');
   nameText.className = 'player-name-link';
+  if (isGameplayLineupContext()) applyPlayerDetailLinkBehavior(nameText, playerId);
   nameText.textContent = typeof formatNameWithJersey === 'function'
     ? formatNameWithJersey(player.jersey, player.name)
     : (player.name || '—');
@@ -1371,8 +1410,13 @@ function comparePlayersForSort(a, b, columnName, direction) {
   } else if (['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'].includes(columnName)) {
     const attrsA = a.attributes || {};
     const attrsB = b.attributes || {};
-    val1 = Math.floor((attrsA[`anchor_${columnName}`] ?? attrsA[columnName] ?? 0) / 10);
-    val2 = Math.floor((attrsB[`anchor_${columnName}`] ?? attrsB[columnName] ?? 0) / 10);
+    const ad = window.GOB_AttributeDisplay;
+    const shown = (attrs, key) => {
+      const d = ad.displayAttr(ad.rawAttr(attrs, key));
+      return d == null ? 0 : d;
+    };
+    val1 = shown(attrsA, columnName);
+    val2 = shown(attrsB, columnName);
   } else if (columnName === 'PTS') {
     val1 = Number(statsA.PTS) || 0;
     val2 = Number(statsB.PTS) || 0;
@@ -1525,7 +1569,7 @@ function renderRosterGame() {
   const tbody = document.getElementById('roster-body-game');
   if (!tbody) return;
   tbody.innerHTML = '';
-  const colSpan = 10;
+  const colSpan = 13; // POS, hs, PLAYER, ENG, PTS, REB, AST, DEF%, RT, F, MIN, MO, rm
   const decorated = roster.map(decoratePlayerForRoster);
   const byId = new Map(decorated.map((p) => [String(p._playerId), p]));
   const bench = sortPlayerList(
@@ -1617,21 +1661,26 @@ function renderRosterAttributes() {
 
   function appendAttrTail(tr, p) {
     const attrs = p.attributes || {};
+    const ad = window.GOB_AttributeDisplay;
+    const shown = (key) => {
+      const d = ad.displayAttr(ad.rawAttr(attrs, key));
+      return d == null ? 0 : d;
+    };
     const vals = [
       formatHeight(p.height),
       p.weight != null && p.weight !== '' ? p.weight : '--',
-      Math.floor((attrs.anchor_SC ?? attrs.SC ?? 0) / 10),
-      Math.floor((attrs.anchor_SH ?? attrs.SH ?? 0) / 10),
-      Math.floor((attrs.anchor_ID ?? attrs.ID ?? 0) / 10),
-      Math.floor((attrs.anchor_OD ?? attrs.OD ?? 0) / 10),
-      Math.floor((attrs.anchor_PS ?? attrs.PS ?? 0) / 10),
-      Math.floor((attrs.anchor_BH ?? attrs.BH ?? 0) / 10),
-      Math.floor((attrs.anchor_RB ?? attrs.RB ?? 0) / 10),
-      Math.floor((attrs.anchor_ST ?? attrs.ST ?? 0) / 10),
-      Math.floor((attrs.anchor_AG ?? attrs.AG ?? 0) / 10),
-      Math.floor((attrs.anchor_ND ?? attrs.ND ?? 0) / 10),
-      Math.floor((attrs.anchor_IQ ?? attrs.IQ ?? 0) / 10),
-      Math.floor((attrs.anchor_FT ?? attrs.FT ?? 0) / 10),
+      shown('SC'),
+      shown('SH'),
+      shown('ID'),
+      shown('OD'),
+      shown('PS'),
+      shown('BH'),
+      shown('RB'),
+      shown('ST'),
+      shown('AG'),
+      shown('ND'),
+      shown('IQ'),
+      shown('FT'),
     ];
     vals.forEach((val) => {
       const td = document.createElement('td');
@@ -1872,6 +1921,7 @@ function clearLineupSlot(pos) {
     return;
   }
   delete lineup[pos];
+  lineupDirty = true;
   if (removedId != null && rimRunnerPlayerId != null && String(rimRunnerPlayerId) === String(removedId)) {
     rimRunnerPlayerId = null;
   }
@@ -1977,26 +2027,28 @@ function bindRosterTableEvents() {
 }
 
 function updatePlayButton() {
-  const playBtn = document.getElementById('play-now');
+  const startBtns = ['play-now', 'sim-now']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
   const gameplanBtn = document.getElementById('gameplan-optional');
   
   const filled = ['PG','SG','SF','PF','C'].every(pos => lineup[pos]);
   const ftShooterPresent = !ftLockActive || Object.values(lineup).some(isFtLockedPlayer);
   const lineupIsValid = filled && ftShooterPresent;
-  
-  if (lineupIsValid) {
-    // Enable play button when lineup is complete
-    if (playBtn) {
-      playBtn.classList.remove('disabled');
-      playBtn.style.cursor = 'pointer';
+
+  const midQuarterResume = urlParams.get('resume_from_timeout') === 'true';
+  startBtns.forEach((btn) => {
+    if (btn.id === 'sim-now' && midQuarterResume) {
+      btn.hidden = true;
+      btn.disabled = true;
+      btn.tabIndex = -1;
+      btn.setAttribute('aria-hidden', 'true');
+      btn.classList.add('disabled');
+      return;
     }
-  } else {
-    // Disable play button when lineup is incomplete
-    if (playBtn) {
-      playBtn.classList.add('disabled');
-      playBtn.style.cursor = 'not-allowed';
-    }
-  }
+    btn.classList.toggle('disabled', !lineupIsValid);
+    btn.style.cursor = lineupIsValid ? 'pointer' : 'not-allowed';
+  });
   
   // Game Plan button is ALWAYS enabled (user can go to Game Plan anytime)
   if (gameplanBtn) {
@@ -2188,6 +2240,7 @@ async function setHeader() {
   const timeValueEl = document.getElementById('time-value');
   const scoreboardEl = document.getElementById('context-scoreboard');
   const playBtn = document.getElementById('play-now');
+  const simBtn = document.getElementById('sim-now');
   if (!quarterValueEl || !timeValueEl) return;
 
   // Score dict keys = core URL names; chrome labels = display (overlay when present).
@@ -2290,8 +2343,8 @@ async function setHeader() {
 
   const isPregame = !(gameId && (resumeFromTimeout || currentQuarter > 1 || userTeamScore > 0 || opponentTeamScore > 0));
   scoreboardEl?.classList.toggle('is-pregame', isPregame);
-  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamLabel || 'Home') : (userTeamLabel || 'Home')).toUpperCase();
-  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamLabel || 'Away') : (opponentTeamLabel || 'Away')).toUpperCase();
+  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamLabel || 'Home') : (userTeamLabel || 'Home'));
+  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamLabel || 'Away') : (opponentTeamLabel || 'Away'));
   if (scoreHomeTeamEl) scoreHomeTeamEl.textContent = displayUserTeamName;
   if (scoreAwayTeamEl) scoreAwayTeamEl.textContent = displayOpponentTeamName;
   if (scoreHomeValueEl) scoreHomeValueEl.textContent = `${userTeamScore}`;
@@ -2300,7 +2353,24 @@ async function setHeader() {
   timeValueEl.textContent = isPregame ? '--:--' : formattedClock;
 
   if (playBtn) {
-    playBtn.textContent = isPregame ? 'Play Game' : 'Return to Game';
+    if (isPregame) playBtn.textContent = 'Play Game';
+    else if (isQuarterBreak) playBtn.textContent = 'Play Quarter';
+    else playBtn.textContent = 'Return to Game';
+  }
+  if (simBtn) {
+    if (resumeFromTimeout) {
+      simBtn.hidden = true;
+      simBtn.disabled = true;
+      simBtn.tabIndex = -1;
+      simBtn.setAttribute('aria-hidden', 'true');
+      simBtn.classList.add('disabled');
+    } else {
+      simBtn.hidden = false;
+      simBtn.disabled = false;
+      simBtn.tabIndex = 0;
+      simBtn.removeAttribute('aria-hidden');
+      simBtn.textContent = isPregame ? 'Sim Game' : 'Sim Rest Of Game';
+    }
   }
 }
 
@@ -2430,7 +2500,8 @@ function wireLineupNavButtons() {
       });
       params.set('from', 'lineup');
       if (DEBUG) params.set('debug', '1');
-      window.location.href = `/game-plan.html?${params.toString()}`;
+      if (window.GOBNav) window.GOBNav.replace(`/game-plan.html?${params.toString()}`);
+      else window.location.replace(`/game-plan.html?${params.toString()}`);
     });
   }
   const playbooksBtn = document.getElementById('playbooks-button');
@@ -2467,7 +2538,9 @@ function wireLineupNavButtons() {
         params.set('pregame', '1');
       }
       params.set('from', 'lineup');
-      window.location.href = `/box-score.html?${params.toString()}`;
+      const boxUrl = `/box-score.html?${params.toString()}`;
+      if (window.GOBNav) window.GOBNav.go(boxUrl);
+      else window.location.assign(boxUrl);
     });
   }
 }
@@ -2479,15 +2552,19 @@ async function init() {
   const validationPassed = await validatePointersOnLoad();
   if (!validationPassed) {
     // Validation failed - error screen already shown, disable functionality
-    const btn = document.getElementById('play-now');
-    if (btn) btn.classList.add('disabled');
+    ['play-now', 'sim-now'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.classList.add('disabled');
+    });
     return;
   }
 
   if (!resolveTeam()) {
     alert("Can't determine your team for this game. Please return and relaunch.");
-    const btn = document.getElementById('play-now');
-    if (btn) btn.classList.add('disabled');
+    ['play-now', 'sim-now'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.classList.add('disabled');
+    });
     return;
   }
 
@@ -2498,6 +2575,11 @@ async function init() {
   
   // Restore lineup from URL
   restoreLineupFromUrl();
+  lineupDirty = false;
+  if (window.GOBNav) {
+    window.GOBNav.warnOnLeave(() => lineupDirty);
+    window.GOBNav.restoreScroll();
+  }
   
   // ✅ FOUL OUT: Remove ineligible players from lineup AFTER restoring from URL
   // This ensures fouled-out players are removed even if they were in the URL params
@@ -2585,6 +2667,8 @@ async function init() {
   if (modeParam === 'tutorial') {
     const playBtnEl = document.getElementById('play-now');
     if (playBtnEl) playBtnEl.textContent = 'Continue';
+    const simBtnEl = document.getElementById('sim-now');
+    if (simBtnEl) simBtnEl.hidden = true;
 
     // Only fill EMPTY slots. A user who set a five, navigated back to Game Plan
     // and returned must not have their choices silently overwritten by autoset.
@@ -2666,10 +2750,11 @@ async function init() {
     }).catch((e) => console.warn('[tutorial] could not init lineup tutorial chrome:', e));
   }
 
-  const btn = document.getElementById('play-now');
-  if (btn) {
-    btn.addEventListener('click', async () => {
-      if (btn.classList.contains('disabled')) return;
+  async function beginFromLineup(courtStart) {
+    const liveNow = liveParams();
+    if (courtStart === 'sim' && liveNow.get('resume_from_timeout') === 'true') return;
+    const btn = document.getElementById(courtStart === 'sim' ? 'sim-now' : 'play-now');
+    if (!btn || btn.hidden || btn.disabled || btn.classList.contains('disabled')) return;
       if (ftLockActive && !Object.values(lineup).some(isFtLockedPlayer)) {
         showToast('Free throw shooter must stay in the lineup');
         updatePlayButton();
@@ -2704,14 +2789,15 @@ async function init() {
       // (FTE v2 tutorial mode is NOT here — init-game runs earlier on the
       // situation page so the engine state + roster are available when this
       // page loads. By the time the user hits Play, game_id is already in URL.)
-      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !resumeFromAnchor && modeParam === 'single' && quarter === 1) {
+      if (!currentGameId && homeTeam && awayTeam && !resumeFromTimeout && !resumeFromAnchor && (modeParam === 'single' || modeParam === 'franchise') && quarter === 1) {
         if (!initGameInProgress) {
           console.log('⏳ [SET-LINEUP] PLAY GAME: game_id not found, calling init-game...');
           initGameInProgress = true;
           try {
-            const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: 'single' };
+            const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: modeParam || 'single' };
             attachMatchupTeamIds(initPayload);
             if (myTeamSide) initPayload.user_team_side = myTeamSide;
+            if (modeParam === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
             const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
               method: 'POST',
               headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -2841,15 +2927,25 @@ async function init() {
         }
         playSound('confirm-1-lowervol.wav');
         setTimeout(() => {
-          window.location.href = '/game-plan.html?' + nextParams.toString();
+          const planUrl = '/game-plan.html?' + nextParams.toString();
+          if (window.GOBNav) window.GOBNav.replace(planUrl);
+          else window.location.replace(planUrl);
         }, 200);
         return;
       }
 
+      params.set('court_start', courtStart);
       const finalUrl = `/court.html?${params.toString()}`;
       console.log('🔍 [DEBUG QTR BREAK] set-lineup.js - Navigating to court.html:', finalUrl);
       playSound('confirm-1-lowervol.wav');
-      const navigate = () => setTimeout(() => { window.location.href = finalUrl; }, 200);
+      const navigate = () => setTimeout(() => {
+        if (window.GOBNav) {
+          window.GOBNav.allowNextLeave();
+          window.GOBNav.replace(finalUrl);
+        } else {
+          window.location.replace(finalUrl);
+        }
+      }, 200);
 
       // FTE v2 tutorial: insert a feedback modal between Return To Game and
       // the actual navigation. Algorithm picks a Talent / skill-based /
@@ -2880,11 +2976,19 @@ async function init() {
 
       // Non-tutorial: navigate directly.
       navigate();
-    });
   }
+
+  const playNowBtn = document.getElementById('play-now');
+  const simNowBtn = document.getElementById('sim-now');
+  if (playNowBtn) playNowBtn.addEventListener('click', () => beginFromLineup('play'));
+  if (simNowBtn) simNowBtn.addEventListener('click', () => beginFromLineup('sim'));
   // Game Plan, Playbooks, Box Score wired in wireLineupNavButtons()
   } finally {
-    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+    let redirected = false;
+    if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+      try { redirected = await window.GOBNav.guardClosedFranchiseGame(); } catch (e) { redirected = false; }
+    }
+    if (!redirected && window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
   }
 }
 
@@ -3393,15 +3497,16 @@ function createCardBack(player) {
     const value = document.createElement('span');
     value.className = 'attr-value';
     // Use anchor attribute (base value, not energy-scaled)
-    const rawVal = attrs[`anchor_${key}`] ?? attrs[key];
-    const displayVal = rawVal != null ? Math.floor(rawVal / 10) : '--';
-    value.textContent = displayVal;
-    
-    // Set gold bar fill percentage (0-10 scale, max at 100%)
-    if (displayVal !== '--' && typeof getAttrColor === 'function') {
+    const ad = window.GOB_AttributeDisplay;
+    const rawVal = ad.rawAttr(attrs, key);
+    const displayVal = ad.displayAttr(rawVal);
+    value.textContent = displayVal == null ? '--' : displayVal;
+
+    // Bar fill is the displayed value × 10, capped at 100% (a 16 still fills the bar).
+    if (displayVal != null && typeof getAttrColor === 'function') {
       const fillPercentage = Math.min(displayVal * 10, 100);
       pill.style.setProperty('--attr-fill', `${fillPercentage}%`);
-      pill.style.setProperty('--attr-bar-color', getAttrColor(Math.ceil(Number(rawVal) / 10)));
+      pill.style.setProperty('--attr-bar-color', getAttrColor(rawVal));
     }
     
     pill.appendChild(value);
@@ -3476,6 +3581,7 @@ function assignToSlot(pos, playerId) {
   
   // Update lineup data
   lineup[pos] = playerId;
+  lineupDirty = true;
   updateAllSlotDisplays();
   return true;
 }
@@ -3560,8 +3666,11 @@ function dndLog(label, data) {
 }
 
 window.addEventListener('pageshow', (event) => {
-  if (event.persisted) {
-    window.location.reload();
+  stripStaleQuarterBreakFrom();
+  if (!event.persisted) return;
+  if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
+  if (window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+    window.GOBNav.guardClosedFranchiseGame();
   }
 });
 

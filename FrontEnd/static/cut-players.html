@@ -1,26 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Assign Practice Squad</title>
-<link rel="stylesheet" href="/franchise-command-center.css">
+  <link rel="stylesheet" href="/css/gob-tokens.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/cut-players.css">
   <link rel="stylesheet" href="/css/fonts.css">
   <link rel="stylesheet" href="/css/rt-buckets.css">
 </head>
-<body>
-  <div class="resource-page-container fcc-brand-page-shell cut-players-page">
+<body class="cut-players-page">
+  <!-- First paint: stay behind the shared loader until the roster and the week's cut
+       count are in (cut-players.js lifts it). In a week with nothing to cut, the
+       heading and table shell are then never shown before "No Cuts Required". -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
+  <div id="cut-players-view">
+  <div class="resource-page-container cut-players-shell">
     <div class="gob-page-header cut-players-header">
       <button id="back-btn" class="brand-back-link" type="button">Back To Locker Room</button>
       <h1>Assign Practice Squad</h1>
       <div class="gob-page-header-actions">
-        <button id="submit-btn" class="gob-action-btn is-green is-dead" type="button" disabled>Submit</button>
+        <p id="cut-submit-reason" class="gob-page-status cut-submit-reason" hidden></p>
+        <button id="submit-btn" class="gob-btn gob-btn--action is-dead" type="button" data-sfx="SFX_COMMIT" disabled>Assign Practice Squad</button>
       </div>
     </div>
 
@@ -35,19 +47,20 @@
               <th>POS</th>
               <th>Year</th>
               <th>Height</th>
-              <th>Weight</th>
-              <th>SC</th>
-              <th>SH</th>
-              <th>ID</th>
-              <th>OD</th>
-              <th>PS</th>
-              <th>BH</th>
-              <th>RB</th>
-              <th>AG</th>
-              <th>ST</th>
-              <th>ND</th>
-              <th>IQ</th>
-              <th>FT</th>
+              <th class="wt">Weight</th>
+              <!-- Six attribute pairs, the roster's order (Styleguide, Tables). -->
+              <th class="gstart"><span class="ak">SC</span></th>
+              <th class="gend"><span class="ak">SH</span></th>
+              <th class="gstart"><span class="ak">ID</span></th>
+              <th class="gend"><span class="ak">OD</span></th>
+              <th class="gstart"><span class="ak">PS</span></th>
+              <th class="gend"><span class="ak">BH</span></th>
+              <th class="gstart"><span class="ak">RB</span></th>
+              <th class="gend"><span class="ak">ST</span></th>
+              <th class="gstart"><span class="ak">AG</span></th>
+              <th class="gend"><span class="ak">ND</span></th>
+              <th class="gstart"><span class="ak">IQ</span></th>
+              <th class="gend"><span class="ak">FT</span></th>
               <th>RT</th>
               <th>To Practice Squad</th>
             </tr>
@@ -58,11 +71,12 @@
       </div>
     </section>
   </div>
+  </div>
 
   <div id="cut-modal-backdrop" class="gob-modal-overlay" aria-hidden="true">
     <div class="gob-modal-backdrop"></div>
     <div class="gob-modal-box" role="dialog" aria-modal="true" aria-labelledby="cut-modal-title">
-      <div id="cut-modal-accent" class="gob-modal-accent is-red"></div>
+      <div id="cut-modal-accent" class="gob-modal-accent is-neutral"></div>
       <div class="gob-modal-body">
         <h3 id="cut-modal-title" class="gob-modal-title">Assign Practice Squad</h3>
         <p id="cut-modal-message" class="gob-modal-subtitle"></p>
@@ -79,6 +93,7 @@
   <script src="/common.js"></script>
   <script src="/js/shared/attributeTooltips.js"></script>
   <script src="/js/shared/playerYear.js"></script>
+  <script src="/js/utils/attributeDisplay.js"></script>
   <script src="/cut-players.js"></script>
 </body>
 </html>

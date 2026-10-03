@@ -1,0 +1,40 @@
+{
+  "href": "/franchise-command-center.html?runtime=local&franchise_id=6abcee371b2d4f5d73df37aa&team_id=69a6fcb68d2c56aa82e48a54&tab=player-view&player_id=83608be4-5065-4df6-9276-5e69376c15aa&origin=team&up=Roster&return_tab=roster-view&pager=roster",
+  "beforeClick": {
+    "search": "?runtime=local&franchise_id=6abcee371b2d4f5d73df37aa&team_id=69a6fcb68d2c56aa82e48a54&tab=roster-view",
+    "ctx": {
+      "runtime": "local",
+      "franchise_id": "6abcee371b2d4f5d73df37aa",
+      "team_id": "69a6fcb68d2c56aa82e48a54",
+      "tab": "roster-view"
+    },
+    "profile": "desktop",
+    "provider": "SessionContextProvider"
+  },
+  "afterClick": {
+    "search": "?runtime=local&franchise_id=6abcee371b2d4f5d73df37aa&team_id=69a6fcb68d2c56aa82e48a54&tab=player-view&player_id=83608be4-5065-4df6-9276-5e69376c15aa&origin=team&up=Roster&return_tab=roster-view&pager=roster",
+    "tab": "player-view",
+    "player_id": "83608be4-5065-4df6-9276-5e69376c15aa",
+    "ctx": {
+      "runtime": "local",
+      "franchise_id": "6abcee371b2d4f5d73df37aa",
+      "team_id": "69a6fcb68d2c56aa82e48a54",
+      "tab": "player-view",
+      "player_id": "83608be4-5065-4df6-9276-5e69376c15aa",
+      "origin": "team",
+      "up": "Roster",
+      "return_tab": "roster-view",
+      "pager": "roster"
+    },
+    "hero": "Ervin Miller",
+    "error": "",
+    "htmlSnippet": "← Roster\nTeam\n/\nRoster\n/\nErvin Miller\n1 of 15\nLANCASTER\nErvin Miller\nLancaster · PG · SO · #5 · 5'9\" · 161 lb\nC+\n→\nB+\nRATING · CURRENT → POTENTIAL\n0 GP\n—\nPTS\n—\nREB\n—\nAST\n—\nFG%\n—\n3PT%\n—\nFT%\n—\nDEF%\nAttributes\nOFFENSE\nSC\n2\nSH\n3\nDEFENSE\nID\n2\nOD\n6\nSKILLS\nPS\n5\nBH\n5\nGRIT\nRB\n2\nST\n3\nBODY\nAG\n5\nND\n4\nMIND\nIQ\n6\nFT\n3\nRecent changes\n\nNo attribute changes yet this season\n\nDevelopment focus\nStandard\nOffensive\nDefe"
+  },
+  "consoleLines": [
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[error] Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "[http 200] http://127.0.0.1:8777/franchise/player-detail?franchise_id=6abcee371b2d4f5d73df37aa&player_id=83608be4-5065-4df6-9276-5e69376c15aa"
+  ],
+  "failed": []
+}

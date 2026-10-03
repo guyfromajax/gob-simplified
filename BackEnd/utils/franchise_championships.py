@@ -85,11 +85,17 @@ def _inc_championship(
     if kind not in TITLE_KINDS:
         return
     if owner_user_id and user_team_id_str:
-        try:
-            oid = ObjectId(owner_user_id)
-        except Exception:
-            logger.warning("Invalid owner_user_id for championships increment: %s", owner_user_id)
-            oid = None
+        from BackEnd.utils.local_coach import LOCAL_COACH_ID, coach_collection, is_local_owner
+
+        local = is_local_owner(owner_user_id)
+        oid: Any = None
+        if local:
+            oid = LOCAL_COACH_ID
+        else:
+            try:
+                oid = ObjectId(owner_user_id)
+            except Exception:
+                logger.warning("Invalid owner_user_id for championships increment: %s", owner_user_id)
         if oid is not None:
             team_key = geek_points_team_key_for_franchise_user(user_team_id_str)
             inc_fields: dict[str, int] = {f"championships_total.{kind}": 1}
@@ -100,7 +106,16 @@ def _inc_championship(
                     "championships_by_team not incremented; could not resolve team key (user_team_id_str=%r)",
                     user_team_id_str,
                 )
-            users_collection.update_one({"_id": oid}, {"$inc": inc_fields})
+            if local:
+                coach_collection().update_one({"_id": oid}, {"$inc": inc_fields}, upsert=True)
+            else:
+                users_collection.update_one({"_id": oid}, {"$inc": inc_fields})
+            try:
+                from BackEnd.utils.trophy_log import record_title_trophy
+
+                record_title_trophy(owner_user_id=owner_user_id, kind=kind, franchise_id=franchise_id)
+            except Exception:
+                logger.exception("[TROPHY] title entry failed kind=%s franchise_id=%s", kind, franchise_id)
     _inc_player_titles(
         franchise_id=franchise_id,
         user_team_id_str=user_team_id_str,

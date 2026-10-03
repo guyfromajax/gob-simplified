@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from bson import ObjectId
 
 from BackEnd.api import franchise_routes
+from BackEnd.utils.franchise_standings import current_streaks, standings_display_sort_key
 
 
 def test_standings_region_filter(monkeypatch):
@@ -37,7 +38,9 @@ def test_standings_region_filter(monkeypatch):
         calculate_franchise_standings=lambda results, team_list: {
             str(team_a): {"W": 1, "L": 0, "PF": 50, "PA": 40},
             str(team_b): {"W": 0, "L": 1, "PF": 40, "PA": 50},
-        }
+        },
+        current_streaks=current_streaks,
+        standings_display_sort_key=standings_display_sort_key,
     ))
 
     payload = franchise_routes.standings(str(franchise_id), region="A")
@@ -73,11 +76,6 @@ def test_team_stats_scope_filters_to_user_conference(monkeypatch):
         ),
     )
     monkeypatch.setattr(franchise_routes, "db", fake_db)
-    monkeypatch.setattr(franchise_routes, "_ftd_team_list_for_franchise", lambda fid: {
-        str(user_team): "User",
-        str(team_same_conf): "Same",
-        str(team_other_conf): "Other",
-    })
     monkeypatch.setattr(
         franchise_routes,
         "franchise_players_data_collection",
@@ -86,12 +84,16 @@ def test_team_stats_scope_filters_to_user_conference(monkeypatch):
     monkeypatch.setattr(
         franchise_routes,
         "franchise_team_data_collection",
-        SimpleNamespace(find=lambda *args, **kwargs: []),
+        SimpleNamespace(find=lambda *args, **kwargs: [
+            {"team_id": user_team, "players": [], "natl_rank": 1},
+            {"team_id": team_same_conf, "players": [], "natl_rank": 2},
+            {"team_id": team_other_conf, "players": [], "natl_rank": 3},
+        ]),
     )
     monkeypatch.setattr(
         franchise_routes,
         "aggregate_team_stats_from_players",
-        lambda players, team_ids, **kwargs: [{"team_id": tid, "team": name, "stats": {}} for tid, name in team_ids.items()],
+        lambda players, team_ids, **kwargs: [{"team_id": tid, "team": tid, "stats": {}} for tid in team_ids.keys()],
     )
 
     payload = franchise_routes.team_stats(str(franchise_id), scope="conference")

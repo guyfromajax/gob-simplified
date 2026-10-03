@@ -14,8 +14,8 @@ const path = require('path');
 
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
-const CSS = read('recruiting-spine.css') + read('css/attr-tiles.css');
-const SCRIPTS = ['js/shared/franchiseContext.js', 'common.js', 'js/shared/attrTiles.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js',
+const CSS = read('css/gob-tokens.css') + read('recruiting-spine.css') + read('css/attr-tiles.css');
+const SCRIPTS = ['js/shared/franchiseContext.js', 'common.js', 'js/utils/attributeDisplay.js', 'js/shared/attrTiles.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js',
   'recruiting-common.js', 'recruiting-spine.js'].map(read);
 const HUB = read('recruiting-hub.js');
 
@@ -88,6 +88,7 @@ async function mount(page, o = {}) {
   await page.setContent(`
     <style>${CSS}</style><style>body{margin:0}.doc{max-width:1360px;margin:0 auto;padding:20px}</style>
     <div class="doc"><a id="back-btn" href="#"></a><div id="hub-root" class="spine"></div></div>`);
+  await page.evaluate(() => document.documentElement.classList.add('gob'));
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
   await page.evaluate(({ data }) => {
     window.API_CONFIG = {
@@ -343,13 +344,16 @@ test.describe('the three empty states are three different things', () => {
     expect(by['Wk 21'].cls).not.toContain('is-upcoming');
   });
 
-  test('this week is the only amber square', async ({ page }) => {
+  test('this week uses outline emphasis, not orange', async ({ page }) => {
     await mount(page, { week: 22, visits: { 20: 'r-1' } });
-    const amber = await page.evaluate(() =>
-      [...document.querySelectorAll('#hub-visits .vwk')]
-        .filter((t) => getComputedStyle(t).borderTopColor.includes('247, 148, 32'))
-        .map((t) => t.querySelector('.vwk-wk').textContent));
-    expect(amber).toEqual(['Wk 22']);
+    const info = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-visits .vwk')].map((t) => ({
+        wk: t.querySelector('.vwk-wk').textContent,
+        pending: t.classList.contains('is-pending'),
+        border: getComputedStyle(t).borderTopColor,
+      })));
+    expect(info.filter((x) => x.border.includes('247, 148, 32'))).toEqual([]);
+    expect(info.find((x) => x.wk === 'Wk 22').pending).toBe(true);
   });
 
   test('a week that already resolved is filled even while it is the current week', async ({ page }) => {

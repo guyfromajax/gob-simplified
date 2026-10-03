@@ -47,6 +47,7 @@ from BackEnd.utils.animation_step_helpers import (
 )
 from BackEnd.utils.animation_step_schema import AnimationStep, GridCoord, PlayerArchetype
 from BackEnd.utils.shared import get_away_player_coords
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 def _safe_id(obj: Any) -> Optional[str]:
@@ -604,6 +605,7 @@ def build_fb_drive_resolution_steps(
         if projected_steps:
             steps = projected_steps
     except Exception as e:
+        reraise_if_strict(e)
         logging.debug(
             "🧩 [FB_DR] StepState projection failed prefix=%s result_type=%s: %s",
             kind_prefix,
@@ -621,6 +623,7 @@ def build_fb_drive_resolution_steps(
             from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
             enforce_step_start_continuity(steps, context="fb_drive")
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps or None

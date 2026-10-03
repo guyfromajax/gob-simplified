@@ -14,8 +14,8 @@ const path = require('path');
 
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
-const CSS = read('recruiting-spine.css') + read('css/attr-tiles.css');
-const SCRIPTS = ['js/shared/franchiseContext.js', 'common.js', 'js/shared/attrTiles.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js',
+const CSS = read('css/gob-tokens.css') + read('recruiting-spine.css') + read('css/attr-tiles.css');
+const SCRIPTS = ['js/shared/franchiseContext.js', 'common.js', 'js/utils/attributeDisplay.js', 'js/shared/attrTiles.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js',
   'recruiting-common.js', 'recruiting-spine.js'].map(read);
 const HUB = read('recruiting-hub.js');
 
@@ -87,10 +87,11 @@ async function mount(page, o = {}) {
   await page.route('**/', (route) => (route.request().resourceType() === 'document'
     ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
     : route.continue()));
-  await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
+  await page.goto('/?franchise_id=fid-test&team_id=user-team-id&hub=pool');
   await page.setContent(`
     <style>${CSS}</style><style>body{margin:0}.doc{max-width:1360px;margin:0 auto;padding:20px}</style>
     <div class="doc"><a id="back-btn" href="#"></a><div id="hub-root" class="spine"></div></div>`);
+  await page.evaluate(() => document.documentElement.classList.add('gob'));
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
   await page.evaluate(({ data }) => {
     window.__writes = [];
@@ -112,6 +113,13 @@ async function mount(page, o = {}) {
   }, { data: fixture(o) });
   await page.addScriptTag({ content: HUB });
   await page.waitForSelector('#hub-board .bpanel', { timeout: 10000 });
+}
+
+/** Seed Sammy (maybeShowSeedModal) loads async and sits over the board. force:true
+ *  still clicks whatever is on top — the reorder test already dismisses it. */
+async function dismissSeedSammy(page) {
+  const gotIt = page.getByRole('button', { name: /got it/i });
+  await gotIt.click({ timeout: 5000 }).catch(() => {});
 }
 
 // FILLED rows only. The board now draws all 20 ranks, empty slots included, so
@@ -255,21 +263,27 @@ test.describe('seed notice', () => {
 
   test('dismissible', async ({ page }) => {
     await mount(page, SEEDED);
-    await page.click('#board-seed-dismiss');
+    await dismissSeedSammy(page);
+    await page.click('#board-seed-dismiss', { force: true });
     await page.waitForFunction(() => !document.querySelector('#board-seed-notice'));
   });
 
   test('disappears once the player reorders', async ({ page }) => {
     await mount(page, SEEDED);
     expect(await page.evaluate(() => !!document.querySelector('#board-seed-notice'))).toBe(true);
+    // The seed Sammy ("Got It") sits over the first row. force:true still clicks
+    // whatever is on top, so dismiss it before the × is the real target.
+    const gotIt = page.getByRole('button', { name: /got it/i });
+    await gotIt.click({ timeout: 5000 }).catch(() => {});
     // Removing a row is an edit: the order is the player's now.
-    await page.click('#hub-board .brow[data-index="0"] .bx');
+    await page.click('#hub-board .brow[data-index="0"] .bx', { force: true });
     await page.waitForFunction(() => !document.querySelector('#board-seed-notice'));
   });
 
   test('disappears once the board is saved', async ({ page }) => {
     await mount(page, SEEDED);
-    await page.click('#dock-save');
+    await dismissSeedSammy(page);
+    await page.click('#dock-save', { force: true });
     await page.waitForFunction(() => !document.querySelector('#board-seed-notice'));
   });
 
@@ -285,7 +299,8 @@ test.describe('seed notice', () => {
 
   test('saving is the only thing that posts the order', async ({ page }) => {
     await mount(page, { week: 20, watchlist: ['r-2'], board: [], noLeans: true });
-    await page.click('#dock-save');
+    await dismissSeedSammy(page);
+    await page.click('#dock-save', { force: true });
     await page.waitForURL('**/franchise-command-center*', { timeout: 5000 });
     const orders = await page.evaluate(() =>
       JSON.parse(sessionStorage.getItem('__writes') || '[]')

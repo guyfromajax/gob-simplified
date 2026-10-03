@@ -1,0 +1,659 @@
+/* Office home. Component chrome lives in gob-components.css. */
+.gob .office button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+.gob .office a { color: inherit; text-decoration: none; }
+.gob .office .wr-1 { min-width: 0; }
+.gob .office .nx-m { min-width: 0; flex: 1 1 auto; }
+.gob .office .nx-m > div { min-width: 0; flex: 1 1 auto; }
+.gob .office .nx-name {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+  line-height: 1.05;
+}
+.gob .office .rs-n {
+  min-width: 0;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+  line-height: 1.05;
+}
+
+.gob .office-skel {
+  min-height: 96px;
+  background: var(--white-4);
+  box-shadow: none;
+}
+.gob .potg .portrait { width: 46px; height: 46px; display: grid; place-items: center; }
+.gob.gob-1920 .potg .portrait { width: 76px; height: 76px; }
+.gob .office-initials {
+  font: var(--fw-bold) var(--fs-16)/1 var(--font-display);
+  color: var(--text-60);
+}
+.gob .office-snap .spread i { background: var(--white-55); }
+.gob .office-snap .spread i:nth-child(2) { background: var(--white-40); }
+.gob .office-snap .spread i:nth-child(3) { background: var(--white-28); }
+.gob .office-snap .spread i:nth-child(4) { background: var(--white-18); }
+.gob .office-snap .spread i:nth-child(5) { background: var(--white-12); }
+.gob .office-snap .spread i.is-low { background: var(--red); }
+
+.gob .office .office-h,
+.gob.gob-1280 .office .office-h {
+  height: auto;
+  align-items: baseline;
+}
+.gob .office .office-h { min-height: var(--dsz-22); margin-bottom: 0; }
+.gob.gob-1280 .office .office-h { min-height: 20px; }
+.gob .office .office-h h2,
+.gob .office .office-h span {
+  margin: 0;
+}
+.gob .office .office-h h2 {
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gob.gob-1280 .office { gap: 2px; }
+html.gob-shell.gob-office .office-col { gap: var(--dsp-12); }
+/* At 1280 the middle column has to hold This Week + Team snapshot + at least four
+   standings rows. Tighten the Team snapshot card's padding (it has the most slack)
+   so the middle column's content fits four rows within the existing grid-row height
+   — without growing the grid (which would stretch the other columns) or shrinking
+   any type. This buys back the row the Ch7 weekly card cost. */
+html.gob-shell.gob-office.gob-1280 .office-snap { padding-top: var(--dsp-4); padding-bottom: var(--dsp-2); }
+.gob.gob-1280 .office .card { padding-top: 8px; padding-bottom: 8px; }
+.gob.gob-1280 .office .rs-pts { font-size: var(--fs-28); }
+.gob.gob-1280 .office .rs-dash { font-size: var(--fs-20); }
+.gob.gob-1280 .office .rs-n { font-size: var(--fs-16); }
+.gob .office .logo {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  font-size: 18px;
+}
+.gob.gob-1280 .office .logo {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  font-size: 15px;
+}
+.gob.gob-1280 .office .res-score { gap: 6px; }
+.gob.gob-1280 .potg { padding-top: 4px; }
+.gob.gob-1280 #office-root:not(.is-todos-open) .todo-list > .todo:nth-child(n + 5) { display: none; }
+.gob.gob-1920 .office-more { display: none; }
+.gob.gob-1280 .td-m2,
+.gob.gob-1280 .pg-extra,
+.gob.gob-1280 .office-av { display: none; }
+
+html.gob-shell.gob-office .pg-head { display: none; }
+html.gob-shell.gob-office .main {
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--page-pad);
+}
+html.gob-shell.gob-office #franchise-container,
+html.gob-shell.gob-office #tournament-tabs,
+html.gob-shell.gob-office #home-tab.tab-content,
+html.gob-shell.gob-office #home-tab.tab-content.active {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+html.gob-shell.gob-office .office {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* The Office is at least the fold tall and grows with its tallest column. The standings
+   card is never sliced to fit, so on a short window the Office is taller than the fold
+   and `.main` scrolls; without this the chain shrank to the fold and the card hung out
+   of its column, flush against the bottom edge. */
+html.gob-shell.gob-office #franchise-container,
+html.gob-shell.gob-office #tournament-tabs,
+html.gob-shell.gob-office #home-tab.tab-content,
+html.gob-shell.gob-office #home-tab.tab-content.active,
+html.gob-shell.gob-office .office,
+html.gob-shell.gob-office .office-grid {
+  flex-shrink: 0;
+}
+
+.gob .week-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--dsp-12);
+  height: 56px;
+  min-height: 56px;
+  flex: none;
+  min-width: 0;
+}
+.gob.gob-1920 .week-strip {
+  height: 64px;
+  min-height: 64px;
+}
+.gob .week-strip.office-skel { min-height: 56px; background: var(--white-4); box-shadow: none; }
+.gob .week-k {
+  flex: none;
+  font: var(--fw-bold) var(--fs-16)/1 var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-87);
+  white-space: nowrap;
+}
+.gob .week-track {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The week's steps are status, not controls: a quiet stepper. A small state mark and plain
+   text per step, joined by a thin line. No outline, no fill, no pointer. Done steps show a
+   check and dim; the current step is full white; upcoming steps are dim. Neutral only. */
+.gob .wk-step {
+  display: flex;
+  align-items: center;
+  gap: var(--dsp-8);
+  flex: 0 1 auto;
+  min-width: max-content;
+  height: 36px;
+  padding: 0;
+  position: relative;
+  white-space: nowrap;
+  cursor: default;
+}
+.gob.gob-1920 .wk-step { height: 40px; }
+.gob .wk-step + .wk-step { margin-left: var(--dsz-44); }
+.gob .wk-step + .wk-step::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--dsz-44) * -1 + var(--dsp-10));
+  width: calc(var(--dsz-44) - var(--dsp-10) * 2);
+  top: 50%;
+  height: 1px;
+  background: var(--line-strong);
+}
+.gob .week-strip.is-tight .wk-step + .wk-step { margin-left: var(--dsz-30); }
+.gob .week-strip.is-tight .wk-step + .wk-step::before { left: calc(var(--dsz-30) * -1 + var(--dsp-8)); width: calc(var(--dsz-30) - var(--dsp-8) * 2); }
+.gob .week-strip.is-tighter .wk-step + .wk-step { margin-left: var(--dsz-20); }
+.gob .week-strip.is-tighter .wk-step + .wk-step::before { left: calc(var(--dsz-20) * -1 + var(--space-5)); width: calc(var(--dsz-20) - var(--space-5) * 2); }
+.gob .week-strip.is-tighter .td-l { font-size: var(--fs-12); }
+.gob .wk-step .td-l {
+  flex: none;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: nowrap;
+  font-weight: var(--fw-regular);
+  color: var(--text-60);
+}
+.gob .wk-dot {
+  width: var(--dsz-18);
+  height: var(--dsz-18);
+  flex: none;
+  border-radius: var(--radius-round);
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1.5px var(--white-40);
+  color: var(--text-60);
+}
+.gob .wk-dot svg { width: 10px; height: 10px; }
+/* Done: a check, dimmed. */
+.gob .wk-step.done .wk-dot { box-shadow: none; }
+.gob .wk-step.done .td-l { color: var(--text-38); }
+.gob .wk-step.done .wk-dot { color: var(--text-38); }
+/* Current: full white, the mark filled. A step that blocks the advance is the current step
+   too (the top bar says what is needed), so it reads the same. */
+.gob .wk-step.is-next .td-l,
+.gob .wk-step.gated .td-l { font-weight: var(--fw-bold); color: var(--text-100); }
+.gob .wk-step.is-next .wk-dot,
+.gob .wk-step.gated .wk-dot {
+  box-shadow: inset 0 0 0 1.5px var(--text-100);
+  background: radial-gradient(circle, var(--text-100) 0, var(--text-100) 34%, transparent 38%);
+}
+/* Upcoming: dim. */
+.gob .wk-step.is-upcoming .td-l { color: var(--text-38); }
+.gob .wk-step.is-upcoming .wk-dot { box-shadow: inset 0 0 0 1.5px var(--white-20); }
+/* Read out, not shown. */
+.gob .wk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.gob .wk-step .td-adv,
+.gob .wk-step .td-gate {
+  flex: none;
+  align-self: center;
+  margin: 0;
+}
+
+.gob .office-col { overflow: visible; }
+.gob .office-col .office-wire {
+  flex: 0 0 auto;
+  height: auto;
+  overflow: visible;
+}
+.gob .wr-empty {
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  color: var(--text-60);
+}
+.gob .office-wire > .wr:first-child { border-top: 0; }
+html.gob-shell.gob-office .office-wire .wr,
+html.gob-shell.gob-office.gob-1920 .office-wire .wr {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+html.gob-shell.gob-office .office-wire .wr-2 {
+  display: block;
+  min-height: calc(var(--fs-12) * 1.35);
+  line-height: 1.35;
+}
+
+.gob .mv-p {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.gob .mv-p .nm {
+  flex: 0 0 auto;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: nowrap;
+  font-size: var(--fs-16);
+}
+.gob .attr-run {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 0;
+}
+.gob .attr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: var(--radius-6);
+  background: var(--white-5);
+  box-shadow: inset 0 0 0 1px var(--line);
+  white-space: nowrap;
+  font-size: var(--fs-22);
+}
+.gob .attr-chip .attr-code {
+  font: var(--fw-bold) var(--fs-22)/1 var(--font-display);
+  color: var(--text-100);
+  letter-spacing: var(--tracking-2);
+}
+.gob .attr-chip .tdig {
+  font: var(--fw-bold) var(--fs-22)/1 var(--font-display);
+}
+.gob .attr-chip .attr-tile {
+  width: auto;
+  height: auto;
+  min-width: calc(var(--fs-22) + 8px);
+  min-height: calc(var(--fs-22) + 4px);
+  padding: 0 4px;
+}
+.gob .attr-chip .attr-tile s {
+  font: var(--fw-bold) var(--fs-22)/1 var(--font-display);
+  padding-top: var(--space-1);
+}
+.gob .office-mv .lnk { align-self: flex-end; }
+.gob .nx-rank {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: var(--fw-bold);
+}
+.gob .office-h a.col-link:hover h2 {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.gob .meter.chem i {
+  background-color: transparent;
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--chem, var(--white-62)) 68%, var(--black)), var(--chem, var(--white-62)));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--chem, transparent) 42%, transparent);
+}
+.gob .meter.chem.is-red { --chem: var(--red); }
+.gob .meter.chem.is-yellow { --chem: var(--yellow); }
+.gob .meter.chem.is-green { --chem: var(--green); }
+.gob .att {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.gob .att-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+.gob .att-emoji { font-size: 16px; line-height: 1; }
+.gob .att-n {
+  font: var(--fw-bold) var(--fs-12)/1 var(--font-display);
+  color: var(--text-87);
+}
+.gob .att-bar {
+  width: 72%;
+  height: 4px;
+  border-radius: var(--radius-4);
+  background: var(--white-7);
+  overflow: hidden;
+}
+.gob .att-bar i { display: block; height: 100%; }
+.gob .att-col[data-bucket="em_0_19"] .att-bar i { background: var(--red); }
+.gob .att-col[data-bucket="em_20_39"] .att-bar i { background: color-mix(in srgb, var(--red) 55%, var(--white-18)); } /* no orange stop */
+.gob .att-col[data-bucket="em_40_59"] .att-bar i { background: var(--white-45); }
+.gob .att-col[data-bucket="em_60_79"] .att-bar i { background: color-mix(in srgb, var(--green) 58%, var(--white-18)); }
+.gob .att-col[data-bucket="em_80_plus"] .att-bar i {
+  background: var(--green);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--green) 45%, transparent);
+}
+html.gob-shell.gob-office #franchise-container .office .card-h h3 {
+  font-size: var(--fs-15);
+  letter-spacing: var(--tracking-8);
+  margin: 0;
+}
+html.gob-shell.gob-office #franchise-container .office-next:not(.tier) .ptw {
+  padding: var(--dsp-6) var(--space-2);
+  line-height: 1.35;
+}
+html.gob-shell.gob-office #franchise-container .office-next.tier .ptw {
+  line-height: 1.35;
+}
+html.gob-shell.gob-office #franchise-container .office-st { gap: 0; }
+html.gob-shell.gob-office #franchise-container .office-st .card-h {
+  margin-bottom: var(--dsp-10);
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-r:not(.st-hd) {
+  grid-template-columns: 1.6em minmax(0, 1fr) auto;
+  gap: var(--dsp-10);
+  align-items: center;
+  padding: var(--dsp-6) var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: 1.35;
+  letter-spacing: normal;
+  color: var(--text-87);
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-n {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  line-height: normal;
+  letter-spacing: normal;
+  color: var(--text-100);
+  overflow: visible;
+  text-overflow: unset;
+  white-space: nowrap;
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-pos {
+  color: var(--text-38);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-r:not(.st-hd) .st-wl {
+  font: var(--fw-bold) var(--fs-22)/var(--lh-1) var(--font-display);
+  letter-spacing: normal;
+  color: var(--text-100);
+  text-align: right;
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-hd {
+  grid-template-columns: 1.6em minmax(0, 1fr) auto;
+  padding: 0 var(--space-2);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
+  border-top: 0;
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-hd .st-wl {
+  text-align: right;
+  justify-self: stretch;
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-r.me {
+  padding: var(--dsp-6) var(--dsp-8);
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-more {
+  align-self: flex-end;
+  margin-top: 0;
+}
+/* The standings card is never tightened or sliced to fit: all of the conference's rows,
+   at the same row spacing as the other Office lists, at every density. On a short window
+   the Office scrolls. */
+html.gob-shell.gob-office.gob-1280 #franchise-container .office-st .card-h {
+  margin-bottom: var(--space-8);
+}
+html.gob-shell.gob-office.gob-1920 #franchise-container .office-st .card-h {
+  margin-bottom: var(--dsp-8);
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-n {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+html.gob-shell.gob-office #franchise-container .office-st .st-n img,
+html.gob-shell.gob-office #franchise-container .office-st .st-n .gob-mark {
+  flex: none;
+  width: var(--dsz-18);
+  height: var(--dsz-18);
+  object-fit: contain;
+}
+.gob.gob-1280 .office-next { gap: 2px; padding-top: 4px; padding-bottom: 2px; }
+.gob.gob-1280 .office-next .nx-name { font-size: var(--fs-24); line-height: 1; }
+.gob.gob-1280 .office-next.tier { padding-top: 0; padding-bottom: 0; gap: 2px; }
+.gob.gob-1280 .office-next.tier .tn-round { font-size: 14px; line-height: 1; }
+.gob.gob-1280 .office-next.tier .tn-band { padding-bottom: 0; }
+.gob.gob-1280 .office-next.tier .tn-lock { max-height: 16px; overflow: hidden; }
+.gob.gob-1280 .office-next.tier .tn-name { font-size: var(--fs-18); line-height: 1; }
+
+/* ── Weekly "Since last week" card (.wkc) ─────────────────────────────────
+   Replaces the Result + What moved cards in Office column 1. Ported from
+   ch7.css with Jamie's overrides: NO team-colour wash on win or loss (the card
+   is neutral chrome; the white WIN plate / outline LOSS tag carries the
+   result), and neutral ▲/▼ deltas. Reward gold appears ONLY on the
+   exceptional-gain marker (diamond, ring, gold delta, and the key). */
+.gob .wkc{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:var(--dsp-10);padding:var(--dsp-12) var(--dsp-14);border-radius:var(--radius-14);border:1px solid var(--line);background:linear-gradient(180deg,var(--white-4),var(--white-1p8));box-shadow:var(--shadow-card);min-width:0}
+.gob .wkc-k{display:flex;align-items:center;gap:var(--space-10)}
+.gob .wtag{display:inline-flex;align-items:center;height:var(--dsz-22);padding:var(--space-2) var(--space-9) 0;border-radius:var(--radius-6);font:var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-12)}
+.gob .wkc.is-win .wtag{background:var(--white-90);color:var(--bg)}
+.gob .wkc.is-loss .wtag{color:var(--text-87);box-shadow:inset 0 0 0 1px var(--line-strong)}
+.gob .wkc-when{flex:1;min-width:0;font-size:var(--fs-11);font-weight:var(--fw-semibold);letter-spacing:var(--tracking-6);text-transform:uppercase;color:var(--text-60);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gob .wkc .sb2{display:flex;flex-direction:column;gap:var(--space-2)}
+.gob .wkc .sb2-r{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-12)}
+.gob .wkc .sb2-n{display:flex;align-items:baseline;gap:var(--space-6);min-width:0;font:var(--fw-bold) var(--fs-22)/1.05 var(--font-display);letter-spacing:var(--tracking-3);color:var(--text-60)}
+.gob .wkc .sb2-n em{font-style:normal;font-size:.7em;color:var(--text-38)}
+.gob .wkc .sb2-n span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gob .wkc .sb2-p{font:var(--fw-bold) var(--fs-48)/.86 var(--font-display);color:var(--text-60);min-width:2ch;text-align:right;letter-spacing:var(--tracking-1)}
+.gob .wkc .sb2-r.w .sb2-n,.gob .wkc .sb2-r.w .sb2-p{color:var(--text-100)}
+/* LOSS is dignified: both teams at t87, so the loser is never dimmed on your page. */
+.gob .wkc.is-loss .sb2-n,.gob .wkc.is-loss .sb2-p,.gob .wkc.is-loss .sb2-r.w .sb2-n,.gob .wkc.is-loss .sb2-r.w .sb2-p{color:var(--text-87)}
+.gob .wkc-hl{font-size:var(--fs-13);font-weight:var(--fw-semibold);color:var(--text-87);text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;text-wrap:pretty}
+.gob .wkc-hl:hover{text-decoration-color:var(--white-50)}
+.gob .wkc .pg2{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:var(--dsp-12);padding-top:var(--dsp-10);border-top:1px solid var(--white-10)}
+.gob .wkc .pg2 .portrait{width:var(--dsz-60);height:var(--dsz-60);display:grid;place-items:center}
+.gob .wkc .pg2-id{display:flex;flex-direction:column;gap:var(--space-3);min-width:0}
+.gob .wkc .pg2-id .nm{font-size:var(--fs-16);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gob .wkc .pg2-l{display:flex;gap:var(--dsp-16);margin-top:var(--space-4)}
+.gob .wkc .pg2-l div{display:flex;align-items:baseline;gap:var(--space-4)}
+.gob .wkc .pg2-l b{font:var(--fw-bold) var(--fs-32)/var(--lh-9) var(--font-display);color:var(--text-100)}
+.gob .wkc .pg2-l span{font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--tracking-8);color:var(--text-60)}
+.gob .wkc .bdgs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-6)}
+.gob .wkc .bdg{display:flex;flex-direction:column;gap:var(--space-5);padding:var(--dsp-8) var(--dsp-10);border-radius:var(--radius-10);background:var(--white-3);box-shadow:inset 0 0 0 1px var(--line);min-width:0}
+.gob .wkc .bdg>span{font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--tracking-8);text-transform:uppercase;color:var(--text-60);white-space:nowrap}
+.gob .wkc .bdg-v{display:flex;align-items:baseline;gap:var(--space-5)}
+.gob .wkc .bdg-v b{font:var(--fw-bold) var(--fs-24)/var(--lh-9) var(--font-display);color:var(--text-100);white-space:nowrap}
+.gob .wkc .bdg-v em{font-style:normal;font-size:var(--fs-11);font-weight:var(--fw-bold);color:var(--text-87);white-space:nowrap}
+.gob .wkc .bdg-v em.dn{color:var(--text-60)}
+.gob .wkc-tr{display:flex;flex-direction:column}
+.gob .wkc-tr-h{display:flex;align-items:baseline;gap:var(--space-8);padding-bottom:var(--space-4)}
+.gob .wkc-tr-h .sub-h{margin-top:0}
+.gob .wkc .gn{display:flex;align-items:center;gap:var(--dsp-10);min-height:var(--dsz-34);border-top:1px solid var(--line)}
+.gob .wkc .gn .nm{flex:1;min-width:0;font-size:var(--fs-13);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gob .wkc .gn-c{display:flex;gap:var(--space-6);flex:none}
+.gob .wkc .gc{position:relative;display:inline-flex;align-items:center;gap:var(--space-5);height:var(--dsz-26);padding:0 var(--space-6) 0 var(--space-8);border-radius:var(--radius-7);background:var(--white-4);box-shadow:inset 0 0 0 1px var(--line)}
+.gob .wkc .gc>b{font:var(--fw-bold) var(--fs-15)/var(--lh-1) var(--font-display);letter-spacing:var(--tracking-4);color:var(--text-87);padding-top:var(--space-1)}
+.gob .wkc .gc .attr-tile{min-width:var(--dsz-22);height:var(--dsz-20);padding:0 var(--space-2);border-radius:var(--radius-4);display:grid;place-items:center}
+.gob .wkc .gc .attr-tile s{font:var(--fw-bold) var(--fs-15)/1 var(--font-display);text-decoration:none;padding-top:var(--space-1)}
+.gob .wkc .gc i{font-style:normal;font-size:var(--fs-10);font-weight:var(--fw-bold);color:var(--text-100);white-space:nowrap}
+.gob .wkc .gc.dn i{color:var(--text-60)}
+.gob .wkc .gc.xg{background:color-mix(in srgb,var(--reward-gold) 9%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--reward-gold) 60%,transparent)}
+.gob .wkc .gc.xg::before{content:'';width:6px;height:6px;margin-right:var(--space-1);transform:rotate(45deg);background:var(--reward-gold)}
+.gob .wkc .gc.xg i{color:var(--reward-gold)}
+.gob .wkc .xg-key{margin-left:auto;display:inline-flex;align-items:center;gap:var(--space-6);font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--tracking-8);text-transform:uppercase;color:var(--reward-gold);white-space:nowrap}
+.gob .wkc .xg-key::before{content:'';width:6px;height:6px;transform:rotate(45deg);background:var(--reward-gold)}
+.gob .wkc-also{display:flex;align-items:center;gap:var(--space-10);padding:var(--dsp-8) var(--dsp-10);border-radius:var(--radius-8);background:var(--white-3p5);box-shadow:inset 0 0 0 1px var(--line);font-size:var(--fs-12)}
+.gob .wkc-also>span{font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--tracking-10);text-transform:uppercase;color:var(--text-60);white-space:nowrap}
+.gob .wkc-also b{flex:1;min-width:0;font-weight:var(--fw-semibold);color:var(--text-87);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gob .wkc-more{align-self:flex-start;font-size:var(--fs-11);font-weight:var(--fw-semibold);color:var(--text-60)}
+.gob .wkc-more:hover{color:var(--text-100)}
+.gob .wkc-f{display:flex;justify-content:flex-end;gap:var(--space-16);margin-top:auto}
+/* Motion rides the office .arriving/.calm system; JS gates it once per result_key. */
+.gob .arriving .wkc .gc.xg{animation:xgSweep var(--dur-gain-sweep) var(--ease-out) var(--delay-chips) both}
+.gob .calm.arriving .wkc.ar-card{animation:wkFade var(--dur-arrive-item) ease both}
+.gob .calm.arriving .wkc .ar-item{animation:none}
+@keyframes wkFade{from{opacity:0}}
+@keyframes xgSweep{0%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--reward-gold) 60%,transparent),0 0 0 0 color-mix(in srgb,var(--reward-gold) 0%,transparent)}35%{box-shadow:inset 0 0 0 1px var(--reward-gold),0 0 0 5px color-mix(in srgb,var(--reward-gold) 22%,transparent)}100%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--reward-gold) 60%,transparent),0 0 0 9px transparent}}
+
+/* Signing class (week 36): one row per signed recruit, grade now -> ceiling.
+   The week-1 lists and Top Recruits (.office-list) are the same card. */
+.gob :is(.office-class, .office-list) .wr { grid-template-columns: minmax(0, 1fr) auto; }
+.gob :is(.office-class, .office-list) .card-h + .wr { border-top: 0; }
+.gob :is(.office-class, .office-list) .card-h .meta { margin-left: auto; font-size: var(--fs-11); font-weight: var(--fw-semibold); color: var(--text-60); }
+.gob :is(.office-class, .office-list) .wr-1 .nm { overflow: hidden; text-overflow: ellipsis; }
+.gob :is(.office-class, .office-list) .wr-2 { color: var(--text-60); }
+.gob :is(.office-class, .office-list) .sg-rt { display: inline-flex; align-items: baseline; gap: var(--space-6); white-space: nowrap; }
+.gob :is(.office-class, .office-list) .sg-rt i { font-style: normal; font-size: var(--fs-12); color: var(--text-38); }
+
+/* --- Week 1: the season preview ------------------------------------------------------
+   The lists (.office-list) share the signing-class card's rules above (two-line rows,
+   grade on the right) and the standings row (.st-r). Only what those do not already say is here. */
+
+/* Rankings: "5 of 8". The unit is wider than a stat's "PPG". */
+.gob .office-ranks .card-h + .ptw { border-top: 0; }
+.gob .office-ranks .ptw em { width: var(--dsz-52); text-align: left; white-space: nowrap; }
+/* Recruit rows (Top Recruits, Watchlist, week-35 Orders): the name; under it
+   "Pos: C  RT: C  YR: JH", quiet labels and the values as they were. The right-hand column
+   is the lean, or the points. */
+.gob .office-list .rc-facts { display: inline-flex; align-items: baseline; gap: var(--space-10); font-size: var(--fs-12); white-space: nowrap; }
+.gob .office-list .rc-f { white-space: nowrap; }
+.gob .office-list .rc-k { font-style: normal; color: var(--text-38); }
+.gob .office-list .rc-facts .tdig { font-size: var(--fs-14); }
+.gob .office-list .rc-row { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-12); }
+.gob .office-list .rc-lean { justify-self: end; white-space: nowrap; text-align: right; font-size: var(--fs-13); font-weight: var(--fw-semibold); color: var(--text-100); }
+.gob .office-list .rc-lean.is-none { font-weight: var(--fw-regular); color: var(--text-38); }
+.gob .office-list .rc-pts { display: inline-flex; align-items: baseline; gap: var(--space-4); white-space: nowrap; }
+.gob .office-list .rc-pts i { font-style: normal; font-size: var(--fs-11); color: var(--text-60); }
+/* Top / Watchlist: the app's segment control, right-aligned in the title row and sized
+   for a card header. */
+.gob .office-top .card-h .office-seg { margin-left: auto; flex: none; }
+html.gob-shell .gob .office-top .office-seg button { padding: var(--space-6) var(--space-10); font-size: var(--fs-11); }
+
+/* Last season, one quiet line under the rows (not in season 1). */
+.gob .office-ranks .rk-last { margin: 0; padding-top: var(--space-6); font-size: var(--fs-13); color: var(--text-60); }
+
+/* "Yours" on a list row: the navy selected-row treatment the standings row uses. */
+.gob .office-list .wr.me {
+  padding-left: var(--dsp-8);
+  padding-right: var(--dsp-8);
+  background: color-mix(in srgb, var(--navy) 35%, transparent);
+  border-radius: var(--radius-6);
+  border-top-color: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy-hi) 35%, transparent);
+}
+.gob .office-list .wr.me + .wr { border-top-color: transparent; }
+.gob .office-list a.wr { color: inherit; text-decoration: none; }
+.gob .office-list a.wr:hover .nm { text-decoration: underline; text-underline-offset: 3px; }
+.gob .office-list .sg-rt .tdig { font-size: var(--fs-18); }
+
+/* A leading tag (position, week) in its own fixed column. */
+.gob .office-list.office-circle .wr { grid-template-columns: var(--dsz-34) minmax(0, 1fr) auto; }
+/* All-Americans: position, headshot, name over team, grade. */
+.gob .office-list.office-aa .wr { grid-template-columns: var(--dsz-30) var(--dsz-40) minmax(0, 1fr) auto; }
+.gob .office-list .aa-pt { width: var(--dsz-40); height: var(--dsz-40); }
+.gob .office-list .aa-pt img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; display: block; }
+.gob .office-list .aa-pt .office-initials { font-size: var(--fs-13); }
+.gob .office-list .wr-k { font-size: var(--fs-10); font-weight: var(--fw-bold); letter-spacing: var(--tracking-8); text-transform: uppercase; color: var(--text-38); white-space: nowrap; }
+.gob .office-list.office-circle .wr-k { color: var(--text-60); }
+.gob .office-list.office-circle .sg-rt .tdig { color: var(--text-100); }
+
+/* The newcomers' summary line sits under the rows, on the list's hairline. */
+.gob .office-list .nc-sum { margin: 0; padding-top: var(--dsp-8); border-top: 1px solid var(--line); font-size: var(--fs-12); color: var(--text-60); }
+
+/* Key Players: the roster's columns as standings rows. One template, so labels sit over values. */
+html.gob-shell.gob-office #franchise-container .office-tb { gap: 0; }
+html.gob-shell.gob-office #franchise-container .office-tb .card-h { margin-bottom: var(--dsp-8); }
+html.gob-shell.gob-office #franchise-container .office-tb .st-r {
+  grid-template-columns: minmax(0, 1fr) var(--dsz-34) var(--dsz-28) var(--dsz-26) var(--dsz-34) var(--dsz-30);
+  gap: var(--space-8);
+  align-items: center;
+  padding: var(--dsp-6) var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-12);
+  line-height: 1.35;
+  letter-spacing: normal;
+  color: var(--text-87);
+}
+html.gob-shell.gob-office #franchise-container .office-tb .st-hd {
+  padding: 0 var(--space-2) var(--space-4);
+  border-top: 0;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+html.gob-shell.gob-office #franchise-container .office-tb .st-r > span:nth-child(n + 2) { text-align: right; }
+html.gob-shell.gob-office #franchise-container .office-tb .st-n { min-width: 0; }
+html.gob-shell.gob-office #franchise-container .office-tb .st-nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  color: var(--text-100);
+  text-decoration: none;
+}
+html.gob-shell.gob-office #franchise-container .office-tb a.st-nm:hover { text-decoration: underline; text-underline-offset: 3px; }
+html.gob-shell.gob-office #franchise-container .office-tb .tb-c { color: var(--text-60); font-variant-numeric: tabular-nums; }
+html.gob-shell.gob-office #franchise-container .office-tb .tb-rt .tdig { font-size: var(--fs-16); }
+
+/* Preseason National Rankings: the standings card, the place column is a national rank. */
+html.gob-shell.gob-office #franchise-container .office-pre .st-r:not(.st-hd),
+html.gob-shell.gob-office #franchise-container .office-pre .st-hd { grid-template-columns: var(--dsz-34) minmax(0, 1fr) auto; }
+html.gob-shell.gob-office #franchise-container .office-pre .st-r:not(.st-hd) .st-pos { font: var(--fw-bold) var(--fs-18)/var(--lh-1) var(--font-display); color: var(--text-87); }
+
+/* "Season Opener" over the opponent. */
+.gob .office-next .nx-open { margin: 0 0 var(--space-6); }
+
+/* "Moved most" with nothing to list: one quiet line, not a row that invites a click. */
+.gob .msr.msr-empty > span:first-child,
+.gob .msr.msr-empty:hover > span:first-child { color: var(--text-60); text-decoration: none; }
+.gob .msr.msr-empty b { color: var(--text-38); }

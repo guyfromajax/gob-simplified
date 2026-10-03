@@ -99,6 +99,7 @@ from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
 )
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 # Named HCO setup spots the 4 non-BH offensive players sample from
@@ -596,7 +597,8 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         shot_variant_extras = roll_shot_variant_extras(
             shot_variant, shooter_y=bh_target["y"],
         )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         shot_variant = None
         shot_variant_extras = {}
 
@@ -738,6 +740,7 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         try:
             pressure_type = game.turn_manager.determine_defensive_pressure_type()
         except Exception as e:
+            reraise_if_strict(e)
             logging.warning(
                 "🚨 [AFTER_STEAL] determine_defensive_pressure_type failed: %s; defaulting to HCO", e
             )

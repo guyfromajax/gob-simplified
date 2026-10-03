@@ -1,9 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
+  <script>
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search);
+        if (q.get('mode') === 'tutorial') return;
+        q.set('tab', 'playbooks-view');
+        location.replace('/franchise-command-center.html?' + q.toString());
+      } catch (err) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/gtm-loader.js"></script>
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
+  <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8">
@@ -12,12 +24,15 @@
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
 <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/css/playbook-cmd.css">
   <link rel="stylesheet" href="/css/playbook-tiles.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/gob-toast.css">
   <link rel="stylesheet" href="/playbooks.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
-<body>
+<body class="playbooks-page">
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
   <div class="resource-page-container fcc-brand-page-shell playbooks-resource-shell">
@@ -34,18 +49,16 @@
                 <h1>Playbook Settings</h1>
                 <p>Configure usage, focus, and Playcall Center order.</p>
               </div>
-              <div id="sections-ready-indicator" class="playbooks-sections-ready warn" aria-live="polite">
-                <span class="chk" aria-hidden="true">
-                  <svg viewBox="0 0 12 12" fill="none" stroke="#0b0d14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5L5 9L9.5 3.5"/></svg>
-                </span>
-                <span class="ready-copy"><b>0 of 2</b> flexible sections balanced</span>
-              </div>
-              <div class="playbooks-page-actions">
-                <button id="save-btn" class="playbooks-save-btn playbooks-save-btn-header" type="button" disabled>Save Playbooks</button>
+              <div id="playbooks-tools-row" class="playbooks-tools-row">
+                <div id="sections-ready-indicator" class="playbooks-sections-ready warn" aria-live="polite">
+                  <span class="ck" aria-hidden="true"></span>
+                  <span class="ready-copy bal"><b>0 of 2</b> flexible sections balanced</span>
+                </div>
+                <button id="save-btn" class="btn-o playbooks-save-btn playbooks-save-btn-header" type="button" disabled>Save Playbooks</button>
               </div>
             </header>
 
-            <div class="playbooks-layout">
+            <div class="pbc playbooks-layout">
               <div class="playbooks-left-column" id="playbooks-edit-column">
                 <section class="settings-card gameplay-lockout-card" id="gameplay-lockout" hidden>
                   <div class="section-block">
@@ -58,120 +71,126 @@
                   </div>
                 </section>
 
-                <div id="shot-weights-live" class="psw-root playbooks-shot-weights-strip" aria-live="polite">
-                  <div class="psw-strip-label">Expected shot distribution <span class="psw-live-pill">LIVE</span></div>
+                <div id="shot-weights-live" class="psw playbooks-shot-weights-strip" aria-live="polite">
+                  <div class="psw-strip-label">Shot Distribution</div>
                   <p class="psw-unavailable">Loading shot weights…</p>
                 </div>
 
-                <div class="playbooks-tabs" role="tablist" aria-label="Playbook side">
-                  <button class="playbooks-tab on" type="button" role="tab" data-tab="offense" aria-selected="true">
-                    <span class="dot" aria-hidden="true"></span> Offense
-                  </button>
-                  <button class="playbooks-tab" type="button" role="tab" data-tab="defense" aria-selected="false">
-                    <span class="dot" aria-hidden="true"></span> Defense
-                  </button>
+                <div class="playbooks-side-row">
+                  <div class="seg playbooks-tabs" id="playbooks-side-seg" role="tablist" aria-label="Playbook side">
+                    <button class="playbooks-tab on" type="button" role="tab" data-tab="offense" aria-selected="true" aria-controls="pane-offense">Offense</button>
+                    <button class="playbooks-tab" type="button" role="tab" data-tab="defense" aria-selected="false" aria-controls="pane-defense">Defense</button>
+                    <button class="playbooks-tab" type="button" role="tab" data-tab="fastBreaks" aria-selected="false" aria-controls="pane-fast-breaks">Fast Breaks</button>
+                    <button class="playbooks-tab" type="button" role="tab" data-tab="pressTraps" aria-selected="false" aria-controls="pane-press-traps">Press/Traps</button>
+                  </div>
                 </div>
 
                 <div class="playbooks-tabpane on" data-pane="offense" id="pane-offense" role="tabpanel">
-                  <section class="pb-sec" data-section="motion">
-                    <div class="pb-sec-head">
+                  <section class="pbs pb-sec" data-section="motion">
+                    <div class="sh pb-sec-head">
                       <div class="pb-sec-title">
                         <h2>Motion</h2>
-                        <span class="cnt" id="motion-count"></span>
+                        <span class="m cnt" id="motion-count"></span>
                       </div>
-                      <div class="section-total" id="motion-total"></div>
+                      <div class="section-total tot" id="motion-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
                     </div>
                     <div class="et-grid" id="motion-grid"></div>
                   </section>
 
-                  <section class="pb-sec" data-section="setPlays">
-                    <div class="pb-sec-head">
+                  <section class="pbs pb-sec" data-section="setPlays">
+                    <div class="sh pb-sec-head">
                       <div class="pb-sec-title">
                         <h2>Set Plays</h2>
-                        <span class="cnt" id="set-plays-count"></span>
+                        <span class="m cnt" id="set-plays-count"></span>
                       </div>
-                      <div class="section-total" id="set-plays-total"></div>
+                      <div class="section-total tot" id="set-plays-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
                     </div>
                     <div class="et-grid" id="set-plays-grid"></div>
-                  </section>
-
-                  <section class="pb-sec" data-section="fastBreaks" data-norm="1">
-                    <div class="pb-sec-head">
-                      <div class="pb-sec-title">
-                        <h2>Fast Breaks</h2>
-                        <span class="cnt" id="fast-breaks-count"></span>
-                      </div>
-                      <div class="pb-sec-actions">
-                        <div class="section-total" id="fast-breaks-total"></div>
-                        <button class="norm-btn" id="fast-breaks-normalize" type="button" hidden>Normalize → 100</button>
-                      </div>
-                    </div>
-                    <div class="chips" id="fast-breaks-chips"></div>
                   </section>
                 </div>
 
                 <div class="playbooks-tabpane" data-pane="defense" id="pane-defense" role="tabpanel" hidden>
-                  <section class="pb-sec def-sec" data-section="manDefense">
-                    <div class="pb-sec-head">
+                  <section class="pbs pb-sec def-sec" data-section="manDefense">
+                    <div class="sh pb-sec-head">
                       <div class="pb-sec-title">
                         <h2>Man Defense</h2>
-                        <span class="cnt" id="man-defense-count"></span>
+                        <span class="m cnt" id="man-defense-count"></span>
                       </div>
-                      <div class="section-total" id="man-defense-total"></div>
+                      <div class="section-total tot" id="man-defense-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
                     </div>
                     <div class="et-grid" id="man-defense-grid"></div>
                   </section>
 
-                  <section class="pb-sec def-sec" data-section="zoneDefense">
-                    <div class="pb-sec-head">
+                  <section class="pbs pb-sec def-sec" data-section="zoneDefense">
+                    <div class="sh pb-sec-head">
                       <div class="pb-sec-title">
                         <h2>Zone Defense</h2>
-                        <span class="cnt" id="zone-defense-count"></span>
+                        <span class="m cnt" id="zone-defense-count"></span>
                       </div>
-                      <div class="section-total" id="zone-defense-total"></div>
+                      <div class="section-total tot" id="zone-defense-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
                     </div>
                     <div class="et-grid" id="zone-defense-grid"></div>
                   </section>
+                </div>
 
-                  <section class="pb-sec def-sec" data-section="hcTraps" data-norm="1">
-                    <div class="pb-sec-head">
+                <div class="playbooks-tabpane" data-pane="fastBreaks" id="pane-fast-breaks" role="tabpanel" hidden>
+                  <section class="pbs pb-sec" data-section="fastBreaks" data-norm="1">
+                    <div class="sh pb-sec-head">
                       <div class="pb-sec-title">
-                        <h2>HC Traps</h2>
-                        <span class="cnt" id="hc-traps-count"></span>
+                        <h2>Fast Breaks</h2>
+                        <span class="m cnt" id="fast-breaks-count"></span>
+                        <button class="norm-btn btn-q" id="fast-breaks-normalize" type="button" hidden>Normalize → 100</button>
                       </div>
-                      <div class="pb-sec-actions">
-                        <div class="section-total" id="hc-traps-total"></div>
-                        <button class="norm-btn" id="hc-traps-normalize" type="button" hidden>Normalize → 100</button>
-                      </div>
+                      <div class="section-total tot" id="fast-breaks-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
                     </div>
-                    <div class="chips" id="hc-traps-chips"></div>
+                    <div class="chips et-grid" id="fast-breaks-chips"></div>
+                  </section>
+                </div>
+
+                <div class="playbooks-tabpane" data-pane="pressTraps" id="pane-press-traps" role="tabpanel" hidden>
+                  <section class="pbs pb-sec def-sec" data-section="hcTraps" data-norm="1">
+                    <div class="sh pb-sec-head">
+                      <div class="pb-sec-title">
+                        <h2>Half-Court Traps</h2>
+                        <span class="m cnt" id="hc-traps-count"></span>
+                        <button class="norm-btn btn-q" id="hc-traps-normalize" type="button" hidden>Normalize → 100</button>
+                      </div>
+                      <div class="section-total tot" id="hc-traps-total"></div>
+                      <span class="cmd-h">CMD</span>
+                      <span class="slot-h" aria-hidden="true"></span>
+                    </div>
+                    <div class="chips et-grid" id="hc-traps-chips"></div>
                   </section>
                 </div>
               </div>
 
-              <aside class="settings-card pc-card">
-                <div class="pc-header">
-                  <h2>Playcall Center</h2>
+              <aside class="pcs pc-card">
+                <div class="pcs-h">
+                  <div class="sh"><h2>Playcall Center</h2></div>
                   <p>Up to 8 offense and 8 defense plays. Drag to reorder.</p>
                 </div>
-                <div class="pc-sections">
-                  <div class="pc-column">
-                    <div class="pc-section-label">
-                      <span>Offense</span>
-                      <span class="pc-cap" id="pc-cap-offense"></span>
-                    </div>
-                    <div id="pc-order-offense" class="pc-list" data-list-type="offense"></div>
-                    <div id="pc-error-offense" class="pc-inline-error" aria-live="polite"></div>
-                  </div>
-                  <div class="pc-column">
-                    <div class="pc-section-label">
-                      <span>Defense</span>
-                      <span class="pc-cap" id="pc-cap-defense"></span>
-                    </div>
-                    <div id="pc-order-defense" class="pc-list" data-list-type="defense"></div>
-                    <div id="pc-error-defense" class="pc-inline-error" aria-live="polite"></div>
-                  </div>
+                <div class="pcs-g">
+                  <b>Offense</b>
+                  <span class="pc-cap" id="pc-cap-offense"></span>
                 </div>
+                <div id="pc-order-offense" class="csr-l pc-list" data-list-type="offense"></div>
+                <div id="pc-error-offense" class="pc-inline-error" aria-live="polite"></div>
+                <div class="pcs-g">
+                  <b>Defense</b>
+                  <span class="pc-cap" id="pc-cap-defense"></span>
+                </div>
+                <div id="pc-order-defense" class="csr-l pc-list" data-list-type="defense"></div>
+                <div id="pc-error-defense" class="pc-inline-error" aria-live="polite"></div>
               </aside>
             </div>
           </div>
@@ -185,13 +204,23 @@
   <script src="/common.js"></script>
   <script src="/js/shared/playbookTeamId.js"></script>
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
-  <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/errorHandler.js"></script>
   <script src="/js/shared/stateTelemetry.js"></script>
-  <script type="module">
-    import '/js/state/gameStore.js';
-  </script>
   <script src="/js/shared/pointerValidation.js"></script>
-  <script src="/playbooks.js"></script>
+  <script src="/js/shared/gobToast.js"></script>
+  <script src="/js/shared/gobLeaveConfirm.js"></script>
+  <script type="module">
+    import { init } from '/playbooks.js';
+    import '/js/state/gameStore.js';
+    window.__gameStoreLoaded = true;
+    try {
+      // FranchiseContext (loaded in <head>), not the URL: correct on web and desktop.
+      const fc = window.FranchiseContext;
+      const ctx = (key) => (fc && typeof fc.get === 'function' ? fc.get(key) : null);
+      if (ctx('mode') === 'tutorial') {
+        init(document.body);
+      }
+    } catch (err) { /* redirect already left */ }
+  </script>
 </body>
 </html>

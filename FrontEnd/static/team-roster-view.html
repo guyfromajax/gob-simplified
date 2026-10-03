@@ -1,11 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var viewed = params.get('roster_team_id') || '';
+      if (params.get('mode') === 'practice_squad' && params.get('ps_team_id')) {
+        // A practice squad opens on the standard team page, under League.
+        params.set('tab', 'team-view');
+        params.set('origin', 'league');
+        params.set('return_tab', 'practice-squad-view');
+        params.delete('mode');
+        params.delete('return_url');
+      } else if (viewed) {
+        params.set('tab', 'team-view');
+        params.set('view_team_id', viewed);
+        if (!params.get('origin')) {
+          var ret = params.get('return_tab') || '';
+          var teamTabs = { 'roster-view': 1, 'schedule-tab': 1, 'player-stats-tab': 1, 'player-stats-view': 1, 'team-attributes-view': 1 };
+          params.set('origin', ret === 'home-tab' ? 'office' : (teamTabs[ret] ? 'team' : 'league'));
+        }
+      } else {
+        params.set('tab', 'roster-view');
+      }
+      var qs = params.toString();
+      window.location.replace('/franchise-command-center.html' + (qs ? '?' + qs : ''));
+    })();
+  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8">
@@ -355,6 +382,7 @@
     .tr-empty { padding: 24px; text-align: center; color: rgba(255,255,255,.4); }
   </style>
   <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/gob-toast.css">
   <link rel="stylesheet" href="/css/development-focus.css">
 </head>
 <body>
@@ -420,9 +448,12 @@
   <script src="/common.js"></script>
   <script src="/js/shared/playerYear.js"></script>
   <script src="/js/shared/attributeTooltips.js"></script>
+  <script src="/js/utils/attributeDisplay.js"></script>
   <script src="/js/shared/attrTiles.js"></script>
   <script src="/js/shared/rtBucket.js"></script>
   <script src="/js/shared/scoutingReport.js"></script>
+  <!-- Development Focus saves on change and confirms with the shared toast. -->
+  <script src="/js/shared/gobToast.js"></script>
   <script src="/js/shared/developmentFocus.js"></script>
   <script src="/team-roster-view.js"></script>
   <script type="module">

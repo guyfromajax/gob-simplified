@@ -1,3 +1,5 @@
+import { TRAINING_SHELL } from '/training-shell.js';
+
 function franchiseCtx() {
   return typeof window !== 'undefined' ? window.FranchiseContext : null;
 }
@@ -19,28 +21,99 @@ function cloneParams(params) {
   return out;
 }
 
+let root = null;
+let started = false;
+let _onPageShow = null;
+let _onResizeSliders = null;
+let _onResizeReq = null;
+let _onScrollTip = null;
+let _reqObserver = null;
+let _tabShown = null;
+let _onKeyModal = null;
+
+function byId(id) {
+  if (id === 'play-now') return document.getElementById(id);
+  if (root) {
+    if (root.id === id) return root;
+    const found = root.querySelector('#' + CSS.escape(id));
+    if (found) return found;
+  }
+  return document.getElementById(id);
+}
+
+function qsa(sel) {
+  return root ? root.querySelectorAll(sel) : document.querySelectorAll(sel);
+}
+
+function rootQuery(sel) {
+  return root ? root.querySelector(sel) : document.querySelector(sel);
+}
+
+function inAppShell() {
+  return !!(root && (root.id === 'training-view' || (root.closest && root.closest('#training-view'))));
+}
+
+function bindDom() {
+  pointsRemainingEl = byId('points-remaining');
+  submitBtn = byId('submit-btn');
+  autoTrainBtn = byId('auto-train-btn');
+  recruitingInvitesBtn = byId('recruiting-invites-btn');
+  backBtn = byId('back-btn');
+  allSliders = qsa('.slider');
+  coachingRadios = qsa('input[name="coaching-focus"]');
+  offensePlaysRadios = qsa('input[name="offense-plays"]');
+  defensePlaysRadios = qsa('input[name="defense-plays"]');
+  autoTrainModal = byId('auto-train-modal');
+  autoTrainModalTitle = byId('auto-train-modal-title');
+  autoTrainModalFocus = byId('auto-train-modal-focus');
+  autoTrainModalClose = byId('auto-train-modal-close');
+  customFocusModal = byId('custom-focus-modal');
+  customFocusThead = byId('custom-focus-thead');
+  customFocusTbody = byId('custom-focus-tbody');
+  customFocusAssignBtn = byId('custom-focus-assign-btn');
+  customFocusCancelBtn = byId('custom-focus-cancel-btn');
+  reqBarEl = byId('requirements-bar');
+  reqPointsChip = byId('req-points');
+  reqPointsUsedEl = byId('req-points-used');
+  reqPointsTotalEl = byId('req-points-total');
+  reqPointsMeterEl = byId('req-points-meter');
+  reqFocusChip = byId('req-focus');
+  reqFocusValueEl = byId('req-focus-value');
+  reqFocusNudgeBtn = byId('req-focus-nudge');
+  playerDevSection = byId('player-dev-section');
+}
+
 // Training Page JavaScript
 let TOTAL_POINTS = 24; // Will be updated from API for franchise mode
 
-// DOM Elements
-const pointsRemainingEl = document.getElementById('points-remaining');
-const submitBtn = document.getElementById('submit-btn');
-const autoTrainBtn = document.getElementById('auto-train-btn');
-const recruitingInvitesBtn = document.getElementById('recruiting-invites-btn');
-const backBtn = document.getElementById('back-btn');
-const allSliders = document.querySelectorAll('.slider');
-const coachingRadios = document.querySelectorAll('input[name="coaching-focus"]');
-const offensePlaysRadios = document.querySelectorAll('input[name="offense-plays"]');
-const defensePlaysRadios = document.querySelectorAll('input[name="defense-plays"]');
-const autoTrainModal = document.getElementById('auto-train-modal');
-const autoTrainModalTitle = document.getElementById('auto-train-modal-title');
-const autoTrainModalFocus = document.getElementById('auto-train-modal-focus');
-const autoTrainModalClose = document.getElementById('auto-train-modal-close');
-const customFocusModal = document.getElementById('custom-focus-modal');
-const customFocusThead = document.getElementById('custom-focus-thead');
-const customFocusTbody = document.getElementById('custom-focus-tbody');
-const customFocusAssignBtn = document.getElementById('custom-focus-assign-btn');
-const customFocusCancelBtn = document.getElementById('custom-focus-cancel-btn');
+// DOM Elements — bound in bindDom() after the shell is in `root`.
+let pointsRemainingEl = null;
+let submitBtn = null;
+let autoTrainBtn = null;
+let recruitingInvitesBtn = null;
+let backBtn = null;
+let allSliders = [];
+let coachingRadios = [];
+let offensePlaysRadios = [];
+let defensePlaysRadios = [];
+let autoTrainModal = null;
+let autoTrainModalTitle = null;
+let autoTrainModalFocus = null;
+let autoTrainModalClose = null;
+let customFocusModal = null;
+let customFocusThead = null;
+let customFocusTbody = null;
+let customFocusAssignBtn = null;
+let customFocusCancelBtn = null;
+let reqBarEl = null;
+let reqPointsChip = null;
+let reqPointsUsedEl = null;
+let reqPointsTotalEl = null;
+let reqPointsMeterEl = null;
+let reqFocusChip = null;
+let reqFocusValueEl = null;
+let reqFocusNudgeBtn = null;
+let playerDevSection = null;
 let currentWeek = 1;
 let currentTeamName = '';
 let currentSeason = 1;
@@ -50,12 +123,21 @@ let trainingNewswireError = null;
 
 /** @type {{ player_id: string, name: string, attrs: Record<string, number> }[]} */
 let customFocusRoster = [];
+let positionTallies = null;
+let focusTallies = null;
 /** @type {string[]} */
 let customFocusRankingAttrs = [];
 /** @type {Record<string, string[]>} playerId -> up to 3 distinct attr codes */
 let customFocusDraft = {};
 /** @type {Record<string, string[]>} committed picks after Assign */
 let customFocusCommitted = {};
+let trainingDirty = false;
+// True after applyTrainingWeekState hides the weekly allocation (submitted week or
+// tournament). The focus page must not enable Submit Training on those weeks.
+let trainingAllocationClosed = false;
+/** 'weekly' (Advance focus page) or 'player-dev' (Prep › Player Training). */
+let trainingSections = 'weekly';
+let trainingFormSnapshot = null;
 
 /** Session keys for Custom Training Playbook → training-playbooks.html */
 const STORAGE_PLAYBOOK_FOCUS = 'gob_training_playbook_focus';
@@ -77,10 +159,10 @@ function saveTrainingFormDraft() {
   const key = trainingFormDraftStorageKey(urlParams);
   if (!key) return;
   const sliders = {};
-  document.querySelectorAll('.slider').forEach(function (el) {
+  qsa('.slider').forEach(function (el) {
     if (el.id) sliders[el.id] = parseInt(el.value, 10) || 0;
   });
-  const checked = document.querySelector('input[name="coaching-focus"]:checked');
+  const checked = rootQuery('input[name="coaching-focus"]:checked');
   const payload = {
     v: 1,
     week: currentWeek,
@@ -93,6 +175,113 @@ function saveTrainingFormDraft() {
   try {
     sessionStorage.setItem(key, JSON.stringify(payload));
   } catch (_e) {}
+}
+
+function isWeekly() {
+  return trainingSections === 'weekly';
+}
+
+function resolveSections(options) {
+  if (options && (options.sections === 'weekly' || options.sections === 'player-dev')) {
+    return options.sections;
+  }
+  return inAppShell() ? 'player-dev' : 'weekly';
+}
+
+function captureTrainingFormSnapshot() {
+  const sliders = {};
+  qsa('.slider').forEach(function (el) {
+    if (el.id) sliders[el.id] = parseInt(el.value, 10) || 0;
+  });
+  const checked = rootQuery('input[name="coaching-focus"]:checked');
+  trainingFormSnapshot = {
+    sliders: sliders,
+    coaching_radio: checked ? checked.value : null,
+    player_maximizer_resolved: playerMaximizerResolvedFocus,
+    custom_focus_committed: JSON.parse(JSON.stringify(customFocusCommitted || {})),
+  };
+}
+
+function applyTrainingFormState(o) {
+  if (!o) return;
+  if (o.sliders && typeof o.sliders === 'object') {
+    Object.keys(o.sliders).forEach(function (id) {
+      const el = byId(id);
+      if (el && el.classList && el.classList.contains('slider')) {
+        const v = Math.max(0, Math.min(5, parseInt(o.sliders[id], 10) || 0));
+        setSliderValue(el, v);
+      }
+    });
+  }
+  playerMaximizerResolvedFocus = o.player_maximizer_resolved || null;
+  customFocusCommitted =
+    o.custom_focus_committed && typeof o.custom_focus_committed === 'object'
+      ? Object.assign({}, o.custom_focus_committed)
+      : {};
+  let radioVal = o.coaching_radio || null;
+  if (radioVal === LEGACY_CHOOSE_ATTRIBUTES_VALUE) radioVal = playerMaximizerResolvedFocus;
+  committedCoachingValue = radioVal;
+  setCoachingFocusRadio(radioVal);
+  updatePointsRemaining();
+}
+
+function restoreTrainingFormSnapshot() {
+  applyTrainingFormState(trainingFormSnapshot);
+}
+
+function confirmTrainingLeave(proceed) {
+  if (!window.GOBLeaveConfirm) {
+    proceed();
+    return;
+  }
+  window.GOBLeaveConfirm.open({
+    title: 'Unsaved Training',
+    copy: 'Leave without submitting this week\'s allocation? Your draft is kept until you submit.',
+    saveLabel: 'Keep Draft',
+    onSave: function () {
+      trainingDirty = false;
+      return true;
+    },
+    onDiscard: function () {
+      restoreTrainingFormSnapshot();
+      clearTrainingFormDraftForCurrentContext();
+      trainingDirty = false;
+    },
+    proceed: proceed,
+  });
+}
+
+function applySections() {
+  const weekly = isWeekly();
+  ['.main-content-grid', '.coaching-section'].forEach(function (sel) {
+    const el = rootQuery(sel);
+    if (el) el.hidden = !weekly;
+  });
+  ['requirements-bar', 'auto-train-btn', 'submit-btn', 'training-tutorial-btn'].forEach(function (id) {
+    const el = byId(id);
+    if (el) el.hidden = !weekly;
+  });
+  const header = rootQuery('.training-header');
+  if (header) header.hidden = !weekly;
+  const note = byId('training-state-note');
+  if (note && !weekly) note.hidden = true;
+  // Player Development shows in both modes once the roster is in (renderPlayerDevelopment):
+  // under Coaching Focus on the weekly page, and as the whole tab in Prep.
+  const pointer = byId('training-advance-pointer');
+  if (pointer) pointer.hidden = weekly;
+  if (backBtn) {
+    backBtn.textContent = 'Back to Locker Room';
+    backBtn.hidden = !weekly;
+  }
+  if (root) root.setAttribute('data-training-sections', trainingSections);
+  document.body.classList.toggle('training-weekly', weekly);
+  document.body.classList.toggle('training-player-dev', !weekly);
+}
+
+// Draft persists; dirty stays true so leave-confirm can fire on the focus page.
+function noteTrainingEdit() {
+  trainingDirty = true;
+  saveTrainingFormDraft();
 }
 
 function clearTrainingFormDraftForCurrentContext() {
@@ -119,7 +308,7 @@ function currentTrainingReturnUrl() {
 }
 
 function navigateToTrainingTutorial() {
-  playSound('click-tiny.wav');
+  playSound('SFX_SELECT');
   saveTrainingFormDraft();
   const returnUrl = currentTrainingReturnUrl();
   if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
@@ -138,7 +327,7 @@ function navigateToTrainingTutorial() {
 }
 
 function wireTrainingTutorialButton() {
-  const btn = document.getElementById('training-tutorial-btn');
+  const btn = byId('training-tutorial-btn');
   if (!btn) return;
   btn.addEventListener('click', navigateToTrainingTutorial);
 }
@@ -146,13 +335,12 @@ function wireTrainingTutorialButton() {
 /**
  * Player Development: the 12 active players, their training position and focus.
  *
- * Rendering lives in js/shared/playerDevelopmentGrid.js, shared with the FCC's Training
- * tab — the only other place these are editable. This function's whole job is adapting
- * `custom_focus_roster` (already RT-descending, already carrying both fields, year, all 12
- * attributes, height/weight and every position rating) into that module's shape.
+ * Rendering lives in js/shared/playerDevelopmentGrid.js. It has two hosts and both are this
+ * module: the weekly training page (under Coaching Focus) and Prep › Player Training.
+ * This function's whole job is adapting `custom_focus_roster` (already RT-descending,
+ * already carrying both fields, year, all 12 attributes, height/weight and every position
+ * rating) into that module's shape.
  */
-const playerDevSection = document.getElementById('player-dev-section');
-
 function playerDevFranchiseId() {
   return liveParams().get('franchise_id') || '';
 }
@@ -173,6 +361,11 @@ function playerDevRows() {
       training_focus: row.training_focus || null,
       resolved_training_position: row.resolved_training_position || null,
       resolved_training_focus: row.resolved_training_focus || null,
+      image_id: row.image_id || null,
+      portrait_source: row.portrait_source || 'player',
+      jersey: row.jersey,
+      pos: row.pos || null,
+      potential_rt_ratcheted: row.potential_rt_ratcheted,
     };
   });
 }
@@ -186,7 +379,15 @@ function renderPlayerDevelopment() {
     return;
   }
   playerDevSection.hidden = false;
+  const weekly = isWeekly();
+  const pointer = byId('training-advance-pointer');
+  if (pointer) pointer.hidden = weekly;
+  // Both hosts (the weekly page and Prep > Player Training) draw the same cards, four
+  // across, in RT order reading left to right; the grid component orders them.
   grid.render(playerDevSection, rows, {
+    tallies: (positionTallies && focusTallies)
+      ? { positions: positionTallies, focuses: focusTallies }
+      : null,
     getFranchiseId: playerDevFranchiseId,
     // Write back to the source array so a later re-render keeps the change.
     onSaved: function (playerId, field, value) {
@@ -205,10 +406,10 @@ function renderPlayerDevelopment() {
  * uses. A coach who reads the chart comes back to the points he had already spent.
  */
 function wirePlayerDevelopmentTutorialButton() {
-  const btn = document.getElementById('player-dev-tutorial-btn');
+  const btn = byId('player-dev-tutorial-btn');
   if (!btn) return;
   btn.addEventListener('click', function () {
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
     saveTrainingFormDraft();
     const returnUrl = currentTrainingReturnUrl();
     if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
@@ -228,11 +429,43 @@ function wirePlayerDevelopmentTutorialButton() {
 }
 wirePlayerDevelopmentTutorialButton();
 
-/** Main PM radio value; modal assigns a concrete leaf here before submit */
-const CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
+/** Old drafts stored this umbrella value plus a resolved leaf; the leaf is now the radio. */
+const LEGACY_CHOOSE_ATTRIBUTES_VALUE = 'player-maximizer-choose-attributes';
+const PM_CUSTOM_VALUE = 'player-maximizer-custom';
 
-/** Resolved leaf: top-3 | attributes-4-6 | positional-focus | custom — set when user taps Assign in modal (choose-attributes path only, or stays null until then) */
+/**
+ * The four Player Maximizer options. Each is its own Coaching Focus radio, and choosing
+ * one opens the attribute modal under that option's name.
+ */
+const PM_LEAVES = {
+  'player-maximizer-top-3': {
+    mode: 'top-3',
+    title: 'Top 3 Attributes',
+    hint: 'Sharpens what each player already does best. Highlighted attributes get the focus.',
+  },
+  'player-maximizer-attributes-4-6': {
+    mode: 'attributes-4-6',
+    title: 'Attributes 4\u20136',
+    hint: 'Takes each player from good to great in emerging skills. Highlighted attributes get the focus.',
+  },
+  'player-maximizer-positional-focus': {
+    mode: 'positional',
+    title: 'Positional Focus',
+    hint: 'Builds positional identity around each player\u2019s best position. Highlighted attributes get the focus.',
+  },
+  'player-maximizer-custom': {
+    mode: 'custom',
+    title: 'Custom',
+    hint: 'Pick three attributes for each player.',
+  },
+};
+
+/** The assigned Player Maximizer leaf, or null. Kept in the draft for older readers. */
 let playerMaximizerResolvedFocus = null;
+/** The Coaching Focus value in force: what Cancel in the attribute modal returns to. */
+let committedCoachingValue = null;
+/** The Player Maximizer leaf the attribute modal is showing. */
+let pmModalValue = null;
 
 const PM_POSITION_RT_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
 const PM_POSITIONAL_FOCUS_ATTRS = {
@@ -279,29 +512,8 @@ function sortedAttrCodesByValue(row) {
 }
 
 function getPmModalMode() {
-  const r = document.querySelector('input[name="pm-modal-mode"]:checked');
-  return r ? r.value : 'top-3';
-}
-
-function resolvedFocusToModalMode(resolved) {
-  if (resolved === 'player-maximizer-custom') return 'custom';
-  if (resolved === 'player-maximizer-attributes-4-6') return 'attributes-4-6';
-  if (resolved === 'player-maximizer-positional-focus') return 'positional';
-  if (resolved === 'player-maximizer-top-3') return 'top-3';
-  return 'top-3';
-}
-
-function modalModeToCoachingLeaf(mode) {
-  if (mode === 'custom') return 'player-maximizer-custom';
-  if (mode === 'attributes-4-6') return 'player-maximizer-attributes-4-6';
-  if (mode === 'positional') return 'player-maximizer-positional-focus';
-  return 'player-maximizer-top-3';
-}
-
-function syncPmModalCustomHint() {
-  const el = document.getElementById('pm-modal-custom-hint');
-  if (!el) return;
-  el.hidden = getPmModalMode() !== 'custom';
+  const leaf = PM_LEAVES[pmModalValue];
+  return leaf ? leaf.mode : 'top-3';
 }
 
 function getRowHighlightPicks(row) {
@@ -390,59 +602,157 @@ async function fetchFranchiseCommandCenterData(franchiseId) {
   return response.json();
 }
 
-async function redirectIfTrainingAlreadyCommitted() {
+/**
+ * Player Training is always the settings page. It used to bounce to the training report
+ * whenever the week was already submitted, which is what made one sub-tab show two
+ * unrelated screens. Now it stays put and says which state the week is in; the report is a
+ * drill-in you open deliberately, from here, the Office card or News.
+ *
+ * Returns true when there is no weekly allocation to make, so the caller can skip the
+ * point-budget setup. Player Development is unaffected either way — it saves per change
+ * and applies to the next training that runs.
+ */
+async function applyTrainingWeekState() {
+  if (!isWeekly()) return false;
   const urlParams = liveParams();
   const mode = urlParams.get('mode');
   const franchiseId = urlParams.get('franchise_id');
   const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
   if (mode !== 'franchise' || !franchiseId) return false;
 
+  let data = null;
   try {
-    const data = await fetchFranchiseCommandCenterData(franchiseId);
-    if (!data || !data.training_completed) return false;
-    const params = emptyParams();
-    params.set('mode', 'franchise');
-    params.set('franchise_id', franchiseId);
-    if (teamId) params.set('team_id', teamId);
-    params.set('week', String(Number(data.week || 1)));
-    params.set('from', 'training');
-    window.location.replace(`/training-report.html?${params.toString()}`);
-    return true;
+    data = await fetchFranchiseCommandCenterData(franchiseId);
   } catch (error) {
     console.warn('⚠️ [TRAINING] Unable to verify committed training state:', error);
     return false;
   }
+  if (!data) return false;
+
+  const week = Number(data.week || 1);
+  const noTrainingWeek = !!data.training_disabled_for_postseason
+    || !!data.training_disabled_for_eos;
+
+  if (noTrainingWeek) {
+    // /franchise/training-points now returns 200 with training_unavailable (and the
+    // roster) after week 26, so the grid still loads. There is still no weekly budget
+    // and nothing to submit.
+    showTrainingStateNote({
+      head: 'No team training during the tournament',
+      body: 'Weekly training runs through week 26. Player development focus below still '
+        + 'saves, and applies from next season\u2019s Training Camp.',
+    });
+    trainingAllocationClosed = true;
+    return true;
+  }
+
+  if (data.training_completed) {
+    showTrainingStateNote({
+      head: 'Training submitted for this week',
+      body: 'Player development focus below still saves, and applies to next week\u2019s '
+        + 'training.',
+      linkText: 'View training report \u2192',
+      linkHref: trainingReportHref(franchiseId, teamId, week),
+    });
+    trainingAllocationClosed = true;
+    return true;
+  }
+
+  trainingAllocationClosed = false;
+  return false;
 }
 
-// Track previous slider values to prevent over-allocation
-allSliders.forEach(slider => {
-  slider.dataset.prev = '0';
-});
+function trainingReportHref(franchiseId, teamId, week) {
+  const params = emptyParams();
+  params.set('mode', 'franchise');
+  params.set('franchise_id', franchiseId);
+  if (teamId) params.set('team_id', teamId);
+  params.set('week', String(week));
+  params.set('from', 'training');
+  params.set('origin', 'prep');
+  return `/training-report.html?${params.toString()}`;
+}
 
 /**
- * Build the 6-pip stepper for one drill.
+ * Swap the weekly allocation for a one-line explanation. Player Development is deliberately
+ * left visible — it is the part that still does something on these weeks.
+ */
+function showTrainingStateNote(opts) {
+  const note = byId('training-state-note');
+  if (!note) return;
+  const head = byId('training-state-note-head');
+  const body = byId('training-state-note-body');
+  const link = byId('training-state-note-link');
+  if (head) head.textContent = opts.head || '';
+  if (body) body.textContent = opts.body || '';
+  if (link) {
+    if (opts.linkHref) {
+      link.textContent = opts.linkText || 'Open';
+      link.href = opts.linkHref;
+      link.hidden = false;
+    } else {
+      link.hidden = true;
+    }
+  }
+  note.hidden = false;
+
+  ['.main-content-grid', '.coaching-section'].forEach(function (sel) {
+    const el = rootQuery(sel);
+    if (el) el.hidden = true;
+  });
+  ['requirements-bar', 'auto-train-btn', 'submit-btn'].forEach(function (id) {
+    const el = byId(id);
+    if (el) el.hidden = true;
+  });
+  document.body.classList.add('training-no-allocation');
+  // The top-bar Advance must not offer Submit Training for a week that cannot take it.
+  if (window.GOBAdvance && window.GOBAdvance.clearOverride) window.GOBAdvance.clearOverride();
+}
+
+function primeSliderPrev() {
+  allSliders.forEach(slider => {
+    slider.dataset.prev = '0';
+  });
+}
+
+const PS_CLEAR_SVG = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg>';
+
+/**
+ * Build the point selector for one drill: a clear control, five boxes and the number.
  *
  * The <input type="range"> stays the model. Everything that reads a drill value — the
  * points counter, the draft save/restore, Auto-Train, collectTrainingData — still reads
- * `slider.value`, so the swap is visual plus a click target and changes no contract. The
- * input is clipped out of sight but stays focusable, so arrow keys still work.
+ * `slider.value`, so this is visual plus click targets and changes no contract. The
+ * input is clipped out of sight but stays focusable: arrow keys change the value, and
+ * Home, Backspace, Delete or 0 clear it.
  */
 function ensureTrainingSliderVisual(slider) {
   const wrapper = slider?.closest('.slider-container');
   if (!wrapper) return null;
-  let row = wrapper.querySelector('.pipstep');
+  let row = wrapper.querySelector('.ps');
   if (row) return row;
 
   row = document.createElement('div');
-  row.className = 'pipstep';
-  for (let i = 0; i <= 5; i++) {
+  row.className = 'ps';
+  // The range input carries the accessible name and value; these are pointer shortcuts
+  // to it, so they stay out of the accessibility tree rather than repeating it.
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'ps-clear';
+  clear.dataset.value = '0';
+  clear.title = 'Clear';
+  clear.setAttribute('aria-hidden', 'true');
+  clear.tabIndex = -1;
+  clear.innerHTML = PS_CLEAR_SVG;
+  clear.addEventListener('click', function () {
+    setSliderValueFromPip(slider, 0);
+  });
+  row.appendChild(clear);
+  for (let i = 1; i <= 5; i++) {
     const pip = document.createElement('button');
     pip.type = 'button';
-    pip.className = 'pipstep-pip';
+    pip.className = 'pip x';
     pip.dataset.value = String(i);
-    pip.textContent = String(i);
-    // The range input carries the accessible name and value; the pips are a shortcut
-    // to it, so they stay out of the accessibility tree rather than repeating it.
     pip.setAttribute('aria-hidden', 'true');
     pip.tabIndex = -1;
     pip.addEventListener('click', function () {
@@ -450,12 +760,26 @@ function ensureTrainingSliderVisual(slider) {
     });
     row.appendChild(pip);
   }
+  const numeral = document.createElement('span');
+  numeral.className = 'ps-n z';
+  numeral.setAttribute('aria-hidden', 'true');
+  numeral.textContent = '0';
+  row.appendChild(numeral);
   wrapper.appendChild(row);
+  if (!slider.dataset.clearKeys) {
+    slider.dataset.clearKeys = '1';
+    slider.addEventListener('keydown', function (event) {
+      if (event.key === 'Backspace' || event.key === 'Delete' || event.key === '0') {
+        event.preventDefault();
+        setSliderValueFromPip(slider, 0);
+      }
+    });
+  }
   return row;
 }
 
 /**
- * A pip click routes through the input's own `input` handler, so over-allocation is
+ * A box click routes through the input's own `input` handler, so over-allocation is
  * refused by the one rule that already guards dragging and keyboard use.
  */
 function setSliderValueFromPip(slider, value) {
@@ -473,12 +797,22 @@ function updateTrainingSliderVisual(slider, rawValue) {
   const value = Math.max(0, Math.min(5, Number(rawValue) || 0));
   const spent = calculateTotalPoints();
   const headroom = TOTAL_POINTS - spent + value;   // what this drill alone could reach
-  row.querySelectorAll('.pipstep-pip').forEach((pip, index) => {
-    pip.classList.toggle('is-filled', index <= value);
-    pip.classList.toggle('is-current', index === value);
-    // Dimming what the budget cannot reach beats letting a click silently do nothing.
-    pip.disabled = index > headroom;
+  row.dataset.value = String(value);
+  row.classList.toggle('has-points', value > 0);
+  row.querySelectorAll('.pip').forEach((pip) => {
+    const n = Number(pip.dataset.value);
+    pip.classList.toggle('f', n <= value);
+    pip.classList.toggle('x', n > value);
+    // Boxes past the remaining budget dim and cannot be clicked.
+    pip.disabled = n > headroom;
   });
+  const clear = row.querySelector('.ps-clear');
+  if (clear) clear.disabled = value === 0;
+  const numeral = row.querySelector('.ps-n');
+  if (numeral) {
+    numeral.textContent = String(value);
+    numeral.classList.toggle('z', value === 0);
+  }
 }
 
 /** Repaint every stepper's reachable range after the budget moves. */
@@ -523,7 +857,7 @@ function formatPointsDisplay(n) {
  * Check if coaching focus is selected
  */
 function isCoachingFocusSelected() {
-  const selectedFocus = document.querySelector('input[name="coaching-focus"]:checked');
+  const selectedFocus = rootQuery('input[name="coaching-focus"]:checked');
   return selectedFocus !== null;
 }
 
@@ -540,17 +874,11 @@ function isCustomFocusComplete() {
   });
 }
 
-/** Submit enabled when PM hidden leaf is selected, or Choose Attributes + resolved leaf (custom → committed complete). */
+/** A Player Maximizer option is ready once chosen; Custom also needs three picks per player. */
 function isPlayerMaximizerSubmitReady() {
-  const sel = document.querySelector('input[name="coaching-focus"]:checked');
-  if (!sel || !sel.value.startsWith('player-maximizer')) return true;
-  if (sel.value === CHOOSE_ATTRIBUTES_VALUE) {
-    if (!playerMaximizerResolvedFocus) return false;
-    if (playerMaximizerResolvedFocus === 'player-maximizer-custom') {
-      return isCustomFocusComplete();
-    }
-    return true;
-  }
+  const sel = rootQuery('input[name="coaching-focus"]:checked');
+  if (!sel || !PM_LEAVES[sel.value]) return true;
+  if (sel.value === PM_CUSTOM_VALUE) return isCustomFocusComplete();
   return true;
 }
 
@@ -559,42 +887,70 @@ function resetCustomFocusCommitted() {
   customFocusDraft = {};
 }
 
-function openCustomFocusModal() {
-  if (!customFocusModal || !customFocusThead || !customFocusTbody) return;
+function isCustomFocusModalOpen() {
+  return !!(customFocusModal && customFocusModal.classList.contains('is-visible'));
+}
+
+/** Open the attribute modal for one Player Maximizer option. Its title is that option. */
+function openCustomFocusModal(value) {
+  if (!customFocusModal || !customFocusThead || !customFocusTbody) return false;
+  const leaf = PM_LEAVES[value];
+  if (!leaf) return false;
   const urlParams = liveParams();
   if (urlParams.get('mode') !== 'franchise' || !urlParams.get('franchise_id')) {
-    showMessageModal('Choose Attributes is available in franchise mode after roster data loads.');
-    return;
+    showMessageModal('Player Maximizer is available in franchise mode after roster data loads.');
+    return false;
   }
   if (!customFocusRoster.length) {
     showMessageModal('Roster data is still loading. Try again in a moment.');
-    return;
+    return false;
   }
-  const mode = resolvedFocusToModalMode(playerMaximizerResolvedFocus);
-  const modeInput = document.querySelector(`input[name="pm-modal-mode"][value="${mode}"]`);
-  if (modeInput) modeInput.checked = true;
+  pmModalValue = value;
+  const title = byId('custom-focus-modal-title');
+  const hint = byId('custom-focus-modal-hint');
+  if (title) title.textContent = leaf.title;
+  if (hint) hint.textContent = leaf.hint;
 
   customFocusDraft = {};
   customFocusRoster.forEach(function (row) {
     const pid = row.player_id;
-    if (mode === 'custom') {
-      const c = customFocusCommitted[pid];
-      customFocusDraft[pid] = c && c.length === 3 ? [c[0], c[1], c[2]] : [];
-    } else {
-      customFocusDraft[pid] = [];
-    }
+    const c = leaf.mode === 'custom' ? customFocusCommitted[pid] : null;
+    customFocusDraft[pid] = c && c.length === 3 ? [c[0], c[1], c[2]] : [];
   });
-  syncPmModalCustomHint();
   renderCustomFocusTable();
   syncCustomFocusAssignButton();
-  customFocusModal.style.display = 'flex';
+  customFocusModal.classList.add('is-visible');
   customFocusModal.setAttribute('aria-hidden', 'false');
+  if (customFocusAssignBtn && !customFocusAssignBtn.disabled) customFocusAssignBtn.focus({ preventScroll: true });
+  else if (customFocusCancelBtn) customFocusCancelBtn.focus({ preventScroll: true });
+  return true;
 }
 
 function closeCustomFocusModal() {
   if (!customFocusModal) return;
-  customFocusModal.style.display = 'none';
+  customFocusModal.classList.remove('is-visible');
   customFocusModal.setAttribute('aria-hidden', 'true');
+}
+
+/** Check the radio for `value` (none when null) and repaint the cards. */
+function setCoachingFocusRadio(value) {
+  qsa('input[name="coaching-focus"]').forEach(function (inp) {
+    inp.checked = !!(value && inp.value === value);
+  });
+  if (value) applyCoachingFocusArchetypeUi(value);
+  else qsa('.archetype-block').forEach(function (block) {
+    block.classList.remove('active', 'header-selected', 'sub-option-selected');
+  });
+}
+
+/** Cancel, Escape or the backdrop: the focus goes back to what it was before the modal. */
+function cancelCustomFocusModal() {
+  if (!isCustomFocusModalOpen()) return;
+  closeCustomFocusModal();
+  customFocusDraft = {};
+  if (committedCoachingValue !== pmModalValue) setCoachingFocusRadio(committedCoachingValue);
+  updatePointsRemaining();
+  saveTrainingFormDraft();
 }
 
 function syncCustomFocusAssignButton() {
@@ -646,8 +1002,9 @@ function renderCustomFocusTable() {
     customFocusRankingAttrs.forEach(function (code) {
       const td = document.createElement('td');
       td.className = 'custom-focus-cell' + (clickable ? '' : ' is-readonly');
-      const val = row.attrs && typeof row.attrs[code] === 'number' ? row.attrs[code] : '';
-      td.textContent = val === '' ? '—' : String(val);
+      const raw = window.GOB_AttributeDisplay.rawAttr(row.attrs, code);
+      const shown = window.GOB_AttributeDisplay.displayAttr(raw);
+      td.textContent = shown == null ? '—' : String(shown);
       if (picks.indexOf(code) !== -1) td.classList.add('selected');
       if (clickable) {
         td.addEventListener('click', function () {
@@ -662,7 +1019,7 @@ function renderCustomFocusTable() {
 
 function onCustomFocusCellClick(playerId, attrCode) {
   if (getPmModalMode() !== 'custom') return;
-  playSound('click-tiny.wav');
+  playSound('SFX_SELECT');
   if (!customFocusDraft[playerId]) customFocusDraft[playerId] = [];
   const sel = customFocusDraft[playerId];
   const idx = sel.indexOf(attrCode);
@@ -678,9 +1035,10 @@ function onCustomFocusCellClick(playerId, attrCode) {
 }
 
 function commitCustomFocusFromModal() {
-  const mode = getPmModalMode();
-  if (mode === 'custom') {
-    customFocusCommitted = {};
+  const value = pmModalValue;
+  if (!PM_LEAVES[value]) return;
+  customFocusCommitted = {};
+  if (value === PM_CUSTOM_VALUE) {
     customFocusRoster.forEach(function (row) {
       const pid = row.player_id;
       const picks = customFocusDraft[pid];
@@ -688,14 +1046,14 @@ function commitCustomFocusFromModal() {
         customFocusCommitted[pid] = [picks[0], picks[1], picks[2]];
       }
     });
-    playerMaximizerResolvedFocus = 'player-maximizer-custom';
-  } else {
-    customFocusCommitted = {};
-    customFocusDraft = {};
-    playerMaximizerResolvedFocus = modalModeToCoachingLeaf(mode);
   }
+  customFocusDraft = {};
+  playerMaximizerResolvedFocus = value;
+  committedCoachingValue = value;
+  setCoachingFocusRadio(value);
   closeCustomFocusModal();
   updatePointsRemaining();
+  noteTrainingEdit();
 }
 
 /**
@@ -747,14 +1105,7 @@ function updatePointsRemaining() {
   const allPointsAllocated = remaining === 0;
   const focusSelected = isCoachingFocusSelected();
   const pmOk = isPlayerMaximizerSubmitReady();
-
-  if (allPointsAllocated && focusSelected && pmOk) {
-    submitBtn.disabled = false;
-    submitBtn.style.opacity = '1';
-  } else {
-    submitBtn.disabled = true;
-    submitBtn.style.opacity = '0.4';
-  }
+  syncTrainingAdvance(allPointsAllocated && focusSelected && pmOk);
 
   updateRequirementsBar();
   // Spending on one drill shrinks every other drill's reachable range, so the disabled
@@ -764,14 +1115,30 @@ function updatePointsRemaining() {
   return remaining;
 }
 
+function syncTrainingAdvance(ready) {
+  if (!isWeekly() || trainingAllocationClosed) {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.hidden = true;
+    }
+    return;
+  }
+  if (submitBtn) {
+    submitBtn.hidden = false;
+    submitBtn.disabled = !ready;
+    submitBtn.style.opacity = ready ? '1' : '0.4';
+  }
+}
+
 /**
  * Handle slider input - prevent over-allocation
  */
+function wireSliders() {
 allSliders.forEach(slider => {
   ensureTrainingSliderVisual(slider);
   updateTrainingSliderVisual(slider, slider.value);
   slider.addEventListener('change', function() {
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
   });
   slider.addEventListener('input', function() {
     const currentValue = parseInt(this.value);
@@ -795,6 +1162,7 @@ allSliders.forEach(slider => {
     
     // Store current value as previous
     this.dataset.prev = this.value;
+    noteTrainingEdit();
     
     // Update points remaining
     updatePointsRemaining();
@@ -807,17 +1175,22 @@ allSliders.forEach(slider => {
   }
   updateTrainingSliderValuePosition(slider);
 });
+}
 
-window.addEventListener('resize', function () {
+function wireSliderResize() {
+_onResizeSliders = function () {
   allSliders.forEach(function (slider) {
     updateTrainingSliderValuePosition(slider);
   });
-});
+};
+window.addEventListener('resize', _onResizeSliders);
+}
 
 /**
  * Auto-Train: assign whole points under the flat budget and pick a random focus
  */
 function autoAssignTraining() {
+  // Same cue as Autoset Lineup on Set Lineup (Sound_Design_System: chaotic-choice).
   playSound('chaotic-choice.wav');
   const sliders = Array.from(allSliders);
   if (sliders.length === 0) return;
@@ -868,8 +1241,7 @@ function autoAssignTraining() {
       return (
         value.includes('-') &&
         !archetypeValues.includes(value) &&
-        value !== 'player-maximizer-choose-attributes' &&
-        value !== 'player-maximizer-custom'
+        value !== PM_CUSTOM_VALUE
       );
     });
     
@@ -879,16 +1251,6 @@ function autoAssignTraining() {
       if (typeof window !== 'undefined') window.__trainingAutoAssigning = true;
       randomRadio.dispatchEvent(new Event('change', { bubbles: true }));
       focusLabel = getFocusLabelText(randomRadio);
-      // Hidden PM leaf radios have no label — use same wording as the modal row
-      const autoTrainPmLeafLabels = {
-        'player-maximizer-top-3': 'Top 3',
-        'player-maximizer-attributes-4-6': 'Attributes 4–6',
-        'player-maximizer-positional-focus': 'Positional Focus'
-      };
-      const rv = randomRadio.value || '';
-      if (autoTrainPmLeafLabels[rv]) {
-        focusLabel = autoTrainPmLeafLabels[rv];
-      }
       archetypeLabel = getArchetypeLabelText(randomRadio);
     }
   }
@@ -950,14 +1312,16 @@ function autoAssignTraining() {
   }
 }
 
+function wireAutoTrain() {
 if (autoTrainBtn) {
   autoTrainBtn.addEventListener('click', autoAssignTraining);
 }
 if (autoTrainModalClose && autoTrainModal) {
   autoTrainModalClose.addEventListener('click', () => {
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
     autoTrainModal.classList.remove('is-visible');
   });
+}
 }
 
 function findCoachingFocusRadioByValue(value) {
@@ -970,7 +1334,7 @@ function findCoachingFocusRadioByValue(value) {
 
 /** Archetype block highlight only (no sound, no PM modal). */
 function applyCoachingFocusArchetypeUi(value) {
-  document.querySelectorAll('.archetype-block').forEach(function (block) {
+  qsa('.archetype-block').forEach(function (block) {
     block.classList.remove('active', 'header-selected', 'sub-option-selected');
   });
   let archetype = null;
@@ -979,7 +1343,7 @@ function applyCoachingFocusArchetypeUi(value) {
   else if (value.startsWith('player-maximizer')) archetype = 'player-maximizer';
   else if (value.startsWith('culture-builder')) archetype = 'culture-builder';
   if (!archetype) return;
-  const archetypeBlock = document.querySelector(`[data-archetype="${archetype}"]`);
+  const archetypeBlock = rootQuery(`[data-archetype="${archetype}"]`);
   if (!archetypeBlock) return;
   const isHeaderRadio = value === archetype;
   if (isHeaderRadio) archetypeBlock.classList.add('active', 'header-selected');
@@ -1007,123 +1371,90 @@ function restoreTrainingFormDraft() {
   if (Number(o.week) !== Number(currentWeek)) return;
   if (Number(o.total_points_budget) !== Number(TOTAL_POINTS)) return;
 
-  if (o.sliders && typeof o.sliders === 'object') {
-    Object.keys(o.sliders).forEach(function (id) {
-      const el = document.getElementById(id);
-      if (el && el.classList && el.classList.contains('slider')) {
-        const v = Math.max(0, Math.min(5, parseInt(o.sliders[id], 10) || 0));
-        setSliderValue(el, v);
-      }
-    });
-  }
-
-  playerMaximizerResolvedFocus = o.player_maximizer_resolved || null;
-  customFocusCommitted =
-    o.custom_focus_committed && typeof o.custom_focus_committed === 'object'
-      ? Object.assign({}, o.custom_focus_committed)
-      : {};
-
-  const radioVal = o.coaching_radio;
-  if (radioVal) {
-    const inp = findCoachingFocusRadioByValue(radioVal);
-    if (inp) {
-      inp.checked = true;
-      applyCoachingFocusArchetypeUi(radioVal);
-    }
-  }
+  applyTrainingFormState(o);
+  trainingDirty = false;
 }
 
 /**
  * Handle coaching focus radio button selection
  * All radios in this section are part of ONE global radio group
  */
+function wireCoachingRadios() {
 coachingRadios.forEach(radio => {
   radio.addEventListener('change', function() {
     if (!this.checked) return;
+    trainingDirty = true;
     
-    // SFX per coaching style — skip when Auto-Train triggered this change (avoid double sound with chaotic-choice)
+    // Skip when Auto-Train triggered this change (one SFX_SELECT already).
     const value = this.value;
     const skipSound = typeof window !== 'undefined' && window.__trainingAutoAssigning;
     if (typeof window !== 'undefined') window.__trainingAutoAssigning = false;
     if (!skipSound) {
-      if (value.startsWith('authoritarian')) {
-        playSound('whistle-3.mp3');
-      } else if (value.startsWith('systems-coach')) {
-        playSound('positive-slide.wav');
-      } else if (value.startsWith('player-maximizer')) {
-        playSound('positive-plop.wav');
-      } else if (value.startsWith('culture-builder')) {
-        playSound('positive-beep.wav');
-      }
+      playSound('SFX_SELECT');
     }
     
     applyCoachingFocusArchetypeUi(value);
 
-    if (value.startsWith('player-maximizer')) {
-      if (value === CHOOSE_ATTRIBUTES_VALUE) {
-        openCustomFocusModal();
-      } else {
-        playerMaximizerResolvedFocus = null;
+    if (PM_LEAVES[value]) {
+      if (skipSound) {
+        // Auto-Train never picks Custom, so the leaf is complete as chosen.
         resetCustomFocusCommitted();
+        playerMaximizerResolvedFocus = value;
+        committedCoachingValue = value;
+      } else if (!openCustomFocusModal(value)) {
+        setCoachingFocusRadio(committedCoachingValue);
       }
     } else {
       resetPlayerMaximizerResolvedState();
+      committedCoachingValue = value;
     }
 
     // Update submit button state when focus is selected
     updatePointsRemaining();
+    saveTrainingFormDraft();
   });
-});
 
-document.querySelectorAll('input[name="pm-modal-mode"]').forEach(function (radio) {
-  radio.addEventListener('change', function () {
-    if (!this.checked) return;
-    playSound('click-tiny.wav');
-    syncPmModalCustomHint();
-    const mode = getPmModalMode();
-    if (mode !== 'custom') {
-      customFocusDraft = {};
-      customFocusRoster.forEach(function (row) {
-        customFocusDraft[row.player_id] = [];
-      });
-    } else {
-      customFocusRoster.forEach(function (row) {
-        const pid = row.player_id;
-        const c = customFocusCommitted[pid];
-        customFocusDraft[pid] = c && c.length === 3 ? [c[0], c[1], c[2]] : [];
-      });
-    }
-    renderCustomFocusTable();
-    syncCustomFocusAssignButton();
-  });
+  // A second click on the assigned option reopens its modal (to review, or to edit
+  // Custom picks). A first click is handled by `change` above.
+  if (PM_LEAVES[radio.value]) {
+    radio.addEventListener('click', function () {
+      if (this.checked && committedCoachingValue === this.value && !isCustomFocusModalOpen()) {
+        openCustomFocusModal(this.value);
+      }
+    });
+  }
 });
-
-const chooseAttrsRadio = document.querySelector(
-  `input[name="coaching-focus"][value="${CHOOSE_ATTRIBUTES_VALUE}"]`
-);
-if (chooseAttrsRadio) {
-  chooseAttrsRadio.addEventListener('click', function () {
-    if (this.checked) openCustomFocusModal();
-  });
-}
 
 if (customFocusAssignBtn) {
   customFocusAssignBtn.addEventListener('click', function () {
-    playSound('confirm-1-lowervol.wav');
+    playSound('SFX_COMMIT');
     commitCustomFocusFromModal();
   });
 }
 if (customFocusCancelBtn) {
   customFocusCancelBtn.addEventListener('click', function () {
-    playSound('click-tiny.wav');
-    closeCustomFocusModal();
+    playSound('SFX_SELECT');
+    cancelCustomFocusModal();
   });
+}
+if (customFocusModal) {
+  const backdrop = customFocusModal.querySelector('.gob-modal-backdrop');
+  if (backdrop) backdrop.addEventListener('click', cancelCustomFocusModal);
+}
+_onKeyModal = function (event) {
+  if (event.key === 'Escape' && isCustomFocusModalOpen()) {
+    event.preventDefault();
+    cancelCustomFocusModal();
+  }
+};
+document.addEventListener('keydown', _onKeyModal);
 }
 
 /**
  * Handle back button click
  */
-backBtn.addEventListener('click', function() {
+function wireBackButton() {
+if (backBtn) backBtn.addEventListener('click', function() {
   clearTutorialResumeContext();
   // Get URL parameters to determine where to navigate back
   const urlParams = liveParams();
@@ -1142,14 +1473,20 @@ backBtn.addEventListener('click', function() {
           teamId: teamId
         })
       : `/franchise-command-center.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}${teamId ? `&team_id=${encodeURIComponent(teamId)}` : ''}`;
-    window.location.href = finalUrl;
+    if (window.GOBNav) window.GOBNav.back(finalUrl);
+    else window.location.replace(finalUrl);
   } else if (from === 'game-plan') {
-    window.location.href = '/game-plan.html?' + urlParams.toString();
+    const planUrl = '/game-plan.html?' + urlParams.toString();
+    if (window.GOBNav) window.GOBNav.replace(planUrl);
+    else window.location.replace(planUrl);
   } else {
     // ✅ PHASE 2: Preserve URL params in fallback (includes game_id if present)
-    window.location.href = '/game-plan.html?' + urlParams.toString();
+    const planUrl = '/game-plan.html?' + urlParams.toString();
+    if (window.GOBNav) window.GOBNav.replace(planUrl);
+    else window.location.replace(planUrl);
   }
 });
+}
 
 /**
  * Collect all training data for submission
@@ -1160,59 +1497,53 @@ function collectTrainingData() {
     // Player Drills
     player_drills: {
       offense: {
-        inside: parseInt(document.getElementById('offense-inside').value) || 0,
-        outside: parseInt(document.getElementById('offense-outside').value) || 0
+        inside: parseInt(byId('offense-inside').value) || 0,
+        outside: parseInt(byId('offense-outside').value) || 0
       },
       defense: {
-        inside: parseInt(document.getElementById('defense-inside').value) || 0,
-        outside: parseInt(document.getElementById('defense-outside').value) || 0
+        inside: parseInt(byId('defense-inside').value) || 0,
+        outside: parseInt(byId('defense-outside').value) || 0
       },
       technical: {
-        passing: parseInt(document.getElementById('technical-passing').value) || 0,
-        ball_handling: parseInt(document.getElementById('technical-ball-handling').value) || 0,
-        rebounding: parseInt(document.getElementById('technical-rebounding').value) || 0
+        passing: parseInt(byId('technical-passing').value) || 0,
+        ball_handling: parseInt(byId('technical-ball-handling').value) || 0,
+        rebounding: parseInt(byId('technical-rebounding').value) || 0
       },
       weight_room: {
-        strength: parseInt(document.getElementById('weight-strength').value) || 0,
-        agility: parseInt(document.getElementById('weight-agility').value) || 0
+        strength: parseInt(byId('weight-strength').value) || 0,
+        agility: parseInt(byId('weight-agility').value) || 0
       }
     },
     
     // Team Drills
     team_drills: {
       team_offense: {
-        install: parseInt(document.getElementById('team-offense-install').value) || 0
+        install: parseInt(byId('team-offense-install').value) || 0
       },
       team_defense: {
-        install: parseInt(document.getElementById('team-defense-install').value) || 0
+        install: parseInt(byId('team-defense-install').value) || 0
       },
       fast_breaks: {
-        offense_install: parseInt(document.getElementById('fast-break-offense-install').value) || 0,
-        defense_install: parseInt(document.getElementById('fast-break-defense-install').value) || 0
+        offense_install: parseInt(byId('fast-break-offense-install').value) || 0,
+        defense_install: parseInt(byId('fast-break-defense-install').value) || 0
       },
-      scrimmages: parseInt(document.getElementById('team-scrimmages').value) || 0,
+      scrimmages: parseInt(byId('team-scrimmages').value) || 0,
       presses_traps: {
-        defense_install: parseInt(document.getElementById('press-defense-install').value) || 0,
-        offense_install: parseInt(document.getElementById('press-offense-install').value) || 0
+        defense_install: parseInt(byId('press-defense-install').value) || 0,
+        offense_install: parseInt(byId('press-offense-install').value) || 0
       }
     },
     
     // General
     general: {
-      conditioning: parseInt(document.getElementById('general-conditioning').value) || 0,
-      free_throws: parseInt(document.getElementById('general-free-throws').value) || 0,
-      film_study: parseInt(document.getElementById('general-film-study').value) || 0,
-      breaks: parseInt(document.getElementById('general-breaks').value) || 0
+      conditioning: parseInt(byId('general-conditioning').value) || 0,
+      free_throws: parseInt(byId('general-free-throws').value) || 0,
+      film_study: parseInt(byId('general-film-study').value) || 0,
+      breaks: parseInt(byId('general-breaks').value) || 0
     },
     
-    // Coaching Focus (Choose Attributes → concrete leaf from modal Assign)
-    coaching_focus: (function () {
-      let cf = document.querySelector('input[name="coaching-focus"]:checked')?.value || null;
-      if (cf === CHOOSE_ATTRIBUTES_VALUE) {
-        cf = playerMaximizerResolvedFocus;
-      }
-      return cf;
-    })(),
+    // Coaching Focus: the checked option's value is the leaf the server reads.
+    coaching_focus: rootQuery('input[name="coaching-focus"]:checked')?.value || null,
     
     // Playbook Training Mode (+ optional custom CMD focus for franchise)
     playbook_training_mode: (function () {
@@ -1223,7 +1554,7 @@ function collectTrainingData() {
         }
         return 'current-playbooks';
       }
-      return document.querySelector('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks';
+      return rootQuery('input[name="playbook-training-mode"]:checked')?.value || 'current-playbooks';
     })(),
     training_playbook_focus: (function () {
       if (pageParams.get('mode') !== 'franchise') return null;
@@ -1256,18 +1587,14 @@ function collectTrainingData() {
     console.log('🔋 [FRONTEND] scrimmages value:', data.team_drills.scrimmages);
   } else {
     console.error('🔋 [FRONTEND] ERROR: scrimmages NOT in team_drills!');
-    console.log('🔋 [FRONTEND] Checking element again:', document.getElementById('team-scrimmages'));
+    console.log('🔋 [FRONTEND] Checking element again:', byId('team-scrimmages'));
   }
   
   return data;
 }
 
-function playSound(filename) {
-  try {
-    const a = new Audio('/sounds/' + encodeURIComponent(filename));
-    a.volume = 0.7;
-    a.play().catch(function() {});
-  } catch (e) {}
+function playSound(name) {
+  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(name, 0.7); }).catch(function () {});
 }
 
 function showMessageModal(message, buttonLabel = 'Close') {
@@ -1282,13 +1609,40 @@ function showMessageModal(message, buttonLabel = 'Close') {
   autoTrainModal.classList.add('is-visible');
 }
 
+function rewriteReportRedirect(redirectUrl) {
+  try {
+    const redirect = new URL(redirectUrl, window.location.origin);
+    if (redirect.pathname === '/training-report.html' || redirect.pathname === '/static/training-report.html') {
+      const bag = franchiseCtx().parseSearch(redirect.search);
+      bag.delete('embed');
+      bag.delete('tab');
+      if (!bag.get('origin')) bag.set('origin', 'prep');
+      if (!bag.get('from')) bag.set('from', 'training');
+      if (!bag.get('franchise_id')) {
+        const fid = franchiseCtx().get('franchise_id');
+        if (fid) bag.set('franchise_id', fid);
+      }
+      if (!bag.get('team_id')) {
+        const tid = franchiseCtx().get('team_id');
+        if (tid) bag.set('team_id', tid);
+      }
+      if (!bag.get('week')) {
+        const w = franchiseCtx().get('week') || currentWeek;
+        if (w) bag.set('week', String(w));
+      }
+      const qs = bag.toString();
+      return '/training-report.html' + (qs ? '?' + qs : '');
+    }
+  } catch (_err) {}
+  return redirectUrl;
+}
+
 /**
  * Handle submit button click
  */
-submitBtn.addEventListener('click', async function() {
-  if (this.disabled) return;
-  playSound('confirm-2-lowervol.wav');
-  
+async function submitTraining(button) {
+  if (button && button.disabled) return;
+
   const trainingData = collectTrainingData();
   
   // Flat integer budget: every slider notch costs exactly one point.
@@ -1304,9 +1658,8 @@ submitBtn.addEventListener('click', async function() {
     return;
   }
 
-  const cfRadio = document.querySelector('input[name="coaching-focus"]:checked')?.value;
-  if (cfRadio === CHOOSE_ATTRIBUTES_VALUE && !isPlayerMaximizerSubmitReady()) {
-    alert('Player Maximizer: open Choose Attributes, pick a mode, and tap Assign Focus Attributes (for Custom, pick three distinct attributes per player).');
+  if (!isPlayerMaximizerSubmitReady()) {
+    alert('Player Maximizer Custom: pick three attributes for each player, then Assign Focus Attributes.');
     return;
   }
   
@@ -1338,8 +1691,10 @@ submitBtn.addEventListener('click', async function() {
   }
   
   try {
-    this.disabled = true;
-    this.textContent = 'Submitting...';
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Submitting...';
+    }
     if (mode === 'franchise' && franchiseId) {
       showTrainingNewswire(franchiseId);
     } else if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
@@ -1423,12 +1778,17 @@ submitBtn.addEventListener('click', async function() {
       sessionStorage.removeItem(STORAGE_TEAM_DRILLS_SNAPSHOT);
       clearTrainingFormDraftForCurrentContext();
       clearTutorialResumeContext();
+      if (mode === 'franchise' && franchiseId) {
+        sessionStorage.setItem('gob_training_return', String(franchiseId));
+      }
     } catch (_clearErr) {}
 
     // Handle success - use redirect URL from backend if provided, otherwise navigate to command center
     if (result.redirect) {
       // ✅ FIX: Strip /static/ prefix from backend redirect URLs for Netlify compatibility
       let redirectUrl = result.redirect.replace(/^\/static\//, '/');
+      const headingToReport = /training-report\.html/.test(redirectUrl);
+      redirectUrl = rewriteReportRedirect(redirectUrl);
       const returnUrl = urlParams.get('return_url');
       if (mode === 'franchise' && returnUrl) {
         const safeReturnUrl = typeof getSafeReturnUrl === 'function' ? getSafeReturnUrl(returnUrl) : returnUrl;
@@ -1440,17 +1800,42 @@ submitBtn.addEventListener('click', async function() {
           redirectUrl = `${redirect.pathname}${qs ? '?' + qs : ''}${redirect.hash || ''}`;
         }
       }
-      window.location.href = redirectUrl;
+      trainingDirty = false;
+      if (!headingToReport && window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(redirectUrl)) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.exitFlow(redirectUrl);
+      } else if (window.GOBNav) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.replace(redirectUrl);
+      } else {
+        window.location.replace(redirectUrl);
+      }
     } else if (mode === 'franchise' && franchiseId) {
-      window.location.href = (typeof resolveFranchiseLockerRoomUrl === 'function')
+      trainingDirty = false;
+      const lockerUrl = (typeof resolveFranchiseLockerRoomUrl === 'function')
         ? resolveFranchiseLockerRoomUrl({
             params: urlParams,
             franchiseId: franchiseId,
             teamId: urlParams.get('team_id')
           })
         : `/franchise-command-center.html?mode=franchise&franchise_id=${franchiseId}`;
+      if (window.GOBNav && window.GOBNav.exitFlow) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.exitFlow(lockerUrl);
+      } else if (window.GOBNav) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.replace(lockerUrl);
+      } else {
+        window.location.replace(lockerUrl);
+      }
     } else {
-      window.location.href = '/game-plan.html';
+      trainingDirty = false;
+      if (window.GOBNav) {
+        window.GOBNav.allowNextLeave();
+        window.GOBNav.replace('/game-plan.html');
+      } else {
+        window.location.replace('/game-plan.html');
+      }
     }
     
   } catch (error) {
@@ -1460,10 +1845,21 @@ submitBtn.addEventListener('click', async function() {
       window.PageLoadOverlay.hide();
     }
     showMessageModal(error.message || 'Failed to submit training. Please try again.');
-    this.disabled = false;
-    this.textContent = 'Submit Training';
+    if (button) {
+      button.disabled = false;
+      button.textContent = button.id === 'play-now' ? 'Submit Training' : 'Submit Training';
+    }
+    syncTrainingAdvance(false);
   }
-});
+}
+
+function wireSubmit() {
+if (submitBtn) {
+  submitBtn.addEventListener('click', function () {
+    submitTraining(submitBtn);
+  });
+}
+}
 
 async function resumeCpuTraining(franchiseId) {
   if (!franchiseId) return;
@@ -1498,7 +1894,17 @@ async function resumeCpuTraining(franchiseId) {
   }
 
   if (result && result.redirect) {
-    window.location.href = result.redirect.replace(/^\/static\//, '/');
+    trainingDirty = false;
+    const next = result.redirect.replace(/^\/static\//, '/');
+    if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(next)) {
+      window.GOBNav.allowNextLeave();
+      window.GOBNav.exitFlow(next);
+    } else if (window.GOBNav) {
+      window.GOBNav.allowNextLeave();
+      window.GOBNav.replace(next);
+    } else {
+      window.location.replace(next);
+    }
   }
 }
 
@@ -1517,15 +1923,28 @@ async function initializeTrainingPoints() {
       if (response.ok) {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
+        adoptSavedPlaybookChoice(data.training_playbook_choice);
         currentWeek = Number(data.week || 1);
         currentSeason = Number(data.season || 1);
         currentTeamName = data.user_team_name || currentTeamName || '';
         prefetchTrainingNewswire(franchiseId);
+        if (data.position_tallies && typeof data.position_tallies === 'object') {
+          positionTallies = data.position_tallies;
+        }
+        if (data.focus_tallies && typeof data.focus_tallies === 'object') {
+          focusTallies = data.focus_tallies;
+        }
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
           // Same 12 rows, already RT-descending, already carrying training_position /
           // training_focus through training_position_projection — no second fetch.
+          // After week 26 the payload still carries this roster so the grid stays
+          // editable even though there is no weekly allocation to make.
           renderPlayerDevelopment();
+        }
+        if (data.training_unavailable) {
+          updatePointsRemaining();
+          return;
         }
         if (Array.isArray(data.player_maximizer_ranking_attrs)) {
           customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
@@ -1560,6 +1979,7 @@ async function initializeTrainingPoints() {
           recruitingInvitesBtn.onclick = null;
         }
         restoreTrainingFormDraft();
+        if (isWeekly()) captureTrainingFormSnapshot();
         console.log(`🎯 [TRAINING] Training points set to ${TOTAL_POINTS} (first training: ${data.is_first_training})`);
       } else {
         console.warn('⚠️ [TRAINING] Failed to fetch training points, using default 24');
@@ -1574,11 +1994,52 @@ async function initializeTrainingPoints() {
 }
 
 
-window.addEventListener('pageshow', (event) => {
+function wirePageShow() {
+_onPageShow = (event) => {
   if (event.persisted) {
-    window.location.reload();
+    if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
+    return;
   }
-});
+  if (isWeekly()) applyTrainingWeekState();
+};
+window.addEventListener('pageshow', _onPageShow);
+}
+
+/**
+ * The Training playbook choice is a saved setting (Jamie, 2026-10-03): once the user trains
+ * a Custom Playbook it stays the default for every later training, camp and next season
+ * included, until they switch back to Current Playbooks. The server keeps it on the
+ * franchise; this page's working copy is the two sessionStorage keys the Custom Playbook
+ * page writes, which a submit clears. A saved custom choice refills them on every load.
+ */
+function adoptSavedPlaybookChoice(choice) {
+  if (!choice || choice.mode !== 'custom' || !choice.focus) return;
+  const offense = Array.isArray(choice.focus.offense) ? choice.focus.offense.map(String) : [];
+  const defense = Array.isArray(choice.focus.defense) ? choice.focus.defense.map(String) : [];
+  if (!offense.length || !defense.length) return;
+  try {
+    sessionStorage.setItem(STORAGE_PLAYBOOK_FOCUS, JSON.stringify({ offense: offense, defense: defense }));
+    sessionStorage.setItem(STORAGE_PLAYBOOK_MODE, 'custom');
+  } catch (_e) {}
+  syncPlaybookModeToggleUi();
+}
+
+/** Save "Current Playbooks" as the choice. keepalive: the request outlives a navigation. */
+function saveCurrentPlaybooksChoice() {
+  const franchiseId = liveParams().get('franchise_id');
+  if (!franchiseId) return Promise.resolve();
+  return fetch(API_CONFIG.buildUrl('/franchise/training-playbook-choice'), {
+    method: 'PATCH',
+    keepalive: true,
+    headers: Object.assign(
+      { 'Content-Type': 'application/json' },
+      (typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {})
+    ),
+    body: JSON.stringify({ franchise_id: franchiseId, mode: 'current-playbooks' })
+  }).catch(function (error) {
+    console.warn('⚠️ [TRAINING] Could not save the playbook choice:', error);
+  });
+}
 
 function syncPlaybookModeToggleUi() {
   try {
@@ -1589,9 +2050,9 @@ function syncPlaybookModeToggleUi() {
       sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
     }
   } catch (_e) {}
-  const banner = document.getElementById('custom-playbook-banner');
-  const btnCurrent = document.getElementById('playbook-mode-current-btn');
-  const btnCustom = document.getElementById('playbook-mode-custom-btn');
+  const banner = byId('custom-playbook-banner');
+  const btnCurrent = byId('playbook-mode-current-btn');
+  const btnCustom = byId('playbook-mode-custom-btn');
   const customOn =
     sessionStorage.getItem(STORAGE_PLAYBOOK_MODE) === 'custom' &&
     sessionStorage.getItem(STORAGE_PLAYBOOK_FOCUS);
@@ -1609,25 +2070,26 @@ function syncPlaybookModeToggleUi() {
 function wireCustomTrainingPlaybook() {
   const pageParams = liveParams();
   if (pageParams.get('mode') !== 'franchise') {
-    const wrap = document.querySelector('.playbook-mode-selection');
+    const wrap = rootQuery('.playbook-mode-selection');
     if (wrap) wrap.style.display = 'none';
     return;
   }
-  const btnCurrent = document.getElementById('playbook-mode-current-btn');
-  const btnCustom = document.getElementById('playbook-mode-custom-btn');
+  const btnCurrent = byId('playbook-mode-current-btn');
+  const btnCustom = byId('playbook-mode-custom-btn');
   if (btnCurrent) {
     btnCurrent.addEventListener('click', function () {
-      playSound('click-tiny.wav');
+      playSound('SFX_SELECT');
       try {
         sessionStorage.removeItem(STORAGE_PLAYBOOK_FOCUS);
         sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
       } catch (_e) {}
       syncPlaybookModeToggleUi();
+      saveCurrentPlaybooksChoice();
     });
   }
   if (btnCustom) {
     btnCustom.addEventListener('click', function () {
-      playSound('click-tiny.wav');
+      playSound('SFX_SELECT');
       saveTrainingFormDraft();
       const snap = collectTrainingData();
       try {
@@ -1646,7 +2108,15 @@ function wireCustomTrainingPlaybook() {
       const tid = p.get('team_id') || p.get('user_team_id');
       if (tid) q.set('team_id', tid);
       if (p.get('session_type')) q.set('session_type', p.get('session_type'));
-      window.location.href = `/training-playbooks.html?${q.toString()}`;
+      const playbooksUrl = `/training-playbooks.html?${q.toString()}`;
+      // Not a leave: the draft was saved above and Training Playbook returns here, so
+      // the unsaved-allocation confirm must not stand in the way once points are spent.
+      if (window.GOBNav && typeof window.GOBNav.go === 'function') {
+        if (typeof window.GOBNav.allowNextLeave === 'function') window.GOBNav.allowNextLeave();
+        window.GOBNav.go(playbooksUrl);
+      } else {
+        window.location.href = playbooksUrl;
+      }
     });
   }
   syncPlaybookModeToggleUi();
@@ -1656,23 +2126,11 @@ function wireCustomTrainingPlaybook() {
    Training polish: tooltips, attribute chips, requirements bar
    ============================================================ */
 
-const ARCH_COLORS = {
-  'authoritarian': '#C0392B',
-  'systems-coach': '#D4A017',
-  'player-maximizer': '#3A8C4A',
-  'culture-builder': '#7B5EA7'
-};
 const ARCH_NAMES = {
   'authoritarian': 'Authoritarian',
   'systems-coach': 'Systems Coach',
   'player-maximizer': 'Player Maximizer',
   'culture-builder': 'Culture Builder'
-};
-const PM_LEAF_NAMES = {
-  'player-maximizer-top-3': 'Top 3',
-  'player-maximizer-attributes-4-6': 'Attributes 4–6',
-  'player-maximizer-positional-focus': 'Positional Focus',
-  'player-maximizer-custom': 'Custom'
 };
 
 function archKeyFromValue(value) {
@@ -1686,18 +2144,18 @@ function archKeyFromValue(value) {
 
 /* --- Tooltip copy registries (source of truth: training tutorial) --- */
 const DRILL_TOOLTIPS = {
-  'offense-inside':      { code: 'SC', color: '#f79420', attr: 'Inside Scoring',   desc: "Sharpens scoring around the rim and in the post." },
-  'offense-outside':     { code: 'SH', color: '#f79420', attr: 'Outside Shooting', desc: "Develops perimeter and mid-range shooting touch." },
-  'defense-inside':      { code: 'ID', color: '#4a90d9', attr: 'Inside Defense',   desc: "Builds post defense, rim protection and interior toughness." },
-  'defense-outside':     { code: 'OD', color: '#4a90d9', attr: 'Outside Defense',  desc: "Hones on-ball perimeter defense and closeouts." },
-  'technical-passing':   { code: 'PS', color: '#7b5ea7', attr: 'Passing',          desc: "Improves court vision, timing and passing accuracy." },
-  'technical-ball-handling': { code: 'BH', color: '#7b5ea7', attr: 'Ball Handling', desc: "Tightens handle and ball security under pressure." },
-  'technical-rebounding':{ code: 'RB', color: '#7b5ea7', attr: 'Rebounding',       desc: "Drills boxing out and finishing on the glass." },
-  'weight-strength':     { code: 'ST', color: '#aeb8cc', attr: 'Strength',         desc: "Adds physical strength for finishing and holding position." },
-  'weight-agility':      { code: 'AG', color: '#aeb8cc', attr: 'Agility',          desc: "Builds quickness, lateral speed and body control." },
-  'general-conditioning':{ code: 'ND', color: '#aeb8cc', attr: 'Conditioning',     desc: "Builds team-wide stamina so legs stay fresh deep into games." },
-  'general-free-throws': { code: 'FT', color: '#d4a017', attr: 'Free Throws',      desc: "Reps from the line to convert when it matters most." },
-  'general-film-study':  { code: 'IQ', color: '#d4a017', attr: 'Basketball IQ',    desc: "Film Study gives coaches better insight into upcoming opponents — especially tendencies from their most recent game." },
+  'offense-inside':      { code: 'SC', attr: 'Inside Scoring',   desc: "Sharpens scoring around the rim and in the post." },
+  'offense-outside':     { code: 'SH', attr: 'Outside Shooting', desc: "Develops perimeter and mid-range shooting touch." },
+  'defense-inside':      { code: 'ID', attr: 'Inside Defense',   desc: "Builds post defense, rim protection and interior toughness." },
+  'defense-outside':     { code: 'OD', attr: 'Outside Defense',  desc: "Hones on-ball perimeter defense and closeouts." },
+  'technical-passing':   { code: 'PS', attr: 'Passing',          desc: "Improves court vision, timing and passing accuracy." },
+  'technical-ball-handling': { code: 'BH', attr: 'Ball Handling', desc: "Tightens handle and ball security under pressure." },
+  'technical-rebounding':{ code: 'RB', attr: 'Rebounding',       desc: "Drills boxing out and finishing on the glass." },
+  'weight-strength':     { code: 'ST', attr: 'Strength',         desc: "Adds physical strength for finishing and holding position." },
+  'weight-agility':      { code: 'AG', attr: 'Agility',          desc: "Builds quickness, lateral speed and body control." },
+  'general-conditioning':{ code: 'ND', attr: 'Conditioning',     desc: "Builds team-wide stamina so legs stay fresh deep into games." },
+  'general-free-throws': { code: 'FT', attr: 'Free Throws',      desc: "Reps from the line to convert when it matters most." },
+  'general-film-study':  { code: 'IQ', attr: 'Basketball IQ',    desc: "Film Study gives coaches better insight into upcoming opponents — especially tendencies from their most recent game." },
   'general-breaks':      { desc: "Breaks boost the effectiveness of all drills and reduce fatigue heading into the next game. But too many run the risk of straining team chemistry and weakening your team's Fight and Discipline attributes. Strong-chemistry teams absorb more downtime with less risk." },
   'team-offense-install':       { desc: "Walk through new or existing offensive plays — no active defense. Pairs well with Film Study to tailor your sets to an opponent's defensive tendencies." },
   'team-defense-install':       { desc: "Walk through new or existing defensive schemes — no active offense. Pairs well with Film Study to tailor your coverage to an opponent's offensive tendencies." },
@@ -1721,16 +2179,10 @@ const FOCUS_TOOLTIPS = {
   'culture-builder-confidence': { name: 'Confidence',           desc: "Build unshakable self-belief through relentless positivity." },
   'culture-builder-community':  { name: 'Community Engagement', desc: "Root the team in its community and rally collective passion." },
   'culture-builder-teamwork':   { name: 'Team Building',        desc: "Forge a brotherhood that plays for each other." },
-  'player-maximizer-choose-attributes': {
-    name: 'Choose Attributes',
-    desc: "Opens a per-player attribute picker. Pick a development mode for the whole roster:",
-    modes: [
-      ['Top 3', "Sharpen what each player already does best."],
-      ['Attributes 4–6', "Take each player from good to great in emerging skills."],
-      ['Positional Focus', "Build positional identity around each player's core strengths."],
-      ['Custom', "Develop each player around the attributes you choose."]
-    ]
-  }
+  'player-maximizer-top-3':             { name: 'Top 3 Attributes', desc: "Sharpen what each player already does best." },
+  'player-maximizer-attributes-4-6':    { name: 'Attributes 4\u20136',   desc: "Take each player from good to great in emerging skills." },
+  'player-maximizer-positional-focus':  { name: 'Positional Focus', desc: "Build positional identity around each player's core strengths." },
+  'player-maximizer-custom':            { name: 'Custom',           desc: "Develop each player around the attributes you choose." }
 };
 
 /* --- Shared tooltip element + positioning --- */
@@ -1814,7 +2266,10 @@ function registerTrainingTooltip(trigger, html, focusEl) {
 }
 
 // Dismiss on scroll and on outside tap
-window.addEventListener('scroll', hideTrainingTooltip, true);
+function wireTooltipScroll() {
+_onScrollTip = hideTrainingTooltip;
+window.addEventListener('scroll', _onScrollTip, true);
+}
 document.addEventListener('click', function (e) {
   if (lastPointerType === 'touch' && trainingTooltipTrigger && !trainingTooltipTrigger.contains(e.target)) {
     hideTrainingTooltip();
@@ -1824,24 +2279,22 @@ document.addEventListener('click', function (e) {
 function buildDrillTooltipHtml(d) {
   let head = '';
   if (d.code) {
-    head = '<div class="tt-head"><span class="attr-chip" style="background:' + d.color + '">' + d.code +
+    head = '<div class="tt-head"><span class="attr-chip">' + d.code +
       '</span><span class="tt-attr">' + d.attr + '</span></div>';
   }
   return head + '<div class="tt-desc">' + d.desc + '</div>';
 }
 
-function buildFocusTooltipHtml(value, f) {
-  const archKey = archKeyFromValue(value);
-  const archColor = ARCH_COLORS[archKey] || '#f79420';
-  const archName = ARCH_NAMES[archKey] || '';
+/* The focus name is the tooltip's title. The archetype it belongs to is not named here
+   (Jamie, 2026-10-03): the option already sits under its archetype heading. */
+function buildFocusTooltipHtml(f) {
   let modes = '';
   if (f.modes) {
     modes = '<ul class="tt-modes">' + f.modes.map(function (m) {
       return '<li class="tt-mode"><b>' + m[0] + '</b> — ' + m[1] + '</li>';
     }).join('') + '</ul>';
   }
-  return '<div class="tt-eyebrow" style="color:' + archColor + '">' + archName + '</div>' +
-    '<div class="tt-name">' + f.name + '</div>' +
+  return '<div class="tt-name">' + f.name + '</div>' +
     '<div class="tt-desc">' + f.desc + '</div>' + modes;
 }
 
@@ -1858,7 +2311,6 @@ function injectAttributeChip(slider, d) {
   if (!lt || lt.querySelector('.attr-chip')) return;
   const chip = document.createElement('span');
   chip.className = 'attr-chip';
-  chip.style.background = d.color;
   chip.textContent = d.code;
   chip.setAttribute('aria-hidden', 'true');
   lt.appendChild(chip);
@@ -1876,7 +2328,7 @@ function triggerForSlider(slider) {
 
 function setupTrainingTooltips() {
   Object.keys(DRILL_TOOLTIPS).forEach(function (id) {
-    const slider = document.getElementById(id);
+    const slider = byId(id);
     if (!slider) return;
     const d = DRILL_TOOLTIPS[id];
     injectAttributeChip(slider, d);
@@ -1884,34 +2336,19 @@ function setupTrainingTooltips() {
     if (trigger) registerTrainingTooltip(trigger, buildDrillTooltipHtml(d), slider);
   });
 
-  document.querySelectorAll('.archetype-option').forEach(function (opt) {
+  qsa('.archetype-option').forEach(function (opt) {
     const radio = opt.querySelector('input[name="coaching-focus"]');
     if (!radio) return;
     const f = FOCUS_TOOLTIPS[radio.value];
     if (!f) return;
-    registerTrainingTooltip(opt, buildFocusTooltipHtml(radio.value, f), radio);
+    registerTrainingTooltip(opt, buildFocusTooltipHtml(f), radio);
   });
 }
 
 /* --- Requirements bar --- */
-const reqBarEl = document.getElementById('requirements-bar');
-const reqPointsChip = document.getElementById('req-points');
-const reqPointsUsedEl = document.getElementById('req-points-used');
-const reqPointsTotalEl = document.getElementById('req-points-total');
-const reqPointsMeterEl = document.getElementById('req-points-meter');
-const reqFocusChip = document.getElementById('req-focus');
-const reqFocusValueEl = document.getElementById('req-focus-value');
-const reqFocusNudgeBtn = document.getElementById('req-focus-nudge');
-
 function friendlyFocusName(radio) {
   const v = radio.value;
-  if (v === CHOOSE_ATTRIBUTES_VALUE) {
-    if (playerMaximizerResolvedFocus && PM_LEAF_NAMES[playerMaximizerResolvedFocus]) {
-      return PM_LEAF_NAMES[playerMaximizerResolvedFocus];
-    }
-    return 'Choose Attributes';
-  }
-  if (PM_LEAF_NAMES[v]) return PM_LEAF_NAMES[v];
+  if (PM_LEAVES[v]) return PM_LEAVES[v].title;
   return getFocusLabelText(radio) || v;
 }
 
@@ -1930,17 +2367,16 @@ function updateRequirementsBar() {
   }
   if (reqPointsChip) reqPointsChip.classList.toggle('is-complete', pointsComplete);
 
-  const checked = document.querySelector('input[name="coaching-focus"]:checked');
+  const checked = rootQuery('input[name="coaching-focus"]:checked');
   const focusSelected = !!checked;
   const focusComplete = focusSelected && isPlayerMaximizerSubmitReady();
 
   if (focusSelected) {
     const archKey = archKeyFromValue(checked.value);
-    const archColor = ARCH_COLORS[archKey] || '#f79420';
     const archName = ARCH_NAMES[archKey] || '';
     const focusName = friendlyFocusName(checked);
     if (reqFocusValueEl) reqFocusValueEl.textContent = archName ? (focusName + ' · ' + archName) : focusName;
-    if (reqFocusChip) reqFocusChip.style.setProperty('--arch', archColor);
+    if (reqFocusChip) reqFocusChip.style.setProperty('--arch', 'var(--text-38)');
   } else {
     if (reqFocusValueEl) reqFocusValueEl.textContent = 'Not selected';
     if (reqFocusChip) reqFocusChip.style.removeProperty('--arch');
@@ -1957,7 +2393,7 @@ function updateRequirementsBar() {
 }
 
 function scrollToCoachingFocus() {
-  const sec = document.querySelector('.coaching-section');
+  const sec = rootQuery('.coaching-section');
   if (!sec) return;
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   sec.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
@@ -1967,55 +2403,146 @@ function scrollToCoachingFocus() {
   window.setTimeout(function () { sec.classList.remove('coaching-flash'); }, 1600);
 }
 
+function wireReqNudge() {
 if (reqFocusNudgeBtn) {
   reqFocusNudgeBtn.addEventListener('click', function () {
-    playSound('click-tiny.wav');
+    playSound('SFX_SELECT');
     scrollToCoachingFocus();
   });
+}
 }
 
 /* Keep the requirements bar docked just below the sticky header. */
 function positionRequirementsBar() {
-  const header = document.querySelector('.training-header');
+  const header = rootQuery('.training-header');
   if (!reqBarEl || !header) return;
   const headerTop = parseFloat(getComputedStyle(header).top) || 0;
   reqBarEl.style.top = Math.round(headerTop + header.offsetHeight + 8) + 'px';
 }
 
-window.addEventListener('resize', positionRequirementsBar);
+function wireReqBarChrome() {
+_onResizeReq = positionRequirementsBar;
+window.addEventListener('resize', _onResizeReq);
 if (typeof ResizeObserver !== 'undefined') {
-  const headerForObserve = document.querySelector('.training-header');
+  const headerForObserve = rootQuery('.training-header');
   if (headerForObserve) {
-    new ResizeObserver(positionRequirementsBar).observe(headerForObserve);
+    _reqObserver = new ResizeObserver(positionRequirementsBar);
+    _reqObserver.observe(headerForObserve);
   }
 }
+}
 
-// Wire up tooltips/chips and prime the requirements bar
-setupTrainingTooltips();
-positionRequirementsBar();
-updateRequirementsBar();
+function wireTrainingUi() {
+  if (root && root.dataset.trainingWired === '1') return;
+  if (root) root.dataset.trainingWired = '1';
+  primeSliderPrev();
+  wireSliders();
+  wireSliderResize();
+  wireAutoTrain();
+  wireCoachingRadios();
+  wireBackButton();
+  wireSubmit();
+  wirePageShow();
+  wireTooltipScroll();
+  wireReqNudge();
+  wireReqBarChrome();
+  setupTrainingTooltips();
+  positionRequirementsBar();
+  updateRequirementsBar();
+}
 
-// Initialize training points on page load
-(async function initTrainingPage() {
-  const redirected = await redirectIfTrainingAlreadyCommitted();
-  if (redirected) return;
+async function startTrainingPage() {
+  applySections();
+  if (isWeekly() && window.GOBNav) {
+    window.GOBNav.warnOnLeave(
+      function () { return trainingDirty; },
+      { confirm: confirmTrainingLeave }
+    );
+  }
+  const noAllocation = await applyTrainingWeekState();
   wireTrainingTutorialButton();
   await initializeTrainingPoints();
-  wireCustomTrainingPlaybook();
-})();
+  applySections();
+  if (isWeekly() && !noAllocation) wireCustomTrainingPlaybook();
+  if (window.GOBNav) window.GOBNav.restoreScroll();
+}
 
-// Debug: Verify scrimmages element exists on page load
-(function() {
-  const scrimmagesElem = document.getElementById('team-scrimmages');
-  console.log('🔋 [PAGE LOAD] team-scrimmages element:', scrimmagesElem);
-  if (scrimmagesElem) {
-    console.log('🔋 [PAGE LOAD] team-scrimmages value:', scrimmagesElem.value);
-    console.log('🔋 [PAGE LOAD] team-scrimmages type:', scrimmagesElem.type);
-    console.log('🔋 [PAGE LOAD] team-scrimmages id:', scrimmagesElem.id);
-  } else {
-    console.error('🔋 [PAGE LOAD] ERROR: team-scrimmages element NOT FOUND!');
-    // Try to find it with different methods
-    console.log('🔋 [PAGE LOAD] All elements with "scrimmages" in id:', document.querySelectorAll('[id*="scrimmages"]'));
-    console.log('🔋 [PAGE LOAD] All sliders:', document.querySelectorAll('.slider[data-category="team-drills"]'));
+function teardown() {
+  if (_onPageShow) window.removeEventListener('pageshow', _onPageShow);
+  if (_onResizeSliders) window.removeEventListener('resize', _onResizeSliders);
+  if (_onResizeReq) window.removeEventListener('resize', _onResizeReq);
+  if (_onScrollTip) window.removeEventListener('scroll', _onScrollTip, true);
+  if (_tabShown) window.removeEventListener('gob-tab-shown', _tabShown);
+  if (_onKeyModal) document.removeEventListener('keydown', _onKeyModal);
+  _onPageShow = _onResizeSliders = _onResizeReq = _onScrollTip = _tabShown = _onKeyModal = null;
+  if (_reqObserver) { try { _reqObserver.disconnect(); } catch (err) {} _reqObserver = null; }
+  if (window.GOBAdvance && window.GOBAdvance.clearOverride) window.GOBAdvance.clearOverride();
+  if (window.GOBNav && typeof window.GOBNav.warnOnLeave === 'function') {
+    try { window.GOBNav.warnOnLeave(null); } catch (err) {}
   }
-})();
+  started = false;
+}
+
+function revalidate(options) {
+  if (options && options.sections) trainingSections = resolveSections(options);
+  if (!started) return init(root, { sections: trainingSections });
+  bindDom();
+  applySections();
+  return applyTrainingWeekState().then(function () {
+    return initializeTrainingPoints();
+  }).then(function () {
+    applySections();
+    if (window.GOBTables && window.GOBTables.placeTools) window.GOBTables.placeTools();
+    return { revalidate: revalidate, unmount: teardown };
+  });
+}
+
+async function init(host, options) {
+  root = host || document.body;
+  trainingSections = resolveSections(options);
+  const hadShell = !!root.querySelector('.training-container');
+  if (!hadShell) root.insertAdjacentHTML('beforeend', shellHtml());
+  bindDom();
+  applySections();
+  if (hadShell && started) return revalidate(options);
+  wireTrainingUi();
+  try {
+    await startTrainingPage();
+    started = true;
+  } catch (error) {
+    console.error('Failed to initialize training page:', error);
+    throw error;
+  } finally {
+    liftWeeklyLoading();
+  }
+  return { revalidate: revalidate, unmount: teardown };
+}
+
+/**
+ * First paint, weekly page only. training.html holds the page behind the shared loader
+ * (html.is-loading); this lifts it once the week's budget, the saved draft and the Player
+ * Development grid are in, so a 24-point budget that becomes 30, rows that refill from a
+ * draft and a grid that lands late are never shown. A resume that is on its way to the
+ * report keeps its own loader up. In the FCC tab the class is never set, so this is a no-op.
+ */
+function liftWeeklyLoading() {
+  const html = document.documentElement;
+  if (!html.classList.contains('is-loading') || trainingNewswireOverlayActive) return;
+  html.classList.remove('is-loading');
+  if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+}
+
+function shellHtml() {
+  return TRAINING_SHELL;
+}
+
+export { init, teardown, revalidate, shellHtml };
+window.initTraining = function (host, options) { return init(host || document.body, options); };
+
+window.GOBTraining = {
+  submit: function () { return submitTraining(byId('play-now')); },
+  syncAdvance: function () {
+    const remaining = TOTAL_POINTS - calculateTotalPoints();
+    syncTrainingAdvance(remaining === 0 && isCoachingFocusSelected() && isPlayerMaximizerSubmitReady());
+  },
+};

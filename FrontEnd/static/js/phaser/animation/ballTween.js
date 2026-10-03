@@ -26,7 +26,8 @@ import { getPlayerMovementDurationMs } from "../utils/playerMovementDuration.js"
 import { playHcoPassStartSfx, playHcoReceiveSfx } from "../utils/gameSfx.js";
 import { playerBallPos } from "../setup/markerConfig.js";
 
-const BALL_DEPTH = 1000;
+import { BALL_DEPTH } from "./ballDepth.js";
+export { BALL_DEPTH };
 export const PASS_DEBUG = false;
 
 // Animation speed constants (pixels per second)

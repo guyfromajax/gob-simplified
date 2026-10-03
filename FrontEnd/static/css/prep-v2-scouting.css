@@ -1,0 +1,622 @@
+/* Prep v2 · Scouting Report (#scouting-view only). Tokens from gob-tokens.css.
+   Tables reuse shell tokens; no global .tb / .seg / .subtabs leakage. */
+
+html.gob-shell #scouting-view.tab-content {
+  display: none;
+  min-width: 0;
+}
+
+html.gob-shell #scouting-view.tab-content.active {
+  display: block;
+}
+
+/* Page column (--pg-head-h matches shell sticky table headers elsewhere) */
+html.gob-shell #scouting-view .pv {
+  --pg-head-h: calc(var(--page-pad) + var(--fs-32) + var(--space-12) + var(--dsz-44) + var(--dsp-8));
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-24);
+  padding-bottom: var(--dsp-24);
+  max-width: min(100%, 1920px);
+}
+
+/* The sections live inside `.scouting-ready`, not directly in `.pv`, so `.pv`'s gap only
+   ever separated the status line from the panel — the sections themselves fell back to
+   whatever margins they happened to have. This is where the rhythm has to sit.
+
+   One token does the whole job: `--dsp-24` is itself density-scaled (24px at 1280, 28.5px
+   at 1920), so there is no density override here. */
+/* `:not([hidden])` matters: a bare `display: flex` here would outrank the UA rule for the
+   hidden attribute and leak the panel into the loading state. */
+html.gob-shell #scouting-view .scouting-ready:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-24);
+}
+
+html.gob-shell #scouting-view .scouting-ready > section {
+  margin: 0;
+}
+
+html.gob-shell.gob-1920 #scouting-view .pv.sc {
+  padding-bottom: var(--dsp-10);
+}
+
+html.gob-shell #scouting-view .scouting-status {
+  font-size: var(--fs-13);
+  color: var(--text-60);
+}
+
+/* Section headers */
+html.gob-shell #scouting-view .sh {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-12);
+  min-height: var(--dsz-28);
+  margin-bottom: var(--dsp-6);
+}
+
+html.gob-shell #scouting-view .sh h2 {
+  font: var(--fw-bold) var(--fs-20) / var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+  white-space: nowrap;
+  max-height: 30px;
+  overflow: hidden;
+}
+
+html.gob-shell #scouting-view .sh .m {
+  font-size: var(--fs-12);
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+html.gob-shell #scouting-view .sh .r {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+/* Attributes / Stats toggle — .seg (neutral selected, colour law) */
+html.gob-shell #scouting-view .seg {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-9);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+html.gob-shell #scouting-view .seg button {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  height: var(--dsz-28);
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-7);
+  font: var(--fw-semibold) var(--fs-12) / var(--lh-1) var(--font-body);
+  color: var(--text-60);
+  background: transparent;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-hover), color var(--dur-hover);
+}
+
+html.gob-shell #scouting-view .seg button:hover {
+  color: var(--text-87);
+  background: var(--white-4);
+}
+
+html.gob-shell #scouting-view .seg button.on {
+  background: var(--white-11);
+  color: var(--text-100);
+  box-shadow: inset 0 1px 0 var(--white-9);
+}
+
+html.gob-shell #scouting-view .seg button:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 1px;
+}
+
+/* Opponent header (D4: no strongest/weakest) */
+html.gob-shell #scouting-view .opp {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--dsp-20);
+}
+
+html.gob-shell #scouting-view .opp-n {
+  font: var(--fw-bold) var(--fs-32) / var(--lh-9) var(--font-display);
+  letter-spacing: var(--tracking-2);
+  color: var(--text-100);
+  white-space: nowrap;
+}
+
+html.gob-shell #scouting-view .opp-m {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  margin-top: var(--space-6);
+  font-size: var(--fs-12);
+  color: var(--text-60);
+  white-space: nowrap;
+}
+
+html.gob-shell #scouting-view .opp-m i {
+  font-style: normal;
+  color: var(--text-38);
+}
+
+html.gob-shell #scouting-view .logo img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  display: block;
+  border-radius: var(--radius-logo);
+}
+
+html.gob-shell #scouting-view .opp-ranks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: calc(var(--dsz-118) * 2.2);
+  padding-left: var(--dsp-20);
+  border-left: 1px solid var(--line-strong);
+}
+
+html.gob-shell #scouting-view .opp-rank-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+html.gob-shell #scouting-view .opp-rank-row .lbl {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+
+html.gob-shell #scouting-view .opp-rank-row .place {
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  color: var(--text-87);
+  white-space: nowrap;
+  text-align: right;
+}
+
+html.gob-shell #scouting-view .opp-rank-row .gob-meter {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--white-6);
+  overflow: hidden;
+}
+
+html.gob-shell #scouting-view .opp-rank-row .gob-meter i {
+  display: block;
+  height: 100%;
+  width: var(--w, 0%);
+  background: var(--white-55);
+  border-radius: 2px;
+}
+
+html.gob-shell #scouting-view .opp-rank-row .gob-meter.is-empty i {
+  width: 0;
+}
+
+/* Measure rows + diverging bars */
+html.gob-shell #scouting-view .cols2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dsp-24) calc(var(--col-gap) * 2);
+  align-items: start;
+}
+
+html.gob-shell #scouting-view .cols3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--col-gap);
+  align-items: start;
+}
+
+html.gob-shell #scouting-view .ms {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.4ch calc(var(--dsz-118) * 1.3);
+  align-items: center;
+  gap: var(--dsp-12);
+  height: var(--dsz-30);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-13);
+  color: var(--text-60);
+}
+
+html.gob-shell.gob-1920 #scouting-view .ms {
+  height: var(--dsz-28);
+}
+
+html.gob-shell #scouting-view .ms b {
+  font: var(--fw-bold) var(--fs-18) / var(--lh-1) var(--font-display);
+  text-align: right;
+  color: var(--text-87);
+}
+
+/* The diverging pill itself is the shared `.gob .dv` atom in gob-components.css. */
+
+/* T2 attribute grid card (scoped browse template) */
+html.gob-shell #scouting-view .tcard {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  background: var(--white-2);
+}
+
+html.gob-shell #scouting-view .tcard.scroll-x {
+  overflow-x: auto;
+}
+
+html.gob-shell #scouting-view .tbl {
+  --th-top: var(--pg-head-h);
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--fs-13);
+}
+
+html.gob-shell #scouting-view .tbl th {
+  position: sticky;
+  top: var(--th-top);
+  z-index: var(--z-sticky);
+  height: var(--dsz-34);
+  padding: 0 var(--dsp-10);
+  text-align: right;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-60);
+  background: linear-gradient(180deg, var(--surface-th-top), var(--surface-th-bottom));
+  border-bottom: 1px solid var(--line-strong);
+}
+
+html.gob-shell #scouting-view .tbl thead tr:first-child th:first-child {
+  border-top-left-radius: var(--radius-10);
+}
+
+html.gob-shell #scouting-view .tbl thead tr:first-child th:last-child {
+  border-top-right-radius: var(--radius-10);
+}
+
+html.gob-shell #scouting-view .tbl td {
+  height: var(--dsz-40);
+  padding: 0 var(--dsp-10);
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-87);
+}
+
+html.gob-shell #scouting-view .tbl tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+html.gob-shell #scouting-view .tbl tbody tr:nth-child(even) td {
+  background-color: var(--white-1p2);
+}
+
+html.gob-shell #scouting-view .tbl .l {
+  text-align: left;
+}
+
+html.gob-shell #scouting-view .tbl .c {
+  text-align: center;
+}
+
+html.gob-shell #scouting-view .tbl .dim {
+  color: var(--text-60);
+}
+
+html.gob-shell #scouting-view .tbl .b {
+  color: var(--text-100);
+  font-weight: var(--fw-semibold);
+}
+
+html.gob-shell #scouting-view .tbl .gs {
+  border-left: 1px solid var(--line-strong);
+}
+
+html.gob-shell #scouting-view .tbl.tight :is(th, td) {
+  padding: 0 var(--dsp-8);
+}
+
+html.gob-shell #scouting-view .tbl.grp thead tr.g th {
+  height: var(--dsz-22);
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-10);
+  color: var(--text-38);
+  text-align: center;
+  background: var(--surface-th-top);
+  border-bottom: 1px solid var(--line);
+}
+
+html.gob-shell #scouting-view .tbl.grp thead tr.g th[rowspan] {
+  background: linear-gradient(180deg, var(--surface-th-top), var(--surface-th-bottom));
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--text-60);
+  letter-spacing: var(--tracking-8);
+}
+
+html.gob-shell #scouting-view .tbl.grp thead tr.g th.l {
+  text-align: left;
+}
+
+html.gob-shell #scouting-view .tbl.grp thead tr:nth-child(2) th {
+  top: calc(var(--th-top) + var(--dsz-22));
+}
+
+html.gob-shell #scouting-view .tbl th .cap {
+  display: block;
+  margin-top: var(--space-3);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-6);
+  color: var(--text-38);
+}
+
+html.gob-shell #scouting-view .tbl .pcol {
+  min-width: calc(var(--dsz-118) + 72px);
+}
+
+html.gob-shell #scouting-view .agrid td {
+  height: var(--dsz-40);
+}
+
+html.gob-shell #scouting-view .agrid th.ag {
+  letter-spacing: var(--tracking-10);
+}
+
+html.gob-shell #scouting-view .agrid th.aa {
+  width: var(--dsz-34);
+  padding: 0 var(--space-2);
+  text-align: center;
+  font-size: var(--fs-11);
+  letter-spacing: var(--tracking-4);
+}
+
+html.gob-shell #scouting-view .agrid td.a {
+  width: var(--dsz-34);
+  padding: 0 var(--space-2);
+  text-align: center;
+}
+
+html.gob-shell #scouting-view .agrid td.gb {
+  background-image: linear-gradient(var(--white-2), var(--white-2));
+}
+
+/* Attribute pairs (Styleguide › Tables): the two values of a pair sit together and
+   the pairs stand apart. */
+html.gob-shell #scouting-view .agrid th.aa.gs,
+html.gob-shell #scouting-view .agrid td.a.gs {
+  width: calc(var(--dsz-34) + var(--dsp-10));
+  padding-left: var(--dsp-12);
+}
+
+html.gob-shell #scouting-view .agrid th.aa.ge,
+html.gob-shell #scouting-view .agrid td.a.ge {
+  width: calc(var(--dsz-34) + var(--dsp-10));
+  padding-right: var(--dsp-12);
+}
+
+/* Pos leads the row, left of the headshot. */
+html.gob-shell #scouting-view .agrid th.pos-h,
+html.gob-shell #scouting-view .agrid td.pos-c {
+  width: 1px;
+  padding-left: var(--dsp-12);
+  padding-right: var(--space-2);
+}
+
+html.gob-shell #scouting-view .agrid td.ht,
+html.gob-shell #scouting-view .agrid td.wt {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The identity block closes before the first pair opens. */
+html.gob-shell #scouting-view .agrid th.wt,
+html.gob-shell #scouting-view .agrid td.wt {
+  padding-right: var(--dsp-16);
+}
+
+/* Spider Chart Comparison: your team on the left, the opponent on the right. */
+html.gob-shell #scouting-view .sc-radars {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--col-gap);
+  align-items: start;
+}
+
+html.gob-shell #scouting-view .sc-radar {
+  padding: var(--dsp-12);
+}
+
+html.gob-shell #scouting-view .sc-radar-h {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  min-width: 0;
+}
+
+html.gob-shell #scouting-view .sc-radar-h .logo,
+html.gob-shell #scouting-view .sc-radar-h .logo img {
+  width: var(--dsz-28);
+  height: var(--dsz-28);
+  flex: none;
+}
+
+html.gob-shell #scouting-view .sc-radar-h .nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fw-bold) var(--fs-20) / var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+
+html.gob-shell #scouting-view .sc-radar-h .who {
+  margin-left: auto;
+  flex: none;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+
+html.gob-shell #scouting-view .sc-radar .tm-radar-wrap {
+  min-height: 0;
+}
+
+html.gob-shell #scouting-view .sc-radar .tm-radar-svg {
+  max-width: min(420px, 100%);
+}
+
+html.gob-shell #scouting-view .sc-radar-empty {
+  margin: var(--dsp-16) 0 var(--space-4);
+  color: var(--text-60);
+  font-size: var(--fs-13);
+}
+
+html.gob-shell #scouting-view .pc {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+html.gob-shell #scouting-view .pc .jn {
+  width: var(--dsz-22);
+  flex: none;
+  text-align: right;
+  font: var(--fw-bold) var(--fs-18) / var(--lh-1) var(--font-display);
+  color: var(--text-38);
+  padding-top: var(--space-2);
+}
+
+html.gob-shell #scouting-view .pc .nm {
+  font-size: var(--fs-13);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Shape, fill and ring all come from the `.gob .av` atom. Only the size is Scouting's. */
+html.gob-shell #scouting-view .av {
+  width: 28px;
+  height: 28px;
+  font-size: var(--fs-10);
+}
+
+html.gob-shell #scouting-view .av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+  display: block;
+}
+
+html.gob-shell #scouting-view .ad {
+  display: inline-grid;
+  place-items: center;
+  width: var(--dsz-30);
+  height: var(--dsz-26);
+  border-radius: var(--radius-5);
+  font: var(--fw-bold) var(--fs-20) / var(--lh-1) var(--font-display);
+  padding-top: var(--space-1);
+}
+
+html.gob-shell #scouting-view .ad.t-yellow {
+  background: var(--white-3);
+}
+
+html.gob-shell #scouting-view .ad.t-green {
+  background: var(--white-6);
+}
+
+html.gob-shell #scouting-view .ad.t-blue {
+  background: var(--white-10);
+  box-shadow: inset 0 0 0 1px var(--white-12);
+}
+
+html.gob-shell #scouting-view .ad.t-red {
+  background: var(--white-2);
+}
+
+html.gob-shell #scouting-view .rtl {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  white-space: nowrap;
+}
+
+html.gob-shell #scouting-view .rtl b {
+  font: var(--fw-bold) var(--fs-20) / var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-2);
+}
+
+html.gob-shell #scouting-view .rtl i {
+  font-style: normal;
+  font-size: var(--fs-11);
+  color: var(--text-38);
+}
+
+html.gob-shell #scouting-view .rtl b.pot {
+  font-size: var(--fs-15);
+}
+
+html.gob-shell #scouting-view .pos {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--dsz-30);
+  height: var(--dsz-20);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-5);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-6);
+  color: var(--text-87);
+  background: var(--white-6);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+html.gob-shell #scouting-view .tbl.ut td.l {
+  text-align: left;
+}
+
+html.gob-shell #scouting-view .tbl.ut tbody td:not(.l):not(.empty-td) {
+  text-align: right;
+}
+
+html.gob-shell #scouting-view .ut .uv {
+  font: var(--fw-bold) var(--fs-17) / var(--lh-1) var(--font-display);
+  color: var(--text-100);
+}
+
+html.gob-shell #scouting-view .ut td.empty-td {
+  height: auto;
+  white-space: normal;
+  text-align: center;
+  padding: var(--dsp-20) var(--dsp-10);
+  font-size: var(--fs-12);
+  color: var(--text-60);
+  line-height: 1.45;
+  background: transparent !important;
+}

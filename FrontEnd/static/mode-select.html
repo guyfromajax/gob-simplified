@@ -1,36 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="hb-html">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Coach's Home Base</title>
-<link rel="stylesheet" href="/mode-select.css">
+  <link rel="stylesheet" href="/css/gob-tokens.css">
+  <link rel="stylesheet" href="/css/gob-components.css">
+  <!-- Still owns the loading panel, the alpha banner and the Leaders By Team modal. -->
+  <link rel="stylesheet" href="/mode-select.css">
+  <link rel="stylesheet" href="/css/home-base.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
-<body class="mode-select-page mode-select-loading">
+<body class="mode-select-page gob-scope">
+  <!-- Shared branded loader, inline so it covers the session check from first
+       paint. mode-select.js hides it once Home Base has painted real content. -->
+  <div id="page-load-overlay" class="gob-scope" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:var(--bg);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
+    <img src="/images/loader1.gif" alt="Loading…" style="width:240px;height:auto;max-width:90vw;">
+  </div>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
-  <!-- Auth bar (logo | Alpha badge | YT, X, account) is injected by authBarInit when not present -->
-
-  <div id="mode-select-loading" class="mode-select-loading-panel" role="status" aria-live="polite">
-    <div class="mode-select-loading-card">
-      <div class="mode-select-loading-mark" aria-hidden="true">
-        <img src="/images/buttons/whiteball.svg" alt="">
-      </div>
-      <div class="mode-select-loading-title">Loading Coach Home Base</div>
-      <div class="mode-select-loading-copy">Checking your session…</div>
-    </div>
-  </div>
 
   <!-- Alpha Disclaimer (shown when IS_ALPHA=true). Copy source: Website_Copy/alpha-box-copy.md -->
   <div id="alpha-disclaimer" class="alpha-disclaimer" hidden>
@@ -43,98 +43,8 @@
     <button id="alpha-disclaimer-dismiss" class="alpha-disclaimer-dismiss" type="button" aria-label="Dismiss alpha disclaimer">×</button>
   </div>
 
-  <div class="mode-wrapper">
-    <section class="franchise-home-section">
-      <div class="ms-hero ms-hero--franchise">
-        <div class="ms-hero-head">
-          <h2 class="ms-hero-title">My Franchises</h2>
-          <span class="ms-hero-note">Two program slots</span>
-        </div>
-        <!-- Phase 2: always two slots (empty and/or occupied), filled by mode-select.js from GET /franchise/list -->
-        <div id="franchise-home-slots" class="franchise-home-slots fv-a" aria-label="Franchise slots"></div>
-      </div>
-    </section>
-
-    <section class="find-a-game-section">
-      <div class="ms-hero ms-hero--pvp fag-panel">
-        <div class="fag-bloom" aria-hidden="true"></div>
-        <div class="fag-court" aria-hidden="true"></div>
-        <div class="fag-body">
-          <div class="fag-eyebrow">Head to head</div>
-          <h2 class="fag-title">Find A Game</h2>
-          <p class="fag-hook">Your program against another coach's program.</p>
-          <div class="fag-sweep" aria-hidden="true"><span></span></div>
-          <div class="fag-status"><span class="fag-status-dot" aria-hidden="true"></span>Coming Soon</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="around-the-league-section">
-      <div class="around-the-league-panel">
-        <div class="community-panel-header">
-          <h2 class="community-panel-title">Around The League</h2>
-          <span class="ms-panel-note">Latest results, league-wide</span>
-        </div>
-        <div id="around-the-league-grid" class="around-the-league-grid" aria-live="polite"></div>
-      </div>
-    </section>
-
-    <section class="community-section">
-      <div class="community-panel">
-        <div class="community-panel-header">
-          <h2 class="community-panel-title">Leaderboard</h2>
-          <div class="ms-leaderboard-toggle-wrap">
-            <button type="button" id="leaderboard-view-geek-points" class="ms-leaderboard-toggle active">Geek Points</button>
-            <button type="button" id="leaderboard-view-titles" class="ms-leaderboard-toggle">Titles</button>
-          </div>
-        </div>
-        <div class="ms-leaderboard-subtitle">Earn Geek Points after each game based on your coaching performance.</div>
-        <div id="community-leaderboard" class="community-leaderboard">
-          <div class="community-leaderboard-empty">Leaderboard coming soon</div>
-        </div>
-        <div class="leaders-by-team-triggers">
-          <div class="leaders-by-team-trigger">
-            <button id="leaders-by-team-btn" class="leaders-by-team-link" type="button">→ View leaders by team</button>
-          </div>
-          <div class="leaders-by-team-trigger">
-            <button type="button" class="leaders-by-team-link" onclick="navigateFromModeSelect('/coaching-archetypes-leaderboard.html')">→ Coaching Archetypes</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="community-highlights-section">
-      <div class="community-highlights-panel">
-        <div class="community-panel-header">
-          <h2 class="community-panel-title">Community Highlights</h2>
-        </div>
-        <div class="community-highlights-body" aria-live="polite">
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <!-- Delete franchise confirmation (per-slot; never wipe-current) -->
-  <div id="delete-franchise-modal" class="confirm-modal" style="display: none;" aria-hidden="true">
-    <div class="confirm-modal-content" role="dialog" aria-modal="true" aria-labelledby="delete-franchise-modal-title">
-      <h2 id="delete-franchise-modal-title" class="confirm-modal-title">Delete Franchise</h2>
-      <p id="delete-franchise-modal-text" class="confirm-modal-text">This cannot be undone.</p>
-      <div class="confirm-modal-actions">
-        <button id="delete-franchise-modal-cancel" class="confirm-modal-cancel" type="button">Cancel</button>
-        <button id="delete-franchise-modal-confirm" class="confirm-modal-confirm" type="button">Delete Franchise</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="slots-full-modal" class="confirm-modal" style="display: none;" aria-hidden="true">
-    <div class="confirm-modal-content" role="dialog" aria-modal="true" aria-labelledby="slots-full-modal-title">
-      <h2 id="slots-full-modal-title" class="confirm-modal-title">Franchise Slots Full</h2>
-      <p class="confirm-modal-text">You already have two franchises. Delete one to start another.</p>
-      <div class="confirm-modal-actions">
-        <button id="slots-full-modal-ok" class="confirm-modal-confirm" type="button">OK</button>
-      </div>
-    </div>
-  </div>
+  <!-- Home Base. homeBase.js builds the top bar and both zones from the view model. -->
+  <div id="home-base" class="gob hb-root"></div>
 
   <div id="leaders-by-team-modal" class="ms-modal-overlay" aria-hidden="true">
     <div class="ms-modal-backdrop" id="leaders-by-team-backdrop"></div>
@@ -152,11 +62,15 @@
 
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/franchiseLocalStorage.js"></script>
-  <script src="/js/shared/pageLoadOverlay.js"></script>
   <script src="/js/shared/archetypeBadge.js"></script>
   <script src="/common.js"></script>
   <script src="/js/shared/teamGeneratedArt.js"></script>
   <script src="/js/shared/tierEmblem.js"></script>
+  <script src="/js/shared/homeBase.js"></script>
+  <script type="module">
+    import { bindGobDensity } from '/js/shared/gobDensity.js';
+    bindGobDensity(document.getElementById('home-base'));
+  </script>
   <script src="./mode-select.js"></script>
 </body>
 </html>

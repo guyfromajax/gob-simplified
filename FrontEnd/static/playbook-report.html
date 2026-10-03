@@ -1,21 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/gtm-loader.js"></script>
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Playbook Settings - GOB</title>
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
-<link rel="stylesheet" href="/resource-pages.css">
+<link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/playbook-report.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
 <body class="playbook-report-page">
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <!-- First paint: stay behind the shared loader until the playbook is drawn
+       (playbook-report.js lifts it), so the bare section heads are never shown and
+       nothing jumps when the rows arrive. -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
 
   <div class="resource-page-container fcc-brand-page-shell playbook-report-shell">
     <header class="report-header">
@@ -72,7 +82,7 @@
 
         <div class="report-column">
           <div class="report-section-head">
-            <h2>HC Traps</h2>
+            <h2>Half-Court Traps</h2>
           </div>
           <div id="hc-trap-list" class="report-list"></div>
         </div>

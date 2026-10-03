@@ -1,45 +1,24 @@
-:root {
-  --color-bg: #0b0d14;
-  --color-surface: rgba(255, 255, 255, 0.05);
-  --color-border: rgba(255, 215, 0, 0.2);
-  --color-accent: #FFD700;
-  --color-accent-orange: #ff7a00;
-  --color-accent-blue: #4a90e2;
-  --color-text: #fff;
-  --color-text-muted: rgba(255, 255, 255, 0.7);
-  --color-success: #2d8f2d;
-  --color-error: #ff4444;
-  --color-warning: #ffd700;
-  --spacing-xs: 0.5rem;
-  --spacing-sm: 1rem;
-  --spacing-md: 1.5rem;
-  --spacing-lg: 2rem;
-  --spacing-xl: 3rem;
-  --radius: 12px;
-  --radius-sm: 4px;
-  --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: var(--font-family);
-  background: var(--color-bg);
-  color: var(--color-text);
-  min-height: 100vh;
-  padding: var(--spacing-md);
-  line-height: 1.6;
-}
-
-button,
-input[type="button"],
-input[type="submit"],
-input[type="reset"] {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+/* Loaded on the command center too. Do not set :root / body / * here —
+   those leaked gold, a global reset, and a full-page background through
+   the embed bridge. App chrome lives under #training-report-view.
+   Aliases remap leftover --color-* names onto gob tokens without touching
+   resource-pages.css. */
+#training-report-view,
+.training-report-page {
+  --color-bg: var(--bg);
+  --color-surface: var(--white-5);
+  --color-border: var(--line-strong);
+  --color-accent: var(--text-100);
+  --color-accent-orange: var(--text-60);
+  --color-accent-blue: var(--text-60);
+  --color-text: var(--text-100);
+  --radius: var(--radius-12);
+  --radius-sm: var(--radius-4);
+  --spacing-sm: var(--space-16);
+  --spacing-md: var(--space-24);
+  --spacing-lg: var(--dsp-24);
+  --color-error: var(--red);
+  --color-warning: var(--text-60);
 }
 
 .training-report-container {
@@ -69,9 +48,7 @@ input[type="reset"] {
 
 .page-title {
   font-size: 2.5rem;
-  color: var(--color-accent);
-  text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin-bottom: var(--spacing-sm);
 }
 
@@ -80,34 +57,34 @@ input[type="reset"] {
   align-items: center;
   gap: 8px;
   margin-top: 6px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.54);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  color: var(--white-55);
   text-align: left;
   flex-wrap: wrap;
 }
 
 .meta-sep {
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--white-25);
 }
 
 .locker-room-button {
-  background: var(--color-accent-orange);
-  color: #fff;
-  border: none;
+  background: var(--white-6);
+  color: var(--text-100);
+  border: 1px solid var(--white-18);
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius);
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   cursor: pointer;
   transition: all 0.3s ease;
   white-space: nowrap;
 }
 
 .locker-room-button:hover {
-  background: #ff8c1a;
+  background: var(--text-60);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 122, 0, 0.4);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--text-60) 40%, transparent);
 }
 
 /* Players Section */
@@ -128,13 +105,13 @@ input[type="reset"] {
 .section-header h2 {
   font-size: 1.8rem;
   color: var(--color-accent);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 
 .view-toggle {
   display: flex;
   gap: var(--spacing-xs);
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--white-10);
   padding: 0.25rem;
   border-radius: var(--radius-sm);
 }
@@ -146,18 +123,18 @@ input[type="reset"] {
   padding: 0.5rem 1rem;
   border-radius: var(--radius-sm);
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .toggle-btn.active {
   background: var(--color-accent-blue);
-  color: #fff;
+  color: var(--text-100);
 }
 
 .toggle-btn:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--white-10);
   color: var(--color-text);
 }
 
@@ -175,13 +152,13 @@ input[type="reset"] {
 }
 
 .players-table thead {
-  background: rgba(255, 215, 0, 0.1);
+  background: color-mix(in srgb, var(--text-100) 10%, transparent);
 }
 
 .players-table th {
   padding: var(--spacing-sm);
   text-align: left;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--color-accent);
   border-bottom: 2px solid var(--color-border);
   white-space: nowrap;
@@ -189,28 +166,28 @@ input[type="reset"] {
 
 .players-table td {
   padding: var(--spacing-sm);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--white-10);
 }
 
 .players-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--white-5);
 }
 
 /* Change indicators */
 .change-positive {
-  color: var(--color-success);
-  font-weight: 600;
+  color: var(--text-100);
+  font-weight: var(--fw-semibold);
 }
 
 .change-gold {
-  color: #d5af37;
-  text-shadow: 0 0 1px rgba(255, 255, 255, 0.25);
-  font-weight: 700;
+  color: var(--text-100);
+  text-shadow: 0 0 1px var(--white-25);
+  font-weight: var(--fw-bold);
 }
 
 .change-negative {
   color: var(--color-error);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 
 .change-zero {
@@ -219,8 +196,8 @@ input[type="reset"] {
 
 /* Total row styling */
 .players-table .total-row {
-  background: rgba(255, 215, 0, 0.1);
-  font-weight: 700;
+  background: color-mix(in srgb, var(--text-100) 10%, transparent);
+  font-weight: var(--fw-bold);
   border-top: 2px solid var(--color-border);
 }
 
@@ -230,50 +207,8 @@ input[type="reset"] {
   padding-bottom: var(--spacing-sm);
 }
 
-/* Attribute tooltip */
 .attribute-value-cell {
   position: relative;
-}
-
-body.training-report-page .players-table td.attribute-display-increase {
-  color: #34EC27;
-  font-weight: 700;
-}
-
-body.training-report-page .players-table td.attribute-display-decrease {
-  color: #ff6d6d;
-  font-weight: 700;
-}
-
-.attribute-tooltip {
-  position: fixed;
-  display: none;
-  background: rgba(0, 0, 0, 0.9);
-  color: #fff;
-  padding: 0.4rem 0.8rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
-  font-weight: 600;
-  z-index: 10000;
-  pointer-events: none;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-.attribute-tooltip-positive {
-  color: var(--color-success);
-}
-
-.attribute-tooltip-negative {
-  color: var(--color-error);
-}
-
-.attribute-tooltip-zero {
-  color: var(--color-text);
-}
-
-.attribute-tooltip-elite {
-  color: #4A90D9;
 }
 
 /* Momentum pill in table */
@@ -301,7 +236,7 @@ body.training-report-page .players-table td.attribute-display-decrease {
 .projected-lineup-section h2 {
   font-size: 1.8rem;
   color: var(--color-accent);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin: 0;
 }
 
@@ -313,20 +248,20 @@ body.training-report-page .players-table td.attribute-display-decrease {
 table.training-projected-table {
   width: 100%;
   border-collapse: collapse;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--black-25);
   font-size: 0.8rem;
   min-width: 720px;
 }
 
 .training-projected-table thead {
-  background: rgba(255, 215, 0, 0.12);
+  background: color-mix(in srgb, var(--text-100) 12%, transparent);
 }
 
 .training-projected-table th,
 .training-projected-table td {
   padding: var(--spacing-sm);
   text-align: center;
-  border: 1px solid rgba(255, 215, 0, 0.15);
+  border: 1px solid color-mix(in srgb, var(--text-100) 15%, transparent);
   color: var(--color-text);
 }
 
@@ -339,16 +274,16 @@ table.training-projected-table {
 
 .training-projected-table th {
   color: var(--color-accent);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   white-space: nowrap;
 }
 
 .training-projected-table tbody tr:nth-child(even) {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--white-3);
 }
 
 .training-projected-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--white-6);
 }
 
 .training-projected-empty {
@@ -369,7 +304,7 @@ table.training-projected-table {
 .team-section h2 {
   font-size: 1.8rem;
   color: var(--color-accent);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin-bottom: var(--spacing-md);
 }
 
@@ -388,7 +323,7 @@ table.training-projected-table {
 
 .attr-label {
   font-size: 1.1rem;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--color-text);
   margin-bottom: var(--spacing-sm);
   display: flex;
@@ -398,13 +333,13 @@ table.training-projected-table {
 
 .attr-value {
   font-size: 1.2rem;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   color: var(--color-accent);
 }
 
 .attr-change {
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   margin-left: var(--spacing-xs);
 }
 
@@ -435,7 +370,7 @@ table.training-projected-table {
   left: 50%;
   top: 0;
   bottom: 0;
-  background: var(--color-success);
+  background: var(--green); /* colour-law: positive-data */
   transition: width 0.3s ease;
   z-index: 1;
 }
@@ -456,7 +391,7 @@ table.training-projected-table {
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 3;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   color: var(--color-text);
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
   display: none; /* Hide by default - pills don't show values */
@@ -485,7 +420,7 @@ table.training-projected-table {
   align-items: center;
   justify-content: center;
   color: var(--color-text);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   font-size: 0.9rem;
 }
 
@@ -495,12 +430,12 @@ table.training-projected-table {
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 2;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   color: var(--color-text);
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
 }
 
-/* +/- Design for Fast Break Defense and Press/Trap Breaks */
+/* +/- Design for Fast Break Defense and P/T Offense */
 .plus-minus-container {
   text-align: center;
   margin-top: var(--spacing-sm);
@@ -508,12 +443,12 @@ table.training-projected-table {
 
 .plus-minus-indicator {
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   display: inline-block;
 }
 
 .plus-minus-positive {
-  color: var(--color-success);
+  color: var(--text-100);
 }
 
 .plus-minus-negative {
@@ -535,7 +470,7 @@ table.training-projected-table {
 .playbook-summary-section h2 {
   font-size: 1.8rem;
   color: var(--color-accent);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin-bottom: var(--spacing-md);
 }
 
@@ -567,7 +502,7 @@ table.training-projected-table {
 .playbook-name {
   min-width: 200px;
   color: var(--color-text);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   padding-top: var(--spacing-xs);
 }
 
@@ -587,7 +522,7 @@ table.training-projected-table {
 .playbook-metric-title {
   min-width: 100px;
   color: var(--color-text);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   font-size: 0.9rem;
 }
 
@@ -599,7 +534,7 @@ table.training-projected-table {
 .playbook-progress-bar {
   width: 100%;
   height: 20px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--white-10);
   border-radius: var(--radius-sm);
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -614,13 +549,13 @@ table.training-projected-table {
   padding-right: 8px;
   color: var(--color-text);
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 
 .playbook-change {
   min-width: 60px;
   text-align: right;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   font-size: 0.9rem;
 }
 
@@ -638,23 +573,23 @@ table.training-projected-table {
 .training-notes-section h2 {
   font-size: 1.8rem;
   color: var(--color-accent);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin-bottom: var(--spacing-md);
 }
 
 .training-note-section {
   min-height: 156px;
   padding: var(--spacing-md);
-  border: 1px solid rgba(255, 215, 0, 0.12);
+  border: 1px solid color-mix(in srgb, var(--text-100) 12%, transparent);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--white-3);
   box-sizing: border-box;
 }
 
 .training-note-section-title {
   font-size: 1.05rem;
   color: var(--color-accent);
-  font-weight: 700;
+  font-weight: var(--fw-bold);
   margin: 0 0 var(--spacing-xs);
 }
 
@@ -720,18 +655,18 @@ body.training-report-page {
   margin: 0;
   min-height: 100vh;
   padding: 0;
-  font-family: 'Inter', sans-serif;
-  background: #0b0d14;
-  color: #f4f6ff;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-100);
 }
 
-body.training-report-page .training-report-resource-shell {
+.training-report-page .training-report-resource-shell {
   width: min(1480px, calc(100vw - 24px));
   padding: 28px 28px 32px;
   gap: 18px;
 }
 
-body.training-report-page .report-header {
+.training-report-page .report-header {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: start;
@@ -741,27 +676,27 @@ body.training-report-page .report-header {
   gap: 16px;
   margin-bottom: 0;
   padding: 16px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  border: 1px solid var(--white-10);
+  border-radius: var(--radius-14);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%),
+    linear-gradient(180deg, var(--white-4), transparent 18%),
     linear-gradient(180deg, rgba(42, 48, 58, 0.94), rgba(30, 35, 44, 0.97));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 var(--white-5),
     0 10px 20px rgba(0, 0, 0, 0.16);
 }
 
-body.training-report-page .page-title {
+.training-report-page .page-title {
   margin: 0;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 2.2rem;
   line-height: 0.95;
-  letter-spacing: 0.03em;
-  color: #ffffff;
+  letter-spacing: var(--tracking-3);
+  color: var(--text-100);
   text-shadow: none;
 }
 
-body.training-report-page .header-left {
+.training-report-page .header-left {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -773,7 +708,7 @@ body.training-report-page .header-left {
   width: 100%;
 }
 
-body.training-report-page .header-meta-row {
+.training-report-page .header-meta-row {
   display: flex;
   align-items: flex-start;
   width: 100%;
@@ -781,13 +716,13 @@ body.training-report-page .header-meta-row {
   flex-wrap: wrap;
 }
 
-body.training-report-page .header-meta-line {
+.training-report-page .header-meta-line {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.54);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  color: var(--white-55);
   text-align: left;
   flex: 1 1 auto;
   min-width: 0;
@@ -796,148 +731,148 @@ body.training-report-page .header-meta-line {
   white-space: nowrap;
 }
 
-body.training-report-page .header-meta-line #week-number,
-body.training-report-page .header-meta-line #upcoming-opponent,
-body.training-report-page .header-meta-line #training-focus {
-  color: #ffffff;
-  font-weight: 600;
+.training-report-page .header-meta-line #week-number,
+.training-report-page .header-meta-line #upcoming-opponent,
+.training-report-page .header-meta-line #training-focus {
+  color: var(--text-100);
+  font-weight: var(--fw-semibold);
 }
 
-body.training-report-page .meta-sep {
-  color: rgba(255, 255, 255, 0.25);
+.training-report-page .meta-sep {
+  color: var(--white-25);
 }
 
-body.training-report-page .locker-room-button {
+.training-report-page .locker-room-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: linear-gradient(180deg, #42f438 0%, #34EC27 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  color: #101510;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 20px;
-  letter-spacing: 0.04em;
-  transition: filter 0.18s ease, transform 0.18s ease;
+  min-height: var(--dsz-44);
+  padding: 0 var(--space-18);
+  border-radius: var(--radius-10);
+  border: 1px solid var(--line-strong);
+  background: var(--white-4);
+  box-shadow: none;
+  color: var(--text-87);
+  font-family: var(--font-display);
+  font-size: var(--fs-20);
+  letter-spacing: var(--tracking-4);
+  transition: filter var(--dur-hover) var(--ease-out), transform var(--dur-hover) var(--ease-out);
 }
 
-body.training-report-page .locker-room-button:hover {
+.training-report-page .locker-room-button:hover {
   filter: brightness(1.04);
   transform: translateY(-1px);
 }
 
-body.training-report-page .training-notes-section,
-body.training-report-page .players-section,
-body.training-report-page .team-section,
-body.training-report-page .projected-lineup-section,
-body.training-report-page .playbook-summary-section {
+.training-report-page .training-notes-section,
+.training-report-page .players-section,
+.training-report-page .team-section,
+.training-report-page .projected-lineup-section,
+.training-report-page .playbook-summary-section {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
+    linear-gradient(180deg, var(--white-5), transparent 18%),
     linear-gradient(180deg, rgba(42, 48, 58, 0.92), rgba(30, 35, 44, 0.95));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
+  border: 1px solid var(--white-12);
+  border-radius: var(--radius-14);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 var(--white-5),
     0 14px 28px rgba(0, 0, 0, 0.12);
   padding: 18px 20px 20px;
 }
 
-body.training-report-page .training-notes-section h2,
-body.training-report-page .section-header h2,
-body.training-report-page .team-section h2,
-body.training-report-page .projected-lineup-section h2,
-body.training-report-page .playbook-summary-section h2 {
+.training-report-page .training-notes-section h2,
+.training-report-page .section-header h2,
+.training-report-page .team-section h2,
+.training-report-page .projected-lineup-section h2,
+.training-report-page .playbook-summary-section h2 {
   margin: 0;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.7rem;
   line-height: 1;
-  letter-spacing: 0.04em;
-  color: #ffffff;
+  letter-spacing: var(--tracking-4);
+  color: var(--text-100);
   position: relative;
   padding-bottom: 10px;
 }
 
-body.training-report-page .training-notes-section h2::after,
-body.training-report-page .section-header h2::after,
-body.training-report-page .team-section h2::after,
-body.training-report-page .projected-lineup-section h2::after,
-body.training-report-page .playbook-summary-section h2::after {
+.training-report-page .training-notes-section h2::after,
+.training-report-page .section-header h2::after,
+.training-report-page .team-section h2::after,
+.training-report-page .projected-lineup-section h2::after,
+.training-report-page .playbook-summary-section h2::after {
   content: "";
   position: absolute;
   left: 0;
   bottom: 0;
   width: 48px;
   height: 1px;
-  background: rgba(247, 148, 32, 0.95);
+  background: color-mix(in srgb, var(--text-60) 95%, transparent);
 }
 
-body.training-report-page .section-header,
-body.training-report-page .projected-lineup-header {
+.training-report-page .section-header,
+.training-report-page .projected-lineup-header {
   margin-bottom: 14px;
 }
 
-body.training-report-page .view-toggle {
+.training-report-page .view-toggle {
   display: inline-flex;
   gap: 6px;
   padding: 6px;
   background: rgba(19, 23, 31, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
+  border: 1px solid var(--white-12);
+  border-radius: var(--radius-14);
 }
 
-body.training-report-page .toggle-btn {
+.training-report-page .toggle-btn {
   padding: 0 16px;
   min-height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.72);
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  border: 1px solid var(--white-12);
+  border-radius: var(--radius-10);
+  background: var(--white-3);
+  color: var(--white-72);
+  font-family: var(--font-display);
+  font-size: var(--fs-18);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-4);
 }
 
-body.training-report-page .toggle-btn.active {
-  background: #F79420;
-  color: #151920;
+.training-report-page .toggle-btn.active {
+  background: var(--text-60);
+  color: var(--bg);
   border-color: transparent;
 }
 
-body.training-report-page .toggle-btn:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+.training-report-page .toggle-btn:hover:not(.active) {
+  background: var(--white-7);
+  color: var(--text-100);
 }
 
-body.training-report-page .scroll-x,
-body.training-report-page .training-projected-lineup-wrap {
+.training-report-page .scroll-x,
+.training-report-page .training-projected-lineup-wrap {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
+  scrollbar-color: var(--white-25) var(--white-6);
 }
 
-body.training-report-page .scroll-x::-webkit-scrollbar,
-body.training-report-page .training-projected-lineup-wrap::-webkit-scrollbar {
+.training-report-page .scroll-x::-webkit-scrollbar,
+.training-report-page .training-projected-lineup-wrap::-webkit-scrollbar {
   height: 10px;
 }
 
-body.training-report-page .scroll-x::-webkit-scrollbar-track,
-body.training-report-page .training-projected-lineup-wrap::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
+.training-report-page .scroll-x::-webkit-scrollbar-track,
+.training-report-page .training-projected-lineup-wrap::-webkit-scrollbar-track {
+  background: var(--white-6);
 }
 
-body.training-report-page .scroll-x::-webkit-scrollbar-thumb,
-body.training-report-page .training-projected-lineup-wrap::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.24);
+.training-report-page .scroll-x::-webkit-scrollbar-thumb,
+.training-report-page .training-projected-lineup-wrap::-webkit-scrollbar-thumb {
+  background: var(--white-25);
   border-radius: 999px;
 }
 
-body.training-report-page .players-table,
-body.training-report-page .training-projected-table {
+.training-report-page .players-table,
+.training-report-page .training-projected-table {
   width: max(100%, 1180px);
   min-width: 1180px;
   border-collapse: separate;
@@ -945,76 +880,76 @@ body.training-report-page .training-projected-table {
   background: transparent;
 }
 
-body.training-report-page .players-table thead,
-body.training-report-page .training-projected-table thead {
+.training-report-page .players-table thead,
+.training-report-page .training-projected-table thead {
   background: transparent;
 }
 
-body.training-report-page .players-table th,
-body.training-report-page .training-projected-table th {
+.training-report-page .players-table th,
+.training-report-page .training-projected-table th {
   position: sticky;
   top: 0;
   z-index: 1;
   padding: 12px 10px 10px;
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  color: var(--white-62);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-6);
   text-transform: uppercase;
   text-align: center;
   border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
+  border-bottom: 1px solid var(--white-10);
+  background: linear-gradient(180deg, var(--white-6), var(--white-1p2));
   white-space: nowrap;
 }
 
-body.training-report-page .players-table td,
-body.training-report-page .training-projected-table td {
+.training-report-page .players-table td,
+.training-report-page .training-projected-table td {
   padding: 9px 10px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
+  color: var(--white-90);
+  font-size: var(--fs-13);
   text-align: center;
   border: 0;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid var(--white-7);
   background: transparent;
 }
 
-body.training-report-page .players-table tbody tr:nth-child(odd) td,
-body.training-report-page .training-projected-table tbody tr:nth-child(odd) td {
-  background: rgba(255,255,255,0.03);
+.training-report-page .players-table tbody tr:nth-child(odd) td,
+.training-report-page .training-projected-table tbody tr:nth-child(odd) td {
+  background: var(--white-3);
 }
 
-body.training-report-page .players-table tbody tr:hover td,
-body.training-report-page .training-projected-table tbody tr:hover td {
-  background: rgba(255,255,255,0.04);
+.training-report-page .players-table tbody tr:hover td,
+.training-report-page .training-projected-table tbody tr:hover td {
+  background: var(--white-4);
 }
 
-body.training-report-page .players-table th:first-child,
-body.training-report-page .training-projected-table th:first-child,
-body.training-report-page .players-table th:nth-child(2),
-body.training-report-page .training-projected-table th:nth-child(2),
-body.training-report-page .training-projected-table td:nth-child(2) {
+.training-report-page .players-table th:first-child,
+.training-report-page .training-projected-table th:first-child,
+.training-report-page .players-table th:nth-child(2),
+.training-report-page .training-projected-table th:nth-child(2),
+.training-report-page .training-projected-table td:nth-child(2) {
   text-align: left;
 }
 
-body.training-report-page .players-table td:first-child,
-body.training-report-page .training-projected-table td:first-child {
+.training-report-page .players-table td:first-child,
+.training-report-page .training-projected-table td:first-child {
   text-align: center;
 }
 
-body.training-report-page .player-name-cell {
+.training-report-page .player-name-cell {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-body.training-report-page .player-name-text,
-body.training-report-page .projected-player-name-cell {
-  color: #ffffff;
-  font-weight: 600;
+.training-report-page .player-name-text,
+.training-report-page .projected-player-name-cell {
+  color: var(--text-100);
+  font-weight: var(--fw-semibold);
 }
 
-body.training-report-page .position-badge {
+.training-report-page .position-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1022,20 +957,20 @@ body.training-report-page .position-badge {
   min-height: 18px;
   padding: 0 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.76);
-  font-family: 'Inter', sans-serif;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  background: var(--white-7);
+  border: 1px solid var(--white-10);
+  color: var(--white-75);
+  font-family: var(--font-body);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-4);
 }
 
-body.training-report-page .practice-player-highlight td {
-  background: rgba(245, 197, 24, 0.08) !important;
+.training-report-page .practice-player-highlight td {
+  background: var(--white-9) !important;
 }
 
-body.training-report-page .training-notes-container {
+.training-report-page .training-notes-container {
   min-height: 0;
   padding: 0;
   border: 0;
@@ -1043,111 +978,111 @@ body.training-report-page .training-notes-container {
   gap: 14px;
 }
 
-body.training-report-page .training-notes-section {
+.training-report-page .training-notes-section {
   display: grid;
   gap: 16px;
 }
 
-body.training-report-page .training-notes-header {
+.training-report-page .training-notes-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 16px;
 }
 
-body.training-report-page .training-notes-header-main {
+.training-report-page .training-notes-header-main {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   min-width: 0;
 }
 
-body.training-report-page .training-notes-header-accent {
+.training-report-page .training-notes-header-accent {
   flex: 0 0 3px;
   width: 3px;
   height: 32px;
   margin-top: 2px;
-  border-radius: 2px;
-  background: #F79420;
+  border-radius: var(--radius-2);
+  background: var(--text-60);
 }
 
-body.training-report-page .training-notes-header-copy {
+.training-report-page .training-notes-header-copy {
   min-width: 0;
 }
 
-body.training-report-page .training-notes-section h2 {
+.training-report-page .training-notes-section h2 {
   margin: 0;
-  color: #ffffff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 22px;
-  letter-spacing: 0.04em;
+  color: var(--text-100);
+  font-family: var(--font-display);
+  font-size: var(--fs-22);
+  letter-spacing: var(--tracking-4);
   line-height: 1;
 }
 
-body.training-report-page .training-notes-section h2::after {
+.training-report-page .training-notes-section h2::after {
   content: none;
 }
 
-body.training-report-page .training-notes-brief {
+.training-report-page .training-notes-brief {
   margin-top: 6px;
-  color: rgba(255,255,255,0.4);
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 400;
+  color: var(--white-40);
+  font-family: var(--font-body);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-regular);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-8);
   line-height: 1.3;
 }
 
 
-body.training-report-page .training-notes-rule,
-body.training-report-page .training-notes-subrule {
+.training-report-page .training-notes-rule,
+.training-report-page .training-notes-subrule {
   width: 100%;
   height: 1px;
-  background: rgba(255,255,255,0.08);
+  background: var(--white-7);
 }
 
-body.training-report-page .training-notes-subrule {
-  background: rgba(255,255,255,0.06);
+.training-report-page .training-notes-subrule {
+  background: var(--white-6);
 }
 
-body.training-report-page .training-notes-container {
+.training-report-page .training-notes-container {
   display: grid;
   grid-template-columns: 1fr;
   gap: 16px;
 }
 
-body.training-report-page .training-notes-hero-grid {
+.training-report-page .training-notes-hero-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
-body.training-report-page .training-notes-hero-card {
+.training-report-page .training-notes-hero-card {
   min-width: 0;
   padding: 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-10);
   border: 1px solid var(--notes-accent-border);
   border-left: 3px solid var(--notes-accent);
-  background: rgba(255,255,255,0.04);
+  background: var(--white-4);
 }
 
-body.training-report-page .training-notes-hero-card.is-muted {
-  --notes-accent: rgba(255,255,255,0.4);
-  --notes-accent-border: rgba(255,255,255,0.2);
-  --notes-accent-tint: rgba(255,255,255,0.08);
+.training-report-page .training-notes-hero-card.is-muted {
+  --notes-accent: var(--white-40);
+  --notes-accent-border: var(--white-20);
+  --notes-accent-tint: var(--white-7);
 }
 
-body.training-report-page .training-notes-hero-label {
+.training-report-page .training-notes-hero-label {
   color: var(--notes-accent);
-  font-family: 'Inter', sans-serif;
-  font-size: 10px;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-8);
 }
 
-body.training-report-page .training-notes-hero-body {
+.training-report-page .training-notes-hero-body {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1155,424 +1090,428 @@ body.training-report-page .training-notes-hero-body {
   min-width: 0;
 }
 
-body.training-report-page .training-notes-hero-portrait {
+.training-report-page .training-notes-hero-portrait {
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
 }
 
-body.training-report-page .training-notes-hero-portrait-img,
-body.training-report-page .training-notes-hero-portrait-fallback {
+/* Square, like every other player headshot. */
+.training-report-page .training-notes-hero-portrait-img,
+.training-report-page .training-notes-hero-portrait-fallback {
   width: 40px;
   height: 40px;
-  border-radius: 999px;
+  border-radius: var(--radius-6, 6px);
 }
 
-body.training-report-page .training-notes-hero-portrait-img {
+.training-report-page .training-notes-hero-portrait-img {
   display: block;
   object-fit: cover;
   border: 1px solid var(--notes-accent-border);
-  background: rgba(255,255,255,0.08);
+  background: var(--white-7);
 }
 
-body.training-report-page .training-notes-hero-portrait-fallback {
+.training-report-page .training-notes-hero-portrait-fallback {
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1.5px solid var(--notes-accent-border);
   background: var(--notes-accent-tint);
   color: var(--notes-accent);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-bold);
 }
 
-body.training-report-page .training-notes-hero-portrait-fallback.is-muted {
-  border-color: rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.4);
+.training-report-page .training-notes-hero-portrait-fallback.is-muted {
+  border-color: var(--white-20);
+  background: var(--white-7);
+  color: var(--white-40);
 }
 
-body.training-report-page .training-notes-hero-copy {
+.training-report-page .training-notes-hero-copy {
   min-width: 0;
   display: grid;
   gap: 4px;
 }
 
-body.training-report-page .training-notes-hero-name {
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 600;
+.training-report-page .training-notes-hero-name {
+  color: var(--text-100);
+  font-family: var(--font-body);
+  font-size: var(--fs-15);
+  font-weight: var(--fw-semibold);
   line-height: 1.2;
 }
 
-body.training-report-page .training-notes-hero-card.is-muted .training-notes-hero-name {
-  color: rgba(255,255,255,0.45);
+.training-report-page .training-notes-hero-card.is-muted .training-notes-hero-name {
+  color: var(--white-45);
 }
 
-body.training-report-page .training-notes-hero-meta {
-  color: rgba(255,255,255,0.45);
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 400;
+.training-report-page .training-notes-hero-meta {
+  color: var(--white-45);
+  font-family: var(--font-body);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-regular);
   line-height: 1.2;
 }
 
-body.training-report-page .training-notes-tactical-grid {
+.training-report-page .training-notes-tactical-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
-body.training-report-page .training-notes-tactical-pill {
+.training-report-page .training-notes-tactical-pill {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
   padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.07);
-  background: rgba(255,255,255,0.03);
+  border-radius: var(--radius-8);
+  border: 1px solid var(--white-7);
+  background: var(--white-3);
 }
 
-body.training-report-page .training-notes-tactical-label {
+.training-report-page .training-notes-tactical-label {
   flex: 0 1 42%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgba(255,255,255,0.38);
-  font-family: 'Inter', sans-serif;
-  font-size: 10px;
-  font-weight: 400;
+  color: var(--text-38);
+  font-family: var(--font-body);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-regular);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-6);
 }
 
-body.training-report-page .training-notes-tactical-value {
+.training-report-page .training-notes-tactical-value {
   flex: 1 1 auto;
   min-width: 0;
   text-align: right;
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--text-100);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
 }
 
-body.training-report-page .training-notes-tactical-pill.is-muted .training-notes-tactical-value {
-  color: rgba(255,255,255,0.45);
-  font-weight: 400;
+.training-report-page .training-notes-tactical-pill.is-muted .training-notes-tactical-value {
+  color: var(--white-45);
+  font-weight: var(--fw-regular);
 }
 
-body.training-report-page .training-notes-tactical-pill.is-positive .training-notes-tactical-value {
-  color: #34EC27;
+.training-report-page .training-notes-tactical-pill.is-positive .training-notes-tactical-value {
+  color: var(--text-100);
 }
 
-body.training-report-page .training-notes-tactical-pill.is-negative .training-notes-tactical-value {
-  color: #ff6d6d;
+.training-report-page .training-notes-tactical-pill.is-negative .training-notes-tactical-value {
+  color: var(--red);
 }
 
-body.training-report-page .training-notes-misc-row {
+.training-report-page .training-notes-misc-row {
   display: flex;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
 }
 
-body.training-report-page .training-notes-misc-label {
+.training-report-page .training-notes-misc-label {
   flex: 0 0 auto;
-  color: rgba(255,255,255,0.3);
-  font-family: 'Inter', sans-serif;
-  font-size: 10px;
-  font-weight: 400;
+  color: var(--white-30);
+  font-family: var(--font-body);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-regular);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-6);
 }
 
-body.training-report-page .training-notes-misc-value {
+.training-report-page .training-notes-misc-value {
   min-width: 0;
-  color: rgba(255,255,255,0.35);
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
+  color: var(--white-35);
+  font-family: var(--font-body);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-regular);
   font-style: italic;
 }
 
 @media (max-width: 980px) {
-  body.training-report-page .training-notes-hero-grid,
-  body.training-report-page .training-notes-tactical-grid {
+  .training-report-page .training-notes-hero-grid,
+  .training-report-page .training-notes-tactical-grid {
     grid-template-columns: 1fr;
   }
 
-  body.training-report-page .training-notes-header {
+  .training-report-page .training-notes-header {
     grid-template-columns: 1fr;
   }
 
-  body.training-report-page .header-meta-row {
+  .training-report-page .header-meta-row {
     flex-direction: column;
     align-items: stretch;
   }
 }
 
-body.training-report-page .team-attributes-grid {
+.training-report-page .team-attributes-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
-body.training-report-page .team-attr-item {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
+.training-report-page .team-attr-item {
+  background: var(--white-3);
+  border: 1px solid var(--white-7);
+  border-radius: var(--radius-12);
   padding: 16px;
   transition: opacity 0.18s ease;
 }
 
-body.training-report-page .team-attr-item.is-muted {
+.training-report-page .team-attr-item.is-muted {
   opacity: 0.6;
 }
 
-body.training-report-page .attr-label {
+.training-report-page .attr-label {
   margin-bottom: 12px;
 }
 
-body.training-report-page .attr-name {
-  color: rgba(255,255,255,0.7);
-  font-size: 12px;
-  font-weight: 600;
+.training-report-page .attr-name {
+  color: var(--white-70);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
 }
 
-body.training-report-page .attr-change {
+.training-report-page .attr-change {
   margin-left: 12px;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 24px;
+  font-family: var(--font-display);
+  font-size: var(--fs-24);
   line-height: 1;
-  letter-spacing: 0.03em;
+  letter-spacing: var(--tracking-3);
 }
 
-body.training-report-page .change-zero {
-  color: #9e9d9d;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
+.training-report-page .change-zero {
+  color: var(--text-60);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-medium);
 }
 
-body.training-report-page .change-positive {
-  color: #34EC27;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.training-report-page .change-positive {
+  color: var(--text-100);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-4);
 }
 
-body.training-report-page .change-negative {
-  color: #ff6d6d;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.training-report-page .change-negative {
+  color: var(--red);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-4);
 }
 
-body.training-report-page .change-gold {
-  color: #F5C518;
-  font-weight: 700;
+.training-report-page .change-gold {
+  color: var(--text-100);
+  font-weight: var(--fw-bold);
 }
 
 /* Triple-up training change — same blue as A / A+ / A++ RT */
-body.training-report-page .change-elite {
-  color: #4A90D9;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.training-report-page .change-elite,
+.training-report-page .change-delta {
+  color: var(--text-100);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-4);
 }
 
-body.training-report-page .players-table td.change-zero {
-  color: #9e9d9d;
-  font-family: 'Inter', sans-serif;
-  font-size: 16px;
-  font-weight: 500;
+.training-report-page .players-table td.change-zero {
+  color: var(--text-60);
+  font-family: var(--font-body);
+  font-size: var(--fs-16);
+  font-weight: var(--fw-medium);
   text-align: center;
 }
 
-body.training-report-page .players-table td.change-positive {
-  color: #34EC27;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+.training-report-page .players-table td.change-positive {
+  color: var(--text-100);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-6);
   text-align: center;
 }
 
-body.training-report-page .players-table td.change-negative {
-  color: #ff6d6d;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+.training-report-page .players-table td.change-negative {
+  color: var(--red);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-6);
   text-align: center;
 }
 
-body.training-report-page .players-table td.change-gold {
-  color: #F5C518;
-  font-weight: 700;
+.training-report-page .players-table td.change-gold {
+  color: var(--text-100);
+  font-weight: var(--fw-bold);
 }
 
-body.training-report-page .players-table td.change-elite {
-  color: #4A90D9;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+.training-report-page .players-table td.change-elite,
+.training-report-page .players-table td.change-delta {
+  color: var(--text-100);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-6);
   text-align: center;
 }
 
-body.training-report-page .attr-pill {
+.training-report-page .attr-pill {
   height: 36px;
-  background: rgba(0,0,0,0.34);
+  background: var(--black-35);
   border-radius: 999px;
 }
 
-body.training-report-page .pill-center-line {
-  background: rgba(255,255,255,0.14);
+.training-report-page .pill-center-line {
+  background: var(--line-strong);
 }
 
-body.training-report-page .pill-fill-positive {
-  background: linear-gradient(90deg, rgba(52, 236, 39, 0.7), rgba(52, 236, 39, 0.96));
-  box-shadow: 0 0 18px rgba(52, 236, 39, 0.28);
+.training-report-page .pill-fill-positive { /* colour-law: positive-data */
+  background: linear-gradient(90deg, color-mix(in srgb, var(--green) 70%, transparent), color-mix(in srgb, var(--green) 96%, transparent));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--green) 28%, transparent);
 }
 
-body.training-report-page .pill-fill-negative {
+.training-report-page .pill-fill-negative {
   background: linear-gradient(90deg, rgba(255, 109, 109, 0.96), rgba(255, 109, 109, 0.7));
   box-shadow: 0 0 18px rgba(255, 109, 109, 0.24);
 }
 
-body.training-report-page .pill-fill-positive.is-extreme,
-body.training-report-page .pill-fill-negative.is-extreme {
+.training-report-page .pill-fill-positive.is-extreme,
+.training-report-page .pill-fill-negative.is-extreme {
   animation: training-report-pill-pulse 1.7s ease-in-out infinite;
 }
 
-body.training-report-page .chemistry-bar-container {
+.training-report-page .chemistry-bar-container {
   height: 36px;
-  background: rgba(0,0,0,0.34);
+  background: var(--black-35);
   border-radius: 999px;
 }
 
-body.training-report-page .chemistry-bar-fill {
-  background: linear-gradient(90deg, rgba(247, 148, 32, 0.7), rgba(247, 148, 32, 0.96));
-  box-shadow: 0 0 18px rgba(247, 148, 32, 0.28);
+.training-report-page .chemistry-bar-fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--text-60) 70%, transparent), color-mix(in srgb, var(--text-60) 96%, transparent));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--text-60) 28%, transparent);
 }
 
-body.training-report-page .players-table .total-row td {
-  background: rgba(255,255,255,0.08) !important;
-  font-weight: 700;
+.training-report-page .players-table .total-row td {
+  background: var(--white-7) !important;
+  font-weight: var(--fw-bold);
 }
 
-body.training-report-page .playbook-summary-container {
+.training-report-page .playbook-summary-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-body.training-report-page .playbook-category {
+.training-report-page .playbook-category {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-body.training-report-page .playbook-category-header h3 {
+.training-report-page .playbook-category-header h3 {
   position: relative;
   display: inline-block;
   padding-bottom: 8px;
-  color: #F79420;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 600;
+  color: var(--text-60);
+  font-family: var(--font-body);
+  font-size: var(--fs-15);
+  font-weight: var(--fw-semibold);
 }
 
-body.training-report-page .playbook-category-header h3::after {
+.training-report-page .playbook-category-header h3::after {
   content: "";
   position: absolute;
   left: 0;
   bottom: 0;
   width: 42px;
   height: 1px;
-  background: rgba(247, 148, 32, 0.9);
+  background: color-mix(in srgb, var(--text-60) 90%, transparent);
 }
 
-body.training-report-page .playbook-card-grid {
+.training-report-page .playbook-card-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
-body.training-report-page .playbook-card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
+.training-report-page .playbook-card {
+  background: var(--white-3);
+  border: 1px solid var(--white-7);
+  border-radius: var(--radius-12);
   padding: 14px;
 }
 
-body.training-report-page .playbook-card-top {
+.training-report-page .playbook-card-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
 }
 
-body.training-report-page .playbook-card-name {
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 600;
+.training-report-page .playbook-card-name {
+  color: var(--text-100);
+  font-size: var(--fs-15);
+  font-weight: var(--fw-semibold);
   line-height: 1.35;
 }
 
-body.training-report-page .playbook-card-delta {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 24px;
+.training-report-page .playbook-card-delta {
+  font-family: var(--font-display);
+  font-size: var(--fs-24);
   line-height: 1;
-  letter-spacing: 0.03em;
+  letter-spacing: var(--tracking-3);
 }
 
-body.training-report-page .playbook-card-delta.is-positive {
-  color: #34EC27;
+.training-report-page .playbook-card-delta.is-positive {
+  color: var(--text-100);
 }
 
-body.training-report-page .playbook-card-delta.is-negative {
-  color: #ff6d6d;
+.training-report-page .playbook-card-delta.is-negative {
+  color: var(--red);
 }
 
-body.training-report-page .playbook-card-delta.is-zero {
-  color: #9e9d9d;
+.training-report-page .playbook-card-delta.is-zero {
+  color: var(--text-60);
 }
 
-body.training-report-page .playbook-card-bars {
+.training-report-page .playbook-card-bars {
   margin-top: 12px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-body.training-report-page .playbook-metric-card {
+.training-report-page .playbook-metric-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-body.training-report-page .playbook-metric-title {
+.training-report-page .playbook-metric-title {
   min-width: 0;
-  color: rgba(255,255,255,0.56);
-  font-size: 11px;
-  font-weight: 500;
+  color: var(--white-55);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-medium);
 }
 
-body.training-report-page .playbook-progress-bar {
+.training-report-page .playbook-progress-bar {
   width: 100%;
   height: 8px;
-  background: rgba(255,255,255,0.08);
+  background: var(--white-7);
   border-radius: 999px;
   overflow: hidden;
 }
 
-body.training-report-page .playbook-progress-fill {
+.training-report-page .playbook-progress-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
+  background: var(--white-55);
 }
 
-body.training-report-page .playbook-empty-state {
+.training-report-page .playbook-empty-state {
   padding: 18px;
-  border-radius: 12px;
-  border: 1px dashed rgba(255,255,255,0.12);
-  color: rgba(255,255,255,0.5);
+  border-radius: var(--radius-12);
+  border: 1px dashed var(--white-12);
+  color: var(--white-50);
   text-align: center;
 }
 
@@ -1582,34 +1521,735 @@ body.training-report-page .playbook-empty-state {
 }
 
 @media (max-width: 1100px) {
-  body.training-report-page .training-report-resource-shell {
+  .training-report-page .training-report-resource-shell {
     width: calc(100vw - 12px);
     padding: 20px 12px 24px;
   }
 
-  body.training-report-page .report-header {
+  .training-report-page .report-header {
     grid-template-columns: 1fr;
   }
 
-  body.training-report-page .section-header,
-  body.training-report-page .projected-lineup-header {
+  .training-report-page .section-header,
+  .training-report-page .projected-lineup-header {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  body.training-report-page .team-attributes-grid,
-  body.training-report-page .playbook-card-grid {
+  .training-report-page .team-attributes-grid,
+  .training-report-page .playbook-card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 700px) {
-  body.training-report-page .header-meta-line {
+  .training-report-page .header-meta-line {
     white-space: normal;
   }
 
-  body.training-report-page .team-attributes-grid,
-  body.training-report-page .playbook-card-grid {
+  .training-report-page .team-attributes-grid,
+  .training-report-page .playbook-card-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* The Back control stays on the report. [hidden] is the News path, where ← News
+   is inserted instead. A bare hide-the-header-button rule used to send it to the
+   sub-tab tools row, which a drill-in no longer has. */
+#training-report-view #locker-room-btn[hidden] {
+  display: none;
+}
+/* Native `<button>` used-values are remapped to UA `buttonface` (light grey)
+   even when the class is `.gob-btn--ghost`. The control is an `<a role="button">`
+   and these values match develop's computed ghost. */
+#training-report-view #locker-room-btn.gob-btn.gob-btn--ghost {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--white-6) !important;
+  background-image: none !important;
+  border: 1px solid var(--white-18) !important;
+  box-shadow: none !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  transition: none;
+}
+
+.training-report-page .change-positive,
+.training-report-page .change-negative,
+.training-report-page .change-elite,
+.training-report-page .change-gold,
+.training-report-page .change-delta,
+#training-report-view .change-positive,
+#training-report-view .change-negative,
+#training-report-view .change-elite,
+#training-report-view .change-gold,
+#training-report-view .change-delta {
+  color: var(--text-100);
+}
+
+.training-report-page .change-zero,
+#training-report-view .change-zero {
+  color: var(--text-38);
+}
+
+.training-report-page .is-delta,
+#training-report-view .is-delta {
+  box-shadow: inset 0 0 0 2px var(--text-60);
+}
+
+#franchise-container #training-report-view.tab-content {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Prep v2 report view: flat page, quiet notes, no green/red/orange. Tokens only. */
+#training-report-view .training-report-container,
+#training-report-view .resource-page-container,
+#training-report-view .fcc-brand-page-shell,
+#training-report-view .training-report-resource-shell,
+#training-report-view .training-notes-section,
+#training-report-view .team-section,
+#training-report-view .players-section,
+#training-report-view .projected-lineup-section,
+#training-report-view .playbook-summary-section {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  backdrop-filter: none;
+}
+#training-report-view .resource-page-container.fcc-brand-page-shell::before,
+#training-report-view .resource-page-container.fcc-brand-page-shell::after {
+  content: none;
+}
+
+#franchise-container #training-report-view h2 {
+  margin: 0 0 var(--dsp-6);
+  padding-bottom: 0;
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+#franchise-container #training-report-view h2::after {
+  display: none;
+}
+
+/* The header stays on screen while the report scrolls (it carries the way out), so it
+   needs the page's own solid fill: transparent, it let every section scroll through the
+   title and the button. */
+#training-report-view .report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-12);
+  top: 0;
+  margin-top: calc(-1 * var(--space-10));
+  padding: var(--space-10) 0 var(--dsp-16);
+  background: var(--bg-page-solid);
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+}
+#training-report-view .page-title,
+#training-report-view .report-header .page-title {
+  display: block;
+  margin: 0 0 var(--dsp-6);
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  color: var(--text-100);
+}
+#training-report-view .header-meta-line {
+  font-size: var(--fs-12);
+  color: var(--text-60);
+}
+
+/* --- Top of the report: Notes cards and the Team Report grid ----------------------
+   Three shared cards (.card, gob-components.css), one kind of information each:
+   Standouts (people), Trends (attributes and schemes), Readiness (two meters). Every
+   label sits directly above its value, or immediately beside it; no pair is split
+   across a card. One layer of small grey caps (the labels); values are white; an empty
+   value is quiet (--text-38). Under them the Team Report is one card: eleven
+   attributes in the four columns of Team > Team Attributes, each a name and its mark. */
+#training-report-view .training-notes-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-10);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  white-space: normal;
+  word-wrap: normal;
+  overflow-wrap: normal;
+}
+#training-report-view .tr-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, .8fr);
+  gap: var(--col-gap);
+  align-items: stretch;
+}
+#training-report-view .training-notes-section {
+  display: block;
+}
+/* "Notes" is a section heading like the others on the page. */
+#training-report-view .training-notes-section > h2 {
+  position: relative;
+  padding-bottom: 10px;
+  font-size: 1.7rem;
+}
+#training-report-view .training-notes-section > h2,
+#training-report-view .team-section > h2 {
+  margin: 0 0 var(--dsp-6);
+}
+#training-report-view .training-notes-section > h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 48px;
+  height: 1px;
+  background: color-mix(in srgb, var(--text-60) 95%, transparent);
+}
+#training-report-view .tr-card {
+  gap: var(--dsp-8);
+  padding: var(--dsp-10) var(--dsp-14) var(--dsp-12);
+}
+#training-report-view .tr-card .card-h h3 {
+  margin: 0;
+}
+
+#training-report-view .tr-pair {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+#training-report-view .tr-label,
+#training-report-view .training-notes-hero-label {
+  margin: 0;
+  font: var(--fw-semibold) var(--fs-10)/var(--lh-1p25) var(--font-body);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-60);
+}
+#training-report-view .tr-value {
+  min-width: 0;
+  max-width: 100%;
+  font: var(--fw-medium) var(--fs-13)/var(--lh-1p25) var(--font-body);
+  color: var(--text-100);
+}
+#training-report-view .tr-none {
+  font-weight: var(--fw-regular);
+  color: var(--text-38);
+}
+
+/* Standouts: the headshot, then the label with the name under it. */
+#training-report-view .tr-standouts {
+  display: grid;
+  gap: var(--dsp-8);
+}
+#training-report-view .training-notes-hero-card,
+#training-report-view .training-notes-hero-card.is-muted {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  --notes-accent: var(--text-38);
+  --notes-accent-border: var(--line);
+  --notes-accent-tint: var(--white-4);
+}
+#training-report-view .training-notes-hero-portrait,
+#training-report-view .training-notes-hero-portrait-img,
+#training-report-view .training-notes-hero-portrait-fallback {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-6, 6px);
+}
+#training-report-view .training-notes-hero-portrait-img {
+  display: block;
+  object-fit: cover;
+}
+#training-report-view .training-notes-hero-portrait-fallback,
+#training-report-view .training-notes-hero-portrait-fallback.is-muted {
+  border: 1px solid var(--line);
+  background: var(--white-3);
+  color: var(--text-38);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-8);
+}
+#training-report-view .training-notes-hero-copy {
+  flex: 1 1 auto;
+}
+#training-report-view .tr-standout-value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
+}
+#training-report-view .training-notes-hero-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-14);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-1p25);
+  color: var(--text-100);
+}
+#training-report-view .training-notes-hero-meta {
+  flex: 0 0 auto;
+  font-size: var(--fs-11);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-1p25);
+  color: var(--text-60);
+  white-space: nowrap;
+}
+#training-report-view .training-notes-hero-card.is-muted .training-notes-hero-name {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-regular);
+  color: var(--text-38);
+}
+
+/* Trends: Rising / Falling read on one line (label beside its tags); the two scheme
+   lines put the label above. */
+#training-report-view .tr-trend-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-6) var(--space-12);
+}
+#training-report-view .tr-trend {
+  display: contents;
+}
+#training-report-view .tr-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-12);
+}
+#training-report-view .tr-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-5);
+  white-space: nowrap;
+}
+#training-report-view .tr-tag i {
+  font-style: normal;
+  font-size: var(--fs-10);
+}
+
+/* Readiness: a five-step meter, one step per level, and the word. Neutral only. */
+#training-report-view .tr-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-10);
+}
+#training-report-view .tr-meter {
+  display: inline-flex;
+  gap: var(--space-3);
+}
+#training-report-view .tr-meter i {
+  display: block;
+  width: 16px;
+  height: 6px;
+  border-radius: var(--radius-2);
+  background: var(--white-12);
+}
+#training-report-view .tr-meter i.on {
+  background: var(--text-87);
+}
+
+/* Player Energy: only when the week has something to report. */
+#training-report-view .tr-energy {
+  margin: 0;
+  padding: var(--space-2) var(--dsp-14) 0;
+}
+#training-report-view .tr-energy .tr-value {
+  font-weight: var(--fw-regular);
+  color: var(--text-87);
+  white-space: pre-line;
+}
+
+/* Team Report: one card, four columns read down. A cell is the name and, right beside
+   it, the mark. No movement is a quiet dash and a quieter name, so what moved stands out. */
+#training-report-view .team-attributes-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 var(--col-gap);
+  padding: var(--dsp-8) var(--dsp-14);
+}
+#training-report-view .team-attr-item,
+#training-report-view .team-attr-item.is-delta,
+#training-report-view .team-attr-item.is-muted {
+  display: block;
+  min-width: 0;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+}
+#training-report-view .team-attr-item .attr-label {
+  display: grid;
+  grid-template-columns: minmax(0, 10em) auto;
+  justify-content: start;
+  align-items: center;
+  column-gap: var(--space-10);
+  min-height: var(--dsz-26);
+  margin: 0;
+  font-size: var(--fs-13);
+}
+#training-report-view .team-attr-item .attr-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-regular);
+  color: var(--text-60);
+}
+#training-report-view .team-attr-item.is-delta .attr-name {
+  font-weight: var(--fw-semibold);
+  color: var(--text-100);
+}
+#training-report-view .team-attr-item .attr-change {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-1);
+  letter-spacing: var(--tracking-8);
+  white-space: nowrap;
+}
+#training-report-view .team-attr-item .attr-change.change-zero {
+  color: var(--text-38);
+}
+#training-report-view .notes-placeholder {
+  color: var(--text-38);
+  font-style: normal;
+}
+@media (max-width: 900px) {
+  #training-report-view .tr-cards { grid-template-columns: minmax(0, 1fr); }
+  #training-report-view .team-attributes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+#training-report-view .attr-pill,
+#training-report-view .chemistry-bar-container,
+#training-report-view .pill-center-line,
+#training-report-view .pill-fill-positive,
+#training-report-view .pill-fill-negative {
+  display: none;
+}
+
+#training-report-view .training-report-container {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--dsp-16);
+  width: 100%;
+}
+#training-report-view .report-header,
+#training-report-view .players-section,
+#training-report-view .projected-lineup-section,
+#training-report-view .playbook-summary-section,
+#training-report-view #back-button {
+  grid-column: 1 / -1;
+}
+#training-report-view #back-button {
+  justify-self: start;
+  height: var(--dsz-30);
+  margin: 0 0 var(--dsp-10);
+}
+#training-report-view #locker-room-btn {
+  align-self: flex-start;
+  flex: none;
+}
+#training-report-view .toggle-btn,
+#training-report-view .toggle-btn.active {
+  min-height: var(--dsz-28);
+  padding: 0 var(--space-10);
+  border: 0;
+  border-radius: var(--radius-7);
+  background: transparent;
+  color: var(--text-60);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-semibold);
+  font-family: var(--font-body);
+  letter-spacing: 0;
+}
+#training-report-view .toggle-btn.active {
+  background: var(--white-11);
+  color: var(--text-100);
+  box-shadow: inset 0 1px 0 var(--white-9), inset 0 0 0 1px var(--white-12);
+}
+#training-report-view .view-toggle {
+  display: inline-flex;
+  gap: 0;
+  border-radius: var(--radius-8);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* --- Player Report and Projected Starting 5: the roster's table ---------------------
+   Shared classes only: `.gob-tbl` rows and zebra, `.gob-pairs` for the six attribute
+   pairs (`gstart` / `gend`, `gshade`), `.gob-roster` for the identity columns. Added
+   here is only what the roster has no word for: a column that stands alone (an attribute
+   trained without its partner, NG, EM), RT as the last column, and the row height. */
+#training-report-view .tr-ptable {
+  overflow-x: auto;
+}
+#training-report-view .tr-ptable .gob-tbl {
+  width: 100%;
+}
+#training-report-view .tr-ptable .gob-tbl th {
+  position: static;
+}
+#training-report-view .tr-ptable .gob-tbl tbody td {
+  height: var(--dsz-44);
+}
+/* Three arrows are wider than a digit: the pair box grows with the type, the pair rule
+   does not change. */
+#training-report-view .tr-ptable[data-view="changes"] {
+  --pair-tile: 4em;
+}
+#training-report-view .tr-ptable .gob-tbl th.gsolo,
+#training-report-view .tr-ptable .gob-tbl td.gsolo {
+  width: 1px;
+  text-align: center;
+  padding-left: var(--pair-out, var(--dsp-16));
+  padding-right: var(--pair-out, var(--dsp-16));
+}
+#training-report-view .tr-ptable .gob-tbl th.tr-rt,
+#training-report-view .tr-ptable .gob-tbl td.tr-rt {
+  width: 1px;
+  text-align: center;
+  padding-left: var(--pair-out, var(--dsp-16));
+  padding-right: var(--pair-out, var(--dsp-16));
+}
+/* The values sit right beside the names: the name column is as wide as its longest name,
+   and the empty last cell takes the spare width, so rows and zebra still span the page. */
+#training-report-view .tr-ptable .gob-tbl th.team,
+#training-report-view .tr-ptable .gob-tbl td.team {
+  width: 1px;
+  padding-left: var(--dsp-6);
+  padding-right: var(--pair-lead, var(--dsp-24));
+}
+#training-report-view .tr-ptable .gob-tbl th.tr-fill,
+#training-report-view .tr-ptable .gob-tbl td.tr-fill {
+  width: auto;
+  padding: 0;
+}
+#training-report-view .tr-ptable .gob-tbl td.attribute-value-cell,
+#training-report-view .tr-ptable .gob-tbl td.change-zero,
+#training-report-view .tr-ptable .gob-tbl td.change-delta,
+#training-report-view .tr-ptable .gob-tbl td.change-negative {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-regular);
+}
+/* The name cell is a table cell like any other (the old page made it a flex box, which a
+   shrink-to-fit column cannot measure): the chip and the name sit inline. */
+#training-report-view .tr-ptable .gob-tbl td.player-name-cell {
+  display: table-cell;
+  white-space: nowrap;
+}
+#training-report-view .tr-ptable .player-name-cell .position-badge {
+  margin-right: var(--space-8);
+  vertical-align: middle;
+}
+#training-report-view .tr-ptable .player-name-cell .player-name-text {
+  vertical-align: middle;
+}
+#training-report-view .tr-ptable .gob-tbl th.code,
+#training-report-view .tr-ptable .gob-tbl td.code,
+#training-report-view .tr-ptable .gob-tbl th.num,
+#training-report-view .tr-ptable .gob-tbl td.num {
+  width: 1px;
+}
+
+/* --- Loading: nothing half-built ------------------------------------------------
+   Until the report data is in, every section is hidden and a quiet skeleton stands in.
+   The page title and the way out stay; the "--" placeholders do not. */
+#training-report-view.is-loading .training-report-container > section,
+#training-report-view.is-load-failed .training-report-container > section,
+#training-report-view.is-loading .header-meta-row,
+#training-report-view.is-load-failed .header-meta-row {
+  visibility: hidden;
+}
+#training-report-view.is-loading .training-report-container > section,
+#training-report-view.is-load-failed .training-report-container > section {
+  display: none;
+}
+#training-report-view .report-skeleton,
+#training-report-view .report-load-status { display: none; grid-column: 1 / -1; }
+#training-report-view.is-loading .report-skeleton {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, .8fr);
+  gap: var(--dsp-16) var(--col-gap);
+  margin-top: var(--dsp-16);
+}
+#training-report-view .rsk-col {
+  display: grid;
+  align-content: start;
+  gap: var(--dsp-12);
+}
+#training-report-view .rsk {
+  display: block;
+  height: var(--dsz-30);
+  border-radius: var(--radius-6);
+  background: linear-gradient(90deg, var(--white-3) 0%, var(--white-6) 50%, var(--white-3) 100%);
+  background-size: 200% 100%;
+  animation: reportSkeleton var(--dur-skeleton) linear infinite;
+}
+#training-report-view .rsk-h { width: 132px; height: var(--dsz-20); }
+#training-report-view .rsk-card { height: 96px; border-radius: var(--radius-10); }
+#training-report-view .rsk-grid { grid-column: 1 / -1; height: 96px; border-radius: var(--radius-10); }
+@keyframes reportSkeleton {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #training-report-view .rsk { animation: none; }
+}
+#training-report-view.is-load-failed .report-load-status {
+  display: block;
+  margin: var(--dsp-16) 0 0;
+  padding: var(--dsp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-10);
+  background: var(--white-2);
+  font-size: var(--fs-14);
+  color: var(--text-60);
+}
+
+/* --- Training movement marks ----------------------------------------------------
+   In season: one up faint green, one down faint red, two up green, three up blue, two
+   or three down red. Camp: one up neutral, any down red (training-report.js
+   describeTrainingChange; Styleguide, Data scales). The faint pair is the same green and
+   red let through to the row behind: 45% for green; red needs 60% to read as clearly
+   (3:1 or better on both zebra rows).
+   Declared after every .change-* rule above so the tone is what paints. */
+.training-report-page .tr-tone-neutral,
+#training-report-view .tr-tone-neutral,
+#training-report-view .players-table td.tr-tone-neutral { color: var(--text-87); }
+.training-report-page .tr-tone-up,
+#training-report-view .tr-tone-up,
+#training-report-view .players-table td.tr-tone-up { color: var(--delta-up); }
+.training-report-page .tr-tone-up-faint,
+#training-report-view .tr-tone-up-faint,
+#training-report-view .players-table td.tr-tone-up-faint { color: color-mix(in srgb, var(--delta-up) 45%, transparent); }
+.training-report-page .tr-tone-elite,
+#training-report-view .tr-tone-elite,
+#training-report-view .players-table td.tr-tone-elite { color: var(--blue); }
+.training-report-page .tr-tone-down,
+#training-report-view .tr-tone-down,
+#training-report-view .players-table td.tr-tone-down { color: var(--tier-red); }
+.training-report-page .tr-tone-down-faint,
+#training-report-view .tr-tone-down-faint,
+#training-report-view .players-table td.tr-tone-down-faint { color: color-mix(in srgb, var(--tier-red) 60%, transparent); }
+
+/* --- Playbook Summary: Offense and Defense side by side -----------------------------
+   Each panel lays its sub-sections out as compact columns, so the whole playbook reads
+   across instead of down one long list. */
+#training-report-view .pbs-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr);
+  gap: var(--dsp-12);
+  align-items: start;
+}
+#training-report-view .pbs-panel {
+  padding: var(--dsp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-10);
+  background: var(--white-2);
+}
+#training-report-view .pbs-panel-title {
+  margin: 0 0 var(--dsp-12);
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
+}
+#training-report-view .pbs-cols {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--dsp-20);
+  align-items: start;
+}
+#training-report-view .pbs-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+  padding: 0 calc(var(--pbs-delta-w) + var(--space-8)) var(--space-6) 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+#training-report-view .pbs-group { --pbs-delta-w: 38px; }
+#training-report-view .pbs-group-head h4,
+#training-report-view .pbs-group-head span {
+  margin: 0;
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-10);
+  text-transform: uppercase;
+  color: var(--text-60);
+  white-space: nowrap;
+}
+#training-report-view .pbs-group-head span { color: var(--text-38); }
+#training-report-view .pbs-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+#training-report-view .pbs-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto var(--pbs-delta-w);
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--dsz-30);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+#training-report-view .pbs-row:last-child { border-bottom: 0; }
+#training-report-view .pbs-name {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-1p25);
+  color: var(--text-87);
+  overflow-wrap: anywhere;
+}
+#training-report-view .pbs-cmd {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-100);
+  text-align: right;
+}
+#training-report-view .pbs-delta {
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-2);
+  text-align: left;
+  white-space: nowrap;
+}
+#training-report-view .pbs-delta.change-zero { color: var(--text-38); }
+#training-report-view .pbs-empty {
+  margin: var(--space-8) 0 0;
+  font-size: var(--fs-12);
+  color: var(--text-38);
+}
+@media (max-width: 1100px) {
+  #training-report-view .pbs-panels { grid-template-columns: minmax(0, 1fr); }
+  #training-report-view .pbs-cols { grid-auto-flow: row; }
 }

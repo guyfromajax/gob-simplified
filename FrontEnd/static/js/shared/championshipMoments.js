@@ -13,8 +13,10 @@
  *                              that have a Box Score button)
  *
  *   processPendingMoments(franchiseId, moments, options) -> Promise<void>
- *     Show each moment in sequence; clears each one server-side after the user
- *     dismisses via the action button. Backdrop click + ESC do NOT dismiss.
+ *     Show each moment in sequence; consume each id on the server as soon as
+ *     the takeover mounts (keepalive fetch) so Box score / rail / reload /
+ *     tab close cannot re-queue the same moment. Backdrop click + ESC do NOT
+ *     dismiss the overlay.
  */
 (function () {
   'use strict';
@@ -508,8 +510,8 @@
           </div>
         </div>
         <div class="cm-va-actions">
-          <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
-          ${hasBoxScore ? `<button type="button" class="cm-btn ghost" data-cm-action="boxscore">Box Score</button>` : ''}
+          <button type="button" class="cm-btn" data-cm-action="primary" data-sfx="SFX_SELECT">Back to Locker Room</button>
+          ${hasBoxScore ? `<button type="button" class="cm-btn ghost" data-cm-action="boxscore" data-sfx="SFX_SELECT">Box Score</button>` : ''}
         </div>
       </div>
     `;
@@ -547,8 +549,8 @@
             </div>
           </div>
           <div class="cm-vb-actions">
-            <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
-            ${hasBoxScore ? `<button type="button" class="cm-btn dark" data-cm-action="boxscore">Box Score</button>` : ''}
+            <button type="button" class="cm-btn" data-cm-action="primary" data-sfx="SFX_SELECT">Back to Locker Room</button>
+            ${hasBoxScore ? `<button type="button" class="cm-btn dark" data-cm-action="boxscore" data-sfx="SFX_SELECT">Box Score</button>` : ''}
           </div>
         </div>
       </div>
@@ -603,7 +605,7 @@
           </div>
         </div>
         <div class="cm-vc-actions">
-          <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
+          <button type="button" class="cm-btn" data-cm-action="primary" data-sfx="SFX_SELECT">Back to Locker Room</button>
         </div>
       </div>
     `;
@@ -628,7 +630,7 @@
           </div>
         </div>
         <div class="cm-vd-actions" data-cm-actions>
-          <button type="button" class="cm-btn" data-cm-action="primary">Back to Locker Room</button>
+          <button type="button" class="cm-btn" data-cm-action="primary" data-sfx="SFX_SELECT">Back to Locker Room</button>
         </div>
       </div>
     `;
@@ -673,6 +675,16 @@
   }
 
   function showMoment(moment, options) {
+    if (window.SeasonPeak && typeof window.SeasonPeak.showTitle === 'function' && moment) {
+      return window.SeasonPeak.showTitle({
+        moments: [moment],
+        item: options && options.item,
+        queue: options && options.queue,
+        nextKind: options && options.nextKind,
+        boxScoreUrlBuilder: options && options.boxScoreUrlBuilder,
+        boxScoreUrl: options && options.boxScoreUrl,
+      });
+    }
     return new Promise((resolve) => {
       if (!moment || !moment.type) {
         resolve();
@@ -700,7 +712,19 @@
       const tmp = document.createElement('div');
       tmp.innerHTML = html.trim();
       const variationNode = tmp.firstChild;
+      if (options && options.queueLabel) {
+        const ey = variationNode.querySelector('[class*="eyebrow"]');
+        if (ey && ey.textContent) {
+          ey.textContent = options.queueLabel + ' · ' + ey.textContent;
+        }
+      }
       root.appendChild(variationNode);
+      // Another team's title is silent: the sting is the coach's own reward.
+      if (moment.user_is_winner) {
+        import('/js/shared/uiSfx.js').then(function (m) {
+          if (m && m.playSfx) m.playSfx(m.STING_SEASON_PEAK);
+        }).catch(function () {});
+      }
 
       // Animate-in: needs to render first, then add is-visible on root.
       requestAnimationFrame(() => {
@@ -727,12 +751,15 @@
         }, 320);
         const opts = options || {};
         if (action === 'primary' && opts.lockerRoomUrl) {
-          window.location.href = opts.lockerRoomUrl;
+          if (window.GOBNav && window.GOBNav.exitFlow) window.GOBNav.exitFlow(opts.lockerRoomUrl, { tab: 'home-tab' });
+          else if (window.GOBNav) window.GOBNav.replace(opts.lockerRoomUrl);
+          else window.location.replace(opts.lockerRoomUrl);
           return;
         }
         if (action === 'boxscore') {
           if (resolvedBoxScoreUrl) {
-            window.location.href = resolvedBoxScoreUrl;
+            if (window.GOBNav) window.GOBNav.replace(resolvedBoxScoreUrl);
+            else window.location.replace(resolvedBoxScoreUrl);
             return;
           }
         }
@@ -751,34 +778,62 @@
     });
   }
 
-  async function dismissOnServer(franchiseId, momentId) {
-    if (!franchiseId || !momentId) return;
-    if (typeof window === 'undefined' || typeof fetch !== 'function') return;
-    if (typeof window.API_CONFIG === 'undefined' || !window.API_CONFIG.buildUrl) return;
-    try {
-      await fetch(window.API_CONFIG.buildUrl('/franchise/championship-moments/dismiss'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(window.API_CONFIG.getAuthHeaders ? window.API_CONFIG.getAuthHeaders() : {}),
-        },
-        body: JSON.stringify({ franchise_id: franchiseId, moment_id: momentId }),
-      });
-    } catch (err) {
-      console.warn('[ChampionshipMoments] dismiss request failed:', err);
+  function dismissOnServer(franchiseId, momentId) {
+    if (!franchiseId || !momentId) return Promise.resolve();
+    if (typeof window === 'undefined' || typeof fetch !== 'function') {
+      return Promise.resolve();
     }
+    var url = '/franchise/championship-moments/dismiss';
+    var headers = { 'Content-Type': 'application/json' };
+    try {
+      if (window.API_CONFIG && typeof window.API_CONFIG.buildUrl === 'function') {
+        url = window.API_CONFIG.buildUrl('/franchise/championship-moments/dismiss');
+      }
+      if (window.API_CONFIG && typeof window.API_CONFIG.getAuthHeaders === 'function') {
+        Object.assign(headers, window.API_CONFIG.getAuthHeaders());
+      }
+    } catch (e) { /* same-origin fallback */ }
+    return fetch(url, {
+      method: 'POST',
+      headers: headers,
+      credentials: 'include',
+      keepalive: true,
+      body: JSON.stringify({ franchise_id: franchiseId, moment_id: momentId }),
+    }).catch(function (err) {
+      console.warn('[ChampionshipMoments] dismiss request failed:', err);
+    });
+  }
+
+  function consumeMoments(franchiseId, moments) {
+    if (!Array.isArray(moments) || !moments.length) return Promise.resolve();
+    return Promise.all(moments.map(function (moment) {
+      return dismissOnServer(franchiseId, moment && moment.id);
+    }));
   }
 
   async function processPendingMoments(franchiseId, moments, options) {
     if (!Array.isArray(moments) || !moments.length) return;
+    // Consume on mount so Box score / rail / reload cannot re-show the same ids.
+    var consume = consumeMoments(franchiseId, moments);
+    if (window.SeasonPeak && typeof window.SeasonPeak.showTitle === 'function') {
+      await window.SeasonPeak.showTitle({
+        moments: moments,
+        item: options && options.item,
+        queue: options && options.queue,
+        nextKind: options && options.nextKind,
+        boxScoreUrlBuilder: options && options.boxScoreUrlBuilder,
+        boxScoreUrl: options && options.boxScoreUrl,
+      });
+      await consume;
+      return;
+    }
     for (const moment of moments) {
       // Each call awaits user dismissal before showing the next.
       // For "primary" action we navigate away; navigation kills the loop naturally.
       // eslint-disable-next-line no-await-in-loop
       await showMoment(moment, options);
-      // eslint-disable-next-line no-await-in-loop
-      await dismissOnServer(franchiseId, moment.id);
     }
+    await consume;
   }
 
   window.ChampionshipMoments = {

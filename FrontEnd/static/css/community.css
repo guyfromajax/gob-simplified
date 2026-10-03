@@ -1,0 +1,267 @@
+/* Community surfaces on gob tokens + the colour law (UX_System.md, "Community
+   pages"): the archetype leaderboard (coaching-archetypes-leaderboard.html),
+   the coaching archetypes catalogue (coaching-archetypes.html) and the account
+   / geek points page (account.html). Pages are html.gob + css/gob-tokens.css.
+
+   Navy is "yours" only: your leaderboard row and your lead archetype card.
+   Points, percentages and status are data, so they are neutral. No page wash,
+   no team colour, no orange (nothing here saves), no green (nothing advances). */
+
+/* ---------- Page ---------- */
+body.community-page {
+  font-family: var(--font-body);
+  margin: 0;
+  color: var(--text-100);
+  line-height: 1.5;
+  /* Neutral top lift (no navy wash: navy is "yours" only). */
+  background: radial-gradient(1200px 620px at 50% -12%, var(--white-4) 0%, transparent 60%), var(--bg-chrome);
+  min-height: 100vh;
+}
+/* Sides and bottom only: body.has-auth-bar (auth-bar.css) owns padding-top,
+   as it did over the old inline styles. */
+body.community-page { padding-right: 20px; padding-bottom: 80px; padding-left: 20px; }
+body.ca-page { line-height: 1.55; }
+
+/* ---------- Archetype leaderboard ---------- */
+.alb { max-width: 1080px; margin: 0 auto 20px; }
+.alb-back {
+  display: inline-block; margin-bottom: 14px; font-size: 13px; font-weight: 600;
+  color: var(--white-50); text-decoration: none;
+}
+.alb-back:hover { color: var(--text-100); }
+.alb-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.alb-title { font-family: var(--font-display); font-weight: 700; font-size: 40px; letter-spacing: 0.04em; margin: 0; }
+.alb-ca-link {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-size: 14px; font-weight: 600; color: var(--white-50); text-decoration: none;
+}
+.alb-ca-link:hover { color: var(--text-100); }
+.alb-ca-link .arrow { transition: transform 0.14s ease; }
+.alb-ca-link:hover .arrow { transform: translateX(2px); }
+.alb-intro { margin: 0 0 26px; color: var(--white-55); font-size: 14px; }
+
+.alb-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+@media (max-width: 880px) { .alb-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 560px) { .alb-grid { grid-template-columns: 1fr; } }
+
+.alb-card {
+  background: var(--white-4); border: 1px solid var(--line);
+  border-radius: 14px; padding: 14px 16px;
+}
+.alb-card-head {
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+.alb-card-head.has-tip { cursor: help; }
+.alb-card-head.has-tip:focus-visible { outline: 2px solid var(--white-45); outline-offset: 3px; border-radius: 6px; }
+
+/* Hover/focus definition tooltip for each archetype header. Text mirrors the
+   archetype `description` shown on coaching-archetypes.html. */
+.alb-tip {
+  position: absolute; left: 0; bottom: calc(100% + 9px);
+  width: max-content; max-width: 260px;
+  background: var(--surface-popover); border: 1px solid var(--line-strong);
+  border-radius: 10px; padding: 9px 11px;
+  font-size: 12.5px; line-height: 1.45; font-weight: 400;
+  color: var(--text-87); white-space: normal;
+  box-shadow: 0 10px 26px var(--black-45);
+  opacity: 0; visibility: hidden; transform: translateY(4px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  z-index: 20; pointer-events: none;
+}
+.alb-tip::after {
+  content: ''; position: absolute; top: 100%; left: 18px;
+  border: 6px solid transparent; border-top-color: var(--surface-popover);
+}
+.alb-card-head.has-tip:hover .alb-tip,
+.alb-card-head.has-tip:focus-within .alb-tip {
+  opacity: 1; visibility: visible; transform: translateY(0);
+}
+.alb-card-badge { width: 28px; height: 28px; flex: 0 0 auto; display: inline-flex; align-items: center; }
+.alb-card-name { font-family: var(--font-display); font-size: 18px; letter-spacing: 0.03em; color: var(--text-100); }
+
+.alb-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 4px;
+  font-size: 13px; border-radius: 7px;
+}
+/* Your row: navy, the Home Base leaderboard recipe (.ldb-r.me). */
+.alb-row.is-current {
+  background: color-mix(in srgb, var(--navy) 35%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--navy-hi) 35%, transparent);
+}
+.alb-rank { font-family: var(--font-display); font-size: 14px; color: var(--white-40); width: 20px; flex: 0 0 auto; }
+.alb-user { flex: 1; min-width: 0; color: var(--text-87); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alb-row.is-current .alb-user { color: var(--text-100); }
+/* Share of games: data, neutral. */
+.alb-pct { flex: 0 0 auto; font-family: var(--font-display); font-size: 15px; color: var(--text-100); font-variant-numeric: tabular-nums; }
+.alb-empty { color: var(--white-35); font-size: 12.5px; padding: 8px 4px; }
+
+/* ---------- Coaching archetypes catalogue ---------- */
+.ca-container { max-width: 1040px; margin: 0 auto; }
+.ca-back {
+  display: inline-block; margin-bottom: 18px;
+  font-size: 13px; font-weight: 600; color: var(--white-50);
+  text-decoration: none;
+}
+.ca-back:hover { color: var(--text-100); }
+.ca-title {
+  font-family: var(--font-display); font-weight: 700; font-size: 44px;
+  letter-spacing: 0.04em; margin: 0 0 6px;
+}
+.ca-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.ca-lb-link {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-size: 14px; font-weight: 600; color: var(--white-50); text-decoration: none;
+}
+.ca-lb-link:hover { color: var(--text-100); }
+.ca-lb-link .arrow { transition: transform 0.14s ease; }
+.ca-lb-link:hover .arrow { transform: translateX(2px); }
+.ca-intro { margin: 0 0 30px; color: var(--white-55); font-size: 15px; max-width: 640px; }
+.ca-section { margin-bottom: 38px; }
+.ca-section-label {
+  font-family: var(--font-display); font-weight: 700; font-size: 24px;
+  letter-spacing: 0.04em; color: var(--text-87);
+  margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.ca-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-template-rows: repeat(var(--ca-rows, 3), auto);
+}
+@media (max-width: 860px) { .ca-grid { grid-template-columns: 1fr; } }
+.ca-card {
+  background: var(--white-4);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 14px; row-gap: 10px;
+  align-items: center;
+}
+/* Your lead archetype: navy ring, the Home Base "is-me" card recipe. */
+.ca-card.is-lead {
+  border-color: var(--navy-hi);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--navy) 45%, transparent), 0 8px 24px var(--black-35);
+}
+.ca-card-badge {
+  grid-row: 1; grid-column: 1;
+  width: 64px; height: 64px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ca-card-name {
+  grid-row: 1; grid-column: 2;
+  font-family: var(--font-display); font-weight: 700; font-size: 22px;
+  letter-spacing: 0.03em; color: var(--text-100); align-self: center;
+}
+.ca-card-desc {
+  grid-row: 2; grid-column: 1 / -1;
+  font-size: 13.5px; color: var(--text-60);
+  min-height: 2.2em;
+}
+.ca-empty { color: var(--white-50); }
+
+/* ---------- Account / geek points ---------- */
+.acct { max-width: 920px; margin: 0 auto; }
+.acct-title { font-family: var(--font-display); font-weight: 700; font-size: 40px; letter-spacing: 0.04em; margin: 0 0 18px; }
+/* Colour law: the ambience switch is a choice control, not a save. Neutral on-state. */
+#acct-ambience-switch.account-switch[aria-checked="true"] {
+  background: var(--white-18);
+  border-color: var(--white-28);
+}
+
+.acct .card {
+  background: var(--white-4); border: 1px solid var(--line);
+  border-radius: 16px; padding: 20px 22px;
+}
+.acct .card + .card, .acct .acct-grid + .card, .acct .card + .acct-grid { margin-top: 14px; }
+/* Cards inside the two-up grid sit level (the sibling margin above is for the stack). */
+.acct .acct-grid > .card + .card { margin-top: 0; }
+.acct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+@media (max-width: 760px) { .acct-grid { grid-template-columns: 1fr; } }
+
+.acct .card-label {
+  font-family: var(--font-body); font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.14em; color: var(--white-40); margin: 0 0 14px;
+}
+
+/* Identity */
+.acct-identity { display: flex; align-items: center; gap: 16px; }
+.acct-avatar {
+  flex-shrink: 0; width: 78px; height: 78px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(155deg, var(--surface-3), var(--surface-1));
+  border: 1px solid var(--white-18); box-shadow: inset 0 1px 0 var(--white-12);
+  font-family: var(--font-display); font-size: 36px; color: var(--white-75);
+}
+.acct-id-text { min-width: 0; }
+.acct-name-row { display: flex; align-items: center; gap: 10px; }
+.acct-name { font-family: var(--font-display); font-size: 34px; letter-spacing: 0.03em; color: var(--text-100); }
+/* Status label (Alpha / plan): neutral. */
+.acct-status {
+  margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-87); background: var(--white-6);
+  border: 1px solid var(--white-18); border-radius: 999px; padding: 4px 11px;
+}
+
+/* Geek points: a count, neutral. */
+.gp-total { font-family: var(--font-display); font-size: 52px; line-height: 1; color: var(--text-100); }
+.gp-card .card-label, .gp-card .gp-total { text-align: center; }
+.gp-team-row, .title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 0; border-top: 1px solid var(--white-6);
+  font-size: 13.5px;
+}
+.gp-team-row:first-of-type, .title-row:first-of-type { border-top: none; }
+.gp-team-name, .title-name { color: var(--white-72); }
+.gp-team-pts, .title-count { font-family: var(--font-display); font-size: 18px; color: var(--text-100); }
+.title-count.zero { color: var(--white-30); }
+.muted-empty { color: var(--white-40); font-size: 13px; padding: 6px 0; }
+
+/* Settings rows */
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 0; border-top: 1px solid var(--white-7); }
+.set-row:first-of-type { border-top: none; }
+.set-label { font-size: 13.5px; color: var(--text-87); font-weight: 600; }
+/* Dead segmented control (In-Game Display): a choice control, neutral on-state. */
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px; overflow: hidden; opacity: 0.85; cursor: default; }
+.seg span { padding: 6px 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--white-50); }
+.seg span.on { background: var(--white-18); color: var(--text-100); }
+
+/* Archetype board */
+.arch-board-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px;
+  grid-auto-flow: column; grid-template-rows: repeat(var(--arch-rows, 4), auto);
+}
+@media (max-width: 680px) { .arch-board-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 440px) { .arch-board-grid { grid-template-columns: 1fr; } }
+.arch-cell {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--white-3); border: 1px solid var(--white-7);
+  border-radius: 11px; padding: 10px 12px;
+}
+.arch-rank { font-family: var(--font-display); font-size: 16px; color: var(--white-40); width: 22px; flex-shrink: 0; }
+.arch-badge { width: 30px; height: 30px; flex-shrink: 0; display: inline-flex; align-items: center; }
+.arch-meta { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.arch-aname { flex: 1; min-width: 0; font-family: var(--font-body); font-size: 12.5px; font-weight: 600; color: var(--text-100); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arch-pct { flex: 0 0 auto; font-family: var(--font-display); font-size: 15px; color: var(--text-100); }
+
+/* Footer links */
+.acct-links { display: flex; gap: 22px; justify-content: center; margin-top: 18px; margin-bottom: 160px; flex-wrap: wrap; }
+.acct-link { font-size: 13px; font-weight: 600; color: var(--white-50); text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
+.acct-link:hover { color: var(--text-100); }
+.acct-link[aria-disabled="true"] { color: var(--white-30); cursor: default; }
+.acct-link .arrow { transition: transform .14s ease; }
+.acct-link:not([aria-disabled="true"]):hover .arrow { transform: translateX(2px); }
+
+/* First paint. Until the page's data is in, the body and the footer are held back behind
+   the shared loader: no placeholder name, no "0", no empty cards, no footer that jumps. */
+html.is-loading .acct,
+html.is-loading .alb,
+html.is-loading .community-page .site-footer {
+  visibility: hidden;
+}

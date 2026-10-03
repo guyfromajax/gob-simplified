@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" class="hb-html">
+<head>
+  <link rel="stylesheet" href="/fonts/app-fonts.css">
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Trophy Case</title>
+  <link rel="stylesheet" href="/css/gob-tokens.css">
+  <link rel="stylesheet" href="/css/gob-components.css">
+  <link rel="stylesheet" href="/css/home-base.css">
+  <link rel="stylesheet" href="/css/season-peak.css">
+  <link rel="stylesheet" href="/css/trophy-case.css">
+  <link rel="stylesheet" href="/css/fonts.css">
+</head>
+<body class="tc-page">
+  <div id="page-load-overlay" class="gob-scope" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:var(--bg);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
+    <img src="/images/loader1.gif" alt="Loading…" style="width:240px;height:auto;max-width:90vw;">
+  </div>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <div id="trophy-case" class="gob hb-root"></div>
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/franchiseLocalStorage.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/teamGeneratedArt.js"></script>
+  <script src="/js/shared/rtBucket.js"></script>
+  <script src="/js/shared/seasonPeak.js"></script>
+  <script type="module">
+    import { bindGobDensity } from '/js/shared/gobDensity.js';
+    bindGobDensity(document.getElementById('trophy-case'));
+  </script>
+  <script src="/js/shared/trophyCase.js"></script>
+</body>
+</html>

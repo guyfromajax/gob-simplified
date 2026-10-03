@@ -34,7 +34,10 @@ test('Practice Squad payload preserves the projected POT RT used by the FCC lock
     }],
   });
   expect(FccRosterData.practiceSquadPlayers(payload)[0].potential_rt_ratcheted).toBe(78);
-  expect(FCC_SOURCE).toContain('potential_rt_ratcheted: p.potential_rt_ratcheted != null ? p.potential_rt_ratcheted : null');
+  const rosterView = fs.readFileSync(
+    path.join(__dirname, '../../FrontEnd/static/js/shared/views/rosterView.js'), 'utf8'
+  );
+  expect(rosterView).toContain('player.potential_rt_ratcheted');
 });
 
 test('Practice Squad scope includes assigned players and signed recruits', () => {
@@ -65,18 +68,23 @@ test('legacy session cache remains safe and warms Varsity only', () => {
 });
 
 test('FCC scope and session wiring use the full roster cache, not top-data summary', () => {
-  const selector = FCC_SOURCE.match(/function fccPracticeSquadPlayers\(\) \{([\s\S]*?)\n\}/)?.[1] || '';
-  expect(selector).toContain('userRosterDataCache');
-  expect(selector).not.toContain('commandCenterTopDataCache');
   expect(FCC_SOURCE).toContain('rosterData: userRosterDataCache || null');
   expect(FCC_SOURCE).toContain('renderTeam(userRosterDataCache)');
+  const rosterView = fs.readFileSync(
+    path.join(__dirname, '../../FrontEnd/static/js/shared/views/rosterView.js'), 'utf8'
+  );
+  expect(rosterView).toContain('training_squad');
+  expect(rosterView).toContain('practice_squad_recruits');
+  expect(rosterView).not.toContain('commandCenterTopDataCache');
 });
 
 test('Player Stats uses one Varsity/Practice Squad scoped table', () => {
-  expect(FCC_HTML).toContain('data-player-stats-scope="varsity"');
-  expect(FCC_HTML).toContain('data-player-stats-scope="practice"');
+  expect(FCC_HTML).toContain('id="player-stats-view"');
+  expect(FCC_HTML).not.toContain('id="player-stats-tab"');
   expect(FCC_HTML).not.toContain('id="ps-stats-table"');
-  expect(FCC_SOURCE).toContain("? fccPracticeSquadPlayers()");
-  expect(FCC_SOURCE).toContain(": (userRosterDataCache?.players || [])");
-  expect(FCC_SOURCE).toContain("isPractice ? (player.ps_stats || {}) : getPlayerSeasonStats(player)");
+  const view = fs.readFileSync(
+    path.join(__dirname, '../../FrontEnd/static/js/shared/views/playerStatsView.js'), 'utf8'
+  );
+  expect(view).toContain('GET /franchise/player-stats');
+  expect(view).toContain('gob-tbl');
 });

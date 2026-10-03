@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 FEED_DOC_ID = "global_feed"
 REGULAR_SEASON_LAST_WEEK = 26
-TOP_DEFENDER_MIN_DEFA_SEASON = 156  # 26 games × 6 DEFA / game
 
 
 def _display_username_for_highlight(user_doc: dict | None) -> str:
@@ -97,15 +96,16 @@ ARCHETYPE_PENDING_FIELD = "post_game_status.community_highlight_archetype_pendin
 
 
 def lead_archetype_for_user(owner_user_id: Any) -> str:
-    """Current denormalized lead_archetype key for a user ('' when none/no games)."""
+    """Current denormalized lead_archetype key for a coach ('' when none/no games).
+
+    Reads the coach doc, so the desktop principal resolves against ``local_coach``
+    (where ``commit_user_game_record`` writes it) rather than the absent users doc.
+    """
     if not owner_user_id:
         return ""
-    try:
-        oid = ObjectId(str(owner_user_id))
-    except Exception:
-        return ""
-    u = users_collection.find_one({"_id": oid}, {"lead_archetype": 1})
-    return str((u or {}).get("lead_archetype") or "")
+    from BackEnd.utils.local_coach import coach_field
+
+    return str(coach_field(owner_user_id, "lead_archetype") or "")
 
 
 def _lead_archetype_for_display_username(display_username: str) -> str:
@@ -144,14 +144,37 @@ def record_archetype_change_if_any(
     # A true *evolution* (changed from a prior archetype, not first-time
     # establishment) also queues the FCC "you have evolved" modal. First-time
     # establishment (lead_before empty) stays with the existing first-reveal modal.
-    if lead_before and owner_user_id:
+    # Both land on the coach doc, so the desktop save carries them too: /api/auth/me
+    # is not served on loopback, and the command-center payload reads them there.
+    if not owner_user_id:
+        return
+    from BackEnd.utils.local_coach import coach_target
+
+    if lead_before:
+        target = coach_target(owner_user_id)
+        if target is not None:
+            coll, doc_id, local = target
+            try:
+                coll.update_one(
+                    {"_id": doc_id},
+                    {"$set": {"archetype_evolution_pending": lead_after}},
+                    upsert=local,
+                )
+            except Exception:
+                logger.exception("[COMMUNITY_HIGHLIGHTS] Failed to set archetype_evolution_pending")
+    else:
+        # First time the lead archetype is established: a career milestone, once per coach.
         try:
-            users_collection.update_one(
-                {"_id": ObjectId(str(owner_user_id))},
-                {"$set": {"archetype_evolution_pending": lead_after}},
+            from BackEnd.utils.trophy_log import (
+                _load_franchise,
+                record_first_archetype_milestone,
             )
+
+            franchise_doc = _load_franchise(franchise_id)
+            if franchise_doc:
+                record_first_archetype_milestone(franchise_doc, lead_after)
         except Exception:
-            logger.exception("[COMMUNITY_HIGHLIGHTS] Failed to set archetype_evolution_pending")
+            logger.exception("[TROPHY] first-archetype milestone failed")
 
 
 def _user_scores_from_row(user_team_id_str: Any, user_row: dict) -> tuple[int, int]:
@@ -372,9 +395,41 @@ def _user_conference_rs_champion(franchise_doc: dict, user_team_id_str: str) -> 
     return seed == 1
 
 
-def _top_defender_season_summary(franchise_id_str: str, user_team_id_str: str) -> dict[str, Any] | None:
-    from BackEnd.api.franchise_routes import get_team_player_stats
+def _regular_season_team_games(franchise_doc: dict[str, Any], team_id_str: str) -> int:
+    """Completed regular-season games (weeks 1–26) for one team. Wins + losses."""
+    from BackEnd.constants.leader_qualification import team_games_from_record
 
+    results = franchise_doc.get("results") or {}
+    filtered: dict[str, Any] = {}
+    for key, value in results.items():
+        try:
+            week = int(key)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= week <= REGULAR_SEASON_LAST_WEEK:
+            filtered[str(week)] = value
+    standings = calculate_franchise_standings(filtered, {str(team_id_str): {}})
+    row = standings.get(str(team_id_str)) or {}
+    return team_games_from_record(row.get("W"), row.get("L"))
+
+
+def _top_defender_season_summary(
+    franchise_id_str: str,
+    user_team_id_str: str,
+    franchise_doc: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    from BackEnd.api.franchise_routes import get_team_player_stats
+    from BackEnd.constants.leader_qualification import qualifies
+
+    if franchise_doc is None:
+        try:
+            franchise_doc = franchises_collection.find_one(
+                {"_id": ObjectId(franchise_id_str)},
+                {"results": 1},
+            ) or {}
+        except Exception:
+            franchise_doc = {}
+    team_games = _regular_season_team_games(franchise_doc, user_team_id_str)
     players = get_team_player_stats(franchise_id_str, user_team_id_str, scope="season", sort=None, limit=None)
     best_pct = -1.0
     best: dict[str, Any] | None = None
@@ -384,7 +439,7 @@ def _top_defender_season_summary(franchise_id_str: str, user_team_id_str: str) -
         if gp <= 0:
             continue
         def_a = int(st.get("DEF_A", 0) or 0)
-        if def_a < TOP_DEFENDER_MIN_DEFA_SEASON:
+        if not qualifies("DEF%", def_a, team_games):
             continue
         def_s = int(st.get("DEF_S", 0) or 0)
         pct = round((def_s / def_a) * 100) if def_a > 0 else 0
@@ -822,11 +877,11 @@ def flush_community_highlight_pending_after_week(
         leaders = _build_team_leader_summary(franchise_id, str(user_team_id_str))
         ts = leaders.get("top_scorer") or {}
         tr = leaders.get("top_rebounder") or {}
-        td = _top_defender_season_summary(franchise_id_str, str(user_team_id_str))
+        td = _top_defender_season_summary(franchise_id_str, str(user_team_id_str), fresh)
         def_part = ""
         if td:
             def_part = f" -- Top Defender: {td['name']}: {td['def_pct']}%"
-        elif TOP_DEFENDER_MIN_DEFA_SEASON:
+        else:
             def_part = " -- Top Defender: —"
         details_line = (
             f"Record: {rec} -- Top Scorer: {ts.get('name', '—')}: {ts.get('average', 0)} PPG"

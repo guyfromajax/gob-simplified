@@ -2,12 +2,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, dialog, shell, Menu } = require('electron');
 const engine = require('./engine');
 
 const START_PAGE = '/mode-select.html';
+const APP_NAME = 'Geeked-Out Basketball';
 
-app.setName('GOB');
+app.setName(APP_NAME);
 if (process.env.GOB_USER_DATA) {
   app.setPath('userData', process.env.GOB_USER_DATA);
 }
@@ -55,7 +56,7 @@ function showError(message) {
   const html = path.join(desktopDir(), 'error.html');
   const qs = new URLSearchParams({ message: String(message || 'The engine stopped.') }).toString();
   mainWindow.loadFile(html, { query: { message: String(message || 'The engine stopped.') } }).catch(() => {
-    dialog.showErrorBox('GOB', message);
+    dialog.showErrorBox(APP_NAME, String(message || 'The game engine stopped. Quit the app and open it again.'));
   });
   void qs;
 }
@@ -66,9 +67,9 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'GOB',
+    title: APP_NAME,
     show: true,
-    backgroundColor: '#0b1020',
+    backgroundColor: '#0b0d14',
     webPreferences: {
       preload: path.join(desktopDir(), 'preload.js'),
       contextIsolation: true,
@@ -87,8 +88,8 @@ async function boot() {
   const root = repoRoot();
   if (!root) {
     dialog.showErrorBox(
-      'GOB',
-      'Could not find the GOB checkout (BackEnd/loopback.py). Run this app from the repo, or from desktop/ after npm start.',
+      APP_NAME,
+      'Geeked-Out Basketball could not find its game files (BackEnd/loopback.py). Reinstall the app, or if you are running from source, start it from the GOB folder (desktop/ after npm start).',
     );
     app.quit();
     return;
@@ -101,13 +102,14 @@ async function boot() {
   const free = await engine.portIsFree(port);
   if (!free) {
     dialog.showErrorBox(
-      'GOB',
-      `Port ${port} is already in use on this Mac.\n\nGOB keeps this port stable so your save and settings survive relaunch. Quit the other app using ${port} (often another GOB window or a leftover engine), then open GOB again.\n\nDo not change the port.`,
+      APP_NAME,
+      `Another program is already using port ${port} on this computer.\n\nThat is usually another Geeked-Out Basketball window or a leftover engine. Quit that copy, then open the game again.\n\nDo not change the port — your save and settings stay on this one.`,
     );
     app.quit();
     return;
   }
 
+  process.env.GOB_BUILD_ID = engine.resolveBuildId(root);
   const userData = app.getPath('userData');
   fs.mkdirSync(userData, { recursive: true });
   const logPath = path.join(userData, 'engine.log');
@@ -145,6 +147,53 @@ function stopEngine() {
   engineHandle = null;
 }
 
+function buildAppMenu() {
+  const isMac = process.platform === 'darwin';
+  const viewItems = [
+    { role: 'reload' },
+    { role: 'togglefullscreen' },
+  ];
+  if (!app.isPackaged) {
+    viewItems.push({ type: 'separator' }, { role: 'toggleDevTools' });
+  }
+  const template = [];
+  if (isMac) {
+    template.push({
+      label: APP_NAME,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    });
+  } else {
+    template.push({
+      label: 'File',
+      submenu: [{ role: 'quit' }],
+    });
+  }
+  template.push(
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    { label: 'View', submenu: viewItems },
+  );
+  return Menu.buildFromTemplate(template);
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -157,7 +206,10 @@ if (!gotLock) {
     }
   });
 
-  app.whenReady().then(boot);
+  app.whenReady().then(() => {
+    Menu.setApplicationMenu(buildAppMenu());
+    return boot();
+  });
 
   app.on('before-quit', () => {
     quitting = true;

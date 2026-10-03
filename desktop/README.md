@@ -86,6 +86,18 @@ Only one GOB app can be open. A second double-click focuses the first window so 
 
 ---
 
+## Build id
+
+Browse responses carry an ETag that includes the running build. Settings shows the same string as `window.GOB_BUILD_LABEL`. A packaged app has no `.git` directory, so a missing id would stay `unknown` on every version and the Electron cache could keep an old page body after an update.
+
+`scripts/compile_loopback.sh` writes that id before it compiles:
+
+1. Use `GOB_BUILD_ID` if the pack script set it (a version, or `git rev-parse --short=12 HEAD`).
+2. Otherwise use the checkout's short git SHA.
+3. Write it to `dist/loopback/BUILD_ID` and pass `--include-data-files` so the file sits next to `gob-loopback`.
+
+The Electron shell reads that file (or `GOB_BUILD_ID`) in `desktop/engine.js` and puts the same 12-character value in the engine environment and in `window.GOB_BUILD_LABEL`. Do not ship a binary without this stamp.
+
 ## Optional: compiled engine
 
 After `scripts/compile_loopback.sh` has produced a Nuitka binary:
@@ -97,6 +109,11 @@ GOB_ENGINE_MODE=binary npm start
 Source mode (`python -m BackEnd.loopback` from `.venv`) is the default and is what you should use first.
 
 ---
+
+## Packaging checklist
+
+- Unsigned recruit portraits. `getRecruitImageUrl` points at `recruits/white/<image_id>.png`. Those masters live in R2 and are not in the static tree, and the loopback paint path returns unconfigured without R2. The pool shows the initials monogram until the white masters are packaged beside the app. This is not a path bug: a file that is present at `FrontEnd/static/images/recruits/white/<image_id>.png` is what the offline build serves.
+- Team mini logos. `getTeamAssetPath(name, 'logo_square')` points at `FrontEnd/static/images/teams/<slug>/<slug>_logo_square.png`. 77 core teams are in `CORE_TEAM_ASSET_SLUGS` but that file was never written (most of those folders have `logo_primary.png` instead; Empire City has no logo file at all). The tables fall back to a letter monogram when the image 404s. Before a desktop pack, generate the missing `logo_square.png` files or the monogram stays in their place. This is not a path or bundling bug: the loopback serves the static tree, and the files are absent from it.
 
 ## Production league check (Jamie, before beta)
 

@@ -483,6 +483,61 @@ def test_sqlite_unsupported_operators_raise(tmp_path: Path):
         coll.update_one({"_id": "p1"}, {"$rename": {"rt": "rating"}})
 
 
+def test_ne_and_type_agree_on_mongo_and_sqlite(tmp_path: Path):
+    docs = [
+        {"_id": "g1", "franchise_id": "f1", "week": 5, "is_final": False, "resume_anchor": {"snapshot": {}}},
+        {"_id": "g2", "franchise_id": "f1", "week": 5, "is_final": True, "resume_anchor": {"snapshot": {}}},
+        {"_id": "g3", "franchise_id": "f1", "week": 5, "is_final": False, "resume_anchor": "stale"},
+        {"_id": "g4", "franchise_id": "f1", "week": 4, "is_final": False, "resume_anchor": {"snapshot": {}}},
+        {"_id": "g5", "franchise_id": "f1", "week": 5, "resume_anchor": {"snapshot": {}}},
+    ]
+    query = {
+        "franchise_id": "f1",
+        "week": 5,
+        "is_final": {"$ne": True},
+        "resume_anchor": {"$type": "object"},
+    }
+
+    def ids(store):
+        store.games_collection.insert_many([dict(doc) for doc in docs])
+        return sorted(doc["_id"] for doc in store.games_collection.find(query))
+
+    mongo_ids = ids(MongoStore(_mongomock_env(tmp_path)))
+    sqlite_ids = ids(SqliteStore(_sqlite_env(tmp_path)))
+    assert mongo_ids == sqlite_ids == ["g1", "g5"]
+
+
+def test_resume_filter_does_not_decode_final_games(tmp_path: Path, monkeypatch):
+    from BackEnd.persistence import sqlite_collection as sc
+    from BackEnd.persistence.sqlite_schema import filter_fully_compiled
+
+    store = SqliteStore(_sqlite_env(tmp_path))
+    fat = "x" * 40000
+    store.games_collection.insert_many([
+        {"_id": "final", "franchise_id": "f1", "week": 5, "is_final": True, "blob": fat},
+        {"_id": "open", "franchise_id": "f1", "week": 5, "is_final": False, "resume_anchor": {"q": 2}, "blob": fat},
+        {"_id": "other", "franchise_id": "f1", "week": 4, "is_final": False, "resume_anchor": {"q": 1}, "blob": fat},
+    ])
+    query = {
+        "franchise_id": "f1",
+        "week": 5,
+        "is_final": {"$ne": True},
+        "resume_anchor": {"$type": "object"},
+    }
+    assert filter_fully_compiled(query) is True
+    decoded = []
+    orig = sc.decode_doc
+
+    def counting(raw):
+        decoded.append(1)
+        return orig(raw)
+
+    monkeypatch.setattr(sc, "decode_doc", counting)
+    hits = list(store.games_collection.find(query))
+    assert [doc["_id"] for doc in hits] == ["open"]
+    assert decoded == [1]
+
+
 def test_sqlite_type_operator_matches_resume_anchor_objects(tmp_path: Path):
     store = SqliteStore(_sqlite_env(tmp_path))
     games = store.games_collection
@@ -553,7 +608,16 @@ def test_sqlite_generated_columns_and_real_indexes(tmp_path: Path):
     }
     sql, _params = compile_filter(setup_filt)
     assert "g_week" in sql and "g_franchise_id" in sql
-    assert filter_fully_compiled(setup_filt) is False
+    assert "team1_id" in sql and " OR " in sql
+    assert filter_fully_compiled(setup_filt) is True
+    residual = {
+        "week": 2,
+        "franchise_id": fid,
+        "$or": [{"team1_id": {"$regex": "A"}}],
+    }
+    residual_sql, _residual_params = compile_filter(residual)
+    assert "g_week" in residual_sql and "OR" not in residual_sql
+    assert filter_fully_compiled(residual) is False
     week_val = store._conn.execute(
         "SELECT g_week FROM games WHERE id = ?",
         ('raw:"g2"',),
@@ -584,6 +648,135 @@ def test_sqlite_projection_skips_full_doc_decode(tmp_path: Path, monkeypatch):
     assert docs[0]["team_id"] == "t1"
     assert "blob" not in docs[0]
     assert decoded == []
+
+
+def test_sqlite_week_range_compiles_and_skips_decode(tmp_path: Path, monkeypatch):
+    """$gte/$lte on g_week (TEXT) must be numeric, and the inclusion projection applies."""
+    from BackEnd.persistence.sqlite_schema import compile_filter, filter_fully_compiled
+
+    store = SqliteStore(_sqlite_env(tmp_path))
+    games = store.games_collection
+    for week in (1, 3, 10, 26, 27):
+        games.insert_one(
+            {
+                "_id": f"g{week}",
+                "franchise_id": "fid",
+                "week": week,
+                "team1_id": ObjectId("69a6fcb68d2c56aa82e48a54"),
+                "home_team_id": "LANCASTER",
+                "blob": "x" * 4000,
+            }
+        )
+    games.insert_one(
+        {
+            "_id": "gabc",
+            "franchise_id": "fid",
+            "week": "abc",
+            "team1_id": "t",
+            "blob": "x" * 4000,
+        }
+    )
+    games.insert_one(
+        {
+            "_id": "gother",
+            "franchise_id": "other",
+            "week": 10,
+            "team1_id": "z",
+            "blob": "y" * 4000,
+        }
+    )
+
+    filt = {"franchise_id": "fid", "week": {"$gte": 1, "$lte": 26}}
+    assert filter_fully_compiled(filt) is True
+    sql, params = compile_filter(filt)
+    assert "CAST(g_week AS REAL)" in sql
+    assert "g_franchise_id" in sql
+    assert params[params.index(1) :][:1] == [1]
+    assert 26 in params
+
+    # Lexicographic TEXT order would drop week 10 ("10" > "26") and keep nothing useful.
+    decoded = []
+    from BackEnd.persistence import sqlite_collection as sc
+
+    orig = sc.decode_doc
+
+    def counting(raw):
+        decoded.append(1)
+        return orig(raw)
+
+    monkeypatch.setattr(sc, "decode_doc", counting)
+    projection = {"_id": 1, "week": 1, "team1_id": 1, "home_team_id": 1}
+    docs = list(games.find(filt, projection))
+    assert sorted(doc["week"] for doc in docs) == [1, 3, 10, 26]
+    assert all("blob" not in doc for doc in docs)
+    assert decoded == []
+    week_10 = next(doc for doc in docs if doc["week"] == 10)
+    assert week_10["team1_id"] == ObjectId("69a6fcb68d2c56aa82e48a54")
+    assert week_10["home_team_id"] == "LANCASTER"
+
+    # Same rows as a full decode + Python match, so the SQL predicate is equivalent.
+    monkeypatch.setattr(sc, "decode_doc", orig)
+    full = list(games.find(filt))
+    assert sorted(doc["week"] for doc in full) == [1, 3, 10, 26]
+
+    adjacent = {"franchise_id": "fid", "week": {"$in": [1, 10, 27], "$gte": 10, "$lte": 26}}
+    assert filter_fully_compiled(adjacent) is True
+    assert sorted(doc["week"] for doc in games.find(adjacent, {"week": 1})) == [10]
+
+    open_high = {"franchise_id": "fid", "week": {"$gt": 3, "$lt": 26}}
+    assert filter_fully_compiled(open_high) is True
+    assert sorted(doc["week"] for doc in games.find(open_high, {"week": 1})) == [10]
+
+    assert filter_fully_compiled({"franchise_id": "fid", "week": {"$ne": 10}}) is True
+    assert sorted(doc["_id"] for doc in games.find({"franchise_id": "fid", "week": {"$ne": 10}}, {"_id": 1})) == [
+        "g1", "g26", "g27", "g3", "gabc",
+    ]
+    assert filter_fully_compiled({"team_id": {"$gte": "L", "$lt": "M"}}) is True
+    team_sql, _team_params = compile_filter({"team_id": {"$gte": "L", "$lt": "M"}})
+    assert "CAST(" not in team_sql
+    assert "g_team_id >= ?" in team_sql
+
+
+def test_sqlite_find_one_sort_matches_find_and_mongo(tmp_path: Path):
+    docs = [
+        {"_id": "a", "franchise_id": "fid", "n": 1},
+        {"_id": "c", "franchise_id": "fid", "n": 3},
+        {"_id": "b", "franchise_id": "fid", "n": 2},
+    ]
+    sqlite_store = SqliteStore(_sqlite_env(tmp_path))
+    mongo_store = MongoStore(_mongomock_env(tmp_path))
+    for doc in docs:
+        sqlite_store.games_collection.insert_one(dict(doc))
+        mongo_store.games_collection.insert_one(dict(doc))
+
+    filt = {"franchise_id": "fid"}
+    for spec in ([("n", -1)], [("n", 1)], [("_id", -1)], [("_id", 1)]):
+        sqlite_hit = sqlite_store.games_collection.find_one(filt, sort=spec)
+        via_find = next(iter(sqlite_store.games_collection.find(filt).sort(spec).limit(1)))
+        mongo_hit = mongo_store.games_collection.find_one(filt, sort=spec)
+        assert sqlite_hit["_id"] == via_find["_id"] == mongo_hit["_id"]
+
+    assert sqlite_store.games_collection.find_one({"franchise_id": "missing"}, sort=[("_id", -1)]) is None
+
+    # Unsorted find_one still seeks one row (SQL LIMIT 1), not the whole match set.
+    decoded = []
+    from BackEnd.persistence.sqlite_collection import SqliteCollection
+
+    orig_select = SqliteCollection._select
+
+    def counting_select(self, filt=None, **kwargs):
+        rows = orig_select(self, filt, **kwargs)
+        if self.name == "games":
+            decoded.append(len(rows))
+        return rows
+
+    SqliteCollection._select = counting_select
+    try:
+        hit = sqlite_store.games_collection.find_one({"_id": "b"})
+    finally:
+        SqliteCollection._select = orig_select
+    assert hit["n"] == 2
+    assert decoded == [1]
 
 
 def test_sqlite_persist_transaction_is_one_commit(tmp_path: Path):
@@ -630,3 +823,161 @@ def test_sqlite_generated_schema_survives_reopen(tmp_path: Path):
         ('raw:"g1"',),
     ).fetchone()
     assert row[0] == "fid"
+
+
+def _office_snapshot_round_trip(store) -> None:
+    coll = store.franchises_collection
+    fid = coll.insert_one({"week": 3, "current_season": 1, "browse_rev": 0}).inserted_id
+    week3 = {"national_rank_before": 12, "team_measures": {"shot_threshold": 1}}
+    coll.update_one(
+        {"_id": fid},
+        {"$set": {"office_week_snapshots.1.3": week3}},
+    )
+    coll.update_one(
+        {"_id": fid},
+        {"$set": {"office_week_snapshots.1.4": {"national_rank_before": 8}}},
+    )
+    doc = coll.find_one({"_id": fid})
+    snaps = doc["office_week_snapshots"]["1"]
+    assert snaps["3"]["national_rank_before"] == 12
+    assert snaps["3"]["team_measures"]["shot_threshold"] == 1
+    assert snaps["4"]["national_rank_before"] == 8
+    coll.update_one(
+        {"_id": fid},
+        {"$set": {"office_week_snapshots.1.3": snaps["3"]}},
+    )
+    again = coll.find_one({"_id": fid})
+    assert again["office_week_snapshots"]["1"]["3"]["national_rank_before"] == 12
+    assert again["office_week_snapshots"]["1"]["4"]["national_rank_before"] == 8
+    whole = {"1": {"3": snaps["3"], "4": snaps["4"]}}
+    coll.update_one({"_id": fid}, {"$set": {"office_week_snapshots": whole}})
+    replaced = coll.find_one({"_id": fid})
+    assert replaced["office_week_snapshots"]["1"]["3"]["national_rank_before"] == 12
+
+
+def test_nested_office_snapshot_round_trips_on_mongo(tmp_path: Path):
+    _office_snapshot_round_trip(create_store(_mongomock_env(tmp_path)))
+
+
+def test_nested_office_snapshot_round_trips_on_sqlite(tmp_path: Path):
+    _office_snapshot_round_trip(SqliteStore(_sqlite_env(tmp_path)))
+
+
+def _or_match_ids(store) -> set:
+    away, home, other = ObjectId(), ObjectId(), ObjectId()
+    games = store.games_collection
+    games.insert_one(
+        {
+            "_id": "hit",
+            "franchise_id": "fid",
+            "week": 3,
+            "team1_id": away,
+            "team2_id": home,
+            "blob": "x" * 2000,
+        }
+    )
+    games.insert_one(
+        {
+            "_id": "miss",
+            "franchise_id": "fid",
+            "week": 3,
+            "team1_id": other,
+            "team2_id": ObjectId(),
+            "blob": "y" * 2000,
+        }
+    )
+    games.insert_one(
+        {
+            "_id": "other-week",
+            "franchise_id": "fid",
+            "week": 2,
+            "team1_id": away,
+            "team2_id": home,
+        }
+    )
+    query = {
+        "franchise_id": "fid",
+        "week": 3,
+        "$or": [
+            {"team1_id": away, "team2_id": home},
+            {"team1_id": str(away), "team2_id": str(home)},
+            {"team1_id": home, "team2_id": away},
+        ],
+    }
+    return {doc["_id"] for doc in games.find(query)}
+
+
+def test_or_equality_matches_on_mongo(tmp_path: Path):
+    assert _or_match_ids(create_store(_mongomock_env(tmp_path))) == {"hit"}
+
+
+def test_or_equality_matches_on_sqlite(tmp_path: Path):
+    assert _or_match_ids(SqliteStore(_sqlite_env(tmp_path))) == {"hit"}
+
+
+def test_or_equality_skips_unmatched_game_decode(tmp_path: Path, monkeypatch):
+    store = SqliteStore(_sqlite_env(tmp_path))
+    away, home = ObjectId(), ObjectId()
+    games = store.games_collection
+    games.insert_one(
+        {"_id": "hit", "franchise_id": "fid", "week": 3, "team1_id": str(away), "team2_id": str(home), "blob": "a" * 3000}
+    )
+    games.insert_one(
+        {"_id": "miss", "franchise_id": "fid", "week": 3, "team1_id": "nope", "team2_id": "nope", "blob": "b" * 3000}
+    )
+    from BackEnd.persistence import sqlite_collection as sc
+
+    decoded = []
+    orig = sc.decode_doc
+
+    def counting(raw):
+        decoded.append(1)
+        return orig(raw)
+
+    monkeypatch.setattr(sc, "decode_doc", counting)
+    hits = list(
+        games.find(
+            {
+                "franchise_id": "fid",
+                "week": 3,
+                "$or": [{"team1_id": str(away), "team2_id": str(home)}],
+            }
+        )
+    )
+    assert [doc["_id"] for doc in hits] == ["hit"]
+    assert decoded == [1]
+
+
+def _desktop_sqlite_env(tmp_path: Path, **extra):
+    """A non-test SQLite env: remote collections unavailable, like the desktop build."""
+    import dataclasses
+
+    return dataclasses.replace(_sqlite_env(tmp_path, **extra), environment="development")
+
+
+def test_desktop_eog_band_uses_mongomock_when_installed(tmp_path: Path):
+    store = SqliteStore(_desktop_sqlite_env(tmp_path, GOB_EOG_BAND_ENABLED="1"))
+    assert not isinstance(store.eog_band_log_collection, NullCollection)
+    store.eog_band_log_collection.insert_one({"week": 3})
+    assert store.eog_band_log_collection.find_one({"week": 3})["week"] == 3
+
+
+def test_desktop_eog_band_without_mongomock_disables_logging_instead_of_crashing(
+    tmp_path: Path, monkeypatch, caplog
+):
+    """mongomock is a dev dependency: an opted-in desktop build without it must still start."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "mongomock", None)  # `import mongomock` -> ImportError
+    with caplog.at_level("WARNING"):
+        store = SqliteStore(_desktop_sqlite_env(tmp_path, GOB_EOG_BAND_ENABLED="1"))
+    assert isinstance(store.eog_band_log_collection, NullCollection)
+    assert any("mongomock is not installed" in r.getMessage() for r in caplog.records)
+
+
+def test_desktop_default_never_imports_mongomock(tmp_path: Path, monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "mongomock", None)
+    store = SqliteStore(_desktop_sqlite_env(tmp_path))  # EOG flag unset (the default)
+    assert isinstance(store.eog_band_log_collection, NullCollection)

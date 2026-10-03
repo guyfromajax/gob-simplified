@@ -1,0 +1,246 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+import os from 'node:os';
+import path from 'node:path';
+
+// uiSfx.js is browser ESM. The repo package.json is not "type": "module"
+// (a nested one would make gobNav.js un-requireable). Load a .mjs copy.
+const dest = path.join(os.tmpdir(), 'gob-uiSfx-under-test.mjs');
+writeFileSync(dest, readFileSync(new URL('../FrontEnd/static/js/shared/uiSfx.js', import.meta.url)));
+const {
+  AUDIO_STORAGE_KEY,
+  LEGACY_AMBIENCE_KEY,
+  channelGain,
+  defaultAudioState,
+  normalizeAudioState,
+  outputVolume,
+  playSfx,
+  resetAudioStateForTests,
+  setChannelLevel,
+  setChannelMuted,
+  getAudioState,
+  audioScope,
+  getAppAudio,
+  setAppAudio,
+  isGameAudioMuted,
+  setGameAudioMuted,
+} = await import(pathToFileURL(dest).href);
+
+test('effective volume is master times channel', () => {
+  const state = defaultAudioState();
+  state.master.level = 50;
+  state.sfx.level = 40;
+  assert.equal(channelGain(state, 'sfx'), 0.2);
+  assert.equal(channelGain(state, 'music'), 0.5);
+});
+
+test('mute on either side zeroes the gain and keeps the level', () => {
+  const state = defaultAudioState();
+  state.sfx.level = 80;
+  state.sfx.muted = true;
+  assert.equal(channelGain(state, 'sfx'), 0);
+  assert.equal(state.sfx.level, 80);
+  state.sfx.muted = false;
+  state.master.muted = true;
+  assert.equal(channelGain(state, 'sfx'), 0);
+  assert.equal(state.sfx.level, 80);
+});
+
+test('legacy ambience opt-out mutes ambience and keeps level 100', () => {
+  const migrated = normalizeAudioState(null, 'false');
+  assert.equal(migrated.ambience.muted, true);
+  assert.equal(migrated.ambience.level, 100);
+  assert.equal(channelGain(migrated, 'ambience'), 0);
+  assert.equal(channelGain(migrated, 'music'), 1);
+});
+
+test('a saved record wins over the legacy flag', () => {
+  const saved = normalizeAudioState({
+    master: { level: 90, muted: false },
+    music: { level: 10, muted: false },
+    sfx: { level: 100, muted: true },
+    ambience: { level: 70, muted: false },
+  }, 'false');
+  assert.equal(saved.ambience.muted, false);
+  assert.equal(saved.ambience.level, 70);
+  assert.equal(saved.music.level, 10);
+  assert.equal(saved.sfx.muted, true);
+});
+
+test('gameplay: output volume multiplies the per-sound base by the channel gain', () => {
+  resetAudioStateForTests({
+    master: { level: 100, muted: false },
+    music: { level: 100, muted: false },
+    sfx: { level: 50, muted: false },
+    ambience: { level: 100, muted: false },
+  }, 'game');
+  assert.equal(outputVolume(0.7, 'sfx'), 0.35);
+  assert.equal(outputVolume(0.5, 'sfx'), 0.25);
+  assert.equal(outputVolume(0.4, 'music'), 0.4);
+});
+
+test('gameplay: setters persist under one key and round-trip', () => {
+  const mem = new Map();
+  global.localStorage = {
+    getItem(k) { return mem.has(k) ? mem.get(k) : null; },
+    setItem(k, v) { mem.set(k, v); },
+    removeItem(k) { mem.delete(k); },
+  };
+  resetAudioStateForTests(null, 'game');
+  mem.set(LEGACY_AMBIENCE_KEY, 'false');
+  const first = getAudioState();
+  assert.equal(first.ambience.muted, true);
+  assert.equal(mem.get(AUDIO_STORAGE_KEY) != null, true);
+  setChannelMuted('ambience', false);
+  setChannelLevel('music', 25);
+  resetAudioStateForTests(null, 'game');
+  const again = getAudioState();
+  assert.equal(again.ambience.muted, false);
+  assert.equal(again.music.level, 25);
+  assert.equal(again.master.level, 100);
+  delete global.localStorage;
+  resetAudioStateForTests(null);
+});
+
+function installFakeAudio() {
+  const plays = [];
+  global.Audio = class FakeAudio {
+    constructor(src) {
+      this.src = src || '';
+      this.volume = 1;
+      this.currentTime = 0;
+    }
+    play() {
+      plays.push(this.src);
+      return Promise.resolve();
+    }
+    pause() {}
+    addEventListener() {}
+    removeEventListener() {}
+  };
+  return plays;
+}
+
+test('gameplay: playSfx does not construct a player when sfx is muted or master is 0', () => {
+  const plays = installFakeAudio();
+  resetAudioStateForTests({
+    master: { level: 100, muted: false },
+    music: { level: 100, muted: false },
+    sfx: { level: 100, muted: true },
+    ambience: { level: 100, muted: false },
+  }, 'game');
+  playSfx('SFX_SELECT');
+  assert.equal(plays.length, 0);
+  resetAudioStateForTests({
+    master: { level: 0, muted: false },
+    music: { level: 100, muted: false },
+    sfx: { level: 100, muted: false },
+    ambience: { level: 100, muted: false },
+  }, 'game');
+  playSfx('SFX_ADVANCE');
+  assert.equal(plays.length, 0);
+  delete global.Audio;
+  resetAudioStateForTests(null);
+});
+
+test('playSfx ignores an unknown name and does not throw', () => {
+  const plays = installFakeAudio();
+  resetAudioStateForTests(null);
+  assert.doesNotThrow(() => playSfx('NOT_A_SOUND'));
+  assert.equal(plays.length, 0);
+  delete global.Audio;
+});
+
+// --- Two scopes: gameplay (the court) and the app (Settings) ----------------------------------
+
+function memoryStorage() {
+  const mem = new Map();
+  global.localStorage = {
+    getItem(k) { return mem.has(k) ? mem.get(k) : null; },
+    setItem(k, v) { mem.set(k, v); },
+    removeItem(k) { mem.delete(k); },
+  };
+  return mem;
+}
+
+test('off the court the scope is the app: two switches, no levels', () => {
+  const mem = memoryStorage();
+  resetAudioStateForTests(null);
+  assert.equal(audioScope(), 'app');
+  assert.deepEqual(getAppAudio(), { music: true, sound: true });
+  assert.equal(outputVolume(0.7, 'sfx'), 0.7);
+  assert.equal(outputVolume(0.4, 'music'), 0.4);
+  assert.equal(outputVolume(0.4, 'ambience'), 0.4);
+
+  setAppAudio('sound', false);
+  assert.equal(outputVolume(0.7, 'sfx'), 0);
+  assert.equal(outputVolume(0.4, 'music'), 0.4, 'Sound does not touch music');
+  setAppAudio('music', false);
+  assert.equal(outputVolume(0.4, 'music'), 0);
+  assert.equal(outputVolume(0.4, 'ambience'), 0, 'the franchise track is music');
+
+  // A level cannot be set outside the court: there are no sliders there.
+  setChannelLevel('music', 10);
+  assert.equal(getAudioState().music.level, 100);
+
+  const stored = JSON.parse(mem.get(AUDIO_STORAGE_KEY));
+  assert.deepEqual(stored.app, { music: false, sound: false });
+  delete global.localStorage;
+  resetAudioStateForTests(null);
+});
+
+test('the Settings switches and the court control do not touch each other', () => {
+  const mem = memoryStorage();
+  resetAudioStateForTests(null);
+  setAppAudio('music', false);
+  setAppAudio('sound', false);
+
+  // On the court: full gameplay audio, whatever Settings says.
+  resetAudioStateForTests(null, 'game');
+  assert.equal(audioScope(), 'game');
+  assert.equal(outputVolume(1, 'sfx'), 1);
+  assert.equal(outputVolume(1, 'music'), 1);
+  setChannelLevel('sfx', 40);
+  setGameAudioMuted(true);
+  assert.equal(isGameAudioMuted(), true);
+  assert.equal(outputVolume(1, 'sfx'), 0);
+  assert.equal(outputVolume(1, 'music'), 0);
+
+  // Back in the app: the switches are as the player left them, and turning
+  // Sound on is heard even though the game is muted.
+  resetAudioStateForTests(null);
+  assert.deepEqual(getAppAudio(), { music: false, sound: false });
+  setAppAudio('sound', true);
+  assert.equal(outputVolume(0.7, 'sfx'), 0.7);
+
+  // The next game starts as the player left it.
+  resetAudioStateForTests(null, 'game');
+  assert.equal(isGameAudioMuted(), true);
+  assert.equal(getAudioState().sfx.level, 40);
+  assert.equal(JSON.parse(mem.get(AUDIO_STORAGE_KEY)).master.muted, true);
+  delete global.localStorage;
+  resetAudioStateForTests(null);
+});
+
+test('a record from before the switches keeps what the player had silenced', () => {
+  const mem = memoryStorage();
+  mem.set(AUDIO_STORAGE_KEY, JSON.stringify({
+    master: { level: 100, muted: false },
+    music: { level: 100, muted: false },
+    sfx: { level: 0, muted: false },
+    ambience: { level: 100, muted: true },
+  }));
+  resetAudioStateForTests(null);
+  assert.deepEqual(getAppAudio(), { music: false, sound: false });
+  delete global.localStorage;
+  resetAudioStateForTests(null);
+
+  const legacy = memoryStorage();
+  legacy.set(LEGACY_AMBIENCE_KEY, 'false');
+  resetAudioStateForTests(null);
+  assert.deepEqual(getAppAudio(), { music: false, sound: true });
+  delete global.localStorage;
+  resetAudioStateForTests(null);
+});

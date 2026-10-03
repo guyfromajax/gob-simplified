@@ -54,6 +54,7 @@ from BackEnd.utils.free_throw_rules import (
 from BackEnd.utils.player_momentum import apply_made_dunk_momentum
 from BackEnd.utils.shot_geometry import classify_shot_value
 from BackEnd.utils.shot_split_tracker import record_shot_split
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 def _safe_id(p: Any) -> Optional[str]:
@@ -338,7 +339,8 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         shot_variant_extras = roll_shot_variant_extras(
             shot_variant, shooter_y=bh_target["y"],
         )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         shot_variant = None
         shot_variant_extras = {}
 
@@ -442,6 +444,7 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         try:
             pressure_type = game.turn_manager.determine_defensive_pressure_type()
         except Exception as e:
+            reraise_if_strict(e)
             logging.warning("🚨 [HCT_FB] pressure-type failed: %s; HCO", e)
             pressure_type = "HCO"
         game_state["offensive_state"] = pressure_type
@@ -607,7 +610,7 @@ def _collapse_defenders_and_pick(
     contested)`` where the shot defender is the nearest defender ending within
     ``CONTEST_EUCLIDEAN_RADIUS`` grid spots of ``shot_spot`` (``None`` → uncontested).
     """
-    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+    from BackEnd.utils.animation_step_helpers import defender_movement_rate
     from BackEnd.utils.transition_bridge import _interrupted_coord
     from BackEnd.engine.dynamic_hct import (
         RIM_PROTECT_X_MIN,
@@ -634,7 +637,8 @@ def _collapse_defenders_and_pick(
             "x": _clampf(start["x"], band_x_lo, band_x_hi),
             "y": _clampf(start["y"], RIM_PROTECT_Y_MIN, RIM_PROTECT_Y_MAX),
         }
-        rate = _ag_grid_per_game_sec(player, "standard")
+        # `player` comes from `def_lineup.items()` above -- a defender by construction.
+        rate = defender_movement_rate(player, "standard", True)
         end = (
             _interrupted_coord(start, target, rate, t) if rate > 0 else dict(target)
         )
@@ -862,7 +866,8 @@ def _finalize_ab_shot(
         shot_variant_extras = roll_shot_variant_extras(
             shot_variant, shooter_y=shot_spot["y"],
         )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         shot_variant = None
         shot_variant_extras = {}
 
@@ -960,6 +965,7 @@ def _finalize_ab_shot(
         try:
             pressure_type = game.turn_manager.determine_defensive_pressure_type()
         except Exception as e:
+            reraise_if_strict(e)
             logging.warning("🚨 [HCT_AB] pressure-type failed: %s; HCO", e)
             pressure_type = "HCO"
         game_state["offensive_state"] = pressure_type

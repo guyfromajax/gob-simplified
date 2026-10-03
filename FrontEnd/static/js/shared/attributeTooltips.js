@@ -18,7 +18,6 @@ const ATTRIBUTE_NAMES = {
   FT: 'Free Throws',
   ND: 'Endurance',
   IQ: 'Basketball IQ',
-  CH: 'Clutch',
   EM: 'Emotion',
   MO: 'Momentum',
   NG: 'Energy',
@@ -77,9 +76,9 @@ function injectTooltipStyles() {
   }
 }
 
-// Show tooltip on hover
+// Show tooltip on hover, and on keyboard focus for focusable triggers
 function setupTooltipEvents(element, tooltipText) {
-  element.addEventListener('mouseenter', (e) => {
+  const show = () => {
     const tooltip = createTooltipElement();
     tooltip.textContent = tooltipText;
     tooltip.style.opacity = '0';
@@ -94,14 +93,19 @@ function setupTooltipEvents(element, tooltipText) {
     // Force reflow, then show
     tooltip.offsetHeight;
     tooltip.style.opacity = '1';
-  });
-  
-  element.addEventListener('mouseleave', () => {
+  };
+  const hide = () => {
     if (tooltipElement) {
       tooltipElement.style.opacity = '0';
       tooltipElement.style.visibility = 'hidden';
     }
+  };
+  element.addEventListener('mouseenter', show);
+  element.addEventListener('mouseleave', () => {
+    if (document.activeElement !== element) hide();
   });
+  element.addEventListener('focus', show);
+  element.addEventListener('blur', hide);
   
   element.addEventListener('mousemove', (e) => {
     if (tooltipElement && tooltipElement.style.visibility === 'visible') {
@@ -200,7 +204,25 @@ function addTooltip(element, abbreviation) {
   }
 }
 
+/**
+ * Explanatory copy on one control (an info button, say). No native title: the
+ * control names itself with aria-label and points aria-describedby at the copy.
+ * @param {HTMLElement} element
+ * @param {string} text
+ */
+function addTextTooltip(element, text) {
+  if (!element || !text) return;
+  injectTooltipStyles();
+  element.classList.add('attr-tooltip');
+  element.removeAttribute('title');
+  setupTooltipEvents(element, text);
+}
+
 // Export for use in other scripts
+if (typeof window !== 'undefined') {
+  window.ATTRIBUTE_NAMES = ATTRIBUTE_NAMES;
+  window.addTextTooltip = addTextTooltip;
+}
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { initAttributeTooltips, addTooltip, ATTRIBUTE_NAMES };
+  module.exports = { initAttributeTooltips, addTooltip, addTextTooltip, ATTRIBUTE_NAMES };
 }

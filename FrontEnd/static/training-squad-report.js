@@ -26,7 +26,8 @@ function cloneParams(params) {
   var franchiseId = urlParams.get('franchise_id');
   var teamId = urlParams.get('team_id');
   // Default to the changes view, mirroring the training report.
-  var ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT', 'CH'];
+  // The twelve visible attributes. CH is hidden: never a column, and the server does not send it.
+  var ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
   function buildFccUrl() {
     if (typeof resolveFranchiseLockerRoomUrl === 'function') {
@@ -39,12 +40,39 @@ function cloneParams(params) {
     return '/franchise-command-center.html?' + p.toString();
   }
 
-  function changeCell(delta) {
+  // The twelve attributes read as six pairs, in the roster's order (Styleguide, Tables).
+  // Presentation only: values are read by key, so the server's key order is not relied on.
+  var PAIR_ORDER = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'];
+
+  /** The pair attributes the server sent, in pair order. Nothing else is ever a column:
+   *  CH is a hidden attribute (UX_System, "CH is hidden"), whatever a payload carries. */
+  function orderKeys(keys) {
+    var list = keys || [];
+    return PAIR_ORDER.filter(function (key) { return list.indexOf(key) !== -1; });
+  }
+
+  /** `gstart` opens a pair and `gend` closes it; an attribute outside the pairs stands alone. */
+  function pairClass(key) {
+    var at = PAIR_ORDER.indexOf(key);
+    if (at === -1) return 'gsolo';
+    return at % 2 ? 'gend' : 'gstart';
+  }
+
+  /** One attribute cell: the text in a fixed-width box, so a label sits over its values. */
+  function attrCell(key, text, tone) {
     var td = document.createElement('td');
-    if (delta > 0) { td.className = 'tsr-up'; td.textContent = '+' + delta; }
-    else if (delta < 0) { td.className = 'tsr-down'; td.textContent = String(delta); }
-    else { td.className = 'tsr-zero'; td.textContent = '0'; }
+    td.className = pairClass(key) + (tone ? ' ' + tone : '');
+    var box = document.createElement('span');
+    box.className = 'ak';
+    box.textContent = text;
+    td.appendChild(box);
     return td;
+  }
+
+  function changeCell(key, delta) {
+    if (delta > 0) return attrCell(key, '+' + delta, 'tsr-up');
+    if (delta < 0) return attrCell(key, String(delta), 'tsr-down');
+    return attrCell(key, '0', 'tsr-zero');
   }
 
   function cell(text, cls) {
@@ -54,7 +82,8 @@ function cloneParams(params) {
     return td;
   }
 
-  function renderReport(report, attrKeys) {
+  function renderReport(report, serverKeys) {
+    var attrKeys = orderKeys(serverKeys);
     var wrap = document.createElement('section');
     wrap.className = 'tsr-report';
 
@@ -83,8 +112,8 @@ function cloneParams(params) {
     var thead = document.createElement('thead');
     var hr = document.createElement('tr');
     hr.appendChild(cell('Name'));
-    hr.appendChild(cell('POS'));
-    attrKeys.forEach(function (k) { hr.appendChild(cell(k)); });
+    hr.appendChild(cell('POS', 'tsr-lead'));
+    attrKeys.forEach(function (k) { hr.appendChild(attrCell(k, k)); });
     thead.appendChild(hr);
     table.appendChild(thead);
     var tbody = document.createElement('tbody');
@@ -96,17 +125,17 @@ function cloneParams(params) {
       (report.players || []).forEach(function (p) {
         var tr = document.createElement('tr');
         tr.appendChild(cell(p.name || p.player_id));
-        tr.appendChild(cell(p.pos || '--', 'tsr-pos'));
+        tr.appendChild(cell(p.pos || '--', 'tsr-pos tsr-lead'));
         var baseline = p.baseline || {};
         var current = p.current || {};
         attrKeys.forEach(function (k) {
           var cur = Number(current[k]);
           var base = Number(baseline[k]);
           if (view === 'absolute') {
-            tr.appendChild(cell(isFinite(cur) ? String(cur) : '--'));
+            tr.appendChild(attrCell(k, isFinite(cur) ? String(cur) : '--'));
           } else {
             var delta = (isFinite(cur) ? cur : 0) - (isFinite(base) ? base : 0);
-            tr.appendChild(changeCell(delta));
+            tr.appendChild(changeCell(k, delta));
           }
         });
         tbody.appendChild(tr);
@@ -153,7 +182,12 @@ function cloneParams(params) {
 
   document.addEventListener('DOMContentLoaded', function () {
     var back = document.getElementById('back-btn');
-    if (back) back.addEventListener('click', function () { window.location.href = buildFccUrl(); });
+    if (back) back.addEventListener('click', function (e) {
+      e.preventDefault();
+      var url = buildFccUrl();
+      if (window.GOBNav) window.GOBNav.back(url);
+      else window.location.replace(url);
+    });
     if (!franchiseId) {
       document.getElementById('tsr-reports').innerHTML = '<p class="tsr-empty">Missing franchise.</p>';
       return;

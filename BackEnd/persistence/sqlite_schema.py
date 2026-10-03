@@ -3,12 +3,14 @@
 ``json_extract`` in a WHERE clause still walks every row in C. Generated
 columns persist franchise_id / player_id / team_id / week as real columns so
 the query planner can seek. Filters that cannot be compiled fall back to a
-full-table decode; ``match_query`` always remains the correctness gate.
+full-table decode and ``match_query``. A fully compiled filter, including
+range comparisons on those columns, is applied in SQL.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
@@ -182,6 +184,243 @@ def index_sql_values(value: Any) -> list[str] | None:
     return [str(value)]
 
 
+# Comparison ops on an extracted column. ``$in`` / ``$eq`` compile alongside
+# them when every operator in the dict is one of these.
+_CMP_OPS = {"$gt": ">", "$gte": ">=", "$lt": "<", "$lte": "<="}
+_ADJACENT_OPS = set(_CMP_OPS) | {"$in", "$eq"}
+
+
+def _is_real_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def compile_indexed_value(column: str, value: Any) -> tuple[str, list[Any]] | None:
+    """SQL for one extracted-column predicate, or None if ``match_query`` must run it.
+
+    Equality and ``$in`` stay string matches against the TEXT generated column.
+    ``$gt`` / ``$gte`` / ``$lt`` / ``$lte`` compile too. Numeric bounds use
+    ``CAST(column AS REAL)`` plus a numeric-text guard, because ``g_week`` is
+    TEXT and ``"10" <= "26"`` is false in SQLite. String bounds stay text
+    comparisons. A dict that also contains ``$in`` or ``$eq`` compiles when
+    every operator is one of those. Anything else (``$ne``, ``$regex``, …)
+    returns None so the row is still decoded and checked in Python.
+    """
+    if isinstance(value, dict) and any(op in _CMP_OPS for op in value):
+        return _compile_comparison_value(column, value)
+    compiled = index_sql_values(value)
+    if compiled is None:
+        return None
+    if not compiled:
+        return f"{column} IS NULL", []
+    if len(compiled) == 1:
+        return f"{column} = ?", list(compiled)
+    placeholders = ",".join("?" * len(compiled))
+    return f"{column} IN ({placeholders})", list(compiled)
+
+
+def _compile_comparison_value(column: str, value: dict[str, Any]) -> tuple[str, list[Any]] | None:
+    if not set(value) <= _ADJACENT_OPS:
+        return None
+    bounds = [(op, value[op]) for op in _CMP_OPS if op in value]
+    kinds: list[str] = []
+    for _op, bound in bounds:
+        if _is_real_number(bound):
+            kinds.append("num")
+        elif isinstance(bound, str):
+            kinds.append("str")
+        else:
+            return None
+    if len(set(kinds)) != 1:
+        return None
+    numeric = kinds[0] == "num"
+    parts: list[str] = []
+    params: list[Any] = []
+    if "$in" in value:
+        compiled = index_sql_values({"$in": value["$in"]})
+        if compiled is None:
+            return None
+        if not compiled:
+            parts.append("0")
+        else:
+            placeholders = ",".join("?" * len(compiled))
+            parts.append(f"{column} IN ({placeholders})")
+            params.extend(compiled)
+    if "$eq" in value:
+        compiled = index_sql_values(value["$eq"])
+        if compiled is None:
+            return None
+        if not compiled:
+            parts.append(f"{column} IS NULL")
+        elif len(compiled) == 1:
+            parts.append(f"{column} = ?")
+            params.append(compiled[0])
+        else:
+            placeholders = ",".join("?" * len(compiled))
+            parts.append(f"{column} IN ({placeholders})")
+            params.extend(compiled)
+    for op, bound in bounds:
+        sql_op = _CMP_OPS[op]
+        if numeric:
+            # Reject stored text that is not itself a number. SQLite's CAST
+            # turns 'abc' into 0, which would disagree with Python's TypeError
+            # (match_query treats that comparison as a non-match).
+            parts.append(
+                f"(CAST({column} AS REAL) {sql_op} ? AND {column} = CAST({column} AS REAL))"
+            )
+            params.append(bound)
+        else:
+            parts.append(f"{column} {sql_op} ?")
+            params.append(bound)
+    if not parts:
+        return None
+    return " AND ".join(parts), params
+
+
+_FIELD_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _json_equality_expr(field: str) -> str:
+    """Same COALESCE as the generated columns, for a field that has no g_* column."""
+    return (
+        f"COALESCE(json_extract(doc, '$.{field}.$oid'), json_extract(doc, '$.{field}'))"
+    )
+
+
+def _compile_equality(field: str, value: Any) -> tuple[str, list[Any]] | None:
+    """One equality predicate, or None when ``match_query`` must decide."""
+    if not _FIELD_NAME.fullmatch(field):
+        return None
+    if isinstance(value, dict):
+        return None
+    if isinstance(value, bool):
+        return None
+    if field in COLUMN_FOR_FIELD:
+        return compile_indexed_value(COLUMN_FOR_FIELD[field], value)
+    compiled = index_sql_values(value)
+    if compiled is None:
+        return None
+    expr = _json_equality_expr(field)
+    if not compiled:
+        return f"{expr} IS NULL", []
+    if len(compiled) != 1:
+        return None
+    return f"{expr} = ?", list(compiled)
+
+
+def _predicate_expr(field: str) -> str | None:
+    """SQL expression for a top-level field. Indexed fields use the g_* column."""
+    if field in COLUMN_FOR_FIELD:
+        return COLUMN_FOR_FIELD[field]
+    if not _FIELD_NAME.fullmatch(field):
+        return None
+    return _json_equality_expr(field)
+
+
+def _compile_ne(expr: str, expected: Any, *, text_column: bool) -> tuple[str, list[Any]] | None:
+    """``$ne`` including missing fields. Null stays residual (Mongo null rules)."""
+    if expected is None:
+        return None
+    if isinstance(expected, bool):
+        if text_column:
+            return None
+        bound: Any = 1 if expected else 0
+    elif isinstance(expected, (int, float)):
+        bound = str(expected) if text_column else expected
+    elif isinstance(expected, str):
+        bound = expected
+    elif isinstance(expected, ObjectId):
+        bound = str(expected)
+    else:
+        return None
+    return f"({expr} IS NULL OR {expr} != ?)", [bound]
+
+
+# Mongo $type names SQLite json_type() can decide. objectId stays residual:
+# it is stored as {"$oid": "..."} and json_type would call that an object.
+_JSON_TYPE_NAMES: dict[Any, tuple[str, ...]] = {
+    "object": ("object",),
+    3: ("object",),
+    "3": ("object",),
+    "string": ("text",),
+    2: ("text",),
+    "2": ("text",),
+    "array": ("array",),
+    4: ("array",),
+    "4": ("array",),
+    "null": ("null",),
+    10: ("null",),
+    "10": ("null",),
+    "bool": ("true", "false"),
+    8: ("true", "false"),
+    "8": ("true", "false"),
+    "number": ("integer", "real"),
+    "int": ("integer",),
+    "long": ("integer",),
+    "double": ("real",),
+    1: ("real",),
+    "1": ("real",),
+    16: ("integer",),
+    "16": ("integer",),
+    18: ("integer",),
+    "18": ("integer",),
+}
+
+
+def _compile_type(field: str, wanted: Any) -> tuple[str, list[Any]] | None:
+    names = _JSON_TYPE_NAMES.get(wanted)
+    if names is None or not _FIELD_NAME.fullmatch(field):
+        return None
+    path = f"$.{field}"
+    if len(names) == 1:
+        return "json_type(doc, ?) = ?", [path, names[0]]
+    placeholders = ",".join("?" * len(names))
+    return f"json_type(doc, ?) IN ({placeholders})", [path, *names]
+
+
+def compile_operator_predicate(field: str, value: Any) -> tuple[str, list[Any]] | None:
+    """SQL for a single ``$ne`` or ``$type`` on a top-level field, else None."""
+    if not isinstance(value, dict) or len(value) != 1:
+        return None
+    if "$ne" in value:
+        expr = _predicate_expr(field)
+        if expr is None:
+            return None
+        return _compile_ne(expr, value["$ne"], text_column=field in COLUMN_FOR_FIELD)
+    if "$type" in value:
+        return _compile_type(field, value["$type"])
+    return None
+
+
+def compile_or_clause(branches: Any) -> tuple[str, list[Any]] | None:
+    """SQL for a ``$or`` of equality branches, or None to leave it residual.
+
+    Each branch is a conjunction of field equalities (string, number, ObjectId,
+    or null). A comparison, regex, or nested operator stays residual so the
+    indexed clauses around the ``$or`` can still be pushed.
+    """
+    if not isinstance(branches, list):
+        return None
+    if not branches:
+        return "0", []
+    parts: list[str] = []
+    params: list[Any] = []
+    for branch in branches:
+        if not isinstance(branch, dict) or not branch:
+            return None
+        if any(str(key).startswith("$") for key in branch):
+            return None
+        ands: list[str] = []
+        for field, value in branch.items():
+            compiled = _compile_equality(str(field), value)
+            if compiled is None:
+                return None
+            clause, clause_params = compiled
+            ands.append(clause)
+            params.extend(clause_params)
+        parts.append("(" + " AND ".join(ands) + ")" if len(ands) > 1 else ands[0])
+    return "(" + " OR ".join(parts) + ")", params
+
+
 def compile_filter(filt: dict[str, Any] | None) -> tuple[str, list[Any]] | None:
     """Push every compilable clause to SQL; leave the rest to ``match_query``.
 
@@ -214,22 +453,29 @@ def compile_filter(filt: dict[str, Any] | None) -> tuple[str, list[Any]] | None:
             clauses.append(f"id IN ({placeholders})")
             params.extend(ids)
             continue
+        if key == "$or":
+            compiled_or = compile_or_clause(value)
+            if compiled_or is None:
+                continue
+            clause, clause_params = compiled_or
+            clauses.append(clause)
+            params.extend(clause_params)
+            continue
+        compiled_op = compile_operator_predicate(key, value)
+        if compiled_op is not None:
+            clause, clause_params = compiled_op
+            clauses.append(clause)
+            params.extend(clause_params)
+            continue
         if key not in COLUMN_FOR_FIELD:
             continue
-        compiled = index_sql_values(value)
-        if compiled is None:
-            continue
         column = COLUMN_FOR_FIELD[key]
-        if not compiled:
-            clauses.append(f"{column} IS NULL")
+        compiled_sql = compile_indexed_value(column, value)
+        if compiled_sql is None:
             continue
-        if len(compiled) == 1:
-            clauses.append(f"{column} = ?")
-            params.append(compiled[0])
-        else:
-            placeholders = ",".join("?" * len(compiled))
-            clauses.append(f"{column} IN ({placeholders})")
-            params.extend(compiled)
+        clause, clause_params = compiled_sql
+        clauses.append(clause)
+        params.extend(clause_params)
     if not clauses:
         return None
     return " AND ".join(clauses), params
@@ -244,8 +490,14 @@ def filter_fully_compiled(filt: dict[str, Any] | None) -> bool:
             if isinstance(value, dict) and "$in" not in value:
                 return False
             continue
+        if key == "$or":
+            if compile_or_clause(value) is None:
+                return False
+            continue
+        if compile_operator_predicate(key, value) is not None:
+            continue
         if key not in COLUMN_FOR_FIELD:
             return False
-        if index_sql_values(value) is None:
+        if compile_indexed_value(COLUMN_FOR_FIELD[key], value) is None:
             return False
     return True

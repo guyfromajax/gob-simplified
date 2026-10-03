@@ -69,5 +69,8 @@ def test_mark_seen_persists_current_season(monkeypatch):
     )
     assert response == {"seen": True, "season": 4}
     assert captured == [
-        ({"_id": franchise_id}, {"$set": {fr.CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD: 4}})
+        (
+            {"_id": franchise_id},
+            {"$set": {fr.CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD: 4}, "$inc": {"browse_rev": 1}},
+        )
     ]

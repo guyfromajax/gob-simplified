@@ -26,6 +26,7 @@ from typing import Any, Iterable
 from bson import ObjectId
 
 from BackEnd.persistence import get_store
+from BackEnd.utils.browse_cache import fold_browse_rev
 _store = get_store()
 db = _store.db
 franchise_team_data_collection = _store.franchise_team_data_collection
@@ -254,7 +255,7 @@ def consume_moment(franchise_id: ObjectId, moment_id: str) -> bool:
         return False
     res = db.franchises.update_one(
         {"_id": franchise_id},
-        {"$pull": {PENDING_MOMENTS_FIELD: {"id": moment_id}}},
+        fold_browse_rev({"$pull": {PENDING_MOMENTS_FIELD: {"id": moment_id}}}),
     )
     return bool(res.modified_count)
 

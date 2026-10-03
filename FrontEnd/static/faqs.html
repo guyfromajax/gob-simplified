@@ -1,24 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/gtm-loader.js"></script>
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>FAQs - Geeked Out Basketball</title>
+<link rel="stylesheet" href="/css/gob-tokens.css">
 <link rel="stylesheet" href="/css/auth-bar.css">
   <style>
-    body { font-family: 'Inter', sans-serif; background: #f5f5f5; margin: 0; padding: 100px 20px 80px; color: #1a1a1a; line-height: 1.6; }
+    /* Tokens via html.gob + css/gob-tokens.css. Same dark page as Privacy and Terms.
+       Links are neutral: orange is for saves. */
+    body { font-family: var(--font-body); background: var(--bg); margin: 0; padding: 100px 20px 80px; color: var(--text-87); line-height: 1.6; }
     .faqs-container { max-width: 640px; margin: 0 auto; padding-top: 1rem; }
-    h1 { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; margin-bottom: 1.5rem; }
+    h1 { font-family: var(--font-display); font-size: 2rem; margin-bottom: 1.5rem; color: var(--text-100); }
     .faq-item { margin-bottom: 2rem; }
-    .faq-item h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #333; }
-    .faq-item p { margin: 0; color: #444; }
-    .back-link { display: inline-block; margin-bottom: 1.5rem; color: #ff7a00; text-decoration: none; font-weight: 600; }
-    .back-link:hover { text-decoration: underline; }
+    .faq-item h2 { font-size: 1.1rem; font-weight: var(--fw-bold); margin-bottom: 0.5rem; color: var(--text-100); }
+    .faq-item p { margin: 0; color: var(--text-87); }
+    .faq-item a { color: var(--text-100); }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; color: var(--white-70); text-decoration: none; font-weight: var(--fw-semibold); }
+    .back-link:hover { color: var(--text-100); text-decoration: underline; }
   </style>
   <script type="application/ld+json">
 {

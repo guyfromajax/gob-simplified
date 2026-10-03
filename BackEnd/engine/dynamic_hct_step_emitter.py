@@ -41,6 +41,8 @@ from BackEnd.constants import (
 )
 from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
+    _is_defender_id,
+    defender_movement_rate,
     _euclid,
     _player_lookup_by_id,
     drift_or_hold_coord,
@@ -69,6 +71,7 @@ from BackEnd.utils.transition_bridge import (
     build_pass_step,
     build_walk_up_step,
 )
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 _OFFENSE_POSITIONS = ("PG", "SG", "SF", "PF", "C")
@@ -99,7 +102,8 @@ def _project_pressure_step(
             turn_type=turn_type,
             result=turn_result,
         )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         return step
 
 
@@ -342,7 +346,8 @@ def _build_loop_step(
                 )
             )
         else:
-            rate = _ag_grid_per_game_sec(player, move_arch)
+            # `pid not in off_ids` is the defender branch above (action "guard_offball").
+            rate = defender_movement_rate(player, move_arch, pid not in off_ids)
         ec = _interrupted_coord(sc, target, rate, t) if rate > 0 else dict(target)
 
         moved = (
@@ -464,7 +469,9 @@ def _build_interception_pass_step(
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
         move_arch: PlayerArchetype = "sprint"
-        rate_player = _ag_grid_per_game_sec(player, move_arch)
+        # `continuing_targets` mixes both lineups; def_lineup membership is the test.
+        rate_player = defender_movement_rate(
+            player, move_arch, _is_defender_id(pid, def_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate_player, t)
         moved = (
             int(round(end_coords[pid]["x"])) != int(round(start_coords[pid]["x"]))
@@ -587,7 +594,7 @@ def _build_bat_oob_steps(
         contact_end_coords[pid] = _interrupted_coord(
             start_coords[pid],
             target,
-            _ag_grid_per_game_sec(player, move_arch),
+            defender_movement_rate(player, move_arch, _is_defender_id(pid, def_lineup)),
             contact_t,
         )
         moved = (
@@ -1683,7 +1690,8 @@ def build_dynamic_hct_animation_steps(
         from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
         enforce_step_start_continuity(steps, context="dynamic_hct")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         import logging
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps

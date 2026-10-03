@@ -45,11 +45,10 @@ export function isPgpcSammyReminderSuppressed() {
 /**
  * @param {Object} opts
  * @param {string} [opts.userTeamName]
- * @param {string} [opts.userPrimaryColor] - hex for Sammy ring
  * @param {() => void} opts.onGotIt
  */
 export function showPgpcSammyReminderModal(opts) {
-  const { userTeamName, userPrimaryColor, onGotIt } = opts || {};
+  const { userTeamName, onGotIt } = opts || {};
   ensureFteStylesheet();
 
   const backdrop = document.createElement('div');
@@ -59,16 +58,12 @@ export function showPgpcSammyReminderModal(opts) {
   backdrop.setAttribute('aria-modal', 'true');
   backdrop.setAttribute('aria-labelledby', 'pgpc-sammy-reminder-title');
 
-  const ringColor = userPrimaryColor && /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(String(userPrimaryColor).trim())
-    ? String(userPrimaryColor).trim()
-    : '#F79420';
-
   const sammySrc = coachSammyImageSrc(userTeamName);
 
   backdrop.innerHTML = [
     '<div class="fte-modal">',
     '  <div class="fte-content">',
-    `    <img src="${sammySrc}" alt="" class="fte-content-img pgpc-sammy-reminder-img" style="border-color: ${ringColor}; box-shadow: 0 2px 8px rgba(0,0,0,0.2), 0 0 0 2px ${ringColor}33;" />`,
+    `    <img src="${sammySrc}" alt="" class="fte-content-img pgpc-sammy-reminder-img" />`,
     '    <div class="fte-content-main">',
     '      <p id="pgpc-sammy-reminder-title">Hey Coach, remember to be strategic at the press conference. Your answers may impact any number of things related to the squad.</p>',
     '      <label class="pgpc-sammy-dont-show">',
@@ -83,46 +78,8 @@ export function showPgpcSammyReminderModal(opts) {
     '</div>',
   ].join('');
 
-  if (!document.getElementById('pgpc-sammy-reminder-styles')) {
-    const st = document.createElement('style');
-    st.id = 'pgpc-sammy-reminder-styles';
-    st.textContent = `
-      .pgpc-sammy-reminder-backdrop {
-        z-index: 10040 !important;
-      }
-      .pgpc-sammy-reminder-backdrop.open {
-        display: flex;
-      }
-      .pgpc-sammy-reminder-img {
-        width: 72px;
-        height: 72px;
-      }
-      .pgpc-sammy-reminder-backdrop .pgpc-sammy-dont-show {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-family: 'Inter', sans-serif;
-        font-size: 12px;
-        font-weight: 400;
-        color: rgba(0, 0, 0, 0.45);
-        cursor: pointer;
-        margin-top: 14px;
-        line-height: 1.3;
-      }
-      .pgpc-sammy-reminder-backdrop .pgpc-sammy-dont-show:hover {
-        color: rgba(0, 0, 0, 0.65);
-      }
-      .pgpc-sammy-reminder-backdrop .pgpc-sammy-dont-show input[type="checkbox"] {
-        width: 14px;
-        height: 14px;
-        cursor: pointer;
-        accent-color: #F79420;
-        flex-shrink: 0;
-      }
-    `;
-    document.head.appendChild(st);
-  }
-
+  // Styling (backdrop stacking, portrait size, "don't show" row + neutral checkbox)
+  // now lives entirely in /css/fte.css — this module no longer ships its own <style>.
   document.body.appendChild(backdrop);
   requestAnimationFrame(() => {
     backdrop.classList.add('open');

@@ -174,7 +174,8 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
 
   // Functional Modal shell (same as timeout gate) + portrait / name subject
   const popup = document.createElement('div');
-  popup.className = 'foul-out-popup';
+  // `gob` so design tokens resolve (court.html links gob-tokens.css).
+  popup.className = 'foul-out-popup gob';
   popup.setAttribute('role', 'dialog');
   popup.setAttribute('aria-modal', 'true');
   popup.setAttribute('aria-labelledby', 'foul-out-title');
@@ -189,7 +190,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
         <div class="foul-out-player-name">${safeDisplayName}</div>
       </div>
       <div class="foul-out-button-container">
-        <a href="${lineupUrl}" class="foul-out-button sub-players-button">Sub Players</a>
+        <a href="${lineupUrl}" class="foul-out-button sub-players-button" data-gob-replace>Sub Players</a>
       </div>
     </div>
   `;
@@ -212,20 +213,21 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
       .foul-out-content {
         width: min(420px, calc(100vw - 40px));
         background: rgba(22, 26, 36, 0.98);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 14px;
+        border: 1px solid var(--white-12);
+        border-radius: var(--radius-14);
         box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+                    inset 0 1px 0 var(--white-6);
         overflow: hidden;
         display: flex;
         flex-direction: column;
         text-align: center;
       }
 
+      /* Decorative top accent — neutral, not orange (orange is reserved for saves). */
       .foul-out-modal-accent {
         height: 3px;
         width: 100%;
-        background: #F79420;
+        background: var(--white-28);
         flex-shrink: 0;
       }
 
@@ -240,10 +242,10 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
       .foul-out-player-image-container {
         width: 96px;
         height: 128px;
-        border-radius: 10px;
+        border-radius: var(--radius-10);
         overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.18);
-        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--white-18);
+        background: var(--white-6);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -265,13 +267,13 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
         font-size: 48px;
         font-weight: 700;
         font-family: 'Bebas Neue', sans-serif;
-        color: rgba(255, 255, 255, 0.45);
-        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-38);
+        background: var(--white-6);
       }
 
       .foul-out-title {
         font-size: 28px;
-        color: #ffffff;
+        color: var(--text-100);
         margin: 0;
         font-family: 'Bebas Neue', sans-serif;
         letter-spacing: 0.04em;
@@ -282,7 +284,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
         font-size: 14px;
         font-weight: 600;
         font-family: Inter, system-ui, sans-serif;
-        color: rgba(255, 255, 255, 0.55);
+        color: var(--text-60);
         text-align: center;
         margin: 0;
         letter-spacing: 0.02em;
@@ -302,7 +304,7 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
         appearance: none;
         flex: 1;
         height: 42px;
-        border-radius: 10px;
+        border-radius: var(--radius-10);
         cursor: pointer;
         text-decoration: none;
         display: inline-flex;
@@ -315,10 +317,12 @@ export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, f
         border: 1px solid transparent;
       }
 
+      /* Corrective navigation to the lineup, not the game/week Advance action, so
+         neutral (prominent) — not green (Advance) and not orange (saves). */
       .sub-players-button {
-        background: #F79420;
-        border-color: rgba(247, 148, 32, 0.45);
-        color: #15181f;
+        background: var(--white-10);
+        border-color: var(--white-28);
+        color: var(--text-100);
       }
 
       .sub-players-button:hover {

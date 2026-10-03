@@ -11,6 +11,18 @@ cd "$ROOT"
 OUT="${GOB_NUITKA_OUT:-dist/loopback}"
 PYTHON="${GOB_NUITKA_PYTHON:-python3}"
 
+# Browse ETags and Settings both show this id. A packaged binary has no git
+# repo, so the stamp is copied next to gob-loopback as BUILD_ID. Override
+# with GOB_BUILD_ID when the desktop pack script already knows the version.
+BUILD_ID="${GOB_BUILD_ID:-}"
+if [ -z "$BUILD_ID" ]; then
+  BUILD_ID="$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+fi
+BUILD_ID="${BUILD_ID:0:12}"
+mkdir -p "$OUT"
+STAMP="$OUT/BUILD_ID"
+printf '%s\n' "$BUILD_ID" > "$STAMP"
+
 "$PYTHON" - <<'PY'
 import fastapi, pymongo, scipy.ndimage, uvicorn  # noqa: F401
 print("compile-deps-ok", flush=True)
@@ -32,6 +44,7 @@ exec "$PYTHON" -m nuitka \
   --nofollow-import-to=scipy.optimize \
   --nofollow-import-to=scipy.integrate \
   --nofollow-import-to=scipy.signal \
+  --include-data-files="$STAMP=BUILD_ID" \
   --include-data-dir=BackEnd/assets=BackEnd/assets \
   --include-data-dir=BackEnd/data=BackEnd/data \
   --include-data-dir=FrontEnd/static=FrontEnd/static \

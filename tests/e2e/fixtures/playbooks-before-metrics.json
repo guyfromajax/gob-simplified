@@ -1,0 +1,48 @@
+{
+  "inApp1280": {
+    "tracks": [
+      { "x": 499, "w": 168, "y": 356 },
+      { "x": 499, "w": 168, "y": 400 },
+      { "x": 499, "w": 168, "y": 444 },
+      { "x": 499, "w": 168, "y": 488 },
+      { "x": 499, "w": 168, "y": 605 },
+      { "x": 499, "w": 168, "y": 649 }
+    ],
+    "divider": "rgba(255, 255, 255, 0.14) 1px 0px 0px 0px inset",
+    "toggle": { "x": 82, "y": 247, "w": 150 },
+    "save": {
+      "bg": "rgb(247, 148, 32)",
+      "color": "rgb(26, 18, 6)",
+      "border": "rgb(26, 18, 6)",
+      "w": 131,
+      "h": 30,
+      "text": "Save Playbooks"
+    },
+    "lockVisible": true,
+    "liveCount": 0,
+    "toastHost": true
+  },
+  "inApp1920": {
+    "tracks": [
+      { "x": 804, "w": 202, "y": 416 },
+      { "x": 804, "w": 202, "y": 468 },
+      { "x": 804, "w": 202, "y": 520 },
+      { "x": 804, "w": 202, "y": 572 },
+      { "x": 804, "w": 202, "y": 703 },
+      { "x": 804, "w": 202, "y": 755 }
+    ],
+    "divider": "rgba(255, 255, 255, 0.14) 1px 0px 0px 0px inset",
+    "toggle": { "x": 228, "y": 291, "w": 166 },
+    "save": {
+      "bg": "rgb(247, 148, 32)",
+      "color": "rgb(26, 18, 6)",
+      "border": "rgb(26, 18, 6)",
+      "w": 131,
+      "h": 36,
+      "text": "Save Playbooks"
+    },
+    "lockVisible": true,
+    "liveCount": 0,
+    "toastHost": true
+  }
+}

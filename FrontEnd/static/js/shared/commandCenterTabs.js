@@ -19,6 +19,24 @@ function cloneParams(params) {
   return out;
 }
 
+// Keys that address one drill-in (a team, a player, a news story) or say where it was
+// opened from. They belong to that one entry. Moving to another tab or section drops
+// them, so a story or a team from earlier cannot ride along and steer a later Back.
+var NAV_KEYS = ['story', 'player_id', 'view_team_id', 'ps_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
+  'return_url', 'origin', 'return_tab', 'id'];
+
+function dropNavKeys(bag) {
+  NAV_KEYS.forEach(function (key) { bag.delete(key); });
+  // The desktop session store is not the URL: a key missing from the next URL would
+  // stay in it. On web the URL is the store, and the entry being left keeps its own.
+  var ctx = franchiseCtx();
+  if (window.GOB_BUILD_PROFILE === 'desktop' && ctx && typeof ctx.setMany === 'function') {
+    var blank = {};
+    NAV_KEYS.forEach(function (key) { blank[key] = ''; });
+    ctx.setMany(blank);
+  }
+}
+
 /**
  * Shared tab management for Franchise and Tournament command centers (Phase 4.4).
  * Expects DOM: .tab-buttons elements with data-tab, and .tab-content elements with id matching data-tab.
@@ -36,39 +54,146 @@ function initCommandCenterTabs(options) {
   if (!tabButtons.length || !tabContents.length) return;
 
   var urlParams = liveParams();
-  var activeTab = urlParams.get('tab') || defaultTab;
+  var activeTab = canonicalTab(urlParams.get('tab') || defaultTab);
+  if (leaveForStandaloneReport(activeTab)) return;
+  var shownTab = '';
+
+  function isKnown(tabName) {
+    if (!tabName) return false;
+    var button = Array.prototype.some.call(tabButtons, function (b) {
+      return b.dataset.tab === tabName;
+    });
+    if (button) return true;
+    var panel = document.getElementById(tabName);
+    return !!(panel && panel.classList && panel.classList.contains('tab-content'));
+  }
 
   function setActive(tabName) {
+    shownTab = tabName;
     tabButtons.forEach(function (b) {
       b.classList.toggle('active', b.dataset.tab === tabName);
     });
     tabContents.forEach(function (c) {
       c.classList.toggle('active', c.id === tabName);
     });
+    if (window.GOBViews && typeof window.GOBViews.has === 'function' && window.GOBViews.has(tabName)) {
+      window.GOBViews.show(tabName);
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('gob-tab-shown', { detail: { tab: tabName } }));
+    } catch (err) { /* ignore */ }
   }
 
-  function updateUrl(tabName) {
+  function standaloneReportHref() {
+    var bag = liveParams();
+    bag.delete('tab');
+    var qs = bag.toString();
+    return '/training-report.html' + (qs ? '?' + qs : '');
+  }
+
+  function leaveForStandaloneReport(tabName) {
+    if (tabName !== 'training-report-view') return false;
+    var next = standaloneReportHref();
+    if (window.GOBNav && typeof window.GOBNav.replace === 'function') window.GOBNav.replace(next);
+    else window.location.replace(next);
+    return true;
+  }
+
+  function canonicalTab(tabName) {
+    if (tabName === 'roster-tab') return 'roster-view';
+    if (tabName === 'recruits-tab') return 'home-tab';
+    if (tabName === 'team-stats-tab') return 'team-attributes-view';
+    if (tabName === 'player-stats-tab') return 'player-stats-view';
+    if (tabName === 'schedule-tab') return 'team-schedule-view';
+    if (tabName === 'press-tab') return 'news-view';
+    if (tabName === 'training-tab') return 'training-view';
+    if (tabName === 'game-plan-tab') return 'game-plan-view';
+    if (tabName === 'playbooks-tab') return 'playbooks-view';
+    if (tabName === 'coaches-tab') return 'scouting-view';
+    if (tabName === 'standings-tab') return 'standings-view';
+    return tabName;
+  }
+
+  // `opts.fresh`: open the tab's own landing even when the URL already names this tab
+  // (the rail's News with a story open). Otherwise the drill keys are dropped only when
+  // the tab changes: GOBViews.open writes the new URL, drill keys and all, before it
+  // calls here, so the tab it names is already current and its keys are kept.
+  function show(tabName, historyMode, opts) {
+    tabName = canonicalTab(tabName);
+    if (leaveForStandaloneReport(tabName)) return;
+    if (!isKnown(tabName)) tabName = defaultTab;
+    var nav = window.GOBNav;
+    if (shownTab && shownTab !== tabName && nav && typeof nav.confirmLeave === 'function') {
+      var held = nav.confirmLeave(function () {
+        if (held) show(tabName, historyMode, opts);
+      }, shownTab);
+      if (held) return;
+    }
+    var before = canonicalTab(liveParams().get('tab') || '');
+    var leaving = !!(opts && opts.fresh) || (!!before && before !== tabName);
+    if (window.GOB_BUILD_PROFILE === 'desktop' && window.FranchiseContext && typeof window.FranchiseContext.set === 'function') {
+      window.FranchiseContext.set('tab', tabName);
+    }
+    if (historyMode === 'push' && window.GOBNav && typeof window.GOBNav.pushSection === 'function') {
+      var bag = liveParams();
+      bag.set('tab', tabName);
+      if (leaving) dropNavKeys(bag);
+      var qs = bag.toString();
+      var next = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+      window.GOBNav.pushSection(next);
+    } else {
+      updateUrl(tabName, leaving);
+    }
+    setActive(tabName);
+    if (historyMode === 'push') {
+      var main = document.querySelector('html.gob-shell .main');
+      if (main) main.scrollTop = 0;
+    }
+    onTabShow(tabName);
+  }
+
+  function updateUrl(tabName, leaving) {
+    if (window.FranchiseContext && typeof window.FranchiseContext.absorbLocation === 'function') {
+      window.FranchiseContext.absorbLocation();
+    }
     var bag = liveParams();
     bag.set('tab', tabName);
+    if (leaving) dropNavKeys(bag);
     var qs = bag.toString();
-    // Keep pushState (back button between tabs). commitParams would replaceState.
-    window.history.pushState({}, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    // Tabs are sub-navigation. replaceState keeps FCC as one history entry
+    // so a later section rail can reuse the same tab switch.
+    var next = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+    window.history.replaceState(window.history.state, '', next);
+    if (window.GOBNav && typeof window.GOBNav.syncCurrent === 'function') {
+      window.GOBNav.syncCurrent();
+    }
   }
 
-  var hasMatchingTab = Array.prototype.some.call(tabButtons, function (b) {
-    return b.dataset.tab === activeTab;
-  });
-  if (!hasMatchingTab) activeTab = defaultTab;
+  function showTabFromUrl() {
+    var bag = liveParams();
+    var tabName = canonicalTab(bag.get('tab') || defaultTab);
+    if (!isKnown(tabName)) tabName = defaultTab;
+    setActive(tabName);
+    onTabShow(tabName);
+    if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
+      window.GOBNav.restoreScroll();
+    }
+  }
 
+  window.addEventListener('popstate', function () {
+    showTabFromUrl();
+  });
+
+  if (!isKnown(activeTab)) activeTab = defaultTab;
+
+  // The visible tab has to be in the URL before a drill-down click captures
+  // return_url. Otherwise in-app Back replaces onto Coach's Office.
+  updateUrl(activeTab);
   setActive(activeTab);
   onTabShow(activeTab);
 
   function playSound(filename) {
-    try {
-      var a = new Audio('/sounds/' + encodeURIComponent(filename));
-      a.volume = 0.7;
-      a.play().catch(function () {});
-    } catch (e) {}
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
   }
 
   tabButtons.forEach(function (btn) {
@@ -82,11 +207,11 @@ function initCommandCenterTabs(options) {
       var tabName = btn.dataset.tab;
       if (!tabName) return;
       playSound('click-tiny.wav');
-      setActive(tabName);
-      updateUrl(tabName);
-      onTabShow(tabName);
+      show(tabName, 'replace');
     });
   });
+
+  if (window.CommandCenterTabs) window.CommandCenterTabs.show = show;
 }
 
 (function (global) {

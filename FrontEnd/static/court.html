@@ -2,10 +2,17 @@
 <html lang="en">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
+  <!-- Design tokens for the DOM game overlays (gameCompletionPopup, PGPC, defense
+       matchups, foul-out, pre-game, sim broadcast). gob-tokens.css defines only
+       .gob-scoped custom properties, so it adds no rules that match court's own
+       chrome — the court paints identically; the overlays carry `.gob` so their
+       var(--token) references resolve. -->
+  <link rel="stylesheet" href="/css/gob-tokens.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
     <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
@@ -146,8 +153,8 @@
       left: 0;
       width: 100%;
       height: var(--scoreboard-height);
-      background: #000;
-      color: #fff;
+      background: var(--black);
+      color: var(--text-100);
       display: grid;
       grid-template-columns:
         var(--side-padding)
@@ -181,11 +188,12 @@
       left: 0;
       right: 0;
       height: 2px;
+      /* colour-law: team-identity — the away/home endpoints identify each team. */
       background: linear-gradient(
         to right,
         var(--away-vibrant-color) 0%,
-        rgba(255, 255, 255, 0.10) 48%,
-        rgba(255, 255, 255, 0.10) 52%,
+        var(--white-10) 48%,
+        var(--white-10) 52%,
         var(--home-vibrant-color) 100%
       );
       pointer-events: none;
@@ -222,6 +230,7 @@
       content: '';
       position: absolute;
       inset: 0;
+      /* colour-law: team-identity — frames the team's own logo (identity zone), not a content wash. */
       background: linear-gradient(to right, rgba(var(--away-vibrant-rgb), 0.25) 0%, transparent 100%);
       pointer-events: none;
       z-index: 0;
@@ -248,7 +257,7 @@
       font-family: 'Bebas Neue', sans-serif;
       font-size: 14px;
       letter-spacing: 0.06em;
-      color: rgba(255, 255, 255, 0.55);
+      color: var(--text-60);
       line-height: 1;
     }
 
@@ -256,7 +265,7 @@
       font-family: 'Inter', sans-serif;
       font-size: 11px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.35);
+      color: var(--text-38);
       letter-spacing: 0.03em;
       line-height: 1;
     }
@@ -272,8 +281,9 @@
       line-height: 0.92;
       text-align: center;
       font-weight: 800;
-      color: #fff;
+      color: var(--text-100);
       text-decoration: underline;
+      /* colour-law: team-identity — the score underline marks which team. */
       text-decoration-color: var(--away-vibrant-color);
       text-decoration-thickness: 3px;
       text-underline-offset: 5px;
@@ -291,7 +301,7 @@
       line-height: 1;
       letter-spacing: 0.02em;
       text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.55);
+      color: var(--text-60);
       align-items: flex-start;
     }
 
@@ -489,7 +499,7 @@
     .sb-strat .lab {
       font-size: 10px;
       letter-spacing: 0.1em;
-      color: rgba(255, 255, 255, 0.45);
+      color: var(--text-38);
       width: 30px;
       text-align: right;
     }
@@ -511,7 +521,7 @@
       right: 0;
       height: 2px;
       transform: translateY(-50%);
-      background: rgba(255, 255, 255, 0.13);
+      background: var(--white-12);
       border-radius: 2px;
     }
     .sb-strat .tick {
@@ -520,7 +530,7 @@
       width: 2px;
       height: 7px;
       transform: translate(-50%, -50%);
-      background: rgba(255, 255, 255, 0.20);
+      background: var(--white-20);
       border-radius: 1px;
     }
 
@@ -583,7 +593,7 @@
       letter-spacing: 0.05em;
       width: 50px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.82);
+      color: var(--text-87);
       text-align: right;
       transition: color 0.3s ease;
     }
@@ -606,9 +616,9 @@
       0% { opacity: 0; } 25% { opacity: 0.55; } 100% { opacity: 0; }
     }
     @keyframes stratWord {
-      0%   { color: rgba(255, 255, 255, 0.82); }
-      18%  { color: #fff; text-shadow: 0 0 8px var(--mk-color, rgba(255,255,255,0.6)); }
-      100% { color: rgba(255, 255, 255, 0.82); text-shadow: none; }
+      0%   { color: var(--text-87); }
+      18%  { color: var(--text-100); text-shadow: 0 0 8px var(--mk-color, rgba(255,255,255,0.6)); }
+      100% { color: var(--text-87); text-shadow: none; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -752,7 +762,7 @@
       line-height: 1;
       letter-spacing: 0.02em;
       text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.55);
+      color: var(--text-60);
       align-items: flex-end;
     }
 
@@ -768,8 +778,9 @@
       line-height: 0.92;
       text-align: center;
       font-weight: 800;
-      color: #fff;
+      color: var(--text-100);
       text-decoration: underline;
+      /* colour-law: team-identity — the score underline marks which team. */
       text-decoration-color: var(--home-vibrant-color);
       text-decoration-thickness: 3px;
       text-underline-offset: 5px;
@@ -794,6 +805,7 @@
       content: '';
       position: absolute;
       inset: 0;
+      /* colour-law: team-identity — frames the team's own logo (identity zone), not a content wash. */
       background: linear-gradient(to left, rgba(var(--home-vibrant-rgb), 0.25) 0%, transparent 100%);
       pointer-events: none;
       z-index: 0;
@@ -823,7 +835,7 @@
       gap: 0;
       overflow: hidden;
       box-sizing: border-box;
-      background: #000 !important;
+      background: var(--black) !important;
     }
 
     /* Court row wrapper (used only when not inside #app-grid) */
@@ -848,15 +860,16 @@
     /* ==================== PLAYER STATS PANELS (LEFT & RIGHT) ==================== */
     .player-stats-panel {
       width: var(--player-stats-width);
-      background: #1a1a1a;
+      background: var(--surface-2);
       display: flex;
       flex-direction: column;
-      border: 1px solid #333;
+      border: 1px solid var(--line-strong);
       overflow: hidden;
       position: relative;
     }
 
     .player-stats-panel.away {
+      /* colour-law: team-identity — the panel's team-colour edge marks which team. */
       border-right: 2px solid var(--away-vibrant-color);
       position: relative;
     }
@@ -871,6 +884,7 @@
     }
 
     .player-stats-panel.home {
+      /* colour-law: team-identity — the panel's team-colour edge marks which team. */
       border-left: 2px solid var(--home-vibrant-color);
       position: relative;
     }
@@ -895,7 +909,7 @@
       flex: 0 0 auto;
       overflow-y: auto;
       padding: 12px;
-      border-bottom: 1px solid #333;
+      border-bottom: 1px solid var(--line);
     }
 
     .stats-header {
@@ -903,7 +917,7 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 10px;
-      border-bottom: 1px solid #444;
+      border-bottom: 1px solid var(--line-strong);
       padding-bottom: 6px;
     }
 
@@ -934,9 +948,9 @@
     }
 
     .toggle-btn {
-      background: #333;
-      color: #aaa;
-      border: 1px solid #555;
+      background: var(--white-6);
+      color: var(--text-60);
+      border: 1px solid var(--white-20);
       padding: 4px 8px;
       font-size: 12px;
       cursor: pointer;
@@ -946,24 +960,20 @@
     }
 
     .toggle-btn:hover {
-      background: #444;
-      color: #fff;
+      background: var(--white-10);
+      color: var(--text-100);
     }
 
+    /* Selected stat view is a choice control → NEUTRAL, not team colour. */
     .toggle-btn.active {
-      background: rgba(var(--home-vibrant-rgb), 0.18);
-      color: #ffffff;
-      border-color: var(--home-vibrant-color);
-    }
-
-    .player-stats-panel.away .toggle-btn.active {
-      background: rgba(var(--away-vibrant-rgb), 0.18);
-      border-color: var(--away-vibrant-color);
+      background: var(--white-20);
+      color: var(--text-100);
+      border-color: var(--white-28);
     }
 
     .momentum-bar-wrap {
       padding: 5px 12px 4px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid var(--white-6);
       flex-shrink: 0;
     }
 
@@ -1028,7 +1038,7 @@
 
     .player-stats-panel.home .player-box-score h3,
     .player-stats-panel.away .player-box-score h3 {
-      color: #fff;
+      color: var(--text-100);
     }
 
     .player-box-score table {
@@ -1038,18 +1048,18 @@
     }
 
     .player-box-score th {
-      background: #222;
+      background: var(--surface-1);
       padding: 6px 4px;
       text-align: center;
       font-size: 14px;
-      color: #aaa;
-      border-bottom: 1px solid #444;
+      color: var(--text-60);
+      border-bottom: 1px solid var(--line-strong);
     }
 
     .player-box-score td {
       text-align: center;
       padding: 5px 4px;
-      border-bottom: 1px solid #2b2b2b;
+      border-bottom: 1px solid var(--line);
     }
 
     .player-box-score td:first-child {
@@ -1058,7 +1068,7 @@
     }
 
     .player-box-score tbody tr:hover {
-      background: #252525;
+      background: var(--white-6);
     }
 
     /* Team Box Score Section (Placeholder) */
@@ -1069,9 +1079,9 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #151515;
-      border-top: 1px solid #444;
-      color: #888;
+      background: var(--surface-1);
+      border-top: 1px solid var(--line-strong);
+      color: var(--text-60);
       font-size: 18px;
       /* remove absolute positioning to avoid overlap */
       /* position: absolute; */
@@ -1086,18 +1096,18 @@
       justify-content: space-between;
       align-items: center;
       padding: 8px 12px;
-      border-bottom: 1px solid #333;
+      border-bottom: 1px solid var(--line);
     }
     .team-stats-header h3 {
       margin: 0;
       font-size: 18px;
-      color: #bbb;
+      color: var(--text-87);
     }
     .team-stats-toggle { display: flex; gap: 6px; }
     .team-toggle-btn {
-      background: #333;
-      color: #aaa;
-      border: 1px solid #555;
+      background: var(--white-6);
+      color: var(--text-60);
+      border: 1px solid var(--white-20);
       padding: 3px 8px;
       font-size: 12px;
       cursor: pointer;
@@ -1105,14 +1115,14 @@
       transition: all 0.2s ease;
       font-family: 'Bebas Neue', sans-serif;
     }
-    .team-toggle-btn.active { background: var(--home-vibrant-color); color: #fff; border-color: var(--home-vibrant-color); }
-    .player-stats-panel.away .team-toggle-btn.active { background: var(--away-vibrant-color); border-color: var(--away-vibrant-color); }
+    /* Selected team-stat view is a choice control → NEUTRAL, not team colour. */
+    .team-toggle-btn.active { background: var(--white-20); color: var(--text-100); border-color: var(--white-28); }
     .team-stats-content { width: 100%; padding: 8px 12px; overflow-y: auto; }
     .team-tab { display: none; }
     .team-tab.active { display: block; }
     .team-stats-table, .team-attrs-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    .team-stats-table th { text-align: left; color: #aaa; padding: 6px 4px; border-bottom: 1px solid #333; }
-    .team-stats-table td, .team-attrs-table td { text-align: center; padding: 6px 4px; border-bottom: 1px solid #222; }
+    .team-stats-table th { text-align: left; color: var(--text-60); padding: 6px 4px; border-bottom: 1px solid var(--line); }
+    .team-stats-table td, .team-attrs-table td { text-align: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
     .team-stats-table td:first-child, .team-attrs-table td:first-child { text-align: left; }
     .team-stats-table th:first-child { text-align: left; }
 
@@ -1225,21 +1235,25 @@
       background: linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,1)) !important;  /* Match Playcall gradient for seamless blend */
     }
 
-    /* Quarter start functional modal */
+    /* Quarter start functional modal.
+       Fallback paths (no court_start) cover the viewport opaquely so the
+       scoreboard and court cannot show around a partial backdrop.
+       z-index sits above court chrome and below the pgxp bridge (10002). */
     .pre-game-container {
-      position: absolute;
+      position: fixed;
       inset: 0;
-      z-index: 300;
+      z-index: 10001;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
+      background: var(--bg);
     }
 
     .pre-game-backdrop {
       position: absolute;
       inset: 0;
-      background: rgba(0, 0, 0, 0.72);
+      background: var(--bg);
     }
 
     .pre-game-modal-box {
@@ -1247,19 +1261,20 @@
       z-index: 1;
       width: min(420px, calc(100vw - 40px));
       background: rgba(22, 26, 36, 0.98);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
+      border: 1px solid var(--white-12);
+      border-radius: var(--radius-14);
       box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.06);
+                  inset 0 1px 0 var(--white-6);
       overflow: hidden;
       display: flex;
       flex-direction: column;
     }
 
+    /* Decorative top accent — neutral, not orange (orange is reserved for saves). */
     .pre-game-modal-accent {
       height: 3px;
       width: 100%;
-      background: #F79420;
+      background: var(--white-28);
       flex-shrink: 0;
     }
 
@@ -1273,7 +1288,7 @@
     .pre-game-modal-title {
       font-family: 'Bebas Neue', sans-serif;
       font-size: 28px;
-      color: #ffffff;
+      color: var(--text-100);
       letter-spacing: 0.04em;
       line-height: 1;
     }
@@ -1282,7 +1297,7 @@
       font-family: 'Inter', sans-serif;
       font-size: 14px;
       font-weight: 400;
-      color: rgba(255, 255, 255, 0.55);
+      color: var(--text-60);
       line-height: 1.5;
     }
 
@@ -1339,10 +1354,12 @@
       pointer-events: none !important;
     }
 
+    /* Neutral divider (was decorative orange #ff6200); orange is reserved for saves.
+       This is the legacy light sim-quarter popup, so a neutral grey, not gob dark tokens. */
     .sim-quarter-header {
       text-align: center;
       margin-bottom: 20px;
-      border-bottom: 2px solid #ff6200;
+      border-bottom: 2px solid #6b7280;
       padding-bottom: 15px;
     }
 
@@ -1371,7 +1388,7 @@
     }
 
     .sim-quarter-scroll-container::-webkit-scrollbar-thumb {
-      background: #ff6200;
+      background: #6b7280;
       border-radius: 4px;
     }
 
@@ -1400,10 +1417,11 @@
       flex: 1;
     }
 
+    /* Square, like every player headshot. */
     .sim-quarter-player-image {
       width: 40px;
       height: 40px;
-      border-radius: 50%;
+      border-radius: 6px;
       object-fit: cover;
       flex-shrink: 0;
       margin-left: 12px;
@@ -1450,17 +1468,19 @@
       letter-spacing: 0.04em;
     }
 
+    /* colour-law: advance — "Play Quarter" / "Resume Game" starts the game, i.e. the
+       one forward action on this prompt, so green (Advance), not orange. */
     .play-button {
       appearance: none;
       width: 100%;
       height: 46px;
       padding: 0 18px;
-      border-radius: 10px;
+      border-radius: var(--radius-10);
       font-size: 18px;
       font-weight: 700;
-      background: #F79420;
-      border: 1px solid rgba(247, 148, 32, 0.45);
-      color: #15181f;
+      background: var(--green);
+      border: 1px solid var(--white-28);
+      color: var(--bg);
       transition: filter 0.14s ease, transform 0.14s ease;
     }
 
@@ -1469,26 +1489,27 @@
       transform: translateY(-1px);
     }
 
+    /* Neutral secondary (choice), not the Advance — "Play Quarter" is the green action. */
     .sim-full-game-button,
     .sim-to-fourth-button {
       appearance: none;
       width: 100%;
       height: 46px;
       padding: 0 18px;
-      border-radius: 10px;
+      border-radius: var(--radius-10);
       font-size: 18px;
       font-weight: 700;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      color: rgba(255, 255, 255, 0.8);
+      background: var(--white-6);
+      border: 1px solid var(--white-12);
+      color: var(--text-87);
       transition: background 0.14s ease, border-color 0.14s ease;
     }
 
     .sim-full-game-button:hover:not(:disabled),
     .sim-to-fourth-button:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.24);
-      color: #ffffff;
+      background: var(--white-10);
+      border-color: var(--white-28);
+      color: var(--text-100);
     }
 
     .play-button:disabled,
@@ -2035,9 +2056,10 @@
       border-bottom: none;
     }
 
+    /* Selected speed is a choice-control state → neutral, not orange (orange = saves). */
     .pcc-speed-btn.on {
-      background: var(--orange);
-      color: #0a0c12;
+      background: var(--white-20);
+      color: var(--text-100);
     }
 
     .pcc-speed-glyph {
@@ -2046,7 +2068,8 @@
       font-size: 11px;
     }
 
-    /* 10. Pause / Resume — primary action, filled orange */
+    /* 10. Pause / Resume — primary CONTROL → neutral (prominent), not orange.
+       Pause/Resume toggles playback; it is neither a save (orange) nor the Advance (green). */
     #playcall-center .pcc-game #pause-btn.pcc-pause {
       position: static;
       transform: none;
@@ -2054,10 +2077,10 @@
       flex: 1;
       min-height: 48px;
       padding: 0 14px;
-      background: var(--orange);
-      border: 1px solid var(--orange);
+      background: var(--white-10);
+      border: 1px solid var(--white-28);
       border-radius: 9px;
-      color: #15181f;
+      color: var(--text-100);
       font-family: 'Bebas Neue', sans-serif;
       font-size: 20px;
       letter-spacing: 0.06em;
@@ -2075,9 +2098,9 @@
     }
 
     #playcall-center .pcc-game #pause-btn.pcc-pause.paused {
-      background: var(--orange);
-      border-color: var(--orange);
-      color: #15181f;
+      background: var(--white-10);
+      border-color: var(--white-28);
+      color: var(--text-100);
     }
 
     .pcc-pause-icon {
@@ -2337,11 +2360,13 @@
       animation: hudReveal 2.5s ease-out forwards;
     }
 
+    /* Square, like every player headshot. 10px is the same corner weight at 70px
+       that the 28px table badges get from 6px. */
     .hud-headshot-container {
       position: relative;
       width: 70px;
       height: 70px;
-      border-radius: 50%;
+      border-radius: 10px;
       overflow: hidden;
       border: 3px solid #FFD700;
       background: #1a1a1a;
@@ -3396,48 +3421,51 @@
       z-index: 950;
     }
 
+    /* Game controls are choice controls → neutral (muted), not colour. Were purple /
+       orange / blue (off-law: orange=saves, blue=RT only, purple=not a law colour);
+       differentiated by label, not hue. */
     #game-speed-btn,
     #pause-btn,
     #skip-btn {
-      color: #fff;
-      border: none;
+      color: var(--text-100);
+      border: 1px solid var(--white-12);
       padding: 8px 20px;
-      border-radius: 6px;
+      border-radius: var(--radius-6);
       cursor: pointer;
       font-family: 'Bebas Neue', sans-serif;
       font-size: 16px;
-      transition: background-color 0.2s;
+      transition: background-color 0.2s, border-color 0.2s;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
     }
 
     #game-speed-btn {
-      background-color: #9c27b0; /* Purple */
+      background-color: var(--white-10);
       white-space: nowrap;
       min-width: fit-content;
     }
 
     #game-speed-btn:hover {
-      background-color: #7b1fa2; /* Darker purple */
+      background-color: var(--white-20);
     }
 
     #pause-btn {
-      background-color: #ff6200;
+      background-color: var(--white-10);
       position: absolute;
       left: 50%;
       transform: translateX(-50%);
     }
 
     #pause-btn:hover {
-      background-color: #ff7a1a;
+      background-color: var(--white-20);
     }
 
     #skip-btn {
-      background-color: #007bff;
+      background-color: var(--white-10);
       margin-left: auto; /* Push to right */
     }
 
     #skip-btn:hover:not(:disabled) {
-      background-color: #0056b3;
+      background-color: var(--white-20);
     }
 
     /* Dead controls are intentionally non-interactive with an obvious visual mask. */
@@ -3452,8 +3480,8 @@
       content: "";
       position: absolute;
       inset: 0;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.28);
+      border-radius: var(--radius-6);
+      background: var(--white-28);
     }
 
     /* Skip To End is not yet implemented; keep it clearly disabled until post-alpha */
@@ -3503,6 +3531,7 @@
     }
 
     /* Playcall / pause control hierarchy (court redesign) */
+    /* Pause/Resume is a playback CONTROL → neutral, not orange (orange = saves). */
     #game-controls-strip #pause-btn {
       position: static;
       left: auto;
@@ -3510,11 +3539,11 @@
       height: 42px;
       min-width: 120px;
       font-size: 20px;
-      background: #F79420;
-      border: 1px solid rgba(247, 148, 32, 0.45);
+      background: var(--white-10);
+      border: 1px solid var(--white-28);
       border-radius: 8px;
-      color: #0a0b10;
-      box-shadow: 0 4px 16px rgba(247, 148, 32, 0.28);
+      color: var(--text-100);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
     }
 
     #game-controls-strip #timeout-btn {
@@ -3537,10 +3566,10 @@
       height: 28px;
       padding: 0 14px;
       font-size: 12px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: var(--white-6);
+      border: 1px solid var(--white-12);
       border-radius: 7px;
-      color: rgba(255, 255, 255, 0.50);
+      color: var(--text-60);
     }
     
     @keyframes timeoutPulse {
@@ -3629,7 +3658,8 @@
       position: fixed;
       display: none;
       background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
-      border: 2px solid #ff6200;
+      /* Neutral border (was decorative orange #ff6200); orange is reserved for saves. */
+      border: 2px solid var(--white-28);
       border-radius: 8px;
       padding: 12px;
       z-index: 10001;
@@ -3756,7 +3786,7 @@
       font-weight: 700;
       font-size: 11px;
       line-height: 1;
-      color: #fff;
+      color: var(--text-100);
       text-shadow: 0 0 2px #000, 0 0 3px #000, 0 1px 1px #000;
       z-index: 3;
       pointer-events: none;
@@ -3767,7 +3797,8 @@
       position: fixed;
       display: none;
       background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
-      border: 2px solid #ff6200;
+      /* Neutral border (was decorative orange #ff6200); orange is reserved for saves. */
+      border: 2px solid var(--white-28);
       border-radius: 8px;
       padding: 12px 16px;
       z-index: 10001;
@@ -4300,9 +4331,11 @@
   </style>
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
-<body>
+<!-- `gob` so gob-tokens.css custom properties resolve for court chrome. gob-tokens.css
+     is custom-properties-only (no element rules), so the court paints identically. -->
+<body class="gob">
   <!-- Page load overlay: hides stale scoreboard/box scores until initializeGameStats (and init) complete -->
-  <div id="page-load-overlay" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
+  <div id="page-load-overlay" class="gob-scope" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:var(--bg);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
     <img src="/images/loader1.gif" alt="Loading…" style="width:240px;height:auto;max-width:90vw;">
   </div>
   <!-- Google Tag Manager (noscript) -->
@@ -4586,7 +4619,7 @@
                 <!-- Section 3: Special Situations (same layout) -->
                 <tr><th colspan="7">Special Situations</th></tr>
                 <tr><td>Fast Breaks</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td><td colspan="4"></td></tr>
-                <tr><td>HC Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>Half-Court Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td><td colspan="4"></td></tr>
                 <tr><td>FC Presses</td><td data-key="fcp_attempts">0</td><td data-key="fcp_rate">0%</td><td colspan="4"></td></tr>
               </tbody>
             </table>
@@ -4800,7 +4833,7 @@
                 <!-- Section 3: Special Situations (same layout) -->
                 <tr><th colspan="7">Special Situations</th></tr>
                 <tr><td>Fast Breaks</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td><td colspan="4"></td></tr>
-                <tr><td>HC Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>Half-Court Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td><td colspan="4"></td></tr>
                 <tr><td>FC Presses</td><td data-key="fcp_attempts">0</td><td data-key="fcp_rate">0%</td><td colspan="4"></td></tr>
               </tbody>
             </table>
@@ -4966,16 +4999,13 @@
   -->
 
   <!-- ==================== SCRIPTS ==================== -->
+  <script type="module" src="/js/shared/courtAudio.js"></script>
   <script>
     // console.log('🚨 HTML: Basic JavaScript is working!');
     // console.log('🚨 HTML: About to load bootGame.js');
     
     function playSound(filename) {
-      try {
-        const a = new Audio('/sounds/' + encodeURIComponent(filename));
-        a.volume = 0.7;
-        a.play().catch(function() {});
-      } catch (e) {}
+      import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
     }
     
     // Stats toggle functionality
@@ -6533,10 +6563,10 @@
       const order = [
         { label: 'Shooting', key: 'shot_threshold' },
         { label: 'Rebounding', key: 'rebound_modifier' },
-        { label: 'Offense Efficiency', key: 'offensive_efficiency' },
-        { label: 'Defense Efficiency', key: 'defensive_efficiency' },
-        { label: 'Fast Break Efficiency', key: 'fb_efficiency' },
-        { label: 'Press/Trap Efficiency', key: 'pt_efficiency' },
+        { label: 'Offense', key: 'offensive_efficiency' },
+        { label: 'Defense', key: 'defensive_efficiency' },
+        { label: 'Fast Break', key: 'fb_efficiency' },
+        { label: 'P/T Defense', key: 'pt_efficiency' },
         { label: 'Discipline', key: 'discipline' },
         { label: 'Fight', key: 'fight' },
         { label: 'Momentum', key: 'momentum_score' },
@@ -6772,7 +6802,10 @@
         const data = await response.json();
         const currentWeek = Number(data.week || 1);
         if (currentWeek > pageWeek) {
-          window.location.replace(`/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`);
+          const hub = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+          if (window.GOBNav && typeof window.GOBNav.exitFlow === 'function') {
+            window.GOBNav.exitFlow(hub, { tab: 'home-tab' });
+          }
           return true;
         }
       } catch (err) {
@@ -6789,9 +6822,7 @@
     const awayDisplay = urlParams.get('away_display') || awayTeam;
 
     window.addEventListener('pageshow', (event) => {
-      if (event.persisted) {
-        window.location.reload();
-      }
+      if (event.persisted && window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
     });
 
     const redirected = await redirectIfFranchiseGameplayAlreadyCommitted(urlParams);
@@ -6850,8 +6881,14 @@
     // after 5s so the user isn't permanently blocked.
     (function () {
       var dismissed = false;
+      var courtStart = new URLSearchParams(window.location.search).get('court_start');
+      // Captured once. bootGame strips court_start from the URL immediately,
+      // so a later read would miss it and the 5s timer would reveal the court.
+      var holdForBridge = courtStart === 'play' || courtStart === 'sim';
       function dismissOverlay(options) {
-        if (window.__GOB_COURT_ENTRY_VISUAL_GATE__ && !(options && options.force)) {
+        var bridgeReady = !!(options && options.bridgeReady);
+        if (holdForBridge && !bridgeReady) return;
+        if (window.__GOB_COURT_ENTRY_VISUAL_GATE__ && !(options && options.force) && !bridgeReady) {
           return;
         }
         if (dismissed) return;
@@ -6860,8 +6897,30 @@
           window.PageLoadOverlay.hide();
         }
       }
-      window.addEventListener('court-ready', dismissOverlay, { once: true });
-      setTimeout(function () { dismissOverlay({ force: true }); }, 5000);
+      window.__GOB_REVEAL_COURT_START_BRIDGE__ = function () {
+        dismissOverlay({ bridgeReady: true });
+      };
+      window.__GOB_RELEASE_COURT_START_HOLD__ = function () {
+        holdForBridge = false;
+        dismissed = false;
+        dismissOverlay({ force: true });
+      };
+      window.addEventListener('court-ready', function () {
+        var guard = (window.GOBNav && window.GOBNav.guardClosedFranchiseGame)
+          ? window.GOBNav.guardClosedFranchiseGame()
+          : Promise.resolve(false);
+        Promise.resolve(guard).then(function (redirected) {
+          if (!redirected) dismissOverlay();
+        });
+      }, { once: true });
+      setTimeout(function () {
+        var guard = (window.GOBNav && window.GOBNav.guardClosedFranchiseGame)
+          ? window.GOBNav.guardClosedFranchiseGame()
+          : Promise.resolve(false);
+        Promise.resolve(guard).then(function (redirected) {
+          if (!redirected) dismissOverlay({ force: true });
+        });
+      }, 5000);
     })();
   </script>
   <script>
@@ -7273,7 +7332,7 @@
     // Load bootGame.js with environment-aware path
     const bootGameScript = document.createElement('script');
     bootGameScript.type = 'module';
-    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js?v=sim-full-bridge-1`;
+    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js?v=court-start-bridge-1`;
     document.head.appendChild(bootGameScript);
   </script>
   <script>

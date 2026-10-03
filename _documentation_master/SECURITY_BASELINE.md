@@ -54,7 +54,7 @@ dotenv and direct-client patterns; Atlas Cloud Backup is the production recovery
 **Franchise:**
 - `POST /franchise/select-team` — creates franchise
 - `POST /franchise/play-next-game`
-- `POST /franchise/save-result`
+- `GET /franchise/next-game` — read-only lookup (never reconciles or writes)
 - `POST /franchise/complete-week`
 - `POST /franchise/complete-week/phase-a`
 - `POST /franchise/complete-week/phase-b`
@@ -69,7 +69,6 @@ dotenv and direct-client patterns; Atlas Cloud Backup is the production recovery
 - `GET /franchise/team-traits`
 - `GET /franchise/team-player-stats`
 - `GET /franchise/recruits`
-- `GET /franchise/latest-training`
 - `GET /franchise/state`
 - `GET /franchise/team-data`
 - `GET /franchise/roster`

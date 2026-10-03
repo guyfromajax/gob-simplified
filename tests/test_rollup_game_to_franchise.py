@@ -23,8 +23,8 @@ def test_rollup_game_to_franchise_idempotent():
         "home_team": "Team1",
         "away_team": "Team2",
         "box_score": {
-            "Team1": {"PG": {"name": "A One", "PTS": 10, "FGA": 5, "FGM": 4, "FTA": 2, "FTM": 1}},
-            "Team2": {"PG": {"name": "B Two", "PTS": 8, "FGA": 6, "FGM": 3, "FTA": 1, "FTM": 1}},
+            "Team1": {"PG": {"name": "A One", "PTS": 10, "FGA": 5, "FGM": 4, "FTA": 2, "FTM": 1, "MIN": 1200}},
+            "Team2": {"PG": {"name": "B Two", "PTS": 8, "FGA": 6, "FGM": 3, "FTA": 1, "FTM": 1, "MIN": 1200}},
         },
         "players": [
             {"playerId": "p1", "team": "home", "pos": "PG"},

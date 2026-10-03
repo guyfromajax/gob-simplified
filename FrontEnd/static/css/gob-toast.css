@@ -1,0 +1,47 @@
+/* Shared save confirmation (js/shared/gobToast.js). Neutral chrome: it reports a
+   save, it is not the save control, so it carries neither orange nor green.
+   Fixed over the centre of .main so showing it never shifts layout. */
+.gob .gob-save-toast {
+  position: fixed;
+  left: calc(var(--rail-w) + (100vw - var(--rail-w)) / 2);
+  bottom: var(--dsp-24);
+  z-index: var(--z-panel);
+  max-width: calc(100vw - var(--rail-w) - var(--dsp-24) * 2);
+  padding: var(--space-10) var(--space-16);
+  border-radius: var(--radius-10);
+  background: var(--surface-popover);
+  box-shadow: var(--shadow-popover);
+  color: var(--text-87);
+  font: var(--fw-semibold) var(--fs-13)/var(--lh-body) var(--font-body);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, var(--space-8));
+  transition:
+    opacity var(--dur-panel) var(--ease-out),
+    transform var(--dur-panel) var(--ease-out),
+    visibility 0s linear var(--dur-panel);
+}
+
+.gob .gob-save-toast.is-on {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition:
+    opacity var(--dur-panel) var(--ease-out),
+    transform var(--dur-panel) var(--ease-out),
+    visibility 0s;
+}
+
+.gob .gob-save-toast:empty {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gob .gob-save-toast,
+  .gob .gob-save-toast.is-on {
+    transform: translate(-50%, 0);
+    transition: none;
+  }
+}

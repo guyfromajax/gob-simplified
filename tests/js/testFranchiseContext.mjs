@@ -212,6 +212,45 @@ function main() {
     assert(storage.getItem(firstPage.lib.SESSION_STORAGE_KEY), 'wrote the session blob');
   }
 
+  // --- A new week without game_id must not keep last week's game ---
+  {
+    const storage = memoryStorage();
+    const firstPage = loadLib({ GOB_BUILD_PROFILE: 'desktop', storage, search: '?franchise_id=f1&week=1' });
+    const ctx1 = firstPage.lib.createFranchiseContext({
+      buildProfile: 'desktop',
+      storage,
+      location: firstPage.loc,
+    });
+    ctx1.setMany({
+      franchise_id: 'f1',
+      week: '1',
+      home: 'Casino Row',
+      away: 'Lancaster',
+      home_id: 'home-1',
+      away_id: 'away-1',
+      game_id: 'week-1-game',
+      quarter: '4',
+      resume_from_timeout: 'true',
+      runtime: 'local',
+    });
+    const nextWeek = loadLib({
+      GOB_BUILD_PROFILE: 'desktop',
+      storage,
+      search: '?mode=franchise&franchise_id=f1&week=2&home=Lancaster&away=Appalachia&home_id=home-2&away_id=away-2',
+    });
+    const ctx2 = nextWeek.lib.createFranchiseContext({
+      buildProfile: 'desktop',
+      storage,
+      location: nextWeek.loc,
+    });
+    assertEqual(ctx2.get('week'), '2', 'new week absorbed');
+    assertEqual(ctx2.get('home'), 'Lancaster', 'new home absorbed');
+    assertEqual(ctx2.get('game_id'), null, 'previous game_id dropped for a new matchup');
+    assertEqual(ctx2.get('quarter'), null, 'previous quarter dropped');
+    assertEqual(ctx2.get('resume_from_timeout'), null, 'previous resume flag dropped');
+    assertEqual(ctx2.get('franchise_id'), 'f1', 'franchise_id kept');
+  }
+
   // --- commitParams writes the whole bag in place (no navigation) ---
   {
     const { lib, loc, history } = loadLib({ search: '?franchise_id=f1&resume_from_timeout=true' });
@@ -314,6 +353,36 @@ function main() {
       remote,
       'web + FranchiseContext.local still remote',
     );
+  }
+
+  // Desktop: a same-document player drill must land in session before the next
+  // URL rebuild, or CommandCenterTabs.show drops player_id.
+  {
+    const { lib, loc, history, storage } = loadLib({
+      GOB_BUILD_PROFILE: 'desktop',
+      search: '?franchise_id=f1&tab=roster-view',
+    });
+    const ctx = lib.createFranchiseContext({
+      buildProfile: 'desktop',
+      location: loc,
+      history,
+      storage,
+    });
+    assertEqual(ctx.get('player_id'), null, 'no player_id on roster');
+    history.replaceState(null, '', '/franchise-command-center.html?franchise_id=f1&tab=player-view&player_id=p3');
+    assertEqual(ctx.get('player_id'), null, 'session does not see pushState until absorb');
+    ctx.absorbLocation();
+    assertEqual(ctx.get('player_id'), 'p3', 'absorbLocation copies player_id');
+    ctx.setMany({
+      tab: 'player-view',
+      player_id: 'p3',
+      origin: 'team',
+      pager: '',
+    });
+    const bag = ctx.toSearchParams();
+    bag.set('tab', 'player-view');
+    assertEqual(bag.get('player_id'), 'p3', 'rebuild from session keeps player_id');
+    assertEqual(bag.get('pager'), null, 'empty drill keys are dropped');
   }
 
   console.log(JSON.stringify({ ok: true, resumeKeys: RESUME_KEYS.length }));

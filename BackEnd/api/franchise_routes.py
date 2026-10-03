@@ -1,5 +1,32 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+
+from BackEnd.utils.browse_cache import browse_cached, bump_browse_rev, fold_browse_rev
+from BackEnd.utils.hidden_attrs import HiddenAttrsJSONResponse, is_hidden_attr, visible_attr_keys
+from BackEnd.utils.franchise_last_played import (
+    LAST_PLAYED_FIELD,
+    last_played_iso,
+    marks_last_played,
+    most_recent_franchise_id,
+)
+from BackEnd.utils.local_coach import (
+    coach_career_payload,
+    coach_fields,
+    is_local_owner,
+    local_coach_doc,
+)
+from BackEnd.utils.attribute_gain import exceptional_gain_rows
+from BackEnd.utils.career_data import coach_career_extras
+from BackEnd.utils.franchise_geek_points import SEASON_GP_FIELD
+from BackEnd.utils.trophy_log import (
+    TROPHIES_FIELD,
+    record_all_american_trophies_if_missing,
+    record_all_conference_trophies_if_missing,
+    record_first_bracket_milestone,
+    record_first_signing_class_milestone,
+    record_season_record_trophy,
+    trophies_newest_first,
+)
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.responses import Response
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
@@ -17,7 +44,7 @@ import re
 import uuid
 from copy import deepcopy
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.parse import urlencode
@@ -46,6 +73,7 @@ from BackEnd.utils.shared import format_height, summarize_game_state
 from BackEnd.utils.rt_display import format_rt_display
 from BackEnd.utils.player_year import format_player_year_display
 from BackEnd.utils import stat_updater
+from BackEnd.utils import cpu_week_pool as _cpu_week_pool_mod
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
 from BackEnd.models.franchise_manager import FranchiseManager, ScheduleManager
 from BackEnd.tournament.bracket_engine import get_round_name
@@ -108,6 +136,9 @@ from BackEnd.models.franchise_manager import choose_franchise_first_name, get_fr
 from BackEnd.models.franchise_manager import carry_dev_fields
 from BackEnd.models.franchise_manager import build_walk_ons_news_story, walk_on_news_row
 from BackEnd.utils.recruiting_report_news import (
+    FTD_RECRUITING_RANK,
+    RESULTS_SCORE_CAPTION,
+    WEEKLY_SCORE_CAPTION,
     build_recruiting_rankings_story,
     compute_recruiting_rank_fields,
     persist_recruiting_ranks_to_ftd,
@@ -132,7 +163,23 @@ from BackEnd.utils.franchise_rank_prestige import (
     use_franchise_rank_prestige_v2,
 )
 
-router = APIRouter()
+# CH is a hidden attribute: no payload on this router carries it (utils/hidden_attrs).
+router = APIRouter(default_response_class=HiddenAttrsJSONResponse)
+
+# Per-user limits on the heavy week/season routes (rate_limiter.user_rate_limit).
+# If the limiter can't import, the routes stay unlimited rather than failing.
+try:
+    from BackEnd.utils.rate_limiter import (
+        CPU_SIMS_RATE_LIMIT,
+        FINISH_SEASON_RATE_LIMIT,
+        WEEK_ADVANCE_RATE_LIMIT,
+        user_rate_limit as _heavy_route_limit,
+    )
+except Exception:  # pragma: no cover - deploy resilience, mirrors api.py
+    CPU_SIMS_RATE_LIMIT = FINISH_SEASON_RATE_LIMIT = WEEK_ADVANCE_RATE_LIMIT = ""
+
+    def _heavy_route_limit(_limit, _scope):
+        return lambda: None
 logger = logging.getLogger(__name__)
 
 from BackEnd.runtime_paths import bundle_path, bundle_root
@@ -484,6 +531,37 @@ def _build_next_matchup_map(
         matchup_map[str(away_id)] = f"at {home_name}"
         matchup_map[str(home_id)] = f"vs {away_name}"
     return matchup_map
+
+
+def _build_next_opponent_detail(franchise_doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Opponent id, site, and week for each team's next game. No day or time."""
+    week = int(franchise_doc.get("week", 1) or 1)
+    detail: dict[str, dict[str, Any]] = {}
+    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+    eos_has_state = bool(
+        franchise_doc.get("conference_tournaments")
+        or franchise_doc.get("region_tournaments")
+        or franchise_doc.get("national_tournament")
+    )
+    pairs: list[tuple[Any, Any]] = []
+    if eos_tournament_active and eos_has_state and week in ft.EOS_WEEKS:
+        for game in ft.get_eos_week_games(franchise_doc, week):
+            away_id = game.get("away_id")
+            home_id = game.get("home_id")
+            if away_id and home_id:
+                pairs.append((away_id, home_id))
+    else:
+        schedule = franchise_doc.get("schedule") or []
+        next_games = schedule[week - 1] if week - 1 < len(schedule) else []
+        for game in next_games:
+            if isinstance(game, (list, tuple)) and len(game) >= 2:
+                pairs.append((game[0], game[1]))
+    for away_id, home_id in pairs:
+        away = str(away_id)
+        home = str(home_id)
+        detail[away] = {"next_opponent_id": home, "next_week": week, "next_site": "at"}
+        detail[home] = {"next_opponent_id": away, "next_week": week, "next_site": "vs"}
+    return detail
 
 
 def _build_previous_week_result_map(
@@ -881,6 +959,32 @@ def _clock_from_time_remaining(seconds: Any) -> str:
     return f"{total // 60}:{total % 60:02d}"
 
 
+def _cc_lap(name: str, started: float) -> float:
+    """Section timer for GET /franchise/command-center/data. Off unless GOB_CC_TIMING=1."""
+    if os.environ.get("GOB_CC_TIMING") == "1":
+        logger.warning("[CC-TIMING] %s %.1fms", name, (time.perf_counter() - started) * 1000)
+    return time.perf_counter()
+
+
+def _active_resume_game_query(franchise_id: str, week: int | None = None) -> dict[str, Any]:
+    """Non-final games that carry a resume anchor, optionally this week only.
+
+    Week is indexed. ``is_final`` and ``resume_anchor`` compile beside it, so
+    SQLite does not decode the rest of the season. Omit ``week`` for the
+    franchise-wide filter used when the week-scoped lookup returns nothing
+    (an in-progress doc can omit ``week``, or store a week other than
+    ``next_game.week``).
+    """
+    query: dict[str, Any] = {
+        "franchise_id": str(franchise_id),
+        "is_final": {"$ne": True},
+        "resume_anchor": {"$type": "object"},
+    }
+    if week is not None:
+        query["week"] = int(week)
+    return query
+
+
 def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
     next_game = _find_user_next_game(franchise_doc, user_team_id_str)
     if not next_game:
@@ -1039,30 +1143,44 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
 
     game_doc = None
     matched_candidates: list[dict[str, Any]] = []
-    anchor_cursor = db.games.find(
-        {
-            "franchise_id": franchise_id,
-            "is_final": {"$ne": True},
-            "resume_anchor": {"$type": "object"},
-        },
-        sort=[("_id", -1)],
-        limit=12,
-    )
-    anchor_candidate_count = 0
     rejected_candidates: list[dict[str, Any]] = []
-    for candidate in anchor_cursor:
-        anchor_candidate_count += 1
-        if _matches_current_user_game(candidate):
-            matched_candidates.append(candidate)
-            continue
-        if len(rejected_candidates) < 5:
-            rejected_candidates.append(
-                {
-                    "game_id": str(candidate.get("_id")),
-                    "pair": sorted(_candidate_pair(candidate)),
-                    "has_snapshot": bool(_anchor_snapshot(candidate)),
-                }
-            )
+
+    def _scan_resume_games(query: dict[str, Any]) -> int:
+        matched_candidates.clear()
+        rejected_candidates.clear()
+        count = 0
+        anchor_cursor = db.games.find(query, sort=[("_id", -1)], limit=12)
+        for candidate in anchor_cursor:
+            count += 1
+            if _matches_current_user_game(candidate):
+                matched_candidates.append(candidate)
+                continue
+            if len(rejected_candidates) < 5:
+                rejected_candidates.append(
+                    {
+                        "game_id": str(candidate.get("_id")),
+                        "pair": sorted(_candidate_pair(candidate)),
+                        "has_snapshot": bool(_anchor_snapshot(candidate)),
+                    }
+                )
+        return count
+
+    next_week = int(next_game.get("week") or 0)
+    anchor_candidate_count = _scan_resume_games(
+        _active_resume_game_query(franchise_id, next_week)
+    )
+    # init-game and quarter/timeout saves do not write ``week``. An EOS game
+    # can also be stored under a week other than ``next_game.week``. The
+    # unscoped filter runs only when the week seek returned no documents.
+    if anchor_candidate_count == 0:
+        logger.warning(
+            "🧭 [MODE-RESUME-LOOKUP] scoped_empty_fallback franchise_id=%s week=%s",
+            franchise_id,
+            next_week,
+        )
+        anchor_candidate_count = _scan_resume_games(
+            _active_resume_game_query(franchise_id, None)
+        )
 
     if matched_candidates:
         game_doc = max(matched_candidates, key=_candidate_sort_key)
@@ -1289,88 +1407,46 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
 
 
 def _find_user_last_completed_game(franchise_doc: dict[str, Any], user_team_id_str: str) -> Optional[dict[str, Any]]:
+    """The user's most recent completed matchup, via one projected games query.
+
+    Results store team ids as strings; ``games.team1_id`` is often an ObjectId, so the
+    query includes both forms. The old path loaded every game document for the week
+    when the string query missed, and command-center called it twice.
+    """
+    from BackEnd.utils.office_digest import LAST_GAME_PROJECTION, last_game_match_query
+
     results = franchise_doc.get("results", {}) or {}
     current_week = int(franchise_doc.get("week", 1) or 1)
     for week in range(current_week - 1, 0, -1):
         for result in list(results.get(str(week), []) or []):
             away_id = str(result.get("away_id") or "")
             home_id = str(result.get("home_id") or "")
-            if user_team_id_str in {away_id, home_id}:
-                exact_query = {
-                    "week": week,
-                    "franchise_id": str(franchise_doc.get("_id")),
-                    "$or": [
-                        {"team1_id": away_id, "team2_id": home_id},
-                        {"team1_id": home_id, "team2_id": away_id},
-                    ],
-                }
-                game_docs = list(db.games.find(exact_query))
-                logger.warning(
-                    "🧭 [FCC-LAST-GAME] franchise_id=%s week=%s user_team_id=%s matchup=%s/%s matched_docs=%s",
-                    str(franchise_doc.get("_id")),
-                    week,
-                    user_team_id_str,
-                    away_id,
-                    home_id,
-                    len(game_docs),
-                )
-                if not game_docs:
-                    fallback_docs = list(db.games.find({
-                        "week": week,
-                        "franchise_id": str(franchise_doc.get("_id")),
-                    }))
-                    target_ids = {away_id, home_id}
-                    filtered_docs = []
-                    for doc in fallback_docs:
-                        candidate_ids = {
-                            str(doc.get("team1_id") or ""),
-                            str(doc.get("team2_id") or ""),
-                            str(doc.get("home_team_id") or ""),
-                            str(doc.get("away_team_id") or ""),
-                        }
-                        teams_obj = doc.get("teams") if isinstance(doc.get("teams"), dict) else {}
-                        if isinstance(teams_obj, dict) and teams_obj:
-                            candidate_ids.update(str(key or "") for key in teams_obj.keys())
-                        candidate_ids.discard("")
-                        if target_ids.issubset(candidate_ids):
-                            filtered_docs.append(doc)
-                    game_docs = filtered_docs
-                    logger.warning(
-                        "🧭 [FCC-LAST-GAME] fallback lookup franchise_id=%s week=%s scanned_docs=%s fallback_matches=%s",
-                        str(franchise_doc.get("_id")),
-                        week,
-                        len(fallback_docs),
-                        len(game_docs),
-                    )
-                for doc in game_docs:
-                    teams_obj = doc.get("teams") if isinstance(doc.get("teams"), dict) else {}
-                    logger.warning(
-                        "🧭 [FCC-LAST-GAME] candidate_game_id=%s richness=%s quarter=%s is_final=%s has_players=%s top_box_score=%s nested_team_boxes=%s",
-                        str(doc.get("_id") or doc.get("game_id") or ""),
-                        _game_doc_richness_score(doc),
-                        doc.get("quarter"),
-                        doc.get("is_final"),
-                        isinstance(doc.get("players"), list) and len(doc.get("players")) > 0,
-                        isinstance(doc.get("box_score"), dict) and bool(doc.get("box_score")),
-                        any(isinstance(team_data, dict) and isinstance(team_data.get("box_score"), dict) and bool(team_data.get("box_score")) for team_data in teams_obj.values()),
-                    )
-                game_doc = None
-                if game_docs:
-                    game_doc = max(game_docs, key=_game_doc_richness_score)
-                    logger.warning(
-                        "🧭 [FCC-LAST-GAME] selected_game_id=%s selected_richness=%s",
-                        str(game_doc.get("_id") or game_doc.get("game_id") or ""),
-                        _game_doc_richness_score(game_doc),
-                    )
-                return {
-                    "week": week,
-                    "away_team_id": away_id,
-                    "home_team_id": home_id,
-                    "away_score": int(result.get("away_score", 0) or 0),
-                    "home_score": int(result.get("home_score", 0) or 0),
-                    "game_id": str(game_doc.get("_id")) if game_doc and game_doc.get("_id") is not None else None,
-                    "game_doc": game_doc,
-                }
+            if user_team_id_str not in {away_id, home_id}:
+                continue
+            cursor = db.games.find(
+                last_game_match_query(franchise_doc.get("_id"), week, away_id, home_id),
+                LAST_GAME_PROJECTION,
+            )
+            if hasattr(cursor, "limit"):
+                cursor = cursor.limit(8)
+            game_docs = list(cursor)
+            game_doc = max(game_docs, key=_game_doc_richness_score) if game_docs else None
+            logger.info(
+                "[FCC-LAST-GAME] franchise_id=%s week=%s matched=%s selected=%s",
+                str(franchise_doc.get("_id")),
+                week,
+                len(game_docs),
+                str(game_doc.get("_id")) if game_doc else None,
+            )
+            return {
+                "week": week,
+                "away_team_id": away_id,
+                "home_team_id": home_id,
+                "away_score": int(result.get("away_score", 0) or 0),
+                "home_score": int(result.get("home_score", 0) or 0),
+                "game_id": str(game_doc.get("_id")) if game_doc and game_doc.get("_id") is not None else None,
+                "game_doc": game_doc,
+            }
     return None
 
 
@@ -3403,12 +3479,6 @@ class PlayGameRequest(BaseModel):
     franchise_id: str
 
 
-class FranchiseResultRequest(BaseModel):
-    franchise_id: str
-    game_id: str
-    winner: str
-
-
 class GameResult(BaseModel):
     team1_id: str
     team2_id: str
@@ -3481,6 +3551,147 @@ def _normalize_team_id(team_id: str):
         return doc["_id"]
 
 
+def _phase_a_conflict(reason: str, message: str) -> None:
+    raise HTTPException(status_code=409, detail={"reason": reason, "message": message})
+
+
+def _find_game_doc(game_id: str | None) -> dict | None:
+    if not game_id:
+        return None
+    game_id_str = str(game_id)
+    found = db.games.find_one({"_id": game_id_str})
+    if found:
+        return found
+    if ObjectId.is_valid(game_id_str):
+        try:
+            found = db.games.find_one({"_id": ObjectId(game_id_str)})
+        except Exception:
+            found = None
+        if found:
+            return found
+    return None
+
+
+def _team_identity_aliases(team_ref: Any) -> set[str]:
+    aliases: set[str] = set()
+    if team_ref is None:
+        return aliases
+    if isinstance(team_ref, dict):
+        for key in ("_id", "team_id", "name", "code", "$oid"):
+            if team_ref.get(key):
+                aliases |= _team_identity_aliases(team_ref.get(key))
+        return aliases
+    text = str(team_ref).strip()
+    if not text or text == "None":
+        return aliases
+    aliases.add(text)
+    doc = None
+    if ObjectId.is_valid(text) and len(text) == 24:
+        try:
+            doc = db.teams.find_one({"_id": ObjectId(text)})
+        except Exception:
+            doc = None
+    if doc is None:
+        doc = db.teams.find_one({"$or": [{"team_id": text}, {"name": text}, {"code": text}]})
+    if doc:
+        aliases.add(str(doc.get("_id")))
+        for key in ("team_id", "name", "code"):
+            if doc.get(key):
+                aliases.add(str(doc.get(key)))
+    return {alias for alias in aliases if alias and alias != "None"}
+
+
+def _game_identity_aliases(game_doc: dict | None) -> set[str]:
+    if not isinstance(game_doc, dict):
+        return set()
+    refs: list[Any] = [
+        game_doc.get("home_team_id"),
+        game_doc.get("away_team_id"),
+        game_doc.get("team1_id"),
+        game_doc.get("team2_id"),
+        game_doc.get("home_team"),
+        game_doc.get("away_team"),
+    ]
+    teams = game_doc.get("teams")
+    if isinstance(teams, dict):
+        refs.extend(list(teams.keys()))
+        for row in teams.values():
+            if isinstance(row, dict):
+                refs.append(row.get("team_id") or row.get("name"))
+    aliases: set[str] = set()
+    for ref in refs:
+        aliases |= _team_identity_aliases(ref)
+    return aliases
+
+
+def _request_matches_game_matchup(game_doc: dict | None, team1_id: Any, team2_id: Any) -> bool:
+    aliases = _game_identity_aliases(game_doc)
+    if not aliases:
+        return False
+    side_a = _team_identity_aliases(team1_id)
+    side_b = _team_identity_aliases(team2_id)
+    return bool(side_a & aliases) and bool(side_b & aliases)
+
+
+def _game_doc_week(game_doc: dict | None) -> int | None:
+    if not isinstance(game_doc, dict) or game_doc.get("week") is None:
+        return None
+    try:
+        return int(game_doc.get("week"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _iter_box_player_rows(box: Any):
+    if isinstance(box, dict):
+        for value in box.values():
+            if isinstance(value, dict) and (value.get("playerId") or value.get("player_id")):
+                yield value
+            elif isinstance(value, dict):
+                yield from _iter_box_player_rows(value)
+            elif isinstance(value, list):
+                yield from _iter_box_player_rows(value)
+    elif isinstance(box, list):
+        for value in box:
+            if isinstance(value, dict) and (value.get("playerId") or value.get("player_id")):
+                yield value
+
+
+def _box_player_count(game_doc: dict | None) -> int:
+    if not isinstance(game_doc, dict):
+        return 0
+    count = 0
+    teams = game_doc.get("teams")
+    if isinstance(teams, dict):
+        for row in teams.values():
+            if isinstance(row, dict):
+                count += sum(1 for _ in _iter_box_player_rows(row.get("box_score")))
+    count += sum(1 for _ in _iter_box_player_rows(game_doc.get("box_score")))
+    return count
+
+
+def _game_id_already_applied(franchise_doc: dict, game_id: str | None, game_doc: dict | None) -> bool:
+    applied = {str(item) for item in (franchise_doc.get("applied_games") or []) if item is not None}
+    if not applied:
+        return False
+    candidates = []
+    if game_id:
+        candidates.append(str(game_id))
+    if isinstance(game_doc, dict) and game_doc.get("_id") is not None:
+        candidates.append(str(game_doc.get("_id")))
+    return any(candidate in applied for candidate in candidates)
+
+
+def _stored_box_is_different_matchup(game_doc: dict | None, team1_id: Any, team2_id: Any, week: int) -> bool:
+    """True when this document already holds a box for another week or pairing."""
+    if _box_player_count(game_doc) <= 0:
+        return False
+    stored_week = _game_doc_week(game_doc)
+    if stored_week is not None and stored_week != int(week):
+        return True
+    return not _request_matches_game_matchup(game_doc, team1_id, team2_id)
+
+
 def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franchise_id=None, game_id=None):
     """
     Save or update game result in games collection.
@@ -3503,6 +3714,7 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
     Returns:
         Dictionary with team IDs and scores
     """
+    existing = None
     # ✅ SS&S: If game_id is provided, use it directly (this is the actual gameplay document)
     if game_id:
         try:
@@ -3517,6 +3729,7 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
                     game_oid = ObjectId(game_id_str)
                     existing_oid = db.games.find_one({"_id": game_oid})
                 if existing_oid:
+                    existing = existing_oid
                     filter_doc = {"_id": game_oid}
                     # [EOG-IDGUARD-FIRED] Tier-3 Phase-0 (log-only): the canonical string-_id
                     # doc was missing and a legacy ObjectId-_id doc was updated instead — the
@@ -3559,6 +3772,17 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
     
     if franchise_id:
         update_fields["franchise_id"] = str(franchise_id)
+
+    if game_id and _stored_box_is_different_matchup(existing, team1_id, team2_id, week):
+        logger.warning(
+            "🚫 [_SAVE_GAME_RESULT] Refusing to retarget game_id=%s week=%s; stored box is a different matchup",
+            game_id,
+            week,
+        )
+        _phase_a_conflict(
+            "stale_game_id",
+            "This game was already played as a different matchup. Sim this game again to record it.",
+        )
 
     db.games.update_one(
         filter_doc,
@@ -3870,6 +4094,12 @@ CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD = "conference_rs_region_modal_seen_
 BRACKET_REVEAL_SEEN_FIELD = "bracket_reveal_seen"
 BRACKET_UPDATE_SEEN_FIELD = "bracket_update_seen"
 RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_season"
+# The two new season-peak/milestone moments. Season-stamped like the modal flags
+# above, so a new season re-arms them with nothing having to clear the flag. The
+# signing class reuses RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD; it is the same
+# beat, so one stamp covers both surfaces.
+ELIMINATION_SEEN_SEASON_FIELD = "elimination_seen_season"
+SEASON_REVIEW_SEEN_SEASON_FIELD = "season_review_seen_season"
 
 # Signing Day conference reveal: stamped with the season once the playback has been
 # watched, so a refresh after submitting does not replay it. Mirrors the modal flag
@@ -3902,6 +4132,11 @@ RECRUITING_BOARD_SAVED_WEEK_FIELD = "recruiting_board_saved_week"
 # It seeds the board CLIENT-SIDE at week 20; nothing here ever writes FTD "Recruits",
 # because has_saved_board derives from that field and the week-20 gate keys off it.
 RECRUITING_WATCHLIST_FIELD = "recruiting_watchlist"
+# The user's Training playbook choice: Current Playbooks (absent) or a Custom Playbook and
+# the plays in it. A saved setting on the franchise document, so it survives every week,
+# training camp and the season rollover until the user switches back.
+TRAINING_PLAYBOOK_CHOICE_FIELD = "training_playbook_choice"
+TRAINING_PLAYBOOK_CHOICE_MAX_IDS = 64
 
 BRACKET_REVEAL_WEEKS = {
     27: ("conference", "Conference Tournament · Weeks 27–29", "full"),
@@ -4581,7 +4816,7 @@ def select_team(
         try:
             db.franchises.update_one(
                 {"_id": manager.franchise_id},
-                {"$set": {"home_slot": home_slot}},
+                fold_browse_rev({"$set": {"home_slot": home_slot}}),
             )
         except Exception:
             logger.exception(
@@ -4608,12 +4843,15 @@ def select_team(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/franchise/team-builder")
+# Team Builder keeps the full attribute set (response_class=JSONResponse on its routes): it
+# round-trips whole player rows (walk-ons, the slot roster) through the client and saves
+# what comes back, so stripping the hidden attribute here would lose it on Apply.
+@router.get("/franchise/team-builder", response_class=JSONResponse)
 def get_team_builder_page():
     return FileResponse(STATIC_DIR / "team-builder.html")
 
 
-@router.get("/franchise/team-builder/slot-roster")
+@router.get("/franchise/team-builder/slot-roster", response_class=JSONResponse)
 def team_builder_slot_roster_json(
     object_id: str = Query(..., description="Core team ObjectId for the replaced slot"),
     user: dict = Depends(get_current_user),
@@ -4643,7 +4881,7 @@ def team_builder_slot_roster_json(
     }
 
 
-@router.get("/franchise/team-builder/league-context")
+@router.get("/franchise/team-builder/league-context", response_class=JSONResponse)
 def team_builder_league_context(user: dict = Depends(get_current_user)):
     """
     Runtime league attribute context for the wizard (Decision #5 / §4.5a).
@@ -4731,7 +4969,7 @@ class TeamBuilderDraftUpsertRequest(BaseModel):
     extra: dict[str, Any] | None = None
 
 
-@router.post("/franchise/team-builder/position-ratings")
+@router.post("/franchise/team-builder/position-ratings", response_class=JSONResponse)
 def team_builder_position_ratings(
     body: TeamBuilderPositionRatingsRequest,
     user: dict = Depends(get_current_user),
@@ -4787,7 +5025,7 @@ def team_builder_position_ratings(
     return {"players": out}
 
 
-@router.get("/franchise/team-builder/drafts")
+@router.get("/franchise/team-builder/drafts", response_class=JSONResponse)
 def team_builder_list_drafts(user: dict = Depends(get_current_user)):
     """Unfinished programs for Program Select — looked up by user_id, not localStorage."""
     from BackEnd.utils.team_builder_drafts import list_unfinished_drafts
@@ -4796,7 +5034,7 @@ def team_builder_list_drafts(user: dict = Depends(get_current_user)):
     return {"drafts": drafts}
 
 
-@router.post("/franchise/team-builder/drafts")
+@router.post("/franchise/team-builder/drafts", response_class=JSONResponse)
 def team_builder_upsert_draft(
     body: TeamBuilderDraftUpsertRequest,
     user: dict = Depends(get_current_user),
@@ -4840,7 +5078,7 @@ def team_builder_upsert_draft(
     return {"draft": doc}
 
 
-@router.delete("/franchise/team-builder/drafts/{replaced_object_id}")
+@router.delete("/franchise/team-builder/drafts/{replaced_object_id}", response_class=JSONResponse)
 def team_builder_discard_draft(
     replaced_object_id: str,
     user: dict = Depends(get_current_user),
@@ -4860,7 +5098,7 @@ def team_builder_discard_draft(
     return {"deleted": deleted}
 
 
-@router.post("/franchise/team-builder/wizard-walk-ons")
+@router.post("/franchise/team-builder/wizard-walk-ons", response_class=JSONResponse)
 def team_builder_wizard_walk_ons(
     body: TeamBuilderWizardWalkOnsRequest,
     user: dict = Depends(get_current_user),
@@ -4936,7 +5174,7 @@ def _tb_portrait_players_payload(
     return out
 
 
-@router.post("/franchise/team-builder/portraits/assign")
+@router.post("/franchise/team-builder/portraits/assign", response_class=JSONResponse)
 def team_builder_portraits_assign(
     body: TeamBuilderPortraitsAssignRequest,
     user: dict = Depends(get_current_user),
@@ -4977,7 +5215,7 @@ def team_builder_portraits_assign(
     }
 
 
-@router.post("/franchise/team-builder/portraits/reroll")
+@router.post("/franchise/team-builder/portraits/reroll", response_class=JSONResponse)
 def team_builder_portraits_reroll(
     body: TeamBuilderPortraitRerollRequest,
     user: dict = Depends(get_current_user),
@@ -5020,7 +5258,7 @@ def team_builder_portraits_reroll(
     return {"portrait": assignment, "portraits": portraits}
 
 
-@router.post("/franchise/team-builder/portraits/pick")
+@router.post("/franchise/team-builder/portraits/pick", response_class=JSONResponse)
 def team_builder_portraits_pick(
     body: TeamBuilderPortraitPickRequest,
     user: dict = Depends(get_current_user),
@@ -5071,7 +5309,7 @@ def team_builder_portraits_pick(
     return {"portrait": assignment, "portraits": portraits}
 
 
-@router.get("/franchise/team-builder/portraits/catalog")
+@router.get("/franchise/team-builder/portraits/catalog", response_class=JSONResponse)
 def team_builder_portraits_catalog(
     skin: str | None = None,
     frame: str | None = None,
@@ -5085,7 +5323,7 @@ def team_builder_portraits_catalog(
     return catalog_for_picker(skin=skin, frame=frame, definition=definition)
 
 
-@router.post("/franchise/team-builder/apply")
+@router.post("/franchise/team-builder/apply", response_class=JSONResponse)
 def team_builder_apply(
     body: TeamBuilderApplyRequest,
     user: dict = Depends(get_current_user),
@@ -5344,7 +5582,7 @@ def team_builder_apply(
     # Mode metadata — eligibility is mode-only; soft-budget echo fields retired.
     db.franchises.update_one(
         {"_id": franchise_id},
-        {
+        fold_browse_rev({
             "$set": {
                 "home_slot": home_slot,
                 TEAM_BUILDER_FIELD: overlay,
@@ -5359,8 +5597,11 @@ def team_builder_apply(
                 "hasEverExceededBudget": "",
                 "roster_shape_at_creation": "",
             },
-        },
+        }),
     )
+    from BackEnd.utils.standings_snapshot import note_standings_stale
+
+    note_standings_stale(str(franchise_id))
 
     # Rewrite FPD meta.team for the replaced slot so leaders / baked identity match.
     try:
@@ -5412,6 +5653,12 @@ def team_builder_apply(
     except Exception:
         logger.exception("[TEAM-BUILDER] wizard walk-on draft cleanup failed")
 
+    # FPD meta.team rewrites and portrait stamps land after the franchise $set.
+    bump_browse_rev(franchise_id)
+    from BackEnd.utils.leaders_snapshot import note_season_stats_written
+
+    note_season_stats_written(str(franchise_id))
+
     eligible = bool(online_eligible)
     return {
         "status": "ok",
@@ -5446,46 +5693,163 @@ def get_animation_page():
     return FileResponse(STATIC_DIR / "court.html")
 
 
-@router.post("/franchise/play-next-game")
-def play_next_game(
-    req: PlayGameRequest,
-    user: dict = Depends(get_current_user),
-):
-    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
-    # Get user team info (with backward compatibility)
+# ---------------------------------------------------------------------------
+# Week-step guard: the server does not trust the page to have walked the
+# Advance ladder before a user game starts (Sep 30: a stale FCC started the
+# week-26 game with invites and training still due).
+# ---------------------------------------------------------------------------
+
+WEEK_STEPS_ENV = "GOB_ENFORCE_WEEK_STEPS"
+WEEK_STEPS_MODES = ("off", "report", "enforce")
+WEEK_STEPS_DEFAULT_MODE = "report"
+# Fields pending_week_step reads; the guard's one franchise read projects to these.
+_WEEK_STEP_PROJECTION = {
+    "week": 1,
+    "training_status": 1,
+    "cpu_sim_jobs": 1,
+    "post_game_status": 1,
+    RECRUITING_BOARD_SAVED_WEEK_FIELD: 1,
+    "user_team_id": 1,
+    "user_team_object_id": 1,
+}
+
+
+def week_steps_mode(environ: Mapping[str, str] | None = None) -> str:
+    """off | report | enforce. Unset or unknown is report, on every build (desktop too)."""
+    env = os.environ if environ is None else environ
+    raw = str(env.get(WEEK_STEPS_ENV) or "").strip().lower()
+    return raw if raw in WEEK_STEPS_MODES else WEEK_STEPS_DEFAULT_MODE
+
+
+def pending_week_step(franchise_doc: dict | None) -> str | None:
+    """First step the FCC Advance ladder requires before this week's user game, or None.
+
+    Same server state and order as ``GOBAdvance.updatePlayButton`` (the ``data-mode``
+    names are reused): finish-cpu-sims, cut-players, recruit-invites, training.
+    Weeks 27+ have no invite or training step, so EOS games pass unless the
+    previous game's computer games are still unfinished.
+    """
+    if not isinstance(franchise_doc, dict):
+        return None
+    try:
+        week = int(franchise_doc.get("week", 1) or 1)
+    except (TypeError, ValueError):
+        return None
+
+    cpu_sims = _cpu_sim_job_public_summary(franchise_doc, week)
+    if cpu_sims and cpu_sims.get("phase_b_required"):
+        return "finish-cpu-sims"
+
+    _team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    cut_state = _week_1_cut_requirement(franchise_doc, franchise_doc.get("_id"), user_team_object_id)
+    if cut_state.get("cut_required"):
+        return "cut-players"
+
+    if INVITE_FIRST_WEEK <= week <= INVITE_LAST_WEEK:
+        try:
+            board_saved_week = int(franchise_doc.get(RECRUITING_BOARD_SAVED_WEEK_FIELD, 0) or 0)
+        except (TypeError, ValueError):
+            board_saved_week = 0
+        if board_saved_week != week:
+            return "recruit-invites"
+
+    if not _postseason_training_disabled_for_week(week):
+        if not franchise_training_fully_complete_for_week(franchise_doc.get("training_status") or {}, week):
+            return "training"
+    return None
+
+
+def _report_week_step_violation(franchise_id: str, week: Any, step: str, *, context: str, mode: str) -> None:
+    logger.warning(
+        "[WEEK-STEP-GUARD] violation franchise_id=%s week=%s pending_step=%s context=%s mode=%s",
+        franchise_id,
+        week,
+        step,
+        context,
+        mode,
+    )
+    try:
+        import sentry_sdk
+
+        with sentry_sdk.push_scope() as scope:
+            scope.set_tag("gob.area", "week_step_guard")
+            scope.set_tag("franchise_id", franchise_id)
+            scope.set_tag("week", str(week))
+            scope.set_tag("pending_step", step)
+            scope.set_tag("gob.week_step_mode", mode)
+            scope.set_context(
+                "week_step_guard",
+                {"franchise_id": franchise_id, "week": week, "pending_step": step, "context": context, "mode": mode},
+            )
+            sentry_sdk.capture_message("User game started with a week step pending", level="warning")
+    except Exception as exc:
+        logger.debug("[WEEK-STEP-GUARD] sentry report failed: %s", exc)
+
+
+def check_week_steps_before_game_start(franchise_id: Any, *, context: str) -> JSONResponse | None:
+    """Run the week-step guard for a new franchise user game.
+
+    report (default): log + Sentry, return None so the game starts. enforce: return
+    the 409 the caller must send, before anything is created or modified. off: skip.
+    One projected franchise read (plus one FTD read in the camp-cut week only).
+    """
+    mode = week_steps_mode()
+    if mode == "off" or not franchise_id:
+        return None
+    try:
+        fid = franchise_id if isinstance(franchise_id, ObjectId) else ObjectId(str(franchise_id))
+    except Exception:
+        return None
+    try:
+        franchise_doc = db.franchises.find_one({"_id": fid}, _WEEK_STEP_PROJECTION)
+        step = pending_week_step(franchise_doc)
+    except Exception as exc:
+        # The guard never breaks a game start on its own failure.
+        logger.warning("[WEEK-STEP-GUARD] check failed franchise_id=%s: %s", str(fid), exc)
+        return None
+    if not step:
+        return None
+    week = (franchise_doc or {}).get("week")
+    _report_week_step_violation(str(fid), week, step, context=context, mode=mode)
+    if mode != "enforce":
+        return None
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": f"Week {week} step '{step}' must be completed before this week's game.",
+            "next_required_step": step,
+        },
+    )
+
+
+def _resolve_user_team_object_id(franchise_doc: dict) -> ObjectId:
+    """User team ObjectId for the next-game lookup (404 / 400 like the original POST)."""
     user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     if not user_team_name or not user_team_object_id:
         raise HTTPException(status_code=404, detail="User team not found in franchise")
-
-    # Resolve user_team_object_id to ObjectId for matching
     try:
-        user_team_id = ObjectId(user_team_object_id)
+        return ObjectId(user_team_object_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user team ObjectId")
 
-    manager = FranchiseManager(db)
-    manager.schedule = franchise_doc.get("schedule", [])
-    manager.week = franchise_doc.get("week", 1)
-    manager.franchise_id = franchise_doc.get("_id")
 
-    # ✅ EOS: Conference / Region / National (weeks 27–34)
-    eos_tournament_active = franchise_doc.get("eos_tournament_active", False)
+def _eos_next_game_week(franchise_doc: dict) -> bool:
+    week = franchise_doc.get("week", 1)
     eos_has_state = bool(
         franchise_doc.get("conference_tournaments") or franchise_doc.get("region_tournaments") or franchise_doc.get("national_tournament")
     )
+    return bool(franchise_doc.get("eos_tournament_active", False) and eos_has_state and week in ft.EOS_WEEKS)
+
+
+def _lookup_user_next_game(franchise_doc: dict, user_team_id: ObjectId) -> dict | None:
+    """The user's matchup for the franchise's current week. Reads only; never writes."""
+    week = franchise_doc.get("week", 1)
+    schedule = franchise_doc.get("schedule", [])
     matchup = None
 
-    if eos_tournament_active and eos_has_state and manager.week in ft.EOS_WEEKS:
-        # Reconcile region brackets before reading the slate so a user who clicks
-        # Play without first hitting /franchise/command-center/data does not land on
-        # a half-built region bracket with placeholder TBD slots.
-        _maybe_reconcile_region_for_eos(
-            franchise_doc,
-            franchise_doc.get("_id"),
-            week=int(manager.week),
-            context_label="play_next_game",
-        )
-        week_games_meta = ft.get_eos_week_games(franchise_doc, manager.week)
+    # ✅ EOS: Conference / Region / National (weeks 27–34)
+    if _eos_next_game_week(franchise_doc):
+        week_games_meta = ft.get_eos_week_games(franchise_doc, week)
         found = ft.find_user_game_in_eos_week(week_games_meta, str(user_team_id))
         if found:
             _, g = found
@@ -5522,13 +5886,13 @@ def play_next_game(
                 "away_display": away_disp.get("name") or away_core,
                 "home_id": str(home_id),
                 "away_id": str(away_id),
-                "week": manager.week,
+                "week": week,
                 "eos_meta": eos_meta,
             }
-    if matchup is None and manager.week <= ScheduleManager.REGULAR_SEASON_WEEKS:
+    if matchup is None and week <= ScheduleManager.REGULAR_SEASON_WEEKS:
         # Regular season (weeks 1–26)
-        if manager.week - 1 < len(manager.schedule):
-            for away_id, home_id in manager.schedule[manager.week - 1]:
+        if week - 1 < len(schedule):
+            for away_id, home_id in schedule[week - 1]:
                 # Compare ObjectIds (schedule uses ObjectIds, user_team_id is now ObjectId)
                 if away_id == user_team_id or home_id == user_team_id:
                     away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
@@ -5546,165 +5910,52 @@ def play_next_game(
                         "away_display": away_disp.get("name") or away_core,
                         "home_id": str(home_id),
                         "away_id": str(away_id),
-                        "week": manager.week,
+                        "week": week,
                     }
                     break
+    return matchup
 
+
+@router.post("/franchise/play-next-game")
+def play_next_game(
+    req: PlayGameRequest,
+    user: dict = Depends(get_current_user),
+):
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    user_team_id = _resolve_user_team_object_id(franchise_doc)
+
+    if _eos_next_game_week(franchise_doc):
+        # Reconcile region brackets before reading the slate so a user who clicks
+        # Play without first hitting /franchise/command-center/data does not land on
+        # a half-built region bracket with placeholder TBD slots. Idempotent: a
+        # second call with nothing changed writes nothing.
+        _maybe_reconcile_region_for_eos(
+            franchise_doc,
+            franchise_doc.get("_id"),
+            week=int(franchise_doc.get("week", 1)),
+            context_label="play_next_game",
+        )
+
+    matchup = _lookup_user_next_game(franchise_doc, user_team_id)
     if not matchup:
         raise HTTPException(status_code=404, detail="User matchup not found")
     return matchup
 
 
-@router.post("/franchise/save-result")
-def save_result(req: FranchiseResultRequest):
-    logger.info(f"🔍 [SAVE-RESULT] ENDPOINT CALLED - franchise_id={req.franchise_id}, game_id={req.game_id}")
-    logger.info(f"🔍 [SAVE-RESULT] Request object: {req}")
-    try:
-        franchise_id = ObjectId(req.franchise_id)
-        game_id = ObjectId(req.game_id)
-        logger.info(f"🔍 [SAVE-RESULT] IDs converted successfully - franchise_id={franchise_id}, game_id={game_id}")
-    except Exception as e:
-        logger.error(f"❌ [SAVE-RESULT] ID conversion failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid ID format")
-
-    logger.info(f"🔍 [SAVE-RESULT] Looking up franchise and game documents")
-    franchise_doc = db.franchises.find_one({"_id": franchise_id})
-    if not franchise_doc:
-        logger.error(f"❌ [SAVE-RESULT] Franchise not found: {franchise_id}")
-        raise HTTPException(status_code=404, detail="Franchise not found")
-
-    game_doc = db.games.find_one({"_id": game_id})
-    if not game_doc:
-        logger.error(f"❌ [SAVE-RESULT] Game not found: {game_id}")
-        raise HTTPException(status_code=404, detail="Game not found")
-
-    # Snapshot the user's lead coaching archetype before finalize_game commits this
-    # game's archetype counts; compared after to flag a first-time/changed archetype
-    # for the community-highlights feed (consumed by the phase-B flush).
-    archetype_owner_user_id = franchise_doc.get("user_id")
-    lead_archetype_before = lead_archetype_for_user(archetype_owner_user_id)
-
-    logger.info(f"🔍 [SAVE-RESULT] Documents found, extracting team info")
-    home = game_doc.get("homeTeam", {}) or {}
-    away = game_doc.get("awayTeam", {}) or {}
-    home_name = home.get("name") or game_doc.get("home_team")
-    away_name = away.get("name") or game_doc.get("away_team")
-    home_id_raw = home.get("team_id") or game_doc.get("home_team_id")
-    away_id_raw = away.get("team_id") or game_doc.get("away_team_id")
-    
-    # ✅ NORMALIZE: Convert ObjectIds/ObjectId strings to team_id strings (e.g. "LANCASTER") for SS&S
-    # This ensures team_attribute_changes keys match box score expectations (home_team_id/away_team_id are team_id strings)
-    home_id = _normalize_team_id_to_string(home_id_raw)
-    away_id = _normalize_team_id_to_string(away_id_raw)
-    
-    if not home_id:
-        logger.error(f"❌ [SAVE-RESULT] Could not normalize home_id: {home_id_raw} (type: {type(home_id_raw)})")
-    if not away_id:
-        logger.error(f"❌ [SAVE-RESULT] Could not normalize away_id: {away_id_raw} (type: {type(away_id_raw)})")
-    
-    logger.info(f"🔍 [SAVE-RESULT] Team IDs extracted and normalized - home_id={home_id} (was {home_id_raw}, type: {type(home_id)}), away_id={away_id} (was {away_id_raw}, type: {type(away_id)})")
-    logger.info(f"🔍 [SAVE-RESULT] Team names - home_name={home_name}, away_name={away_name}")
-    score_map = game_doc.get("score") or game_doc.get("final_score") or {}
-    home_score = home.get("score", score_map.get(home_name, 0))
-    away_score = away.get("score", score_map.get(away_name, 0))
-
-    if req.winner == home_name:
-        winner_id, loser_id = home_id, away_id
-        winner_score, loser_score = home_score, away_score
-    else:
-        winner_id, loser_id = away_id, home_id
-        winner_score, loser_score = away_score, home_score
-
-    # ✅ FIX: Removed updates to universal teams collection.
-    # Franchise mode stores W/L and PF/PA in franchise.results (set in complete-week endpoint),
-    # and team stats are calculated from franchise.results when displayed.
-    # This ensures franchise stats are isolated from other game modes and franchise instances.
-
-    week = franchise_doc.get("week", 1) - 1
-    if week < 1:
-        week = 1
-
-    db.games.delete_many(
-        {
-            "week": week,
-            "$or": [
-                {"team1_id": away_id, "team2_id": home_id},
-                {"team1_id": home_id, "team2_id": away_id},
-            ],
-            "_id": {"$ne": game_id},
-        }
-    )
-
-    db.games.update_one(
-        {"_id": game_id},
-        {
-            "$set": {
-                "franchise_id": str(franchise_id),
-                "team1_id": away_id,
-                "team2_id": home_id,
-                "team1_score": away_score,
-                "team2_score": home_score,
-                "week": week,
-            }
-        },
-        upsert=True,
-    )
-    
-    # ✅ FIX: Verify box_score exists before finalize_game()
-    # box_score should already exist from summarize_game_state() which calls game.get_box_score()
-    # (includes all players: lineup + bench). If it's missing/incomplete, log error but don't rebuild
-    # from players array (which only has final 5 players per team).
-    game_doc_updated = db.games.find_one({"_id": game_id})
-    if game_doc_updated:
-        box_score = game_doc_updated.get("box_score", {})
-        home_team_obj = game_doc_updated.get("home_team", {})
-        away_team_obj = game_doc_updated.get("away_team", {})
-        
-        # Check if box_score exists in nested structure (where summarize_game_state stores it)
-        if not box_score:
-            if isinstance(home_team_obj, dict) and "box_score" in home_team_obj:
-                home_team_name = home_team_obj.get("name")
-                if home_team_name:
-                    box_score[home_team_name] = home_team_obj.get("box_score", {})
-            if isinstance(away_team_obj, dict) and "box_score" in away_team_obj:
-                away_team_name = away_team_obj.get("name")
-                if away_team_name:
-                    box_score[away_team_name] = away_team_obj.get("box_score", {})
-        
-        # Verify box_score is complete (has reasonable number of players per team)
-        # Expected: ~12 players per team (5 starters + 7 bench), minimum 5 (just starters)
-        if box_score:
-            for team_name, team_box in box_score.items():
-                player_count = len(team_box) if isinstance(team_box, dict) else 0
-                if player_count < 5:
-                    logger.warning(f"⚠️ [SAVE-RESULT] box_score for {team_name} has only {player_count} players (expected 12). Game_id={game_id}")
-        else:
-            logger.error(f"❌ [SAVE-RESULT] No box_score found in game document (game_id={game_id}). finalize_game() may fail or produce incomplete stats.")
-    
-    logger.info(f"🔍 [SAVE-RESULT] Calling finalize_game()")
-    stat_updater.finalize_game(
-        req.game_id, mode="franchise", franchise_id=req.franchise_id
-    )
-    logger.info(f"🔍 [SAVE-RESULT] finalize_game() completed")
-
-    # Flag a coaching-archetype change (established for the first time, or evolved)
-    # for the community-highlights feed. No-op when unchanged.
-    record_archetype_change_if_any(franchise_id, archetype_owner_user_id, lead_archetype_before)
-
-    # Run team attribute update once and set team_attribute_changes on game doc for box score display
-    _finalize_team_attributes_for_game(
-        game_id=game_id,
-        franchise_id=franchise_id,
-        home_team_id=home_id,
-        away_team_id=away_id,
-        winner_id=winner_id,
-        loser_id=loser_id,
-        winner_score=winner_score,
-        loser_score=loser_score,
-        week=req.week,
-    )
-
-    return {"status": "success"}
+@router.get("/franchise/next-game")
+def get_next_game(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Read-only twin of POST /franchise/play-next-game's lookup: same response shape,
+    never reconciles or writes. In region weeks it reads the bracket as saved, so a
+    half-built bracket (not yet reconciled by command-center/data or play) can 404."""
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    user_team_id = _resolve_user_team_object_id(franchise_doc)
+    matchup = _lookup_user_next_game(franchise_doc, user_team_id)
+    if not matchup:
+        raise HTTPException(status_code=404, detail="User matchup not found")
+    return matchup
 
 
 def _phase_a_user_week_done(franchise_doc: dict, week: int) -> bool:
@@ -5841,9 +6092,35 @@ def _cpu_sim_job_path(week: int) -> str:
 # start a second full sim — that was the observed double-sim. start-cpu-sims
 # persists results.{week} on completion, so once it releases the claim a waiting
 # phase-b finds the results, skips every CPU game, and just finalizes.
-_CPU_SIM_CLAIM_STALE_SECONDS = 300   # crash backstop; > worst-case uncontended sim
 _CPU_SIM_CLAIM_WAIT_SECONDS = 150    # phase-b bounded wait for an in-flight claim
 _CPU_SIM_CLAIM_POLL_SECONDS = 0.5
+_CPU_SIM_CLAIM_HEARTBEAT_SECONDS = 30  # owner refresh interval; well under the stale window
+
+
+def _cpu_sim_claim_stale_seconds() -> int:
+    """Crash backstop: a claim whose heartbeat is older than this is re-claimable.
+
+    A live owner refreshes every _CPU_SIM_CLAIM_HEARTBEAT_SECONDS (30 s), so 90 s is
+    three missed beats. It was 300 s before the heartbeat existed (the only signal
+    was acquire time, so it had to exceed a whole slow sim); that left a player
+    locked out of phase-b for ~5 min after a deploy killed the owner. Env override
+    GOB_CPU_SIM_CLAIM_STALE_SECONDS; never below 3 heartbeats.
+    """
+    floor = 3 * _CPU_SIM_CLAIM_HEARTBEAT_SECONDS
+    raw = os.environ.get("GOB_CPU_SIM_CLAIM_STALE_SECONDS", "").strip()
+    try:
+        value = int(raw) if raw else 90
+    except ValueError:
+        value = 90
+    return max(value, floor)
+
+
+_CPU_SIM_CLAIM_STALE_SECONDS = _cpu_sim_claim_stale_seconds()
+
+# Claims this process currently owns: (franchise_id str, week, owner) -> heartbeat.
+# Lets the shutdown hook release exactly this process's claims (never another's).
+_owned_claims_lock = threading.Lock()
+_owned_claims: dict[tuple[str, int, str], Any] = {}
 
 
 def _cpu_sim_claim_path(week: int) -> str:
@@ -5874,16 +6151,117 @@ def _acquire_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> boo
             "acquired_at": now_iso, "heartbeat": now_iso,
         }}},
     )
+    if matched is not None:
+        with _owned_claims_lock:
+            _owned_claims.setdefault((str(franchise_id), int(week), owner), None)
     return matched is not None
 
 
 def _release_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> None:
     """Release the claim iff this request still owns it (never steal a re-claim)."""
+    _release_cpu_sim_claim_as(franchise_id, week, owner, reason=None)
+
+
+def _release_cpu_sim_claim_as(franchise_id: ObjectId, week: int, owner: str, *, reason: str | None) -> bool:
     path = _cpu_sim_claim_path(week)
-    db.franchises.update_one(
+    fields = {f"{path}.active": False, f"{path}.released_at": _utc_now_iso()}
+    if reason:
+        fields[f"{path}.released_reason"] = reason
+    res = db.franchises.update_one(
         {"_id": franchise_id, f"{path}.owner": owner, f"{path}.active": True},
-        {"$set": {f"{path}.active": False, f"{path}.released_at": _utc_now_iso()}},
+        fold_browse_rev({"$set": fields}),
     )
+    with _owned_claims_lock:
+        _owned_claims.pop((str(franchise_id), int(week), owner), None)
+    return bool(getattr(res, "modified_count", 0))
+
+
+def release_owned_cpu_sim_claims(reason: str = "shutdown") -> int:
+    """Release every CPU-sim claim THIS process owns (shutdown hook). Idempotent.
+
+    Stops each claim's heartbeat, then marks the claim inactive with an owner-token
+    filter, so a claim another process has since taken is never touched. The next
+    start-cpu-sims / phase-b (on the new deployment) re-claims immediately instead of
+    waiting out the stale window. Returns the number of claims released.
+    """
+    with _owned_claims_lock:
+        owned = list(_owned_claims.items())
+    released = 0
+    for (fid, week, owner), heartbeat in owned:
+        if heartbeat is not None:
+            try:
+                heartbeat.stop()
+            except Exception:
+                logger.exception("[CPU-SIM-CLAIM] heartbeat stop failed on %s", reason)
+        try:
+            if _release_cpu_sim_claim_as(ObjectId(fid), week, owner, reason=reason):
+                released += 1
+        except Exception:
+            logger.exception("[CPU-SIM-CLAIM] release failed on %s franchise_id=%s week=%s", reason, fid, week)
+    if owned:
+        logger.warning("[CPU-SIM-CLAIM] %s: released %s/%s owned claim(s)", reason, released, len(owned))
+    return released
+
+
+def _refresh_cpu_sim_claim_heartbeat(franchise_id: ObjectId, week: int, owner: str) -> bool:
+    """Bump the claim heartbeat iff this request still owns the active claim.
+
+    Returns False once the claim is released or taken over, so the refresher stops."""
+    path = _cpu_sim_claim_path(week)
+    res = db.franchises.update_one(
+        {"_id": franchise_id, f"{path}.owner": owner, f"{path}.active": True},
+        {"$set": {f"{path}.heartbeat": _utc_now_iso()}},
+    )
+    return bool(getattr(res, "matched_count", 0))
+
+
+class _CpuSimClaimHeartbeat:
+    """Keeps an owned claim fresh while the owner is still simming.
+
+    Without it the heartbeat is only written at acquire, so a week slower than
+    _CPU_SIM_CLAIM_STALE_SECONDS looks crashed and a second request re-claims and
+    sims it again. Daemon thread + stop event; start after acquire, stop in the same
+    finally that releases."""
+
+    def __init__(self, franchise_id: ObjectId, week: int, owner: str):
+        self.franchise_id = franchise_id
+        self.week = week
+        self.owner = owner
+        self._stop = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"cpu-claim-hb-{str(franchise_id)[:8]}-w{week}",
+            daemon=True,
+        )
+
+    def start(self) -> "_CpuSimClaimHeartbeat":
+        self._interval = _CPU_SIM_CLAIM_HEARTBEAT_SECONDS
+        with _owned_claims_lock:
+            key = (str(self.franchise_id), int(self.week), self.owner)
+            if key in _owned_claims:
+                _owned_claims[key] = self
+        self._thread.start()
+        return self
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread.is_alive() and self._thread is not threading.current_thread():
+            self._thread.join(timeout=5)
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval):
+            try:
+                if not _refresh_cpu_sim_claim_heartbeat(self.franchise_id, self.week, self.owner):
+                    logger.info(
+                        "[CPU-SIM-CLAIM] heartbeat stopped: claim no longer owned franchise_id=%s week=%s",
+                        str(self.franchise_id), self.week,
+                    )
+                    return
+            except Exception:
+                logger.exception(
+                    "[CPU-SIM-CLAIM] heartbeat refresh failed franchise_id=%s week=%s",
+                    str(self.franchise_id), self.week,
+                )
 
 
 def _await_cpu_sim_claim(franchise_id: ObjectId, week: int, owner: str) -> bool:
@@ -6090,7 +6468,7 @@ def _persist_cpu_sim_job(franchise_id: ObjectId, week: int, local_job: dict) -> 
     merged_job = _compute_cpu_sim_job_rollup(merged_job)
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": {_cpu_sim_job_path(week): merged_job}},
+        fold_browse_rev({"$set": {_cpu_sim_job_path(week): merged_job}}),
     )
     return merged_job
 
@@ -6580,7 +6958,10 @@ def _maybe_reconcile_region_for_eos(
     if updated_rt is None:
         return False
     franchise_doc["region_tournaments"] = updated_rt
-    db.franchises.update_one({"_id": franchise_oid}, {"$set": {"region_tournaments": updated_rt}})
+    db.franchises.update_one(
+        {"_id": franchise_oid},
+        fold_browse_rev({"$set": {"region_tournaments": updated_rt}}),
+    )
     logger.warning(
         "[EOS-REGION-RECONCILE] context=%s week=%s franchise_id=%s persisted=%s ftd_team_count=%s",
         context_label,
@@ -6982,6 +7363,47 @@ def _complete_week_process_user_game_block(
     
     # ✅ SS&S: Use provided game_id if available (this is the actual gameplay document with box_score)
     user_game_id = req.game_id
+    posted_doc = req.game_document if isinstance(req.game_document, dict) else None
+    stored_doc = _find_game_doc(str(user_game_id)) if user_game_id else None
+    if user_game_id or posted_doc is not None:
+        if user_game_id and _game_id_already_applied(franchise_doc, str(user_game_id), stored_doc):
+            same_week = stored_doc is not None and _game_doc_week(stored_doc) == int(req.week)
+            same_teams = stored_doc is not None and _request_matches_game_matchup(
+                stored_doc, team1_id, team2_id
+            )
+            if not (same_week and same_teams):
+                _phase_a_conflict(
+                    "stale_game_id",
+                    "This game was already saved for a different week. Sim this game again to record it.",
+                )
+            logger.warning(
+                "🧭 [COMPLETE-WEEK] Idempotent user game game_id=%s week=%s (already applied)",
+                user_game_id,
+                req.week,
+            )
+            user_res = {
+                "team1_id": str(team1_id),
+                "team2_id": str(team2_id),
+                "team1_score": user.team1_score,
+                "team2_score": user.team2_score,
+            }
+            user_row = {
+                "away_id": user_res["team1_id"],
+                "home_id": user_res["team2_id"],
+                "away_score": user_res["team1_score"],
+                "home_score": user_res["team2_score"],
+            }
+            return user_res, user_row, 0, None, str(user_game_id)
+        if _stored_box_is_different_matchup(stored_doc, team1_id, team2_id, req.week):
+            _phase_a_conflict(
+                "stale_game_id",
+                "This game was already played as a different matchup. Sim this game again to record it.",
+            )
+        if _box_player_count(posted_doc) <= 0 and _box_player_count(stored_doc) <= 0:
+            _phase_a_conflict(
+                "missing_box_score",
+                "This game has no box score, so the result was not saved. Sim this game to record it.",
+            )
     bulk_sim_used = _resolve_user_game_bulk_sim_used(req)
     eos_g_meta = None
     if req.week in ft.EOS_WEEKS:
@@ -7047,6 +7469,8 @@ def _complete_week_process_user_game_block(
         week=req.week,
         eos_game_meta=eos_matchup_for_user,
         bulk_sim_used=bulk_sim_used,
+        franchise_id=franchise_doc.get("_id"),
+        season=franchise_doc.get("current_season"),
     )
     maybe_award_franchise_loss_geek_points(
         owner_user_id=franchise_doc.get("user_id"),
@@ -7056,6 +7480,8 @@ def _complete_week_process_user_game_block(
         week=req.week,
         eos_game_meta=eos_matchup_for_user,
         bulk_sim_used=bulk_sim_used,
+        franchise_id=franchise_doc.get("_id"),
+        season=franchise_doc.get("current_season"),
     )
     maybe_award_franchise_eos_title_championship(
         owner_user_id=franchise_doc.get("user_id"),
@@ -7646,6 +8072,25 @@ def _finalize_franchise_week_after_cpu_games(
             "[NEWS] weekly news generation failed; continuing. franchise_id=%s week=%s",
             franchise_id_str, week,
         )
+    # Office snapshot uses entering-week rank and conference place. Capture before
+    # the rank writer moves natl_rank. The map joins the franchise $set below.
+    office_week_snapshots = None
+    try:
+        from BackEnd.utils.office_digest import capture_office_week_snapshot
+
+        office_week_snapshots = capture_office_week_snapshot(
+            franchise_doc,
+            user_team_id_str,
+            week,
+            ftd_collection=franchise_team_data_collection,
+            teams_collection=db.teams,
+        )
+    except Exception:
+        logger.exception(
+            "[OFFICE] week snapshot failed; continuing. franchise_id=%s week=%s",
+            franchise_id_str,
+            week,
+        )
     try:
         _apply_regular_season_rank_prestige_updates(franchise_id, franchise_doc, week, results)
     except Exception:
@@ -7670,6 +8115,9 @@ def _finalize_franchise_week_after_cpu_games(
         update_fields["training_squad_report_baseline"] = franchise_doc["training_squad_report_baseline"]
     if "season_news" in franchise_doc:
         update_fields["season_news"] = franchise_doc["season_news"]
+    if office_week_snapshots is not None:
+        update_fields["office_week_snapshots"] = office_week_snapshots
+        franchise_doc["office_week_snapshots"] = office_week_snapshots
 
     if week == ScheduleManager.REGULAR_SEASON_WEEKS:
         ftd_docs = list(
@@ -7698,6 +8146,12 @@ def _finalize_franchise_week_after_cpu_games(
             conference_tournaments=conference_tournaments,
             franchise_id=franchise_id,
         )
+        try:
+            record_first_bracket_milestone(franchise_doc, conference_tournaments)
+        except Exception:
+            logger.exception(
+                "[TROPHY] first-bracket milestone failed franchise_id=%s", franchise_id_str
+            )
         try:
             from BackEnd.utils.franchise_championship_moments import (
                 enqueue_trophy_spotlight_for_user_conference,
@@ -7737,10 +8191,34 @@ def _finalize_franchise_week_after_cpu_games(
     update_fields["post_game_status.phase_a_user_week"] = None
     if community_highlight_pending is not None:
         update_fields["post_game_status.community_highlight_pending"] = community_highlight_pending
-    db.franchises.update_one(
-        {"_id": franchise_id},
-        {"$set": update_fields},
-    )
+    # Player season totals for this week are already on franchise_players_data.
+    # One rebuild, not one per game. A miss on the next Leaders open still scans.
+    # Same SQLite transaction as the franchise $set, so the snapshot does not
+    # add a second commit.
+    from contextlib import nullcontext
+
+    from BackEnd.persistence import get_store
+    from BackEnd.utils.leaders_snapshot import refresh_leaders_snapshot
+
+    transaction = getattr(get_store(), "transaction", None)
+    with transaction() if transaction is not None else nullcontext():
+        refresh_leaders_snapshot(
+            franchise_id_str,
+            week=int(update_fields.get("week") or (week + 1)),
+            season=int(franchise_doc.get("current_season") or 1),
+            results=existing_results,
+        )
+        _refresh_standings_for_committed_week(
+            franchise_doc,
+            franchise_id_str,
+            int(update_fields.get("week") or (week + 1)),
+            int(franchise_doc.get("current_season") or 1),
+            existing_results,
+        )
+        db.franchises.update_one(
+            {"_id": franchise_id},
+            fold_browse_rev({"$set": update_fields}),
+        )
     try:
         flush_community_highlight_pending_after_week(franchise_id, week)
     except Exception:
@@ -7972,7 +8450,11 @@ def _eos_heal_phase_from_games(
         patch["results"] = fresh.get("results") or {}
     if slots_total or adv_steps:
         patch[bracket_field] = fresh.get(bracket_field) or ({} if bracket_field != "national_tournament" else {})
-    db.franchises.update_one({"_id": franchise_id}, {"$set": patch})
+    db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": patch}))
+    if rows_total:
+        from BackEnd.utils.standings_snapshot import note_standings_stale
+
+        note_standings_stale(franchise_id_str)
     out["did_work"] = True
     out["results_rows_added"] = rows_total
     out["bracket_slots_synced"] = slots_total
@@ -8515,6 +8997,9 @@ def _complete_week_finish_cpu_and_persist(
         stat_updater.reset_finalize_subtiming()  # [FINALIZE-SUBTIMING] split finalize_game internals
         with stat_updater.franchise_team_maps_scope():
           for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+            # Deploy/shutdown: stop before the next game's writes. The claim is released
+            # by the shutdown hook; the next claimant re-sims only games without results.
+            _cpu_week_pool_mod.raise_if_shutting_down()
             if job_idx in sim_err:
                 logger.error(
                     "❌ [COMPLETE-WEEK] Parallel full-sim core failed; random fallback + bracket sync. franchise_id=%s week=%s idx=%s",
@@ -8773,8 +9258,11 @@ def _complete_week_finish_cpu_and_persist(
                 partial_update[_eos_key] = _eos_val
         db.franchises.update_one(
             {"_id": franchise_id},
-            {"$set": partial_update},
+            fold_browse_rev({"$set": partial_update}),
         )
+        from BackEnd.utils.standings_snapshot import note_standings_stale
+
+        note_standings_stale(franchise_id_str)
         cpu_job = _persist_cpu_sim_job(
             franchise_id,
             week,
@@ -8890,7 +9378,11 @@ def _complete_week_finish_cpu_and_persist(
 
     return finalized
 
-@router.post("/franchise/complete-week")
+@router.post(
+    "/franchise/complete-week",
+    dependencies=[Depends(_heavy_route_limit(WEEK_ADVANCE_RATE_LIMIT, "complete-week"))],
+)
+@marks_last_played
 def complete_week(req: CompleteWeekRequest):
     logger.warning(
         "🧭 [COMPLETE-WEEK-ENTRY] franchise_id=%s week=%s game_id=%s has_game_document=%s",
@@ -8995,7 +9487,11 @@ def complete_week(req: CompleteWeekRequest):
 
 
 
-@router.post("/franchise/complete-week/phase-a")
+@router.post(
+    "/franchise/complete-week/phase-a",
+    dependencies=[Depends(_heavy_route_limit(WEEK_ADVANCE_RATE_LIMIT, "complete-week-phase-a"))],
+)
+@marks_last_played
 def complete_week_phase_a(req: CompleteWeekRequest):
     logger.warning(
         "🧭 [COMPLETE-WEEK-PHASE-A] franchise_id=%s week=%s game_id=%s",
@@ -9082,8 +9578,11 @@ def complete_week_phase_a(req: CompleteWeekRequest):
 
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": phase_a_fields},
+        fold_browse_rev({"$set": phase_a_fields}),
     )
+    from BackEnd.utils.standings_snapshot import note_standings_stale
+
+    note_standings_stale(str(franchise_id))
 
     return {
         "status": "ok",
@@ -9094,7 +9593,10 @@ def complete_week_phase_a(req: CompleteWeekRequest):
     }
 
 
-@router.post("/franchise/complete-week/start-cpu-sims")
+@router.post(
+    "/franchise/complete-week/start-cpu-sims",
+    dependencies=[Depends(_heavy_route_limit(CPU_SIMS_RATE_LIMIT, "start-cpu-sims"))],
+)
 def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
     """
     Run full CPU sims for all **non-user** week matchups and persist ``results.{week}``
@@ -9163,7 +9665,9 @@ def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
             "idempotent": True,
             "cpu_sim_job": _cpu_sim_job_public_summary(franchise_doc, req.week),
         }
+    _claim_heartbeat = _CpuSimClaimHeartbeat(franchise_id, req.week, _claim_owner)
     try:
+        _claim_heartbeat.start()
         out = _complete_week_finish_cpu_and_persist(
             franchise_doc,
             franchise_id,
@@ -9181,6 +9685,7 @@ def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
             persist_cpu_results_only=True,
         )
     finally:
+        _claim_heartbeat.stop()
         _release_cpu_sim_claim(franchise_id, req.week, _claim_owner)
     out["idempotent"] = False
     logger.info(
@@ -9193,7 +9698,11 @@ def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
     return out
 
 
-@router.post("/franchise/complete-week/phase-b")
+@router.post(
+    "/franchise/complete-week/phase-b",
+    dependencies=[Depends(_heavy_route_limit(WEEK_ADVANCE_RATE_LIMIT, "complete-week-phase-b"))],
+)
+@marks_last_played
 def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
     logger.warning(
         "🧭 [COMPLETE-WEEK-PHASE-B] franchise_id=%s week=%s",
@@ -9262,7 +9771,9 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
             status_code=503,
             detail="CPU sims for this week are still in progress; please retry.",
         )
+    _claim_heartbeat = _CpuSimClaimHeartbeat(franchise_id, req.week, _claim_owner)
     try:
+        _claim_heartbeat.start()
         # Re-read post-wait: start-cpu-sims may have advanced the week or persisted
         # the full CPU slate while we waited.
         franchise_doc = db.franchises.find_one({"_id": franchise_id}) or franchise_doc
@@ -9319,6 +9830,7 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
             community_highlight_pending=None,
         )
     finally:
+        _claim_heartbeat.stop()
         _release_cpu_sim_claim(franchise_id, req.week, _claim_owner)
     out["status"] = "ok"
     out["phase"] = "b"
@@ -9379,6 +9891,7 @@ def _franchise_summary_for_list(doc: dict) -> dict:
         "asset_strategy": display.get("asset_strategy") or "core",
         "jersey_preset": display.get("jersey_preset") if display.get("is_custom") else None,
         "court": display.get("court") if display.get("is_custom") else None,
+        "last_played_at": last_played_iso(doc),
     }
 
 
@@ -9429,6 +9942,7 @@ def _ensure_home_slots_for_user(user_id: str) -> list[dict]:
                 "home_slot": 1,
                 # Required for Team Builder resolve_team_display on list cards.
                 "team_builder": 1,
+                LAST_PLAYED_FIELD: 1,
             },
         ).sort("_id", 1)
     )
@@ -9451,7 +9965,10 @@ def _ensure_home_slots_for_user(user_id: str) -> list[dict]:
         if not free:
             break
         slot = free.pop(0)
-        db.franchises.update_one({"_id": doc["_id"]}, {"$set": {"home_slot": slot}})
+        db.franchises.update_one(
+            {"_id": doc["_id"]},
+            fold_browse_rev({"$set": {"home_slot": slot}}),
+        )
         doc["home_slot"] = slot
         used.add(slot)
 
@@ -9521,6 +10038,61 @@ def list_user_franchises(user: dict = Depends(get_current_user)):
         "franchises": franchises,
         "count": len(franchises),
         "max": MAX_FRANCHISES_PER_USER,
+        "most_recent_franchise_id": most_recent_franchise_id(docs),
+    }
+
+
+@router.get("/franchise/coach-career")
+def get_coach_career(user: dict = Depends(get_current_user)):
+    """Career record and championships in the /api/auth/me shape.
+
+    Loopback serves this for the local desktop coach (no /api/auth there); online it
+    reads the same users fields /api/auth/me does.
+
+    Everything Home Base and the Trophy Case show is computed here: ``record.win_rate``,
+    career ``geek_points``, ``seasons_completed``, ``programs`` and ``top_seasons``
+    (which ranks in-progress seasons alongside finished ones). The client formats
+    them; it derives none of them.
+    """
+    uid = user.get("user_id")
+    if is_local_owner(uid):
+        doc = local_coach_doc()
+    else:
+        try:
+            doc = _store.users_collection.find_one(
+                {"_id": ObjectId(uid)},
+                {
+                    "username": 1,
+                    "record": 1,
+                    "archetypes": 1,
+                    "lead_archetype": 1,
+                    "championships_total": 1,
+                    "geek_points": 1,
+                    SEASON_GP_FIELD: 1,
+                    TROPHIES_FIELD: 1,
+                },
+            ) or {}
+        except Exception:
+            doc = {}
+    # Trophies survive a deleted program, so a live franchise only adds the
+    # in-progress season and its own program to the counts.
+    franchises = list(
+        db.franchises.find(
+            {"user_id": uid},
+            {
+                "user_team_id": 1,
+                "user_team_object_id": 1,
+                "current_season": 1,
+                "week": 1,
+                "results": 1,
+                "team_builder": 1,
+            },
+        )
+    )
+    return {
+        **coach_career_payload(doc, user),
+        **coach_career_extras(doc, franchises),
+        "trophies": trophies_newest_first(doc.get(TROPHIES_FIELD)),
     }
 
 
@@ -9552,7 +10124,6 @@ def get_current_franchise(user: dict = Depends(get_current_user)):
     }
 
 
-@router.post("/franchise/delete-current")
 @router.delete("/franchise/current")
 def delete_current_franchise(user: dict = Depends(get_current_user)):
     """
@@ -9700,11 +10271,343 @@ def set_player_development_focus(
 
     updates["updated_at"] = datetime.utcnow()
     franchise_players_data_collection.update_one({"_id": fpd["_id"]}, {"$set": updates})
+    bump_browse_rev(oid)
     updates.pop("updated_at", None)
     return {"updated": True, "player_id": str(body.player_id), **updates}
 
 
+def _build_office_digest_for_command_center(
+    response: dict[str, Any],
+    franchise_doc: Optional[dict[str, Any]],
+    team_id: Any,
+    team_doc: Optional[dict[str, Any]],
+    last_game: Optional[dict[str, Any]],
+) -> dict[str, Any]:
+    """Assemble office_digest from data this request already loaded, plus one EM projection."""
+    from BackEnd.utils.office_digest import (
+        build_office_digest,
+        missing_wire_recruit_ids,
+        recruit_lookup_from_docs,
+    )
+
+    franchise_doc = franchise_doc or {}
+    team_doc = team_doc or {}
+    week = int(response.get("week") or franchise_doc.get("week") or 1)
+    wire = response.get("recruiting_wire") if isinstance(response.get("recruiting_wire"), dict) else {}
+    lean_recruits = response.get("lean_recruits") or []
+    lookup = recruit_lookup_from_docs(lean_recruits, str(team_id or ""))
+    wire_events = wire.get("events") if isinstance(wire.get("events"), list) else []
+    missing_ids = missing_wire_recruit_ids(wire_events, lookup)
+    if missing_ids and franchise_doc.get("_id") is not None:
+        supplemental = list(franchise_recruits_data_collection.find(
+            {
+                "franchise_id": str(franchise_doc["_id"]),
+                "recruit_id": {"$in": missing_ids},
+            },
+            {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1},
+        ))
+        lookup.update(recruit_lookup_from_docs(supplemental, str(team_id or "")))
+    em_values: list[Any] = []
+    player_ids = [pid for pid in (team_doc.get("_office_player_ids") or []) if pid]
+    if franchise_doc.get("_id") is not None and player_ids:
+        for doc in franchise_players_data_collection.find(
+            {"franchise_id": str(franchise_doc["_id"]), "player_id": {"$in": player_ids}},
+            {"attributes.EM": 1},
+        ):
+            attrs = doc.get("attributes") if isinstance(doc.get("attributes"), dict) else {}
+            em_values.append(attrs.get("EM"))
+    summary = response.get("last_game_summary") if isinstance(response.get("last_game_summary"), dict) else {}
+    if last_game:
+        last_game = dict(last_game)
+        last_game["home_team_name"] = summary.get("home_team_name")
+        last_game["away_team_name"] = summary.get("away_team_name")
+        last_game["opponent_team_name"] = summary.get("opponent_team_name")
+        last_game["potg"] = summary.get("potg")
+    roster_spots = None
+    if week == 35 and franchise_doc.get("_id") is not None and team_id:
+        roster_spots = _calculate_available_roster_spots(franchise_doc["_id"], str(team_id))
+        # Signing Day: the Office lists every recruit on the submitted Orders, so each
+        # needs his name, position, rating and year (identity only, no attributes).
+        orders = team_doc.get("_office_signing_orders")
+        order_ids = sorted({
+            str(entry.get("id")) for entry in (orders.values() if isinstance(orders, dict) else [])
+            if isinstance(entry, dict) and entry.get("id")
+        })
+        if order_ids:
+            lookup.update(recruit_lookup_from_docs(
+                list(franchise_recruits_data_collection.find(
+                    {"franchise_id": str(franchise_doc["_id"]), "recruit_id": {"$in": order_ids}},
+                    {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1, "year": 1},
+                )),
+                str(team_id or ""),
+            ))
+    newcomers = None
+    if week <= 1:
+        walk_ons = franchise_doc.get("pending_walk_on_welcome") or []
+        if isinstance(walk_ons, list) and walk_ons:
+            newcomers = [
+                {"name": row.get("name"), "player_id": row.get("player_id")}
+                for row in walk_ons
+                if isinstance(row, dict)
+            ] or None
+    flags = {
+        "week": week,
+        "cpu_phase_b_required": bool(
+            (response.get("cpu_sim_resume") or {}).get("phase_b_required")
+            and (response.get("cpu_sim_resume") or {}).get("can_resume_phase_b")
+        ),
+        "cut_required": bool(response.get("cut_required")),
+        "board_saved_week": wire.get("board_saved_week"),
+        "week_35_orders_submitted": bool(wire.get("week_35_orders_submitted")),
+        "week_36_results_seen": bool(wire.get("week_36_results_seen")),
+        "tournament_complete": bool((response.get("eos_tournament") or {}).get("completed"))
+        if isinstance(response.get("eos_tournament"), dict)
+        else False,
+        "eos_tournament_active": bool(response.get("eos_tournament_active")),
+        "offer_sim_rest": bool(response.get("offer_sim_rest")),
+        "training_disabled_for_postseason": bool(response.get("training_disabled_for_postseason")),
+        "training_disabled_for_eos": bool(response.get("training_disabled_for_eos")),
+        "user_eliminated": response.get("user_eliminated"),
+        "region_qualified": bool(response.get("region_qualified")),
+        "has_eos_game_this_week": bool(response.get("has_eos_game_this_week")),
+        "training_completed": bool(response.get("training_completed")),
+        "session_type": response.get("session_type") or "in-season",
+        "cpu_training_resume": bool((response.get("cpu_training_resume") or {}).get("required")),
+    }
+    season_preview_block, top_recruits_block = _office_preview_blocks(
+        response, franchise_doc, team_id, week, player_ids
+    )
+    rank = response.get("rank")
+    try:
+        national_rank = int(rank) if rank not in (None, "-", "") else None
+    except (TypeError, ValueError):
+        national_rank = None
+    return build_office_digest({
+        "franchise_doc": franchise_doc,
+        "user_team_id": str(team_id) if team_id else "",
+        "week": week,
+        "national_rank": national_rank,
+        "user_conference": response.get("user_conference"),
+        "chemistry": team_doc.get("team_chemistry"),
+        "rankings": response.get("rankings") or [],
+        "em_values": em_values,
+        "advance_flags": flags,
+        "last_game": last_game,
+        "next_game": response.get("next_game_summary"),
+        "training_report": franchise_doc.get("latest_training") or {},
+        "recruiting_wire": wire,
+        "recruit_lookup": lookup,
+        "team_name_map": response.get("team_name_map") if isinstance(response.get("team_name_map"), dict) else {},
+        "signing_orders": team_doc.get("_office_signing_orders"),
+        "signing_points_total": WEEK_35_RECRUITING_POINTS_BUDGET,
+        "roster_spots": roster_spots,
+        "newcomers": newcomers,
+        "season_preview_block": season_preview_block,
+        "top_recruits": top_recruits_block,
+    })
+
+
+def _office_preview_blocks(
+    response: dict[str, Any],
+    franchise_doc: dict[str, Any],
+    team_id: Any,
+    week: int,
+    player_ids: list[Any],
+) -> tuple[Optional[dict[str, Any]], Optional[dict[str, Any]]]:
+    """(season preview, top recruits) for the Office, with the reads they need.
+
+    Week 1 of every season gets the preview: one projected roster read, and from season 2
+    the coach's trophies for last season's line. Weeks 1-34 get Top Recruits: one projected
+    recruit read. A failure in either leaves that block out; the Office still loads.
+    """
+    from BackEnd.utils.season_preview import build_season_preview, region_letter, top_recruits
+
+    if franchise_doc.get("_id") is None or not team_id:
+        return None, None
+    fid = str(franchise_doc["_id"])
+    tid = str(team_id)
+    preview = None
+    recruits = None
+    if week <= 1:
+        try:
+            roster_docs = list(franchise_players_data_collection.find(
+                {"franchise_id": fid, "player_id": {"$in": [str(pid) for pid in player_ids]}},
+                # Identity and ratings only: no attributes leave the database for this.
+                {"player_id": 1, "meta": 1, "position_ratings": 1},
+            )) if player_ids else []
+            trophies: list[Any] = []
+            if int(franchise_doc.get("current_season", 1) or 1) > 1:
+                from BackEnd.utils.local_coach import coach_fields
+
+                trophies = list(coach_fields(franchise_doc.get("user_id"), "trophies").get("trophies") or [])
+            preview = build_season_preview({
+                "franchise_doc": franchise_doc,
+                "user_team_id": tid,
+                "user_conference": response.get("user_conference"),
+                "rankings": response.get("rankings") or [],
+                "roster_docs": roster_docs,
+                "trophies": trophies,
+                "next_game": response.get("next_game_summary"),
+            })
+        except Exception:
+            logger.exception("[OFFICE] season preview failed franchise_id=%s", fid)
+    if week < 35:
+        try:
+            region = str(response.get("user_region") or "").strip().upper() or region_letter(
+                response.get("user_conference")
+            )
+            recruits = top_recruits(
+                franchise_recruits_data_collection.find(
+                    {"franchise_id": fid},
+                    {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1,
+                     "Home Region": 1, "year": 1},
+                ),
+                region=region,
+                user_team_id=tid,
+                team_name_map=response.get("team_name_map") if isinstance(response.get("team_name_map"), dict) else {},
+                # The Office's Watchlist side: the coach's own list, from any region.
+                watchlist=_recruiting_watchlist(franchise_doc),
+            )
+        except Exception:
+            logger.exception("[OFFICE] top recruits failed franchise_id=%s", fid)
+    return preview, recruits
+
+
+def _build_moment_queue_for_command_center(
+    response: dict[str, Any],
+    franchise_doc: dict[str, Any] | None,
+    team_id: Any,
+    team_doc: dict[str, Any] | None,
+    week: int | None,
+    archetype_signals: Mapping[str, Any],
+    *,
+    is_local: bool,
+) -> dict[str, Any]:
+    """The Office moment queue, plus the three payloads the new kinds point at.
+
+    Every payload is derived here, at route level, from data the load already has:
+    the tournament brackets, the season-record detail helper (same path as the
+    stored trophy), and the week-35 signing results. No sim hook and no new
+    stored field beyond the two season "seen" stamps.
+    """
+    from BackEnd.utils.moment_queue import ARCHETYPES_HREF, build_moment_queue
+    from BackEnd.utils.office_digest import ROUND_NAME_BY_WEEK
+    from BackEnd.utils.season_moments import (
+        TIER_ORDER,
+        elimination_payload,
+        first_archetype_payload,
+        season_review_payload,
+        signed_class_payload,
+        user_in_bracket,
+    )
+
+    franchise_doc = franchise_doc or {}
+    tid = str(team_id) if team_id else ""
+    season = _franchise_current_season(franchise_doc) if franchise_doc else 1
+    week_val = int(week or 0)
+    digest = response.get("office_digest") if isinstance(response.get("office_digest"), dict) else {}
+    what_moved = digest.get("what_moved") if isinstance(digest.get("what_moved"), dict) else {}
+    name_map = response.get("team_name_map") if isinstance(response.get("team_name_map"), dict) else {}
+
+    elimination = None
+    if franchise_doc and team_doc and tid:
+        tier_brackets = []
+        for tier in TIER_ORDER:
+            bracket, seeds = _user_eos_bracket_and_seeds(franchise_doc, team_doc, tier)
+            tier_brackets.append((tier, bracket, seeds))
+        elimination = elimination_payload(
+            tier_brackets=tier_brackets,
+            team_id=tid,
+            season=season,
+            region_qualified=bool(response.get("region_qualified")),
+            seen_season=franchise_doc.get(ELIMINATION_SEEN_SEASON_FIELD),
+            round_name_by_week=ROUND_NAME_BY_WEEK,
+            team_name_of=lambda other: name_map.get(str(other)),
+            record=what_moved.get("record"),
+            conference_place=(what_moved.get("conference_standing") or {}).get("now"),
+            national_rank=(what_moved.get("national_rank") or {}).get("now"),
+        )
+
+    # The season's games are all played once a national champion is decided, or once
+    # the calendar has left the tournament weeks. finish_season has not run yet, so
+    # the franchise still holds everything the review reads.
+    national_champion = bool((franchise_doc.get("national_tournament") or {}).get("champion"))
+    season_over = bool(national_champion or week_val >= 35)
+    season_review = season_review_payload(
+        franchise_doc,
+        tid,
+        season_over=season_over,
+        seen_season=franchise_doc.get(SEASON_REVIEW_SEEN_SEASON_FIELD),
+    ) if franchise_doc and tid else None
+
+    signed_class = signed_class_payload(
+        franchise_doc,
+        tid,
+        results_modal=response.get("recruiting_results_modal"),
+        hub_reveal_seen=int(franchise_doc.get(WEEK_35_REVEAL_SEEN_SEASON_FIELD, 0) or 0) == season,
+    ) if franchise_doc and tid else None
+
+    first_archetype = first_archetype_payload(archetype_signals)
+
+    reveal = response.get("bracket_reveal_modal")
+    in_revealed_bracket = bool(
+        isinstance(reveal, dict) and reveal.get("eligible") and user_in_bracket(reveal.get("bracket"), tid)
+    )
+
+    response["elimination"] = elimination
+    response["season_review"] = season_review
+    response["signed_class"] = signed_class
+    response["first_archetype"] = first_archetype
+
+    return build_moment_queue(
+        championship_moments=response.get("pending_championship_moments"),
+        season_review=season_review,
+        elimination=elimination,
+        conference_rs_region_modal=response.get("conference_rs_region_modal"),
+        region_bye_modal_eligible=bool(response.get("region_bye_modal_eligible")),
+        walk_on_welcome_modal=response.get("walk_on_welcome_modal"),
+        recruit_visit_modal=response.get("recruit_visit_modal"),
+        bracket_reveal_modal=reveal,
+        bracket_update_modal=response.get("bracket_update_modal"),
+        signed_class=signed_class,
+        first_archetype=first_archetype,
+        archetype_evolution_pending=archetype_signals.get("archetype_evolution_pending"),
+        user_in_revealed_bracket=in_revealed_bracket,
+        # The coaching-archetypes page is a community surface, so the weekly row
+        # carries no link on desktop.
+        archetype_href=None if is_local else ARCHETYPES_HREF,
+    )
+
+
+def _coach_archetype_signals(user: dict | None) -> dict[str, Any]:
+    """Archetype fields the Office reads: pending evolution, lead key, reveal gate.
+
+    Online these ride the authenticated principal (they come from /api/auth/me).
+    The desktop principal has no users doc and loopback serves no /api/auth, so the
+    same three keys are read off the save's local_coach doc — where
+    ``commit_user_game_record`` writes ``lead_archetype`` and
+    ``record_archetype_change_if_any`` writes ``archetype_evolution_pending``.
+    That desktop read is projected to these three fields, so an Office load does
+    not pull the coach's whole career back.
+    """
+    user = user or {}
+    doc = user
+    if is_local_owner(user.get("user_id")):
+        doc = coach_fields(
+            user["user_id"],
+            "archetype_evolution_pending",
+            "lead_archetype",
+            "archetype_reveal_seen",
+        )
+    return {
+        "archetype_evolution_pending": str(doc.get("archetype_evolution_pending") or ""),
+        "lead_archetype": str(doc.get("lead_archetype") or ""),
+        "archetype_reveal_seen": bool(doc.get("archetype_reveal_seen")),
+    }
+
+
 @router.get("/franchise/command-center/data")
+@browse_cached
 def command_center_data(
     franchise_id: str = None,
     user: dict = Depends(get_current_user),
@@ -9712,8 +10615,22 @@ def command_center_data(
 ):
     """FCC main data load. Add ?profile=1 to get profile_summary in the response."""
     def _build():
+        cc_t = time.perf_counter()
+        last_completed_game_cache: dict[str, Any] = {"loaded": False, "value": None}
+
+        def _cached_last_completed_game() -> Optional[dict[str, Any]]:
+            if last_completed_game_cache["loaded"]:
+                return last_completed_game_cache["value"]
+            last_completed_game_cache["loaded"] = True
+            if franchise_doc and team_id:
+                last_completed_game_cache["value"] = _find_user_last_completed_game(
+                    franchise_doc, str(team_id)
+                )
+            return last_completed_game_cache["value"]
+
         team_name = None
         team_id = None
+        team_doc: dict[str, Any] = {}
         training_completed = False
         session_type = "in-season"
         franchise_doc = None
@@ -9734,11 +10651,20 @@ def command_center_data(
                         team_doc = db.teams.find_one({"_id": ObjectId(team_id)}) or {}
                         ftd = franchise_team_data_collection.find_one(
                             {"franchise_id": fid, "team_id": ObjectId(team_id)},
-                            {"team_attributes": 1, "prestige": 1, "natl_rank": 1}
+                            {
+                                "team_attributes": 1,
+                                "prestige": 1,
+                                "natl_rank": 1,
+                                "players": 1,
+                                "recruiting_orders_week_35": 1,
+                            }
                         )
                         if ftd:
-                            attrs = ftd.get("team_attributes", {})
+                            attrs = ftd.get("team_attributes", {}) or {}
+                            team_doc["team_attributes"] = attrs
                             team_doc["team_chemistry"] = attrs.get("team_chemistry", 0)
+                            team_doc["_office_player_ids"] = list(ftd.get("players") or [])
+                            team_doc["_office_signing_orders"] = ftd.get("recruiting_orders_week_35")
                             if "prestige" in ftd:
                                 team_doc["prestige"] = ftd["prestige"]
                             if "natl_rank" in ftd:
@@ -9817,6 +10743,7 @@ def command_center_data(
                     response["attribute_mode"] = franchise_doc.get("attribute_mode")
             except Exception:
                 logger.exception("[FCC] team display resolve failed franchise_id=%s", franchise_id)
+        cc_t = _cc_lap("franchise_team", cc_t)
         # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank
         if franchise_id and franchise_doc:
             try:
@@ -9845,7 +10772,11 @@ def command_center_data(
                         for team_id in team_ids
                     }
                     display_name_by_id = resolve_team_name_map(franchise_doc, team_ids)
-                    team_list = _ftd_team_list_for_franchise(franchise_id)
+                    team_list = {
+                        str(d["team_id"]): {}
+                        for d in ftd_rank_docs
+                        if d.get("team_id") is not None
+                    }
                     standings_data = calculate_franchise_standings(
                         franchise_doc.get("results", {}),
                         team_list,
@@ -9876,6 +10807,8 @@ def command_center_data(
                                 "conference": core_row.get("conference"),
                                 "W": int((standings_data.get(tid, {}) or {}).get("W", 0) or 0),
                                 "L": int((standings_data.get(tid, {}) or {}).get("L", 0) or 0),
+                                "PF": int((standings_data.get(tid, {}) or {}).get("PF", 0) or 0),
+                                "PA": int((standings_data.get(tid, {}) or {}).get("PA", 0) or 0),
                                 "last_week": (previous_week_result_map.get(tid) or {}).get("text", ""),
                                 "last_week_result": (previous_week_result_map.get(tid) or {}).get(
                                     "result", ""
@@ -9887,6 +10820,11 @@ def command_center_data(
                     response["rankings"] = rankings
 
                     if team_id:
+                        own_row = standings_data.get(str(team_id), {}) or {}
+                        response["team_record"] = {
+                            "wins": int(own_row.get("W", 0) or 0),
+                            "losses": int(own_row.get("L", 0) or 0),
+                        }
                         next_game = _find_user_next_game(franchise_doc, str(team_id))
                         if next_game:
                             opponent_id = (
@@ -9924,7 +10862,7 @@ def command_center_data(
                             ):
                                 response["next_game_is_bye"] = True
 
-                        last_game = _find_user_last_completed_game(franchise_doc, str(team_id))
+                        last_game = _cached_last_completed_game()
                         if last_game:
                             away_id = str(last_game.get("away_team_id") or "")
                             home_id = str(last_game.get("home_team_id") or "")
@@ -9969,6 +10907,7 @@ def command_center_data(
             response["rankings"] = []
             response["next_game_summary"] = None
             response["last_game_summary"] = None
+        cc_t = _cc_lap("rankings_and_games", cc_t)
         response["username"] = state.get("username", "Coach")
         response["seed"] = state.get("seed", 1)
         response["training_completed"] = training_completed
@@ -9995,6 +10934,7 @@ def command_center_data(
         response["cut_count"] = int(cut_state.get("cut_count", 0) or 0)
         response["cut_required"] = bool(cut_state.get("cut_required", False))
         response["week_35_recruiting_ran"] = bool(franchise_doc.get("week_35_recruiting_ran", False)) if franchise_doc else False
+        cc_t = _cc_lap("cuts_and_flags", cc_t)
         response["active_game_resume"] = None
         if franchise_doc and team_id:
             try:
@@ -10002,6 +10942,7 @@ def command_center_data(
             except Exception as e:
                 logger.debug("active game resume lookup failed: %s", e)
                 response["active_game_resume"] = None
+        cc_t = _cc_lap("resume", cc_t)
         response["cpu_sim_resume"] = _cpu_sim_job_public_summary(franchise_doc, week) if franchise_doc else None
         if response.get("cpu_sim_resume"):
             _csr = response["cpu_sim_resume"]
@@ -10023,6 +10964,17 @@ def command_center_data(
             response["awards_ready"] = bool((awards or {}).get("all_american_teams"))
         else:
             response["awards_ready"] = False
+            if franchise_doc and week is not None:
+                # Weekly All-American projection: rebuilt on the first read after an advance.
+                try:
+                    from BackEnd.utils.all_american import ensure_projection
+
+                    ensure_projection(franchise_doc)
+                except Exception:
+                    logger.exception("[ALL-AMERICAN] projection failed franchise_id=%s", franchise_doc.get("_id"))
+        if franchise_doc and week is not None:
+            # All-Conference: weekly projection, and the final from week 27.
+            _ensure_all_conference(franchise_doc)
         if franchise_id and franchise_doc and team_id:
             try:
                 user_ftd_doc = franchise_team_data_collection.find_one(
@@ -10088,7 +11040,7 @@ def command_center_data(
                     for rid in (franchise_doc.get(FCC_PENDING_NEW_LEAN_RECRUITS_FIELD) or [])
                     if rid
                 ]
-                if pending_new_lean_ids and _find_user_last_completed_game(franchise_doc, str(team_id)):
+                if pending_new_lean_ids and _cached_last_completed_game():
                     lean_recruit_ids = {
                         str(recruit.get("recruit_id"))
                         for recruit in response["lean_recruits"]
@@ -10112,6 +11064,7 @@ def command_center_data(
             response["week_35_user_recruits"] = []
             response["current_week_invite_recruit"] = None
             response["new_lean_recruit_ids"] = []
+        cc_t = _cc_lap("recruits", cc_t)
         response["training_status"] = (
             {"training_completed": training_completed, "session_type": session_type}
             if franchise_id and franchise_doc else {}
@@ -10160,7 +11113,10 @@ def command_center_data(
                 )
                 if updated_rt is not None:
                     franchise_doc["region_tournaments"] = updated_rt
-                    db.franchises.update_one({"_id": fid_obj}, {"$set": {"region_tournaments": updated_rt}})
+                    db.franchises.update_one(
+                        {"_id": fid_obj},
+                        fold_browse_rev({"$set": {"region_tournaments": updated_rt}}),
+                    )
                     fcc_reconcile_persisted = True
                 logger.warning(
                     "[EOS-REGION-RECONCILE] context=fcc week=%s franchise_id=%s persisted=%s ftd_team_count=%s",
@@ -10289,9 +11245,41 @@ def command_center_data(
         response["recruit_visit_modal"] = (
             _build_recruit_visit_modal_payload(franchise_doc, team_id) if franchise_doc else None
         )
+        # /api/auth/me is not served on loopback, so the desktop coach's archetype
+        # signals come off the local_coach doc here. Online keeps reading the
+        # principal. Same three keys either way, so the moment queue and the
+        # first-archetype reveal read one shape.
+        archetype_signals = _coach_archetype_signals(user)
+        response.update(archetype_signals)
         response["recruiting_wire"] = _build_recruiting_wire_payload(
             franchise_doc, str(team_id) if team_id else None
         )
+        response["office_digest"] = _build_office_digest_for_command_center(
+            response,
+            franchise_doc,
+            team_id,
+            team_doc,
+            _cached_last_completed_game(),
+        )
+        # The queue is built after the digest: the elimination moment reports the
+        # season record, conference place and national rank the digest already
+        # computed, rather than reading them a second time.
+        queue = _build_moment_queue_for_command_center(
+            response,
+            franchise_doc,
+            team_id,
+            team_doc,
+            week,
+            archetype_signals,
+            is_local=is_local_owner(user.get("user_id") if user else None),
+        )
+        response["moments"] = queue["moments"]
+        response["moments_for_this_visit"] = queue["moments_for_this_visit"]
+        response["weekly_card_items"] = queue["weekly_card_items"]
+        if isinstance(response.get("office_digest"), dict):
+            response["office_digest"]["weekly_card_items"] = queue["weekly_card_items"]
+            response["office_digest"]["also"] = queue["also"]
+        _cc_lap("modals_digest", cc_t)
         return response
     if profile:
         from BackEnd.utils.profiling import run_profiled
@@ -10645,7 +11633,102 @@ def _build_season_schedule_payload(
     }
 
 
+def _standings_rows_from_doc(franchise_doc: dict) -> list:
+    """Sorted standings rows. The route filters scopes; it does not recompute."""
+    from BackEnd.utils.franchise_standings import (
+        calculate_franchise_standings,
+        current_streaks,
+        standings_display_sort_key,
+    )
+
+    franchise_id = franchise_doc.get("_id")
+    franchise_results = franchise_doc.get("results", {})
+    team_list = _ftd_team_list_for_franchise(franchise_id)
+    standings_data = calculate_franchise_standings(franchise_results, team_list)
+    streaks = current_streaks(franchise_results)
+    next_detail = _build_next_opponent_detail(franchise_doc)
+    # natl_rank is display data for the next-opponent label, not the standings order.
+    fid = ObjectId(franchise_id)
+    ftd_rank_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": fid},
+        {"team_id": 1, "natl_rank": 1},
+    ))
+    natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
+    # Display names at the edge (Team Builder overlay); standings join keys stay ObjectIds.
+    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+    team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
+    display_name_by_id = resolve_team_name_map(franchise_doc, team_ids_list)
+    matchup_map = _build_next_matchup_map(franchise_doc, display_name_by_id, natl_rank_by_team_id)
+    teams = list(db.teams.find(
+        {"_id": {"$in": team_ids_list}},
+        {"name": 1, "_id": 1, "region": 1, "conference": 1, "primary_color": 1}
+    ))
+    output = []
+    for t in teams:
+        team_id_str = str(t["_id"])
+        team_standings = standings_data.get(team_id_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
+        wins = team_standings.get("W", 0)
+        losses = team_standings.get("L", 0)
+        games_played = wins + losses
+        pct = round(wins / games_played, 3) if games_played else 0.0
+        pf = team_standings.get("PF", 0)
+        pa = team_standings.get("PA", 0)
+        differential = pf - pa
+        natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
+        core_name = t.get("name", "")
+        upcoming = next_detail.get(team_id_str) or {}
+        opponent_id = upcoming.get("next_opponent_id") or ""
+        output.append({
+            "team_id": team_id_str,
+            # Identity = core; chrome = display_name (never overwrite name).
+            "name": core_name,
+            "display_name": display_name_by_id.get(team_id_str, core_name),
+            "primary_color": t.get("primary_color") or "",
+            "region": t.get("region") or "",
+            "conference": t.get("conference"),
+            "W": wins,
+            "L": losses,
+            "pct": pct,
+            "PF": pf,
+            "PA": pa,
+            "differential": differential,
+            "streak": streaks.get(team_id_str, ""),
+            "natl_rank": natl_rank,
+            "next": matchup_map.get(team_id_str, ""),
+            "next_opponent_id": opponent_id,
+            "next_opponent_name": display_name_by_id.get(opponent_id, "") if opponent_id else "",
+            "next_week": upcoming.get("next_week"),
+            "next_site": upcoming.get("next_site") or "",
+        })
+    # Same order the Standings page presents: wins desc, then point differential desc.
+    output.sort(key=standings_display_sort_key)
+    return output
+
+
+def _refresh_standings_for_committed_week(
+    franchise_doc: dict,
+    franchise_id_str: str,
+    week: int,
+    season: int,
+    results: dict,
+) -> None:
+    """Rebuild inside the week-advance transaction from the document about to be saved."""
+    from BackEnd.utils.standings_snapshot import refresh_standings_snapshot
+
+    snap = dict(franchise_doc)
+    snap["results"] = results
+    snap["week"] = int(week)
+    refresh_standings_snapshot(
+        franchise_id_str,
+        week=int(week),
+        season=int(season or 1),
+        rows=_standings_rows_from_doc(snap),
+    )
+
+
 @router.get("/franchise/standings")
+@browse_cached
 def standings(
     franchise_id: str,
     profile: bool = False,
@@ -10655,97 +11738,80 @@ def standings(
 ):
     """Add ?profile=1 for profile_summary. scope=user_region&team_id=... returns only user + sister conference."""
     def _build():
-        franchise_doc = db.franchises.find_one(
-            {"_id": ObjectId(franchise_id)},
-            {
-                "schedule": 1,
-                "week": 1,
-                "eos_tournament": 1,
-                "eos_tournament_active": 1,
-                "conference_tournaments": 1,
-                "region_tournaments": 1,
-                "national_tournament": 1,
-                "results": 1,
-                "team_builder": 1,
-                "_id": 1,
-            }
-        )
-        found = franchise_doc is not None
-        logger.info("standings franchise_id=%s found=%s", franchise_id, found)
-        if not franchise_doc:
+        from BackEnd.utils.standings_snapshot import fresh_rows, rows_for_request
+
+        try:
+            franchise_oid = ObjectId(franchise_id)
+        except Exception:
             raise HTTPException(status_code=404, detail="Franchise not found")
-        schedule = franchise_doc.get("schedule", [])
-        week = franchise_doc.get("week", 1)
-        from BackEnd.utils.franchise_standings import calculate_franchise_standings
-        franchise_results = franchise_doc.get("results", {})
-        team_list = _ftd_team_list_for_franchise(franchise_id)
-        standings_data = calculate_franchise_standings(franchise_results, team_list)
-        # Load natl_rank from FTD for tiebreaker (lower natl_rank = higher in standings)
-        fid = ObjectId(franchise_id)
-        ftd_rank_docs = list(franchise_team_data_collection.find(
-            {"franchise_id": fid},
-            {"team_id": 1, "natl_rank": 1},
-        ))
-        natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
-        # Display names at the edge (Team Builder overlay); standings join keys stay ObjectIds.
-        from BackEnd.utils.franchise_team_display import resolve_team_name_map
+        header = db.franchises.find_one(
+            {"_id": franchise_oid},
+            {"week": 1, "current_season": 1},
+        )
+        found = header is not None
+        logger.info("standings franchise_id=%s found=%s", franchise_id, found)
+        if not header:
+            raise HTTPException(status_code=404, detail="Franchise not found")
+        try:
+            week = int(header.get("week") or 1)
+        except (TypeError, ValueError):
+            week = 1
+        try:
+            season = int(header.get("current_season") or 1)
+        except (TypeError, ValueError):
+            season = 1
+        output = fresh_rows(franchise_id, week=week, season=season)
+        if output is None:
+            franchise_doc = db.franchises.find_one(
+                {"_id": franchise_oid},
+                {
+                    "schedule": 1,
+                    "week": 1,
+                    "current_season": 1,
+                    "eos_tournament": 1,
+                    "eos_tournament_active": 1,
+                    "conference_tournaments": 1,
+                    "region_tournaments": 1,
+                    "national_tournament": 1,
+                    "results": 1,
+                    "team_builder": 1,
+                    "_id": 1,
+                },
+            )
+            if not franchise_doc:
+                raise HTTPException(status_code=404, detail="Franchise not found")
+            output = _standings_rows_from_doc(franchise_doc)
+            rows_for_request(franchise_id, week=week, season=season, live_rows=output)
 
-        team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
-        display_name_by_id = resolve_team_name_map(franchise_doc, team_ids_list)
-        matchup_map = _build_next_matchup_map(franchise_doc, display_name_by_id, natl_rank_by_team_id)
-        teams = list(db.teams.find(
-            {"_id": {"$in": team_ids_list}},
-            {"name": 1, "_id": 1, "region": 1, "conference": 1}
-        ))
-        output = []
-        for t in teams:
-            team_id_str = str(t["_id"])
-            team_standings = standings_data.get(team_id_str, {"W": 0, "L": 0, "PF": 0, "PA": 0})
-            wins = team_standings.get("W", 0)
-            losses = team_standings.get("L", 0)
-            games_played = wins + losses
-            pct = round(wins / games_played, 3) if games_played else 0.0
-            pf = team_standings.get("PF", 0)
-            pa = team_standings.get("PA", 0)
-            differential = pf - pa
-            natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
-            core_name = t.get("name", "")
-            output.append({
-                "team_id": team_id_str,
-                # Identity = core; chrome = display_name (never overwrite name).
-                "name": core_name,
-                "display_name": display_name_by_id.get(team_id_str, core_name),
-                "region": t.get("region") or "",
-                "conference": t.get("conference"),
-                "W": wins,
-                "L": losses,
-                "pct": pct,
-                "PF": pf,
-                "PA": pa,
-                "differential": differential,
-                "natl_rank": natl_rank,
-                "next": matchup_map.get(team_id_str, "")
-            })
-        # Primary: wins desc. Tiebreaker: natl_rank asc (lower = higher in standings)
-        output.sort(key=lambda x: (-x["W"], x["natl_rank"]))
-
-        # Optional: return only user + sister conference (lighter payload for FCC Standings tab)
+        # Optional scopes filter the already-sorted list. Order inside a scope
+        # is the same standings_display_sort_key order; nothing re-sorts.
         result = {"standings": output}
-        if scope == "user_region" and team_id:
+        user_conf = None
+        user_region_value = None
+        if team_id:
             try:
                 tid = ObjectId(team_id) if ObjectId.is_valid(team_id) else None
                 if tid:
-                    user_team_doc = db.teams.find_one({"_id": tid}, {"conference": 1})
-                    user_conf = user_team_doc.get("conference") if user_team_doc else None
-                    if user_conf is not None and isinstance(user_conf, int):
-                        sister = _sister_conference(user_conf)
-                        allowed = {user_conf, sister}
-                        output_filtered = [x for x in output if x.get("conference") in allowed]
-                        result["standings"] = output_filtered
+                    user_team_doc = db.teams.find_one({"_id": tid}, {"conference": 1, "region": 1})
+                    if user_team_doc:
+                        user_conf = user_team_doc.get("conference")
+                        user_region_value = user_team_doc.get("region") or ""
                         result["user_conference"] = user_conf
-                        result["sister_conference"] = sister
+                        result["user_region"] = user_region_value
             except Exception as e:
-                logger.warning("standings scope=user_region failed: %s", e)
+                logger.warning("standings user team lookup failed: %s", e)
+        if scope == "user_region" and isinstance(user_conf, int):
+            sister = _sister_conference(user_conf)
+            result["standings"] = [x for x in output if x.get("conference") in {user_conf, sister}]
+            result["sister_conference"] = sister
+        elif scope == "conference" and user_conf is not None:
+            result["standings"] = [x for x in output if x.get("conference") == user_conf]
+        elif scope == "region" and user_region_value:
+            region_key = str(user_region_value).strip().upper()
+            result["standings"] = [
+                x for x in output
+                if str(x.get("region") or "").strip().upper() == region_key
+            ]
 
         if region:
             region_normalized = str(region).strip().upper()
@@ -10769,6 +11835,7 @@ def standings(
 
 
 @router.get("/franchise/schedule")
+@browse_cached
 def season_schedule(franchise_id: str, conference: Optional[int] = None, user_team_only: bool = False):
     if conference is not None and (not isinstance(conference, int) or conference < 1 or conference > 16):
         raise HTTPException(status_code=422, detail="conference must be an integer from 1 to 16")
@@ -10780,8 +11847,20 @@ def season_schedule(franchise_id: str, conference: Optional[int] = None, user_te
 
 
 @router.get("/franchise/schedule/national")
+@browse_cached
 def national_schedule(franchise_id: str):
     return _build_season_schedule_payload(franchise_id=franchise_id)
+
+
+@router.get("/franchise/schedule/week")
+@browse_cached
+def schedule_week(franchise_id: str, week: Optional[int] = None):
+    """One national week. The season bundle stays in process so the next week is a slice."""
+    if week is not None and (week < 1 or week > 34):
+        raise HTTPException(status_code=422, detail="week must be from 1 to 34")
+    from BackEnd.utils.schedule_browse import build_schedule_week
+
+    return build_schedule_week(franchise_id, week, _build_eos_schedule_payload)
 
 
 @router.get("/franchise/league-news")
@@ -10810,160 +11889,88 @@ def get_leaders(
     limit: int = 10,
     allowed_team_ids: Optional[set[str]] = None,
     allowed_team_names: Optional[set[str]] = None,
+    basis: Optional[str] = None,
 ):
     """Return the top players for a given stat within a franchise.
 
-    ✅ FPD: Reads from franchise_players_data (season/career stats), not franchise.players.
+    Live read of franchise_players_data. GET /franchise/leaders uses the same
+    ranker on the week snapshot when that snapshot is fresh.
     """
-    start_time = time.time()
+    from BackEnd.utils.leaders_snapshot import (
+        load_lines,
+        rank_lines,
+        team_games_from_results,
+    )
 
     try:
-        fid = ObjectId(franchise_id)
+        oid = ObjectId(franchise_id)
     except Exception:
-        fid = franchise_id
-
-    # ✅ FIX: Map TPM to 3PTM for aggregation
-    stat_field = stat
-    if stat == "TPM":
-        stat_field = "3PTM"
-    elif stat == "TPA":
-        stat_field = "3PTA"
-
-    # ✅ FPD: Aggregate from franchise_players_data (season/career live here)
-    aggregation_start = time.time()
-    pipeline = [{"$match": {"franchise_id": str(franchise_id)}}]
-    if allowed_team_ids or allowed_team_names:
-        team_filters = []
-        if allowed_team_ids:
-            team_filters.append({"meta.team_id": {"$in": list(allowed_team_ids)}})
-        if allowed_team_names:
-            team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
-        pipeline.append({"$match": {"$or": team_filters}})
-
-    per_game_stats = {"PTS", "REB", "AST"}
-    if stat in {"FG%", "DEF%"}:
-        numerator_field = "FGM" if stat == "FG%" else "DEF_S"
-        denominator_field = "FGA" if stat == "FG%" else "DEF_A"
-        pipeline.extend([
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "gp": {"$ifNull": [f"${scope}.GP", 0]},
-                    "numerator": {"$ifNull": [f"${scope}.{numerator_field}", 0]},
-                    "denominator": {"$ifNull": [f"${scope}.{denominator_field}", 0]},
-                }
-            },
-            {
-                "$match": {
-                    "$expr": {
-                        "$and": [
-                            {"$gt": ["$gp", 0]},
-                            {"$gte": ["$denominator", {"$multiply": ["$gp", 5]}]},
-                        ]
-                    }
-                }
-            },
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "value": {
-                        "$cond": [
-                            {"$gt": ["$denominator", 0]},
-                            {"$multiply": [{"$divide": ["$numerator", "$denominator"]}, 100]},
-                            0,
-                        ]
-                    },
-                    "tiebreak_volume": "$denominator",
-                }
-            },
-            {"$sort": {"value": -1, "tiebreak_volume": -1}},
-            {"$limit": limit},
-        ])
-    elif stat in per_game_stats:
-        pipeline.extend([
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "gp": {"$ifNull": [f"${scope}.GP", 0]},
-                    "total": {"$ifNull": [f"${scope}.{stat_field}", 0]},
-                }
-            },
-            {"$match": {"gp": {"$gt": 0}}},
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "value": {"$divide": ["$total", "$gp"]},
-                    "tiebreak_total": "$total",
-                }
-            },
-            {"$sort": {"value": -1, "tiebreak_total": -1}},
-            {"$limit": limit},
-        ])
-    else:
-        pipeline.extend([
-            {
-                "$project": {
-                    "player_id": 1,
-                    "meta": 1,
-                    "value": {"$ifNull": [f"${scope}.{stat_field}", 0]},
-                }
-            },
-            {"$sort": {"value": -1}},
-            {"$limit": limit},
-        ])
-
-    agg = list(franchise_players_data_collection.aggregate(pipeline))
-    aggregation_time = time.time() - aggregation_start
-    # logger.info(f"⏱️ [PERF] get_leaders('{stat}') Aggregation pipeline (FPD): {aggregation_time:.3f}s")
-    results: list[dict[str, Any]] = []
-    for p in agg:
-        meta = p.get("meta", {})
-        value = p.get("value", 0)
-        if stat in per_game_stats:
-            value = round(float(value or 0), 1)
-        elif stat == "FG%":
-            value = round(float(value or 0), 1)
-        elif stat == "DEF%":
-            value = int(round(float(value or 0)))
-        results.append(
-            {
-                "player_id": p.get("player_id"),
-                "first_name": meta.get("first_name", ""),
-                "last_name": meta.get("last_name", ""),
-                "team": meta.get("team", meta.get("team_id", "")),
-                "value": value,
-            }
-        )
-    total_time = time.time() - start_time
-    # logger.info(f"⏱️ [PERF] get_leaders('{stat}') COMPLETE (aggregation): {total_time:.3f}s")
-    return results
+        oid = None
+    results = {}
+    if oid is not None:
+        doc = db.franchises.find_one({"_id": oid}, {"results": 1})
+        if doc:
+            results = doc.get("results") or {}
+    rows = load_lines(str(franchise_id))
+    leader_basis = basis if basis in {"per_game", "totals"} else None
+    return rank_lines(
+        rows,
+        scope=scope,
+        stat=stat,
+        limit=limit,
+        team_games=team_games_from_results(results),
+        allowed_team_ids=allowed_team_ids,
+        allowed_team_names=allowed_team_names,
+        basis=leader_basis,
+    )
 
 
 @router.get("/franchise/leaders")
+@browse_cached
 def leaders(
     franchise_id: str,
     scope: str = "season",
     limit: int = 10,
     view_scope: str = "national",
+    basis: Optional[str] = None,
 ):
-    start_time = time.time()
-    # logger.info(f"⏱️ [PERF] /franchise/leaders START - franchise_id={franchise_id}, scope={scope}")
-    
+    from BackEnd.utils.leaders_snapshot import fresh_lines, lines_for_request, rank_lines
+
+    try:
+        oid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID format")
+    header = db.franchises.find_one(
+        {"_id": oid},
+        {
+            "week": 1,
+            "current_season": 1,
+            "user_team_object_id": 1,
+            "user_team_id": 1,
+        },
+    )
+    if not header:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    week = int(header.get("week") or 1)
+    season = int(header.get("current_season") or 1)
+    cached = fresh_lines(str(franchise_id), week=week, season=season)
+    if cached is not None:
+        rows, team_games = cached
+    else:
+        results_doc = db.franchises.find_one({"_id": oid}, {"results": 1}) or {}
+        rows, team_games, _source = lines_for_request(
+            str(franchise_id),
+            week=week,
+            season=season,
+            results=results_doc.get("results") or {},
+        )
+
     categories = ["PTS", "3PTM", "AST", "BLK", "FG%", "REB", "STL", "DEF%"]
     allowed_team_ids: Optional[set[str]] = None
     allowed_team_names: Optional[set[str]] = None
     if view_scope in {"conference", "region"}:
-        franchise_doc = db.franchises.find_one(
-            {"_id": ObjectId(franchise_id)},
-            {"user_team_object_id": 1, "user_team_id": 1},
-        )
         user_team_id = None
-        if franchise_doc:
-            _, user_team_id = get_user_team_from_franchise(franchise_doc)
+        _, user_team_id = get_user_team_from_franchise(header)
         if user_team_id and ObjectId.is_valid(user_team_id):
             user_team_doc = db.teams.find_one({"_id": ObjectId(user_team_id)}, {"conference": 1, "region": 1})
             if user_team_doc:
@@ -10975,27 +11982,34 @@ def leaders(
                 team_docs = list(db.teams.find(query, {"_id": 1, "name": 1}))
                 allowed_team_ids = {str(team["_id"]) for team in team_docs}
                 allowed_team_names = {team.get("name", "") for team in team_docs if team.get("name")}
+    leader_basis = basis if basis in {"per_game", "totals"} else None
     result: dict[str, list[dict[str, Any]]] = {}
     for cat in categories:
-        cat_start = time.time()
-        top = get_leaders(
-            franchise_id,
+        top = rank_lines(
+            rows,
             scope=scope,
             stat=cat,
             limit=limit,
+            team_games=team_games,
             allowed_team_ids=allowed_team_ids,
             allowed_team_names=allowed_team_names,
+            basis=leader_basis,
         )
-        cat_time = time.time() - cat_start
-        result[cat] = [
-            {
+        result[cat] = []
+        for p in top:
+            entry = {
                 "player_id": p.get("player_id"),
                 "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
                 "team": p.get("team"),
+                "team_id": p.get("team_id") or "",
+                "position": p.get("position") or "",
+                "year": p.get("year") or "",
                 "value": p.get("value", 0),
             }
-            for p in top
-        ]
+            caption = p.get("qualification_caption")
+            if caption:
+                entry["qualification_caption"] = caption
+            result[cat].append(entry)
     all_team_names = set()
     for cat in categories:
         for entry in result[cat]:
@@ -11011,13 +12025,11 @@ def leaders(
             meta = team_meta.get(entry.get("team") or "", {})
             entry["conference"] = meta.get("conference")
             entry["region"] = meta.get("region", "")
-    
-    total_time = time.time() - start_time
-    # logger.info(f"⏱️ [PERF] /franchise/leaders COMPLETE: {total_time:.3f}s")
     return result
 
 
 @router.get("/franchise/team-stats")
+@browse_cached
 def team_stats(franchise_id: str, scope: str = "national"):
     """Get team stats by aggregating player stats from franchise document.
     
@@ -11043,10 +12055,17 @@ def team_stats(franchise_id: str, scope: str = "national"):
     # logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
-    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id)}))
+    from BackEnd.utils.team_stats_aggregator import load_franchise_player_seasons
+
+    fpd_docs = load_franchise_player_seasons(franchise_players_data_collection, str(franchise_id))
     players = {d["player_id"]: d for d in fpd_docs}
     franchise_results = franchise_doc.get("results", {})
-    team_list = _ftd_team_list_for_franchise(fid)
+    # One roster read supplies the team list. A second team_id-only scan was the same rows.
+    ftd_docs = list(franchise_team_data_collection.find(
+        {"franchise_id": fid},
+        {"team_id": 1, "players": 1, "natl_rank": 1},
+    ))
+    team_list = {str(row["team_id"]): {} for row in ftd_docs if row.get("team_id")}
     if scope in {"conference", "region"}:
         user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
         if user_team_object_id and ObjectId.is_valid(user_team_object_id):
@@ -11064,8 +12083,6 @@ def team_stats(franchise_id: str, scope: str = "national"):
                     if scope == "region" and team_doc.get("region", "") == user_team_doc.get("region", ""):
                         filtered_team_list[team_id_str] = team_name
                 team_list = filtered_team_list
-    # Build team_id -> [player_id, ...] from FTD.players for aggregation (prefer over meta.team_id)
-    ftd_docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1, "players": 1, "natl_rank": 1}))
     franchise_team_rosters = {}
     natl_rank_by_team_id = {}
     for ftd in ftd_docs:
@@ -11090,12 +12107,13 @@ def team_stats(franchise_id: str, scope: str = "national"):
     # logger.info(f"⏱️ [PERF] /franchise/team-stats Aggregation: {aggregation_time:.3f}s")
     team_ids_for_meta = [ObjectId(t["team_id"]) for t in output if t.get("team_id")]
     if team_ids_for_meta:
-        team_meta_docs = list(db.teams.find({"_id": {"$in": team_ids_for_meta}}, {"_id": 1, "conference": 1, "region": 1, "mascot": 1}))
+        team_meta_docs = list(db.teams.find({"_id": {"$in": team_ids_for_meta}}, {"_id": 1, "conference": 1, "region": 1, "mascot": 1, "primary_color": 1}))
         id_to_meta = {
             str(d["_id"]): {
                 "conference": d.get("conference"),
                 "region": d.get("region", ""),
                 "mascot": d.get("mascot", ""),
+                "primary_color": d.get("primary_color") or "",
             }
             for d in team_meta_docs
         }
@@ -11104,6 +12122,7 @@ def team_stats(franchise_id: str, scope: str = "national"):
             t["conference"] = meta.get("conference")
             t["region"] = meta.get("region", "")
             t["mascot"] = meta.get("mascot", "")
+            t["primary_color"] = meta.get("primary_color", "")
             t["natl_rank"] = natl_rank_by_team_id.get(t.get("team_id", ""), 999)
     else:
         for t in output:
@@ -11118,6 +12137,24 @@ def team_stats(franchise_id: str, scope: str = "national"):
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
     return {"teams": output}
+
+
+@router.get("/franchise/player-detail")
+@browse_cached
+def player_detail(franchise_id: str, player_id: str):
+    """T3 player page. Additive beside GET /player/{id}, which player-detail.html still uses."""
+    from BackEnd.utils.t3_detail import build_player_detail
+
+    return build_player_detail(franchise_id, player_id)
+
+
+@router.get("/franchise/team-detail")
+@browse_cached
+def team_detail(franchise_id: str, team_id: str):
+    """T3 team page for any franchise team. The roster table stays on GET /roster/{id}."""
+    from BackEnd.utils.t3_detail import build_team_detail
+
+    return build_team_detail(franchise_id, team_id)
 
 
 @router.get("/franchise/team-traits")
@@ -11271,12 +12308,12 @@ def get_team_player_stats(
     except Exception:
         fid = franchise_id
 
-    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_id) if isinstance(franchise_id, str) else str(fid)}))
-    franchise_players = {d["player_id"]: d for d in fpd_docs}
+    fid_str = str(franchise_id) if isinstance(franchise_id, str) else str(fid)
     team_id_str = str(team_id)
     results: list[dict] = []
 
-    # Prefer FTD.players (roster list) when present
+    # Prefer FTD.players (roster list) when present. Seek those player ids
+    # instead of decoding every player in the franchise for one roster.
     try:
         team_oid = ObjectId(team_id_str) if len(team_id_str) == 24 else None
     except Exception:
@@ -11287,6 +12324,12 @@ def get_team_player_stats(
             {"players": 1},
         )
         if ftd and ftd.get("players"):
+            player_ids = [str(pid) for pid in ftd["players"] if pid is not None]
+            fpd_docs = list(franchise_players_data_collection.find(
+                {"franchise_id": fid_str, "player_id": {"$in": player_ids}},
+                {"player_id": 1, "meta": 1, scope: 1},
+            )) if player_ids else []
+            franchise_players = {d["player_id"]: d for d in fpd_docs if d.get("player_id")}
             for pid in ftd["players"]:
                 pid_str = str(pid)
                 pdata = franchise_players.get(pid_str)
@@ -11309,6 +12352,9 @@ def get_team_player_stats(
                 start = max(page - 1, 0) * limit
                 results = results[start : start + limit]
             return results
+
+    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": fid_str}))
+    franchise_players = {d["player_id"]: d for d in fpd_docs}
 
     # Fallback: filter by meta.team_id (legacy / no FTD.players)
     for pid, pdata in franchise_players.items():
@@ -11337,6 +12383,7 @@ def get_team_player_stats(
 
 
 @router.get("/franchise/team-player-stats/{team_id}")
+@browse_cached
 def team_player_stats_endpoint(
     team_id: str,
     franchise_id: str,
@@ -11360,6 +12407,7 @@ def team_player_stats_endpoint(
 
 
 @router.get("/franchise/team-player-stats")
+@browse_cached
 def user_team_player_stats_endpoint(
     franchise_id: str,
     scope: str = "season",
@@ -11392,6 +12440,15 @@ def user_team_player_stats_endpoint(
     return {"players": players}
 
 
+@router.get("/franchise/player-stats")
+@browse_cached
+def player_stats(franchise_id: str, team_id: str):
+    """Varsity season lines for Team › Player Stats. Rates and per-game values are computed here."""
+    from BackEnd.utils.t3_detail import build_player_stats
+
+    return build_player_stats(franchise_id, team_id)
+
+
 @router.get("/franchise/recruits")
 def recruits(franchise_id: str = Query(...)):
     """Get recruits for a specific franchise. Reads from FRD (franchise_recruits_data)."""
@@ -11411,6 +12468,7 @@ def recruits(franchise_id: str = Query(...)):
 
 
 @router.get("/recruit/{recruit_id}")
+@browse_cached
 def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
     """Single recruit for the detail page (player-detail.html in recruit mode).
 
@@ -12255,7 +13313,7 @@ def _apply_complete_week_recruiting_lean_updates(
         {"team_id": 1, "recruit_visit": 1},
     ))
     if not ftd_docs:
-        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+        db.franchises.update_one({"_id": fid}, fold_browse_rev({"$set": {f"recruiting_lean_updates_applied.{week}": True}}))
         return [], []
 
     visited_recruit_ids: set[str] = set()
@@ -12282,7 +13340,7 @@ def _apply_complete_week_recruiting_lean_updates(
         recruit_visit_pairs.append((team_id, recruit_id))
 
     if not recruit_visit_pairs:
-        db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
+        db.franchises.update_one({"_id": fid}, fold_browse_rev({"$set": {f"recruiting_lean_updates_applied.{week}": True}}))
         return [], []
 
     recruit_ids = [recruit_id for _, recruit_id in recruit_visit_pairs]
@@ -12347,7 +13405,7 @@ def _apply_complete_week_recruiting_lean_updates(
     )
     db.franchises.update_one(
         {"_id": fid},
-        {"$set": {f"recruiting_lean_updates_applied.{week}": True}},
+        fold_browse_rev({"$set": {f"recruiting_lean_updates_applied.{week}": True}}),
     )
     return new_lean_events, movement_events
 
@@ -13356,7 +14414,6 @@ NEWS_ATTRIBUTE_FULL_NAMES = {
     "FT": "Free Throws",
     "ND": "Endurance",
     "IQ": "Basketball IQ",
-    "CH": "Clutch",
 }
 
 
@@ -13396,12 +14453,13 @@ def _region_team_ids_for_letter(region_letter: str) -> set[str]:
 def _persist_recruiting_ranks_from_scores(
     franchise_id: ObjectId | str,
     scores: dict[str, int],
-) -> None:
+) -> dict[str, dict[str, int]]:
     """Rank all 128 teams (zeros included) and write recruiting_* fields to FTD.
 
     Called whenever weekly lean scores or Week-35 signing scores are computed so
     Roster / FCC can read durable ranks without rescanning FRDs. After Week 35
     Results this freezes until the next season's Week-1 lean recompute.
+    Returns the ranks it wrote, by team id.
     """
     team_docs = list(db.teams.find({}, {"_id": 1, "region": 1}))
     team_ids = [str(doc["_id"]) for doc in team_docs if doc.get("_id") is not None]
@@ -13416,6 +14474,7 @@ def _persist_recruiting_ranks_from_scores(
         ranked_by_team_id=ranked,
         franchise_team_data_collection=franchise_team_data_collection,
     )
+    return ranked
 
 
 def _build_recruiting_rankings_story(
@@ -13428,8 +14487,12 @@ def _build_recruiting_rankings_story(
     team_name_map: dict[str, str],
     user_region_letter: str | None,
     region_team_ids: set[str] | None,
+    user_team_id: str | None = None,
+    user_zero_rank: int | None = None,
+    previous_story: dict[str, Any] | None = None,
+    score_caption: str | None = None,
 ) -> dict[str, Any] | None:
-    """National Top 25 + user-region Top 5 ranking tables. None if nobody has points."""
+    """National Top 25 + the user's full region. None if nobody has points."""
     return build_recruiting_rankings_story(
         story_id=story_id,
         week=week,
@@ -13441,7 +14504,27 @@ def _build_recruiting_rankings_story(
         region_team_ids=region_team_ids,
         national_limit=NEWS_RECRUITING_REPORT_NATIONAL_LIMIT,
         region_limit=NEWS_RECRUITING_REPORT_REGION_LIMIT,
+        user_team_id=user_team_id,
+        user_zero_rank=user_zero_rank,
+        previous_story=previous_story,
+        score_caption=score_caption,
     )
+
+
+def _recruiting_story_user_team(
+    franchise_doc: dict[str, Any],
+    durable_ranks: dict[str, dict[str, int]] | None,
+) -> tuple[str | None, int | None]:
+    """(user team id, its durable national recruiting rank) for the story's own row."""
+    try:
+        _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    except Exception:
+        user_team_object_id = None
+    user_tid = str(user_team_object_id) if user_team_object_id else None
+    if not user_tid:
+        return None, None
+    rank = int(((durable_ranks or {}).get(user_tid) or {}).get(FTD_RECRUITING_RANK) or 0)
+    return user_tid, (rank or None)
 
 
 def _build_weekly_recruiting_report_story(
@@ -13460,8 +14543,9 @@ def _build_weekly_recruiting_report_story(
         )
     )
     scores = team_points_from_lean_lists(recruits, _recruit_rt)
+    durable_ranks: dict[str, dict[str, int]] | None = None
     try:
-        _persist_recruiting_ranks_from_scores(franchise_id, scores)
+        durable_ranks = _persist_recruiting_ranks_from_scores(franchise_id, scores)
     except Exception:
         logger.exception(
             "[RECRUITING-RANK] weekly persist failed franchise=%s week=%s",
@@ -13471,6 +14555,20 @@ def _build_weekly_recruiting_report_story(
     team_name_map = _format_team_name_map(franchise=franchise_doc)
     region_letter = _user_team_region_letter(franchise_doc)
     region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
+    user_tid, user_zero_rank = _recruiting_story_user_team(franchise_doc, durable_ranks)
+    # Last week's report, for rank movement. Week 1 has none, and neither does a week
+    # that follows one with no report: those stories carry no movement.
+    previous_id = f"w{report_week - 1}-recruiting-report"
+    previous_story = next(
+        (
+            story
+            for story in (franchise_doc.get("season_news") or [])
+            if isinstance(story, dict)
+            and story.get("story_id") == previous_id
+            and story.get("type") == "recruiting_report"
+        ),
+        None,
+    )
     return _build_recruiting_rankings_story(
         story_id=f"w{report_week}-recruiting-report",
         week=report_week,
@@ -13480,6 +14578,10 @@ def _build_weekly_recruiting_report_story(
         team_name_map=team_name_map,
         user_region_letter=region_letter,
         region_team_ids=region_ids,
+        user_team_id=user_tid,
+        user_zero_rank=user_zero_rank,
+        previous_story=previous_story,
+        score_caption=WEEKLY_SCORE_CAPTION,
     )
 
 
@@ -13497,9 +14599,10 @@ def _build_season_recruiting_results_story(
         [player for player in (signed_players or []) if not player.get("walk_on")]
     )
     franchise_id = franchise_doc.get("_id")
+    durable_ranks: dict[str, dict[str, int]] | None = None
     if franchise_id is not None:
         try:
-            _persist_recruiting_ranks_from_scores(franchise_id, scores)
+            durable_ranks = _persist_recruiting_ranks_from_scores(franchise_id, scores)
         except Exception:
             logger.exception(
                 "[RECRUITING-RANK] results persist failed franchise=%s season=%s",
@@ -13509,6 +14612,7 @@ def _build_season_recruiting_results_story(
     team_name_map = _format_team_name_map(franchise=franchise_doc)
     region_letter = _user_team_region_letter(franchise_doc)
     region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
+    user_tid, user_zero_rank = _recruiting_story_user_team(franchise_doc, durable_ranks)
     return _build_recruiting_rankings_story(
         story_id=f"s{season}-recruiting-results",
         week=36,
@@ -13518,6 +14622,9 @@ def _build_season_recruiting_results_story(
         team_name_map=team_name_map,
         user_region_letter=region_letter,
         region_team_ids=region_ids,
+        user_team_id=user_tid,
+        user_zero_rank=user_zero_rank,
+        score_caption=RESULTS_SCORE_CAPTION,
     )
 
 
@@ -13552,16 +14659,46 @@ def _carryover_recruiting_results_story(
     return carried
 
 
+def _week_game_ids(franchise_id: Any, week: int) -> dict[tuple[str, str], str]:
+    """``(away id, home id) -> game id`` for one week's stored games.
+
+    A read, for the news story only: an upset line stores its game so the page can link
+    the box score. Empty when the lookup fails; the story is then written without links.
+    """
+    try:
+        from BackEnd.utils.schedule_browse import matchup_game_ids
+
+        # A stamp of its own: the browse routes' cache is keyed on the stored franchise,
+        # which does not have this week's results yet.
+        found = matchup_game_ids(str(franchise_id), stamp=("week-news", int(week)))
+    except Exception:
+        logger.exception("[NEWS] game id lookup failed franchise_id=%s week=%s", franchise_id, week)
+        return {}
+    return {
+        (away_id, home_id): game_id
+        for (game_week, away_id, home_id), game_id in found.items()
+        if game_week == int(week)
+    }
+
+
 def _build_week_upset_report_story(
     week: int,
     results: list[dict[str, Any]],
     rank_by_team_id: dict[str, int],
     team_name_map: dict[str, str],
+    game_id_by_matchup: Any = None,
 ) -> dict[str, Any] | None:
     """Week {n} Upset Report: games where the winner's entering-week natl_rank was
     more than NEWS_UPSET_RANK_GAP spots worse than the loser's, and the losing team
-    was ranked 1–NEWS_UPSET_LOSER_RANK_MAX. None when no games qualify."""
-    upsets: list[tuple[int, str]] = []
+    was ranked 1–NEWS_UPSET_LOSER_RANK_MAX. None when no games qualify.
+
+    Each line is a ``game_result`` rich line: its text, and the ``game_id`` of that game
+    when one is stored, so the page can link its box score. ``game_id_by_matchup`` is
+    ``{(away id, home id): game id}`` or a callable returning it (called only when the
+    week has an upset). ``lines`` keeps the same text for a reader that knows no rich
+    lines.
+    """
+    upsets: list[tuple[int, str, tuple[str, str]]] = []
     for row in results or []:
         away_id = str(row.get("away_id") or "")
         home_id = str(row.get("home_id") or "")
@@ -13590,17 +14727,27 @@ def _build_week_upset_report_story(
             f"#{loser_rank}. {team_name_map.get(loser_id, loser_id)} "
             f"by a score of {winner_score}-{loser_score}."
         )
-        upsets.append((int(loser_rank), line))
+        upsets.append((int(loser_rank), line, (away_id, home_id)))
     if not upsets:
         return None
     # Ascending by the losing team's natl_rank (biggest-name victim first).
     upsets.sort(key=lambda item: item[0])
+    game_ids = game_id_by_matchup() if callable(game_id_by_matchup) else game_id_by_matchup
+    game_ids = game_ids if isinstance(game_ids, dict) else {}
+    rich_lines: list[dict[str, Any]] = []
+    for _rank, line, matchup in upsets:
+        rich: dict[str, Any] = {"type": "game_result", "text": line}
+        game_id = game_ids.get(matchup)
+        if game_id:
+            rich["game_id"] = str(game_id)
+        rich_lines.append(rich)
     return {
         "story_id": f"w{week}-upset-report",
         "week": int(week),
         "type": "upset_report",
         "headline": f"Week {week} Upset Report",
-        "lines": [line for _, line in upsets],
+        "lines": [line for _rank, line, _matchup in upsets],
+        "rich_lines": rich_lines,
         "created_at": datetime.utcnow(),
     }
 
@@ -13630,18 +14777,19 @@ def _build_ps_all_stars_story(
         qualifiers = [g for g in qualifiers if int(g.get("total_gain") or 0) >= cutoff]
     lines = []
     for g in qualifiers:
-        deltas = g.get("deltas") or {}
+        # Copy names and counts the visible attributes only; the hidden one is never revealed.
+        deltas = {key: value for key, value in (g.get("deltas") or {}).items() if not is_hidden_attr(key)}
         max_gain = max(deltas.values()) if deltas else 0
         top_attrs = [
             NEWS_ATTRIBUTE_FULL_NAMES.get(key, key)
-            for key in TRAINING_SQUAD_ATTR_KEYS
+            for key in visible_attr_keys(TRAINING_SQUAD_ATTR_KEYS)
             if deltas.get(key) == max_gain
         ]
         rt = g.get("rt")
         team_name = team_name_map.get(str(g.get("team_id") or ""), "")
         of_team = f" of {team_name}" if team_name else ""
         lines.append(
-            f"{g.get('name')}{of_team} increased by {int(g.get('total_gain') or 0)} attribute points this week. "
+            f"{g.get('name')}{of_team} increased by {int(sum(deltas.values()))} attribute points this week. "
             f"His strongest gains were in {_join_with_and(top_attrs)}. "
             f"He's now rated {format_rt_display(rt)} at {g.get('pos', '--')}."
         )
@@ -13659,19 +14807,21 @@ NEWS_TOP_RECRUIT_MIN_RT = 49  # recruit RT must exceed this for the Top Rated se
 NEWS_COACH_OFFICE_EXCLUDED_TYPES = frozenset({"upset_report"})
 
 
-def _build_recruiting_leans_lines(
+def _recruiting_leans_content(
     lean_events: list[dict[str, str]],
     rank_by_team_id: dict[str, int],
     team_name_map: dict[str, str],
     recruit_by_id: dict[str, dict[str, Any]],
     conference_by_team_id: dict[str, str],
     user_conference: str | None,
-) -> list[str] | None:
-    """Body lines for the Recruiting Leans Announced section (no outer header).
+) -> dict[str, Any] | None:
+    """The week's lean announcements, as data.
 
-    Recruits with RT > NEWS_TOP_RECRUIT_MIN_RT who newly added a team to their lean
-    list, followed by new leans toward teams in the user's conference (a recruit can
-    appear in both). None when neither section has content.
+    ``top_lines``: one sentence per recruit with RT > NEWS_TOP_RECRUIT_MIN_RT who newly
+    added a team to their lean list, highest RT first. ``conference_teams``: new leans
+    toward teams in the user's conference, teams by ascending national rank and each
+    team's recruits by descending RT (a recruit can appear in both). None when neither
+    has content.
     """
     teams_by_recruit: dict[str, list[str]] = {}
     for event in lean_events or []:
@@ -13686,7 +14836,7 @@ def _build_recruiting_leans_lines(
         return None
 
     top_entries: list[tuple[int, dict[str, Any], list[str]]] = []
-    conference_recruits_by_team: dict[str, list[tuple[int, str]]] = {}
+    conference_recruits_by_team: dict[str, list[tuple[int, str, str]]] = {}
     for recruit_id, team_ids in teams_by_recruit.items():
         recruit_doc = recruit_by_id.get(recruit_id)
         if not recruit_doc:
@@ -13699,7 +14849,7 @@ def _build_recruiting_leans_lines(
         for team_id in team_ids:
             if conference_by_team_id.get(team_id) == user_conference:
                 conference_recruits_by_team.setdefault(team_id, []).append(
-                    (rt, str(recruit_doc.get("name") or ""))
+                    (rt, str(recruit_doc.get("name") or ""), recruit_id)
                 )
 
     top_lines: list[str] = []
@@ -13711,58 +14861,114 @@ def _build_recruiting_leans_lines(
             f"has announced a lean toward {team_names}."
         )
 
-    conference_lines: list[str] = []
+    conference_teams: list[dict[str, Any]] = []
     for team_id in sorted(
         conference_recruits_by_team, key=lambda tid: rank_by_team_id.get(tid, 999)
     ):
         entries = sorted(conference_recruits_by_team[team_id], key=lambda e: e[0], reverse=True)
-        conference_lines.append(team_name_map.get(team_id, team_id))
-        conference_lines.append(", ".join(
-            f"{name} ({format_rt_display(rt)})" for rt, name in entries
-        ))
+        conference_teams.append({
+            "team_id": team_id,
+            "team_name": team_name_map.get(team_id, team_id),
+            "recruits": [
+                {"recruit_id": recruit_id, "name": name, "rt": int(rt)}
+                for rt, name, recruit_id in entries
+            ],
+        })
 
-    if not top_lines and not conference_lines:
+    if not top_lines and not conference_teams:
+        return None
+    return {
+        "top_lines": top_lines,
+        "conference": user_conference,
+        "conference_teams": conference_teams,
+    }
+
+
+def _build_recruiting_leans_lines(
+    lean_events: list[dict[str, str]],
+    rank_by_team_id: dict[str, int],
+    team_name_map: dict[str, str],
+    recruit_by_id: dict[str, dict[str, Any]],
+    conference_by_team_id: dict[str, str],
+    user_conference: str | None,
+) -> list[str] | None:
+    """The lean announcements as plain text lines (the legacy standalone story).
+
+    The weekly Recruiting Report no longer uses this: it stores the conference section
+    as ``team_recruits`` blocks (``_recruiting_leans_section_rich_lines``).
+    """
+    content = _recruiting_leans_content(
+        lean_events,
+        rank_by_team_id,
+        team_name_map,
+        recruit_by_id,
+        conference_by_team_id,
+        user_conference,
+    )
+    if not content:
         return None
     lines: list[str] = []
-    if top_lines:
+    if content["top_lines"]:
         lines.append("Top Rated Recruit Announcements")
-        lines.extend(top_lines)
-    if conference_lines:
+        lines.extend(content["top_lines"])
+    if content["conference_teams"]:
         if lines:
             lines.append("")
-        lines.append(f"Conference {user_conference} Lean Announcements")
-        lines.extend(conference_lines)
+        lines.append(f"Conference {content['conference']} Lean Announcements")
+        for team in content["conference_teams"]:
+            lines.append(team["team_name"])
+            lines.append(", ".join(
+                f"{recruit['name']} ({format_rt_display(recruit['rt'])})" for recruit in team["recruits"]
+            ))
     return lines
 
 
-def _recruiting_leans_section_rich_lines(leans_lines: list[str]) -> list[dict[str, Any]]:
-    """Wrap lean body lines under a Recruiting Leans Announced section heading."""
-    rich: list[dict[str, Any]] = [
-        {"type": "gap"},
-        {"type": "heading", "text": "Recruiting Leans Announced"},
-    ]
-    for line in leans_lines:
-        if not str(line).strip():
-            rich.append({"type": "gap"})
-            continue
-        text = str(line)
-        if text == "Top Rated Recruit Announcements" or (
-            text.startswith("Conference ") and text.endswith(" Lean Announcements")
-        ):
-            rich.append({"type": "heading", "text": text})
-        else:
-            rich.append({"type": "text", "text": text})
+def _recruiting_leans_section_rich_lines(content: dict[str, Any]) -> list[dict[str, Any]]:
+    """The lean announcements as story content, under their own two sub-headings.
+
+    The conference section is one ``team_recruits`` block per team: the team (id and
+    name, so the page can draw its mark and link its page) over its recruits, one per
+    row with the raw RT. The page formats it; nothing is left to guess from text.
+    """
+    rich: list[dict[str, Any]] = []
+    top_lines = list(content.get("top_lines") or [])
+    teams = list(content.get("conference_teams") or [])
+    if top_lines:
+        rich.append({"type": "gap"})
+        rich.append({"type": "heading", "text": "Top Rated Recruit Announcements"})
+        rich.extend({"type": "text", "text": str(line)} for line in top_lines)
+    if teams:
+        # The conference as the rest of the app names it: region letter + number (A2).
+        from BackEnd.utils.t3_detail import conference_label
+
+        label = conference_label(content.get("conference")) or content.get("conference")
+        rich.append({"type": "gap"})
+        rich.append({"type": "heading", "text": f"Conference {label} Lean Announcements"})
+        for team in teams:
+            rich.append({
+                "type": "team_recruits",
+                "team_id": str(team.get("team_id") or ""),
+                "team_name": str(team.get("team_name") or ""),
+                "recruits": [
+                    {
+                        "recruit_id": str(recruit.get("recruit_id") or ""),
+                        "name": str(recruit.get("name") or ""),
+                        "rt": int(recruit.get("rt") or 0),
+                    }
+                    for recruit in team.get("recruits") or []
+                ],
+            })
     return rich
 
 
 def _merge_recruiting_report_with_leans(
     report_story: dict[str, Any] | None,
-    leans_lines: list[str] | None,
+    leans_content: dict[str, Any] | None,
     *,
     report_week: int,
 ) -> dict[str, Any] | None:
-    """One Week N Recruiting Report story: rankings first, then leans section."""
-    if not report_story and not leans_lines:
+    """One Week N Recruiting Report story: rankings first, then the lean announcements."""
+    if not report_story and not leans_content:
         return None
     if report_story is None:
         report_story = {
@@ -13777,8 +14983,8 @@ def _merge_recruiting_report_with_leans(
         # Copy so callers can reuse the rankings builder output safely.
         report_story = dict(report_story)
         report_story["rich_lines"] = list(report_story.get("rich_lines") or [])
-    if leans_lines:
-        report_story["rich_lines"].extend(_recruiting_leans_section_rich_lines(leans_lines))
+    if leans_content:
+        report_story["rich_lines"].extend(_recruiting_leans_section_rich_lines(leans_content))
     if not report_story.get("rich_lines"):
         return None
     return report_story
@@ -13822,7 +15028,7 @@ def _build_recruiting_movement_story(
 ) -> dict[str, Any] | None:
     """"Your Recruiting Board Moved" — the user's own lean movement, gains AND drops.
 
-    Distinct from the league-wide Recruiting Leans Announced section on the weekly
+    Distinct from the league-wide lean announcements on the weekly
     Recruiting Report, which reports only additions and only for top recruits / the
     user's conference. This one is personal and carries the losses.
     """
@@ -13929,7 +15135,7 @@ def _append_franchise_week_news(
 
     team_name_map = _format_team_name_map(franchise=franchise_doc)
 
-    recruiting_leans_lines = None
+    recruiting_leans_content = None
     if new_lean_events:
         recruit_ids = list({str(e.get("recruit_id") or "") for e in new_lean_events})
         recruit_by_id = {
@@ -13964,7 +15170,7 @@ def _append_franchise_week_news(
             )
             if user_team_doc and user_team_doc.get("conference") is not None:
                 user_conference = str(user_team_doc.get("conference"))
-        recruiting_leans_lines = _build_recruiting_leans_lines(
+        recruiting_leans_content = _recruiting_leans_content(
             new_lean_events,
             rank_by_team_id,
             team_name_map,
@@ -13982,13 +15188,16 @@ def _append_franchise_week_news(
     report_week = week + 1
     recruiting_report_story = _merge_recruiting_report_with_leans(
         _build_weekly_recruiting_report_story(franchise_id, franchise_doc, report_week),
-        recruiting_leans_lines,
+        recruiting_leans_content,
         report_week=report_week,
     )
     stories = [
         story
         for story in (
-            _build_week_upset_report_story(week, results, rank_by_team_id, team_name_map)
+            _build_week_upset_report_story(
+                week, results, rank_by_team_id, team_name_map,
+                game_id_by_matchup=lambda: _week_game_ids(franchise_id, week),
+            )
             if regular_season else None,
             _build_ps_all_stars_story(week, ts_weekly_gains, team_name_map)
             if regular_season else None,
@@ -14028,77 +15237,42 @@ def _franchise_news_headlines(franchise_doc: dict[str, Any], limit: int = 5) -> 
     return headlines
 
 
-def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
-    pts = int(season_stats.get("PTS", 0) or 0)
-    ast = int(season_stats.get("AST", 0) or 0)
-    reb = int(season_stats.get("REB", 0) or (int(season_stats.get("OREB", 0) or 0) + int(season_stats.get("DREB", 0) or 0)))
-    stl = int(season_stats.get("STL", 0) or 0)
-    blk = int(season_stats.get("BLK", 0) or 0)
-    def_a = int(season_stats.get("DEF_A", 0) or 0)
-    def_s = int(season_stats.get("DEF_S", 0) or 0)
-    def_pct = int(round((def_s / def_a) * 100)) if def_a >= 130 else 0
-
-    score = 2 * (pts + ast + reb + stl + blk)
-    if def_a >= 130:
-        if def_pct > 80:
-            score += 15
-        elif def_pct > 60:
-            score += 10
-        elif def_pct > 40:
-            score += 5
-    return score, def_pct
-
-
 def _compute_all_american_teams(franchise_doc: dict[str, Any]) -> dict[str, Any]:
-    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_doc["_id"])}))
-    team_name_map = _format_team_name_map(franchise=franchise_doc)
-    candidates = []
-    for doc in fpd_docs:
-        meta = doc.get("meta", {})
-        season_stats = doc.get("season", {}) or {}
-        score, def_pct = _season_awards_score(season_stats)
-        team_id = str(meta.get("team_id") or "")
-        candidates.append({
-            "player_id": doc.get("player_id"),
-            "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip(),
-            "team_id": team_id,
-            "team_name": team_name_map.get(team_id, meta.get("team", "")),
-            "year": meta.get("year") or "",
-            "score": score,
-            "stats": {
-                "PTS": int(season_stats.get("PTS", 0) or 0),
-                "REB": int(season_stats.get("REB", 0) or (int(season_stats.get("OREB", 0) or 0) + int(season_stats.get("DREB", 0) or 0))),
-                "AST": int(season_stats.get("AST", 0) or 0),
-                "STL": int(season_stats.get("STL", 0) or 0),
-                "BLK": int(season_stats.get("BLK", 0) or 0),
-                "DEF%": def_pct,
-            },
-        })
-    candidates.sort(key=lambda player: (-player["score"], -player["stats"]["PTS"], player["name"]))
+    """The final All-American teams. The logic lives in BackEnd/utils/all_american.py."""
+    from BackEnd.utils.all_american import compute_final
 
-    top_twenty = candidates[:20]
-    third_team_pool = top_twenty[10:20]
-    third_team = random.sample(third_team_pool, min(5, len(third_team_pool))) if third_team_pool else []
-    return {
-        "computed_at": datetime.utcnow(),
-        "all_american_teams": {
-            "first_team": top_twenty[:5],
-            "second_team": top_twenty[5:10],
-            "third_team": third_team,
-        },
-    }
+    return compute_final(franchise_doc)
+
+
+def _ensure_all_conference(franchise_doc: dict[str, Any]) -> None:
+    """The All-Conference projection, and its final once week 26 is complete, with the
+    user's trophy entries. Runs on the same reads as the All-American projection; a
+    failure never fails the read."""
+    try:
+        from BackEnd.utils.all_american import CONFERENCE_TEAMS_KEY, ensure_conference_projection
+
+        ensure_conference_projection(franchise_doc)
+        awards = franchise_doc.get(AWARDS_FIELD) or {}
+        if awards.get(CONFERENCE_TEAMS_KEY):
+            record_all_conference_trophies_if_missing(franchise_doc, awards)
+    except Exception:
+        logger.exception("[ALL-CONFERENCE] failed franchise_id=%s", franchise_doc.get("_id"))
 
 
 def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str, Any]:
     awards = franchise_doc.get(AWARDS_FIELD) or {}
-    if awards.get("all_american_teams"):
-        return awards
-    awards = _compute_all_american_teams(franchise_doc)
-    db.franchises.update_one(
-        {"_id": franchise_doc["_id"]},
-        {"$set": {AWARDS_FIELD: awards}},
-    )
-    franchise_doc[AWARDS_FIELD] = awards
+    if not awards.get("all_american_teams"):
+        # Merge: the weekly projection is stored under the same field and stays.
+        awards = {**awards, **_compute_all_american_teams(franchise_doc)}
+        db.franchises.update_one(
+            {"_id": franchise_doc["_id"]},
+            fold_browse_rev({"$set": {AWARDS_FIELD: awards}}),
+        )
+        franchise_doc[AWARDS_FIELD] = awards
+    try:
+        record_all_american_trophies_if_missing(franchise_doc, awards)
+    except Exception:
+        logger.exception("[TROPHY] All-American entries failed franchise_id=%s", franchise_doc.get("_id"))
     return awards
 
 
@@ -14621,6 +15795,7 @@ def _run_week_35_signings(franchise_doc: dict[str, Any]) -> dict[str, Any]:
     }
 
 @router.get("/franchise/recruiting-data")
+@browse_cached
 def get_recruiting_data(
     franchise_id: str,
     user: dict = Depends(get_current_user),
@@ -14748,7 +15923,98 @@ def get_recruiting_data(
     }
 
 
+def _news_dispatch_week(value: Any) -> int | None:
+    try:
+        week = int(value)
+    except (TypeError, ValueError):
+        return None
+    if week != value and str(value).strip() != str(week):
+        return None
+    return week
+
+
+def _news_dispatch_items(franchise_doc: dict[str, Any]) -> list[dict[str, Any]]:
+    """Your-team rows for the news feed, from the same stored fields the old
+    press tab read. Wording matches that tab. The view only formats them.
+
+    Written beside ``season_news`` on the week-advance ``$set`` (``season_inbox``)
+    and on the training ``$set`` (``latest_training``). Both already fold
+    ``browse_rev``, so these rows share the news route's week and rev stamp.
+    """
+    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    team_id = str(user_team_object_id or "")
+    franchise_key = str(franchise_doc.get("_id") or "")
+    items: list[dict[str, Any]] = []
+
+    latest = franchise_doc.get("latest_training") or {}
+    report_week = _news_dispatch_week(latest.get("week"))
+    if report_week is not None and report_week >= 1 and franchise_key and team_id:
+        query = urlencode([
+            ("mode", "franchise"),
+            ("franchise_id", franchise_key),
+            ("team_id", team_id),
+            ("week", str(report_week)),
+            ("from", "news"),
+            ("origin", "news"),
+        ])
+        items.append({
+            "week": report_week,
+            "type": "training_report",
+            "headline": f"Week {report_week} training report",
+            "target": f"/training-report.html?{query}",
+            "link_label": "view",
+            "yours": True,
+        })
+
+    for item in franchise_doc.get("season_inbox") or []:
+        if not isinstance(item, dict):
+            continue
+        kind = item.get("type")
+        week = _news_dispatch_week(item.get("week"))
+        if week is None:
+            continue
+        if kind == "training_squad_report":
+            query = urlencode([
+                ("franchise_id", franchise_key),
+                ("team_id", team_id),
+                ("from", "news"),
+            ])
+            items.append({
+                "week": week,
+                "type": "training_squad_report",
+                "headline": f"Week {week} Practice Squad development report",
+                "target": f"/training-squad-report.html?{query}",
+                "link_label": "view",
+                "yours": True,
+            })
+            continue
+        if kind != "game_result":
+            continue
+        verb = "defeated" if item.get("result") == "win" else "lost to"
+        user_name = item.get("user_team_name")
+        opponent_name = item.get("opponent_team_name")
+        if user_name and opponent_name:
+            headline = (
+                f"{user_name} {verb} {opponent_name} "
+                f"{item.get('user_score')}-{item.get('opponent_score')}"
+            )
+        else:
+            headline = str(item.get("copy") or "")
+        if not headline:
+            continue
+        items.append({
+            "week": week,
+            "type": "game_result",
+            "headline": headline,
+            "target": str(item.get("box_score_url") or ""),
+            "link_label": "box score",
+            "yours": True,
+        })
+    return items
+
+
 @router.get("/franchise/news")
+@browse_cached
 def get_franchise_news(
     franchise_id: str,
     category: str | None = Query(
@@ -14757,12 +16023,14 @@ def get_franchise_news(
     ),
     user: dict = Depends(get_current_user),
 ):
-    """Season news feed for the standalone news page (newest first; cleared at season rollover).
+    """Season news feed (newest first; cleared at season rollover).
 
-    ``category=recruiting`` narrows to the ``recruiting_*`` story types
-    (``recruiting_report``, ``recruiting_results``, ``recruiting_movement``, and any
-    legacy ``recruiting_leans``) so recruiting news can be read on its own.
+    ``category=recruiting`` narrows ``news`` to the ``recruiting_*`` story types.
+    ``dispatches`` are your-team rows from ``season_inbox`` and ``latest_training``,
+    included on every response. Headlines are the stored sentences.
     """
+    from BackEnd.utils.all_american import public_story
+
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     news = franchise_doc.get("season_news") or []
     if category:
@@ -14771,32 +16039,62 @@ def get_franchise_news(
             story for story in news
             if str(story.get("type") or "").startswith(prefix)
         ]
+    # Stored copy that says how All-Americans are picked is replaced on the way out; the
+    # stored story is not rewritten.
+    news = [public_story(story) for story in news]
     return {
         "week": int(franchise_doc.get("week", 1) or 1),
         "category": category,
         "news": news,
+        "dispatches": _news_dispatch_items(franchise_doc),
     }
 
 
+def _user_ps_region(franchise_doc: dict) -> str:
+    """Region letter of the user's varsity team. Empty when it is not stored."""
+    _name, team_oid = get_user_team_from_franchise(franchise_doc)
+    if not team_oid:
+        return ""
+    try:
+        team = db.teams.find_one({"_id": ObjectId(str(team_oid))}, {"region": 1}) or {}
+    except Exception:
+        return ""
+    return str(team.get("region") or "").strip().upper()
+
+
 @router.get("/franchise/practice-squad/standings")
+@browse_cached
 def get_practice_squad_standings(
     franchise_id: str,
     user: dict = Depends(get_current_user),
 ):
+    from BackEnd.practice_squad.browse import standings_tiers
+
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     ps = franchise_doc.get("practice_squad") or {}
+    week = int(franchise_doc.get("week", 1) or 1)
     if not ps.get("initialized"):
-        return {"initialized": False, "standings": {}, "teams": {}, "week": int(franchise_doc.get("week", 1) or 1)}
+        return {
+            "initialized": False,
+            "standings": {},
+            "teams": {},
+            "tiers": [],
+            "week": week,
+        }
+    standings = ps.get("standings") or {}
+    teams = ps.get("teams") or {}
     return {
         "initialized": True,
-        "week": int(franchise_doc.get("week", 1) or 1),
-        "standings": ps.get("standings") or {},
-        "teams": ps.get("teams") or {},
+        "week": week,
+        "standings": standings,
+        "teams": teams,
         "tier_names": {str(i): n for i, n in enumerate(["", "All-Americans", "All-Stars", "Varsity", "JV", "Squad", "Scrubs"]) if i},
+        "tiers": standings_tiers(standings, teams, _user_ps_region(franchise_doc)),
     }
 
 
 @router.get("/franchise/practice-squad/schedule")
+@browse_cached
 def get_practice_squad_schedule(
     franchise_id: str,
     week: int | None = None,
@@ -14804,11 +16102,19 @@ def get_practice_squad_schedule(
 ):
     from BackEnd.practice_squad.manager import _completed_games_for_week
 
+    from BackEnd.practice_squad.browse import ps_open_week
+
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     ps = franchise_doc.get("practice_squad") or {}
     current_week = int(franchise_doc.get("week", 1) or 1)
     if not ps.get("initialized"):
-        return {"initialized": False, "week": current_week, "games": [], "weeks": []}
+        return {
+            "initialized": False,
+            "week": current_week,
+            "current_week": ps_open_week(current_week),
+            "games": [],
+            "weeks": [],
+        }
     schedule = ps.get("schedule") or {}
     teams = ps.get("teams") or {}
     weeks_available = sorted(set(list(int(w) for w in schedule.keys()) + list(range(16, 20))))
@@ -14830,10 +16136,44 @@ def get_practice_squad_schedule(
             upcoming = [g for g in _games_for_week(ps, week) if g.get("status") not in ("completed", "forfeit")]
             games = completed + upcoming
         return {"initialized": True, "week": week, "games": _enrich(games)}
-    return {"initialized": True, "week": current_week, "weeks": weeks_available}
+    return {
+        "initialized": True,
+        "week": current_week,
+        "current_week": ps_open_week(current_week),
+        "weeks": weeks_available,
+    }
+
+
+@router.get("/franchise/tournament/brackets")
+@browse_cached
+def get_tournament_brackets(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    from BackEnd.tournament.browse import build_tournament_brackets_response
+    from BackEnd.utils.franchise_standings import calculate_franchise_standings
+
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    _legacy_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    user_team_id = str(user_team_object_id or _legacy_team_id or "")
+    team_doc = None
+    if user_team_object_id and ObjectId.is_valid(str(user_team_object_id)):
+        team_doc = db.teams.find_one({"_id": ObjectId(str(user_team_object_id))})
+    if not user_team_id:
+        raise HTTPException(status_code=400, detail="Franchise has no user team")
+    return build_tournament_brackets_response(
+        franchise_doc,
+        user_team_id=str(user_team_id),
+        user_team_doc=team_doc,
+        teams_collection=db.teams,
+        franchise_team_data_collection=franchise_team_data_collection,
+        get_user_eos_phase_status=_get_user_eos_phase_status,
+        calculate_franchise_standings=calculate_franchise_standings,
+    )
 
 
 @router.get("/franchise/practice-squad/brackets")
+@browse_cached
 def get_practice_squad_brackets(
     franchise_id: str,
     user: dict = Depends(get_current_user),
@@ -14850,6 +16190,7 @@ def get_practice_squad_brackets(
 
 
 @router.get("/franchise/practice-squad/team")
+@browse_cached
 def get_practice_squad_team(
     franchise_id: str,
     ps_team_id: str = Query(...),
@@ -14864,7 +16205,7 @@ def get_practice_squad_team(
         ps = ensure_ps_season_stats_backfilled(str(franchise_id), ps)
         db.franchises.update_one(
             {"_id": franchise_doc["_id"]},
-            {"$set": {"practice_squad": ps}},
+            fold_browse_rev({"$set": {"practice_squad": ps}}),
         )
     team = (ps.get("teams") or {}).get(ps_team_id)
     if not team:
@@ -14964,16 +16305,60 @@ def get_practice_squad_team(
     }
     from BackEnd.utils.scouting_utils import build_enriched_projected_starting_five
 
-    projected_starting_five = build_enriched_projected_starting_five(players, season_map)
+    # The selector reads a flat ``stats`` dict as THIS GAME's line (``Player._merge_stats_from_data``),
+    # so a squad player's season fouls looked like fouls in a game in progress: five in a
+    # season read as fouled out, fewer as foul trouble, and the five came back short (two or
+    # three seats) or seated the wrong players. The five at tip has no fouls: select on the
+    # players without their season line; the season averages are still attached from
+    # ``season_map``.
+    projected_starting_five = build_enriched_projected_starting_five(
+        [{**p, "stats": {}} for p in players], season_map
+    )
+
+    # The standard team page (team-view) reads the squad in the shapes it already knows:
+    # roster rows (rt, position) and season lines (per_game / totals / rates).
+    from BackEnd.practice_squad.browse import team_page
+    from BackEnd.practice_squad.constants import PS_CHAMPIONSHIP_WEEK, PS_TOURNAMENT_WEEKS
+    from BackEnd.practice_squad.manager import _completed_games_for_week
+    from BackEnd.utils.leaders_snapshot import _best_position, _ratings_dict
+    from BackEnd.utils.t3_detail import _highest_rt, season_bases
+
+    # The projected five are the page's Starters, in slot order; the rest are the Bench.
+    starter_order = {
+        str(five.get("player_id") or ""): index
+        for index, five in enumerate(projected_starting_five or [])
+    }
+    # A starter reads at the position he starts at, so the five read PG, SG, SF, PF, C.
+    starter_slot = {
+        str(five.get("player_id") or ""): five.get("position")
+        for five in (projected_starting_five or [])
+    }
+    for row in players:
+        ratings = _ratings_dict(row.get("position_ratings"))
+        bases = season_bases(row.get("stats") or {})
+        row["starter"] = str(row.get("player_id") or "") in starter_order
+        row["lineup_order"] = starter_order.get(str(row.get("player_id") or ""))
+        row["rt"] = _highest_rt(ratings)
+        row["position"] = starter_slot.get(str(row.get("player_id") or "")) or _best_position(ratings)
+        row["per_game"] = bases["per_game"]
+        row["totals"] = bases["totals"]
+        row["rates"] = bases["rates"]
+
+    tournament_games = []
+    for ps_week in (*PS_TOURNAMENT_WEEKS, PS_CHAMPIONSHIP_WEEK):
+        for game in _completed_games_for_week(ps, ps_week):
+            tournament_games.append({**game, "week": ps_week})
 
     return {
         "team": team,
         "players": players,
         "projected_starting_five": projected_starting_five,
+        "page": team_page(ps, ps_team_id, tournament_games),
     }
 
 
 @router.get("/franchise/recruiting-results")
+@browse_cached
 def get_recruiting_results(
     franchise_id: str,
     week: int | None = None,
@@ -14985,16 +16370,24 @@ def get_recruiting_results(
 
 
 @router.get("/franchise/awards")
+@browse_cached
 def get_franchise_awards(
     franchise_id: str,
     user: dict = Depends(get_current_user),
 ):
+    from BackEnd.utils.all_american import awards_payload, ensure_projection
+
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     week = int(franchise_doc.get("week", 1) or 1)
-    if week < 35:
-        raise HTTPException(status_code=400, detail="Awards are not available until week 35")
-    awards = _persist_week_35_awards_if_needed(franchise_doc)
-    return awards
+    if week >= 35:
+        # The final, set after the National Tournament.
+        _persist_week_35_awards_if_needed(franchise_doc)
+    else:
+        # Projected All-Americans, weeks 1-26; frozen through the tournaments.
+        ensure_projection(franchise_doc)
+    # All-Conference: weekly projection, and the final from week 27.
+    _ensure_all_conference(franchise_doc)
+    return awards_payload(franchise_doc)
 
 
 @router.post("/franchise/recruiting-orders")
@@ -15091,6 +16484,7 @@ def save_recruiting_orders(
                     }
                 },
             )
+        bump_browse_rev(fid)
         return {"status": "success", "saved_orders_week_35": orders_payload, "results_week": None}
 
     recruit_ids = [str(recruit_id) for recruit_id in (req.recruit_ids or []) if recruit_id]
@@ -15118,7 +16512,7 @@ def save_recruiting_orders(
     # "Recruits" persists across weeks and so can't answer "sent THIS week".
     db.franchises.update_one(
         {"_id": fid},
-        {"$set": {RECRUITING_BOARD_SAVED_WEEK_FIELD: week}},
+        fold_browse_rev({"$set": {RECRUITING_BOARD_SAVED_WEEK_FIELD: week}}),
     )
     return {"status": "success", "saved_orders": orders_payload, "results_week": None}
 
@@ -15170,8 +16564,13 @@ def run_week_35_recruiting(
         update_fields["season_news"] = franchise_doc.get("season_news") or []
     db.franchises.update_one(
         {"_id": fid},
-        {"$set": update_fields},
+        fold_browse_rev({"$set": update_fields}),
     )
+
+    try:
+        record_first_signing_class_milestone(franchise_doc, results.get("signed_players"))
+    except Exception:
+        logger.exception("[TROPHY] first-signing-class milestone failed franchise_id=%s", str(fid))
 
     # Warm the user's REGION portraits for the Signing Day reveal, off the request
     # thread. The reveal holds ~5s per card and a paint costs ~1.2s of CPU, so this
@@ -15197,44 +16596,8 @@ def run_week_35_recruiting(
     return {"status": "success", "week": 36, "results": results}
 
 
-@router.get("/franchise/debug-names")
-def debug_names():
-    """Debug endpoint to check if franchise names are loading correctly."""
-    from BackEnd.models.franchise_manager import RecruitManager
-    rm = RecruitManager(db)
-    return {
-        "first_names_count": len(rm.first_names),
-        "last_names_count": len(rm.last_names),
-        "sample_first_names": rm.first_names[:10],
-        "sample_last_names": rm.last_names[:10],
-        "using_fallback": len(rm.first_names) == 5 and len(rm.last_names) == 5
-    }
-
-
-@router.get("/franchise/latest-training")
-def get_latest_training(franchise_id: str):
-    """
-    Get the latest training session results for display on Training tab.
-    """
-    try:
-        fid = ObjectId(franchise_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid franchise ID")
-    
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"latest_training": 1})
-    if not franchise_doc:
-        raise HTTPException(status_code=404, detail="Franchise not found")
-    
-    latest_training = franchise_doc.get("latest_training", {})
-    return latest_training if latest_training else {
-        "player_logs": {},
-        "team_log": {},
-        "session_type": "in-season",
-        "week": 0
-    }
-
-
 @router.get("/franchise/state")
+@browse_cached
 def get_franchise_state(franchise_id: str, profile: bool = False):
     """
     Get the full franchise document (for loading team data in Command Center).
@@ -15269,6 +16632,7 @@ def get_franchise_state(franchise_id: str, profile: bool = False):
 
 
 @router.get("/franchise/team-data")
+@browse_cached
 def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: str = None):
     """
     Get team data (attributes, plays, scouting_data) from FTD.
@@ -15337,7 +16701,43 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     
     if not ftd_doc:
         raise HTTPException(status_code=404, detail=f"Team data not found in FTD for team_id: {actual_team_id}")
-    
+
+    # Ranks and the Team Attributes rows use the stored attributes, before the
+    # zero-fill below. One measures[] list: the roster rows plus rank fields.
+    from BackEnd.utils.office_digest import prior_measure_snapshot, team_attribute_measures
+    from BackEnd.utils.team_measure_ranks import measures_for_team, merge_display_ranks
+
+    raw_attributes = dict(ftd_doc.get("team_attributes") or {})
+    franchise_meta = db.franchises.find_one(
+        {"_id": fid},
+        {
+            "week": 1,
+            "current_week": 1,
+            "current_season": 1,
+            "office_week_snapshots": 1,
+            "user_team_object_id": 1,
+        },
+    ) or {}
+    week_raw = franchise_meta.get("week")
+    if week_raw is None:
+        week_raw = franchise_meta.get("current_week")
+    try:
+        current_week = int(week_raw) if week_raw is not None else 0
+    except (TypeError, ValueError):
+        current_week = 0
+    before, closed = prior_measure_snapshot(franchise_meta, current_week)
+    is_user = str(franchise_meta.get("user_team_object_id") or "") == str(actual_team_id)
+    prior_measures = before if is_user else None
+    ranked = measures_for_team(
+        franchise_team_data_collection,
+        fid,
+        actual_team_id,
+        prior_measures=prior_measures,
+        own_attributes=raw_attributes,
+    )
+    measure_view = team_attribute_measures(raw_attributes, prior_measures, closed)
+    measures = merge_display_ranks(measure_view["measures"], ranked)
+
     # Extract team attributes from FTD
     team_attributes = ftd_doc.get("team_attributes", {})
     # Ensure all expected keys exist (with defaults if missing)
@@ -15401,7 +16801,9 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     return {
         "team_attributes": team_attributes,
         "plays_data": plays_data,
-        "scouting_data": scouting_data
+        "scouting_data": scouting_data,
+        "measures": measures,
+        "updated_after_week": measure_view["updated_after_week"],
     }
 
 
@@ -15630,6 +17032,7 @@ def cut_franchise_players(
             )
             ps_initialized = False
 
+    bump_browse_rev(fid)
     return {
         "status": "success",
         "cut_count": required_cut_count,
@@ -15754,6 +17157,7 @@ def cut_franchise_players_final(
             " ".join(x for x in [meta.get("first_name", ""), meta.get("last_name", "")] if x).strip() or pid
         )
     _hard_release_players(fid, team_object_id, requested)
+    bump_browse_rev(fid)
     return {"status": "success", "cut_count": len(requested), "cut_names": cut_names}
 
 
@@ -15763,7 +17167,8 @@ def get_training_squad_reports(franchise_id: str, user: dict = Depends(get_curre
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     reports = franchise_doc.get("training_squad_reports") or {}
     ordered = [reports[k] for k in sorted(reports.keys(), key=lambda x: int(x), reverse=True)]
-    return {"reports": ordered, "attr_keys": TRAINING_SQUAD_ATTR_KEYS}
+    # The hidden attribute still develops on the practice squad; it is never a report column.
+    return {"reports": ordered, "attr_keys": visible_attr_keys(TRAINING_SQUAD_ATTR_KEYS)}
 
 
 def _scouting_usage_unlocks_for_week(current_week: int, user_film_study: int) -> tuple[bool, bool]:
@@ -15775,6 +17180,7 @@ def _scouting_usage_unlocks_for_week(current_week: int, user_film_study: int) ->
 
 
 @router.get("/franchise/scouting-report")
+@browse_cached
 def get_scouting_report(franchise_id: str, team_name: str):
     """
     Get scouting report for a team, including last game's play usage data.
@@ -16086,13 +17492,13 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
     if int(training_status.get("cpu_training_complete_week") or 0) == week:
         db.franchises.update_one(
             {"_id": franchise_id},
-            {
+            fold_browse_rev({
                 "$set": {
                     "training_status.training_completed": True,
                     "training_status.week": week,
                     "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
                 }
-            },
+            }),
         )
         user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
         team_id = user_team_object_id
@@ -16154,7 +17560,7 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
         if ps_job.get("status") != "complete":
             db.franchises.update_one(
                 {"_id": franchise_id},
-                {"$set": {"practice_squad": ps_state}},
+                fold_browse_rev({"$set": {"practice_squad": ps_state}}),
             )
             return {
                 "status": "processing",
@@ -16179,7 +17585,7 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
     if season_news_prepend:
         _prepend_season_news_stories(franchise_doc, season_news_prepend)
         cpu_update["season_news"] = franchise_doc["season_news"]
-    db.franchises.update_one({"_id": franchise_id}, {"$set": cpu_update})
+    db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": cpu_update}))
     return {
         "status": "success",
         "week": week,
@@ -16246,6 +17652,8 @@ def _build_custom_focus_roster_for_franchise(
     if not ftd_doc:
         return [], ranking
 
+    from BackEnd.utils.rt_projection import potential_rt_for_player
+
     team_player_ids = ftd_doc.get("players") or []
     rows: List[dict] = []
     for pid in team_player_ids:
@@ -16265,6 +17673,7 @@ def _build_custom_focus_roster_for_franchise(
         position_ratings = (
             {str(k): v for k, v in pr_raw.items()} if isinstance(pr_raw, dict) else {}
         )
+        best = _best_position(position_ratings if isinstance(position_ratings, dict) else {})
         rows.append(
             {
                 "player_id": pid_str,
@@ -16277,6 +17686,16 @@ def _build_custom_focus_roster_for_franchise(
                 # the only fields the card needed that were not here.
                 "height": meta.get("height"),
                 "weight": meta.get("weight"),
+                "image_id": meta.get("image_id") or None,
+                "portrait_source": meta.get("portrait_source") or "player",
+                "jersey": meta.get("jersey"),
+                "pos": best.get("pos") or "--",
+                "potential_rt_ratcheted": potential_rt_for_player(
+                    pid_str,
+                    fpd.get("entry_tier"),
+                    fpd.get("potential_factor"),
+                    position_ratings,
+                ),
                 **training_position_projection(fpd),
                 "_sort_max_rt": _max_position_rating_from_fpd(fpd),
             }
@@ -16308,13 +17727,11 @@ def get_training_points(franchise_id: str):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
-    # Training camp is week 1; weeks 2–26 are in-season training.
+    # Training camp is week 1; weeks 2–26 are in-season training. After week 26 there
+    # is no weekly allocation, but player development focus still applies next season —
+    # so this endpoint still returns the roster. `training_unavailable` is how the
+    # client knows not to offer Submit Training.
     week = franchise_doc.get("week", 1)
-    if _postseason_training_disabled_for_week(week):
-        raise HTTPException(
-            status_code=400,
-            detail="Training is unavailable after week 26.",
-        )
     from BackEnd.constants.training_shape import (
         CAMP_POINT_BUDGET,
         CAMP_WEEKS,
@@ -16322,8 +17739,12 @@ def get_training_points(franchise_id: str):
         gain_percentage_matrix,
         is_camp_week,
     )
-    is_first_training = is_camp_week(week)
-    training_points = CAMP_POINT_BUDGET if is_first_training else IN_SEASON_POINT_BUDGET
+    training_unavailable = _postseason_training_disabled_for_week(week)
+    is_first_training = False if training_unavailable else is_camp_week(week)
+    if training_unavailable:
+        training_points = 0
+    else:
+        training_points = CAMP_POINT_BUDGET if is_first_training else IN_SEASON_POINT_BUDGET
     
     total_time = (time.time() - endpoint_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] get_training_points TOTAL: {total_time:.2f}ms, training_points={training_points}, is_first_training={is_first_training}")
@@ -16331,9 +17752,21 @@ def get_training_points(franchise_id: str):
     custom_roster, ranking_attrs = _build_custom_focus_roster_for_franchise(
         franchise_doc, franchise_id_obj
     )
+    from BackEnd.constants.training_shape import TRAINING_FOCUSES
+    position_order = ("PG", "SG", "SF", "PF", "C")
+    position_tallies = {key: 0 for key in position_order}
+    focus_tallies = {key: 0 for key in TRAINING_FOCUSES}
+    for row in custom_roster:
+        pos_key = row.get("resolved_training_position") or ""
+        focus_key = row.get("resolved_training_focus") or ""
+        if pos_key in position_tallies:
+            position_tallies[pos_key] += 1
+        if focus_key in focus_tallies:
+            focus_tallies[focus_key] += 1
 
     return {
         "training_points": training_points,
+        "training_unavailable": training_unavailable,
         "is_first_training": is_first_training,
         "is_camp_week": is_first_training,
         "camp_weeks": CAMP_WEEKS,
@@ -16342,7 +17775,10 @@ def get_training_points(franchise_id: str):
         "season": int(franchise_doc.get("current_season") or 1),
         "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,
+        "position_tallies": position_tallies,
+        "focus_tallies": focus_tallies,
         "player_maximizer_ranking_attrs": ranking_attrs,
+        "training_playbook_choice": _training_playbook_choice(franchise_doc),
         "cpu_training_resume": (
             {
                 "required": True,
@@ -16980,13 +18416,14 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             ftd_ops,
         )
 
-    db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update_user})
+    db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": franchise_update_user}))
 
     if phase == "user_only":
         return {
             "status": "success",
             "week": week,
             "player_changes": player_logs,
+            "exceptional_gains": exceptional_gain_rows({"week": week, "player_logs": player_logs}),
             "team_changes": team_log,
             "coaching_focus": training_report.get("coaching_focus", {}),
             "session_type": session_type,
@@ -17015,12 +18452,13 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     }
     if cuts_ran_this_call:
         cpu_update["training_status.cpu_training_camp_cuts_applied"] = True
-    db.franchises.update_one({"_id": franchise_id}, {"$set": cpu_update})
+    db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": cpu_update}))
 
     return {
         "status": "success",
         "week": week,
         "player_changes": player_logs,
+        "exceptional_gains": exceptional_gain_rows({"week": week, "player_logs": player_logs}),
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "session_type": session_type,
@@ -17482,6 +18920,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "player_attribute_display_movements": report_data.get(
                 "player_attribute_display_movements", {}
             ),
+            # Same rule as the Office weekly card's gold marker, computed once on the
+            # server (BackEnd/utils/attribute_gain.py) so the two surfaces cannot drift.
+            "exceptional_gains": exceptional_gain_rows(report_data),
             "team_changes": report_data.get("team_log") or report_data.get("team_changes", {}),
             "training_notes": report_data.get("training_notes", []),
             "plays_data": report_data.get("plays_data", {}),
@@ -17537,7 +18978,7 @@ def mark_region_bye_modal_seen(
     current_season = int(franchise_doc.get("current_season", 1) or 1)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {REGION_BYE_MODAL_SEEN_SEASON_FIELD: current_season}},
+        fold_browse_rev({"$set": {REGION_BYE_MODAL_SEEN_SEASON_FIELD: current_season}}),
     )
     return {"seen": True, "season": current_season}
 
@@ -17556,7 +18997,7 @@ def mark_conference_rs_region_modal_seen(
     current_season = int(franchise_doc.get("current_season", 1) or 1)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD: current_season}},
+        fold_browse_rev({"$set": {CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD: current_season}}),
     )
     return {"seen": True, "season": current_season}
 
@@ -17584,9 +19025,114 @@ def mark_bracket_reveal_modal_seen(
     seen[reveal_key] = True
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {seen_field: seen}},
+        fold_browse_rev({"$set": {seen_field: seen}}),
     )
     return {"seen": True, "reveal_key": reveal_key}
+
+
+class EliminationSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/elimination-seen")
+def mark_elimination_seen(
+    req: EliminationSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist that this season's elimination moment was presented."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    current_season = _franchise_current_season(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        fold_browse_rev({"$set": {ELIMINATION_SEEN_SEASON_FIELD: current_season}}),
+    )
+    return {"seen": True, "season": current_season}
+
+
+class ArchetypeRevealSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/archetype-reveal-seen")
+def mark_archetype_reveal_seen_offline(
+    req: ArchetypeRevealSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Offline build: stamp the first-archetype reveal as seen on the save.
+
+    Online the flag is on the account and is written by
+    ``PATCH /api/auth/archetype-reveal-seen``; that stays the only online path.
+    The desktop client cannot reach ``/api/auth`` (always remote, and loopback
+    does not serve it), so the reveal was shown and never marked, and came back
+    on every Office visit. This writes the same key to the save's ``local_coach``
+    doc, the one ``_coach_archetype_signals`` reads it back from, and bumps the
+    franchise's browse revision so the next command-center read is not a 304 of
+    the body that still carried the moment.
+    """
+    _stamp_local_coach(req.franchise_id, user, set_fields={"archetype_reveal_seen": True})
+    return {"archetype_reveal_seen": True}
+
+
+def _stamp_local_coach(
+    franchise_id: str,
+    user: dict,
+    set_fields: dict[str, Any] | None = None,
+    unset_fields: tuple[str, ...] = (),
+) -> None:
+    """Offline build only: change coach fields on the save and refresh the Office read."""
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    if not is_local_owner(user.get("user_id")):
+        raise HTTPException(status_code=404, detail="Offline build only")
+    from datetime import timezone
+
+    from BackEnd.utils.local_coach import LOCAL_COACH_ID, coach_collection
+
+    update: dict[str, Any] = {"$set": {**(set_fields or {}), "updated_at": datetime.now(timezone.utc)}}
+    if unset_fields:
+        update["$unset"] = {field: "" for field in unset_fields}
+    coach_collection().update_one({"_id": LOCAL_COACH_ID}, update, upsert=True)
+    bump_browse_rev(franchise_doc["_id"])
+
+
+@router.patch("/franchise/archetype-evolution-seen")
+def clear_archetype_evolution_offline(
+    req: ArchetypeRevealSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Offline build: clear the "Coaching archetype evolved" weekly-card row.
+
+    The row is ``archetype_evolution_pending`` on the coach. Online that is the
+    account's, cleared by ``PATCH /api/auth/archetype-evolution-seen``; the desktop
+    client cannot reach ``/api/auth``. This removes the same key from the save's
+    ``local_coach`` doc, where ``record_archetype_change_if_any`` wrote it and
+    ``_coach_archetype_signals`` reads it, and bumps the browse revision so the
+    next Office read drops the row.
+
+    The key is removed, not set to "": on SQLite a projected read of a field
+    holding an empty string raises (``sqlite_collection._extracted_value``), and
+    the Office reads this field projected.
+    """
+    _stamp_local_coach(req.franchise_id, user, unset_fields=("archetype_evolution_pending",))
+    return {"archetype_evolution_pending": ""}
+
+
+class SeasonReviewSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/season-review-seen")
+def mark_season_review_seen(
+    req: SeasonReviewSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist that this season's end-of-season review was presented."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    current_season = _franchise_current_season(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        fold_browse_rev({"$set": {SEASON_REVIEW_SEEN_SEASON_FIELD: current_season}}),
+    )
+    return {"seen": True, "season": current_season}
 
 
 class RecruitingResultsModalSeenRequest(BaseModel):
@@ -17603,7 +19149,7 @@ def mark_recruiting_results_modal_seen(
     current_season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD: current_season}},
+        fold_browse_rev({"$set": {RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD: current_season}}),
     )
     return {"seen": True, "season": current_season}
 
@@ -17648,8 +19194,10 @@ def toggle_recruiting_watchlist(
     if not recruit_id:
         raise HTTPException(status_code=400, detail="recruit_id is required")
 
+    # No ``limit``: the SQLite store's count_documents takes the filter only, and passing one
+    # made every watch-star click a 500 on desktop. One recruit id matches at most one row.
     valid = franchise_recruits_data_collection.count_documents(
-        {"franchise_id": str(req.franchise_id), "recruit_id": recruit_id}, limit=1
+        {"franchise_id": str(req.franchise_id), "recruit_id": recruit_id}
     )
     if not valid:
         raise HTTPException(status_code=400, detail="Unknown recruit for this franchise")
@@ -17665,9 +19213,77 @@ def toggle_recruiting_watchlist(
 
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {RECRUITING_WATCHLIST_FIELD: watchlist}},
+        fold_browse_rev({"$set": {RECRUITING_WATCHLIST_FIELD: watchlist}}),
     )
     return {"watching": watching, "count": len(watchlist), "watchlist": watchlist}
+
+
+def _training_playbook_focus_ids(raw: Any) -> list[str]:
+    """Play ids as the Custom Playbook page sends them: strings, in order, no repeats."""
+    out: list[str] = []
+    for item in raw if isinstance(raw, (list, tuple)) else []:
+        text = str(item or "").strip()[:80]
+        if text and text not in out:
+            out.append(text)
+        if len(out) >= TRAINING_PLAYBOOK_CHOICE_MAX_IDS:
+            break
+    return out
+
+
+def _training_playbook_choice(franchise_doc: dict[str, Any] | None) -> dict[str, Any]:
+    """The saved Training playbook choice, in the shape the training page reads.
+
+    Custom needs at least one offense play and one defense (the Custom Playbook page's own
+    save rule); anything less reads as Current Playbooks.
+    """
+    saved = (franchise_doc or {}).get(TRAINING_PLAYBOOK_CHOICE_FIELD)
+    if isinstance(saved, dict) and saved.get("mode") == "custom":
+        focus = saved.get("focus") if isinstance(saved.get("focus"), dict) else {}
+        offense = _training_playbook_focus_ids(focus.get("offense"))
+        defense = _training_playbook_focus_ids(focus.get("defense"))
+        if offense and defense:
+            return {"mode": "custom", "focus": {"offense": offense, "defense": defense}}
+    return {"mode": "current-playbooks", "focus": None}
+
+
+def _training_playbook_choice_update(mode: str, focus: Any) -> dict[str, Any]:
+    """The franchise-document update that saves a choice. Current Playbooks removes the field."""
+    choice = _training_playbook_choice(
+        {TRAINING_PLAYBOOK_CHOICE_FIELD: {"mode": mode, "focus": focus}}
+    )
+    if choice["mode"] == "custom":
+        return {"$set": {TRAINING_PLAYBOOK_CHOICE_FIELD: choice}}
+    return {"$unset": {TRAINING_PLAYBOOK_CHOICE_FIELD: ""}}
+
+
+class TrainingPlaybookChoiceRequest(BaseModel):
+    franchise_id: str
+    mode: str
+    focus: dict[str, list[str]] | None = None
+
+
+@router.patch("/franchise/training-playbook-choice")
+def save_training_playbook_choice(
+    req: TrainingPlaybookChoiceRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Save the Training playbook choice so it is the default for every later training.
+
+    Writes ONLY ``training_playbook_choice`` on the franchise doc. It does not run or change
+    training: ``/franchise/run-training/user`` still trains with what the page submits.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    if req.mode not in ("custom", "current-playbooks"):
+        raise HTTPException(status_code=400, detail="mode must be custom or current-playbooks")
+    update = _training_playbook_choice_update(req.mode, req.focus)
+    if req.mode == "custom" and "$set" not in update:
+        raise HTTPException(
+            status_code=400,
+            detail="A custom playbook needs at least one offense play and one defense",
+        )
+    db.franchises.update_one({"_id": franchise_doc["_id"]}, update)
+    saved = db.franchises.find_one({"_id": franchise_doc["_id"]}, {TRAINING_PLAYBOOK_CHOICE_FIELD: 1})
+    return _training_playbook_choice(saved)
 
 
 class RecruitingWireSeenRequest(BaseModel):
@@ -17704,7 +19320,7 @@ def mark_recruit_visit_modal_seen(
     week = int(franchise_doc.get("week", 1) or 1)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {RECRUIT_VISIT_MODAL_SEEN_WEEK_FIELD: week}},
+        fold_browse_rev({"$set": {RECRUIT_VISIT_MODAL_SEEN_WEEK_FIELD: week}}),
     )
     return {"seen_week": week}
 
@@ -17723,7 +19339,7 @@ def mark_invite_seed_modal_seen(
     season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {INVITE_SEED_MODAL_SEEN_SEASON_FIELD: season}},
+        fold_browse_rev({"$set": {INVITE_SEED_MODAL_SEEN_SEASON_FIELD: season}}),
     )
     return {"seen_season": season}
 
@@ -17743,7 +19359,7 @@ def mark_week_35_reveal_seen(
     season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {WEEK_35_REVEAL_SEEN_SEASON_FIELD: season}},
+        fold_browse_rev({"$set": {WEEK_35_REVEAL_SEEN_SEASON_FIELD: season}}),
     )
     return {"seen_season": season}
 
@@ -17763,7 +19379,7 @@ def mark_week_36_results_seen(
     season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {WEEK_36_RESULTS_SEEN_SEASON_FIELD: season}},
+        fold_browse_rev({"$set": {WEEK_36_RESULTS_SEEN_SEASON_FIELD: season}}),
     )
     return {"seen_season": season}
 
@@ -17783,7 +19399,7 @@ def mark_recruiting_wire_seen(
     week = int(franchise_doc.get("week", 1) or 1)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {RECRUITING_WIRE_SEEN_WEEK_FIELD: week}},
+        fold_browse_rev({"$set": {RECRUITING_WIRE_SEEN_WEEK_FIELD: week}}),
     )
     return {"seen": True, "seen_week": week}
 
@@ -17807,10 +19423,10 @@ def mark_walk_on_welcome_modal_seen(
     current_season = _franchise_current_season(franchise_doc)
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
-        {"$set": {
+        fold_browse_rev({"$set": {
             WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD: current_season,
             PENDING_WALK_ON_WELCOME_FIELD: [],
-        }},
+        }}),
     )
     return {"seen": True, "season": current_season}
 
@@ -17864,6 +19480,7 @@ def _mark_completed_full_game_summary_final(summary: dict[str, Any]) -> dict[str
 
 
 @router.post("/franchise/sim-rest-of-tournament")
+@marks_last_played
 def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     """Simulate all games in the current EOS round (when user has no game: bye or did not qualify)."""
     try:
@@ -17899,7 +19516,10 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             )
             if updated_rt is not None:
                 franchise_doc["region_tournaments"] = updated_rt
-                db.franchises.update_one({"_id": franchise_id}, {"$set": {"region_tournaments": updated_rt}})
+                db.franchises.update_one(
+                    {"_id": franchise_id},
+                    fold_browse_rev({"$set": {"region_tournaments": updated_rt}}),
+                )
                 sim_rest_reconcile_persisted = True
             logger.warning(
                 "[EOS-REGION-RECONCILE] context=sim_rest week=%s franchise_id=%s persisted=%s ftd_team_count=%s",
@@ -17991,6 +19611,9 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         stat_updater.reset_finalize_subtiming()
         with stat_updater.franchise_team_maps_scope():
           for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+            # Deploy/shutdown: stop before the next game's writes. The claim is released
+            # by the shutdown hook; the next claimant re-sims only games without results.
+            _cpu_week_pool_mod.raise_if_shutting_down()
             g = week_games_meta[job_idx] if job_idx < len(week_games_meta) else None
             if job_idx in sim_err:
                 logger.error(
@@ -18053,6 +19676,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                     winner_team_id=winner_id,
                     week=week,
                     eos_game_meta=g,
+                    franchise_id=franchise_doc.get("_id"),
+                    season=franchise_doc.get("current_season"),
                 )
                 maybe_award_franchise_loss_geek_points(
                     owner_user_id=franchise_doc.get("user_id"),
@@ -18061,6 +19686,8 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                     participant_team_ids=(aid, hid),
                     week=week,
                     eos_game_meta=g,
+                    franchise_id=franchise_doc.get("_id"),
+                    season=franchise_doc.get("current_season"),
                 )
                 maybe_award_franchise_eos_title_championship(
                     owner_user_id=franchise_doc.get("user_id"),
@@ -18123,7 +19750,27 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     if ts_reset:
         update_fields.update(ts_reset)
 
-    db.franchises.update_one({"_id": franchise_id}, {"$set": update_fields})
+    from contextlib import nullcontext
+
+    from BackEnd.persistence import get_store
+    from BackEnd.utils.leaders_snapshot import refresh_leaders_snapshot
+
+    transaction = getattr(get_store(), "transaction", None)
+    with transaction() if transaction is not None else nullcontext():
+        refresh_leaders_snapshot(
+            franchise_id_str,
+            week=int(update_fields.get("week") or (week + 1)),
+            season=int(franchise_doc.get("current_season") or 1),
+            results=existing_results,
+        )
+        _refresh_standings_for_committed_week(
+            franchise_doc,
+            franchise_id_str,
+            int(update_fields.get("week") or (week + 1)),
+            int(franchise_doc.get("current_season") or 1),
+            existing_results,
+        )
+        db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": update_fields}))
     logger.warning(
         "[EOS-SIM-REST] franchise=%s week=%s | total=%.1fs | next_week=%s",
         franchise_id_str, week, time.time() - _cpu_week_t0, update_fields.get("week", week),
@@ -18136,6 +19783,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
 
 
 @router.post("/franchise/sim-championship")
+@marks_last_played
 def sim_championship(req: SimChampionshipRequest):
     """Simulate the national championship game (week 34 final)."""
     try:
@@ -18213,7 +19861,7 @@ def sim_championship(req: SimChampionshipRequest):
         ts_reset = _training_status_reset_after_advance_to_week(35)
         if ts_reset:
             champ_patch.update(ts_reset)
-        db.franchises.update_one({"_id": franchise_id}, {"$set": champ_patch})
+        db.franchises.update_one({"_id": franchise_id}, fold_browse_rev({"$set": champ_patch}))
         refreshed = db.franchises.find_one({"_id": franchise_id})
         if refreshed:
             _persist_week_35_awards_if_needed(refreshed)
@@ -18223,6 +19871,8 @@ def sim_championship(req: SimChampionshipRequest):
             winner_team_id=winner_id,
             week=week,
             eos_game_meta={"phase": "national", "round": 3},
+            franchise_id=franchise_doc.get("_id"),
+            season=franchise_doc.get("current_season"),
         )
         maybe_award_franchise_loss_geek_points(
             owner_user_id=franchise_doc.get("user_id"),
@@ -18231,6 +19881,8 @@ def sim_championship(req: SimChampionshipRequest):
             participant_team_ids=(away_id, home_id),
             week=week,
             eos_game_meta={"phase": "national", "round": 3},
+            franchise_id=franchise_doc.get("_id"),
+            season=franchise_doc.get("current_season"),
         )
         maybe_award_franchise_eos_title_championship(
             owner_user_id=franchise_doc.get("user_id"),
@@ -18608,7 +20260,11 @@ def get_senior_tribute(
     )
 
 
-@router.post("/franchise/finish-season")
+@router.post(
+    "/franchise/finish-season",
+    dependencies=[Depends(_heavy_route_limit(FINISH_SEASON_RATE_LIMIT, "finish-season"))],
+)
+@marks_last_played
 def finish_season(req: FinishSeasonRequest):
     """Finish current season and start new season."""
     try:
@@ -18636,6 +20292,11 @@ def finish_season(req: FinishSeasonRequest):
     )
     if consume_result.modified_count == 0:
         raise HTTPException(status_code=409, detail="Season transition has already been processed")
+
+    try:
+        record_season_record_trophy(franchise_doc)
+    except Exception:
+        logger.exception("[TROPHY] season_record failed franchise_id=%s", str(franchise_id))
 
     try:
         from BackEnd.utils.franchise_championship_moments import (
@@ -18958,6 +20619,9 @@ def finish_season(req: FinishSeasonRequest):
     franchise_players_data_collection.delete_many({"franchise_id": str(franchise_id)})
     if next_fpd_docs:
         franchise_players_data_collection.insert_many(next_fpd_docs)
+    from BackEnd.utils.leaders_snapshot import note_season_stats_written
+
+    note_season_stats_written(str(franchise_id))
 
     # Eager-warm the user's own signed players' uniform masters (best-effort, never
     # blocks the transition on a portrait paint) so their new signings are already
@@ -19030,6 +20694,39 @@ def finish_season(req: FinishSeasonRequest):
             str(franchise_id),
         )
 
+    # Next season's Office preview reads three things this reset wipes: the user's results
+    # (last meeting with each opponent), the seniors who leave, and the class that signed.
+    # One small snapshot, written with the reset below. Never blocks the rollover.
+    last_season_summary = None
+    try:
+        from BackEnd.utils.season_preview import last_season_snapshot
+
+        _ls_ftd = next(
+            (doc for doc in ftd_docs if str(doc.get("team_id")) == str(_welcome_user_team_id)), None
+        ) if _welcome_user_team_id else None
+        _ls_graduating = None
+        if _ls_ftd is not None:
+            _ls_ids = dict.fromkeys(
+                str(pid)
+                for pid in list(_ls_ftd.get("players") or []) + list(_ls_ftd.get("training_squad_players") or [])
+                if pid
+            )
+            _ls_graduating = sum(
+                1 for pid in _ls_ids
+                if fpd_by_id.get(pid) and _is_graduating_year(_player_year_from_fpd_or_core(pid, fpd_by_id.get(pid)))
+            )
+        last_season_summary = last_season_snapshot(
+            franchise_doc,
+            _welcome_user_team_id,
+            graduated_seniors=_ls_graduating,
+            signed_class=signed_players_by_team.get(str(_welcome_user_team_id), []),
+        )
+    except Exception:
+        logger.exception(
+            "[OFFICE] last-season snapshot failed at rollover; continuing. franchise_id=%s",
+            str(franchise_id),
+        )
+
     db.games.delete_many({"franchise_id": str(franchise_id)})
     from BackEnd.practice_squad.stats import clear_ps_season_stats_for_franchise
 
@@ -19037,12 +20734,14 @@ def finish_season(req: FinishSeasonRequest):
     awards_reset = {}
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": {
+        fold_browse_rev({"$set": {
             "current_season": next_season,
             "week": 1,
             # append the set consumed this rollover (never reused within the franchise)
             "used_recruit_set_ids": _prev_used + ([used_recruit_set_id] if used_recruit_set_id else []),
             "results": {},
+            # Matchup claims are season-scoped; clear so the list doesn't grow forever.
+            "applied_matchups": [],
             "season_inbox": [],
             # Cleared for the new season, then seeded with the prior season's exact
             # Recruiting Results story plus this season's Week-1 stories.
@@ -19072,6 +20771,8 @@ def finish_season(req: FinishSeasonRequest):
             # Consumed by the Walk-On Welcome modal on the first FCC landing of the
             # new season; captured above, before the week-35 results are cleared.
             PENDING_WALK_ON_WELCOME_FIELD: pending_walk_on_welcome,
+            # Read by the week-1 Office preview (season_preview.LAST_SEASON_FIELD).
+            "last_season": last_season_summary,
             AWARDS_FIELD: awards_reset,
             # Fresh walk-on portrait deck each season (camp-cut assign reuses only within a season).
             "walk_on_image_ids_used": [],
@@ -19088,9 +20789,12 @@ def finish_season(req: FinishSeasonRequest):
             "stats.top_10_steals": [],
             RANK_PRESTIGE_SYSTEM_VERSION_FIELD: rank_prestige_system_version,
             RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD: 0,
-        }}
+        }}),
     )
-    
+    from BackEnd.utils.standings_snapshot import note_standings_stale
+
+    note_standings_stale(str(franchise_id))
+
     logger.info(f"✅ [FINISH SEASON] Started season {next_season}")
 
     logger.info(

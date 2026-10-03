@@ -66,11 +66,7 @@ function cloneParams(params) {
   var els = {};
 
   function playSound(filename) {
-    try {
-      var a = new Audio('/sounds/' + encodeURIComponent(filename));
-      a.volume = 0.7;
-      a.play().catch(function () {});
-    } catch (e) {}
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
   }
 
   function escapeHtml(value) {
@@ -495,7 +491,8 @@ function cloneParams(params) {
       ? 'You are taking <em>' + escapeHtml(team.name) + "</em>'s place"
       : escapeHtml(team.name) + ' <em>' + escapeHtml(team.mascot || '') + '</em>';
     var cta = state.builder ? 'Take This Slot' : 'Enter Franchise';
-    var ctaClass = state.builder ? 'btn lg' : 'btn lg grn';
+    // Both are the Advance: Enter Franchise, and Take This Slot (Team Builder's step-1 Continue).
+    var ctaClass = 'btn lg advance';
     els.actionInner.innerHTML =
       '<div class="ab-art"><img src="' +
       escapeHtml(art.src) +
@@ -786,10 +783,16 @@ function cloneParams(params) {
       backLink: document.getElementById('team-select-back-link'),
     };
 
+    // The lobby track is non-gameplay music: it follows the Music switch in Settings.
     try {
       var lobbyMusic = new Audio('/sounds/crossover-21738.mp3');
       lobbyMusic.loop = true;
-      lobbyMusic.volume = 0.4;
+      lobbyMusic.volume = 0;
+      import('/js/shared/uiSfx.js').then(function (m) {
+        var applyMusic = function () { lobbyMusic.volume = m.outputVolume(0.4, 'music'); };
+        applyMusic();
+        m.subscribeAudio(applyMusic);
+      }).catch(function () { lobbyMusic.volume = 0.4; });
       lobbyMusic.play().catch(function () {});
     } catch (e) {}
 
@@ -865,6 +868,12 @@ function cloneParams(params) {
     } catch (err) {
       console.error(err);
       showError(err.message || 'Unable to load programs');
+    } finally {
+      // First paint: the page stays behind the loader (and hidden, see the page's
+      // is-loading rule) until the programs are in, so "0 of 128 match", the empty
+      // filters and a footer that jumps are never shown.
+      document.documentElement.classList.remove('is-loading');
+      if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
     }
   });
 })();

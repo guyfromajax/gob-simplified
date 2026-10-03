@@ -1,7 +1,7 @@
-"""Player Development grid: shared by the training page and the FCC Training tab.
+"""Player Development grid: the one editor is Prep › Player Training.
 
-These are the only two places development is editable, so they render from one module.
-A coach who learns one has learned the other, and neither can drift.
+The legacy FCC #training-tab panel is gone — it was unreachable, and Player Training
+now keeps the grid after week 26 itself.
 
 Covers: RT follows the TRAINING position (not the best one), the hover card carries year /
 height / weight / the core 12, row order never changes under an edit, and the Inbox tab's
@@ -31,35 +31,36 @@ REPORT_JS = (S / "training-report.js").read_text()
 
 # ── one implementation, two hosts ───────────────────────────────────────────
 
-def test_both_editors_render_from_the_one_module():
-    for src in (TRAIN_JS, FCC_JS):
-        assert "GOBPlayerDevelopmentGrid" in src
-    for page in (TRAIN_HTML, FCC_HTML):
-        assert "/js/shared/playerDevelopmentGrid.js" in page
-        assert "/css/player-development-grid.css" in page
+def test_the_training_page_renders_from_the_one_module():
+    assert "GOBPlayerDevelopmentGrid" in TRAIN_JS
+    assert "/js/shared/playerDevelopmentGrid.js" in TRAIN_HTML
+    assert "/css/player-development-grid.css" in TRAIN_HTML
+    # The shell still ships the module so the embed can bind without a second fetch.
+    assert "/js/shared/playerDevelopmentGrid.js" in FCC_HTML
+    assert "renderFccTrainingTab" not in FCC_JS
+    assert 'id="fcc-training-dev"' not in FCC_HTML
 
 
 def test_neither_host_builds_its_own_cards():
     """Card markup lives in the module. A second copy is how two screens start disagreeing."""
-    for src in (TRAIN_JS, FCC_JS):
-        assert "pdg-card" not in src
-        assert "positionSelectHtml" not in src
+    assert "pdg-card" not in TRAIN_JS
+    assert "positionSelectHtml" not in TRAIN_JS
 
 
 def test_the_summaries_sit_above_the_roster():
     """A summary belongs before the detail it summarises, and twelve rows would push it
     below the fold if it sat underneath."""
-    for page in (TRAIN_HTML, FCC_HTML):
-        assert page.index("pdg-tally") < page.index('class="pdg-grid"')
+    assert TRAIN_HTML.index("pdg-tally") < TRAIN_HTML.index('class="pdg-grid"')
 
 
-def test_the_fcc_tab_does_not_depend_on_the_training_endpoint():
-    """/franchise/training-points 400s after week 26 and is the training page's own
-    dependency. Using it here would rebuild the gap this tab exists to close."""
-    fn = FCC_JS[FCC_JS.index("function renderFccTrainingTab"):]
-    fn = fn[:fn.index("\nfunction fccMaxPositionRating")]
-    assert "training-points" not in fn
-    assert "userRosterDataCache" in fn
+def test_player_training_keeps_the_grid_when_there_is_no_weekly_allocation():
+    """After week 26 the weekly budget is gone, but development focus still saves.
+    The page stays put and still asks the points endpoint for the roster — that
+    payload now carries `training_unavailable` instead of 400ing."""
+    assert "applyTrainingWeekState" in TRAIN_JS
+    assert "training_unavailable" in TRAIN_JS
+    assert "No team training during the tournament" in TRAIN_JS
+    assert "function redirectIfTrainingAlreadyCommitted" not in TRAIN_JS
 
 
 # ── behaviour, executed ─────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ HARNESS = """
 'use strict';
 global.window = {};
 global.CSS = { escape: (s) => s };
+require(__DISPLAY__);
 require(__DEVFOCUS__);
 require(__GRID__);
 const g = global.window.GOBPlayerDevelopmentGrid;
@@ -92,6 +94,7 @@ process.stdout.write(JSON.stringify({
 def _run(pos: str) -> dict:
     script = (textwrap.dedent(HARNESS)
               .replace("__GRID__", json.dumps(str(GRID)))
+              .replace("__DISPLAY__", json.dumps(str(S / "js" / "utils" / "attributeDisplay.js")))
               .replace("__DEVFOCUS__", json.dumps(str(S / "js" / "shared" / "developmentFocus.js")))
               .replace("__POS__", json.dumps(pos)))
     return json.loads(subprocess.check_output(["node", "-e", script], text=True, timeout=30))
@@ -120,23 +123,99 @@ def test_height_renders_from_inches_and_anchors_win():
 # ── order is stable while editing ───────────────────────────────────────────
 
 def test_a_position_change_repaints_the_number_not_the_order():
-    """Re-sorting on change would pull the row out from under the coach the instant he
-    used it. Only the RT cell is rewritten."""
+    """Re-sorting on change would pull the card out from under the coach the instant he
+    used it. Only the RT cell is rewritten; the order is set once, when the grid renders."""
     fn = GRID_JS[GRID_JS.index("function render(host"):]
     fn = fn[:fn.index("\n  function paintTallies")]
     assert "[data-pdg-rt]" in fn
     assert ".sort(" not in fn
+    assert fn.count("orderByRt(") == 1, "ordered once per render, not in the save handler"
+    handler = fn[fn.index("dev.bind(grid"):]
+    assert "orderByRt" not in handler
 
 
-def test_both_editors_link_to_the_training_by_position_chart():
-    """Same affordance in both places. The training page saves its draft first because
-    leaving mid-allocation would lose points; the FCC tab has nothing to protect, since
-    every change there is already saved."""
-    assert 'id="fcc-training-tutorial-btn"' in FCC_HTML
+def test_there_is_one_layout_for_both_hosts():
+    """Prep > Player Training draws the same cards as the weekly page: no table variant."""
+    assert "pdg-table" not in GRID_JS and "tableRowHtml" not in GRID_JS
+    assert "layout:" not in TRAIN_JS[TRAIN_JS.index("function renderPlayerDevelopment"):TRAIN_JS.index("function wirePlayerDevelopmentTutorialButton")]
+
+
+ORDER_HARNESS = """
+'use strict';
+const fs = require('fs');
+global.window = { GOBDevelopmentFocus: { positionOf: (p) => p.resolved_training_position || 'PG' } };
+eval(fs.readFileSync(process.argv[1], 'utf8'));
+const order = window.GOBPlayerDevelopmentGrid.orderByRt;
+const player = (id, pos, ratings) => ({ id, resolved_training_position: pos, position_ratings: ratings });
+const rows = [
+  player('low', 'PG', { PG: 40, C: 99 }),      // shown RT is the TRAINING position's, not his best
+  player('tie-a', 'SG', { SG: 54 }),
+  player('top', 'C', { C: 88 }),
+  player('none', 'SF', {}),                    // no rating: last
+  player('tie-b', 'PG', { PG: 54 }),
+  player('tie-c', 'SF', { SF: 54.2 }),         // rounds to 54: still a tie
+];
+rows[0].potential_rt_ratcheted = 120;          // a potential never moves a card: the order is on the current
+const before = rows.map((r) => r.id);
+const out = order(rows).map((r) => r.id);
+console.log(JSON.stringify({ out, untouched: rows.map((r) => r.id).join() === before.join() }));
+"""
+
+
+def test_cards_are_ordered_by_shown_rt_and_ties_keep_their_order():
+    res = subprocess.run(["node", "-e", ORDER_HARNESS, str(GRID)], capture_output=True, text=True, timeout=30)
+    assert res.returncode == 0, res.stderr
+    got = json.loads(res.stdout.strip().splitlines()[-1])
+    assert got["out"] == ["top", "tie-a", "tie-b", "tie-c", "low", "none"]
+    assert got["untouched"] is True, "the caller's array is not reordered in place"
+
+
+PAIR_HARNESS = """
+'use strict';
+const fs = require('fs');
+global.window = {
+  GOBDevelopmentFocus: {
+    positionOf: (p) => p.resolved_training_position || 'PG',
+    positionSelectHtml: () => '<select></select>', focusSelectHtml: () => '<select></select>',
+  },
+  formatRtDisplay: (n) => 'G' + Math.round(Number(n)),
+  getRtBucketClass: (n) => (Number(n) >= 60 ? 'rt-high' : 'rt-low'),
+};
+global.formatRtDisplay = window.formatRtDisplay; // the page's global, as in the browser
+eval(fs.readFileSync(process.argv[1], 'utf8'));
+const html = window.GOBPlayerDevelopmentGrid.rtPairHtml;
+const base = { id: 'p', name: 'P', resolved_training_position: 'SF', position_ratings: { SF: 57, C: 34 } };
+console.log(JSON.stringify({
+  pair: html(Object.assign({ potential_rt_ratcheted: 91 }, base)),
+  none: html(base),
+  blank: html(Object.assign({ potential_rt_ratcheted: '' }, base)),
+}));
+"""
+
+
+@pytestmark_node
+def test_each_card_reads_current_then_potential_and_only_when_there_is_one():
+    """Both hosts: "current → potential" in the one RT slot; no arrow and no second grade without a potential."""
+    res = subprocess.run(["node", "-e", PAIR_HARNESS, str(GRID)], capture_output=True, text=True, timeout=30)
+    assert res.returncode == 0, res.stderr
+    got = json.loads(res.stdout.strip().splitlines()[-1])
+    assert got["pair"] == (
+        '<span class="pdg-rt rtl"><b data-pdg-rt class="rt-low">G57</b>'
+        '<i>\u2192</i><b class="pot rt-high">G91</b></span>'
+    )
+    assert got["none"] == '<span class="pdg-rt rtl"><b data-pdg-rt class="rt-low">G57</b></span>'
+    assert got["blank"] == got["none"]
+    # The card has no jersey number and no portrait; the lockup is the only thing after the name.
+    card = GRID_JS[GRID_JS.index("function cardHtml"):GRID_JS.index("function tallyHtml")]
+    assert "rtPairHtml(player)" in card
+    assert "jersey" not in card and "<img" not in card and "portrait" not in card
+
+
+def test_player_training_links_to_the_training_by_position_chart():
+    """The chart leaves the page, so the in-progress allocation is saved first."""
     assert 'id="player-dev-tutorial-btn"' in TRAIN_HTML
-    for src in (FCC_JS, TRAIN_JS):
-        assert "tutorial-advanced-training-by-position.html" in src
-        assert "setTrainingPageContext" in src, "the chart needs a way back"
+    assert "tutorial-advanced-training-by-position.html" in TRAIN_JS
+    assert "setTrainingPageContext" in TRAIN_JS
     train_fn = TRAIN_JS[TRAIN_JS.index("function wirePlayerDevelopmentTutorialButton"):]
     assert "saveTrainingFormDraft();" in train_fn[:train_fn.index("window.location.href")]
 
@@ -228,32 +307,35 @@ def test_the_inbox_tab_is_gone_with_nothing_dangling():
 def test_tab_order_is_training_then_recruiting_then_news():
     bar = FCC_HTML[FCC_HTML.index('data-tab="standings-tab"'):FCC_HTML.index("</div>", FCC_HTML.index('data-tab="standings-tab"'))]
     order = [bar.index(t) for t in ('data-tab="awards-tab"', 'data-tab="training-tab"',
-                                    'data-tab="recruits-tab"', 'data-tab="press-tab"')]
+                                    'data-tab="recruits-tab"', 'data-tab="news-view"')]
     assert order == sorted(order)
 
 
 def test_everything_the_inbox_published_now_runs_in_news():
-    """Training report, Practice Squad development report, and game results/box scores."""
-    fn = FCC_JS[FCC_JS.index("function fccTeamDispatches"):]
-    fn = fn[:fn.index("\nfunction renderNewsTab") if "\nfunction renderNewsTab" in fn else len(fn)]
-    assert "training report" in fn
-    assert "training_squad_report" in fn
-    assert "game_result" in fn
-    assert "box score" in fn
+    """Training report, Practice Squad development report, and game results/box scores.
+    The sentences are built on the news route, not in the browser."""
+    src = (S.parent.parent / "BackEnd" / "api" / "franchise_routes.py").read_text()
+    assert 'f"Week {report_week} training report"' in src
+    assert 'f"Week {week} Practice Squad development report"' in src
+    assert '"type": "game_result"' in src
+    assert '"link_label": "box score"' in src
+    assert "function fccTeamDispatches" not in FCC_JS
 
 
 def test_dispatches_interleave_into_the_week_cards():
-    fn = FCC_JS[FCC_JS.index("async function renderNewsTab"):]
-    fn = fn[:fn.index("\nasync function renderHomeTab")]
-    assert "fccTeamDispatches(" in fn
-    assert "b.mine.join('')" in fn, "your items render inside the week card, not beside it"
+    view = (S / "js" / "shared" / "views" / "newsView.js").read_text()
+    assert "dispatches.forEach" in view
+    assert "news.forEach" in view
+    yours = view.index("if (a.yours && !b.yours) return -1")
+    week = view.index("Number(b.week || 0) - Number(a.week || 0)")
+    assert week < yours, "newest week first, then yours above that week's other headlines"
 
 
 def test_a_shared_report_link_still_has_its_back_button():
     """Links already out in the wild carry from=inbox; the tab they named is gone, but the
     Back button must still work and must now return to News."""
-    assert "_reportFromRaw === 'news' || _reportFromRaw === 'inbox'" in REPORT_JS
-    assert "tab: 'press-tab'" in REPORT_JS
+    assert "fromRaw === 'news' || fromRaw === 'inbox'" in REPORT_JS
+    assert "tab: 'news-view'" in REPORT_JS
     assert "tutorials-tab" not in REPORT_JS
 
 
@@ -321,14 +403,17 @@ def test_the_always_100_attributes_are_never_named():
 
 
 def test_the_accent_is_on_the_code_and_never_the_value():
-    """Colour on a rating already means 'how good is he' product-wide — blue #4A90D9 for
-    10+, green for 7-9 (attrTiles.js). Tinting the values here would make one colour mean
+    """Colour on a rating already means how good he is — red / yellow / green / blue by the
+    displayed tier (attrTiles.js). Tinting the values here would make one colour mean
     two things on the same attribute, one click apart."""
     css = (S / "css" / "player-development-grid.css").read_text()
-    assert ".pdg-hc-attr.is-develops b { color: #F79420; }" in css
+    develops = css[css.index(".pdg-hc-attr.is-develops b"):]
+    assert "var(--text-87)" in develops[:develops.index("}")]
+    assert "var(--orange)" not in develops[:develops.index("}")]
+    assert "colour-law:" not in develops[:develops.index("}") + 40]
     assert ".pdg-hc-attr.is-develops i" not in css
     block = css[css.index(".pdg-hc-attr i {"):]
-    assert "color: #fff" in block[:block.index("}")]
+    assert "var(--text-100)" in block[:block.index("}")]
 
 
 def test_the_threshold_is_published_not_hardcoded_in_the_view():

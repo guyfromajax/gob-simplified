@@ -66,6 +66,8 @@ from BackEnd.utils.animation_step_schema import (
     PlayerAction,
     PlayerArchetype,
 )
+from BackEnd.utils.animation_step_helpers import defender_aware_rate  # STAGE 2: per-player defender test
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 # HCO drive-start VO (SFX_System.md): an announcer "he's driving!" cue fired the instant a
@@ -860,7 +862,7 @@ def _build_step_end_coords_with_interrupts(
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
         arch = archetype.get(pid, "standard")
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         ec, _ = _interpolate_step_end(sc, dest, rate, step_t)
         final[pid] = ec
     return final
@@ -1177,7 +1179,7 @@ def append_hco_bat_oob_trajectory(
         if arch not in ("standard", "sprint", "burst", "cruise", "drift"):
             arch = "standard"
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         moved_end, _dur = _interpolate_step_end(sc, tgt, rate, contact_t)
         actions[pid] = "cut" if pid in off_ids else "guard_offball"
         archetype[pid] = arch
@@ -1396,8 +1398,8 @@ def append_hco_loose_ball_trajectory(
         arch = prior_arch.get(pid)
         if arch not in ("standard", "sprint", "burst", "cruise", "drift"):
             arch = "standard"
-        rate = _ag_grid_per_game_sec(
-            _player_lookup_by_id(off_lineup, def_lineup, pid), arch)
+        rate = defender_aware_rate(
+            _player_lookup_by_id(off_lineup, def_lineup, pid), arch, pid, def_lineup)
         moved_end, _dur = _interpolate_step_end(sc, tgt, rate, contact_t)
         actions[pid] = "cut" if pid in off_ids else "guard_offball"
         archetype[pid] = arch
@@ -1471,9 +1473,8 @@ def append_hco_loose_ball_trajectory(
                 dests[pid] = dict(sc)
                 ends[pid] = dict(sc)
                 continue
-            rate = _ag_grid_per_game_sec(
-                _player_lookup_by_id(off_lineup, def_lineup, pid),
-                LOOSE_BALL_CONVERGE_ARCHETYPE)
+            rate = defender_aware_rate(
+                _player_lookup_by_id(off_lineup, def_lineup, pid), LOOSE_BALL_CONVERGE_ARCHETYPE, pid, def_lineup)
             moved_end, _dur = _interpolate_step_end(sc, bounce, rate, t)
             acts[pid] = "cut" if pid in off_ids else "guard_offball"
             archs[pid] = LOOSE_BALL_CONVERGE_ARCHETYPE
@@ -1614,6 +1615,7 @@ def build_skeleton_animation_steps(
                 for_emitter=True,   # this IS the emitter
             )
         except Exception as _anim_err:
+            reraise_if_strict(_anim_err)
             import logging as _anim_log
             _anim_log.warning(
                 "skeleton_step_emitter: internal animator build failed: %s",
@@ -1649,7 +1651,8 @@ def build_skeleton_animation_steps(
                 animations, _def_lineup or {}, skeleton_steps, game)
         else:
             setattr(game, "_hco_render_animations", animations)
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         pass
 
     # Walk one step per skeleton step. Phase 3 of HCO UESS migration: step T
@@ -1815,7 +1818,10 @@ def build_skeleton_animation_steps(
                         _last_step_next = _last_step_end.get("next")
                         if isinstance(_last_step_ball, dict):
                             _last_step_ball_owner = _last_step_ball.get("owner_player_id")
-                _hco_entry_log.error(
+                # WARNING, not ERROR: fires ~10x per HEALTHY game (119 in 12 healthy
+                # games, reports/observability-2026-09-30.md). At ERROR the Sentry logging
+                # integration turned each one into an event. The HCO entry recovers below.
+                _hco_entry_log.warning(
                     "❌❌❌ [HCO ENTRY BUG] current_bh_id is None — prior turn "
                     "failed to stamp a final ball handler. step0_bh=%s "
                     "prior_turn.result_type=%s prior_turn.current_turn=%s "
@@ -2925,38 +2931,14 @@ def _compute_pass_meet_point(
     return {"x": float(meet_x), "y": float(meet_y)}
 
 
-def _interpolate_step_end(
-    start_coord: GridCoord,
-    dest_coord: GridCoord,
-    rate: float,
-    step_t: float,
-) -> Tuple[GridCoord, float]:
-    """Compute the interrupted end coord + tween duration for a player moving
-    toward ``dest_coord`` at ``rate`` grid/game-sec over a step of duration
-    ``step_t`` game-sec.
+# STAGE 1 (2026-09-24): `_interpolate_step_end` and `_motion_end_toward_dest` were
+# byte-identical (verified over 200k random inputs). One implementation now lives in
+# animation_step_helpers; this name is re-exported because seven callers import it
+# from here. Both still take a RAW rate — wiring the defender spread in is a LATER
+# stage, not this one. See reports/rate-unify-stage1.md.
+from BackEnd.utils.animation_step_helpers import _motion_end_toward_dest
 
-    Returns ``(end_coord, tween_duration_game_seconds)``.
-
-    - If ``natural_t = dist / rate <= step_t``: player reaches dest. Tween
-      duration = natural_t (player idles for the remainder of step_t at their
-      destination).
-    - If ``natural_t > step_t``: player is interrupted at
-      ``start + rate × step_t`` along start→dest. Tween duration = step_t.
-    - Degenerate inputs (dist ~ 0, rate ≤ 0, step_t ≤ 0): no tween, end = start.
-
-    Enforces UESS §9.5 — non-gate movers freeze at interrupted coord, never
-    snap to destination.
-    """
-    dist = _euclid(start_coord, dest_coord)
-    if dist < 1e-6 or rate <= 0 or step_t <= 0:
-        return dict(start_coord), 0.0
-    natural_t = dist / rate
-    if natural_t <= step_t:
-        return dict(dest_coord), float(natural_t)
-    frac = (rate * step_t) / dist
-    x = start_coord["x"] + (dest_coord["x"] - start_coord["x"]) * frac
-    y = start_coord["y"] + (dest_coord["y"] - start_coord["y"]) * frac
-    return {"x": float(x), "y": float(y)}, float(step_t)
+_interpolate_step_end = _motion_end_toward_dest
 
 
 # Per-overlay-map archetype assignment. Rebounders move at standard pace
@@ -3017,7 +2999,7 @@ def _apply_overlay_motion_to_shoot_step(
         if sc is None:
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         ec, dur = _interpolate_step_end(sc, dest_coord, rate, step_t)
         end_coords[pid] = ec
         destinations[pid] = dict(dest_coord)
@@ -3078,7 +3060,7 @@ def _build_ball_motion_sub_step(
             archetype[pid] = "stationary"
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         ec, dur = _interpolate_step_end(sc, dest_coord, rate, step_t)
         end_coords[pid] = ec
         destinations[pid] = dict(dest_coord)

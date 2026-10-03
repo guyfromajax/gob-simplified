@@ -62,6 +62,9 @@ from BackEnd.utils.animation_step_schema import (
     StepEnd,
     StepStart,
 )
+from BackEnd.utils.shared import movement_rate  # STAGE 1: the one rate accessor
+from BackEnd.utils.animation_step_helpers import _is_defender_id  # STAGE 2
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 # --- Vocabulary helpers ----------------------------------------------------
@@ -490,7 +493,10 @@ def _build_outlet_pass_step(
     for pid, target, arch in targets:
         start = all_start_coords[pid]
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        # BUG: canonical is the archetype base (burst off by -20.0). STAGE 2.
+        rate = movement_rate(player, arch, apply_spread=False, fallback_rate=12.0)
+        # BUG: no max(0.0, ...) floor — a negative t moves the player AWAY from the
+        # target instead of holding him at start. Preserved exactly. STAGE 2.
         max_traversal = rate * t
         dist = _euclid(start, target)
         if dist <= max_traversal or dist == 0.0:
@@ -854,7 +860,8 @@ def _guard_step_start_continuity(steps, context: str) -> None:
         )
 
         enforce_step_start_continuity(steps, context=context)
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
 
 
@@ -901,7 +908,10 @@ def _stamp_tween_durations(
             continue
         arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # STAGE 2: the endpoints on this path already use the wrapper; this closes the
+        # split so the rendered duration matches the simulated distance. Defenders only —
+        # def_lineup membership is the test, so the offence is untouched.
+        rate = movement_rate(player, arch, apply_spread=_is_defender_id(pid, def_lineup))
         if rate <= 0:
             continue
         durations[pid] = float(min(dist / rate, step_t))
@@ -1064,7 +1074,10 @@ def _build_outcome_step(
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
         arch = archetype.get(pid, "standard")
-        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        # BUG: canonical is the archetype base (burst off by -20.0). STAGE 2.
+        rate = movement_rate(player, arch, apply_spread=False, fallback_rate=12.0)
+        # BUG: no max(0.0, ...) floor — a negative t moves the player AWAY from the
+        # target instead of holding him at start. Preserved exactly. STAGE 2.
         max_traversal = rate * t
         if dist > max_traversal:
             ratio = max_traversal / dist
@@ -1304,7 +1317,8 @@ def _build_step_back_step(
         dy = end["y"] - start["y"]
         dist = (dx * dx + dy * dy) ** 0.5
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "sprint") if player else 12.0
+        # BUG: canonical is the archetype base (burst off by -20.0). STAGE 2.
+        rate = movement_rate(player, "sprint", apply_spread=False, fallback_rate=12.0)
         traversal = dist / rate if rate > 0 else 0.0
         if traversal > t:
             t = traversal
@@ -1654,7 +1668,8 @@ def build_covert_release_animation_steps(
             _build_post_shot_sub_steps(
                 steps, turn_result, off_lineup, def_lineup, is_away_offense,
             )
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             import logging
             logging.exception("CR FB post-shot sub-steps failed")
     elif result_type != "DEFENSIVE_STOP":
@@ -1715,7 +1730,10 @@ def _clamp_step_end_coords_to_archetype(
         if dist == 0.0:
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        # BUG: canonical is the archetype base (burst off by -20.0). STAGE 2.
+        rate = movement_rate(player, arch, apply_spread=False, fallback_rate=12.0)
+        # BUG: no max(0.0, ...) floor — a negative t moves the player AWAY from the
+        # target instead of holding him at start. Preserved exactly. STAGE 2.
         max_traversal = rate * t
         if dist > max_traversal:
             ratio = max_traversal / dist

@@ -1,0 +1,213 @@
+{
+  "label": "before",
+  "seed": {
+    "fid": "6abcebf3207cb609a9f4761b",
+    "tid": ""
+  },
+  "runs": {
+    "desktop": [
+      {
+        "painted": 800,
+        "waterfall": [
+          {
+            "t": 28,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 247,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 247,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      },
+      {
+        "painted": 800,
+        "waterfall": [
+          {
+            "t": 200,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 303,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 303,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      },
+      {
+        "painted": 807,
+        "waterfall": [
+          {
+            "t": 65,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 248,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 248,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      },
+      {
+        "painted": 806,
+        "waterfall": [
+          {
+            "t": 184,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 268,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 268,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      },
+      {
+        "painted": 799,
+        "waterfall": [
+          {
+            "t": 64,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 246,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 246,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      }
+    ],
+    "online": [
+      {
+        "painted": 828,
+        "waterfall": [
+          {
+            "t": 39,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 282,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 282,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      },
+      {
+        "painted": 802,
+        "waterfall": [
+          {
+            "t": 45,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 245,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 245,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      },
+      {
+        "painted": 800,
+        "waterfall": [
+          {
+            "t": 57,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 250,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 250,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      },
+      {
+        "painted": 800,
+        "waterfall": [
+          {
+            "t": 44,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 309,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 309,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      },
+      {
+        "painted": 804,
+        "waterfall": [
+          {
+            "t": 55,
+            "method": "POST",
+            "path": "/franchise/play-next-game"
+          },
+          {
+            "t": 254,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 254,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      }
+    ]
+  }
+}

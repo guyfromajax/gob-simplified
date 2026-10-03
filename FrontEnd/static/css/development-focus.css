@@ -7,65 +7,44 @@
  */
 
 .devfocus-select {
-  min-height: 28px;
+  min-height: var(--dsz-28);
   max-width: 128px;
-  padding: 0 22px 0 8px;
-  border-radius: 6px;
+  padding: 0 22px 0 var(--space-8);
+  border-radius: var(--radius-6);
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, .05);
-  color: rgba(255, 255, 255, .88);
-  font: 600 11px/1 'Inter', sans-serif;
-  letter-spacing: .02em;
+  background: var(--white-5);
+  color: var(--text-87);
+  font: var(--fw-semibold) var(--fs-11)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-2);
   cursor: pointer;
   appearance: none;
   /* Caret drawn in CSS: a native arrow renders at wildly different widths across
      platforms and pushed the attribute tiles around on Windows. */
-  background-image: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, .45) 50%),
-                    linear-gradient(135deg, rgba(255, 255, 255, .45) 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, var(--white-45) 50%),
+                    linear-gradient(135deg, var(--white-45) 50%, transparent 50%);
   background-position: calc(100% - 12px) 12px, calc(100% - 7px) 12px;
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
-  transition: background-color .14s ease, border-color .14s ease;
+  transition: background-color var(--dur-toggle) var(--ease-out), border-color var(--dur-toggle) var(--ease-out);
 }
 .devfocus-select--pos { width: 60px; }
-.devfocus-select:hover { background-color: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .16); }
-.devfocus-select:focus-visible { outline: 2px solid #F79420; outline-offset: 1px; }
+.devfocus-select:hover { background-color: var(--white-10); border-color: var(--line-strong); }
+.devfocus-select:focus-visible { outline: 2px solid var(--white-40); outline-offset: 1px; }
 .devfocus-select:disabled { opacity: .45; cursor: progress; }
-.devfocus-select option { background: #14161c; color: #fff; }
+.devfocus-select option { background: var(--surface-2); color: var(--text-100); }
 
-/* Development Focus confirmation. Bottom-centre so it never covers the control the coach
-   just used, and aria-live so a save is announced rather than only seen. */
-.devfocus-toast {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  transform: translate(-50%, 12px);
-  z-index: 9999;
-  max-width: min(440px, calc(100vw - 32px));
-  padding: 10px 16px;
-  border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, .14);
-  background: #1b1e26;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
-  color: #fff;
-  font: 600 12px/1.35 'Inter', sans-serif;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .16s ease, transform .16s ease;
-}
-.devfocus-toast.is-open { opacity: 1; transform: translate(-50%, 0); }
-.devfocus-toast.is-error { border-color: rgba(229, 87, 73, .55); background: #2a1a18; }
-@media (prefers-reduced-motion: reduce) { .devfocus-toast { transition: opacity .16s ease; } }
+/* The save confirmation is the shared GOBToast (css/gob-toast.css), not a toast of
+   this module's own. Every page that loads developmentFocus.js loads it too. */
 
 /* --- Read-only renderings (roster surfaces) ------------------------------
    The roster tables are for scanning and comparing; the one editor is the training
    page's Player Development grid. These read as data, not as dormant controls. */
 .devfocus-value {
-  font: 600 11px/1 'Inter', sans-serif;
-  letter-spacing: .03em;
-  color: rgba(255, 255, 255, .86);
+  font: var(--fw-semibold) var(--fs-11)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-3);
+  color: var(--text-87);
   white-space: nowrap;
 }
-.devfocus-value--pos { font-weight: 700; }
+.devfocus-value--pos { font-weight: var(--fw-bold); }
 /* Standard is where nearly everyone sits; muting it lets a real choice stand out. */
-.devfocus-value--focus.is-default { color: rgba(255, 255, 255, .42); font-weight: 500; }
+.devfocus-value--focus.is-default { color: var(--text-38); font-weight: var(--fw-medium); }

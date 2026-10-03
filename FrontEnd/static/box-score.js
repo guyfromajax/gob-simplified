@@ -23,12 +23,7 @@ function cloneParams(params) {
 // Fetches game data and renders box score information
 
 function playSound(filename) {
-  try {
-    const base = (typeof window.API_CONFIG !== 'undefined' && window.API_CONFIG.buildStaticPath) ? window.API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
-    const a = new Audio(base + encodeURIComponent(filename));
-    a.volume = 0.7;
-    a.play().catch(() => {});
-  } catch (e) {}
+  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
 }
 
 let gameData = null;
@@ -94,62 +89,53 @@ function resolveBannerTeamNameFromParams(bannerParam, homeName, awayName) {
   return b;
 }
 
-/** User franchise team display name for Phase B pulse overlay (same rules as header banner). */
-function resolveUserTeamNameForPhaseBPulse(urlParams) {
-  if (!gameData || !urlParams) return '';
-  const { homeTeam, awayTeam, homeTeamId, awayTeamId } = getTeamContext();
-  const homeCore = teamCoreName(homeTeam, 'Home Team');
-  const awayCore = teamCoreName(awayTeam, 'Away Team');
-  const homeLabel = teamDisplayLabel(homeTeam, 'Home Team');
-  const awayLabel = teamDisplayLabel(awayTeam, 'Away Team');
-  const bannerTeamParam = (urlParams.get('banner_team') || '').trim();
-  const myTeamParam = urlParams.get('my_team');
-  const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
-  let userTeamSide = null;
-  if (myTeamParam === 'home' || myTeamParam === 'away') {
-    userTeamSide = myTeamParam;
-  } else if (teamIdParam) {
-    userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeCore, awayCore, homeTeamId, awayTeamId);
+// A box score opened to read it (a schedule result, the Office "Box score" link, a news
+// headline, a bracket score) carries return_url. It is not a step of the game flow, so the
+// closed-game guard must leave it alone: that guard sends a finished game's flow pages
+// back to the Office once the week has moved on, which is exactly last week's result.
+function openedToRead() {
+  try {
+    const raw = liveParams().get('return_url');
+    if (!raw) return false;
+    return typeof getSafeReturnUrl === 'function' ? !!getSafeReturnUrl(raw) : raw.charAt(0) === '/';
+  } catch (e) {
+    return false;
   }
-  if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
-    const fid = urlParams.get('franchise_id');
-    const stored =
-      fid && window.FranchiseLS
-        ? window.FranchiseLS.getLastGameUserTeamSide(fid)
-        : null;
-    if (stored === 'home' || stored === 'away') userTeamSide = stored;
-  }
-  if (bannerTeamParam) {
-    return resolveBannerTeamNameFromParams(bannerTeamParam, homeLabel, awayLabel)
-      || resolveBannerTeamNameFromParams(bannerTeamParam, homeCore, awayCore)
-      || '';
-  }
-  if (userTeamSide === 'away') return awayLabel;
-  if (userTeamSide === 'home') return homeLabel;
-  return '';
-}
-
-function resolveUserTeamSideForPhaseBPulse(urlParams) {
-  if (!gameData || !urlParams) return null;
-  const { homeTeam, awayTeam, homeTeamId, awayTeamId } = getTeamContext();
-  const homeCore = teamCoreName(homeTeam, 'Home Team');
-  const awayCore = teamCoreName(awayTeam, 'Away Team');
-  const myTeamParam = urlParams.get('my_team');
-  const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
-  if (myTeamParam === 'home' || myTeamParam === 'away') return myTeamParam;
-  if (teamIdParam) return mapTeamIdToSide(teamIdParam, gameData, homeCore, awayCore, homeTeamId, awayTeamId);
-  if (typeof localStorage !== 'undefined') {
-    const fid = urlParams.get('franchise_id');
-    const stored =
-      fid && window.FranchiseLS
-        ? window.FranchiseLS.getLastGameUserTeamSide(fid)
-        : null;
-    if (stored === 'home' || stored === 'away') return stored;
-  }
-  return null;
 }
 
 // Initialize on page load
+async function releaseClosedGameCover() {
+  let redirected = false;
+  if (!openedToRead() && window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+    try { redirected = await window.GOBNav.guardClosedFranchiseGame(); } catch (e) { redirected = false; }
+  }
+  if (!redirected && window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  return redirected;
+}
+
+/**
+ * No game to show: the page was opened without a game (and without two teams for a
+ * pre-game view), or the game's data could not be loaded. The sections are built for a game,
+ * so their bare heads and the "Away Team 0 @ Home Team 0" header say nothing: they are
+ * hidden and one card says what happened. The back button stays.
+ */
+function showNoGameState() {
+  const container = document.getElementById('box-score-container');
+  if (!container || container.classList.contains('is-empty')) return;
+  container.classList.add('is-empty');
+  const card = document.createElement('div');
+  card.className = 'box-score-empty';
+  card.setAttribute('role', 'status');
+  const line = document.createElement('p');
+  line.textContent = 'This box score could not be opened.';
+  const hint = document.createElement('p');
+  hint.className = 'box-score-empty-hint';
+  hint.textContent = 'The game was not found.';
+  card.appendChild(line);
+  card.appendChild(hint);
+  container.appendChild(card);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = liveParams();
   const gameId = urlParams.get('game_id');
@@ -174,6 +160,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('⚠️ No gameId in URL params');
     if (!homeTeamName || !awayTeamName) {
       console.error('❌ No game_id provided and team names missing');
+      showNoGameState();
+      setupLockerRoomButton();
+      await releaseClosedGameCover();
       return;
     }
     try {
@@ -182,9 +171,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       setupTabs();
     } catch (e) {
       console.error('❌ Error loading pregame box score:', e);
+      // Only when there is no game to draw. A game that loaded and then hit an error
+      // part-way through drawing keeps what it drew.
+      if (!gameData) showNoGameState();
     } finally {
       // ✅ Always setup locker room button, even if data loading fails
       setupLockerRoomButton();
+      await releaseClosedGameCover();
     }
     return;
   }
@@ -195,9 +188,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupTabs();
   } catch (error) {
     console.error('❌ Error loading box score:', error);
+    if (!gameData) showNoGameState();
   } finally {
     // ✅ Always setup locker room button, even if data loading fails
     setupLockerRoomButton();
+    await releaseClosedGameCover();
   }
 });
 
@@ -734,6 +729,18 @@ function renderHeader() {
     if (stored === 'home' || stored === 'away') userTeamSide = stored;
   }
 
+  const wlPlate = document.getElementById('user-game-wl-plate');
+  if (wlPlate) {
+    if (userTeamSide && homeScore !== awayScore) {
+      const userWon = (userTeamSide === 'home' && homeWon) || (userTeamSide === 'away' && awayWon);
+      wlPlate.textContent = userWon ? 'W' : 'L';
+      wlPlate.hidden = false;
+    } else {
+      wlPlate.hidden = true;
+      wlPlate.textContent = '';
+    }
+  }
+
   // Banner / assets use display labels; side mapping uses core identity.
   const userTeamNameForBanner = bannerTeamParam
     ? resolveBannerTeamNameFromParams(bannerTeamParam, homeLabel, awayLabel)
@@ -768,6 +775,9 @@ function renderHeader() {
       ? resolveTeamBannerPath(null, 'banner_primary')
       : '/images/teams/general/general_banner_primary.jpg';
   }
+
+  // A practice squad game has no program's banner behind it: the plain scoreboard surface.
+  if (urlParams.get('mode') === 'practice_squad') bannerUrl = '';
 
   const header = document.getElementById('box-score-header');
   if (header && bannerUrl) {
@@ -1087,12 +1097,6 @@ function renderPlayerStatsTable(team, players) {
   }
 }
 
-// Format minutes (convert seconds to integer minutes only)
-function formatMinutes(seconds) {
-  if (!seconds) return '0';
-  return Math.floor(seconds / 60).toString();
-}
-
 // Helper function to create table cell
 function createTableCell(text) {
   const td = document.createElement('td');
@@ -1242,15 +1246,15 @@ function renderAttributeChangePills(container, attributeDeltas) {
     offensive_efficiency: { label: 'Offense', scale: 20, invert: false },
     defensive_efficiency: { label: 'Defense', scale: 20, invert: false },
     fb_efficiency: { label: 'Fast Break', scale: 20, invert: false },
-    fb_defense: { label: 'FB Defense', scale: 20, invert: false },
-    pt_efficiency: { label: 'Press/Trap', scale: 20, invert: false },
-    pt_breaks: { label: 'P/T Breaks', scale: 20, invert: false },
+    fb_defense: { label: 'Fast Break Defense', scale: 20, invert: false },
+    pt_efficiency: { label: 'P/T Defense', scale: 20, invert: false },
+    pt_breaks: { label: 'P/T Offense', scale: 20, invert: false },
     fight: { label: 'Fight', scale: 20, invert: false },
     discipline: { label: 'Discipline', scale: 20, invert: false },
     momentum_score: { label: 'Momentum', scale: 10, invert: false },
     team_chemistry: { label: 'Chemistry', scale: 10, invert: false },
-    fb_opp_modifier: { label: 'FB Defense', scale: 20, invert: false },
-    pt_opp_modifier: { label: 'P/T Breaks', scale: 20, invert: false },
+    fb_opp_modifier: { label: 'Fast Break Defense', scale: 20, invert: false },
+    pt_opp_modifier: { label: 'P/T Offense', scale: 20, invert: false },
     offensiveefficiency: { label: 'Offense', scale: 20, invert: false },
     defensiveefficiency: { label: 'Defense', scale: 20, invert: false },
     reboundmodifier: { label: 'Rebounding', scale: 0.5, invert: false },
@@ -1258,8 +1262,8 @@ function renderAttributeChangePills(container, attributeDeltas) {
     teamchemistry: { label: 'Chemistry', scale: 10, invert: false },
     momentumscore: { label: 'Momentum', scale: 10, invert: false },
     fbefficiency: { label: 'Fast Break', scale: 20, invert: false },
-    ptefficiency: { label: 'Press/Trap', scale: 20, invert: false },
-    ptbreaks: { label: 'P/T Breaks', scale: 20, invert: false }
+    ptefficiency: { label: 'P/T Defense', scale: 20, invert: false },
+    ptbreaks: { label: 'P/T Offense', scale: 20, invert: false }
   };
   container.innerHTML = '';
   container.className = 'attr-changes';
@@ -1742,7 +1746,7 @@ function renderScoutingContent(team, teamStats, eogSnapshot = null) {
   const hctPct = hctUsed > 0 ? ((hctSuccess / hctUsed) * 100).toFixed(0) : '0';
   const hctBlock = document.createElement('div');
   hctBlock.className = 'scouting-play-type';
-  hctBlock.innerHTML = `<div class="scouting-play-type-header"><span>HC Traps:</span><span>${hctSuccess} / ${hctUsed} (${hctPct}%)</span></div>`;
+  hctBlock.innerHTML = `<div class="scouting-play-type-header"><span>Half-Court Traps:</span><span>${hctSuccess} / ${hctUsed} (${hctPct}%)</span></div>`;
   specialSection.appendChild(hctBlock);
 
   const fcp = defense.FCP || {};
@@ -2188,7 +2192,9 @@ function setupLockerRoomButton() {
       e.preventDefault();
       e.stopPropagation();
       playSound('x-back.mp3');
-      window.location.href = backUrl;
+      if (from === 'lineup' && window.GOBNav) window.GOBNav.back(backUrl);
+      else if (window.GOBNav) window.GOBNav.replace(backUrl);
+      else window.location.replace(backUrl);
     });
     return;
   }
@@ -2202,7 +2208,13 @@ function setupLockerRoomButton() {
       e.preventDefault();
       e.stopPropagation();
       playSound('x-back.mp3');
-      window.location.href = safeReturnUrl;
+      if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(safeReturnUrl)) {
+        // Back goes to the tab the reader came from (Team › Schedule, League › Schedule,
+        // a bracket): GOBNav reads it from return_url, and falls back to the tab the
+        // reader left when the URL names none. It used to force the Office.
+        window.GOBNav.exitFlow(safeReturnUrl);
+      } else if (window.GOBNav) window.GOBNav.replace(safeReturnUrl);
+      else window.location.replace(safeReturnUrl);
     });
     return;
   }
@@ -2215,7 +2227,8 @@ function setupLockerRoomButton() {
         e.preventDefault();
         e.stopPropagation();
         playSound('x-back.mp3');
-        window.location.href = lineupUrl;
+        if (window.GOBNav) window.GOBNav.back(lineupUrl);
+        else window.location.replace(lineupUrl);
       });
       return;
     }
@@ -2295,26 +2308,12 @@ function setupLockerRoomButton() {
           if (fetchBody && String(fetchBody.franchise_id) === String(urlFranchiseId)) {
             cleanButton.disabled = true;
             const prevText = cleanButton.textContent;
-            const pulseTeamName = resolveUserTeamNameForPhaseBPulse(urlParams);
-            const overlayTitle = pulseTeamName || 'Your team';
             let usedStatusFallback = false;
+            let weekFinished = false;
+            // One loader from here to the drawn Office: the same spinner the next page
+            // shows while it loads, so the wait reads as a single screen.
             if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-              const userTeamSideForFeed = resolveUserTeamSideForPhaseBPulse(urlParams);
-              const statLines = window.PageLoadOverlay.buildPostgameStatFeed
-                ? window.PageLoadOverlay.buildPostgameStatFeed(gameData, {
-                    userTeamSide: userTeamSideForFeed === 'away' ? 'away' : 'home',
-                  })
-                : [];
-              window.PageLoadOverlay.show({
-                variant: 'pulse',
-                title: statLines.length ? '' : overlayTitle,
-                label: 'Simulating Computer Games',
-                subtitle: '',
-                statLines,
-                statIntervalMs: 8000,
-                teamName: pulseTeamName || '',
-                assetKey: 'banner_primary',
-              });
+              window.PageLoadOverlay.show();
             } else {
               cleanButton.textContent = 'Simulating computer games...';
               usedStatusFallback = true;
@@ -2329,6 +2328,7 @@ function setupLockerRoomButton() {
                 body: JSON.stringify(fetchBody),
               });
               if (res.ok) {
+                weekFinished = true;
                 if (window.FranchiseLS && urlFranchiseId) {
                   window.FranchiseLS.clearPendingAndEog(urlFranchiseId);
                 }
@@ -2338,7 +2338,9 @@ function setupLockerRoomButton() {
                 return;
               }
             } finally {
-              if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+              // On success the spinner stays up through the navigation below; it comes
+              // down only when the week did not finish and the user stays on this page.
+              if (!weekFinished && window.PageLoadOverlay && window.PageLoadOverlay.hide) {
                 window.PageLoadOverlay.hide();
               }
               if (usedStatusFallback) {
@@ -2368,7 +2370,10 @@ function setupLockerRoomButton() {
       }
     }
     console.log('🚪 [BOX-SCORE] Navigating to locker room:', lockerRoomUrl);
-    window.location.href = lockerRoomUrl;
+    if (window.GOBNav && window.GOBNav.exitFlow) {
+      window.GOBNav.exitFlow(lockerRoomUrl, navMode === 'franchise' ? { tab: 'home-tab' } : undefined);
+    } else if (window.GOBNav) window.GOBNav.replace(lockerRoomUrl);
+    else window.location.replace(lockerRoomUrl);
   });
 }
 
@@ -2547,3 +2552,11 @@ function closeSpecialStatsPopup() {
     popup.remove();
   }
 }
+
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted) return;
+  if (window.GOBNav && window.GOBNav.reloadIfStale && window.GOBNav.reloadIfStale(event)) return;
+  if (!openedToRead() && window.GOBNav && typeof window.GOBNav.guardClosedFranchiseGame === 'function') {
+    window.GOBNav.guardClosedFranchiseGame();
+  }
+});

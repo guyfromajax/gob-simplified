@@ -1,20 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('mode') === 'recruit' || params.get('recruit_id')) return;
+      var id = params.get('player_id') || params.get('id') || '';
+      params.delete('id');
+      if (id) params.set('player_id', id);
+      params.set('tab', 'player-view');
+      if (!params.get('origin')) {
+        var ret = params.get('return_tab') || '';
+        params.set('origin', ret === 'home-tab' ? 'office' : (ret === 'roster-view' || ret === 'schedule-tab' ? 'team' : 'league'));
+      }
+      var qs = params.toString();
+      window.location.replace('/franchise-command-center.html' + (qs ? '?' + qs : ''));
+    })();
+  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
   <title>Player Profile</title>
-<link rel="stylesheet" href="/resource-pages.css">
+<link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/player-detail.css">
   <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/gob-toast.css">
 </head>
 <body class="player-detail-page">
   <!-- Google Tag Manager (noscript) -->
@@ -29,9 +47,12 @@
 
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/rtBucket.js"></script>
+  <script src="/js/utils/attributeDisplay.js"></script>
   <script src="/common.js"></script>
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/playerYear.js"></script>
+  <!-- Development Focus saves on change and confirms with the shared toast. -->
+  <script src="/js/shared/gobToast.js"></script>
   <script src="/js/shared/developmentFocus.js"></script>
   <script src="/player-detail.js"></script>
   <script src="/js/shared/attributeTooltips.js"></script>

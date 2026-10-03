@@ -29,15 +29,7 @@ function cloneParams(params) {
   const STORAGE_INSTALL = 'gob_training_team_drills_snapshot';
 
   function playSound(filename) {
-    try {
-      const base =
-        typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath
-          ? API_CONFIG.buildStaticPath('/sounds/')
-          : '/sounds/';
-      const a = new Audio(base + encodeURIComponent(filename));
-      a.volume = 0.7;
-      a.play().catch(() => {});
-    } catch (e) {}
+    import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
   }
 
   const params = liveParams();
@@ -332,6 +324,26 @@ function cloneParams(params) {
     } catch (e) {}
   }
 
+  /**
+   * Save the Custom Playbook as the franchise's Training playbook choice, so it is the
+   * default for every later training until the user switches back to Current Playbooks.
+   * A failed save does not block this training: the sessionStorage copy still carries it.
+   */
+  function saveChoice(payload) {
+    if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl) return Promise.resolve();
+    return fetch(API_CONFIG.buildUrl('/franchise/training-playbook-choice'), {
+      method: 'PATCH',
+      keepalive: true,
+      headers: Object.assign(
+        { 'Content-Type': 'application/json' },
+        typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {}
+      ),
+      body: JSON.stringify({ franchise_id: franchiseId, mode: 'custom', focus: payload }),
+    }).catch(function (error) {
+      console.warn('[training-playbooks] could not save the playbook choice', error);
+    });
+  }
+
   function persistAndLeave() {
     playSound('confirm-2-lowervol.wav');
     const payload = {
@@ -341,15 +353,18 @@ function cloneParams(params) {
     sessionStorage.setItem(STORAGE_FOCUS, JSON.stringify(payload));
     sessionStorage.setItem(STORAGE_MODE, 'custom');
     showToast('Playbooks Saved', 'Custom training playbook updated.');
-    setTimeout(() => {
+    const pause = new Promise((resolve) => setTimeout(resolve, 400));
+    Promise.all([saveChoice(payload), pause]).then(() => {
       window.location.href = trainingOrdersUrl();
-    }, 400);
+    });
   }
 
   function wireNav() {
     document.getElementById('tp-back').addEventListener('click', (e) => {
       e.preventDefault();
-      window.location.href = trainingOrdersUrl();
+      const ordersUrl = trainingOrdersUrl();
+      if (window.GOBNav && typeof window.GOBNav.back === 'function') window.GOBNav.back(ordersUrl);
+      else window.location.href = ordersUrl;
     });
     document.getElementById('tp-cancel').addEventListener('click', () => {
       window.location.href = trainingOrdersUrl();
@@ -358,7 +373,23 @@ function cloneParams(params) {
     document.getElementById('tp-save-footer').addEventListener('click', persistAndLeave);
   }
 
+  /* First paint: the page stays behind the loader (and hidden, see the is-loading rule
+     in training-playbooks.css) until the cards are in, so the bare Offense / Defense
+     titles, the "—" docks and a Save button with nothing to save are never shown. */
+  function liftLoading() {
+    document.documentElement.classList.remove('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
+  }
+
   async function init() {
+    try {
+      await load();
+    } finally {
+      liftLoading();
+    }
+  }
+
+  async function load() {
     if (!franchiseId || !teamId) {
       alert('Missing franchise or team. Open this page from Training Orders.');
       window.location.href = '/mode-select.html';
@@ -396,6 +427,12 @@ function cloneParams(params) {
     const defenseRows = buildDefenseCards(data);
     totalOffenseCards = offenseRows.length;
     totalDefenseCards = defenseRows.length;
+    // The selection is a saved setting now and can outlive a play: drop ids that are not on
+    // the page, so the percentages and the "N of M included" counts only count real cards.
+    [[offenseSel, offenseRows], [defenseSel, defenseRows]].forEach(([sel, rows]) => {
+      const known = new Set(rows.map((row) => String(row.id)));
+      Array.from(sel).forEach((id) => { if (!known.has(id)) sel.delete(id); });
+    });
     offenseRows.forEach((row) => renderCard(offGrid, row, offenseSel));
     defenseRows.forEach((row) => renderCard(defGrid, row, defenseSel));
 

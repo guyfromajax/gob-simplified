@@ -69,6 +69,13 @@ export function initTimeoutButton() {
 /**
  * Load timeout sounds if not already loaded (used by both user and computer timeout so airhorn plays in both cases)
  */
+// Both timeout sounds are gameplay audio: scale them by the court's sound
+// control each time they play (0 when muted).
+function busVolume(audio, base) {
+    const bus = typeof window !== 'undefined' ? window.GOBUiSfx : null;
+    audio.volume = bus && typeof bus.outputVolume === 'function' ? bus.outputVolume(base, 'sfx') : base;
+}
+
 function ensureTimeoutSounds() {
     if (airhornSound && timeoutSound) return;
     try {
@@ -552,6 +559,7 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         // Play sound effect
         if (timeoutSound) {
             try {
+                busVolume(timeoutSound, 0.5);
                 timeoutSound.currentTime = 0; // Reset to start
                 timeoutSound.play().catch(err => {
                     console.warn('⚠️ [TIMEOUT] Could not play sound:', err);
@@ -683,6 +691,7 @@ async function handleTimeoutButtonClick(executeOnly = false) {
         // Play airhorn sound when timeout executes (popup appears)
         if (airhornSound) {
             try {
+                busVolume(airhornSound, 0.7);
                 airhornSound.currentTime = 0; // Reset to start
                 airhornSound.play().catch(err => {
                     console.warn('⚠️ [TIMEOUT] Could not play airhorn:', err);
@@ -786,6 +795,7 @@ export async function showComputerTimeoutPopup(timeoutResult, gameId, scene, com
     ensureTimeoutSounds();
     if (airhornSound) {
         try {
+            busVolume(airhornSound, 0.7);
             airhornSound.currentTime = 0;
             airhornSound.play().catch(err => {
                 console.warn('⚠️ [TIMEOUT] Could not play airhorn (computer timeout popup):', err);
@@ -1039,8 +1049,10 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
         // Continue navigation even if fetch fails
     }
     
-    // Navigate to lineup screen
-    window.location.href = `/set-lineup.html?${params.toString()}`;
+    // Replace, so a timeout does not push a second court/lineup history entry.
+    const lineupUrl = `/set-lineup.html?${params.toString()}`;
+    if (window.GOBNav) window.GOBNav.replace(lineupUrl);
+    else window.location.replace(lineupUrl);
 }
 
 // Progress bar functions removed - no longer needed

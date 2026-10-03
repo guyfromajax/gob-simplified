@@ -23,6 +23,7 @@ import {
   coerceFlssSfxFilename,
   resolveFlssCoachVoFile,
 } from '../constants/flssSfx.js';
+import { getAudioState, channelGain, subscribeAudio } from '../../shared/uiSfx.js';
 
 const DEFAULT_VOLUME = 0.7;
 const DEFAULT_POOL_SIZE = 4;
@@ -142,14 +143,34 @@ function debugSfx(eventName, payload = {}) {
   console.debug("[gameSfx]", eventName, payload);
 }
 
+function applySfxVolume(audio, base = DEFAULT_VOLUME) {
+  if (!audio) return;
+  const baseVolume = typeof base === "number" ? base : DEFAULT_VOLUME;
+  audio.dataset.gameSfxBase = String(baseVolume);
+  audio.volume = Math.max(0, Math.min(1, baseVolume * channelGain(getAudioState(), "sfx")));
+}
+
 function createAudio(filename) {
   const audio = new Audio(`${soundBasePath()}${encodeURIComponent(filename)}`);
   audio.preload = "auto";
-  audio.volume = DEFAULT_VOLUME;
+  applySfxVolume(audio, DEFAULT_VOLUME);
   audio.dataset.gameSfxFile = filename;
   audio.dataset.gameSfxBusy = "0";
   return audio;
 }
+
+subscribeAudio(() => {
+  sfxPools.forEach((pool) => {
+    pool.audios.forEach((audio) => {
+      const base = Number(audio.dataset.gameSfxBase);
+      applySfxVolume(audio, Number.isFinite(base) ? base : DEFAULT_VOLUME);
+    });
+  });
+  if (pregameBedAudio) {
+    const base = Number(pregameBedAudio.dataset.gameSfxBase);
+    applySfxVolume(pregameBedAudio, Number.isFinite(base) ? base : DEFAULT_VOLUME);
+  }
+});
 
 function ensurePool(filename, poolSize = DEFAULT_POOL_SIZE) {
   if (!filename) return null;
@@ -267,7 +288,7 @@ export function playGameSfx(scene, filename, volume = DEFAULT_VOLUME, meta = {})
   };
 
   try {
-    audio.volume = volume;
+    applySfxVolume(audio, volume);
     audio.currentTime = 0;
     audio.dataset.gameSfxBusy = "1";
     audio.addEventListener("ended", release, { once: true });
@@ -809,7 +830,7 @@ export function startPregameBed(scene, options = {}) {
   try {
     const audio = createAudio(filename);
     audio.loop = !!options.loop; // loop for the Sim Full Game cover (plays through Act 1 + Act 2)
-    audio.volume = DEFAULT_VOLUME;
+    applySfxVolume(audio, DEFAULT_VOLUME);
     pregameBedAudio = audio;
     const releaseSceneRef = retainActiveSfx(scene, audio);
     const release = () => {

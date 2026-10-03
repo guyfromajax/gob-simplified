@@ -1,279 +1,50 @@
-/* Scouting Report Modal Styles */
-button,
-input[type="button"],
-input[type="submit"],
-input[type="reset"] {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-}
+/* Scouting projected-five cards (team roster Starting 5 + leftover helpers).
+   In-app Prep › Scouting uses css/prep-v2-scouting.css. Tokens only.
+   Dead modal / light-theme table rules removed — no HTML still uses them. */
 
-.scouting-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.scouting-modal-content {
-  background: #fff;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 1200px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.scouting-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 30px;
-  border-bottom: 2px solid #e0e0e0;
-  background: #f5f5f5;
-  border-radius: 12px 12px 0 0;
-}
-
-.scouting-modal-header h2 {
-  margin: 0;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
-  font-size: 32px;
-  color: #333;
-}
-
-.scouting-modal-close {
-  background: none;
-  border: none;
-  font-size: 36px;
-  color: #666;
-  cursor: pointer;
-  padding: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.scouting-modal-close:hover {
-  background: #e0e0e0;
-  color: #333;
-}
-
-.scouting-modal-body {
-  padding: 30px;
-  color: #333;
-}
-
-.scouting-loading {
-  text-align: center;
-  padding: 40px;
-  color: #666;
-  font-size: 18px;
-}
-
-.scouting-report-btn {
-  background: #2d8f2d;
-  color: #fff;
-  border: none;
-  padding: 10px 16px;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
-  font-size: 20px;
-  cursor: pointer;
-  margin-top: 10px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.scouting-report-btn:hover {
-  background: #247a24;
-}
-
-.projected-starting-five-section {
-  margin-bottom: 28px;
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.projected-starting-five-section h2 {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
-  font-size: 1.8rem;
-  color: #4a90e2;
-  font-weight: 600;
-  margin: 0 0 16px 0;
-}
-
-.scouting-projected-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.scouting-projected-header h2 {
-  margin: 0;
-}
-
-.scouting-projected-toggle {
-  display: flex;
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.06);
-  padding: 4px;
-  border-radius: 6px;
-}
-
-.scouting-projected-toggle .toggle-btn {
-  background: transparent;
-  color: #555;
-  border: none;
-  padding: 6px 14px;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.scouting-projected-toggle .toggle-btn:hover:not(.active) {
-  background: rgba(0, 0, 0, 0.05);
-  color: #333;
-}
-
-.scouting-projected-toggle .toggle-btn.active {
-  background: #4a90e2;
-  color: #fff;
-}
-
-.scouting-projected-lineup-wrap {
+.scouting-projected-lineup-wrap,
+#scouting-view .scouting-projected-lineup-wrap {
   overflow-x: auto;
 }
 
-.scouting-projected-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-  font-size: 0.8rem;
-  min-width: 960px;
-}
-
-.scouting-projected-table thead {
-  background: #333;
-  color: #fff;
-}
-
-.scouting-projected-table th,
-.scouting-projected-table td {
-  padding: 8px 6px;
-  text-align: center;
-  border: 1px solid #ddd;
-}
-
-.scouting-projected-table td {
-  color: #333;
-}
-
-.scouting-projected-table th:first-child,
-.scouting-projected-table td:first-child,
-.scouting-projected-table th:nth-child(2),
-.scouting-projected-table td:nth-child(2) {
-  text-align: left;
-}
-
-.scouting-projected-table tbody tr:nth-child(even) {
-  background: #f9f9f9;
-}
-
 .scouting-projected-empty {
-  color: #666;
-  font-size: 0.95rem;
-  padding: 12px 0;
+  color: var(--text-60);
+  font-size: var(--fs-13);
+  padding: var(--space-12) 0;
 }
 
-.play-usage-section {
-  margin-top: 40px;
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.play-usage-section h2 {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
-  font-size: 1.8rem;
-  color: #4a90e2;
-  font-weight: 600;
-  margin-bottom: 20px;
-}
-
-.play-usage-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-}
-
-.play-usage-table thead {
-  background: #333;
-  color: white;
-}
-
-.play-usage-table th {
-  padding: 12px 16px;
-  text-align: left;
-  font-weight: 600;
-}
-
-.play-usage-table td {
-  padding: 10px 16px;
-  border-bottom: 1px solid #eee;
-  color: #333;
-}
-
-.play-usage-table tr:hover {
-  background: #f9f9f9;
-}
-
-/* ── FCC Scouting: Projected Starting Five image cards ─────────────────────
- * Visual source: _documentation_master/projects/Scouting - Projected Five (Images).html
- * RT text color via /css/rt-buckets.css + getRtBucketClass (not mock inline thresholds).
- */
 .p5-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
+  gap: var(--dsp-14);
 }
+
 .p5-card {
   display: flex;
   flex-direction: column;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015) 30%, transparent);
+  border-radius: var(--radius-12);
+  border: 1px solid var(--white-10);
+  background: var(--white-2);
   overflow: hidden;
-  transition: transform 0.16s, border-color 0.16s, box-shadow 0.16s;
+  transition: transform var(--dur-hover), border-color var(--dur-hover), box-shadow var(--dur-hover);
 }
+
 .p5-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.38);
+  border-color: var(--white-22);
+  box-shadow: var(--shadow-card);
 }
+
 .p5-photo {
   position: relative;
   aspect-ratio: 1 / 1;
-  background:
-    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.09), transparent 60%),
-    linear-gradient(180deg, #1b2130, #10141d);
+  border-radius: var(--radius-10);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background: var(--surface-3);
   overflow: hidden;
 }
+
 .p5-photo img {
   width: 100%;
   height: 100%;
@@ -281,6 +52,7 @@ input[type="reset"] {
   object-position: center top;
   display: block;
 }
+
 .p5-photo::after {
   content: '';
   position: absolute;
@@ -288,58 +60,63 @@ input[type="reset"] {
   right: 0;
   bottom: 0;
   height: 46%;
-  background: linear-gradient(180deg, transparent, rgba(11, 13, 20, 0.82));
+  background: linear-gradient(180deg, transparent, var(--bg-page));
   pointer-events: none;
 }
+
 .p5-pos {
   position: absolute;
   top: 10px;
   left: 10px;
   z-index: 2;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 20px;
-  letter-spacing: 0.06em;
+  font-family: var(--font-display);
+  font-size: var(--fs-20);
+  letter-spacing: var(--tracking-6);
   line-height: 1;
   padding: 5px 9px 3px;
-  border-radius: 7px;
-  color: #0b0d14;
-  background: #ffffff;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-6);
+  color: var(--bg);
+  background: var(--white);
+  box-shadow: var(--shadow-logo);
 }
+
 .p5-rt-badge {
   position: absolute;
   top: 8px;
   right: 9px;
   z-index: 2;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 30px;
+  font-family: var(--font-display);
+  font-size: var(--fs-32);
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-2);
   padding: 3px 8px 1px;
-  border-radius: 7px;
-  background: rgba(11, 13, 20, 0.55);
-  backdrop-filter: blur(2px);
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  border-radius: var(--radius-6);
+  background: var(--scrim);
+  text-shadow: 0 2px 6px var(--black-50);
 }
+
 .p5-body {
   padding: 12px 13px 13px;
   display: flex;
   flex-direction: column;
   gap: 0;
 }
+
 .p5-namerow {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-8);
 }
+
 .p5-ident {
   min-width: 0;
 }
+
 .p5-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: #ffffff;
+  font-size: var(--fs-15);
+  font-weight: var(--fw-bold);
+  color: var(--text-100);
   line-height: 1.15;
   min-height: 34px;
   display: -webkit-box;
@@ -347,49 +124,61 @@ input[type="reset"] {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
 .p5-bio {
-  margin-top: 4px;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  color: rgba(255, 255, 255, 0.55);
+  margin-top: var(--space-4);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-3);
+  color: var(--text-60);
 }
+
 .p5-jersey {
   flex-shrink: 0;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 32px;
+  font-family: var(--font-display);
+  font-size: var(--fs-32);
   line-height: 0.82;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: var(--tracking-2);
+  color: var(--text-60);
 }
+
 .p5-stats {
-  margin-top: 12px;
+  margin-top: var(--space-12);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   padding: 11px 6px;
   gap: 2px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-10);
+  background: var(--white-4);
+  border: 1px solid var(--line);
 }
+
 .p5-stat {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
 }
+
 .p5-stat .sv {
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.90);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-bold);
+  color: var(--text-87);
   font-variant-numeric: tabular-nums;
 }
+
 .p5-stat .sl {
-  font-size: 8.5px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-4);
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.40);
+  color: var(--text-38);
+}
+
+.scouting-projected-empty-cell {
+  text-align: center;
+  padding: var(--dsp-20);
+  color: var(--text-60);
 }
 
 @media (max-width: 900px) {
@@ -397,9 +186,9 @@ input[type="reset"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
 @media (max-width: 560px) {
   .p5-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-

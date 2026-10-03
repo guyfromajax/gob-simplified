@@ -15,12 +15,14 @@ const path = require('path');
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
 
-const CSS = read('recruiting-spine.css') + read('recruiting-signing.css') + read('css/attr-tiles.css');
+const CSS = read('css/gob-tokens.css') + read('css/gob-tables.css') + read('recruiting-spine.css')
+  + read('recruiting-signing.css') + read('recruiting-results-hub.css') + read('css/attr-tiles.css');
 // Same order recruiting.html loads them; common.js supplies getBestPosition, which
 // RecruitingCommon.normalizeRecruits depends on.
 const SCRIPTS = [
   'js/shared/franchiseContext.js',
   'common.js',
+  'js/utils/attributeDisplay.js',
   'js/shared/attrTiles.js', 'js/shared/rtBucket.js',
   'js/shared/playerYear.js',
   'recruiting-common.js',
@@ -120,6 +122,7 @@ async function mountPool(page, opts = {}) {
     <style>body{margin:0;background:#0b0d14}.doc{max-width:1180px;margin:0 auto;padding:20px}</style>
     <div class="doc"><a id="back-btn" href="#">Back</a><div id="hub-root" class="spine"></div></div>
   `);
+  await page.evaluate(() => document.documentElement.classList.add('gob'));
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
 
   await page.evaluate(({ data, runResults }) => {
@@ -183,7 +186,7 @@ async function mountPool(page, opts = {}) {
   await page.waitForSelector(opts.waitFor ? opts.waitFor
     : opts.action === 'run' ? '#hub-reveal'
     : opts.week === 35 ? '.spool-rows .prow'
-      : opts.week >= 36 ? '.rstage' : '#hub-pool table.pool tbody tr.rec', { timeout: 10000 });
+      : opts.week >= 36 ? '.gob-rec-results' : '#hub-pool table.pool tbody tr.rec', { timeout: 10000 });
   return patchCalls;
 }
 
@@ -707,15 +710,10 @@ test.describe('week 36 league list', () => {
     const { signed, conferences } = conferenceFixture();
     await mountPool(page, { week: 36, signed, conferences });
     const m = await page.evaluate(() => ({
-      order: [...document.querySelectorAll('.lsconf-t')].map((e) => e.textContent.trim()),
-      tags: [...document.querySelectorAll('.lsconf')].map((c) => {
-        const t = c.querySelector('.lstag');
-        return t ? t.textContent.trim() : '';
-      }),
+      order: [...document.querySelectorAll('#hub-signings .gob-rec-conf h2')].map((e) => e.textContent.trim()),
+      tags: [...document.querySelectorAll('#hub-signings .gob-rec-eye')].map((e) => e.textContent.trim()),
       playback: document.querySelectorAll('#pb-next, #pb-auto, #pb-skip').length,
     }));
-    // Region letter + the conference's OWN number: 9 = E9, 10 = E10, 3 = B3. Letter+1|2
-    // gave every region a "1" and a "2", so B2 and D2 collided as labels.
     expect(m.order).toEqual(['Conference E9', 'Conference E10', 'Conference B3']);
     expect(m.tags[0]).toBe('Your conference');
     expect(m.tags[1]).toBe('Sister conference');
@@ -726,7 +724,7 @@ test.describe('week 36 league list', () => {
     const { signed, conferences } = conferenceFixture({ walkOns: 6 });
     await mountPool(page, { week: 36, signed, conferences });
     const names = await page.evaluate(() =>
-      [...document.querySelectorAll('.lsnm')].map((e) => e.textContent.trim()));
+      [...document.querySelectorAll('#hub-signings .gob-rec-league .name')].map((e) => e.textContent.trim()));
     expect(names.some((n) => n.startsWith('WalkOn'))).toBe(false);
     expect(names.length).toBe(3 + 12 + 5 + 4);
   });
@@ -735,11 +733,11 @@ test.describe('week 36 league list', () => {
     const { signed, conferences } = conferenceFixture();
     await mountPool(page, { week: 36, signed, conferences });
     const m = await page.evaluate(() => ({
-      userTeams: document.querySelectorAll('.lsteam.is-user').length,
-      userConf: document.querySelectorAll('.lsconf.is-user').length,
+      userRows: document.querySelectorAll('#hub-signings .gob-rec-team.is-user-team tr.me').length,
+      yourConf: document.querySelector('#hub-signings .gob-rec-eye')?.textContent.trim(),
     }));
-    expect(m.userTeams).toBe(1);
-    expect(m.userConf).toBe(1);
+    expect(m.userRows).toBeGreaterThan(0);
+    expect(m.yourConf).toBe('Your conference');
   });
 });
 
@@ -829,91 +827,23 @@ test.describe('Orders Submitted modal (confirm before running)', () => {
 });
 
 test.describe('league list layout', () => {
-  test('four teams per row — no ragged tail on an eight-team conference', async ({ page }) => {
-    const { signed, conferences } = conferenceFixture({ mine: 3, others: 14, walkOns: 4 });
-    await mountPool(page, { week: 36, signed, conferences, revealSeen: true });
-    // WIDE on purpose. The old rule was auto-fill/minmax(240px), which happens to give
-    // four columns at the default 1180px doc width too — so a narrow viewport cannot
-    // tell the two apart. At 1900px auto-fill gives seven and splits the conference
-    // 7+1; a fixed four-column grid is still 4+4.
-    await page.setViewportSize({ width: 1900, height: 1200 });
-    await page.evaluate(() => { document.querySelector('.doc').style.maxWidth = '1860px'; });
-    const m = await page.evaluate(() => {
-      const grid = document.querySelector('#hub-signings .lsconf-teams');
-      const cards = [...grid.querySelectorAll('.lsteam')];
-      const rows = {};
-      cards.forEach((c) => {
-        const top = Math.round(c.getBoundingClientRect().top);
-        rows[top] = (rows[top] || 0) + 1;
-      });
-      return {
-        cols: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
-        perRow: Object.keys(rows).sort((a, b) => a - b).map((k) => rows[k]),
-        teams: cards.length,
-      };
-    });
-    expect(m.cols).toBe(4);
-    // Eight teams split 4+4. auto-fill gave 5+3 / 6+2 at this width, which is the
-    // ragged tail the fixed four-column grid exists to remove.
-    expect(m.teams).toBe(8);
-    expect(m.perRow).toEqual([4, 4]);
-  });
-
   test('every signing shows name, position, year and an RT pair', async ({ page }) => {
     const { signed, conferences } = conferenceFixture({ mine: 3, others: 14, walkOns: 4 });
     await mountPool(page, { week: 36, signed, conferences, revealSeen: true });
     const rows = await page.evaluate(() =>
-      [...document.querySelectorAll('#hub-signings .lsrow')].map((r) => ({
-        nm: r.querySelector('.lsnm').textContent.trim(),
-        pos: r.querySelector('.lspos').textContent.trim(),
-        yr: r.querySelector('.lsyr') ? r.querySelector('.lsyr').textContent.trim() : null,
-        rt: r.querySelector('.lsrt').textContent.trim(),
+      [...document.querySelectorAll('#hub-signings .gob-rec-league tbody tr')].map((r) => ({
+        nm: r.querySelector('.name').textContent.trim(),
+        pos: r.querySelector('.pos').textContent.trim(),
+        yr: r.querySelector('.yr').textContent.trim(),
+        rt: r.querySelector('.rt').textContent.trim(),
       })));
     expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) {
       expect(r.nm).not.toBe('');
       expect(r.pos).not.toBe('--');
-      // Abbreviated, like every other recruit surface — never the raw 'Sophomore'.
       expect(['JH', 'FR', 'SO', 'JR']).toContain(r.yr);
-      // current/potential, not a lone grade.
       expect(r.rt).toContain('/');
     }
-  });
-
-  test('the four cells stay on the same rails across teams', async ({ page }) => {
-    // The RT column used to be `auto`, so it sized to the widest RT in ITS OWN card.
-    // This fixture is built to expose that: one team's class tops out at A+/A++ and
-    // another's at F, so a content-sized column makes the two cards disagree and drags
-    // Pos and Yr to different offsets. Uniform rails are what make four columns
-    // scannable at all.
-    const { conferences, teamNames } = conferenceFixture({ mine: 0, others: 0, walkOns: 0 });
-    const ids = Object.keys(conferences.by_team_id).slice(0, 6);
-    const signed = [];
-    ids.forEach((tid, i) => {
-      // Alternate wide (A+/A++) and narrow (F) classes.
-      const rt = i % 2 === 0 ? 99 : 18;
-      for (let k = 0; k < 2; k += 1) {
-        signed.push({
-          recruit_id: `x-${i}-${k}`, player_id: `px-${i}-${k}`, image_id: `ix-${i}-${k}`,
-          name: k ? 'Al Vo' : 'Bartholomew Fitzwilliam',   // and divergent name lengths
-          pos: 'SF', year: 'Sophomore', rt, potential_rt_ratcheted: rt + 6,
-          team_id: tid, team_name: teamNames[tid],
-        });
-      }
-    });
-    await page.setViewportSize({ width: 1560, height: 940 });
-    await mountPool(page, { week: 36, signed, conferences, teamNames, revealSeen: true });
-    const rails = await page.evaluate(() => {
-      const cards = [...document.querySelectorAll('#hub-signings .lsteam')];
-      return cards.map((c) => {
-        const row = c.querySelector('.lsrow');
-        const left = c.getBoundingClientRect().left;
-        const at = (sel) => Math.round(row.querySelector(sel).getBoundingClientRect().left - left);
-        return [at('.lspos'), at('.lsyr'), at('.lsrt')];
-      });
-    });
-    expect(rails.length).toBeGreaterThan(2);
-    for (const r of rails.slice(1)) expect(r).toEqual(rails[0]);
   });
 });
 

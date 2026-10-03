@@ -1,3 +1,7 @@
+/* Frozen: no new rules. Put new styles in the view's own CSS.
+   CI (check_ui_tokens.py) fails if this file's style-rule count or line
+   count grows past FCC_CSS_MAX_RULES / FCC_CSS_MAX_LINES. */
+
 :root {
   --fcc-primary: #27408e;
   --fcc-primary-top: #263d7a;
@@ -7,8 +11,6 @@
   --fcc-panel-border: rgba(255, 255, 255, 0.18);
   --fcc-text: #f7f9ff;
   --fcc-muted: rgba(255, 255, 255, 0.72);
-  --fcc-metal: #9a9a9a;
-  --fcc-shadow: 0 18px 36px rgba(0, 0, 0, 0.26);
 }
 
 body {
@@ -74,16 +76,6 @@ body.has-auth-bar #franchise-container {
 #franchise-container > * {
   position: relative;
   z-index: 1;
-}
-
-.fcc-practice-squad-title {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 1.6rem;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  margin: 4px 0 10px;
-  padding-left: 12px;
-  color: #f7f9ff;
 }
 
 #franchise-container #tournament-top {
@@ -224,24 +216,6 @@ body.has-auth-bar #franchise-container {
   font-style: italic;
 }
 
-#franchise-container .tb-eligibility {
-  margin: 4px 0 0;
-  max-width: 520px;
-  font-family: Inter, sans-serif;
-  font-size: 11px;
-  line-height: 1.35;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-#franchise-container .tb-eligibility.is-yes {
-  color: rgba(140, 210, 160, 0.9);
-}
-
-#franchise-container .tb-eligibility.is-no {
-  color: rgba(240, 180, 120, 0.95);
-}
-
 #franchise-container .fcc-record-label {
   justify-self: center;
   text-align: center;
@@ -344,7 +318,6 @@ body.has-auth-bar #franchise-container {
   outline-offset: 2px;
 }
 
-
 #franchise-container .hero-btn {
   min-width: 138px;
   min-height: 42px;
@@ -417,13 +390,6 @@ body.has-auth-bar #franchise-container {
   background: rgba(255, 255, 255, 0.4);
 }
 
-#franchise-container #schedule-tab .fcc-schedule-tab-inner {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
 /* Footnote: recruiting status; pinned below tab panel inside the FCC card */
 .fcc-recruiting-footnote {
   flex-shrink: 0;
@@ -444,58 +410,7 @@ body.has-auth-bar #franchise-container {
   text-align: center;
 }
 
-.fcc-recruiting-footnote__text {
-  margin: 0;
-  max-width: 56rem;
-}
-
-.fcc-recruiting-footnote__btn {
-  margin: 0;
-  padding: 4px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #e8eeff;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.fcc-recruiting-footnote__btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.fcc-recruiting-footnote__btn:disabled,
-.fcc-recruiting-footnote__btn.is-dead {
-  opacity: 0.45;
-  cursor: default;
-  text-decoration: none;
-}
-
 /* Embedded footnotes: Coach's Office Recruiting card + Recruits tab */
-.fcc-recruiting-footnote--embed {
-  margin-top: 12px;
-  margin-bottom: 0;
-  padding: 10px 0 2px;
-}
-
-#franchise-container #home-tab .fcc-home-card-recruiting .fcc-recruiting-footnote--embed {
-  margin-top: 10px;
-  padding-top: 10px;
-  justify-content: flex-start;
-  text-align: left;
-}
-
-#franchise-container #recruits-tab .fcc-recruiting-footnote--embed {
-  margin-top: 14px;
-  padding-top: 12px;
-}
 
 #franchise-container .tab-buttons {
   display: grid;
@@ -562,8 +477,8 @@ body.has-auth-bar #franchise-container {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #f79420;
-  box-shadow: 0 0 6px rgba(247, 148, 32, 0.7);
+  background: var(--text-100);
+  box-shadow: 0 0 6px var(--white-45);
   animation: inboxBadgePulse 2.5s infinite;
 }
 
@@ -578,33 +493,6 @@ body.has-auth-bar #franchise-container {
     opacity: 0.6;
     transform: scale(0.85);
   }
-}
-
-#franchise-container #playbooks-franchise {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container #playbooks-franchise.needs-playbook-save {
-  border-color: rgba(247, 148, 32, 0.45);
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.09);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-#franchise-container #playbooks-franchise.active {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  transform: translateY(-2px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-#franchise-container #playbooks-franchise.active.needs-playbook-save {
-  border-color: rgba(247, 148, 32, 0.55);
-  color: #ffffff;
 }
 
 #franchise-container .tab-content {
@@ -629,10 +517,6 @@ body.has-auth-bar #franchise-container {
 #franchise-container #tournament-tabs > .tab-content.active > * {
   flex: 0 0 auto;
   min-width: 0;
-}
-
-#franchise-container .fcc-scouting-layout > .fcc-data-card {
-  flex: 0 0 auto;
 }
 
 /* Table wrappers scroll horizontally only; vertical scroll stays on the tab panel */
@@ -672,347 +556,11 @@ body.has-auth-bar #franchise-container {
   color: #ffffff;
 }
 
-#franchise-container .fcc-placeholder-tab {
-  min-height: 0;
-}
-
-#franchise-container .fcc-placeholder-tab.active {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#franchise-container .fcc-placeholder-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 0;
-  text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.72);
-  letter-spacing: 0.02em;
-}
-
 #home-tab {
   min-height: 0;
 }
 
-.fcc-home-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  /* Every card is exactly one row tall, both rows the same. Sizing rows to content let
-     the tallest card in row 1 set that row's height — the Recruiting card, whose wire
-     grows all season — so row 1 stood 315px against row 2's 216 and row 2 walked down
-     the page. Cards fill this box and scroll inside it instead of stretching it. */
-  --fcc-home-row-h: 216px;
-  grid-auto-rows: var(--fcc-home-row-h);
-  gap: 14px;
-}
-
-.fcc-home-card {
-  /* The grid row owns the height now; a min-height here would fight it. */
-  min-height: 0;
-  overflow: hidden;
-  padding: 16px 16px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 18%),
-    linear-gradient(180deg, rgba(26, 30, 42, 0.95), rgba(18, 21, 32, 0.97));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 18px 36px rgba(0, 0, 0, 0.14);
-  display: flex;
-  flex-direction: column;
-}
-
-#franchise-container #home-tab .fcc-home-card h3 {
-  margin: 0 0 18px;
-  color: #ffffff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
-  font-size: 16px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-#franchise-container #home-tab .fcc-home-card-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-#franchise-container #home-tab .fcc-home-card-head h3 {
-  margin: 0;
-}
-
-/* Tournament tier lockup in the Next/Last Game card headers — Surface B.
-   Right-justified on the same row as the <h3>; collapses when empty so the
-   header renders exactly as before with no tournament active. */
-#franchise-container #home-tab .fcc-home-card-head--tier {
-  align-items: center;
-}
-#franchise-container #home-tab .fcc-card-tier-lockup {
-  flex: 0 0 auto;
-}
-#franchise-container #home-tab .fcc-card-tier-lockup:empty {
-  display: none;
-}
-
-#franchise-container #home-tab .fcc-home-card-link {
-  flex-shrink: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-}
-
-#franchise-container #home-tab .fcc-home-card-link:hover {
-  text-decoration: underline;
-}
-
-.fcc-home-card-body {
-  flex: 1;
-  min-height: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.fcc-home-news-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 7px 2px;
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fcc-home-news-row:hover .fcc-home-news-headline {
-  color: #ffffff;
-  text-decoration: underline;
-}
-
-.fcc-home-news-headline {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 13px;
-  font-weight: 700;
-}
-
 /* News tab: full-season list of stories grouped by week */
-.fcc-news-tab-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.fcc-news-tab-week {
-  padding: 12px 16px 14px;
-}
-
-.fcc-news-tab-week-title {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 18px;
-  letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.66);
-  text-transform: uppercase;
-  margin-bottom: 6px;
-}
-
-.fcc-news-tab-headline {
-  display: block;
-  padding: 8px 2px;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fcc-news-tab-headline:last-child {
-  border-bottom: none;
-  padding-bottom: 2px;
-}
-
-.fcc-news-tab-headline:hover {
-  color: #ffffff;
-  text-decoration: underline;
-}
-
-.fcc-news-tab-empty {
-  padding: 28px 12px;
-  text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.66);
-}
-
-.fcc-home-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100%;
-  text-align: center;
-  font-size: 16px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.66);
-}
-
-.fcc-home-list-scroll {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  max-height: 126px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 6px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.06);
-}
-
-.fcc-home-list-scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.fcc-home-list-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
-}
-
-.fcc-home-list-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.28);
-  border-radius: 999px;
-}
-
-.fcc-home-list-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.fcc-home-list-row,
-.fcc-home-recruit-row,
-.fcc-home-team-stats-row {
-  display: grid;
-  align-items: center;
-  gap: 8px;
-  min-height: 24px;
-  padding: 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fcc-home-list-row:last-child,
-.fcc-home-recruit-row:last-child,
-.fcc-home-team-stats-row:last-child,
-.fcc-home-standings-row:last-child {
-  border-bottom: none;
-}
-
-.fcc-home-list-row {
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-}
-
-.fcc-home-list-rank,
-.fcc-home-list-meta {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.fcc-home-list-main {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: rgba(255, 255, 255, 0.94);
-}
-
-.fcc-home-standings {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.fcc-home-standings-row {
-  display: grid;
-  grid-template-columns: minmax(98px, 1.9fr) 24px 24px 34px 34px;
-  gap: 4px;
-  align-items: center;
-  min-height: 24px;
-  padding: 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fcc-home-standings-row-header {
-  min-height: 22px;
-  padding-top: 0;
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.fcc-home-standings-team {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.fcc-home-standings-team {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.94);
-}
-
-.fcc-home-standings-stat {
-  text-align: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.fcc-home-matchup-card {
-  display: grid;
-  grid-template-rows: 33% 1fr;
-  height: 100%;
-}
-
-.fcc-home-matchup-top {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.fcc-home-matchup-label {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
-  font-size: 28px;
-  letter-spacing: 0.06em;
-  color: #ffffff;
-}
-
-.fcc-home-matchup-logo {
-  width: min(88%, 284px);
-  max-width: 100%;
-  max-height: 50px;
-  object-fit: contain;
-  justify-self: end;
-}
 
 #franchise-container .team-tooltip-host {
   position: relative;
@@ -1070,324 +618,7 @@ body.has-auth-bar #franchise-container {
   visibility: visible;
 }
 
-.fcc-home-matchup-top .team-tooltip-host {
-  justify-self: end;
-}
-
-.fcc-home-matchup-bottom {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-  padding-top: 10px;
-}
-
-.fcc-home-detail-line {
-  font-size: 12px;
-  line-height: 1.3;
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.fcc-home-opponent-name {
-  font-size: 13px;
-  line-height: 1.25;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.94);
-}
-
-.fcc-home-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.fcc-home-potg-line {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.fcc-home-final-score {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.fcc-home-final-score-at {
-  color: rgba(255, 255, 255, 0.56);
-}
-
-.fcc-home-score-strong {
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.fcc-home-locker-room {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.fcc-home-locker-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.68);
-}
-
-.fcc-home-chemistry-bar {
-  position: relative;
-  height: 22px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.fcc-home-chemistry-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: linear-gradient(90deg, rgba(247, 148, 32, 0.18) 0%, rgba(247, 148, 32, 0.45) 45%, rgba(247, 148, 32, 0.85) 100%);
-  border-right: 1px solid rgba(255, 205, 38, 0.72);
-}
-
-.fcc-home-chemistry-text {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  font-size: 11px;
-  font-weight: 700;
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
-}
-
-.fcc-home-attitude-scale {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.fcc-home-attitude-emojis,
-.fcc-home-attitude-counts,
-.fcc-home-attitude-rail {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: center;
-  text-align: center;
-}
-
-.fcc-home-attitude-emojis span {
-  font-size: 18px;
-}
-
-.fcc-home-attitude-rail {
-  position: relative;
-  min-height: 12px;
-}
-
-.fcc-home-attitude-rail::before {
-  content: '';
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  top: 50%;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-50%);
-}
-
-.fcc-home-attitude-tick {
-  justify-self: center;
-  width: 1px;
-  height: 12px;
-  background: rgba(255, 255, 255, 0.68);
-  position: relative;
-  z-index: 1;
-}
-
-.fcc-home-attitude-counts span {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.86);
-}
-
-.fcc-home-team-stats {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-#franchise-container #home-tab .fcc-home-leaders-head {
-  align-items: center;
-}
-
-.fcc-home-leaders-toggle {
-  display: flex;
-  gap: 3px;
-}
-
-.fcc-home-leaders-toggle button {
-  min-width: 32px;
-  height: 24px;
-  padding: 0 6px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.58);
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
-  font-size: 12px;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-}
-
-.fcc-home-leaders-toggle button:hover {
-  color: rgba(255, 255, 255, 0.9);
-  border-color: rgba(255, 255, 255, 0.28);
-}
-
-.fcc-home-leaders-toggle button[aria-pressed="true"] {
-  color: #ffffff;
-  border-color: var(--fcc-primary-top);
-  background: var(--fcc-primary-deep);
-}
-
-.fcc-home-team-stats-header,
-.fcc-home-team-stats-row {
-  grid-template-columns: minmax(0, 1fr) 44px;
-}
-
-.fcc-home-team-stats-header {
-  display: grid;
-  gap: 8px;
-  align-items: center;
-  min-height: 22px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.64);
-}
-
-.fcc-home-team-stats-header span:last-child,
-.fcc-home-team-stats-value {
-  text-align: right;
-}
-
-.fcc-home-team-stats-name {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.fcc-home-team-stats-value {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.fcc-home-recruit-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 40px 40px 34px;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.fcc-home-recruiting {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  gap: 10px;
-}
-
-.fcc-home-recruiting-topline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 18px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.fcc-home-recruiting-rank {
-  text-align: left;
-}
-
-.fcc-home-recruiting-prestige {
-  text-align: right;
-}
-
-.fcc-home-recruit-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 40px 40px 34px;
-  align-items: center;
-  gap: 8px;
-  min-height: 22px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.64);
-}
-
-.fcc-home-recruit-name,
-.fcc-home-recruit-arch {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.fcc-home-recruit-name {
-  color: rgba(255, 255, 255, 0.92);
-  font-weight: 700;
-}
-
-.fcc-home-recruit-arch {
-  color: rgba(255, 255, 255, 0.84);
-}
-
-.fcc-home-recruit-stat {
-  text-align: right;
-  color: rgba(255, 255, 255, 0.82);
-  font-weight: 700;
-}
-
 /* FCC Tournament tab: bracket mount (styles in .fcc-tb-* below) */
-#tournament-bracket-container.bracket,
-#fcc-tournament-bracket.fcc-tournament-bracket,
-#all-brackets-root.fcc-tournament-bracket {
-  padding-top: 8px;
-  padding-bottom: 16px;
-  min-height: 500px;
-}
-
-#tournament-bracket-container,
-#fcc-tournament-bracket.fcc-tournament-bracket,
-#all-brackets-root.fcc-tournament-bracket {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  width: 100%;
-  overflow-x: auto;
-}
 
 .fcc-tournament-empty-msg {
   margin: 0;
@@ -1411,22 +642,6 @@ body.has-auth-bar #franchise-container {
   color: #1f2937;
 }
 
-.fcc-tournament-tone-conference {
-  background: #ffffff;
-}
-
-.fcc-tournament-tone-region {
-  background: #f5f5f5;
-}
-
-.fcc-tournament-tone-national {
-  background: #ebebeb;
-}
-
-.fcc-data-card.fcc-tournament-card .fcc-tournament-card-body {
-  min-height: 0;
-}
-
 .fcc-tournament-divider {
   border: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.14);
@@ -1434,19 +649,8 @@ body.has-auth-bar #franchise-container {
 }
 
 /* ===== FCC Tournament — Style A (Classic horizontal), .fcc-tb-* ===== */
-.fcc-data-card.fcc-tournament-card .fcc-tournament-divider,
 .resource-page-container .fcc-tournament-divider {
   border-top-color: rgba(255, 255, 255, 0.14);
-}
-
-.fcc-data-card.fcc-tournament-card .fcc-tournament-section.fcc-tb-tier {
-  position: relative;
-  isolation: isolate;
-  padding: 12px 0 16px;
-  background: transparent;
-  border-radius: 16px;
-  --tb-intensity: 0.62;
-  --tb-champ-scale: 1;
 }
 
 .fcc-tb-tier[data-tb-tier='region'] {
@@ -1577,10 +781,10 @@ body.has-auth-bar #franchise-container {
 }
 
 .fcc-tb-mu--user {
-  border-color: rgba(43, 214, 106, 0.45);
+  border-color: color-mix(in srgb, var(--navy-hi) 55%, var(--white-10));
   box-shadow:
-    0 0 0 1px rgba(43, 214, 106, 0.45),
-    0 0 26px rgba(43, 214, 106, 0.32),
+    0 0 0 1px color-mix(in srgb, var(--navy-hi) 45%, transparent),
+    0 0 26px color-mix(in srgb, var(--navy-hi) 28%, transparent),
     0 8px 22px rgba(0, 0, 0, 0.4);
 }
 
@@ -1632,17 +836,17 @@ body.has-auth-bar #franchise-container {
 }
 
 .fcc-tb-team--user {
-  border-left: 3px solid #2bd66a;
-  background: linear-gradient(90deg, rgba(43, 214, 106, 0.16), rgba(43, 214, 106, 0.04));
+  border-left: 3px solid var(--navy);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--navy) 22%, transparent), transparent);
 }
 
 .fcc-tb-team--user .fcc-tb-name-text,
 .fcc-tb-team--user .fcc-tb-score {
-  color: #eafff2;
+  color: var(--text-100);
 }
 
 .fcc-tb-team--user .fcc-tb-seed {
-  color: #2bd66a;
+  color: var(--text-60);
 }
 
 .fcc-tb-team--champion {
@@ -1650,7 +854,7 @@ body.has-auth-bar #franchise-container {
 }
 
 .fcc-tb-team--champion.fcc-tb-team--user {
-  background: linear-gradient(90deg, rgba(43, 214, 106, 0.22), rgba(212, 168, 72, 0.1));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--navy) 18%, transparent), rgba(212, 168, 72, 0.1));
 }
 
 .fcc-tb-team--bye {
@@ -1703,7 +907,7 @@ body.has-auth-bar #franchise-container {
 }
 
 .fcc-tb-team--user .fcc-tb-record {
-  color: rgba(43, 214, 106, 0.75);
+  color: var(--text-60);
 }
 
 .fcc-tb-rank-prefix {
@@ -1820,9 +1024,7 @@ body.has-auth-bar #franchise-container {
   padding: 4px 0 8px;
 }
 
-.fcc-tb-region--4,
-.fcc-tb-region--3,
-.fcc-tb-region--full {
+.fcc-tb-region--full{
   grid-template-columns: 1fr 1fr minmax(12px, 0.35fr);
 }
 
@@ -1852,11 +1054,6 @@ body.has-auth-bar #franchise-container {
   align-items: stretch;
   gap: 10px;
   min-height: 0;
-}
-
-.fcc-tb-region-col--solo {
-  max-width: 420px;
-  margin: 0 auto;
 }
 
 .fcc-tb-region-col--spacer {
@@ -1922,9 +1119,7 @@ body.has-auth-bar #franchise-container {
     display: none;
   }
 
-  .fcc-tb-region--4,
-  .fcc-tb-region--3,
-  .fcc-tb-region--full {
+  .fcc-tb-region--full{
     grid-template-columns: 1fr;
   }
 
@@ -2019,28 +1214,9 @@ body.has-auth-bar #franchise-container {
   background: #4065af;
   color: #fff;
 }
-.rankings-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.rankings-list li {
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  font-family: 'Inter', sans-serif;
-}
-
-.rankings-list li .rankings-team.conference-1 {
-  font-weight: bold;
-}
 
 /* Standings tab: region toggles and conference sections */
-.standings-region-toggle-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
+
 .standings-region-btn {
   padding: 8px 14px;
   border-radius: 999px;
@@ -2174,15 +1350,6 @@ body.has-auth-bar #franchise-container {
 }
 
 /* Tournament tab (week 27+): bracket mount + footer links (inherits .fcc-standings-full-link) */
-.fcc-tournament-footer-links {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  margin-top: 10px;
-  padding: 0 4px;
-}
 
 .fcc-data-card {
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -2200,9 +1367,6 @@ body.has-auth-bar #franchise-container {
   padding: 0;
 }
 
-#franchise-container #roster-tab table.roster-table,
-#franchise-container #player-stats-tab table.stats-table,
-#franchise-container #recruits-tab table.recruiting-table,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table {
   margin: 0;
   min-width: 1180px;
@@ -2211,9 +1375,6 @@ body.has-auth-bar #franchise-container {
   border-spacing: 0;
 }
 
-#franchise-container #roster-tab table.roster-table thead th,
-#franchise-container #player-stats-tab table.stats-table thead th,
-#franchise-container #recruits-tab table.recruiting-table thead th,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table thead th {
   position: sticky;
   top: 0;
@@ -2230,42 +1391,6 @@ body.has-auth-bar #franchise-container {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
 }
 
-/* Roster tab: scrolling moves to the tab panel (both axes) so the attribute
-   header row can stick to the top while the user scrolls down */
-#franchise-container #tournament-tabs > #roster-tab.tab-content.active {
-  overflow-x: auto;
-}
-
-#franchise-container #roster-tab .fcc-data-card {
-  overflow: visible;
-  align-self: flex-start;
-  width: max-content;
-  min-width: 100%;
-}
-
-#franchise-container #roster-tab .fcc-data-card-body.scroll-x {
-  overflow: visible;
-}
-
-#franchise-container #roster-tab table.roster-table thead th {
-  z-index: 2;
-  /* Opaque base so scrolled rows don't show through the stuck header */
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015)),
-    #262b34;
-}
-
-#franchise-container #roster-tab table.roster-table thead th:first-child {
-  border-top-left-radius: 14px;
-}
-
-#franchise-container #roster-tab table.roster-table thead th:last-child {
-  border-top-right-radius: 14px;
-}
-
-#franchise-container #roster-tab table.roster-table tbody td,
-#franchise-container #player-stats-tab table.stats-table tbody td,
-#franchise-container #recruits-tab table.recruiting-table tbody td,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td {
   padding: 9px 10px;
   color: rgba(255, 255, 255, 0.9);
@@ -2276,51 +1401,30 @@ body.has-auth-bar #franchise-container {
   background: transparent;
 }
 
-#franchise-container #roster-tab table.roster-table tbody tr:nth-child(odd),
-#franchise-container #player-stats-tab table.stats-table tbody tr:nth-child(odd),
-#franchise-container #recruits-tab table.recruiting-table tbody tr:nth-child(odd),
 #franchise-container #fcc-team-stats-summary-tab table.stats-table tbody tr:nth-child(odd) {
   background: rgba(255, 255, 255, 0.03);
 }
 
-#franchise-container #roster-tab table.roster-table tbody tr:hover td,
-#franchise-container #player-stats-tab table.stats-table tbody tr:hover td,
-#franchise-container #recruits-tab table.recruiting-table tbody tr:hover td,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table tbody tr:hover td {
   background: rgba(255, 255, 255, 0.04);
 }
 
-#franchise-container #roster-tab table.roster-table thead th:first-child,
-#franchise-container #player-stats-tab table.stats-table thead th:first-child,
-#franchise-container #recruits-tab table.recruiting-table thead th:first-child,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table thead th:first-child,
-#franchise-container #roster-tab table.roster-table tbody td:first-child,
-#franchise-container #player-stats-tab table.stats-table tbody td:first-child,
-#franchise-container #recruits-tab table.recruiting-table tbody td:first-child,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child {
   text-align: left;
   padding-left: 16px;
 }
 
-#franchise-container #roster-tab table.roster-table tbody td:first-child,
-#franchise-container #player-stats-tab table.stats-table tbody td:first-child,
-#franchise-container #recruits-tab table.recruiting-table tbody td:first-child,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child {
   font-weight: 700;
   color: #ffffff;
 }
 
-#franchise-container #roster-tab table.roster-table tbody td:first-child a,
-#franchise-container #player-stats-tab table.stats-table tbody td:first-child a,
-#franchise-container #recruits-tab table.recruiting-table tbody td:first-child a,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child a {
   color: #ffffff;
   text-decoration: none;
 }
 
-#franchise-container #roster-tab table.roster-table tbody td:first-child a:hover,
-#franchise-container #player-stats-tab table.stats-table tbody td:first-child a:hover,
-#franchise-container #recruits-tab table.recruiting-table tbody td:first-child a:hover,
 #franchise-container #fcc-team-stats-summary-tab table.stats-table tbody td:first-child a:hover {
   text-decoration: underline;
 }
@@ -2328,127 +1432,6 @@ body.has-auth-bar #franchise-container {
 .fcc-team-stats-footer-link-wrap {
   width: 100%;
   margin-top: 10px;
-}
-
-#franchise-container .fcc-scouting-status {
-  padding: 18px 6px 10px;
-  color: rgba(255, 255, 255, 0.78);
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-#franchise-container .fcc-scouting-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-#franchise-container .fcc-scouting-summary-body {
-  padding: 14px 16px 12px;
-}
-
-#franchise-container .fcc-scouting-meta-strip {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  padding-bottom: 13px;
-  margin-bottom: 14px;
-}
-
-#franchise-container .fcc-scouting-meta-label {
-  color: rgba(255, 255, 255, 0.5);
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-#franchise-container .fcc-scouting-meta-rank {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-#franchise-container .fcc-scouting-rank-value {
-  color: #f7f9ff;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-#franchise-container .fcc-scouting-hero-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 24px;
-}
-
-#franchise-container .fcc-scouting-hero-name {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  min-width: 0;
-}
-
-#franchise-container .fcc-scouting-opponent-name {
-  color: #ffffff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 54px;
-  letter-spacing: 0.03em;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-#franchise-container .fcc-scouting-opponent-record {
-  color: rgba(255, 255, 255, 0.5);
-  font-family: 'Inter', sans-serif;
-  font-size: 19px;
-  font-weight: 600;
-  line-height: 1;
-  position: relative;
-  top: 2px;
-  white-space: nowrap;
-}
-
-#franchise-container .fcc-scouting-team-page-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: 'Inter', sans-serif;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 9px 15px;
-  border-radius: 9px;
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-  color: #ffa84a;
-  border: 1px solid rgba(247, 148, 32, 0.45);
-  background: rgba(247, 148, 32, 0.06);
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-#franchise-container .fcc-scouting-team-page-link svg {
-  width: 15px;
-  height: 15px;
-  transition: transform 0.15s ease;
-}
-
-#franchise-container .fcc-scouting-team-page-link:hover {
-  background: rgba(247, 148, 32, 0.14);
-  border-color: #f79420;
-}
-
-#franchise-container .fcc-scouting-team-page-link:hover svg {
-  transform: translateX(3px);
 }
 
 #franchise-container .fcc-scouting-card-head {
@@ -2483,428 +1466,6 @@ body.has-auth-bar #franchise-container {
 
 #franchise-container .fcc-scouting-p5-body {
   padding: 14px;
-}
-
-#franchise-container #coaches-tab .scouting-projected-lineup-wrap {
-  min-width: 0;
-}
-
-#franchise-container .fcc-scouting-team-body {
-  padding: 12px 14px 14px;
-}
-
-#franchise-container .fcc-scouting-measures-body {
-  padding: 14px;
-}
-
-#franchise-container .fcc-scouting-measures-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.82fr);
-  gap: 18px;
-  align-items: stretch;
-}
-
-#franchise-container .fcc-scouting-radar-host {
-  min-width: 0;
-}
-
-#franchise-container .fcc-scouting-radar-host .tm-radar-wrap {
-  min-height: 460px;
-}
-
-#franchise-container .fcc-scouting-side-cards {
-  display: grid;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-#franchise-container .fcc-scouting-side-card {
-  min-width: 0;
-  display: flex;
-}
-
-#franchise-container .fcc-scouting-side-card .tm-side-card-content {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 100%;
-  min-height: 100%;
-  padding: 18px 18px 16px;
-}
-
-#franchise-container .fcc-scouting-side-card-chemistry .tm-side-card-content {
-  padding-top: 20px;
-  padding-bottom: 18px;
-}
-
-#franchise-container #coaches-tab .tm-side-card-label,
-#franchise-container #coaches-tab .tm-radar-axis-label {
-  font-size: 18px;
-}
-
-#franchise-container #coaches-tab .scouting-projected-lineup-wrap {
-  padding: 0;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table {
-  width: max(100%, 960px);
-  min-width: 960px;
-  margin: 0;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: transparent;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table thead th,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 12px 10px 10px;
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody td,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody td {
-  padding: 9px 10px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: transparent;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody tr:nth-child(odd),
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody tr:nth-child(even),
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:nth-child(even) {
-  background: transparent;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody tr:nth-child(even) td,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:nth-child(even) td {
-  background: transparent;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody tr:hover td,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-#franchise-container #coaches-tab .scouting-projected-table th:first-child,
-#franchise-container #coaches-tab .scouting-projected-table td:first-child,
-#franchise-container #coaches-tab .scouting-projected-table th:nth-child(2),
-#franchise-container #coaches-tab .scouting-projected-table td:nth-child(2),
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table th:first-child,
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table td:first-child {
-  text-align: left;
-  padding-left: 16px;
-}
-
-#franchise-container #coaches-tab .scouting-projected-table tbody td:nth-child(2),
-#franchise-container #coaches-tab .fcc-scouting-play-usage-table tbody td:first-child {
-  color: #ffffff;
-  font-weight: 700;
-}
-
-#franchise-container #coaches-tab .scouting-projected-empty {
-  padding: 18px 16px;
-  color: rgba(255, 255, 255, 0.72);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-#franchise-container .fcc-playbooks-card-body {
-  min-height: 0;
-  padding: 12px 16px 14px;
-}
-
-#franchise-container .fcc-playbooks-card {
-  flex: 0 0 auto;
-  overflow: visible;
-}
-
-#franchise-container .fcc-playbooks-sections {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 18px;
-}
-
-#franchise-container .fcc-playbooks-section {
-  min-width: 0;
-}
-
-#franchise-container .fcc-playbooks-section-head-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-#franchise-container .fcc-playbooks-section-head {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 0 8px;
-  color: #F79420;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.2;
-  border-bottom: 1px solid rgba(247, 148, 32, 0.7);
-}
-
-#franchise-container .fcc-playbooks-inline-link {
-  appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.76);
-  border-radius: 10px;
-  padding: 0 12px;
-  min-height: 30px;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-}
-
-#franchise-container .fcc-playbooks-inline-link:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-}
-
-#franchise-container .fcc-playbooks-section-body {
-  padding: 12px 0 0;
-}
-
-#franchise-container .fcc-playbooks-placeholder-body {
-  min-height: 96px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-#franchise-container .fcc-playbooks-placeholder-copy {
-  color: rgba(255, 255, 255, 0.72);
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  text-align: left;
-}
-
-#franchise-container .fcc-playbooks-items {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px 14px;
-}
-
-#franchise-container .fcc-playbooks-item-card {
-  min-width: 0;
-  min-height: 0;
-  padding: 8px 12px 7px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
-    rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-#franchise-container .fcc-playbooks-item-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-#franchise-container .fcc-playbooks-item-name {
-  color: rgba(255, 255, 255, 0.92);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#franchise-container .fcc-playbooks-item-percent {
-  flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.92);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-#franchise-container .fcc-playbooks-item-eff {
-  color: rgba(255, 255, 255, 0.62);
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.2;
-}
-
-#franchise-container .fcc-playbooks-item-meta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 5px;
-}
-
-/* CMD band colors → css/playbook-cmd.css */
-
-#franchise-container .fcc-playbooks-item-top-scorer {
-  flex: 0 0 auto;
-  color: #9e9d9d;
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.2;
-  text-align: right;
-}
-
-#franchise-container .fcc-playbooks-empty {
-  grid-column: 1 / -1;
-  padding: 16px 0 10px;
-  text-align: left;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-#franchise-container .fcc-playcall-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 18px;
-}
-
-#franchise-container .fcc-playcall-column {
-  min-width: 0;
-}
-
-#franchise-container .fcc-playcall-column-head {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 0 10px;
-  padding-bottom: 6px;
-  color: #F79420;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.2;
-  border-bottom: 1px solid rgba(247, 148, 32, 0.7);
-}
-
-#franchise-container .fcc-psw-strip {
-  margin: 0 0 14px;
-}
-
-#franchise-container .fcc-psw-strip .psw-group-label {
-  color: rgba(255,255,255,0.35);
-}
-
-#franchise-container .fcc-playcall-slots {
-  display: grid;
-  gap: 8px;
-}
-
-#franchise-container .fcc-playcall-slot-card {
-  min-width: 0;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
-    rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-#franchise-container .fcc-playcall-slot-line {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.25;
-}
-
-#franchise-container .fcc-playcall-slot-number,
-#franchise-container .fcc-playcall-slot-detail,
-#franchise-container .fcc-playcall-slot-empty {
-  color: #9e9d9d;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 400;
-}
-
-#franchise-container .fcc-playcall-slot-name {
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-@media (max-width: 720px) {
-  #franchise-container .fcc-scouting-hero-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-}
-
-@media (max-width: 1280px) {
-  #franchise-container .fcc-scouting-measures-grid {
-    grid-template-columns: 1fr;
-  }
-
-  #franchise-container .fcc-scouting-radar-host .tm-radar-wrap {
-    min-height: 420px;
-  }
-
-  #franchise-container .fcc-playbooks-sections {
-    grid-template-columns: 1fr;
-  }
-
-  #franchise-container .fcc-playbooks-items {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  #franchise-container .fcc-playcall-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 980px) {
-  #franchise-container .fcc-playbooks-items {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 680px) {
-  #franchise-container .fcc-playbooks-section-head-wrap {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  #franchise-container .fcc-playbooks-items {
-    grid-template-columns: 1fr;
-  }
 }
 
 #franchise-container .fcc-leaders-card-body {
@@ -3012,440 +1573,7 @@ body.has-auth-bar #franchise-container {
   text-align: center;
 }
 
-#franchise-container .fcc-game-plan-card-body {
-  padding: 12px 16px 14px;
-}
-
-#franchise-container .fcc-game-plan-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0 18px;
-}
-
-#franchise-container .fcc-game-plan-item {
-  display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-#franchise-container .fcc-game-plan-item:nth-last-child(-n + 2) {
-  border-bottom: 0;
-}
-
-#franchise-container .fcc-game-plan-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.68);
-}
-
-#franchise-container .fcc-game-plan-value {
-  min-width: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.94);
-  line-height: 1.35;
-}
-
-#franchise-container .fcc-game-plan-empty {
-  grid-column: 1 / -1;
-  padding: 24px 0 20px;
-  text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-#franchise-container .fcc-game-plan-cta-wrap {
-  display: flex;
-  justify-content: center;
-  padding-top: 14px;
-}
-
-#franchise-container .fcc-game-plan-edit-btn {
-  min-width: 164px;
-  height: 42px;
-  padding: 0 18px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: linear-gradient(180deg, #ffab40 0%, #F79420 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.14s ease, filter 0.14s ease;
-}
-
-#franchise-container .fcc-game-plan-edit-btn:hover {
-  filter: brightness(1.04);
-  transform: translateY(-1px);
-}
-
-#franchise-container .fcc-game-plan-edit-btn:active {
-  transform: translateY(0);
-}
-
-#franchise-container .fcc-schedule-card-body {
-  padding: 12px 14px 14px;
-}
-
-#franchise-container .fcc-schedule-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-#franchise-container .fcc-schedule-column {
-  min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
-    rgba(255, 255, 255, 0.02);
-  overflow: hidden;
-}
-
-#franchise-container .fcc-schedule-column-head {
-  padding: 10px 12px 8px;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 20px;
-  letter-spacing: 0.03em;
-  color: #f7f9ff;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
-}
-
-#franchise-container .fcc-schedule-column-body {
-  padding: 2px 10px 4px;
-}
-
-#franchise-container .fcc-schedule-row {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  min-height: 34px;
-  padding: 5px 2px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container .fcc-schedule-row:last-child {
-  border-bottom: 0;
-}
-
-#franchise-container .fcc-schedule-week {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.62);
-}
-
-#franchise-container .fcc-schedule-detail {
-  min-width: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#franchise-container .fcc-schedule-detail.is-complete-win {
-  color: #34EC27;
-}
-
-#franchise-container .fcc-schedule-detail.is-complete-loss {
-  color: #ff6d6d;
-}
-
-#franchise-container .fcc-schedule-detail.is-complete-tie {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-#franchise-container .fcc-schedule-detail.is-pending {
-  color: rgba(255, 255, 255, 0.86);
-}
-
-#franchise-container .fcc-schedule-detail.is-tournament {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-#franchise-container #recruits-tab table.recruiting-table thead th:nth-child(3),
-#franchise-container #recruits-tab table.recruiting-table thead th:nth-child(20),
-#franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(3),
-#franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(20) {
-  text-align: left;
-}
-
-#franchise-container #recruits-tab table.recruiting-table thead th:nth-child(3),
-#franchise-container #recruits-tab table.recruiting-table thead th:nth-child(20),
-#franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(3),
-#franchise-container #recruits-tab table.recruiting-table tbody td:nth-child(20) {
-  padding-left: 14px;
-}
-
-/* Stats and Team Traits scope toggles (Conference / Region / National) */
-.stats-scope-toggle-wrap,
-.traits-scope-toggle-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.stats-scope-btn,
-.traits-scope-btn {
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.8);
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-weight: 600;
-  cursor: pointer;
-}
-.stats-scope-btn:hover,
-.traits-scope-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-.stats-scope-btn.active,
-.traits-scope-btn.active {
-  background: #4065af;
-  color: #fff;
-}
-
-/* Schedule tab: 16 conference toggles (2 rows of 8) */
-.schedule-conference-toggle-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.schedule-conference-toggle-wrap.schedule-toggles-hidden {
-  display: none;
-}
-.schedule-conference-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.schedule-conference-btn {
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.8);
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 13px;
-}
-.schedule-conference-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-.schedule-conference-btn.active {
-  background: #4065af;
-  color: #fff;
-}
-
-/* Standings tab: note linking to Resources */
-.standings-fcc-note {
-  margin-bottom: 16px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.74);
-}
-.standings-fcc-note a {
-  color: #ffffff;
-  text-decoration: none;
-}
-.standings-fcc-note a:hover {
-  text-decoration: underline;
-}
-
-body.team-stats-page #franchise-container .fcc-routed-page {
-  padding-top: 4px;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x {
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.24) rgba(255, 255, 255, 0.06);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x::-webkit-scrollbar {
-  height: 10px;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-card .scroll-x::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.24);
-  border-radius: 999px;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid {
-  width: max-content;
-  min-width: 1600px;
-  margin: 0;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.group-row th {
-  padding: 12px 8px 10px;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: 11px 10px 10px;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015));
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th.sortable:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th.active {
-  color: #fff;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead th.col-group-start,
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td.col-group-start {
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td {
-  padding: 9px 10px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  text-align: center;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: transparent;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td:first-child,
-body.team-stats-page #franchise-container .fcc-team-stats-grid thead tr.col-row th:first-child {
-  text-align: left;
-  padding-left: 16px;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td:first-child {
-  font-weight: 700;
-  color: #fff;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td.col-w {
-  color: #9ee8b2;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody td.col-l {
-  color: #ffd26c;
-}
-
-body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-row td {
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.05);
-}
-
 /* Resources tab: 3-column grid, buttons like Game Plan (blue fill, white bold) */
-.resources-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  max-width: 720px;
-  margin-top: 20px;
-}
-.resources-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 44px;
-  padding: 12px 20px;
-  background: linear-gradient(180deg, #4b64ba 0%, #27408e 100%);
-  color: #fff;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-weight: 700;
-  font-size: 15px;
-  text-align: center;
-  text-decoration: none;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
-  box-sizing: border-box;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
-}
-.resources-btn:hover {
-  background: linear-gradient(180deg, #627ad0 0%, #2d49a3 100%);
-  color: #fff;
-  transform: translateY(-1px);
-}
-
-.resources-btn.is-dead,
-.resources-btn[aria-disabled="true"] {
-  opacity: 0.45;
-  cursor: default;
-  pointer-events: auto;
-  box-shadow: none;
-  filter: grayscale(0.2);
-}
-
-.resources-btn.is-dead:hover,
-.resources-btn[aria-disabled="true"]:hover {
-  background: linear-gradient(180deg, #4b64ba 0%, #27408e 100%);
-  color: #fff;
-  transform: none;
-}
 
 #franchise-container .tab-content table {
   width: 100%;
@@ -3470,65 +1598,6 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   background: rgba(255, 255, 255, 0.04);
 }
 
-#franchise-container .training-report-styled {
-  --color-bg: transparent;
-  --color-surface: rgba(255, 255, 255, 0.06);
-  --color-border: rgba(255, 255, 255, 0.12);
-  --color-accent: #ffffff;
-  --color-accent-orange: #34ec27;
-  --color-accent-blue: #4c6cc8;
-  --color-text: rgba(255, 255, 255, 0.9);
-  --color-text-muted: rgba(255, 255, 255, 0.66);
-  --color-success: #34ec27;
-  --color-error: #ff6d6d;
-  --color-warning: #ffcd26;
-}
-
-#franchise-container .training-report-styled .team-section,
-#franchise-container .training-report-styled .playbook-summary-section,
-#franchise-container .training-report-styled .team-attr-item {
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-#franchise-container .fcc-team-measures-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
-  gap: 12px;
-  align-items: stretch;
-}
-
-#franchise-container .fcc-team-measures-radar-panel,
-#franchise-container .fcc-team-measures-side-card {
-  min-height: 0;
-}
-
-#franchise-container .fcc-team-measures-side-card {
-  display: flex;
-}
-
-#franchise-container .fcc-team-measures-panel-body {
-  padding: 12px;
-}
-
-#franchise-container .fcc-team-measures-side-card .fcc-team-measures-panel-body {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-  align-items: center;
-  justify-content: center;
-}
-
-#franchise-container .fcc-team-measures-side {
-  display: grid;
-  grid-template-rows: 1fr 1fr 1.08fr;
-  gap: 12px;
-}
-
-#franchise-container .fcc-team-measures-side-card-chemistry .fcc-team-measures-panel-body {
-  min-height: 162px;
-}
-
 #franchise-container .tm-radar-wrap {
   display: flex;
   align-items: center;
@@ -3549,8 +1618,11 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   stroke-width: 1;
 }
 
+/* The radar is neutral. Blue is reserved for RT A, attribute 9+ and elite glyphs,
+   so the shape reads in white tints — which also lets the tier colours in the
+   surrounding grid be the only hue on the page. */
 #franchise-container .tm-radar-ring-zero {
-  stroke: rgba(215, 231, 255, 0.34);
+  stroke: var(--white-28);
   stroke-width: 1.75;
 }
 
@@ -3560,23 +1632,22 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 }
 
 #franchise-container .tm-radar-shape-fill {
-  fill: rgba(64, 101, 175, 0.3);
+  fill: var(--white-12);
 }
 
 #franchise-container .tm-radar-shape-outline {
   fill: none;
-  stroke: rgba(215, 231, 255, 0.92);
+  stroke: rgba(255, 255, 255, 0.92);
   stroke-width: 2.25;
   filter: url(#tm-radar-outline-glow);
-  filter: drop-shadow(0 0 10px rgba(64, 101, 175, 0.38));
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.24));
 }
 
 #franchise-container .tm-radar-shape-outline.is-pulsing {
   animation: tmRadarOutlinePulse 2.8s ease-in-out infinite;
 }
 
-#franchise-container .tm-radar-axis-label,
-#franchise-container .tm-radar-value {
+#franchise-container .tm-radar-axis-label{
   fill: #ffffff;
   font-family: 'Barlow Condensed', sans-serif;
 }
@@ -3587,386 +1658,18 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   letter-spacing: 0.02em;
 }
 
-#franchise-container .tm-radar-value {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-#franchise-container .tm-radar-point {
-  fill: #ffffff;
-  opacity: 0.95;
-  filter: url(#tm-radar-point-glow);
-}
-
-#franchise-container .tm-radar-point.is-pulsing {
-  animation: tmRadarPointPulse 2.2s ease-in-out infinite;
-}
-
-#franchise-container .tm-side-card-content {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-self: center;
-  min-height: 100%;
-  width: 100%;
-  max-width: 100%;
-  gap: 10px;
-}
-
-#franchise-container .tm-side-card-content-chemistry {
-  gap: 10px;
-}
-
-#franchise-container .tm-side-card-label {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.96);
-}
-
-#franchise-container .tm-side-card-value {
-  font-family: 'Inter', sans-serif;
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1;
-  color: #ffffff;
-}
-
-#franchise-container .tm-linear-bar,
-#franchise-container .tm-chemistry-bar {
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  height: 32px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.06));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container .tm-linear-center {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: #ffcd26;
-  transform: translateX(-50%);
-  z-index: 2;
-}
-
-#franchise-container .tm-linear-fill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 1;
-  transition: width 0.28s ease, opacity 0.28s ease;
-}
-
-#franchise-container .tm-linear-fill-positive {
-  left: 50%;
-  background: linear-gradient(90deg, rgba(73, 255, 55, 0.74), rgba(52, 236, 39, 0.96));
-  box-shadow: 0 0 10px rgba(52, 236, 39, 0.35), 0 0 18px rgba(52, 236, 39, 0.18);
-}
-
-#franchise-container .tm-linear-fill-negative {
-  right: 50%;
-  background: linear-gradient(90deg, rgba(255, 109, 109, 0.96), rgba(255, 82, 82, 0.74));
-  box-shadow: 0 0 10px rgba(255, 82, 82, 0.35), 0 0 18px rgba(255, 82, 82, 0.18);
-}
-
-#franchise-container .tm-linear-inline-value {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 3;
-  min-width: 44px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(10, 16, 30, 0.54);
-  color: rgba(255, 255, 255, 0.96);
-  text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#franchise-container .tm-chemistry-fill {
-  height: 100%;
-  background: linear-gradient(90deg, rgba(247, 148, 32, 0.35) 0%, rgba(247, 148, 32, 0.74) 60%, #f79420 100%);
-  box-shadow: 0 0 10px rgba(247, 148, 32, 0.35), 0 0 18px rgba(247, 148, 32, 0.18);
-  transition: width 0.28s ease, opacity 0.28s ease;
-}
-
-#franchise-container .tm-chemistry-text {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 800;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  z-index: 2;
-}
-
-#franchise-container .tm-linear-bar.is-pulsing .tm-linear-fill,
-#franchise-container .tm-chemistry-bar.is-pulsing .tm-chemistry-fill {
-  animation: fccAttrPulse 2.2s ease-in-out infinite;
-}
-
-@keyframes tmRadarPointPulse {
-  0%, 100% {
-    opacity: 0.8;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.18);
-  }
-}
-
 @keyframes tmRadarOutlinePulse {
   0%, 100% {
     opacity: 0.82;
-    filter: drop-shadow(0 0 10px rgba(64, 101, 175, 0.34));
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.22));
   }
   50% {
     opacity: 1;
-    filter: drop-shadow(0 0 14px rgba(64, 101, 175, 0.48));
+    filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.32));
   }
 }
 
-#franchise-container .training-report-styled .team-attr-item {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 14px 16px;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-#franchise-container .training-report-styled .team-attr-item[data-tone="negative"] {
-  background:
-    linear-gradient(180deg, rgba(255, 82, 82, 0.08), rgba(255, 82, 82, 0.03)),
-    rgba(255, 255, 255, 0.05);
-}
-
-#franchise-container .training-report-styled .team-attr-item[data-tone="positive"] {
-  background:
-    linear-gradient(180deg, rgba(52, 236, 39, 0.08), rgba(52, 236, 39, 0.03)),
-    rgba(255, 255, 255, 0.05);
-}
-
-#franchise-container .training-report-styled .team-attr-item[data-tone="warning-negative"] {
-  background:
-    linear-gradient(180deg, rgba(255, 82, 82, 0.085), rgba(255, 82, 82, 0.035)),
-    rgba(255, 255, 255, 0.05);
-}
-
-#franchise-container .training-report-styled .team-attr-item[data-tone="warning-elite"] {
-  background:
-    linear-gradient(180deg, rgba(247, 148, 32, 0.09), rgba(247, 148, 32, 0.035)),
-    rgba(255, 255, 255, 0.05);
-}
-
-#franchise-container .training-report-styled .attr-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-#franchise-container .training-report-styled .attr-pill {
-  position: relative;
-  width: 100%;
-  height: 34px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.06));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-#franchise-container .training-report-styled .pill-center-line {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: #ffcd26;
-  transform: translateX(-50%);
-  z-index: 2;
-}
-
-#franchise-container .training-report-styled .pill-fill-positive,
-#franchise-container .training-report-styled .pill-fill-negative {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 1;
-  transition: width 0.28s ease, box-shadow 0.28s ease, opacity 0.28s ease;
-}
-
-#franchise-container .training-report-styled .pill-fill-positive {
-  left: 50%;
-  background: linear-gradient(90deg, rgba(73, 255, 55, 0.72), rgba(52, 236, 39, 0.92));
-  box-shadow: 0 0 10px rgba(52, 236, 39, 0.35), 0 0 18px rgba(52, 236, 39, 0.18);
-}
-
-#franchise-container .training-report-styled .pill-fill-negative {
-  right: 50%;
-  background: linear-gradient(90deg, rgba(255, 109, 109, 0.92), rgba(255, 82, 82, 0.72));
-  box-shadow: 0 0 10px rgba(255, 82, 82, 0.35), 0 0 18px rgba(255, 82, 82, 0.18);
-}
-
-#franchise-container .training-report-styled .pill-value {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 3;
-  display: none;
-  min-width: 44px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(10, 16, 30, 0.54);
-  color: rgba(255, 255, 255, 0.96);
-  text-align: center;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
-}
-
-#franchise-container .training-report-styled .pill-value.show {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#franchise-container .training-report-styled .fcc-chemistry-bar-container {
-  position: relative;
-  width: 100%;
-  height: 34px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-#franchise-container .training-report-styled .fcc-chemistry-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, rgba(247, 148, 32, 0.35) 0%, rgba(247, 148, 32, 0.72) 60%, #f79420 100%);
-  box-shadow: 0 0 10px rgba(247, 148, 32, 0.35), 0 0 18px rgba(247, 148, 32, 0.18);
-  transition: width 0.28s ease, box-shadow 0.28s ease, opacity 0.28s ease;
-}
-
-#franchise-container .training-report-styled .fcc-chemistry-bar-text {
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-}
-
-#franchise-container .training-report-styled .attr-pill.is-pulsing .pill-fill-positive,
-#franchise-container .training-report-styled .attr-pill.is-pulsing .pill-fill-negative,
-#franchise-container .training-report-styled .fcc-chemistry-bar-container.is-pulsing .fcc-chemistry-bar-fill {
-  animation: fccAttrPulse 2.2s ease-in-out infinite;
-}
-
-@keyframes fccAttrPulse {
-  0%, 100% {
-    opacity: 0.82;
-    filter: saturate(1);
-  }
-  50% {
-    opacity: 1;
-    filter: saturate(1.12);
-  }
-}
-
-/* Inbox tab (training report shortcut) */
-/* ───────── Weekly Invite block (Recruiting surfaces) ───────── */
-.fcc-invite {
-  --fcc-invite-accent: #f3a73c;
-  position: relative;
-  margin-bottom: 12px;
-  padding: 9px 13px 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--fcc-invite-accent) 36%, transparent);
-  border-left: 3px solid var(--fcc-invite-accent);
-  border-radius: 11px;
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--fcc-invite-accent) 17%, transparent),
-    color-mix(in srgb, var(--fcc-invite-accent) 4%, transparent));
-  font-family: 'Inter', sans-serif;
-}
-.fcc-invite__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
-.fcc-invite__eyebrow {
-  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700;
-  letter-spacing: 0.15em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--fcc-invite-accent) 65%, #ffffff);
-}
-.fcc-invite__status {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-  color: rgba(255,255,255,0.66); white-space: nowrap;
-}
-.fcc-invite__dot {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--fcc-invite-accent);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--fcc-invite-accent) 70%, transparent);
-  animation: fcc-invite-pulse 1.9s ease-out infinite;
-}
-.fcc-invite__body { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.fcc-invite__id { min-width: 0; }
-.fcc-invite__name {
-  display: block; font-size: 15px; font-weight: 700; color: #fff; line-height: 1.15;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.fcc-invite__meta {
-  display: block; margin-top: 2px; font-size: 11.5px; font-weight: 600;
-  color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.fcc-invite__rt {
-  flex-shrink: 0; display: flex; flex-direction: column; align-items: center; line-height: 1;
-  padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.12);
-}
-.fcc-invite__rtnum { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; }
-.fcc-invite__rtlabel {
-  font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
-  letter-spacing: 0.14em; color: rgba(255,255,255,0.42); margin-top: 3px;
-}
 /* Wide variant — Recruits tab */
-.fcc-invite--wide {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 22px;
-  margin-bottom: 18px; padding: 14px 20px; border-radius: 14px; border-left-width: 4px;
-}
-.fcc-invite--wide .fcc-invite__top {
-  flex-direction: column; align-items: flex-start; gap: 5px; margin: 0;
-  padding-right: 22px; border-right: 1px solid rgba(255,255,255,0.12); min-width: max-content;
-}
-.fcc-invite--wide .fcc-invite__eyebrow { font-size: 10.5px; white-space: nowrap; }
-.fcc-invite--wide .fcc-invite__name { font-size: 19px; }
-.fcc-invite--wide .fcc-invite__meta { font-size: 13px; margin-top: 3px; }
-.fcc-invite--wide .fcc-invite__rtnum { font-size: 24px; }
-.fcc-invite--wide .fcc-invite__rtlabel { font-size: 9px; }
-@keyframes fcc-invite-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--fcc-invite-accent) 55%, transparent); }
-  70%  { box-shadow: 0 0 0 6px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-@media (prefers-reduced-motion: reduce) { .fcc-invite__dot { animation: none; } }
 
 /* ───────── Recruit name -> player page links (Recruiting surfaces) ─────────
    Lives here, not recruiting.css: recruiting.html and the FCC don't load that
@@ -3985,222 +1688,21 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
 }
 
 .recruit-name-link:focus-visible {
-  outline: 2px solid var(--fcc-newlean-accent, #34c77a);
+  outline: 2px solid var(--white-45);
   outline-offset: 2px;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 /* ───────── New-lean highlight (Recruiting surfaces) ───────── */
-:root { --fcc-newlean-accent: #34c77a; }
+/* Neutral: the law keeps green off badges, and nothing on a live view renders this. */
+:root { --fcc-newlean-accent: var(--text-100); }
 .fcc-newlean-badge {
   display:inline-flex; align-items:center;
   font-family:'JetBrains Mono', monospace; font-size:8.5px; font-weight:700;
   letter-spacing:0.12em; text-transform:uppercase;
-  color:#08130d; background:var(--fcc-newlean-accent);
+  color:var(--bg); background:var(--fcc-newlean-accent);
   padding:2px 6px; border-radius:5px; line-height:1;
-}
-/* Coach's Office card: highlighted row pinned to the top of the leans list */
-.fcc-newlean-row {
-  position:relative; border-radius:8px; margin-bottom:3px; padding:3px 8px 5px;
-  background:linear-gradient(90deg,
-    color-mix(in srgb, var(--fcc-newlean-accent) 15%, transparent),
-    color-mix(in srgb, var(--fcc-newlean-accent) 4%, transparent));
-  box-shadow:inset 3px 0 0 var(--fcc-newlean-accent);
-}
-.fcc-newlean-row .fcc-home-recruit-row { border-bottom:none; }
-.fcc-newlean-tag { display:flex; align-items:center; gap:8px; padding-left:2px; margin-top:1px; }
-/* Recruits tab: highlighted table row (match the file's existing #recruits-tab scoping) */
-#franchise-container #recruits-tab table.recruiting-table tbody tr.fcc-newlean td {
-  background: color-mix(in srgb, var(--fcc-newlean-accent) 13%, transparent) !important;
-}
-#franchise-container #recruits-tab table.recruiting-table tbody tr.fcc-newlean td:first-child {
-  box-shadow: inset 3px 0 0 var(--fcc-newlean-accent);
-}
-.fcc-newlean-cell { display:inline-flex; align-items:center; gap:7px; }
-
-/* ───────── Wire card: drops, as visible as gains ─────────
-   Same geometry as .fcc-newlean-badge / .fcc-newlean-row on purpose — only the
-   accent token differs. Drops are the reason the card exists; anything quieter than
-   the gain treatment would bury them. */
-:root { --fcc-drop-accent: #ff6d6d; }
-
-.fcc-drop-badge {
-  display:inline-flex; align-items:center;
-  font-family:'JetBrains Mono', monospace; font-size:8.5px; font-weight:700;
-  letter-spacing:0.12em; text-transform:uppercase;
-  color:#1d0707; background:var(--fcc-drop-accent);
-  padding:2px 6px; border-radius:5px; line-height:1;
-}
-
-.fcc-drop-row {
-  position:relative; border-radius:8px; margin-bottom:3px; padding:3px 8px 5px;
-  background:linear-gradient(90deg,
-    color-mix(in srgb, var(--fcc-drop-accent) 15%, transparent),
-    color-mix(in srgb, var(--fcc-drop-accent) 4%, transparent));
-  box-shadow:inset 3px 0 0 var(--fcc-drop-accent);
-}
-
-/* Neutral movement (rival churn on a ladder you're on) — quieter than either. */
-.fcc-wire-row {
-  position:relative; border-radius:8px; margin-bottom:3px; padding:3px 8px 5px;
-  background:rgba(255,255,255,0.03);
-  box-shadow:inset 3px 0 0 rgba(255,255,255,0.14);
-}
-
-/* Your own signings, once week 35 has run. Same row shape as the wire it replaces —
-   green rail because these are yours, which is the app-wide meaning of that colour. */
-.fcc-signed-row {
-  box-shadow:inset 3px 0 0 rgba(52,236,39,0.55);
-  background:rgba(52,236,39,0.05);
-}
-.fcc-signed-row .fcc-wire-line__wk { color:rgba(169,255,156,0.72); }
-
-.fcc-wire-line {
-  display:flex; align-items:baseline; gap:8px; justify-content:space-between;
-  font-family:'Inter', sans-serif; font-size:12px; line-height:1.45;
-  color:rgba(255,255,255,0.9);
-}
-
-.fcc-wire-line__wk {
-  font-family:'JetBrains Mono', monospace; font-size:9px;
-  color:rgba(255,255,255,0.45); white-space:nowrap; flex:0 0 auto;
-}
-
-.fcc-wire-status {
-  margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);
-  font-family:'Inter', sans-serif; font-size:11px; color:rgba(255,255,255,0.55);
-  /* Reserved even when the line is empty, so the card's height does not depend on
-     whether there is anything to say this week. */
-  min-height:15px;
-}
-
-/* Recruiting card spans two columns (Standings retired to keep rows of 4). */
-#franchise-container .fcc-home-card--recruiting { grid-column: span 2; }
-
-/* The wire grows without bound — every week adds events — and a grid row is sized to
-   its items' MAX-content, so an uncapped list drags row 2 off the fold as a season
-   runs. A max-height alone was not enough either: the list still grew INTO the cap,
-   so the card climbed 216px -> 337px over the first dozen events and took row 2 with
-   it. The card body therefore reserves ONE fixed height for every week of the season,
-   and whatever is inside fits itself to that box:
-     - the wire list flex-fills the space left under the status line and scrolls;
-     - the empty state fills it;
-     - Signing Day centres its call to action in it.
-   One number, not one per state — the list height follows the box rather than being
-   a second constant to keep in sync. */
-#franchise-container .fcc-home-card--recruiting .fcc-home-card-body {
-  /* Fills whatever the row leaves and scrolls inside it, so a season's worth of wire
-     cannot change the card's height. Replaces a fixed 242px body, which was itself
-     what made row 1 taller than row 2. */
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-#franchise-container .fcc-home-card--recruiting .fcc-home-recruiting {
-  flex: 1;
-  min-height: 0;
-}
-#franchise-container .fcc-home-card--recruiting .fcc-home-list-scroll {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-  height: auto;
-}
-#franchise-container .fcc-home-card--recruiting .fcc-home-empty {
-  flex: 1;
-  min-height: 0;
-}
-
-/* Signing Day (week 35): one call to action, centred in the card.
-   The event feed is gone, so nothing competes with the button — the copy sits directly
-   above it and the pair is centred on both axes. The footnote's separator rule and its
-   left alignment are dropped here; both exist to divide it from a list that isn't
-   there. The card keeps the same height as every other week (see the fixed-height
-   block above), so row 2 does not move when the season reaches Signing Day. */
-#franchise-container .fcc-home-card--recruiting.is-signing-day .fcc-home-card-body {
-  align-items: center;
-  justify-content: center;
-}
-#franchise-container .fcc-home-card--recruiting.is-signing-day .fcc-wire-signing {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  text-align: center;
-}
-#franchise-container .fcc-home-card--recruiting.is-signing-day .fcc-wire-signing__copy {
-  margin: 0;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.82);
-}
-/* Two IDs, to outrank `#franchise-container #home-tab .fcc-home-card-recruiting
-   .fcc-recruiting-footnote--embed` above — its margin-top/padding-top otherwise survive
-   here and push the button below the optical centre of the stack. */
-#franchise-container #home-tab .fcc-home-card--recruiting.is-signing-day .fcc-recruiting-footnote--embed {
-  margin: 0;
-  padding: 0;
-  border-top: none;
-  justify-content: center;
-  text-align: center;
-}
-
-/* ============================================================
-   Roster / Recruiting tabs — sticky identity column.
-   The banding sits on the <tr>, so a transparent sticky cell would show rows
-   sliding underneath it. Each row state needs a SOLID equivalent.
-   ============================================================ */
-#franchise-container #roster-tab table.roster-table th.c-ident,
-#franchise-container #roster-tab table.roster-table td.c-ident,
-#franchise-container #recruits-tab table.roster-table th.c-ident,
-#franchise-container #recruits-tab table.roster-table td.c-ident {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  text-align: left;
-  background: #191d27;               /* solid base — matches the card fill */
-}
-
-#franchise-container #roster-tab table.roster-table thead th.c-ident,
-#franchise-container #recruits-tab table.roster-table thead th.c-ident {
-  z-index: 4;                        /* above both the sticky header and body cells */
-  background: #22262f;
-}
-
-#franchise-container #roster-tab table.roster-table tbody tr:nth-child(even) td.c-ident,
-#franchise-container #recruits-tab table.roster-table tbody tr:nth-child(even) td.c-ident {
-  background: #1c202a;               /* solid equivalent of the banded row */
-}
-
-#franchise-container #roster-tab table.roster-table tbody tr:hover td.c-ident,
-#franchise-container #recruits-tab table.roster-table tbody tr:hover td.c-ident {
-  background: #232833;               /* solid equivalent of the hover row */
-}
-
-/* The grouped attribute header is a 2-row grid inside one cell, so it sticks as a unit.
-   It still needs opaque backing or rows bleed through on scroll. */
-#franchise-container #roster-tab table.roster-table thead th.attr-tiles-head,
-#franchise-container #recruits-tab table.roster-table thead th.attr-tiles-head {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: #22262f;
-}
-
-#franchise-container #recruits-tab table.roster-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: #22262f;
-}
-
-#franchise-container #recruits-tab .fcc-data-card-body.scroll-x {
-  max-height: calc(100vh - 260px);
-  overflow: auto;
 }
 
 /* ============================================================
@@ -4275,49 +1777,3 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   .fcc-season-advance__bar i { animation: none; left: 0; width: 100%; opacity: 0.7; }
 }
 
-/* Your team's own dispatches inside News (the retired Inbox tab's contents). Marked apart
-   from league headlines so "my team" and "the league" don't read as one list. */
-#franchise-container .fcc-news-mine {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 7px 10px;
-  margin-bottom: 6px;
-  border-left: 2px solid rgba(247, 148, 32, .65);
-  border-radius: 0 7px 7px 0;
-  background: rgba(247, 148, 32, .07);
-  font: 600 13px/1.35 'Inter', sans-serif;
-  color: rgba(255, 255, 255, .88);
-}
-#franchise-container .fcc-news-mine-link {
-  font: 700 11px/1 'Inter', sans-serif;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  color: #F79420;
-  text-decoration: none;
-  white-space: nowrap;
-}
-#franchise-container .fcc-news-mine-link:hover { text-decoration: underline; }
-#franchise-container .fcc-news-mine-link:focus-visible { outline: 2px solid #F79420; outline-offset: 2px; }
-
-/* The Training tab is a full-width working surface, not a data table. */
-#franchise-container #fcc-training-dev .fcc-data-card-body { padding: 16px 18px 18px; }
-
-/* Training tab header: title left, the tutorial link right — the same pairing the
-   training page's Player Development section uses. */
-#franchise-container .fcc-training-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-#franchise-container .fcc-training-title {
-  margin: 0;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 1.5rem;
-  letter-spacing: .04em;
-  color: #fff;
-}

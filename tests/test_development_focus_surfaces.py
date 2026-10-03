@@ -22,6 +22,7 @@ SHARED_JS = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "developmentFocus.
 FCC_JS = (ROOT / "FrontEnd" / "static" / "franchise-command-center.js").read_text()
 TRV_JS = (ROOT / "FrontEnd" / "static" / "team-roster-view.js").read_text()
 FCC_HTML = (ROOT / "FrontEnd" / "static" / "franchise-command-center.html").read_text()
+ROSTER_VIEW = (ROOT / "FrontEnd" / "static" / "js" / "shared" / "views" / "rosterView.js").read_text()
 
 
 def _strip_js_comments(source: str) -> str:
@@ -128,31 +129,32 @@ def test_roster_view_reads_the_flag_rather_than_the_url():
 # ── one POS column, not a derived one plus a training one ───────────────────
 
 def test_fcc_has_a_single_position_column_titled_pos():
-    head = FCC_HTML[FCC_HTML.index('<th class="c-ident" data-sort-col="Name">'):]
-    head = head[:head.index("</thead>")]
-    assert head.count('data-sort-col="POS"') == 1
-    assert 'data-sort-col="TrainPos"' not in head, "the duplicate training column is gone"
-    assert ">POS<" in head and ">TRAIN<" not in head
+    """Live roster-view (leftover #roster-tab is gone). One POS, no TRAIN."""
+    identity = ROSTER_VIEW[ROSTER_VIEW.index("var IDENTITY = ["):ROSTER_VIEW.index("function params()")]
+    assert identity.count("label: 'POS'") == 1
+    assert "TrainPos" not in ROSTER_VIEW
+    assert ">TRAIN<" not in ROSTER_VIEW
+    assert "label: 'POS'" in identity
 
 
 def test_pos_keeps_its_slot_and_dev_focus_trails_the_attributes():
-    """POS stays in the third column it has always occupied — the edit moved to the
-    training page, so the column is a plain value again. DEV FOCUS sits past the attribute
-    tiles: read the evidence, then the coaching call."""
-    head = FCC_HTML[FCC_HTML.index('<th class="c-ident" data-sort-col="Name">'):]
-    head = head[:head.index("</thead>")]
-    order = [head.index(m) for m in ('data-sort-col="RT"', 'data-sort-col="POS"',
-                                     'data-sort-col="Year"', 'attr-tiles-head',
-                                     'data-sort-col="Focus"')]
+    """POS stays after RT — the edit moved to the training page, so the column is a
+    plain value again. Dev focus sits past the attribute tiles."""
+    identity = ROSTER_VIEW[ROSTER_VIEW.index("var IDENTITY = ["):ROSTER_VIEW.index("function params()")]
+    order = [identity.index(m) for m in ("label: 'RT'", "label: 'POS'", "label: 'YR'")]
     assert order == sorted(order)
+    table = ROSTER_VIEW[ROSTER_VIEW.index("export function rosterTableHtml"):ROSTER_VIEW.index("function headerRow")]
+    assert table.index("GROUPS.forEach") < table.index("var focus = devText")
+    header = ROSTER_VIEW[ROSTER_VIEW.index("function headerRow"):ROSTER_VIEW.index("export function mount")]
+    assert header.index("GROUPS.forEach") < header.index('data-sort="dev">Dev focus')
 
 
 def test_the_row_builders_emit_the_same_order_as_the_header():
     """Header and row are built in different places; a mismatch shifts every cell."""
-    row = FCC_JS[FCC_JS.index("function fccRosterRowHtml"):]
-    row = row[:row.index("\n}")]
-    order = [row.index(m) for m in ("fccRtLockupHtml", "fccPositionCellHtml",
-                                    "p.weight", "attr-tiles-cell", "fccFocusCellHtml")]
+    row = ROSTER_VIEW[ROSTER_VIEW.index("export function rosterTableHtml"):]
+    row = row[row.index("rows.forEach"):row.index("function headerRow")]
+    order = [row.index(m) for m in ("rtHtml", "player.position", "player.weight",
+                                    "GROUPS.forEach", "devText")]
     assert order == sorted(order)
 
     trow = TRV_JS[TRV_JS.index("function trAttrRowHtml"):]
@@ -164,10 +166,11 @@ def test_the_row_builders_emit_the_same_order_as_the_header():
 
 def test_the_pos_cell_falls_back_to_the_chip_where_development_does_not_apply():
     """Practice-squad rows must still show a position, just not a development one."""
-    fn = FCC_JS[FCC_JS.index("function fccPositionCellHtml"):]
-    fn = fn[:fn.index("\n}")]
-    assert "fccPosChipHtml(p.pos)" in fn
-    assert "FCC_ROSTER_STATE.scope === 'practice'" in fn
+    cell = ROSTER_VIEW[ROSTER_VIEW.index("html += '<td class=\"code'"):]
+    cell = cell[:cell.index("html += '<td class=\"num'")]
+    assert "player.position" in cell
+    assert "GOBDevelopmentFocus.bind" not in ROSTER_VIEW
+    assert "scope === 'practice'" in ROSTER_VIEW
 
 
 def test_roster_view_pos_cell_does_the_same():
@@ -231,7 +234,7 @@ def test_the_pos_cell_carries_nothing_but_the_position():
 def test_pos_sorting_was_broken_and_is_now_wired():
     """'POS' mapped to 'pos', fell through to the attribute branch, read a non-existent
     anchor_pos and scored every row 0 — clicking the header did nothing."""
-    assert "dataKey === 'pos' || dataKey === 'Focus'" in FCC_JS
+    assert "if (key === 'pos') return player.position || '';" in ROSTER_VIEW
     assert "if (key === 'pos')" in TRV_JS
 
 
@@ -243,13 +246,16 @@ def test_the_training_grid_binds_its_controls():
 
 
 def test_fcc_mappers_carry_the_development_fields():
-    """The projection trap, front-end edition: every FCC mapper cherry-picks fields —
-    varsity rows, practice-squad rows, and the Training tab's grid rows."""
-    assert FCC_JS.count("resolved_training_focus: p.resolved_training_focus") == 3
+    """The leftover FCC roster mappers are gone. Live roster-view reads the payload
+    through GOBDevelopmentFocus.focusLabel; team-roster-view still projects the field."""
+    assert "api.focusLabel(player)" in ROSTER_VIEW
+    assert "resolved_training_focus" not in ROSTER_VIEW
+    assert TRV_JS.count("resolved_training_focus: p.resolved_training_focus") == 1
 
 
 def test_practice_scope_renders_no_controls():
-    assert "FCC_ROSTER_STATE.scope === 'practice'" in FCC_JS
+    assert "scope === 'practice'" in ROSTER_VIEW
+    assert "GOBDevelopmentFocus.bind" not in ROSTER_VIEW
     assert "TR_STATE.scope !== 'practice'" in TRV_JS
 
 

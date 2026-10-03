@@ -1,4 +1,5 @@
 """Tests for the franchise News system (upset report + practice squad all-stars)."""
+import pytest
 from bson import ObjectId
 
 from BackEnd.api import franchise_routes
@@ -354,10 +355,106 @@ def test_append_week_news_resolves_user_conference_from_string_team_id(monkeypat
     assert not any(s.get("type") == "recruiting_leans" for s in stories)
     texts = [line.get("text") for line in report["rich_lines"] if line.get("text")]
     assert "National Recruit Rankings" in texts
-    assert "Recruiting Leans Announced" in texts
-    assert "Conference 4 Lean Announcements" in texts
-    assert "Rival U" in texts
-    assert "Al Low (D)" in texts
+    # The redundant outer heading is gone; the conference sub-heading stays.
+    assert "Recruiting Leans Announced" not in texts
+    # The conference is named the way the rest of the app names it: region letter + number.
+    assert "Conference B4 Lean Announcements" in texts
+    assert "Conference 4 Lean Announcements" not in texts
+    # The team and its recruit are a block, not two text lines that run together.
+    assert "Rival U" not in texts and "Al Low (D)" not in texts
+    blocks = [line for line in report["rich_lines"] if line.get("type") == "team_recruits"]
+    assert blocks == [{
+        "type": "team_recruits",
+        "team_id": str(rival_oid),
+        "team_name": "Rival U",
+        "recruits": [{"recruit_id": "r1", "name": "Al Low", "rt": 31}],
+    }]
+
+
+def _conference_case():
+    recruit_by_id = {
+        "r1": _recruit_doc("r1", "Al Low", 28),
+        "r2": _recruit_doc("r2", "Bo Mid", 41),
+        "r3": _recruit_doc("r3", "Cy Top", 55),
+        "r4": _recruit_doc("r4", "Out Of Conf", 60),
+    }
+    events = [
+        {"recruit_id": "r1", "team_id": "t1"},
+        {"recruit_id": "r2", "team_id": "t1"},
+        {"recruit_id": "r3", "team_id": "t2"},
+        {"recruit_id": "r4", "team_id": "t9"},  # team outside user's conference
+    ]
+    return (
+        events,
+        {"t1": 88, "t2": 12, "t9": 1},
+        {"t1": "Alpha", "t2": "Beta", "t9": "Niner"},
+        recruit_by_id,
+        {"t1": "3", "t2": "3", "t9": "7"},
+        "3",
+    )
+
+
+def test_recruiting_report_lean_section_is_structured_story_content():
+    content = franchise_routes._recruiting_leans_content(*_conference_case())
+    story = franchise_routes._merge_recruiting_report_with_leans(None, content, report_week=11)
+    assert story["story_id"] == "w11-recruiting-report"
+    assert story["rich_lines"] == [
+        {"type": "gap"},
+        {"type": "heading", "text": "Top Rated Recruit Announcements"},
+        {"type": "text", "text": "Out Of Conf, a Sharp Shooter rated B, has announced a lean toward Niner."},
+        {"type": "text", "text": "Cy Top, a Sharp Shooter rated C+, has announced a lean toward Beta."},
+        {"type": "gap"},
+        {"type": "heading", "text": "Conference B3 Lean Announcements"},
+        # Teams by national rank (12 before 88), recruits by RT.
+        {"type": "team_recruits", "team_id": "t2", "team_name": "Beta",
+         "recruits": [{"recruit_id": "r3", "name": "Cy Top", "rt": 55}]},
+        {"type": "team_recruits", "team_id": "t1", "team_name": "Alpha",
+         "recruits": [{"recruit_id": "r2", "name": "Bo Mid", "rt": 41},
+                      {"recruit_id": "r1", "name": "Al Low", "rt": 28}]},
+    ]
+    assert not any(line.get("text") == "Recruiting Leans Announced" for line in story["rich_lines"])
+
+
+def test_structured_lean_section_names_the_same_teams_and_recruits_as_the_plain_lines():
+    """The block shape changes how the section is stored, not who is in it."""
+    case = _conference_case()
+    lines = franchise_routes._build_recruiting_leans_lines(*case)
+    rich = franchise_routes._recruiting_leans_section_rich_lines(franchise_routes._recruiting_leans_content(*case))
+    flat = []
+    for line in rich:
+        if line["type"] == "gap":
+            flat.append("")
+        elif line["type"] in ("heading", "text"):
+            flat.append(line["text"])
+        else:
+            flat.append(line["team_name"])
+            flat.append(", ".join(
+                f"{r['name']} ({franchise_routes.format_rt_display(r['rt'])})" for r in line["recruits"]
+            ))
+    # Only the conference's name differs: the plain lines say "Conference 3".
+    assert "Conference 3 Lean Announcements" in lines and "Conference B3 Lean Announcements" in flat
+    flat = [line.replace("Conference B3 ", "Conference 3 ") for line in flat]
+    assert flat[0] == "" and flat[1:] == lines
+
+
+def test_lean_section_with_only_conference_leans_has_no_top_rated_heading():
+    content = franchise_routes._recruiting_leans_content(
+        [{"recruit_id": "r1", "team_id": "t1"}], {"t1": 5}, {"t1": "Alpha"},
+        {"r1": _recruit_doc("r1", "Al Low", 28)}, {"t1": "5"}, "5",
+    )
+    rich = franchise_routes._recruiting_leans_section_rich_lines(content)
+    assert [line["type"] for line in rich] == ["gap", "heading", "team_recruits"]
+    assert rich[1]["text"] == "Conference C5 Lean Announcements"
+
+
+@pytest.mark.parametrize("conference, label", [("1", "A1"), ("2", "A2"), ("3", "B3"), ("16", "H16")])
+def test_conference_heading_uses_the_app_label(conference, label):
+    content = franchise_routes._recruiting_leans_content(
+        [{"recruit_id": "r1", "team_id": "t1"}], {"t1": 5}, {"t1": "Alpha"},
+        {"r1": _recruit_doc("r1", "Al Low", 28)}, {"t1": conference}, conference,
+    )
+    rich = franchise_routes._recruiting_leans_section_rich_lines(content)
+    assert rich[1] == {"type": "heading", "text": f"Conference {label} Lean Announcements"}
 
 
 def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
@@ -491,3 +588,178 @@ def test_franchise_news_headlines_excludes_upset_and_limits():
         "w7-recruiting-movement",
     ]
     assert all(set(h.keys()) == {"story_id", "headline", "week"} for h in headlines)
+
+
+def test_weekly_report_story_carries_movement_the_user_row_and_the_caption(monkeypatch):
+    """The weekly builder reads last week's stored report, the user's team and the
+    durable rank, and hands them to the story: movement, the foot row, the caption."""
+    from BackEnd.utils.recruiting_report_news import WEEKLY_SCORE_CAPTION
+
+    teams = [f"t{i:02d}" for i in range(1, 31)]            # 30 teams with points
+    user = "t30"                                            # the weakest: outside the top 25
+
+    def recruits_for(order):
+        # One recruit per team, rated so the teams rank in ``order``.
+        return [
+            {"recruit_id": f"r-{tid}", "Lean": {"1": tid}, "position_ratings": {"PG": 90 - place}}
+            for place, tid in enumerate(order)
+        ]
+
+    state = {"recruits": recruits_for(teams)}
+
+    class _Recruits:
+        def find(self, _query, _projection=None):
+            return list(state["recruits"])
+
+    monkeypatch.setattr(franchise_routes, "franchise_recruits_data_collection", _Recruits())
+    monkeypatch.setattr(
+        franchise_routes, "_persist_recruiting_ranks_from_scores",
+        lambda _fid, _scores: {user: {"recruiting_rank": 30}},
+    )
+    monkeypatch.setattr(
+        franchise_routes, "_format_team_name_map",
+        lambda team_ids=None, franchise=None: {tid: tid.upper() for tid in teams},
+    )
+    monkeypatch.setattr(franchise_routes, "_user_team_region_letter", lambda _doc: "A")
+    monkeypatch.setattr(franchise_routes, "_region_team_ids_for_letter", lambda _letter: set(teams[:4]))
+    monkeypatch.setattr(franchise_routes, "get_user_team_from_franchise", lambda _doc: ("T30", user))
+
+    doc = {"_id": ObjectId(), "season_news": []}
+    first = franchise_routes._build_weekly_recruiting_report_story(doc["_id"], doc, 1)
+    national = next(line for line in first["rich_lines"] if line.get("table") == "national")
+    assert national["caption"] == WEEKLY_SCORE_CAPTION
+    assert len(national["rows"]) == 25
+    assert national["user_row"]["team_id"] == user and national["user_row"]["rank"] == 30
+    # Week 1: nothing to move against.
+    assert all("move" not in row and "new" not in row for row in national["rows"])
+    assert "move" not in national["user_row"]
+
+    # Next week t02 passes t01, and the story is built with last week's in season_news.
+    doc["season_news"] = [first]
+    state["recruits"] = recruits_for([teams[1], teams[0]] + teams[2:])
+    second = franchise_routes._build_weekly_recruiting_report_story(doc["_id"], doc, 2)
+    rows = {row["team_id"]: row for row in
+            next(line for line in second["rich_lines"] if line.get("table") == "national")["rows"]}
+    assert rows["t02"]["rank"] == 1 and rows["t02"]["move"] == 1
+    assert rows["t01"]["rank"] == 2 and rows["t01"]["move"] == -1
+    assert rows["t03"]["move"] == 0
+    region = next(line for line in second["rich_lines"] if line.get("table") == "region")
+    assert {row["team_id"]: row["move"] for row in region["rows"]} == {"t02": 1, "t01": -1, "t03": 0, "t04": 0}
+
+    # A week whose previous report is missing (none was published) shows no movement.
+    third = franchise_routes._build_weekly_recruiting_report_story(doc["_id"], doc, 4)
+    national = next(line for line in third["rich_lines"] if line.get("table") == "national")
+    assert all("move" not in row and "new" not in row for row in national["rows"])
+
+
+# ---------------------------------------------------------------------------
+# Upset Report: each line stores its game
+# ---------------------------------------------------------------------------
+
+def _upset_case():
+    ranks = {"t1": 95, "t2": 10, "t5": 60, "t6": 3, "t3": 59, "t4": 30}
+    names = {"t1": "Alpha", "t2": "Beta", "t5": "Epsilon", "t6": "Zeta", "t3": "Gamma", "t4": "Delta"}
+    results = [
+        _result_row("t1", "t2", 80, 72),      # Alpha (away) upsets Beta
+        _result_row("t6", "t5", 90, 95),      # Epsilon (home) upsets Zeta
+        _result_row("t3", "t4", 70, 75),      # no upset
+    ]
+    return results, ranks, names
+
+
+def test_upset_lines_store_their_game_and_keep_the_same_text():
+    results, ranks, names = _upset_case()
+    # Keyed (away id, home id), as the result rows are.
+    game_ids = {("t1", "t2"): "g-alpha-beta", ("t6", "t5"): "g-zeta-epsilon", ("t3", "t4"): "g-no-upset"}
+    story = franchise_routes._build_week_upset_report_story(5, results, ranks, names, game_id_by_matchup=game_ids)
+    assert story["rich_lines"] == [
+        {"type": "game_result", "text": "#60. Epsilon upset #3. Zeta by a score of 95-90.", "game_id": "g-zeta-epsilon"},
+        {"type": "game_result", "text": "#95. Alpha upset #10. Beta by a score of 80-72.", "game_id": "g-alpha-beta"},
+    ]
+    # The plain lines are the same sentences, in the same order.
+    assert story["lines"] == [line["text"] for line in story["rich_lines"]]
+
+
+def test_upset_line_with_no_stored_game_has_no_game_id():
+    results, ranks, names = _upset_case()
+    story = franchise_routes._build_week_upset_report_story(
+        5, results, ranks, names, game_id_by_matchup={("t1", "t2"): "g-alpha-beta"},
+    )
+    by_text = {line["text"]: line for line in story["rich_lines"]}
+    assert by_text["#95. Alpha upset #10. Beta by a score of 80-72."]["game_id"] == "g-alpha-beta"
+    assert "game_id" not in by_text["#60. Epsilon upset #3. Zeta by a score of 95-90."]
+    # No lookup at all: every line is written, none has a game.
+    bare = franchise_routes._build_week_upset_report_story(5, results, ranks, names)
+    assert [line["type"] for line in bare["rich_lines"]] == ["game_result", "game_result"]
+    assert not any("game_id" in line for line in bare["rich_lines"])
+
+
+def test_the_game_lookup_runs_only_when_the_week_has_an_upset():
+    results, ranks, names = _upset_case()
+    calls = []
+
+    def lookup():
+        calls.append(1)
+        return {("t1", "t2"): "g1"}
+
+    assert franchise_routes._build_week_upset_report_story(
+        5, [_result_row("t3", "t4", 70, 75)], ranks, names, game_id_by_matchup=lookup) is None
+    assert calls == []
+    story = franchise_routes._build_week_upset_report_story(5, results, ranks, names, game_id_by_matchup=lookup)
+    assert calls == [1]
+    assert any(line.get("game_id") == "g1" for line in story["rich_lines"])
+
+
+def test_week_game_ids_keeps_one_week_and_survives_a_failed_read(monkeypatch):
+    import BackEnd.utils.schedule_browse as schedule_browse
+
+    seen = {}
+
+    def fake(franchise_id, stamp=None):
+        seen["args"] = (franchise_id, stamp)
+        return {(4, "a", "b"): "g-week-4", (5, "a", "b"): "g-week-5", (5, "c", "d"): "g-week-5b"}
+
+    monkeypatch.setattr(schedule_browse, "matchup_game_ids", fake)
+    assert franchise_routes._week_game_ids("fid", 5) == {("a", "b"): "g-week-5", ("c", "d"): "g-week-5b"}
+    # Its own stamp, so a cache keyed on the stored franchise cannot answer for a week
+    # whose results are not stored yet.
+    assert seen["args"][0] == "fid" and seen["args"][1] != None  # noqa: E711
+
+    def broken(_franchise_id, stamp=None):
+        raise RuntimeError("no games collection")
+
+    monkeypatch.setattr(schedule_browse, "matchup_game_ids", broken)
+    assert franchise_routes._week_game_ids("fid", 5) == {}
+
+
+def test_append_week_news_stores_the_game_on_each_upset_line(monkeypatch):
+    franchise_id = ObjectId()
+    team_a, team_b = str(ObjectId()), str(ObjectId())
+
+    class _Ftd:
+        def find(self, _query, _projection=None):
+            return [{"team_id": team_a, "natl_rank": 50}, {"team_id": team_b, "natl_rank": 11}]
+
+    monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", _Ftd())
+    monkeypatch.setattr(
+        franchise_routes, "_format_team_name_map",
+        lambda team_ids=None, franchise=None: {team_a: "Underdog U", team_b: "Favorite State"},
+    )
+    monkeypatch.setattr(franchise_routes, "_build_weekly_recruiting_report_story", lambda *_a, **_k: None)
+    asked = []
+
+    def week_ids(fid, week):
+        asked.append((fid, week))
+        return {(team_a, team_b): "game-123"}
+
+    monkeypatch.setattr(franchise_routes, "_week_game_ids", week_ids)
+    doc = {"season_news": []}
+    franchise_routes._append_franchise_week_news(franchise_id, doc, 2, [_result_row(team_a, team_b, 88, 81)], [])
+    story = doc["season_news"][0]
+    assert story["story_id"] == "w2-upset-report"
+    assert story["rich_lines"] == [{
+        "type": "game_result",
+        "text": "#50. Underdog U upset #11. Favorite State by a score of 88-81.",
+        "game_id": "game-123",
+    }]
+    assert asked == [(franchise_id, 2)]

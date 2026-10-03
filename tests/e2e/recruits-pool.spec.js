@@ -15,12 +15,13 @@ const path = require('path');
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
 
-const CSS = read('recruiting-spine.css') + read('css/attr-tiles.css');
+const CSS = read('css/gob-tokens.css') + read('recruiting-spine.css') + read('css/attr-tiles.css');
 // Same order recruiting.html loads them; common.js supplies getBestPosition, which
 // RecruitingCommon.normalizeRecruits depends on.
 const SCRIPTS = [
   'js/shared/franchiseContext.js',
   'common.js',
+  'js/utils/attributeDisplay.js',
   'js/shared/attrTiles.js', 'js/shared/rtBucket.js',
   'js/shared/playerYear.js',
   'recruiting-common.js',
@@ -81,12 +82,13 @@ async function mountPool(page, opts = {}) {
   await page.route('**/', (route) => (route.request().resourceType() === 'document'
     ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
     : route.continue()));
-  await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
+  await page.goto('/?franchise_id=fid-test&team_id=user-team-id&hub=pool');
   await page.setContent(`
     <style>${CSS}</style>
-    <style>body{margin:0;background:#0b0d14}.doc{max-width:1180px;margin:0 auto;padding:20px}</style>
+    <style>body{margin:0;background:#0b0d14}.doc{max-width:${opts.docWidth || 1180}px;margin:0 auto;padding:20px}</style>
     <div class="doc"><a id="back-btn" href="#">Back</a><div id="hub-root" class="spine"></div></div>
   `);
+  await page.evaluate(() => document.documentElement.classList.add('gob'));
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
 
   await page.evaluate(({ data }) => {
@@ -132,13 +134,19 @@ test.describe('450 rows', () => {
     expect(await rowCount(page)).toBe(450);
     const m = await page.evaluate(() => {
       const s = document.querySelector('#hub-pool .pool-scroll');
+      const table = document.querySelector('#hub-pool table.pool');
+      const fits = table.scrollWidth <= s.clientWidth + 1;
       return {
         scrollable: s.scrollHeight > s.clientHeight,
         bodyOverflowsX: document.body.scrollWidth > window.innerWidth + 1,
+        fits,
+        reps: document.querySelectorAll('#hub-pool tbody tr.gob-rep').length,
       };
     });
     expect(m.scrollable).toBe(true);
     expect(m.bodyOverflowsX).toBe(false);
+    // Narrow tables drop the 16-row repeat; a table that still overflows keeps all 28.
+    expect(m.reps).toBe(m.fits ? 0 : 28);
   });
 
   test('header stays pinned while the body scrolls', async ({ page }) => {
@@ -160,7 +168,7 @@ test.describe('450 rows', () => {
   test('re-render on a filter keystroke stays responsive', async ({ page }) => {
     await mountPool(page);
     const ms = await page.evaluate(() => {
-      const input = document.querySelector('#pool-search');
+      const input = document.querySelector('.gob-search');
       const t0 = performance.now();
       input.value = 'Recruit 1';
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -179,17 +187,17 @@ test.describe('450 rows', () => {
 });
 
 test.describe('columns and headers', () => {
-  test('column order is Recruit Pos RT Yr Ht Wt Rgn Attributes Lean Watch', async ({ page }) => {
+  test('column order is Watch Recruit POS RT YR HT WT RGN then the six groups then Lean', async ({ page }) => {
     await mountPool(page);
     const labels = await page.evaluate(() =>
-      [...document.querySelectorAll('#hub-pool thead th')].map((t) => t.textContent.replace(/[▲▼]/g, '').trim()));
-    expect(labels).toEqual(['Recruit', 'Pos', 'RT', 'Yr', 'Ht', 'Wt', 'Rgn', 'Attributes', 'Lean', 'Watch']);
+      [...document.querySelectorAll('#hub-pool thead tr.gob-cols th')].map((t) => t.textContent.replace(/[▲▼]/g, '').trim()));
+    expect(labels).toEqual(['', 'Recruit', 'POS', 'RT', 'YR', 'HT', 'WT', 'RGN', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'Lean']);
   });
 
   test('every header is centered over its column', async ({ page }) => {
     await mountPool(page);
     const offsets = await page.evaluate(() => {
-      const heads = [...document.querySelectorAll('#hub-pool thead th')];
+      const heads = [...document.querySelectorAll('#hub-pool thead tr.gob-cols th')];
       const cells = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child td')];
       return heads.map((th, i) => {
         const h = th.getBoundingClientRect(), c = cells[i].getBoundingClientRect();
@@ -201,24 +209,73 @@ test.describe('columns and headers', () => {
     for (const o of offsets) expect(o.delta, `${o.label} column`).toBeLessThan(1.5);
   });
 
-  test('Attributes header centers across the whole 12-chip block, not the first chip', async ({ page }) => {
+  test('each attribute is a label-less roster tile under its group header', async ({ page }) => {
     await mountPool(page);
     const m = await page.evaluate(() => {
-      const th = [...document.querySelectorAll('#hub-pool thead th')].find((t) => t.textContent.trim() === 'Attributes');
-      const chips = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child .attr-tile')];
-      const first = chips[0].getBoundingClientRect(), last = chips[chips.length - 1].getBoundingClientRect();
-      const h = th.getBoundingClientRect();
+      const row = document.querySelector('#hub-pool tbody tr.rec');
+      const tiles = [...row.querySelectorAll('.attr-tile')];
+      const groups = [...document.querySelectorAll('#hub-pool thead tr.gob-groups th.gob-g')].map((th) => ({
+        name: th.textContent.trim(),
+        span: Number(th.colSpan),
+      }));
+      const offense = document.querySelector('#hub-pool thead tr.gob-groups th.gob-g');
+      const sc = row.querySelector('.attr-tile[data-attr="SC"]');
+      const sh = row.querySelector('.attr-tile[data-attr="SH"]');
+      const head = offense.getBoundingClientRect();
+      const a = sc.getBoundingClientRect();
+      const b = sh.getBoundingClientRect();
       return {
-        chipCount: chips.length,
-        headerCenter: h.left + h.width / 2,
-        blockCenter: (first.left + last.right) / 2,
-        firstChipCenter: first.left + first.width / 2,
+        tiles: tiles.length,
+        labels: row.querySelectorAll('.attr-tile u').length,
+        groups,
+        offenseCenter: head.left + head.width / 2,
+        pairCenter: (a.left + b.right) / 2,
       };
     });
-    expect(m.chipCount).toBe(12);
-    expect(Math.abs(m.headerCenter - m.blockCenter)).toBeLessThan(2);
-    // Explicitly NOT left-aligned over the first chip.
-    expect(Math.abs(m.headerCenter - m.firstChipCenter)).toBeGreaterThan(20);
+    expect(m.tiles).toBe(12);
+    expect(m.labels).toBe(0);
+    const first = await page.evaluate(() => {
+      const row = document.querySelector('#hub-pool tbody tr.rec');
+      const rt = row.querySelector('td.rt .rtl b:not(.pot)');
+      const digits = [...row.querySelectorAll('.attr-tile s')].map((s) => s.textContent.trim());
+      const tile = row.querySelector('.attr-tile');
+      const digit = tile.querySelector('s');
+      const tileBox = tile.getBoundingClientRect();
+      const av = row.querySelector('.pc-av');
+      const rowBox = row.getBoundingClientRect();
+      return {
+        rt: rt ? rt.textContent.trim() : '',
+        digits,
+        tileW: tileBox.width,
+        tileH: tileBox.height,
+        digitSize: parseFloat(getComputedStyle(digit).fontSize),
+        digitWeight: getComputedStyle(digit).fontWeight,
+        digitFamily: getComputedStyle(digit).fontFamily,
+        radius: getComputedStyle(av).borderRadius,
+        avW: av.getBoundingClientRect().width,
+        rowH: rowBox.height,
+      };
+    });
+    expect(CSS).toContain('.pool .attr-tile{width:var(--dsz-30);height:var(--dsz-26);border-radius:var(--radius-5)}');
+    expect(CSS).toContain('font:var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display)');
+    expect(CSS).toContain('border-radius:var(--radius-6)');
+    expect(first.rt).toMatch(/^[A-F]/);
+    expect(first.digits).toHaveLength(12);
+    for (const digit of first.digits) expect(digit, 'tile digit').toMatch(/^\d+$/);
+    // Harness loads gob-tokens + html.gob so --dsz-30 / --fs-20 resolve like the shell.
+    const dszW = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dsz-30')));
+    if (Number.isFinite(dszW)) {
+      expect(first.tileW).toBeCloseTo(dszW, 0);
+      expect(first.tileH).toBeCloseTo(first.digitSize === 23.5 ? 30.5 : 26, 0);
+      expect([20, 23.5]).toContain(first.digitSize);
+      expect(Number(first.digitWeight)).toBeGreaterThanOrEqual(700);
+      // Square, like every other player headshot: a small corner, not half the side.
+      expect(first.radius, 'portrait radius').not.toBe('50%');
+      expect(parseFloat(first.radius) / first.avW).toBeLessThanOrEqual(0.25);
+    }
+    expect(m.groups.map((g) => g.name)).toEqual(['Offense', 'Defense', 'Skills', 'Grit', 'Body', 'Mind']);
+    expect(m.groups.every((g) => g.span === 2)).toBe(true);
+    expect(Math.abs(m.offenseCenter - m.pairCenter)).toBeLessThan(5);
   });
 
   test('attributes are visible (no condensed mode) and the name column is capped', async ({ page }) => {
@@ -232,22 +289,24 @@ test.describe('columns and headers', () => {
     expect(m.condensedClass).toBe(false);
     expect(m.chipsVisible).toBe(12);
     expect(Math.round(m.nameWidth)).toBe(248);
-    // Content-sized, not stretched to a much wider container. Wt widened it ~44px;
-    // see the known-limitation note on the invite-phase width test.
-    expect(m.tableWidth).toBeLessThan(1250);
+    // Column sum, not the page. The harness does not resolve --dsz-30, so the
+    // attribute columns shrink to their content here; in the shell they are 38px
+    // and the passive table is 1140.
+    expect(m.tableWidth).toBeGreaterThan(900);
+    expect(m.tableWidth).toBeLessThan(1400);
   });
 
   test('RT sorts descending by default and is the active sort', async ({ page }) => {
     await mountPool(page);
     const m = await page.evaluate(() => {
       const rtTh = [...document.querySelectorAll('#hub-pool thead th')].find((t) => t.textContent.includes('RT'));
-      const vals = [...document.querySelectorAll('#hub-pool tbody tr.rec td.rt .v')].slice(0, 12).map((e) => e.textContent.trim());
+      const vals = [...document.querySelectorAll('#hub-pool tbody tr.rec td.rt .rtl b:not(.pot)')].slice(0, 12).map((e) => e.textContent.trim());
       return { arrow: rtTh.textContent.includes('▼'), vals };
     });
     expect(m.arrow).toBe(true);
     // Letter grades: A++ > A+ > A > B+ > B > C+ > C > D > F.
     const ORDER = ['A++', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
-    const ranks = m.vals.map((v) => ORDER.indexOf(v.split('/')[0].trim()));
+    const ranks = m.vals.map((v) => ORDER.indexOf(v.trim()));
     for (let i = 1; i < ranks.length; i++) expect(ranks[i]).toBeGreaterThanOrEqual(ranks[i - 1]);
   });
 
@@ -256,6 +315,27 @@ test.describe('columns and headers', () => {
     const href = await page.evaluate(() =>
       document.querySelector('#hub-pool tbody tr.rec .nm a')?.getAttribute('href') || '');
     expect(href).toContain('recruit');
+  });
+
+  test('names are not orange, RT is letters, and every headshot is an image or a monogram', async ({ page }) => {
+    await mountPool(page);
+    const m = await page.evaluate(() => {
+      const link = document.querySelector('#hub-pool .recruit-name-link');
+      const color = getComputedStyle(link).color;
+      const cell = document.querySelector('#hub-pool td.rt');
+      const rt = cell.querySelector('.rtl').textContent.replace(/\s/g, '');
+      const shots = [...document.querySelectorAll('#hub-pool tbody tr.rec .pc-av')];
+      const empty = shots.filter((el) => !el.querySelector('img') && !el.textContent.trim()).length;
+      const withImg = shots.filter((el) => el.querySelector('img')).length;
+      const letters = shots.filter((el) => !el.querySelector('img') && el.textContent.trim()).length;
+      return { color, rt, title: cell.getAttribute('title'), empty, withImg, letters, rows: shots.length };
+    });
+    expect(m.color).not.toBe('rgb(247, 148, 32)');
+    expect(m.rt).toMatch(/^[A-F][+\-−]*$/);
+    expect(m.title).toBe('Current → Potential');
+    expect(m.empty).toBe(0);
+    expect(m.withImg + m.letters).toBe(m.rows);
+    expect(m.letters).toBeGreaterThan(0);
   });
 });
 
@@ -280,10 +360,9 @@ test.describe('filters compose', () => {
     // Every surviving row must satisfy all three at once.
     const ok = await page.evaluate(() =>
       [...document.querySelectorAll('#hub-pool tbody tr.rec')].every((tr) => {
-        const td = tr.querySelectorAll('td');
-        return td[1].textContent.trim() === 'PG'
-          && td[3].textContent.trim() === 'JR'
-          && td[5].textContent.trim() === 'C';
+        return tr.querySelector('td.pos').textContent.trim() === 'PG'
+          && tr.querySelector('td.year').textContent.trim() === 'JR'
+          && tr.querySelector('td.rgn').textContent.trim() === 'C';
       }));
     expect(ok).toBe(true);
   });
@@ -298,9 +377,9 @@ test.describe('filters compose', () => {
     expect(m.shown).toBe(m.rows);
   });
 
-  test('Leans to me view keeps only recruits leaning to the user', async ({ page }) => {
+  test('Leans tab keeps only recruits leaning to the user', async ({ page }) => {
     await mountPool(page);
-    await page.click('#hub-pool .pool-view[data-view="leans"]');
+    await page.evaluate(() => window.RecruitingHub.show('leans'));
     const m = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('#hub-pool tbody tr.rec')];
       return { n: rows.length, allMine: rows.every((r) => r.classList.contains('mine') || r.classList.contains('list-mine')) };
@@ -308,23 +387,24 @@ test.describe('filters compose', () => {
     expect(m.n).toBeGreaterThan(0);
     expect(m.n).toBeLessThan(450);
     expect(m.allMine).toBe(true);
+    await page.evaluate(() => window.RecruitingHub.show('pool'));
+    expect(await rowCount(page)).toBe(450);
   });
 
   test('clicking the active view clears it', async ({ page }) => {
-    await mountPool(page);
-    await page.click('#hub-pool .pool-view[data-view="leans"]');
+    await mountPool(page, { watchlist: ['r-3', 'r-9'] });
+    await page.click('#hub-pool .pool-view[data-view="watch"]');
     const filtered = await rowCount(page);
-    await page.click('#hub-pool .pool-view[data-view="leans"]');
+    await page.click('#hub-pool .pool-view[data-view="watch"]');
     expect(await rowCount(page)).toBe(450);
     expect(filtered).toBeLessThan(450);
   });
 });
 
 test.describe('attribute tiles', () => {
-  test('10+ renders in the brand RT display blue', async ({ page }) => {
+  test('9+ renders in the brand blue, and nothing below 9 does', async ({ page }) => {
     await mountPool(page);
     const m = await page.evaluate(() => {
-      // Force a known spread onto the first row's chips and re-read the classes.
       const chips = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child .attr-tile')];
       return chips.map((c) => ({
         v: Number(c.querySelector('s').textContent),
@@ -332,9 +412,16 @@ test.describe('attribute tiles', () => {
         color: getComputedStyle(c.querySelector('s')).color,
       }));
     });
-    const blue = 'rgb(74, 144, 217)';
+    const blue = await page.evaluate(() => {
+      const el = document.createElement('span');
+      el.style.color = 'var(--tier-blue)';
+      document.body.appendChild(el);
+      const c = getComputedStyle(el).color;
+      el.remove();
+      return c;
+    });
     for (const chip of m) {
-      if (chip.v >= 10) {
+      if (chip.v >= 9) {
         expect(chip.cls, `value ${chip.v}`).toContain('is-elite');
         expect(chip.color, `value ${chip.v}`).toBe(blue);
       } else {
@@ -344,26 +431,38 @@ test.describe('attribute tiles', () => {
     }
   });
 
-  test('the tier boundaries hold at 9/10', async ({ page }) => {
+  test('tier class paints 9 elite, 8 high, 6 mid, 4 low', async ({ page }) => {
     await mountPool(page);
     const m = await page.evaluate(() => {
       const chip = document.querySelector('#hub-pool tbody tr.rec:first-child .attr-tile');
       const s = chip.querySelector('s');
       const read = (v) => {
         s.textContent = String(v);
-        chip.className = 'attr-tile ' + (v >= 10 ? 'is-elite' : v >= 7 ? 'is-hi' : v <= 3 ? 'is-lo' : '');
+        chip.className = 'attr-tile ' + window.GOB_AttrTiles.tierClass(v);
         return getComputedStyle(s).color;
       };
-      return { nine: read(9), ten: read(10), sixteen: read(16) };
+      return { nine: read(9), eight: read(8), six: read(6), four: read(4) };
     });
-    expect(m.ten).toBe('rgb(74, 144, 217)');
-    expect(m.sixteen).toBe('rgb(74, 144, 217)');
-    expect(m.nine).not.toBe('rgb(74, 144, 217)');
+    const { elite, gold } = await page.evaluate(() => {
+      const probe = (token) => {
+        const el = document.createElement('span');
+        el.style.color = `var(${token})`;
+        document.body.appendChild(el);
+        const c = getComputedStyle(el).color;
+        el.remove();
+        return c;
+      };
+      return { elite: probe('--tier-blue'), gold: probe('--tier-yellow') };
+    });
+    expect(m.nine).toBe(elite);
+    expect(m.eight).not.toBe(elite);
+    expect(m.six).toBe(gold);
+    expect(m.four).not.toBe(elite);
   });
 });
 
 test.describe('watchlist', () => {
-  test('star toggles, is 32px, gold when on, hollow when off, and has no text label', async ({ page }) => {
+  test('star toggles, is 32px, neutral when on, hollow when off, and has no text label', async ({ page }) => {
     await mountPool(page);
     const before = await page.evaluate(() => {
       const b = document.querySelector('#hub-pool .wt');
@@ -383,15 +482,20 @@ test.describe('watchlist', () => {
     await page.click('#hub-pool tbody tr.rec:first-child .wt');
     await page.waitForFunction(() =>
       document.querySelector('#hub-pool tbody tr.rec:first-child .wt').classList.contains('is-on'));
-    // Park the pointer away from the row: .wt.is-on:hover is a different (lighter) gold,
-    // so measuring while hovering would test the wrong state.
+    // Park the pointer away from the row so hover does not tint the resting colour.
     await page.mouse.move(0, 0);
-    // .wt has transition: color .14s, so getComputedStyle mid-flight returns an
-    // interpolated colour. Wait for it to settle on the resting gold — this both waits
-    // and asserts (a colour that never settles fails on timeout).
-    await page.waitForFunction(() =>
+    // Neutral-on is --text (text-100). Wait out the .14s colour transition.
+    const onColor = await page.evaluate(() => {
+      const el = document.createElement('span');
+      el.style.color = 'var(--text)';
+      document.body.appendChild(el);
+      const c = getComputedStyle(el).color;
+      el.remove();
+      return c;
+    });
+    await page.waitForFunction((want) =>
       getComputedStyle(document.querySelector('#hub-pool tbody tr.rec:first-child .wt')).color
-        === 'rgb(255, 215, 0)', null, { timeout: 3000 });
+        === want, onColor, { timeout: 3000 });
     const after = await page.evaluate(() => {
       const b = document.querySelector('#hub-pool tbody tr.rec:first-child .wt');
       return {
@@ -402,8 +506,7 @@ test.describe('watchlist', () => {
     });
     expect(after.fill).toBe('currentColor');
     expect(after.pressed).toBe('true');
-    // Gold #FFD700
-    expect(after.color).toBe('rgb(255, 215, 0)');
+    expect(after.color).toBe(onColor);
   });
 
   test('toggle PATCHes the watchlist endpoint and nothing else', async ({ page }) => {
@@ -536,34 +639,65 @@ test.describe('invite phase runs full width (no board rail)', () => {
     expect(m.board).toBe(true);                   // the invite board itself stays
   });
 
-  test('the Lean and Watch columns are rendered, but still overflow (known limitation)', async ({ page }) => {
-    await mountPool(page, { week: 22 });
+  test('at 1280 a passive week shows Lean inside the viewport with no horizontal overflow', async ({ page }) => {
+    await mountPool(page, { week: 7, docWidth: 1280 });
+    await page.setViewportSize({ width: 1280, height: 720 });
     const m = await page.evaluate(() => {
       const sc = document.querySelector('#hub-pool .pool-scroll');
-      const heads = [...document.querySelectorAll('#hub-pool thead th')].map((h) => h.className);
+      const lean = document.querySelector('#hub-pool tbody tr.rec td.lean-col');
+      const th = document.querySelector('#hub-pool thead th');
       return {
-        hasLean: heads.some((c) => c.includes('lean')),
-        hasWatch: heads.some((c) => c.includes('watch')),
-        client: sc.clientWidth,
-        overflowBy: sc.scrollWidth - sc.clientWidth,
+        leanRight: lean.getBoundingClientRect().right,
+        inner: window.innerWidth,
+        overflow: sc.scrollWidth - sc.clientWidth,
+        reps: document.querySelectorAll('#hub-pool tbody tr.gob-rep').length,
+        sticky: getComputedStyle(th).position,
+        backdrop: getComputedStyle(th).backdropFilter,
       };
     });
-    // Both columns exist and are reachable by scrolling .pool-scroll.
+    expect(m.leanRight).toBeLessThanOrEqual(m.inner + 1);
+    expect(m.overflow).toBeLessThanOrEqual(1);
+    expect(m.reps).toBe(0);
+    expect(m.sticky).toBe('sticky');
+    expect(m.backdrop).toBe('none');
+  });
+
+  test('a table wider than its scrollport keeps the repeated header', async ({ page }) => {
+    await mountPool(page, { week: 7, docWidth: 640 });
+    const m = await page.evaluate(() => {
+      const sc = document.querySelector('#hub-pool .pool-scroll');
+      return {
+        overflow: sc.scrollWidth - sc.clientWidth,
+        reps: document.querySelectorAll('#hub-pool tbody tr.gob-rep').length,
+      };
+    });
+    expect(m.overflow).toBeGreaterThan(1);
+    expect(m.reps).toBe(28);
+  });
+
+  test('Lean stays on screen when the invite column is open', async ({ page }) => {
+    await mountPool(page, { week: 22, docWidth: 1280 });
+    const m = await page.evaluate(() => {
+      const sc = document.querySelector('#hub-pool .pool-scroll');
+      const lean = document.querySelector('#hub-pool tbody tr.rec td.lean-col');
+      const box = sc.getBoundingClientRect();
+      const fits = sc.scrollWidth <= sc.clientWidth + 1;
+      return {
+        hasLean: !!document.querySelector('#hub-pool thead th.lean-h'),
+        hasWatch: !!document.querySelector('#hub-pool thead th.watch-col'),
+        hasAdd: !!document.querySelector('#hub-pool thead th.act'),
+        leanInside: lean.getBoundingClientRect().right <= box.left + sc.clientWidth + 1,
+        overflowBy: sc.scrollWidth - sc.clientWidth,
+        reps: document.querySelectorAll('#hub-pool tbody tr.gob-rep').length,
+        fits,
+      };
+    });
     expect(m.hasLean).toBe(true);
     expect(m.hasWatch).toBe(true);
-
-    // KNOWN LIMITATION, recorded rather than asserted away.
-    //
-    // Removing the 306px rail gave the pool that width back, but the table still needs
-    // ~88px more than it has, so Lean and Watch sit off the right edge until the user
-    // scrolls sideways. The cause is NOT the rail: `.doc { max-width: 1360px }` in
-    // recruiting-spine.css caps the whole hub page, so the pool measures the same
-    // 1096px at 1440, 1600, 1920 and 2200 viewports. Fixing it means raising that cap,
-    // narrowing the 12-tile attributes column, or dropping a column — a product call.
-    //
-    // Asserts the CURRENT truth so the suite stays honest; flip to toBe(0) once settled.
-    expect(m.overflowBy).toBeGreaterThan(0);
-    expect(m.overflowBy).toBeLessThan(200);   // if this grows, something else regressed
+    expect(m.hasAdd).toBe(true);
+    expect(m.leanInside).toBe(true);
+    expect(m.overflowBy).toBeLessThan(320);
+    expect(m.reps).toBe(m.fits ? 0 : 28);
   });
 
   test('the passive phase is unchanged — it never had a rail', async ({ page }) => {

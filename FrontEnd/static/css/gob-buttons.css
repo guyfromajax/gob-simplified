@@ -3,15 +3,22 @@
  * defined in Styleguide.md (Buttons §).
  *
  *   min-width: 138px   height: 42px   padding: 0 18px   radius: 10px
- *   border: 1px solid rgba(255,255,255,0.28)
- *   inset top highlight: rgba(255,255,255,0.18)
- *   font: Bebas Neue Pro Bold (700), +tracking
+ *   border: 1px solid --white-28
+ *   inset top highlight: --white-18
+ *   font: --font-display bold, +tracking
  *   hover-lift -1px, press-compress translateY(0)
  *
- * Variants are role-based, NOT decorative:
- *   .gob-btn--action  orange #F79420 — non-gating primary (saves, configures, advances UI)
- *   .gob-btn--gate    green #34EC27 — gating primary (advances game state). Scarce by design.
+ * Variants are role-based, NOT decorative (Styleguide.md, Colour law):
+ *   .gob-btn--action  --orange — a save or commit, nothing else
+ *   .gob-btn--gate    --green — the one Advance per screen. Scarce by design.
+ *   .gob-btn--neutral white plate — the main CTA when it neither saves nor advances
  *   .gob-btn--ghost   subdued — acknowledgements, secondary actions, dismissals
+ *
+ * Colours, the display face, weight, tracking and the fixed radius / padding come
+ * from gob-tokens.css. Every var() carries the same value as a fallback, because
+ * modules inject this sheet into pages that are not .gob. Sizes that have no fixed
+ * token (heights, min-widths, font sizes: the --fs-* tokens scale with density)
+ * stay literal.
  *
  * Use sparingly across the product. Inside Functional modals, the existing
  * .gob-modal-btn-* classes are already canonical and should be preferred.
@@ -23,20 +30,20 @@
   justify-content: center;
   min-width: 138px;
   height: 42px;
-  padding: 0 18px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  padding: 0 var(--space-18, 18px);
+  border-radius: var(--radius-10, 10px);
+  border: 1px solid var(--white-28, rgba(255, 255, 255, 0.28));
+  box-shadow: inset 0 1px 0 var(--white-18, rgba(255, 255, 255, 0.18));
+  font-family: var(--font-display, 'Bebas Neue Pro', 'Bebas Neue', sans-serif);
   font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  line-height: 1;
+  font-weight: var(--fw-bold, 700);
+  letter-spacing: var(--tracking-6, 0.06em);
+  line-height: var(--lh-1, 1);
   text-decoration: none;
   cursor: pointer;
   appearance: none;
   background: transparent;
-  color: #ffffff;
+  color: var(--text-100, #ffffff);
   transition: filter 0.14s ease, transform 0.14s ease, background 0.14s ease, border-color 0.14s ease;
 }
 
@@ -65,28 +72,28 @@
   min-width: 180px;
   padding: 0 28px;
   font-size: 19px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-8, 0.08em);
 }
 
 /* --- Role variants ----------------------------------------------------- */
 
-/* Non-gating primary — orange. Default for almost every primary CTA. */
-.gob-btn--action {
-  background: #F79420;
-  border-color: rgba(247, 148, 32, 0.55);
+/* Save or commit — orange. Only for a save or commit. */
+.gob-btn--action { /* colour-law: committed */
+  background: var(--orange, #F79420);
+  border-color: color-mix(in srgb, var(--orange, #F79420) 55%, transparent);
   color: #15181f;
 }
 
-.gob-btn--action:hover:not(:disabled):not(.is-disabled) {
+.gob-btn--action:hover:not(:disabled):not(.is-disabled) { /* colour-law: committed */
   background: #ffa84a;
 }
 
 /* Gating primary — green. Reserved for actions that advance game state.
  * Per styleguide: must remain scarce. In the FTE flow, this appears on
  * exactly one button (Tip-off → SET LINEUP). */
-.gob-btn--gate {
-  background: #34EC27;
-  border-color: rgba(52, 236, 39, 0.55);
+.gob-btn--gate { /* colour-law: positive-data — gating Advance */
+  background: var(--green, #34EC27);
+  border-color: color-mix(in srgb, var(--green, #34EC27) 55%, transparent);
   color: #15181f;
 }
 
@@ -94,16 +101,32 @@
   background: #4dff3f;
 }
 
+/* Neutral primary — the main CTA when it neither saves nor advances
+ * (tutorial "Start lesson", Sammy "Got It", navigation). A white plate, no
+ * colour. Fallbacks keep it right on hosts without html.gob. Two classes so
+ * the dark ink beats page rules like `body.gob-tut a { color: inherit }`. */
+.gob-btn.gob-btn--neutral {
+  background: var(--white-90, rgba(255, 255, 255, 0.9));
+  border-color: var(--white-90, rgba(255, 255, 255, 0.9));
+  color: var(--bg, #0b0d14);
+  box-shadow: none;
+}
+
+.gob-btn.gob-btn--neutral:hover:not(:disabled):not(.is-disabled) {
+  background: var(--text-100, #ffffff);
+  border-color: var(--text-100, #ffffff);
+}
+
 /* Ghost — acknowledgements and quiet secondaries. */
 .gob-btn--ghost {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--white-6, rgba(255, 255, 255, 0.06));
+  border-color: var(--white-18, rgba(255, 255, 255, 0.18));
   color: rgba(255, 255, 255, 0.85);
   box-shadow: none;
 }
 
 .gob-btn--ghost:hover:not(:disabled):not(.is-disabled) {
-  background: rgba(255, 255, 255, 0.11);
-  border-color: rgba(255, 255, 255, 0.30);
-  color: #ffffff;
+  background: var(--white-11, rgba(255, 255, 255, 0.11));
+  border-color: var(--white-30, rgba(255, 255, 255, 0.30));
+  color: var(--text-100, #ffffff);
 }

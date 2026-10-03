@@ -15,6 +15,21 @@ function currentSearch() {
   const s = liveParams().toString();
   return s ? '?' + s : '';
 }
+function shellFocusNavigation(pathname, search) {
+  var path = pathname || '';
+  var q = new URLSearchParams(search || '');
+  if (path === '/box-score.html') return !q.get('return_url');
+  if (path === '/recruiting.html' && q.get('action') === 'run') return true;
+  if (path === '/game-plan.html') {
+    return q.get('resume_from_timeout') === 'true' || q.get('mode') === 'tutorial';
+  }
+  return path === '/set-lineup.html'
+    || path === '/training-squad-report.html'
+    || path === '/training-playbooks.html'
+    || path === '/cut-players.html'
+    || path === '/playbook-report.html';
+}
+
 function cloneParams(params) {
   const out = emptyParams();
   if (params && typeof params.forEach === 'function') {
@@ -33,6 +48,17 @@ function cloneParams(params) {
  * Public pages: homepage, login, signup (and root /)
  */
 (function () {
+  (function loadClientStore() {
+    try {
+      var head = document.head || document.documentElement;
+      if (!head || document.querySelector('script[src="/js/shared/gobStore.js"]')) return;
+      var script = document.createElement('script');
+      script.src = '/js/shared/gobStore.js';
+      script.async = false;
+      head.appendChild(script);
+    } catch (e) {}
+  })();
+
   (function loadGlobalButtonFont() {
     try {
       var head = document.head || document.getElementsByTagName("head")[0];
@@ -52,6 +78,55 @@ function cloneParams(params) {
         styleLink.rel = "stylesheet";
         styleLink.href = "/css/button-font.css";
         head.appendChild(styleLink);
+      }
+
+      var shellPages = {
+        "/recruiting.html": 1,
+        "/rankings.html": 1,
+        "/schedule.html": 1,
+        "/practice-squad-standings.html": 1,
+        "/practice-squad-bracket.html": 1,
+        "/brackets.html": 1,
+        "/awards.html": 1,
+        "/news.html": 1,
+        "/leaders.html": 1,
+        "/standings.html": 1,
+        "/team-stats.html": 1,
+        "/stats.html": 1,
+        "/team-traits.html": 1,
+        "/player-detail.html": 1,
+        "/team-roster-view.html": 1,
+        "/set-lineup.html": 1,
+        "/training.html": 1,
+        "/training-report.html": 1,
+        "/training-squad-report.html": 1,
+        "/training-playbooks.html": 1,
+        "/cut-players.html": 1,
+        "/game-plan.html": 1,
+        "/playbooks.html": 1,
+        "/playbook-report.html": 1,
+        "/box-score.html": 1
+      };
+      if (shellPages[window.location.pathname]) {
+        ["/css/gob-tokens.css", "/css/gob-components.css", "/css/gob-shell.css"].forEach(function (href) {
+          if (document.querySelector('link[href="' + href + '"]')) return;
+          var link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = href;
+          head.appendChild(link);
+        });
+        if (shellFocusNavigation(window.location.pathname, window.location.search)) {
+          var vtOff = document.createElement("style");
+          vtOff.textContent = "@view-transition { navigation: none; }";
+          head.appendChild(vtOff);
+        }
+        ["/js/shared/gobAdvance.js", "/js/shared/gobSubtabs.js", "/js/shared/gobShell.js"].forEach(function (src) {
+          if (document.querySelector('script[src="' + src + '"]')) return;
+          var script = document.createElement("script");
+          script.src = src;
+          script.async = false;
+          head.appendChild(script);
+        });
       }
     } catch (e) {
       // ignore
@@ -112,7 +187,21 @@ function cloneParams(params) {
   // Login is always-remote, so sending the user there strands them offline.
   // window.GOB_BUILD_PROFILE is set by the Electron preload before any page
   // script runs. The web build never sets it, so this branch is dead there.
-  var isDesktop = typeof window !== "undefined" && window.GOB_BUILD_PROFILE === "desktop";
+  var desktopCookie = false;
+  try {
+    desktopCookie = typeof document !== "undefined" && document.cookie.indexOf("GOB_BUILD_PROFILE=desktop") !== -1;
+  } catch (err) {
+    desktopCookie = false;
+  }
+  var isDesktop = typeof window !== "undefined" && (
+    window.GOB_BUILD_PROFILE === "desktop" || desktopCookie
+  );
+  if (isDesktop && window.GOB_BUILD_PROFILE !== "desktop") {
+    window.GOB_BUILD_PROFILE = "desktop";
+    if (!window.GOB_LOOPBACK_PORT && window.location && window.location.port) {
+      window.GOB_LOOPBACK_PORT = window.location.port;
+    }
+  }
   if (!isDesktop) {
     var token = typeof localStorage !== "undefined" ? localStorage.getItem("auth_token") : null;
     if (!token) {

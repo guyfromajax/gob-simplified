@@ -1,28 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
+  <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Training Report - GOB</title>
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
 <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/css/gob-tokens.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/css/rt-buckets.css">
+  <!-- The shared table styles: the Player Report and Projected Starting 5 use the roster's
+       attribute pairs (.gob-pairs / .gob-tbl), not a table style of their own. -->
+  <link rel="stylesheet" href="/css/gob-views.css">
+  <link rel="stylesheet" href="/css/gob-tables.css">
   <link rel="stylesheet" href="/training-report.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
-<body class="training-report-page">
+<body>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
+  <div id="training-report-view" class="is-loading" aria-busy="true">
   <div class="training-report-container resource-page-container fcc-brand-page-shell training-report-resource-shell">
     <!-- Header -->
     <header class="report-header">
@@ -41,21 +51,22 @@
       <button id="locker-room-btn" class="locker-room-button">Go To Locker Room</button>
     </header>
 
-    <!-- Training Notes (first: Notes → Players → Team → Plays) -->
+    <!-- Loading state: stands in for every section until the report data is in. -->
+    <div class="report-skeleton" aria-hidden="true"><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><div class="rsk-col"><i class="rsk rsk-h"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i><i class="rsk rsk-line"></i></div><i class="rsk rsk-grid"></i></div>
+    <p class="report-load-status" role="status" aria-live="polite"></p>
+
+    <!-- Training Notes (Notes → Team → Players → Projected → Playbook) -->
     <section class="training-notes-section">
-      <div class="training-notes-header">
-        <div class="training-notes-header-main">
-          <div class="training-notes-header-accent" aria-hidden="true"></div>
-          <div class="training-notes-header-copy">
-            <h2>Notes</h2>
-            <div id="training-notes-brief" class="training-notes-brief">Week -- Training Brief · For Coaching Staff Only</div>
-          </div>
-        </div>
-      </div>
-      <div class="training-notes-rule" aria-hidden="true"></div>
+      <h2>Notes</h2>
       <div class="training-notes-container" id="training-notes-container">
-        <!-- Populated by training-report.js -->
+        <!-- Populated by training-report.js: Standouts, Trends, Readiness -->
       </div>
+    </section>
+
+    <!-- Team Section -->
+    <section class="team-section">
+      <h2>Team Report</h2>
+      <div class="team-attributes-grid card" id="team-attributes-grid"></div>
     </section>
 
     <!-- Players Section -->
@@ -67,18 +78,12 @@
           <button class="toggle-btn active" data-view="changes">Training Changes</button>
         </div>
       </div>
-      <div class="scroll-x">
-        <table class="players-table" id="players-table">
+      <div class="scroll-x gob-roster gob-pairs tr-ptable">
+        <table class="gob-tbl" id="players-table">
           <thead id="players-thead"></thead>
           <tbody id="players-tbody"></tbody>
         </table>
       </div>
-    </section>
-
-    <!-- Team Section -->
-    <section class="team-section">
-      <h2>Team Report</h2>
-      <div class="team-attributes-grid" id="team-attributes-grid"></div>
     </section>
 
     <!-- Projected Starting 5 -->
@@ -103,8 +108,8 @@
       </div>
     </section>
   </div>
+  </div>
 
-  <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
   <script src="/js/shared/playerYear.js"></script>
   <script src="/js/shared/scoutingReport.js"></script>
@@ -112,10 +117,14 @@
   <script src="/js/shared/rtBucket.js"></script>
   <script src="/js/shared/playerYear.js"></script>
   <script src="/js/shared/teamShotThresholdScale.js"></script>
-  <script src="/training-report.js"></script>
+  <script src="/js/utils/attributeDisplay.js"></script>
   <script type="module">
     import { resumeFranchiseTrack } from '/js/musicController.js';
+    import { init } from '/training-report.js';
     resumeFranchiseTrack();
+    try {
+      init(document.getElementById('training-report-view'));
+    } catch (err) { /* init logs */ }
   </script>
 </body>
 </html>

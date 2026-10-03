@@ -2,14 +2,13 @@
  * Username Modal — FTE v2 onboarding redesign.
  *
  * Implemented as the canonical Functional modal (`gob-modal-*` chrome,
- * 3px orange accent bar, Bebas Neue Pro title, Inter subtitle). Team-linked
+ * 3px neutral accent bar, Bebas Neue Pro title, Inter subtitle). Team-linked
  * Sammy portrait overlaps the top edge of the modal so the persona stays
  * warm without breaking the system box.
  *
- * Primary CTA is the canonical `.gob-btn--action` (orange) — per the
- * styleguide's Action Color rules, naming yourself is a non-gating action
- * (configures a preference; doesn't advance game state). Previously this
- * button was green, which was incorrect.
+ * Primary CTA is the neutral plate (`.gob-btn--neutral`): CONTINUE neither
+ * advances game state (not green) nor is a save of unsaved changes (not
+ * orange; Jamie, 2026-10-01).
  *
  * Usage:
  *   import { openUsernameModal } from '/js/shared/usernameModal.js';
@@ -88,7 +87,7 @@ export function openUsernameModal(opts = {}) {
   const onSuccess = typeof opts.onSuccess === 'function' ? opts.onSuccess : null;
   const mascotText = (opts.mascot || '').trim();
   const titleText = mascotText
-    ? `YOU'RE COACHING THE ${mascotText.toUpperCase()}`
+    ? `YOU'RE COACHING THE ${mascotText}`
     : 'CHOOSE A USERNAME';
   const sammySrc = getTeamSammyImage(opts.teamName);
   // String() guard so a stray null/undefined doesn't end up rendered as
@@ -127,7 +126,7 @@ export function openUsernameModal(opts = {}) {
         </div>
       </div>
       <div class="gob-modal-actions username-modal-actions">
-        <button type="button" class="gob-btn gob-btn--action username-modal-cta" id="username-modal-cta">CONTINUE</button>
+        <button type="button" class="gob-btn gob-btn--neutral username-modal-cta" id="username-modal-cta">CONTINUE</button>
       </div>
     </div>
   `;

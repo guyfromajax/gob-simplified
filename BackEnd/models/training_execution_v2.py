@@ -953,14 +953,22 @@ def apply_training_points(
                 changes[attr] = delta
             display_movement = training_report_display_movement(old_val, new_val)
             if display_movement:
-                display_movements[attr] = display_movement
+                # First-digit display scale (raw // 10). The Office digest returns
+                # these from/to values; the training report derives the arrow.
+                display_movements[attr] = {
+                    "from": training_report_display_bucket(old_val),
+                    "to": training_report_display_bucket(new_val),
+                }
         if changes:
             yr = player.get("year")
             if yr is not None and str(yr).strip():
                 changes["year"] = str(yr).strip().lower()
             player_changes[name] = changes
         if display_movements:
-            player_attribute_display_movements[name] = display_movements
+            player_attribute_display_movements[str(pid)] = {
+                "name": name,
+                **display_movements,
+            }
     
     team_changes = {}
     for attr_name in TEAM_ATTR_CLAMPS.keys():

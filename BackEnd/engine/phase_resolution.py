@@ -24,6 +24,7 @@ from BackEnd.models.shot_manager import ShotManager
 from BackEnd.utils.team_attr_scale import core8_gameplay
 from BackEnd.utils.situational_logic import slow_it_down_defense_setting
 from BackEnd.engine.steal_fast_break_routing import choose_steal_next_offensive_state
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 if TYPE_CHECKING:
     from BackEnd.models.turn_manager import TurnManager
 if TYPE_CHECKING:
@@ -1631,6 +1632,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             if anim_steps is not None:
                 turn_result["animation_steps"] = anim_steps
         except Exception as e:  # pragma: no cover
+            reraise_if_strict(e)
             logging.warning(
                 "build_after_steal_fast_break_animation_steps failed: %s", e
             )
@@ -1666,6 +1668,7 @@ def resolve_fast_break_logic(game: "GameManager"):
                         rr_result.get("next_play_type"),
                     )
             except Exception as e:
+                reraise_if_strict(e)
                 logging.exception(
                     "🚨 [RR EMITTER EXCEPTION] result_type=%s: %s "
                     "— animation_steps not set, FE → LEGACY",
@@ -1691,6 +1694,7 @@ def resolve_fast_break_logic(game: "GameManager"):
                         rr_result.get("next_play_type"),
                     )
             except Exception as e:
+                reraise_if_strict(e)
                 logging.exception(
                     "🚨 [TRIANGLE EMITTER EXCEPTION] result_type=%s: %s "
                     "— animation_steps not set, FE → LEGACY",
@@ -1717,6 +1721,7 @@ def resolve_fast_break_logic(game: "GameManager"):
                 if anim_steps is not None:
                     turn_result["animation_steps"] = anim_steps
             except Exception as e:
+                reraise_if_strict(e)
                 logging.warning(
                     "build_covert_release_animation_steps failed: %s", e
                 )
@@ -2330,6 +2335,7 @@ def resolve_fast_break_logic(game: "GameManager"):
                         result.get("result_type"),
                     )
             except Exception as e:
+                reraise_if_strict(e)
                 logging.exception(
                     "🚨 [CR EMITTER EXCEPTION] (defensive_stop) result_type=%s: %s "
                     "— animation_steps not set, FE → LEGACY",
@@ -2610,6 +2616,7 @@ def resolve_fast_break_logic(game: "GameManager"):
                     turn_result.get("next_play_type"),
                 )
         except Exception as e:
+            reraise_if_strict(e)
             logging.exception(
                 "🚨 [CR EMITTER EXCEPTION] (outcome) result_type=%s rebound_type=%s: %s "
                 "— animation_steps not set, FE → LEGACY",
@@ -2644,6 +2651,7 @@ def resolve_fast_break_logic(game: "GameManager"):
                     turn_result.get("next_play_type"),
                 )
         except Exception as e:
+            reraise_if_strict(e)
             logging.exception(
                 "🚨 [AFTER_STEAL EMITTER EXCEPTION] result_type=%s: %s "
                 "— animation_steps not set, FE → LEGACY",
@@ -3816,6 +3824,7 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
                                 if success == 1:
                                     player.record_stat("SCR_S")
         except Exception as e:
+            reraise_if_strict(e)
             pass  # Silently handle skeleton analysis errors
     
     # PLACEHOLDER: Return random lean score for now
@@ -3927,6 +3936,7 @@ def _store_lean_score_internal(lean_score, game, offense_team, defense_team):
                     game_stats[combo_key]["lean_scores"].append(lean_score)
     except Exception as e:
         # Silently handle errors to avoid disrupting gameplay
+        reraise_if_strict(e)
         pass
 
 def _store_execution_score(execution_score, game, offense_team, defense_team):
@@ -4781,7 +4791,8 @@ def _uess_sync_emitted_shot_coords(game, skeleton, animations, roles, turn_type=
         if isinstance(c, dict) and c.get("x") is not None and c.get("y") is not None:
             return {"x": float(c["x"]), "y": float(c["y"])}
         return None
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         return None
 
 
@@ -6230,7 +6241,8 @@ def _track_hco_intercept_gates(game_state, in_lane, attempted, stage, pass_type=
             "by-type[p·g1·g2·INT·BAT]: %s [is_full_sim=%s]",
             n, g1, _r(g1, n), g2, _r(g2, g1), g["g3a_safe"], _r(g["g3a_safe"], g2),
             g["g3b_int"], g["g3b_bat"], g["g3b_miss"], types_s, game_state.get("_is_full_simulation"))
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         pass
 
 
@@ -6332,7 +6344,8 @@ def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lin
             w["pass_seen"] += 1
             if receiver:
                 w["pass_same"] += 1
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         pass
     if not passer or not receiver or not off_lineup.get(passer):
         return None
@@ -6556,7 +6569,8 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         # "Single producer" is FALSE by design here — a step's row belongs to whoever
         # created the step. Say so out loud rather than letting the claim drift.
         _pf.announce_blocked_write("_stamp_contest_defender_grid", _blocked, game)
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         pass
 
 
@@ -7048,7 +7062,8 @@ def _track_hco_pass_lanes(result, game):
             full = min_perp_in_lane(passer_xy, receiver_xy, def_xy, 0.1, 1.0)
             turn_samples.append((round(mid, 1) if mid is not None else None,
                                  round(full, 1) if full is not None else None))
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             continue
 
     if not turn_samples:
@@ -7751,7 +7766,8 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                         posture=game_state.get("_hco_defense_posture"))
                     _post_separation_map = _hco_shooter_separation_map(
                         off_lineup, _post_def_xy, _post_coord)
-            except Exception:
+            except Exception as e:
+                reraise_if_strict(e)
                 pass
             post_shoot = should_shoot(bh_pos, off_lineup, _alt_locs, read_map, off_team,
                                       shot_clock_est, tempo, random,
@@ -8389,6 +8405,7 @@ def resolve_final_turn_shot_logic(
             )
             apply_coords_from_animations_list(game, final_turn_animations)
         except Exception as _ft_sync_err:
+            reraise_if_strict(_ft_sync_err)
             import logging as _ft_sync_log
             _ft_sync_log.warning(
                 "FT-Task 1: pre-resolve defender sync failed (%s); falling back "
@@ -9501,6 +9518,7 @@ def resolve_half_court_offense_logic(game):
                     if motion_shot_info is None:
                         logging.debug("ℹ️ [DYNAMIC SETPLAY] Resolver returned None; using standard set-play shot path")
                 except Exception as e:
+                    reraise_if_strict(e)
                     logging.debug(f"⚠️ [DYNAMIC SETPLAY] Error in dynamic resolver, falling back to standard path: {e}")
                     motion_shot_info = None
         else:
@@ -9916,6 +9934,7 @@ def resolve_half_court_offense_logic(game):
             # print(f"🎯 SUCCESS DEBUG: Skipping - type_label={type_label}, focus={focus}")
     except Exception as e:
         # Error logging kept - important for debugging actual errors
+        reraise_if_strict(e)
         logging.error(f"🎯 SUCCESS DEBUG ERROR: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
@@ -10729,6 +10748,7 @@ def get_fcp_skeleton(result_type, game_context=None):
         else:
             logging.warning("⚠️ No FCP skeletons in MongoDB, falling back to hardcoded")
     except Exception as e:
+        reraise_if_strict(e)
         logging.warning(f"⚠️ Error loading FCP skeleton from MongoDB: {e}, falling back to hardcoded")
     
     # Fallback to old hardcoded system
@@ -10829,6 +10849,7 @@ def get_hct_skeleton(result_type, game_context=None):
         else:
             logging.warning("⚠️ No HCT skeletons in MongoDB, falling back to hardcoded")
     except Exception as e:
+        reraise_if_strict(e)
         logging.warning(f"⚠️ Error loading HCT skeleton from MongoDB: {e}, falling back to hardcoded")
     
     # Fallback to old hardcoded system
@@ -10949,7 +10970,8 @@ def _playcall_memo(game_context, bucket: str) -> dict:
         memo = {}
         try:
             setattr(game_context, attr, memo)
-        except Exception:
+        except Exception as e:
+            reraise_if_strict(e)
             return {}
     return memo
 
@@ -10972,9 +10994,10 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
     try:
         if plays_catalog.name_exists(playcall):
             return playcall
-    except Exception:
+    except Exception as e:
         # Unchanged semantics: on lookup failure do NOT memoize, and fall through to the
         # team-plays resolution below rather than returning early.
+        reraise_if_strict(e)
         logging.debug("canonical playcall: universal name lookup failed for %r", playcall, exc_info=True)
 
     offense_team = getattr(game_context, "offense_team", None)
@@ -10992,7 +11015,8 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
                     team_obj = game_doc["teams"].get(team_id) or game_doc["teams"].get(str(team_id))
                     if isinstance(team_obj, dict):
                         play_obj = resolve_team_play(team_obj.get("plays") or {}, playcall)
-            except Exception:
+            except Exception as e:
+                reraise_if_strict(e)
                 logging.debug("canonical playcall: game doc team plays lookup failed", exc_info=True)
 
     if play_obj:
@@ -11002,14 +11026,16 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
                 name = plays_catalog.name_for_id(pid)
                 if name:
                     return name
-            except Exception:
+            except Exception as e:
+                reraise_if_strict(e)
                 pass
         embedded = play_obj.get("name")
         if isinstance(embedded, str) and embedded:
             try:
                 if plays_catalog.name_exists(embedded):
                     return embedded
-            except Exception:
+            except Exception as e:
+                reraise_if_strict(e)
                 pass
 
     return playcall
@@ -11218,6 +11244,7 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
             game_context._skeleton_cache[cache_key] = play_doc
             # print(f"🔍 FETCHED from universal: '{playcall}' (play_id: {play_id})")
         except Exception as e:
+            reraise_if_strict(e)
             print(f"🚨 Error fetching play from universal collection: {e}")
             return None
     
@@ -12445,6 +12472,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             if anim_steps is not None:
                 shot_result["animation_steps"] = anim_steps
         except Exception as e:
+            reraise_if_strict(e)
             logging.warning("build_hct_animation_steps (shot path) failed: %s", e)
 
         return shot_result
@@ -12775,6 +12803,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         if anim_steps is not None:
             result["animation_steps"] = anim_steps
     except Exception as e:
+        reraise_if_strict(e)
         logging.warning("build_hct_animation_steps (non-shot path) failed: %s", e)
 
     return result

@@ -1,9 +1,9 @@
 /**
  * Player Development grid — the 12 active players, their training position and focus.
  *
- * ONE implementation for its two hosts: the training page (under Coaching Focus) and the
- * FCC's Training tab. They are the only two places development is editable, and a coach
- * who learns one has learned the other.
+ * ONE implementation and ONE layout for its two hosts: the weekly training page (under
+ * Coaching Focus) and Prep › Player Training. Both draw the same cards, four across. They
+ * are the only two places development is editable.
  *
  * Hosts differ in where their roster comes from, so each adapts its own payload into the
  * normalised shape below rather than this module learning two payloads:
@@ -11,11 +11,17 @@
  *   { id, name, year, height, weight,
  *     attributes: { SC: 7, ... },        // 0-10 display scale or raw; passed through
  *     position_ratings: { PG: 72, ... },
+ *     potential_rt_ratcheted,            // optional; drawn after the current RT as "cur → pot"
  *     training_position, training_focus, resolved_training_position, resolved_training_focus }
  *
- * Row order is fixed by the caller and never re-sorted. The displayed RT follows the
- * TRAINING position, so it changes when the coach changes the position — but re-sorting on
- * that would make a row jump out from under the cursor immediately after it was used.
+ * Each card shows the current RT (at the training position) and, when the payload carries
+ * one, the potential after an arrow: "B+ → A++". No jersey number, no portrait.
+ *
+ * Order: by the CURRENT RT the card shows (the rating at the TRAINING position), highest first,
+ * reading left to right and then top to bottom; ties keep the caller's order. The order is
+ * set when the grid is rendered and not while it is being edited: that RT changes when the
+ * coach changes a position, and re-sorting then would move a card out from under the
+ * cursor immediately after it was used. A longer roster (camp, before cuts) adds a row.
  */
 (function () {
   'use strict';
@@ -37,6 +43,17 @@
     return isFinite(v) ? Math.round(v) : null;
   }
 
+  /** Highest shown RT first; a card with no rating last; ties keep the caller's order. */
+  function orderByRt(players) {
+    return (players || []).map(function (player, index) {
+      return { player: player, index: index, rt: rtAtTrainingPosition(player) };
+    }).sort(function (a, b) {
+      var ar = a.rt == null ? -Infinity : a.rt;
+      var br = b.rt == null ? -Infinity : b.rt;
+      return (br - ar) || (a.index - b.index);
+    }).map(function (entry) { return entry.player; });
+  }
+
   /** Height may arrive as inches (training payload) or preformatted (roster payload). */
   function formatHeight(height) {
     if (height == null || height === '') return '--';
@@ -45,12 +62,11 @@
     return Math.floor(n / 12) + "'" + (n % 12) + '"';
   }
 
-  /** Attributes may be stored raw or under anchor_ keys; prefer the anchor. */
+  /** Raw attribute, preferring anchor_. The hover card displays the first digit. */
   function attrValue(attributes, code) {
-    var a = attributes || {};
-    var v = a['anchor_' + code];
-    if (v == null) v = a[code];
-    var n = Number(v);
+    var raw = window.GOB_AttributeDisplay.rawAttr(attributes, code);
+    if (raw == null || raw === '') return null;
+    var n = Number(raw);
     return isFinite(n) ? n : null;
   }
 
@@ -99,14 +115,14 @@
   function hoverCardHtml(player) {
     var develops = developsFor(player);
     var rows = ATTR_ORDER.map(function (code) {
-      var v = attrValue(player.attributes, code);
+      var raw = attrValue(player.attributes, code);
+      var shown = window.GOB_AttributeDisplay.displayAttr(raw);
       // The accent is on the CODE, never the value. Values are ratings, and colour on a
-      // rating already means "how good is he" everywhere else in the product — blue #4A90D9
-      // for 10+, green for 7-9. Tinting them here would put the product's own value palette
+      // rating already means how good he is. Tinting them here would put that palette
       // on a quantity that is not a value.
       var on = develops.indexOf(code) !== -1 ? ' is-develops' : '';
       return '<span class="pdg-hc-attr' + on + '"><b>' + esc(code) + '</b>' +
-        '<i>' + (v == null ? '--' : v) + '</i></span>';
+        '<i>' + (shown == null ? '--' : shown) + '</i></span>';
     }).join('');
 
     var dev = window.GOBDevelopmentFocus;
@@ -184,7 +200,7 @@
     var open = function (e) {
       var name = e.target.closest ? e.target.closest('.pdg-name') : null;
       if (!name) return;
-      var card = name.closest('.pdg-card');
+      var card = name.closest('.pdg-card') || name.closest('tr[data-pdg-player]');
       var lookup = grid._pdgById || byId;
       var player = card && lookup[String(card.dataset.pdgPlayer)];
       if (player) showHoverCard(name, player);
@@ -199,12 +215,27 @@
     window.addEventListener('resize', hideHoverCard);
   }
 
+  function bucketClass(rt) {
+    return (rt != null && typeof window.getRtBucketClass === 'function') ? window.getRtBucketClass(rt) : '';
+  }
+
+  /** "current → potential": the current RT at the training position, then the potential when known. */
+  function rtPairHtml(player) {
+    var rt = rtAtTrainingPosition(player);
+    var pot = player.potential_rt_ratcheted;
+    var html = '<span class="pdg-rt rtl"><b data-pdg-rt class="' + esc(bucketClass(rt)) + '">' +
+      (rt == null ? '--' : esc(formatRtDisplay(rt))) + '</b>';
+    if (pot != null && pot !== '' && isFinite(Number(pot))) {
+      html += '<i>\u2192</i><b class="pot ' + esc(bucketClass(Number(pot))) + '">' + esc(formatRtDisplay(pot)) + '</b>';
+    }
+    return html + '</span>';
+  }
+
   function cardHtml(player) {
     var dev = window.GOBDevelopmentFocus;
-    var rt = rtAtTrainingPosition(player);
     return '<div class="pdg-card" data-pdg-player="' + esc(player.id) + '">' +
       '<span class="pdg-name" tabindex="0">' + esc(player.name) + '</span>' +
-      '<span class="pdg-rt" data-pdg-rt>' + (rt == null ? '--' : rt) + '</span>' +
+      rtPairHtml(player) +
       '<span class="pdg-controls">' +
         dev.positionSelectHtml(player) + dev.focusSelectHtml(player) +
       '</span>' +
@@ -236,10 +267,15 @@
     var dev = window.GOBDevelopmentFocus;
     if (!host || !dev) return;
     var o = opts || {};
-    var rows = players || [];
+    var rows = orderByRt(players);
     var grid = host.querySelector('.pdg-grid');
     if (!grid) return;
 
+    // One layout for both hosts: cards, four across, filled row by row. Twelve players
+    // are three rows of four, and a longer camp roster adds a row.
+    host.classList.remove('pdg-layout-table');
+    host.classList.add('pdg-layout-cards');
+    if (o.tallies) host._pdgTallies = o.tallies;
     grid.innerHTML = rows.length
       ? rows.map(cardHtml).join('')
       : '<div class="pdg-empty">No active players.</div>';
@@ -259,15 +295,28 @@
       var row = null;
       rows.forEach(function (r) { if (String(r.id) === String(playerId)) row = r; });
       if (row) {
+        var prevResolved = field === 'training_focus' ? row.resolved_training_focus : row.resolved_training_position;
         row[field] = value;
         row[field === 'training_focus' ? 'resolved_training_focus' : 'resolved_training_position'] = value;
         // The row keeps its place; only the number it shows moves. Re-sorting here would
         // pull the row out from under the coach the instant he used it.
+        if (host._pdgTallies && prevResolved !== value) {
+          var maps = host._pdgTallies;
+          var bag = field === 'training_focus' ? maps.focuses : maps.positions;
+          if (bag) {
+            if (prevResolved && Object.prototype.hasOwnProperty.call(bag, prevResolved)) {
+              bag[prevResolved] = Math.max(0, (bag[prevResolved] || 0) - 1);
+            }
+            if (value && Object.prototype.hasOwnProperty.call(bag, value)) bag[value] = (bag[value] || 0) + 1;
+          }
+        }
         if (field === 'training_position') {
           var cell = grid.querySelector('[data-pdg-player="' + CSS.escape(String(playerId)) + '"] [data-pdg-rt]');
           if (cell) {
             var rt = rtAtTrainingPosition(row);
-            cell.textContent = rt == null ? '--' : rt;
+            cell.textContent = rt == null ? '--' : formatRtDisplay(rt);
+            // Only the current rating follows the position; the potential stays.
+            cell.className = bucketClass(rt);
           }
         }
       }
@@ -279,14 +328,34 @@
   function paintTallies(host, rows) {
     var pos = host.querySelector('.pdg-tally-positions');
     var foc = host.querySelector('.pdg-tally-focuses');
+    var maps = host._pdgTallies;
+    if (maps && maps.positions && maps.focuses) {
+      if (pos) pos.innerHTML = serverTallyHtml(maps.positions, 'position');
+      if (foc) foc.innerHTML = serverTallyHtml(maps.focuses, 'focus');
+      return;
+    }
     if (pos) pos.innerHTML = tallyHtml(rows, 'position');
     if (foc) foc.innerHTML = tallyHtml(rows, 'focus');
+  }
+
+  function serverTallyHtml(counts, kind) {
+    var dev = window.GOBDevelopmentFocus;
+    var keys = kind === 'position'
+      ? dev.POSITIONS.map(function (p) { return { k: p, label: p }; })
+      : dev.FOCUSES.map(function (f) { return { k: f.value, label: f.label }; });
+    return keys.map(function (o) {
+      var n = counts[o.k] || 0;
+      return '<span class="pdg-tally-item' + (n ? '' : ' is-zero') + '">' +
+        esc(o.label) + ' <b>' + n + '</b></span>';
+    }).join('');
   }
 
   window.GOBPlayerDevelopmentGrid = {
     ATTR_ORDER: ATTR_ORDER,
     render: render,
     rtAtTrainingPosition: rtAtTrainingPosition,
+    orderByRt: orderByRt,
+    rtPairHtml: rtPairHtml,
     formatHeight: formatHeight,
     attrValue: attrValue,
     developsFor: developsFor,

@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.utils.animation_step_schema import GridCoord, PlayerAction, PlayerArchetype
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 # --- Universal foul-contact rattle -----------------------------------------
@@ -52,7 +53,8 @@ def stamp_foul_contact_rattle(
                 "cycles": int(cycles),
                 "foul_rattle_mult": float(mult),
             }
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         pass
 
 
@@ -153,7 +155,8 @@ def stamp_idle_wander_on_still_players(
         return 0
     try:
         from BackEnd.engine.motion_step_decision import SUBTLE_IDLE_STYLE_AMPLITUDE_GRID
-    except Exception:  # pragma: no cover - amplitude table is advisory
+    except Exception as e:  # pragma: no cover - amplitude table is advisory
+        reraise_if_strict(e)
         SUBTLE_IDLE_STYLE_AMPLITUDE_GRID = {}
 
     excluded = {str(p) for p in (exclude or ()) if p is not None}
@@ -316,7 +319,8 @@ def stamp_arrival_settle(
         return 0
     try:
         from BackEnd.engine.motion_step_decision import SUBTLE_IDLE_STYLE_AMPLITUDE_GRID
-    except Exception:  # pragma: no cover - amplitude table is advisory
+    except Exception as e:  # pragma: no cover - amplitude table is advisory
+        reraise_if_strict(e)
         SUBTLE_IDLE_STYLE_AMPLITUDE_GRID = {}
     import math
 
@@ -681,6 +685,99 @@ def _motion_end_toward_dest(
     return {"x": float(x), "y": float(y)}, float(step_t)
 
 
+# ── Per-player defender rate for the combined helper (Stage 2, 2026-09-24) ─────────────
+#
+# `_motion_end_toward_dest` (re-exported as `_interpolate_step_end`) produces the ENDPOINT
+# and the DURATION together, and has 13 callers. EVERY ONE IS MIXED: each resolves the
+# player with `_player_lookup_by_id(off_lineup, def_lineup, pid)` and several branch
+# `"cut" if pid in off_ids else "guard_offball"` inside the same loop.
+#
+# `GOB_DEFENDER_AG_SPREAD` is a DEFENDER spread. Setting `apply_spread=True` for a whole
+# call site would widen the OFFENCE too, which is out of scope and a large behaviour
+# change. So the decision is made PER PLAYER, keyed on `pid`, by this one function.
+#
+# WHY IT LIVES HERE AND NOT INSIDE THE HELPER: the helper takes an already-computed
+# `rate`, five of the thirteen callers reference `rate` again after the call, and one
+# (`shared.apply_sim_crash_destinations`) has no `def_lineup` in scope at all — it reaches
+# the lineup through `game.defense_team`. Hoisting the rate computation into the helper
+# would therefore mean thirteen signature changes and a special case, for no behavioural
+# gain. Instead every caller goes through THIS function, and a test asserts that each of
+# the thirteen does — so a new caller that forgets fails the suite.
+
+
+def defender_aware_rate(player: Any, archetype: PlayerArchetype, pid: Any,
+                        def_lineup: Dict[str, Any]) -> float:
+    """grid/game-sec for ONE player, with the defender spread applied only if he is one.
+
+    Membership of ``def_lineup`` is the test — never an action label, never a variable
+    name. With ``GOB_DEFENDER_AG_SPREAD`` off this is exactly the raw archetype rate, which
+    is why flag-off stays byte-identical.
+    """
+    return defender_movement_rate(player, archetype, _is_defender_id(pid, def_lineup))
+
+
+# ── Interrupted-coord core (Stage 1, 2026-09-24) ───────────────────────────────────────
+#
+# There were FOUR definitions of ``_interrupted_coord`` and TWO distinct arithmetic
+# variants (reports/movement-rate-inventory.md Q2). They are identical for every real
+# input and differ ONLY on degenerate ones. Stage 1 collapses them to one core plus two
+# thin, explicitly named wrappers — it does NOT normalise either policy, because choosing
+# one would be a behaviour change.
+#
+#   strict  = old transition_bridge / reset_step_helper  — no None guard, zero test < 1e-9
+#   lenient = old rim_runner / fb_outlet_pass            — None guards, zero test == 0.0
+#
+# All four old definitions called an arithmetically identical ``_euclid``
+# (``(dx*dx + dy*dy) ** 0.5``), including rim_runner's private copy, so routing every one
+# through this module's ``_euclid`` is byte-identical.
+
+
+def _interrupted_coord_core(
+    start: GridCoord, target: GridCoord, rate: float, t: float, *, lenient: bool
+) -> GridCoord:
+    """Where the player ends up after moving from ``start`` toward ``target``
+    at ``rate`` (grid/game-sec) for ``t`` game-seconds. Clamps at target.
+
+    ``lenient`` selects the degenerate-distance test only: the lenient variant treats
+    exactly zero as arrival, the strict one treats anything under 1e-9 as arrival. The
+    difference is bounded by 1e-9 grid units and is preserved rather than unified.
+    """
+    dist = _euclid(start, target)
+    max_traversal = max(0.0, rate * t)
+    zero = (dist == 0.0) if lenient else (dist < 1e-9)
+    if dist <= max_traversal or zero:
+        return {"x": float(target["x"]), "y": float(target["y"])}
+    ratio = max_traversal / dist
+    return {
+        "x": float(start["x"] + (target["x"] - start["x"]) * ratio),
+        "y": float(start["y"] + (target["y"] - start["y"]) * ratio),
+    }
+
+
+def _interrupted_coord_strict(
+    start: GridCoord, target: GridCoord, rate: float, t: float
+) -> GridCoord:
+    """Variant A — 22 call sites. NO None guard: a None coord raises TypeError, which is
+    today's behaviour on the transition_bridge / reset_step_helper paths and is left alone.
+    """
+    return _interrupted_coord_core(start, target, rate, t, lenient=False)
+
+
+def _interrupted_coord_lenient(
+    start: Optional[GridCoord], target: Optional[GridCoord], rate: float, t: float
+) -> GridCoord:
+    """Variant B — 10 call sites (rim runner / FB outlet pass)."""
+    if start is None and target is None:
+        # STAGE 2: see reports/movement-rate-inventory.md
+        # Silently teleports the player to centre court instead of failing.
+        return {"x": 50.0, "y": 25.0}
+    if start is None:
+        return {"x": float(target["x"]), "y": float(target["y"])}
+    if target is None:
+        return {"x": float(start["x"]), "y": float(start["y"])}
+    return _interrupted_coord_core(start, target, rate, t, lenient=True)
+
+
 def floor_step_t_to_traversal(
     step_t: float,
     start_coord: Optional[GridCoord],
@@ -768,7 +865,7 @@ def stamp_rebound_capture_player_motion(
             actions[pid] = "cut"
             archetypes[pid] = "sprint"
             player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-            rate = _ag_grid_per_game_sec(player, "sprint")
+            rate = defender_aware_rate(player, 'sprint', pid, def_lineup)
             ec, dur = _motion_end_toward_dest(start, bounce_coords, rate, step_t)
             end_coords[pid] = ec
             if dur > 0:
@@ -777,7 +874,7 @@ def stamp_rebound_capture_player_motion(
         if pid in attemptor_set:
             dest = sample_rebound_collapse_target(bounce_coords)
             player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-            rate = _ag_grid_per_game_sec(player, attemptor_archetype)
+            rate = defender_aware_rate(player, attemptor_archetype, pid, def_lineup)
             ec, dur = _motion_end_toward_dest(start, dest, rate, step_t)
             end_coords[pid] = ec
             destinations[pid] = dest
@@ -793,47 +890,19 @@ def stamp_rebound_capture_player_motion(
 
 
 def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
-    """grid/game-sec rate for a player at a given archetype. Each archetype
-    has an absolute rate at AG=50 (see ``CRUISE_GRID_PER_GAME_SEC`` etc.);
-    other AG values scale proportionally via the AG curve anchored at
-    AG=50 → 14. ``archetype="standard"`` is the unscaled base rate.
+    """grid/game-sec rate for a player at a given archetype.
+
+    STAGE 1 (2026-09-24): the body moved to ``shared.movement_rate`` /
+    ``shared._archetype_rate`` — one implementation for all 117 rate sites. This stays as
+    the name the engine imports. The ``except -> 14.0`` fallback is preserved exactly: it
+    fires only if the import itself fails.
     """
     try:
-        from BackEnd.utils.shared import ag_to_grid_per_game_sec
-        from BackEnd.constants import (
-            BURST_GRID_PER_GAME_SEC,
-            CRUISE_GRID_PER_GAME_SEC,
-            DRIFT_GRID_PER_GAME_SEC,
-            STANDARD_GRID_PER_GAME_SEC,
-            SHOT_MOTION_GRID_PER_GAME_SEC,
-            SPRINT_GRID_PER_GAME_SEC,
-        )
-    except Exception:
+        from BackEnd.utils.shared import movement_rate
+    except Exception as e:
+        reraise_if_strict(e)
         return 14.0
-
-    if player is None:
-        ag = 50
-    else:
-        attrs = getattr(player, "attributes", None) or {}
-        ag = attrs.get("AG", 50) if isinstance(attrs, dict) else 50
-    # AG scale factor: at AG=50 → 1.0; scales other AG values proportionally.
-    ag_scale = float(ag_to_grid_per_game_sec(ag)) / float(STANDARD_GRID_PER_GAME_SEC)
-
-    if archetype == "standard":
-        return STANDARD_GRID_PER_GAME_SEC * ag_scale
-    if archetype in ("shot_motion", "compressed_hco"):
-        return SHOT_MOTION_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "sprint":
-        return SPRINT_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "burst":
-        return BURST_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "cruise":
-        return CRUISE_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "drift":
-        return DRIFT_GRID_PER_GAME_SEC * ag_scale
-    # Unknown / fallback → base rate. The canonical name is "standard"; any
-    # unrecognized archetype string defensively resolves here.
-    return STANDARD_GRID_PER_GAME_SEC * ag_scale
+    return movement_rate(player, archetype, apply_spread=False)
 
 
 #: Public alias — **the** archetype rate function. Step emitters must import
@@ -1190,6 +1259,84 @@ def rebase_animation_step_next_indices(
             nxt["next_step_index"] = int(nxt["next_step_index"]) + base_index
 
 
+def _is_defender_id(pid: Any, def_lineup: Dict[str, Any]) -> bool:
+    """True when ``pid`` is on the defending lineup. Membership, never a guess."""
+    target = str(pid)
+    for p in (def_lineup or {}).values():
+        if p is None:
+            continue
+        if str(getattr(p, "player_id", None)) == target:
+            return True
+    return False
+
+
+# ── Defender AG spread (GOB_DEFENDER_AG_SPREAD; default OFF) ────────────────────────────────
+# The shipped AG curve is nearly flat: rate = base x (0.90 + AG/100 x 0.2), so across the real
+# league a p90-AG defender is only 1.103x a p10-AG one, and the measured p10->p90 ENDPOINT gap is
+# 0.35 grid units (0.66 on `standard`). Defenders therefore all move alike
+# (reports/ag-spread-sweep-2026-09-24.md).
+#
+# This widens the PLAYER multiplier for DEFENDERS ONLY, keeping the midpoint at AG=50 so the
+# average player is unchanged:
+#
+#     scale(AG) = (1 - s) + (AG / 100) x 2s          s = DEFENDER_AG_SPREAD
+#
+# At s = 0.10 that is algebraically 0.90 + (AG/100) x 0.2 -- the shipped formula -- so the flag
+# off is byte-identical, not merely equivalent.
+#
+# WHY IT IS NOT IN `_ag_grid_per_game_sec`: that function feeds `natural_t`, which feeds the
+# step gate, which sets step duration T. Widening it there costs +11.2% game length at s = 0.50
+# (measured, same report), because 1/x is convex and the league mean AG sits below the 50 anchor.
+# This wrapper is called only AFTER T is frozen, so it cannot reach step duration.
+#
+# ONE SOURCE OF TRUTH: both the endpoint (transition_bridge's final_end_coords loop) and the
+# tween (`stamp_tween_durations` below) call this. If the endpoint used the wide rate and the
+# tween the narrow one, the rendered motion would stop matching the distance covered.
+DEFENDER_AG_SPREAD = 0.50
+DEFENDER_AG_SPREAD_FLAG = "GOB_DEFENDER_AG_SPREAD"
+
+
+def defender_ag_spread_enabled() -> bool:
+    """``GOB_DEFENDER_AG_SPREAD`` - **default ON** since 2026-09-24.
+
+    Defenders' player multiplier is widened to ``(1 - s) + (AG/100) * 2s`` at ``s = 0.50``,
+    keeping AG=50 fixed. Offence is untouched: the spread is applied per player, by
+    ``def_lineup`` membership (``defender_aware_rate``), never by an action label.
+
+    Kill switch: ``GOB_DEFENDER_AG_SPREAD=0`` disables the spread entirely and reproduces
+    ``equiv_v3_reference_1f4af0ede_loosesag_nogate.json`` - verified 160/160 on fingerprint
+    AND draws in all four cells at the flip, plus 80/80 on
+    ``equiv_v3_loose_baseline_1f4af0ede_loosesag.json``. Unlike the loose-sag flip this
+    rollback IS symmetric: flag-off was proved byte-identical in Stage 2, so setting 0
+    restores the OLD reference exactly rather than merely a related footing.
+
+    The new default is captured by ``equiv_v3_reference_<sha>_agspread.json``; see
+    reports/ag-spread-default-flip.md.
+    """
+    import os
+    return os.environ.get(DEFENDER_AG_SPREAD_FLAG, "1") == "1"
+
+
+def defender_movement_rate(player: Any, archetype: PlayerArchetype,
+                           is_defender: bool = False) -> float:
+    """grid/game-sec for one player on one step, with the defender spread applied.
+
+    STAGE 1 (2026-09-24): delegates to ``shared.movement_rate``. ``is_defender`` IS
+    ``apply_spread`` — flag off, or an offensive player, returns the raw archetype rate, so
+    there is still exactly one implementation and nothing to drift.
+
+    The constant and the flag stay in THIS module (``DEFENDER_AG_SPREAD``,
+    ``defender_ag_spread_enabled``) and the core reads them through it at call time, so
+    monkeypatching them here still reaches the arithmetic.
+    """
+    try:
+        from BackEnd.utils.shared import movement_rate
+    except Exception as e:
+        reraise_if_strict(e)
+        return _ag_grid_per_game_sec(player, archetype)
+    return movement_rate(player, archetype, apply_spread=bool(is_defender))
+
+
 def stamp_tween_durations(
     start: Dict[str, Any],
     end_coords: Dict[str, GridCoord],
@@ -1218,7 +1365,8 @@ def stamp_tween_durations(
             continue
         arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # Same wrapper the endpoint uses, so the tween always matches the distance covered.
+        rate = defender_movement_rate(player, arch, _is_defender_id(pid, def_lineup))
         if rate <= 0:
             continue
         durations[pid] = float(min(dist / rate, step_t))

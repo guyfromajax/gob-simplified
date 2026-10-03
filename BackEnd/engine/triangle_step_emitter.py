@@ -39,6 +39,8 @@ from BackEnd.utils.animation_step_schema import (
 
 from BackEnd.engine.rim_runner_step_emitter import (
     _all_player_start_coords,
+    _is_defender_id,
+    defender_movement_rate,
     append_lane_pass_to_rr_resolution_steps,
     _build_burst_step,
     _build_hold_up_step,
@@ -62,6 +64,7 @@ from BackEnd.engine.rim_runner_step_emitter import (
     _traversal_seconds,
     _ag_grid_per_game_sec,
 )
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 def _triangle_guarded(steps):
@@ -72,7 +75,8 @@ def _triangle_guarded(steps):
         from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
         enforce_step_start_continuity(steps, context="triangle")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return steps
 
@@ -191,7 +195,8 @@ def _build_parallel_move_step(
         archetype[pid] = arch
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # `movers` mixes both lineups; def_lineup membership is the test.
+        rate = defender_movement_rate(player, arch, _is_defender_id(pid, def_lineup))
         end_coords[pid] = _interrupted_coord(step_start_coords[pid], target, rate, t)
 
     if ball_owner_id in step_start_coords:
@@ -655,7 +660,7 @@ def _build_triangle_shot_motion_step(
         d_start = step_start_coords[defender_id]
         contest = _closeout_contest_coord(d_start, shooter_end)
         d_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
-        d_rate = _ag_grid_per_game_sec(d_player, "sprint")
+        d_rate = defender_movement_rate(d_player, "sprint", True)
         end_coords[defender_id] = _interrupted_coord(d_start, contest, d_rate, t)
 
     destinations[shooter_id] = dict(shooter_end)

@@ -32,11 +32,16 @@ function cloneParams(params) {
  */
 
 import { fadeOutPregameBed } from './gameSfx.js';
+import { isGameAudioMuted, setGameAudioMuted, subscribeAudio } from '../../shared/uiSfx.js';
 import { REG_Q_SEC, clockToSeconds } from './simWormTime.js';
 import { loadCalloutCopy } from './simCalloutCopy.js';
 import { CalloutCadence, CALLOUT_HOLD_S, GAME_WINNER_HOLD_S, GAME_WINNER_TIER } from './simCalloutCadence.js';
 
-const POSC = { PG: '#4A90D9', SG: '#7B5EA7', SF: '#3A8C4A', PF: '#C0392B', C: '#D4A017' };
+// Position colours are gob tokens (--pos-*). The literal is the same value, as a fallback.
+const POSC = {
+  PG: 'var(--pos-pg, #4A90D9)', SG: 'var(--pos-sg, #7B5EA7)', SF: 'var(--pos-sf, #3A8C4A)',
+  PF: 'var(--pos-pf, #C0392B)', C: 'var(--pos-c, #D4A017)',
+};
 const GREEN = '#34EC27', BLUE = '#4A90D9', ORANGE = '#F79420', RED = '#ff6d6d', GOLD = '#FFD700';
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 
@@ -277,7 +282,7 @@ function ensureStyles() {
       --w90:rgba(255,255,255,.90);--w70:rgba(255,255,255,.70);--w55:rgba(255,255,255,.55);--w40:rgba(255,255,255,.40);--w25:rgba(255,255,255,.25);
       --hair:rgba(255,255,255,.08);--green:${GREEN};--orange:${ORANGE}}
     .sgp-root .overlay{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;padding:16px 26px 12px;gap:14px;isolation:isolate;overflow:hidden;
-      background:radial-gradient(120% 78% at 50% 26%,rgba(39,64,142,.13),transparent 62%),radial-gradient(90% 70% at 50% 120%,rgba(247,148,32,.045),transparent 60%),#0b0d14}
+      background:radial-gradient(120% 78% at 50% 26%,rgba(39,64,142,.13),transparent 62%),/* was orange bottom glow (rgba(247,148,32,.045)) -> neutral; orange is reserved for saves */radial-gradient(90% 70% at 50% 120%,rgba(255,255,255,.03),transparent 60%),#0b0d14}
     .sgp-root .overlay::before{content:'';position:absolute;left:50%;bottom:-54%;width:94%;aspect-ratio:1/1;transform:translateX(-50%);border-radius:50%;border:1px solid rgba(255,255,255,.04);pointer-events:none}
     .sgp-root.fade-in{animation:sgpFade .45s ease}
     @keyframes sgpFade{from{opacity:0}to{opacity:1}}
@@ -521,8 +526,8 @@ function buildSkeleton(teams) {
         <div class="f4">
           <div class="bench away" data-bench="away"></div>
           <div class="tgl">
-            <span class="tgl-lbl">HIGHLIGHTS</span>
-            <button type="button" class="tgl-sw on" data-highlights aria-pressed="true" aria-label="Toggle highlights"></button>
+            <span class="tgl-lbl">SOUND</span>
+            <button type="button" class="tgl-sw on" data-sound role="switch" aria-checked="true" aria-label="Sound"></button>
           </div>
           <div class="bench home" data-bench="home"></div>
         </div>
@@ -834,7 +839,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
   const wTeam = root.querySelector('[data-wteam]');
   const wAxis = root.querySelector('[data-waxis]');
   const teamPanelEl = root.querySelector('[data-team-panel]');
-  const highlightsBtn = root.querySelector('[data-highlights]');
+  const soundBtn = root.querySelector('[data-sound]');
   const breakAvEl = root.querySelector('[data-break-av]');
 
   const applyFit = () => {
@@ -854,7 +859,8 @@ export function showSimGamePresentation(timeline, opts = {}) {
   positionBelowScoreboard();
   window.addEventListener('resize', positionBelowScoreboard);
 
-  let highlightsOn = true;
+  // Highlights are always on in Sim Game. The switch in the footer is Sound.
+  const highlightsOn = true;
   let cadence = null;
   let lastRenderedFrame = null;
   let tipMeta = { cx: FIT_W / 2, cy: WORM_PLOT_H / 2, rising: true, w: FIT_W, h: WORM_PLOT_H };
@@ -1018,13 +1024,19 @@ export function showSimGamePresentation(timeline, opts = {}) {
     return true;
   };
 
-  highlightsBtn?.addEventListener('click', () => {
-    highlightsOn = !highlightsOn;
-    highlightsBtn.classList.toggle('on', highlightsOn);
-    highlightsBtn.setAttribute('aria-pressed', highlightsOn ? 'true' : 'false');
-    if (cadence) cadence.suspend(!highlightsOn);
-    if (!highlightsOn) clearCallout();
-    if (dbgEl) renderCalloutsDebug(dbgEl, cadence);
+  // Sound is the gameplay audio switch: the same mute the court's command-center
+  // control sets, stored with it, so the next game starts as the player left it.
+  const paintSound = () => {
+    if (!soundBtn) return;
+    const on = !isGameAudioMuted();
+    soundBtn.classList.toggle('on', on);
+    soundBtn.setAttribute('aria-checked', on ? 'true' : 'false');
+  };
+  paintSound();
+  const stopSoundWatch = subscribeAudio(paintSound);
+  soundBtn?.addEventListener('click', () => {
+    setGameAudioMuted(!isGameAudioMuted());
+    paintSound();
   });
 
   const replaceWormSvg = (html) => {
@@ -1181,6 +1193,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
       timers.forEach(clearTimeout);
       clearCalloutTimers();
       window.removeEventListener('resize', positionBelowScoreboard);
+      stopSoundWatch();
       root.classList.add('dissolving');
       const t = setTimeout(() => { root.remove(); resolve(); }, prefersReduced ? 0 : 450);
       timers.push(t);

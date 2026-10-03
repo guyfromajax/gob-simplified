@@ -1,0 +1,426 @@
+{
+  "painted": 801,
+  "ctxDump": {
+    "urlFid": "6abce9ce9876a64225372764",
+    "fcFid": "6abce9ce9876a64225372764",
+    "fcReady": true
+  },
+  "events": [
+    {
+      "t": 19,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/js/shared/views/scoutingView.js"
+    },
+    {
+      "t": 53,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/js/shared/views/scoutingView.js"
+    },
+    {
+      "t": 53,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/css/prep-v2-scouting.css"
+    },
+    {
+      "t": 54,
+      "kind": "req",
+      "method": "POST",
+      "url": "http://127.0.0.1:8221/franchise/play-next-game"
+    },
+    {
+      "t": 58,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/css/prep-v2-scouting.css"
+    },
+    {
+      "t": 227,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/franchise/training-points?franchise_id=6abce9ce9876a64225372764"
+    },
+    {
+      "t": 229,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/franchise/league-news?franchise_id=6abce9ce9876a64225372764"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/26e15606-2eca-4616-840a-d14b87174395.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/778e8352-eecb-4870-a280-a0eb90222551.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/da0cf556-b8b9-47d1-91f9-a80595359f4e.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/131abe35-8f84-41ce-ba4c-154556289954.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/83608be4-5065-4df6-9276-5e69376c15aa.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/a699d851-8d4e-4987-936d-293b04a7b1f8.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/7acb9670-0995-45e3-8ca8-1c7f8a601f92.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/7c10c995-0d1a-4c1b-b4eb-7198ad81c9b2.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/0df15c02-a4d1-437b-b102-45f42b25e50b.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/d9449124-4ca6-4437-b192-554be3a5d00a.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/0c750491-c705-49bb-823b-a7ef731e60ba.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/8bb31aa2-54e3-4c10-8c9f-0f984c491774.png"
+    },
+    {
+      "t": 230,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/b17a21bc-790e-4893-82d5-362dd8ec19a2.png"
+    },
+    {
+      "t": 231,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/560d1d61-4ddb-4ac8-b68b-00181e488c48.png"
+    },
+    {
+      "t": 231,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/fe9e3459-a1b6-4213-8d16-4eb1688520ab.png"
+    },
+    {
+      "t": 231,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/franchise/play-next-game"
+    },
+    {
+      "t": 231,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/franchise/team-data?franchise_id=6abce9ce9876a64225372764&team_id=69a6fcb68d2c56aa82e48a5b"
+    },
+    {
+      "t": 231,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/franchise/scouting-report?franchise_id=6abce9ce9876a64225372764&team_name=Cagers%20World"
+    },
+    {
+      "t": 259,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/778e8352-eecb-4870-a280-a0eb90222551.png"
+    },
+    {
+      "t": 259,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/83608be4-5065-4df6-9276-5e69376c15aa.png"
+    },
+    {
+      "t": 260,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/26e15606-2eca-4616-840a-d14b87174395.png"
+    },
+    {
+      "t": 260,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/131abe35-8f84-41ce-ba4c-154556289954.png"
+    },
+    {
+      "t": 261,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/da0cf556-b8b9-47d1-91f9-a80595359f4e.png"
+    },
+    {
+      "t": 330,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/franchise/league-news?franchise_id=6abce9ce9876a64225372764"
+    },
+    {
+      "t": 353,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/a699d851-8d4e-4987-936d-293b04a7b1f8.png"
+    },
+    {
+      "t": 362,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/7acb9670-0995-45e3-8ca8-1c7f8a601f92.png"
+    },
+    {
+      "t": 383,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/franchise/team-data?franchise_id=6abce9ce9876a64225372764&team_id=69a6fcb68d2c56aa82e48a5b"
+    },
+    {
+      "t": 386,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/7c10c995-0d1a-4c1b-b4eb-7198ad81c9b2.png"
+    },
+    {
+      "t": 387,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/0df15c02-a4d1-437b-b102-45f42b25e50b.png"
+    },
+    {
+      "t": 392,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/d9449124-4ca6-4437-b192-554be3a5d00a.png"
+    },
+    {
+      "t": 509,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/franchise/scouting-report?franchise_id=6abce9ce9876a64225372764&team_name=Cagers%20World"
+    },
+    {
+      "t": 521,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/images/teams/cagers_world/cagers_world_logo_square.png"
+    },
+    {
+      "t": 521,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8221/static/images/players/0c750491-c705-49bb-823b-a7ef731e60ba.png"
+    },
+    {
+      "t": 526,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/d0b1e262-4680-41bf-ae6e-a56ca8ed1d07.png"
+    },
+    {
+      "t": 526,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/aab419c2-9a06-477b-9325-4fed9ad359e5.png"
+    },
+    {
+      "t": 526,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/554ac0e0-4a9b-4da8-8dc5-70371136f325.png"
+    },
+    {
+      "t": 526,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/45fee34b-726f-4679-b498-a7912a2ea73b.png"
+    },
+    {
+      "t": 526,
+      "kind": "req",
+      "method": "GET",
+      "url": "http://127.0.0.1:8221/static/images/players/fa6e6da6-d53b-481f-84bf-a81170f58fbf.png"
+    },
+    {
+      "t": 530,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8221/static/images/players/8bb31aa2-54e3-4c10-8c9f-0f984c491774.png"
+    },
+    {
+      "t": 534,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/images/teams/cagers_world/cagers_world_logo_square.png"
+    },
+    {
+      "t": 546,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8221/static/images/players/45fee34b-726f-4679-b498-a7912a2ea73b.png"
+    },
+    {
+      "t": 549,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8221/static/images/players/d0b1e262-4680-41bf-ae6e-a56ca8ed1d07.png"
+    },
+    {
+      "t": 555,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8221/static/images/players/aab419c2-9a06-477b-9325-4fed9ad359e5.png"
+    },
+    {
+      "t": 555,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8221/static/images/players/fa6e6da6-d53b-481f-84bf-a81170f58fbf.png"
+    },
+    {
+      "t": 556,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8221/static/images/players/554ac0e0-4a9b-4da8-8dc5-70371136f325.png"
+    },
+    {
+      "t": 560,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/b17a21bc-790e-4893-82d5-362dd8ec19a2.png"
+    },
+    {
+      "t": 560,
+      "kind": "res",
+      "status": 200,
+      "url": "http://127.0.0.1:8221/static/images/players/560d1d61-4ddb-4ac8-b68b-00181e488c48.png"
+    },
+    {
+      "t": 561,
+      "kind": "res",
+      "status": 404,
+      "url": "http://127.0.0.1:8221/static/images/players/fe9e3459-a1b6-4213-8d16-4eb1688520ab.png"
+    }
+  ],
+  "resources": [
+    {
+      "name": "/scouting-report.css",
+      "start": 4,
+      "dur": 11,
+      "transfer": 8416,
+      "initiator": "link"
+    },
+    {
+      "name": "/css/rt-buckets.css",
+      "start": 4,
+      "dur": 11,
+      "transfer": 989,
+      "initiator": "link"
+    },
+    {
+      "name": "/js/utils/attributeDisplay.js",
+      "start": 5,
+      "dur": 39,
+      "transfer": 2030,
+      "initiator": "script"
+    },
+    {
+      "name": "/js/shared/scoutingReport.js",
+      "start": 5,
+      "dur": 52,
+      "transfer": 20037,
+      "initiator": "script"
+    },
+    {
+      "name": "/js/shared/playerYear.js",
+      "start": 5,
+      "dur": 52,
+      "transfer": 1932,
+      "initiator": "script"
+    },
+    {
+      "name": "/franchise/team-data?franchise_id=6abce9ce9876a64225372764&team_id=69a6fcb68d2c56aa82e48a54",
+      "start": 190,
+      "dur": 16,
+      "transfer": 21442,
+      "initiator": "fetch"
+    },
+    {
+      "name": "/js/shared/views/viewLoader.js",
+      "start": 487,
+      "dur": 3,
+      "transfer": 1545,
+      "initiator": "script"
+    },
+    {
+      "name": "/js/shared/views/scoutingView.js",
+      "start": 534,
+      "dur": 34,
+      "transfer": 23118,
+      "initiator": "script"
+    },
+    {
+      "name": "/css/prep-v2-scouting.css",
+      "start": 568,
+      "dur": 9,
+      "transfer": 13459,
+      "initiator": "link"
+    },
+    {
+      "name": "/franchise/play-next-game",
+      "start": 569,
+      "dur": 174,
+      "transfer": 482,
+      "initiator": "fetch"
+    },
+    {
+      "name": "/franchise/team-data?franchise_id=6abce9ce9876a64225372764&team_id=69a6fcb68d2c56aa82e48a5b",
+      "start": 746,
+      "dur": 153,
+      "transfer": 21447,
+      "initiator": "fetch"
+    },
+    {
+      "name": "/franchise/scouting-report?franchise_id=6abce9ce9876a64225372764&team_name=Cagers%20World",
+      "start": 746,
+      "dur": 279,
+      "transfer": 9761,
+      "initiator": "fetch"
+    }
+  ]
+}

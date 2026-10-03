@@ -104,46 +104,47 @@ function showMissingPointerError({
 
   // Create error screen HTML
   const errorHtml = `
-    <div class="error-screen" style="
+    <div class="error-screen gob-scope" style="
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: #1e1e1e;
-      color: #fff;
+      background: var(--bg);
+      color: var(--text-100);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       z-index: 10000;
-      font-family: 'Bebas Neue', 'Inter', sans-serif;
+      font-family: var(--font-display);
       padding: 20px;
       box-sizing: border-box;
     ">
       <div class="error-content" style="
         max-width: 600px;
         text-align: center;
-        background: #2b2b2b;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
         padding: 40px;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        border-radius: var(--radius-8);
+        box-shadow: 0 4px 20px var(--black-50);
       ">
         <h1 style="
-          font-size: 48px;
+          font-size: var(--fs-48);
           margin-bottom: 20px;
-          color: #ff6200;
+          color: var(--text-100);
         ">⚠️ Error</h1>
         <h2 style="
-          font-size: 24px;
+          font-size: var(--fs-24);
           margin-bottom: 20px;
-          color: #fff;
+          color: var(--text-100);
         ">Missing Required ${missingPointer.toUpperCase().replace('_', ' ')}</h2>
         <p style="
-          font-size: 16px;
+          font-size: var(--fs-16);
           line-height: 1.6;
           margin-bottom: 30px;
-          color: #cdcdcd;
+          color: var(--text-87);
         ">${message}</p>
         <div style="
           display: flex;
@@ -152,29 +153,29 @@ function showMissingPointerError({
           flex-wrap: wrap;
         ">
           <button onclick="window.location.href='${recoveryUrl}'" style="
-            background: #ff6200;
-            color: #fff;
-            border: none;
+            background: var(--white-10);
+            color: var(--text-100);
+            border: 1px solid var(--white-28);
             padding: 12px 30px;
-            font-size: 18px;
-            font-family: 'Bebas Neue', sans-serif;
-            border-radius: 4px;
+            font-size: var(--fs-18);
+            font-family: var(--font-display);
+            border-radius: var(--radius-4);
             cursor: pointer;
             transition: background 0.3s;
-          " onmouseover="this.style.background='#ff7a33'" onmouseout="this.style.background='#ff6200'">
+          " onmouseover="this.style.background='var(--white-18)'" onmouseout="this.style.background='var(--white-10)'">
             ${redirectLabel}
           </button>
           <button onclick="window.location.href='/homepage.html'" style="
-            background: #444;
-            color: #fff;
-            border: none;
+            background: transparent;
+            color: var(--text-87);
+            border: 1px solid var(--line-strong);
             padding: 12px 30px;
-            font-size: 18px;
-            font-family: 'Bebas Neue', sans-serif;
-            border-radius: 4px;
+            font-size: var(--fs-18);
+            font-family: var(--font-display);
+            border-radius: var(--radius-4);
             cursor: pointer;
             transition: background 0.3s;
-          " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+          " onmouseover="this.style.background='var(--white-6)'" onmouseout="this.style.background='transparent'">
             Go to Homepage
           </button>
         </div>
@@ -265,52 +266,53 @@ function showMissingTruthError({
 
   // Create error screen HTML
   const errorHtml = `
-    <div class="error-screen" style="
+    <div class="error-screen gob-scope" style="
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: #1e1e1e;
-      color: #fff;
+      background: var(--bg);
+      color: var(--text-100);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       z-index: 10000;
-      font-family: 'Bebas Neue', 'Inter', sans-serif;
+      font-family: var(--font-display);
       padding: 20px;
       box-sizing: border-box;
     ">
       <div class="error-content" style="
         max-width: 600px;
         text-align: center;
-        background: #2b2b2b;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
         padding: 40px;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        border-radius: var(--radius-8);
+        box-shadow: 0 4px 20px var(--black-50);
       ">
         <h1 style="
-          font-size: 48px;
+          font-size: var(--fs-48);
           margin-bottom: 20px;
-          color: #ff6200;
+          color: var(--text-100);
         ">❌ Error</h1>
         <h2 style="
-          font-size: 24px;
+          font-size: var(--fs-24);
           margin-bottom: 20px;
-          color: #fff;
+          color: var(--text-100);
         ">Document Not Found</h2>
         <p style="
-          font-size: 16px;
+          font-size: var(--fs-16);
           line-height: 1.6;
           margin-bottom: 15px;
-          color: #cdcdcd;
+          color: var(--text-87);
         ">The ${pointerType.replace('_', ' ')} you're looking for doesn't exist in the database.</p>
         <p style="
-          font-size: 14px;
+          font-size: var(--fs-14);
           line-height: 1.6;
           margin-bottom: 30px;
-          color: #9a9a9a;
+          color: var(--text-60);
           font-style: italic;
         ">${message}</p>
         <div style="
@@ -320,29 +322,29 @@ function showMissingTruthError({
           flex-wrap: wrap;
         ">
           <button onclick="window.location.href='${recoveryUrl}'" style="
-            background: #ff6200;
-            color: #fff;
-            border: none;
+            background: var(--white-10);
+            color: var(--text-100);
+            border: 1px solid var(--white-28);
             padding: 12px 30px;
-            font-size: 18px;
-            font-family: 'Bebas Neue', sans-serif;
-            border-radius: 4px;
+            font-size: var(--fs-18);
+            font-family: var(--font-display);
+            border-radius: var(--radius-4);
             cursor: pointer;
             transition: background 0.3s;
-          " onmouseover="this.style.background='#ff7a33'" onmouseout="this.style.background='#ff6200'">
+          " onmouseover="this.style.background='var(--white-18)'" onmouseout="this.style.background='var(--white-10)'">
             ${redirectLabel}
           </button>
           <button onclick="window.location.href='/homepage.html'" style="
-            background: #444;
-            color: #fff;
-            border: none;
+            background: transparent;
+            color: var(--text-87);
+            border: 1px solid var(--line-strong);
             padding: 12px 30px;
-            font-size: 18px;
-            font-family: 'Bebas Neue', sans-serif;
-            border-radius: 4px;
+            font-size: var(--fs-18);
+            font-family: var(--font-display);
+            border-radius: var(--radius-4);
             cursor: pointer;
             transition: background 0.3s;
-          " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+          " onmouseover="this.style.background='var(--white-6)'" onmouseout="this.style.background='transparent'">
             Go to Homepage
           </button>
         </div>
@@ -398,52 +400,53 @@ function showVersionMismatchError({
 
   // Create error screen HTML
   const errorHtml = `
-    <div class="error-screen" style="
+    <div class="error-screen gob-scope" style="
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: #1e1e1e;
-      color: #fff;
+      background: var(--bg);
+      color: var(--text-100);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       z-index: 10000;
-      font-family: 'Bebas Neue', 'Inter', sans-serif;
+      font-family: var(--font-display);
       padding: 20px;
       box-sizing: border-box;
     ">
       <div class="error-content" style="
         max-width: 600px;
         text-align: center;
-        background: #2b2b2b;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
         padding: 40px;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        border-radius: var(--radius-8);
+        box-shadow: 0 4px 20px var(--black-50);
       ">
         <h1 style="
-          font-size: 48px;
+          font-size: var(--fs-48);
           margin-bottom: 20px;
-          color: #ffaa00;
+          color: var(--text-100);
         ">⚠️ Version Mismatch</h1>
         <h2 style="
-          font-size: 24px;
+          font-size: var(--fs-24);
           margin-bottom: 20px;
-          color: #fff;
+          color: var(--text-100);
         ">Cache Out of Sync</h2>
         <p style="
-          font-size: 16px;
+          font-size: var(--fs-16);
           line-height: 1.6;
           margin-bottom: 15px;
-          color: #cdcdcd;
+          color: var(--text-87);
         ">The cached data is out of date and needs to be refreshed.</p>
         <p style="
-          font-size: 14px;
+          font-size: var(--fs-14);
           line-height: 1.6;
           margin-bottom: 30px;
-          color: #9a9a9a;
+          color: var(--text-60);
           font-style: italic;
         ">${message}</p>
         <div style="
@@ -453,29 +456,29 @@ function showVersionMismatchError({
           flex-wrap: wrap;
         ">
           <button onclick="${recoveryAction}" style="
-            background: #ff6200;
-            color: #fff;
-            border: none;
+            background: var(--white-10);
+            color: var(--text-100);
+            border: 1px solid var(--white-28);
             padding: 12px 30px;
-            font-size: 18px;
-            font-family: 'Bebas Neue', sans-serif;
-            border-radius: 4px;
+            font-size: var(--fs-18);
+            font-family: var(--font-display);
+            border-radius: var(--radius-4);
             cursor: pointer;
             transition: background 0.3s;
-          " onmouseover="this.style.background='#ff7a33'" onmouseout="this.style.background='#ff6200'">
+          " onmouseover="this.style.background='var(--white-18)'" onmouseout="this.style.background='var(--white-10)'">
             ${redirectLabel}
           </button>
           <button onclick="window.location.href='/homepage.html'" style="
-            background: #444;
-            color: #fff;
-            border: none;
+            background: transparent;
+            color: var(--text-87);
+            border: 1px solid var(--line-strong);
             padding: 12px 30px;
-            font-size: 18px;
-            font-family: 'Bebas Neue', sans-serif;
-            border-radius: 4px;
+            font-size: var(--fs-18);
+            font-family: var(--font-display);
+            border-radius: var(--radius-4);
             cursor: pointer;
             transition: background 0.3s;
-          " onmouseover="this.style.background='#555'" onmouseout="this.style.background='#444'">
+          " onmouseover="this.style.background='var(--white-6)'" onmouseout="this.style.background='transparent'">
             Go to Homepage
           </button>
         </div>

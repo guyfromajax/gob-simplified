@@ -720,6 +720,108 @@ def calc_fb_pass_segment_seconds(passer_coords, receiver_coords):
 # replace AG internals with the real ag_to_grid_per_game_sec curve and remove
 # the legacy constants.
 
+# ── Movement-rate core (Stage 1 of the movement-rate unification, 2026-09-24) ───────────
+#
+# ONE canonical accessor. Every rate-producing site in the engine reaches the game through
+# ``movement_rate``: ``_ag_grid_per_game_sec`` and ``defender_movement_rate`` in
+# ``animation_step_helpers`` are now thin delegates, so the 117 call sites inventoried in
+# reports/movement-rate-inventory.md all land here without being individually rewritten.
+#
+# ORDER OF OPERATIONS IS LOAD-BEARING. The [0.5, 60] clamp is applied to the AG-scaled
+# STANDARD rate *before* the archetype multiplier, never after. For AG 0-100 the standard
+# rate spans 12.6-15.4 so the clamp never binds in play, but reversing the order would be a
+# silent change at extreme AG. ``_archetype_rate`` below preserves that order exactly.
+#
+# Stage 1 is a ZERO-BEHAVIOUR-CHANGE refactor: the two AG-extraction paths below are
+# deliberately NOT merged, because they differ (one floats and swallows, one does not) and
+# merging them would move results for malformed attribute dicts.
+
+
+def _archetype_rate(player: Any, archetype: Any) -> float:
+    """The raw archetype rate — exactly the body that ``_ag_grid_per_game_sec`` carried.
+
+    AG extraction here does NOT coerce to float and does NOT swallow exceptions; the curve
+    (``ag_to_grid_per_game_sec``) handles a non-numeric AG. Do not "tidy" this into the
+    spread path's extraction — they are different on purpose.
+    """
+    if player is None:
+        ag = 50
+    else:
+        attrs = getattr(player, "attributes", None) or {}
+        ag = attrs.get("AG", 50) if isinstance(attrs, dict) else 50
+    # AG scale factor: at AG=50 -> 1.0; scales other AG values proportionally.
+    # The clamp lives inside ag_to_grid_per_game_sec, i.e. BEFORE this multiply.
+    ag_scale = float(ag_to_grid_per_game_sec(ag)) / float(STANDARD_GRID_PER_GAME_SEC)
+
+    if archetype == "standard":
+        return STANDARD_GRID_PER_GAME_SEC * ag_scale
+    if archetype in ("shot_motion", "compressed_hco"):
+        return SHOT_MOTION_GRID_PER_GAME_SEC * ag_scale
+    if archetype == "sprint":
+        return SPRINT_GRID_PER_GAME_SEC * ag_scale
+    if archetype == "burst":
+        return BURST_GRID_PER_GAME_SEC * ag_scale
+    if archetype == "cruise":
+        return CRUISE_GRID_PER_GAME_SEC * ag_scale
+    if archetype == "drift":
+        return DRIFT_GRID_PER_GAME_SEC * ag_scale
+    # Unknown / fallback -> base rate. The canonical name is "standard"; any
+    # unrecognized archetype string defensively resolves here.
+    return STANDARD_GRID_PER_GAME_SEC * ag_scale
+
+
+def _defender_spread_rate(player: Any, archetype: Any):
+    """The ``GOB_DEFENDER_AG_SPREAD`` widening, or ``None`` to fall through to the raw rate.
+
+    The flag and the constant stay in ``animation_step_helpers`` and are read through the
+    module at call time, so a test that monkeypatches ``ASH.DEFENDER_AG_SPREAD`` still
+    reaches this. Returning ``None`` (rather than the raw rate) keeps the single
+    raw-rate return in ``movement_rate``.
+    """
+    try:
+        from BackEnd.utils import animation_step_helpers as _ash
+    except Exception:
+        return None
+    if not _ash.defender_ag_spread_enabled():
+        return None
+    if player is None:
+        ag = 50.0
+    else:
+        attrs = getattr(player, "attributes", None) or {}
+        try:
+            ag = float(attrs.get("AG", 50)) if isinstance(attrs, dict) else 50.0
+        except (TypeError, ValueError):
+            ag = 50.0
+    s = _ash.DEFENDER_AG_SPREAD
+    std = STANDARD_GRID_PER_GAME_SEC * ((1.0 - s) + (ag / 100.0) * 2.0 * s)
+    std = max(0.5, min(std, 60.0))
+    base = _archetype_rate(None, archetype)
+    return base * (std / float(STANDARD_GRID_PER_GAME_SEC))
+
+
+def movement_rate(player: Any, archetype: Any, *, apply_spread: bool,
+                  fallback_rate: Optional[float] = None) -> float:
+    """**The** movement-rate accessor. grid units per game-second for one player.
+
+    ``apply_spread`` selects the path, and is exactly today's ``is_defender`` argument to
+    ``defender_movement_rate``: True widens the player multiplier for a defender when
+    ``GOB_DEFENDER_AG_SPREAD`` is on, False is the raw archetype rate. With the flag off the
+    two are the same number, which is why Stage 1 is byte-identical.
+
+    ``fallback_rate`` is used ONLY when the player lookup failed (a falsy ``player``). It
+    exists to carry the covert-release sites' hardcoded 12.0 unchanged through Stage 1; see
+    reports/movement-rate-inventory.md. Everywhere else it is None and a missing player
+    resolves to AG=50, i.e. the archetype's own base rate.
+    """
+    if fallback_rate is not None and not player:
+        return fallback_rate
+    if apply_spread:
+        spread = _defender_spread_rate(player, archetype)
+        if spread is not None:
+            return spread
+    return _archetype_rate(player, archetype)
+
+
 def ag_to_grid_per_game_sec(ag):
     """
     Convert AG attribute (1-100, average 50, rare values above 100) to grid
@@ -3890,7 +3992,7 @@ def apply_sim_crash_destinations(game: Any, turn_result: Dict[str, Any],
     if turn_result.get("animation_steps") or turn_result.get("animations"):
         return 0
     from BackEnd.engine.skeleton_step_emitter import _OVERLAY_ARCHETYPES, _interpolate_step_end
-    from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec
+    from BackEnd.utils.animation_step_helpers import defender_aware_rate
 
     maps = [(key, arch, turn_result.get(key)) for key, arch in _OVERLAY_ARCHETYPES]
     if not any(isinstance(m, dict) and m for _k, _a, m in maps):
@@ -3910,6 +4012,12 @@ def apply_sim_crash_destinations(game: Any, turn_result: Dict[str, Any],
         for player in (getattr(team, "lineup", None) or {}).values():
             if player is not None and getattr(player, "player_id", None) is not None:
                 by_id[_norm_player_id(player.player_id)] = player
+    # STAGE 2: this is the SIM arm's counterpart of the played arm's `_interpolate_step_end`
+    # callers (see the docstring above — both interrupt the same players toward the same
+    # destinations at the same archetype rate). If the defender spread reached one arm and
+    # not the other the two would diverge, so the same per-player test is applied here.
+    # This function has no `def_lineup` parameter; the defending lineup comes off `game`.
+    _crash_def_lineup = getattr(getattr(game, "defense_team", None), "lineup", None) or {}
     moved = 0
     for _key, archetype, overlay in maps:
         if not isinstance(overlay, dict):
@@ -3922,7 +4030,7 @@ def apply_sim_crash_destinations(game: Any, turn_result: Dict[str, Any],
                 continue
             if dest.get("x") is None or dest.get("y") is None:
                 continue
-            rate = _ag_grid_per_game_sec(player, archetype)
+            rate = defender_aware_rate(player, archetype, pid, _crash_def_lineup)
             end, _dur = _interpolate_step_end(
                 {"x": float(start["x"]), "y": float(start["y"])},
                 {"x": float(dest["x"]), "y": float(dest["y"])},

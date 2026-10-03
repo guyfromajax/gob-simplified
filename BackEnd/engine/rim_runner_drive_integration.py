@@ -38,6 +38,7 @@ from BackEnd.utils.shared import apply_scoring, get_name_safe
 from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
 from BackEnd.utils.position_snapshot_ledger import attach_position_snapshots, build_fast_break_pre_shot_snapshot
 from BackEnd.engine.foul_announcement_language import stamp_fb_foul_on_ball
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 def _drive_onset_coord(
@@ -452,7 +453,8 @@ def resolve_attack_drive_finisher_turn(
             if not shot["has_and_one"]:
                 try:
                     pressure_type = game.turn_manager.determine_defensive_pressure_type()
-                except Exception:
+                except Exception as e:
+                    reraise_if_strict(e)
                     pressure_type = "HCO"
                 game_state["offensive_state"] = pressure_type or "HCO"
         else:
@@ -567,7 +569,8 @@ def resolve_attack_drive_finisher_turn(
         if not shot["has_and_one"]:
             try:
                 pressure_type = game.turn_manager.determine_defensive_pressure_type()
-            except Exception:
+            except Exception as e:
+                reraise_if_strict(e)
                 pressure_type = "HCO"
             game_state["offensive_state"] = pressure_type or "HCO"
     else:

@@ -48,6 +48,49 @@ async function fetchJSON(url) {
   return (await fetchJSONWithStatus(url)).data;
 }
 
+// The read right after a week advance lands on a busy server (or a deploy
+// cutover). Advance stays off until it succeeds, so ride out a transient miss.
+const FCC_DATA_RETRY_DELAYS_MS = [1000, 2000, 4000];
+
+async function fetchCommandCenterData() {
+  let result = await fetchJSONWithStatus(fccCommandCenterDataUrl(franchiseId));
+  for (const delay of FCC_DATA_RETRY_DELAYS_MS) {
+    if (result.data || [401, 403, 404].includes(result.status)) break;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    result = await fetchJSONWithStatus(fccCommandCenterDataUrl(franchiseId));
+  }
+  return result;
+}
+
+// Profiling stays available as ?cc_profile=1. The Office load itself does not request it.
+function fccProfileSuffix() {
+  try {
+    return new URLSearchParams(window.location.search).get('cc_profile') === '1' ? '&profile=1' : '';
+  } catch (error) {
+    return '';
+  }
+}
+
+function fccCommandCenterDataUrl(franchiseId) {
+  return `${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}${fccProfileSuffix()}`;
+}
+
+function fccTeamDataUrl() {
+  return `${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`;
+}
+
+function fccRosterUrl() {
+  return `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}${fccProfileSuffix()}`;
+}
+
+function fccPlaybooksUrl() {
+  const params = emptyParams();
+  params.set('mode', 'franchise');
+  params.set('franchise_id', franchiseId);
+  params.set('team_id', userTeamId);
+  return `${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`;
+}
+
 // A franchise_id that 404s is a franchise that no longer exists — almost always one
 // the user just deleted, where the delete landed server-side but the client did not
 // see the confirmation. Without this the FCC silently bailed out of init and left
@@ -59,21 +102,23 @@ function showFranchiseGoneNotice() {
   const panel = document.createElement('div');
   panel.id = 'fcc-franchise-gone';
   panel.setAttribute('role', 'alert');
+  // Tokens resolve here because the page is html.gob. The button is a neutral plate:
+  // leaving a dead franchise is not Advance, so it is not green.
   panel.style.cssText =
-    'position:fixed;inset:0;z-index:1000000;background:rgba(4,8,16,0.96);' +
+    'position:fixed;inset:0;z-index:1000000;background:var(--bg);' +
     'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-    'gap:18px;padding:24px;text-align:center;';
+    'gap:var(--space-18);padding:var(--space-24);text-align:center;';
   panel.innerHTML =
-    '<div style="font-family:\'Bebas Neue Pro\',\'Bebas Neue\',sans-serif;' +
-    'font-size:38px;letter-spacing:0.03em;color:#ffffff;">This Franchise No Longer Exists</div>' +
-    '<div style="font-family:Inter,sans-serif;font-size:15px;line-height:1.5;' +
-    'color:rgba(255,255,255,0.72);max-width:440px;">It was deleted, so there is nothing left to load. ' +
+    '<div style="font-family:var(--font-display);' +
+    'font-size:var(--fs-36);letter-spacing:var(--tracking-3);color:var(--text-100);">This Franchise No Longer Exists</div>' +
+    '<div style="font-family:var(--font-body);font-size:var(--fs-15);line-height:1.5;' +
+    'color:var(--white-72);max-width:440px;">It was deleted, so there is nothing left to load. ' +
     'Your other program slot is untouched.</div>' +
     '<button type="button" id="fcc-franchise-gone-back" style="min-width:138px;min-height:42px;' +
-    'padding:10px 18px;border:1px solid rgba(255,255,255,0.28);border-radius:10px;' +
-    'background:linear-gradient(180deg,#49ff37 0%,#34ec27 100%);color:#07101f;cursor:pointer;' +
-    'font-family:\'Bebas Neue Pro\',\'Bebas Neue\',sans-serif;font-size:14px;font-weight:700;' +
-    'letter-spacing:0.02em;box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);">Back To Home Base</button>';
+    'padding:var(--space-10) var(--space-18);border:1px solid var(--white-28);border-radius:var(--radius-10);' +
+    'background:var(--white-10);color:var(--text-100);cursor:pointer;' +
+    'font-family:var(--font-display);font-size:var(--fs-14);font-weight:var(--fw-bold);' +
+    'letter-spacing:var(--tracking-2);">Back To Home Base</button>';
   document.body.appendChild(panel);
   const backBtn = document.getElementById('fcc-franchise-gone-back');
   if (backBtn) {
@@ -86,6 +131,93 @@ function showFranchiseGoneNotice() {
   if (window.FranchiseLS && typeof window.FranchiseLS.clearAllForFranchise === 'function') {
     try { window.FranchiseLS.clearAllForFranchise(franchiseId); } catch (e) {}
   }
+}
+
+// --- Season-load failure state -------------------------------------------------
+// When fetchCommandCenterData() exhausts its retries on a transient failure
+// (network/offline -> status 0, a 5xx, or a 429 that never cleared) the Office
+// used to be left blank with a dead, disabled Advance and no explanation. Instead
+// we render the shared design-system error card (.gob-view-error / .gob-view-retry
+// in css/gob-views.css — no new styling, nothing added to the frozen
+// franchise-command-center.css) in the Office main area, and tell Advance why it
+// is disabled. Retry re-runs the full load (init) with the same retry policy.
+let fccSeasonRetrying = false;
+const FCC_ADVANCE_LOAD_FAILED_LABEL = "Season didn't load: retry above";
+
+function seasonLoadCauseLine(status) {
+  if (status === 0) return 'Connection lost.';
+  if (status === 429) return 'The server is busy.';
+  if (typeof status === 'number' && status >= 500) return 'Server error.';
+  return '';
+}
+
+// Advance stays disabled, LOOKS disabled (inline opacity/cursor — .hero-btn has no
+// :disabled rule and its stylesheet is frozen), plays no sound (a disabled button
+// never dispatches click, so its data-sfx hook can't fire), and says why.
+function markAdvanceSeasonLoadFailed() {
+  const btn = document.getElementById('play-now');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.setAttribute('aria-disabled', 'true');
+  btn.setAttribute('aria-label', FCC_ADVANCE_LOAD_FAILED_LABEL);
+  btn.setAttribute('title', FCC_ADVANCE_LOAD_FAILED_LABEL);
+  btn.style.opacity = '0.4';
+  btn.style.cursor = 'not-allowed';
+}
+
+function clearAdvanceSeasonLoadFailed() {
+  const btn = document.getElementById('play-now');
+  if (!btn) return;
+  btn.removeAttribute('aria-disabled');
+  btn.removeAttribute('aria-label');
+  btn.removeAttribute('title');
+  btn.style.opacity = '';
+  btn.style.cursor = '';
+}
+
+function showSeasonLoadError(status) {
+  markAdvanceSeasonLoadFailed();
+  const host = document.getElementById('office-root');
+  if (!host) return;
+  host.setAttribute('data-office-state', 'error');
+  host.setAttribute('aria-busy', 'false');
+
+  const card = document.createElement('div');
+  card.className = 'gob-view-error';
+  card.setAttribute('role', 'alert');
+
+  const title = document.createElement('p');
+  const strong = document.createElement('strong');
+  strong.textContent = "Couldn't load your season";
+  title.appendChild(strong);
+  card.appendChild(title);
+
+  const cause = seasonLoadCauseLine(status);
+  if (cause) {
+    const line = document.createElement('p');
+    line.textContent = cause;
+    card.appendChild(line);
+  }
+
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.className = 'gob-view-retry';
+  retry.textContent = 'Retry';
+  retry.setAttribute('data-sfx', 'SFX_SELECT'); // neutral select tick; not Advance
+  retry.addEventListener('click', () => {
+    if (fccSeasonRetrying) return; // no double-submit
+    fccSeasonRetrying = true;
+    retry.disabled = true;
+    retry.textContent = 'Retrying…';
+    host.setAttribute('aria-busy', 'true');
+    Promise.resolve()
+      .then(() => init()) // re-run the full load; same retry policy
+      .catch((err) => { console.error('[fcc] season retry failed', err); })
+      .finally(() => { fccSeasonRetrying = false; });
+  });
+  card.appendChild(retry);
+
+  host.replaceChildren(card);
 }
 
 function fccCpuSimNeedsRecovery(data) {
@@ -138,7 +270,7 @@ async function recoverCpuSimsBeforeFccRender(topData) {
         localStorage.removeItem('franchise_eog_pgpc_snapshot');
       }
     } catch (_) {}
-    const refreshed = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+    const refreshed = await fetchJSON(fccCommandCenterDataUrl(franchiseId));
     return refreshed || topData;
   } catch (err) {
     console.error('[FCC CPU SIM RESUME] Could not finish computer games:', err);
@@ -180,7 +312,6 @@ let userRosterDataCache = null;
 let homeTeamLeaderCategory = 'PTS';
 let userScheduleDataCache = null;
 let homeLastGameDataCache = null;
-let fccNewsListCache = null;
 const homeOpponentRosterCache = new Map();
 const FCC_SESSION_CACHE_PREFIX = 'fcc-shell';
 let statsScope = 'conference';   // 'conference' | 'region' | 'national'
@@ -190,13 +321,6 @@ const FCC_DEFAULT_TOP = '#3551A5';
 const FCC_DEFAULT_DEEP = '#1C2D60';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 const recruitSortState = { key: 'rt', direction: 'desc' };
-const HOME_EMOJI_BUCKETS = [
-  { emoji: '😡', min: 0, maxExclusive: 20 },
-  { emoji: '😕', min: 20, maxExclusive: 40 },
-  { emoji: '😐', min: 40, maxExclusive: 60 },
-  { emoji: '😊', min: 60, maxExclusive: 80 },
-  { emoji: '😎', min: 80, maxExclusive: Infinity }
-];
 const GENERIC_GAMEPLAN_SCALE = {
   0: 'Never',
   1: 'Less',
@@ -241,9 +365,48 @@ function hideFccLoadingOverlay() {
   if (typeof AccessDenied !== 'undefined' && AccessDenied.hideLoadingOverlay) AccessDenied.hideLoadingOverlay();
 }
 
-window.addEventListener('pageshow', () => {
+window.addEventListener('pageshow', (event) => {
   maybeRefreshPlaybooksButtonState();
+  if (event && event.persisted) void revalidateRestoredFcc();
 });
+
+// The fields the Advance step and the week header are computed from.
+function fccAdvanceKey(data) {
+  if (!data) return '';
+  const wire = data.recruiting_wire || {};
+  const resume = data.cpu_sim_resume || {};
+  return JSON.stringify([
+    data.current_season, data.week, data.session_type, !!data.training_completed,
+    !!data.cut_required, wire.board_saved_week, !!wire.week_35_orders_submitted,
+    resume.status || null, !!data.season_complete,
+  ]);
+}
+
+// A back-forward-cache restore is the old document. gobNav reloads the returns it
+// has markers for; any other restore checks the server before Advance is live, so
+// the FCC never offers a step from a week that has already moved on.
+async function revalidateRestoredFcc() {
+  if (window.GOBNav && typeof window.GOBNav.isReloading === 'function' && window.GOBNav.isReloading()) return;
+  const shown = window.__gobCommandCenterData;
+  if (!franchiseId || !shown) return;
+  const wasDisabled = playNowBtn.disabled;
+  playNowBtn.disabled = true;
+  const url = fccCommandCenterDataUrl(franchiseId);
+  let fresh = null;
+  try {
+    fresh = window.GOBStore && typeof window.GOBStore.revalidate === 'function'
+      ? await window.GOBStore.revalidate(url, { headers: API_CONFIG.getAuthHeaders() })
+      : await fetchJSON(url);
+  } catch (err) {
+    fresh = null;
+  }
+  if (!fresh || fccAdvanceKey(fresh) !== fccAdvanceKey(shown)) {
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+    window.location.replace(window.location.href);
+    return;
+  }
+  playNowBtn.disabled = wasDisabled;
+}
 
 window.addEventListener('focus', () => {
   maybeRefreshPlaybooksButtonState();
@@ -320,8 +483,26 @@ function invalidateFccTeamScopedCaches() {
   invalidateHomeWeekSensitiveCaches();
 }
 
+function publishFccUserTeam(teamId) {
+  if (!franchiseId || !window.GOBViews || typeof window.GOBViews.noteUserTeam !== 'function') return;
+  window.GOBViews.noteUserTeam(franchiseId, teamId || '');
+}
+
+function teamIdFromCommandCenter(topData) {
+  if (!topData) return '';
+  const digest = topData.office_digest;
+  return String(
+    topData.team_id
+    || topData.user_team_id
+    || topData.user_team_object_id
+    || (digest && (digest.user_team_id || digest.team_id))
+    || ''
+  );
+}
+
 function adoptAuthoritativeFccTeamId(topData) {
-  const authoritativeTeamId = topData?.team_id ? String(topData.team_id) : '';
+  const authoritativeTeamId = teamIdFromCommandCenter(topData);
+  publishFccUserTeam(authoritativeTeamId);
   if (!authoritativeTeamId) return false;
 
   const previousTeamId = userTeamId ? String(userTeamId) : '';
@@ -348,16 +529,15 @@ function adoptAuthoritativeFccTeamId(topData) {
 function invalidateHomeWeekSensitiveCaches() {
   userScheduleDataCache = null;
   homeLastGameDataCache = null;
-  fccNewsListCache = null;
   homeOpponentRosterCache.clear();
 }
 
 function buildPlayerDetailUrl(playerId) {
+  if (window.GOBTables) return window.GOBTables.viewHref({ tab: 'player-view', player_id: playerId });
   const qs = emptyParams();
   qs.set('id', playerId);
   if (franchiseId) qs.set('mode', 'franchise');
   if (franchiseId) qs.set('franchise_id', franchiseId);
-  qs.set('return_url', getCurrentRelativeUrl());
   return `/player-detail.html?${qs.toString()}`;
 }
 
@@ -425,13 +605,11 @@ function renderFccHeaderEmblem(data) {
   if (!tier) { slot.innerHTML = ''; return; }
   window.GOBTierEmblem.injectCss();
   const sz = window.GOBTierEmblem.EMBLEM_SIZING.fccFranchiseHeader;
-  slot.innerHTML = window.GOBTierEmblem.renderLockup({
+  // The emblem alone: the top bar spells out the tournament and the round beside it.
+  slot.innerHTML = window.GOBTierEmblem.renderEmblem({
     tier,
     value: emblemValueForTier(tier, data),
     size: sz.emblem,
-    l1: sz.labelL1,
-    l2: sz.labelL2,
-    variant: 'stack'
   });
 }
 
@@ -475,9 +653,19 @@ function resolveFccTeamBanner(data) {
   return '/images/teams/general/general_banner_primary.jpg';
 }
 
-function populateTop(data) {
+// `warm` is the session-cache paint behind the overlay. That copy can be from an
+// older week (a late write after the week advanced), so it never reaches the
+// shared command-center data or the shell's week: Advance reads those.
+function populateTop(data, { warm = false } = {}) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
+  const logoEl = document.getElementById('team-logo');
+  if (logoEl) {
+    logoEl.alt = formattedTeam;
+    logoEl.title = formattedTeam;
+  }
+  const topId = document.getElementById('gob-top-id');
+  if (topId) topId.setAttribute('aria-label', formattedTeam);
   // Hydrate from franchise payload — FranchiseLS is cache only.
   const visual =
     typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function'
@@ -506,6 +694,10 @@ function populateTop(data) {
     rankLabelEl.textContent = `National Rank: ${data.rank || '--'}`;
   }
   updateTopRecordLabel();
+  if (!warm) {
+    window.__gobCommandCenterData = data;
+    if (window.GOBShell && typeof window.GOBShell.syncTop === 'function') window.GOBShell.syncTop(data);
+  }
   console.log('Team logo URL:', logoSrc);
 
   const abbr = teamMap[formattedTeam];
@@ -556,46 +748,18 @@ function populateTop(data) {
   const rankEl = document.getElementById('stat-rank');
   if (prestigeEl) prestigeEl.textContent = `Prestige: ${data.prestige || '--'}`;
   if (rankEl) rankEl.textContent = `Nat'l Rank: ${data.rank || '--'}`;
-  applyScheduleTabMode(Number(data.week || 1));
-  const wk = Number(data.week || 1);
-  if (Number.isFinite(wk) && wk >= 27 && document.getElementById('schedule-tab')?.classList.contains('active')) {
-    void renderTournamentBracket();
-  }
-}
-
-/**
- * Week 27+: tab label "Tournament", show bracket mount + footer links; else regular-season schedule.
- * Uses franchise command-center `week` (same source as header season/week label).
- */
-function applyScheduleTabMode(weekArg) {
-  const w = weekArg !== undefined && weekArg !== null
-    ? Number(weekArg)
-    : Number(commandCenterTopDataCache?.week || 1);
-  const tabBtn = document.querySelector('.tab-buttons button[data-tab="schedule-tab"]');
-  const regularView = document.getElementById('fcc-regular-schedule-view');
-  const regularFooter = document.getElementById('fcc-regular-schedule-footer');
-  const tournamentView = document.getElementById('fcc-tournament-view');
-  const tournamentFooter = document.getElementById('fcc-tournament-footer');
-  const isTournament = Number.isFinite(w) && w >= 27;
-
-  if (tabBtn) tabBtn.textContent = isTournament ? 'Tournament' : 'Schedule';
-  if (regularView) regularView.style.display = isTournament ? 'none' : '';
-  if (regularFooter) regularFooter.style.display = isTournament ? 'none' : '';
-  if (tournamentView) tournamentView.style.display = isTournament ? '' : 'none';
-  if (tournamentFooter) tournamentFooter.style.display = isTournament ? 'flex' : 'none';
 }
 
 function updateTopRecordLabel() {
   const recordLabelEl = document.getElementById('fcc-record-label');
   if (!recordLabelEl) return;
-  let wins = 0;
-  let losses = 0;
-  if (standingsDataCache?.standings?.length && userTeamId) {
-    const teamEntry = standingsDataCache.standings.find((team) => String(team.team_id || '') === String(userTeamId));
-    wins = Number(teamEntry?.W || 0);
-    losses = Number(teamEntry?.L || 0);
-  }
+  if (!standingsDataCache?.standings?.length || !userTeamId) return;
+  const teamEntry = standingsDataCache.standings.find((team) => String(team.team_id || '') === String(userTeamId));
+  if (!teamEntry) return;
+  const wins = Number(teamEntry.W || 0);
+  const losses = Number(teamEntry.L || 0);
   recordLabelEl.textContent = `Record: ${wins}-${losses}`;
+  if (window.GOBShell && typeof window.GOBShell.syncRecord === 'function') window.GOBShell.syncRecord();
 }
 
 function normalizeHexColor(value) {
@@ -678,6 +842,10 @@ async function hydrateFccDisplayColorPreference() {
     syncFccDisplayColorFromAccountSettings(window.__gobAuthMeData);
     return;
   }
+  if (window.GOB_BUILD_PROFILE === 'desktop') {
+    applyFccDisplayColor('default');
+    return;
+  }
   if (typeof API_CONFIG === 'undefined' || !API_CONFIG.buildUrl || !API_CONFIG.getAuthHeaders) {
     applyFccDisplayColor('default');
     return;
@@ -735,134 +903,26 @@ function standingsTeamLabel(t) {
 }
 
 function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
-  const returnUrl = encodeURIComponent(getCurrentRelativeUrl());
-  return `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId)}&team_name=${encodeURIComponent(teamName)}&return_tab=${returnTab}&return_url=${returnUrl}`;
+  if (window.GOBTables) return window.GOBTables.rosterHref(franchiseId, teamId, teamName, returnTab);
+  const owner = new URLSearchParams(window.location.search).get('team_id') || teamId;
+  const params = new URLSearchParams();
+  params.set('mode', 'franchise');
+  if (franchiseId) params.set('franchise_id', franchiseId);
+  params.set('team_id', owner);
+  if (teamId) params.set('roster_team_id', teamId);
+  if (teamName) params.set('team_name', teamName);
+  if (returnTab) params.set('return_tab', returnTab);
+  params.set('origin', 'league');
+  return '/team-roster-view.html?' + params.toString();
 }
 
-function buildTeamLink(t) {
-  const teamLink = document.createElement('a');
-  const label = standingsTeamLabel(t);
-  teamLink.href = buildFranchiseTeamPageUrl(t.team_id, label, 'standings-tab');
-  const rank = Number(t?.natl_rank);
-  const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
-  teamLink.textContent = `${rankPrefix}${label}`;
-  teamLink.style.color = '#4a90e2';
-  teamLink.style.textDecoration = 'none';
-  teamLink.style.cursor = 'pointer';
-  teamLink.addEventListener('mouseenter', () => { teamLink.style.textDecoration = 'underline'; });
-  teamLink.addEventListener('mouseleave', () => { teamLink.style.textDecoration = 'none'; });
-  return teamLink;
-}
-
-function buildStandingsCard(titleText, teams) {
-  const card = document.createElement('section');
-  card.className = 'fcc-standings-card';
-
-  const title = document.createElement('div');
-  title.className = 'fcc-standings-card-title';
-  title.textContent = titleText;
-  card.appendChild(title);
-
-  const headerRow = document.createElement('div');
-  headerRow.className = 'fcc-standings-row fcc-standings-row-header';
-  headerRow.innerHTML = [
-    '<span class="fcc-standings-col-team">Team</span>',
-    '<span class="fcc-standings-col-stat">W</span>',
-    '<span class="fcc-standings-col-stat">L</span>',
-    '<span class="fcc-standings-col-stat">PF</span>',
-    '<span class="fcc-standings-col-stat">PA</span>',
-    '<span class="fcc-standings-col-next">Next</span>'
-  ].join('');
-  card.appendChild(headerRow);
-
-  const body = document.createElement('div');
-  body.className = 'fcc-standings-card-body';
-
-  teams.forEach((t) => {
-    const row = document.createElement('div');
-    row.className = 'fcc-standings-row';
-
-    const teamCell = document.createElement('span');
-    teamCell.className = 'fcc-standings-col-team';
-    teamCell.appendChild(buildTeamLink(t));
-    row.appendChild(teamCell);
-
-    const wCell = document.createElement('span');
-    wCell.className = 'fcc-standings-col-stat';
-    wCell.textContent = t.W;
-    row.appendChild(wCell);
-
-    const lCell = document.createElement('span');
-    lCell.className = 'fcc-standings-col-stat';
-    lCell.textContent = t.L;
-    row.appendChild(lCell);
-
-    const pfCell = document.createElement('span');
-    pfCell.className = 'fcc-standings-col-stat';
-    pfCell.textContent = t.PF;
-    row.appendChild(pfCell);
-
-    const paCell = document.createElement('span');
-    paCell.className = 'fcc-standings-col-stat';
-    paCell.textContent = t.PA;
-    row.appendChild(paCell);
-
-    const nextCell = document.createElement('span');
-    nextCell.className = 'fcc-standings-col-next';
-    nextCell.textContent = t.next || '';
-    row.appendChild(nextCell);
-
-    body.appendChild(row);
-  });
-
-  card.appendChild(body);
-  return card;
-}
-
-function renderStandings(data, selectedRegion) {
+// The League › Standings view draws the table. This keeps the top-bar record and the
+// team id → name map current.
+function renderStandings(data) {
   if (!data) return;
   const list = data.standings || [];
   updateTopRecordLabel();
   list.forEach(t => { teamIdNameMap[t.team_id] = standingsTeamLabel(t); });
-
-  const container = document.getElementById('standings-by-region');
-  if (!container) return;
-  container.innerHTML = '';
-
-  // FCC slim view: two blocks (user conference, sister conference) when API returned user_conference/sister_conference
-  const userConf = data.user_conference;
-  const sisterConf = data.sister_conference;
-  if (userConf != null && sisterConf != null && list.length > 0) {
-    const regionLabels = { 1: 'A1', 2: 'A2', 3: 'B1', 4: 'B2', 5: 'C1', 6: 'C2', 7: 'D1', 8: 'D2', 9: 'E1', 10: 'E2', 11: 'F1', 12: 'F2', 13: 'G1', 14: 'G2', 15: 'H1', 16: 'H2' };
-    [userConf, sisterConf].forEach((confNum) => {
-      const teams = list.filter(t => t.conference === confNum);
-      if (teams.length === 0) return;
-      const label = regionLabels[confNum] ? `Conference ${regionLabels[confNum]}` : `Conference ${confNum}`;
-      container.appendChild(buildStandingsCard(label, teams));
-    });
-    return;
-  }
-
-  // Fallback: full standings by region (e.g. from standalone standings page)
-  selectedRegion = selectedRegion || 'A';
-  const byRegion = list.filter(t => (t.region || '').toString().toUpperCase() === selectedRegion);
-  const byConference = {};
-  byRegion.forEach(t => {
-    const c = t.conference != null ? t.conference : 0;
-    if (!byConference[c]) byConference[c] = [];
-    byConference[c].push(t);
-  });
-  const confNumbers = Object.keys(byConference).map(Number).sort((a, b) => a - b);
-
-  confNumbers.forEach(confNum => {
-    const teams = byConference[confNum];
-    teams.sort((a, b) => (b.W - a.W) || (b.differential - a.differential));
-    container.appendChild(buildStandingsCard(`Conference ${selectedRegion}${confNum}`, teams));
-  });
-
-  document.querySelectorAll('.standings-region-btn').forEach(btn => {
-    if (btn) btn.classList.toggle('active', btn.getAttribute('data-region') === selectedRegion);
-  });
 }
 
 function escapeHomeHtml(value) {
@@ -873,79 +933,6 @@ function escapeHomeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
-function getPlayerSeasonStats(player) {
-  return player?.stats?.season || {};
-}
-
-function getGamesPlayed(player) {
-  const stats = getPlayerSeasonStats(player);
-  return Number(stats.GP || 0) || 0;
-}
-
-function formatPerGame(total, gamesPlayed) {
-  if (!gamesPlayed) return '0.0';
-  return (Number(total || 0) / gamesPlayed).toFixed(1);
-}
-
-function getPlayerDisplayName(player) {
-  return `${player?.first_name || ''} ${player?.last_name || ''}`.trim() || player?.name || 'Unknown';
-}
-
-function getPlayerTotalRebounds(player) {
-  const stats = getPlayerSeasonStats(player);
-  return Number(stats.TREB || ((stats.OREB || 0) + (stats.DREB || 0)) || 0);
-}
-
-function getDisplayPlayerNameForStats(player) {
-  const base = `${player?.first_name || ''} ${player?.last_name || ''}`.trim() || player?.name || '';
-  return typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player?.jersey, base) : base;
-}
-
-function getTopPlayerByAverage(players, totalResolver) {
-  let best = null;
-  let bestAvg = -1;
-  (players || []).forEach((player) => {
-    const gp = getGamesPlayed(player);
-    if (!gp) return;
-    const average = Number(totalResolver(player) || 0) / gp;
-    if (average > bestAvg) {
-      best = player;
-      bestAvg = average;
-    }
-  });
-  return { player: best, average: bestAvg > -1 ? bestAvg : 0 };
-}
-
-function getPlayerPpg(player) {
-  return Number(formatPerGame(getPlayerSeasonStats(player).PTS || 0, getGamesPlayed(player)));
-}
-
-function getPlayerRt(player) {
-  if (player?.rt != null) return Number(player.rt) || 0;
-  if (player?.position_ratings && typeof getBestPosition === 'function') {
-    try {
-      return Number(getBestPosition(player.position_ratings || {}).rating || 0);
-    } catch (error) {
-      return 0;
-    }
-  }
-  return 0;
-}
-
-function getScheduleDisplayName(teamId) {
-  if (!userScheduleDataCache) return '';
-  const display = userScheduleDataCache.team_display_name_map?.[teamId];
-  const fallback = userScheduleDataCache.team_name_map?.[teamId];
-  return display || fallback || '';
-}
-
-/**
- * Region letter + the conference's OWN number: A1 A2 B3 B4 C5 C6 … H15 H16.
- *
- * Not letter + 1|2. That gave every region a "1" and a "2", so the suffix said nothing
- * about which conference — B2 and D2 were different conferences with the same number.
- * Matches conferenceLabel() in recruiting-hub.js; the two name the same thing.
- */
 function formatConferenceShortLabel(conference) {
   const numericConference = Number(conference);
   if (!Number.isInteger(numericConference) || numericConference < 1 || numericConference > 16) return '';
@@ -967,497 +954,6 @@ function getTeamRankingEntry(teamId) {
 function getStandingsTeamEntry(teamId) {
   return (standingsDataCache?.standings || []).find((entry) => String(entry.team_id || '') === String(teamId)) || null;
 }
-
-function getUserScheduleGames() {
-  const weeks = userScheduleDataCache?.schedule || [];
-  return weeks.flat().filter((game) => game && game.is_user_team);
-}
-
-function getOpponentIdFromGame(game) {
-  if (!game || !userTeamId) return null;
-  return String(game.home_team_id) === String(userTeamId) ? String(game.away_team_id) : String(game.home_team_id);
-}
-
-function getMatchupLabelForGame(game) {
-  if (!game || !userTeamId) return '';
-  return String(game.home_team_id) === String(userTeamId) ? 'vs' : '@';
-}
-
-function getNextUserGame() {
-  const currentWeek = Number(commandCenterTopDataCache?.week || 1);
-  return getUserScheduleGames().find((game) => Number(game.week || 0) >= currentWeek && game.status !== 'complete') || null;
-}
-
-function getLastCompletedUserGame() {
-  const currentWeek = Number(commandCenterTopDataCache?.week || 1);
-  const games = getUserScheduleGames()
-    .filter((game) => {
-      const week = Number(game.week || 0);
-      const awayScore = game.away_score;
-      const homeScore = game.home_score;
-      const hasRecordedScore =
-        awayScore !== null &&
-        awayScore !== undefined &&
-        homeScore !== null &&
-        homeScore !== undefined;
-      const hasRealFinalScore =
-        hasRecordedScore &&
-        (Number(awayScore) > 0 || Number(homeScore) > 0);
-      const looksComplete = game.status === 'complete' || hasRealFinalScore;
-      return looksComplete && week <= currentWeek;
-    })
-    .sort((a, b) => Number(b.week || 0) - Number(a.week || 0));
-  return games[0] || null;
-}
-
-async function fetchRosterWithStatsForTeam(teamId) {
-  if (!franchiseId || !teamId) return [];
-  if (homeOpponentRosterCache.has(teamId)) return homeOpponentRosterCache.get(teamId);
-  const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(teamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}`;
-  const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${encodeURIComponent(franchiseId)}`;
-  try {
-    const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
-    const players = result?.players || [];
-    homeOpponentRosterCache.set(teamId, players);
-    persistFccSessionCache();
-    return players;
-  } catch (error) {
-    console.warn('Failed to load opponent roster for Home tab:', teamId, error);
-    return [];
-  }
-}
-
-async function ensureHomeScheduleData() {
-  if (userScheduleDataCache || !franchiseId) return userScheduleDataCache;
-  const params = emptyParams();
-  params.set('franchise_id', franchiseId);
-  params.set('user_team_only', '1');
-  userScheduleDataCache = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/schedule')}?${params.toString()}`);
-  persistFccSessionCache();
-  return userScheduleDataCache;
-}
-
-async function ensureHomeLastGameData(game) {
-  if (!game?.game_id) return null;
-  if (homeLastGameDataCache && homeLastGameDataCache.game_id === game.game_id) return homeLastGameDataCache.data;
-  const data = await fetchJSON(`${API_CONFIG.buildUrl(`/api/game/${encodeURIComponent(game.game_id)}`)}`);
-  if (data) {
-    homeLastGameDataCache = { game_id: game.game_id, data };
-    persistFccSessionCache();
-  }
-  return data;
-}
-
-function createEmptyHomeState(message = 'N/A') {
-  return `<div class="fcc-home-empty">${escapeHomeHtml(message)}</div>`;
-}
-
-function renderHomeRankingsCard() {
-  const body = document.getElementById('home-rankings-body');
-  if (!body) return;
-  const rankings = (commandCenterTopDataCache?.rankings || []).slice(0, 10);
-  if (!rankings.length) {
-    body.innerHTML = createEmptyHomeState('Loading...');
-    return;
-  }
-  body.innerHTML = `
-    <div class="fcc-home-list-scroll">
-      ${rankings.map((team) => `
-        <div class="fcc-home-list-row">
-          <span class="fcc-home-list-rank">${escapeHomeHtml(team.natl_rank)}</span>
-          <span class="fcc-home-list-main">${escapeHomeHtml(`${team.team_name || ''}${formatConferenceShortLabel(team.conference) ? ` (${formatConferenceShortLabel(team.conference)})` : ''}`)}</span>
-          <span class="fcc-home-list-meta">${escapeHomeHtml(`${team.W || 0}-${team.L || 0}`)}</span>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-function getScheduleGameForWeek(weekNumber) {
-  return getUserScheduleGames().find((game) => Number(game.week || 0) === Number(weekNumber)) || null;
-}
-
-function getScheduleRowMarkup(label, detail, detailClass = '') {
-  return `
-    <div class="fcc-schedule-row">
-      <span class="fcc-schedule-week">${escapeHomeHtml(label)}</span>
-      <span class="fcc-schedule-detail ${detailClass}">${escapeHomeHtml(detail)}</span>
-    </div>
-  `;
-}
-
-function formatScheduleGameDetail(game) {
-  if (!game) {
-    return { text: 'Open', className: '' };
-  }
-  const opponentId = getOpponentIdFromGame(game);
-  const opponentName = getScheduleDisplayName(opponentId) || 'TBD';
-  const matchupLabel = getMatchupLabelForGame(game);
-  const baseText = `${matchupLabel} ${opponentName}`;
-  const awayScore = Number(game.away_score ?? 0);
-  const homeScore = Number(game.home_score ?? 0);
-  const isComplete = game.status === 'complete' || (Number.isFinite(awayScore) && Number.isFinite(homeScore) && (awayScore > 0 || homeScore > 0));
-  if (!isComplete) {
-    return { text: baseText, className: 'is-pending' };
-  }
-  const userIsHome = String(game.home_team_id) === String(userTeamId);
-  const userScore = userIsHome ? homeScore : awayScore;
-  const oppScore = userIsHome ? awayScore : homeScore;
-  let className = 'is-complete-tie';
-  if (userScore > oppScore) className = 'is-complete-win';
-  else if (userScore < oppScore) className = 'is-complete-loss';
-  return {
-    text: `${baseText} ${userScore}-${oppScore}`,
-    className
-  };
-}
-
-function buildScheduleColumnMarkup(title, weeks, extraRows = []) {
-  const rows = weeks.map((weekNumber) => {
-    const game = getScheduleGameForWeek(weekNumber);
-    const detail = formatScheduleGameDetail(game);
-    return getScheduleRowMarkup(`Wk ${weekNumber}`, detail.text, detail.className);
-  });
-  extraRows.forEach((rowText) => {
-    rows.push(getScheduleRowMarkup('', rowText, 'is-tournament'));
-  });
-  return `
-    <section class="fcc-schedule-column">
-      <div class="fcc-schedule-column-head">${escapeHomeHtml(title)}</div>
-      <div class="fcc-schedule-column-body">${rows.join('')}</div>
-    </section>
-  `;
-}
-
-async function renderScheduleTab() {
-  applyScheduleTabMode();
-  const weekNum = Number(commandCenterTopDataCache?.week || 0);
-  if (Number.isFinite(weekNum) && weekNum >= 27) {
-    await renderTournamentBracket();
-    return;
-  }
-  const host = document.getElementById('fcc-schedule-grid');
-  if (!host) return;
-  if (!franchiseId) {
-    host.innerHTML = '<div class="fcc-game-plan-empty">Schedule unavailable.</div>';
-    return;
-  }
-  if (!userScheduleDataCache) {
-    host.innerHTML = '<div class="fcc-game-plan-empty">Loading schedule...</div>';
-  }
-  await ensureHomeScheduleData();
-  if (!userScheduleDataCache) {
-    host.innerHTML = '<div class="fcc-game-plan-empty">Schedule unavailable.</div>';
-    return;
-  }
-  host.innerHTML = [
-    buildScheduleColumnMarkup('Weeks 1-7', [1, 2, 3, 4, 5, 6, 7]),
-    buildScheduleColumnMarkup('Weeks 8-14', [8, 9, 10, 11, 12, 13, 14]),
-    buildScheduleColumnMarkup('Weeks 15-21', [15, 16, 17, 18, 19, 20, 21]),
-    buildScheduleColumnMarkup('Weeks 22-26', [22, 23, 24, 25, 26], [
-      'Conference Tournaments',
-      'Region Tournaments',
-      'National Tournament'
-    ])
-  ].join('');
-}
-
-function renderHomeMatchupCard(bodyId, summary, options = {}) {
-  const body = document.getElementById(bodyId);
-  if (!body) return;
-  if (!summary) {
-    const emptyLabel = options.emptyMessage != null ? options.emptyMessage : 'N/A';
-    body.innerHTML = createEmptyHomeState(emptyLabel);
-    return;
-  }
-  const opponentName = summary.opponent_team_name || 'Opponent';
-  const opponentMascot = String(summary.opponent_team_mascot || '').trim();
-  const opponentRegion = String(summary.opponent_team_region || '').trim().toUpperCase();
-  const opponentConference = summary.opponent_team_conference;
-  const opponentRegionConference = opponentRegion && opponentConference != null && opponentConference !== ''
-    ? `${opponentRegion}${opponentConference}`
-    : '';
-  const opponentBaseDisplayName = opponentMascot ? `${opponentName} ${opponentMascot}` : opponentName;
-  const opponentDisplayName = opponentRegionConference
-    ? `${opponentBaseDisplayName} (${opponentRegionConference})`
-    : opponentBaseDisplayName;
-  const matchupLabel = summary.matchup_label || '';
-  const logoSrc = typeof getTeamAssetPath === 'function'
-    ? getTeamAssetPath(opponentName, 'banner_primary')
-    : '/images/teams/general/general_banner_primary.jpg';
-  const tooltipText = getTeamTooltipText(opponentName);
-
-  if (bodyId === 'home-next-game-body') {
-    body.innerHTML = `
-      <div class="fcc-home-matchup-card">
-        <div class="fcc-home-matchup-top">
-          <span class="fcc-home-matchup-label">${escapeHomeHtml(matchupLabel)}</span>
-          <span class="team-tooltip-host" data-team-tooltip="${escapeHomeHtml(tooltipText)}" aria-label="${escapeHomeHtml(tooltipText)}">
-            <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
-          </span>
-        </div>
-        <div class="fcc-home-matchup-bottom">
-          <div class="fcc-home-opponent-name">${escapeHomeHtml(opponentDisplayName)}</div>
-          <div class="fcc-home-detail-line fcc-home-meta-row">
-            <span>Record: ${escapeHomeHtml(`${summary.record?.wins || 0}-${summary.record?.losses || 0}`)}</span>
-            <span>Rank: ${escapeHomeHtml(summary.rank || 'N/A')}</span>
-          </div>
-          <div class="fcc-home-detail-line">Top Scorer: ${escapeHomeHtml(summary.top_scorer ? `${summary.top_scorer.name}, ${Number(summary.top_scorer.average || 0).toFixed(1)}` : 'N/A')}</div>
-          <div class="fcc-home-detail-line">Top Rebounder: ${escapeHomeHtml(summary.top_rebounder ? `${summary.top_rebounder.name}, ${Number(summary.top_rebounder.average || 0).toFixed(1)}` : 'N/A')}</div>
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  const awayName = summary.away_team_name || 'Away';
-  const homeName = summary.home_team_name || 'Home';
-  const awayScore = Number(summary.away_score || 0);
-  const homeScore = Number(summary.home_score || 0);
-  const awayBold = awayScore > homeScore ? 'fcc-home-score-strong' : '';
-  const homeBold = homeScore > awayScore ? 'fcc-home-score-strong' : '';
-
-  body.innerHTML = `
-    <div class="fcc-home-matchup-card">
-      <div class="fcc-home-matchup-top">
-        <span class="fcc-home-matchup-label">${escapeHomeHtml(matchupLabel)}</span>
-        <span class="team-tooltip-host" data-team-tooltip="${escapeHomeHtml(tooltipText)}" aria-label="${escapeHomeHtml(tooltipText)}">
-          <img class="fcc-home-matchup-logo" src="${escapeHomeHtml(logoSrc)}" alt="${escapeHomeHtml(opponentName)} banner">
-        </span>
-      </div>
-      <div class="fcc-home-matchup-bottom">
-        <div class="fcc-home-final-score">
-          <span class="${awayBold}">${escapeHomeHtml(`${awayName} (${awayScore})`)}</span>
-          <span class="fcc-home-final-score-at">at</span>
-          <span class="${homeBold}">${escapeHomeHtml(`${homeName} (${homeScore})`)}</span>
-        </div>
-        <div class="fcc-home-detail-line">Player of The Game: ${escapeHomeHtml(summary.potg?.name || 'N/A')}</div>
-        <div class="fcc-home-detail-line fcc-home-potg-line">
-          ${escapeHomeHtml(summary.potg ? `${summary.potg.stats.pts} PTS  ${summary.potg.stats.reb} REB  ${summary.potg.stats.ast} AST  ${summary.potg.stats.stl} STL  ${summary.potg.stats.blk} BLK  ${summary.potg.stats.defPct} DEF%` : 'N/A')}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderHomeLockerRoomCard() {
-  const body = document.getElementById('home-locker-room-body');
-  if (!body) return;
-  if (!teamData?.team_attributes || !userRosterPlayersCache.length) {
-    body.innerHTML = createEmptyHomeState('Loading...');
-    return;
-  }
-
-  const chemistry = Number(teamData.team_attributes.team_chemistry || 0);
-  const chemistryPercent = Math.max(0, Math.min(100, (chemistry / 25) * 100));
-  const attitudeCounts = HOME_EMOJI_BUCKETS.map((bucket) => {
-    const count = userRosterPlayersCache.filter((player) => {
-      const em = Number(player?.attributes?.EM || 0);
-      return em >= bucket.min && em < bucket.maxExclusive;
-    }).length;
-    return { ...bucket, count };
-  });
-
-  body.innerHTML = `
-    <div class="fcc-home-locker-room">
-      <div class="fcc-home-locker-label">Team Chemistry</div>
-      <div class="fcc-home-chemistry-bar">
-        <div class="fcc-home-chemistry-fill" style="width:${chemistryPercent}%"></div>
-        <div class="fcc-home-chemistry-text">${escapeHomeHtml(`${chemistry} / 25`)}</div>
-      </div>
-      <div class="fcc-home-locker-label">Player Attitudes</div>
-      <div class="fcc-home-attitude-scale">
-        <div class="fcc-home-attitude-emojis">
-          ${attitudeCounts.map((bucket) => `<span>${bucket.emoji}</span>`).join('')}
-        </div>
-        <div class="fcc-home-attitude-rail">
-          ${attitudeCounts.map(() => '<span class="fcc-home-attitude-tick"></span>').join('')}
-        </div>
-        <div class="fcc-home-attitude-counts">
-          ${attitudeCounts.map((bucket) => `<span>${bucket.count}</span>`).join('')}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderHomeTeamStatsCard() {
-  const body = document.getElementById('home-team-stats-body');
-  if (!body) return;
-  if (!userRosterPlayersCache.length) {
-    body.innerHTML = createEmptyHomeState('Loading...');
-    return;
-  }
-  const category = homeTeamLeaderCategory;
-  const categoryConfig = {
-    PTS: {
-      heading: 'PPG',
-      qualifies: (player) => getGamesPlayed(player) > 0,
-      value: (player) => Number(getPlayerSeasonStats(player).PTS || 0) / getGamesPlayed(player),
-      display: (value) => value.toFixed(1)
-    },
-    REB: {
-      heading: 'RPG',
-      qualifies: (player) => getGamesPlayed(player) > 0,
-      value: (player) => getPlayerTotalRebounds(player) / getGamesPlayed(player),
-      display: (value) => value.toFixed(1)
-    },
-    AST: {
-      heading: 'APG',
-      qualifies: (player) => getGamesPlayed(player) > 0,
-      value: (player) => Number(getPlayerSeasonStats(player).AST || 0) / getGamesPlayed(player),
-      display: (value) => value.toFixed(1)
-    },
-    DEF: {
-      heading: 'DEF%',
-      qualifies: (player) => {
-        const gp = getGamesPlayed(player);
-        return gp > 0 && (Number(getPlayerSeasonStats(player).DEF_A || 0) / gp) >= 4;
-      },
-      value: (player) => {
-        const stats = getPlayerSeasonStats(player);
-        const attempts = Number(stats.DEF_A || 0);
-        return attempts > 0 ? (Number(stats.DEF_S || 0) / attempts) * 100 : 0;
-      },
-      display: (value) => `${Math.round(value)}%`
-    }
-  };
-  const activeConfig = categoryConfig[category] || categoryConfig.PTS;
-  const players = [...userRosterPlayersCache]
-    .filter(activeConfig.qualifies)
-    .sort((a, b) => {
-      const difference = activeConfig.value(b) - activeConfig.value(a);
-      if (difference !== 0) return difference;
-      return getPlayerRt(b) - getPlayerRt(a);
-    })
-    .slice(0, 12);
-  if (!players.length) {
-    body.innerHTML = createEmptyHomeState(category === 'DEF' ? 'No qualifying defenders yet.' : 'No season stats yet.');
-    return;
-  }
-  body.innerHTML = `
-    <div class="fcc-home-team-stats">
-      <div class="fcc-home-team-stats-header">
-        <span>Player</span>
-        <span>${activeConfig.heading}</span>
-      </div>
-      <div class="fcc-home-list-scroll">
-        ${players.map((player, index) => `
-          <div class="fcc-home-team-stats-row">
-            <span class="fcc-home-team-stats-name">${escapeHomeHtml(`${index + 1}. ${getPlayerDisplayName(player)}`)}</span>
-            <span class="fcc-home-team-stats-value">${escapeHomeHtml(activeConfig.display(activeConfig.value(player)))}</span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-}
-
-function bindHomeTeamLeaderButtons() {
-  document.querySelectorAll('[data-home-leader-category]').forEach((button) => {
-    if (button.dataset.bound) return;
-    button.dataset.bound = '1';
-    button.addEventListener('click', () => {
-      homeTeamLeaderCategory = button.dataset.homeLeaderCategory || 'PTS';
-      document.querySelectorAll('[data-home-leader-category]').forEach((candidate) => {
-        candidate.setAttribute('aria-pressed', String(candidate.dataset.homeLeaderCategory === homeTeamLeaderCategory));
-      });
-      renderHomeTeamStatsCard();
-    });
-  });
-}
-
-function getNewLeanRecruitIdSet() {
-  return new Set((newLeanRecruitIdsCache || []).map((id) => String(id)));
-}
-
-function isNewLeanRecruit(recruit) {
-  if (!recruit) return false;
-  const recruitId = recruit.recruitId != null ? recruit.recruitId : recruit.recruit_id;
-  return getNewLeanRecruitIdSet().has(String(recruitId));
-}
-
-function partitionRecruitsWithNewLeans(recruits, sortFn, sortState) {
-  const newLeanIds = getNewLeanRecruitIdSet();
-  if (!newLeanIds.size) {
-    return sortFn ? sortFn(recruits, sortState) : recruits.slice();
-  }
-  const newOnes = [];
-  const rest = [];
-  recruits.forEach((recruit) => {
-    if (newLeanIds.has(String(recruit.recruitId))) newOnes.push(recruit);
-    else rest.push(recruit);
-  });
-  if (!sortFn) return newOnes.concat(rest);
-  return sortFn(newOnes, sortState).concat(sortFn(rest, sortState));
-}
-
-// Per-user standing rank (1/2/3, or 0) from the recruit's raw Lean map vs the user's team.
-function fccRecruitStandingRank(recruit) {
-  const lean = (recruit && recruit.lean) || {};
-  const uid = String(userTeamId);
-  if (String(lean['1']) === uid) return 1;
-  if (String(lean['2']) === uid) return 2;
-  if (String(lean['3']) === uid) return 3;
-  return 0;
-}
-
-function buildFccInviteBlockHtml(recruit, week, wide) {
-  if (!recruit) return '';
-  const isAssigned = recruit.status === 'assigned';
-  const rtClass = typeof window.getRecruitRtBucketClassForYear === 'function'
-    ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year)
-    : '';
-  const weightDisplay = recruit.weight != null ? recruit.weight : '--';
-  const meta = `${recruit.archetype || '--'} · ${recruit.height || '--'} / ${weightDisplay}`;
-  const rtDisplay = formatRtWithPotentialDisplay(recruit.rt, recruit.potential_rt_ratcheted);
-  const eyebrow = isAssigned ? 'Recruiting Visit' : `Week ${Number(week)} Invite`;
-  const statusHtml = isAssigned
-    ? ''
-    : '<span class="fcc-invite__status"><span class="fcc-invite__dot" aria-hidden="true"></span>Visit Pending</span>';
-  const topHtml = `
-    <div class="fcc-invite__top">
-      <span class="fcc-invite__eyebrow">${escapeHomeHtml(eyebrow)}</span>
-      ${statusHtml}
-    </div>
-  `;
-  const idHtml = `
-    <div class="fcc-invite__id">
-      <span class="fcc-invite__name">${escapeHomeHtml(recruit.name || '--')}</span>
-      <span class="fcc-invite__meta">${escapeHomeHtml(meta)}</span>
-    </div>
-  `;
-  const rtHtml = `
-    <div class="fcc-invite__rt">
-      <span class="fcc-invite__rtnum ${rtClass}">${escapeHomeHtml(rtDisplay)}</span>
-      <span class="fcc-invite__rtlabel">RT</span>
-    </div>
-  `;
-  if (wide) {
-    return `<div class="fcc-invite fcc-invite--wide">${topHtml}${idHtml}${rtHtml}</div>`;
-  }
-  return `<div class="fcc-invite">${topHtml}<div class="fcc-invite__body">${idHtml}${rtHtml}</div></div>`;
-}
-
-function renderFccRecruitsInviteBanner() {
-  const host = document.getElementById('fcc-recruits-invite');
-  if (!host) return;
-  const week = Number(document.body.dataset.fccWeek || commandCenterTopDataCache?.week || 1);
-  const invite = currentWeekInviteRecruitCache;
-  if (week < 20 || week > 26 || !invite) {
-    host.innerHTML = '';
-    host.hidden = true;
-    return;
-  }
-  host.innerHTML = buildFccInviteBlockHtml(invite, week, true);
-  host.hidden = false;
-}
-
-// ───────── Recruiting: the Wire ─────────
-// Surfaces the Prompt 1 event log (recruiting_lean_events). Reporting only.
-
-const RECRUITING_DROP_KINDS = new Set(['dropped_you']);
-const RECRUITING_GAIN_KINDS = new Set(['gained_you', 'moved_up']);
 
 function buildRecruitingUrl() {
   const params = emptyParams();
@@ -1492,158 +988,10 @@ async function openRecruitingSurface() {
     // Never block navigation on the read marker.
     console.warn('[WIRE] could not persist seen state:', err);
   }
-  window.location.href = url;
+  if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(url);
+  else window.location.assign(url);
 }
 
-function wireRowClassFor(kind) {
-  if (RECRUITING_DROP_KINDS.has(kind)) return 'fcc-drop-row';
-  if (RECRUITING_GAIN_KINDS.has(kind)) return 'fcc-newlean-row';
-  return 'fcc-wire-row';
-}
-
-function wireBadgeFor(kind) {
-  if (RECRUITING_DROP_KINDS.has(kind)) return '<span class="fcc-drop-badge">Drop</span>';
-  if (RECRUITING_GAIN_KINDS.has(kind)) return '<span class="fcc-newlean-badge">Gain</span>';
-  return '';
-}
-
-/** Phase-appropriate status line beneath the feed. */
-/** Signing Day: the Coach's Office card becomes a single call to action. */
-const SIGNING_DAY_WEEK = 35;
-// Invite window. Mirrors INVITE_FIRST_WEEK/INVITE_LAST_WEEK in recruitingButtonState.js
-// and INVITE_WEEKS on the backend; updatePlayButton needs them without the module.
-const INVITE_FIRST_WEEK = 20;
-const INVITE_LAST_WEEK = 26;
-
-function wireStatusLine(week, wire) {
-  const w = Number(week || 0);
-  const counts = wire.counts || {};
-  if (w === 35) return 'Signing Day — allocate your recruiting points.';
-  if (w >= 20 && w <= 26) {
-    if (Number(wire.board_saved_week || 0) === w) return `Invite board sent for week ${w}.`;
-    if (!wire.has_saved_board) return 'No invite board yet — build one to start sending invites.';
-    return `Invite week ${w - 19} of 7 — board not sent yet.`;
-  }
-  const unseen = Number(wire.unseen_count || 0);
-  if (unseen > 0) {
-    const parts = [];
-    if (counts.moved) parts.push(`${counts.moved} moved`);
-    if (counts.dropped) parts.push(`${counts.dropped} dropped you`);
-    return `${parts.join(' · ')} since you last looked.`;
-  }
-  return '';
-}
-
-/** The footnote element inside a recruiting card, if the card has one. */
-function footerFor(card) {
-  return card ? card.querySelector('.fcc-recruiting-footnote--embed') : null;
-}
-
-function renderHomeRecruitingWire() {
-  const body = document.getElementById('home-recruiting-body');
-  if (!body) return;
-  const wire = commandCenterTopDataCache?.recruiting_wire || {};
-  const week = Number(commandCenterTopDataCache?.week || document.body.dataset.fccWeek || 1);
-
-  const fullLink = document.getElementById('home-recruiting-full-link');
-  if (fullLink && !fullLink.dataset.wireBound) {
-    fullLink.dataset.wireBound = '1';
-    fullLink.href = buildRecruitingUrl();
-    fullLink.addEventListener('click', (event) => {
-      event.preventDefault();
-      void openRecruitingSurface();
-    });
-  }
-
-  const events = Array.isArray(wire.events) ? wire.events : [];
-  const statusText = wireStatusLine(week, wire);
-  const card = body.closest('.fcc-home-card--recruiting');
-
-  // Once the signings have run, the card's job changes: the wire's week-by-week lean
-  // movement is a record of a race that is over, and the only thing worth reading is
-  // who you actually signed. Falls through to the wire when nothing was signed.
-  const signed = commandCenterTopDataCache?.week_35_user_recruits || [];
-  if (commandCenterTopDataCache?.week_35_recruiting_ran && signed.length) {
-    if (card) card.classList.remove('is-signing-day');
-    if (footerFor(card) && footerFor(card).parentElement !== card) card.appendChild(footerFor(card));
-    const rows = signed.map((p) => {
-      const rt = typeof window.formatRtWithPotentialDisplay === 'function'
-        ? window.formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted)
-        : (p.rt != null ? String(p.rt) : '--');
-      const yr = window.GOB_PlayerYear ? window.GOB_PlayerYear.formatAbbrev(p.year) : (p.year || '--');
-      return `
-        <div class="fcc-wire-row fcc-signed-row">
-          <div class="fcc-wire-line">
-            <span>${escapeHomeHtml(p.name || '--')}</span>
-            <span class="fcc-wire-line__wk">${escapeHomeHtml(p.pos || '--')} · ${escapeHomeHtml(yr)} · ${escapeHomeHtml(rt)}</span>
-          </div>
-        </div>`;
-    }).join('');
-    body.innerHTML = `
-      <div class="fcc-home-recruiting">
-        <div class="fcc-home-list-scroll">${rows}</div>
-      </div>
-      <div class="fcc-wire-status">${signed.length} signed to your program.</div>
-    `;
-    return;
-  }
-  const footer = card ? card.querySelector('.fcc-recruiting-footnote--embed') : null;
-
-  // Week 35 is a single call to action, not a feed. The wire's whole season of movement
-  // is behind it now, so the card drops the event list entirely and shows one line over
-  // the button, centred. The footnote element is MOVED rather than rebuilt so the button
-  // keeps the click handler updateRecruitingButton() wired onto it by id.
-  if (week === SIGNING_DAY_WEEK) {
-    if (card) card.classList.add('is-signing-day');
-    body.innerHTML = '<div class="fcc-wire-signing">'
-      + `<p class="fcc-wire-signing__copy">${escapeHomeHtml(statusText)}</p>`
-      + '</div>';
-    const stack = body.querySelector('.fcc-wire-signing');
-    if (footer && stack) stack.appendChild(footer);
-    return;
-  }
-  if (card) card.classList.remove('is-signing-day');
-  // Put the footnote back if a previous render moved it into the body.
-  if (card && footer && footer.parentElement !== card) card.appendChild(footer);
-  // Always emitted, even when empty: the card reserves a fixed height, and a status
-  // line that appears and disappears would move the boundary the list sits above.
-  const status = `<div class="fcc-wire-status">${escapeHomeHtml(statusText || '')}</div>`;
-
-  if (!events.length) {
-    body.innerHTML = `${createEmptyHomeState('No board movement yet')}${status}`;
-    return;
-  }
-
-  const rows = events.map((event) => {
-    const kind = String(event.kind || '');
-    const badge = wireBadgeFor(kind);
-    return `
-      <div class="${wireRowClassFor(kind)}">
-        <div class="fcc-wire-line">
-          <span>${escapeHomeHtml(event.line || '')}</span>
-          <span class="fcc-wire-line__wk">Wk ${escapeHomeHtml(event.week ?? '--')}</span>
-        </div>
-        ${badge ? `<div class="fcc-newlean-tag">${badge}</div>` : ''}
-      </div>
-    `;
-  }).join('');
-
-  body.innerHTML = `
-    <div class="fcc-home-recruiting">
-      <div class="fcc-home-list-scroll">${rows}</div>
-    </div>
-    ${status}
-  `;
-}
-
-/**
- * Recruiting TAB BADGE. Driven by the same pure state function as before.
- *
- * The amber secondary hero button it used to render is GONE: every week's recruiting
- * news lives in the Coach's Office recruiting card, and a second notice under the green
- * action bar was repeating it. The only thing left below #play-now is week 35's
- * "Edit Recruiting Orders" ghost.
- */
 function renderRecruitingTabBadge() {
   const api = window.GOB_RecruitingButtonState;
   if (!api) return;
@@ -1653,15 +1001,15 @@ function renderRecruitingTabBadge() {
 
   // Tab badge — prompted only. Hovering does not clear it; only opening the surface
   // does, via the mark-seen PATCH.
+  const prompted = api.recruitingIsPrompted({
+    week,
+    counts: wire.counts || {},
+    boardSavedWeek: Number(wire.board_saved_week || 0),
+    hasSavedBoard: !!wire.has_saved_board,
+  });
   const tabBtn = document.querySelector('#franchise-container [data-tab="recruits-tab"]')
     || document.querySelector('[data-tab="recruits-tab"]');
   if (tabBtn) {
-    const prompted = api.recruitingIsPrompted({
-      week,
-      counts: wire.counts || {},
-      boardSavedWeek: Number(wire.board_saved_week || 0),
-      hasSavedBoard: !!wire.has_saved_board,
-    });
     let badge = tabBtn.querySelector('.inbox-badge');
     if (prompted && !badge) {
       badge = document.createElement('span');
@@ -1674,111 +1022,15 @@ function renderRecruitingTabBadge() {
   }
 }
 
-function renderHomeNewsCard() {
-  const body = document.getElementById('home-news-body');
-  if (!body) return;
-  const seeAllLink = document.getElementById('home-news-see-all-link');
-  if (seeAllLink) seeAllLink.href = buildStandaloneNewsUrl(null);
-  const headlines = (commandCenterTopDataCache?.news_headlines || []).slice(0, 5);
-  if (!headlines.length) {
-    body.innerHTML = createEmptyHomeState('No News To Report');
-    return;
-  }
-  body.innerHTML = `
-    <div class="fcc-home-list-scroll">
-      ${headlines.map((item) => `
-        <a class="fcc-home-news-row" href="${buildStandaloneNewsUrl(item.story_id)}">
-          <span class="fcc-home-news-headline">${escapeHomeHtml(item.headline || '--')}</span>
-          <span class="fcc-home-list-meta">Wk ${escapeHomeHtml(item.week ?? '--')}</span>
-        </a>
-      `).join('')}
-    </div>
-  `;
-}
-
-function buildStandaloneNewsUrl(storyId) {
-  const q = emptyParams();
-  if (franchiseId) q.set('franchise_id', franchiseId);
-  if (userTeamId) q.set('team_id', userTeamId);
-  if (storyId) q.set('story', storyId);
-  const qs = q.toString();
-  return `/news.html${qs ? `?${qs}` : ''}`;
-}
-
-async function renderNewsTab() {
-  const host = document.getElementById('fcc-news-list');
-  if (!host) return;
-  if (!fccNewsListCache) {
-    const data = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/news')}?franchise_id=${franchiseId}`);
-    if (!data) {
-      host.innerHTML = '<div class="fcc-news-tab-empty">Failed to load news.</div>';
-      return;
-    }
-    fccNewsListCache = Array.isArray(data.news) ? data.news : [];
-  }
-  const news = fccNewsListCache;
-  if (!news.length && !fccTeamDispatches(commandCenterTopDataCache).length) {
-    host.innerHTML = '<div class="fcc-news-tab-empty">No News To Report</div>';
-    return;
-  }
-  // Group by release week, newest first. Your team's own dispatches (training report,
-  // Practice Squad report, results) are interleaved into the same cards, above that week's
-  // league headlines and styled apart — one week reads as one story, and the Inbox tab that
-  // used to hold them separately is retired.
-  const mine = fccTeamDispatches(commandCenterTopDataCache);
-  const byWeek = new Map();
-  const bucket = (week) => {
-    const w = Number(week || 0);
-    if (!byWeek.has(w)) byWeek.set(w, { mine: [], stories: [] });
-    return byWeek.get(w);
-  };
-  mine.forEach((m) => { if (Number.isFinite(m.week)) bucket(m.week).mine.push(m.html); });
-  news.forEach((story) => bucket(story.week).stories.push(story));
-
-  const weeks = [...byWeek.keys()].sort((a, b) => b - a);
-  host.innerHTML = weeks.map((week) => {
-    const b = byWeek.get(week);
-    return `
-    <section class="fcc-data-card fcc-news-tab-week">
-      <div class="fcc-news-tab-week-title">Week ${week}</div>
-      <div class="fcc-news-tab-week-body">
-        ${b.mine.join('')}
-        ${b.stories.map((story) => `
-          <a class="fcc-news-tab-headline" href="${buildStandaloneNewsUrl(story.story_id)}">${escapeHomeHtml(story.headline || '--')}</a>
-        `).join('')}
-      </div>
-    </section>
-  `; }).join('');
-}
-
 async function renderHomeTab() {
-  bindHomeTeamLeaderButtons();
-  renderHomeRankingsCard();
-  renderHomeLockerRoomCard();
-  renderHomeTeamStatsCard();
-  renderHomeRecruitingWire();
+  if (window.GOBOffice && typeof window.GOBOffice.render === 'function') {
+    window.GOBOffice.render(commandCenterTopDataCache && commandCenterTopDataCache.office_digest);
+  }
   renderRecruitingTabBadge();
-  renderHomeNewsCard();
-  renderHomeMatchupCard('home-next-game-body', commandCenterTopDataCache?.next_game_summary || null, {
-    emptyMessage: commandCenterTopDataCache?.next_game_is_bye ? 'Bye' : 'N/A'
-  });
-  renderHomeMatchupCard('home-last-game-body', commandCenterTopDataCache?.last_game_summary || null);
-  renderFccGameCardLockups();
 }
 
 async function loadHomeTabData() {
   await renderHomeTab();
-}
-
-function bindStandingsRegionButtons() {
-  document.querySelectorAll('.standings-region-btn').forEach(btn => {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', () => {
-      const region = btn.getAttribute('data-region');
-      if (standingsDataCache) renderStandings(standingsDataCache, region);
-    });
-  });
 }
 
 function buildResourceUrl(page, extraParams) {
@@ -1795,9 +1047,7 @@ async function updatePlaybooksButtonState(topData) {
   const playbooksBtn = document.getElementById('playbooks-franchise');
   if (!playbooksBtn || !franchiseId || !userTeamId) return;
   const currentWeek = Number(topData?.week || 1);
-  const data = await fetchJSON(
-    `${API_CONFIG.buildUrl('/api/playbooks')}?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`
-  );
+  const data = await fetchJSON(fccPlaybooksUrl());
   const savedForWeek = Number(data?.playbook_meta?.saved_for_week || 0);
   playbooksWeekSavedCache = savedForWeek;
   const needsSave = savedForWeek !== currentWeek;
@@ -1840,12 +1090,13 @@ function bindResourcesLinks() {
   };
   const standingsLink = document.getElementById('standings-resources-link');
   if (standingsLink) standingsLink.href = `/standings.html${q()}`;
-  const standingsFullLink = document.getElementById('standings-full-link');
-  if (standingsFullLink) standingsFullLink.href = `/standings.html${q()}`;
   const scheduleFullLink = document.getElementById('schedule-full-link');
-  if (scheduleFullLink) scheduleFullLink.href = `/schedule.html${q()}`;
+  const leagueScheduleHref = q()
+    ? `/franchise-command-center.html${q()}&tab=league-schedule-view`
+    : '/franchise-command-center.html?tab=league-schedule-view';
+  if (scheduleFullLink) scheduleFullLink.href = leagueScheduleHref;
   const tournamentScheduleLink = document.getElementById('tournament-schedule-link');
-  if (tournamentScheduleLink) tournamentScheduleLink.href = `/schedule.html${q()}`;
+  if (tournamentScheduleLink) tournamentScheduleLink.href = leagueScheduleHref;
   const statsNavBtn = document.getElementById('stats-nav-btn');
   if (statsNavBtn) statsNavBtn.dataset.route = '';
   const teamStatsFullLink = document.getElementById('team-stats-full-link');
@@ -1857,13 +1108,23 @@ function bindResourcesLinks() {
   const rStats = document.getElementById('resources-stats');
   if (rStats) rStats.href = `/stats.html${q()}`;
   const rSchedule = document.getElementById('resources-schedule');
-  if (rSchedule) rSchedule.href = `/schedule.html${q()}`;
+  if (rSchedule) rSchedule.href = q()
+    ? `/franchise-command-center.html${q()}&tab=league-schedule-view`
+    : '/franchise-command-center.html?tab=league-schedule-view';
   const rTraits = document.getElementById('resources-team-traits');
   if (rTraits) rTraits.href = `/team-traits.html${q()}`;
   const rRankings = document.getElementById('resources-rankings');
   if (rRankings) rRankings.href = `/rankings.html${q()}`;
   const homeRankingsFullLink = document.getElementById('home-rankings-full-link');
   if (homeRankingsFullLink) homeRankingsFullLink.href = `/rankings.html${q()}`;
+  const psLink = document.getElementById('fcc-ps-season-link');
+  if (psLink && franchiseId && userTeamId) {
+    const psParams = emptyParams();
+    psParams.set('franchise_id', franchiseId);
+    psParams.set('team_id', userTeamId);
+    psParams.set('tab', 'practice-squad-view');
+    psLink.href = `/franchise-command-center.html?${psParams.toString()}`;
+  }
   const rRecruits = document.getElementById('resources-recruits');
   if (rRecruits) rRecruits.href = `/recruiting.html${q()}${q() ? '&from=fcc' : '?from=fcc'}`;
   const rAwards = document.getElementById('resources-awards');
@@ -1977,16 +1238,6 @@ async function ensureFccTeamStatsSummary() {
   return fccTeamStatsSummaryCache;
 }
 
-async function ensureFccPlaybooksSummary() {
-  if (fccPlaybooksSummaryCache || !franchiseId || !userTeamId) return fccPlaybooksSummaryCache;
-  const params = emptyParams();
-  params.set('mode', 'franchise');
-  params.set('team_id', userTeamId);
-  params.set('franchise_id', franchiseId);
-  fccPlaybooksSummaryCache = await fetchJSON(`${API_CONFIG.buildUrl('/api/playbooks')}?${params.toString()}`);
-  return fccPlaybooksSummaryCache;
-}
-
 async function renderFccTeamStatsSummary() {
   const tbody = document.getElementById('fcc-team-stats-summary-body');
   if (!tbody) return;
@@ -2037,502 +1288,11 @@ async function renderFccTeamStatsSummary() {
   tbody.innerHTML = rows;
 }
 
-const FCC_PLAYBOOK_SECTION_ORDER = [
-  { key: 'motion', label: 'Motion Plays' },
-  { key: 'set_plays', label: 'Set Plays' },
-  { key: 'man_defense', label: 'Man Defense' },
-  { key: 'zone_defense', label: 'Zone Defense' },
-  { key: 'fast_breaks', label: 'Fast Breaks' },
-  { key: 'hc_traps', label: 'HC Traps' }
-];
-
-function escapePlaybookHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function fccPlaybookSectionPcSide(key) {
-  if (key === 'motion' || key === 'set_plays') return 'offense';
-  if (key === 'man_defense' || key === 'zone_defense') return 'defense';
-  return null;
-}
-
-/** Show weighted plays, plus 0% plays that are still on the call sheet. */
-function fccPlaybookItemVisible(item, key, data) {
-  if (Number(item.percentage || 0) > 0) return true;
-  const side = fccPlaybookSectionPcSide(key);
-  if (!side) return false;
-  const order = ((data?.pc_order || {})[side] || []).map(String);
-  return order.includes(String(item.id || ''));
-}
-
-function buildFccPlaybooksItems(data, key) {
-  const percentages = data?.simple_playbook_percentages || data?.playbook_percentages || {};
-  let items = [];
-
-  if (key === 'motion') {
-    items = (data?.motion || []).map((play) => ({
-      id: String(play?.play_id || ''),
-      name: play?.name || 'Unknown',
-      percentage: Number(percentages.motion?.[play?.play_id] || 0),
-      effectiveness: Number(play?.effectiveness || 0),
-      top_scorer: play?.top_scorer || '',
-      motion_focus: play?.motion_focus || ''
-    }));
-  } else if (key === 'set_plays') {
-    items = (data?.set_plays || []).map((play, index) => ({
-      id: String(play?.play_id || ''),
-      name: play?.name || 'Unknown',
-      percentage: Number(percentages.set_plays?.[play?.play_id] || 0),
-      effectiveness: Number(play?.effectiveness || 0),
-      top_scorer: play?.top_scorer || '',
-      target_shooter: play?.target_shooter || '',
-      focus: play?.play_focus || '',
-      _apiIndex: index
-    }));
-  } else if (key === 'man_defense') {
-    items = (data?.man_defense_rows || [])
-      .filter((row) => row?.is_active !== false)
-      .map((row) => ({
-        id: String(row?.id || ''),
-        name: row?.name || 'Unknown',
-        percentage: Number(percentages.man_defense?.[row?.id] || 0),
-        effectiveness: Number(row?.effectiveness || 0),
-        top_scorer: row?.top_scorer || ''
-      }));
-  } else if (key === 'zone_defense') {
-    items = (data?.zone_defense_rows || []).map((row) => ({
-      id: String(row?.id || ''),
-      name: row?.name || 'Unknown',
-      percentage: Number(percentages.zone_defense?.[row?.id] || 0),
-      effectiveness: Number(row?.effectiveness || 0),
-      top_scorer: row?.top_scorer || ''
-    }));
-  } else if (key === 'fast_breaks') {
-    items = (data?.fast_breaks || []).map((row) => ({
-      id: String(row?.id || ''),
-      name: row?.name || 'Unknown',
-      percentage: Number(percentages.fast_breaks?.[row?.id] || 0),
-      effectiveness: Number(row?.effectiveness || 0),
-      top_scorer: row?.top_scorer || ''
-    }));
-  } else if (key === 'hc_traps') {
-    items = (data?.hc_traps || []).map((row) => ({
-      id: String(row?.id || ''),
-      name: row?.name || 'Unknown',
-      percentage: Number(percentages.hc_traps?.[row?.id] || 0),
-      effectiveness: Number(row?.effectiveness || 0),
-      top_scorer: row?.top_scorer || ''
-    }));
-  }
-
-  return items
-    .filter((item) => fccPlaybookItemVisible(item, key, data))
-    .sort((a, b) => {
-      if (key === 'set_plays' && typeof compareSetPlaysForDisplay === 'function') {
-        return compareSetPlaysForDisplay(a, b, { percentPrimary: true });
-      }
-      return Number(b.percentage || 0) - Number(a.percentage || 0) || String(a.name).localeCompare(String(b.name));
-    });
-}
-
-function getFccPlaybookEffClass(value) {
-  if (typeof getPlaybookCmdClass === 'function') {
-    return getPlaybookCmdClass(value);
-  }
-  const numeric = Number(value || 0);
-  if (numeric >= 70) return 'is-good';
-  if (numeric >= 40) return 'is-mid';
-  return 'is-low';
-}
-
-function getFccMotionFocusLabel(value) {
-  if (value === 'inside') return 'Inside';
-  if (value === 'attack') return 'Attack';
-  if (value === 'outside') return 'Outside';
-  return 'Balanced';
-}
-
-function buildFccPlaycallCenterMaps(data) {
-  const offense = new Map();
-  const defense = new Map();
-
-  (data?.motion || []).forEach((play) => {
-    offense.set(String(play?.play_id || ''), {
-      name: play?.name || 'Unknown',
-      detail: getFccMotionFocusLabel(play?.motion_focus || '')
-    });
-  });
-  (data?.set_plays || []).forEach((play) => {
-    offense.set(String(play?.play_id || ''), {
-      name: play?.name || 'Unknown',
-      detail: play?.target_shooter || ''
-    });
-  });
-  (data?.man_defense_rows || []).filter((row) => row?.is_active !== false).forEach((row) => {
-    defense.set(String(row?.id || ''), {
-      name: row?.name || 'Unknown',
-      detail: ''
-    });
-  });
-  (data?.zone_defense_rows || []).forEach((row) => {
-    defense.set(String(row?.id || ''), {
-      name: row?.name || 'Unknown',
-      detail: ''
-    });
-  });
-
-  return { offense, defense };
-}
-
-function buildFccPlaycallCenterListMarkup(label, entries, lookup) {
-  const rows = Array.from({ length: 8 }, (_, index) => {
-    const id = String(entries?.[index] || '');
-    const item = id ? lookup.get(id) : null;
-    return `
-      <article class="fcc-playcall-slot-card">
-        <div class="fcc-playcall-slot-line">
-          <span class="fcc-playcall-slot-number">${index + 1}.</span>
-          ${item
-            ? `<span class="fcc-playcall-slot-name">${escapePlaybookHtml(item.name)}</span>${item.detail ? ` <span class="fcc-playcall-slot-detail">&mdash; ${escapePlaybookHtml(item.detail)}</span>` : ''}`
-            : '<span class="fcc-playcall-slot-empty">Empty</span>'}
-        </div>
-      </article>
-    `;
-  }).join('');
-
-  return `
-    <div class="fcc-playcall-column">
-      <div class="fcc-playcall-column-head">${escapePlaybookHtml(label)}</div>
-      <div class="fcc-playcall-slots">${rows}</div>
-    </div>
-  `;
-}
-
-function buildFccPlaycallCenterSectionMarkup(data) {
-  const editLinkMarkup = `
-    <button id="fcc-edit-playcall-center-link" class="fcc-playbooks-inline-link" type="button">Edit in Playbooks</button>
-  `;
-  const pcOrder = data?.pc_order || { offense: [], defense: [] };
-  const lookup = buildFccPlaycallCenterMaps(data);
-
-  return `
-    <section class="fcc-playbooks-section fcc-playcall-section">
-      <div class="fcc-playbooks-section-head-wrap">
-        <div class="fcc-playbooks-section-head">Playcall Center</div>
-        ${editLinkMarkup}
-      </div>
-      <div class="fcc-playbooks-section-body">
-        <div class="fcc-playcall-grid">
-          ${buildFccPlaycallCenterListMarkup('Offense', pcOrder.offense || [], lookup.offense)}
-          ${buildFccPlaycallCenterListMarkup('Defense', pcOrder.defense || [], lookup.defense)}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function buildFccPlaybooksSectionMarkup(data, section) {
-  const editButtonMarkup = section.key === 'motion'
-    ? '<button id="fcc-edit-playbooks-btn" class="fcc-game-plan-edit-btn" type="button">Edit Playbooks</button>'
-    : '';
-
-  const items = buildFccPlaybooksItems(data, section.key);
-  const bodyMarkup = items.length
-    ? `<div class="fcc-playbooks-items">${items.map((item) => `
-        <article class="fcc-playbooks-item-card">
-          <div class="fcc-playbooks-item-top">
-            <div class="fcc-playbooks-item-name">${escapePlaybookHtml(
-              section.key === 'set_plays' && item.target_shooter
-                ? `${item.name} (${item.target_shooter})`
-                : item.name
-            )}</div>
-            <div class="fcc-playbooks-item-percent">${escapePlaybookHtml(`${Number(item.percentage || 0)}%`)}</div>
-          </div>
-          <div class="fcc-playbooks-item-meta">
-            <div class="fcc-playbooks-item-eff ${getFccPlaybookEffClass(item.effectiveness)}">${escapePlaybookHtml(`CMD: ${Number(item.effectiveness || 0)}`)}</div>
-            ${item.top_scorer && item.top_scorer !== 'N/A' ? `<div class="fcc-playbooks-item-top-scorer">${escapePlaybookHtml(`TOP: ${item.top_scorer}`)}</div>` : ''}
-          </div>
-        </article>
-      `).join('')}</div>`
-    : '<div class="fcc-playbooks-empty">No plays assigned.</div>';
-
-  return `
-    <section class="fcc-playbooks-section">
-      <div class="fcc-playbooks-section-head-wrap">
-        <div class="fcc-playbooks-section-head">${escapePlaybookHtml(section.label)}</div>
-        ${editButtonMarkup}
-      </div>
-      <div class="fcc-playbooks-section-body">
-        ${bodyMarkup}
-      </div>
-    </section>
-  `;
-}
-
-async function renderFccPlaybooksSummary() {
-  const host = document.getElementById('fcc-playbooks-sections');
-  if (!host) return;
-
-  host.innerHTML = '<div class="fcc-playbooks-empty">Loading playbook settings...</div>';
-  const data = await ensureFccPlaybooksSummary();
-  if (!data) {
-    host.innerHTML = '<div class="fcc-playbooks-empty">Failed to load playbook settings.</div>';
-    return;
-  }
-
-  host.innerHTML = `${FCC_PLAYBOOK_SECTION_ORDER.map((section) => buildFccPlaybooksSectionMarkup(data, section)).join('')}${buildFccPlaycallCenterSectionMarkup(data)}`;
-
-  // TODO: confirm position_shot_weights is present in FCC playbook API response
-  const shotWeights = data?.position_shot_weights || null;
-  const playbooksCardBody = host.closest('.fcc-playbooks-card-body');
-  if (playbooksCardBody) {
-    playbooksCardBody.querySelectorAll(':scope > .fcc-psw-strip').forEach((el) => el.remove());
-  }
-  if (shotWeights && typeof renderShotWeights === 'function') {
-    if (playbooksCardBody) {
-      const pswStrip = document.createElement('div');
-      pswStrip.className = 'fcc-psw-strip';
-      pswStrip.style.marginTop = '18px';
-      renderShotWeights(pswStrip, shotWeights, true);
-      playbooksCardBody.appendChild(pswStrip);
-    }
-  }
-
-  const editBtn = document.getElementById('fcc-edit-playbooks-btn');
-  if (editBtn && !editBtn.dataset.bound) {
-    editBtn.dataset.bound = '1';
-    editBtn.addEventListener('click', () => {
-      if (!franchiseId || !userTeamId) return;
-      const params = emptyParams();
-      params.set('mode', 'franchise');
-      params.set('team_id', userTeamId);
-      params.set('franchise_id', franchiseId);
-      params.set('return_url', getCurrentRelativeUrl());
-      window.location.href = `/playbooks.html?${params.toString()}`;
-    });
-  }
-
-  const playcallEditLink = document.getElementById('fcc-edit-playcall-center-link');
-  if (playcallEditLink && !playcallEditLink.dataset.bound) {
-    playcallEditLink.dataset.bound = '1';
-    playcallEditLink.addEventListener('click', () => {
-      if (!franchiseId || !userTeamId) return;
-      const params = emptyParams();
-      params.set('mode', 'franchise');
-      params.set('team_id', userTeamId);
-      params.set('franchise_id', franchiseId);
-      params.set('return_url', getCurrentRelativeUrl());
-      window.location.href = `/playbooks.html?${params.toString()}`;
-    });
-  }
-}
-
-function bindStatsAndTraitsScopeButtons() {
-  document.querySelectorAll('.stats-scope-btn').forEach(btn => {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', async () => {
-      statsScope = btn.getAttribute('data-scope') || 'conference';
-      document.querySelectorAll('.stats-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === statsScope));
-      const leaders = await ensureLeaders(statsScope, 10);
-      if (leaders) renderLeaders(leaders, statsScope);
-      if (teamStatsDataCache) renderTeamStats(teamStatsDataCache, statsScope);
-    });
-  });
-  document.querySelectorAll('.traits-scope-btn').forEach(btn => {
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', () => {
-      traitsScope = btn.getAttribute('data-scope') || 'conference';
-      document.querySelectorAll('.traits-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === traitsScope));
-      if (teamTraitsDataCache) renderTeamTraits(teamTraitsDataCache, traitsScope);
-    });
-  });
-}
-
-function renderFccRecruits() {
-  const tbody = document.getElementById('fcc-recruits-body');
-  const table = document.getElementById('fcc-recruits-table');
-  const heading = document.querySelector('#recruits-tab h3');
-  const lastCol = document.getElementById('fcc-recruits-last-col');
-  const fullListLink = document.getElementById('fcc-recruits-full-link');
-  if (!tbody || !table || typeof RecruitingCommon === 'undefined') return;
-
-  renderFccRecruitsInviteBanner();
-
-  const useSignedRecruits = Number(document.body.dataset.fccWeek || 1) >= 36;
-  if (heading) heading.textContent = useSignedRecruits ? 'Signed Recruits' : 'Recruits Leaning Your Way';
-  if (fullListLink) {
-    const params = emptyParams();
-    params.set('franchise_id', franchiseId);
-    params.set('team_id', userTeamId);
-    params.set('from', 'fcc');
-    params.set('return_url', getCurrentRelativeUrl());
-    fullListLink.href = `/recruiting.html?${params.toString()}`;
-  }
-  const psLink = document.getElementById('fcc-ps-season-link');
-  if (psLink) {
-    const psParams = emptyParams();
-    psParams.set('franchise_id', franchiseId);
-    psParams.set('team_id', userTeamId);
-    psLink.href = `/practice-squad-standings.html?${psParams.toString()}`;
-  }
-  if (lastCol) {
-    lastCol.textContent = 'Leans / Your Standing';
-    lastCol.dataset.sortKey = 'lean';
-    lastCol.style.display = useSignedRecruits ? 'none' : '';
-  }
-
-  if (useSignedRecruits) {
-    if (!signedRecruitsDataCache.length) {
-      tbody.innerHTML = '<tr><td colspan="8">No recruits or walk-ons joined your team.</td></tr>';
-      return;
-    }
-    const rows = RecruitingCommon.sortRecruits(signedRecruitsDataCache, recruitSortState);
-    if (tbody) tbody.innerHTML = '';
-    rows.forEach(function (recruit) {
-      const tr = document.createElement('tr');
-      // Same column order as the main path: Recruit | RT | POS | HT | WT | Attributes | Lean.
-      const sRegion = String(recruit.homeRegion || '').trim();
-      const sSub = [
-        sRegion && sRegion !== '--' ? 'Region ' + sRegion.charAt(0).toUpperCase() : '',
-        recruit.archetype && recruit.archetype !== '--' ? '<b>' + escapeHomeHtml(recruit.archetype) + '</b>' : '',
-      ].filter(Boolean).join(' · ');
-      tr.innerHTML = [
-        '<td class="c-ident"><div class="ident"><span class="ident-body">' +
-          '<span class="ident-name">' + RecruitingCommon.recruitNameLinkHtml(recruit.detailRecruitId, franchiseId, recruit.name) + '</span>' +
-          (sSub ? '<span class="ident-sub">' + sSub + '</span>' : '') +
-        '</span></div></td>',
-        '<td>' + escapeHomeHtml(recruit.yearDisplay || '--') + '</td>',
-        '<td class="c-rt">' + fccRtLockupHtml(recruit.rt, recruit.potentialRt) + '</td>',
-        '<td>' + fccPosChipHtml(recruit.pos) + '</td>',
-        '<td>' + recruit.height + '</td>',
-        '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
-        '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(recruit.rawAttrs) + '</td>',
-        '<td>&mdash;</td>'
-      ].join('');
-      tbody.appendChild(tr);
-    });
-    return;
-  }
-
-  if (!leanRecruitsDataCache.length) {
-    tbody.innerHTML = '<tr><td colspan="8">No recruits currently have your team on their lean list.</td></tr>';
-    return;
-  }
-  RecruitingCommon.renderRecruitTableRows(
-    tbody,
-    partitionRecruitsWithNewLeans(
-      leanRecruitsDataCache,
-      RecruitingCommon.sortRecruits.bind(RecruitingCommon),
-      recruitSortState
-    ),
-    { newLeanIds: getNewLeanRecruitIdSet(), franchiseId: franchiseId,
-      userTeamId: userTeamId, teamNameMap: recruitTeamNameMapCache }
-  );
-}
-
 function initFccRecruits(topData) {
-  if (typeof RecruitingCommon === 'undefined') return;
   document.body.dataset.fccWeek = String(Number(topData?.week || 1));
-  currentWeekInviteRecruitCache = topData?.current_week_invite_recruit || null;
-  newLeanRecruitIdsCache = Array.isArray(topData?.new_lean_recruit_ids) ? topData.new_lean_recruit_ids : [];
-  recruitTeamNameMapCache = topData?.team_name_map || {};
-  leanRecruitsDataCache = RecruitingCommon.normalizeRecruits(
-    topData?.lean_recruits || [],
-    recruitTeamNameMapCache
-  );
-  signedRecruitsDataCache = (topData?.week_35_user_recruits || []).map((player) => {
-    const attrs = player.attributes || {};
-    return {
-      recruitId: player.recruit_id || player.player_id,
-      // Walk-ons no longer reach this list — the API filters them so their first
-      // reveal is the next season's Walk-On Welcome modal. The fallbacks stay because
-      // they cost nothing and keep the row rendering if that ever changes.
-      detailRecruitId: player.recruit_id || null,
-      name: player.walk_on ? player.name + ' (walk on)' : player.name,
-      homeRegion: player.home_region || '--',
-      archetype: player.archetype || '--',
-      height: typeof formatHeight === 'function' ? formatHeight(player.height) : '--',
-      heightRaw: Number(player.height) || 0,
-      weight: player.weight != null ? Number(player.weight) : null,
-      pos: player.pos || '--',
-      year: player.year || 'JH',
-      yearDisplay: RecruitingCommon.formatYearAbbrev(player.year || 'JH'),
-      rt: player.rt != null ? Number(player.rt) : null,
-      potentialRt: player.potential_rt_ratcheted != null ? Number(player.potential_rt_ratcheted) : null,
-      leanDisplay: '',
-      leanSortValue: '',
-      // UN-scaled, for the shared attr-tile builder — it does its own 0-10 conversion.
-      // The row renders groupedTilesHtml(rawAttrs); without this it got `undefined` and
-      // every tile came out blank. normalizeRecruits sets the same field for the lean
-      // path, which is why that table always worked and this one never did.
-      rawAttrs: attrs,
-      attrs: {
-        SC: Math.floor((Number(attrs.SC) || 0) / 10),
-        SH: Math.floor((Number(attrs.SH) || 0) / 10),
-        ID: Math.floor((Number(attrs.ID) || 0) / 10),
-        OD: Math.floor((Number(attrs.OD) || 0) / 10),
-        PS: Math.floor((Number(attrs.PS) || 0) / 10),
-        BH: Math.floor((Number(attrs.BH) || 0) / 10),
-        RB: Math.floor((Number(attrs.RB) || 0) / 10),
-        AG: Math.floor((Number(attrs.AG) || 0) / 10),
-        ST: Math.floor((Number(attrs.ST) || 0) / 10),
-        ND: Math.floor((Number(attrs.ND) || 0) / 10),
-        IQ: Math.floor((Number(attrs.IQ) || 0) / 10),
-        FT: Math.floor((Number(attrs.FT) || 0) / 10)
-      },
-      raw: player
-    };
-  });
-  const recruitsAttrHead = document.getElementById('fcc-recruits-attr-head');
-  if (recruitsAttrHead && window.GOB_AttrTiles) {
-    recruitsAttrHead.innerHTML = window.GOB_AttrTiles.groupedHeaderHtml({
-      key: recruitSortState.key, dir: recruitSortState.direction,
-    });
-  }
-  RecruitingCommon.bindSortableHeaders(
-    document.getElementById('fcc-recruits-table'),
-    recruitSortState,
-    renderFccRecruits
-  );
-  renderFccRecruits();
-  if (typeof initAttributeTooltips !== 'undefined') {
-    const recruitsTable = document.getElementById('fcc-recruits-table');
-    if (recruitsTable) initAttributeTooltips(recruitsTable, ['th', '.attr-tile']);
-  }
   void renderHomeTab();
 }
 
-let rankingsFullList = [];
-
-function renderRankings(rankings, showAll) {
-  const listEl = document.getElementById('rankings-list');
-  if (!listEl) return;
-  listEl.innerHTML = '';
-  if (!rankings || rankings.length === 0) return;
-  const toShow = showAll ? rankings : rankings.slice(0, 25);
-  toShow.forEach((r) => {
-    const li = document.createElement('li');
-    li.appendChild(document.createTextNode(`${r.natl_rank}. `));
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = r.team_name;
-    if (r.conference === 1) {
-      nameSpan.className = 'rankings-team conference-1';
-      nameSpan.style.color = r.primary_color || '#000';
-      nameSpan.style.fontWeight = 'bold';
-    }
-    li.appendChild(nameSpan);
-    listEl.appendChild(li);
-  });
-}
-
-// Helper function to initialize team color cache
 async function initializeTeamColorCache() {
   if (teamColorCache) return; // Already initialized
   
@@ -2586,1154 +1346,12 @@ function getTeamPrimaryColor(teamName) {
   return teamColorCache[teamName] || null;
 }
 
-function filterLeadersByScope(data, scope) {
-  if (!data || scope === 'national') return data;
-  const out = {};
-  const confMatch = scope === 'conference' && userConference != null;
-  const regionMatch = scope === 'region' && userRegion != null;
-  const regionNorm = (v) => (v || '').toString().toUpperCase();
-  const userRegionNorm = regionNorm(userRegion);
-  Object.keys(data).forEach(cat => {
-    const list = data[cat] || [];
-    out[cat] = list.filter((p) => {
-      if (confMatch) return p.conference === userConference;
-      if (regionMatch) return regionNorm(p.region) === userRegionNorm;
-      return true;
-    });
-  });
-  return out;
-}
-
-function renderLeaders(data, scope) {
-  if (!data) return;
-  scope = scope || statsScope;
-  const filtered = filterLeadersByScope(data, scope);
-  const container = document.getElementById('leaders-container');
-  container.innerHTML = '';
-  const preferredOrderGroups = [
-    ['PTS'],
-    ['3PTM', 'TPM'],
-    ['REB'],
-    ['AST'],
-    ['BLK'],
-    ['STL']
-  ];
-  const ordered = preferredOrderGroups
-    .map(group => group.find(cat => Object.prototype.hasOwnProperty.call(filtered, cat)))
-    .filter(Boolean);
-  const categories = [
-    ...ordered,
-    ...Object.keys(filtered).filter(cat => !ordered.includes(cat))
-  ];
-  const primaryColor = getTeamPrimaryColor(userTeamNameForLeaders);
-  
-  // Map category names for display (backward compatibility for old keys)
-  const categoryNameMap = {
-    'PTS': 'Points',
-    'TPM': '3PTM',  // Legacy key support
-    '3PTM': '3PTM', // ✅ SS&S: Standardized key (backend now uses this)
-    'REB': 'Rebound',
-    'AST': 'Assists',
-    'BLK': 'Blocks',
-    'STL': 'Steals'
-  };
-
-  const valueHeaderMap = {
-    'PTS': 'Points',
-    'TPM': '3PT Made',
-    '3PTM': '3PT Made',
-    'REB': 'Rebounds',
-    'AST': 'Assists',
-    'BLK': 'Blocks',
-    'STL': 'Steals'
-  };
-  
-  categories.forEach(cat => {
-    const section = document.createElement('div');
-    const h3 = document.createElement('h3');
-    h3.textContent = categoryNameMap[cat] || cat;
-    section.appendChild(h3);
-    const div = document.createElement('div');
-    div.className = 'scroll-x';
-    const table = document.createElement('table');
-    table.className = 'leaders-table';
-    const valueHeader = valueHeaderMap[cat] || 'Value';
-    table.innerHTML = `<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>${valueHeader}</th></tr></thead>`;
-    const body = document.createElement('tbody');
-    (filtered[cat] || []).forEach((p, idx) => {
-      const tr = document.createElement('tr');
-      const isUserTeam = userTeamNameForLeaders && p.team === userTeamNameForLeaders;
-      
-      // Create cells individually to apply styling
-      const rankCell = document.createElement('td');
-      rankCell.textContent = idx + 1;
-      const playerCell = document.createElement('td');
-      playerCell.textContent = p.name;
-      const teamCell = document.createElement('td');
-      teamCell.textContent = p.team;
-      const valueCell = document.createElement('td');
-      valueCell.textContent = formatLeaderValue(cat, p.value);
-      
-      // Apply bold and color if user team player
-      if (isUserTeam && primaryColor) {
-        [rankCell, playerCell, teamCell, valueCell].forEach(cell => {
-          cell.style.fontWeight = 'bold';
-          cell.style.color = primaryColor;
-        });
-      }
-      
-      tr.appendChild(rankCell);
-      tr.appendChild(playerCell);
-      tr.appendChild(teamCell);
-      tr.appendChild(valueCell);
-      body.appendChild(tr);
-    });
-    table.appendChild(body);
-    div.appendChild(table);
-    section.appendChild(div);
-    container.appendChild(section);
-  });
-}
-
-// Store teams data for sorting
-let teamsDataForSorting = [];
-
-function filterTeamsByScope(teams, scope) {
-  if (!teams || scope === 'national') return teams || [];
-  const confMatch = scope === 'conference' && userConference != null;
-  const regionMatch = scope === 'region' && userRegion != null;
-  const regionNorm = (v) => (v || '').toString().toUpperCase();
-  const userRegionNorm = regionNorm(userRegion);
-  return teams.filter((t) => {
-    if (confMatch) return t.conference === userConference;
-    if (regionMatch) return regionNorm(t.region) === userRegionNorm;
-    return true;
-  });
-}
-
-function renderTeamStats(data, scope) {
-  if (!data) return;
-  scope = scope || statsScope;
-  const allTeams = data.teams || [];
-  const filtered = filterTeamsByScope(JSON.parse(JSON.stringify(allTeams)), scope);
-  teamsDataForSorting = filtered;
-  TeamStatsTable.renderTeamStatsTable(teamsDataForSorting);
-  
-  // Add click handlers to sortable headers (only once)
-  const sortableHeaders = document.querySelectorAll('#stats-tab .sortable');
-  sortableHeaders.forEach(header => {
-    // Remove existing listeners to avoid duplicates
-    const newHeader = header.cloneNode(true);
-    header.parentNode.replaceChild(newHeader, header);
-    
-    newHeader.style.cursor = 'pointer';
-    newHeader.style.userSelect = 'none';
-    newHeader.addEventListener('click', () => {
-      const stat = newHeader.dataset.stat;
-      TeamStatsTable.sortTeamStats(stat, teamsDataForSorting);
-    });
-  });
-}
-
-// ✅ SS&S: Team stats table rendering now uses shared module (teamStatsTable.js)
-// Removed ~160 lines of duplicate code
-
-function renderRecruits(data) {
-  if (!data) return;
-  const tbody = document.getElementById('recruits-body');
-  if (tbody) tbody.innerHTML = '';
-  
-  // Process recruits to add position and rating info
-  let recruits = (data.recruits || []).map(r => {
-    const a = r.attributes || {};
-    const ratings = r.position_ratings || {};
-    const best = getBestPosition(ratings);
-    
-    return {
-      name: r.name,
-      archetype: r.archetype || '--',
-      height: formatHeight(r.height),
-      weight: r.weight ?? '--',
-      pos: best.pos,
-      rt: best.rating,
-      attributes: a
-    };
-  });
-  
-  // Sort by rating (highest to lowest)
-  recruits.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
-  
-  // Render sorted recruits
-  recruits.forEach(r => {
-    const tr = document.createElement('tr');
-    const a = r.attributes;
-    
-    // Format attributes: 0-9 displays 0, 10-19 displays 1, 20-29 displays 2, etc.
-    const formatAttr = (attr) => {
-      const value = attr ?? 0;
-      return Math.floor(value / 10);
-    };
-    
-    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr(a.SC)}</td><td>${formatAttr(a.SH)}</td><td>${formatAttr(a.ID)}</td><td>${formatAttr(a.OD)}</td><td>${formatAttr(a.PS)}</td><td>${formatAttr(a.BH)}</td><td>${formatAttr(a.RB)}</td><td>${formatAttr(a.AG)}</td><td>${formatAttr(a.ST)}</td><td>${formatAttr(a.ND)}</td><td>${formatAttr(a.IQ)}</td><td>${formatAttr(a.FT)}</td><td>${formatRtDisplay(r.rt)}</td>`;
-    tbody.appendChild(tr);
-  });
-  
-  // Initialize tooltips for table cells (and headers)
-  if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
-  }
-}
-
-function renderTrainingResults(data) {
-  const container = document.getElementById('training-results-container');
-  if (!container) return;
-  
-  if (!data || (!data.player_logs || Object.keys(data.player_logs).length === 0)) {
-    container.innerHTML = '<p>No training session completed yet.</p>';
-    return;
-  }
-  
-  container.innerHTML = '';
-  
-  // Add session type header
-  const sessionHeader = document.createElement('h4');
-  const sessionLabel = data.session_type === 'preseason' ? 'Training Camp' : 'In-Season Training';
-  sessionHeader.textContent = sessionLabel + (data.week ? ` (Week ${data.week})` : '');
-  sessionHeader.style.marginBottom = '15px';
-  container.appendChild(sessionHeader);
-  
-  // Player Results
-  const playerHeader = document.createElement('h5');
-  playerHeader.textContent = 'Player Attribute Changes';
-  playerHeader.style.marginTop = '10px';
-  container.appendChild(playerHeader);
-  
-  const traitOrder = ['SH','SC','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
-  
-  if (data.player_logs && typeof data.player_logs === 'object') {
-    Object.entries(data.player_logs).forEach(([name, traits]) => {
-      const row = document.createElement('p');
-      row.style.marginBottom = '5px';
-      const bold = document.createElement('strong');
-      bold.textContent = name + ': ';
-      row.appendChild(bold);
-
-      const parts = traitOrder.map(attr => {
-        const val = Object.hasOwnProperty.call(traits, attr) ? traits[attr] : 0;
-        if (val === 0) return null;
-        const sign = val > 0 ? '+' : '';
-        return `${attr} ${sign}${val}`;
-      }).filter(p => p !== null);
-
-      row.appendChild(document.createTextNode(parts.join(', ')));
-      container.appendChild(row);
-    });
-  }
-  
-  // Team Results
-  if (data.team_log && typeof data.team_log === 'object' && Object.keys(data.team_log).length > 0) {
-    const teamHeader = document.createElement('h5');
-    teamHeader.textContent = 'Team Attribute Changes';
-    teamHeader.style.marginTop = '20px';
-    container.appendChild(teamHeader);
-
-    Object.entries(data.team_log).forEach(([attr, delta]) => {
-      const row = document.createElement('p');
-      row.style.marginBottom = '5px';
-      const sign = delta > 0 ? '+' : '';
-      row.textContent = `${attr}: ${sign}${delta}`;
-      container.appendChild(row);
-    });
-  }
-}
-
-// Practice Squad section (the 3 cut players). After Week 35 Recruiting Day
-// the team's recruits join the list under the same "Practice Squad" header.
-// Renders an attributes table and a stats table (fed by ps_season_stats), mirroring
-// the team roster pages.
-function renderPracticeSquad(data) {
-  const section = document.getElementById('training-squad-section');
-  const tbody = document.getElementById('training-squad-body');
-  // The stats table lives in a separate section at the bottom of the Player Stats tab.
-  const statsBody = document.getElementById('ps-stats-body');
-  const statsSection = document.getElementById('ps-stats-section');
-  const titleEl = document.getElementById('ps-section-title');
-  const statsTitleEl = document.getElementById('ps-stats-title');
-  // The Roster tab's stacked PS attributes table is gone — practice squad is now a SCOPE
-  // of the one roster table (bindFccRosterScope). This function still owns the PS stats
-  // table on the Player Stats tab, so it must not bail when the old section is absent.
-  if (!statsBody && !tbody) return;
-  // Neither field provided on this render (e.g. cache restore) => leave as-is.
-  if (!Array.isArray(data.training_squad) && !Array.isArray(data.practice_squad_recruits)) return;
-
-  const psPlayers = Array.isArray(data.training_squad) ? data.training_squad : [];
-  const recruits = Array.isArray(data.practice_squad_recruits) ? data.practice_squad_recruits : [];
-  const combined = psPlayers.concat(recruits);
-
-  if (!combined.length) {
-    if (section) section.style.display = 'none';
-    if (tbody) tbody.innerHTML = '';
-    if (statsBody) statsBody.innerHTML = '';
-    if (statsSection) statsSection.style.display = 'none';
-    return;
-  }
-
-  const psTitle = 'Practice Squad';
-  if (titleEl) titleEl.textContent = psTitle;
-  if (statsTitleEl) statsTitleEl.textContent = psTitle;
-
-  // Attributes table
-  if (tbody) tbody.innerHTML = '';
-  combined.forEach(p => {
-    try {
-      const best = getBestPosition(p.position_ratings || {});
-      const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
-      const attrs = p.attributes || {};
-      const tr = document.createElement('tr');
-
-      const nameTd = document.createElement('td');
-      if (p.is_recruit) {
-        // Recruits have no player-detail page until the season transition.
-        nameTd.textContent = fullName;
-      } else {
-        const nameLink = document.createElement('a');
-        nameLink.href = buildPlayerDetailUrl(p._id);
-        nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
-        nameLink.style.color = 'inherit';
-        nameLink.style.textDecoration = 'none';
-        nameTd.appendChild(nameLink);
-      }
-      tr.appendChild(nameTd);
-
-      const addCell = (content, extraClass) => {
-        const td = document.createElement('td');
-        td.textContent = content;
-        if (extraClass) td.className = extraClass;
-        tr.appendChild(td);
-        return td;
-      };
-      addCell(best.pos || '--');
-      addCell(yearMap[(p.year || '').toLowerCase()] || p.year || '--');
-      addCell(formatHeight(p.height));
-      addCell(p.weight ?? '--');
-      // Tiles, matching the roster table directly above it in the same tab.
-      const psAttrTd = document.createElement('td');
-      psAttrTd.className = 'attr-tiles-cell';
-      psAttrTd.innerHTML = window.GOB_AttrTiles.tilesHtml(attrs || {});
-      tr.appendChild(psAttrTd);
-      const rt = best.rating;
-      const rtCell = addCell(
-        rt == null ? '-' : formatRtWithPotentialDisplay(rt, p.potential_rt_ratcheted),
-        typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : ''
-      );
-      rtCell.setAttribute('data-tooltip', 'current/potential');
-      rtCell.setAttribute('title', 'current/potential');
-      if (tbody) tbody.appendChild(tr);
-    } catch (e) {
-      console.error('Error rendering practice squad player:', p, e);
-    }
-  });
-
-  // Stats table (ps_season_stats — regional Practice Squad games)
-  if (statsBody) {
-    statsBody.innerHTML = '';
-    combined.forEach(p => {
-      try {
-        const stats = p.ps_stats || {};
-        const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
-        const tr = document.createElement('tr');
-
-        const nameTd = document.createElement('td');
-        if (p.is_recruit) {
-          nameTd.textContent = fullName;
-        } else {
-          const nameLink = document.createElement('a');
-          nameLink.href = buildPlayerDetailUrl(p._id);
-          nameLink.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, fullName) : fullName;
-          nameLink.style.color = 'inherit';
-          nameLink.style.textDecoration = 'none';
-          nameTd.appendChild(nameLink);
-        }
-        tr.appendChild(nameTd);
-
-        const addCell = (content) => {
-          const td = document.createElement('td');
-          td.textContent = content;
-          tr.appendChild(td);
-        };
-
-        const tpm = stats['3PTM'] || 0;
-        const tpa = stats['3PTA'] || 0;
-        const fgm = stats.FGM || 0;
-        const fga = stats.FGA || 0;
-        const ftm = stats.FTM || 0;
-        const fta = stats.FTA || 0;
-        const defa = stats.DEF_A || 0;
-        const defs = stats.DEF_S || 0;
-        const scra = stats.SCR_A || 0;
-        const scrs = stats.SCR_S || 0;
-
-        addCell(stats.PTS || 0);
-        addCell(fgm);
-        addCell(fga);
-        addCell(fga > 0 ? ((fgm / fga) * 100).toFixed(1) : '0.0');
-        addCell(tpm);
-        addCell(tpa);
-        addCell(tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0');
-        addCell(ftm);
-        addCell(fta);
-        addCell(fta > 0 ? ((ftm / fta) * 100).toFixed(1) : '0.0');
-        addCell(stats.DREB || 0);
-        addCell(stats.OREB || 0);
-        addCell(stats.TREB || stats.REB || 0);
-        addCell(stats.AST || 0);
-        addCell(stats.STL || 0);
-        addCell(stats.BLK || 0);
-        addCell(stats.F || 0);
-        addCell(stats.TO || 0);
-        addCell(defa);
-        addCell(defa > 0 ? `${Math.round((defs / defa) * 100)}%` : '0%');
-        addCell(scra);
-        addCell(scra > 0 ? ((scrs / scra) * 100).toFixed(1) : '0.0');
-        statsBody.appendChild(tr);
-      } catch (e) {
-        console.error('Error rendering practice squad stats row:', p, e);
-      }
-    });
-  }
-
-  if (section) section.style.display = '';
-  if (statsSection) statsSection.style.display = '';
-  if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
-  }
-}
-
-// ===================== FCC Roster tab — shared builders =====================
-// One row builder for all three render paths (first paint, post-sort, scope switch).
-// Three separate copies of the attribute loop existed here before and drifted.
-const FCC_ROSTER_STATE = { scope: 'varsity', sortKey: 'RT', sortDir: 'desc' };
-
-/** Neutral POS chip. Colored position chips were built and rejected. */
-function fccPosChipHtml(pos) {
-  return '<span class="pos-chip">' + escapeHomeHtml(pos || '--') + '</span>';
-}
-
-/** RT as an explicit current -> potential lockup, bucket-coloured (never hardcoded). */
-function fccRtLockupHtml(rt, potentialRt) {
-  const cls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : '';
-  const cur = typeof formatRtDisplay === 'function' ? formatRtDisplay(rt) : (rt == null ? '--' : String(rt));
-  let html = '<span class="rt-lockup"><b class="' + cls + '">' + escapeHomeHtml(cur) + '</b>';
-  if (potentialRt != null) {
-    const pcls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(potentialRt) : '';
-    const pot = typeof formatRtDisplay === 'function' ? formatRtDisplay(potentialRt) : String(potentialRt);
-    html += '<i class="' + pcls + '">' + escapeHomeHtml(pot) + '</i>';
-  }
-  return html + '</span>';
-}
-
-/** Identity cell: jersey in a fixed box so numbers align, then the linked name. */
-function fccIdentityCellHtml(opts) {
-  const o = opts || {};
-  const nameHtml = o.href
-    ? '<a href="' + escapeHomeHtml(o.href) + '">' + escapeHomeHtml(o.name || '--') + '</a>'
-    : escapeHomeHtml(o.name || '--');
-  return '<div class="ident">' +
-    '<span class="ident-jersey">' + escapeHomeHtml(o.jersey == null ? '' : o.jersey) + '</span>' +
-    '<span class="ident-body"><span class="ident-name">' + nameHtml + (o.flags || '') + '</span>' +
-    (o.sub ? '<span class="ident-sub">' + o.sub + '</span>' : '') +
-    '</span></div>';
-}
-
-function fccRosterFlagsHtml(p) {
-  let out = '';
-  if (p.has_playing_time_promise) out += '<span class="ident-flag ptp"> (PTP)</span>';
-  if (p.is_graduating) out += '<span class="ident-flag gr"> (GR)</span>';
-  if (p.walk_on) out += '<span class="ident-flag wo"> (walk on)</span>';
-  return out;
-}
-
-/** One roster row: Player | RT | POS | YR | HT | WT | Attributes. */
-function fccRosterRowHtml(p, opts) {
-  const o = opts || {};
-  const href = o.link === false ? null : buildPlayerDetailUrl(p._id || p.player_id);
-  return '<td class="c-ident">' + fccIdentityCellHtml({
-      name: p.name, jersey: p.jersey, href: href, flags: fccRosterFlagsHtml(p),
-    }) + '</td>' +
-    '<td class="c-rt">' + fccRtLockupHtml(p.rt, p.potential_rt_ratcheted) + '</td>' +
-    fccPositionCellHtml(p) +
-    '<td>' + escapeHomeHtml(p.year == null ? '--' : p.year) + '</td>' +
-    '<td>' + escapeHomeHtml(p.height == null ? '--' : p.height) + '</td>' +
-    '<td>' + escapeHomeHtml(p.weight == null ? '--' : p.weight) + '</td>' +
-    '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>' +
-    fccFocusCellHtml(p);
-}
-
-/** Development Focus cells. The roster tab is the user's own team, so they always render
- *  here; the guard is the shared module's absence (script not loaded) rather than a flag. */
-/**
- * POS and DEV FOCUS — READ-ONLY here. Editing lives on the training page's Player
- * Development grid and nowhere else, so the setting sits beside the points it governs.
- *
- * There is no separate derived-position column: POS shows the TRAINING position, the one
- * that governs how he develops. A second column repeating the natural best position read
- * as duplicated data, because for most players it is.
- *
- * Practice-squad rows fall back to the chip: that payload carries neither field, so a
- * training position there would be an invented default shown as if it were his setting.
- */
-function fccPositionCellHtml(p) {
-  const api = window.GOBDevelopmentFocus;
-  if (!api || FCC_ROSTER_STATE.scope === 'practice') {
-    return '<td class="c-devpos">' + fccPosChipHtml(p.pos) + '</td>';
-  }
-  return '<td class="c-devpos">' + api.positionTextHtml(p) + '</td>';
-}
-
-/** DEV FOCUS trails the attribute tiles: the evidence first, then what he is coached
- *  toward. Empty on the practice scope, which carries neither field. */
-function fccFocusCellHtml(p) {
-  const api = window.GOBDevelopmentFocus;
-  if (!api || FCC_ROSTER_STATE.scope === 'practice') return '<td class="c-devfocus"></td>';
-  return '<td class="c-devfocus">' + api.focusTextHtml(p) + '</td>';
-}
-
-/** Grouped 2-row attribute header + its per-attribute sort controls. */
-function renderFccRosterAttrHeader() {
-  const head = document.getElementById('fcc-roster-attr-head');
-  if (!head || !window.GOB_AttrTiles) return;
-  head.innerHTML = window.GOB_AttrTiles.groupedHeaderHtml({
-    key: FCC_ROSTER_STATE.sortKey, dir: FCC_ROSTER_STATE.sortDir,
-  });
-  head.querySelectorAll('[data-attr-sort]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      fccRosterSortBy(btn.dataset.attrSort, 'desc');
-    });
-  });
-  if (typeof initAttributeTooltips !== 'undefined') initAttributeTooltips(head, ['.attr-abbr']);
-}
-
-/** Single entry point for every sort, so state and rendering can't disagree. */
-function fccRosterSortBy(key, firstDir) {
-  if (FCC_ROSTER_STATE.sortKey === key) {
-    FCC_ROSTER_STATE.sortDir = FCC_ROSTER_STATE.sortDir === 'desc' ? 'asc' : 'desc';
-  } else {
-    FCC_ROSTER_STATE.sortKey = key;
-    FCC_ROSTER_STATE.sortDir = firstDir || 'desc';
-  }
-  rosterSortColumn = FCC_ROSTER_STATE.sortKey;
-  rosterSortDirection = FCC_ROSTER_STATE.sortDir;
-  renderFccRosterAttrHeader();
-  sortRosterTable(FCC_ROSTER_STATE.sortKey, FCC_ROSTER_STATE.sortDir);
-}
-
-function fccPracticeSquadPlayers() {
-  return window.FccRosterData.practiceSquadPlayers(userRosterDataCache);
-}
-
-/** Practice-squad entries arrive in a different shape than roster players. */
-function fccNormalizePracticePlayer(p) {
-  const best = typeof getBestPosition === 'function' ? getBestPosition(p.position_ratings || {}) : {};
-  const heightRaw = Number(p.height) || 0;
-  return {
-    _id: p._id || p.player_id,
-    name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '--',
-    jersey: p.jersey,
-    pos: best.pos || p.pos || '--',
-    year: (typeof window.GOB_PlayerYear !== 'undefined' && window.GOB_PlayerYear.formatDisplay)
-      ? window.GOB_PlayerYear.formatDisplay(p.year) : (p.year || '--'),
-    height: heightRaw ? `${Math.floor(heightRaw / 12)}'${heightRaw % 12}"` : '--',
-    weight: p.weight != null ? p.weight : '--',
-    attributes: p.attributes || {},
-    rt: best.rating != null ? best.rating : null,
-    potential_rt_ratcheted: p.potential_rt_ratcheted != null ? p.potential_rt_ratcheted : null,
-    position_ratings: p.position_ratings || {},
-    training_position: p.training_position || null,
-    training_focus: p.training_focus || null,
-    resolved_training_position: p.resolved_training_position || null,
-    resolved_training_focus: p.resolved_training_focus || null,
-  };
-}
-
-function updateFccRosterCounts() {
-  const varsity = (userRosterPlayersCache || []).length;
-  const practice = fccPracticeSquadPlayers().length;
-  document.querySelectorAll('#roster-tab [data-scope-count]').forEach((el) => {
-    el.textContent = el.dataset.scopeCount === 'practice' ? practice : varsity;
-  });
-  const count = document.getElementById('roster-rowcount');
-  if (count) {
-    const shown = FCC_ROSTER_STATE.scope === 'practice' ? practice : varsity;
-    count.textContent = shown + (shown === 1 ? ' player' : ' players');
-  }
-}
-
-/** Scope toggle: swaps the one table's body instead of stacking a second table. */
-function bindFccRosterScope() {
-  const buttons = document.querySelectorAll('#roster-tab [data-roster-scope]');
-  buttons.forEach((btn) => {
-    if (btn.dataset.scopeBound) return;
-    btn.dataset.scopeBound = '1';
-    btn.addEventListener('click', () => {
-      FCC_ROSTER_STATE.scope = btn.dataset.rosterScope;
-      buttons.forEach((b) => b.setAttribute('aria-pressed',
-        b.dataset.rosterScope === FCC_ROSTER_STATE.scope ? 'true' : 'false'));
-      renderFccRosterBody();
-    });
-  });
-  updateFccRosterCounts();
-}
-
-function renderFccRosterBody() {
-  const tbody = document.getElementById('team-body');
-  if (!tbody) return;
-  if (FCC_ROSTER_STATE.scope === 'practice') {
-    const rows = fccPracticeSquadPlayers().map(fccNormalizePracticePlayer);
-    tbody.innerHTML = rows.length
-      ? rows.map((p) => '<tr>' + fccRosterRowHtml(p, { link: false }) + '</tr>').join('')
-      : '<tr><td colspan="8" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No practice-squad players.</td></tr>';
-    updateFccRosterCounts();
-      if (typeof initAttributeTooltips !== 'undefined') {
-      initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
-    }
-  } else {
-    sortRosterTable(FCC_ROSTER_STATE.sortKey, FCC_ROSTER_STATE.sortDir);
-    updateFccRosterCounts();
-  }
-}
-
 function renderTeam(data) {
-  if (!data) {
-    return;
-  }
+  if (!data) return;
   userRosterDataCache = window.FccRosterData.normalize(data);
   userRosterPlayersCache = userRosterDataCache.players;
   persistFccSessionCache();
-  const tbody = document.getElementById('team-body');
-  if (!tbody) {
-    return;
-  }
-  if (tbody) tbody.innerHTML = '';
-  let players = (data.players || []).map(p => {
-    try {
-      const best = getBestPosition(p.position_ratings || {});
-      const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
-      const player = {
-        _id: p._id, // Add missing _id field for player detail links
-        name: fullName,
-        jersey: p.jersey,
-        pos: best.pos,
-        year: yearMap[p.year?.toLowerCase()] || p.year || '--',
-        height: formatHeight(p.height),
-        weight: p.weight ?? '--',
-        attributes: p.attributes || {},
-        rt: best.rating,
-        potential_rt_ratcheted: p.potential_rt_ratcheted,
-        has_playing_time_promise: !!p.has_playing_time_promise,
-        is_graduating: !!p.is_graduating,
-        walk_on: !!p.walk_on,
-        // Development Focus. Carried explicitly: this mapper cherry-picks fields, so an
-        // omission here reaches the control as a blank rather than as his real setting.
-        position_ratings: p.position_ratings || {},
-        training_position: p.training_position || null,
-        training_focus: p.training_focus || null,
-        resolved_training_position: p.resolved_training_position || null,
-        resolved_training_focus: p.resolved_training_focus || null,
-      };
-      return player;
-    } catch (error) {
-      console.error('Error mapping player:', p, error);
-      return null;
-    }
-  }).filter(p => p !== null);
-  players.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
-  
-  // Store for sorting
-  rosterTableDataForSorting = JSON.parse(JSON.stringify(players));
-  
-  players.forEach((p, index) => {
-    const tr = document.createElement('tr');
-    
-    // Shared row builder — same markup as the post-sort and scope-switch paths.
-    tr.innerHTML = fccRosterRowHtml(p);
-    tbody.appendChild(tr);
-  });
-  renderFccRosterAttrHeader();
-  bindFccRosterScope();
-
-  // Initialize tooltips. Scoped to the parent table so the grouped header's sort
-  // controls and every tile get their hover copy.
-  if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
-  }
-
-  // Sort bindings. KEY-based, not index-based: the 12 attribute columns collapsed into
-  // one cell, so an index lookup mapped clicks to the wrong column (Attributes -> SC).
-  const sortableHeaders = document.querySelectorAll('#roster-tab .roster-table thead th[data-sort-col]');
-  let rosterSortColumn = 'RT';
-  let rosterSortDirection = 'desc';
-
-  sortableHeaders.forEach((header) => {
-    // Remove existing listeners
-    const newHeader = header.cloneNode(true);
-    header.parentNode.replaceChild(newHeader, header);
-
-    newHeader.style.cursor = 'pointer';
-    newHeader.style.userSelect = 'none';
-    newHeader.addEventListener('click', () => {
-      // Name sorts A->Z first; everything else high->low first.
-      const columnName = newHeader.dataset.sortCol;
-      fccRosterSortBy(columnName, columnName === 'Name' ? 'asc' : 'desc');
-    });
-  });
-  void rosterSortColumn; void rosterSortDirection;
-  renderPlayerStatsTable();
   void renderHomeTab();
-}
-
-const FCC_PLAYER_STATS_STATE = { scope: 'varsity', sortKey: 'PTS', sortDir: 'desc' };
-
-function playerStatsScopePlayers() {
-  return FCC_PLAYER_STATS_STATE.scope === 'practice'
-    ? fccPracticeSquadPlayers()
-    : (userRosterDataCache?.players || []);
-}
-
-function updatePlayerStatsScopeControls() {
-  const varsity = (userRosterDataCache?.players || []).length;
-  const practice = fccPracticeSquadPlayers().length;
-  document.querySelectorAll('#player-stats-tab [data-player-stats-count]').forEach((el) => {
-    el.textContent = el.dataset.playerStatsCount === 'practice' ? practice : varsity;
-  });
-  document.querySelectorAll('#player-stats-tab [data-player-stats-scope]').forEach((button) => {
-    button.setAttribute('aria-pressed', String(button.dataset.playerStatsScope === FCC_PLAYER_STATS_STATE.scope));
-    if (!button.dataset.scopeBound) {
-      button.dataset.scopeBound = '1';
-      button.addEventListener('click', () => {
-        FCC_PLAYER_STATS_STATE.scope = button.dataset.playerStatsScope;
-        renderPlayerStatsTable();
-      });
-    }
-  });
-  const shown = FCC_PLAYER_STATS_STATE.scope === 'practice' ? practice : varsity;
-  const rowCount = document.getElementById('player-stats-rowcount');
-  if (rowCount) rowCount.textContent = shown + (shown === 1 ? ' player' : ' players');
-}
-
-function renderPlayerStatsTable() {
-  const tbody = document.getElementById('player-stats-body');
-  const statsTable = document.querySelector('#player-stats-tab .stats-table');
-  if (!tbody || !statsTable) return;
-
-  updatePlayerStatsScopeControls();
-  const isPractice = FCC_PLAYER_STATS_STATE.scope === 'practice';
-  const statsRows = playerStatsScopePlayers().map((player) => ({
-    raw: player,
-    stats: isPractice ? (player.ps_stats || {}) : getPlayerSeasonStats(player),
-    rt: getPlayerRt(player)
-  }));
-
-  function statValueForSort(entry, statKey) {
-    const stats = entry.stats || {};
-    if (statKey === 'name') return `${entry.raw?.last_name || ''} ${entry.raw?.first_name || ''}`.trim() || entry.raw?.name || '';
-      if (statKey === 'FG%') return stats.FGA > 0 ? ((stats.FGM || 0) / stats.FGA) : 0;
-      if (statKey === '3PT%') {
-        const attempts = stats['3PTA'] || stats.TPA || 0;
-        return attempts > 0 ? (((stats['3PTM'] || stats.TPM || 0) / attempts)) : 0;
-      }
-      if (statKey === 'FT%') return stats.FTA > 0 ? ((stats.FTM || 0) / stats.FTA) : 0;
-      if (statKey === 'SCR%') return stats.SCR_A > 0 ? ((stats.SCR_S || 0) / stats.SCR_A) : 0;
-      if (statKey === 'DEF%') return stats.DEF_A > 0 ? ((stats.DEF_S || 0) / stats.DEF_A) : 0;
-      if (statKey === 'TREB') return stats.TREB || ((stats.DREB || 0) + (stats.OREB || 0));
-      return Number(stats[statKey] || 0);
-    }
-
-  function renderRows(rows) {
-    if (tbody) tbody.innerHTML = '';
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="24" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No players in this scope.</td></tr>';
-      return;
-    }
-    rows.forEach((entry) => {
-      const stats = entry.stats || {};
-      const tpm = stats['3PTM'] || 0;
-      const tpa = stats['3PTA'] || stats.TPA || 0;
-      const fgPct = stats.FGA > 0 ? (((stats.FGM || 0) / stats.FGA) * 100).toFixed(1) : '0.0';
-      const threePct = tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0';
-      const ftPct = stats.FTA > 0 ? (((stats.FTM || 0) / stats.FTA) * 100).toFixed(1) : '0.0';
-      const scrA = stats.SCR_A || 0;
-      const scrPct = scrA > 0 ? (((stats.SCR_S || 0) / scrA) * 100).toFixed(1) : '0.0';
-      const defA = stats.DEF_A || 0;
-      const defPct = defA > 0 ? String(Math.round(((stats.DEF_S || 0) / defA) * 100)) : '0';
-
-      const tr = document.createElement('tr');
-      const playerName = escapeHomeHtml(getDisplayPlayerNameForStats(entry.raw));
-      const playerId = entry.raw?._id || entry.raw?.player_id;
-      const playerCell = isPractice && entry.raw?.is_recruit
-        ? playerName
-        : '<a href="' + buildPlayerDetailUrl(playerId) + '" style="color:inherit;text-decoration:none;">' + playerName + '</a>';
-      tr.innerHTML =
-        '<td>' + playerCell + '</td>' +
-        '<td>' + (stats.PTS || 0) + '</td>' +
-        '<td>' + (stats.FGM || 0) + '</td>' +
-        '<td>' + (stats.FGA || 0) + '</td>' +
-        '<td>' + fgPct + '%</td>' +
-        '<td>' + tpm + '</td>' +
-        '<td>' + tpa + '</td>' +
-        '<td>' + threePct + '%</td>' +
-        '<td>' + (stats.FTM || 0) + '</td>' +
-        '<td>' + (stats.FTA || 0) + '</td>' +
-        '<td>' + ftPct + '%</td>' +
-        '<td>' + (stats.DREB || 0) + '</td>' +
-        '<td>' + (stats.OREB || 0) + '</td>' +
-        '<td>' + (stats.TREB || ((stats.DREB || 0) + (stats.OREB || 0))) + '</td>' +
-        '<td>' + (stats.AST || 0) + '</td>' +
-        '<td>' + (stats.STL || 0) + '</td>' +
-        '<td>' + (stats.BLK || 0) + '</td>' +
-        '<td>' + (stats.F || 0) + '</td>' +
-        '<td>' + (stats.MIN || 0) + '</td>' +
-        '<td>' + (stats.TO || 0) + '</td>' +
-        '<td>' + scrA + '</td>' +
-        '<td>' + scrPct + '%</td>' +
-        '<td>' + defA + '</td>' +
-        '<td>' + defPct + '%</td>';
-      tbody.appendChild(tr);
-    });
-  }
-
-  function sortAndRender(statKey, direction) {
-    const sorted = [...statsRows].sort((a, b) => {
-      if (statKey === 'name') {
-        const cmp = statValueForSort(a, statKey).localeCompare(statValueForSort(b, statKey));
-        return direction === 'asc' ? cmp : -cmp;
-      }
-      const aVal = statValueForSort(a, statKey);
-      const bVal = statValueForSort(b, statKey);
-      if (aVal !== bVal) return direction === 'asc' ? aVal - bVal : bVal - aVal;
-      return direction === 'asc' ? a.rt - b.rt : b.rt - a.rt;
-    });
-    renderRows(sorted);
-  }
-
-  sortAndRender(FCC_PLAYER_STATS_STATE.sortKey, FCC_PLAYER_STATS_STATE.sortDir);
-
-  statsTable.querySelectorAll('thead .sortable').forEach((header) => {
-    const newHeader = header.cloneNode(true);
-    header.parentNode.replaceChild(newHeader, header);
-    newHeader.style.cursor = 'pointer';
-    newHeader.style.userSelect = 'none';
-    newHeader.addEventListener('click', () => {
-      const stat = newHeader.dataset.stat;
-      if (FCC_PLAYER_STATS_STATE.sortKey === stat) {
-        FCC_PLAYER_STATS_STATE.sortDir = FCC_PLAYER_STATS_STATE.sortDir === 'desc' ? 'asc' : 'desc';
-      } else {
-        FCC_PLAYER_STATS_STATE.sortKey = stat;
-        FCC_PLAYER_STATS_STATE.sortDir = stat === 'name' ? 'asc' : 'desc';
-      }
-      sortAndRender(FCC_PLAYER_STATS_STATE.sortKey, FCC_PLAYER_STATS_STATE.sortDir);
-    });
-  });
-}
-
-// Store roster data for sorting
-let rosterTableDataForSorting = [];
-
-function sortRosterTable(columnName, direction) {
-  const tbody = document.getElementById('team-body');
-  if (!tbody || !rosterTableDataForSorting.length) return;
-  
-  const columnMap = {
-    'Name': 'name',
-    'POS': 'pos',
-    'Year': 'year',
-    'Height': 'height',
-    'Weight': 'weight',
-    'SC': 'SC',
-    'SH': 'SH',
-    'ID': 'ID',
-    'OD': 'OD',
-    'PS': 'PS',
-    'BH': 'BH',
-    'RB': 'RB',
-    'AG': 'AG',
-    'ST': 'ST',
-    'ND': 'ND',
-    'IQ': 'IQ',
-    'FT': 'FT',
-    'RT': 'RT'
-  };
-  
-  const dataKey = columnMap[columnName] || columnName;
-  
-  rosterTableDataForSorting.sort((a, b) => {
-    let val1, val2;
-    
-    if (dataKey === 'name') {
-      val1 = a.name || '';
-      val2 = b.name || '';
-      return direction === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
-    } else if (dataKey === 'RT') {
-      val1 = a.rt ?? -Infinity;
-      val2 = b.rt ?? -Infinity;
-    } else if (dataKey === 'year') {
-      const yearOrder = { 'FR': 1, 'SO': 2, 'JR': 3, 'SR': 4 };
-      val1 = yearOrder[a.year] || 0;
-      val2 = yearOrder[b.year] || 0;
-    } else if (dataKey === 'height') {
-      const parseHeight = (h) => {
-        if (!h || h === '--') return 0;
-        const match = h.match(/(\d+)'(\d+)"/);
-        return match ? parseInt(match[1]) * 12 + parseInt(match[2]) : 0;
-      };
-      val1 = parseHeight(a.height);
-      val2 = parseHeight(b.height);
-    } else if (dataKey === 'weight') {
-      val1 = parseInt(a.weight) || 0;
-      val2 = parseInt(b.weight) || 0;
-    } else if (dataKey === 'pos' || dataKey === 'Focus') {
-      // Sort on what the column DISPLAYS. POS previously fell through to the attribute
-      // branch, read a non-existent anchor_pos and scored every row 0, so clicking it did
-      // nothing; it now ranks PG→C on the same value the cell shows. Focus sorts on the
-      // RESOLVED value for the same reason — the raw field is null for anyone unchanged.
-      const api = window.GOBDevelopmentFocus;
-      if (!api) return 0;
-      const isPos = dataKey === 'pos';
-      const order = isPos ? api.POSITIONS : api.FOCUSES.map((f) => f.value);
-      const shown = (p) => (isPos
-        ? (FCC_ROSTER_STATE.scope === 'practice' ? (p.pos || '') : api.positionOf(p))
-        : api.focusOf(p));
-      val1 = order.indexOf(shown(a));
-      val2 = order.indexOf(shown(b));
-    } else {
-      // Attribute columns
-      const attrsA = a.attributes || {};
-      const attrsB = b.attributes || {};
-      const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
-      const rawValB = attrsB[`anchor_${dataKey}`] ?? attrsB[dataKey] ?? 0;
-      val1 = Math.floor(rawValA / 10);
-      val2 = Math.floor(rawValB / 10);
-    }
-    
-    if (direction === 'desc') {
-      return val2 - val1;
-    } else {
-      return val1 - val2;
-    }
-  });
-  
-  // Re-render the table
-  if (tbody) tbody.innerHTML = '';
-rosterTableDataForSorting.forEach((p) => {
-    const tr = document.createElement('tr');
-    // Shared row builder — identical markup to first paint and the scope switch.
-    tr.innerHTML = fccRosterRowHtml(p);
-    tbody.appendChild(tr);
-  });
-
-  // The rows are new DOM nodes, so the previous listeners went with the old ones.
-
-  if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
-  }
-}
-
-// Schedule tab removed; full schedule is on schedule.html (Resources).
-
-// Store team traits data for sorting
-let teamTraitsDataForSorting = [];
-let teamTraitsSortColumn = 'total';
-let teamTraitsSortDirection = 'desc';
-
-function renderTeamTraits(data, scope) {
-  if (!data || !data.teams) return;
-  scope = scope || traitsScope;
-  const filtered = filterTeamsByScope(JSON.parse(JSON.stringify(data.teams)), scope);
-  teamTraitsDataForSorting = filtered;
-  
-  // Calculate totals for each team and add to data
-  teamTraitsDataForSorting.forEach(team => {
-    const attrs = team.attributes || {};
-    const attributes = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
-    let total = 0;
-    attributes.forEach(attr => {
-      total += attrs[attr] || 0;
-    });
-    team.total = total;
-  });
-  
-  // Render main table
-  const tbody = document.getElementById('team-traits-body');
-  if (!tbody) return;
-  if (tbody) tbody.innerHTML = '';
-  
-  // Sort by default (total descending)
-  sortTeamTraitsTable(teamTraitsSortColumn, teamTraitsSortDirection);
-  
-  // Setup sortable headers (clone + replace to avoid duplicate listeners when switching scope)
-  const headers = document.querySelectorAll('#team-traits-table thead th.sortable');
-  headers.forEach(header => {
-    const newHeader = header.cloneNode(true);
-    header.parentNode.replaceChild(newHeader, header);
-    newHeader.style.cursor = 'pointer';
-    newHeader.style.userSelect = 'none';
-    newHeader.addEventListener('click', () => {
-      const attr = newHeader.dataset.attr;
-      if (teamTraitsSortColumn === attr) {
-        teamTraitsSortDirection = teamTraitsSortDirection === 'desc' ? 'asc' : 'desc';
-      } else {
-        teamTraitsSortColumn = attr;
-        teamTraitsSortDirection = 'desc';
-      }
-      sortTeamTraitsTable(attr, teamTraitsSortDirection);
-    });
-  });
-  
-  // Render Top 10 list (excluding FT)
-  renderTeamTraitsTop10(teamTraitsDataForSorting);
-}
-
-function sortTeamTraitsTable(columnName, direction) {
-  const tbody = document.getElementById('team-traits-body');
-  if (!tbody || !teamTraitsDataForSorting.length) return;
-  
-  // Ensure totals are calculated for all teams
-  teamTraitsDataForSorting.forEach(team => {
-    if (team.total === undefined) {
-      const attrs = team.attributes || {};
-      const attributes = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
-      let total = 0;
-      attributes.forEach(attr => {
-        total += attrs[attr] || 0;
-      });
-      team.total = total;
-    }
-  });
-  
-  teamTraitsDataForSorting.sort((a, b) => {
-    let val1, val2;
-    
-    if (columnName === 'team') {
-      val1 = a.team_name || '';
-      val2 = b.team_name || '';
-      return direction === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
-    } else if (columnName === 'total') {
-      // Total column - use calculated total
-      val1 = a.total || 0;
-      val2 = b.total || 0;
-    } else {
-      // Attribute columns
-      const attrsA = a.attributes || {};
-      const attrsB = b.attributes || {};
-      val1 = attrsA[columnName] || 0;
-      val2 = attrsB[columnName] || 0;
-    }
-    
-    if (direction === 'desc') {
-      return val2 - val1;
-    } else {
-      return val1 - val2;
-    }
-  });
-  
-  // Render sorted table
-  if (tbody) tbody.innerHTML = '';
-  teamTraitsDataForSorting.forEach(team => {
-    const tr = document.createElement('tr');
-    const attrs = team.attributes || {};
-    
-    // Create team name cell with primary color and bold styling
-    const teamNameCell = document.createElement('td');
-    teamNameCell.textContent = team.team_name || '';
-    teamNameCell.style.color = team.primary_color || '#000000';
-    teamNameCell.style.fontWeight = 'bold';
-    tr.appendChild(teamNameCell);
-    
-    // Add attribute cells individually
-    const attributeValues = [
-      attrs.SC || 0,
-      attrs.SH || 0,
-      attrs.ID || 0,
-      attrs.OD || 0,
-      attrs.PS || 0,
-      attrs.BH || 0,
-      attrs.RB || 0,
-      attrs.AG || 0,
-      attrs.ST || 0,
-      attrs.ND || 0,
-      attrs.IQ || 0,
-      attrs.FT || 0
-    ];
-    
-    attributeValues.forEach(value => {
-      const td = document.createElement('td');
-      td.textContent = value;
-      tr.appendChild(td);
-    });
-    
-    // Add Total cell
-    const totalCell = document.createElement('td');
-    // Calculate total if not already set
-    if (team.total === undefined) {
-      team.total = attributeValues.reduce((sum, val) => sum + val, 0);
-    }
-    totalCell.textContent = team.total || 0;
-    totalCell.style.fontWeight = 'bold';
-    tr.appendChild(totalCell);
-    
-    tbody.appendChild(tr);
-  });
-}
-
-function renderTeamTraitsTop10(teams) {
-  const container = document.getElementById('team-traits-top10');
-  if (!container) return;
-  container.innerHTML = '';
-  
-  // Create list of all (team_name, attribute, value) tuples, excluding FT
-  const allValues = [];
-  const attributes = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ'];
-  
-  teams.forEach(team => {
-    const attrs = team.attributes || {};
-    attributes.forEach(attr => {
-      allValues.push({
-        team_name: team.team_name,
-        team_id: team.team_id,
-        primary_color: team.primary_color || '#000000',
-        attribute: attr,
-        value: attrs[attr] || 0
-      });
-    });
-  });
-  
-  // Sort by value descending
-  allValues.sort((a, b) => b.value - a.value);
-  
-  // Get Top 10
-  const top10 = allValues.slice(0, 10);
-  
-  // Create list element
-  const list = document.createElement('ul');
-  list.style.listStyle = 'none';
-  list.style.padding = '0';
-  list.style.margin = '0';
-  
-  top10.forEach((item, index) => {
-    const li = document.createElement('li');
-    li.style.padding = '8px 0';
-    li.style.borderBottom = '1px solid #eee';
-    
-    const span = document.createElement('span');
-    span.style.fontWeight = 'bold';
-    span.style.color = item.primary_color;
-    span.textContent = `${index + 1}. ${item.team_name} ${item.attribute}: ${item.value}`;
-    
-    li.appendChild(span);
-    list.appendChild(li);
-  });
-  
-  container.appendChild(list);
 }
 
 async function init() {
@@ -3765,7 +1383,7 @@ async function init() {
     persistFranchiseDisplayColorContext(commandCenterTopDataCache);
     emitDisplayContextUpdate();
     adoptAuthoritativeFccTeamId(commandCenterTopDataCache);
-    populateTop(commandCenterTopDataCache);
+    populateTop(commandCenterTopDataCache, { warm: true });
     void hydrateFccDisplayColorPreference();
     initFccRecruits(commandCenterTopDataCache);
     if (commandCenterTopDataCache.team) {
@@ -3774,40 +1392,46 @@ async function init() {
     userConference = commandCenterTopDataCache.user_conference != null ? commandCenterTopDataCache.user_conference : null;
     userRegion = commandCenterTopDataCache.user_region != null && commandCenterTopDataCache.user_region !== '' ? commandCenterTopDataCache.user_region : null;
     void initializeTeamColorCache();
-    updatePlayButton(commandCenterTopDataCache);
+    // Advance and its ghost wait for the authoritative read below: the cached week
+    // can be the one the player just finished.
     updateScoutingButton(commandCenterTopDataCache);
     updateRecruitingButton(commandCenterTopDataCache);
-    updateEditRecruitingButton(commandCenterTopDataCache);
     updateAwardsButton(commandCenterTopDataCache);
     void updatePlaybooksButtonState(commandCenterTopDataCache);
     bindResourcesLinks();
-    if (standingsDataCache) renderStandings(standingsDataCache, 'A');
+    if (standingsDataCache) renderStandings(standingsDataCache);
     if (userRosterPlayersCache.length) renderTeam(userRosterDataCache);
-    renderHomeRankingsCard();
-    renderHomeLockerRoomCard();
-    renderHomeTeamStatsCard();
-    renderHomeRecruitingWire();
-    renderRecruitingTabBadge();
-    renderHomeNewsCard();
-    if (userScheduleDataCache) {
-      void renderHomeTab();
-    }
+    void renderHomeTab();
     // Keep the full-page overlay visible until authoritative command-center
     // data returns. Cached rendering is only a behind-the-overlay warm paint;
     // showing it directly causes a stale-data flash on FCC entry.
   }
   const topDataStartTime = performance.now();
-  const topDataResult = await fetchJSONWithStatus(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+  const topDataResult = await fetchCommandCenterData();
   let topData = topDataResult.data;
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
   if (!topData && topDataResult.status === 404) {
     showFranchiseGoneNotice();
+    publishFccUserTeam('');
     return;
   }
-  if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
+  if (!topData) {
+    publishFccUserTeam('');
+    // 404 (franchise gone) handled above; 401/403 already triggered an AccessDenied
+    // redirect. Anything else — network (status 0), 5xx, or a 429 that never cleared
+    // after the retry loop — is a real load failure. Show the retryable error card
+    // instead of a silent dead page (Advance stuck disabled with no reason).
+    if (topDataResult.status !== 401 && topDataResult.status !== 403) {
+      showSeasonLoadError(topDataResult.status);
+    }
+    return; // finally block hides page-load-overlay, revealing the card
+  }
   topData = await recoverCpuSimsBeforeFccRender(topData);
-  if (!topData) return;
+  if (!topData) {
+    publishFccUserTeam('');
+    return;
+  }
   const previousWeek = Number(commandCenterTopDataCache?.week || 0);
   const nextWeek = Number(topData?.week || 0);
   if (previousWeek && nextWeek && previousWeek !== nextWeek) {
@@ -3821,19 +1445,18 @@ async function init() {
   persistFccSessionCache();
   emitDisplayContextUpdate();
   
-  // ✅ FIX: Use EXACT same source as Team tab - fetch team_chemistry from /franchise/team-data
-  // This ensures 100% consistency between header and Team tab
+  // One team-data read. loadTeamData reuses this body. Chemistry for the header
+  // comes from the same payload the Team tab renders.
   if (franchiseId && userTeamId) {
     try {
       const teamDataStartTime = performance.now();
-      const teamDataResponse = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
+      const teamPayload = await fetchJSON(fccTeamDataUrl());
       const teamDataEndTime = performance.now();
       console.log(`⏱️ [PERF] /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
-      if (teamDataResponse.ok) {
-        const teamData = await teamDataResponse.json();
-        // Override team_chemistry with value from team-data endpoint (same as Team tab uses)
-        if (teamData && teamData.team_attributes && teamData.team_attributes.team_chemistry !== undefined) {
-          topData.team_chemistry = teamData.team_attributes.team_chemistry;
+      if (teamPayload) {
+        fccTeamDataPayload = teamPayload;
+        if (teamPayload.team_attributes && teamPayload.team_attributes.team_chemistry !== undefined) {
+          topData.team_chemistry = teamPayload.team_attributes.team_chemistry;
           console.log('📊 [TEAM CHEMISTRY] Top bar value (from team-data):', topData.team_chemistry);
           persistFccSessionCache();
         }
@@ -3861,86 +1484,55 @@ async function init() {
   
   // Update button based on training status
   updatePlayButton(topData);
+  playNowBtn.disabled = false;
+  clearAdvanceSeasonLoadFailed(); // a prior failed load may have marked it; the load succeeded
   updateScoutingButton(topData);
   updateRecruitingButton(topData);
   updateEditRecruitingButton(topData);
   updateAwardsButton(topData);
   await updatePlaybooksButtonState(topData);
-  const playbooksTab = document.getElementById('playbooks-tab');
-  if (playbooksTab && playbooksTab.classList.contains('active')) {
-    void renderFccPlaybooksSummary();
-  }
   // Your team's dispatches render inside News now; nothing to paint on load.
-  const pendingMoments = Array.isArray(topData?.pending_championship_moments)
-    ? topData.pending_championship_moments
-    : [];
-  let championshipMomentsDone = Promise.resolve();
-  if (pendingMoments.length && typeof window.ChampionshipMoments !== 'undefined') {
-    championshipMomentsDone = window.ChampionshipMoments.processPendingMoments(
-      franchiseId,
-      pendingMoments,
-      {
-        boxScoreUrlBuilder: (moment) => buildFccBoxScoreUrlForMoment(moment),
-      }
-    );
-  }
-  championshipMomentsDone.then(() => {
-    if (window.ConferenceRsRegionModal) window.ConferenceRsRegionModal.maybeShow(topData);
-    if (window.RegionByeModal) window.RegionByeModal.maybeShow(topData);
-    // Season-start walk-on reveal. Self-gates on its own payload and defers via
-    // blockerVisible() while any other overlay is up, so ordering here is safe:
-    // the two cannot be eligible on the same visit (a region bye is a week-30
-    // state, this is a week-1 pre-Training-Camp one).
-    if (window.WalkOnWelcomeModal) window.WalkOnWelcomeModal.maybeShow(topData);
-    // Weeks 20-26: who is visiting this week. Both are Moment modals on the shared
-    // Sammy chrome and both self-suppress, so ordering only matters if a season ever
-    // starts inside the invite window — which it cannot.
-    if (window.RecruitVisitModal) window.RecruitVisitModal.maybeShow(topData);
-    if (window.BigNewsModals) {
-      window.BigNewsModals.maybeShow(topData, {
+  const startMomentQueue = () => {
+    if (fccBrowseTournamentTabActive()) return Promise.resolve();
+    if (!window.MomentQueue || typeof window.MomentQueue.play !== 'function') return Promise.resolve();
+    return window.MomentQueue.play(topData, {
+      maps: {
         userTeamId,
         teamIdToNameMap: topData?.team_name_map || {},
         teamIdMetaMap,
-      });
+      },
+      boxScoreUrlBuilder: (moment) => buildFccBoxScoreUrlForMoment(moment),
+    });
+  };
+  const afterTutorial = (fn) => {
+    const ta = window.GOBTutorialAlerts;
+    if (ta && typeof ta.whenReturnAlertsSettled === 'function') ta.whenReturnAlertsSettled(fn);
+    else fn();
+  };
+  afterTutorial(() => {
+    const queueDone = startMomentQueue();
+    if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
+      let shown = false;
+      const overlayUp = () => !!(typeof document !== 'undefined' && document.querySelector(
+        '.cm-overlay.is-visible,.arch-reveal-overlay.is-visible,.afm-overlay.is-visible,'
+        + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show,.mm-scrim.is-open,.pk.is-open,.rv.is-open'
+      ));
+      const showTs = () => {
+        if (shown) return;
+        shown = true;
+        showCutPlayersRequiredModal(Number(topData.cut_count || 0));
+      };
+      Promise.resolve(queueDone).then(showTs, showTs);
+      setTimeout(() => {
+        if (shown) return;
+        if (overlayUp()) {
+          Promise.resolve(queueDone).then(showTs, showTs);
+          return;
+        }
+        showTs();
+      }, 8000);
     }
   });
-  if (topData?.cut_required && Number(topData.cut_count || 0) > 0) {
-    const showTs = () => showCutPlayersRequiredModal(Number(topData.cut_count || 0));
-    // Sequence behind tutorial alerts: on the season-1 week-1 return the Team
-    // Attributes tutorial must come first. whenReturnAlertsSettled fires once that
-    // alert is dismissed (or immediately if no tutorial alert is showing). Fallback
-    // to showing directly if the tutorial-alert module isn't present.
-    const ta = window.GOBTutorialAlerts;
-    if (ta && typeof ta.whenReturnAlertsSettled === 'function') {
-      let shown = false;
-      const fire = () => { if (shown) return; shown = true; showTs(); };
-      ta.whenReturnAlertsSettled(fire);
-      setTimeout(fire, 8000); // safety net if the settle signal never arrives
-    } else {
-      showTs();
-    }
-  }
-
-  // Lowest-priority coaching-archetype "you have evolved" modal. Runs only after
-  // the rest of the modal sequence has settled (championship moments resolved +
-  // tutorial-return alerts settled + a short delay so any synchronous reveal /
-  // feedback / region-bye / big-news overlay has rendered). On a clean visit it
-  // shows; if anything else claimed the visit it's skipped permanently. The
-  // pending flag is consumed either way (inside ArchetypeEvolutionModal.run).
-  if (window.ArchetypeEvolutionModal) {
-    const runEvo = () => setTimeout(() => {
-      window.ArchetypeEvolutionModal.run(fccHasCompetingModal(topData));
-    }, 1200);
-    const settleThenEvo = () => {
-      const taEvo = window.GOBTutorialAlerts;
-      if (taEvo && typeof taEvo.whenReturnAlertsSettled === 'function') {
-        taEvo.whenReturnAlertsSettled(runEvo);
-      } else {
-        runEvo();
-      }
-    };
-    championshipMomentsDone.then(settleThenEvo, settleThenEvo);
-  }
 
   if (topData && (topData.team_id || topData.team) && userTeamId) {
     console.log('Loading franchise roster for team_id:', userTeamId, 'franchiseId:', franchiseId);
@@ -3950,11 +1542,9 @@ async function init() {
     }
     try {
       const rosterStartTime = performance.now();
-      const rosterUrl = `${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`;
-      const stateUrl = `${API_CONFIG.buildUrl('/franchise/state')}?franchise_id=${franchiseId}&profile=1`;
-      const result = await RosterLoader.loadRosterWithStats(rosterUrl, stateUrl);
+      const result = await RosterLoader.loadRosterWithStats(fccRosterUrl(), '');
       const rosterEndTime = performance.now();
-      console.log(`⏱️ [PERF] roster+state (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
+      console.log(`⏱️ [PERF] roster (franchise): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
       renderTeam(result);
     } catch (error) {
       console.error('Failed to load franchise roster:', error);
@@ -3962,42 +1552,18 @@ async function init() {
   }
   const standingsStartTime = performance.now();
   const standingsUrl = userTeamId
-    ? `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&scope=user_region&team_id=${encodeURIComponent(userTeamId)}&profile=1`
-    : `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&profile=1`;
+    ? `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}&scope=user_region&team_id=${encodeURIComponent(userTeamId)}${fccProfileSuffix()}`
+    : `${API_CONFIG.buildUrl('/franchise/standings')}?franchise_id=${franchiseId}${fccProfileSuffix()}`;
   const standingsData = await fetchJSON(standingsUrl);
   const standingsEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/standings: ${(standingsEndTime - standingsStartTime).toFixed(2)}ms`);
   standingsDataCache = standingsData;
   persistFccSessionCache();
-  renderStandings(standingsData, 'A');
+  renderStandings(standingsData);
   bindResourcesLinks();
   const homeTabDataPromise = loadHomeTabData();
     
-    // ============================================================================
-    // 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
-    // ============================================================================
-    // ⚠️  DISABLED: Commented out for testing
-    // ⚠️  To disable: Comment out the code block below (lines ~785-850)
-    // ⚠️  To re-enable: Uncomment the code block
-    // ============================================================================
-    // const popupStartTime = performance.now();
-    // console.log('⏱️ [PERF] showDevSimPopup START', { week: topData?.week, hasResults: !!topData?.results, resultsKeys: topData?.results ? Object.keys(topData.results).length : 0 });
-    // showDevSimPopup(topData);
-    // const popupEndTime = performance.now();
-    // console.log(`⏱️ [PERF] showDevSimPopup COMPLETE: ${(popupEndTime - popupStartTime).toFixed(2)}ms`);
-    // ============================================================================
-    // 🛠️ END DEV MODE FEATURE
-    // ============================================================================
-    
-    // ✅ Stats, Team Traits, Rankings moved to standalone pages (Resources tab)
-    
-    // Initialize tooltips for table headers
-    if (typeof initAttributeTooltips !== 'undefined') {
-      const rosterTable = document.querySelector('#roster-tab .roster-table');
-      if (rosterTable) initAttributeTooltips(rosterTable, ['th']);
-    }
-    
-    // Load team data for Team tab
+    // Load team data for header chemistry / session cache
     const loadTeamDataStartTime = performance.now();
     console.log('⏱️ [PERF] loadTeamData() START');
     if (restoredFromSession && teamData) {
@@ -4092,16 +1658,25 @@ function appendFranchiseBoxScoreUserHints(params, homeTeamName, awayTeamName) {
 // that may not have rendered yet — avoids a render-timing race). Conservative:
 // when in doubt it returns true, so the evolution modal over-yields rather than
 // stacking on another modal.
+function fccBrowseTournamentTabActive() {
+  try {
+    return new URLSearchParams(window.location.search).get('tab') === 'tournament-view';
+  } catch (_) {
+    return false;
+  }
+}
+
 function fccHasCompetingModal(topData) {
   if (typeof document !== 'undefined' && document.querySelector(
       '.cm-overlay.is-visible,.arch-reveal-overlay.is-visible,.afm-overlay.is-visible,'
-      + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show')) {
+      + '.gob-talert-overlay,.sammy-modal-backdrop.open,.bn-overlay.show,.mm-scrim.is-open,.pk.is-open,.rv.is-open')) {
     return true;
   }
+  if (Array.isArray(topData?.moments_for_this_visit) && topData.moments_for_this_visit.length) return true;
   if (Array.isArray(topData?.pending_championship_moments) && topData.pending_championship_moments.length) return true;
   if (topData?.region_bye_modal_eligible) return true;
   if (topData?.conference_rs_region_modal?.eligible) return true;
-  if (topData?.bracket_reveal_modal?.eligible || topData?.bracket_update_modal?.eligible || topData?.recruiting_results_modal?.eligible) return true;
+  if (topData?.bracket_reveal_modal?.eligible || topData?.bracket_update_modal?.eligible) return true;
   if (topData?.walk_on_welcome_modal?.eligible) return true;
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) return true;
   const me = window.__gobAuthMeData;
@@ -4234,7 +1809,7 @@ function showCutPlayersRequiredModal(cutCount) {
         <p id="fcc-cut-required-copy" class="gob-modal-subtitle">Assign ${cutCount} player${cutCount === 1 ? '' : 's'} to your practice squad. They'll sit out this season, but they'll keep developing and return eligible next year.</p>
       </div>
       <div class="gob-modal-actions">
-        <button type="button" class="gob-modal-btn-primary is-green" id="fcc-cut-required-close">Assign Practice Squad</button>
+        <button type="button" class="gob-modal-btn-dismiss" id="fcc-cut-required-close">Assign Practice Squad</button>
       </div>
     </div>
   `;
@@ -4249,13 +1824,15 @@ function showCutPlayersRequiredModal(cutCount) {
     if (event.target === overlay || event.target.classList.contains('gob-modal-backdrop')) close();
   });
   document.addEventListener('keydown', onKeydown);
-  // Straight to the assignment screen — no extra Green Action Button hop.
+  // Straight to the assignment screen. The button is neutral (one action = a
+  // full-width ghost): green is the top-bar Advance and nothing else.
   overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', async () => {
     playSound('confirm-1-lowervol.wav');
     const sfxReady = waitForConfirmSfx();
     close();
     await sfxReady;
-    window.location.href = buildAssignPracticeSquadUrl();
+    if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(buildAssignPracticeSquadUrl());
+    else window.location.assign(buildAssignPracticeSquadUrl());
   });
   document.body.appendChild(overlay);
   overlay.querySelector('#fcc-cut-required-close')?.focus();
@@ -4297,121 +1874,32 @@ function fccEosSimOverlayCopy(week) {
   return EOS_SIM_OVERLAY_BY_WEEK[n] || 'Simming Tournament Games';
 }
 
-function updatePlayButton(data) {
-  const playNowBtn = document.getElementById('play-now');
-  if (!data) return;
-
-  const eosTournamentActive = data.eos_tournament_active || false;
-  const eosTournament = data.eos_tournament;
-  const week = Number(data.week || 1);
-  playNowBtn.dataset.week = String(week);
-  const trainingDisabledForEos = !!data.training_disabled_for_eos;
-  const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || week >= 27;
-  const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
-  const offerSimRest = data.offer_sim_rest != null ? !!data.offer_sim_rest : null;
-  const regionQualified = !!data.region_qualified;
-  const hasEosGameThisWeek = !!data.has_eos_game_this_week;
-  
-  if (fccCpuSimNeedsRecovery(data)) {
-    playNowBtn.textContent = 'Finish Computer Games';
-    playNowBtn.dataset.mode = 'finish-cpu-sims';
-    return;
-  }
-
-  // Fallback: infer eliminated from bracket when API doesn't return user_eliminated/offer_sim_rest
-  let userTeamEliminated = false;
-  if (eosTournamentActive && eosTournament && userTeamId && userEliminated == null) {
-    const bracket = eosTournament.bracket || {};
-    const allMatchups = [...(bracket.round1 || []), ...(bracket.round2 || []), ...(bracket.final || [])];
-    const userInMatchup = allMatchups.some(m =>
-      String(m.home_team) === String(userTeamId) || String(m.away_team) === String(userTeamId)
-    );
-    userTeamEliminated = !userInMatchup && week >= 27;
-  }
-  
-  const eliminated = userEliminated != null ? userEliminated : userTeamEliminated;
-  const showSimRest = offerSimRest != null ? offerSimRest : (eliminated && eosTournamentActive && !eosTournament?.completed);
-  const tournamentComplete = eosTournament?.completed || false;
-  const cutRequired = !!data.cut_required;
-  
-  const wire = data.recruiting_wire || {};
-  // Weeks 20-26 open with recruiting. Invites are the FIRST step of the week — the
-  // green button runs Recruit Invites -> Training -> Play Game — because invites are
-  // assigned during run-training, so a board sent afterwards misses its own week.
-  //
-  // Done = the board was SUBMITTED this week (board_saved_week), not merely built:
-  // has_saved_board never clears once set, so it can only gate week 20. Deliberately
-  // AFTER the cut gate — an illegal roster outranks an unsent board.
-  //
-  // UI ORDER ONLY. /run-training still 400s in week 20 with no board at all, and still
-  // accepts weeks 21-26 without a fresh one; nothing here can lock a save out of a week.
-  const inviteWindow = week >= INVITE_FIRST_WEEK && week <= INVITE_LAST_WEEK;
-  const invitesPending = inviteWindow && Number(wire.board_saved_week || 0) !== week;
-
-  if (cutRequired) {
-    playNowBtn.textContent = 'Assign Practice Squad';
-    playNowBtn.dataset.mode = 'cut-players';
-  } else if (invitesPending) {
-    // Set on the first week (there is nothing to review yet), Review after — the board
-    // persists, so weeks 21-26 are confirming a standing list rather than building one.
-    playNowBtn.textContent = week === INVITE_FIRST_WEEK ? 'Set Recruit Invites' : 'Review Recruit Invites';
-    playNowBtn.dataset.mode = 'recruit-invites';
-  } else if (week === 35 && wire.week_35_orders_submitted) {
-    // Orders are saved but NOT run. The green press runs the day; the ghost button
-    // below it (see updateEditRecruitingButton) goes back to edit. The cut offer does
-    // not repeat here — it belongs on the way IN, before points were committed against
-    // a roster size.
-    playNowBtn.textContent = 'Run Recruiting Day';
-    playNowBtn.dataset.mode = 'week35-run';
-  } else if (week === 35) {
-    playNowBtn.textContent = 'Run Signing Day';
-    playNowBtn.dataset.mode = 'week35-recruiting';
-  } else if (week === 36 && !wire.week_36_results_seen) {
-    // Signing Day has run and the league list is the payoff — it comes BEFORE the
-    // rollover, which is irreversible. The hub stamps the view server-side (season-
-    // stamped), so the next load falls through to Go To Next Season below.
-    playNowBtn.textContent = 'View Recruiting Results';
-    playNowBtn.dataset.mode = 'view-recruiting-results';
-  } else if (week === 36) {
-    playNowBtn.textContent = 'Go To Next Season';
-    playNowBtn.dataset.mode = 'new-season';
-  } else if (tournamentComplete && week >= 37) {
-    playNowBtn.textContent = 'Go To Next Season';
-    playNowBtn.dataset.mode = 'new-season';
-  } else if (showSimRest && eosTournamentActive) {
-    playNowBtn.textContent = EOS_SIM_CTA_BY_WEEK[week] || 'Sim Next Round';
-    playNowBtn.dataset.mode = 'sim-rest-tournament';
-  } else if (
-    trainingDisabledForPostseason
-    && !eliminated
-    && regionQualified
-    && week >= 27
-    && week <= 29
-    && !hasEosGameThisWeek
-  ) {
-    playNowBtn.textContent = EOS_SIM_CTA_BY_WEEK[week] || 'Sim Next Round';
-    playNowBtn.dataset.mode = 'sim-rest-tournament';
-  } else if (trainingDisabledForPostseason && !eliminated) {
-    playNowBtn.textContent = EOS_PLAY_CTA_BY_WEEK[week] || 'Play Next Game';
-    playNowBtn.dataset.mode = 'play';
-  } else if (trainingDisabledForEos || eliminated) {
-    playNowBtn.textContent = 'Go To Next Season';
-    playNowBtn.dataset.mode = 'new-season';
-  } else {
-    const trainingCompleted = data.training_completed || false;
-    const sessionType = data.session_type || 'in-season';
-    if (!trainingCompleted) {
-      const cpuResumeRequired = !!data.cpu_training_resume?.required;
-      playNowBtn.textContent = cpuResumeRequired
-        ? 'Resume Training'
-        : (sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training');
-      playNowBtn.dataset.mode = 'training';
-    } else {
-      playNowBtn.textContent = 'Play Next Game';
-      playNowBtn.dataset.mode = 'play';
-    }
-  }
+function advanceEnv() {
+  return {
+    franchiseId: franchiseId,
+    userTeamId: userTeamId,
+    userTeamName: userTeamNameForLeaders,
+    topData: commandCenterTopDataCache,
+    fetchJSON: fetchJSON,
+    fccCpuSimNeedsRecovery: fccCpuSimNeedsRecovery,
+    recoverCpuSimsBeforeFccRender: recoverCpuSimsBeforeFccRender,
+    emptyParams: emptyParams,
+    getCurrentRelativeUrl: getCurrentRelativeUrl,
+    openRecruitingSurface: openRecruitingSurface,
+    buildAssignPracticeSquadUrl: buildAssignPracticeSquadUrl,
+    fccEosSimOverlayCopy: fccEosSimOverlayCopy,
+    showNewSeasonConfirmModal: showNewSeasonConfirmModal,
+    flashSeasonAdvanceScreen: flashSeasonAdvanceScreen,
+    showSeasonAdvanceOverlay: showSeasonAdvanceOverlay,
+    normalizeHexColor: normalizeHexColor,
+    nextSeasonNumber: nextSeasonNumber,
+  };
 }
+
+function updatePlayButton(data) {
+  if (window.GOBAdvance) window.GOBAdvance.updatePlayButton(data, advanceEnv());
+}
+
 
 /**
  * The ghost button under #play-now — the way BACK into recruiting.
@@ -4427,22 +1915,9 @@ function updatePlayButton(data) {
  * preserved by the sessionStorage draft, and re-submitting simply overwrites.
  */
 function updateEditRecruitingButton(data) {
-  const btn = document.getElementById('fcc-edit-recruiting');
-  if (!btn) return;
-  const week = Number(data?.week || 1);
-  const wire = data?.recruiting_wire || {};
-  const inviteWindow = week >= INVITE_FIRST_WEEK && week <= INVITE_LAST_WEEK;
-  const label = inviteWindow && Number(wire.board_saved_week || 0) === week ? 'Edit Recruit Invites'
-    : week === SIGNING_DAY_WEEK && wire.week_35_orders_submitted ? 'Edit Recruiting Orders'
-      : null;
-  btn.style.display = label ? 'block' : 'none';
-  if (!label) return;
-  btn.textContent = label;
-  if (!btn.dataset.wireBound) {
-    btn.dataset.wireBound = '1';
-    btn.addEventListener('click', () => { void openRecruitingSurface(); });
-  }
+  if (window.GOBAdvance) window.GOBAdvance.updateEditRecruitingButton(data, advanceEnv());
 }
+
 
 function updateRecruitingButton(data) {
   const week = Number(data?.week || 1);
@@ -4513,7 +1988,8 @@ function updateRecruitingButton(data) {
     recruitingBtn.onclick = null;
     if (showButton && href) {
       recruitingBtn.onclick = () => {
-        window.location.href = href;
+        if (window.GOBNav && window.GOBNav.go) window.GOBNav.go(href);
+        else window.location.assign(href);
       };
     }
   }
@@ -4535,12 +2011,7 @@ function updateAwardsButton(data) {
 }
 
 function playSound(filename) {
-  try {
-    const base = (typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath('/sounds/') : '/sounds/';
-    const a = new Audio(base + encodeURIComponent(filename));
-    a.volume = 0.7;
-    a.play().catch(function() {});
-  } catch (e) {}
+  import('/js/shared/uiSfx.js').then(function (m) { m.playSfx(filename, 0.7); }).catch(function () {});
 }
 
 const FCC_CONFIRM_NAV_DELAY_MS = 200;
@@ -4550,299 +2021,8 @@ function waitForConfirmSfx() {
 
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
-playNowBtn.addEventListener('click', async () => {
-  playSound('confirm-1-lowervol.wav');
-  const confirmSfxReady = waitForConfirmSfx();
-  const mode = playNowBtn.dataset.mode || 'play';
+if (window.GOBAdvance && playNowBtn) window.GOBAdvance.bind(playNowBtn, advanceEnv);
 
-  if (mode === 'finish-cpu-sims') {
-    const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
-    const recovered = await recoverCpuSimsBeforeFccRender(topData);
-    if (recovered && !fccCpuSimNeedsRecovery(recovered)) {
-      window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
-    } else {
-      updatePlayButton(recovered || topData);
-    }
-    return;
-  }
-  
-  if (mode === 'training') {
-    const topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
-    if (topData?.training_disabled_for_eos || topData?.training_disabled_for_postseason) {
-      return;
-    }
-    const sessionType = topData?.session_type || 'in-season';
-    const params = emptyParams();
-    params.set('franchise_id', franchiseId);
-    params.set('mode', 'franchise');
-    params.set('session_type', sessionType);
-    params.set('return_url', getCurrentRelativeUrl());
-    if (userTeamId) params.set('team_id', userTeamId);
-    const trainingReturnUrl = `/training.html?${params.toString()}`;
-    const navigateToTraining = async () => {
-      await confirmSfxReady;
-      try {
-        const { clearFranchiseMusicState } = await import('/js/musicController.js');
-        clearFranchiseMusicState();
-      } catch {}
-      window.location.href = trainingReturnUrl;
-    };
-    if (window.GOBTutorialAlerts) {
-      const blocked = await window.GOBTutorialAlerts.interceptTraining(franchiseId, navigateToTraining, trainingReturnUrl);
-      if (blocked) return;
-    } else {
-      await navigateToTraining();
-    }
-    return;
-  }
-
-  if (mode === 'recruit-invites') {
-    await openRecruitingSurface();
-    return;
-  }
-
-  if (mode === 'view-recruiting-results') {
-    // Week 36: the hub's results phase renders the league signing list (user's
-    // conference first). Same handoff the invite modes use.
-    await openRecruitingSurface();
-    return;
-  }
-
-  if (mode === 'week35-run') {
-    // The hub owns both /run-week-35-recruiting and the reveal that follows it, so the
-    // press is handed over rather than duplicated here. No cut offer: the orders are
-    // already allocated against the current roster.
-    const params = emptyParams();
-    params.set('franchise_id', franchiseId);
-    params.set('team_id', userTeamId);
-    params.set('from', 'fcc');
-    params.set('action', 'run');
-    params.set('return_url', getCurrentRelativeUrl());
-    await confirmSfxReady;
-    try {
-      const { clearFranchiseMusicState } = await import('/js/musicController.js');
-      clearFranchiseMusicState();
-    } catch {}
-    window.location.href = `/recruiting.html?${params.toString()}`;
-    return;
-  }
-
-  if (mode === 'week35-recruiting') {
-    const params = emptyParams();
-    params.set('franchise_id', franchiseId);
-    params.set('team_id', userTeamId);
-    params.set('from', 'fcc');
-    params.set('return_url', getCurrentRelativeUrl());
-    const recruitingUrl = `/recruiting.html?${params.toString()}`;
-    const goRecruiting = async () => {
-      await confirmSfxReady;
-      try {
-        const { clearFranchiseMusicState } = await import('/js/musicController.js');
-        clearFranchiseMusicState();
-      } catch {}
-      window.location.href = recruitingUrl;
-    };
-    await goRecruiting();
-    return;
-  }
-
-  if (mode === 'cut-players') {
-    await confirmSfxReady;
-    window.location.href = buildAssignPracticeSquadUrl();
-    return;
-  }
-  
-  // ✅ EOS TOURNAMENT: Handle sim rest of tournament
-  if (mode === 'sim-rest-tournament') {
-    const originalText = playNowBtn.textContent;
-    playNowBtn.disabled = true;
-    const week = Number(playNowBtn.dataset.week || commandCenterTopDataCache?.week || 0);
-    if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-      window.PageLoadOverlay.show({
-        variant: 'pulse',
-        title: fccEosSimOverlayCopy(week),
-        showBanner: false,
-      });
-    }
-
-    try {
-      const res = await fetch(API_CONFIG.buildUrl('/franchise/sim-rest-of-tournament'), {
-      method: 'POST',
-      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ franchise_id: franchiseId })
-      });
-      if (!res.ok) throw new Error('Simulation failed');
-      await confirmSfxReady;
-      location.reload();
-    } catch (err) {
-      console.error(err);
-      if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
-      alert('Unable to simulate tournament');
-      playNowBtn.disabled = false;
-      playNowBtn.textContent = originalText;
-    }
-    return;
-  }
-  
-  // End-of-season franchise rollover: keep the same franchise instance and build the next season from franchise data
-  if (mode === 'new-season') {
-    const modal = showNewSeasonConfirmModal();
-    const closeModal = () => {
-      if (typeof modal.closeGobModal === 'function') modal.closeGobModal();
-      else modal.remove();
-    };
-    modal.querySelector('#fcc-new-season-cancel')?.addEventListener('click', () => {
-      closeModal();
-    });
-    modal.querySelector('#fcc-new-season-proceed')?.addEventListener('click', async () => {
-      // Same confirm SFX as the FCC green advance button + a brief full-screen flash.
-      playSound('confirm-1-lowervol.wav');
-      flashSeasonAdvanceScreen();
-      const originalText = playNowBtn.textContent;
-      playNowBtn.disabled = true;
-      playNowBtn.textContent = 'Starting...';
-      // Take the modal down BEFORE the request: the old order left the dialog and a
-      // live button on screen for the whole rollover.
-      closeModal();
-
-      const goToNextSeasonFcc = () => {
-        window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
-      };
-      const startFinishSeason = () => fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
-        method: 'POST',
-        headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ franchise_id: franchiseId }),
-      }).then((res) => {
-        if (!res.ok) throw new Error('Finish season failed');
-        return res.json();
-      });
-      const failAdvance = (err, overlay) => {
-        console.error(err);
-        if (overlay) overlay.remove();
-        if (window.SeniorTribute && window.SeniorTribute.teardown) window.SeniorTribute.teardown();
-        alert('Unable to start new season');
-        playNowBtn.disabled = false;
-        playNowBtn.textContent = originalText;
-      };
-
-      let tribute = null;
-      try {
-        tribute = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/senior-tribute')}?franchise_id=${encodeURIComponent(franchiseId)}`);
-      } catch (err) {
-        console.warn('[TRIBUTE] snapshot failed; using load cover', err);
-      }
-      const seniors = (tribute && tribute.players) || [];
-
-      // No graduating seniors — current season-transition load cover.
-      if (!seniors.length || !window.SeniorTribute) {
-        const advanceOverlay = showSeasonAdvanceOverlay(nextSeasonNumber());
-        try {
-          await startFinishSeason();
-          goToNextSeasonFcc();
-        } catch (err) {
-          failAdvance(err, advanceOverlay);
-        }
-        return;
-      }
-
-      // Sequence A: snapshot is already in hand. Start rollover behind the tribute.
-      let finishState = 'pending';
-      const finishPromise = startFinishSeason()
-        .then(() => { finishState = 'ok'; })
-        .catch((err) => { finishState = 'err'; throw err; });
-
-      window.SeniorTribute.start({
-        players: seniors,
-        season: tribute.season || commandCenterTopDataCache?.current_season || 1,
-        // Atmosphere only (one soft radial on the tribute host).
-        teamColor: normalizeHexColor(commandCenterTopDataCache?.primary_color) || undefined,
-        onAdvance: async () => {
-          let overlay = null;
-          if (finishState === 'pending') {
-            overlay = showSeasonAdvanceOverlay(nextSeasonNumber());
-            // The cover (z 4000) sits below the tribute (z 10010), so it would open
-            // invisibly behind it. Remove the tribute so this screen matches the
-            // no-seniors path exactly. failAdvance already tears it down on error.
-            window.SeniorTribute.teardown();
-          }
-          try {
-            await finishPromise;
-            goToNextSeasonFcc();
-          } catch (err) {
-            failAdvance(err, overlay);
-          }
-        },
-      });
-    });
-    return;
-  }
-  
-  // Otherwise, play the game
-  console.log('Play Now click search:', currentSearch());
-  const originalText = playNowBtn.textContent;
-  playNowBtn.disabled = true;
-  playNowBtn.textContent = 'Loading...';
-  if (!franchiseId) {
-    alert('Franchise not loaded');
-    playNowBtn.disabled = false;
-    playNowBtn.textContent = originalText;
-    return;
-  }
-  try {
-    const res = await fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
-      method: 'POST',
-      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ franchise_id: franchiseId })
-    });
-    if (!res.ok) throw new Error('Simulation failed');
-    const { home, away, week, home_id, away_id, home_display, away_display } = await res.json();
-    if (!home || !away) throw new Error('Matchup not found');
-    try {
-      if (franchiseId && window.FranchiseLS) {
-        window.FranchiseLS.setWeek(franchiseId, week);
-      }
-    } catch {}
-    // Prefer ObjectId for side (display names must not drive identity). Core names stay on home/away.
-    let resolvedSide = '';
-    if (userTeamId && home_id != null && away_id != null) {
-      if (String(userTeamId) === String(home_id)) resolvedSide = 'home';
-      else if (String(userTeamId) === String(away_id)) resolvedSide = 'away';
-    }
-    if (!resolvedSide) {
-      resolvedSide = (userTeamNameForLeaders === home ? 'home' : (userTeamNameForLeaders === away ? 'away' : ''));
-    }
-    let url = `/set-lineup.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
-    if (home_display) url += `&home_display=${encodeURIComponent(home_display)}`;
-    if (away_display) url += `&away_display=${encodeURIComponent(away_display)}`;
-    // ✅ SS&S: Use ObjectId for consistent navigation
-    if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}&user_team_id=${encodeURIComponent(userTeamId)}`;
-    if (resolvedSide) url += `&my_team=${resolvedSide}`;
-    console.log('Navigating to', url);
-    const navigateToLineup = async () => {
-      await confirmSfxReady;
-      try {
-        const { clearFranchiseMusicState } = await import('/js/musicController.js');
-        clearFranchiseMusicState();
-      } catch {}
-      window.location.href = url;
-    };
-    if (window.GOBTutorialAlerts) {
-      const blocked = await window.GOBTutorialAlerts.interceptPlayNextGame(franchiseId, url, navigateToLineup);
-      if (blocked) {
-        playNowBtn.disabled = false;
-        playNowBtn.textContent = originalText;
-        return;
-      }
-    } else {
-      await navigateToLineup();
-    }
-  } catch (err) {
-    console.error(err);
-    alert('Unable to play next game');
-    playNowBtn.disabled = false;
-    playNowBtn.textContent = originalText;
-  }
-});
 
 function navigateToGamePlan() {
   playSound('click-tiny.wav');
@@ -4856,7 +2036,8 @@ function navigateToGamePlan() {
   params.set('team_id', userTeamId);
   params.set('from', 'command_center');
   params.set('return_url', getCurrentRelativeUrl());
-  window.location.href = `/game-plan.html?${params.toString()}`;
+  if (window.GOBNav) window.GOBNav.go(`/game-plan.html?${params.toString()}`);
+  else window.location.assign(`/game-plan.html?${params.toString()}`);
 }
 
 // Legacy route buttons were removed from the FCC tab bar in favor of local placeholder tabs.
@@ -4898,9 +2079,8 @@ window.addEventListener('DOMContentLoaded', () => {
     window.location.href = '/franchise-select-team.html';
     return;
   }
-  if (franchiseId) {
-    playNowBtn.disabled = false;
-  }
+  // #play-now stays disabled until authoritative command-center data sets it
+  // (init below, or GOBAdvance.load). The static label is not a real step.
 
   const exitFranchiseBtn = document.getElementById('exit-franchise');
   if (exitFranchiseBtn) {
@@ -4925,200 +2105,22 @@ window.addEventListener('DOMContentLoaded', () => {
         if (commandCenterTopDataCache) {
           updateRecruitingButton(commandCenterTopDataCache);
         }
-        if (tabName === 'recruits-tab') {
-          renderFccRecruits();
-        }
-        if (tabName === 'press-tab') {
-          void renderNewsTab();
-        }
-        if (tabName === 'game-plan-tab') {
-          renderGamePlanSummary();
-        }
-        if (tabName === 'playbooks-tab') {
-          void renderFccPlaybooksSummary();
-        }
-        if (tabName === 'coaches-tab') {
-          void renderScoutingTab();
-        }
-        if (tabName === 'schedule-tab') {
-          void renderScheduleTab();
-        }
         if (tabName === 'fcc-team-stats-summary-tab') {
           void renderFccTeamStatsSummary();
         }
         if (tabName === 'awards-tab') {
           void renderFccLeadersSummary();
         }
-        if (tabName === 'team-stats-tab') {
-          renderTeamReport();
-        }
-        if (tabName === 'training-tab') {
-          renderFccTrainingTab();
+        if (window.GOBNav && typeof window.GOBNav.restoreScroll === 'function') {
+          window.GOBNav.restoreScroll();
         }
       }
     });
   }
 });
 
-/**
- * Training tab — the second and only other place development is editable.
- *
- * Source is the roster the FCC already holds, NOT /franchise/training-points. That
- * endpoint 400s after week 26 and is the training page's own dependency; using it here
- * would reproduce the very gap this tab closes, where development becomes unreachable once
- * the week's training is submitted and for the whole postseason. The roster payload
- * already carries attributes, year, height, weight, position ratings and both development
- * fields, so nothing extra is fetched.
- */
-function renderFccTrainingTab() {
-  const host = document.getElementById('fcc-training-dev');
-  const grid = window.GOBPlayerDevelopmentGrid;
-  wireFccTrainingTutorialButton();
-  if (!host || !grid) return;
-  const players = (userRosterDataCache && userRosterDataCache.players) || userRosterPlayersCache || [];
-  const rows = players.map((p) => ({
-    id: p._id || p.player_id,
-    _id: p._id || p.player_id,
-    player_id: p._id || p.player_id,
-    name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
-    year: p.year,
-    height: p.height,
-    weight: p.weight,
-    attributes: p.attributes || {},
-    position_ratings: p.position_ratings || {},
-    training_position: p.training_position || null,
-    training_focus: p.training_focus || null,
-    resolved_training_position: p.resolved_training_position || null,
-    resolved_training_focus: p.resolved_training_focus || null,
-  }));
-  // Same order the roster tab shows: best-position RT, descending, fixed while editing.
-  rows.sort((a, b) => fccMaxPositionRating(b) - fccMaxPositionRating(a));
-
-  grid.render(host, rows, {
-    getFranchiseId: () => (typeof franchiseId !== 'undefined' && franchiseId)
-      || liveParams().get('franchise_id') || '',
-    // Keep the roster caches in step so the Roster tab's read-only columns agree.
-    onSaved: (playerId, field, value) => {
-      const key = field === 'training_focus'
-        ? 'resolved_training_focus' : 'resolved_training_position';
-      [userRosterDataCache && userRosterDataCache.players, userRosterPlayersCache,
-       rosterTableDataForSorting].forEach((list) => {
-        (list || []).forEach((p) => {
-          if (String(p._id || p.player_id) === String(playerId)) { p[field] = value; p[key] = value; }
-        });
-      });
-    },
-  });
-}
-
-/**
- * "Training by Position" leaves the FCC, so a return context is set the same way the
- * training page sets one — the tutorial's footer uses it to come back here. Unlike the
- * training page there is no draft to protect: every change on this tab is already saved.
- */
-function wireFccTrainingTutorialButton() {
-  const btn = document.getElementById('fcc-training-tutorial-btn');
-  if (!btn || btn.dataset.bound) return;
-  btn.dataset.bound = '1';
-  btn.addEventListener('click', () => {
-    const returnUrl = (typeof getCurrentRelativeUrl === 'function')
-      ? getCurrentRelativeUrl()
-      : window.location.pathname + window.location.search;
-    if (window.GOBTutorialAlertResume && window.GOBTutorialAlertResume.setTrainingPageContext) {
-      window.GOBTutorialAlertResume.setTrainingPageContext(returnUrl);
-    }
-    window.location.href = '/tutorial-advanced-training-by-position.html';
-  });
-}
-
-function fccMaxPositionRating(player) {
-  const r = player.position_ratings || {};
-  let best = -Infinity;
-  Object.keys(r).forEach((k) => {
-    const v = Number(r[k]);
-    if (isFinite(v) && v > best) best = v;
-  });
-  return best === -Infinity ? -1 : best;
-}
-
-/**
- * Your team's own dispatches — training report, Practice Squad development report, game
- * results with box scores. These used to live in a separate Inbox tab; the Inbox is gone
- * and they now run inside News, interleaved into the same week cards as league headlines
- * so one week reads as one story.
- *
- * Returns entries keyed by week: { week, html }. Rendering belongs to renderNewsTab.
- */
-function fccTeamDispatches(topData) {
-  const out = [];
-  const items = Array.isArray(topData?.season_inbox) ? topData.season_inbox : [];
-  const tid = (topData && topData.team_id) || userTeamId;
-  const w = topData && topData.last_training_report_week;
-
-  const entry = (week, href, text, linkText) => {
-    const a = href
-      ? '<a class="fcc-news-mine-link" href="' + href + '">' + escapeHomeHtml(linkText) + '</a>'
-      : '';
-    out.push({
-      week: Number(week),
-      html: '<div class="fcc-news-mine">' + escapeHomeHtml(text) + (a ? ' ' + a : '') + '</div>',
-    });
-  };
-
-  if (w != null && w !== '' && franchiseId && tid) {
-    const weekNum = Number(w);
-    if (Number.isFinite(weekNum) && weekNum >= 1) {
-      const q = emptyParams();
-      q.set('mode', 'franchise');
-      q.set('franchise_id', String(franchiseId));
-      q.set('team_id', String(tid));
-      q.set('week', String(weekNum));
-      q.set('from', 'news');
-      entry(weekNum, '/training-report.html?' + q.toString(),
-        'Week ' + weekNum + ' training report', 'view');
-    }
-  }
-
-  items.forEach((item) => {
-    if (!item) return;
-    if (item.type === 'training_squad_report') {
-      const q = emptyParams();
-      q.set('franchise_id', String(franchiseId || ''));
-      q.set('team_id', String(tid || ''));
-      q.set('from', 'news');
-      entry(item.week, '/training-squad-report.html?' + q.toString(),
-        'Week ' + Number(item.week) + ' Practice Squad development report', 'view');
-      return;
-    }
-    if (item.type !== 'game_result') return;
-    const verb = item.result === 'win' ? 'defeated' : 'lost to';
-    const text = (Number.isFinite(Number(item.week)) && item.user_team_name && item.opponent_team_name)
-      ? `${item.user_team_name} ${verb} ${item.opponent_team_name} ${item.user_score}-${item.opponent_score}`
-      : item.copy;
-    if (!text) return;
-    entry(item.week, item.box_score_url || '', text, 'box score');
-  });
-
-  return out;
-}
-
-// Team Report and Playbook Summary functions (adapted from training-report.js)
-const TEAM_ATTR_NAMES = {
-  'shot_threshold': 'Shooting',
-  'rebound_modifier': 'Rebounding',
-  'offensive_efficiency': 'Offense',
-  'defensive_efficiency': 'Defense',
-  'fb_efficiency': 'Fast Breaks',
-  'pt_efficiency': 'Press/Traps',
-  'fight': 'Fight',
-  'discipline': 'Discipline',
-  'momentum_score': 'Momentum',
-  'team_chemistry': 'Team Chemistry',
-  'fb_opp_modifier': 'Fast Break Defense',
-  'pt_opp_modifier': 'P/T Offense'
-};
-
 let teamData = null;
+let fccTeamDataPayload = null;
 
 async function loadTeamData() {
   if (!franchiseId || !userTeamId) return;
@@ -5143,34 +2145,22 @@ async function loadTeamData() {
       console.warn('Could not ensure team objects exist:', error);
     }
     
-    // ✅ SS&S: Use ObjectId directly - backend accepts team_id parameter
-    const teamDataStartTime = performance.now();
-    console.log('⏱️ [PERF] loadTeamData() calling /franchise/team-data START');
-    const response = await fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_id=${encodeURIComponent(userTeamId)}`, { headers: API_CONFIG.getAuthHeaders() });
-    const teamDataEndTime = performance.now();
-    console.log(`⏱️ [PERF] loadTeamData() /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
-    
-    if (!response.ok) {
-      console.error('Failed to load team data:', response.status, response.statusText);
+    // The Office init already loaded this body. Fetch only if that read did not run.
+    let data = fccTeamDataPayload;
+    if (!data) {
+      const teamDataStartTime = performance.now();
+      console.log('⏱️ [PERF] loadTeamData() calling /franchise/team-data START');
+      data = await fetchJSON(fccTeamDataUrl());
+      fccTeamDataPayload = data;
+      const teamDataEndTime = performance.now();
+      console.log(`⏱️ [PERF] loadTeamData() /franchise/team-data: ${(teamDataEndTime - teamDataStartTime).toFixed(2)}ms`);
+    }
+    if (!data) {
+      console.error('Failed to load team data');
       return;
     }
-    
-    const data = await response.json();
-    
-    // Also load players for top scorer lookup (wire by team_id per Data_Persistence_System / FCC)
-    let players = [];
-    try {
-      const rosterStartTime = performance.now();
-      const rosterResponse = await fetch(`${API_CONFIG.buildUrl(`/roster/${encodeURIComponent(userTeamId)}`)}?franchise_id=${encodeURIComponent(franchiseId)}&profile=1`, { headers: API_CONFIG.getAuthHeaders() });
-      const rosterEndTime = performance.now();
-      console.log(`⏱️ [PERF] loadTeamData() /roster (team_id): ${(rosterEndTime - rosterStartTime).toFixed(2)}ms`);
-      if (rosterResponse.ok) {
-        const rosterData = await rosterResponse.json();
-        players = rosterData.players || [];
-      }
-    } catch (error) {
-      console.warn('Could not load players for team data:', error);
-    }
+
+    const players = userRosterPlayersCache.length ? userRosterPlayersCache.slice() : [];
     
     teamData = {
       team_attributes: data.team_attributes || {},
@@ -5184,15 +2174,6 @@ async function loadTeamData() {
     // Log all team attribute values on page load
     console.log('📊 [TEAM ATTRIBUTES] All team attribute values:', teamData.team_attributes);
     
-    // Render if Team Measures tab is active
-    const teamMeasuresTab = document.getElementById('team-stats-tab');
-    if (teamMeasuresTab && teamMeasuresTab.classList.contains('active')) {
-      renderTeamReport();
-    }
-    const gamePlanTab = document.getElementById('game-plan-tab');
-    if (gamePlanTab && gamePlanTab.classList.contains('active')) {
-      renderGamePlanSummary();
-    }
     void renderHomeTab();
     
     const loadTeamDataEndTime = performance.now();
@@ -5202,115 +2183,11 @@ async function loadTeamData() {
   }
 }
 
-function renderTeamReport() {
-  if (!teamData) return;
-  const teamAttrs = teamData.team_attributes || {};
-  const radarHost = document.getElementById('team-measures-radar');
-  const shootingHost = document.getElementById('team-measure-shooting');
-  const reboundingHost = document.getElementById('team-measure-rebounding');
-  const chemistryHost = document.getElementById('team-measure-chemistry');
-  if (!radarHost || !shootingHost || !reboundingHost || !chemistryHost) return;
-
-  radarHost.innerHTML = buildTeamMeasuresRadarMarkup(teamAttrs);
-  shootingHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Shooting', 'shot_threshold', Number(teamAttrs.shot_threshold || 0));
-  reboundingHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Rebounding', 'rebound_modifier', Number(teamAttrs.rebound_modifier || 0));
-  chemistryHost.innerHTML = buildTeamMeasuresLinearCardMarkup('Team Chemistry', 'team_chemistry', Number(teamAttrs.team_chemistry || 0));
-}
-
-function mapGamePlanValue(key, rawValue) {
-  const value = Math.max(0, Math.min(4, Number(rawValue ?? 2)));
-  switch (key) {
-    case 'offense':
-      return {
-        0: '100% Motion',
-        1: '75% Motion / 25% Set Plays',
-        2: '50% Motion / 50% Set Plays',
-        3: '75% Set Plays / 25% Motion',
-        4: '100% Set Plays'
-      }[value];
-    case 'defense':
-      return {
-        0: '100% Man',
-        1: '75% Man / 25% Zone',
-        2: '50% Man / 50% Zone',
-        3: '75% Zone / 25% Man',
-        4: '100% Zone'
-      }[value];
-    case 'fast_breaks':
-      return {
-        0: '100% Half Court Sets',
-        1: '75% Half Court Sets / 25% Fast Breaks',
-        2: '50% Half Court Sets / 50% Fast Breaks',
-        3: '75% Fast Breaks / 25% Half Court Sets',
-        4: '100% Fast Breaks'
-      }[value];
-    case 'tempo':
-      return {
-        0: 'Slow',
-        1: 'Slow / Normal',
-        2: 'Normal',
-        3: 'Normal / Fast',
-        4: 'Fast'
-      }[value];
-    case 'alterations':
-      return {
-        0: 'Least',
-        1: 'Less',
-        2: 'Normal',
-        3: 'More',
-        4: 'Most'
-      }[value];
-    case 'aggression':
-      return {
-        0: 'Passive',
-        1: 'Normal / Passive',
-        2: 'Normal',
-        3: 'Normal / Aggressive',
-        4: 'Aggressive'
-      }[value];
-    case 'rebounding':
-      return {
-        0: '100% Crash The Boards',
-        1: '75% Crash The Boards / 25% Get Back on D',
-        2: '50% Crash The Boards / 50% Get Back on D',
-        3: '75% Get Back on D / 25% Crash The Boards',
-        4: '100% Get Back on D'
-      }[value];
-    default:
-      return GENERIC_GAMEPLAN_SCALE[value] || 'Normal';
-  }
-}
-
-function buildGamePlanSummaryMarkup(strategySettings = {}) {
-  const items = GAMEPLAN_DISPLAY_ORDER.map((key) => {
-    const label = GAMEPLAN_LABELS[key];
-    const valueText = mapGamePlanValue(key, strategySettings?.[key]);
-    return `
-      <div class="fcc-game-plan-item">
-        <div class="fcc-game-plan-label">${label}</div>
-        <div class="fcc-game-plan-value">${valueText}</div>
-      </div>
-    `;
-  });
-  return items.join('');
-}
-
-function renderGamePlanSummary() {
-  const host = document.getElementById('fcc-game-plan-grid');
-  if (!host) return;
-  const strategySettings = teamData?.game_plan?.strategy_settings;
-  if (!strategySettings || typeof strategySettings !== 'object') {
-    host.innerHTML = '<div class="fcc-game-plan-empty">Game plan settings are not available yet.</div>';
-    return;
-  }
-  host.innerHTML = buildGamePlanSummaryMarkup(strategySettings);
-}
-
 const TEAM_MEASURES_RADAR_AXES = [
   { key: 'offensive_efficiency', label: 'Offense', angle: -90 },
-  { key: 'fb_efficiency', label: 'Fast Breaks', angle: -45 },
+  { key: 'fb_efficiency', label: 'Fast Break', angle: -45 },
   { key: 'discipline', label: 'Discipline', angle: 0 },
-  { key: 'pt_efficiency', label: 'Press/Traps', angle: 45 },
+  { key: 'pt_efficiency', label: 'P/T Defense', angle: 45 },
   { key: 'defensive_efficiency', label: 'Defense', angle: 90 },
   { key: 'fb_opp_modifier', label: 'Fast Break Defense', angle: 135 },
   { key: 'fight', label: 'Fight', angle: 180 },
@@ -5416,492 +2293,41 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
   `;
 }
 
-function buildTeamMeasuresLinearCardMarkup(title, attrKey, value) {
-  const visual = getTeamAttrVisualConfig(attrKey, value);
-  if (attrKey === 'team_chemistry') {
-    const percentage = Math.max(0, Math.min((Number(value) / 25) * 100, 100));
-    const pulseClass = visual.pulse ? ' is-pulsing' : '';
-    return `
-      <div class="tm-side-card-content tm-side-card-content-chemistry">
-        <div class="tm-side-card-label">${title}</div>
-        <div class="tm-chemistry-bar${pulseClass}">
-          <div class="tm-chemistry-fill" style="width:${percentage}%; opacity:${0.2 + (percentage / 100) * 0.8};"></div>
-          <div class="tm-chemistry-text">${visual.displayValue}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  const pulseClass = visual.pulse ? ' is-pulsing' : '';
-  const fillMarkup = visual.direction === 'positive'
-    ? `<div class="tm-linear-fill tm-linear-fill-positive" style="width:${visual.fillPercent}%"></div>`
-    : (visual.direction === 'negative'
-      ? `<div class="tm-linear-fill tm-linear-fill-negative" style="width:${visual.fillPercent}%"></div>`
-      : '');
-
-  return `
-    <div class="tm-side-card-content">
-      <div class="tm-side-card-label">${title}</div>
-      <div class="tm-linear-bar${pulseClass}">
-        ${fillMarkup}
-        <div class="tm-linear-center"></div>
-      </div>
-    </div>
-  `;
-}
-
-function createTeamAttrItem(attrKey, currentValue, change) {
-  const displayName = TEAM_ATTR_NAMES[attrKey];
-  if (!displayName) return null;
-  
-  if (currentValue === undefined || currentValue === null) {
-    currentValue = 0;
-  }
-  if (change === undefined || change === null) {
-    change = 0;
-  }
-  
-  const item = document.createElement('div');
-  item.className = 'team-attr-item';
-  const visual = getTeamAttrVisualConfig(attrKey, Number(currentValue) || 0);
-  if (visual.cardTone) item.dataset.tone = visual.cardTone;
-  
-  const label = document.createElement('div');
-  label.className = 'attr-label';
-  
-  const nameSpan = document.createElement('span');
-  nameSpan.textContent = displayName;
-  
-  label.appendChild(nameSpan);
-  item.appendChild(label);
-  
-  if (attrKey === 'team_chemistry') {
-    const barContainer = document.createElement('div');
-    barContainer.className = 'fcc-chemistry-bar-container';
-    if (visual.pulse) barContainer.classList.add('is-pulsing');
-    
-    const barFill = document.createElement('div');
-    barFill.className = 'fcc-chemistry-bar-fill';
-    const percentage = Math.max(0, Math.min((Number(currentValue) / 25) * 100, 100));
-    barFill.style.width = `${percentage}%`;
-    barFill.style.opacity = String(0.2 + (percentage / 100) * 0.8);
-    
-    const barText = document.createElement('div');
-    barText.className = 'fcc-chemistry-bar-text';
-    barText.textContent = `${currentValue} / 25`;
-    
-    barContainer.appendChild(barFill);
-    barContainer.appendChild(barText);
-    item.appendChild(barContainer);
-  } else {
-    const pill = createPill(currentValue, attrKey);
-    item.appendChild(pill);
-  }
-  
-  return item;
-}
-
-function createPill(originalValue, attrKey) {
-  const pill = document.createElement('div');
-  pill.className = 'attr-pill';
-  const visual = getTeamAttrVisualConfig(attrKey, Number(originalValue) || 0);
-  if (visual.direction !== 'zero') {
-    pill.classList.add(`pill-${visual.direction}`);
-  }
-  if (visual.pulse) {
-    pill.classList.add('is-pulsing');
-  }
-  
-  const centerLine = document.createElement('div');
-  centerLine.className = 'pill-center-line';
-  pill.appendChild(centerLine);
-
-  if (visual.direction === 'positive') {
-    const fill = document.createElement('div');
-    fill.className = 'pill-fill-positive';
-    fill.style.width = `${visual.fillPercent}%`;
-    pill.insertBefore(fill, centerLine);
-  } else if (visual.direction === 'negative') {
-    const fill = document.createElement('div');
-    fill.className = 'pill-fill-negative';
-    fill.style.width = `${visual.fillPercent}%`;
-    pill.insertBefore(fill, centerLine);
-  }
-
-  const valueLabel = document.createElement('div');
-  valueLabel.className = 'pill-value show';
-  valueLabel.textContent = visual.displayValue;
-  pill.appendChild(valueLabel);
-  
-  return pill;
-}
-
-function formatTeamAttrDisplayValue(attrKey, value) {
-  const numericValue = Number(value) || 0;
-  if (attrKey === 'rebound_modifier') return numericValue.toFixed(2);
-  return Number.isInteger(numericValue) ? String(numericValue) : numericValue.toFixed(1);
-}
-
-function getTeamAttrVisualConfig(attrKey, value) {
-  if (attrKey === 'team_chemistry') {
-    return {
-      direction: value > 0 ? 'positive' : 'zero',
-      fillPercent: Math.max(0, Math.min((value / 25) * 100, 100)),
-      displayValue: `${value} / 25`,
-      pulse: value <= 5 || value >= 22,
-      cardTone: value < 8 ? 'warning-negative' : (value > 20 ? 'warning-elite' : '')
-    };
-  }
-
-  let normalized = value;
-  let fillPercent = 0;
-  let pulse = false;
-
-  if (attrKey === 'shot_threshold') {
-    const st = window.TeamShotThresholdScale;
-    normalized = st.normalizedScore(value);
-    fillPercent = st.pillFillPercent(value);
-    pulse = st.shouldPulse(value);
-  } else if (attrKey === 'rebound_modifier') {
-    // 0.0-1.0 range. Center = neutral = init = 0.2 (NOT the midpoint). Asymmetric
-    // span: 0.2 of room below, 0.8 above, each mapped to the ±20 normalized scale so
-    // the shared cardTone (±12) / pulse (±14) thresholds apply as for the core-8 span.
-    const deviation = value - 0.2;
-    const halfSpan = deviation < 0 ? 0.2 : 0.8;
-    normalized = (deviation / halfSpan) * 20;
-    fillPercent = Math.min((Math.abs(deviation) / halfSpan) * 50, 50);
-    pulse = Math.abs(normalized) >= 14;
-  } else {
-    fillPercent = Math.min((Math.abs(normalized) / 20) * 50, 50);
-    pulse = Math.abs(normalized) >= 14;
-  }
-
-  let cardTone = '';
-  if (normalized <= -12) cardTone = 'negative';
-  else if (normalized >= 12) cardTone = 'positive';
-
-  return {
-    direction: normalized > 0 ? 'positive' : (normalized < 0 ? 'negative' : 'zero'),
-    fillPercent,
-    displayValue: formatTeamAttrDisplayValue(attrKey, value),
-    pulse,
-    cardTone
-  };
-}
-
-function renderPlaybookSummary() {
-  if (!teamData) return;
-  
-  const container = document.getElementById('playbook-summary-container');
-  if (!container) return;
-  
-  container.innerHTML = '';
-  
-  const plays_data = teamData.plays_data || {};
-  const scouting_data = teamData.scouting_data || {};
-  
-  const motion_plays = [];
-  const set_plays = [];
-  
-  for (const [play_name, play_data] of Object.entries(plays_data)) {
-    if (typeof play_data === 'object' && play_data !== null) {
-      const resolvedName = play_data.name || play_name;
-      const play_type = play_data.play_type || '';
-      if (play_type === 'motion') {
-        motion_plays.push({ ...play_data, name: resolvedName, display_name: resolvedName, play_key: play_name });
-      } else if (play_type === 'set_play') {
-        set_plays.push({ ...play_data, name: resolvedName, display_name: resolvedName, play_key: play_name });
-      }
-    }
-  }
-  
-  motion_plays.sort((a, b) => a.name.localeCompare(b.name));
-  set_plays.sort((a, b) => a.name.localeCompare(b.name));
-  
-  let man_defenses = [];
-  let zone_defenses = [];
-  if (scouting_data.defense && typeof window !== 'undefined' && window.GOBDefenseDisplay) {
-    const split = window.GOBDefenseDisplay.buildPlaybookStyleDefenseRows(scouting_data.defense);
-    man_defenses = split.man_defenses;
-    zone_defenses = split.zone_defenses;
-  } else if (scouting_data.defense) {
-    for (const [defense_name, defense_data] of Object.entries(scouting_data.defense)) {
-      if (typeof defense_data === 'object' && defense_data !== null) {
-        if (defense_name === 'Man' || defense_name === 'man') {
-          man_defenses.push({ name: defense_name === 'man' ? 'Man' : defense_name, ...defense_data });
-        } else if (defense_name.includes('Zone') || defense_name.includes('zone')) {
-          zone_defenses.push({ name: defense_name, ...defense_data });
-        }
-      }
-    }
-  }
-  
-  man_defenses.sort((a, b) => a.name.localeCompare(b.name));
-  zone_defenses.sort((a, b) => a.name.localeCompare(b.name));
-  
-  const offenseSection = document.createElement('div');
-  offenseSection.className = 'playbook-category';
-  
-  const offenseTitle = document.createElement('h3');
-  offenseTitle.textContent = 'Offense';
-  offenseSection.appendChild(offenseTitle);
-  
-  // Get players data for top scorer lookup (only for offensive plays)
-  const players = teamData.players || [];
-  
-  if (motion_plays.length > 0) {
-    motion_plays.forEach(play => {
-      // Pass full play object to access effectiveness, momentum, cloaking, and season_stats
-      const playRow = createPlayRow(play.display_name || play.name, play, null, players);
-      offenseSection.appendChild(playRow);
-    });
-  }
-  
-  if (set_plays.length > 0) {
-    set_plays.forEach(play => {
-      // Pass full play object to access effectiveness, momentum, cloaking, and season_stats
-      const playRow = createPlayRow(play.display_name || play.name, play, null, players);
-      offenseSection.appendChild(playRow);
-    });
-  }
-  
-  const emptyRow = document.createElement('div');
-  emptyRow.className = 'playbook-empty-row';
-  offenseSection.appendChild(emptyRow);
-  
-  container.appendChild(offenseSection);
-  
-  const defenseSection = document.createElement('div');
-  defenseSection.className = 'playbook-category';
-  
-  const defenseTitle = document.createElement('h3');
-  defenseTitle.textContent = 'Defense';
-  defenseSection.appendChild(defenseTitle);
-  
-  if (man_defenses.length > 0) {
-    man_defenses.forEach(defense => {
-      // Pass full defense object to access effectiveness, momentum, cloaking
-      const defenseRow = createPlayRow(defense.name, defense, null);
-      defenseSection.appendChild(defenseRow);
-    });
-  }
-  
-  if (zone_defenses.length > 0) {
-    zone_defenses.forEach(defense => {
-      // Pass full defense object to access effectiveness, momentum, cloaking
-      const defenseRow = createPlayRow(defense.name, defense, null);
-      defenseSection.appendChild(defenseRow);
-    });
-  }
-  
-  container.appendChild(defenseSection);
-}
-
-function createPlayRow(playName, playData, change, players = []) {
-  // playData can be an object with effectiveness, momentum, cloaking, or just a number (effectiveness)
-  // Handle both formats for backward compatibility
-  const effectiveness = typeof playData === 'object' ? (playData.effectiveness || 0) : (playData || 0);
-  const momentum = typeof playData === 'object' ? (playData.momentum || 0) : 0;
-  const cloaking = typeof playData === 'object' ? (playData.cloaking || 0) : 0;
-  
-  // Check if this is an offensive play (motion or set_play) to show success rate and top scorer
-  const isOffensivePlay = typeof playData === 'object' && 
-    (playData.play_type === 'motion' || playData.play_type === 'set_play');
-  
-  const row = document.createElement('div');
-  row.className = 'playbook-row';
-  if (playData && typeof playData === 'object' && playData.play_id) {
-    row.dataset.playId = playData.play_id;
-  }
-  
-  // Play name
-  const nameDiv = document.createElement('div');
-  nameDiv.className = 'playbook-name';
-  nameDiv.textContent = playName;
-  row.appendChild(nameDiv);
-  
-  // Metrics container - holds all three bars
-  const metricsContainer = document.createElement('div');
-  metricsContainer.className = 'playbook-metrics-container';
-  
-  // Command metric - Blue, 0-100 scale
-  const commandMetric = createMetricBar('Command', effectiveness, 100, '#4a90e2', null);
-  metricsContainer.appendChild(commandMetric);
-  
-  // Momentum - Orange, 0-10 scale
-  const momentumMetric = createMetricBar('Momentum', momentum, 10, '#ff9800', null);
-  metricsContainer.appendChild(momentumMetric);
-  
-  // Cloaking - Purple, 0-10 scale
-  const cloakingMetric = createMetricBar('Cloaking', cloaking, 10, '#9c27b0', null);
-  metricsContainer.appendChild(cloakingMetric);
-  
-  row.appendChild(metricsContainer);
-  
-  // Success Rate and Top Scorer column (only for offensive plays)
-  if (isOffensivePlay) {
-    const statsContainer = document.createElement('div');
-    statsContainer.className = 'playbook-stats-container';
-    statsContainer.style.display = 'flex';
-    statsContainer.style.flexDirection = 'column';
-    statsContainer.style.gap = '8px';
-    
-    // Calculate success rate from season_stats
-    const seasonStats = playData.season_stats || {};
-    const timesRun = seasonStats.times_run || 0;
-    const successes = seasonStats.successes || 0;
-    const successRate = timesRun > 0 ? Math.round((successes / timesRun) * 100) : 0;
-    
-    // Success Rate
-    const successRateDiv = document.createElement('div');
-    successRateDiv.className = 'playbook-success-rate';
-    successRateDiv.textContent = `Success Rate: ${successRate}%`;
-    statsContainer.appendChild(successRateDiv);
-    
-    // Top Scorer
-    const topScorerDiv = document.createElement('div');
-    topScorerDiv.className = 'playbook-top-scorer';
-    
-    const playerPoints = seasonStats.player_points || {};
-    let topScorerId = null;
-    let topScorerPoints = 0;
-    
-    // Find top scorer
-    for (const [playerId, points] of Object.entries(playerPoints)) {
-      if (points > topScorerPoints) {
-        topScorerPoints = points;
-        topScorerId = playerId;
-      }
-    }
-    
-    if (topScorerId && topScorerPoints > 0) {
-      // Find player name
-      const player = players.find(p => p._id === topScorerId || p.id === topScorerId);
-      const playerName = player ? (player.name || `${player.first_name || ''} ${player.last_name || ''}`.trim()) : 'Unknown Player';
-      topScorerDiv.textContent = `Top Scorer: ${playerName}, ${topScorerPoints} PTS`;
-    } else {
-      topScorerDiv.textContent = 'Top Scorer: N/A';
-    }
-    
-    statsContainer.appendChild(topScorerDiv);
-    row.appendChild(statsContainer);
-  }
-  
-  return row;
-}
-
-function createMetricBar(title, value, maxValue, color, change) {
-  const metricDiv = document.createElement('div');
-  metricDiv.className = 'playbook-metric';
-  
-  // Title
-  const titleDiv = document.createElement('div');
-  titleDiv.className = 'playbook-metric-title';
-  titleDiv.textContent = title;
-  metricDiv.appendChild(titleDiv);
-  
-  // Progress bar container
-  const progressContainer = document.createElement('div');
-  progressContainer.className = 'playbook-progress-container';
-  
-  const progressBar = document.createElement('div');
-  progressBar.className = 'playbook-progress-bar';
-  
-  const progressFill = document.createElement('div');
-  progressFill.className = 'playbook-progress-fill';
-  progressFill.style.backgroundColor = color;
-  const percentage = Math.min(100, (value / maxValue) * 100);
-  progressFill.style.width = `${percentage}%`;
-  
-  progressBar.appendChild(progressFill);
-  progressContainer.appendChild(progressBar);
-  metricDiv.appendChild(progressContainer);
-  
-  // Change indicator (only for Command)
-  if (change !== null && change !== undefined) {
-    const changeDiv = document.createElement('div');
-    changeDiv.className = 'playbook-change';
-    
-    if (change > 0) {
-      changeDiv.textContent = `+${change}`;
-      changeDiv.style.color = '#4CAF50'; // Green
-    } else if (change < 0) {
-      changeDiv.textContent = `-${Math.abs(change)}`;
-      changeDiv.style.color = '#f44336'; // Red
-    } else {
-      changeDiv.textContent = '0';
-      changeDiv.style.color = '#ffffff'; // White
-    }
-    
-    metricDiv.appendChild(changeDiv);
-  }
-  
-  return metricDiv;
-}
-
-// ✅ Phase 4.2: Roster stats rendering delegated to RosterStatsRenderer (rosterStatsRenderer.js)
-
-// ✅ EOS TOURNAMENT: Render tournament bracket (shared renderer: franchise-tournament-brackets-render.js)
-async function renderTournamentBracket() {
-  const container =
-    document.getElementById('fcc-tournament-bracket') || document.getElementById('tournament-bracket-container');
-  const titleEl = document.getElementById('fcc-tournament-title');
-  if (!container || !franchiseId) return;
-
-  let topData = commandCenterTopDataCache;
-  try {
-    topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
-    commandCenterTopDataCache = topData;
-  } catch (e) {
-    console.warn('[FCC] Could not refresh command-center data for bracket:', e);
-    if (!topData) {
-      container.innerHTML = '<p class="fcc-tournament-empty-msg">Tournament bracket not available.</p>';
-      return;
-    }
-  }
-
-  let teamIdToNameMap = {};
-  try {
-    const teamStatsRes = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/team-stats')}?franchise_id=${franchiseId}`);
-    const teams = teamStatsRes?.teams || [];
-    teams.forEach(function (t) {
-      if (t.team_id != null && t.team != null) {
-        teamIdToNameMap[String(t.team_id)] = t.team;
-        const st = t.stats || {};
-        teamIdMetaMap[String(t.team_id)] = {
-          team: t.team,
-          mascot: t.mascot || '',
-          conference: t.conference,
-          region: t.region != null && t.region !== '' ? String(t.region).toUpperCase() : '',
-          natl_rank: t.natl_rank != null && Number.isFinite(Number(t.natl_rank)) ? Number(t.natl_rank) : null,
-          W: Number.isFinite(Number(st.W)) ? Number(st.W) : 0,
-          L: Number.isFinite(Number(st.L)) ? Number(st.L) : 0,
-        };
-      }
-    });
-  } catch (e) {
-    console.warn('[FCC] Could not load team-stats for bracket names:', e);
-  }
-
-  if (typeof FranchiseTournamentBrackets !== 'undefined' && FranchiseTournamentBrackets.appendFranchiseBracketSections) {
-    FranchiseTournamentBrackets.appendFranchiseBracketSections(container, topData, {
-      userTeamId,
-      teamIdToNameMap,
-      teamIdMetaMap,
-      mode: 'fcc',
-      titleEl,
-      allTournamentsHref: buildResourceUrl('brackets.html'),
-    });
-  } else {
-    container.innerHTML = '<p class="fcc-tournament-empty-msg">Bracket UI not loaded.</p>';
-  }
-}
-
-// Scouting Report functionality
 let upcomingOpponent = null;
 let upcomingOpponentId = null;
-let scoutingTabDataCache = null;
-let fccScoutingProjectedViewMode = 'attributes';
+const upcomingOpponentByKey = Object.create(null);
+
+function upcomingOpponentCacheKey(data) {
+  const week = data?.week || data?.training_status?.current_week || 0;
+  return String(franchiseId || '') + ':' + String(week);
+}
+
+function opponentFromLoadedFcc(data) {
+  if (!data) return null;
+  const summary = data.next_game_summary;
+  if (summary && (summary.opponent_team_name || summary.opponent_team_id)) {
+    return {
+      name: summary.opponent_team_name || '',
+      id: summary.opponent_team_id != null ? String(summary.opponent_team_id) : '',
+    };
+  }
+  const digestGame = data.office_digest && data.office_digest.next_game;
+  if (digestGame && (digestGame.opponent || digestGame.opponent_team_name || digestGame.opponent_team_id)) {
+    return {
+      name: digestGame.opponent || digestGame.opponent_team_name || '',
+      id: digestGame.opponent_team_id != null ? String(digestGame.opponent_team_id) : '',
+    };
+  }
+  return null;
+}
+
+function rememberUpcomingOpponent(key, resolved) {
+  if (!key || !resolved || !resolved.name) return null;
+  upcomingOpponentByKey[key] = resolved;
+  upcomingOpponent = resolved.name;
+  upcomingOpponentId = resolved.id || null;
+  return resolved;
+}
 
 function disableLegacyFccScoutingModal() {
   const legacyModal = document.getElementById('scouting-report-modal');
@@ -5917,7 +2343,6 @@ function disableLegacyFccScoutingModal() {
 disableLegacyFccScoutingModal();
 
 async function resolveUpcomingOpponentFromMatchup(data) {
-  const resolvedUserTeamName = data?.team || userTeamNameForLeaders || userTeamName || '';
   const week = data?.week || data?.training_status?.current_week || 0;
   const eosTournamentActive = data?.eos_tournament_active || false;
   const eosTournament = data?.eos_tournament;
@@ -5938,46 +2363,25 @@ async function resolveUpcomingOpponentFromMatchup(data) {
     return null;
   }
 
-  try {
-    const res = await fetch(API_CONFIG.buildUrl('/franchise/play-next-game'), {
-      method: 'POST',
-      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ franchise_id: franchiseId })
-    });
-    if (!res.ok) throw new Error('Failed to resolve next game');
-    const matchup = await res.json();
-    upcomingOpponent = null;
-    upcomingOpponentId = null;
-    if (matchup && matchup.home && matchup.away) {
-      const awayLabel = matchup.away_display || matchup.away;
-      const homeLabel = matchup.home_display || matchup.home;
-      // Prefer ObjectId (display name ≠ core name under Team Builder).
-      if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
-        if (String(userTeamId) === String(matchup.home_id)) {
-          upcomingOpponent = awayLabel;
-          upcomingOpponentId = matchup.away_id;
-        } else if (String(userTeamId) === String(matchup.away_id)) {
-          upcomingOpponent = homeLabel;
-          upcomingOpponentId = matchup.home_id;
-        }
-      }
-      if (!upcomingOpponent) {
-        if (resolvedUserTeamName === matchup.home || resolvedUserTeamName === homeLabel) {
-          upcomingOpponent = awayLabel;
-          upcomingOpponentId = matchup.away_id;
-        } else if (resolvedUserTeamName === matchup.away || resolvedUserTeamName === awayLabel) {
-          upcomingOpponent = homeLabel;
-          upcomingOpponentId = matchup.home_id;
-        }
-      }
-    }
-    return upcomingOpponent ? { name: upcomingOpponent, id: upcomingOpponentId } : null;
-  } catch (err) {
-    console.warn('Could not determine upcoming opponent:', err);
-    upcomingOpponent = null;
-    upcomingOpponentId = null;
-    return null;
+  const key = upcomingOpponentCacheKey(data);
+  const hit = upcomingOpponentByKey[key];
+  if (hit && hit.name) {
+    upcomingOpponent = hit.name;
+    upcomingOpponentId = hit.id || null;
+    return hit;
   }
+
+  // play-next-game can persist region_tournaments on EOS weeks
+  // (_maybe_reconcile_region_for_eos). Scouting reads the opponent already
+  // sitting on the FCC payload / Office digest instead of that POST.
+  const fromLoaded = opponentFromLoadedFcc(data);
+  if (fromLoaded && fromLoaded.name) {
+    return rememberUpcomingOpponent(key, fromLoaded);
+  }
+
+  upcomingOpponent = null;
+  upcomingOpponentId = null;
+  return null;
 }
 
 function updateScoutingButton(data) {
@@ -5988,476 +2392,14 @@ function updateScoutingButton(data) {
   });
 }
 
-function renderFccScoutingProjectedLineup() {
-  if (!scoutingTabDataCache) return;
-  if (typeof renderProjectedStartingFiveCards === 'function') {
-    renderProjectedStartingFiveCards(scoutingTabDataCache.projected_starting_five || [], {
-      containerId: 'fcc-scouting-projected-lineup',
-      emptyClass: 'scouting-projected-empty',
-    });
-  }
-}
-
-function renderFccScoutingMeasures(teamAttrs) {
-  const radarHost = document.getElementById('fcc-scouting-radar-host');
-  const shootingCard = document.getElementById('fcc-scouting-shooting-card');
-  const reboundingCard = document.getElementById('fcc-scouting-rebounding-card');
-  const chemistryCard = document.getElementById('fcc-scouting-chemistry-card');
-  if (!radarHost || !shootingCard || !reboundingCard || !chemistryCard) return;
-
-  const attrs = teamAttrs || {};
-  radarHost.innerHTML = buildTeamMeasuresRadarMarkup(attrs);
-  shootingCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Shooting', 'shot_threshold', Number(attrs.shot_threshold || 0));
-  reboundingCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Rebounding', 'rebound_modifier', Number(attrs.rebound_modifier || 0));
-  chemistryCard.innerHTML = buildTeamMeasuresLinearCardMarkup('Team Chemistry', 'team_chemistry', Number(attrs.team_chemistry || 0));
-}
-
-async function renderScoutingTab() {
-  const status = document.getElementById('fcc-scouting-status');
-  const content = document.getElementById('fcc-scouting-content');
-  const opponentName = document.getElementById('fcc-scouting-opponent-name');
-  const opponentRecord = document.getElementById('fcc-scouting-opponent-record');
-  const opponentRank = document.getElementById('fcc-scouting-opponent-rank');
-  if (!status || !content || !opponentName || !opponentRecord || !opponentRank) return;
-
-  status.style.display = 'block';
-  content.style.display = 'none';
-  status.textContent = 'Loading scouting report...';
-
-  // A return URL can activate coaches-tab in the same event turn that starts
-  // init(). Wait for the FCC's authoritative team identity and top data before
-  // resolving the matchup. Ordinary tab clicks after startup pass through an
-  // already-settled promise, so this adds no repeat fetch or artificial delay.
-  if (fccInitializationPromise) {
-    try {
-      await fccInitializationPromise;
-    } catch (error) {
-      console.error('Error initializing FCC before scouting report:', error);
-      status.textContent = 'Unable to initialize scouting report.';
-      return;
-    }
-  }
-
-  const opponent = await resolveUpcomingOpponentFromMatchup(commandCenterTopDataCache);
-  if (!opponent) {
-    status.textContent = 'No upcoming opponent available for scouting.';
-    return;
-  }
-
-  const opponentTeamName = opponent.name || '--';
-  const standingsEntry = getStandingsTeamEntry(opponent.id);
-  const rankingEntry = getTeamRankingEntry(opponent.id);
-  const wins = Number(standingsEntry?.W ?? rankingEntry?.W ?? 0);
-  const losses = Number(standingsEntry?.L ?? rankingEntry?.L ?? 0);
-  const rank = Number(rankingEntry?.natl_rank || 0);
-
-  opponentName.textContent = opponentTeamName;
-  opponentRecord.textContent = `${wins}-${losses}`;
-  opponentRank.textContent = Number.isFinite(rank) && rank > 0 ? String(rank) : '--';
-
-  const teamPageLink = document.getElementById('fcc-scouting-team-page-link');
-  if (teamPageLink) {
-    if (opponent.id && franchiseId) {
-      teamPageLink.href = buildFranchiseTeamPageUrl(opponent.id, opponentTeamName, 'coaches-tab');
-    } else {
-      // TODO: wire team page URL when opponent team id is unavailable in matchup context
-      teamPageLink.href = '#';
-    }
-  }
-
-  try {
-    const authHeaders = API_CONFIG.getAuthHeaders();
-    const [teamDataRes, playUsageRes] = await Promise.all([
-      fetch(`${API_CONFIG.buildUrl('/franchise/team-data')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(opponent.name)}`, { headers: authHeaders }),
-      fetch(`${API_CONFIG.buildUrl('/franchise/scouting-report')}?franchise_id=${encodeURIComponent(franchiseId)}&team_name=${encodeURIComponent(opponent.name)}`, { headers: authHeaders })
-    ]);
-
-    if (!teamDataRes.ok) throw new Error('Failed to load team report');
-    if (!playUsageRes.ok) throw new Error('Failed to load play usage');
-
-    const teamData = await teamDataRes.json();
-    const playUsage = await playUsageRes.json();
-    scoutingTabDataCache = playUsage || {};
-    renderFccScoutingProjectedLineup();
-    renderFccScoutingMeasures(teamData.team_attributes || {});
-    if (typeof renderPlayUsage === 'function') {
-      // Backend owns scouting visibility. Regular-season Play Usage is gated by
-      // Film Study; EOS tournament weeks bypass the gate because training does
-      // not run. Until unlocked, each panel shows N/A with a hint.
-      const playUsageUnlocked = playUsage.play_usage_unlocked !== false;
-      renderPlayUsage(
-        playUsageUnlocked ? (playUsage.plays || []) : [],
-        playUsageUnlocked
-          ? 'No previous game data available. Opponent has not played a game yet this season.'
-          : "N/A — Run Film Study in training this week to scout this opponent's play usage.",
-        'fcc-play-usage-body'
-      );
-
-      const extendedUnlocked = playUsage.fast_break_usage_unlocked === true;
-      const extendedHint = "N/A — Set Film Study above 1 in training this week to scout this opponent's play usage.";
-      renderPlayUsage(
-        extendedUnlocked ? (playUsage.fast_break_plays || []) : [],
-        extendedUnlocked
-          ? 'No fast break data available from the opponent\'s last game.'
-          : extendedHint,
-        'fcc-fast-break-usage-body'
-      );
-      renderPlayUsage(
-        (playUsage.hct_usage_unlocked === true) ? (playUsage.hct_trap_plays || []) : [],
-        (playUsage.hct_usage_unlocked === true)
-          ? 'No half-court trap data available from the opponent\'s last game.'
-          : extendedHint,
-        'fcc-hct-usage-body'
-      );
-    }
-    status.style.display = 'none';
-    content.style.display = 'flex';
-  } catch (error) {
-    console.error('Error loading scouting report tab:', error);
-    status.textContent = `Error loading scouting report: ${error.message}`;
-  }
-}
-
-// ============================================================================
-// 🛠️ DEV MODE: Simulate Entire Regular Season Popup (Temporary Development Feature)
-// ============================================================================
-// ⚠️  THIS IS A TEMPORARY DEVELOPMENT FEATURE
-// ⚠️  To disable: Comment out the function below (lines ~1985-2090)
-// ⚠️  To re-enable: Uncomment the function
-// ============================================================================
-
-function showDevSimPopup(topData) {
-  const funcStartTime = performance.now();
-  console.log('⏱️ [PERF] showDevSimPopup function START', { 
-    hasTopData: !!topData,
-    week: topData?.week,
-    trainingWeek: topData?.training_status?.current_week,
-    hasResults: !!topData?.results,
-    resultsType: typeof topData?.results,
-    resultsKeys: topData?.results ? Object.keys(topData.results).length : 'N/A'
-  });
-  
-  // Only show if week is 1 and no games have been played
-  const week = topData?.week || topData?.training_status?.current_week || 1;
-  const results = topData?.results || {};
-  const hasPlayedGames = Object.keys(results).length > 0;
-  
-  console.log('⏱️ [PERF] showDevSimPopup check', { week, hasPlayedGames, resultsKeys: Object.keys(results).length });
-  
-  // Check if games exist in database
-  if (week === 1 && !hasPlayedGames) {
-    console.log('⏱️ [PERF] showDevSimPopup - Creating popup DOM elements');
-    const domStartTime = performance.now();
-    // Create popup overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'dev-sim-popup-overlay';
-    overlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      z-index: 10000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    `;
-    
-    // Create popup content
-    const popup = document.createElement('div');
-    popup.style.cssText = `
-      background: white;
-      padding: 30px;
-      border-radius: 10px;
-      max-width: 500px;
-      text-align: center;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    `;
-    
-    popup.innerHTML = `
-      <h2 style="margin-top: 0; color: #333;">🛠️ Dev Mode: Simulate Regular Season</h2>
-      <p style="color: #666; margin-bottom: 20px;">
-        This will simulate weeks 1-14 with auto-training and auto-lineups for all teams.
-        <br><strong>This will skip directly to the tournament!</strong>
-      </p>
-      <div style="display: flex; gap: 10px; justify-content: center;">
-        <button id="dev-sim-confirm-btn" style="
-          padding: 12px 24px;
-          background: #4a90e2;
-          color: white;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-          font-size: 16px;
-          font-weight: bold;
-        ">Simulate Regular Season</button>
-        <button id="dev-sim-cancel-btn" style="
-          padding: 12px 24px;
-          background: #cdcdcd;
-          color: #333;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-          font-size: 16px;
-        ">Cancel</button>
-      </div>
-      <p style="color: #9a9a9a; font-size: 12px; margin-top: 20px;">
-        ⚠️ Development feature - can be disabled in code
-      </p>
-    `;
-    
-    overlay.appendChild(popup);
-    document.body.appendChild(overlay);
-    
-    // Handle confirm button
-    document.getElementById('dev-sim-confirm-btn').addEventListener('click', async () => {
-      const btn = document.getElementById('dev-sim-confirm-btn');
-      btn.disabled = true;
-      btn.style.display = 'none';
-      
-      // Create progress container
-      const progressContainer = document.createElement('div');
-      progressContainer.id = 'dev-sim-progress';
-      progressContainer.style.cssText = `
-        max-height: 400px;
-        overflow-y: auto;
-        margin: 20px 0;
-        padding: 15px;
-        background: #f5f5f5;
-        border-radius: 5px;
-        font-family: monospace;
-        font-size: 13px;
-        line-height: 1.6;
-        text-align: left;
-      `;
-      
-      const progressList = document.createElement('div');
-      progressList.id = 'dev-sim-progress-list';
-      progressContainer.appendChild(progressList);
-      
-      // Insert progress container before buttons
-      const buttonsContainer = popup.querySelector('div[style*="display: flex"]');
-      if (buttonsContainer) {
-        popup.insertBefore(progressContainer, buttonsContainer);
-      } else {
-        // Fallback: append to popup
-        popup.appendChild(progressContainer);
-      }
-      
-      function addProgressMessage(message, type = 'info') {
-        const messageDiv = document.createElement('div');
-        const timestamp = new Date().toLocaleTimeString();
-        const colors = {
-          info: '#666',
-          success: '#4a90e2',
-          error: '#e74c3c',
-          warning: '#f39c12'
-        };
-        messageDiv.style.cssText = `color: ${colors[type] || colors.info}; margin: 4px 0;`;
-        messageDiv.textContent = `[${timestamp}] ${message}`;
-        progressList.appendChild(messageDiv);
-        progressContainer.scrollTop = progressContainer.scrollHeight;
-      }
-      
-      try {
-        const response = await fetch(API_CONFIG.buildUrl('/franchise/dev-sim-regular-season'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ franchise_id: franchiseId })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Simulation failed: ${response.status} ${response.statusText}`);
-        }
-        
-        // Check if response is streaming (text/event-stream)
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('text/event-stream')) {
-          // Fallback to JSON response (backward compatibility)
-          const result = await response.json();
-          addProgressMessage(result.message || 'Simulation complete!', 'success');
-          setTimeout(() => {
-            popup.innerHTML = `
-              <h2 style="margin-top: 0; color: #4a90e2;">✅ Simulation Complete!</h2>
-              <p style="color: #666; margin-bottom: 20px;">
-                ${result.message || 'Regular season simulated successfully.'}
-              </p>
-              <button id="dev-sim-close-btn" style="
-                padding: 12px 24px;
-                background: #4a90e2;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 16px;
-              ">Close & Reload</button>
-            `;
-            document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
-              document.body.removeChild(overlay);
-              location.reload();
-            });
-          }, 1000);
-          return;
-        }
-        
-        // Stream SSE events
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        
-        addProgressMessage('Starting simulation...', 'info');
-        
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) {
-            break;
-          }
-          
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
-                
-                // Handle different event types
-                switch (data.type) {
-                  case 'start':
-                    addProgressMessage(data.message, 'info');
-                    break;
-                  case 'week_start':
-                    addProgressMessage(`📅 ${data.message}`, 'info');
-                    break;
-                  case 'training_start':
-                    addProgressMessage(`🏋️ ${data.message}`, 'info');
-                    break;
-                  case 'training_progress':
-                    addProgressMessage(`  ✓ ${data.message}`, 'success');
-                    break;
-                  case 'training_complete':
-                    addProgressMessage(`✅ ${data.message}`, 'success');
-                    break;
-                  case 'training_skip':
-                    addProgressMessage(`⏭️ ${data.message}`, 'warning');
-                    break;
-                  case 'training_error':
-                    addProgressMessage(`⚠️ ${data.message}`, 'error');
-                    break;
-                  case 'game_start':
-                    addProgressMessage(`🏀 ${data.message}`, 'info');
-                    break;
-                  case 'game_simulating':
-                    addProgressMessage(`  ⏳ ${data.message}`, 'info');
-                    break;
-                  case 'game_result':
-                    addProgressMessage(`  📊 ${data.message}`, 'success');
-                    break;
-                  case 'game_finalizing':
-                    addProgressMessage(`  💾 ${data.message}`, 'info');
-                    break;
-                  case 'week_completing':
-                    addProgressMessage(`  🔄 ${data.message}`, 'info');
-                    break;
-                  case 'week_complete':
-                    addProgressMessage(`✅ ${data.message}`, 'success');
-                    break;
-                  case 'week_skip':
-                    addProgressMessage(`⏭️ ${data.message}`, 'warning');
-                    break;
-                  case 'week_error':
-                    addProgressMessage(`⚠️ ${data.message}`, 'error');
-                    break;
-                  case 'complete':
-                    addProgressMessage(`🎉 ${data.message}`, 'success');
-                    // Show completion UI
-                    setTimeout(() => {
-                      popup.innerHTML = `
-                        <h2 style="margin-top: 0; color: #4a90e2;">✅ Simulation Complete!</h2>
-                        <p style="color: #666; margin-bottom: 20px;">
-                          ${data.message || 'Regular season simulated successfully.'}
-                        </p>
-                        <button id="dev-sim-close-btn" style="
-                          padding: 12px 24px;
-                          background: #4a90e2;
-                          color: white;
-                          border: none;
-                          border-radius: 5px;
-                          cursor: pointer;
-                          font-size: 16px;
-                        ">Close & Reload</button>
-                      `;
-                      document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
-                        document.body.removeChild(overlay);
-                        location.reload();
-                      });
-                    }, 1000);
-                    break;
-                  case 'error':
-                    addProgressMessage(`❌ ${data.message}`, 'error');
-                    throw new Error(data.message);
-                  default:
-                    if (data.message) {
-                      addProgressMessage(data.message, 'info');
-                    }
-                }
-              } catch (parseError) {
-                console.error('Error parsing SSE data:', parseError, line);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Dev sim error:', error);
-        addProgressMessage(`❌ Error: ${error.message}`, 'error');
-        setTimeout(() => {
-          popup.innerHTML = `
-            <h2 style="margin-top: 0; color: #e74c3c;">❌ Simulation Failed</h2>
-            <p style="color: #666; margin-bottom: 20px;">
-              ${error.message || 'An error occurred during simulation.'}
-            </p>
-            <button id="dev-sim-close-btn" style="
-              padding: 12px 24px;
-              background: #cdcdcd;
-              color: #333;
-              border: none;
-              border-radius: 5px;
-              cursor: pointer;
-              font-size: 16px;
-            ">Close</button>
-          `;
-          document.getElementById('dev-sim-close-btn').addEventListener('click', () => {
-            document.body.removeChild(overlay);
-          });
-        }, 2000);
-      }
-    });
-    
-    // Handle cancel button
-    document.getElementById('dev-sim-cancel-btn').addEventListener('click', () => {
-      document.body.removeChild(overlay);
-    });
-    
-    // Close on overlay click (outside popup)
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
-        document.body.removeChild(overlay);
-      }
-    });
-    
-    const domEndTime = performance.now();
-    console.log(`⏱️ [PERF] showDevSimPopup - DOM creation: ${(domEndTime - domStartTime).toFixed(2)}ms`);
-  } else {
-    console.log('⏱️ [PERF] showDevSimPopup - Popup NOT shown (week !== 1 or hasPlayedGames)');
-  }
-  
-  const funcEndTime = performance.now();
-  console.log(`⏱️ [PERF] showDevSimPopup function COMPLETE: ${(funcEndTime - funcStartTime).toFixed(2)}ms`);
-}
-
-// ============================================================================
-// 🛠️ END DEV MODE FEATURE
-// ============================================================================
+window.GOBFccPrep = {
+  whenReady: () => fccInitializationPromise,
+  resolveUpcomingOpponent: () => resolveUpcomingOpponentFromMatchup(commandCenterTopDataCache),
+  peekUpcomingOpponent: () => {
+    const key = upcomingOpponentCacheKey(commandCenterTopDataCache);
+    return upcomingOpponentByKey[key] || opponentFromLoadedFcc(commandCenterTopDataCache);
+  },
+  rankingEntry: getTeamRankingEntry,
+  standingsEntry: getStandingsTeamEntry,
+  teamPageUrl: buildFranchiseTeamPageUrl,
+};

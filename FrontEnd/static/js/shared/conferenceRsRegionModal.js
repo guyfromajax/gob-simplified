@@ -35,7 +35,8 @@ function cloneParams(params) {
       + '.afm-overlay.is-visible,'
       + '.gob-talert-overlay,'
       + '.sammy-modal-backdrop.open,'
-      + '.bn-overlay.show'
+      + '.bn-overlay.show,'
+      + '.mm-scrim.is-open'
     ));
   }
 
@@ -67,7 +68,7 @@ function cloneParams(params) {
   }
 
   function goToLockerRoom() {
-    var card = document.getElementById('home-locker-room-body');
+    var card = document.getElementById('office-root') || document.getElementById('home-locker-room-body');
     if (!card) return;
     var homeTab = document.querySelector('[data-tab="home-tab"]');
     var homePanel = document.getElementById('home-tab');
@@ -113,5 +114,45 @@ function cloneParams(params) {
     });
   }
 
-  window.ConferenceRsRegionModal = { maybeShow: maybeShow };
+  function labeledEyebrow(queue, eyebrow) {
+    return (window.MomentQueue && window.MomentQueue.queueLabel)
+      ? window.MomentQueue.queueLabel(queue, eyebrow)
+      : eyebrow;
+  }
+
+  function showFromQueue(data, queue) {
+    return new Promise(function (resolve) {
+      var payload = data && data.conference_rs_region_modal;
+      if (presented || !payload || !payload.eligible) {
+        resolve();
+        return;
+      }
+      presented = true;
+      Promise.all([
+        import('/js/shared/sammyModal.js'),
+        import('/js/shared/teamCoachAsset.js'),
+      ]).then(function (loaded) {
+        var finalSentence = payload.lost_round === 'final'
+          ? "Let's go on to the Region Tourney now!"
+          : "Let's sim the rest of the Conference Tourney, then get ready for the Region Tourney!";
+        loaded[0].showSammyModal({
+          eyebrow: labeledEyebrow(queue, 'Region Tournament Qualified'),
+          body: 'Hey Coach, we lost the game, but because you won the regular-season conference title, you still qualify for the Region Tournament. ' + finalSentence,
+          ctaLabel: 'Go To Locker Room',
+          imageSrc: loaded[1].getTeamSammyImage(data.team || ''),
+          primaryClass: 'is-orange',
+          onCta: function () {
+            goToLockerRoom();
+            resolve();
+          },
+        });
+        return markSeen(franchiseId());
+      }).catch(function (err) {
+        console.error('[ConferenceRsRegionModal] failed to show:', err);
+        resolve();
+      });
+    });
+  }
+
+  window.ConferenceRsRegionModal = { maybeShow: maybeShow, showFromQueue: showFromQueue };
 })();

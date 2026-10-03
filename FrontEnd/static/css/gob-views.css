@@ -1,0 +1,1016 @@
+/* Module views. Skeleton is a still block in the view's shape. No spinner. */
+
+#rankings-view .gob-view-skel,
+.gob-view-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0 8px;
+}
+
+.gob-view-skel-bar,
+.gob-view-skel-row {
+  background: var(--white-4, rgba(255, 255, 255, 0.06));
+  border-radius: 8px;
+}
+
+.gob-view-skel-bar {
+  height: 36px;
+  width: 42%;
+}
+
+.gob-view-skel-row {
+  height: 28px;
+  width: 100%;
+}
+
+.gob-view-error {
+  margin: 12px 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.gob-view-error p {
+  margin: 0 0 12px;
+}
+
+.gob-view-retry {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+}
+
+#rankings-view {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.gob-news-empty {
+  margin: 12px 0;
+  color: var(--text-60);
+  font: var(--fw-semibold) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+
+.gob-news,
+.gob-awards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-16);
+}
+
+#franchise-container #awards-view .gob-awards section > h3 {
+  margin: 0 0 var(--space-8);
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
+}
+
+#news-view .gob-news-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: 0;
+  min-height: 100%;
+  padding: var(--space-16) var(--space-18);
+  color: var(--text-100);
+  text-decoration: none;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+}
+
+#news-view .gob-news-card p {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font: var(--fw-semibold) var(--fs-16)/var(--lh-body) var(--font-body);
+}
+
+#news-view .gob-news-card.is-hero p {
+  font-size: var(--fs-22);
+}
+
+#news-view .gob-news-card.is-yours {
+  box-shadow: inset 3px 0 0 var(--navy);
+}
+
+#news-view .gob-news-card:hover p {
+  text-decoration: underline;
+}
+
+#news-view .gob-news-when {
+  color: var(--text-38);
+  font: var(--fw-semibold) var(--fs-11)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-6);
+}
+
+/* One section per week: a quiet heading on a rule, then that week's cards. */
+#news-view .gob-news {
+  gap: var(--dsp-24);
+  padding-top: var(--dsp-8);
+}
+
+#news-view .gob-news-week {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-12);
+  min-width: 0;
+}
+
+#franchise-container #news-view .gob-news-wk {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-10);
+  margin: 0;
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--line);
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-87);
+}
+
+#franchise-container #news-view .gob-news-wk em {
+  font: var(--fw-bold) var(--fs-10)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+
+#news-view .gob-news-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dsp-12);
+  align-items: stretch;
+}
+
+html.gob-shell.gob-1920 #news-view .gob-news-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#franchise-container #news-view a.lnk {
+  color: var(--text-60);
+}
+
+#franchise-container #news-view a.lnk:hover {
+  color: var(--text-100);
+}
+
+.gob-news-type {
+  flex: none;
+  color: var(--text-38);
+  font: var(--fw-semibold) var(--fs-11)/var(--lh-1) var(--font-body);
+  letter-spacing: var(--tracking-6);
+}
+
+.gob-news-link {
+  color: var(--text-60);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.gob-news-link:hover {
+  text-decoration: underline;
+}
+
+.gob-news-story {
+  max-width: 920px;
+}
+
+.gob-news-headline {
+  margin: 8px 0 4px;
+  font: var(--fw-bold) var(--fs-22)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-2);
+}
+
+.gob-news-meta,
+.gob-news-line {
+  margin: 0 0 8px;
+  color: var(--text-87);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+
+.gob-news-gap {
+  height: 10px;
+}
+
+/* Story headings are the app's heading styles (Styleguide › Type), never bold body
+   text: a section is heading-col, a sub-section (and a team over its recruits) is
+   heading-card. */
+#franchise-container #news-view .gob-news-heading {
+  margin: var(--space-12) 0 var(--space-8);
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+#franchise-container #news-view .gob-news-sub {
+  margin: var(--space-8) 0 var(--space-4);
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  color: var(--text-60);
+}
+/* A story with no "Week N" line under its headline: the body keeps its distance. */
+#franchise-container #news-view .gob-news-headline + .gob-news-body {
+  margin-top: var(--space-12);
+}
+#franchise-container #news-view .gob-news-body > .gob-news-heading:first-child,
+#franchise-container #news-view .gob-news-rank > .gob-news-heading {
+  margin-top: 0;
+}
+
+/* Ranking tables. National and Region stack; from 1600px they sit side by side and the
+   story takes the page's width. */
+#franchise-container #news-view .gob-news-ranks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--dsp-16) var(--dsp-24);
+  margin: 0 0 var(--space-12);
+}
+@media (min-width: 1600px) {
+  #franchise-container #news-view .gob-news-story.is-wide {
+    max-width: none;
+  }
+  #franchise-container #news-view .gob-news-ranks.is-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+/* What Score is: one quiet line under the heading. */
+#franchise-container #news-view .gob-news-caption {
+  margin: 0 0 var(--space-8);
+  color: var(--text-60);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-body) var(--font-body);
+}
+/* The rank column is as wide as its content; the team name takes the slack. */
+#franchise-container #news-view .gob-news-rank-tbl th.rk,
+#franchise-container #news-view .gob-news-rank-tbl td.rk {
+  width: 1px;
+  text-align: left;
+  white-space: nowrap;
+}
+#franchise-container #news-view .gob-news-rkn {
+  display: inline-block;
+  min-width: 2.5ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* Rank movement since last week. Neutral both ways (the arrow carries the direction),
+   as the Office draws national rank movement: up t87, down t60. */
+#franchise-container #news-view .gob-news-mv {
+  display: inline-block;
+  min-width: var(--dsz-30);
+  margin-left: var(--space-6);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-bold);
+  color: var(--text-87);
+  white-space: nowrap;
+}
+#franchise-container #news-view .gob-news-mv.dn,
+#franchise-container #news-view .gob-news-mv.is-new {
+  color: var(--text-60);
+}
+#franchise-container #news-view .gob-news-mv.is-new {
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-6);
+}
+/* The user's team outside the table: its own row at the foot, set off by a rule. */
+#franchise-container #news-view .gob-news-rank-tbl tr.is-foot td {
+  border-top: 1px solid var(--line);
+}
+
+/* Recruiting Report › conference leans: a team is a sub-heading over its recruits. The
+   recruits sit under the team name (past the mark), names in one column and RT in the
+   next, so a team can never be read as one more recruit. */
+#franchise-container #news-view .gob-news-team {
+  margin: 0 0 var(--space-12);
+}
+#franchise-container #news-view .gob-news-team-h {
+  margin: 0 0 var(--space-4);
+}
+#franchise-container #news-view .gob-news-team-h .gob-team {
+  color: inherit;
+}
+#franchise-container #news-view .gob-news-team-h a.gob-team:hover {
+  color: var(--text-100);
+}
+#franchise-container #news-view .gob-news-team-h a.gob-team:hover > span {
+  text-decoration: underline;
+}
+#franchise-container #news-view .gob-news-recruits {
+  margin: 0;
+  padding: 0 0 0 var(--dsp-24);
+  list-style: none;
+}
+#franchise-container #news-view .gob-news-recruits li {
+  display: grid;
+  grid-template-columns: 14rem 3rem;
+  column-gap: var(--space-12);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  color: var(--text-87);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+#franchise-container #news-view .gob-news-recruit {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#franchise-container #news-view .gob-news-rt {
+  font-weight: var(--fw-bold);
+}
+
+.gob-news-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+/* The shared wide-table floor is 1760px. A story player table is content-sized so
+   the attribute tiles and the RT letter stay on screen with the name. */
+#franchise-container #news-view .gob-news-body .gob-xs .gob-tbl {
+  min-width: 0;
+  width: max-content;
+}
+
+#franchise-container #awards-view .gob-awards .gob-tcard {
+  width: fit-content;
+  max-width: 100%;
+}
+
+#franchise-container #awards-view table.gob-awards-tbl {
+  width: max-content;
+  max-width: 100%;
+}
+
+#franchise-container #awards-view table.gob-awards-tbl col.c-player { width: 14rem; }
+#franchise-container #awards-view table.gob-awards-tbl col.c-yr { width: 3rem; }
+#franchise-container #awards-view table.gob-awards-tbl col.c-team { width: 14rem; }
+#franchise-container #awards-view table.gob-awards-tbl col.c-stat { width: 3.5rem; }
+
+#franchise-container #awards-view table.gob-awards-tbl col.c-pos { width: 3.25rem; }
+#franchise-container #awards-view table.gob-awards-tbl col.c-rt { width: 3.5rem; }
+
+/* All-Conference sits under the All-American teams: its own head, the row of sixteen
+   conferences (the shared segment control, wrapping), then the two tables. The user's
+   conference is cued with a quiet "Yours"; the chosen one is `on`. */
+#franchise-container #awards-view .gob-awards-conf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsp-16);
+  margin-top: var(--space-8);
+  padding-top: var(--dsp-16);
+  border-top: 1px solid var(--line);
+}
+#franchise-container #awards-view .gob-awards-conf-row {
+  flex-wrap: wrap;
+  align-self: flex-start;
+  max-width: 100%;
+}
+#franchise-container #awards-view .gob-awards-conf-row button.is-yours {
+  color: var(--text-87);
+}
+#franchise-container #awards-view .gob-awards-conf-row button em {
+  font-style: normal;
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-6);
+  text-transform: uppercase;
+  color: var(--text-60);
+}
+#franchise-container #awards-view .gob-awards-conf-row button.on em {
+  color: var(--text-87);
+}
+
+/* What the page is, and when it changes. Neutral: a projection is information. */
+#franchise-container #awards-view .gob-awards-head h2 {
+  margin: 0 0 var(--space-4);
+  font: var(--fw-bold) var(--fs-20)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-7);
+  color: var(--text-100);
+}
+#franchise-container #awards-view .gob-awards-head p,
+#franchise-container #awards-view .gob-awards-note {
+  margin: 0;
+  font: var(--fw-medium) var(--fs-12)/var(--lh-body) var(--font-body);
+  color: var(--text-60);
+}
+/* Position is an information code: luminance only. */
+#franchise-container #awards-view .gob-awards-pos {
+  font-weight: var(--fw-bold);
+  color: var(--text-60);
+}
+
+#franchise-container #awards-view a.gob-player {
+  color: var(--text-100);
+  text-decoration: none;
+}
+
+#franchise-container #awards-view a.gob-player:hover {
+  text-decoration: underline;
+}
+
+#franchise-container #awards-view .gob-awards-empty {
+  color: var(--text-38);
+}
+
+#franchise-container #practice-squad-view .gob-ps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  min-width: 0;
+  padding-bottom: var(--space-16);
+}
+
+#franchise-container #practice-squad-view .gob-ps-empty {
+  margin: 0;
+  color: var(--text-60);
+  font: var(--fw-regular) var(--fs-14)/var(--lh-body) var(--font-body);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-eye {
+  margin: 0;
+  color: var(--text-38);
+  font: var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-12);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row .away {
+  justify-self: end;
+  text-align: right;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row .home {
+  justify-self: start;
+  text-align: left;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ-row .res {
+  text-align: center;
+}
+
+#franchise-container #practice-squad-view a.gob-team {
+  color: var(--text-100);
+  text-decoration: none;
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ a.gob-team {
+  color: var(--text-60);
+}
+
+#franchise-container #practice-squad-view .gob-ps-champ a.gob-team.is-win {
+  color: var(--text-100);
+}
+
+#franchise-container #practice-squad-view a.gob-team:hover,
+#franchise-container #practice-squad-view a.gob-team:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+}
+
+#franchise-container #practice-squad-view a.gob-res {
+  color: var(--text-87);
+  text-decoration: none;
+}
+
+#franchise-container #practice-squad-view a.gob-res:hover,
+#franchise-container #practice-squad-view a.gob-res:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+}
+
+#franchise-container #practice-squad-view a.gob-team:focus-visible,
+#franchise-container #practice-squad-view a.gob-res:focus-visible,
+#franchise-container #practice-squad-view .gob-ps-tiers button:focus-visible,
+html.gob-shell .pg-tools[data-owner="practice-squad-view"] button:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+#franchise-container #practice-squad-view .gob-ps-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  width: max-content;
+  max-width: 100%;
+}
+
+#franchise-container #practice-squad-view .gob-ps-tiers button.on {
+  background: var(--white-10);
+  color: var(--white);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket {
+  position: relative;
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  overflow-x: auto;
+  padding-bottom: var(--space-8);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket > svg.conn {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .bracket-col {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1 1 8.5rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-8);
+  min-width: 8.5rem;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .col-head {
+  color: var(--text-60);
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-6);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .mu {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  min-width: 8.5rem;
+  overflow: hidden;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .team {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .team + .team {
+  border-top: 1px solid var(--line);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .tname {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .seed,
+#franchise-container #practice-squad-view .gob-ps-bracket .score {
+  color: var(--text-60);
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .trophy,
+#franchise-container #practice-squad-view .gob-ps-bracket .champ-badge,
+#franchise-container #practice-squad-view .gob-ps-bracket .champ-vs,
+#franchise-container #practice-squad-view .gob-ps-bracket .champ-plate,
+#franchise-container #practice-squad-view .gob-ps-bracket .team svg,
+#franchise-container #practice-squad-view .gob-ps-bracket img,
+#franchise-container #practice-squad-view .gob-ps-bracket .logo {
+  display: none;
+}
+
+#franchise-container #practice-squad-view .gob-ps-bracket .mu--user {
+  box-shadow: inset 3px 0 0 var(--navy);
+}
+
+#franchise-container #practice-squad-view .gob-ps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-12);
+  align-items: start;
+}
+
+html.gob-shell.gob-1920 #franchise-container #practice-squad-view .gob-ps-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+#franchise-container #practice-squad-view .gob-ps-grid .gob-tbl th,
+#franchise-container #practice-squad-view .gob-ps-grid .gob-tbl td,
+#franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl th,
+#franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl td {
+  padding: var(--space-4) var(--space-8);
+}
+
+#franchise-container #practice-squad-view .gob-ps-schedule .gob-tbl {
+  width: 100%;
+}
+
+#franchise-container #practice-squad-view .gob-ps-schedule th.res,
+#franchise-container #practice-squad-view .gob-ps-schedule td.res {
+  width: 1%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* League › Tournament (tournament-view) */
+#franchise-container #tournament-view .gob-tour-phases button.on {
+  background: var(--white-10);
+  color: var(--white);
+}
+
+#franchise-container #tournament-view .gob-tour-empty {
+  color: var(--text-60);
+  margin: 0 0 var(--space-12);
+}
+
+#franchise-container #tournament-view .gob-tour-locked-block {
+  margin: 0 0 var(--space-16);
+}
+
+#franchise-container #tournament-view .gob-tour-locked-title {
+  margin: 0 0 var(--space-12);
+  color: var(--text-60);
+  font: var(--fw-semibold) var(--fs-14)/var(--lh-1-3) var(--font-ui);
+}
+
+#franchise-container #tournament-view .gob-tour-phase-info {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+#franchise-container #tournament-view .gob-tour-phase-info li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-12);
+  color: var(--text-60);
+  font: var(--fw-medium) var(--fs-13)/var(--lh-1-3) var(--font-ui);
+}
+
+#franchise-container #tournament-view .gob-tour-status {
+  margin: 0 0 var(--space-16);
+}
+
+#franchise-container #tournament-view .gob-tour-status-eye {
+  margin: 0;
+  color: var(--text-38);
+  font: var(--fw-bold) var(--fs-11)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-8);
+  text-transform: uppercase;
+}
+
+#franchise-container #tournament-view .gob-tour-status-name {
+  margin: var(--space-6) 0 0;
+  color: var(--text-100);
+  font: var(--fw-bold) var(--fs-22)/var(--lh-1-1) var(--font-display);
+  letter-spacing: var(--tracking-2);
+}
+
+#franchise-container #tournament-view .gob-tour-bracket {
+  margin-top: var(--space-12);
+  min-height: 28rem;
+  width: 100%;
+  overflow-x: auto;
+}
+
+#franchise-container #tournament-view .fcc-tb-classic,
+#franchise-container #tournament-view .fcc-tb-region--full,
+#franchise-container #tournament-view .fcc-tb-region--4,
+#franchise-container #tournament-view .fcc-tb-region--3 {
+  width: fit-content;
+  max-width: 100%;
+}
+
+#franchise-container #tournament-view .fcc-tb-classic {
+  grid-template-columns: repeat(5, minmax(0, 22rem));
+}
+
+#franchise-container #tournament-view .fcc-tb-region--full,
+#franchise-container #tournament-view .fcc-tb-region--4,
+#franchise-container #tournament-view .fcc-tb-region--3 {
+  grid-template-columns: minmax(0, 22rem) minmax(0, 22rem) minmax(12px, 1fr);
+}
+
+#franchise-container #tournament-view .fcc-tb-region-col {
+  max-width: 22rem;
+}
+
+#franchise-container #tournament-view .fcc-tb-enter,
+#franchise-container #tournament-view .fcc-tb-enter * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+#franchise-container #tournament-view .fcc-tb-mu--user {
+  border-color: color-mix(in srgb, var(--navy-hi) 55%, var(--white-10));
+  box-shadow:
+    inset 3px 0 0 var(--navy),
+    0 8px 22px rgba(0, 0, 0, 0.4);
+}
+
+#franchise-container #tournament-view .fcc-tb-team--user {
+  border-left: 3px solid var(--navy);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--navy) 22%, transparent),
+    transparent
+  );
+  box-shadow: none;
+}
+
+#franchise-container #tournament-view .fcc-tb-team--user .fcc-tb-name-text,
+#franchise-container #tournament-view .fcc-tb-team--user .fcc-tb-score,
+#franchise-container #tournament-view .fcc-tb-team--user a.fcc-tb-score {
+  color: var(--text-87);
+}
+
+#franchise-container #tournament-view .fcc-tb-team--user .fcc-tb-seed {
+  color: var(--text-60);
+}
+
+#franchise-container #tournament-view .fcc-tb-team--champion.fcc-tb-team--user {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--navy) 18%, transparent),
+    color-mix(in srgb, rgba(212, 168, 72, 1) 12%, transparent)
+  );
+}
+
+#franchise-container #tournament-view .fcc-tb-res-link {
+  display: none;
+}
+
+#franchise-container #tournament-view a.gob-res {
+  color: var(--text-87);
+  text-decoration: none;
+}
+
+#franchise-container #tournament-view a.gob-res:hover,
+#franchise-container #tournament-view a.gob-res:focus-visible {
+  color: var(--text-100);
+  text-decoration: underline;
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+#franchise-container #tournament-view .fcc-tb-team--winner a.fcc-tb-score {
+  font-weight: var(--fw-semibold);
+}
+
+#franchise-container #team-schedule-view tr.is-tourney td.wk {
+  color: var(--text-60);
+}
+
+/* ── Roster rhythm ────────────────────────────────────────────────────────────
+   Nineteen columns read as three groups: identity, six attribute pairs, Dev focus.
+   Scoped to the full roster grid, wherever it renders (Team › Roster, a team page). */
+
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td {
+  padding-left: var(--dsp-6);
+  padding-right: var(--dsp-6);
+}
+
+/* Current → Pot starts at the column edge so the two grades read as one lockup. */
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th.rt,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td.rt {
+  text-align: left;
+  padding-left: var(--dsp-12);
+  padding-right: var(--dsp-12);
+}
+
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th.code,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td.code {
+  text-align: center;
+  padding-left: var(--dsp-8);
+  padding-right: var(--dsp-8);
+}
+
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th.num,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding-left: var(--dsp-8);
+}
+
+/* Dev focus keeps its right edge, and opens on the gutter that separates two pairs. */
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl th.dev,
+html.gob-shell .gob-roster:not(.is-compact) .gob-tbl td.dev {
+  text-align: right;
+  padding-left: var(--pair-out, var(--dsp-16));
+  padding-right: var(--dsp-12);
+}
+
+/* The tier already lives in the digit's colour. The luminance square behind it
+   said the same thing a second time and turned the grid into a heat map. */
+html.gob-shell .gob-roster:not(.is-compact) .attr-tile {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ── Attribute pairs (Styleguide › Tables) ────────────────────────────────────
+   SC SH | ID OD | PS BH | RB ST | AG ND | IQ FT. The two values of a pair sit
+   against their shared edge, `--pair-in` apart, so a pair reads as one unit however
+   wide the table is; `--pair-out` is the gutter between pairs. The pair columns take
+   no slack: it goes to the identity columns and to `--pair-lead`, the wider gutter
+   that separates WT from the first pair. Row and group shading are untouched. */
+
+html.gob-shell .gob-pairs {
+  --pair-tile: var(--dsz-22);
+  --pair-in: var(--space-2);
+  --pair-out: var(--dsp-16);
+  --pair-lead: var(--dsp-24);
+}
+
+/* The gutters follow the card, not the window, so a roster inside a narrower card
+   keeps the same proportions. */
+@supports (width: 1cqw) {
+  html.gob-shell .gob-pairs {
+    container-type: inline-size;
+    --pair-out: max(var(--dsp-8), 1.65cqw);
+    --pair-lead: max(var(--dsp-16), 4cqw);
+  }
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.gstart,
+html.gob-shell .gob-pairs .gob-tbl td.gstart,
+html.gob-shell .gob-pairs .gob-tbl th.gend,
+html.gob-shell .gob-pairs .gob-tbl td.gend {
+  width: 1px;
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.gstart,
+html.gob-shell .gob-pairs .gob-tbl td.gstart {
+  text-align: right;
+  padding-left: var(--pair-out);
+  padding-right: var(--pair-in);
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.gend,
+html.gob-shell .gob-pairs .gob-tbl td.gend {
+  text-align: left;
+  padding-left: var(--pair-in);
+  padding-right: var(--pair-out);
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.wt,
+html.gob-shell .gob-pairs .gob-tbl td.wt {
+  padding-right: var(--pair-lead);
+}
+
+html.gob-shell .gob-pairs .attr-tile { width: var(--pair-tile); }
+html.gob-shell .gob-pairs td.gstart .attr-tile { margin-left: auto; }
+html.gob-shell .gob-pairs td.gend .attr-tile { margin-right: auto; }
+
+/* The label sits over its value, and the sort caret under the label, so neither
+   widens the column. */
+html.gob-shell .gob-pairs .ak {
+  position: relative;
+  display: inline-block;
+  width: var(--pair-tile);
+  text-align: center;
+}
+
+html.gob-shell .gob-pairs .gob-tbl th.gstart.s::after,
+html.gob-shell .gob-pairs .gob-tbl th.gend.s::after {
+  content: none;
+}
+
+html.gob-shell .gob-pairs th.s .ak::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  margin: var(--space-2) 0 0 calc(-1 * var(--space-3));
+  border: var(--space-3) solid transparent;
+  border-top-color: var(--text-38);
+}
+
+html.gob-shell .gob-pairs th.s.asc .ak::after {
+  margin-top: calc(-1 * var(--space-2));
+  border-top-color: transparent;
+  border-bottom-color: var(--text-100);
+}
+
+html.gob-shell .gob-pairs th.s.desc .ak::after {
+  border-top-color: var(--text-100);
+}
+
+/* ── Team › Team Attributes (design review item 5) ────────────────────────────
+   Four columns of paired measures over three rows. Each cell carries its name and
+   place on one line and its gauge and value on the next, so no row ends
+   in a long empty run. */
+
+/* The card stays a block: `.tm-radar-wrap` already centres the chart, and making it
+   a flex item here would shrink it to fit, which collapses the svg's own width:100%.
+   The chart is sized to leave the twelve cells visible below it. */
+html.gob-shell #team-attributes-view .mradar {
+  padding: var(--dsp-2) var(--dsp-12);
+}
+
+html.gob-shell #team-attributes-view .mradar .tm-radar-wrap { min-height: 0; }
+
+/* The chart is square, so its width is also its height. Bounding it by the viewport
+   keeps the twelve cells on screen at 720px tall and still lets it grow at 1080. */
+html.gob-shell #team-attributes-view .mradar .tm-radar-svg { max-width: min(448px, 44vh); }
+
+html.gob-shell #team-attributes-view .mgrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--dsp-10) var(--col-gap);
+  padding: var(--dsp-8) var(--dsp-12);
+}
+
+html.gob-shell #team-attributes-view .mcell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+/* The rule separates rows, so it sits on top of every cell below the first row.
+   Drawn on the bottom instead it would trail under the last row, floating just
+   above the card's own edge — and the last row is short, so counting back from the
+   end would take the rule off a cell in the row above it. */
+html.gob-shell #team-attributes-view .mcell:nth-child(n+5) {
+  padding-top: var(--dsp-8);
+  border-top: 1px solid var(--line);
+}
+
+/* Name, then its place beside it: "Offense (1st of 128)". */
+html.gob-shell #team-attributes-view .mtop {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+html.gob-shell #team-attributes-view .mtop .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-100);
+  font-size: var(--fs-13);
+}
+
+html.gob-shell #team-attributes-view .mtop .place {
+  flex: none;
+  color: var(--text-38);
+  font-size: var(--fs-11);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+html.gob-shell #team-attributes-view .mbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.6ch;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+html.gob-shell #team-attributes-view .mbar b {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  text-align: right;
+  color: var(--text-87);
+  font-variant-numeric: tabular-nums;
+}
+
+html.gob-shell #team-attributes-view .mbar b em {
+  font-style: normal;
+  font-size: var(--fs-11);
+  color: var(--text-38);
+}
+
+html.gob-shell #team-attributes-view .dv.is-empty i { width: 0; }
+
+/* The percentile meter fills the same track as the ± pill so every gauge in the
+   grid starts and ends on the same two edges. */
+html.gob-shell #team-attributes-view .gob-meter {
+  width: auto;
+  min-width: 0;
+  flex: none;
+}

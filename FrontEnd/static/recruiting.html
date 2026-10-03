@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
 <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,23 +12,25 @@
 <link rel="stylesheet" href="/css/fonts.css">
   <link rel="stylesheet" href="/css/rt-buckets.css">
   <link rel="stylesheet" href="/css/attr-tiles.css">
+  <link rel="stylesheet" href="/css/gob-tokens.css">
+  <link rel="stylesheet" href="/css/gob-tables.css">
   <link rel="stylesheet" href="/recruiting-spine.css">
   <link rel="stylesheet" href="/recruiting-dock.css">
   <link rel="stylesheet" href="/recruiting-signing.css">
   <link rel="stylesheet" href="/recruiting-results-hub.css">
   <style>
     /* Hub page frame (back link + error). Everything else is spine-styled. */
-    .hub-page-header { display: flex; align-items: center; margin-bottom: 4px; }
+    .hub-page-header { display: flex; align-items: center; margin-bottom: var(--space-4); }
     .brand-back-link {
-      display: inline-flex; align-items: center; gap: 8px; padding: 0; background: none;
-      color: rgba(255, 255, 255, 0.76); font-weight: 600; font-size: 14px;
-      text-decoration: none; border: 0; transition: color 0.18s ease, transform 0.18s ease;
+      display: inline-flex; align-items: center; gap: var(--space-8); padding: 0; background: none;
+      color: var(--white-75); font-weight: var(--fw-semibold); font-size: var(--fs-14);
+      text-decoration: none; border: 0; transition: color var(--dur-rail) var(--ease-out), transform var(--dur-rail) var(--ease-out);
     }
-    .brand-back-link:hover { color: #fff; transform: translateX(-1px); }
-    .brand-back-link::before { content: "\2190"; font-size: 16px; line-height: 1; }
+    .brand-back-link:hover { color: var(--text-100); transform: translateX(-1px); }
+    .brand-back-link::before { content: "\2190"; font-size: var(--fs-16); line-height: var(--lh-1); }
     .hub-error {
       margin-top: 40px; padding: 26px; text-align: center; border: 1px solid var(--border);
-      border-radius: 14px; background: var(--surf); color: var(--muted); font-size: 14px;
+      border-radius: var(--radius-card); background: var(--surf); color: var(--muted); font-size: var(--fs-14);
     }
   </style>
 </head>
@@ -36,12 +39,13 @@
     <div class="hub-page-header">
       <a id="back-btn" class="brand-back-link" href="#">Back to Locker Room</a>
     </div>
-    <div id="hub-root" class="spine"></div>
+    <div id="hub-root" class="spine"><div class="hub-skel" aria-hidden="true"><i></i><i></i><i class="tall"></i></div></div>
   </div>
 
   <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
   <script src="/js/shared/attributeTooltips.js"></script>
+  <script src="/js/utils/attributeDisplay.js"></script>
   <script src="/js/shared/attrTiles.js"></script>
   <script src="/js/shared/rtBucket.js"></script>
   <script src="/js/shared/playerYear.js"></script>

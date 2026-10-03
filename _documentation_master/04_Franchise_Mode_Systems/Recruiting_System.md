@@ -158,7 +158,9 @@ CPU teams build up to 20 entries:
 Recruit visits are resolved when weekly training processing runs. Each team receives at most one
 visit and each recruit visits at most one team. The conflict resolver considers board priority,
 existing leans, and a prestige-weighted team draw. Results are stored on the franchise and exposed
-through `/franchise/recruiting-results`.
+through `/franchise/recruiting-results`. No page reads that route now. In weeks 20–26 the Recruiting
+Hub shows visits only through the Invite Visits calendar (`visit_history` from
+`/franchise/recruiting-data`); the "This Week's Results" panel was removed on 2026-09-28.
 
 ### Visit-based lean movement
 

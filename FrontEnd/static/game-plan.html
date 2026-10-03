@@ -1,11 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
+  <script>
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search);
+        if (q.get('resume_from_timeout') === 'true' || q.get('mode') === 'tutorial') return;
+        q.set('tab', 'game-plan-view');
+        if (!q.get('from')) q.set('from', 'command_center');
+        location.replace('/franchise-command-center.html?' + q.toString());
+      } catch (err) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
+  <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8" />
@@ -13,12 +26,14 @@
   <title>Set Your Game Plan</title>
 <link rel="stylesheet" href="/franchise-command-center.css" />
   <link rel="stylesheet" href="/resource-pages.css" />
-  <!-- gob-buttons supplies .gob-btn--action for the FTE v3 tutorial CONTINUE CTA. -->
+  <!-- gob-buttons supplies .gob-btn--neutral for the FTE v3 tutorial PLAY NOW CTA. -->
+  <link rel="stylesheet" href="/css/gob-tokens.css" />
   <link rel="stylesheet" href="/css/gob-buttons.css" />
+  <link rel="stylesheet" href="/css/gob-toast.css" />
   <link rel="stylesheet" href="/game-plan.css" />
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
-<body>
+<body class="game-plan-page">
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -35,187 +50,223 @@
           <h1 id="page-title">Set Your Game Plan</h1>
           <p id="tutorial-readonly-subhead" class="tutorial-readonly-subhead" hidden>Read-only for onboarding game.</p>
         </header>
-        <div class="sliders-container">
-          <!-- Left Column: Offense -->
-          <div class="slider-column">
-            <div class="slider-group">
-              <label for="slider-offense">Offense</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-offense" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-offense">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>100% Motion</span>
-                <span>50/50</span>
-                <span>100% Set Plays</span>
+        <div class="button-container">
+          <button type="button" id="btn-back-to-lineup" class="btn btn-secondary" style="display: none;">Back To Lineup</button>
+          <button type="button" id="btn-cancel" class="btn btn-secondary" style="display: none;">Cancel</button>
+          <button type="button" id="btn-save-game-plan" class="btn btn-o btn-save-game-plan">Save Game Plan</button>
+        </div>
+        <div class="gpc cols2">
+          <section aria-label="Offense">
+            <div class="gpr">
+              <div class="gpr-n"><b>Offense</b><span data-effect="offense"></span></div>
+              <div class="gt strategy-slider" id="slider-offense" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Offense">
+                <i class="gt-r"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <span class="gt-l a">100% Motion</span>
+                <span class="gt-l b on">50/50</span>
+                <span class="gt-l c">100% Set Plays</span>
+                <span class="slider-value" id="value-offense" hidden>2</span>
               </div>
             </div>
-
-            <!-- FTE v3 "Shot Diet" nest. Inside / Attack / Outside compete for the
-                 SAME touches, so they are grouped to make that tradeoff visible.
-                 Visual grouping ONLY — slider semantics, ids, and the
-                 offense-not-all-zero validation are untouched. One shared tip on the
-                 section title; deliberately no per-slider info icons. -->
-            <div class="slider-nest" id="shot-diet-nest">
-              <div class="slider-nest__head">
-                <span class="slider-nest__title">Shot diet</span>
+            <!-- Shot Diet: Inside / Attack / Outside share touches. A section like
+                 Execution and Transition; the tip and the offense-not-all-Never modal
+                 are unchanged. -->
+            <div class="grp" id="shot-diet-nest">
+              <div class="grp-hd">
+                <span class="eb grp-h">Shot Diet</span>
                 <button type="button" class="slider-nest__info"
                         aria-label="About the shot diet sliders"
-                        title="These three share touches — raise one, the others compete.">i</button>
+                        aria-describedby="shot-diet-tip">i</button>
+                <span id="shot-diet-tip" hidden>These three share touches — raise one, the others compete.</span>
               </div>
-
-            <div class="slider-group">
-              <label for="slider-inside">Inside Offense</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-inside" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-inside">2</span>
+              <div class="gpr">
+                <div class="gpr-n"><b>Inside Offense</b><span data-effect="inside"></span></div>
+                <div class="gt strategy-slider" id="slider-inside" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Inside Offense">
+                  <i class="gt-r"></i>
+                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                  <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                  <span class="gt-l a">Never</span>
+                  <span class="gt-l b on">Normal</span>
+                  <span class="gt-l c">Most</span>
+                  <span class="slider-value" id="value-inside" hidden>2</span>
+                </div>
               </div>
-              <div class="slider-labels">
-                <span>Never</span>
-                <span>Normal</span>
-                <span>Most</span>
+              <div class="gpr">
+                <div class="gpr-n"><b>Attack Offense</b><span data-effect="attack"></span></div>
+                <div class="gt strategy-slider" id="slider-attack" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Attack Offense">
+                  <i class="gt-r"></i>
+                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                  <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                  <span class="gt-l a">Never</span>
+                  <span class="gt-l b on">Normal</span>
+                  <span class="gt-l c">Most</span>
+                  <span class="slider-value" id="value-attack" hidden>2</span>
+                </div>
               </div>
-            </div>
-
-            <div class="slider-group">
-              <label for="slider-attack">Attack Offense</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-attack" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-attack">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>Never</span>
-                <span>Normal</span>
-                <span>Most</span>
-              </div>
-            </div>
-
-            <div class="slider-group">
-              <label for="slider-outside">Outside Offense</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-outside" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-outside">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>Never</span>
-                <span>Normal</span>
-                <span>Most</span>
-              </div>
-            </div>
-            </div><!-- /.slider-nest -->
-
-            <div class="slider-group">
-              <label for="slider-tempo">Offense Tempo</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-tempo" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-tempo">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>Slow</span>
-                <span>Normal</span>
-                <span>Fast</span>
+              <div class="gpr">
+                <div class="gpr-n"><b>Outside Offense</b><span data-effect="outside"></span></div>
+                <div class="gt strategy-slider" id="slider-outside" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Outside Offense">
+                  <i class="gt-r"></i>
+                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                  <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                  <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                  <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                  <span class="gt-l a">Never</span>
+                  <span class="gt-l b on">Normal</span>
+                  <span class="gt-l c">Most</span>
+                  <span class="slider-value" id="value-outside" hidden>2</span>
+                </div>
               </div>
             </div>
-
-            <div class="slider-group">
-              <label for="slider-alterations">Play Alteration</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-alterations" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-alterations">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>Least</span>
-                <span>Normal</span>
-                <span>Most</span>
-              </div>
-            </div>
-          </div>
-          <!-- Right Column: Defense / General -->
-          <div class="slider-column">
-            <div class="slider-group">
-              <label for="slider-defense">Defense</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-defense" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-defense">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>100% Man</span>
-                <span>50/50</span>
-                <span>100% Zone</span>
+            <span class="eb grp-h">Execution</span>
+            <div class="gpr">
+              <div class="gpr-n"><b>Offense Tempo</b><span data-effect="tempo"></span></div>
+              <div class="gt strategy-slider" id="slider-tempo" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Offense Tempo">
+                <i class="gt-r"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <span class="gt-l a">Slow</span>
+                <span class="gt-l b on">Normal</span>
+                <span class="gt-l c">Fast</span>
+                <span class="slider-value" id="value-tempo" hidden>2</span>
               </div>
             </div>
-
-            <div class="slider-group">
-              <label for="slider-aggression">Aggression</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-aggression" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-aggression">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>Passive</span>
-                <span>Normal</span>
-                <span>Aggressive</span>
-              </div>
-            </div>
-
-            <div class="slider-group">
-              <label for="slider-hc-trap">Half-Court Trap</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-hc-trap" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-hc-trap">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>Never</span>
-                <span>Normal</span>
-                <span>Most</span>
+            <div class="gpr">
+              <div class="gpr-n"><b>Play Alteration</b><span data-effect="alterations"></span></div>
+              <div class="gt strategy-slider" id="slider-alterations" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Play Alteration">
+                <i class="gt-r"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <span class="gt-l a">Least</span>
+                <span class="gt-l b on">Normal</span>
+                <span class="gt-l c">Most</span>
+                <span class="slider-value" id="value-alterations" hidden>2</span>
               </div>
             </div>
-
-            <div class="slider-group">
-              <label for="slider-fc-press">Full-Court Press</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-fc-press" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-fc-press">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>Never</span>
-                <span>Normal</span>
-                <span>Most</span>
-              </div>
-            </div>
-
-            <div class="slider-group">
-              <label for="slider-fast_breaks">Fast Break</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-fast_breaks" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-fast_breaks">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>100% Half-Court Sets</span>
-                <span>50/50</span>
-                <span>100% Fast Breaks</span>
+          </section>
+          <section aria-label="Defense">
+            <div class="gpr">
+              <div class="gpr-n"><b>Defense</b><span data-effect="defense"></span></div>
+              <div class="gt strategy-slider" id="slider-defense" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Defense">
+                <i class="gt-r"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <span class="gt-l a">100% Man</span>
+                <span class="gt-l b on">50/50</span>
+                <span class="gt-l c">100% Zone</span>
+                <span class="slider-value" id="value-defense" hidden>2</span>
               </div>
             </div>
-
-            <div class="slider-group">
-              <label for="slider-rebounding">Offensive Rebounding</label>
-              <div class="slider-wrapper">
-                <input type="range" id="slider-rebounding" class="strategy-slider" min="0" max="4" step="1" value="2" />
-                <span class="slider-value" id="value-rebounding">2</span>
-              </div>
-              <div class="slider-labels">
-                <span>100% Crash the Boards</span>
-                <span>50/50</span>
-                <span>100% Get Back on D</span>
+            <span class="eb grp-h">Disruption</span>
+            <div class="gpr">
+              <div class="gpr-n"><b>Aggression</b><span data-effect="aggression"></span></div>
+              <div class="gt strategy-slider" id="slider-aggression" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Aggression">
+                <i class="gt-r"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <span class="gt-l a">Passive</span>
+                <span class="gt-l b on">Normal</span>
+                <span class="gt-l c">Aggressive</span>
+                <span class="slider-value" id="value-aggression" hidden>2</span>
               </div>
             </div>
-          </div>
-        </div>
-        <!-- Action Buttons -->
-        <div class="button-container">
-          <button id="btn-save-game-plan" class="btn btn-save-game-plan">Save Game Plan</button>
-          <button id="btn-back-to-lineup" class="btn btn-secondary" style="display: none;">Back To Lineup</button>
-          <button id="btn-cancel" class="btn btn-secondary" style="display: none;">Cancel</button>
+            <div class="gpr">
+              <div class="gpr-n"><b>Half-Court Trap</b><span data-effect="hc_trap"></span></div>
+              <div class="gt strategy-slider" id="slider-hc-trap" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Half-Court Trap">
+                <i class="gt-r"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <span class="gt-l a">Never</span>
+                <span class="gt-l b on">Normal</span>
+                <span class="gt-l c">Most</span>
+                <span class="slider-value" id="value-hc-trap" hidden>2</span>
+              </div>
+            </div>
+            <div class="gpr">
+              <div class="gpr-n"><b>Full-Court Press</b><span data-effect="fc_press"></span></div>
+              <div class="gt strategy-slider" id="slider-fc-press" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="Normal" aria-label="Full-Court Press">
+                <i class="gt-r"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <span class="gt-l a">Never</span>
+                <span class="gt-l b on">Normal</span>
+                <span class="gt-l c">Most</span>
+                <span class="slider-value" id="value-fc-press" hidden>2</span>
+              </div>
+            </div>
+            <span class="eb grp-h">Transition</span>
+            <div class="gpr">
+              <div class="gpr-n"><b>Fast Break</b><span data-effect="fast_breaks"></span></div>
+              <div class="gt strategy-slider" id="slider-fast_breaks" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Fast Break">
+                <i class="gt-r"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <span class="gt-l a">100% Half-Court Sets</span>
+                <span class="gt-l b on">50/50</span>
+                <span class="gt-l c">100% Fast Breaks</span>
+                <span class="slider-value" id="value-fast_breaks" hidden>2</span>
+              </div>
+            </div>
+            <div class="gpr">
+              <div class="gpr-n"><b>Offensive Rebounding</b><span data-effect="rebounding"></span></div>
+              <div class="gt strategy-slider" id="slider-rebounding" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="4" aria-valuenow="2" aria-valuetext="50/50" aria-label="Offensive Rebounding">
+                <i class="gt-r"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.25)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <i class="gt-s n" style="left:calc(8px + (100% - 16px) * 0.75)"></i>
+                <i class="gt-s" style="left:calc(8px + (100% - 16px) * 1)"></i>
+                <i class="gt-k" style="left:calc(8px + (100% - 16px) * 0.5)"></i>
+                <span class="gt-l a">100% Crash the Boards</span>
+                <span class="gt-l b on">50/50</span>
+                <span class="gt-l c">100% Get Back on D</span>
+                <span class="slider-value" id="value-rebounding" hidden>2</span>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </section>
@@ -234,80 +285,28 @@
   <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
 
   <script src="/common.js"></script>
+  <script src="/js/shared/attributeTooltips.js"></script>
   <script src="/js/shared/playbookTeamId.js"></script>
   <script src="/js/shared/timeoutNavigationHelper.js"></script>
-  <script>
-    // Cache buster: Add timestamp to force browser to reload game-plan.js
-    const cacheBuster = Date.now();
-    const script = document.createElement('script');
-    // Load API config first (detect environment for path)
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const staticPrefix = isLocalhost ? '/static' : '';
-    const apiConfigScript = document.createElement('script');
-    apiConfigScript.src = `${staticPrefix}/js/config/api-config.js`;
-    apiConfigScript.onload = () => {
-      // ✅ PHASE 1.1: Load error handler before game-plan.js
-      const errorHandlerScript = document.createElement('script');
-      errorHandlerScript.src = `${staticPrefix}/js/shared/errorHandler.js`;
-      document.head.appendChild(errorHandlerScript);
-      
-      // ✅ PHASE 1.3: Load state telemetry before game-plan.js
-      const telemetryScript = document.createElement('script');
-      telemetryScript.src = `${staticPrefix}/js/shared/stateTelemetry.js`;
-      document.head.appendChild(telemetryScript);
-      
-      // ✅ PHASE 1.3: Load gameStore module for optional cache (must load before game-plan.js)
-      const gameStoreScript = document.createElement('script');
-      gameStoreScript.type = 'module';
-      gameStoreScript.textContent = `
-        import gameStore from '${staticPrefix}/js/state/gameStore.js';
-        // gameStore is already exposed globally in gameStore.js
-        // Mark as loaded so game-plan.js can wait for it
-        window.__gameStoreLoaded = true;
-        if (window.__gameStoreReadyCallback) {
-          window.__gameStoreReadyCallback();
-        }
-      `;
-      document.head.appendChild(gameStoreScript);
-      
-      // ✅ PHASE 2: Load pointer validation before game-plan.js
-      const pointerValidationScript = document.createElement('script');
-      pointerValidationScript.src = `${staticPrefix}/js/shared/pointerValidation.js`;
-      document.head.appendChild(pointerValidationScript);
-      
-      // ✅ PHASE 1.3: Wait for gameStore to load before loading game-plan.js
-      function loadGamePlanScript() {
-        script.src = `${API_CONFIG.getStaticPath()}/game-plan.js?v=${cacheBuster}`;
-        script.onload = () => {
-          console.log('✅ game-plan.js loaded with cache buster:', cacheBuster);
-          // If DOM is already loaded, manually trigger init() since DOMContentLoaded already fired
-          if (document.readyState !== 'loading') {
-            if (typeof init === 'function') {
-              console.log('🚀 Manually calling init() - DOM already loaded');
-              init();
-            }
-          }
-          // The script's DOMContentLoaded listener will handle it if DOM is still loading
-        };
-        document.head.appendChild(script);
-      }
-      
-      // Check if gameStore is already loaded, otherwise wait for it
-      if (window.__gameStoreLoaded) {
-        loadGamePlanScript();
-      } else {
-        window.__gameStoreReadyCallback = loadGamePlanScript;
-      }
-    };
-    document.head.appendChild(apiConfigScript);
-  </script>
+  <script src="/js/shared/errorHandler.js"></script>
+  <script src="/js/shared/stateTelemetry.js"></script>
+  <script src="/js/shared/pointerValidation.js"></script>
+  <script src="/js/shared/gobToast.js"></script>
+  <script src="/js/shared/gobLeaveConfirm.js"></script>
   <script type="module">
+    import { init } from '/game-plan.js';
     import { resumeMusicForGamePlan } from '/js/musicController.js';
-    // Crossover page: resume whichever music context is in flight.
-    // - From FCC sidebar → franchise music carries over.
-    // - From set-lineup "View Game Plan" → timeout-loop carries over.
-    // - From a deep link with no state → silent.
+    import '/js/state/gameStore.js';
+    window.__gameStoreLoaded = true;
     resumeMusicForGamePlan();
+    try {
+      // FranchiseContext (loaded in <head>), not the URL: correct on web and desktop.
+      const fc = window.FranchiseContext;
+      const ctx = (key) => (fc && typeof fc.get === 'function' ? fc.get(key) : null);
+      if (ctx('resume_from_timeout') === 'true' || ctx('mode') === 'tutorial') {
+        init(document.body);
+      }
+    } catch (err) { /* redirect already left */ }
   </script>
 </body>
 </html>

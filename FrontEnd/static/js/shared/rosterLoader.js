@@ -35,6 +35,14 @@ function mergeRosterWithStateDoc(rosterData, stateDoc) {
  * @param {string} stateUrl - Full URL for GET state doc
  * @returns {Promise<{ players: Array }>}
  */
+function rosterCarriesSeason(rosterData) {
+  var players = (rosterData && rosterData.players) || [];
+  if (!players.length) return false;
+  return players.every(function (player) {
+    return player && player.stats && Object.prototype.hasOwnProperty.call(player.stats, 'season');
+  });
+}
+
 function loadRosterWithStats(rosterUrl, stateUrl) {
   var headers = (typeof window !== 'undefined' && window.API_CONFIG && window.API_CONFIG.getAuthHeaders) ? window.API_CONFIG.getAuthHeaders() : {};
   return fetch(rosterUrl, { headers: headers })
@@ -47,6 +55,11 @@ function loadRosterWithStats(rosterUrl, stateUrl) {
       return rosterRes.json();
     })
     .then(function (rosterData) {
+      // Franchise rosters carry stats.season. Skip /franchise/state.
+      if (!stateUrl || rosterCarriesSeason(rosterData)) {
+        rosterData.players = rosterData.players || [];
+        return rosterData;
+      }
       return fetch(stateUrl, { headers: headers })
         .then(function (stateRes) {
           if (!stateRes.ok) {

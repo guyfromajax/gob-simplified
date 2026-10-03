@@ -1,21 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <script src="/js/shared/gtm-loader.js"></script>
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
+  <script src="/js/shared/pageLoadOverlay.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Training Playbooks - GOB</title>
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
-<link rel="stylesheet" href="/resource-pages.css">
+<link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/training-playbooks.css">
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
 <body class="tp-page">
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <!-- First paint: stay behind the shared loader until the playbooks are drawn
+       (training-playbooks.js lifts it). -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
 
   <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
 

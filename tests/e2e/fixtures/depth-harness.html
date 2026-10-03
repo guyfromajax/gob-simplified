@@ -1,0 +1,81 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Depth ordering harness</title>
+<style>html,body{margin:0;background:#1e1e1e}#c{width:1229px;height:768px}</style></head>
+<body><div id="c"></div>
+<script type="module">
+// Standalone harness: loads the REAL marker factory and the REAL depth applier and renders a
+// fixed ten-player frame containing (a) a merged teammate pair and (b) a defender sitting on
+// the man he is guarding. No sim, no backend — the point is the RENDERING code under test.
+import * as Phaser from "/js/vendor/phaser-3.60.0.esm.js";
+import { createPhaserPlayer } from "/static/js/phaser/setup/createPhaserPlayer.js";
+import { installDepthOrdering } from "/static/js/phaser/utils/applyPlayerDepths.js";
+import { gridToPixels } from "/static/js/phaser/utils/gridToPixels.js";
+import { BALL_DEPTH } from "/static/js/phaser/animation/ballDepth.js";
+
+const OFF = "OFFENCE", DEF = "DEFENCE";
+// grid coords: the two merged pairs sit well inside pinned_coverage_distance() = 2.5
+const ROSTER = [
+  // teammate merge — two offensive bigs on one spot (the O-C/O-PF stack from the audit)
+  { id: "o_C",  team: OFF, pos: "C",  x: 86, y: 32.0, name: "Off Centre" },
+  { id: "o_PF", team: OFF, pos: "PF", x: 86, y: 33.1, name: "Off Power" },
+  // defender-on-his-man merge — 1.2 grid apart, inside the coverage band
+  { id: "o_SG", team: OFF, pos: "SG", x: 70, y: 14.0, name: "Off Guard" },
+  { id: "d_SG", team: DEF, pos: "SG", x: 70, y: 15.2, name: "Def Guard" },
+  // the ball carrier is the FURTHEST player from the viewer (highest grid y) on purpose:
+  // that is the case where a naive `carrier.depth + 1` would let a nearer player hide the ball
+  { id: "o_PG", team: OFF, pos: "PG", x: 64, y: 46.0, name: "Off Point" },
+  { id: "d_PG", team: DEF, pos: "PG", x: 64, y: 44.8, name: "Def Point" },
+  { id: "o_SF", team: OFF, pos: "SF", x: 78, y: 8.0,  name: "Off Small" },
+  { id: "d_SF", team: DEF, pos: "SF", x: 40, y: 25.0, name: "Def Small" },
+  { id: "d_PF", team: DEF, pos: "PF", x: 30, y: 30.0, name: "Def Power" },
+  { id: "d_C",  team: DEF, pos: "C",  x: 20, y: 20.0, name: "Def Centre" },
+];
+
+class S extends Phaser.Scene {
+  create() {
+    this.add.rectangle(614, 384, 1229, 768, 0x2b2b2b);
+    const playerSprites = {};
+    for (const r of ROSTER) {
+      const px = gridToPixels(r.x, r.y);
+      const sprite = createPhaserPlayer({
+        scene: this,
+        player: { playerId: r.id, name: r.name, jersey: 9, pos: r.pos,
+                  coords: { x: r.x, y: r.y }, height: 75, team_id: r.team,
+                  attributes: { ST: 50, AG: 50 } },
+        teamInfo: { isHome: r.team === OFF, primary_color: r.team === OFF ? "#c84b31" : "#2d4059",
+                    secondary_color: "#ffffff" },
+        position: r.pos,
+        Phaser,
+      });
+      sprite.setPosition(px.x, px.y);
+      sprite.playerId = r.id;
+      sprite.team_id = r.team;
+      playerSprites[r.id] = sprite;
+    }
+    // the ball, on the FURTHEST offensive player, via the same rule BallController uses
+    const carrier = playerSprites["o_PG"];
+    const ball = this.add.circle(carrier.x, carrier.y, 11, 0xff8c1a).setStrokeStyle(2, 0x000000);
+    this.ballSprite = ball;
+    this.__ball = { carrier, ball };
+
+    // the animation payload the applier reads — exactly the backend shape, nothing computed here
+    const animations = ROSTER.map((r) => ({
+      playerId: r.id,
+      hasBallAtStep: [r.id === "o_PG"],
+      movement: [{ coords: { x: r.x, y: r.y }, action: r.id === "o_PG" ? "handle_ball" : "drift" }],
+    }));
+    this.__depthContext = { animations, stepIndex: 0, offenseTeamId: OFF };
+    installDepthOrdering(this, playerSprites);
+
+    this.events.on("update", () => {
+      const { carrier: c, ball: b } = this.__ball;
+      b.setPosition(c.x, c.y - 26);
+      b.setDepth(Math.max(BALL_DEPTH, c.depth + 1));   // the fixed rule
+      this.ballSprite = b;
+    });
+    window.__HARNESS_READY = true;
+  }
+}
+new Phaser.Game({ type: Phaser.CANVAS, width: 1229, height: 768, parent: "c",
+                  backgroundColor: "#1e1e1e", audio: { noAudio: true }, scene: S });
+</script></body></html>

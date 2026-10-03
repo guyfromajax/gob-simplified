@@ -2,11 +2,12 @@ const { test, expect } = require('@playwright/test');
 
 /**
  * Marketing home: public (authGuard), nav + auth chrome, auth assets load.
- * Covers canonical /homepage.html and legacy /homepage-v3.html redirect.
+ * Covers the canonical /homepage.html. The homepage-v3.html copy was deleted on 2026-10-01
+ * (Jamie's ruling #10); jamie-rulings-batch.spec.js checks it is gone.
  */
 
 function marketingPaths() {
-  return ['/static/homepage.html', '/static/homepage-v3.html'];
+  return ['/static/homepage.html'];
 }
 
 test.describe('homepage (v3 design) — public access & auth UI', () => {
@@ -26,12 +27,6 @@ test.describe('homepage (v3 design) — public access & auth UI', () => {
       await expect(page.locator('#auth-logged-out a[href*="signup"]')).toBeVisible();
     });
   }
-
-  test('homepage-v3.html redirects to homepage.html', async ({ page }) => {
-    await page.goto('/static/homepage-v3.html');
-    await page.waitForURL(/homepage\.html/i, { timeout: 10000 });
-    await expect(page).toHaveURL(/homepage\.html/);
-  });
 
   test('authGuard / authBarInit not 404 on main homepage', async ({ page }) => {
     const failed = [];

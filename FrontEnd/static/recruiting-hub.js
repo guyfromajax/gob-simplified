@@ -28,17 +28,34 @@
     { value: 'JH', label: 'JH' }
   ];
   var SORTABLE = { name: 'text', pos: 'num', year: 'num', height: 'num', weight: 'num', region: 'text', rt: 'num' };
+  // Same groups and shade rhythm as the Roster grid (rosterView.js GROUPS).
+  var POOL_GROUPS = [
+    { name: 'Offense', keys: ['SC', 'SH'], shade: false },
+    { name: 'Defense', keys: ['ID', 'OD'], shade: true },
+    { name: 'Skills', keys: ['PS', 'BH'], shade: false },
+    { name: 'Grit', keys: ['RB', 'ST'], shade: true },
+    { name: 'Body', keys: ['AG', 'ND'], shade: false },
+    { name: 'Mind', keys: ['IQ', 'FT'], shade: true }
+  ];
   var INVITE_WEEKS = [20, 21, 22, 23, 24, 25, 26];
   var POS_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
   var MAX_BOARD = 20;
 
   var context = Common.getQueryContext();
+  function replaceNav(url) {
+    if (window.GOBNav && window.GOBNav.exitFlow && window.GOBNav.isHubUrl && window.GOBNav.isHubUrl(String(url))) {
+      window.GOBNav.exitFlow(url);
+      return;
+    }
+    if (window.GOBNav) window.GOBNav.replace(url);
+    else window.location.replace(url);
+  }
   var state = {
     week: 1, phase: 'passive', userTeamId: null, userRegion: '',
     recruits: [], byId: {}, newLeanIds: new Set(),
     board: [],                       // ordered recruit ids (invite phase)
     search: '', region: 'all', pos: 'all', year: 'all',
-    view: 'all',                     // 'all' | 'watch' | 'leans' | 'unranked'
+    view: 'all',                     // toolbar: 'all' | 'watch' | 'unranked'
     watchlist: new Set(),            // unordered, uncapped shortlist of recruit ids
     wire: {},                        // Prompt 1 event log (recruiting_wire payload)
     boardSeeded: false,              // drives the seed notice; cleared on save/reorder
@@ -55,7 +72,6 @@
     // screens are read for different jobs and a filter carried across surprises.
     sPos: 'all', sYear: 'all', sWatch: false, sView: 'pool',
     // Results (D4)
-    currentResultsWeek: null, weeklyDismissed: false, visitTree: null,
     playback: { index: 0, auto: false, done: false, timer: null },
     week35Results: {}, signFilter: 'all',
     // Signing Day conference reveal (payload `conferences`; `revealSeen` season-stamped
@@ -66,13 +82,15 @@
   // No per-recruit cap: the 50-point budget is the only limit, so every point can go
   // on one recruit if that is the call the coach wants to make.
   var SIGN = { TOTAL: 50, PROMISE_W: 18 };
+  var hubView = 'pool';
+  var hubReady = false;
+  var pendingHub = '';
 
   function boardActive() { return state.phase === 'invite'; }
-  function attrClass(v) { return v >= 65 ? 'attr-hi' : v >= 40 ? 'attr-mid' : v >= 20 ? 'attr-lo' : 'attr-zero'; }
   function regionOf(rec) { var v = rec && rec.homeRegion ? String(rec.homeRegion).trim().toUpperCase() : ''; return v ? v.charAt(0) : ''; }
   // Recruit | Pos | RT | Yr | Ht | Rgn | Attributes | Lean | Watch — attributes are a
   // single cell of chips now, not 12 columns. +1 for the add column in the invite phase.
-  function colspan() { return (boardActive() ? 1 : 0) + 10; }   // +1: Wt
+  function colspan() { return 21 + (boardActive() ? 1 : 0); }
 
   var CHEVRON = '<svg class="region-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"></path></svg>';
   var ARROW_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M7 17L17 7M9 7h8v8"></path></svg>';
@@ -93,8 +111,8 @@
       if (state.region !== 'all' && regionOf(r) !== state.region) return false;
       if (state.pos !== 'all' && String(r.pos).toUpperCase() !== state.pos) return false;
       if (state.year !== 'all' && r.year !== state.year) return false;
+      if (hubView === 'leans' && !r.leansToUser) return false;
       if (state.view === 'watch' && !state.watchlist.has(String(r.recruitId))) return false;
-      if (state.view === 'leans' && !r.leansToUser) return false;
       if (state.view === 'unranked' && state.board.indexOf(r.recruitId) !== -1) return false;
       if (q && String(r.name).toLowerCase().indexOf(q) === -1) return false;
       return true;
@@ -126,46 +144,95 @@
   }
 
   // ---------- head ----------
-  // Order: Recruit | Pos | RT | Yr | Ht | Rgn | Attributes | Lean | Watch.
-  // Name/Pos/RT lead because they answer "is he worth watching" fastest, and it keeps
-  // the sorted column beside the name. Lean and Watch pair at the right edge: both are
-  // about you and him, not about him.
+  // Watch, then the recruit, then the roster identity columns, then the six
+  // attribute groups, then Lean. The invite add/rank cell is last, and only
+  // while the board is open (weeks 20–26).
   function colgroupHtml() {
-    return '<colgroup>' +
-      (boardActive() ? '<col class="c-add">' : '') +
-      '<col class="c-name"><col class="c-pos"><col class="c-rt"><col class="c-yr"><col class="c-ht">' +
-      '<col class="c-wt"><col class="c-rgn"><col class="c-attrs"><col class="c-lean"><col class="c-watch">' +
-      '</colgroup>';
+    var cols = '<col class="c-watch"><col class="c-name"><col class="c-pos"><col class="c-rt"><col class="c-yr"><col class="c-ht"><col class="c-wt"><col class="c-rgn">';
+    POOL_GROUPS.forEach(function (group) {
+      group.keys.forEach(function () { cols += '<col class="c-attr">'; });
+    });
+    cols += '<col class="c-lean">';
+    if (boardActive()) cols += '<col class="c-add">';
+    return '<colgroup>' + cols + '</colgroup>';
+  }
+  function groupHeadHtml() {
+    var html = '<tr class="gob-groups"><th colspan="8"></th>';
+    POOL_GROUPS.forEach(function (group) {
+      html += '<th class="gob-g' + (group.shade ? ' gshade' : '') + '" colspan="2">' + group.name + '</th>';
+    });
+    html += '<th></th>';
+    if (boardActive()) html += '<th></th>';
+    return html + '</tr>';
+  }
+  function colsHeadHtml(repeat) {
+    var html = '<tr class="gob-cols' + (repeat ? ' gob-rep' : '') + '">' +
+      '<th class="watch-col" aria-label="Watch"></th>' +
+      th('name', 'Recruit', 'name-col') +
+      th('pos', 'POS') +
+      '<th class="num" data-sortkey="rt" data-tooltip="Current → Potential" title="Current → Potential">RT' + arrow('rt') + '</th>' +
+      th('year', 'YR') +
+      th('height', 'HT') +
+      th('weight', 'WT') +
+      th('region', 'RGN');
+    POOL_GROUPS.forEach(function (group) {
+      group.keys.forEach(function (key) {
+        var names = window.GOB_AttrTiles && window.GOB_AttrTiles.ATTR_FULL_NAMES;
+        var tip = (names && names[key]) || key;
+        html += '<th class="num' + (group.shade ? ' gshade' : '') + '" data-tooltip="' + Common.escapeHtml(tip) + '" title="' + Common.escapeHtml(tip) + '">' + key + '</th>';
+      });
+    });
+    html += '<th class="lean-h">Lean</th>';
+    if (boardActive()) html += '<th class="act" aria-label="Invite board"></th>';
+    return html + '</tr>';
   }
   function headHtml() {
-    return '<thead><tr>' +
-      (boardActive() ? '<th class="act"></th>' : '') +
-      th('name', 'Recruit', 'name-col') +
-      th('pos', 'Pos') +
-      '<th class="num" data-sortkey="rt" data-tooltip="current/potential" title="current/potential">RT' + arrow('rt') + '</th>' +
-      th('year', 'Yr') +
-      th('height', 'Ht') +
-      th('weight', 'Wt') +
-      th('region', 'Rgn') +
-      '<th class="attrs-col attr-tiles-head">Attributes</th>' +
-      '<th class="lean-h">Lean</th>' +
-      '<th class="watch-col">Watch</th>' +
-      '</tr></thead>';
+    return '<thead>' + groupHeadHtml() + colsHeadHtml(false) + '</thead>';
   }
 
   // ---------- row ----------
-  function headshotHtml(r) {
-    var imageId = r.imageId;
-    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
-      return '<span class="pc-av"></span>';
-    }
-    return '<span class="pc-av"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
-      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"></span>';
+  function initials(name) {
+    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   }
-  // Delegates to the shared builder so this screen, the FCC Roster/Recruits tabs and
-  // team-roster-view all render identical tiles with identical hover copy.
-  function attrChipsHtml(r) {
-    return window.GOB_AttrTiles.tilesHtml(r.rawAttrs);
+  function portraitSpan(r, cls) {
+    var letters = Common.escapeHtml(initials(r && r.name));
+    var imageId = r && r.imageId;
+    if (!r) return '<span class="' + cls + '"></span>';
+    var box = (cls ? cls + ' ' : '') + 'av';
+    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
+      return '<span class="' + box + '">' + letters + '</span>';
+    }
+    return '<span class="' + box + '"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
+      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"' +
+      ' data-letters="' + letters + '"' +
+      ' onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';}"></span>';
+  }
+  function headshotHtml(r) {
+    return portraitSpan(r, 'pc-av av');
+  }
+  function attrCellsHtml(r) {
+    var tiles = window.GOB_AttrTiles;
+    var html = '';
+    POOL_GROUPS.forEach(function (group) {
+      group.keys.forEach(function (key) {
+        var value = tiles ? tiles.tileValue(r.rawAttrs, key) : null;
+        var cell = tiles ? tiles.tileHtml(key, value, false) : '';
+        html += '<td class="' + (group.shade ? 'gshade' : '') + '">' + cell + '</td>';
+      });
+    });
+    return html;
+  }
+  function rtCellHtml(r) {
+    var bucket = typeof getRtBucketClass === 'function' ? getRtBucketClass : function () { return ''; };
+    var fmt = typeof formatRtDisplay === 'function' ? formatRtDisplay : function (v) { return v == null ? '' : String(v); };
+    var html = '<span class="rtl"><b class="' + bucket(r.rt) + '">' + Common.escapeHtml(fmt(r.rt)) + '</b>';
+    if (r.potentialRt != null && r.potentialRt !== '') {
+      html += '<i>→</i><b class="pot ' + bucket(r.potentialRt) + '">' + Common.escapeHtml(fmt(r.potentialRt)) + '</b>';
+    }
+    return html + '</span>';
   }
 
   function watchButtonHtml(r) {
@@ -187,19 +254,20 @@
       if (idx !== -1) rowCls += ' on-board';
     }
     var flags = (state.newLeanIds.has(String(r.recruitId)) ? '<span class="flag new">New</span>' : '');
-    return '<tr class="rec ' + rowCls + '" data-rec-id="' + r.recruitId + '">' + actCell +
+    return '<tr class="rec ' + rowCls + '" data-rec-id="' + r.recruitId + '">' +
+      '<td class="watch-cell">' + watchButtonHtml(r) + '</td>' +
       '<td class="name-col"><div class="pc-id">' + headshotHtml(r) + '<span class="pc-txt">' +
         '<span class="pc-name"><span class="nm">' + Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) + '</span>' + flags + '</span>' +
         '<span class="pc-arch">' + Common.escapeHtml(r.archetype) + '</span></span></div></td>' +
       '<td class="pos">' + Common.escapeHtml(r.pos) + '</td>' +
-      '<td class="rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></td>' +
+      '<td class="rt" data-tooltip="Current → Potential" title="Current → Potential">' + rtCellHtml(r) + '</td>' +
       '<td class="year">' + Common.escapeHtml(r.yearDisplay) + '</td>' +
       '<td class="num">' + Common.escapeHtml(r.height) + '</td>' +
       '<td class="num">' + (r.weight != null ? Common.escapeHtml(r.weight) : '--') + '</td>' +
-      '<td class="num">' + Common.escapeHtml(regionOf(r) || '--') + '</td>' +
-      '<td class="attr-tiles-cell">' + attrChipsHtml(r) + '</td>' +
+      '<td class="num rgn">' + Common.escapeHtml(regionOf(r) || '--') + '</td>' +
+      attrCellsHtml(r) +
       '<td class="lean-col">' + Spine.Lean.ladderHtml(r.leanModel) + '</td>' +
-      '<td class="watch-cell">' + watchButtonHtml(r) + '</td>' +
+      actCell +
       '</tr>';
   }
   function poolBodyHtml() {
@@ -207,7 +275,26 @@
     if (!recs.length) {
       return '<tr><td colspan="' + colspan() + '" style="padding:26px;text-align:center;color:var(--muted-3)">No recruits match your filters.</td></tr>';
     }
-    return recs.map(rowHtml).join('');
+    var html = '';
+    recs.forEach(function (r, index) {
+      if (index > 0 && index % 16 === 0) html += colsHeadHtml(true);
+      html += rowHtml(r);
+    });
+    return html;
+  }
+  // A table that fits .pool-scroll is narrow: one sticky header under the page
+  // head, no repeated column row. A table that still overflows keeps the
+  // 16-row repeat, and the shell's wide-wrap rule pins that header static.
+  function poolTableFits() {
+    var table = document.querySelector('#hub-pool table.pool');
+    var sc = document.querySelector('#hub-pool .pool-scroll');
+    if (!table || !sc || sc.clientWidth < 200) return false;
+    return table.scrollWidth <= sc.clientWidth + 1;
+  }
+  function syncPoolHeaderMode() {
+    var table = document.querySelector('#hub-pool table.pool');
+    if (!table || !poolTableFits()) return;
+    table.querySelectorAll('tbody tr.gob-rep').forEach(function (row) { row.remove(); });
   }
 
   /**
@@ -246,9 +333,97 @@
     });
     return { watch: watch, leans: leans, unranked: unranked };
   }
+  var filtersTouched = false;
+  function filterStorageKey() {
+    return 'gob-hub-filters:' + (context.franchiseId || '');
+  }
+  function noteFilterChange() {
+    filtersTouched = true;
+    try {
+      sessionStorage.setItem(filterStorageKey(), JSON.stringify({
+        touched: true,
+        view: hubView === 'leans' ? 'leans' : state.view,
+        region: state.region,
+        pos: state.pos,
+        year: state.year,
+        search: state.search
+      }));
+    } catch (err) {}
+  }
+  function readHubParam() {
+    try {
+      var hub = new URLSearchParams(window.location.search).get('hub') || '';
+      if (hub === 'pool' || hub === 'leans' || hub === 'visits') return hub;
+    } catch (err) {}
+    return '';
+  }
+  function publishHub(hub) {
+    hubView = hub;
+    if (window.GOBShell && typeof window.GOBShell.replaceRecruitingHub === 'function') {
+      window.GOBShell.replaceRecruitingHub(hub, { silent: true });
+    }
+  }
+  function applyLandingFilters() {
+    if (filtersTouched) return;
+    var explicit = readHubParam();
+    var back = false;
+    try {
+      var nav = performance.getEntriesByType('navigation')[0];
+      back = !!(nav && nav.type === 'back_forward');
+    } catch (err) {}
+    if (back) {
+      try {
+        var raw = sessionStorage.getItem(filterStorageKey());
+        if (raw) {
+          var saved = JSON.parse(raw);
+          if (saved && saved.touched) {
+            var savedView = saved.view || 'all';
+            state.view = (savedView === 'watch' || savedView === 'unranked') ? savedView : 'all';
+            state.region = saved.region || 'all';
+            state.pos = saved.pos || 'all';
+            state.year = saved.year || 'all';
+            state.search = typeof saved.search === 'string' ? saved.search : '';
+            filtersTouched = true;
+            publishHub(explicit || (saved.view === 'leans' ? 'leans' : 'pool'));
+            return;
+          }
+        }
+      } catch (err2) {}
+    } else {
+      try { sessionStorage.removeItem(filterStorageKey()); } catch (err3) {}
+    }
+    if (explicit) {
+      publishHub(explicit);
+      return;
+    }
+    // From the invite window on, the coach recruits his own region: land on all of it,
+    // Leans off. Earlier weeks keep the old landing (Leans when anyone leans to him).
+    if (state.week < 20 && viewCounts().leans > 0) {
+      publishHub('leans');
+      return;
+    }
+    if (state.userRegion) state.region = state.userRegion;
+    publishHub('pool');
+  }
+  function viewIsOn(value) {
+    return value === 'leans' ? hubView === 'leans' : state.view === value;
+  }
   function viewBtn(value, label, count, iconSvg) {
-    return '<button class="pool-view' + (state.view === value ? ' is-on' : '') + '" data-view="' + value + '" type="button">' +
+    var on = viewIsOn(value);
+    return '<button class="pool-view' + (on ? ' is-on' : '') + '" data-view="' + value + '" type="button" aria-pressed="' + on + '">' +
       (iconSvg || '') + label + '<span class="n">' + count + '</span></button>';
+  }
+  // Leans, Watchlist and Unranked are one view at a time. Leans is the hub's 'leans'
+  // view, so the underline Leans tab and this toggle are the same state.
+  function setPoolView(value) {
+    var off = viewIsOn(value);
+    if (value === 'leans') {
+      if (!off) state.view = 'all';
+      publishHub(off ? 'pool' : 'leans');
+    } else {
+      state.view = off ? 'all' : value;
+      if (!off && hubView === 'leans') publishHub('pool');
+    }
   }
   function toolbarHtml(total, shown) {
     var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z" fill="currentColor"/></svg>';
@@ -260,17 +435,15 @@
       }).join('');
     var posOpts = [{ value: 'all', label: 'All' }].concat(POS_ORDER.map(function (p) { return { value: p, label: p }; }));
     var activeFilters = (state.region !== 'all') + (state.pos !== 'all') + (state.year !== 'all')
-      + (state.view !== 'all') + (state.search.trim() ? 1 : 0);
-    return '<div class="pool-fbar">' +
+      + (state.view !== 'all') + (state.search.trim() ? 1 : 0) + (hubView === 'leans' ? 1 : 0);    return '<div class="pool-fbar">' +
       '<div class="pool-frow"><span class="pool-flab">Filter</span>' +
         '<span class="pool-sel"><select id="pool-region" aria-label="Region">' + regionOpts + '</select></span>' +
         segHtml('pos', posOpts, state.pos) +
         segHtml('year', YEAR_FILTERS, state.year) +
-        '<input class="pool-srch" id="pool-search" placeholder="Search name…" value="' + Common.escapeHtml(state.search) + '">' +
       '</div>' +
       '<div class="pool-frow"><span class="pool-flab">Views</span>' +
+        viewBtn('leans', 'Leans', counts.leans) +
         viewBtn('watch', 'Watchlist', counts.watch, STAR) +
-        viewBtn('leans', 'Leans to me', counts.leans) +
         viewBtn('unranked', 'Unranked by me', counts.unranked) +
         '<span class="pool-fcount">Showing <b>' + shown + '</b> of ' + total +
           (activeFilters ? '' : ' · no filters') + '</span>' +
@@ -281,26 +454,26 @@
   function renderPool() {
     var host = document.getElementById('hub-pool'); if (!host) return;
     host.innerHTML = toolbarHtml(state.recruits.length, filteredRecruits().length) +
-      '<div class="pool-scroll"><table class="pool">' + colgroupHtml() + headHtml() +
+      '<div class="pool-scroll"><table class="pool gob-tbl">' + colgroupHtml() + headHtml() +
       '<tbody>' + poolBodyHtml() + '</tbody></table></div>';
+    syncPoolHeaderMode();
     bindPool(host);
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['th', 'td', '.attr-tile']);
   }
   function bindPool(host) {
-    var search = host.querySelector('#pool-search');
-    if (search) search.addEventListener('input', function () { state.search = this.value; renderPoolBodyOnly(); updateCount(); });
     var region = host.querySelector('#pool-region');
-    if (region) region.addEventListener('change', function () { state.region = this.value; renderPool(); });
+    if (region) region.addEventListener('change', function () { state.region = this.value; noteFilterChange(); renderPool(); });
     host.querySelectorAll('.pool-seg button[data-pos]').forEach(function (b) {
-      b.addEventListener('click', function () { state.pos = this.dataset.pos; renderPool(); });
+      b.addEventListener('click', function () { state.pos = this.dataset.pos; noteFilterChange(); renderPool(); });
     });
     host.querySelectorAll('.pool-seg button[data-year]').forEach(function (b) {
-      b.addEventListener('click', function () { state.year = this.dataset.year; renderPool(); });
+      b.addEventListener('click', function () { state.year = this.dataset.year; noteFilterChange(); renderPool(); });
     });
     host.querySelectorAll('.pool-view[data-view]').forEach(function (b) {
       // Views are mutually exclusive; clicking the active one clears it.
       b.addEventListener('click', function () {
-        state.view = state.view === this.dataset.view ? 'all' : this.dataset.view;
+        setPoolView(this.dataset.view);
+        noteFilterChange();
         renderPool();
       });
     });
@@ -323,34 +496,49 @@
     host.querySelectorAll('.wt[data-watch-id]').forEach(function (b) {
       b.addEventListener('click', function (e) { e.stopPropagation(); toggleWatch(this); });
     });
-    bindHeadshotFallbacks(host);
-  }
-  // Lazy paint: on a 404 ask the backend to paint the master, retry once, then generic.
-  function bindHeadshotFallbacks(host) {
-    host.querySelectorAll('.pc-av img[data-image-id]').forEach(function (img) {
-      if (img.dataset.fallbackBound) return;
-      img.dataset.fallbackBound = '1';
-      img.addEventListener('error', function () {
-        var el = this, imageId = el.dataset.imageId;
-        if (el.dataset.retried || typeof API_CONFIG === 'undefined') {
-          el.remove();
-          return;
-        }
-        el.dataset.retried = '1';
-        API_CONFIG.ensureRecruitImage(imageId).then(function () {
-          el.src = API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' }) + '?r=1';
-        }).catch(function () { el.remove(); });
-      });
-    });
   }
   function renderPoolBodyOnly() {
     var tbody = document.querySelector('#hub-pool tbody'); if (tbody) tbody.innerHTML = poolBodyHtml();
+    syncPoolHeaderMode();
     bindPoolBodyHandlers(document.getElementById('hub-pool'));
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(document.getElementById('hub-pool'), ['td', '.attr-tile']);
   }
   function updateCount() {
     var el = document.querySelector('#hub-pool .pool-fcount b');
     if (el) el.textContent = filteredRecruits().length;
+  }
+  function mountSearch() {
+    if (state.phase === 'day' || state.phase === 'results') return;
+    var row = document.getElementById('gob-subtabs');
+    var host = (row && !row.hidden) ? row : document.getElementById('hub-root');
+    if (!host) return;
+    document.querySelectorAll('.pg-tools[data-owner="recruiting"]').forEach(function (node) {
+      if (node.parentElement !== host) node.remove();
+    });
+    var existing = host.querySelector('.pg-tools[data-owner="recruiting"] .gob-search');
+    if (existing) {
+      if (document.activeElement !== existing && existing.value !== state.search) existing.value = state.search;
+      return;
+    }
+    var slot = document.createElement('div');
+    slot.className = 'pg-tools';
+    slot.setAttribute('data-owner', 'recruiting');
+    var input = document.createElement('input');
+    input.className = 'gob-search';
+    input.type = 'search';
+    input.placeholder = 'Search name…';
+    input.setAttribute('aria-label', 'Search name…');
+    input.value = state.search;
+    input.addEventListener('input', function () {
+      state.search = input.value;
+      noteFilterChange();
+      if (document.getElementById('hub-pool')) { renderPoolBodyOnly(); updateCount(); }
+    });
+    slot.appendChild(input);
+    host.appendChild(slot);
+    if (row && host === row && window.GOBSubtabs && typeof window.GOBSubtabs.syncTools === 'function') {
+      window.GOBSubtabs.syncTools(row);
+    }
   }
 
   // ---------- watchlist ----------
@@ -552,13 +740,7 @@
   }
 
   function headshotBoxHtml(r, cls) {
-    if (!r) return '<span class="' + cls + '"></span>';
-    var imageId = r.imageId;
-    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
-      return '<span class="' + cls + '"></span>';
-    }
-    return '<span class="' + cls + '"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
-      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"></span>';
+    return portraitSpan(r, cls);
   }
 
   // ---------- hero: the top unvisited recruit ----------
@@ -793,7 +975,6 @@
     if (dismiss) dismiss.addEventListener('click', function () { state.seedNoticeDismissed = true; renderDock(); });
     var save = host.querySelector('#dock-save');
     if (save) save.addEventListener('click', saveBoard);
-    bindHeadshotFallbacks(host);
   }
 
   function saveBoard() {
@@ -819,7 +1000,7 @@
       renderDock();
       var live = document.getElementById('dock-save');
       if (live) live.disabled = true;
-      window.location.href = Common.buildFccUrl(context);
+      replaceNav(Common.buildFccUrl(context));
     })
       .catch(function (err) {
         console.error(err);
@@ -836,7 +1017,8 @@
     if (!el) { el = document.createElement('div'); el.id = 'hub-toast'; el.className = 'hub-toast'; document.body.appendChild(el); }
     el.innerHTML = '<span class="ti">' + CHECK + '</span><div><div class="tt1">' + Common.escapeHtml(title || 'Invites Submitted') +
       '</div><div class="tt2">' + Common.escapeHtml(sub || 'Your ranked board runs each week (Wks 20–26).') + '</div></div>';
-    el.style.borderLeftColor = ok === false ? 'var(--red)' : 'var(--green)';
+    el.classList.toggle('is-ok', ok !== false);
+    el.classList.toggle('is-err', ok === false);
     void el.offsetWidth; el.classList.add('show');
     clearTimeout(showToast._t); showToast._t = setTimeout(function () { el.classList.remove('show'); }, 3200);
   }
@@ -944,9 +1126,9 @@
       '<span class="prow-rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
       standingCellHtml(r) +
       leanCellHtml(r) +
-      '<div><div class="stepper"><button data-step="-1" data-id="' + r.recruitId + '"' + (a.points === 0 ? ' disabled' : '') + '>−</button>' +
+      '<div class="stepper-wrap"><div class="stepper"><button data-step="-1" data-id="' + r.recruitId + '"' + (a.points === 0 ? ' disabled' : '') + '>−</button>' +
         '<span class="val' + (a.points === 0 ? ' zero' : '') + '">' + a.points + '</span>' +
-        '<button data-step="1" data-id="' + r.recruitId + '"' + (canPlus ? '' : ' disabled') + '>+</button><span class="stepper-pts">pts</span></div></div>' +
+        '<button data-step="1" data-id="' + r.recruitId + '"' + (canPlus ? '' : ' disabled') + '>+</button></div><span class="stepper-pts">pts</span></div>' +
       '<div class="promise-cell' + (a.promise ? ' set' : '') + '"><button class="promise-toggle" data-promise="' + r.recruitId + '" title="Promise playing time">' +
         '<span class="box">' + CHECK + '</span>' + (a.promise ? 'Binding' : 'Promise') + '</button></div>' +
       '</div>';
@@ -1009,12 +1191,13 @@
     if (ids.length > cap.spots) {
       out.push({
         level: 'warn',
-        text: ids.length + ' recruits funded but only ' + cap.spots + ' roster spot' +
+        text: ids.length + ' recruit' + (ids.length === 1 ? '' : 's') + ' funded but only ' + cap.spots + ' roster spot' +
           (cap.spots === 1 ? '' : 's') + ' — signings beyond that cannot be taken.',
       });
     }
     if (rem < 0) {
-      out.push({ level: 'warn', text: Math.abs(rem) + ' points over budget — trim before submitting.' });
+      var over = Math.abs(rem);
+      out.push({ level: 'warn', text: over + ' point' + (over === 1 ? '' : 's') + ' over budget — trim before submitting.' });
     }
     return out;
   }
@@ -1068,7 +1251,7 @@
       '<div class="budget-bar"><div class="budget-fill' + (rem < 0 ? ' over' : '') + '" style="width:' + pct + '%"></div></div>' +
       // Capacity is the header number, straight from the payload.
       '<div class="cap-row"><span class="cap-item"><b>' + cap.spots + '</b>/' + cap.cap + ' roster spots</span>' +
-        '</div>' +
+        '</div></div>' +
       list + preflight +
       '<div class="rail-foot">' + note +
         '<button class="rail-submit" id="sign-submit"' + (disabled ? ' disabled' : '') + '>' + (state.week35Ran ? 'Signings Run' : 'Submit Orders') + '</button></div>';
@@ -1093,7 +1276,7 @@
         '<div class="spool-colhdr"><span>Recruit</span><span class="c-num">Pos</span><span class="c-num">Region</span><span class="c-num">RT</span>' +
           '<span class="c-num">Standing</span><span>Lean</span><span>Points</span><span>Playing Time</span></div>' +
         '<div class="spool-rows" id="sign-rows">' + signFiltered().map(prowHtml).join('') + '</div></div>' +
-      '<aside class="rail" id="sign-rail">' + railHtml() + '</aside>';
+      '<aside class="srail" id="sign-rail">' + railHtml() + '</aside>';
   }
 
   /**
@@ -1250,7 +1433,7 @@
     var go = overlay.querySelector('#ssum-go');
     go.addEventListener('click', function () {
       overlay.remove();
-      window.location.href = Common.buildFccUrl(context);
+      replaceNav(Common.buildFccUrl(context));
     });
     go.focus();
   }
@@ -1266,7 +1449,11 @@
    */
   function maybeAutoRun() {
     if (context.action !== 'run') return;
-    if (state.phase !== 'day' || state.week35Ran) return;
+    if (state.week35Ran) {
+      if (window.GOBNav) window.GOBNav.stripParam('action');
+      return;
+    }
+    if (state.phase !== 'day') return;
     if (!committedIds().length) return;
     runRecruiting();
   }
@@ -1279,6 +1466,7 @@
    * put "Orders Submitted" on screen after the decision could no longer be changed.
    */
   function runRecruiting() {
+    if (window.GOBNav) window.GOBNav.stripParam('action');
     var btn = document.getElementById('sign-submit');
     if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
     Common.fetchJSON(API_CONFIG.buildUrl('/franchise/run-week-35-recruiting'), {
@@ -1808,7 +1996,7 @@
     var host = document.getElementById('hub-reveal');
     if (host) host.remove();
     // The confirm modal now comes BEFORE the run, so Continue leaves for the FCC.
-    window.location.href = Common.buildFccUrl(context);
+    replaceNav(Common.buildFccUrl(context));
   }
 
   // How many masters to force-paint before the stage opens. The background warm on the
@@ -1856,7 +2044,7 @@
     };
     // Nothing to reveal: stamp it seen and go, rather than opening an empty screen.
     if (!revealCards().length) {
-      markRevealSeen(); window.location.href = Common.buildFccUrl(context); return;
+      markRevealSeen(); replaceNav(Common.buildFccUrl(context)); return;
     }
     revealMusic(true);
     // FCC?action=run installs this cover before recruiting data is requested, so the
@@ -1943,10 +2131,10 @@
    * League signing list (week 36). No playback — the drama happened on Signing Day; this
    * is the durable record you come back to.
    *
-   * Grouped by conference then team, ordered user's conference -> sister conference ->
-   * 1..16 ascending with those two removed so neither repeats. The order comes from the
-   * server (`conferences.order`); "same region, other conference" has one definition and
-   * the client does not re-derive it.
+   * Every conference, in one format: its eight teams, highest class score first. The
+   * conference order comes from the server (`conferences.order`): the user's conference,
+   * its sister, then 1..16 with those two removed. "Same region, other conference" has
+   * one definition and the client does not re-derive it.
    *
    * Walk-ons are excluded here as everywhere before rollover — they are roster backfill,
    * not signings, and their first reveal is next season's Walk-On Welcome.
@@ -1955,26 +2143,33 @@
     var conf = state.conferences || {};
     var byTeam = conf.by_team_id || {};
     var order = conf.order || [];
-    var buckets = {};
+    var signings = {};
     (state.week35Results.signed_players || []).forEach(function (e) {
       if (!e || e.walk_on) return;
-      var c = Number(byTeam[String(e.team_id)]) || 0;
-      if (!c) return;
-      (buckets[c] = buckets[c] || {});
       var tid = String(e.team_id);
-      (buckets[c][tid] = buckets[c][tid] || []).push(e);
+      (signings[tid] = signings[tid] || []).push(e);
     });
-    return order.filter(function (c) { return buckets[c]; }).map(function (c) {
-      var teams = Object.keys(buckets[c]).map(function (tid) {
+    var scores = classScores();
+    // Every team of the conference has a place, signings or not.
+    var teamsOf = {};
+    Object.keys(byTeam).forEach(function (tid) {
+      var c = Number(byTeam[tid]) || 0;
+      if (c) (teamsOf[c] = teamsOf[c] || []).push(String(tid));
+    });
+    return order.filter(function (c) { return teamsOf[c]; }).map(function (c) {
+      var teams = teamsOf[c].map(function (tid) {
+        var list = (signings[tid] || []).slice().sort(byRtDesc);
         return {
           teamId: tid,
-          name: (state.teamNameMap && state.teamNameMap[tid]) || (buckets[c][tid][0] || {}).team_name || '',
+          name: teamNameOf(tid, (list[0] || {}).team_name || ''),
           isUser: String(tid) === String(state.userTeamId),
-          signings: buckets[c][tid].sort(function (a, b) {
-            return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1);
-          })
+          score: scores[tid] || 0,
+          signings: list
         };
-      }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      }).sort(function (a, b) {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.name.localeCompare(b.name);
+      });
       return {
         conference: c,
         label: conferenceLabel(c),
@@ -1983,6 +2178,21 @@
         teams: teams
       };
     });
+  }
+
+  /**
+   * team_id -> class score: the signed recruits' RT, summed. It is the number the
+   * Signing Day boards finish on (`revealScores` after the last card), so the week-36
+   * order matches the board the user watched fill.
+   */
+  function classScores() {
+    var scores = {};
+    (state.week35Results.signed_players || []).forEach(function (e) {
+      if (!e || e.walk_on) return;
+      var tid = String(e.team_id);
+      scores[tid] = (scores[tid] || 0) + (Number(e.rt) || 0);
+    });
+    return scores;
   }
 
   /**
@@ -1999,39 +2209,114 @@
     return String.fromCharCode(65 + Math.floor((n - 1) / 2)) + n;
   }
 
-  function leagueRowHtml(e) {
-    return '<div class="lsrow">' +
-      '<span class="lsnm">' + Common.escapeHtml(e.name || '--') + '</span>' +
-      '<span class="lspos">' + Common.escapeHtml(e.pos || '--') + '</span>' +
-      '<span class="lsyr">' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</span>' +
-      '<span class="lsrt ' + Spine.rtClassForYear(e.rt, e.year) + '" ' +
-        'data-tooltip="current/potential" title="current/potential">' +
-        Common.formatRtWithPotential(e.rt, e.potential_rt_ratcheted) + '</span>' +
-      '</div>';
+  function signingRtHtml(e) {
+    return '<span class="' + Spine.rtClassForYear(e.rt, e.year) + '" data-tooltip="current/potential" title="current/potential">' +
+      Common.formatRtWithPotential(e.rt, e.potential_rt_ratcheted) + '</span>';
+  }
+
+  function playerViewHref(playerId) {
+    if (!playerId || !context.franchiseId || !context.teamId) return '';
+    var params = new URLSearchParams();
+    params.set('franchise_id', context.franchiseId);
+    params.set('team_id', context.teamId);
+    params.set('tab', 'player-view');
+    params.set('player_id', String(playerId));
+    return '/franchise-command-center.html?' + params.toString();
+  }
+
+  /** Player detail when `player_id` is on the signing entry (player-view tab). */
+  function signingNameHtml(e) {
+    var name = Common.escapeHtml(e.name || '--');
+    var href = playerViewHref(e.player_id);
+    if (!href) return name;
+    return '<a class="gob-rec-player-link" href="' + Common.escapeHtml(href) + '">' + name + '</a>';
+  }
+
+  function signingPortraitHtml(e) {
+    var r = state.byId[String(e.recruit_id)];
+    var imageId = (r && r.imageId) || e.image_id;
+    var name = e.name || (r && r.name) || '';
+    var letters = Common.escapeHtml(initials(name));
+    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
+      return '<span class="av">' + letters + '</span>';
+    }
+    return '<span class="av"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
+      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"' +
+      ' data-letters="' + letters + '"' +
+      ' onerror="var box=this.parentNode;if(box){box.textContent=this.getAttribute(\'data-letters\')||\'\';}"></span>';
+  }
+
+  function userClassSignings() {
+    var uid = String(state.userTeamId);
+    return (state.week35Results.signed_players || []).filter(function (e) {
+      return e && !e.walk_on && String(e.team_id) === uid;
+    }).sort(function (a, b) {
+      return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1);
+    });
+  }
+
+  function yourClassTableHtml(entries) {
+    if (!entries.length) return '';
+    var rows = entries.map(function (e) {
+      return '<tr><td class="c-port">' + signingPortraitHtml(e) + '</td>' +
+        '<td class="left team">' + signingNameHtml(e) + '</td>' +
+        '<td>' + Common.escapeHtml(e.pos || '--') + '</td>' +
+        '<td>' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</td>' +
+        '<td class="rt">' + signingRtHtml(e) + '</td></tr>';
+    }).join('');
+    return '<section class="gob-tcard gob-rec-your-class">' +
+      '<h2>Your class<em>' + entries.length + '</em></h2>' +
+      '<div class="gob-xs gob-rec-class"><table class="gob-tbl"><colgroup>' +
+      '<col class="c-port"><col class="c-name"><col class="c-pos"><col class="c-yr"><col class="c-rt"></colgroup>' +
+      '<thead><tr><th class="c-port"></th><th class="left">Name</th><th>Pos</th><th>Yr</th><th>RT</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div></section>';
+  }
+
+  function leagueSigningRowHtml(e, isUserTeam) {
+    return '<tr' + (isUserTeam ? ' class="me"' : '') + '>' +
+      '<td class="left name">' + signingNameHtml(e) + '</td>' +
+      '<td class="pos">' + Common.escapeHtml(e.pos || '--') + '</td>' +
+      '<td class="yr">' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</td>' +
+      '<td class="rt">' + signingRtHtml(e) + '</td></tr>';
+  }
+
+  /** One team of a conference: its place, name and class score, then who it signed. */
+  function leagueTeamHtml(t, place) {
+    var body = t.signings.map(function (e) {
+      return leagueSigningRowHtml(e, t.isUser);
+    }).join('');
+    var list = t.signings.length
+      ? '<div class="gob-xs gob-rec-league"><table class="gob-tbl">' +
+        '<colgroup><col class="c-name"><col class="c-pos"><col class="c-yr"><col class="c-rt"></colgroup>' +
+        '<tbody>' + body + '</tbody></table></div>'
+      : '<p class="gob-rec-none">No signings</p>';
+    return '<div class="gob-rec-team' + (t.isUser ? ' is-user-team' : '') + '">' +
+      '<h3 class="gob-rec-team-h"><span class="rk">' + place + '</span>' +
+      '<span class="nm">' + Common.escapeHtml(t.name) + '</span>' +
+      '<span class="sc" title="Class score">' + t.score + '</span></h3>' + list + '</div>';
+  }
+
+  function leagueConferenceCardHtml(g) {
+    var eye = g.isUser ? '<p class="gob-rec-eye">Your conference</p>'
+      : g.isSister ? '<p class="gob-rec-eye">Sister conference</p>' : '';
+    var teams = g.teams.map(function (t, i) { return leagueTeamHtml(t, i + 1); }).join('');
+    var head = '<div class="gob-rec-conf-head"><div>' + eye +
+      '<h2>Conference ' + Common.escapeHtml(g.label) + '</h2></div>' +
+      '<span class="gob-rec-key">Class score</span></div>';
+    return '<section class="gob-tcard gob-rec-conf" data-conference="' + Common.escapeHtml(g.label) + '">' +
+      head + '<div class="gob-rec-teams">' + teams + '</div></section>';
   }
 
   function finalSigningsHtml() {
     var groups = leagueSigningGroups();
-    if (!groups.length) {
-      return '<div class="rstage"><div class="rempty">No signings to report yet.</div></div>';
+    var yours = userClassSignings();
+    if (!groups.length && !yours.length) {
+      return '<div class="gob-rec-results"><p class="gob-rec-empty">No signings to report yet.</p></div>';
     }
-    var body = groups.map(function (g) {
-      var tag = g.isUser ? '<span class="lstag you">Your conference</span>'
-        : g.isSister ? '<span class="lstag sis">Sister conference</span>' : '';
-      var teams = g.teams.map(function (t) {
-        return '<div class="lsteam' + (t.isUser ? ' is-user' : '') + '">' +
-          '<div class="lsteam-h">' + Common.escapeHtml(t.name) +
-            '<span class="lsn">' + t.signings.length + '</span></div>' +
-          t.signings.map(leagueRowHtml).join('') + '</div>';
-      }).join('');
-      return '<section class="lsconf' + (g.isUser ? ' is-user' : '') + '">' +
-        '<div class="lsconf-h"><span class="lsconf-t">Conference ' + g.label + '</span>' + tag + '</div>' +
-        '<div class="lsconf-teams">' + teams + '</div></section>';
-    }).join('');
-    return '<div class="rstage">' +
-      '<div class="rhead"><div class="rhead-t">Signing Day Results</div>' +
-        '<div class="rhead-s">Every signing in the league, by conference.</div></div>' +
-      '<div class="lswrap">' + body + '</div></div>';
+    var league = groups.length
+      ? '<div class="gob-rec-conf-grid">' + groups.map(leagueConferenceCardHtml).join('') + '</div>'
+      : '';
+    return '<div class="gob-rec-results">' + yourClassTableHtml(yours) + league + '</div>';
   }
 
   // The week-36 screen is a league LIST now, not a playback — the reveal moved to
@@ -2054,82 +2339,6 @@
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['div']);
     markSigningsSeen();
   }
-  // ---- Weekly-visit results panel (wks 20-26) ----
-  function showWeeklyPanel() { return state.phase === 'invite' && state.currentResultsWeek === state.week && !state.weeklyDismissed; }
-  function weeklyPanelHtml() {
-    var tree = state.visitTree;
-    if (!tree) return '<div class="wpanel"><div class="wpanel-head"><div class="wpanel-title"><small>Loading</small>This Week\'s Results</div></div></div>';
-    // Flatten team visits → your visit + a recruit→visitors map.
-    var yourVisit = null, visitors = {};
-    (tree.regions || []).forEach(function (rg) {
-      (rg.conferences || []).forEach(function (cf) {
-        (cf.teams || []).forEach(function (t) {
-          if (!t.visit) return;
-          var rid = String(t.visit.recruit_id);
-          (visitors[rid] = visitors[rid] || []).push({ team_id: String(t.team_id), team_name: t.team_name });
-          if (String(t.team_id) === String(state.userTeamId)) yourVisit = t.visit;
-        });
-      });
-    });
-    var mineCount = state.recruits.filter(function (r) { return r.leansToUser; }).length;
-    var invitesLeft = INVITE_WEEKS.filter(function (w) { return w > state.week; }).length;
-
-    // Hero: your visit
-    var heroVisit;
-    if (yourVisit) {
-      var vrec = state.byId[String(yourVisit.recruit_id)];
-      var leanNote = vrec && vrec.leansToUser ? 'now leaning you at <b>#' + (vrec.yourRank || 1) + '</b>. Odds up sharply.' : 'visit logged this week.';
-      heroVisit = '<div class="wvisit"><span class="wvisit-mark gain">' + ARROW_UP + '</span><div class="wvisit-body">' +
-        '<div class="nm">' + Common.recruitNameLinkHtml(yourVisit.recruit_id, context.franchiseId, yourVisit.name) + '<span class="wmeta" data-tooltip="current/potential" title="current/potential"><span class="pos">' + Common.escapeHtml(yourVisit.pos) + '</span>Region ' + Common.escapeHtml(yourVisit.home_region) + ' · ' + Common.formatRtWithPotential(yourVisit.rt, yourVisit.potential_rt_ratcheted) + ' RT</span></div>' +
-        '<div class="sub">Visit landed — ' + leanNote + '</div></div></div>';
-    } else {
-      heroVisit = '<div class="wvisit"><div class="wvisit-body"><div class="nm">No visit this week</div><div class="sub">Your program didn\'t land a visit in Week ' + state.week + '.</div></div></div>';
-    }
-
-    // Contested region activity: your leaners a rival visited this week, grouped by region.
-    var byRegion = {};
-    state.recruits.filter(function (r) { return r.leansToUser; }).forEach(function (r) {
-      var v = visitors[String(r.recruitId)]; if (!v) return;
-      var rival = v.filter(function (x) { return x.team_id !== String(state.userTeamId); })[0];
-      (byRegion[regionOf(r)] = byRegion[regionOf(r)] || []).push({ r: r, rival: rival });
-    });
-    var regionsShown = REGION_ORDER.filter(function (rg) { return byRegion[rg]; }).slice(0, 4);
-    var regionHtml = regionsShown.map(function (rg) {
-      var visits = byRegion[rg].slice(0, 6).map(function (x) {
-        var rivalPart = x.rival
-          ? '<span class="team">' + Common.escapeHtml(Spine.Lean.deriveAbbr(x.rival.team_name, x.rival.team_id)) + '</span><span class="note threat">also visited — contested</span>'
-          : '<span class="note">no rival visits — clear lane</span>';
-        return '<div class="wvrow"><span class="team you">' + Common.escapeHtml(Spine.Lean.deriveAbbr(state.teamName || 'You', state.userTeamId)) + '</span>' +
-          '<span class="who">' + Common.escapeHtml(x.r.name) + '</span><span class="arrow">·</span>' + rivalPart + '</div>';
-      }).join('');
-      return '<div class="wregion-row"><span class="wregion-tag">' + rg + '</span><div class="wregion-visits">' + visits + '</div></div>';
-    }).join('');
-    if (!regionHtml) regionHtml = '<div class="wregion-empty"><span class="note">No contested visits among your leaners this week — clear lanes.</span></div>';
-
-    return '<div class="wpanel"><div class="wpanel-head"><span class="wpanel-badge">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 22V4M4 4h13l-2 4 2 4H4"></path></svg></span>' +
-        '<div class="wpanel-title"><small>Week ' + state.week + ' · Visits processed</small>This Week\'s Results</div></div>' +
-      '<div class="wpanel-hero"><div class="whero"><div class="whero-lbl">Your visit</div>' + heroVisit + '</div>' +
-        '<div class="whero"><div class="whero-lbl">What it changed</div><div class="wvisit"><span class="wvisit-mark gain">' + DOT_SVG + '</span>' +
-          '<div class="wvisit-body"><div class="nm">' + state.newLeanIds.size + ' new lean' + (state.newLeanIds.size === 1 ? '' : 's') + ' this week</div>' +
-          '<div class="sub"><b>' + mineCount + '</b> recruits now have your team on their list. ' + invitesLeft + ' invite' + (invitesLeft === 1 ? '' : 's') + ' left this season.</div></div></div></div></div>' +
-      '<div class="wregion">' + regionHtml + '</div></div>';
-  }
-  function dismissWeekly() {
-    state.weeklyDismissed = true;
-    var host = document.getElementById('hub-weekly'); if (host) host.innerHTML = '';
-    var pool = document.querySelector('.pool-wrap');
-    if (pool) window.scrollTo({ top: pool.getBoundingClientRect().top + window.scrollY - 60, behavior: 'smooth' });
-  }
-  function loadWeeklyPanel() {
-    var host = document.getElementById('hub-weekly'); if (!host) return;
-    var render = function () { host.innerHTML = weeklyPanelHtml(); var d = host.querySelector('#weekly-dismiss'); if (d) d.addEventListener('click', dismissWeekly); };
-    if (state.visitTree) { render(); return; }
-    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-results') + '?franchise_id=' + encodeURIComponent(context.franchiseId) + '&week=' + encodeURIComponent(state.week))
-      .then(function (tree) { state.visitTree = tree || {}; render(); })
-      .catch(function (err) { console.error(err); state.weeklyDismissed = true; host.innerHTML = ''; });
-  }
-
   /**
    * Season-panel visit log: every invite week 20-26 in ascending order.
    *
@@ -2198,62 +2407,89 @@
       '</div>';
   }
 
-  function visitCalendarHtml() {
-    var hist = state.visitHistory || [];
+  function visitCalendarHtml(mode) {
+    var preview = mode === 'preview';
+    var hist = (state.visitHistory || []).slice();
+    if (!hist.length && preview) {
+      hist = INVITE_WEEKS.map(function (w) {
+        return { week: w, recruit_id: null, name: null, lean: null };
+      });
+    }
     if (!hist.length) return '';
+    var title = preview ? 'Invite window opens Week 20' : 'Invite Visits';
     return '<section class="vcal">' +
       // No counter: the seven squares ARE the count, and a number beside them restated
       // what the row already shows.
-      '<div class="vcal-head"><div class="vcal-title">Invite Visits</div></div>' +
+      '<div class="vcal-head"><div class="vcal-title">' + title + '</div></div>' +
       '<div class="vcal-grid">' + hist.map(visitWeekTileHtml).join('') + '</div>' +
       '</section>';
   }
 
   // ===================== SHELL =====================
+  function columnHtml(inner) {
+    return '<div class="spine-body no-dock" style="padding-top:14px">' +
+      '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' + inner + '</div></div>';
+  }
+  function visitsMountHtml() {
+    var mode = 'invite';
+    if (state.phase !== 'invite') mode = state.week < 20 ? 'preview' : 'history';
+    return '<div id="hub-visits" data-vmode="' + mode + '"></div>';
+  }
+  function shellBodyHtml() {
+    if (state.phase === 'day') return '<div class="hub-body-sign" id="hub-sign"></div>';
+    if (state.phase === 'results') return '<div id="hub-signings"></div>';
+    var pool = '<div class="pool-wrap"><div id="hub-pool"></div></div>';
+    if (state.phase === 'invite') {
+      if (hubView === 'visits') return columnHtml(visitsMountHtml());
+      return columnHtml(visitsMountHtml() + '<div id="hub-board"></div>'
+        + '<button type="button" class="hub-more" data-scroll-pool>Recruit pool below</button>' + pool);
+    }
+    if (hubView === 'visits') return columnHtml(visitsMountHtml());
+    return columnHtml((state.phase === 'passive' ? storyHtml() : '') + pool);
+  }
+  function syncHubChrome() {
+    var showRow = state.phase !== 'day' && state.phase !== 'results';
+    if (window.GOBShell && typeof window.GOBShell.setRecruitingTabs === 'function') {
+      window.GOBShell.setRecruitingTabs(showRow);
+      return;
+    }
+    if (showRow) mountSearch();
+  }
+  function showHub(hub) {
+    if (hub !== 'pool' && hub !== 'leans' && hub !== 'visits') hub = 'pool';
+    if (state.phase === 'invite') hub = 'pool';
+    if (!hubReady) { pendingHub = hub; return; }
+    var changed = hub !== hubView;
+    hubView = hub;
+    if (hub === 'leans') state.view = 'all';
+    if (changed && hub !== 'visits') noteFilterChange();
+    renderShell();
+  }
   function renderShell() {
     var root = document.getElementById('hub-root');
     var signing = state.phase === 'day', results = state.phase === 'results';
-    var body;
-    if (signing) body = '<div class="hub-body-sign" id="hub-sign"></div>';
-    else if (results) body = '<div id="hub-signings"></div>';
-    else body =
-      (showWeeklyPanel() ? '<div id="hub-weekly"></div>' : '') +
-      // Single column in every phase. The invite phase used to carry a 306px rail
-      // (This week / Roster capacity) beside the board, which squeezed the pool table
-      // and pushed its Lean and Watch columns out of view — the two columns the pool
-      // exists to be scanned for.
-      '<div class="spine-body no-dock" style="padding-top:14px">' +
-        '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' +
-          (state.phase === 'passive' ? storyHtml() : '') +
-          // Invite phase: the seven-week visit calendar sits ABOVE the board — what the
-          // season has bought, then what is still ranked to buy — with the pool beneath
-          // as the add source.
-          (hasDock() ? '<div id="hub-visits"></div><div id="hub-board"></div>' : '') +
-          '<div class="pool-wrap"><div id="hub-pool"></div></div></div></div>';
-    root.innerHTML =
-      '<div class="spine-topbar"><span class="spine-h">Recruiting <b>Hub</b></span><span id="hub-anchor-mount"></span></div>' +
-      '<div class="spine-topbar" style="padding-top:12px;padding-bottom:0"><div style="flex:1" id="hub-phase"></div></div>' + body;
+    var body = shellBodyHtml();
+    // The section h1 already says Recruiting. Pool and Leans show the pool on the
+    // page, and Visits and Results have nothing to jump to. Signing Day is the
+    // exception: My Orders replaces the pool, so the Recruit Pool / My Orders
+    // switch stays.
+    root.innerHTML = (signing ? '<div class="spine-switch" id="hub-anchor-mount"></div>' : '') +
+      '<div class="spine-phase" id="hub-phase"></div>' + body;
     var phaseHost = document.getElementById('hub-phase');
     phaseHost.innerHTML = Spine.Phase.stripHtml({ phase: state.phase, week: state.week,
       inviteSent: Math.max(0, INVITE_WEEKS.filter(function (w) { return w < state.week; }).length),
       points: remaining() });
     Spine.Phase.bind(phaseHost);
-    var mount = document.getElementById('hub-anchor-mount');
-    // Signing Day pairs the pool anchor with a My Orders view: the same two things the
-    // screen is about, switched from one place. Outside Signing Day there is no orders
-    // view to switch to, so the anchor stands alone as before.
-    mount.innerHTML = Spine.Anchor.html()
-      + (signing
-        ? '<button class="hub-anchor hub-anchor--orders' + (state.sView === 'orders' ? ' is-on' : '') +
-          '" id="hub-orders-toggle" type="button" aria-pressed="' + (state.sView === 'orders' ? 'true' : 'false') +
-          '"><span class="ic">◧</span> My Orders</button>'
-        : '');
-    Spine.Anchor.bind(mount.querySelector('.hub-anchor'), {
-      poolSelector: signing ? '.spool' : results ? '.signings-wrap' : '.pool-wrap',
-      onDismiss: null   // weekly-results panel is persistent now; the anchor only scrolls to the pool
-    });
     if (signing) {
-      // The pool anchor is also the way back: pressing it leaves the orders-only view.
+      var mount = document.getElementById('hub-anchor-mount');
+      mount.innerHTML = Spine.Anchor.html() +
+        '<button class="hub-anchor hub-anchor--orders' + (state.sView === 'orders' ? ' is-on' : '') +
+        '" id="hub-orders-toggle" type="button" aria-pressed="' + (state.sView === 'orders' ? 'true' : 'false') +
+        '"><span class="ic">◧</span> My Orders</button>';
+      Spine.Anchor.bind(mount.querySelector('.hub-anchor'), {
+        poolSelector: '.spool',
+        onDismiss: null
+      });
       var poolBtn = mount.querySelector('.hub-anchor:not(.hub-anchor--orders)');
       if (poolBtn) poolBtn.addEventListener('click', function () { setSignView('pool'); });
       var ordersBtn = document.getElementById('hub-orders-toggle');
@@ -2262,17 +2498,43 @@
       });
     }
     var visits = document.getElementById('hub-visits');
-    if (visits) visits.innerHTML = visitCalendarHtml();
-    if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); applySignView(); bindSignBoard(); }
-    else if (results) { renderSignings(); }
-    else { renderPool(); if (hasDock()) renderDock(); if (showWeeklyPanel()) loadWeeklyPanel(); }
+    if (visits) visits.innerHTML = visitCalendarHtml(visits.getAttribute('data-vmode') || 'invite');
+    try {
+      if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); applySignView(); bindSignBoard(); }
+      else if (results) { renderSignings(); }
+      else {
+        if (document.getElementById('hub-pool')) renderPool();
+        if (document.getElementById('hub-board')) renderDock();
+        var more = root.querySelector('[data-scroll-pool]');
+        if (more) more.addEventListener('click', function () {
+          var pool = document.getElementById('hub-pool');
+          var main = document.querySelector('html.gob-shell .main');
+          if (!pool) return;
+          if (main) {
+            var head = document.querySelector('html.gob-shell .pg-head');
+            var pad = (head ? Math.round(head.getBoundingClientRect().height) : 0) + 8;
+            main.scrollTo({
+              top: main.scrollTop + pool.getBoundingClientRect().top - main.getBoundingClientRect().top - pad,
+              behavior: 'smooth'
+            });
+            return;
+          }
+          pool.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+    } finally {
+      syncHubChrome();
+    }
   }
 
   // ===================== INIT =====================
   function init() {
     var root = document.getElementById('hub-root'), backBtn = document.getElementById('back-btn');
     if (!context.franchiseId || !context.teamId) { if (root) root.innerHTML = '<div class="hub-error">Missing franchise context.</div>'; return; }
-    if (backBtn) backBtn.href = Common.buildFccUrl(context);
+    if (backBtn) {
+      backBtn.href = Common.buildFccUrl(context);
+      backBtn.setAttribute('data-gob-up', backBtn.href);
+    }
     // The FCC's green run action is a handoff to the Signing Day Experience, not a
     // visit to the Recruiting Hub. Cover the page before the first request begins and
     // keep this same pulse screen alive until the reveal is ready to paint.
@@ -2291,7 +2553,6 @@
         state.userRegion = REGION_ORDER.indexOf(String(data.team_region || '').trim().toUpperCase()) !== -1
           ? String(data.team_region).trim().toUpperCase() : '';
         state.teamName = data.team || 'your program';
-        state.currentResultsWeek = data.current_results_week;
         state.week35Results = data.week_35_recruiting_results || {};
         state.newLeanIds = new Set((data.new_lean_recruit_ids || []).map(String));
         var teamNameMap = data.team_name_map || {};
@@ -2335,6 +2596,7 @@
         if (!state.board.length) state.board = seedBoard();
         // Signing Day: restore the budget from saved entries; else auto-fill top leaners.
         state.week35Ran = !!data.week_35_recruiting_ran;
+        if (state.week35Ran && window.GOBNav) window.GOBNav.stripParam('action');
         if (state.phase === 'day') {
           // Restore what the player previously SAVED, and nothing else. There is no
           // load-time seed: an empty board loads at 0 of 50 with zero promises.
@@ -2348,6 +2610,14 @@
         // LAST, so it lays over the server copy, the watchlist seed and the restored
         // week-35 entries alike — an unsubmitted edit is newer than all three.
         restoreDraft();
+        if (pendingHub) {
+          hubView = pendingHub;
+          pendingHub = '';
+          publishHub(hubView);
+        } else {
+          applyLandingFilters();
+        }
+        hubReady = true;
         var canAutoRun = context.action === 'run' && state.phase === 'day' &&
           !state.week35Ran && committedIds().length > 0;
         if (!canAutoRun) {
@@ -2368,5 +2638,29 @@
       });
   }
 
+  window.RecruitingHub = {
+    show: showHub,
+    current: function () { return hubReady ? hubView : ''; },
+    // False until the week is known. The shell paints no Pool / Leans / Visits
+    // row before that: most weeks have a different row, or none.
+    ready: function () { return hubReady; },
+    week: function () { return state.week || 0; },
+    rowVisible: function () {
+      if (!hubReady) return true;
+      return state.phase !== 'day' && state.phase !== 'results';
+    },
+    mountSearch: mountSearch
+  };
+
   init();
+  window.addEventListener('pageshow', function () {
+    if (!context.franchiseId || typeof Common.fetchJSON !== 'function') return;
+    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-data') + '?franchise_id=' + encodeURIComponent(context.franchiseId))
+      .then(function (data) {
+        if (!data || !data.week_35_recruiting_ran) return;
+        state.week35Ran = true;
+        if (window.GOBNav) window.GOBNav.stripParam('action');
+      })
+      .catch(function () {});
+  });
 })();

@@ -1,0 +1,165 @@
+{
+  "label": "after",
+  "seed": {
+    "fid": "6abcf5df6032095c73597b18",
+    "tid": ""
+  },
+  "runs": {
+    "desktop": [
+      {
+        "painted": 350,
+        "breakdown": {
+          "painted": 350,
+          "pwAttached": 14,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 540.1000000238419,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 48,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 46
+              },
+              {
+                "name": "scouting-load",
+                "t": 48
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 48
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 48
+              },
+              {
+                "name": "scouting-opp",
+                "t": 48
+              },
+              {
+                "name": "scouting-fetch-start",
+                "t": 48
+              },
+              {
+                "name": "scouting-data",
+                "t": 336
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 337
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 337
+              }
+            ]
+          }
+        },
+        "waterfall": [
+          {
+            "t": 50,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 50,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      }
+    ],
+    "online": [
+      {
+        "painted": 385,
+        "breakdown": {
+          "painted": 385,
+          "pwAttached": 8,
+          "warm": false,
+          "skipPrefetch": false,
+          "trace": {
+            "page": {
+              "t0": 492.80000001192093,
+              "marks": [
+                {
+                  "t": 1,
+                  "ev": "show",
+                  "id": "scouting-view"
+                },
+                {
+                  "t": 42,
+                  "ev": "show-done",
+                  "id": "scouting-view"
+                }
+              ]
+            },
+            "marks": [
+              {
+                "name": "scouting-mount",
+                "t": 42
+              },
+              {
+                "name": "scouting-load",
+                "t": 42
+              },
+              {
+                "name": "scouting-fcc",
+                "t": 42
+              },
+              {
+                "name": "scouting-scripts",
+                "t": 42
+              },
+              {
+                "name": "scouting-opp",
+                "t": 42
+              },
+              {
+                "name": "scouting-fetch-start",
+                "t": 42
+              },
+              {
+                "name": "scouting-data",
+                "t": 373
+              },
+              {
+                "name": "scouting-paint-start",
+                "t": 373
+              },
+              {
+                "name": "scouting-paint-done",
+                "t": 374
+              }
+            ]
+          }
+        },
+        "waterfall": [
+          {
+            "t": 44,
+            "method": "GET",
+            "path": "/franchise/team-data"
+          },
+          {
+            "t": 44,
+            "method": "GET",
+            "path": "/franchise/scouting-report"
+          }
+        ]
+      }
+    ]
+  }
+}

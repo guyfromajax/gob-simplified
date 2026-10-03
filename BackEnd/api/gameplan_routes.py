@@ -7,6 +7,7 @@ import logging
 from typing import Optional
 
 from BackEnd.persistence import get_store
+from BackEnd.utils.browse_cache import browse_cached, bump_browse_rev
 _store = get_store()
 db = _store.db
 games_collection = _store.games_collection
@@ -241,6 +242,39 @@ def _build_player_name_lookup(team_obj: dict | None) -> dict[str, str]:
             player_lookup[str(player_doc["_id"])] = _get_player_display_name(player_doc)
 
     return player_lookup
+
+
+def _copy_1_text(play_data: dict | None) -> str | None:
+    """Return play-document copy.copy_1 when present and non-empty."""
+    if not isinstance(play_data, dict):
+        return None
+    copy = play_data.get("copy")
+    if isinstance(copy, dict):
+        text = copy.get("copy_1")
+        if isinstance(text, str) and text.strip():
+            return text.strip()
+    return None
+
+
+def _catalog_copy_1_by_key() -> dict[str, str]:
+    """Map catalog play id / name → copy_1. Team snapshots omit the play document copy."""
+    mapping: dict[str, str] = {}
+    try:
+        for doc in plays_collection.find({}, {"copy": 1, "play_id": 1, "name": 1}):
+            text = _copy_1_text(doc)
+            if not text:
+                continue
+            if doc.get("_id") is not None:
+                mapping[str(doc["_id"])] = text
+            play_id = doc.get("play_id")
+            if play_id:
+                mapping[str(play_id)] = text
+            name = doc.get("name")
+            if name:
+                mapping[str(name)] = text
+    except Exception:
+        return {}
+    return mapping
 
 
 def _get_top_scorer_label(play_data: dict, player_lookup: dict[str, str]) -> str | None:
@@ -1167,6 +1201,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
             }
             
             franchise_team_data_collection.insert_one(ftd_entry)
+            bump_browse_rev(doc_id)
             logger.info(f"✅ [ENSURE-TEAM-OBJECTS] Created FTD entry for team {team_id}")
             
             # Return the team data in expected format
@@ -1203,6 +1238,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                     {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                     {"$set": ftd_update}
                 )
+                bump_browse_rev(doc_id)
                 # Update local copy
                 for key, value in ftd_update.items():
                     ftd_doc[key] = value
@@ -1433,6 +1469,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
 
 
 @router.get("/api/gameplan")
+@browse_cached
 def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None, source: str = None):
     """
     Get game plan settings for a team in the specified mode.
@@ -1868,6 +1905,9 @@ def update_gameplan(request: GamePlanUpdateRequest):
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to save game plan settings")
+
+        if request.mode == "franchise" and request.franchise_id and not request.game_id:
+            bump_browse_rev(request.franchise_id)
         
         logger.info(f"✅ Updated game plan for team {actual_team_id} in {request.mode} mode")
         return {"success": True, "message": "Game plan saved successfully"}
@@ -1880,6 +1920,7 @@ def update_gameplan(request: GamePlanUpdateRequest):
 
 
 @router.get("/api/playbooks")
+@browse_cached
 def get_playbooks(
     mode: str,
     team_id: str,
@@ -2427,6 +2468,7 @@ def get_playbooks(
                     {"$set": ftd_entry},
                     upsert=True
                 )
+                bump_browse_rev(doc_id)
                 
                 team_obj = {
                     "playbook_settings": playbook_settings,
@@ -2466,6 +2508,7 @@ def get_playbooks(
                     {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                     {"$set": {"playbook_settings": playbook_settings}}
                 )
+                bump_browse_rev(doc_id)
                 team_obj["playbook_settings"] = playbook_settings
         elif actual_team_id and (not team_obj or not team_obj.get("playbook_settings")):
             # Tournament/single mode - existing logic
@@ -2520,6 +2563,7 @@ def get_playbooks(
                         {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                         {"$set": {"playbook_settings": existing_playbook_settings}}
                     )
+                    bump_browse_rev(doc_id)
                     team_obj["playbook_settings"] = existing_playbook_settings
                 else:
                     # Else branch: updating game or tournament doc (both use "teams")
@@ -2566,6 +2610,7 @@ def get_playbooks(
                     {"franchise_id": ObjectId(doc_id), "team_id": team_object_id},
                     {"$set": {"plays": populated_plays}}
                 )
+                bump_browse_rev(doc_id)
                 team_obj["plays"] = populated_plays
             else:
                 # Else branch: updating game or tournament doc (both use "teams")
@@ -2622,6 +2667,7 @@ def get_playbooks(
         player_name_lookup = _build_player_name_lookup(team_obj)
         scouting_data = (team_obj or {}).get("scouting_data", {})
         defense_scouting = scouting_data.get("defense", {}) if isinstance(scouting_data, dict) else {}
+        catalog_copy_1 = _catalog_copy_1_by_key()
 
         for play_key, play_data, display_name in iter_team_plays(plays):
             play_type = play_data.get("play_type", "")
@@ -2636,6 +2682,11 @@ def get_playbooks(
                 "cloaking": play_data.get("cloaking", 0),
                 "top_scorer": _get_top_scorer_label(play_data, player_name_lookup),
             }
+            copy_1 = _copy_1_text(play_data) or catalog_copy_1.get(
+                str(play_data.get("play_id") or "")
+            ) or catalog_copy_1.get(display_name)
+            if copy_1:
+                play_summary["copy"] = {"copy_1": copy_1}
             
             if play_type == "motion":
                 play_summary["motion_focus"] = play_data.get("motion_focus")
@@ -3279,6 +3330,9 @@ def save_playbooks(request: PlaybookSettingsRequest):
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to save playbook settings")
+
+        if request.mode == "franchise" and request.franchise_id and not request.game_id:
+            bump_browse_rev(request.franchise_id)
         
         logger.warning(f"✅ Saved playbook settings for team {actual_team_id} in {request.mode} mode")
         

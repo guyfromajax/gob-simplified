@@ -85,6 +85,7 @@ from BackEnd.utils.animation_step_schema import (
     PlayerAction,
     PlayerArchetype,
 )
+from BackEnd.utils.animation_step_helpers import defender_aware_rate  # STAGE 2: per-player defender test
 
 ContestResult = Literal["offense_win", "neutral", "defense_win"]
 
@@ -1035,7 +1036,7 @@ def _carry_unfinished_movement(
         if arch not in ("standard", "sprint", "burst", "cruise", "drift"):
             arch = "standard"
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_aware_rate(player, arch, pid, def_lineup)
         new_end, _dur = _motion_end_toward_dest(start_coord, target, rate, float(step_t))
 
         actions[pid] = "cut"
@@ -1511,7 +1512,11 @@ def build_shot_micro_steps(
             # over a ~140ms beat teleports him across the court (jet). Interrupt
             # his motion at his standard rate × step_t so he closes what he can.
             if defender_player is not None:
-                rate = _ag_grid_per_game_sec(defender_player, "standard")
+                # NOTE: the id here is defender_id, NOT the loop variable pid. pid belongs to
+                # earlier loops in this function and is UNBOUND on this path (measured: 70
+                # occurrences in one game), which would raise NameError inside the argument
+                # list and be swallowed upstream. See reports/ag-spread-stage2.md.
+                rate = defender_aware_rate(defender_player, 'standard', defender_id, def_lineup)
                 clamped, _ = _motion_end_toward_dest(
                     current_coords[defender_id], def_end, rate, step_t,
                 )

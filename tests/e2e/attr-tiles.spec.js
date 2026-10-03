@@ -3,8 +3,9 @@
  * Attribute tiles — shared builder, shared hover, four surfaces.
  *
  * In scope: Recruits screen (Hub pool), FCC Roster tab, FCC Recruits tab,
- * team-roster-view.html. Everything else that shows attributes is deliberately
- * untouched, and the last describe block guards that.
+ * and the Roster module view. team-roster-view.html redirects there.
+ * Everything else that shows attributes is deliberately untouched, and the
+ * last describe block guards that.
  *
  * Run: npx playwright test tests/e2e/attr-tiles.spec.js --project=chromium
  */
@@ -15,6 +16,7 @@ const path = require('path');
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
 const TILES_JS = read('js/shared/attrTiles.js');
+const DISPLAY_JS = read('js/utils/attributeDisplay.js');
 const TOOLTIP_JS = read('js/shared/attributeTooltips.js');
 const TILES_CSS = read('css/attr-tiles.css');
 
@@ -32,6 +34,7 @@ async function mount(page, attrs) {
   await page.setContent(`<style>${TILES_CSS}</style><body style="margin:0;background:#0b0d14">
     <table><thead><tr><th class="attr-tiles-head">Attributes</th></tr></thead>
     <tbody><tr id="row"></tr></tbody></table></body>`);
+  await page.addScriptTag({ content: DISPLAY_JS });
   await page.addScriptTag({ content: TILES_JS });
   await page.addScriptTag({ content: TOOLTIP_JS });
   await page.evaluate((a) => {
@@ -120,7 +123,7 @@ test.describe('hover copy', () => {
 });
 
 test.describe('tiers', () => {
-  test('10+ is the brand blue, 7-9 green, <=3 red, rest neutral', async ({ page }) => {
+  test('9+ is elite blue, 7-8 high, 5-6 mid, 0-4 low', async ({ page }) => {
     await mount(page, rawAttrs([10, 16, 3, 1, 7, 9, 5, 6, 4, 2, 8, 5]));
     const m = await page.evaluate(() =>
       [...document.querySelectorAll('.attr-tile')].map((t) => ({
@@ -129,27 +132,32 @@ test.describe('tiers', () => {
         color: getComputedStyle(t.querySelector('s')).color,
       })));
     const BLUE = 'rgb(74, 144, 217)';
+    const YELLOW = 'rgb(255, 215, 0)';
     for (const t of m) {
-      if (t.v >= 10) { expect(t.cls, `${t.v}`).toContain('is-elite'); expect(t.color).toBe(BLUE); }
+      if (t.v >= 9) { expect(t.cls, `${t.v}`).toContain('is-elite'); expect(t.color).toBe(BLUE); }
       else if (t.v >= 7) { expect(t.cls, `${t.v}`).toContain('is-hi'); expect(t.color).not.toBe(BLUE); }
-      else if (t.v <= 3) { expect(t.cls, `${t.v}`).toContain('is-lo'); expect(t.color).not.toBe(BLUE); }
-      else { expect(t.cls, `${t.v}`).not.toMatch(/is-(elite|hi|lo)/); }
+      else if (t.v >= 5) { expect(t.cls, `${t.v}`).toContain('is-mid'); expect(t.color).toBe(YELLOW); }
+      else { expect(t.cls, `${t.v}`).toContain('is-lo'); expect(t.color).not.toBe(BLUE); }
     }
   });
 
-  test('the 9/10 boundary is exact', async ({ page }) => {
+  test('tier class follows the displayed value', async ({ page }) => {
     await mount(page, {});
     const m = await page.evaluate(() => ({
-      nine: window.GOB_AttrTiles.tierClass(9),
-      ten: window.GOB_AttrTiles.tierClass(10),
-      three: window.GOB_AttrTiles.tierClass(3),
+      zero: window.GOB_AttrTiles.tierClass(0),
       four: window.GOB_AttrTiles.tierClass(4),
+      five: window.GOB_AttrTiles.tierClass(5),
       six: window.GOB_AttrTiles.tierClass(6),
       seven: window.GOB_AttrTiles.tierClass(7),
+      eight: window.GOB_AttrTiles.tierClass(8),
+      nine: window.GOB_AttrTiles.tierClass(9),
+      ten: window.GOB_AttrTiles.tierClass(10),
+      twelve: window.GOB_AttrTiles.tierClass(12),
     }));
     expect(m).toEqual({
-      nine: 'is-hi', ten: 'is-elite', three: 'is-lo',
-      four: '', six: '', seven: 'is-hi',
+      zero: 'is-lo', four: 'is-lo', five: 'is-mid', six: 'is-mid',
+      seven: 'is-hi', eight: 'is-hi', nine: 'is-elite', ten: 'is-elite',
+      twelve: 'is-elite',
     });
   });
 });
@@ -158,44 +166,60 @@ test.describe('tiers', () => {
 // the page. Its alignment and column-count coverage moved to standalone-roster.spec.js,
 // which mounts the real renderer instead of a hand-built stand-in of the old markup.
 
-test.describe('the four in-scope surfaces all use the shared builder', () => {
-  const SURFACES = [
-    ['recruiting-hub.js', 'Recruits screen (Hub pool)'],
-    ['franchise-command-center.js', 'FCC Roster + Recruits tabs'],
-    ['team-roster-view.js', 'team-roster-view'],
-  ];
+test.describe('the in-scope surfaces all use the shared builder', () => {
+  test('Recruits screen (Hub pool) calls GOB_AttrTiles', async () => {
+    // The pool uses the roster tile, one attribute per cell. The group header
+    // carries the abbreviation, so the tile is drawn without its own label.
+    const hub = read('recruiting-hub.js');
+    expect(hub).toContain('GOB_AttrTiles');
+    expect(hub).toContain('tileHtml');
+    expect(hub).toContain('tileHtml(key, value, false)');
+  });
 
-  for (const [file, label] of SURFACES) {
-    test(`${label} calls GOB_AttrTiles`, async () => {
-      // Grouped surfaces build a whole 6-pair cell; the Hub pool still renders a flat strip.
-      expect(read(file)).toMatch(/GOB_AttrTiles\.(grouped)?[tT]ilesHtml/);
-    });
-  }
+  test('FCC Roster + Recruits tabs calls GOB_AttrTiles', async () => {
+    // Leftover #roster-tab / #recruits-tab are gone. Live Roster is roster-view;
+    // Recruiting pool is recruiting-hub.js (asserted above).
+    const view = read('js/shared/views/rosterView.js');
+    expect(view).toContain('GOB_AttrTiles');
+    expect(view).toContain('tileHtml');
+  });
+
+  test('the roster module paints each attribute with the shared tile', async () => {
+    const view = read('js/shared/views/rosterView.js');
+    expect(view).toContain('GOB_AttrTiles');
+    expect(view).toContain('tileHtml');
+  });
 
   test('each in-scope page loads the module and stylesheet', async () => {
-    for (const page of ['recruiting.html', 'franchise-command-center.html', 'team-roster-view.html']) {
+    for (const page of ['recruiting.html', 'franchise-command-center.html']) {
       const html = read(page);
       expect(html, page).toContain('/js/shared/attrTiles.js');
       expect(html, page).toContain('/css/attr-tiles.css');
+      expect(html, page).toContain('/js/utils/attributeDisplay.js');
+      expect(html.indexOf('/js/utils/attributeDisplay.js'), page).toBeLessThan(html.indexOf('/js/shared/attrTiles.js'));
     }
   });
 
+  test('the old roster page redirects instead of loading its own tile script', async () => {
+    const html = read('team-roster-view.html');
+    expect(html).toContain("params.get('mode') === 'practice_squad' && params.get('ps_team_id')");
+    expect(html).toContain("params.set('tab', 'roster-view')");
+    expect(html).toContain("location.replace('/franchise-command-center.html'");
+  });
+
   test('no in-scope surface still emits 12 separate attribute columns', async () => {
-    for (const page of ['franchise-command-center.html', 'team-roster-view.html']) {
-      const html = read(page);
-      expect(html, page).not.toContain('<th>SC</th>');
-      expect(html, page).not.toContain('data-sort-key="SC"');
-      expect(html, page).not.toContain('data-sort="SC"');
-    }
+    const html = read('franchise-command-center.html');
+    expect(html).not.toContain('<th>SC</th>');
+    expect(html).not.toContain('data-sort-key="SC"');
   });
 
   test('every surface routes its attribute header through the grouped builder', async () => {
     // The header markup is rendered, not authored, so assert on the caller.
-    // The FCC renders both of its tabs' headers (Roster and Recruiting); the standalone
-    // roster renders its own. recruiting-common.js supplies rows, never the header.
-    const fcc = read('franchise-command-center.js').split('GOB_AttrTiles.groupedHeaderHtml').length - 1;
-    expect(fcc).toBe(2);
-    expect(read('team-roster-view.js')).toContain('GOB_AttrTiles.groupedHeaderHtml');
+    // Leftover FCC roster/recruits grouped headers are gone. Live roster-view
+    // paints one tile per cell; recruiting-hub uses tileHtml without a label.
+    expect(read('franchise-command-center.js')).not.toContain('GOB_AttrTiles.groupedHeaderHtml');
+    expect(read('js/shared/views/rosterView.js')).toContain('tileHtml');
+    expect(read('recruiting-hub.js')).toContain('tileHtml');
   });
 
   test('out-of-scope surfaces are untouched', async () => {

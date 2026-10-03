@@ -18,6 +18,21 @@ def test_flask_app_is_deleted():
         importlib.import_module("BackEnd.flask_app")
 
 
+def test_deployed_commit_uses_packaged_build_id(monkeypatch, tmp_path):
+    from BackEnd.api._bootstrap import _deployed_commit
+
+    for key in ("RAILWAY_GIT_COMMIT_SHA", "GIT_COMMIT_SHA", "SOURCE_VERSION", "GOB_BUILD_ID"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("GOB_BUILD_ID", "abc123def456extra")
+    assert _deployed_commit() == "abc123def456"
+    monkeypatch.delenv("GOB_BUILD_ID")
+    monkeypatch.setenv("GOB_BUNDLE_ROOT", str(tmp_path))
+    (tmp_path / "BUILD_ID").write_text("stampfile01\nsecond line\n", encoding="utf-8")
+    assert _deployed_commit() == "stampfile01"
+    monkeypatch.setenv("RAILWAY_GIT_COMMIT_SHA", "railway12345")
+    assert _deployed_commit() == "railway12345"
+
+
 def test_bundle_root_honors_override(monkeypatch, tmp_path):
     monkeypatch.setenv("GOB_BUNDLE_ROOT", str(tmp_path))
     assert bundle_root() == tmp_path.resolve()

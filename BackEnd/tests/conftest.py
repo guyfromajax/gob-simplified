@@ -22,9 +22,10 @@ performance ~60x, because ``defense_identity._ensure_cache`` treats an empty cat
 "never loaded" and re-reads the whole collection on every lookup — measured at 4,664 reads
 per game, 94.4% of wall time. See ``projects/Sim_Perf_Capstone.md``.
 
-Keep this in sync with ``tests/conftest.py``. If you add a third test tree, give it a guard
-too — a guard that covers some directories reads as protection everywhere, which is worse
-than no guard at all.
+The guard itself now lives in ``tests/db_guard.py`` and is imported by BOTH conftests, so
+there is nothing left to keep in sync. If you add a third test tree, import the same module —
+a guard that covers some directories reads as protection everywhere, which is worse than no
+guard at all.
 """
 
 import os
@@ -39,24 +40,10 @@ os.environ.setdefault("MONGO_DB_NAME", "gob-test")
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-_BLOCKED_DB_NAMES = frozenset({"gob", "gob-staging"})
-
-
 def pytest_configure(config):
-    try:
-        from BackEnd.db import db
-    except Exception:
-        # Can't import db — let the normal run surface that rather than masking it.
-        return
-    name = getattr(db, "name", None)
-    if name in _BLOCKED_DB_NAMES:
-        pytest.exit(
-            f"\n❌ Refusing to run pytest: connected DB is {name!r}, which is on "
-            f"the safety block-list {set(_BLOCKED_DB_NAMES)}.\n\n"
-            f"Tests in BackEnd/tests/ contain destructive delete_many({{}}) calls. "
-            f"gob-staging.defenses has been emptied FOUR times this way — and an empty "
-            f"defenses collection also collapses sim speed ~60x.\n\n"
-            f"Use the default in-memory mode (GOB_DB_MODE=mongomock) or point at a "
-            f"throwaway DB whose name is NOT on the block-list.\n",
-            returncode=2,
-        )
+    # THE guard lives in tests/db_guard.py and is shared with tests/conftest.py, so the two
+    # trees cannot drift apart. The sys.path insert above is what makes it importable from
+    # here. It is an ALLOW-LIST: see that module for why.
+    from tests.db_guard import enforce
+
+    enforce(pytest, "BackEnd/tests/")

@@ -26,15 +26,19 @@
   border-radius: 50%;
   object-fit: cover;
   object-position: center top;
-  background: rgba(0, 0, 0, 0.5);
-  border: 3px solid #F79420;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  background: var(--black-50, rgba(0, 0, 0, 0.5));
+  border: 3px solid var(--white-28, rgba(255, 255, 255, 0.28));
+  box-shadow: 0 8px 24px var(--black-50, rgba(0, 0, 0, 0.5));
 }
 
 /* Extra top padding so the title clears the portrait overlap. */
 .username-modal-body {
   padding-top: 56px;
   text-align: center;
+}
+
+.username-modal-body .gob-modal-title {
+  text-transform: uppercase;
 }
 
 .username-modal-body .gob-modal-subtitle {
@@ -51,10 +55,10 @@
   height: 44px;
   padding: 0 14px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
+  background: var(--black-35, rgba(0, 0, 0, 0.35));
+  border: 1px solid var(--white-18, rgba(255, 255, 255, 0.18));
+  color: var(--text-100, #ffffff);
+  font-family: var(--font-body, 'Inter', sans-serif);
   font-size: 15px;
   letter-spacing: 0.01em;
   outline: none;
@@ -62,28 +66,28 @@
 }
 
 .username-modal-input:focus {
-  border-color: rgba(247, 148, 32, 0.7);
-  background: rgba(0, 0, 0, 0.5);
+  border-color: var(--white-45, rgba(255, 255, 255, 0.45));
+  background: var(--black-50, rgba(0, 0, 0, 0.5));
 }
 
 .username-modal-input::placeholder {
-  color: rgba(255, 255, 255, 0.32);
+  color: var(--white-30, rgba(255, 255, 255, 0.3));
 }
 
 .username-modal-hint {
   margin: 8px 2px 0;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body, 'Inter', sans-serif);
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--white-45, rgba(255, 255, 255, 0.45));
   letter-spacing: 0.02em;
 }
 
 .username-modal-error {
   margin: 8px 2px 0;
   min-height: 1.2em;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body, 'Inter', sans-serif);
   font-size: 12px;
-  color: #ff6d6d;
+  color: var(--red, #ff6d6d);
   letter-spacing: 0.02em;
 }
 

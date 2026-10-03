@@ -1,0 +1,1161 @@
+/* Franchise shell layout for franchise-command-center.html only.
+   Token values stay in gob-tokens.css. This file only places the shell
+   and stops the old page chrome from scrolling beside .main. */
+
+/* html.gob-shell also matches the tutorial page's .gob-shell card
+   (gob-tutorial.css). Reset that wrapper so the franchise shell is flush. */
+html.gob-shell {
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+html.gob-shell::before,
+html.gob-shell::after {
+  content: none;
+  display: none;
+}
+
+html.gob-shell body,
+html.gob-shell body.has-auth-bar {
+  margin: 0 !important;
+  height: 100%;
+  overflow: hidden;
+  padding: 0 !important;
+  background: var(--bg);
+}
+
+html.gob-shell .app {
+  width: 100%;
+  height: 100vh;
+  max-height: 100vh;
+}
+
+html.gob-shell .main {
+  min-width: 0;
+}
+
+html.gob-shell .pg-head {
+  --pg-head-h: calc(var(--page-pad) + var(--fs-32) + var(--space-12) + var(--dsz-44) + var(--dsp-8));
+  height: auto;
+  min-width: 0;
+  /* Solid fill. The foundation gradient fades to --bg-page (translucent),
+     so table rows scrolling under the last 15% of the head read as ghost text. */
+  background: var(--bg-page-solid);
+}
+
+html.gob-shell .pg-head:has(.nav-row:not([hidden])) {
+  height: auto;
+  padding-bottom: var(--dsp-8);
+}
+
+/* The handoff stripe sits on .main. The office already paints its own
+   panel, so a second stripe would change the existing cards. */
+html.gob-shell .main::after {
+  content: none;
+}
+
+html.gob-shell #auth-bar,
+html.gob-shell #site-footer,
+html.gob-shell #alpha-badge,
+html.gob-shell #tournament-top,
+html.gob-shell #franchise-container .tab-buttons {
+  display: none !important;
+}
+
+html.gob-shell #franchise-container {
+  position: static;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.gob-shell #franchise-container::before,
+html.gob-shell #franchise-container::after {
+  content: none;
+  display: none;
+}
+
+html.gob-shell #franchise-container #tournament-tabs {
+  display: block;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  padding: 0;
+}
+
+html.gob-shell #franchise-container #tournament-tabs > .tab-content.active {
+  overflow: visible;
+  height: auto;
+  max-height: none;
+}
+
+/* The section panel was a second rounded frame around the page. The head
+   sits on .main, and the cards inside the panel stay as they are. */
+html.gob-shell:not(.gob-office) #franchise-container .tab-content {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.gob-shell.gob-office .main {
+  display: flex;
+  flex-direction: column;
+}
+
+html.gob-shell.gob-office #franchise-container,
+html.gob-shell.gob-office #franchise-container #tournament-tabs,
+html.gob-shell.gob-office #franchise-container #tournament-tabs > #home-tab.tab-content.active {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  width: 100%;
+}
+
+html.gob-shell .top {
+  min-width: 0;
+}
+
+html.gob-shell .top-stats {
+  min-width: 0;
+}
+
+html.gob-shell .ts[hidden] {
+  display: none !important;
+}
+
+html.gob-shell a.top-id {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  height: var(--top-h);
+  padding: 0 var(--dsp-12);
+  gap: 0;
+  box-sizing: border-box;
+}
+
+html.gob.gob-shell.gob-1280 a.top-id,
+html.gob.gob-shell.gob-1920 a.top-id {
+  padding: 0 var(--dsp-12);
+  min-width: 0;
+  height: var(--top-h);
+  gap: 0;
+}
+
+html.gob-shell #team-logo {
+  height: var(--top-h);
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+  flex: none;
+  display: block;
+}
+
+html.gob-shell #fcc-header-emblem {
+  max-height: calc(var(--top-h) - var(--space-12));
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+html.gob-shell #fcc-header-emblem svg {
+  display: block;
+  width: auto;
+  height: calc(var(--top-h) - var(--space-16));
+}
+
+/* The week stat's text column. In a tournament week it reads
+   "<Tier> Tournament" over the round, with the tier emblem to its left. */
+html.gob-shell .ts-txt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+html.gob-shell .ts-txt b,
+html.gob-shell .ts-txt span {
+  white-space: nowrap;
+}
+
+/* The line under the week (season, or round and season) never sets the stat's
+   width: the value does. A longer label runs on into the empty strip beside it,
+   so it cannot widen the stats or move the action button. */
+html.gob-shell .ts-txt span {
+  width: 0;
+  min-width: 100%;
+}
+
+html.gob-shell #fcc-header-emblem:empty {
+  display: none;
+}
+
+html.gob-shell #fcc-edit-recruiting {
+  min-height: var(--dsz-40);
+  padding: 0 var(--space-16);
+  border: 1px solid var(--white-28);
+  border-radius: var(--radius-10);
+  background: transparent;
+  color: var(--text-87);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-14);
+  letter-spacing: var(--tracking-2);
+}
+
+html.gob-shell #fcc-edit-recruiting:hover {
+  color: var(--text-100);
+  background: var(--white-6);
+}
+
+html.gob-shell #play-now.advance:disabled {
+  opacity: 1;
+}
+
+html.gob-shell button.rail-i,
+html.gob-shell button.stab {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+}
+
+html.gob-shell button.rail-i {
+  background: transparent;
+  color: inherit;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+}
+
+html.gob-shell button.rail-i.on {
+  background: var(--navy);
+  color: var(--text-100);
+}
+
+html.gob-shell .app > nav.rail {
+  position: relative;
+  top: 0;
+  z-index: 30;
+  min-height: 0;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  max-height: none;
+  background: var(--bg-chrome);
+}
+
+html.gob-shell .main {
+  z-index: 1;
+}
+
+/* Legacy .gob-modal-overlay must stay a viewport layer. `.gob .main>*`
+   sets position:relative + --z-raised, which pins the dialog under the
+   focus top bar if adoptMain ever takes it. */
+html.gob.gob-shell .main .gob-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+}
+
+html.gob-shell .rail-face {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
+}
+
+html.gob-shell .rail-sp {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+html.gob-shell .rail-i.exit,
+html.gob-shell .rail-div.q {
+  flex-shrink: 0;
+}
+
+/* 1280: the grid column stays --rail-w. The face overlays .main.
+   One motion: after 400ms the face width runs 64 → 200 in --dur-rail.
+   Collapse waits 120ms, then the same single width transition.
+   Labels only fade; they are out of flow so they cannot widen the face early. */
+html.gob-shell.gob-1280 .rail {
+  padding: 0;
+}
+
+html.gob-shell.gob-1280 .rail-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--rail-w);
+  padding: var(--space-12) var(--space-10);
+  background: var(--bg-chrome);
+  border-right: 1px solid var(--line);
+  box-sizing: border-box;
+  overflow: hidden;
+  clip-path: inset(0);
+  transition: width var(--dur-rail) var(--ease-out);
+  transition-delay: 120ms;
+}
+
+html.gob-shell.gob-1280 .rail:hover .rail-face,
+html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-face {
+  width: 200px;
+  transition-delay: 400ms;
+}
+
+html.gob-shell.gob-1280 .rail-i {
+  justify-content: flex-start;
+  padding-left: calc((var(--rail-w) - 22px) / 2 - var(--space-10));
+  transition: padding-left var(--dur-rail) var(--ease-out), color var(--dur-hover);
+  transition-delay: 120ms, 0s;
+}
+
+html.gob-shell.gob-1280 .rail:hover .rail-i,
+html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i {
+  padding-left: var(--space-14);
+  transition-delay: 400ms, 0s;
+}
+
+/* Collapsed labels have a zero box inside the face, so a glyph cannot
+   paint past the 64px edge. max-width stays zero until the face starts
+   opening: an immediate snap overflowed the still-collapsed face, and the
+   rail's view-transition snapshot (the nav is overflow:visible) could
+   keep that glyph. Opacity is the fade, on the same clock as the face. */
+html.gob-shell.gob-1280 .rail-i > .rail-l {
+  display: inline;
+  position: absolute;
+  left: calc(var(--space-14) + 22px + var(--space-12));
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition-property: max-width, opacity;
+  transition-duration: 0s, var(--dur-rail);
+  transition-timing-function: linear, var(--ease-out);
+  transition-delay: calc(120ms + var(--dur-rail)), 120ms;
+}
+
+html.gob-shell.gob-1280 .rail:hover .rail-i > .rail-l,
+html.gob-shell.gob-1280 .rail:has(:focus-visible) .rail-i > .rail-l {
+  max-width: 148px;
+  opacity: 1;
+  transition-duration: 0s, var(--dur-rail);
+  transition-delay: 400ms, 400ms;
+}
+
+html.gob-shell.gob-1280 .rail-i > .inbox-badge {
+  display: block;
+  opacity: 1;
+}
+
+html.gob-shell.gob-1920 .rail-face {
+  width: 100%;
+}
+
+html.gob-shell .rail-i .inbox-badge {
+  animation: none;
+  top: 6px;
+  right: 8px;
+}
+
+html.gob-shell .subtabs {
+  flex-wrap: wrap;
+}
+
+html.gob-shell .stats-toggle {
+  display: inline-flex;
+  margin-left: 0;
+  border-radius: var(--radius-8);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+html.gob-shell .stats-toggle[hidden] {
+  display: none;
+}
+
+html.gob-shell .stats-toggle button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-60);
+  cursor: pointer;
+  font: var(--fw-bold) var(--fs-12)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-6);
+  padding: var(--space-8) var(--space-12);
+}
+
+html.gob-shell .stats-toggle button em {
+  margin-left: var(--space-6);
+}
+
+html.gob-shell .stats-toggle button.on {
+  background: var(--white-10);
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .subtabs:empty,
+html.gob-shell .pg-head .subtabs[hidden] {
+  display: none;
+}
+
+html.gob-shell .pg-head .stab.is-locked,
+html.gob-shell .pg-head .stab.is-locked:hover,
+html.gob-shell .pg-head .stab.is-locked:focus,
+html.gob-shell .pg-head .stab.is-locked:focus-visible {
+  display: grid;
+  place-items: center;
+  height: 40px;
+  min-width: 118px;
+  padding: 0 var(--space-20);
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  background: var(--white-6);
+  color: var(--text-38) !important;
+  font-family: var(--font-display) !important;
+  font-weight: var(--fw-bold) !important;
+  font-size: var(--fs-16) !important;
+  line-height: var(--lh-1) !important;
+  letter-spacing: var(--tracking-4) !important;
+  text-align: center;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Focus mode: top bar only. Settings sits at the right. The panel anchors at left 0. */
+html.gob-shell.gob-focus .app {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html.gob-shell.gob-focus .main {
+  grid-column: 1 / -1;
+}
+
+html.gob-shell.gob-focus .rail,
+html.gob-shell.gob-focus .adv-wrap,
+html.gob-shell.gob-focus .pg-head {
+  display: none !important;
+}
+
+html.gob-shell #gob-focus-settings {
+  display: none;
+}
+
+html.gob-shell.gob-focus #gob-focus-settings {
+  display: grid;
+  place-items: center;
+  width: var(--top-h);
+  height: var(--top-h);
+  flex: 0 0 auto;
+  color: var(--text-60);
+  background: transparent;
+}
+
+html.gob-shell.gob-focus #gob-focus-settings svg {
+  width: 22px;
+  height: 22px;
+}
+
+html.gob-shell.gob-pending .rail,
+html.gob-shell.gob-pending .adv-wrap,
+html.gob-shell.gob-pending .top-id,
+html.gob-shell.gob-pending .top-div,
+html.gob-shell.gob-pending .top-stats {
+  visibility: hidden;
+}
+
+/* Locker-room backs are replaced by the rail. Up-a-level backs stay (data-gob-keep-back). */
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .rankings-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .schedule-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .hub-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .team-stats-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .team-roster-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .standings-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .ps-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .news-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .leaders-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .brackets-page-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .recruiting-header,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .playbooks-page-header-wrap,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .game-plan-page-header-wrap,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .stats-topbar-back,
+html.gob-shell:not(.gob-focus):not([data-gob-keep-back]) .back-to-locker-room {
+  display: none !important;
+}
+
+/* One vertical scroll: nested page lists grow, and .main (or focus .main) scrolls. */
+html.gob-shell .fcc-home-list-scroll,
+html.gob-shell .spool-rows,
+html.gob-shell .rail-list,
+html.gob-shell .idock-list,
+html.gob-shell .signtable,
+html.gob-shell #tr-scroll,
+html.gob-shell .pd-right-column,
+html.gob-shell #franchise-container .fcc-home-card--recruiting .fcc-home-card-body,
+html.gob-shell #franchise-container .fcc-home-card--recruiting .fcc-home-list-scroll {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+/* Fitting tables pin under .pg-head. --gob-stick-top is the measured head
+   height. Focus has no .pg-head in .main, so the offset stays 0.
+   Ancestors between thead and .main stay overflow:visible. A clipped card
+   (box score sections, .table-container) was the sticky box, so the page-head
+   offset landed inside the card and covered the first rows.
+   A table wider than .main gets .gob-wide-wrap at runtime: horizontal scroll
+   inside the card, edge fades, and a static header. */
+html.gob-shell {
+  --gob-stick-top: 0px;
+  --gob-stick-row: 0px;
+}
+
+html.gob-shell .main .fcc-brand-page-shell,
+html.gob-shell .main .fcc-data-card,
+html.gob-shell .main .scroll-x,
+html.gob-shell .main .pool-scroll,
+html.gob-shell .main .spine,
+html.gob-shell .main .doc,
+html.gob-shell .main .table-container,
+html.gob-shell .main .stats-section,
+html.gob-shell .main #quarter-scoring-section,
+html.gob-shell .main #potg-section,
+html.gob-shell .main .play-usage-scroll,
+html.gob-shell .main #tr-scroll,
+html.gob-shell .main .team-roster-shell,
+html.gob-shell .main .gob-table-wrap,
+html.gob-shell .main .stats-table-wrap,
+html.gob-shell .main .gob-data-grid-scroll {
+  overflow: visible !important;
+  max-height: none !important;
+  max-width: 100%;
+  min-width: 0;
+}
+
+html.gob-shell .main thead th {
+  position: sticky;
+  top: var(--gob-stick-top);
+  z-index: var(--z-sticky);
+  background: var(--bg-page-solid);
+}
+
+html.gob-shell .main thead tr + tr th {
+  top: calc(var(--gob-stick-top) + var(--gob-stick-row));
+}
+
+/* A pinned header's dividers travel with its cells. In a collapsed table the 1px border
+   under a row is painted by the table where the row is laid out, so when the cells are
+   pinned the border stays behind and the rows show through its pixel row (the Lean chips,
+   Recruiting › Pool, 2026-10-02). Where a header row has that border (the group row of a
+   grouped header; every header row of the recruiting pool) it keeps its width and goes
+   transparent, and each cell draws the line in its place with a pseudo-element hung one
+   pixel below its box: same colour, same pixel row, same heights. The id selector outranks
+   `#franchise-container .tab-content th` in the command center (Player Stats). */
+html.gob-shell .main .gob-tbl tr.gob-groups th,
+html.gob-shell .main #franchise-container .tab-content .gob-tbl tr.gob-groups th,
+html.gob-shell .main .gob-tbl.pool thead th {
+  border-bottom-color: transparent;
+}
+html.gob-shell .main .gob-tbl tr.gob-groups th::before,
+html.gob-shell .main .gob-tbl tr.gob-groups ~ tr th::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  pointer-events: none;
+}
+html.gob-shell .main .gob-tbl tr.gob-groups th::before,
+html.gob-shell .main .gob-tbl.pool thead th::before {
+  background: color-mix(in srgb, var(--white) 8%, var(--bg-page-solid));
+}
+
+/* While the header is pinned (the shell sets `is-pinned` on the table as .main scrolls),
+   a hairline under its last row closes it off from the rows. At rest there is none. */
+html.gob-shell .main table.is-pinned thead tr:last-child th::before {
+  background: color-mix(in srgb, var(--white) 14%, var(--bg-page-solid));
+}
+
+html.gob-shell .main #roster-table thead th,
+html.gob-shell .main #roster-table thead th.c-ident {
+  z-index: var(--z-sticky);
+}
+
+html.gob-shell .main #roster-table thead tr:first-child th {
+  top: var(--gob-stick-top);
+}
+
+html.gob-shell .main #roster-table thead tr.tr-colrow th {
+  top: calc(var(--gob-stick-top) + var(--gob-stick-row));
+}
+
+html.gob-shell .main .gob-wide-wrap,
+html.gob-shell .main #quarter-scoring-section.gob-wide-wrap,
+html.gob-shell .main #potg-section.gob-wide-wrap,
+html.gob-shell .main #tr-scroll.gob-wide-wrap {
+  overflow-x: auto !important;
+  overflow-y: clip !important;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  contain: inline-size;
+  box-sizing: border-box;
+}
+
+html.gob-shell .main .gob-wide-wrap thead th,
+html.gob-shell .main .gob-xs thead th,
+html.gob-shell .main .gob-roster.is-compact thead th {
+  position: static !important;
+  top: auto !important;
+}
+
+html.gob-shell .main .gob-xs {
+  overflow-x: auto !important;
+  overflow-y: clip !important;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  contain: inline-size;
+  box-sizing: border-box;
+}
+
+html.gob-shell .main .gob-wide-wrap.is-fade-right {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+}
+
+html.gob-shell .main .gob-wide-wrap.is-fade-left:not(.is-fade-right) {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 36px);
+  mask-image: linear-gradient(to right, transparent, #000 36px);
+}
+
+html.gob-shell .main .gob-wide-wrap.is-fade-left.is-fade-right {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+}
+
+/* The pool already scrolls inside .pool-scroll. The wide-table mask on that
+   box paints a hole over the phase strip and the filter row, and
+   contain:inline-size collapses the column so the story and filters stop
+   short of the phase strip. Keep the horizontal scroll. Drop the mask and
+   the containment. */
+html.gob-shell .main .pool-scroll.gob-wide-wrap {
+  contain: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/* Page shells sized themselves with 100vw, which ignores the rail and runs
+   past .main. Under the shell, content width is .main minus page padding.
+   Wide tables keep their min-width and scroll inside their own wrap. */
+html.gob-shell .main .resource-page-container,
+html.gob-shell .main .fcc-brand-page-shell,
+html.gob-shell .main #franchise-container,
+html.gob-shell .main .team-roster-shell,
+html.gob-shell .main .training-resource-shell,
+html.gob-shell .main .playbooks-resource-shell,
+html.gob-shell .main .pd-shell,
+html.gob-shell .main .doc,
+html.gob-shell .main .spine,
+html.gob-shell .main .hub-root {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box;
+}
+
+/* The section h1 is the title. The hub does not draw a second card or a
+   second "Recruiting Hub" heading. The phase strip is the first content,
+   8px under the row hairline (the head's own padding). */
+html.gob-shell .main .spine {
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.gob-shell .main .doc {
+  padding: 0 !important;
+}
+
+html.gob-shell .main .spine-phase {
+  padding: 0;
+}
+
+html.gob-shell .main .spine-body {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+html.gob-shell .main .spine-switch {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 8px;
+}
+
+html.gob-shell .main .scroll-x,
+html.gob-shell .main .stats-table-wrap,
+html.gob-shell .main .gob-data-grid-scroll,
+html.gob-shell .main .fcc-data-card,
+html.gob-shell .main .fcc-data-card-body,
+html.gob-shell .main .recruiting-section,
+html.gob-shell .main .pool-scroll {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+html.gob-shell .main .scroll-x,
+html.gob-shell .main .pool-scroll,
+html.gob-shell .main .stats-table-wrap,
+html.gob-shell .main .gob-data-grid-scroll {
+  height: auto;
+  max-height: none;
+}
+
+/* Focus lineup: the 80px banner strip is the team banner. Hide it only
+   while both the image and the name fallback are still hidden. */
+html.gob-focus .set-lineup-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+html.gob-focus .set-lineup-shell:has(.lineup-banner-strip:has(#team-banner[hidden]):has(#team-banner-fallback[hidden]))::before,
+html.gob-focus .set-lineup-shell:has(.lineup-banner-strip:has(#team-banner[hidden]):has(#team-banner-fallback[hidden]))::after {
+  top: 0;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+}
+
+html.gob-focus .lineup-banner-strip:has(#team-banner[hidden]):has(#team-banner-fallback[hidden]) {
+  display: none;
+}
+
+/* Same-origin page loads crossfade .main. The top bar and rail keep stable
+   names so they stay put. Reduced motion turns the navigation transition off. */
+@view-transition {
+  navigation: auto;
+}
+
+html.gob-shell .top {
+  view-transition-name: gob-chrome-top;
+}
+
+html.gob-shell .app > nav.rail {
+  view-transition-name: gob-chrome-rail;
+}
+
+::view-transition-old(gob-chrome-top),
+::view-transition-new(gob-chrome-top),
+::view-transition-old(gob-chrome-rail),
+::view-transition-new(gob-chrome-rail) {
+  animation: 150ms linear both gob-hold;
+  mix-blend-mode: normal;
+}
+
+@keyframes gob-hold {
+  from { opacity: 1; }
+  to { opacity: 1; }
+}
+
+::view-transition,
+::view-transition-group(*),
+::view-transition-image-pair(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  pointer-events: none;
+}
+
+::view-transition-old(root) {
+  animation: 150ms var(--ease-out) both gob-page-out;
+}
+
+::view-transition-new(root) {
+  animation: 150ms var(--ease-out) both gob-page-in;
+}
+
+@keyframes gob-page-out {
+  to { opacity: 0; }
+}
+
+@keyframes gob-page-in {
+  from { opacity: 0; }
+}
+
+/* Underline sub-tabs. Shared .sx rules and direction A only.
+   The row is neutral white. Tools stay the existing segment and search. */
+html.gob-shell .pg-head .nav-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-24);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: var(--dsz-44);
+  box-shadow: inset 0 -1px 0 var(--line-strong);
+}
+
+html.gob-shell .pg-head .nav-row[hidden] {
+  display: none;
+}
+
+html.gob-shell .pg-head .tabs {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  height: 100%;
+  min-width: 0;
+  gap: 26px;
+}
+
+html.gob-shell .pg-head .tb,
+html.gob-shell .pg-head a.tb:link,
+html.gob-shell .pg-head a.tb:visited,
+html.gob-shell .pg-head a.tb:hover,
+html.gob-shell .pg-head a.tb:focus,
+html.gob-shell .pg-head a.tb:active {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex: none;
+  height: 100%;
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+  font: var(--fw-bold) var(--fs-17)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-5);
+  color: var(--text-60);
+  background: none;
+  background-image: none;
+  border: 0;
+  box-shadow: none;
+  cursor: pointer;
+  outline: none;
+  text-align: left;
+  text-decoration: none;
+  text-decoration-line: none;
+  transition: color var(--dur-hover);
+}
+
+html.gob-shell .pg-head .tb svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin-top: -2px;
+}
+
+html.gob-shell .pg-head .tb:hover,
+html.gob-shell .pg-head a.tb:hover {
+  color: var(--text-87);
+}
+
+html.gob-shell .pg-head .tb[aria-selected="true"],
+html.gob-shell .pg-head .tb[aria-selected="true"]:hover,
+html.gob-shell .pg-head a.tb[aria-selected="true"]:hover {
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .tb[aria-disabled="true"],
+html.gob-shell .pg-head .tb[aria-disabled="true"]:hover,
+html.gob-shell .pg-head .tb[aria-disabled="true"]:focus {
+  color: var(--text-38);
+  cursor: not-allowed;
+}
+
+html.gob-shell .pg-head .tb:not([aria-selected="true"]):not([aria-disabled="true"]):hover::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--white-30);
+}
+
+html.gob-shell .pg-head .tb:focus-visible {
+  outline: none;
+}
+
+html.gob-shell .pg-head .tb:focus-visible::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--space-6));
+  right: calc(-1 * var(--space-6));
+  top: var(--space-8);
+  bottom: var(--space-8);
+  border-radius: var(--radius-6);
+  box-shadow: 0 0 0 2px var(--white);
+}
+
+html.gob-shell .pg-head .ink {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-100);
+  pointer-events: none;
+}
+
+html.gob-shell .pg-head .ink.ready {
+  transition: transform var(--dur-tab) var(--ease-out), width var(--dur-tab) var(--ease-out);
+}
+
+html.gob-shell .pg-head .tb.ovf {
+  display: none;
+}
+
+html.gob-shell .pg-head .more-w {
+  position: relative;
+  display: none;
+  flex: none;
+  height: 100%;
+}
+
+html.gob-shell .pg-head .more-w.show {
+  display: flex;
+}
+
+html.gob-shell .pg-head .more svg {
+  width: 14px;
+  height: 14px;
+  margin-top: 0;
+  transition: transform var(--dur-toggle);
+}
+
+html.gob-shell .pg-head .more[aria-expanded="true"] {
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .more[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+html.gob-shell .pg-head .mmenu {
+  position: absolute;
+  top: calc(100% + var(--space-6));
+  left: auto;
+  right: 0;
+  min-width: 212px;
+  padding: var(--space-6);
+  border-radius: var(--radius-10);
+  background: var(--surface-popover);
+  box-shadow: var(--shadow-popover);
+  display: none;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: var(--z-popover);
+}
+
+html.gob-shell .pg-head .mmenu.open {
+  display: flex;
+}
+
+html.gob-shell .pg-head .mi {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  height: 34px;
+  padding: 0 var(--space-10);
+  border: 0;
+  border-radius: var(--radius-7);
+  background: none;
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-87);
+  cursor: pointer;
+  outline: none;
+  white-space: nowrap;
+  text-align: left;
+}
+
+html.gob-shell .pg-head .mi svg {
+  width: 12px;
+  height: 12px;
+  margin-top: -2px;
+}
+
+html.gob-shell .pg-head .mi em {
+  margin-left: auto;
+  font: var(--fw-medium) var(--fs-11)/var(--lh-1) var(--font-body);
+  font-style: normal;
+  letter-spacing: 0;
+  color: var(--text-38);
+}
+
+html.gob-shell .pg-head .mi:hover,
+html.gob-shell .pg-head .mi:focus-visible {
+  background: var(--white-6);
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .mi[aria-disabled="true"],
+html.gob-shell .pg-head .mi[aria-disabled="true"]:hover {
+  background: none;
+  color: var(--text-38);
+  cursor: not-allowed;
+}
+
+html.gob-shell .pg-head .mi:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--white);
+}
+
+html.gob-shell .pg-head .ltip {
+  position: absolute;
+  top: calc(100% + var(--space-6));
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-10) var(--space-12);
+  border-radius: var(--radius-10);
+  background: var(--surface-popover);
+  box-shadow: var(--shadow-popover);
+  white-space: nowrap;
+  z-index: var(--z-popover);
+  cursor: default;
+  text-align: left;
+}
+
+html.gob-shell .pg-head .ltip b {
+  font: var(--fw-bold) var(--fs-16)/var(--lh-1) var(--font-display);
+  letter-spacing: var(--tracking-4);
+  color: var(--text-100);
+}
+
+html.gob-shell .pg-head .ltip span {
+  font: var(--fw-regular) var(--fs-12)/var(--lh-body) var(--font-body);
+  letter-spacing: 0;
+  color: var(--text-87);
+}
+
+html.gob-shell .pg-head .tb[aria-disabled="true"]:hover .ltip,
+html.gob-shell .pg-head .tb[aria-disabled="true"]:focus .ltip {
+  display: flex;
+}
+
+html.gob-shell .pg-head .pg-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+html.gob-shell .pg-head .gob-search {
+  width: 9.5rem;
+  max-width: 36vw;
+  height: 28px;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  background: transparent;
+  color: var(--text-100);
+  font: var(--fw-regular) var(--fs-12)/var(--lh-1) var(--font-body);
+}
+
+html.gob-shell .pg-head .gob-search::placeholder {
+  color: var(--text-38);
+}
+
+html.gob-shell .pg-head .gob-search.is-collapsed {
+  display: none;
+}
+
+html.gob-shell .pg-head .sbtn {
+  display: none;
+  place-items: center;
+  flex: none;
+  width: calc(var(--dsz-28) + 6px);
+  height: calc(var(--dsz-28) + 6px);
+  padding: 0;
+  border-radius: var(--radius-9);
+  background: var(--white-4);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-60);
+  cursor: pointer;
+  transition: background var(--dur-hover), color var(--dur-hover);
+}
+
+html.gob-shell .pg-head .sbtn.show {
+  display: grid;
+}
+
+html.gob-shell .pg-head .sbtn svg {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
+html.gob-shell .pg-head .sbtn:hover {
+  background: var(--white-6);
+  color: var(--text-87);
+}
+
+html.gob-shell .pg-head .sbtn:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+
+  html.gob-shell .top,
+  html.gob-shell .app > nav.rail,
+  html.gob-shell .main {
+    view-transition-name: none;
+  }
+}
+
+
+/* First paint: a logo with no source yet draws nothing, not its alt text. */
+html.gob-shell .top .top-id img:not([src]),
+html.gob-shell .top .top-id img[src=""] {
+  visibility: hidden;
+}

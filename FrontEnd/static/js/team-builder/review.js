@@ -213,7 +213,7 @@
               escapeHtml(API_CONFIG.getRecruitImageUrl(p.image_id, { size: 'card' })) +
               '" alt="">'
             : '';
-        var tone = 'rgba(255,255,255,.12)';
+        var tone = 'var(--white-12)';
         if (p.portrait_meta && p.portrait_meta.skin_hex) {
           tone = p.portrait_meta.skin_hex;
         }
@@ -231,9 +231,7 @@
           '</span>' +
           escapeHtml((p.first_name || '') + ' ' + (p.last_name || '')) +
           '</div><div class="pl-m">' +
-          '<span class="pos-b" style="background:' +
-          escapeHtml((C.POS_COLOR && C.POS_COLOR[pos]) || '#4A90D9') +
-          '">' +
+          '<span class="pos-b">' +
           escapeHtml(pos) +
           '</span>' +
           '<span class="cl">' +

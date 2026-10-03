@@ -173,3 +173,124 @@ def test_compute_recruiting_rank_fields_full_128_includes_zeros():
     # Region B: t5 first
     assert ranked["t5"][FTD_RECRUITING_REGION_RANK] == 1
 
+
+
+# ---------------------------------------------------------------------------
+# Rank movement, the user's own row, and the score caption
+# ---------------------------------------------------------------------------
+
+NAMES = {key: key.upper() for key in "abcdefghij"}
+
+
+def _report(week, scores, **kwargs):
+    return build_recruiting_rankings_story(
+        story_id=f"w{week}-recruiting-report",
+        week=week,
+        headline=f"Week {week} Recruiting Report",
+        story_type="recruiting_report",
+        scores=scores,
+        team_name_map=NAMES,
+        user_region_letter="A",
+        region_team_ids={"a", "b", "c", "d"},
+        **kwargs,
+    )
+
+
+def _tables(story):
+    return {line["table"]: line for line in story["rich_lines"] if line.get("type") == "ranking_table"}
+
+
+def _by_team(table):
+    return {row["team_id"]: row for row in table["rows"]}
+
+
+def test_week_one_and_a_week_with_no_prior_report_carry_no_movement():
+    story = _report(1, {"a": 50, "b": 40})
+    for table in _tables(story).values():
+        for row in table["rows"]:
+            assert "move" not in row and "new" not in row
+    # No report last week (previous_story is None) is the same.
+    story = _report(7, {"a": 50, "b": 40}, previous_story=None)
+    assert all("move" not in row and "new" not in row for row in _tables(story)["national"]["rows"])
+
+
+def test_movement_is_against_last_weeks_same_table_rose_fell_unchanged_new():
+    last = _report(2, {"a": 90, "b": 80, "c": 70, "d": 60}, national_limit=4)
+    assert [row["team_id"] for row in _tables(last)["national"]["rows"]] == ["a", "b", "c", "d"]
+    # This week: c rises two places, b falls one, a holds, and e is in the table for the
+    # first time (d drops out of it).
+    this = _report(3, {"a": 95, "c": 92, "b": 85, "e": 70, "d": 5}, national_limit=4, previous_story=last)
+    national = _by_team(_tables(this)["national"])
+    assert [row["team_id"] for row in _tables(this)["national"]["rows"]] == ["a", "c", "b", "e"]
+    assert national["c"]["move"] == 1 and "new" not in national["c"]       # 3rd -> 2nd: rose
+    assert national["b"]["move"] == -1                                       # 2nd -> 3rd: fell
+    assert national["a"]["move"] == 0                                        # unchanged
+    assert national["e"].get("new") is True and "move" not in national["e"]  # not ranked last week
+    # The region table moves against last week's region table, not the national one.
+    region_last = _by_team(_tables(last)["region"])
+    region = _by_team(_tables(this)["region"])
+    assert [region_last[t]["rank"] for t in "abcd"] == [1, 2, 3, 4]
+    assert [region[t]["rank"] for t in "acbd"] == [1, 2, 3, 4]
+    assert region["c"]["move"] == 1 and region["b"]["move"] == -1
+    assert region["a"]["move"] == 0 and region["d"]["move"] == 0
+    assert not any(row.get("new") for row in _tables(this)["region"]["rows"])
+
+
+def test_movement_reads_a_report_stored_before_tables_were_named():
+    # The old stored shape: no "table" key, national first and region second.
+    last = _report(2, {"a": 90, "b": 80, "c": 70}, national_limit=3)
+    for line in last["rich_lines"]:
+        line.pop("table", None)
+    this = _report(3, {"b": 99, "a": 90, "c": 70}, national_limit=3, previous_story=last)
+    national = _by_team(_tables(this)["national"])
+    assert national["b"]["move"] == 1 and national["a"]["move"] == -1 and national["c"]["move"] == 0
+
+
+def test_user_team_outside_the_table_gets_a_foot_row_with_its_real_rank():
+    scores = {"a": 90, "b": 80, "c": 70, "d": 60, "e": 50}
+    story = _report(4, scores, national_limit=3, user_team_id="e")
+    national = _tables(story)["national"]
+    assert [row["team_id"] for row in national["rows"]] == ["a", "b", "c"]
+    assert national["user_row"] == {"rank": 5, "team_id": "e", "team": "E", "score": 50}
+    # In the table already: no foot row.
+    assert "user_row" not in _tables(_report(4, scores, national_limit=3, user_team_id="b"))["national"]
+    # No user team named: no foot row.
+    assert "user_row" not in _tables(_report(4, scores, national_limit=3))["national"]
+    # No points: the durable full-league rank, score 0.
+    story = _report(4, scores, national_limit=3, user_team_id="j", user_zero_rank=97)
+    assert _tables(story)["national"]["user_row"] == {"rank": 97, "team_id": "j", "team": "J", "score": 0}
+    # No points and no durable rank to show: no row rather than an invented rank.
+    assert "user_row" not in _tables(_report(4, scores, national_limit=3, user_team_id="j"))["national"]
+
+
+def test_the_foot_row_moves_only_against_a_known_earlier_rank():
+    last = _report(4, {"a": 90, "b": 80, "c": 70, "d": 60, "e": 50}, national_limit=3, user_team_id="e")
+    this = _report(5, {"a": 90, "b": 80, "c": 70, "e": 65, "d": 60}, national_limit=3,
+                   user_team_id="e", previous_story=last)
+    assert _tables(this)["national"]["user_row"]["move"] == 1               # 5th -> 4th
+    # Last week's story had no row for this team: unknown, so no mark (and never "new").
+    this = _report(5, {"a": 90, "b": 80, "c": 70, "d": 60, "e": 50}, national_limit=3,
+                   user_team_id="d", previous_story=last)
+    foot = _tables(this)["national"]["user_row"]
+    assert "move" not in foot and "new" not in foot
+    # Last week in the table, this week below it: a fall.
+    this = _report(5, {"a": 90, "b": 80, "d": 75, "e": 72, "c": 70}, national_limit=3,
+                   user_team_id="c", previous_story=last)
+    assert _tables(this)["national"]["user_row"]["move"] == -2              # 3rd -> 5th
+
+
+def test_score_caption_is_stored_on_the_national_table_only():
+    from BackEnd.utils.recruiting_report_news import RESULTS_SCORE_CAPTION, WEEKLY_SCORE_CAPTION
+
+    story = _report(2, {"a": 50, "b": 40}, score_caption=WEEKLY_SCORE_CAPTION)
+    tables = _tables(story)
+    assert tables["national"]["caption"] == WEEKLY_SCORE_CAPTION
+    assert "caption" not in tables["region"]
+    assert "caption" not in _tables(_report(2, {"a": 50}))["national"]
+    # The formula is hidden: the caption says what Score is for, never how it is built.
+    assert WEEKLY_SCORE_CAPTION == "Class strength so far"
+    assert RESULTS_SCORE_CAPTION == "Class strength"
+    for caption in (WEEKLY_SCORE_CAPTION, RESULTS_SCORE_CAPTION):
+        assert not any(word in caption.lower() for word in (
+            "rating", "choice", "half", "quarter", "full", "signed", "lean", "adds", "%",
+        ))

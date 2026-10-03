@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="gob">
 <head>
   <link rel="stylesheet" href="/fonts/app-fonts.css">
   <!-- Google Tag Manager (production only) -->
   <script src="/js/shared/gtm-loader.js"></script>
   <!-- End Google Tag Manager -->
   <script src="/js/shared/franchiseContext.js"></script>
+  <script src="/js/shared/gobNav.js"></script>
+  <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/authGuard.js"></script>
   <script src="/js/shared/sentryInit.js"></script>
   <script src="/js/shared/pageLoadOverlay.js"></script>
@@ -14,24 +16,34 @@
   <title>Team Training - GOB</title>
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
 <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/css/gob-tokens.css">
   <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/training.css">
   <link rel="stylesheet" href="/css/training-newswire.css">
   <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/gob-toast.css">
   <link rel="stylesheet" href="/css/development-focus.css">
   <link rel="stylesheet" href="/css/player-development-grid.css">
+  <link rel="stylesheet" href="/css/rt-buckets.css">
 </head>
-<body class="training-page">
+<body>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
 
+  <!-- First paint: stay behind the shared loader until the week's budget, draft and
+       Player Development grid are in (training.js liftWeeklyLoading lifts it). -->
+  <script>
+    document.documentElement.classList.add('is-loading');
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) window.PageLoadOverlay.show();
+  </script>
+  <div id="training-view">
   <div class="training-container resource-page-container fcc-brand-page-shell training-resource-shell">
     <!-- Header -->
     <header class="training-header">
       <div class="training-header-left">
-        <button id="back-btn" class="back-button" type="button">Back</button>
+        <button id="back-btn" class="back-button" type="button">Back to Locker Room</button>
         <button id="training-tutorial-btn" type="button" class="gob-btn gob-btn--ghost training-tutorial-btn">Training Tutorial</button>
       </div>
       <div class="header-center">
@@ -39,7 +51,7 @@
         <!-- The two submit requirements, in the one place a coach already looks. Replaces
              the full-width "Before you submit" bar; the ids are unchanged so the same
              updateRequirementsBar() drives it. -->
-        <div class="req-pill" id="requirements-bar" aria-label="Before you submit">
+        <div class="req-pill bud" id="requirements-bar" aria-label="Before you submit">
           <span class="req-pill-seg req-chip req-chip--points" id="req-points">
             <span class="req-chip-check" aria-hidden="true"></span>
             <span class="req-pill-label">Points</span>
@@ -57,22 +69,31 @@
         </div>
       </div>
       <div class="header-actions">
-        <button id="auto-train-btn" class="auto-train-button">Auto-Train</button>
+        <button id="auto-train-btn" class="gob-btn gob-btn--ghost auto-train-button" type="button">Auto-Train</button>
         <div class="submit-stack">
-          <button id="submit-btn" class="submit-button" disabled>Submit Training</button>
+          <button id="submit-btn" class="submit-button advance" data-sfx="SFX_COMMIT" disabled>Submit Training</button>
           <button id="recruiting-invites-btn" class="recruiting-invites-button" type="button" style="display:none;">Recruiting Invites</button>
         </div>
       </div>
     </header>
 
     <!-- Three equal columns: Player Drills · Scheme Installs · General -->
+    <!-- Shown instead of the weekly point allocation when this week has no allocation to
+         make: training already submitted, or a tournament week where the server refuses
+         training outright. Player Development below stays put in both cases. -->
+    <div class="training-state-note" id="training-state-note" hidden>
+      <p class="training-state-note-head" id="training-state-note-head"></p>
+      <p class="training-state-note-body" id="training-state-note-body"></p>
+      <a class="gob-btn gob-btn--ghost training-state-note-link" id="training-state-note-link" hidden></a>
+    </div>
+
     <div class="main-content-grid">
       <div class="content-section player-drills-section">
         <h2 class="section-header">Player Drills</h2>
         <div class="section-container">
           <div class="drill-stack">
             <div class="drill-group">
-              <h3 class="drill-title">Offense Drills</h3>
+              <h3 class="drill-title">Offense</h3>
               <label class="slider-label">
                 <span class="label-text">Inside Offense</span>
                 <div class="slider-container">
@@ -88,7 +109,7 @@
             </div>
 
             <div class="drill-group">
-              <h3 class="drill-title">Defense Drills</h3>
+              <h3 class="drill-title">Defense</h3>
               <label class="slider-label">
                 <span class="label-text">Inside Defense</span>
                 <div class="slider-container">
@@ -104,7 +125,7 @@
             </div>
 
             <div class="drill-group">
-              <h3 class="drill-title">Technical Drills</h3>
+              <h3 class="drill-title">Technical</h3>
               <label class="slider-label">
                 <span class="label-text">Passing</span>
                 <div class="slider-container">
@@ -149,15 +170,15 @@
             </div>
 
             <div class="drill-group">
-              <h3 class="drill-title">Fast Breaks</h3>
+              <h3 class="drill-title">Fast Break</h3>
               <label class="slider-label">
-                <span class="label-text">FB Offense Install</span>
+                <span class="label-text">Fast Break Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="fast-break-offense-install" data-category="team-drills">
                 </div>
               </label>
               <label class="slider-label">
-                <span class="label-text">FB Defense Install</span>
+                <span class="label-text">Fast Break Defense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="fast-break-defense-install" data-category="team-drills">
                 </div>
@@ -165,15 +186,15 @@
             </div>
 
             <div class="drill-group">
-              <h3 class="drill-title">Press / Trap</h3>
+              <h3 class="drill-title">Press/Traps</h3>
               <label class="slider-label">
-                <span class="label-text">P/T Offense Install</span>
+                <span class="label-text">Press/Traps Offense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="press-offense-install" data-category="team-drills">
                 </div>
               </label>
               <label class="slider-label">
-                <span class="label-text">P/T Defense Install</span>
+                <span class="label-text">Press/Traps Defense Install</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="press-defense-install" data-category="team-drills">
                 </div>
@@ -182,12 +203,13 @@
 
           </div>
 
-          <!-- Playbook mode sits under the install rows it governs. -->
+          <!-- Which plays the install points train. Sits under the install rows it governs. -->
           <div class="playbook-mode-selection">
+            <h3 class="drill-title">Training Plays</h3>
             <p id="custom-playbook-banner" class="custom-playbook-banner" hidden>
-              Custom playbook is configured for this session (CMD gains only on selected plays).
+              Custom playbook is on: CMD gains go only to the plays you selected. It stays your default until you switch back to Current Playbooks.
             </p>
-            <div class="playbook-mode-toggle" role="group" aria-label="Playbook training mode">
+            <div class="playbook-mode-toggle" role="group" aria-label="Training plays">
               <button type="button" id="playbook-mode-current-btn" class="playbook-mode-btn is-selected" aria-pressed="true">
                 Current Playbooks
               </button>
@@ -203,57 +225,58 @@
         <h2 class="section-header">Full Team Sessions</h2>
         <div class="section-container">
           <div class="drill-stack">
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Strength Training</h3>
+            <h3 class="drill-title drill-title--spacer" aria-hidden="true">&nbsp;</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Strength Training</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-strength" data-category="player-drills">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Agility Training</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Agility Training</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-agility" data-category="player-drills">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Conditioning</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Conditioning</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-conditioning" data-category="general">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Free Throws</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Free Throws</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-free-throws" data-category="general">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Film Study</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Film Study</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-film-study" data-category="general">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Breaks</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Breaks</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="general-breaks" data-category="general">
                 </div>
               </label>
             </div>
-            <div class="drill-group drill-group--solo">
-              <h3 class="drill-title">Scrimmages</h3>
+            <div class="drill-group">
               <label class="slider-label">
+                <span class="label-text">Scrimmages</span>
                 <div class="slider-container">
                   <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-scrimmages" data-category="team-drills">
                 </div>
@@ -266,13 +289,13 @@
 
     <!-- Coaching Style / Focus Section -->
     <div class="coaching-section">
-      <h2 class="coaching-title">Coaching Style / Focus</h2>
+      <h2 class="coaching-title">Coaching Focus</h2>
       <p class="coaching-subtitle">Sets what you emphasize across drills, scrimmages and locker-room talks.</p>
       <div class="archetypes-grid">
         <!-- Authoritarian -->
         <div class="archetype-block" data-archetype="authoritarian">
           <div class="archetype-header">
-            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="10" r="3.5"/><path d="M6 6.5h8v3H9.4"/><path d="M3.2 3.6l1.1 1.5M6.4 2.6v1.9"/></svg></span>
             <span class="archetype-name">Authoritarian</span>
           </div>
           <div class="archetype-options">
@@ -291,14 +314,14 @@
             <label class="archetype-option">
               <input type="radio" name="coaching-focus" value="authoritarian-teamwork" class="archetype-radio">
               <span>Teamwork</span>
-      </label>
-    </div>
+            </label>
+          </div>
         </div>
 
         <!-- Systems Coach -->
         <div class="archetype-block" data-archetype="systems-coach">
           <div class="archetype-header">
-            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 5l2 2M7 5L5 7"/><circle cx="10.6" cy="10.6" r="1.3"/><path d="M6.2 10.8c1-.2 2.6-1.6 3.4-4"/></svg></span>
             <span class="archetype-name">Systems Coach</span>
           </div>
           <div class="archetype-options">
@@ -312,37 +335,46 @@
             </label>
             <label class="archetype-option">
               <input type="radio" name="coaching-focus" value="systems-coach-fast-breaks" class="archetype-radio">
-              <span>Fast Breaks</span>
+              <span>Fast Break</span>
             </label>
             <label class="archetype-option">
               <input type="radio" name="coaching-focus" value="systems-coach-press-trap" class="archetype-radio">
-              <span>Press / Trap</span>
-      </label>
-    </div>
-  </div>
+              <span>Press/Traps</span>
+            </label>
+          </div>
+        </div>
 
         <!-- Player Maximizer -->
         <div class="archetype-block" data-archetype="player-maximizer">
           <div class="archetype-header">
-            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5h11"/><path d="M4.5 13.5v-3M8 13.5v-5.5M11.5 13.5V6.5"/><path d="M9.5 4.2l2-2 2 2"/></svg></span>
             <span class="archetype-name">Player Maximizer</span>
           </div>
           <div class="archetype-options">
+            <!-- Each option opens the attribute modal under its own name. -->
             <label class="archetype-option">
-              <input type="radio" name="coaching-focus" value="player-maximizer-choose-attributes" class="archetype-radio">
-              <span>Choose Attributes</span>
+              <input type="radio" name="coaching-focus" value="player-maximizer-top-3" class="archetype-radio">
+              <span>Top 3 Attributes</span>
             </label>
-            <!-- Auto-Train: leaf values not shown in main UI -->
-            <input type="radio" name="coaching-focus" value="player-maximizer-top-3" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
-            <input type="radio" name="coaching-focus" value="player-maximizer-attributes-4-6" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
-            <input type="radio" name="coaching-focus" value="player-maximizer-positional-focus" class="training-coaching-focus-sr-only" aria-hidden="true" tabindex="-1">
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-attributes-4-6" class="archetype-radio">
+              <span>Attributes 4&ndash;6</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-positional-focus" class="archetype-radio">
+              <span>Positional Focus</span>
+            </label>
+            <label class="archetype-option">
+              <input type="radio" name="coaching-focus" value="player-maximizer-custom" class="archetype-radio">
+              <span>Custom</span>
+            </label>
           </div>
-  </div>
+        </div>
 
         <!-- Culture Builder -->
         <div class="archetype-block" data-archetype="culture-builder">
           <div class="archetype-header">
-            <span class="arch-dot" aria-hidden="true"></span>
+            <span class="arch-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13.4S2.5 10.2 2.5 6.3A2.9 2.9 0 0 1 8 5a2.9 2.9 0 0 1 5.5 1.3c0 3.9-5.5 7.1-5.5 7.1z"/></svg></span>
             <span class="archetype-name">Culture Builder</span>
           </div>
           <div class="archetype-options">
@@ -368,9 +400,11 @@
     </div>
 
     <!-- Player Development: per-player training position + focus, for the 12 active
-         players. Read and written through the shared Development Focus module, the same
-         one the roster surfaces use, so the six values cannot drift between screens. -->
+         players. On the weekly page it sits under Coaching Focus as four columns of
+         three; in Prep it is the whole tab, as a table. Read and written through the
+         shared Development Focus module, so the six values cannot drift between screens. -->
     <section class="player-dev-section" id="player-dev-section" hidden>
+      <p class="training-advance-pointer" id="training-advance-pointer" hidden>Weekly training is set when you advance.</p>
       <div class="player-dev-head">
         <h2 class="coaching-title player-dev-title">Player Development</h2>
         <button type="button" class="gob-btn gob-btn--ghost player-dev-tutorial-btn" id="player-dev-tutorial-btn">
@@ -387,30 +421,19 @@
       <div class="pdg-grid"></div>
     </section>
   </div>
+  </div>
 
-  <!-- Player Maximizer: Choose Attributes modal -->
-  <div id="custom-focus-modal" class="custom-focus-modal" style="display: none;" aria-hidden="true">
-    <div class="custom-focus-modal-content">
-      <h2 class="custom-focus-modal-title">Custom Focus Attributes</h2>
-      <div class="pm-modal-mode-row" role="radiogroup" aria-label="Focus mode">
-        <label class="pm-modal-mode-option">
-          <input type="radio" name="pm-modal-mode" value="top-3" class="archetype-radio">
-          <span>Top 3</span>
-        </label>
-        <label class="pm-modal-mode-option">
-          <input type="radio" name="pm-modal-mode" value="attributes-4-6" class="archetype-radio">
-          <span>Attributes 4–6</span>
-        </label>
-        <label class="pm-modal-mode-option">
-          <input type="radio" name="pm-modal-mode" value="positional" class="archetype-radio">
-          <span>Positional Focus</span>
-        </label>
-        <label class="pm-modal-mode-option">
-          <input type="radio" name="pm-modal-mode" value="custom" class="archetype-radio">
-          <span>Custom</span>
-        </label>
-      </div>
-      <p id="pm-modal-custom-hint" class="pm-modal-custom-hint" hidden>Pick three attributes per player.</p>
+  <!-- Player Maximizer attribute modal. .gob-modal-overlay keeps it a viewport layer:
+       the focus shell adopts every other body child into .main, where a fixed box
+       becomes an in-flow one and opens below the fold. -->
+  <div id="custom-focus-modal" class="gob-modal-overlay custom-focus-modal" aria-hidden="true">
+    <div class="gob-modal-backdrop"></div>
+    <div class="custom-focus-modal-content" role="dialog" aria-modal="true" aria-labelledby="custom-focus-modal-title">
+      <header class="custom-focus-modal-head">
+        <span class="custom-focus-modal-eyebrow">Player Maximizer</span>
+        <h2 class="custom-focus-modal-title" id="custom-focus-modal-title">Top 3 Attributes</h2>
+        <p class="custom-focus-modal-hint" id="custom-focus-modal-hint"></p>
+      </header>
       <div class="custom-focus-table-wrap">
         <table class="custom-focus-table" id="custom-focus-table">
           <thead id="custom-focus-thead"></thead>
@@ -418,8 +441,8 @@
         </table>
       </div>
       <div class="custom-focus-modal-actions">
-        <button type="button" id="custom-focus-assign-btn" class="custom-focus-assign-btn" disabled>Assign Focus Attributes</button>
         <button type="button" id="custom-focus-cancel-btn" class="custom-focus-cancel-btn">Cancel</button>
+        <button type="button" id="custom-focus-assign-btn" class="custom-focus-assign-btn" disabled>Assign Focus Attributes</button>
       </div>
     </div>
   </div>
@@ -439,13 +462,22 @@
     </div>
   </div>
 
-  <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
   <script src="/js/shared/trainingNewswire.js"></script>
   <script src="/js/shared/gobTutorialAlertResume.js"></script>
+  <!-- Development Focus saves on change and confirms with the shared toast. -->
+  <script src="/js/shared/gobLeaveConfirm.js"></script>
+  <script src="/js/shared/gobToast.js"></script>
   <script src="/js/shared/developmentFocus.js"></script>
   <script src="/js/generated/trainingMatrix.js"></script>
+  <script src="/js/utils/attributeDisplay.js"></script>
+  <script src="/js/shared/rtBucket.js"></script>
   <script src="/js/shared/playerDevelopmentGrid.js"></script>
-  <script src="/training.js"></script>
+  <script type="module">
+    import { init } from '/training.js';
+    try {
+      init(document.getElementById('training-view'), { sections: 'weekly' });
+    } catch (err) { /* init logs */ }
+  </script>
 </body>
 </html>

@@ -1,40 +1,459 @@
 /**
- * Shared UI sound effects.
+ * One audio bus, two scopes, one stored record.
  *
- * `playSound` was copy-pasted into six files (set-lineup, game-plan,
- * franchise-select-team, authBarInit, commandCenterTabs, gobTutorialNav) before
- * this module existed. The duplication is why FTE v3's new screens shipped silent:
- * there was nothing to import, so nothing got wired.
+ *   game  Gameplay audio: everything on the court screen. Controlled only from
+ *         the court (the command-center sound control, and the Sound switch in
+ *         Sim Game). master / music / sfx, each a level 0-100 and a mute;
+ *         effective gain is master x channel, or 0 when either is muted.
+ *   app   Everything else. Controlled only in Settings, by two on/off switches:
+ *         Music (all non-gameplay music) and Sound (all non-gameplay sound).
+ *         No levels.
  *
- * Named constants rather than raw filenames at call sites, so "the advance sound"
- * is one edit away from changing everywhere instead of a grep for .wav strings.
+ * The scope is the page: court.html is `game`, every other page is `app`.
+ * Callers keep asking for a channel (music / sfx / ambience) and the bus answers
+ * for the scope they are in. Persisted in localStorage under AUDIO_STORAGE_KEY,
+ * so the same settings work online and in the offline desktop build.
+ *
+ * Named constants stay the call-site vocabulary. playSfx(name) maps those
+ * names (and legacy filenames) onto files, respects the scope, and installs
+ * one data-sfx click hook per document.
  */
 
-/** Primary CTA that moves the user forward a screen. */
-export const SFX_ADVANCE = 'confirm-1-lowervol.wav';
-/** Light tick for selecting within a screen (a card, a tab, a row). */
-export const SFX_SELECT = 'click-tiny.wav';
-/** Heavier click for committing a choice that defines the run (your program). */
-export const SFX_COMMIT = 'click-beep.wav';
+const SFX_FILES = {
+  SFX_ADVANCE: 'confirm-1-lowervol.wav',
+  SFX_SELECT: 'click-tiny.wav',
+  SFX_COMMIT: 'click-beep.wav',
+  STING_WIN: 'sting-win.wav',
+  STING_MILESTONE: 'sting-milestone.wav',
+  STING_SEASON_PEAK: 'sting-season-peak.wav',
+};
 
-/**
- * Fire and forget. Never throws and never blocks navigation — autoplay policy
- * rejects `play()` until the user has interacted, and a missing file must not
- * take a screen down. A CTA that navigates should not await this.
- */
-export function playSfx(filename, volume = 0.7) {
-  try {
-    const base = (typeof window !== 'undefined'
-      && window.API_CONFIG
-      && typeof window.API_CONFIG.buildStaticPath === 'function')
-      ? window.API_CONFIG.buildStaticPath('/sounds/')
-      : '/sounds/';
-    const a = new Audio(base + encodeURIComponent(filename));
-    a.volume = volume;
-    a.play().catch(() => {});
-  } catch (_) { /* non-fatal */ }
+export const SFX_ADVANCE = SFX_FILES.SFX_ADVANCE;
+export const SFX_SELECT = SFX_FILES.SFX_SELECT;
+export const SFX_COMMIT = SFX_FILES.SFX_COMMIT;
+export const STING_WIN = SFX_FILES.STING_WIN;
+export const STING_MILESTONE = SFX_FILES.STING_MILESTONE;
+export const STING_SEASON_PEAK = SFX_FILES.STING_SEASON_PEAK;
+
+export const AUDIO_STORAGE_KEY = 'gob_audio_v1';
+export const LEGACY_AMBIENCE_KEY = 'gob_scouting_ambience_enabled';
+export const AUDIO_CHANNELS = ['master', 'music', 'sfx', 'ambience'];
+
+const listeners = new Set();
+
+function clampLevel(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 100;
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-export function playAdvance() { playSfx(SFX_ADVANCE); }
-export function playSelect() { playSfx(SFX_SELECT); }
-export function playCommit() { playSfx(SFX_COMMIT); }
+function channelSlot(raw, fallback) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  return {
+    level: clampLevel(src.level == null ? fallback.level : src.level),
+    muted: src.muted == null ? !!fallback.muted : !!src.muted,
+  };
+}
+
+export function defaultAudioState() {
+  return {
+    master: { level: 100, muted: false },
+    music: { level: 100, muted: false },
+    sfx: { level: 100, muted: false },
+    ambience: { level: 100, muted: false },
+  };
+}
+
+/**
+ * Build a state object from stored JSON and the legacy ambience flag.
+ * An existing gob_audio_v1 record wins. Otherwise a legacy "false" opt-out
+ * mutes ambience and keeps its level.
+ */
+export function normalizeAudioState(raw, legacyValue) {
+  const base = defaultAudioState();
+  const src = raw && typeof raw === 'object' ? raw : null;
+  if (src) {
+    AUDIO_CHANNELS.forEach((name) => {
+      base[name] = channelSlot(src[name], base[name]);
+    });
+    return base;
+  }
+  if (legacyValue === 'false') base.ambience.muted = true;
+  return base;
+}
+
+export function channelGain(state, channel) {
+  if (!state || !state.master || !state[channel]) return 0;
+  if (state.master.muted || state[channel].muted) return 0;
+  return (state.master.level / 100) * (state[channel].level / 100);
+}
+
+function storage() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage;
+  } catch (_err) {
+    return null;
+  }
+}
+
+let state = null;      // the game scope's channels (the stored master / music / sfx / ambience)
+let appState = null;   // the app scope's two switches
+let scopeOverride = null;
+
+/** court.html is gameplay; every other page is the app. */
+export function audioScope() {
+  if (scopeOverride) return scopeOverride;
+  try {
+    if (typeof location !== 'undefined' && /\/court\.html$/.test(location.pathname || '')) return 'game';
+  } catch (_err) { /* no location */ }
+  return 'app';
+}
+
+/**
+ * The two Settings switches. A record written before the switches existed has
+ * none: a channel the player had silenced there stays off.
+ */
+export function normalizeAppAudio(raw, channels) {
+  const src = raw && typeof raw === 'object' ? raw : null;
+  if (src) return { music: src.music !== false, sound: src.sound !== false };
+  const base = channels || defaultAudioState();
+  return {
+    music: channelGain(base, 'music') > 0 && channelGain(base, 'ambience') > 0,
+    sound: channelGain(base, 'sfx') > 0,
+  };
+}
+
+function ensureState() {
+  if (state) return state;
+  const store = storage();
+  let raw = null;
+  let legacy = null;
+  if (store) {
+    try { raw = JSON.parse(store.getItem(AUDIO_STORAGE_KEY) || 'null'); } catch (_err) { raw = null; }
+    try { legacy = store.getItem(LEGACY_AMBIENCE_KEY); } catch (_err) { legacy = null; }
+  }
+  const hadRecord = !!(raw && typeof raw === 'object');
+  state = normalizeAudioState(raw, legacy);
+  appState = normalizeAppAudio(hadRecord ? raw.app : null, state);
+  if (store && !hadRecord && legacy === 'false') writeState();
+  return state;
+}
+
+function writeState() {
+  const store = storage();
+  if (!store || !state) return;
+  const record = Object.assign({}, state, { app: appState });
+  try { store.setItem(AUDIO_STORAGE_KEY, JSON.stringify(record)); } catch (_err) { /* quota */ }
+}
+
+let announcing = false;
+
+function notify() {
+  const snapshot = getAudioState();
+  listeners.forEach((fn) => {
+    try { fn(snapshot); } catch (_err) { /* listener */ }
+  });
+  return snapshot;
+}
+
+function emit() {
+  const snapshot = notify();
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    announcing = true;
+    try { window.dispatchEvent(new CustomEvent('gob-audio-change', { detail: snapshot })); } finally { announcing = false; }
+  }
+}
+
+// Two copies of this module can be alive in one page: localhost serves the
+// Phaser tree from /static and the shell from /js, and each copy has its own
+// listeners (game sfx on one, music on the other). They share the stored record,
+// so when another copy announces a change this one re-reads it and tells its
+// own listeners. A control only ever has to write through one copy.
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('gob-audio-change', () => {
+    if (announcing) return;
+    state = null;
+    appState = null;
+    notify();
+  });
+}
+
+function appSnapshot() {
+  return {
+    master: { level: 100, muted: false },
+    music: { level: 100, muted: !appState.music },
+    sfx: { level: 100, muted: !appState.sound },
+    ambience: { level: 100, muted: !appState.music },
+  };
+}
+
+/** The channels of the scope this page is in. */
+export function getAudioState() {
+  const current = ensureState();
+  if (audioScope() === 'app') return appSnapshot();
+  const copy = {};
+  AUDIO_CHANNELS.forEach((name) => {
+    copy[name] = { level: current[name].level, muted: current[name].muted };
+  });
+  return copy;
+}
+
+export function subscribeAudio(fn) {
+  if (typeof fn !== 'function') return function () {};
+  listeners.add(fn);
+  return function () { listeners.delete(fn); };
+}
+
+/** Levels exist only for gameplay audio. Outside the court this does nothing. */
+export function setChannelLevel(channel, level) {
+  if (!AUDIO_CHANNELS.includes(channel)) return getAudioState();
+  ensureState();
+  if (audioScope() !== 'game') return getAudioState();
+  state[channel].level = clampLevel(level);
+  writeState();
+  emit();
+  return getAudioState();
+}
+
+export function setChannelMuted(channel, muted) {
+  if (!AUDIO_CHANNELS.includes(channel)) return getAudioState();
+  ensureState();
+  if (audioScope() === 'game') {
+    state[channel].muted = !!muted;
+  } else {
+    if (channel !== 'sfx') appState.music = !muted;
+    if (channel === 'sfx' || channel === 'master') appState.sound = !muted;
+  }
+  writeState();
+  emit();
+  return getAudioState();
+}
+
+/** Settings: { music, sound }, both booleans. */
+export function getAppAudio() {
+  ensureState();
+  return { music: appState.music, sound: appState.sound };
+}
+
+/** Settings: turn all non-gameplay music or all non-gameplay sound on or off. */
+export function setAppAudio(kind, on) {
+  ensureState();
+  if (kind !== 'music' && kind !== 'sound') return getAppAudio();
+  appState[kind] = !!on;
+  writeState();
+  emit();
+  return getAppAudio();
+}
+
+/** Gameplay audio as one switch (Sim Game). The court control mutes the same thing. */
+export function isGameAudioMuted() {
+  return !!ensureState().master.muted;
+}
+
+export function setGameAudioMuted(muted) {
+  ensureState();
+  state.master.muted = !!muted;
+  writeState();
+  emit();
+  return isGameAudioMuted();
+}
+
+export function resetAudioStateForTests(next, scope) {
+  state = next ? normalizeAudioState(next, null) : null;
+  appState = next ? normalizeAppAudio(next.app, state) : null;
+  scopeOverride = scope || null;
+}
+
+function soundBase() {
+  if (typeof window !== 'undefined'
+    && window.API_CONFIG
+    && typeof window.API_CONFIG.buildStaticPath === 'function') {
+    return window.API_CONFIG.buildStaticPath('/sounds/');
+  }
+  return '/sounds/';
+}
+
+export function outputVolume(baseVolume, channel) {
+  const base = typeof baseVolume === 'number' ? baseVolume : 0.7;
+  const gain = channelGain(getAudioState(), channel || 'sfx');
+  return Math.max(0, Math.min(1, base * gain));
+}
+
+const missingLogged = new Set();
+const knownMissing = new Set();
+const preloadCache = Object.create(null);
+let activeSting = null;
+const hookedDocs = typeof WeakSet === 'function' ? new WeakSet() : null;
+let hookedFallback = false;
+
+function resolveNamed(name) {
+  if (!name || typeof name !== 'string') return null;
+  const key = name.trim();
+  if (!key) return null;
+  if (SFX_FILES[key]) {
+    return { key, file: SFX_FILES[key], sting: key.indexOf('STING_') === 0 };
+  }
+  const keys = Object.keys(SFX_FILES);
+  for (let i = 0; i < keys.length; i += 1) {
+    const k = keys[i];
+    if (SFX_FILES[k] === key) {
+      return { key: k, file: key, sting: k.indexOf('STING_') === 0 };
+    }
+  }
+  if (key.indexOf('.') !== -1) {
+    return { key, file: key, sting: false };
+  }
+  return null;
+}
+
+function logMissingOnce(key) {
+  if (missingLogged.has(key)) return;
+  missingLogged.add(key);
+  if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+    console.debug('[uiSfx] missing sound', key);
+  }
+}
+
+function stopActiveSting() {
+  if (!activeSting) return;
+  try {
+    activeSting.pause();
+    activeSting.currentTime = 0;
+  } catch (_err) { /* non-fatal */ }
+  activeSting = null;
+}
+
+function markMissing(file, key, audio) {
+  knownMissing.add(file);
+  preloadCache[file] = false;
+  logMissingOnce(key);
+  if (activeSting === audio) activeSting = null;
+}
+
+function preloadFile(file, key) {
+  if (typeof Audio === 'undefined') return;
+  if (preloadCache[file] || knownMissing.has(file)) return;
+  try {
+    const probe = new Audio();
+    probe.preload = 'auto';
+    probe.addEventListener('canplaythrough', function () {
+      preloadCache[file] = probe;
+    }, { once: true });
+    probe.addEventListener('error', function () {
+      markMissing(file, key, probe);
+    }, { once: true });
+    probe.src = soundBase() + encodeURIComponent(file);
+    preloadCache[file] = probe;
+  } catch (_err) { /* non-fatal */ }
+}
+
+export function playSfx(name, baseVolume = 0.7) {
+  try {
+    const resolved = resolveNamed(name);
+    if (!resolved || typeof Audio === 'undefined') return;
+    if (knownMissing.has(resolved.file) || preloadCache[resolved.file] === false) return;
+    const vol = outputVolume(baseVolume, 'sfx');
+    if (vol <= 0) return;
+    if (typeof window !== 'undefined' && Array.isArray(window.__gobSfxCalls)) {
+      try { window.__gobSfxCalls.push(resolved.key); } catch (_err) { /* spy */ }
+    }
+
+    preloadFile(resolved.file, resolved.key);
+
+    const a = new Audio(soundBase() + encodeURIComponent(resolved.file));
+    a.volume = vol;
+    a.addEventListener('error', function onErr() {
+      a.removeEventListener('error', onErr);
+      markMissing(resolved.file, resolved.key, a);
+    }, { once: true });
+
+    if (resolved.sting) {
+      stopActiveSting();
+      activeSting = a;
+      a.addEventListener('ended', function () {
+        if (activeSting === a) activeSting = null;
+      }, { once: true });
+    }
+
+    const played = a.play();
+    if (played && typeof played.catch === 'function') {
+      played.catch(function () {
+        if (activeSting === a) activeSting = null;
+      });
+    }
+  } catch (_err) { /* non-fatal */ }
+}
+
+function isSfxDisabled(el) {
+  if (!el) return true;
+  if (el.disabled) return true;
+  if (el.getAttribute('aria-disabled') === 'true') return true;
+  if (el.classList.contains('is-disabled') || el.classList.contains('is-dead')) return true;
+  return false;
+}
+
+function onSfxClick(ev) {
+  const t = ev && ev.target;
+  if (!t || typeof t.closest !== 'function') return;
+  const el = t.closest('[data-sfx]');
+  if (!el || typeof el.matches !== 'function') return;
+  if (!el.matches('button, a, [role="tab"]')) return;
+  if (isSfxDisabled(el)) return;
+  const hookName = el.getAttribute('data-sfx');
+  if (!hookName || !SFX_FILES[hookName.trim()]) return;
+  playSfx(hookName.trim());
+}
+
+export function installSfxHooks(doc) {
+  const root = doc || (typeof document !== 'undefined' ? document : null);
+  if (!root || typeof root.addEventListener !== 'function') return;
+  if (hookedDocs) {
+    if (hookedDocs.has(root)) return;
+    hookedDocs.add(root);
+  } else {
+    if (hookedFallback) return;
+    hookedFallback = true;
+  }
+  // Capture so a handler that disables the control on the same click
+  // (leave-confirm Save) does not swallow the sound. A button that was
+  // already disabled never dispatches click.
+  root.addEventListener('click', onSfxClick, true);
+  preloadFile(SFX_FILES.SFX_ADVANCE, 'SFX_ADVANCE');
+  preloadFile(SFX_FILES.SFX_SELECT, 'SFX_SELECT');
+  preloadFile(SFX_FILES.SFX_COMMIT, 'SFX_COMMIT');
+}
+
+export function playAdvance() { playSfx(SFX_ADVANCE, 0.7); }
+export function playSelect() { playSfx(SFX_SELECT, 0.7); }
+export function playCommit() { playSfx(SFX_COMMIT, 0.7); }
+
+const api = {
+  playSfx,
+  playAdvance,
+  playSelect,
+  playCommit,
+  installSfxHooks,
+  SFX_ADVANCE,
+  SFX_SELECT,
+  SFX_COMMIT,
+  STING_WIN,
+  STING_MILESTONE,
+  STING_SEASON_PEAK,
+  getAudioState,
+  setChannelLevel,
+  setChannelMuted,
+  getAppAudio,
+  setAppAudio,
+  isGameAudioMuted,
+  setGameAudioMuted,
+  audioScope,
+  subscribeAudio,
+  channelGain,
+  outputVolume,
+  AUDIO_STORAGE_KEY,
+  LEGACY_AMBIENCE_KEY,
+};
+
+if (typeof window !== 'undefined') window.GOBUiSfx = api;
+if (typeof document !== 'undefined') installSfxHooks(document);

@@ -9,3 +9,17 @@ node_modules/
 *.mp4
 *.zip
 .DS_Store
+
+# Non-runtime bulk (grep-checked 2026-09-29: nothing below is read at build, start or
+# runtime). The runtime reads FrontEnd/static, teams/, scripts/, BackEnd/, BUILD_ID and
+# the base_league.* / catalog.* bundles; never exclude those.
+tmp/
+.arm/
+reports/
+_documentation_master/
+# docs/ is only WRITTEN by the opt-in diagnostics endpoint (mkdir parents=True).
+docs/
+tests/
+scratch_*.py
+*.log
+**/*.log

@@ -40,6 +40,7 @@ from BackEnd.utils.animation_step_helpers import (
     _ag_grid_per_game_sec,
     _euclid,
     _player_lookup_by_id,
+    defender_movement_rate,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -95,18 +96,13 @@ def _pick_pg_target(bh_coord: GridCoord, is_away_offense: bool) -> GridCoord:
     return {"x": x, "y": y}
 
 
-def _interrupted_coord(
-    start: GridCoord, target: GridCoord, rate: float, t: float
-) -> GridCoord:
-    dist = _euclid(start, target)
-    max_traversal = max(0.0, rate * t)
-    if dist <= max_traversal or dist < 1e-9:
-        return {"x": float(target["x"]), "y": float(target["y"])}
-    ratio = max_traversal / dist
-    return {
-        "x": float(start["x"] + (target["x"] - start["x"]) * ratio),
-        "y": float(start["y"] + (target["y"] - start["y"]) * ratio),
-    }
+# STAGE 1 (2026-09-24): the four `_interrupted_coord` definitions collapsed to one core
+# in animation_step_helpers. This module reached VARIANT A, so it binds the strict wrapper;
+# the name is kept because other modules import it from here BY VALUE.
+# See reports/movement-rate-inventory.md and reports/rate-unify-stage1.md.
+from BackEnd.utils.animation_step_helpers import _interrupted_coord_strict
+
+_interrupted_coord = _interrupted_coord_strict
 
 
 def _is_offense_player(pid: str, off_lineup: Dict[str, Any]) -> bool:
@@ -250,7 +246,7 @@ def _build_reset_hold_step(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -327,7 +323,7 @@ def _build_reset_pg_converge_step(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -403,7 +399,7 @@ def _build_reset_inbound_pass_step(
         archetype[pid] = "standard"
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}

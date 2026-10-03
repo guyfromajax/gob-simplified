@@ -77,6 +77,8 @@ from BackEnd.utils.animation_step_schema import (
     StepEnd,
     StepStart,
 )
+from BackEnd.utils.shared import movement_rate  # STAGE 1: the one rate accessor
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 
 # --- Vocabulary helpers ----------------------------------------------------
@@ -227,6 +229,8 @@ def _is_offense_player(pid: str, off_lineup: Dict[str, Any]) -> bool:
 # so drift resolved to `standard` (14 instead of 8). Aliased to the private
 # name so existing call sites in this file are unchanged.
 from BackEnd.utils.animation_step_helpers import (  # noqa: E402
+    _is_defender_id,
+    defender_movement_rate,
     ag_grid_per_game_sec as _ag_grid_per_game_sec,
 )
 from BackEnd.utils.animation_step_helpers import (  # noqa: E402
@@ -240,30 +244,13 @@ def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:
     return _euclid(start, end) / rate
 
 
-def _interrupted_coord(
-    start: Optional[GridCoord],
-    target: Optional[GridCoord],
-    rate: float,
-    t: float,
-) -> GridCoord:
-    """Schema interrupted-coord math: position along start→target at
-    ``rate × t``; clamped to ``target`` if the player can complete the
-    traversal in ``t`` seconds."""
-    if start is None and target is None:
-        return {"x": 50.0, "y": 25.0}
-    if start is None:
-        return {"x": float(target["x"]), "y": float(target["y"])}
-    if target is None:
-        return {"x": float(start["x"]), "y": float(start["y"])}
-    dist = _euclid(start, target)
-    max_traversal = max(0.0, rate * t)
-    if dist <= max_traversal or dist == 0.0:
-        return {"x": float(target["x"]), "y": float(target["y"])}
-    ratio = max_traversal / dist
-    return {
-        "x": float(start["x"] + (target["x"] - start["x"]) * ratio),
-        "y": float(start["y"] + (target["y"] - start["y"]) * ratio),
-    }
+# STAGE 1 (2026-09-24): the four `_interrupted_coord` definitions collapsed to one core
+# in animation_step_helpers. This module reached VARIANT B, so it binds the lenient wrapper;
+# the name is kept because other modules import it from here BY VALUE.
+# See reports/movement-rate-inventory.md and reports/rate-unify-stage1.md.
+from BackEnd.utils.animation_step_helpers import _interrupted_coord_lenient
+
+_interrupted_coord = _interrupted_coord_lenient
 
 
 def _attacking_basket(is_away_offense: bool) -> GridCoord:
@@ -322,7 +309,10 @@ def _stamp_tween_durations(
             continue
         arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # STAGE 2: the endpoints on this path already use the wrapper; this closes the
+        # split so the rendered duration matches the simulated distance. Defenders only —
+        # def_lineup membership is the test, so the offence is untouched.
+        rate = movement_rate(player, arch, apply_spread=_is_defender_id(pid, def_lineup))
         if rate <= 0:
             continue
         durations[pid] = float(min(dist / rate, step_t))
@@ -380,7 +370,7 @@ def _initialize_continuing_movement(
             else "sprint"
         )
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        rate = defender_movement_rate(player, arch, not _is_offense_player(pid, off_lineup))
         actions[pid] = (
             "cut" if _is_offense_player(pid, off_lineup) else "guard_offball"
         )
@@ -595,7 +585,8 @@ def _build_burst_step(
         archetype[pid] = arch
         destinations[pid] = dict(target)
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # generic committer: called for both lineups, so use def_lineup membership.
+        rate = defender_movement_rate(player, arch, _is_defender_id(pid, def_lineup))
         end_coords[pid] = _interrupted_coord(
             all_start_coords[pid], target, rate, t
         )
@@ -1227,7 +1218,7 @@ def _build_shot_motion_step(
         d_start = step_start_coords[defender_id]
         contest = closeout_contest_coord(d_start, rr_coord_end)
         d_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
-        d_rate = _ag_grid_per_game_sec(d_player, "sprint")
+        d_rate = defender_movement_rate(d_player, "sprint", True)
         end_coords[defender_id] = _interrupted_coord(d_start, contest, d_rate, t)
 
     destinations[rr_id] = dict(rr_coord_end)
@@ -1646,7 +1637,7 @@ def _build_hold_up_step(
         )
         archetype[pid] = "standard"
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, "standard")
+        rate = defender_movement_rate(player, "standard", not _is_offense_player(pid, off_lineup))
         end_coords[pid] = _interrupted_coord(start_coord, drift_target, rate, t)
 
     ball_start: BallState = {"owner_player_id": bh_id}
@@ -1767,7 +1758,7 @@ def converge_outlet_denied_into_burst(
     step_t = float(end.get("time_elapsed") or 0.0)
     d_start = start_coords[defender_id]
     d_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
-    d_rate = _ag_grid_per_game_sec(d_player, "standard")
+    d_rate = defender_movement_rate(d_player, "standard", True)
     start.setdefault("action", {})[defender_id] = "guard_ball"
     start.setdefault("archetype", {})[defender_id] = "standard"
     start.setdefault("destination", {})[defender_id] = dict(target)
@@ -2056,7 +2047,7 @@ def carry_defense_to_basket(
                 filled += 1
 
             player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-            rate = _ag_grid_per_game_sec(player, arch)
+            rate = defender_movement_rate(player, arch, _is_defender_id(pid, def_lineup))
             new_end = _interrupted_coord(sc, target, rate, step_t)
             end_coords[pid] = dict(new_end)
             cur[pid] = dict(new_end)
@@ -2205,8 +2196,9 @@ def _finalize_rr_steps(
         from BackEnd.utils.shared import canonicalize_post_shot_overlays
 
         canonicalize_post_shot_overlays(turn_result)
-    except Exception:
+    except Exception as e:
         # Canonicalize is best-effort; failure shouldn't block the steps emit.
+        reraise_if_strict(e)
         pass
 
     # Variant-aware post-shot sub-steps (audit remediation item 4). Brings
@@ -2242,7 +2234,8 @@ def _finalize_rr_steps(
             _build_post_shot_sub_steps(
                 steps, turn_result, off_lineup, def_lineup, away_offense,
             )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("FB post-shot sub-steps failed")
     _warn_if_post_shot_sfx_missing(turn_result, steps)
 
@@ -2265,7 +2258,8 @@ def _finalize_rr_steps(
             def_lineup=def_team_l,
             is_away_offense=_away_off,
         )
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("carry_defense_to_basket failed — steps left unchanged")
 
     # UESS §8.1 guard, LAST so it sees every builder's output. Modelled on the
@@ -2273,7 +2267,8 @@ def _finalize_rr_steps(
     # Expected to be a no-op; it logs whenever it is not.
     try:
         enforce_step_start_continuity(steps, context="rim_runner/triangle")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
 
     return steps

@@ -11,6 +11,9 @@ const SCOUTING_PROJECTED_STATS_COLUMNS = [
   'PTS', 'FGM', 'FGA', 'FG%', '3PTM', '3PTA', '3PT%', 'FTM', 'FTA', 'FT%',
   'DREB', 'OREB', 'TREB', 'AST', 'STL', 'BLK', 'F', 'MIN', 'TO',
 ];
+if (typeof window !== 'undefined') {
+  window.SCOUTING_PROJECTED_STATS_COLUMNS = SCOUTING_PROJECTED_STATS_COLUMNS;
+}
 
 var scoutingProjectedRowsCache = [];
 var scoutingPlayerSeasonStatsCache = {};
@@ -269,6 +272,8 @@ function formatScoutingSeasonStat(stats, col) {
       if (s.TREB != null && s.TREB !== '') return String(s.TREB);
       return String(num(s.OREB) + num(s.DREB));
     }
+    case 'MIN':
+      return String(Math.round(num(s.MIN)));
     default: {
       const v = s[col];
       if (v == null || v === '') return '0';
@@ -409,7 +414,6 @@ function renderScoutingTeamReport(teamAttrs, createTeamAttrItem, gridId) {
     'pt_efficiency',
     'fight',
     'discipline',
-    'momentum_score',
     'team_chemistry',
     'fb_opp_modifier',
     'pt_opp_modifier'
@@ -438,7 +442,7 @@ function renderPlayUsage(plays, emptyMessage = 'No previous game data available.
   tbody.innerHTML = '';
 
   if (!plays || plays.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align: center; padding: 20px; color: #666;">${emptyMessage}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colspan}" class="scouting-projected-empty-cell">${emptyMessage}</td></tr>`;
     return;
   }
 
@@ -459,7 +463,7 @@ function renderPlayUsage(plays, emptyMessage = 'No previous game data available.
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${play.name || 'Unknown'}</td>
+      <td class="l">${play.name || 'Unknown'}</td>
       <td>${timesRun}</td>
       <td>${successRate}%</td>
       <td>${usagePct}%</td>
@@ -484,11 +488,7 @@ function setupScoutingReport(loadScoutingReportCallback) {
   
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
-      try {
-        var a = new Audio('/sounds/' + encodeURIComponent('x-back.mp3'));
-        a.volume = 0.7;
-        a.play().catch(function () {});
-      } catch (e) {}
+      import('/js/shared/uiSfx.js').then(function (m) { m.playSfx('SFX_SELECT', 0.7); }).catch(function () {});
       if (modal) modal.style.display = 'none';
     });
   }

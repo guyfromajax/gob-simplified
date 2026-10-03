@@ -12,6 +12,7 @@ ENDPOINTS:
 
 import logging
 import os
+import hashlib
 import re
 import secrets
 from datetime import datetime, timezone, timedelta
@@ -40,12 +41,20 @@ franchise_team_data_collection = _store.franchise_team_data_collection
 teams_collection = _store.teams_collection
 
 from BackEnd.utils.auth import (
+    BCRYPT_MAX_PASSWORD_BYTES,
+    bump_token_version,
+    burn_password_check,
     hash_password,
+    invalidate_user_auth_cache,
+    password_too_long,
+    token_version_claim,
     verify_password,
     create_access_token,
     get_current_user,
+    get_current_user_optional,
     get_user_by_email
 )
+from BackEnd.utils.franchise_team_display import resolve_geek_points_teams
 from BackEnd.utils.otp_validator import (
     inspect_code,
     is_alpha_mode,
@@ -165,6 +174,13 @@ class TutorialAdvanceRequest(BaseModel):
     game_id: Optional[str] = None         # FTE v3 — see TutorialState
 
 
+class GeekPointsTeamRow(BaseModel):
+    """One Account Geek Points row. ``display_name`` is chrome (TB-aware)."""
+    team_id: str
+    display_name: str
+    points: int
+
+
 class UserResponse(BaseModel):
     """User info response."""
     user_id: str
@@ -191,6 +207,8 @@ class UserResponse(BaseModel):
     subscription: Optional[str] = None  # e.g. "alpha" — drives the account-page Status field
     geek_points: Optional[int] = None  # total geek points
     geek_points_by_team: Optional[dict] = None  # canonical team_id -> int (lazy; {} when none)
+    # Additive chrome: stored / Team Builder display names for the Account list.
+    geek_points_teams: Optional[list[GeekPointsTeamRow]] = None
     championships_total: Optional[dict] = None  # { conf_rs, conf_t, region, national } -> int counts
 
 
@@ -327,6 +345,37 @@ def _redact_email(email: str) -> str:
     return "***"
 
 
+def _reset_token_hash(token: str) -> str:
+    """Reset tokens are stored only as sha256(token); the email link carries the token."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _issue_reset_token(user_id) -> str:
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    password_reset_tokens_collection.insert_one({
+        "token_hash": _reset_token_hash(token),
+        "user_id": user_id,
+        "expires_at": now + timedelta(hours=RESET_TOKEN_EXPIRY_HOURS),
+        "created_at": now,
+    })
+    return token
+
+
+def _reject_long_password(password: str) -> None:
+    if password_too_long(password):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password must be at most {BCRYPT_MAX_PASSWORD_BYTES} bytes (shorter, or fewer non-ASCII characters).",
+        )
+
+
+def _alpha_code_error(reason: Optional[str]) -> HTTPException:
+    if reason == "exhausted":
+        return HTTPException(status_code=400, detail="All spots on this code are claimed.")
+    return HTTPException(status_code=400, detail="Invalid alpha access code")
+
+
 def _access_code_rate_limit_exceeded(email: str, now: datetime) -> bool:
     window_start = now - timedelta(hours=1)
     recent = access_code_requests_collection.count_documents(
@@ -342,14 +391,7 @@ def _trigger_password_reset_for_email(email: str) -> None:
     user = get_user_by_email(email)
     if not user:
         return
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=RESET_TOKEN_EXPIRY_HOURS)
-    password_reset_tokens_collection.insert_one({
-        "token": token,
-        "user_id": user["_id"],
-        "expires_at": expires_at,
-        "created_at": datetime.now(timezone.utc),
-    })
+    token = _issue_reset_token(user["_id"])
     reset_link = f"{RESET_LINK_BASE_URL.rstrip('/')}/reset-password.html?token={token}"
     send_password_reset_email(email, reset_link)
 
@@ -603,6 +645,7 @@ async def signup(request: Request, body: SignupRequest):
     """
     email = body.email.lower().strip()
     reserved_code = None
+    _reject_long_password(body.password)
     
     # Check if alpha mode requires OTP
     if is_alpha_mode():
@@ -611,6 +654,11 @@ async def signup(request: Request, body: SignupRequest):
                 status_code=400,
                 detail="Alpha access code is required for signup"
             )
+        # Validate the code (read-only) BEFORE revealing whether the email exists,
+        # so the "already exists" answer can't be used to enumerate accounts.
+        code_ok, code_reason = inspect_code(body.otp_code)
+        if not code_ok:
+            raise _alpha_code_error(code_reason)
     
     # Check if email already exists
     existing_user = get_user_by_email(email)
@@ -623,12 +671,7 @@ async def signup(request: Request, body: SignupRequest):
     if is_alpha_mode():
         reserved, reason = reserve_code(body.otp_code, email)
         if not reserved:
-            if reason == "exhausted":
-                raise HTTPException(
-                    status_code=400,
-                    detail="All spots on this code are claimed.",
-                )
-            raise HTTPException(status_code=400, detail="Invalid alpha access code")
+            raise _alpha_code_error(reason)
         reserved_code = normalize_otp_code(body.otp_code)
     
     # Create user document
@@ -678,7 +721,8 @@ async def signup(request: Request, body: SignupRequest):
     token = create_access_token({
         "sub": user_id,
         "email": email,
-        "role": "user"
+        "role": "user",
+        "tv": 0,
     })
     
     payload = AuthResponse(
@@ -720,6 +764,8 @@ async def login(request: Request, body: LoginRequest):
     # Find user
     user = get_user_by_email(email)
     if not user:
+        # Same bcrypt cost as a wrong password, so timing doesn't reveal the email.
+        burn_password_check(body.password)
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
@@ -737,7 +783,8 @@ async def login(request: Request, body: LoginRequest):
     token = create_access_token({
         "sub": user_id,
         "email": email,
-        "role": user.get("role", "user")
+        "role": user.get("role", "user"),
+        "tv": token_version_claim(user),
     })
     
     # Update last login timestamp
@@ -817,6 +864,28 @@ async def update_account_settings(
     }
 
 
+def _set_on_coach(user: dict, fields: dict) -> None:
+    """``$set`` archetype state on whichever doc holds this coach's career.
+
+    Online that is the ``users`` doc. The desktop principal has no users doc — its
+    id is not an ObjectId — so the same keys go to the save's ``local_coach`` doc,
+    the one ``command_center_data`` reads them back from. Without this the two
+    archetype moments could be shown but never marked seen on desktop, and would
+    reappear on every Office load.
+    """
+    from BackEnd.utils.local_coach import coach_target
+
+    target = coach_target(user.get("user_id"))
+    if target is None:
+        return
+    collection, doc_id, is_local = target
+    collection.update_one(
+        {"_id": doc_id},
+        {"$set": {**fields, "updated_at": datetime.now(timezone.utc)}},
+        upsert=is_local,
+    )
+
+
 @router.patch("/archetype-reveal-seen")
 async def mark_archetype_reveal_seen(user: dict = Depends(get_current_user)):
     """Mark the one-time first-archetype reveal modal as seen for this account.
@@ -824,10 +893,7 @@ async def mark_archetype_reveal_seen(user: dict = Depends(get_current_user)):
     Idempotent; called by the frontend when the reveal is shown so it never
     appears again on any device/session.
     """
-    users_collection.update_one(
-        {"_id": ObjectId(user["user_id"])},
-        {"$set": {"archetype_reveal_seen": True, "updated_at": datetime.now(timezone.utc)}}
-    )
+    _set_on_coach(user, {"archetype_reveal_seen": True})
     return {"archetype_reveal_seen": True, "message": "Archetype reveal marked seen"}
 
 
@@ -839,10 +905,7 @@ async def clear_archetype_evolution_pending(user: dict = Depends(get_current_use
     because a higher-priority modal claimed the visit — either way the change is
     consumed and never shown again.
     """
-    users_collection.update_one(
-        {"_id": ObjectId(user["user_id"])},
-        {"$set": {"archetype_evolution_pending": "", "updated_at": datetime.now(timezone.utc)}}
-    )
+    _set_on_coach(user, {"archetype_evolution_pending": ""})
     return {"archetype_evolution_pending": "", "message": "Archetype evolution cleared"}
 
 
@@ -984,14 +1047,7 @@ async def password_reset_request(request: Request, body: ResetRequest):
     user = get_user_by_email(email)
     if user:
         logger.warning("[RESET] user found, creating token and sending email")
-        token = secrets.token_urlsafe(32)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=RESET_TOKEN_EXPIRY_HOURS)
-        password_reset_tokens_collection.insert_one({
-            "token": token,
-            "user_id": user["_id"],
-            "expires_at": expires_at,
-            "created_at": datetime.now(timezone.utc),
-        })
+        token = _issue_reset_token(user["_id"])
         reset_link = f"{RESET_LINK_BASE_URL.rstrip('/')}/reset-password.html?token={token}"
         sent = send_password_reset_email(email, reset_link)
         logger.warning("[RESET] send_password_reset_email returned %s", sent)
@@ -1012,7 +1068,9 @@ async def password_reset_confirm(request: Request, body: ResetPasswordRequest):
     Token is invalidated after use. Returns 400 if token is invalid or expired.
     """
     logger.warning("[RESET] reset-password received (token length=%s)", len(body.token) if body.token else 0)
-    doc = password_reset_tokens_collection.find_one({"token": body.token})
+    _reject_long_password(body.new_password)
+    # Only the hash is stored; tokens issued before hashing (plaintext) no longer match.
+    doc = password_reset_tokens_collection.find_one({"token_hash": _reset_token_hash(body.token or "")})
     if not doc:
         logger.warning("[RESET] reset-password: token not found or already used")
         raise HTTPException(status_code=400, detail="Invalid or expired reset link. Please request a new one.")
@@ -1032,8 +1090,13 @@ async def password_reset_confirm(request: Request, body: ResetPasswordRequest):
         user_id = ObjectId(user_id)
     users_collection.update_one(
         {"_id": user_id},
-        {"$set": {"password_hash": hash_password(body.new_password), "updated_at": datetime.now(timezone.utc)}}
+        {
+            "$set": {"password_hash": hash_password(body.new_password), "updated_at": datetime.now(timezone.utc)},
+            # Sign out every existing session for this account.
+            "$inc": {"token_version": 1},
+        }
     )
+    invalidate_user_auth_cache(str(user_id))
     password_reset_tokens_collection.delete_many({"user_id": user_id})
     logger.warning("[RESET] reset-password: password updated for user_id=%s", user_id)
     return JSONResponse(
@@ -1119,6 +1182,7 @@ async def get_me(user: dict = Depends(get_current_user)):
     subscription = (db_user.get("subscription") if db_user else None) or "alpha"
     geek_points = int(db_user.get("geek_points", 0) or 0) if db_user else 0
     geek_points_by_team = (db_user.get("geek_points_by_team") if db_user else None) or {}
+    geek_points_teams = resolve_geek_points_teams(geek_points_by_team, user.get("user_id"))
     raw_champs = (db_user.get("championships_total") if db_user else None) or {}
     championships_total = {k: int(raw_champs.get(k, 0) or 0) for k in ("conf_rs", "conf_t", "region", "national")}
 
@@ -1147,6 +1211,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         subscription=subscription,
         geek_points=geek_points,
         geek_points_by_team=geek_points_by_team,
+        geek_points_teams=geek_points_teams,
         championships_total=championships_total
     )
 
@@ -1244,8 +1309,10 @@ async def get_leaderboard(user: dict = Depends(get_current_user)):
             titles_current_user_entry = ranked
 
     return LeaderboardResponse(
-        top=ranked_entries[:10],
-        current_user=(None if current_user_entry and current_user_entry.rank <= 10 else current_user_entry),
+        # 15 rows so 1920 can fill its taller list; 1280 renders its own shorter
+        # count (--lb-rows) from the same payload. Titles stays at 5.
+        top=ranked_entries[:15],
+        current_user=(None if current_user_entry and current_user_entry.rank <= 15 else current_user_entry),
         titles_top=ranked_titles_entries[:5],
         titles_current_user=(
             None
@@ -1421,11 +1488,14 @@ async def tutorial_complete(user: dict = Depends(get_current_user)):
 
 
 @router.post("/logout")
-async def logout():
+async def logout(user: Optional[dict] = Depends(get_current_user_optional)):
     """
     Logout endpoint.
-    
-    JWT tokens are stateless, so logout is handled client-side by removing the token.
-    This endpoint exists for API completeness and potential future server-side token invalidation.
+
+    When the request carries a valid bearer token, bumps the user's token_version,
+    which signs out EVERY session for the account (all devices), not just this one.
+    Without a token it only acknowledges; the client still drops its token.
     """
+    if user and user.get("user_id"):
+        bump_token_version(user["user_id"])
     return {"message": "Logged out successfully"}

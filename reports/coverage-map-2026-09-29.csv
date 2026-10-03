@@ -1,0 +1,103 @@
+group,name,url_or_view,rail_section,how_reached,kind,gobnav,back_works,online,offline,evidence,new_design,playwright,timing_desktop_cold_ms,timing_desktop_warm_ms,timing_online_cold_ms,timing_online_warm_ms,notes
+screen,Office,franchise-command-center.html?tab=home-tab,office,rail (default landing),IN-APP VIEW,push (rail),yes,works,works,R,yes,"app-router, fcc-recruiting-layout, navigation-history, shell-1 (+4)",219/248 (app load),7/11,232/267 (app load),9/11,Cold = full FCC load from a blank page to Office painted
+screen,Roster,roster-view,team,rail,IN-APP VIEW,push (rail),yes,works,works,R,yes,"attr-tiles, player-stats, shell-1, shell-1b, t2-roster (+4)",26/30,11/11,26/30,10/11,
+screen,Player Stats,player-stats-view,team,sub-tab,IN-APP VIEW,replace,yes (returns to entry before the rail push),works,works,R,yes,"player-stats, fcc-roster-data, shell-1, t2-roster (+2)",24/29,7/8,23/25,7/8,
+screen,Team Attributes,team-attributes-view,team,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"shell-1, shell-1b, store-client, t2-roster (+1)",14/15,4/5,12/17,3/8,
+screen,Team Schedule,team-schedule-view,team,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"schedule-views, shell-1, store-client (+2)",52/69,5/6,51/82,5/9,
+screen,Practice Squad,practice-squad-view,team,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"practice-squad-view, shell-1b",33/35,4/6,34/37,3/7,practice-squad-standings/bracket.html redirect here
+screen,Player Training,training-view (player-dev only),prep,rail,IN-APP VIEW,replace,yes,works,works,R,yes,"training-advance-focus, prep-modules-training",,,,,Weekly allocation is /training.html focus via Advance
+screen,Game Plan,game-plan-view (embeds /game-plan.html?embed=1),prep,sub-tab,EMBED BRIDGE,replace,yes,works,works,R,yes,"shell-1, shell-1b, shell-2, store-client",24/25,5/7,24/24,5/8,
+screen,Playbooks,playbooks-view (embeds /playbooks.html?embed=1),prep,sub-tab,EMBED BRIDGE,replace,yes,works,works,R,yes,"shell-1, shell-1b, store-client",100/127,6/8,98/133,6/7,Layout jump on first open (CLS 0.354 in 10/10 runs per profile)
+screen,Scouting Report,scouting-view,prep,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"prep-scouting, shell-1, shell-1b",154/180,39/72,152/188,43/64,Panel empty for 4-5 frames on every reopen (DOM); slowest warm module view
+screen,Training Report,/training-report.html,focus,Submit / Office card / News / old tab remap,FOCUS PAGE,go (standalone),yes,works,works,R,yes,training-advance-focus,,,,,Same module as the retired FCC tab; no rail
+screen,Standings,standings-view,league,rail,IN-APP VIEW,push (rail),yes,works,works,R,yes,"app-router, shell-1, shell-1b, shell-2 (+3)",29/30,7/9,29/30,7/10,
+screen,Rankings,rankings-view,league,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"app-router, shell-1b, shell-2, subtabs (+1)",75/108,7/8,75/84,6/7,
+screen,Leaders,leaders-view,league,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"shell-1, shell-1b, t1-tables, t3-detail",82/88,4/6,83/85,4/5,
+screen,Team Stats,team-stats-view,league,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"shell-1, shell-1b, subtabs, t1-tables (+1)",132/151,27/31,129/160,27/30,
+screen,League Schedule,league-schedule-view,league,sub-tab,IN-APP VIEW,replace,yes,works,works,R,yes,"schedule-views, shell-1b, shell-2, team-schedule-columns",55/81,7/8,56/69,7/8,
+screen,Tournament,tournament-view,league,sub-tab (locked until tournament weeks),IN-APP VIEW,replace,yes (C),works (locked shell),works (locked shell),R (locked) / C (bracket content),yes,"shell-1b, tournament-view",locked,locked,locked,locked,Locked at week 1 so bracket content not exercised
+screen,News,news-view,news,rail,IN-APP VIEW,push (rail),yes,works,works,R,yes,"fcc-recruiting-layout, news-awards, shell-1, shell-1b",39/40,6/10,39/68,7/10,
+screen,Awards,awards-view,news,sub-tab,IN-APP VIEW,replace,yes,works (empty state),works (empty state),R,yes,"news-awards, shell-1b",38/45,5/7,37/44,6/8,GET /franchise/awards returns 400 before awards exist (console noise)
+screen,Player,player-view,none (context),drill-in from player links (GOBViews.open),IN-APP VIEW,push,yes,works,BROKEN,R,yes,"subtabs, t3-detail",timeout 10/10,—,170/190,5/8,"Desktop: 'This player could not be opened' (player_id dropped from desktop session URL). Office rail button inert from this view (both profiles)"
+screen,Team,team-view (via /team-roster-view.html stub),none (context),drill-in from team links (standings/rankings/office/scouting),IN-APP VIEW,full page load (location.href to stub),yes,works,works,R,yes,t3-detail,132/158,92/100,130/144,91/110,"Every team drill reloads the FCC; return_url nests on each drill. Office rail button inert from this view"
+screen,Settings panel,gobSettings (rail utility),rail utility,rail button,IN-APP VIEW,none (panel),n/a,works,works (account section replaced by 'Offline'),R (panel) / C (account swap),yes,"foundation-settings, desktop-settings-faqs",,,,,
+screen,Feedback modal,alphaFeedbackModal (rail utility),rail utility,rail button,IN-APP VIEW,none (modal),n/a,works on FCC; button missing on recruiting.html and stats.html,hidden,R,yes,navigation-history (alpha-feedback page),,,,,gobShell.js:1259 hides the button when the page has no #feedback-btn
+screen,Recruiting,/recruiting.html,recruiting,rail (GOBNav.go),FULL PAGE (new design),push (page),yes,works,works,R,yes,"recruiting-tabs, recruits-pool, signing-day-hub, invite-board-layout (+11)",299/340,305/398,311/347,295/320,Slowest navigation in the app; warm is no faster than cold
+screen,Box Score,/box-score.html,none (context),game rows (schedule/news/office) or post-game,FULL PAGE (new design),push (page),yes (C),works (shell; no game data in smoke),works (shell; no game data in smoke),R (loads) / C (game content),yes,"moment-queue, news-awards, office-frontend, shell-2",,,,,Browse when return_url is set; focus otherwise
+screen,Set Lineup,/set-lineup.html,none,Advance (Play game),FOCUS PAGE,push (page),C,works (loads),works (loads),R (loads) / C (flow),yes,"desktop-play-flow, game-start-sequence, navigation-history (+4)",,,,,
+screen,Court (live game),/court.html,none,from set-lineup / game plan,FOCUS PAGE,page,C,works (loads),works (loads),R (loads) / C (flow),no,"desktop-play-flow, depth-ordering, foundation-settings (+2)",,,,,Phaser game; no shell by design
+screen,Cut Players,/cut-players.html,none,Advance when roster over limit (gobAdvance.js:710),FOCUS PAGE,page,C,works (shell; needs flow params),works (shell; needs flow params),R (shell) / C (flow),yes,"fcc-recruiting-buttons, office-frontend, shell-2",,,,,Without params GET /roster/null returns 404
+screen,Playbook Report,/playbook-report.html,none,Playbooks save (playbooks.js:233),FOCUS PAGE,page,C,works (shell; needs flow params),works (shell; needs flow params),R (shell) / C (flow),yes,shell-2,,,,,Without params /api/playbooks returns 422
+screen,Training Squad Report,/training-squad-report.html,none,after Training submit,FOCUS PAGE,page,C,works (loads),works (loads),R,yes,shell-2,,,,,
+screen,Training Playbooks,/training-playbooks.html,none,Training > Custom Training Playbook (training.js:1771),FOCUS PAGE,page,C,not verified (bounces without session keys),not verified (bounces without session keys),C,unknown (static: no tokens link),shell-2,,,,,Smoke without session keys lands on mode-select (desktop) / login (online)
+screen,Game Plan (timeout / tutorial),/game-plan.html?resume_from_timeout=true or mode=tutorial,none,in-game timeout; first-time tutorial,FOCUS PAGE,page,C,C,C,C,no (legacy game-plan page),"desktop-play-flow, navigation-history",,,,,Only case where game-plan.html is not redirected into the FCC
+screen,Tutorials hub,/tutorial.html,rail utility,rail Tutorials link,LEGACY PAGE,page,yes,works,works,R,no,none found,46/50,33/46,34/41,28/32,Layout jump on first open (CLS 0.086; 3-4 of 5 runs)
+screen,Tutorial: Player Attributes,/tutorial-player-attributes.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Training,/tutorial-training.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Team Attributes,/tutorial-team-attributes.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Game Plans,/tutorial-game-plans.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Playbooks,/tutorial-playbooks.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Scouting,/tutorial-scouting.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Recruiting,/tutorial-recruiting.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Momentum (advanced),/tutorial-advanced-momentum.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Practice Squads (advanced),/tutorial-advanced-practice-squads.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Press & Trap (advanced),/tutorial-advanced-press-trap.html,none,Tutorials hub,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Tutorial: Training by Position (advanced),/tutorial-advanced-training-by-position.html,none,Tutorials hub / Training,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,FTE: Persona intro,/tutorial-persona-intro.html,none,first-time flow (authBarInit.js:277),LEGACY PAGE,page,C,works (loads),hidden,R (loads) / C (offline),no,none found,,,,,Flow is driven by /api/auth tutorial_state (always remote)
+screen,FTE: Situation,/tutorial-situation.html,none,first-time flow (authBarInit.js:279),LEGACY PAGE,page,C,works (loads),hidden,R (loads) / C (offline),no,none found,,,,,
+screen,FTE: Pick opponent,/tutorial-pick-opponent.html,none,first-time flow (authBarInit.js:280),LEGACY PAGE,page,C,works (loads),hidden,R (loads) / C (offline),no,none found,,,,,
+screen,Home Base (mode select),/mode-select.html,rail utility,rail Exit,LEGACY PAGE,page,yes,works (C; harness bounced to login),works,R (desktop) / C (online),no,"desktop-play-flow, home-base-offline-guard, navigation-fixes-3 (+2)",140/175,105/134,timeout (harness),timeout (harness),Offline hides Around the League / leaderboards / highlights (mode-select.js:386)
+screen,Franchise select team,/franchise-select-team.html,none,Home Base > new franchise,LEGACY PAGE,page,C,works,works,R,no,desktop-play-flow,,,,,
+screen,Team builder,/team-builder.html,none,franchise-select-team builder mode (franchise-select-team.js:332),LEGACY PAGE,page,C,bounces (flag off),bounces (flag off),R,no,none found,,,,,isTeamBuilderEnabled() false here: replace() to franchise-select-team
+screen,Homepage,/ (homepage.html),none,public entry (Netlify /),LEGACY PAGE,page,C,works,n/a,R,no,"homepage-v3-auth, shell-site-footer",,,,,
+screen,Login,/login.html,none,auth redirect,LEGACY PAGE,page,C,works,n/a (authGuard skips on desktop),R (online) / C (offline),no,"recruiting-tabs, shell-1b",,,,,
+screen,Signup,/signup.html,none,homepage / login,LEGACY PAGE,page,C,works,n/a,R (online) / C (offline),no,none found,,,,,
+screen,Reset password,/reset-password.html,none,email link,LEGACY PAGE,page,C,works,n/a,R (online) / C (offline),no,none found,,,,,
+screen,Account,/account.html,none,Settings panel (online),LEGACY PAGE,page,C,works,hidden,R (online) / C (offline),no,shell-site-footer,,,,,
+screen,Alpha feedback,/alpha-feedback.html,none,Feedback modal,LEGACY PAGE,page,C,works,hidden,R (online) / C (offline),no,navigation-history,,,,,
+screen,Coaching archetypes,/coaching-archetypes.html,none,Account page / archetype modals,LEGACY PAGE,page,C,works,hidden (entry points are account-only),R (online) / C (offline),no,"navigation-history, shell-1",,,,,
+screen,Coaching archetypes leaderboard,/coaching-archetypes-leaderboard.html,none,Home Base community panel / archetypes page,LEGACY PAGE,page,C,works,hidden,R (online) / C (offline),no,none found,,,,,/api/leaderboard is always-remote
+screen,FAQs,/faqs.html,none,Settings panel / footers,LEGACY PAGE,page,C,works,works,R,no,"desktop-settings-faqs, foundation-settings, shell-site-footer",,,,,
+screen,Privacy,/privacy.html,none,footers,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Terms,/terms.html,none,footers,LEGACY PAGE,page,C,works,works,R,no,none found,,,,,
+screen,Play details,/play-details.html,none,Playbooks play row (playbooks.js:216),LEGACY PAGE,page,C,works (loads),works (loads),R,no,none found,,,,,
+redirect,awards.html,-> FCC ?tab=awards-view,news,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"news-awards, shell-1b, shell-2",,,,,
+redirect,brackets.html,-> FCC ?tab=tournament-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"shell-1b, shell-2, tournament-view",,,,,Linked at franchise-command-center.js:5349
+redirect,game-plan.html,-> FCC ?tab=game-plan-view (embed guard; focus page for timeout/tutorial),prep,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"desktop-play-flow, navigation-history, shell-2",,,,,"Linked at training.js:1196, training.js:1545, box-score.js:2182, franchise-command-center.js:4387"
+redirect,leaders.html,-> FCC ?tab=leaders-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"shell-2, store-client, t1-tables",,,,,"Linked at franchise-command-center.js:1792, 1818"
+redirect,news.html,-> FCC ?tab=news-view,news,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"news-awards, shell-2, store-client",,,,,
+redirect,playbooks.html,-> FCC ?tab=playbooks-view (embed guard),prep,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,shell-2,,,,,"Linked at playbook-report.js:353, play-details.html:527, franchise-command-center.js:2260, 2274"
+redirect,player-detail.html,-> FCC ?tab=player-view,context,stub,REDIRECT STUB,replace,n/a,works,BROKEN (player-view),R,n/a,"office-frontend, shell-2, t3-detail",,,,,"Linked at officeHome.js:147, team-roster-view.js:98, franchise-command-center.js:398"
+redirect,practice-squad-bracket.html,-> FCC ?tab=practice-squad-view,team,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"practice-squad-view, shell-2",,,,,
+redirect,practice-squad-standings.html,-> FCC ?tab=practice-squad-view,team,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"practice-squad-view, shell-2",,,,,
+redirect,rankings.html,-> FCC ?tab=rankings-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"app-router, office-frontend, shell-1b, shell-2, t2-roster",,,,,"Linked at franchise-command-center.js:1804, 1806"
+redirect,schedule.html,-> FCC ?tab=league-schedule-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"app-router, schedule-views, shell-1b, shell-2, t1-tables",,,,,
+redirect,standings.html,-> FCC ?tab=standings-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"foundation-settings, shell-2, t1-tables (+3)",,,,,"Linked at franchise-command-center.js:1777, 1779, 1794"
+redirect,team-roster-view.html,-> FCC ?tab=team-view (stays a page for mode=practice_squad),context,stub,REDIRECT STUB,location.href,n/a,works,works,R,n/a,"app-router, standalone-roster, t2-roster, t3-detail (+2)",,,,,"Linked at officeHome.js:158, gobTables.js:237, rankingsView.js:84, franchise-select-team.js:657, franchise-command-center.js:796 (practiceSquadView.js:79 is the legit PS page)"
+redirect,team-stats.html,-> FCC ?tab=team-stats-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"shell-2, store-client, t1-tables",,,,,Linked at franchise-command-center.js:1790
+screen,Weekly Training,/training.html,none,Advance (mode=training),FOCUS PAGE,go,yes,works,works,R,yes,"training-advance-focus, navigation-fixes-3, shell-2",,,,,"gobAdvance.js → /training.html; training-playbooks.js returns here"
+page,training-report.html,focus weekly report (same module),focus,Submit / Office / News / old tab,FOCUS PAGE,go,yes,works,works,R,yes,"training-advance-focus, shell-2",,,,,Old FCC tab remaps here
+redirect,game-plans.html,-> tutorial-game-plans.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,0 inbound links
+redirect,player-attributes.html,-> tutorial-player-attributes.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,0 inbound links
+redirect,scouting.html,-> tutorial-scouting.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,0 inbound links
+redirect,team-attributes.html,-> tutorial-team-attributes.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,0 inbound links
+redirect,index.html,-> homepage.html,none,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,Netlify serves / as homepage.html directly
+redirect,stats.html,-> FCC ?tab=team-stats-view,league,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,"shell-2",,,,,Jamie Q7 A; copies franchise_id/team_id/week
+redirect,team-traits.html,-> FCC ?tab=team-attributes-view,team,stub,REDIRECT STUB,replace,n/a,works,works,R,n/a,none,,,,,Jamie Q7 A; copies franchise_id/team_id/week
+unreached,maintenance.html,/maintenance.html,none,Netlify wildcard (commented out),LEGACY PAGE,n/a,n/a,loads (empty text),loads (empty text),R,no,none,,,,,Ops switch only
+unreached,trailer.html,/trailer,none,Netlify /trailer (reviewer link),LEGACY PAGE,n/a,n/a,works,works,R,no,none,,,,,Not linked in app
+unreached,homepage-v3.html,/homepage-v3.html,none,authGuard public list only,LEGACY PAGE,n/a,n/a,works,works,R,no,homepage-v3-auth,,,,,Same content as homepage.html
+unreached,Playcall Center POC.html,,none,none,DEAD,n/a,n/a,loads,loads,R,no,none,,,,,
+unreached,Tournament Tab.html,,none,none,DEAD,n/a,n/a,loads,loads,R,no,none,,,,,
+unreached,_preview-training-phase5.html,,none,none,DEAD,n/a,n/a,loads,loads,R,no,none,,,,,
+unreached,coaching-grid.html,,none,none,DEAD,n/a,n/a,loads,loads,R,no,none,,,,,
+unreached,homepage-backup.html,,none,none,DEAD,n/a,n/a,loads,loads,R,no,none,,,,,
+unreached,homepage-v2-legacy.html,,none,none,DEAD,n/a,n/a,loads,loads,R,no,none,,,,,
+unreached,homepage-v3-source.html,,none,none,DEAD,n/a,n/a,loads,loads,R,no,none,,,,,
+unreached,scrimmage-select.html,,none,none,DEAD,n/a,n/a,loads,loads,R,no,none,,,,,
+unreached,tb-band-placement-qa.html,,none,none,DEAD,n/a,n/a,loads,loads,R,no,none,,,,,
+internal,fcp-skeletons.html,,none,admin (adminGuard; skeleton_routes),ADMIN,n/a,n/a,loads,loads,R,no,none,,,,,
+internal,hct-skeletons.html,,none,admin (adminGuard; skeleton_routes),ADMIN,n/a,n/a,loads,loads,R,no,none,,,,,
+internal,play-builder.html,,none,admin (adminGuard; play_routes),ADMIN,n/a,n/a,loads,loads,R,no,none,,,,,
+internal,play-builder-v2.html,,none,admin (adminGuard; play_routes),ADMIN,n/a,n/a,loads,loads,R,no,none,,,,,
+internal,plays-builder.html,,none,admin (adminGuard),ADMIN,n/a,n/a,loads,loads,R,no,none,,,,,

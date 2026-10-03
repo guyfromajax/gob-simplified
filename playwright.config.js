@@ -43,7 +43,7 @@ module.exports = defineConfig({
     command: process.env.PYTHON_PATH
       ? `${process.env.PYTHON_PATH} tests/e2e/helpers/seed_and_serve.py`
       : "sh -c '(.venv/bin/python tests/e2e/helpers/seed_and_serve.py) || (venv/bin/python tests/e2e/helpers/seed_and_serve.py) || python3 tests/e2e/helpers/seed_and_serve.py'",
-    url: 'http://localhost:8000',
+    url: process.env.BASE_URL || 'http://localhost:8000',
     // Never attach to a leftover :8000. A bare `dev.py` or catalog sidecar
     // has empty mongomock and produced fake court-layout reds three times.
     // Opt in only when you know the listener is seed_and_serve: PW_REUSE_SERVER=1

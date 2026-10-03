@@ -10,7 +10,7 @@
  * Signing Day also splits the green button: once orders are saved it RUNS the day;
  * before that it is still the way IN to the board.
  *
- * Extracts the REAL functions out of franchise-command-center.js — same technique as
+ * Calls the REAL GOBAdvance button writers — same technique as
  * fcc-invite-step.spec.js — so the test tracks the shipped branch order rather than a
  * copy of it.
  *
@@ -21,27 +21,9 @@ const fs = require('fs');
 const path = require('path');
 
 const S = path.join(__dirname, '../../FrontEnd/static');
-const JS = fs.readFileSync(path.join(S, 'franchise-command-center.js'), 'utf8');
+const ADVANCE_SRC = fs.readFileSync(path.join(S, 'js/shared/gobAdvance.js'), 'utf8');
 const CSS = fs.readFileSync(path.join(S, 'franchise-command-center.css'), 'utf8');
 const HTML = fs.readFileSync(path.join(S, 'franchise-command-center.html'), 'utf8');
-
-function extractFunction(source, name) {
-  const lines = source.split('\n');
-  const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
-  if (start === -1) throw new Error(`${name} not found`);
-  const end = lines.findIndex((l, i) => i > start && l === '}');
-  return lines.slice(start, end + 1).join('\n');
-}
-
-const UPDATE_PLAY_BUTTON = extractFunction(JS, 'updatePlayButton');
-const UPDATE_EDIT_BUTTON = extractFunction(JS, 'updateEditRecruitingButton');
-// Pulled from source rather than hardcoded: if a week boundary ever moves, these tests
-// move with it instead of asserting against a stale number.
-const SIGNING_DAY_CONST = ['SIGNING_DAY_WEEK', 'INVITE_FIRST_WEEK', 'INVITE_LAST_WEEK'].map((n) => {
-  const m = JS.match(new RegExp(`^const ${n} = \\d+;$`, 'm'));
-  if (!m) throw new Error(`${n} not found`);
-  return m[0];
-}).join('\n');
 
 /** The real hero button group, lifted out of the shipped template. */
 const HERO_GROUP = (() => {
@@ -53,19 +35,12 @@ const HERO_GROUP = (() => {
 })();
 
 async function runWith(page, data) {
-  return page.evaluate(({ playSrc, editSrc, weekConst, css, group, data }) => {
-    document.head.innerHTML = `<style>${css}</style>`;
-    document.body.innerHTML = `<div id="franchise-container"><div class="right-controls">${group}</div></div>`;
-    window.fccCpuSimNeedsRecovery = () => false;
-    window.userTeamId = 'user-team';
-    // Label lookups only — week 34 falls through to the postseason branch, and these
-    // tests assert the mode and the ghost button, never the postseason copy.
-    window.EOS_PLAY_CTA_BY_WEEK = {};
-    window.EOS_SIM_CTA_BY_WEEK = {};
-    // eslint-disable-next-line no-eval
-    eval(`${weekConst}\n${playSrc}\n${editSrc}\nwindow.__play = updatePlayButton; window.__edit = updateEditRecruitingButton;`);
-    window.__play(data);
-    window.__edit(data);
+  await page.setContent(`<!doctype html><style>${CSS}</style><div id="franchise-container"><div class="right-controls">${HERO_GROUP}</div></div>`);
+  await page.addScriptTag({ path: path.join(S, 'js/shared/gobAdvance.js') });
+  return page.evaluate((data) => {
+    const env = { userTeamId: 'user-team', fccCpuSimNeedsRecovery: () => false };
+    window.GOBAdvance.updatePlayButton(data, env);
+    window.GOBAdvance.updateEditRecruitingButton(data, env);
     const play = document.getElementById('play-now');
     const edit = document.getElementById('fcc-edit-recruiting');
     const pr = play.getBoundingClientRect();
@@ -82,7 +57,7 @@ async function runWith(page, data) {
       editBg: getComputedStyle(edit).backgroundColor,
       playBg: getComputedStyle(play).backgroundImage,
     };
-  }, { playSrc: UPDATE_PLAY_BUTTON, editSrc: UPDATE_EDIT_BUTTON, weekConst: SIGNING_DAY_CONST, css: CSS, group: HERO_GROUP, data });
+  }, data);
 }
 
 const SUBMITTED = { recruiting_wire: { week_35_orders_submitted: true } };
@@ -125,10 +100,10 @@ test.describe('week 35 — before orders exist', () => {
   });
 
   test('the entry goes directly to recruiting without an optional cut step', () => {
-    const start = JS.indexOf("if (mode === 'week35-recruiting')");
-    const end = JS.indexOf("if (mode === 'cut-players')", start);
-    const branch = JS.slice(start, end);
-    expect(branch).toContain('await goRecruiting()');
+    const start = ADVANCE_SRC.indexOf("if (mode === 'week35-recruiting')");
+    const end = ADVANCE_SRC.indexOf("if (mode === 'cut-players')", start);
+    const branch = ADVANCE_SRC.slice(start, end);
+    expect(branch).toContain("'/recruiting.html?'");
     expect(branch).not.toContain('/cut-players.html');
     expect(branch).not.toContain('Cut Players?');
   });

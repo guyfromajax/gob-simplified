@@ -37,6 +37,8 @@ from BackEnd.constants import (
     FB_PASS_MIN_GAME_SECONDS,
 )
 from BackEnd.utils.animation_step_helpers import (
+    _is_defender_id,
+    defender_movement_rate,
     _ag_grid_per_game_sec,
     _euclid,
     _player_lookup_by_id,
@@ -52,34 +54,20 @@ from BackEnd.utils.animation_step_schema import (
     StepEnd,
     StepStart,
 )
+from BackEnd.utils.shared import movement_rate  # STAGE 1: the one rate accessor
+from BackEnd.utils.strict_exceptions import reraise_if_strict  # GOB_STRICT_EXCEPTIONS (default off)
 
 # (target_coord, movement archetype, per-player action)
 MoverTarget = Tuple[GridCoord, PlayerArchetype, PlayerAction]
 
 
-def _interrupted_coord(
-    start: Optional[GridCoord],
-    target: Optional[GridCoord],
-    rate: float,
-    t: float,
-) -> GridCoord:
-    """Position along ``start``→``target`` at ``rate × t``; clamped to
-    ``target`` if the player completes the traversal within ``t`` seconds."""
-    if start is None and target is None:
-        return {"x": 50.0, "y": 25.0}
-    if start is None:
-        return {"x": float(target["x"]), "y": float(target["y"])}
-    if target is None:
-        return {"x": float(start["x"]), "y": float(start["y"])}
-    dist = _euclid(start, target)
-    max_traversal = max(0.0, rate * t)
-    if dist <= max_traversal or dist == 0.0:
-        return {"x": float(target["x"]), "y": float(target["y"])}
-    ratio = max_traversal / dist
-    return {
-        "x": float(start["x"] + (target["x"] - start["x"]) * ratio),
-        "y": float(start["y"] + (target["y"] - start["y"]) * ratio),
-    }
+# STAGE 1 (2026-09-24): the four `_interrupted_coord` definitions collapsed to one core
+# in animation_step_helpers. This module reached VARIANT B, so it binds the lenient wrapper;
+# the name is kept because other modules import it from here BY VALUE.
+# See reports/movement-rate-inventory.md and reports/rate-unify-stage1.md.
+from BackEnd.utils.animation_step_helpers import _interrupted_coord_lenient
+
+_interrupted_coord = _interrupted_coord_lenient
 
 
 def _stamp_tween_durations(
@@ -103,7 +91,10 @@ def _stamp_tween_durations(
             continue
         arch = archetype.get(pid, "standard")
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch)
+        # STAGE 2: the endpoints on this path already use the wrapper; this closes the
+        # split so the rendered duration matches the simulated distance. Defenders only —
+        # def_lineup membership is the test, so the offence is untouched.
+        rate = movement_rate(player, arch, apply_spread=_is_defender_id(pid, def_lineup))
         if rate <= 0:
             continue
         durations[pid] = float(min(dist / rate, step_t))
@@ -176,7 +167,9 @@ def build_fb_outlet_pass_step(
         if pid in (passer_id, receiver_id) or pid not in start_coords:
             continue
         player = _player_lookup_by_id(off_lineup, def_lineup, pid)
-        rate = _ag_grid_per_game_sec(player, arch) if player else 12.0
+        # mover_targets mixes both lineups; def_lineup membership is the test.
+        rate = (defender_movement_rate(player, arch, _is_defender_id(pid, def_lineup))
+                if player else 12.0)
         end_coords[pid] = _interrupted_coord(start_coords[pid], target, rate, t)
         destinations[pid] = {"x": float(target["x"]), "y": float(target["y"])}
         actions[pid] = action
@@ -238,6 +231,7 @@ def build_fb_outlet_pass_step(
             result={"current_turn": "FAST_BREAK"},
         )
     except Exception as e:
+        reraise_if_strict(e)
         logging.warning(
             "🐛 [FB_OUTLET_PASS_STEPSTATE] projection failed passer_id=%s "
             "receiver_id=%s: %s",
@@ -249,6 +243,7 @@ def build_fb_outlet_pass_step(
         from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity
 
         enforce_step_start_continuity([step] if step else None, context="fb_outlet_pass")
-    except Exception:
+    except Exception as e:
+        reraise_if_strict(e)
         logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
     return step
