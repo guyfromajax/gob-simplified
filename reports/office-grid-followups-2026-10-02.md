@@ -1,6 +1,6 @@
 # polish/office-grid-followups — 2026-10-02
 
-Branch `polish/office-grid-followups` off `origin/develop` @ `f5bc9b66f` (after `polish/office-followups` and `polish/player-dev-grid` merged). Worktree `~/gob-office-grid-followups`. `origin/develop` did not move during the task (still `f5bc9b66f`), so there was nothing to merge; the gates are on `ebfbe43d0` = develop + this change. Ready for review.
+Branch `polish/office-grid-followups` off `origin/develop` @ `f5bc9b66f` (after `polish/office-followups` and `polish/player-dev-grid` merged). Worktree `~/gob-office-grid-followups`. `origin/develop` moved to `de38092ae` (feature/all-conference) as the first gate run finished; merged as `8da67c035` with no conflict and none of this branch's files touched. The gates below are on `8da67c035` (the first run on `ebfbe43d0` had pytest 4454 passed and Playwright 1188 passed / 43 skipped / 0 failed). Ready for review.
 
 ## Items
 
@@ -62,15 +62,15 @@ Fail-on-old-code run: the three specs against `f5bc9b66f`'s four product files: 
 
 The specs also rewrite their own shots under `reports/player-dev-grid/`, `reports/office-week-1/` and `reports/office-followups/`; those are not committed here.
 
-## Gates (tree `ebfbe43d0` = `origin/develop` @ `f5bc9b66f` + the change)
+## Gates (merged tree `8da67c035` = this branch + `origin/develop` @ `de38092ae`)
 
 | Gate | Result |
 |---|---|
-| `pytest --ignore=tests/e2e -q` | 4454 passed, 14 skipped, 108 xfailed, 2 xpassed, 0 failed (both XPASS pre-existing; `known_failures.py` not edited) |
+| `pytest --ignore=tests/e2e -q` | 4474 passed, 14 skipped, 108 xfailed, 2 xpassed, 0 failed (both XPASS pre-existing; `known_failures.py` not edited) |
 | `check_ui_tokens.py --strict --no-write` | exit 0 |
 | `check_migration_gates.py` | passed (Gate A 0, Gate B 133 lines / 43 files) |
 | `franchise-command-center.css` | 1779 lines, unchanged |
 | Specs touching the grid or the Office (41 files) | 448 passed, 15 skipped, 0 failed |
-| Full Playwright (one run under the lock, 1 worker) | 1188 passed, 43 skipped, 0 failed (lock held 19:42–20:04) |
+| Full Playwright (one run on the merged tree under the lock, 1 worker) | 1192 passed, 44 skipped, 0 failed (lock held 20:05–20:36) |
 
-**Full suite: pytest 4454 passed, 14 skipped, 108 xfailed, 2 xpassed, 0 failed · Playwright 1188 passed, 43 skipped, 0 failed.**
+**Full suite: pytest 4474 passed, 14 skipped, 108 xfailed, 2 xpassed, 0 failed · Playwright 1192 passed, 44 skipped, 0 failed.**
