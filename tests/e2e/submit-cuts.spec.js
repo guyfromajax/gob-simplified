@@ -248,6 +248,20 @@ test.describe('week-1 practice-squad assignment', () => {
     await page.locator('#submit-btn').click();
     await expect(page.locator('#cut-modal-backdrop.is-visible')).toBeVisible();
     await expect(page.locator('#cut-modal-title')).toHaveText('Confirm Practice Squad');
+    // The title and the two buttons, no body copy.
+    await expect(page.locator('#cut-modal-message')).toBeHidden();
+    await expect(page.locator('#cut-modal-message')).toHaveText('');
+    await expect(page.locator('#cut-modal-actions button')).toHaveText(['Cancel', 'Confirm']);
+    expect((await page.locator('#cut-modal-backdrop .gob-modal-box').innerText()).split('\n').map((s) => s.trim()).filter(Boolean))
+      .toEqual(['Confirm Practice Squad', 'Cancel', 'Confirm']);
+    if (process.env.V3_SHOTS === '1') {
+      const v3 = path.join(__dirname, '../../reports/v3-pages');
+      fs.mkdirSync(v3, { recursive: true });
+      await page.screenshot({ path: path.join(v3, 'after-confirm-practice-squad-1280.png') });
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await page.screenshot({ path: path.join(v3, 'after-confirm-practice-squad-1920.png') });
+      await page.setViewportSize({ width: 1280, height: 720 });
+    }
     const stack = await page.evaluate(() => {
       const overlay = document.getElementById('cut-modal-backdrop');
       const r = overlay.getBoundingClientRect();

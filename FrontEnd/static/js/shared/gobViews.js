@@ -367,7 +367,7 @@
   };
   // `story` is a drill key like the rest: a link out of a story (to a team) must not
   // carry the story along, and Back still returns to the story's own entry.
-  var DRILL_KEYS = ['player_id', 'view_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
+  var DRILL_KEYS = ['player_id', 'view_team_id', 'ps_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
     'return_url', 'origin', 'return_tab', 'id', 'story'];
 
   function originFor(returnTab) {
@@ -388,12 +388,19 @@
     var incoming = url.searchParams;
     var path = url.pathname;
     if (/\/team-roster-view\.html$/i.test(path)) {
-      if (incoming.get('mode') === 'practice_squad' && incoming.get('ps_team_id')) return '';
-      var viewed = incoming.get('roster_team_id') || '';
-      if (!viewed) return '';
-      incoming.set('tab', 'team-view');
-      incoming.set('view_team_id', viewed);
-      if (!incoming.get('origin')) incoming.set('origin', originFor(incoming.get('return_tab') || ''));
+      if (incoming.get('mode') === 'practice_squad' && incoming.get('ps_team_id')) {
+        // A practice squad opens on the standard team page, under League.
+        incoming.set('tab', 'team-view');
+        incoming.set('origin', 'league');
+        incoming.set('return_tab', 'practice-squad-view');
+        incoming.delete('mode');
+      } else {
+        var viewed = incoming.get('roster_team_id') || '';
+        if (!viewed) return '';
+        incoming.set('tab', 'team-view');
+        incoming.set('view_team_id', viewed);
+        if (!incoming.get('origin')) incoming.set('origin', originFor(incoming.get('return_tab') || ''));
+      }
       incoming.delete('roster_team_id');
       incoming.delete('team_name');
     } else if (/\/player-detail\.html$/i.test(path)) {

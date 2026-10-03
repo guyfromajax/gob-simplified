@@ -461,7 +461,7 @@ def test_sim_modules_never_mention_trophies():
         assert "trophies" not in src and "trophy" not in src
 
 
-def test_honour_entries_carry_the_position_when_the_pick_has_one(store, owner):
+def test_honor_entries_carry_the_position_when_the_pick_has_one(store, owner):
     doc, user_tid, _cpu = _seed(store, owner)
     doc["awards"] = {
         "all_american_teams": {

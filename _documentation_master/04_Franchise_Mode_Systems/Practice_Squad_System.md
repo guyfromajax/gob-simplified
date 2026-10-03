@@ -184,7 +184,10 @@ walk-on fill = 15, then Training Camp re-trims to 12 + 3.
 - **Team roster page** (`team-roster-view.html` / `.js`) — **Starting 5** image cards at the
   top (shared `renderProjectedStartingFiveCards`; franchise, base/tutorial, and Practice
   Squad team pages; not tournament). Same "Training Squad" section below the roster.
-- **Practice Squad team pages** (`GET /franchise/practice-squad/team`) also return
+- **Practice Squad team pages** are the standard team page (`tab=team-view&ps_team_id=…`,
+  `teamView.js`), not `team-roster-view.html`: the route's `page` block and player rows are in
+  that page's shapes, and the projected five are its Starters. The route
+  (`GET /franchise/practice-squad/team`) also returns
   `projected_starting_five` enriched from `ps_season_stats`. The PS portrait contract carries
   `portrait_source` plus `image_id`: unsigned FRD recruits use their white recruit master,
   while FPD players use the normal player master. Both retry the existing lazy-paint endpoint

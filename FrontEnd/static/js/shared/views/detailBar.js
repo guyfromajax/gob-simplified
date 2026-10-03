@@ -15,7 +15,8 @@ var PAGES = {
   'rankings-view': 'Rankings',
   'team-stats-view': 'Team Stats',
   'home-tab': 'Office',
-  'coaches-tab': 'Scouting Report'
+  'coaches-tab': 'Scouting Report',
+  'practice-squad-view': 'Practice Squads'
 };
 
 var CHEV_L = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5.5L8 12l6.5 6.5"/></svg>';
@@ -85,7 +86,7 @@ export function fallbackUrl() {
   var tab = q.get('return_tab') || (q.get('origin') === 'league' ? 'standings-view' : 'roster-view');
   if (tab === 'player-view' || tab === 'team-view') tab = 'roster-view';
   q.set('tab', tab);
-  ['player_id', 'view_team_id', 'pager', 'up', 'return_url', 'origin', 'return_tab', 'roster_team_id'].forEach(function (key) {
+  ['player_id', 'view_team_id', 'ps_team_id', 'pager', 'up', 'return_url', 'origin', 'return_tab', 'roster_team_id'].forEach(function (key) {
     q.delete(key);
   });
   var text = q.toString();
