@@ -124,8 +124,8 @@ function busy() {
     { title: 'Concerning Regression', body: 'AG' },
     { title: 'Strongest Offensive Plays', body: '4-1 Motion, Horns Flare, 5-0 Flex' },
     { title: 'Strongest Defensive Set', body: '2-3 Zone' },
-    { title: 'Fast Break Readiness', body: 'Strong' },
-    { title: 'Press/Trap Readiness', body: 'Weak' },
+    { title: 'Fast Break Readiness', body: 'Strong', value: 12 },
+    { title: 'Press/Trap Readiness', body: 'Weak', value: -14 },
     { title: 'Player Energy Levels', body: 'No Significant Updates' },
   ];
   return report;
@@ -145,8 +145,8 @@ function quiet() {
     { title: 'Concerning Regression', body: 'No Significant Updates' },
     { title: 'Strongest Offensive Plays', body: '4-1 Motion' },
     { title: 'Strongest Defensive Set', body: 'Man-to-Man' },
-    { title: 'Fast Break Readiness', body: 'Neutral' },
-    { title: 'Press/Trap Readiness', body: 'Neutral' },
+    { title: 'Fast Break Readiness', body: 'Neutral', value: 0 },
+    { title: 'Press/Trap Readiness', body: 'Neutral', value: -9 },
     { title: 'Player Energy Levels', body: 'No Significant Updates' },
   ];
   return report;
@@ -182,8 +182,8 @@ function camp() {
     { title: 'Concerning Progression', body: 'FT' },
     { title: 'Strongest Offensive Plays', body: 'Horns Flare, Double Drag' },
     { title: 'Strongest Defensive Set', body: '2-3 Zone, Man-to-Man' },
-    { title: 'Fast Break Readiness', body: 'Very Strong' },
-    { title: 'Press/Trap Readiness', body: 'Neutral' },
+    { title: 'Fast Break Readiness', body: 'Very Strong', value: 24 },
+    { title: 'Press/Trap Readiness', body: 'Neutral', value: 3 },
     { title: 'Player Energy Levels', body: p[5].name + ' and ' + p[9].name + ' came out of camp with heavy legs.' },
   ];
   return report;

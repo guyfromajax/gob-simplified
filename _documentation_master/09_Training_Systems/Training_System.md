@@ -163,7 +163,7 @@ While training runs, `PageLoadOverlay` uses its separate `newswire` variant to r
   - Defense (Defense Install slider)
   - Presses / Traps (P/T Defense Install, P/T Offense Install sliders)
 - **Bottom of Team Drills Section:**
-  - Playbook training mode (**franchise**): toggle between **Current Playbooks** (default) and **Custom Playbook** (opens `training-playbooks.html` to choose plays/defenses for install CMD only). Tournament/single-game pages that still expose playbook mode may use the historical `playbook_training_mode` values from the API.
+  - Playbook training mode (**franchise**): toggle between **Current Playbooks** (default) and **Custom Playbook** (opens `training-playbooks.html` to choose plays/defenses for install CMD only). The choice is a **saved setting** on the franchise (`training_playbook_choice`: `{mode: "custom", focus: {offense: [...], defense: [...]}}`, absent = Current Playbooks): a Custom Playbook and its plays stay the default for every later training, camp and next season included, until the user switches back. Saved by `PATCH /franchise/training-playbook-choice`, returned on `GET /franchise/training-points`; saving it never runs training. Tournament/single-game pages that still expose playbook mode may use the historical `playbook_training_mode` values from the API.
 
 **General Section (Full Width):**
 - Four sliders in a 4-column grid:
@@ -740,8 +740,7 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
   - Strong Cumulative Increase / Concerning Progression or Regression
   - Strongest Offensive Plays
   - Strongest Defensive Set
-  - Fast Break Readiness
-  - Press/Trap Readiness
+  - Fast Break Readiness (`fb_efficiency` + `fb_opp_modifier`) and Press/Trap Readiness (`pt_efficiency` + `pt_opp_modifier`): `body` is the band word, `value` the combined whole number (−40…40) read after training. Bands (`READINESS_BANDS`): Awful −40…−30, Very Weak −29…−20, Weak −19…−10, Neutral −9…9, Strong 10…19, Very Strong 20…29, Elite 30…40. The report draws `value` as bars out of six (row labels "Fast Break", "Press/Traps").
   - Player Energy Levels
 - Legacy flat NG-reduction notes are still generated inside training execution, then folded into the structured **Player Energy Levels** section
 - **Play identity in notes:** notes that reference offensive plays display the play **`name`** (user-facing string); any underlying matching/ranking may use `play_id`, but note text stays display-name based. Notes are a reporting/output layer, not a persistence-identity layer. (`training_notes.py` keys `plays_data` by name.)
