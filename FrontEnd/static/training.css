@@ -2526,7 +2526,9 @@ html.gob-shell body.training-no-allocation .pg-tools:has(#requirements-bar) #aut
 }
 
 /* Weekly focus host: same tokenised tools as the old in-app pg-tools row.
-   The FCC tab still hides .training-header (tools park in the sub-tab row). */
+   The FCC tab still hides .training-header (tools park in the sub-tab row).
+   The top padding keeps the buttons off the top strip's edge (the Training Report's
+   header leaves the same space). */
 html.gob-focus #training-view .training-header {
   grid-column: 1 / -1;
   display: grid;
@@ -2534,7 +2536,7 @@ html.gob-focus #training-view .training-header {
   align-items: center;
   gap: var(--space-12);
   margin: 0 0 var(--dsp-16);
-  padding: 0 0 var(--dsp-16);
+  padding: var(--space-10) 0 var(--dsp-16);
   border: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 0;
