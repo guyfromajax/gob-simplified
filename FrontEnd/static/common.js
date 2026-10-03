@@ -1046,6 +1046,62 @@ function teamLogoArtKind(teamNameOrSlug) {
 }
 
 /**
+ * A practice squad is not a program: it has no art, and it must never borrow another
+ * team's. Its mark is generated: the Region letter in a square, the tier name under it
+ * when the square is large enough to read (the CSS decides: `.gob-squad-mark`).
+ *
+ * `practiceSquadOf(name)` reads the squad's display name ("Region A All-Americans"), so
+ * the tier is whatever the data calls it. Returns { region, tier } or null.
+ */
+function practiceSquadOf(teamName) {
+  var match = /^Region ([A-Z]) (\S.*)$/.exec(String(teamName == null ? '' : teamName).trim());
+  if (match) return { region: match[1], tier: match[2] };
+  // A bare squad id ("ps_A_1") names the region; the tier's name is not in an id.
+  var byId = /^ps_([A-Za-z])_\d+$/.exec(String(teamName == null ? '' : teamName).trim());
+  return byId ? { region: byId[1].toUpperCase(), tier: '' } : null;
+}
+
+function _squadEsc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** The one squad mark, as markup. Every surface that can draw markup uses this. */
+function practiceSquadMarkHtml(teamName) {
+  var squad = practiceSquadOf(teamName);
+  if (!squad) return '';
+  return '<span class="gob-squad-mark" role="img" aria-label="' + _squadEsc(teamName) + '">'
+    + '<b>' + _squadEsc(squad.region) + '</b>'
+    + (squad.tier ? '<i>' + _squadEsc(squad.tier) + '</i>' : '')
+    + '</span>';
+}
+
+/**
+ * The same mark for a surface that can only take an image URL: the letter alone (an
+ * image cannot know how large it is drawn), in the page's own token colours.
+ */
+function practiceSquadMarkDataUrl(teamName) {
+  var squad = practiceSquadOf(teamName);
+  if (!squad) return '';
+  var fill = 'Canvas';
+  var ink = 'CanvasText';
+  try {
+    var host = document.querySelector('.gob') || document.documentElement;
+    var style = getComputedStyle(host);
+    fill = (style.getPropertyValue('--surface-2') || '').trim() || fill;
+    ink = (style.getPropertyValue('--text-100') || '').trim() || ink;
+  } catch (err) { /* system colours */ }
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    + '<rect width="64" height="64" rx="8" fill="' + _squadEsc(fill) + '"/>'
+    + '<text x="32" y="33" text-anchor="middle" dominant-baseline="central" font-family="sans-serif"'
+    + ' font-weight="700" font-size="40" fill="' + _squadEsc(ink) + '">' + _squadEsc(squad.region) + '</text></svg>';
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/** A practice squad has no banner or background either: nothing, never the generic art. */
+var _SQUAD_NO_IMAGE = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+/**
  * Filesystem team asset path (core programs). Used as the no-op pass-through.
  * Unknown / custom slugs fall back to generic art (§1: never broken).
  */
@@ -1089,6 +1145,11 @@ function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
  * @param {object} [visualOverride] - optional overlay (e.g. mode-select multi-slot cards)
  */
 function getTeamAssetPath(teamNameOrSlug, assetKey, visualOverride) {
+  // A practice squad: its own generated mark, or no image. Never a program's art. This
+  // is the one gate every logo and banner lookup goes through.
+  if (assetKey !== 'court' && practiceSquadOf(teamNameOrSlug)) {
+    return assetKey === 'logo_square' ? practiceSquadMarkDataUrl(teamNameOrSlug) : _SQUAD_NO_IMAGE;
+  }
   // Prefer total chrome snapshot when ready — overlay entry drives generated art
   // with the display label (agreement with .team-name / Sim Exp).
   if (!visualOverride && _tbChromeSnapshotByKey && teamNameOrSlug) {

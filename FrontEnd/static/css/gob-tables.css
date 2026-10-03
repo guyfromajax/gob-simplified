@@ -301,6 +301,49 @@ a.gob-team.gob-player {
   letter-spacing: 0;
 }
 
+/* A practice squad's mark: the Region letter in a square, generated (common.js
+   `practiceSquadMarkHtml`). The tier name sits under the letter only when the square is
+   large enough to read it (40px and up: the team page banner); a small mark is the
+   letter alone, beside the squad's full name. Tokens only. */
+.gob-squad-mark {
+  container-type: size;
+  box-sizing: border-box;
+  display: inline-grid;
+  place-content: center;
+  justify-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 3px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text-100);
+  vertical-align: middle;
+}
+.gob-squad-mark b {
+  font: var(--fw-bold) 66cqh/1 var(--font-display);
+  letter-spacing: 0;
+}
+.gob-squad-mark i { display: none; }
+@container (min-width: 40px) {
+  .gob-squad-mark b { font-size: 56cqh; line-height: 0.9; }
+  .gob-squad-mark i {
+    display: block;
+    max-width: 92cqw;
+    margin-top: 3cqh;
+    overflow: hidden;
+    white-space: nowrap;
+    /* The condensed display face: "All-Americans", the longest tier, fits the square. */
+    font: var(--fw-bold) 13cqh/1 var(--font-display);
+    font-style: normal;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-60);
+  }
+}
+.gob-hero-logo .gob-squad-mark { width: 72px; height: 72px; border-radius: 8px; }
+
 .gob-diff {
   display: inline-flex;
   align-items: center;

@@ -65,6 +65,11 @@
   }
 
   function markHtml(name, color) {
+    // A practice squad: its generated mark (common.js), never an image of a program.
+    if (typeof global.practiceSquadMarkHtml === 'function') {
+      var squad = global.practiceSquadMarkHtml(name);
+      if (squad) return squad;
+    }
     var src = logo(name);
     if (!src) return monogram(name, color);
     return '<img alt="" src="' + esc(src) + '" data-letter="' + esc(letterOf(name))

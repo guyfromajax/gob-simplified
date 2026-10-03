@@ -776,6 +776,9 @@ function renderHeader() {
       : '/images/teams/general/general_banner_primary.jpg';
   }
 
+  // A practice squad game has no program's banner behind it: the plain scoreboard surface.
+  if (urlParams.get('mode') === 'practice_squad') bannerUrl = '';
+
   const header = document.getElementById('box-score-header');
   if (header && bannerUrl) {
     header.style.backgroundImage = `

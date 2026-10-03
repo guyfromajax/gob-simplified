@@ -324,7 +324,10 @@ def test_team_route_sends_the_page_and_roster_rows_the_team_page_reads(kind, tmp
     ]
     signed, recruit = body["players"]
     # The roster grid's fields, and the season line in the Player Stats shape.
-    assert (signed["rt"], signed["position"], signed["source"]) == (70, "SF", "fpd")
+    slots = {str(row["player_id"]): row["position"] for row in body["projected_starting_five"]}
+    assert (signed["rt"], signed["source"]) == (70, "fpd")
+    # A starter reads at the slot he starts at; anyone else at his best position.
+    assert signed["position"] == slots.get("p-1", "SF")
     # The projected five are the page's Starters, in slot order.
     five = [str(row["player_id"]) for row in body["projected_starting_five"]]
     assert five and all(p["starter"] == (p["player_id"] in five) for p in body["players"])
@@ -333,7 +336,75 @@ def test_team_route_sends_the_page_and_roster_rows_the_team_page_reads(kind, tmp
     ]
     assert signed["totals"]["GP"] == 2 and signed["per_game"]["PTS"] == 15
     assert signed["rates"]["fg_pct"] == 50
-    assert (recruit["rt"], recruit["position"], recruit["source"]) == (66, "PG", "frd")
+    assert (recruit["rt"], recruit["source"]) == (66, "frd")
+    assert recruit["position"] == slots.get("r-1", "PG")
     assert recruit["totals"]["GP"] == 0 and recruit["per_game"]["PTS"] is None
     # The keys the old page read are still there.
     assert set(body) >= {"team", "players", "projected_starting_five", "page"}
+
+
+@pytest.mark.parametrize("kind", ["mongo", "sqlite"])
+def test_team_route_starters_are_the_full_five_whatever_the_season_fouls(kind, tmp_path, monkeypatch):
+    """Season fouls are not fouls in a game: the projected five is five, PG to C.
+
+    The selector reads a flat ``stats`` dict as the current game's line, so a squad whose
+    players had five or more SEASON fouls came back with two or three starters.
+    """
+    if kind == "mongo":
+        env = _mongomock_env(tmp_path)
+    else:
+        env = _mongomock_env(
+            tmp_path,
+            GOB_PERSISTENCE="sqlite",
+            GOB_SQLITE_PATH=str(tmp_path / "ps-five.sqlite"),
+        )
+    store = create_store(env)
+    franchise_id = _seed(store)
+    fid = str(franchise_id)
+    ps = store.franchises_collection.find_one({"_id": franchise_id})["practice_squad"]
+    ps["ps_season_stats_backfilled"] = True
+    ids = [f"p-{n:02d}" for n in range(12)]
+    ps["teams"]["ps_C_1"] = {
+        "display_name": "Region C All-Americans", "tier": 1, "region": "C",
+        "roster": [{"player_id": pid, "source": "fpd", "name": f"Player {pid}"} for pid in ids],
+    }
+    store.franchises_collection.update_one({"_id": franchise_id}, {"$set": {"practice_squad": ps}})
+    positions = ["PG", "SG", "SF", "PF", "C"]
+    for n, pid in enumerate(ids):
+        ratings = {pos: 40 for pos in positions}
+        ratings[positions[n % 5]] = 80 - n
+        store.franchise_players_data_collection.insert_one({
+            "franchise_id": fid, "player_id": pid,
+            "meta": {"first_name": "Player", "last_name": pid, "year": 1, "height": 76, "weight": 190},
+            "position_ratings": ratings,
+            "attributes": {"SC": 50, "NG": 1.0},
+            # Ten of the twelve have fouled out of a GAME's worth of fouls over the season.
+            "ps_season_stats": {"GP": 6, "PTS": 60, "F": 3 if n in (5, 11) else 9 + n},
+        })
+
+    import BackEnd.api.franchise_routes as routes
+    import BackEnd.utils.ownership as ownership
+
+    monkeypatch.setattr(routes, "db", store.db)
+    monkeypatch.setattr(ownership, "franchises_collection", store.franchises_collection)
+    monkeypatch.setattr(routes, "franchise_players_data_collection", store.franchise_players_data_collection)
+    monkeypatch.setattr(routes, "franchise_recruits_data_collection", store.franchise_recruits_data_collection)
+    monkeypatch.setattr(routes, "_format_team_name_map", lambda **_kwargs: {})
+
+    body = routes.get_practice_squad_team(fid, ps_team_id="ps_C_1", user={"user_id": "coach-1"})
+    five = body["projected_starting_five"]
+    assert [row["position"] for row in five] == positions
+    # The best player at each position, fouls or no fouls.
+    assert [row["player_id"] for row in five] == ids[:5]
+    starters = [p for p in body["players"] if p["starter"]]
+    bench = [p for p in body["players"] if not p["starter"]]
+    assert len(body["players"]) == 12 and len(starters) == 5 and len(bench) == 7
+    assert sorted(starters, key=lambda p: p["lineup_order"]) == [
+        next(p for p in body["players"] if p["player_id"] == pid) for pid in ids[:5]
+    ]
+    assert [p["lineup_order"] for p in sorted(starters, key=lambda p: p["lineup_order"])] == [0, 1, 2, 3, 4]
+    # A starter reads at the position he starts at.
+    assert [p["position"] for p in sorted(starters, key=lambda p: p["lineup_order"])] == positions
+    assert all(p["lineup_order"] is None for p in bench)
+    # The season line itself is still sent, untouched.
+    assert body["players"][0]["stats"]["F"] == 9 and body["players"][0]["totals"]["GP"] == 6
