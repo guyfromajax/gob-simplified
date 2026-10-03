@@ -224,6 +224,7 @@ export function mount(container, ctx) {
         lineup: !rosterSort.key,
         userTeam: userTeam,
         dev: userTeam,
+        program: isSquad(),
         playerHref: playerHref
       });
     }
@@ -239,6 +240,7 @@ export function mount(container, ctx) {
       basis: 'per_game',
       sortKey: statsSort.key,
       sortDir: statsSort.dir,
+      program: isSquad(),
       playerHref: statsPlayerHref
     });
   }

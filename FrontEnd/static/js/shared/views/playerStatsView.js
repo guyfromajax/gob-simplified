@@ -137,6 +137,8 @@ export function statsTableHtml(tables, rows, options) {
     if (col.key === 'name') {
       var name = row.name || 'Player';
       var sub = subline(row);
+      // A practice squad's signed player: his own program closes the line.
+      if (opts.program && row.parent_team_name) sub = (sub ? sub + ' · ' : '') + row.parent_team_name;
       return '<a class="gob-team gob-player" href="' + tables.esc(hrefFor(row.player_id)) + '">'
         + '<span class="av">' + portraitHtml(tables, row) + '</span>'
         + '<span class="gob-id"><span>' + tables.esc(name) + '</span>'

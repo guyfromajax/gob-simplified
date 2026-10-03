@@ -669,6 +669,25 @@ button.gob-dt-up:focus-visible {
   display: block;
 }
 
+/* A practice squad's roster: name over the player's own program. One block height with
+   or without the second line (the avatar's), so every row is the same height. */
+.gob-roster.has-program .gob-id {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 28px;
+  min-width: 0;
+  line-height: 1;
+  text-align: left;
+}
+.gob-roster.has-program .gob-id > span:first-child { line-height: 14px; }
+.gob-roster.has-program .gob-id .sub {
+  color: var(--text-60);
+  font-size: var(--fs-11);
+  line-height: 12px;
+  font-weight: 500;
+}
+
 .gob-roster .rtl {
   display: inline-flex;
   align-items: baseline;

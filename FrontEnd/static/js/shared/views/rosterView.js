@@ -205,7 +205,11 @@ export function rosterTableHtml(tables, rows, options) {
   var span = dev ? 19 : 18;
   var hrefFor = opts.playerHref || function () { return '#'; };
   // `gob-pairs`: the six attribute pairs share one gutter rule (Styleguide › Tables).
-  var html = '<div class="gob-xs gob-roster gob-pairs"><table class="gob-tbl"><thead>';
+  // `program`: a practice squad is drawn from several programs, so a signed player's own
+  // sits on a quiet second line under his name. The name block has one height with or
+  // without it, so every row stays the same.
+  var program = !!opts.program;
+  var html = '<div class="gob-xs gob-roster gob-pairs' + (program ? ' has-program' : '') + '"><table class="gob-tbl"><thead>';
   html += '<tr class="gob-groups"><th colspan="6"></th>';
   GROUPS.forEach(function (group) {
     html += '<th class="gob-g' + (group.shade ? ' gshade' : '') + '" colspan="2">' + tables.esc(group.name) + '</th>';
@@ -226,8 +230,14 @@ export function rosterTableHtml(tables, rows, options) {
       seenBench = true;
     }
     html += '<tr>';
+    var nameHtml = '<span>' + tables.esc(displayName(player)) + '</span>';
+    if (program) {
+      nameHtml = '<span class="gob-id">' + nameHtml
+        + (player.parent_team_name ? '<span class="sub">' + tables.esc(player.parent_team_name) + '</span>' : '')
+        + '</span>';
+    }
     html += '<td class="pin team"><a class="gob-team gob-player" href="' + tables.esc(hrefFor(player)) + '">'
-      + '<span class="av">' + portraitHtml(tables, player) + '</span><span>' + tables.esc(displayName(player)) + '</span></a></td>';
+      + '<span class="av">' + portraitHtml(tables, player) + '</span>' + nameHtml + '</a></td>';
     html += '<td class="rt' + (sortKey === 'rt' ? ' on' : '') + '">' + rtHtml(tables, player) + '</td>';
     html += '<td class="code' + (sortKey === 'pos' ? ' on' : '') + '">' + tables.esc(player.position || '') + '</td>';
     html += '<td class="code' + (sortKey === 'yr' ? ' on' : '') + '">' + tables.esc(player.year || '') + '</td>';

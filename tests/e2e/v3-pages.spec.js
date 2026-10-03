@@ -104,7 +104,11 @@ function squadBody(kind) {
     players: [
       squadPlayer('p-ps-1', 'Casey Lane', 'fpd', 'Lancaster', played ? 6 : 0),
       squadPlayer('r-ps-2', 'Drew Park', 'frd', null, played ? 6 : 0),
-    ],
+    ].concat(kind !== 'programs' ? [] : [
+      // The longest program name in the league, under a long player name.
+      squadPlayer('p-ps-3', 'Maximilian Featherstonehaugh', 'fpd', 'San Bernardino Valley State', 6),
+      squadPlayer('r-ps-4', 'Al Wu', 'frd', null, 6),
+    ]),
     projected_starting_five: [],
     page: {
       team_id: SQUAD, name: 'Region C Varsity', practice_squad: true, tier: 3, tier_label: 'Varsity', region: 'C',
@@ -306,7 +310,7 @@ test('Practice squad: opens on the standard team page, with only what a squad ha
       modes: text('.gob-team-mode button'),
       heads: text('.gob-team-roster-body thead tr:not(.gob-groups) th'),
       separators: text('.gob-team-roster-body tr.gob-sep'),
-      players: text('.gob-team-roster-body a.gob-player > span:last-child'),
+      players: text('.gob-team-roster-body a.gob-player .gob-id > span:first-child'),
       crumb: text('.gob-dt-crumb')[0],
       up: text('.gob-dt-up')[0],
       rail: [...document.querySelectorAll('.rail [data-gob-section].active, .rail [data-gob-section][aria-current]')].map((el) => el.getAttribute('data-gob-section')),
@@ -419,4 +423,112 @@ test('a varsity team page is unchanged: four hero stats, both cards, lineup orde
   await expect(page.locator('#team-view .gob-hero .gob-hs span')).toHaveText(['Record', 'National', 'Conference', 'Streak']);
   await expect(page.locator('#team-view .gob-card-head h2')).toHaveCount(2);
   await expect(page.locator('#team-view .gob-team-mode button')).toHaveText(['Attributes', 'Stats']);
+});
+
+// ── The parent program under a signed player's name (v3 pages 2) ─────────────────
+const SHOTS2 = process.env.V32_SHOTS === '1';
+const OUT2 = path.join(__dirname, '../../reports/v3-pages-2');
+
+async function shot2(page, name) {
+  if (!SHOTS2) return;
+  fs.mkdirSync(OUT2, { recursive: true });
+  await page.mouse.move(700, 4);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(OUT2, name), animations: 'disabled' });
+}
+
+function readNameCells(page) {
+  return page.evaluate(() => {
+    const body = document.querySelector('#team-view .gob-team-roster-body');
+    const rows = [...body.querySelectorAll('tbody tr')].filter((tr) => tr.querySelector('a.gob-player'));
+    return {
+      marked: !!body.querySelector('.gob-roster.has-program'),
+      rows: rows.map((tr) => {
+        const link = tr.querySelector('a.gob-player');
+        const id = link.querySelector('.gob-id');
+        const name = id ? id.querySelector(':scope > span:first-child') : link.querySelector(':scope > span:last-child');
+        const line = id ? id.querySelector('.sub') : null;
+        const cell = link.closest('td').getBoundingClientRect();
+        const fits = (el) => !el || (el.scrollWidth <= el.clientWidth && el.getBoundingClientRect().right <= cell.right + 0.5);
+        const style = line ? getComputedStyle(line) : null;
+        return {
+          name: name.textContent,
+          line: line ? line.textContent : null,
+          height: Math.round(tr.getBoundingClientRect().height * 10) / 10,
+          fits: fits(name) && fits(line),
+          below: line ? line.getBoundingClientRect().top >= name.getBoundingClientRect().bottom - 1 : null,
+          quiet: style ? style.color !== getComputedStyle(name).color && parseFloat(style.fontSize) < parseFloat(getComputedStyle(name).fontSize) : null,
+        };
+      }),
+    };
+  });
+}
+
+for (const [width, height] of SIZES.slice(0, 2)) {
+  test('Practice squad roster: the parent program under a signed player\'s name at ' + width, async ({ page }) => {
+    await install(page, { squad: 'programs', squadReads: [] });
+    await open(page, 'tab=team-view&ps_team_id=' + SQUAD + '&origin=league&return_tab=practice-squad-view', width, height);
+    await expect(page.locator('#team-view .gob-team-roster-body a.gob-player')).toHaveCount(4);
+
+    // Attributes: the program is the second line; a recruit has none.
+    const attrs = await readNameCells(page);
+    const byName = (seen) => Object.fromEntries(seen.rows.map((row) => [row.name, row]));
+    expect(attrs.marked).toBe(true);
+    expect(byName(attrs)['Casey Lane'].line).toBe('Lancaster');
+    expect(byName(attrs)['Maximilian Featherstonehaugh'].line).toBe('San Bernardino Valley State');
+    expect(byName(attrs)['Drew Park'].line).toBeNull();
+    expect(byName(attrs)['Al Wu'].line).toBeNull();
+    attrs.rows.forEach((row) => {
+      const note = JSON.stringify(row);
+      expect(row.fits, note).toBe(true);
+      if (row.line) {
+        expect(row.below, note).toBe(true);
+        expect(row.quiet, note).toBe(true);
+      }
+    });
+    // One row height, with or without the second line.
+    expect(new Set(attrs.rows.map((row) => row.height)).size, JSON.stringify(attrs.rows.map((r) => r.height))).toBe(1);
+    await shot2(page, 'after-squad-roster-attributes-' + width + '.png');
+
+    // Stats: the program closes the line that already carries position and year.
+    await page.locator('#team-view .gob-team-mode button', { hasText: 'Stats' }).click();
+    await expect(page.locator('#team-view .gob-team-roster-body .gob-pstats')).toHaveCount(1);
+    const stats = await readNameCells(page);
+    expect(byName(stats)['Casey Lane'].line).toBe('SF · FR · Lancaster');
+    expect(byName(stats)['Maximilian Featherstonehaugh'].line).toBe('SF · FR · San Bernardino Valley State');
+    expect(byName(stats)['Drew Park'].line).toBe('SF · FR');
+    expect(byName(stats)['Al Wu'].line).toBe('SF · FR');
+    stats.rows.forEach((row) => expect(row.fits, JSON.stringify(row)).toBe(true));
+    expect(new Set(stats.rows.map((row) => row.height)).size).toBe(1);
+    const overflow = await page.evaluate(() => {
+      const main = document.querySelector('html.gob-shell .main');
+      return main.scrollWidth - main.clientWidth;
+    });
+    expect(overflow).toBeLessThanOrEqual(0);
+    await shot2(page, 'after-squad-roster-stats-' + width + '.png');
+  });
+}
+
+test('a varsity roster has no program line, and its rows are the height a squad\'s are', async ({ page }) => {
+  const state = { squad: 'programs', squadReads: [] };
+  await install(page, state);
+  await page.route('**/roster/**', (route) => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ is_user_team: false, players: [
+      Object.assign(squadPlayer('v-1', 'Vern Wall', 'fpd', 'Lancaster', 6), { starter: false }),
+      Object.assign(squadPlayer('v-2', 'Perry Gray', 'fpd', null, 6), { starter: false }),
+    ] }),
+  }));
+  await open(page, 'tab=team-view&view_team_id=' + TID + '&origin=team', 1280, 720);
+  await expect(page.locator('#team-view .gob-team-roster-body a.gob-player')).toHaveCount(2);
+  const varsity = await readNameCells(page);
+  expect(varsity.marked).toBe(false);
+  expect(await page.locator('#team-view .gob-team-roster-body .gob-id').count()).toBe(0);
+  varsity.rows.forEach((row) => expect(row.line).toBeNull());
+  await shot2(page, 'after-varsity-roster-1280.png');
+
+  await open(page, 'tab=team-view&ps_team_id=' + SQUAD + '&origin=league&return_tab=practice-squad-view', 1280, 720);
+  await expect(page.locator('#team-view .gob-team-roster-body a.gob-player')).toHaveCount(4);
+  const squad = await readNameCells(page);
+  expect(squad.rows[0].height).toBe(varsity.rows[0].height);
 });
