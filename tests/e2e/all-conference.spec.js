@@ -21,7 +21,7 @@ const TID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const OTHER = 'bbbbbbbbbbbbbbbbbbbbbbbb';
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const LETTERS = 'ABCDEFGH';
-const OUT = path.join(__dirname, '../../reports/all-conference');
+const OUT = path.resolve(__dirname, process.env.AC_SHOTS_DIR || '../../reports/all-conference');
 const SHOTS = process.env.AC_SHOTS === '1';
 const USER_CONFERENCE = '6';
 
@@ -108,7 +108,7 @@ async function fulfillJson(route, body, status) {
   await route.fulfill({ status: status || 200, contentType: 'application/json', body: JSON.stringify(body) });
 }
 
-async function openAwards(page, body) {
+async function openAwards(page, body, center) {
   await stubAuth(page);
   await page.route('**/*', async (route) => {
     let pathname = '';
@@ -124,6 +124,7 @@ async function openAwards(page, body) {
     if (pathname === '/app-config') return fulfillJson(route, { isAlpha: false, alphaDisclaimer: null, version: '1.0' });
     if (pathname === '/teams') return fulfillJson(route, [{ name: 'Lancaster', display_name: 'Lancaster', object_id: TID, _id: TID }]);
     if (pathname.startsWith('/franchise/command-center/data')) {
+      if (center) return fulfillJson(route, center);
       return fulfillJson(route, {
         franchise_id: FID, team_id: TID, user_team_id: TID, team: 'Lancaster', week: 13, rank: 8,
         season: 1, current_season: 1, training_completed: true, session_type: 'in-season',
@@ -294,8 +295,15 @@ test('after shots from a real projection', async ({ page }) => {
   const dir = process.env.AC_AWARDS_DIR || '';
   test.skip(!dir || !SHOTS, 'AC_AWARDS_DIR + AC_SHOTS only');
   const body = JSON.parse(fs.readFileSync(path.join(dir, 'ac-projection.json'), 'utf8'));
-  await openAwards(page, body);
+  // The same save's command center, so the top strip's week and the block agree.
+  const centerPath = path.join(dir, 'ac-command-center.json');
+  const center = fs.existsSync(centerPath) ? JSON.parse(fs.readFileSync(centerPath, 'utf8')) : null;
+  await openAwards(page, body, center);
   const section = await readSection(page);
+  if (center) {
+    await expect(page.locator('#fcc-season-label')).toContainText('Week ' + center.week);
+    expect(section.status).toBe('After week ' + (Number(center.week) - 1));
+  }
   expect(section.buttons.filter((b) => b.on).map((b) => b.key)).toEqual([String(body.all_conference.conference)]);
   expect(section.text).not.toMatch(/Score|Bonus|weight|\brank\b/i);
   await shots(page, 'awards-all-conference-real');

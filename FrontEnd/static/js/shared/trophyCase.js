@@ -16,6 +16,15 @@
     milestone_first_bracket: { letter: 'B', label: 'First bracket' },
     milestone_first_archetype: { letter: 'A', label: 'First coach archetype' }
   };
+  // A player's honour, at team level: the entry carries the player (detail), the program
+  // and the season. Drawn like the milestones: neutral medal, nothing new in colour.
+  var HONOUR_KINDS = {
+    all_american_1: { letter: 'A', label: '1st Team All-American' },
+    all_american_2: { letter: 'A', label: '2nd Team All-American' },
+    all_american_3: { letter: 'A', label: '3rd Team All-American' },
+    all_conference_1: { letter: 'C', label: '1st Team All-Conference' },
+    all_conference_2: { letter: 'C', label: '2nd Team All-Conference' }
+  };
 
   var root = document.getElementById('trophy-case');
   var career = null;
@@ -112,6 +121,30 @@
     }).join('') + '</div>';
   }
 
+  /** Newest season first, then All-American before All-Conference, first team first. */
+  function honourOrder(a, b) {
+    var season = (Number(b.season) || 0) - (Number(a.season) || 0);
+    if (season) return season;
+    var kinds = Object.keys(HONOUR_KINDS);
+    return kinds.indexOf(a.kind) - kinds.indexOf(b.kind);
+  }
+
+  // Honours only when there are any: no empty state, no section head.
+  function honoursShelf(honours) {
+    if (!honours.length) return '';
+    var html = '<div class="sec"><div class="sec-h"><h3>Honours</h3><span>' + honours.length + '</span></div></div>'
+      + '<div class="shelf">';
+    html += honours.slice().sort(honourOrder).map(function (t) {
+      var spec = HONOUR_KINDS[t.kind];
+      var d = t.detail && typeof t.detail === 'object' ? t.detail : {};
+      var sub = [d.player_name, d.position, t.team_name, t.season != null ? 'Season ' + t.season : '']
+        .filter(Boolean).join(' · ');
+      return '<div class="tro sm hon"><span class="med ms">' + esc(spec.letter) + '</span>'
+        + '<div><b>' + esc(spec.label) + '</b>' + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</div></div>';
+    }).join('');
+    return html + '</div>';
+  }
+
   function finishForRecord(record, titles) {
     if (record.finish) return record.finish;
     if (record.in_progress && record.week != null) return 'In progress · Week ' + record.week;
@@ -205,6 +238,7 @@
     var programsN = Number(career.programs) || 0;
     var titles = trophiesOf(TITLE_KINDS);
     var miles = trophiesOf(MILESTONE_KINDS);
+    var honours = trophiesOf(HONOUR_KINDS);
     var rows = reviewRows();
     root.innerHTML = '<div class="hb">' + topBarHtml(career)
       + '<main class="tc">'
@@ -218,6 +252,7 @@
       + '<div class="sec"><div class="sec-h"><h3>Titles</h3>'
       + (titles.length ? '<span>' + titles.length + '</span>' : '') + '</div></div>'
       + titlesShelf(titles)
+      + honoursShelf(honours)
       + '<div class="sec"><div class="sec-h"><h3>Milestones</h3>'
       + (miles.length ? '<span>' + miles.length + '</span>' : '') + '</div></div>'
       + milestoneShelf(miles)

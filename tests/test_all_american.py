@@ -1001,14 +1001,17 @@ def test_all_conference_trophies_and_career_tags_sit_beside_all_american(store):
     assert set(kinds.values()) == {"all_conference_1"} and set(kinds) == {p["player_id"] for _, p in picks}
     # A team with no All-Conference pick has no entry.
     assert tl._user_all_conference_picks({**stored, "user_team_object_id": str(ObjectId())}, awards) == []
-    # Birch (conference 1's second team) players are All-Conference second team; with the
-    # All-American final set, one of them is on both.
-    stored["user_team_object_id"] = str(team_ids[1])
+    # Alder's players are conference 1's first team at every position, and with the
+    # All-American final set they are on its first or second team (Birch's tournament
+    # bonus can pass them, never drop them further): every one of them is on both.
+    # (Birch would not do here: the second-team coin, seeded on the franchise id, can
+    # seat Cedar at any position.)
+    stored["user_team_object_id"] = str(team_ids[0])
     _play_tournaments(store, doc, team_ids)
     awards = {**awards, **aa.compute_final(_stored(store, doc))}
     both = {p["player_id"] for _, p in tl._user_all_american_picks(stored, awards)} & {
         p["player_id"] for _, p in tl._user_all_conference_picks(stored, awards)}
-    assert both
+    assert len(both) == 5
     ac_keys = tl.expected_all_conference_storage_keys(stored, awards)
     aa_keys = tl.expected_all_american_storage_keys(stored, awards)
     assert ac_keys and aa_keys and not (ac_keys & aa_keys)                  # distinct entries, one each

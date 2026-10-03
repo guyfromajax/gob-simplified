@@ -263,6 +263,16 @@ def read_trophy_keys(owner_user_id: Any) -> set[str]:
     return {str(key) for key in raw}
 
 
+def _player_detail(pick: dict) -> dict:
+    """What an honour entry says about the player: id, name, and the position the player
+    was picked at (older entries have no position)."""
+    player_id = str(pick.get("player_id") or "")
+    detail = {"player_id": player_id, "player_name": pick.get("name") or ""}
+    if pick.get("position"):
+        detail["position"] = str(pick.get("position"))
+    return detail
+
+
 def record_all_american_trophies(franchise_doc: dict, awards: dict) -> int:
     """One entry per USER-team player on the first/second/third All-American teams."""
     user_tid = str(franchise_doc.get("user_team_object_id") or "")
@@ -278,7 +288,7 @@ def record_all_american_trophies(franchise_doc: dict, awards: dict) -> int:
             kind=kind,
             team_id=user_tid,
             player_id=player_id,
-            detail={"player_id": player_id, "player_name": pick.get("name") or ""},
+            detail=_player_detail(pick),
         )
         added += int(append_trophy(owner, entry))
     return added
@@ -312,7 +322,7 @@ def record_all_conference_trophies(franchise_doc: dict, awards: dict) -> int:
             kind=kind,
             team_id=user_tid,
             player_id=player_id,
-            detail={"player_id": player_id, "player_name": pick.get("name") or ""},
+            detail=_player_detail(pick),
         )
         added += int(append_trophy(owner, entry))
     return added
