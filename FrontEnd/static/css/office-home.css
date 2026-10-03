@@ -558,9 +558,12 @@ html.gob-shell.gob-office #franchise-container .office-st .st-n .gob-mark {
 /* Rankings: "5 of 8". The unit is wider than a stat's "PPG". */
 .gob .office-ranks .card-h + .ptw { border-top: 0; }
 .gob .office-ranks .ptw em { width: var(--dsz-52); text-align: left; white-space: nowrap; }
-/* Recruit rows (Top Recruits, Watchlist, week-35 Orders): the name; under it position, RT,
-   year. The right-hand column is the lean, or the points. */
-.gob .office-list .rc-facts { display: inline-flex; align-items: baseline; gap: var(--space-8); font-size: var(--fs-12); white-space: nowrap; }
+/* Recruit rows (Top Recruits, Watchlist, week-35 Orders): the name; under it
+   "Pos: C  RT: C  YR: JH", quiet labels and the values as they were. The right-hand column
+   is the lean, or the points. */
+.gob .office-list .rc-facts { display: inline-flex; align-items: baseline; gap: var(--space-10); font-size: var(--fs-12); white-space: nowrap; }
+.gob .office-list .rc-f { white-space: nowrap; }
+.gob .office-list .rc-k { font-style: normal; color: var(--text-38); }
 .gob .office-list .rc-facts .tdig { font-size: var(--fs-14); }
 .gob .office-list .rc-row { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-12); }
 .gob .office-list .rc-lean { justify-self: end; white-space: nowrap; text-align: right; font-size: var(--fs-13); font-weight: var(--fw-semibold); color: var(--text-100); }

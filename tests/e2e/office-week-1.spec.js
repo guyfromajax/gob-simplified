@@ -261,12 +261,12 @@ test('week 1, season 1: every section, in order, with its content', async ({ pag
   ]);
   const top = await rowsOf(page, '#office-root .office-top');
   expect(top.map((row) => row.cells)).toEqual([
-    // The name; under it position, RT, year; the lean on the right (v3-office.spec.js).
-    ['Darius Kemp C A+ SR', 'Alpha'],
-    ['Miles Hart SG A SR', 'Amariabi International'],
-    ['Owen Blake PF A JR', 'Crickstown'],
-    ['Jon Abara PG B+ SR', 'No lean'],
-    ['Luka Fenn SF B SO', 'Gamma'],
+    // The name; under it "Pos: … RT: … YR: …"; the lean on the right (v3-office-2.spec.js).
+    ['Darius Kemp Pos: C RT: A+ YR: SR', 'Alpha'],
+    ['Miles Hart Pos: SG RT: A YR: SR', 'Amariabi International'],
+    ['Owen Blake Pos: PF RT: A YR: JR', 'Crickstown'],
+    ['Jon Abara Pos: PG RT: B+ YR: SR', 'No lean'],
+    ['Luka Fenn Pos: SF RT: B YR: SO', 'Gamma'],
   ]);
   expect(top.map((row) => row.mine)).toEqual([false, true, false, false, false]);
   await expect(page.locator('#office-root .office-top .card-h h3')).toHaveText('Top Recruits (Region A)');
