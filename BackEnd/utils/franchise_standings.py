@@ -140,3 +140,46 @@ def current_streaks(franchise_results: Dict[str, Any] | None) -> Dict[str, str]:
         if outcome and count
     }
 
+
+
+def conference_records(
+    franchise_results: Dict[str, Any] | None,
+    conference_by_team: Mapping[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    """Conference W/L and win percentage per team, from stored results.
+
+    A game counts when both teams are in the same conference (``conference_by_team``
+    maps team id to conference). Ties count for neither side. ``PCT`` is wins over
+    conference games played, 0.0 with no conference game yet.
+    Returns ``{team_id: {"W": int, "L": int, "PCT": float}}`` for every team in
+    ``conference_by_team``.
+    """
+    records: Dict[str, Dict[str, Any]] = {
+        str(team_id): {"W": 0, "L": 0, "PCT": 0.0} for team_id in conference_by_team
+    }
+    for week_results in (franchise_results or {}).values():
+        if not isinstance(week_results, list):
+            continue
+        for game in week_results:
+            if not isinstance(game, dict):
+                continue
+            away_id = str(game.get("away_id") or "")
+            home_id = str(game.get("home_id") or "")
+            if not away_id or not home_id or away_id not in records or home_id not in records:
+                continue
+            if conference_by_team.get(away_id) is None:
+                continue
+            if str(conference_by_team.get(away_id)) != str(conference_by_team.get(home_id)):
+                continue
+            away_score = game.get("away_score", 0) or 0
+            home_score = game.get("home_score", 0) or 0
+            if away_score > home_score:
+                records[away_id]["W"] += 1
+                records[home_id]["L"] += 1
+            elif home_score > away_score:
+                records[home_id]["W"] += 1
+                records[away_id]["L"] += 1
+    for row in records.values():
+        played = row["W"] + row["L"]
+        row["PCT"] = (row["W"] / played) if played else 0.0
+    return records

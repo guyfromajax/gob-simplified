@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 
 import pytest
 from bson import ObjectId
@@ -227,8 +228,11 @@ def _seed_league(store, *, week=1, games=0, season=4):
     """Six teams, each with one player at every position. Team 0 is the best."""
     fid = ObjectId()
     team_ids = [ObjectId() for _ in TEAM_NAMES]
+    # Two conferences: Alder, Birch, Cedar in 1; Dogwood, Elm, Fir in 2. The weekly
+    # pairings (0-1, 2-3, 4-5) make 0-1 and 4-5 conference games and 2-3 not.
     store.teams_collection.insert_many(
-        [{"_id": tid, "name": name, "team_id": name.upper()} for tid, name in zip(team_ids, TEAM_NAMES)]
+        [{"_id": tid, "name": name, "team_id": name.upper(), "conference": 1 if t < 3 else 2}
+         for t, (tid, name) in enumerate(zip(team_ids, TEAM_NAMES))]
     )
     fpd, ftd = [], []
     for t, tid in enumerate(team_ids):
@@ -523,7 +527,9 @@ def test_stored_shape_keeps_trophy_log_and_career_data_working(store):
 
 def test_awards_payload_projected_then_final(store):
     doc, team_ids = _seed_league(store, week=5, games=4)
-    assert aa.awards_payload(doc) == {"status": "unavailable", "all_american_teams": None}
+    empty = aa.awards_payload(doc)
+    assert {k: v for k, v in empty.items() if k != "all_conference"} == {"status": "unavailable", "all_american_teams": None}
+    assert empty["all_conference"]["status"] == "unavailable"
     aa.ensure_projection(doc)
     body = aa.awards_payload(doc)
     assert body["status"] == "projected" and body["label"] == "After week 4"
@@ -570,6 +576,12 @@ def _assert_formula_hidden(body):
         for pick in picks:
             assert set(pick) == PICK_KEYS
             assert set(pick["stats"]) == set(aa.STAT_KEYS)
+    conference = body.get("all_conference") or {}
+    for lists in (conference.get("conferences") or {}).values():
+        assert set(lists) == set(aa.CONFERENCE_TEAM_KEYS)              # no rank-3 alternates
+        for picks in lists.values():
+            for pick in picks:
+                assert set(pick) == PICK_KEYS
 
 
 def test_awards_payload_hides_the_formula_and_the_stored_doc_keeps_it(store):
@@ -577,7 +589,7 @@ def test_awards_payload_hides_the_formula_and_the_stored_doc_keeps_it(store):
     aa.ensure_projection(doc)
     body = aa.awards_payload(doc)
     assert body["status"] == "projected" and body["label"] == "End of regular season"
-    assert set(body) == {"status", "week", "label", "stats_basis", "computed_at", "all_american_teams"}
+    assert set(body) == {"status", "week", "label", "stats_basis", "computed_at", "all_american_teams", "all_conference"}
     _assert_formula_hidden(body)
 
     # Stored for the engine: weights on the projection, score / rank / components on a pick.
@@ -591,7 +603,7 @@ def test_awards_payload_hides_the_formula_and_the_stored_doc_keeps_it(store):
     stored_doc["awards"] = {**stored_doc["awards"], **aa.compute_final(stored_doc)}
     body = aa.awards_payload(stored_doc)
     assert body["status"] == "final"
-    assert set(body) == {"status", "label", "stats_basis", "computed_at", "all_american_teams"}
+    assert set(body) == {"status", "label", "stats_basis", "computed_at", "all_american_teams", "all_conference"}
     _assert_formula_hidden(body)
     kept = stored_doc["awards"]["all_american_teams"]["first_team"][0]
     assert {"score", "rank", "components", "bonus", "week26_score"} <= set(kept)
@@ -760,3 +772,265 @@ def test_news_route_scrubs_on_read_and_does_not_rewrite_the_store(store, monkeyp
     assert news[1]["lines"] == other["lines"]
     # Still the old sentence in the store.
     assert _stored(store, doc)["season_news"][0]["rich_lines"][0]["text"] == OLD_INTRO
+
+
+# ---------------------------------------------------------------------------
+# All-Conference
+# ---------------------------------------------------------------------------
+
+def _conference_teams(projection_or_final, conference):
+    return (projection_or_final.get("conferences") or projection_or_final)[str(conference)]
+
+
+def test_conference_records_count_same_conference_games_only():
+    from BackEnd.utils.franchise_standings import conference_records
+
+    conference_by_team = {"a": 1, "b": 1, "c": 2, "d": 2}
+    results = {
+        "1": [{"home_id": "a", "away_id": "b", "home_score": 70, "away_score": 60},   # a beats b, conference
+              {"home_id": "c", "away_id": "a", "home_score": 80, "away_score": 50}],  # c beats a, not conference
+        "2": [{"home_id": "d", "away_id": "c", "home_score": 60, "away_score": 60},   # tie, conference: neither
+              {"home_id": "b", "away_id": "a", "home_score": 61, "away_score": 60}],  # b beats a, conference
+    }
+    records = conference_records(results, conference_by_team)
+    assert records["a"] == {"W": 1, "L": 1, "PCT": 0.5}
+    assert records["b"] == {"W": 1, "L": 1, "PCT": 0.5}
+    assert records["c"] == {"W": 0, "L": 0, "PCT": 0.0}
+    assert records["d"] == {"W": 0, "L": 0, "PCT": 0.0}
+    assert conference_records({}, {"a": 1}) == {"a": {"W": 0, "L": 0, "PCT": 0.0}}
+
+
+def test_score_players_takes_a_team_score_in_place_of_the_national_rank():
+    players = [_player("a", team="t1"), _player("b", team="t2")]
+    scored = {p["player_id"]: p for p in _score(players, ranks={"t1": 1, "t2": 128})}
+    assert scored["a"]["components"]["team"] == 100.0 and scored["b"]["components"]["team"] == 0.0
+    scored = {p["player_id"]: p for p in aa.score_players(
+        [_player("a", team="t1"), _player("b", team="t2")],
+        weights=aa.weights_for_week(26), team_games={}, rank_by_team={"t1": 1, "t2": 128},
+        team_count=128, team_scores={"t1": 25.0, "t2": 87.5},
+    )}
+    assert scored["a"]["components"]["team"] == 25.0 and scored["b"]["components"]["team"] == 87.5
+
+
+def test_all_conference_compares_a_player_only_against_his_own_conference(store):
+    doc, team_ids = _seed_league(store, week=11, games=10)
+    projection = aa.build_conference_projection(doc, 10)
+    assert set(projection["conferences"]) == {"1", "2"}
+    assert projection["user_conference"] == 2                       # Fir, the user's team
+    one = _conference_teams(projection, 1)
+    two = _conference_teams(projection, 2)
+    for lists in (one, two):
+        assert set(lists) == {"first_team", "second_team", "third_team"}
+        for key in lists:
+            assert [p["position"] for p in lists[key]] == list(POSITIONS)
+    # Conference 1 is the three best teams; conference 2 the three weakest, whose
+    # players never reach an All-American team but lead their own conference.
+    assert {p["team_name"] for p in one["first_team"]} == {"Alder"}
+    assert {p["team_name"] for p in one["second_team"]} == {"Birch"}
+    assert {p["team_name"] for p in two["first_team"]} == {"Dogwood"}
+    assert {p["team_name"] for p in two["second_team"]} == {"Elm"}
+    assert {p["team_name"] for p in two["third_team"]} == {"Fir"}
+    # Attribute part is within the conference: Dogwood's best is 100 there, not nationally.
+    assert two["first_team"][0]["components"]["attributes"] == 100.0
+    # Projections show rank 2 on the second team.
+    assert {p["rank"] for p in two["second_team"]} == {2}
+    assert projection["weights"] == aa.weights_percent(10)
+
+
+def test_all_conference_team_part_is_the_conference_win_percentage(store):
+    doc, team_ids = _seed_league(store, week=27, games=26)
+    league = aa.load_league(doc)
+    # Alder (0) beats Birch (1) every week: 26 conference games, 1.000 and .000.
+    # Cedar (2) only plays Dogwood (3), another conference: no conference game.
+    pct = league["conference_pct_by_team"]
+    assert pct[str(team_ids[0])] == 100.0 and pct[str(team_ids[1])] == 0.0
+    assert pct[str(team_ids[2])] == 0.0 and pct[str(team_ids[3])] == 0.0
+    projection = aa.build_conference_projection(doc, 26, league)
+    first = _conference_teams(projection, 1)["first_team"][0]
+    assert first["team_name"] == "Alder" and first["components"]["team"] == 100.0
+    # Week 26 weights: team is 30%. Alder's players carry it in full, Birch's not at all.
+    second = _conference_teams(projection, 1)["second_team"][0]
+    assert second["team_name"] == "Birch" and second["components"]["team"] == 0.0
+
+
+def test_all_conference_projection_updates_weekly_then_locks_and_sets_the_final(store, monkeypatch):
+    doc, team_ids = _seed_league(store, week=1, games=0)
+    calls = []
+    real = aa.build_conference_projection
+    monkeypatch.setattr(aa, "build_conference_projection", lambda d, c, league=None: calls.append(c) or real(d, c, league))
+    aa.ensure_conference_projection(doc)
+    aa.ensure_conference_projection(_stored(store, doc))
+    assert calls == [0]
+    _advance(store, doc, week=2, games=1)
+    aa.ensure_conference_projection(_stored(store, doc))
+    aa.ensure_conference_projection(_stored(store, doc))
+    assert calls == [0, 1]
+    assert "all_conference_teams" not in _stored(store, doc)["awards"]
+
+    # Week 26 complete: the projection is frozen and the final is written, once.
+    _advance(store, doc, week=27, games=26)
+    projection = aa.ensure_conference_projection(_stored(store, doc))
+    assert calls == [0, 1, 26] and projection["frozen"] is True
+    stored = _stored(store, doc)["awards"]
+    assert set(stored["all_conference_teams"]) == {"1", "2"}
+    assert stored["all_conference_final"]["basis"] == "week_26"
+    assert stored["all_conference_final"]["second_team_ranks"]["2"].keys() == set(POSITIONS)
+    # Tournament weeks: stats keep growing, nothing moves.
+    for week in range(28, 36):
+        store.franchise_players_data_collection.update_many(
+            {"franchise_id": str(doc["_id"])}, {"$inc": {"season.PTS": 50, "season.GP": 1}})
+        store.franchises_collection.update_one({"_id": doc["_id"]}, {"$set": {"week": week}})
+        aa.ensure_conference_projection(_stored(store, doc))
+    assert calls == [0, 1, 26]
+    assert _stored(store, doc)["awards"]["all_conference_teams"] == stored["all_conference_teams"]
+
+
+def test_all_conference_final_second_team_is_a_seeded_coin_between_ranks_2_and_3(store):
+    doc, team_ids = _seed_league(store, week=27, games=26)
+    projection = aa.build_conference_projection(doc, 26)
+    final = aa.conference_final(doc, projection)
+    again = aa.conference_final(doc, projection)
+    assert final["all_conference_teams"] == again["all_conference_teams"]        # stable
+    for conference in ("1", "2"):
+        frozen = _conference_teams(projection, conference)
+        teams = final["all_conference_teams"][conference]
+        assert teams["first_team"] == frozen["first_team"]                     # rank 1
+        ranks = final["all_conference_final"]["second_team_ranks"][conference]
+        for pick in teams["second_team"]:
+            want = aa.conference_second_team_rank(str(doc["_id"]), 4, conference, pick["position"])
+            assert want in (2, 3) and ranks[pick["position"]] == want
+            source = frozen["second_team" if want == 2 else "third_team"]
+            assert pick in source and pick["rank"] == want
+        assert [p["position"] for p in teams["second_team"]] == list(POSITIONS)
+        assert set(teams) == {"first_team", "second_team"}                     # no third team
+        assert not any("bonus" in p for key in teams for p in teams[key])      # no tournament bonus
+    # Different seeds across franchises, seasons and conferences, over all positions.
+    coins = {
+        (f, season, conference): tuple(aa.conference_second_team_rank(f, season, conference, pos) for pos in POSITIONS)
+        for f in ("f1", "f2") for season in (1, 2) for conference in ("1", "9")
+    }
+    assert len(set(coins.values())) > 1
+    # The All-American coin is unchanged by sharing the hash.
+    assert aa.third_team_rank("f1", 3, "PG") == 3 + aa.seeded_coin("all-american:f1:3:PG")
+
+
+def test_all_conference_payload_hides_the_formula(store):
+    doc, team_ids = _seed_league(store, week=11, games=10)
+    aa.ensure_projection(doc)
+    aa.ensure_conference_projection(doc)
+    body = aa.awards_payload(doc)
+    block = body["all_conference"]
+    assert block["status"] == "projected" and block["label"] == "After week 10" and block["week"] == 10
+    assert block["conference"] == 2
+    assert block["labels"]["1"] == "A1" and block["labels"]["2"] == "A2" and block["labels"]["16"] == "H16"
+    assert set(block["conferences"]) == {"1", "2"}
+    _assert_formula_hidden(body)
+    for lists in block["conferences"].values():
+        assert set(lists) == {"first_team", "second_team"}
+        for picks in lists.values():
+            assert [p["position"] for p in picks] == list(POSITIONS)
+    # Stored: weights, scores, ranks and the rank-3 alternates stay on the doc.
+    stored = _stored(store, doc)["awards"]["all_conference_projection"]
+    assert "weights" in stored and "third_team" in stored["conferences"]["1"]
+    assert {"score", "rank", "components"} <= set(stored["conferences"]["1"]["first_team"][0])
+
+    _advance(store, doc, week=27, games=26)
+    aa.ensure_conference_projection(_stored(store, doc))
+    body = aa.awards_payload(_stored(store, doc))
+    block = body["all_conference"]
+    assert block["status"] == "final" and block["label"] == "Final" and block["conference"] == 2
+    assert body["status"] == "projected"                                   # All-American waits for week 35
+    _assert_formula_hidden(body)
+
+
+def test_all_conference_stories_publish_for_the_users_conference_only(store):
+    doc, _teams = _seed_league(store, week=1, games=0)
+    for completed in range(0, 27):
+        if completed:
+            _advance(store, doc, week=completed + 1, games=completed)
+        aa.ensure_conference_projection(_stored(store, doc))
+    news = [s for s in _stored(store, doc)["season_news"] if s["type"] == "all_conference"]
+    assert [s["story_id"] for s in news] == [
+        "w26-all-conference-final", "w19-all-conference", "w13-all-conference",
+        "w7-all-conference", "w1-all-conference",
+    ]
+    assert [s["headline"] for s in news] == [
+        "All-Conference A2: end of the regular season",
+        "Projected All-Conference A2: week 19",
+        "Projected All-Conference A2: week 13",
+        "Projected All-Conference A2: week 7",
+        "Preseason All-Conference A2 teams",
+    ]
+    import re
+    for story in news:
+        text = story["headline"] + " " + " ".join(line.get("text", "") for line in story["rich_lines"])
+        assert "%" not in text and not re.search(r"weight|score|bonus|rating", text, re.IGNORECASE)
+        # The user's conference (Dogwood, Elm, Fir), never conference 1's teams.
+        assert not re.search(r"Alder|Birch|Cedar", text), text
+        assert "First Team" in text and "Second Team" in text
+    final = news[0]
+    assert "PG: Dogwood PG (Dogwood, SR)" in " ".join(l.get("text", "") for l in final["rich_lines"])
+
+
+def test_all_conference_first_seen_mid_tournament_locks_what_it_has_without_a_story(store):
+    doc, _teams = _seed_league(store, week=30, games=26)
+    projection = aa.ensure_conference_projection(doc)
+    assert projection["week"] == 26 and projection["includes_tournament_games"] is True
+    awards = _stored(store, doc)["awards"]
+    assert awards["all_conference_teams"] and awards["all_conference_final"]["includes_tournament_games"] is True
+    assert _stored(store, doc).get("season_news") == []
+
+
+def test_all_conference_trophies_and_career_tags_sit_beside_all_american(store):
+    from BackEnd.utils.career_data import _user_all_conference_kind_by_player
+
+    doc, team_ids = _seed_league(store, week=27, games=26)
+    aa.ensure_projection(doc)
+    aa.ensure_conference_projection(doc)
+    stored = _stored(store, doc)
+    stored["user_team_object_id"] = str(team_ids[3])          # the user coaches Dogwood: conference 2's best
+    stored["user_id"] = "owner-1"
+    awards = stored["awards"]
+    picks = tl._user_all_conference_picks(stored, awards)
+    assert picks and {kind for kind, _ in picks} == {"all_conference_1"}
+    assert len(picks) == 5 and all(p["team_id"] == str(team_ids[3]) for _, p in picks)
+    keys = tl.expected_all_conference_storage_keys(stored, awards)
+    assert len(keys) == 5 and all(":all_conference_1:" in key for key in keys)
+    assert set(tl.ALL_CONFERENCE_KIND_BY_TEAM.values()) <= set(tl.TROPHY_KINDS)
+    kinds = dict(_user_all_conference_kind_by_player(awards, str(team_ids[3])))
+    assert set(kinds.values()) == {"all_conference_1"} and set(kinds) == {p["player_id"] for _, p in picks}
+    # A team with no All-Conference pick has no entry.
+    assert tl._user_all_conference_picks({**stored, "user_team_object_id": str(ObjectId())}, awards) == []
+    # Birch (conference 1's second team) players are All-Conference second team; with the
+    # All-American final set, one of them is on both.
+    stored["user_team_object_id"] = str(team_ids[1])
+    _play_tournaments(store, doc, team_ids)
+    awards = {**awards, **aa.compute_final(_stored(store, doc))}
+    both = {p["player_id"] for _, p in tl._user_all_american_picks(stored, awards)} & {
+        p["player_id"] for _, p in tl._user_all_conference_picks(stored, awards)}
+    assert both
+    ac_keys = tl.expected_all_conference_storage_keys(stored, awards)
+    aa_keys = tl.expected_all_american_storage_keys(stored, awards)
+    assert ac_keys and aa_keys and not (ac_keys & aa_keys)                  # distinct entries, one each
+
+
+def test_awards_route_hides_the_all_conference_formula_too(store, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from BackEnd.api import franchise_routes
+    from BackEnd.api.api import app
+
+    doc, team_ids = _seed_league(store, week=27, games=26)
+    monkeypatch.setattr(
+        franchise_routes, "verify_franchise_owned_by_user", lambda _fid, _uid: _stored(store, doc))
+    res = TestClient(app).get("/franchise/awards", params={"franchise_id": str(doc["_id"])})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["all_conference"]["status"] == "final"
+    _assert_formula_hidden(body)
+    for word in ("weights", "components", "second_team_ranks", "bonus"):
+        assert word not in res.text
+    assert "third_team" not in json.dumps(body["all_conference"])          # the alternates stay home
+    # The read stored the final and the trophies' source; a second read is a no-op.
+    stored = _stored(store, doc)["awards"]
+    assert stored["all_conference_teams"] and "third_team" in stored["all_conference_projection"]["conferences"]["1"]
