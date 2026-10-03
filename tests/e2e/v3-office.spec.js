@@ -77,7 +77,7 @@ function recruitsCard(page, selector) {
         };
         return {
           name: text(name),
-          // The second line, in order: position, RT, year.
+          // The second line, in order: Pos, RT, YR, each a quiet label and its value.
           facts: facts ? [...facts.children].map(text) : [],
           factsBelowName: facts ? box(facts).top >= box(name).bottom - 1 : false,
           nameLine: [...row.querySelector('.wr-1').children].map(text),
@@ -154,11 +154,11 @@ test('2a/2b/2d: "Top Recruits (Region A)", the segment on the right, and the row
 
   // Rows: the name alone on top; under it position, RT, year; the lean on the right.
   expect(card.rows.map((row) => [row.name, row.facts, row.right])).toEqual([
-    ['Darius Kemp', ['C', 'A+', 'SR'], 'Alpha'],
-    ['Miles Hart', ['SG', 'A', 'SR'], 'Amariabi International'],
-    ['Owen Blake', ['PF', 'A', 'JR'], 'Crickstown'],
-    ['Jon Abara', ['PG', 'B+', 'SR'], 'No lean'],
-    ['Luka Fenn', ['SF', 'B', 'SO'], 'Gamma'],
+    ['Darius Kemp', ['Pos: C', 'RT: A+', 'YR: SR'], 'Alpha'],
+    ['Miles Hart', ['Pos: SG', 'RT: A', 'YR: SR'], 'Amariabi International'],
+    ['Owen Blake', ['Pos: PF', 'RT: A', 'YR: JR'], 'Crickstown'],
+    ['Jon Abara', ['Pos: PG', 'RT: B+', 'YR: SR'], 'No lean'],
+    ['Luka Fenn', ['Pos: SF', 'RT: B', 'YR: SO'], 'Gamma'],
   ]);
   card.rows.forEach((row) => {
     expect(row.nameLine, row.name).toEqual([row.name]);
@@ -187,11 +187,11 @@ test('2c: Watchlist is the coach’s five best from any region, and the title dr
     { text: 'Watchlist', on: true, pressed: 'true' },
   ]);
   expect(card.rows.map((row) => [row.name, row.facts, row.right])).toEqual([
-    ['Tobias Okonkwo-Reyes', ['PF', 'A+', 'SR'], 'Long Island Methodist'],
-    ['Miles Hart', ['SG', 'A', 'SR'], 'Amariabi International'],
-    ['Enzo Varga', ['PG', 'A', 'JR'], 'Chapel Hill'],
-    ['Sol Whitaker', ['C', 'B+', 'SR'], 'No lean'],
-    ['Kofi Brandt', ['SF', 'B+', 'FR'], 'Delta'],
+    ['Tobias Okonkwo-Reyes', ['Pos: PF', 'RT: A+', 'YR: SR'], 'Long Island Methodist'],
+    ['Miles Hart', ['Pos: SG', 'RT: A', 'YR: SR'], 'Amariabi International'],
+    ['Enzo Varga', ['Pos: PG', 'RT: A', 'YR: JR'], 'Chapel Hill'],
+    ['Sol Whitaker', ['Pos: C', 'RT: B+', 'YR: SR'], 'No lean'],
+    ['Kofi Brandt', ['Pos: SF', 'RT: B+', 'YR: FR'], 'Delta'],
   ]);
   card.rows.forEach((row) => {
     expect(row.factsBelowName, row.name).toBe(true);
@@ -215,11 +215,8 @@ test('2c: an empty watchlist shows one line', async ({ page }) => {
   expect(card.rows).toEqual([]);
   expect(card.empty).toBe('Hey Coach, add players to your watchlist');
   await expect(page.locator('#office-root .office-top .wr-empty')).toHaveCount(1);
-  // A payload from before the watchlist block reads the same way.
-  const old = week(10);
-  delete old.office_digest.top_recruits.watchlist;
-  await O.openOffice(page, old);
-  expect((await recruitsCard(page)).empty).toBe('Hey Coach, add players to your watchlist');
+  // A payload from before the watchlist block (an older server) never claims the watchlist
+  // is empty: see v3-office-2.spec.js.
 });
 
 test('2e: the choice is remembered for the session, and a new session starts on Top', async ({ page, context }) => {
@@ -277,11 +274,11 @@ test('3: Orders submitted — the Signing Day card, then everyone with points, m
   expect(card.title).toBe('Your Orders');
   expect(card.seg).toBe(null);
   expect(card.rows.map((row) => [row.name, row.facts, row.right])).toEqual([
-    ['Miles Hart', ['SG', 'A', 'SR'], '18 pts'],
-    ['Owen Blake', ['PF', 'B+', 'JR'], '12 pts'],
-    ['Tobias Okonkwo-Reyes', ['PF', 'A+', 'SR'], '5 pts'],
-    ['Sol Whitaker', ['C', 'B', 'SR'], '2 pts'],
-    ['Kofi Brandt', ['SF', 'C+', 'FR'], '1 pt'],
+    ['Miles Hart', ['Pos: SG', 'RT: A', 'YR: SR'], '18 pts'],
+    ['Owen Blake', ['Pos: PF', 'RT: B+', 'YR: JR'], '12 pts'],
+    ['Tobias Okonkwo-Reyes', ['Pos: PF', 'RT: A+', 'YR: SR'], '5 pts'],
+    ['Sol Whitaker', ['Pos: C', 'RT: B', 'YR: SR'], '2 pts'],
+    ['Kofi Brandt', ['Pos: SF', 'RT: C+', 'YR: FR'], '1 pt'],
   ]);
   card.rows.forEach((row) => {
     expect(row.nameLine, row.name).toEqual([row.name]);

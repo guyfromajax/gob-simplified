@@ -1118,9 +1118,19 @@
     return node;
   }
 
+  // One labelled fact on a recruit's second line: a quiet label, then the value as it was.
+  function recruitFact(label, value) {
+    var fact = el('span', 'rc-f');
+    fact.appendChild(el('i', 'rc-k', label + ':'));
+    fact.appendChild(document.createTextNode(' '));
+    fact.appendChild(value);
+    return fact;
+  }
+
   // One recruit, the same on every recruiting list of the Office: the name on top; under
-  // it position, RT and year, in that order. The right-hand column is the list's own
-  // (who he leans to, or the points the coach put on him).
+  // it "Pos: C  RT: C  YR: JH", in that order (Jamie, 2026-10-03). A fact the server did
+  // not send is left out, label and all. The right-hand column is the list's own (who he
+  // leans to, or the points the coach put on him).
   function recruitRow(row, right, mine) {
     var url = recruitingHref();
     var node = el('a', 'wr sg-c rc-row' + (mine ? ' me' : ''));
@@ -1131,10 +1141,10 @@
     line.appendChild(el('span', 'nm', row.name));
     body.appendChild(line);
     var facts = el('span', 'wr-2 rc-facts');
-    if (present(row.position)) facts.appendChild(el('span', 'rc-pos', row.position));
+    if (present(row.position)) facts.appendChild(recruitFact('Pos', el('span', 'rc-pos', row.position)));
     var grade = rtNode(row.rt);
-    if (grade) facts.appendChild(grade);
-    if (present(row.year)) facts.appendChild(el('span', 'rc-yr', row.year));
+    if (grade) facts.appendChild(recruitFact('RT', grade));
+    if (present(row.year)) facts.appendChild(recruitFact('YR', el('span', 'rc-yr', row.year)));
     if (facts.childNodes.length) body.appendChild(facts);
     node.appendChild(body);
     if (right) node.appendChild(right);
@@ -1161,11 +1171,15 @@
 
   // All season until Signing Day. Top: the region's five best and who leads for each.
   // Watchlist: the five best the coach is watching, from any region.
+  // The Watchlist side exists only when the server sent a `watchlist` block. A server from
+  // before the block (the site can deploy ahead of it) sends none: the card is then the
+  // Top list alone, and never says the coach's watchlist is empty when it was not read.
   function topRecruitsCard(top, index) {
     if (!top) return null;
+    var watchSent = !!top.watchlist && Array.isArray(top.watchlist.rows);
     var lists = {
       top: listOf(top.rows).filter(function (row) { return present(row.name); }),
-      watchlist: listOf(top.watchlist && top.watchlist.rows).filter(function (row) { return present(row.name); })
+      watchlist: watchSent ? top.watchlist.rows.filter(function (row) { return present(row.name); }) : []
     };
     var node = card('office-list office-top', index);
     var head = el('div', 'card-h');
@@ -1176,7 +1190,7 @@
     seg.setAttribute('role', 'group');
     seg.setAttribute('aria-label', 'Recruit list');
     var buttons = {};
-    [['top', 'Top'], ['watchlist', 'Watchlist']].forEach(function (pair) {
+    (watchSent ? [['top', 'Top'], ['watchlist', 'Watchlist']] : []).forEach(function (pair) {
       var button = el('button', '', pair[1]);
       button.type = 'button';
       button.dataset.value = pair[0];
@@ -1190,8 +1204,9 @@
       buttons[pair[0]] = button;
       seg.appendChild(button);
     });
-    head.appendChild(seg);
+    if (watchSent) head.appendChild(seg);
     node.appendChild(head);
+    node.dataset.watchlist = watchSent ? 'sent' : 'not-sent';
 
     function paint(which) {
       node.dataset.recruitList = which;
@@ -1216,7 +1231,7 @@
       });
     }
 
-    paint(recruitListChoice());
+    paint(watchSent ? recruitListChoice() : 'top');
     return node;
   }
 
