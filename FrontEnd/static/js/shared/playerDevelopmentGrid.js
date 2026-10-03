@@ -11,9 +11,13 @@
  *   { id, name, year, height, weight,
  *     attributes: { SC: 7, ... },        // 0-10 display scale or raw; passed through
  *     position_ratings: { PG: 72, ... },
+ *     potential_rt_ratcheted,            // optional; drawn after the current RT as "cur → pot"
  *     training_position, training_focus, resolved_training_position, resolved_training_focus }
  *
- * Order: by the RT the card shows (the rating at the TRAINING position), highest first,
+ * Each card shows the current RT (at the training position) and, when the payload carries
+ * one, the potential after an arrow: "B+ → A++". No jersey number, no portrait.
+ *
+ * Order: by the CURRENT RT the card shows (the rating at the TRAINING position), highest first,
  * reading left to right and then top to bottom; ties keep the caller's order. The order is
  * set when the grid is rendered and not while it is being edited: that RT changes when the
  * coach changes a position, and re-sorting then would move a card out from under the
@@ -211,14 +215,27 @@
     window.addEventListener('resize', hideHoverCard);
   }
 
+  function bucketClass(rt) {
+    return (rt != null && typeof window.getRtBucketClass === 'function') ? window.getRtBucketClass(rt) : '';
+  }
+
+  /** "current → potential": the current RT at the training position, then the potential when known. */
+  function rtPairHtml(player) {
+    var rt = rtAtTrainingPosition(player);
+    var pot = player.potential_rt_ratcheted;
+    var html = '<span class="pdg-rt rtl"><b data-pdg-rt class="' + esc(bucketClass(rt)) + '">' +
+      (rt == null ? '--' : esc(formatRtDisplay(rt))) + '</b>';
+    if (pot != null && pot !== '' && isFinite(Number(pot))) {
+      html += '<i>\u2192</i><b class="pot ' + esc(bucketClass(Number(pot))) + '">' + esc(formatRtDisplay(pot)) + '</b>';
+    }
+    return html + '</span>';
+  }
+
   function cardHtml(player) {
     var dev = window.GOBDevelopmentFocus;
-    var rt = rtAtTrainingPosition(player);
-    var bucket = (rt != null && typeof window.getRtBucketClass === 'function') ? window.getRtBucketClass(rt) : '';
     return '<div class="pdg-card" data-pdg-player="' + esc(player.id) + '">' +
       '<span class="pdg-name" tabindex="0">' + esc(player.name) + '</span>' +
-      '<span class="pdg-rt"><b data-pdg-rt class="' + esc(bucket) + '">' +
-        (rt == null ? '--' : esc(formatRtDisplay(rt))) + '</b></span>' +
+      rtPairHtml(player) +
       '<span class="pdg-controls">' +
         dev.positionSelectHtml(player) + dev.focusSelectHtml(player) +
       '</span>' +
@@ -298,9 +315,8 @@
           if (cell) {
             var rt = rtAtTrainingPosition(row);
             cell.textContent = rt == null ? '--' : formatRtDisplay(rt);
-            if (typeof window.getRtBucketClass === 'function') {
-              cell.className = rt == null ? '' : window.getRtBucketClass(rt);
-            }
+            // Only the current rating follows the position; the potential stays.
+            cell.className = bucketClass(rt);
           }
         }
       }
@@ -339,6 +355,7 @@
     render: render,
     rtAtTrainingPosition: rtAtTrainingPosition,
     orderByRt: orderByRt,
+    rtPairHtml: rtPairHtml,
     formatHeight: formatHeight,
     attrValue: attrValue,
     developsFor: developsFor,

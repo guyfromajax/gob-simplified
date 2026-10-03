@@ -167,6 +167,9 @@ test('week 1, season 1: every section, in order, with its content', async ({ pag
   expect((await rowsOf(page, '#office-root .office-ranks')).map((row) => row.cells)).toEqual([
     ['Conference', '4', 'of 8'], ['Region', '7', 'of 16'], ['National', '40', 'of 128'],
   ]);
+  // Season 1 has no last season: the card ends at its rows.
+  await expect(page.locator('#office-root .office-ranks .rk-last')).toHaveCount(0);
+  await expect(page.locator('#office-root')).not.toContainText(/Last season: \d/);
 
   // Key Players: the roster's columns in the roster's order, names to the player page.
   const kpHead = await page.locator('#office-root .office-kp .st-hd span').allTextContents();
@@ -285,6 +288,23 @@ test('week 1, a later season: last season, the newcomers, and last season’s me
     cards: ['Rankings', 'Key Players', 'Newcomers', 'Preseason All-Americans'],
   });
   await expect(page.locator('#office-root .office-outlook')).toHaveCount(0);
+  // Last season: one quiet line at the bottom of the Rankings card, en dash in the record.
+  const lastLine = page.locator('#office-root .office-ranks .rk-last');
+  await expect(lastLine).toHaveCount(1);
+  await expect(lastLine).toHaveText('Last season: 18\u20138, lost in the Region semifinal.');
+  expect(await lastLine.evaluate((node) => {
+    const card = node.closest('.office-ranks');
+    const rows = [...card.querySelectorAll('.ptw')];
+    const cs = getComputedStyle(node);
+    const rowCs = getComputedStyle(card.querySelector('.ptw b'));
+    return {
+      last: card.lastElementChild === node,
+      below: node.getBoundingClientRect().top >= rows[rows.length - 1].getBoundingClientRect().bottom,
+      quieter: parseFloat(cs.fontSize) < parseFloat(rowCs.fontSize),
+      color: cs.color,
+      fits: node.scrollWidth <= node.clientWidth,
+    };
+  })).toEqual({ last: true, below: true, quieter: true, color: 'rgba(255, 255, 255, 0.6)', fits: true });
   const newcomers = await rowsOf(page, '#office-root .office-new');
   expect(newcomers.map((row) => row.cells)).toEqual([
     ['Rafe Dalton PG', 'B'], ['Emeka Sorensen C', 'C+'], ['Coby Tran SF', 'C'], ['Will Hask SG', 'C'],
@@ -304,6 +324,19 @@ test('a loss last season reads as a loss', async ({ page }) => {
   data.office_digest.season_preview.outlook.last_season = { wins: 31, losses: 5, finish: 'won the National championship' };
   await O.openOffice(page, data);
   await expect(page.locator('#office-root .office-next .nx-sub')).toContainText('Last season: L 58\u201361');
+  await expect(page.locator('#office-root .office-ranks .rk-last')).toHaveText('Last season: 31\u20135, won the National championship.');
+});
+
+test('a last season with a record but no finish, or no record at all, keeps the Rankings card tidy', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const data = laterSeason();
+  data.office_digest.season_preview.outlook.last_season = { wins: 12, losses: 14, finish: null };
+  await O.openOffice(page, data);
+  await expect(page.locator('#office-root .office-ranks .rk-last')).toHaveText('Last season: 12\u201314.');
+  const none = laterSeason();
+  none.office_digest.season_preview.outlook.last_season = null;
+  await O.openOffice(page, none);
+  await expect(page.locator('#office-root .office-ranks .rk-last')).toHaveCount(0);
 });
 
 /* -------------------------------------------------------------- week 2 --- */

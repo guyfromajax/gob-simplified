@@ -995,7 +995,15 @@
       row.appendChild(el('em', '', 'of ' + place.of));
       node.appendChild(row);
     });
-    return node.querySelector('.ptw') ? node : null;
+    if (!node.querySelector('.ptw')) return null;
+    // Last season, as one quiet line at the bottom: "Last season: 18–8, lost in the Region
+    // semifinal." Season 1 has no last season, so the card ends at the rows.
+    var last = preview.outlook && preview.outlook.last_season;
+    if (last && present(last.wins) && present(last.losses)) {
+      node.appendChild(el('p', 'rk-last', 'Last season: ' + last.wins + '\u2013' + last.losses
+        + (present(last.finish) ? ', ' + last.finish : '') + '.'));
+    }
+    return node;
   }
 
   // The roster's columns, in the roster's order: Player, RT, Pos, Yr, Ht, Wt.
@@ -1308,9 +1316,10 @@
     if (snap.state === 'set_after_camp' || !moved.length) {
       // One quiet line: before camp there is nothing to compare; after it, none of the
       // eight moved. Never a fallback to a measure on another scale.
+      // "No movement this week" stands alone, no trailing dash (Jamie, 2026-10-02).
       var line = el('div', 'msr msr-empty');
       line.appendChild(el('span', '', snap.state === 'set_after_camp' ? 'Set after camp' : 'No movement this week'));
-      line.appendChild(el('b', '', '\u2014'));
+      if (snap.state === 'set_after_camp') line.appendChild(el('b', '', '\u2014'));
       node.appendChild(line);
     } else {
       moved.slice(0, 2).forEach(function (row) {
