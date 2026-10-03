@@ -1,10 +1,10 @@
 // @ts-check
 /**
- * Trophy Case: the Honours shelf. All-American and All-Conference entries already in the
+ * Trophy Case: the Honors shelf. All-American and All-Conference entries already in the
  * coach's trophy log are drawn at team level ("1st Team All-American", "2nd Team
  * All-Conference") with the player, position, program and season, between Titles and
  * Milestones, in the page's own tile style and colours. With none, nothing extra.
- * TH_SHOTS=1 writes reports/trophy-honours/after-*.png at 1280 and 1920.
+ * TH_SHOTS=1 writes reports/v3-pages/after-*.png at 1280 and 1920.
  */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
@@ -14,7 +14,7 @@ const { stubAuth } = require('./helpers/auth');
 test.describe.configure({ timeout: 90000 });
 
 const SHOTS = process.env.TH_SHOTS === '1';
-const OUT = path.join(__dirname, '../../reports/trophy-honours');
+const OUT = path.join(__dirname, '../../reports/v3-pages');
 
 function career(trophies) {
   return {
@@ -34,7 +34,7 @@ function career(trophies) {
 }
 
 // Newest first in the data, as the server sends them.
-const HONOURS = [
+const HONORS = [
   { kind: 'all_conference_2', season: 2, team_name: 'Lawrence Eagles', franchise_id: 'f1', team_id: 't-f1',
     detail: { player_id: 'p4', player_name: 'Owen Price', position: 'C' } },
   { kind: 'all_american_1', season: 2, team_name: 'Lawrence Eagles', franchise_id: 'f1', team_id: 't-f1',
@@ -71,7 +71,7 @@ async function openTrophyCase(page, body, width) {
 function readPage(page) {
   return page.evaluate(() => {
     const heads = [...document.querySelectorAll('.tc-col .sec-h h3')].map((h) => h.textContent.trim());
-    const section = [...document.querySelectorAll('.tc-col .sec')].find((s) => /Honours/.test(s.textContent));
+    const section = [...document.querySelectorAll('.tc-col .sec')].find((s) => /Honors/.test(s.textContent));
     const shelf = section ? section.nextElementSibling : null;
     const tiles = shelf ? [...shelf.querySelectorAll('.tro')] : [];
     const colour = (el) => getComputedStyle(el).color;
@@ -102,10 +102,10 @@ async function shots(page, name) {
   await page.screenshot({ path: path.join(OUT, name), animations: 'disabled' });
 }
 
-test('Honours: All-American and All-Conference entries, between Titles and Milestones, in the page\'s tile', async ({ page }) => {
-  await openTrophyCase(page, career(HONOURS));
+test('Honors: All-American and All-Conference entries, between Titles and Milestones, in the page\'s tile', async ({ page }) => {
+  await openTrophyCase(page, career(HONORS));
   const seen = await readPage(page);
-  expect(seen.heads).toEqual(['Titles', 'Honours', 'Milestones', 'Season Reviews']);
+  expect(seen.heads).toEqual(['Titles', 'Honors', 'Milestones', 'Season Reviews']);
   expect(seen.count).toBe('4');
   // Newest season first; within a season All-American before All-Conference, first team first.
   expect(seen.tiles.map((t) => t.label)).toEqual([
@@ -123,25 +123,25 @@ test('Honours: All-American and All-Conference entries, between Titles and Miles
     expect(t.medal).not.toBe(seen.titleMedal);
   });
   expect(seen.overflow).toBeLessThanOrEqual(0);
-  await shots(page, 'after-honours-1280.png');
+  await shots(page, 'after-honors-1280.png');
   // The title and milestone shelves are as they were.
   await expect(page.locator('.shelf .med.gold')).toHaveCount(3);
   await expect(page.locator('.tro.sm:not(.hon)')).toHaveCount(1);
 });
 
-test('Honours at 1920', async ({ page }) => {
-  await openTrophyCase(page, career(HONOURS), 1920);
+test('Honors at 1920', async ({ page }) => {
+  await openTrophyCase(page, career(HONORS), 1920);
   const seen = await readPage(page);
-  expect(seen.heads).toEqual(['Titles', 'Honours', 'Milestones', 'Season Reviews']);
+  expect(seen.heads).toEqual(['Titles', 'Honors', 'Milestones', 'Season Reviews']);
   expect(seen.tiles.length).toBe(4);
   expect(seen.overflow).toBeLessThanOrEqual(0);
-  await shots(page, 'after-honours-1920.png');
+  await shots(page, 'after-honors-1920.png');
 });
 
-test('no honours: nothing extra on the page', async ({ page }) => {
+test('no honors: nothing extra on the page', async ({ page }) => {
   await openTrophyCase(page, career([]));
   const seen = await readPage(page);
   expect(seen.heads).toEqual(['Titles', 'Milestones', 'Season Reviews']);
   await expect(page.locator('.tro.hon')).toHaveCount(0);
-  await expect(page.locator('main.tc')).not.toContainText('Honours');
+  await expect(page.locator('main.tc')).not.toContainText('Honors');
 });

@@ -179,3 +179,161 @@ def test_uninitialized_standings_have_no_navy_rows(kind, tmp_path, monkeypatch):
     schedule = routes.get_practice_squad_schedule(str(franchise_id), user={"user_id": "coach-1"})
     assert schedule["current_week"] == 2
     assert schedule["weeks"] == []
+
+
+# ── The standard team page for a practice squad ──────────────────────────────
+
+def _ps_state():
+    return {
+        "teams": {
+            "ps_A_3": {"display_name": "Region A Varsity", "tier": 3, "region": "A"},
+            "ps_B_3": {"display_name": "Region B Varsity", "tier": 3, "region": "B"},
+            "ps_C_3": {"display_name": "Region C Varsity", "tier": 3, "region": "C"},
+            "ps_C_6": {"display_name": "Region C Scrubs", "tier": 6, "region": "C"},
+        },
+        "standings": {
+            "3": {
+                "ps_A_3": {"w": 2, "l": 0},
+                "ps_C_3": {"w": 1, "l": 1},
+                "ps_B_3": {"w": 0, "l": 2},
+            },
+        },
+        "schedule": {
+            "3": [
+                {"home_team_id": "ps_B_3", "away_team_id": "ps_C_3", "tier": 3, "week": 3,
+                 "status": "completed", "game_id": "g3", "home_score": 64, "away_score": 55},
+            ],
+            "2": [
+                {"home_team_id": "ps_C_3", "away_team_id": "ps_A_3", "tier": 3, "week": 2,
+                 "status": "completed", "game_id": "g2", "home_score": 70, "away_score": 61},
+                {"home_team_id": "ps_A_3", "away_team_id": "ps_B_3", "tier": 3, "week": 2,
+                 "status": "completed", "game_id": "gx", "home_score": 80, "away_score": 60},
+            ],
+            "4": [
+                {"home_team_id": "ps_C_3", "away_team_id": "ps_B_3", "tier": 3, "week": 4,
+                 "status": "forfeit", "game_id": None, "home_score": 0, "away_score": 0, "winner": "ps_C_3"},
+            ],
+            "5": [
+                {"home_team_id": "ps_A_3", "away_team_id": "ps_C_3", "tier": 3, "week": 5,
+                 "status": "skipped", "game_id": None, "home_score": None, "away_score": None},
+            ],
+            "9": [
+                {"home_team_id": "ps_C_3", "away_team_id": "ps_A_3", "tier": 3, "week": 9,
+                 "status": "scheduled", "game_id": None, "home_score": None, "away_score": None},
+            ],
+        },
+    }
+
+
+def test_team_page_is_the_squad_in_the_team_pages_shape():
+    from BackEnd.practice_squad.browse import team_page
+
+    page = team_page(_ps_state(), "ps_C_3")
+    assert page["team_id"] == "ps_C_3"
+    assert page["name"] == "Region C Varsity"
+    assert page["practice_squad"] is True
+    assert (page["tier"], page["tier_label"], page["region"]) == (3, "Varsity", "C")
+    assert page["record"] == {"wins": 1, "losses": 1}
+    # Same order as the standings table: wins, then fewest losses.
+    assert page["tier_place"] == "2nd of 3"
+    # Results in week order, from this squad's side, whatever side it played on.
+    assert [(r["week"], r["site"], r["opponent_name"], r["team_score"], r["opp_score"], r["result"], r["game_id"])
+            for r in page["results"][:2]] == [
+        (2, "home", "Region A Varsity", 70, 61, "W", "g2"),
+        (3, "away", "Region B Varsity", 55, 64, "L", "g3"),
+    ]
+    # A forfeit is a result with the winner's letter and no box score; a skipped game is nothing.
+    forfeit = page["results"][2]
+    assert (forfeit["week"], forfeit["result"], forfeit["forfeit"], forfeit["game_id"]) == (4, "W", True, None)
+    assert len(page["results"]) == 3
+    assert [(u["week"], u["site"], u["opponent_id"]) for u in page["upcoming"]] == [(9, "home", "ps_A_3")]
+    assert page["next_game"] == page["upcoming"][0]
+    # Nothing a squad does not have.
+    for key in ("natl_rank", "conference", "conference_place", "streak"):
+        assert key not in page
+
+
+def test_team_page_adds_completed_tournament_games_and_survives_an_empty_squad():
+    from BackEnd.practice_squad.browse import team_page
+
+    extra = [{"home_team_id": "ps_A_3", "away_team_id": "ps_C_3", "home_score": 50, "away_score": 58,
+              "game_id": "t16", "status": "completed", "week": 16},
+             {"home_team_id": "ps_A_3", "away_team_id": "ps_B_3", "home_score": 50, "away_score": 58,
+              "game_id": "other", "status": "completed", "week": 16}]
+    page = team_page(_ps_state(), "ps_C_3", extra)
+    assert [(r["week"], r["result"], r["game_id"]) for r in page["results"]][-1] == (16, "W", "t16")
+    assert "other" not in [r["game_id"] for r in page["results"]]
+
+    # Scrubs sit off the standings table: a record of 0-0 and no place, not an error.
+    scrubs = team_page(_ps_state(), "ps_C_6")
+    assert scrubs["record"] == {"wins": 0, "losses": 0}
+    assert scrubs["tier_place"] is None
+    assert scrubs["results"] == [] and scrubs["upcoming"] == [] and scrubs["next_game"] is None
+    assert team_page(None, "ps_X_1")["name"] == "ps_X_1"
+
+
+@pytest.mark.parametrize("kind", ["mongo", "sqlite"])
+def test_team_route_sends_the_page_and_roster_rows_the_team_page_reads(kind, tmp_path, monkeypatch):
+    if kind == "mongo":
+        env = _mongomock_env(tmp_path)
+    else:
+        env = _mongomock_env(
+            tmp_path,
+            GOB_PERSISTENCE="sqlite",
+            GOB_SQLITE_PATH=str(tmp_path / "ps-team.sqlite"),
+        )
+    store = create_store(env)
+    franchise_id = _seed(store)
+    fid = str(franchise_id)
+    ps = store.franchises_collection.find_one({"_id": franchise_id})["practice_squad"]
+    ps["ps_season_stats_backfilled"] = True
+    ps["teams"]["ps_C_1"] = {
+        "display_name": "Region C All-Americans", "tier": 1, "region": "C",
+        "roster": [{"player_id": "p-1", "source": "fpd", "name": "Casey Lane"},
+                   {"player_id": "r-1", "source": "frd", "name": "Drew Park"}],
+    }
+    store.franchises_collection.update_one({"_id": franchise_id}, {"$set": {"practice_squad": ps}})
+    store.franchise_players_data_collection.insert_one({
+        "franchise_id": fid, "player_id": "p-1",
+        "meta": {"first_name": "Casey", "last_name": "Lane", "year": 1, "height": 76, "weight": 190},
+        "position_ratings": {"PG": 61, "SF": 70, "C": 50},
+        "attributes": {"SC": 50, "CH": 77},
+        "ps_season_stats": {"GP": 2, "PTS": 30, "FGM": 10, "FGA": 20},
+    })
+    store.franchise_recruits_data_collection.insert_one({
+        "franchise_id": fid, "recruit_id": "r-1", "name": "Drew Park",
+        "position_ratings": {"PG": 66}, "attributes": {"SC": 40},
+    })
+
+    import BackEnd.api.franchise_routes as routes
+    import BackEnd.utils.ownership as ownership
+
+    monkeypatch.setattr(routes, "db", store.db)
+    monkeypatch.setattr(ownership, "franchises_collection", store.franchises_collection)
+    monkeypatch.setattr(routes, "franchise_players_data_collection", store.franchise_players_data_collection)
+    monkeypatch.setattr(routes, "franchise_recruits_data_collection", store.franchise_recruits_data_collection)
+    monkeypatch.setattr(routes, "_format_team_name_map", lambda **_kwargs: {})
+
+    body = routes.get_practice_squad_team(fid, ps_team_id="ps_C_1", user={"user_id": "coach-1"})
+    page = body["page"]
+    assert page["name"] == "Region C All-Americans"
+    assert page["record"] == {"wins": 3, "losses": 1}
+    assert page["tier_place"] == "2nd of 5"
+    assert [(u["week"], u["site"], u["opponent_name"]) for u in page["upcoming"]] == [
+        (8, "home", "Region A All-Americans"),
+    ]
+    signed, recruit = body["players"]
+    # The roster grid's fields, and the season line in the Player Stats shape.
+    assert (signed["rt"], signed["position"], signed["source"]) == (70, "SF", "fpd")
+    # The projected five are the page's Starters, in slot order.
+    five = [str(row["player_id"]) for row in body["projected_starting_five"]]
+    assert five and all(p["starter"] == (p["player_id"] in five) for p in body["players"])
+    assert [p["lineup_order"] for p in body["players"] if p["starter"]] == [
+        five.index(p["player_id"]) for p in body["players"] if p["starter"]
+    ]
+    assert signed["totals"]["GP"] == 2 and signed["per_game"]["PTS"] == 15
+    assert signed["rates"]["fg_pct"] == 50
+    assert (recruit["rt"], recruit["position"], recruit["source"]) == (66, "PG", "frd")
+    assert recruit["totals"]["GP"] == 0 and recruit["per_game"]["PTS"] is None
+    # The keys the old page read are still there.
+    assert set(body) >= {"team", "players", "projected_starting_five", "page"}

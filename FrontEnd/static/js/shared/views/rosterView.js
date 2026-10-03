@@ -89,7 +89,11 @@ function portraitHtml(tables, player) {
   var letters = initials(displayName(player));
   var pid = idOf(player);
   var url = '';
-  if (pid && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function') {
+  if (player && player.portrait_source === 'recruit' && window.API_CONFIG
+      && typeof window.API_CONFIG.getRecruitImageUrl === 'function') {
+    // An unsigned recruit (a practice squad has them) has a recruit portrait, by image id.
+    url = window.API_CONFIG.getRecruitImageUrl(player.image_id, { size: 'card' });
+  } else if (pid && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function') {
     url = window.API_CONFIG.getPlayerImageUrl(pid, { size: 'card' });
   }
   if (!url) return tables.esc(letters);

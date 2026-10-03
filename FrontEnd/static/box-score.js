@@ -89,61 +89,6 @@ function resolveBannerTeamNameFromParams(bannerParam, homeName, awayName) {
   return b;
 }
 
-/** User franchise team display name for Phase B pulse overlay (same rules as header banner). */
-function resolveUserTeamNameForPhaseBPulse(urlParams) {
-  if (!gameData || !urlParams) return '';
-  const { homeTeam, awayTeam, homeTeamId, awayTeamId } = getTeamContext();
-  const homeCore = teamCoreName(homeTeam, 'Home Team');
-  const awayCore = teamCoreName(awayTeam, 'Away Team');
-  const homeLabel = teamDisplayLabel(homeTeam, 'Home Team');
-  const awayLabel = teamDisplayLabel(awayTeam, 'Away Team');
-  const bannerTeamParam = (urlParams.get('banner_team') || '').trim();
-  const myTeamParam = urlParams.get('my_team');
-  const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
-  let userTeamSide = null;
-  if (myTeamParam === 'home' || myTeamParam === 'away') {
-    userTeamSide = myTeamParam;
-  } else if (teamIdParam) {
-    userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeCore, awayCore, homeTeamId, awayTeamId);
-  }
-  if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
-    const fid = urlParams.get('franchise_id');
-    const stored =
-      fid && window.FranchiseLS
-        ? window.FranchiseLS.getLastGameUserTeamSide(fid)
-        : null;
-    if (stored === 'home' || stored === 'away') userTeamSide = stored;
-  }
-  if (bannerTeamParam) {
-    return resolveBannerTeamNameFromParams(bannerTeamParam, homeLabel, awayLabel)
-      || resolveBannerTeamNameFromParams(bannerTeamParam, homeCore, awayCore)
-      || '';
-  }
-  if (userTeamSide === 'away') return awayLabel;
-  if (userTeamSide === 'home') return homeLabel;
-  return '';
-}
-
-function resolveUserTeamSideForPhaseBPulse(urlParams) {
-  if (!gameData || !urlParams) return null;
-  const { homeTeam, awayTeam, homeTeamId, awayTeamId } = getTeamContext();
-  const homeCore = teamCoreName(homeTeam, 'Home Team');
-  const awayCore = teamCoreName(awayTeam, 'Away Team');
-  const myTeamParam = urlParams.get('my_team');
-  const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
-  if (myTeamParam === 'home' || myTeamParam === 'away') return myTeamParam;
-  if (teamIdParam) return mapTeamIdToSide(teamIdParam, gameData, homeCore, awayCore, homeTeamId, awayTeamId);
-  if (typeof localStorage !== 'undefined') {
-    const fid = urlParams.get('franchise_id');
-    const stored =
-      fid && window.FranchiseLS
-        ? window.FranchiseLS.getLastGameUserTeamSide(fid)
-        : null;
-    if (stored === 'home' || stored === 'away') return stored;
-  }
-  return null;
-}
-
 // A box score opened to read it (a schedule result, the Office "Box score" link, a news
 // headline, a bracket score) carries return_url. It is not a step of the game flow, so the
 // closed-game guard must leave it alone: that guard sends a finished game's flow pages
@@ -2360,26 +2305,12 @@ function setupLockerRoomButton() {
           if (fetchBody && String(fetchBody.franchise_id) === String(urlFranchiseId)) {
             cleanButton.disabled = true;
             const prevText = cleanButton.textContent;
-            const pulseTeamName = resolveUserTeamNameForPhaseBPulse(urlParams);
-            const overlayTitle = pulseTeamName || 'Your team';
             let usedStatusFallback = false;
+            let weekFinished = false;
+            // One loader from here to the drawn Office: the same spinner the next page
+            // shows while it loads, so the wait reads as a single screen.
             if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-              const userTeamSideForFeed = resolveUserTeamSideForPhaseBPulse(urlParams);
-              const statLines = window.PageLoadOverlay.buildPostgameStatFeed
-                ? window.PageLoadOverlay.buildPostgameStatFeed(gameData, {
-                    userTeamSide: userTeamSideForFeed === 'away' ? 'away' : 'home',
-                  })
-                : [];
-              window.PageLoadOverlay.show({
-                variant: 'pulse',
-                title: statLines.length ? '' : overlayTitle,
-                label: 'Simulating Computer Games',
-                subtitle: '',
-                statLines,
-                statIntervalMs: 8000,
-                teamName: pulseTeamName || '',
-                assetKey: 'banner_primary',
-              });
+              window.PageLoadOverlay.show();
             } else {
               cleanButton.textContent = 'Simulating computer games...';
               usedStatusFallback = true;
@@ -2394,6 +2325,7 @@ function setupLockerRoomButton() {
                 body: JSON.stringify(fetchBody),
               });
               if (res.ok) {
+                weekFinished = true;
                 if (window.FranchiseLS && urlFranchiseId) {
                   window.FranchiseLS.clearPendingAndEog(urlFranchiseId);
                 }
@@ -2403,7 +2335,9 @@ function setupLockerRoomButton() {
                 return;
               }
             } finally {
-              if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+              // On success the spinner stays up through the navigation below; it comes
+              // down only when the week did not finish and the user stays on this page.
+              if (!weekFinished && window.PageLoadOverlay && window.PageLoadOverlay.hide) {
                 window.PageLoadOverlay.hide();
               }
               if (usedStatusFallback) {

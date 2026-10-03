@@ -16,9 +16,9 @@
     milestone_first_bracket: { letter: 'B', label: 'First bracket' },
     milestone_first_archetype: { letter: 'A', label: 'First coach archetype' }
   };
-  // A player's honour, at team level: the entry carries the player (detail), the program
+  // A player's honor, at team level: the entry carries the player (detail), the program
   // and the season. Drawn like the milestones: neutral medal, nothing new in colour.
-  var HONOUR_KINDS = {
+  var HONOR_KINDS = {
     all_american_1: { letter: 'A', label: '1st Team All-American' },
     all_american_2: { letter: 'A', label: '2nd Team All-American' },
     all_american_3: { letter: 'A', label: '3rd Team All-American' },
@@ -122,20 +122,20 @@
   }
 
   /** Newest season first, then All-American before All-Conference, first team first. */
-  function honourOrder(a, b) {
+  function honorOrder(a, b) {
     var season = (Number(b.season) || 0) - (Number(a.season) || 0);
     if (season) return season;
-    var kinds = Object.keys(HONOUR_KINDS);
+    var kinds = Object.keys(HONOR_KINDS);
     return kinds.indexOf(a.kind) - kinds.indexOf(b.kind);
   }
 
-  // Honours only when there are any: no empty state, no section head.
-  function honoursShelf(honours) {
-    if (!honours.length) return '';
-    var html = '<div class="sec"><div class="sec-h"><h3>Honours</h3><span>' + honours.length + '</span></div></div>'
+  // Honors only when there are any: no empty state, no section head.
+  function honorsShelf(honors) {
+    if (!honors.length) return '';
+    var html = '<div class="sec"><div class="sec-h"><h3>Honors</h3><span>' + honors.length + '</span></div></div>'
       + '<div class="shelf">';
-    html += honours.slice().sort(honourOrder).map(function (t) {
-      var spec = HONOUR_KINDS[t.kind];
+    html += honors.slice().sort(honorOrder).map(function (t) {
+      var spec = HONOR_KINDS[t.kind];
       var d = t.detail && typeof t.detail === 'object' ? t.detail : {};
       var sub = [d.player_name, d.position, t.team_name, t.season != null ? 'Season ' + t.season : '']
         .filter(Boolean).join(' · ');
@@ -238,7 +238,7 @@
     var programsN = Number(career.programs) || 0;
     var titles = trophiesOf(TITLE_KINDS);
     var miles = trophiesOf(MILESTONE_KINDS);
-    var honours = trophiesOf(HONOUR_KINDS);
+    var honors = trophiesOf(HONOR_KINDS);
     var rows = reviewRows();
     root.innerHTML = '<div class="hb">' + topBarHtml(career)
       + '<main class="tc">'
@@ -252,7 +252,7 @@
       + '<div class="sec"><div class="sec-h"><h3>Titles</h3>'
       + (titles.length ? '<span>' + titles.length + '</span>' : '') + '</div></div>'
       + titlesShelf(titles)
-      + honoursShelf(honours)
+      + honorsShelf(honors)
       + '<div class="sec"><div class="sec-h"><h3>Milestones</h3>'
       + (miles.length ? '<span>' + miles.length + '</span>' : '') + '</div></div>'
       + milestoneShelf(miles)

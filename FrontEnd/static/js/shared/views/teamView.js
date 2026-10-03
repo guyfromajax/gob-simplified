@@ -3,6 +3,11 @@
  * Roster sits above Schedule. The roster card is the full Roster grid (all twelve
  * attributes, in pairs) with an Attributes / Stats switch; Stats is the Player Stats
  * grid for that team, from GET /franchise/player-stats.
+ *
+ * A practice squad (`ps_team_id`) is the same page from GET /franchise/practice-squad/team,
+ * which sends the squad in these shapes. What a squad has no data for is left out: no
+ * national rank, conference or streak, no Dev focus column, no Scout link;
+ * the Stats switch and the Schedule card show only once there is something in them.
  */
 
 import { barHtml, bindPager, bindUp, query, readPager, stampOrigin, withParams } from './detailBar.js';
@@ -27,10 +32,11 @@ function opponentHtml(tables, row, href) {
   return '<a class="gob-team" data-gob-drill href="' + tables.esc(href) + '">' + mark + '<span>' + tables.esc(name) + '</span></a>';
 }
 
-function teamHref(id, up) {
+function teamHref(id, up, squad) {
   return withParams({
     tab: 'team-view',
-    view_team_id: id,
+    view_team_id: squad ? '' : id,
+    ps_team_id: squad ? id : '',
     player_id: '',
     pager: '',
     up: up || ''
@@ -54,8 +60,47 @@ export function mount(container, ctx) {
   var loaded = false;
   var requestId = 0;
 
+  function squadId() {
+    return query().get('ps_team_id') || '';
+  }
+
+  function isSquad() {
+    return !!squadId();
+  }
+
   function viewedId() {
-    return query().get('view_team_id') || query().get('roster_team_id') || userId;
+    return squadId() || query().get('view_team_id') || query().get('roster_team_id') || userId;
+  }
+
+  function squadUrl() {
+    return tables.apiBase('/franchise/practice-squad/team')
+      + '?franchise_id=' + encodeURIComponent(franchiseId)
+      + '&ps_team_id=' + encodeURIComponent(squadId());
+  }
+
+  /** The squad has season lines once any of its players has played a game. */
+  function squadHasStats() {
+    return ((roster && roster.players) || []).some(function (player) {
+      return Number(player && player.totals && player.totals.GP) > 0;
+    });
+  }
+
+  /** Attributes or Stats; a squad with no games yet has only Attributes. */
+  function shownMode() {
+    if (isSquad() && !squadHasStats()) return 'attributes';
+    return mode;
+  }
+
+  /** Detail and roster for the viewed team, as [detail, roster]. `how` is get or revalidate. */
+  function read(how) {
+    var store = ctx && ctx.store;
+    if (isSquad()) {
+      return store[how](squadUrl()).then(function (body) {
+        if (!body) return null;
+        return [body.page || {}, { players: body.players || [], is_user_team: false }];
+      });
+    }
+    return Promise.all([store[how](detailUrl()), store[how](rosterUrl())]);
   }
 
   function detailUrl() {
@@ -87,29 +132,39 @@ export function mount(container, ctx) {
 
   function playerHref(player) {
     var id = String((player && (player._id || player.player_id || player.id)) || '');
+    // A squad's unsigned recruit has no player page; it has the recruit page.
+    if (player && player.source === 'frd') {
+      return '/player-detail.html?recruit_id=' + encodeURIComponent(id)
+        + '&franchise_id=' + encodeURIComponent(franchiseId)
+        + '&return_url=' + encodeURIComponent(window.location.pathname + '?' + query().toString());
+    }
     return withParams({
       tab: 'player-view',
       player_id: id,
       pager: 'roster',
       up: (team && team.name) || 'Team',
-      view_team_id: ''
+      view_team_id: '',
+      ps_team_id: ''
     });
   }
 
   function boxHref(gameId) {
     return '/box-score.html?game_id=' + encodeURIComponent(gameId)
-      + '&mode=franchise&franchise_id=' + encodeURIComponent(franchiseId)
+      + '&mode=' + (isSquad() ? 'practice_squad' : 'franchise')
+      + '&franchise_id=' + encodeURIComponent(franchiseId)
       + '&team_id=' + encodeURIComponent(userId);
   }
 
   function scheduleRow(row, result) {
-    var href = row.opponent_id ? teamHref(row.opponent_id, (team && team.name) || 'Team') : '';
+    var href = row.opponent_id ? teamHref(row.opponent_id, (team && team.name) || 'Team', isSquad()) : '';
     var site = siteWord(row.site);
     var html = '<div class="gob-sch"><span class="gob-sch-w">' + tables.esc(row.week == null ? '' : 'Wk ' + row.week) + '</span>'
       + '<span class="gob-sch-opp">' + tables.esc(site) + ' ' + opponentHtml(tables, row, href) + '</span>';
     if (result) {
       var letter = row.result || '';
-      var score = (row.team_score == null ? '' : row.team_score) + '–' + (row.opp_score == null ? '' : row.opp_score);
+      var score = row.forfeit
+        ? 'Forfeit'
+        : (row.team_score == null ? '' : row.team_score) + '–' + (row.opp_score == null ? '' : row.opp_score);
       var cls = 'gob-sch-res' + (letter === 'L' ? ' is-loss' : '');
       var text = tables.esc((letter ? letter + ' ' : '') + score);
       // A result with a stored game opens its box score. `data-return`: GOBNav adds
@@ -154,11 +209,14 @@ export function mount(container, ctx) {
   }
 
   function statsPlayerHref(id) {
-    return playerHref({ player_id: id });
+    var match = ((roster && roster.players) || []).filter(function (player) {
+      return String((player && player.player_id) || '') === String(id);
+    })[0];
+    return playerHref(match && match.source ? match : { player_id: id });
   }
 
   function rosterBodyHtml() {
-    if (mode !== 'stats') {
+    if (shownMode() !== 'stats') {
       var userTeam = !!(roster && roster.is_user_team);
       return rosterTableHtml(tables, rosterRows(), {
         sortKey: rosterSort.key,
@@ -195,7 +253,12 @@ export function mount(container, ctx) {
     var record = body.record || {};
     var pager = readPager(body.team_id || viewedId());
     var color = body.primary_color || '';
-    var conf = [body.conference ? body.conference + ' Conference' : '', body.region ? 'Region ' + body.region : ''].filter(Boolean).join(' · ');
+    var squad = isSquad();
+    var conf = squad
+      ? ['Practice Squad', body.tier_label || ''].filter(Boolean).join(' · ')
+      : [body.conference ? body.conference + ' Conference' : '', body.region ? 'Region ' + body.region : ''].filter(Boolean).join(' · ');
+    var results = body.results || [];
+    var upcoming = body.upcoming || [];
     var wins = record.wins == null ? '—' : record.wins;
     var losses = record.losses == null ? '—' : record.losses;
     var place = body.conference_place || '—';
@@ -212,21 +275,30 @@ export function mount(container, ctx) {
       + (nextLine(body.next_game) ? '<div class="gob-hero-bio">' + tables.esc(nextLine(body.next_game)) + '</div>' : '')
       + (scout ? '<div class="gob-hero-act"><a class="gob-scout" data-gob-drill href="' + tables.esc(scout) + '">Scout them</a></div>' : '')
       + '</div><div class="gob-hero-stats"><div class="gob-hs">'
-      + '<div><b>' + tables.esc(wins + '–' + losses) + '</b><span>Record</span></div>'
-      + '<div><b>' + tables.esc(rank) + '</b><span>National</span></div>'
-      + '<div><b>' + tables.esc(place) + '</b><span>Conference</span></div>'
-      + '<div><b>' + tables.esc(streak) + '</b><span>Streak</span></div>'
-      + '</div></div></section>';
+      + '<div><b>' + tables.esc(wins + '–' + losses) + '</b><span>Record</span></div>';
+    if (squad) {
+      // A squad has a record and a place in its tier table; nothing else.
+      if (body.tier_place) html += '<div><b>' + tables.esc(body.tier_place) + '</b><span>Standing</span></div>';
+    } else {
+      html += '<div><b>' + tables.esc(rank) + '</b><span>National</span></div>'
+        + '<div><b>' + tables.esc(place) + '</b><span>Conference</span></div>'
+        + '<div><b>' + tables.esc(streak) + '</b><span>Streak</span></div>';
+    }
+    html += '</div></div></section>';
     html += '<div class="gob-dt-stack"><section class="gob-tcard gob-team-roster">'
       + '<div class="gob-card-head"><h2>Roster<em>' + count + ' players</em></h2>'
-      + '<div class="gob-team-mode" aria-label="Roster shows">' + tables.segment(MODES, mode) + '</div></div>'
-      + '<div class="gob-team-roster-body">' + rosterBodyHtml() + '</div>'
-      + '</section><section class="gob-tcard gob-team-sched"><div class="gob-card-head"><h2>Schedule</h2></div>'
-      + '<div class="gob-sch-split"><div><h3 class="gob-sub">Results</h3>'
-      + scheduleList(body.results || [], true, 'No results yet')
-      + '</div><div><h3 class="gob-sub">Upcoming</h3>'
-      + scheduleList(body.upcoming || [], false, 'No games ahead')
-      + '</div></div></section></div>';
+      + (squad && !squadHasStats() ? ''
+        : '<div class="gob-team-mode" aria-label="Roster shows">' + tables.segment(MODES, shownMode()) + '</div>')
+      + '</div><div class="gob-team-roster-body">' + rosterBodyHtml() + '</div></section>';
+    if (!squad || results.length || upcoming.length) {
+      html += '<section class="gob-tcard gob-team-sched"><div class="gob-card-head"><h2>Schedule</h2></div>'
+        + '<div class="gob-sch-split"><div><h3 class="gob-sub">Results</h3>'
+        + scheduleList(results, true, 'No results yet')
+        + '</div><div><h3 class="gob-sub">Upcoming</h3>'
+        + scheduleList(upcoming, false, 'No games ahead')
+        + '</div></div></section>';
+    }
+    html += '</div>';
     container.innerHTML = html;
     bindUp(container);
     bindPager(container, function (id) {
@@ -257,7 +329,7 @@ export function mount(container, ctx) {
       });
     });
     bindRoster();
-    if (mode === 'stats') loadStats();
+    if (shownMode() === 'stats') loadStats();
   }
 
   /** Repaints the roster card body only, so a sort or a switch leaves the page still. */
@@ -278,16 +350,16 @@ export function mount(container, ctx) {
     host.querySelectorAll('th.s').forEach(function (th) {
       th.addEventListener('click', function () {
         var key = th.getAttribute('data-sort');
-        var sort = mode === 'stats' ? statsSort : rosterSort;
+        var sort = shownMode() === 'stats' ? statsSort : rosterSort;
         if (sort.key === key) sort.dir = -sort.dir;
         else {
           sort.key = key;
-          sort.dir = mode === 'stats' ? (key === 'name' ? 1 : -1) : rosterSortDir(key);
+          sort.dir = shownMode() === 'stats' ? (key === 'name' ? 1 : -1) : rosterSortDir(key);
         }
         paintRoster();
       });
     });
-    var order = mode === 'stats'
+    var order = shownMode() === 'stats'
       ? statsRows().map(function (row) { return String(row.player_id || ''); })
       : rosterRows().map(function (player) { return String((player && (player._id || player.player_id || player.id)) || ''); });
     host.querySelectorAll('a.gob-player').forEach(function (link) {
@@ -295,6 +367,8 @@ export function mount(container, ctx) {
         try { sessionStorage.setItem('gob-view-roster-order', JSON.stringify(order)); }
         catch (err) { /* pager reads it later */ }
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        // A recruit's page is its own document, not a view in this shell.
+        if (/^\/player-detail\.html/.test(link.getAttribute('href') || '')) return;
         event.preventDefault();
         if (window.GOBViews && typeof window.GOBViews.open === 'function') {
           window.GOBViews.open(link.getAttribute('href'), 'push');
@@ -310,6 +384,8 @@ export function mount(container, ctx) {
   function loadStats(force) {
     var store = ctx && ctx.store;
     var id = viewedId();
+    // A squad's season lines arrive with its roster.
+    if (isSquad()) return;
     if (!store || typeof store.get !== 'function' || !franchiseId || !id) return;
     if (!force && statsFor === id && (stats || !statsFailed)) return;
     statsFor = id;
@@ -340,6 +416,12 @@ export function mount(container, ctx) {
     }
     team = nextTeam;
     roster = nextRoster;
+    if (isSquad()) {
+      // A squad's season lines arrive with its roster.
+      stats = { players: nextRoster.players || [] };
+      statsFor = viewedId();
+      statsFailed = false;
+    }
     loaded = true;
     render();
   }
@@ -352,8 +434,9 @@ export function mount(container, ctx) {
     }
     if (!loaded) showSkeleton();
     var token = ++requestId;
-    Promise.all([store.get(detailUrl()), store.get(rosterUrl())]).then(function (pair) {
+    read('get').then(function (pair) {
       if (token !== requestId) return;
+      if (!pair) throw new Error('no team');
       apply(pair[0] || {}, pair[1] || { players: [] });
     }).catch(function () {
       if (token !== requestId) return;
@@ -376,8 +459,8 @@ export function mount(container, ctx) {
       return;
     }
     var token = ++requestId;
-    Promise.all([store.revalidate(detailUrl()), store.revalidate(rosterUrl())]).then(function (pair) {
-      if (token !== requestId) return;
+    read('revalidate').then(function (pair) {
+      if (token !== requestId || !pair) return;
       apply(pair[0] || team, pair[1] || roster);
     }).catch(function () { /* keep the mounted page */ });
   }

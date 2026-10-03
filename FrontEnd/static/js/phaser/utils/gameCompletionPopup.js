@@ -995,22 +995,10 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
         try {
           popup.remove();
         } catch (_) {}
-        const pulseTeamName = userTeamName || '';
-        const overlayTitle = pulseTeamName || 'Your team';
-        const statLines = window.PageLoadOverlay && window.PageLoadOverlay.buildPostgameStatFeed
-          ? window.PageLoadOverlay.buildPostgameStatFeed(resolvedGameDoc, { userTeamSide: resolvedUserTeamSide })
-          : [];
+        // One loader from here to the drawn Office: the same spinner the next page
+        // shows while it loads, so the wait reads as a single screen.
         if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-          window.PageLoadOverlay.show({
-            variant: 'pulse',
-            title: statLines.length ? '' : overlayTitle,
-            label: 'Simulating Computer Games',
-            subtitle: '',
-            statLines,
-            statIntervalMs: 8000,
-            teamName: pulseTeamName,
-            assetKey: 'banner_primary',
-          });
+          window.PageLoadOverlay.show();
         }
         const res = await getOrStartFranchisePhaseB(franchisePhaseBPending);
         if (res.ok) {
@@ -1035,7 +1023,8 @@ export async function showGameCompletionPopup({ gameId, mode, franchiseId, teamI
         console.error('[gameCompletionPopup] phase-b error before FCC navigation:', err);
         alert('Could not finish the week (computer games). Try again.');
       } finally {
-        if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
+        // On success the spinner stays up through the navigation below.
+        if (!okToNavigate && window.PageLoadOverlay && window.PageLoadOverlay.hide) {
           window.PageLoadOverlay.hide();
         }
       }

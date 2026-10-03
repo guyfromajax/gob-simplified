@@ -211,7 +211,8 @@ const DRILL_INS = [
   ['a player page opened from the Office', HUB + '&tab=player-view&player_id=p1&return_tab=home-tab&origin=office', '#player-view', 'office'],
   ['a news story', storyUrl(UPSETS.with_games.story_id), '#news-view .gob-news-story', 'news'],
   ['a box score opened to read', '/box-score.html?game_id=' + GAME.game_id + '&mode=franchise&' + IDENTITY + '&return_url=' + RETURN, '#home-player-stats-body tr', 'league'],
-  ['a practice-squad roster page', '/team-roster-view.html?mode=practice_squad&ps_team_id=x&' + IDENTITY, '.rail [data-gob-section]', 'team'],
+  // An old practice-squad roster link: it lands on the standard team page, under League.
+  ['a practice-squad team page', '/team-roster-view.html?mode=practice_squad&ps_team_id=x&' + IDENTITY, '#team-view.tab-content.active', 'league'],
 ];
 
 for (const [name, url, ready, lit] of DRILL_INS) {
@@ -229,7 +230,7 @@ for (const [name, url, ready, lit] of DRILL_INS) {
       await expect(page.locator('.rail [data-gob-section="' + section + '"]')).toHaveClass(/\bon\b/);
       // It is the section itself: no team, player or story rides along.
       const q = new URL(page.url()).searchParams;
-      ['view_team_id', 'player_id', 'story', 'return_tab', 'origin'].forEach((key) => {
+      ['view_team_id', 'ps_team_id', 'player_id', 'story', 'return_tab', 'origin'].forEach((key) => {
         expect(q.get(key), key + ' after ' + section + ' from ' + name).toBeNull();
       });
       if (section === 'news') await expect(page.locator('#news-view.active .gob-news')).toBeVisible();

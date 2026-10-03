@@ -4,9 +4,15 @@
   <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
-      if (params.get('mode') === 'practice_squad' && params.get('ps_team_id')) return;
       var viewed = params.get('roster_team_id') || '';
-      if (viewed) {
+      if (params.get('mode') === 'practice_squad' && params.get('ps_team_id')) {
+        // A practice squad opens on the standard team page, under League.
+        params.set('tab', 'team-view');
+        params.set('origin', 'league');
+        params.set('return_tab', 'practice-squad-view');
+        params.delete('mode');
+        params.delete('return_url');
+      } else if (viewed) {
         params.set('tab', 'team-view');
         params.set('view_team_id', viewed);
         if (!params.get('origin')) {
